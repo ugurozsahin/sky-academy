@@ -1,0 +1,147 @@
+// Mission / endless session controller. Pure game logic (no DOM) so it can be unit-tested.
+import type { Difficulty, Question, Topic, YearInfo } from '../curriculum';
+
+export type Mode = 'mission' | 'endless';
+export interface SessionEvents {
+  onQuestion: (q: Question, info: { stage: number; index: number; total: number; speed: number; labels: string[] }) => void;
+  onCorrect: (q: Question, points: number, combo: number) => void;
+  onWrong: (q: Question, hitLabel: string) => void;
+  onMiss: (q: Question) => void;                        // correct bubble fell / sequence not finished
+  onProgress: (label: string, done: number, total: number) => void;   // sequence step
+  onLives: (lives: number) => void;
+  onStageClear: (stage: number, stars: number, accuracy: number) => void;
+  onEnd: (r: SessionResult) => void;
+}
+export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number }
+export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; rng?: () => number; stages?: number }
+
+export class Session {
+  stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
+  correct = 0; attempts = 0; stageCorrect = 0; stageAttempts = 0; stageStars: number[] = [];
+  current: Question | null = null; seqIndex = 0; waiting = false; ended = false; questionsAsked = 0;
+  private rng: () => number; readonly stages: number;
+  constructor(public o: SessionOpts, private ev: SessionEvents) {
+    this.lives = o.year.lives; this.rng = o.rng ?? Math.random; this.stages = o.stages ?? o.year.speeds.length;
+  }
+  get perStage() { return this.o.year.perStage; }
+  get difficulty(): Difficulty {
+    if (this.o.mode === 'mission') return this.o.year.diffs[Math.min(this.stage, this.o.year.diffs.length) - 1] ?? 3;
+    return this.questionsAsked < 8 ? 1 : this.questionsAsked < 20 ? 2 : 3;
+  }
+  get speed() {
+    const gentle = this.o.year.gentle;
+    if (this.o.mode === 'mission') { const s = this.o.year.speeds[Math.min(this.stage, this.o.year.speeds.length) - 1] ?? 3; return this.current?.sequence ? Math.max(1, s - 1) : s; }
+    const s = this.questionsAsked < 10 ? 1 : this.questionsAsked < 25 ? 2 : 3;
+    return gentle ? Math.min(2, s) : s;
+  }
+  /** Player hit a bomb / trap bubble: costs a life but the question continues. */
+  bomb() {
+    if (this.ended || this.waiting) return;
+    this.combo = 0; this.loseLife();
+  }
+  private pickTopic(): Topic {
+    if (this.o.topic) return this.o.topic;
+    const pool = this.o.pool!; return pool[Math.floor(this.rng() * pool.length)];
+  }
+  start() { this.nextQuestion(); }
+
+  /** Bubble labels for the current question (sequence letters incl. duplicates + decoys). */
+  labelsFor(q: Question): string[] {
+    if (!q.sequence) return q.options;
+    const decoys = q.options.filter(o => !q.sequence!.includes(o));
+    return [...q.sequence.slice(this.seqIndex), ...decoys].sort(() => this.rng() - 0.5);
+  }
+  nextQuestion() {
+    if (this.ended) return;
+    const topic = this.pickTopic();
+    let q = topic.gen(this.difficulty, this.rng);
+    // avoid immediate repeats
+    for (let i = 0; i < 5 && this.current && q.prompt === this.current.prompt && q.answer === this.current.answer; i++) q = topic.gen(this.difficulty, this.rng);
+    this.current = q; this.seqIndex = 0; this.waiting = false; this.questionsAsked++;
+    this.ev.onQuestion(q, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(q) });
+  }
+  /** Re-launch the remaining letters of a spelling sequence. */
+  respawn() { if (this.current) this.ev.onQuestion(this.current, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(this.current) }); }
+
+  /** Player hit a bubble. Returns 'correct' | 'wrong' | 'step' | 'ignored'. */
+  hit(label: string): 'correct' | 'wrong' | 'step' | 'ignored' {
+    const q = this.current; if (!q || this.waiting || this.ended) return 'ignored';
+    if (q.sequence) {
+      const target = q.sequence[this.seqIndex];
+      if (label === target) {
+        this.seqIndex++; this.ev.onProgress(label, this.seqIndex, q.sequence.length);
+        if (this.seqIndex >= q.sequence.length) { this.markCorrect(); return 'correct'; }
+        return 'step';
+      }
+      this.markWrong(label); return 'wrong';
+    }
+    if (label === q.answer) { this.markCorrect(); return 'correct'; }
+    this.markWrong(label); return 'wrong';
+  }
+  /** A bubble fell off-screen without being hit. */
+  fall(label: string) {
+    const q = this.current; if (!q || this.waiting || this.ended) return;
+    const isTarget = q.sequence ? label === q.sequence[this.seqIndex] : label === q.answer;
+    if (!isTarget) return;
+    this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0;
+    this.ev.onMiss(q);
+    if (!this.o.year.gentle) this.loseLife();
+  }
+  /** Wave finished (all bubbles gone). Decide what happens next. */
+  waveEnd() {
+    if (this.ended) return;
+    if (!this.waiting) { // nothing decided (e.g. only decoys fell) – for sequences relaunch remaining letters
+      if (this.current?.sequence) { this.respawn(); return; }
+      this.waiting = true; this.attempts++; this.stageAttempts++; this.ev.onMiss(this.current!); if (!this.o.year.gentle) this.loseLife(); if (this.ended) return;
+    }
+    this.advance();
+  }
+  private markCorrect() {
+    const q = this.current!; this.waiting = true;
+    this.attempts++; this.correct++; this.stageAttempts++; this.stageCorrect++;
+    this.combo++; this.bestCombo = Math.max(this.bestCombo, this.combo);
+    const base = this.o.mode === 'mission' ? 10 * this.stage : 10 + Math.min(20, Math.floor(this.questionsAsked / 5) * 5);
+    const points = base + (this.combo >= 3 ? Math.min(20, this.combo * 2) : 0);
+    this.score += points;
+    this.ev.onCorrect(q, points, this.combo);
+  }
+  private markWrong(label: string) {
+    const q = this.current!; this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0;
+    this.ev.onWrong(q, label);
+    this.loseLife();
+  }
+  private loseLife() {
+    this.lives = Math.max(0, this.lives - 1); this.ev.onLives(this.lives);
+    if (this.lives === 0) this.end(false);
+  }
+  /** Called by the UI after feedback delay to move on. */
+  advance() {
+    if (this.ended) return;
+    if (this.o.mode === 'endless') { this.nextQuestion(); return; }
+    this.index++;
+    if (this.index >= this.perStage) {
+      const acc = this.stageAttempts ? this.stageCorrect / this.stageAttempts : 0;
+      const stars = acc >= 0.95 ? 3 : acc >= 0.7 ? 2 : 1;
+      this.stageStars.push(stars);
+      this.ev.onStageClear(this.stage, stars, acc);
+      return; // UI calls nextStage()
+    }
+    this.nextQuestion();
+  }
+  nextStage() {
+    if (this.stage >= this.stages) { this.end(true); return; }
+    this.stage++; this.index = 0; this.stageCorrect = 0; this.stageAttempts = 0;
+    if (this.o.year.gentle) this.lives = this.o.year.lives; else this.lives = Math.min(this.o.year.lives, this.lives + 1); // small top-up between stages
+    this.ev.onLives(this.lives);
+    this.nextQuestion();
+  }
+  end(won: boolean) {
+    if (this.ended) return;
+    this.ended = true;
+    const total = this.stageStars.reduce((s, x) => s + x, 0);
+    const stars = this.o.mode === 'mission' ? (won ? Math.max(1, Math.round(total / this.stages)) : 0) : (this.score >= 300 ? 3 : this.score >= 150 ? 2 : this.score >= 50 ? 1 : 0);
+    // Ninja coins: 1 per correct answer, +5 per stage star, +20 for a completed mission, endless: score/10
+    const coins = this.correct + total * 5 + (won && this.o.mode === 'mission' ? 20 : 0) + (this.o.mode === 'endless' ? Math.floor(this.score / 10) : 0);
+    this.ev.onEnd({ mode: this.o.mode, won, score: this.score, stars, stageStars: this.stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins });
+  }
+}
