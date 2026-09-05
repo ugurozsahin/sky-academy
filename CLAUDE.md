@@ -21,3 +21,4 @@ Vite + vanilla TypeScript (no framework), canvas arena, DOM HUD, localStorage. V
 - Don't add dependencies without reason; no external assets except Google Fonts (Fredoka) and `public/avatars`.
 - Keep files small; prefer editing existing modules over new abstractions. Run `npm test` after logic changes, `npm run test:e2e` after UI changes.
 - Backlog lives in `BACKLOG.md` — the owner prioritises it; don't reorder it yourself.
+- Env note: on the Mac-side Linux VM used by scheduled runs, Playwright browsers cannot be downloaded (network allowlist) — run unit tests + tsc there; e2e runs in cloud sessions.
