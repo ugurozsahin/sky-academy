@@ -1,5 +1,5 @@
 // Writing / English topics: EYFS Literacy ELGs, Y1–Y2 spelling (NC English Appendix 1), punctuation & grammar.
-import type { Generator, Rng, Topic } from './types';
+import type { Generator, Question, Rng, Topic } from './types';
 import { ri, pick, shuffle, wordQ } from './util';
 
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
@@ -9,6 +9,49 @@ const VOWELS = ['a', 'e', 'i', 'o', 'u'];
 const CVC: [string, string][] = [['cat', '🐱'], ['dog', '🐶'], ['sun', '☀️'], ['bus', '🚌'], ['hat', '🎩'], ['pig', '🐷'], ['cup', '☕'], ['bed', '🛏️'], ['fox', '🦊'], ['bag', '👜'], ['pen', '🖊️'], ['egg', '🥚'], ['hen', '🐔'], ['box', '📦'], ['jam', '🍯'], ['map', '🗺️'], ['bat', '🦇'], ['web', '🕸️'], ['cow', '🐮'], ['leg', '🦵'], ['bug', '🐛'], ['van', '🚐'], ['mug', '🍺'], ['net', '🥅'], ['zip', '🤐'], ['log', '🪵']];
 const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['moth', 'th', '🦋'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['coin', 'oi', '🪙'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
 const DIGRAPHS = ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh', 'qu', 'ck'];
+
+/**
+ * Sound Hunt bank: [grapheme, phoneme family, where the sound sits in the words, keyword words].
+ * Phase 2/3 (Reception) and phase 5 (Year 1) follow the Letters and Sounds / Little Wandle order.
+ * The phoneme family keeps sound-alike graphemes (c/k, ai/ay/a-e, ee/ea …) out of each other's bubbles: by ear they are the same sound.
+ */
+export type Sound = [string, string, 'start' | 'middle' | 'end', string[]];
+export const PHASE2: Sound[] = [
+  ['s', 's', 'start', ['sun', 'sock', 'sad', 'sit']], ['a', 'a', 'start', ['apple', 'ant', 'add', 'axe']], ['t', 't', 'start', ['tap', 'tin', 'top', 'ten']], ['p', 'p', 'start', ['pan', 'pig', 'pen', 'pot']],
+  ['i', 'i', 'start', ['ink', 'insect', 'igloo', 'it']], ['n', 'n', 'start', ['net', 'nap', 'nut', 'nod']], ['m', 'm', 'start', ['man', 'map', 'mud', 'mop']], ['d', 'd', 'start', ['dog', 'dig', 'dad', 'duck']],
+  ['g', 'g', 'start', ['goat', 'gap', 'get', 'gum']], ['o', 'o', 'start', ['on', 'orange', 'octopus', 'off']], ['c', 'k', 'start', ['cat', 'cup', 'cot', 'can']], ['k', 'k', 'start', ['kit', 'kick', 'kid', 'king']],
+  ['e', 'e', 'start', ['egg', 'elbow', 'end', 'elephant']], ['u', 'u', 'start', ['up', 'umbrella', 'under', 'us']], ['r', 'r', 'start', ['rat', 'run', 'red', 'rug']],
+];
+export const PHASE2B: Sound[] = [   // the remaining single-letter sounds (phase 2 set 5, phase 3 letters)
+  ['h', 'h', 'start', ['hat', 'hen', 'hop', 'hug']], ['b', 'b', 'start', ['bat', 'bed', 'bus', 'big']], ['f', 'f', 'start', ['fan', 'fox', 'fin', 'fun']], ['l', 'l', 'start', ['leg', 'lip', 'log', 'lot']],
+  ['j', 'j', 'start', ['jam', 'jet', 'jug', 'jog']], ['v', 'v', 'start', ['van', 'vet', 'vest', 'visit']], ['w', 'w', 'start', ['wet', 'web', 'win', 'wig']], ['x', 'ks', 'end', ['fox', 'box', 'six', 'mix']],
+  ['y', 'y', 'start', ['yes', 'yak', 'yum', 'yell']], ['z', 'z', 'start', ['zip', 'zebra', 'zoo', 'zoom']], ['qu', 'kw', 'start', ['queen', 'quick', 'quilt', 'quiz']],
+];
+export const PHASE3: Sound[] = [
+  ['ch', 'ch', 'start', ['chip', 'chop', 'chin', 'chick']], ['sh', 'sh', 'start', ['ship', 'shop', 'shell', 'shut']], ['th', 'th', 'start', ['thin', 'thick', 'think', 'thumb']], ['ng', 'ng', 'end', ['ring', 'king', 'song', 'long']],
+  ['ai', 'ai', 'middle', ['rain', 'tail', 'paint', 'snail']], ['ee', 'ee', 'middle', ['feet', 'sheep', 'green', 'keep']], ['igh', 'igh', 'middle', ['night', 'light', 'fight', 'tight']], ['oa', 'oa', 'middle', ['boat', 'goat', 'coat', 'road']],
+  ['oo', 'oo', 'middle', ['moon', 'spoon', 'food', 'boot']], ['ar', 'ar', 'middle', ['park', 'farm', 'card', 'dark']], ['or', 'or', 'middle', ['fork', 'corn', 'storm', 'sort']], ['ur', 'ur', 'middle', ['burn', 'turn', 'hurt', 'curl']],
+  ['ow', 'ow', 'end', ['cow', 'how', 'now', 'wow']], ['oi', 'oi', 'middle', ['coin', 'boil', 'join', 'soil']], ['ear', 'ear', 'end', ['near', 'dear', 'fear', 'hear']], ['air', 'air', 'end', ['hair', 'fair', 'chair', 'pair']], ['er', 'ur', 'end', ['hammer', 'ladder', 'letter', 'dinner']],
+];
+export const PHASE5: Sound[] = [
+  ['ay', 'ai', 'end', ['day', 'play', 'say', 'tray']], ['ou', 'ow', 'middle', ['out', 'cloud', 'shout', 'loud']], ['ie', 'igh', 'end', ['pie', 'tie', 'lie', 'die']], ['ea', 'ee', 'middle', ['leaf', 'beach', 'meat', 'seat']],
+  ['oy', 'oi', 'end', ['boy', 'toy', 'joy', 'enjoy']], ['ir', 'ur', 'middle', ['girl', 'bird', 'shirt', 'dirt']], ['ue', 'oo', 'end', ['blue', 'glue', 'clue', 'true']], ['aw', 'or', 'end', ['saw', 'paw', 'claw', 'draw']],
+  ['wh', 'w', 'start', ['when', 'whale', 'wheel', 'whisk']], ['ph', 'f', 'start', ['phone', 'photo', 'phonics', 'phrase']], ['ew', 'oo', 'end', ['new', 'chew', 'few', 'grew']], ['oe', 'oa', 'end', ['toe', 'hoe', 'tiptoe', 'doe']], ['au', 'or', 'start', ['autumn', 'August', 'author', 'auburn']],
+];
+export const SPLIT: Sound[] = [   // split digraphs (phase 5)
+  ['a-e', 'ai', 'middle', ['cake', 'make', 'lake', 'gate']], ['i-e', 'igh', 'middle', ['bike', 'kite', 'time', 'line']], ['o-e', 'oa', 'middle', ['bone', 'home', 'nose', 'rope']], ['u-e', 'oo', 'middle', ['cube', 'tube', 'June', 'flute']],
+];
+const LETTER_SOUNDS = [...PHASE2, ...PHASE2B];
+/** Sound Hunt: three keyword words are spoken (never shown); slice the grapheme for the sound they share. */
+function soundQ(rng: Rng, pool: Sound[], distractPool: Sound[], decoys: number): Question {
+  const [g, ph, pos, words] = pick(rng, pool);
+  const ws = shuffle(rng, words).slice(0, 3);
+  const ds = shuffle(rng, distractPool.filter(s => s[1] !== ph)).slice(0, decoys).map(s => s[0]);
+  const where = pos === 'start' ? 'start with' : pos === 'end' ? 'end with' : 'have in the middle';
+  return wordQ(rng, '🔊 Listen!', g, ds, { say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}` });
+}
+const rSoundHunt: Generator = (d, rng) => d === 1 ? soundQ(rng, PHASE2, PHASE2, 2) : d === 2 ? soundQ(rng, LETTER_SOUNDS, LETTER_SOUNDS, 3) : soundQ(rng, PHASE3, PHASE3, 3);
+const y1SoundHunt: Generator = (d, rng) => d === 1 ? soundQ(rng, PHASE3, PHASE3, 2) : d === 2 ? soundQ(rng, PHASE5, [...PHASE3, ...PHASE5], 3) : soundQ(rng, [...PHASE5, ...SPLIT], [...PHASE3, ...PHASE5, ...SPLIT], 3);
 
 export const Y1_CEW = ['the', 'a', 'do', 'to', 'today', 'of', 'said', 'says', 'are', 'were', 'was', 'is', 'his', 'has', 'you', 'your', 'they', 'be', 'he', 'me', 'she', 'we', 'no', 'go', 'so', 'by', 'my', 'here', 'there', 'where', 'love', 'come', 'some', 'one', 'once', 'ask', 'friend', 'school', 'put', 'push', 'pull', 'full', 'house', 'our'];
 export const Y2_CEW = ['door', 'floor', 'poor', 'because', 'find', 'kind', 'mind', 'behind', 'child', 'children', 'wild', 'climb', 'most', 'only', 'both', 'old', 'cold', 'gold', 'hold', 'told', 'every', 'everybody', 'even', 'great', 'break', 'steak', 'pretty', 'beautiful', 'after', 'fast', 'last', 'past', 'father', 'class', 'grass', 'pass', 'plant', 'path', 'bath', 'hour', 'move', 'prove', 'improve', 'sure', 'sugar', 'eye', 'could', 'should', 'would', 'who', 'whole', 'any', 'many', 'clothes', 'busy', 'people', 'water', 'again', 'half', 'money', 'parents'];
@@ -189,11 +232,13 @@ const y2Trace: Generator = (d, rng) => {
 
 export const WRITING_TOPICS: Topic[] = [
   { id: 'r-sounds', title: 'Letter Sounds', icon: '🔊', subject: 'writing', year: 'reception', nc: 'ELG Writing: sounds to letters', gen: rLetterSound },
+  { id: 'r-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: say a sound for each letter; phase 2–3 sounds by ear', gen: rSoundHunt },
   { id: 'r-capitals', title: 'Big & Small Letters', icon: '🅰️', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: letters', gen: rCapitals },
   { id: 'r-build', title: 'Build a Word', icon: '🧱', subject: 'writing', year: 'reception', nc: 'ELG Writing: spell by sounds (CVC)', gen: rBuild },
   { id: 'r-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'reception', nc: 'ELG Writing: simple sentences', gen: rSentence },
   { id: 'r-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'reception', nc: 'ELG Writing: form letters', mode: 'tracing', gen: rTrace },
   { id: 'y1-digraphs', title: 'Sound Pairs', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: digraphs', gen: y1Digraphs },
+  { id: 'y1-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: respond speedily to graphemes; phase 3 & 5 alternatives, split digraphs', gen: y1SoundHunt },
   { id: 'y1-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year1', nc: 'Y1 common exception words', gen: y1Spelling },
   { id: 'y1-plurals', title: 'Plurals -s -es', icon: '🐈', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: plurals', gen: y1Plurals },
   { id: 'y1-suffix', title: 'Endings -ing -ed -er', icon: '🏃', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: suffixes', gen: y1Suffix },

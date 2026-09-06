@@ -49,7 +49,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.mode !== 'tracing') : undefined }, {
     onQuestion(q, info) {
       els.stage.textContent = o.mode !== 'mission' ? `Q${session.questionsAsked}` : `${STAGE_NAMES[info.stage - 1] ?? 'Stage ' + info.stage} · ${info.index + 1}/${info.total}`;
-      els.prompt.innerHTML = promptHTML(q, session.seqIndex); els.vis.innerHTML = renderVisual(q.visual); els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
+      els.prompt.innerHTML = q.listen && !load().speech ? esc(q.listen) : promptHTML(q, session.seqIndex); els.vis.innerHTML = renderVisual(q.visual); els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
       lastOutcome = 'none';
       if (tracing) { say(q.say ?? q.prompt); startTrace(q); return; }
       const labels = villainMode && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence ? [...info.labels, BOMB] : info.labels;

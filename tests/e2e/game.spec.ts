@@ -15,7 +15,7 @@ async function startTopic(page: Page, year: string, topic: string) {
   if (await page.locator('.island-screen').count()) await page.click('#back');
   await page.click(`.island[data-year="${year}"]`);
   await expect(page.locator('.island-screen')).toBeVisible();
-  const subjectTab = topic.includes('trace') || /-(sounds|capitals|build|digraphs|spelling|plurals|suffix|punct|days|contractions|homophones|sentence)$/.test(topic) ? 'writing' : 'maths';
+  const subjectTab = topic.includes('trace') || /-(sounds|soundhunt|capitals|build|digraphs|spelling|plurals|suffix|punct|days|contractions|homophones|sentence)$/.test(topic) ? 'writing' : 'maths';
   await page.click(`.tab[data-s="${subjectTab}"]`);
   await page.click(`.topic[data-id="${topic}"]`);
   await expect(page.locator('.play')).toBeVisible();
@@ -188,6 +188,23 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
     await solveCurrent(page);                                                          // whole sentence, word by word
     await expect(page.locator('#score')).not.toHaveText('0');
+  });
+
+  test('Sound Hunt: nothing to read on the card; the words appear only when read-aloud is off', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'reception', 'r-soundhunt');
+    await expect(page.locator('.prompt')).toHaveText('🔊 Listen!');
+    await expect(page.locator('.vis')).toHaveCount(0);                                 // picture-free: no clue on the card
+    const q = await page.evaluate(() => window.__sna.session.current);
+    expect(q.say).toMatch(/^Listen: \w+, \w+, \w+\. Which sound/);                    // the sound is carried by spoken keywords only
+    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__sna.state().score)).toBeGreaterThan(0);
+    await page.click('#pause'); await page.click('#quit');
+    await page.click('#spk');                                                          // read-aloud off → the card shows the words instead
+    await startTopic(page, 'reception', 'r-soundhunt');
+    const listen = await page.evaluate(() => window.__sna.session.current.listen as string);
+    await expect(page.locator('.prompt')).toHaveText(listen);
+    expect(listen.split(' · ')).toHaveLength(3);
   });
 
   test('letter tracing passes when the glyph is covered', async ({ page }) => {

@@ -23,6 +23,7 @@ export interface Question {
   visual?: Visual;
   hint?: string;          // small instruction text under the prompt
   wide?: boolean;         // options are words → bigger bubbles
+  listen?: string;        // spoken-only question: shown on the card instead of `prompt` when read-aloud is off
 }
 
 export type Difficulty = 1 | 2 | 3;

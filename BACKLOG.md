@@ -23,7 +23,7 @@ Status: `todo` · `doing` · `done` · `later`
 | P3 | **Balance the Scales** — pick the bubble that makes both sides equal (=), leads into Y2 equivalence & Y3 algebra thinking | Curriculum depth (equals as balance) | done |
 | P4 | **Memory Match** (non-slice) — flip cards: number ↔ word, coin ↔ value, shape ↔ name | Calm mode for Reception, different pace | done |
 | P5 | **Story Sentences** — slice words in order to build a sentence read aloud ("The cat sat on the mat.") | Writing composition / word order, uses sequence engine | done |
-| P6 | **Sound Hunt** — hear a sound (speech), slice the letter/digraph; picture-free phonics | Reception phonics without reading | todo |
+| P6 | **Sound Hunt** — hear a sound (speech), slice the letter/digraph; picture-free phonics | Reception phonics without reading | done |
 | P7 | **Adaptive practice** — "Train with Sensei": auto-picks weakest topics from history | Mastery, parent-visible progress | todo |
 | P8 | **Dojo challenges** — daily 3 missions with bonus coins; streak multiplier | Retention, uses reward system | todo |
 | P9 | Costumes / blade skins bought with coins (owner art) | Reward sink, personalisation | todo |
@@ -72,3 +72,4 @@ Status: `todo` · `doing` · `done` · `later`
 | Balance the Scales topics (R/Y1/Y2) with a balance-scales visual: equals as balance, `a + b = ? + c` forms, tables in Y2 | v0.5 |
 | Memory Match mode: calm card-pairs screen (no slicing) per island — count/shapes/words (R), words/coins/2-D shapes/doubles (Y1), words/coins/3-D shapes/tables (Y2); stars by turns, coins, boards counted | v0.5 |
 | Story Sentences topics (R/Y1/Y2): slice the words of a spoken sentence in order (word bubbles via the sequence engine); Reception reads the sentence, Y1/Y2 listen-and-build from d2 | v0.5 |
+| Sound Hunt topics (R/Y1): picture-free phonics by ear — three spoken keyword words, slice the grapheme (phase 2 → 3 → 5 + split digraphs); sound-alike graphemes never used as decoys; card shows the words only when read-aloud is off | v0.5 |

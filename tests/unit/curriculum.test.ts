@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import type { Difficulty, Question } from '../../src/curriculum';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT } from '../../src/curriculum/writing';
 
 // Deterministic RNG (mulberry32)
 function rng(seed: number) {
@@ -116,6 +117,31 @@ describe('curriculum ranges', () => {
         const bare = (w: string) => w.toLowerCase().replace(/[.!?,]/g, '');
         for (const o of q.options.filter(o => !words.includes(o))) expect(words.map(bare), q.answer).not.toContain(bare(o));
         expect(q.visual?.type).toBe(d === 1 || id === 'r-sentence' ? 'sentence' : 'word');   // shown vs. spoken-only
+      }
+    }
+  });
+  it('Sound Hunt: spoken words carry the sound where the hint says, no sound-alike decoys, nothing to read on the card', () => {
+    const bank = [...PHASE2, ...PHASE2B, ...PHASE3, ...PHASE5, ...SPLIT];
+    const family = (g: string) => bank.find(s => s[0] === g)![1];
+    const has = (w: string, g: string, pos: string) => {
+      if (g.length === 3 && g[1] === '-') return new RegExp(`${g[0]}[a-z]${g[2]}$`).test(w);      // split digraph: a_e
+      return pos === 'start' ? w.startsWith(g) : pos === 'end' ? w.endsWith(g) : w.includes(g);
+    };
+    for (const id of ['r-soundhunt', 'y1-soundhunt']) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 11);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 150; i++) {
+        const q = t.gen(d, r);
+        expect(q.visual).toBeUndefined(); expect(q.prompt).toBe('🔊 Listen!');
+        const m = q.say!.match(/^Listen: (.+)\. Which sound do they (start with|end with|have in the middle)\?$/)!;
+        expect(m, q.say).not.toBeNull();
+        const pos = m[2] === 'start with' ? 'start' : m[2] === 'end with' ? 'end' : 'middle';
+        const words = m[1].split(', '); expect(words).toHaveLength(3); expect(new Set(words).size).toBe(3);
+        for (const w of words) expect(has(w.toLowerCase(), q.answer, pos), `${w} / ${q.answer}`).toBe(true);
+        expect(q.listen!.split(' · ')).toEqual(words);
+        expect(q.hint).toContain(pos);
+        for (const o of q.options.filter(o => o !== q.answer)) expect(family(o), `${o} sounds like ${q.answer}`).not.toBe(family(q.answer));
+        if (id === 'r-soundhunt' && d < 3) expect(q.answer.length <= 1 || q.answer === 'qu', q.answer).toBe(true);   // single sounds before digraphs
+        expect(q.options.length).toBe(d === 1 ? 3 : 4);
       }
     }
   });
