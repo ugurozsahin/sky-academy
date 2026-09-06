@@ -2,6 +2,7 @@
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; r: number;
   launchAt: number; launched: boolean; hit: boolean; dead: boolean; color: string; wobble: number; scale: number;
+  mark?: 'good' | 'bad'; markAt?: number; fade?: boolean;   // outcome reveal: spotlighted (✓/✗) or faded out
 }
 type PKind = 'dot' | 'ring' | 'shard' | 'text' | 'ember' | 'drop' | 'bolt' | 'rock' | 'leaf' | 'crystal' | 'star' | 'smoke' | 'pixel' | 'slash';
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; size: number; kind: PKind; text?: string; rot?: number }
@@ -13,7 +14,8 @@ export interface ArenaCallbacks {
   onFall: (b: Bubble) => void;                       // an un-hit bubble fell off screen
   onWaveEnd: () => void;                             // no live bubbles remain
 }
-export interface WaveOpts { labels: string[]; speed: number; wide?: boolean; gravity?: number }
+export interface WaveOpts { labels: string[]; speed: number; wide?: boolean; gravity?: number; first?: string /* keep this label in the first batch */ }
+const GOOD = '#66e07d', BAD = '#ff5f6d';
 
 const PALETTE = ['#ff5f6d', '#ffa726', '#ffd54f', '#66e07d', '#40c4ff', '#b388ff', '#ff7ac6', '#4dd0e1'];
 
@@ -25,7 +27,7 @@ export class Arena {
   private trail: { x: number; y: number; t: number }[] = [];
   private pointerDown = false; private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600;
-  paused = false; trailColor = '#7fe0ff'; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;
+  paused = false; frozen = false; trailColor = '#7fe0ff'; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;
   time = 0;
 
   constructor(public canvas: HTMLCanvasElement, private cb: ArenaCallbacks, opts: { trailColor?: string; fx?: FxKind; onSwish?: () => void } = {}) {
@@ -63,36 +65,60 @@ export class Arena {
   }
 
   spawnWave(o: WaveOpts) {
-    this.bubbles = [];
+    this.bubbles = []; this.frozen = false;
     const n = o.labels.length;
-    const r = this.radius(!!o.wide);
+    const r = Math.max(26, this.radius(!!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
     const T = o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4;              // seconds in the air
     const apexMin = this.topInset + r + 10;
     const usable = this.H - apexMin - r;
     const now = performance.now();
-    const stagger = (o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260) * (n > 6 ? 0.6 : 1);
+    const stagger = o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260;
+    // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
+    // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
+    const perBatch = Math.max(3, Math.min(n, Math.floor((this.W - 16) / (2 * r + 10))));
+    const batchGap = T * 1000 * 0.62;
     const order = o.labels.map((_, i) => i).sort(() => Math.random() - 0.5);
+    if (o.first) { const k = order.findIndex(i => o.labels[i] === o.first); if (k >= perBatch) { const j = Math.floor(Math.random() * perBatch); [order[j], order[k]] = [order[k], order[j]]; } }
     const margin = r + 8;
     const span = this.W - margin * 2;
     for (let k = 0; k < n; k++) {
       const i = order[k];
+      const batch = Math.floor(k / perBatch), idx = k % perBatch, size = Math.min(perBatch, n - batch * perBatch);
       // spread x across the width in shuffled slots so bubbles don't overlap
-      const slot = (k + 0.5) / n;
-      const x = margin + span * Math.min(1, Math.max(0, slot + (Math.random() - 0.5) * (0.6 / n)));
+      const slot = (idx + 0.5) / size;
+      const x = margin + span * Math.min(1, Math.max(0, slot + (Math.random() - 0.5) * ((size >= perBatch ? 0.3 : 0.6) / size)));   // tighter jitter when the row is full
       const apexY = apexMin + usable * (0.05 + Math.random() * 0.45);
       const h = this.H + r - apexY;
       const tUp = T / 2;
       const g = 2 * h / (tUp * tUp);
       const vy = -Math.sqrt(2 * g * h);
       const vx = ((this.W / 2 - x) / this.W) * 30 * (Math.random() * 0.6 + 0.4);
-      this.bubbles.push({ id: this.nextId++, label: o.labels[i], x, y: this.H + r, vx, vy, r, launchAt: now + k * stagger, launched: false, hit: false, dead: false, color: PALETTE[(k * 3 + Math.floor(Math.random() * 3)) % PALETTE.length], wobble: Math.random() * Math.PI * 2, scale: 1 });
+      const launchAt = now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1);
+      this.bubbles.push({ id: this.nextId++, label: o.labels[i], x, y: this.H + r, vx, vy, r, launchAt, launched: false, hit: false, dead: false, color: PALETTE[(k * 3 + Math.floor(Math.random() * 3)) % PALETTE.length], wobble: Math.random() * Math.PI * 2, scale: 1 });
       (this.bubbles[this.bubbles.length - 1] as any)._g = g;
     }
     this.waveActive = true;
   }
+  /** Freeze the wave and show the outcome: the sliced bubble stays put with a ✓ (or ✗ beside the glowing right answer),
+   *  the rest fade. If the right answer is no longer on screen (it fell, or is still queued) it pops in as a ghost bubble. */
+  reveal(o: { good?: string; bad?: string }) {
+    this.frozen = true; const now = performance.now(); let shown = false;
+    for (const b of this.bubbles) {
+      if (b.dead) continue;
+      if (!b.launched) { b.dead = true; continue; }                       // still queued: never launch
+      if (o.good !== undefined && b.label === o.good && !shown) { b.mark = 'good'; b.markAt = now; shown = true; }
+      else if (o.bad !== undefined && b.label === o.bad && b.hit && !b.mark) { b.mark = 'bad'; b.markAt = now; }
+      else b.fade = true;
+    }
+    if (o.good !== undefined && !shown) {
+      const r = this.radius(o.good.length > 3);
+      this.bubbles.push({ id: this.nextId++, label: o.good, x: this.W / 2, y: this.topInset + (this.H - this.topInset) * 0.42, vx: 0, vy: 0, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, scale: 1, mark: 'good', markAt: now });
+    }
+  }
   /** Remove remaining bubbles (with a gentle fade) — used when the question is over. */
   clearWave(popColor?: string) {
-    for (const b of this.bubbles) if (!b.dead) { b.dead = true; if (popColor && b.launched) this.burst(b.x, b.y, popColor, 6); }
+    for (const b of this.bubbles) if (!b.dead) { b.dead = true; if (popColor && b.launched && !b.fade) this.burst(b.x, b.y, b.mark === 'good' ? GOOD : popColor, b.mark ? 14 : 6); }
+    this.frozen = false;
     if (this.waveActive) { this.waveActive = false; this.cb.onWaveEnd(); }
   }
   /** Highlight a bubble (e.g. show the correct answer after a mistake). */
@@ -102,6 +128,7 @@ export class Arena {
   }
   /** Programmatic hit (tests / accessibility). */
   hitLabel(label: string) {
+    if (this.frozen) return false;
     const b = this.bubbles.find(x => x.label === label && x.launched && !x.hit && !x.dead);
     if (b) this.hitBubble(b, false);
     return !!b;
@@ -138,7 +165,7 @@ export class Arena {
   // ---------- input ----------
   private pos(e: PointerEvent) { const r = this.canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   private onDown = (e: PointerEvent) => {
-    if (this.paused) return;
+    if (this.paused || this.frozen) return;
     this.pointerDown = true; this.moved = 0; this.downPos = this.pos(e); this.lastPt = this.downPos;
     this.trail = [{ ...this.downPos, t: performance.now() }];
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -146,7 +173,7 @@ export class Arena {
     if (b) this.hitBubble(b, false);
   };
   private onMove = (e: PointerEvent) => {
-    if (!this.pointerDown || this.paused) return;
+    if (!this.pointerDown || this.paused || this.frozen) return;
     // Hit-test against the last pointer position, not the visual trail: the trail fades after 280ms,
     // so a finger that pauses mid-stroke (or slow pointer events) must not lose its slice segment.
     const p = this.pos(e); const prev = this.lastPt;
@@ -165,9 +192,10 @@ export class Arena {
     return best;
   }
   private hitBubble(b: Bubble, viaSwipe: boolean) {
-    b.hit = true; b.dead = true;
+    b.hit = true;
     this.burst(b.x, b.y, b.color);
     this.cb.onHit(b, viaSwipe);
+    if (!b.mark) b.dead = true;                     // reveal() may keep it on screen as the spotlighted outcome
   }
 
   // ---------- loop ----------
@@ -183,6 +211,7 @@ export class Arena {
     let live = 0;
     for (const b of this.bubbles) {
       if (b.dead) continue;
+      if (this.frozen) { live++; b.wobble += dt * 3; continue; }        // outcome reveal: everything holds still
       if (!b.launched) { if (now >= b.launchAt) b.launched = true; else { live++; continue; } }
       const g = (b as any)._g ?? this.g;
       b.vy += g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.wobble += dt * 3;
@@ -196,13 +225,26 @@ export class Arena {
   }
   private render(now: number) {
     const c = this.ctx; c.clearRect(0, 0, this.W, this.H);
-    for (const b of this.bubbles) { if (b.dead || !b.launched) continue; this.drawBubble(c, b); }
+    for (const b of this.bubbles) { if (b.dead || !b.launched || b.mark) continue; this.drawBubble(c, b, now); }
+    for (const b of this.bubbles) { if (!b.dead && b.launched && b.mark) this.drawBubble(c, b, now); }   // spotlighted on top
     for (const p of this.particles) this.drawParticle(c, p);
     this.drawTrail(c, now);
   }
-  private drawBubble(c: CanvasRenderingContext2D, b: Bubble) {
+  private drawBubble(c: CanvasRenderingContext2D, b: Bubble, now: number) {
     const wob = Math.sin(b.wobble) * 0.04;
-    c.save(); c.translate(b.x, b.y); c.rotate(wob); c.scale(b.scale, b.scale);
+    c.save(); c.translate(b.x, b.y);
+    let scale = b.scale;
+    if (b.fade) { c.globalAlpha = 0.28; scale *= 0.9; }
+    if (b.mark) {                                    // outcome spotlight: pop in, gentle pulse, a shake for a wrong slice
+      const age = (now - (b.markAt ?? now)) / 1000;
+      scale *= Math.min(1, age / 0.16) * (1.18 + 0.05 * Math.sin(age * 9));
+      if (b.mark === 'bad') c.translate(Math.sin(age * 45) * 6 * Math.max(0, 0.45 - age) / 0.45, 0);
+    }
+    c.rotate(b.mark ? 0 : wob); c.scale(scale, scale);
+    if (b.mark) {
+      const col = b.mark === 'good' ? GOOD : BAD;
+      c.strokeStyle = col; c.lineWidth = 6; c.shadowColor = col; c.shadowBlur = 18; c.beginPath(); c.arc(0, 0, b.r + 7, 0, Math.PI * 2); c.stroke(); c.shadowBlur = 0;
+    }
     // glow (cached sprite — shadowBlur is too slow on low-end devices)
     const g = glowSprite(b.color, b.r); c.drawImage(g, -g.width / 2, -g.height / 2);
     const grd = c.createRadialGradient(-b.r * 0.35, -b.r * 0.4, b.r * 0.1, 0, 0, b.r);
@@ -219,6 +261,12 @@ export class Arena {
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.lineJoin = 'round'; c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = 'rgba(20,20,40,.75)'; c.strokeText(text, 0, 2);
     c.fillStyle = '#fff'; c.fillText(text, 0, 2);
+    if (b.mark) {                                    // ✓ / ✗ badge
+      const col = b.mark === 'good' ? GOOD : BAD, br = b.r * 0.36, bx = b.r * 0.74, by = -b.r * 0.74;
+      c.fillStyle = col; c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.stroke();
+      c.font = `900 ${br * 1.5}px "Fredoka", "Baloo 2", system-ui, sans-serif`; c.lineWidth = 0; c.fillStyle = '#fff'; c.fillText(b.mark === 'good' ? '✓' : '✗', bx, by + 1);
+    }
     c.restore();
   }
   private drawParticle(c: CanvasRenderingContext2D, p: Particle) {

@@ -194,6 +194,43 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#score')).not.toHaveText('0');
   });
 
+  test('outcome beat: a slice freezes the wave, spotlights the answer and fills in the card before moving on', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'year1', 'y1-add');
+    await waitForTarget(page);
+    const t0 = Date.now(); expect(await answer(page)).toBe(true);
+    // correct: wave frozen, the sliced bubble stays with a ✓, the card turns green with the answer filled in
+    expect(await page.evaluate(() => window.__sna.arena.frozen)).toBe(true);
+    expect(await page.evaluate(() => window.__sna.arena.bubbles.some((b: any) => b.mark === 'good' && !b.dead))).toBe(true);
+    await expect(page.locator('.qcard.good .prompt .ans')).toHaveText((await state(page)).answer as string);
+    await expect(page.locator('.qcard.good .hint')).toContainText("that's right");
+    await page.waitForFunction(() => window.__sna.state().index === 1 && !window.__sna.state().waiting);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1200);                       // a real pause before the next question
+    await expect(page.locator('.qcard')).not.toHaveClass(/good|bad/);
+    // wrong: the sliced bubble gets a ✗, the right one glows, the card goes red and names the answer
+    await waitForWrongOrEnd(page);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    const marks = await page.evaluate(() => window.__sna.arena.bubbles.filter((b: any) => !b.dead && b.mark).map((b: any) => b.mark).sort());
+    expect(marks).toEqual(['bad', 'good']);
+    await expect(page.locator('.qcard.bad .hint')).toContainText('The answer is');
+    expect(await page.evaluate(() => window.__sna.answer())).toBe(false);          // input is ignored while the outcome shows
+    await page.waitForFunction(() => window.__sna.state().index === 2 && !window.__sna.state().waiting);
+  });
+
+  test('long sentences launch in batches that fit across the screen, never on top of each other', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'year2', 'y2-sentence');
+    await page.waitForFunction(() => window.__sna.arena.bubbles.length >= 5);
+    const info = await page.evaluate(() => { const a = window.__sna.arena; const r = a.bubbles[0].r; return { n: a.bubbles.length, fits: Math.floor((a.W - 16) / (2 * r + 10)), queued: a.bubbles.filter((b: any) => !b.launched).length }; });
+    if (info.n > info.fits) expect(info.queued).toBeGreaterThan(0);              // more words than fit across → later batches wait (phones)
+    // sample the flight a few times: launched bubbles must not overlap
+    for (let i = 0; i < 6; i++) {
+      await page.waitForTimeout(400);
+      const worst = await page.evaluate(() => { const bs = window.__sna.arena.bubbles.filter((b: any) => b.launched && !b.dead && !b.hit); let w = Infinity; for (const a of bs) for (const b of bs) if (a !== b) w = Math.min(w, Math.hypot(a.x - b.x, a.y - b.y) / (a.r + b.r)); return w; });
+      expect(worst).toBeGreaterThan(0.75);
+    }
+  });
+
   test('Sound Hunt: nothing to read on the card; the words appear only when read-aloud is off', async ({ page }) => {
     await pickAvatar(page);
     await startTopic(page, 'reception', 'r-soundhunt');
