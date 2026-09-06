@@ -35,10 +35,13 @@ async function swipeAnswer(page: Page) {
     return hit ? JSON.stringify(hit) : null;
   }, null, { timeout: 15000 });
   const label = JSON.parse(await b.jsonValue() as string).label as string;
-  const { others, W, H, top } = await page.evaluate(() => { // freeze every bubble where it is; never launch the rest of the wave
+  const { others, W, H, top, ox, oy } = await page.evaluate(() => { // freeze every bubble where it is; never launch the rest of the wave
     const a = window.__sna.arena;
     for (const x of a.bubbles) { if (x.launched) { x.vx = 0; x.vy = 0; x._g = 0; } else x.launchAt = Infinity; }
-    return { others: window.__sna.bubbles(), W: a.W, H: a.H, top: a.topInset };
+    // bubbles() returns canvas-space coords (arena.pos subtracts the canvas rect); the arena is now centred and
+    // capped (#67), so page.mouse (viewport coords) must add the canvas box offset — 0 on a phone, non-zero on desktop.
+    const rect = (document.getElementById('arena') as HTMLCanvasElement).getBoundingClientRect();
+    return { others: window.__sna.bubbles(), W: a.W, H: a.H, top: a.topInset, ox: rect.left, oy: rect.top };
   });
   const target = others.find((x: any) => x.label === label);   // position after the freeze, not before the round trip
   // Approach from a side with no other bubble in the way (a stroke through a decoy counts as a wrong answer),
@@ -48,9 +51,9 @@ async function swipeAnswer(page: Page) {
   const onCanvas = (dx: number, dy: number) => { const sx = target.x + dx * target.r * 1.6, sy = target.y + dy * target.r * 1.6; return sx > 4 && sx < W - 4 && sy > top + 4 && sy < H - 4; };
   const clear = (dx: number, dy: number) => onCanvas(dx, dy) && decoys.every((o: any) => [1.6, 1.1, 0.6].every(k => Math.hypot(o.x - (target.x + dx * target.r * k), o.y - (target.y + dy * target.r * k)) > o.r * 1.2 + 4));
   const [dx, dy] = dirs.find(([x, y]) => clear(x, y)) ?? dirs.find(([x, y]) => onCanvas(x, y)) ?? dirs[0];
-  await page.mouse.move(target.x + dx * target.r * 1.6, target.y + dy * target.r * 1.6);
+  await page.mouse.move(ox + target.x + dx * target.r * 1.6, oy + target.y + dy * target.r * 1.6);
   await page.mouse.down();
-  for (let i = 1; i <= 4; i++) { const k = 1.6 - (1.8 * i) / 4; await page.mouse.move(target.x + dx * target.r * k, target.y + dy * target.r * k); }
+  for (let i = 1; i <= 4; i++) { const k = 1.6 - (1.8 * i) / 4; await page.mouse.move(ox + target.x + dx * target.r * k, oy + target.y + dy * target.r * k); }
   await page.mouse.up();
 }
 const answer = (page: Page) => page.evaluate(() => window.__sna.answer());
@@ -265,6 +268,25 @@ test.describe('Sky Ninja Academy', () => {
       await page.waitForTimeout(400);
       const worst = await page.evaluate(() => { const bs = window.__sna.arena.bubbles.filter((b: any) => b.launched && !b.dead && !b.hit); let w = Infinity; for (const a of bs) for (const b of bs) if (a !== b) w = Math.min(w, Math.hypot(a.x - b.x, a.y - b.y) / (a.r + b.r)); return w; });
       expect(worst).toBeGreaterThan(0.75);
+    }
+  });
+
+  test('the play area is capped and centred on a wide screen, full-width on a phone (#67)', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'reception', 'r-count');
+    const m = await page.evaluate(() => {
+      const c = document.getElementById('arena')!.getBoundingClientRect();
+      const cap = parseFloat(getComputedStyle(document.querySelector('.play')!).getPropertyValue('--arena-w'));
+      return { boxW: c.width, left: c.left, right: window.innerWidth - c.right, vw: window.innerWidth, W: window.__sna.arena.W, cap };
+    });
+    expect(m.W).toBeLessThanOrEqual(m.cap + 1);              // Arena.W follows the capped canvas box, not the window
+    expect(Math.abs(m.boxW - m.W)).toBeLessThan(1.5);        // the physics width matches the CSS box
+    if (m.vw > m.cap) {                                      // desktop / tablet: a bounded, centred arena
+      expect(m.boxW).toBeLessThanOrEqual(m.cap + 1);
+      expect(m.boxW).toBeLessThan(m.vw - 40);               // not window-wide
+      expect(Math.abs(m.left - m.right)).toBeLessThan(2);   // centred, sky either side
+    } else {                                                 // phone: the arena fills the width as before
+      expect(m.boxW).toBeGreaterThan(m.vw - 2);
     }
   });
 

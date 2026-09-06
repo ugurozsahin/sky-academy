@@ -176,9 +176,15 @@ img { -webkit-user-drag: none; }
 .dojo-bonus.set { background: linear-gradient(90deg, #2a2008, #1a1f44); border-color: #ffb02088; box-shadow: 0 0 24px #ffb02044; } .dojo-bonus.set b { color: #ffd87a; }
 
 /* ---------- play ---------- */
-.play { max-width: none; padding: 0; height: calc(var(--vh) * 100); overflow: hidden; }
-#arena { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
-.hud { position: absolute; inset: 0; pointer-events: none; display: flex; flex-direction: column; align-items: center; padding: calc(10px + var(--sat)) 12px 0; }
+.play { max-width: none; padding: 0; height: calc(var(--vh) * 100); overflow: hidden; --arena-w: 600px; }
+/* The arena (and its HUD) is capped to a portrait play area and centred, so on a desktop/tablet the bubbles
+   don't spread window-wide (#67). The sky is position:fixed, so it shows through the transparent canvas and
+   continues outside the box. On a phone (viewport ≤ --arena-w) width:100% wins → the layout is unchanged. */
+#arena { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--arena-w); height: 100%; touch-action: none; display: block; }
+.hud { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--arena-w); pointer-events: none; display: flex; flex-direction: column; align-items: center; padding: calc(10px + var(--sat)) 12px 0; }
+/* Only once the window is wider than the play area: frame the arena against the sky so the bounded width
+   reads as intentional (a hairline edge, a soft inner vignette and a drop shadow). Owner tunes --arena-w. */
+@media (min-width: 620px) { #arena { box-shadow: inset 0 0 110px #0b103055, 0 0 0 1px #ffffff14, 0 30px 90px #00000066; } }
 .hud > * { pointer-events: auto; }
 .hud-top { width: 100%; max-width: 760px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .lives span { font-size: 22px; filter: drop-shadow(0 2px 4px #0008); transition: transform .3s, opacity .3s; display: inline-block; }
