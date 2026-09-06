@@ -89,7 +89,7 @@
     "owner-input",
     "playtest"
    ],
-   "body": "Round 1 (2026-09-06) found: outcome moved on too fast, mistakes not visible enough, long sentences overlapped, Trace Words too lenient. The first three shipped in 051ed5e; tracing is {{trace}}.\n\nNext round: play each mode on the phone and file one issue per finding with the `playtest` label.",
+   "body": "Round 1 (2026-09-06) found: outcome moved on too fast, mistakes not visible enough, long sentences overlapped, Trace Words too lenient. The first three shipped in 85711b9; tracing is {{trace}}.\n\nNext round: play each mode on the phone and file one issue per finding with the `playtest` label.",
    "owner_action": "play every mode on the phone with the child and file findings as `playtest` issues"
   },
   {
@@ -99,7 +99,7 @@
     "playtest"
    ],
    "state": "closed",
-   "body": "Owner feedback: after a slice everything moved on too quickly; mistakes should be obvious, the correct move should be highlighted even on success, and there should be a beat before the next question.\n\nShipped in 051ed5e: `arena.reveal()` freezes the wave, the sliced bubble stays with a ✓ (or ✗ beside the glowing right answer), the card turns green/red and fills the answer into the gap, then a hold (1 s / 1.8 s / 1.5 s) and a gap before the next wave. Sprint stays brisk.",
+   "body": "Owner feedback: after a slice everything moved on too quickly; mistakes should be obvious, the correct move should be highlighted even on success, and there should be a beat before the next question.\n\nShipped in 85711b9: `arena.reveal()` freezes the wave, the sliced bubble stays with a ✓ (or ✗ beside the glowing right answer), the card turns green/red and fills the answer into the gap, then a hold (1 s / 1.8 s / 1.5 s) and a gap before the next wave. Sprint stays brisk.",
    "owner_action": null
   },
   {
@@ -109,7 +109,7 @@
     "playtest"
    ],
    "state": "closed",
-   "body": "Shipped in 051ed5e: waves launch in batches sized to the screen width, radius shrinks for 7+ bubbles, the next word of a sequence is always in the first batch. e2e test samples the flight and asserts no overlap.",
+   "body": "Shipped in 85711b9: waves launch in batches sized to the screen width, radius shrinks for 7+ bubbles, the next word of a sequence is always in the first batch. e2e test samples the flight and asserts no overlap.",
    "owner_action": null
   },
   {
@@ -153,8 +153,9 @@
     "reward",
     "routine-ok"
    ],
-   "body": "Old backlog P8. Three daily missions (one per island, seeded by date), bonus coins on completion, streak multiplier; ties into the existing daily streak. Unit tests for the daily seed and rewards; e2e for the dojo screen.",
-   "owner_action": "playtest the daily loop with the child after it ships"
+   "body": "Old backlog P8. Three daily missions (one per island, seeded by date), bonus coins on completion, streak multiplier; ties into the existing daily streak. Unit tests for the daily seed and rewards; e2e for the dojo screen.\n\nShipped by the 08:40 hourly run in e1a7b9b (before the Issues workflow existed — no PR/review; the next routine run should QA it: full e2e + screenshots, and reopen if anything is off).",
+   "owner_action": "playtest the daily loop with the child after it ships",
+   "state": "closed"
   },
   {
    "title": "Year 1/2 shape, measurement and statistics topics",
@@ -250,8 +251,9 @@
     "priority:P3",
     "reward"
    ],
-   "body": "Old backlog P11. Canvas-rendered certificate with name, avatar, island, stars; share/save.",
-   "owner_action": null
+   "body": "Old backlog P11. Canvas-rendered certificate with name, avatar, island, stars; share/save.\n\nShipped by the 08:40 hourly run in cf2d748 (before the Issues workflow existed — no PR/review; the next routine run should QA it: full e2e + screenshots, and reopen if anything is off).",
+   "owner_action": null,
+   "state": "closed"
   },
   {
    "title": "Landscape layout polish for tablets",
@@ -269,8 +271,9 @@
     "platform",
     "routine-ok"
    ],
-   "body": "Old backlog #15. Short vibration on hit, longer on wrong; respect a settings toggle.",
-   "owner_action": null
+   "body": "Old backlog #15. Short vibration on hit, longer on wrong; respect a settings toggle.\n\nShipped by the 08:40 hourly run in 33d84d1 (before the Issues workflow existed — no PR/review; the next routine run should QA it: full e2e + screenshots, and reopen if anything is off).",
+   "owner_action": null,
+   "state": "closed"
   },
   {
    "title": "Multiple profiles on one device (siblings)",
