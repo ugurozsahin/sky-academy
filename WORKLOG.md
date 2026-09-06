@@ -79,3 +79,10 @@ Append one dated entry per run (newest at the bottom). Keep entries short: what 
 - Tests: unit 258/258 (+3 avatars.test.ts), tsc clean, build ok; e2e mobile full run 24 passed + 1 flaky (sentence batch overlap — physics timing under software rendering, passed on retry), then 4 affected tests 4/4 after the final CSS tweak. Desktop e2e not run (time). Screenshots taken of all four Sensei placements (not committed).
 - GitHub access from the routine works through the GitHub MCP tools (issue comment, issue update, PR) — no `GITHUB_TOKEN` action needed from the owner.
 - Next run: review/QA PR #49 (desktop e2e + screenshots for the owner), then #8 (Y1/Y2 shape, measurement and statistics topics). #6 (coin shop) is `owner-input`; #1 needs the owner.
+
+## 2026-09-06 11:00–12:30 (interactive session with the owner, continued)
+- PR #49 (Master Ninja, #5, opened by the 09:40 run) reviewed by a fresh subagent (APPROVE, 3 low findings fixed in 0e45a8d), QA: unit 258/258, tsc, e2e 50/50 → squash-merged as 1771a4f; artifact republished (label "1771a4f — Master Ninja"). Screenshots sent to the owner for the visual approval (owner action still open on #5).
+- #47 British English audit → PR #52: TS-AST scan of every string in src/** + index.html and every generated question against a KS1 blocklist; no offenders. Reviewer requested changes (tsc break, nested templates) → fixed → approved → 6c311af. Not player-visible, artifact unchanged.
+- New issues: #50 certificate download does nothing inside the artifact viewer (`downloads` capability), #51 sticky "Let's go!" covers the last avatar row. #46 updated (#5, #47 ticked).
+- Commit identity decision (owner): commits stay under the owner's name/e-mail; Claude credited via Co-Authored-By.
+- Next: #6 coin shop infrastructure (routine-ok part), #48 tap-to-pop projectile (owner approves visuals), review #26/#27 before Dojo/Duel/Y3+.
