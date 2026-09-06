@@ -3,18 +3,21 @@ import type { Visual } from '../curriculum';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 
+/** `n` objects in rows of five; slots past `keep` are crossed out ("take away"); at least one full row of slots is always shown. */
+export function fiveFrames(n: number, emoji: string, keep = n): string {
+  const slots = Math.max(5, Math.ceil(n / 5) * 5);
+  const cells = Array.from({ length: slots }, (_, i) => i < n ? `<span class="slot"><span class="obj${i >= keep ? ' gone' : ''}">${emoji}</span></span>` : '<span class="slot"></span>');
+  const rows: string[] = []; for (let r = 0; r < slots; r += 5) rows.push(`<span class="five">${cells.slice(r, r + 5).join('')}</span>`);
+  return rows.join('');
+}
 export function renderVisual(v: Visual | undefined): string {
   if (!v) return '';
   switch (v.type) {
     case 'objects': {
-      const a = Array.from({ length: v.n }, () => `<span class="obj">${v.emoji}</span>`).join('');
-      if (v.n2 === undefined) return `<div class="vis objs">${a}</div>`;
-      if (v.n2 < 0) { // take away: cross out |n2| objects
-        const take = v.n2; const items = Array.from({ length: v.n }, (_, i) => `<span class="obj${i >= v.n + take ? ' gone' : ''}">${v.emoji}</span>`).join('');
-        return `<div class="vis objs">${items}</div>`;
-      }
-      const b = Array.from({ length: v.n2 }, () => `<span class="obj">${v.emoji2 ?? v.emoji}</span>`).join('');
-      return `<div class="vis objs two"><div class="grp">${a}</div><div class="plus">${v.emoji2 && v.emoji2 !== v.emoji ? 'or' : '+'}</div><div class="grp">${b}</div></div>`;
+      // Objects sit in five-frames (rows of 5 slots, empty slots drawn faintly) so a child can count in fives (#54).
+      if (v.n2 === undefined) return `<div class="vis objs">${fiveFrames(v.n, v.emoji)}</div>`;
+      if (v.n2 < 0) return `<div class="vis objs">${fiveFrames(v.n, v.emoji, v.n + v.n2)}</div>`;   // take away: cross out |n2| objects
+      return `<div class="vis objs two"><div class="grp">${fiveFrames(v.n, v.emoji)}</div><div class="plus">${v.emoji2 && v.emoji2 !== v.emoji ? 'or' : '+'}</div><div class="grp">${fiveFrames(v.n2, v.emoji2 ?? v.emoji)}</div></div>`;
     }
     case 'tenframe': {
       const total = v.n + (v.n2 ?? 0);
