@@ -33,3 +33,12 @@ Append one dated entry per run (newest at the bottom). Keep entries short: what 
 - Tests: unit 209/209, tsc clean, e2e mobile: full run 14/16 before the e2e fixes (both failures analysed above), then the 4 touched tests 8/8 with `--repeat-each 2`. Desktop e2e not run (time).
 - Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins.
 - Next: P4 Memory Match (non-slice card mode; needs a new screen, no owner input) or Next #9 (Y1/Y2 measurement & statistics topics).
+
+## 2026-09-06 06:40 (hourly routine, cloud)
+- Backlog P4 done: **Memory Match** — `src/game/memory.ts` (pure `Memory` class: flip/hide/match, turns, streak bonus score, stars by turns-per-pair, coins = 2×pairs + 5×stars; `THEMES` decks per island with distinct faces: R count/shapes/words, Y1 words/coins/2-D shapes/doubles, Y2 words 21–99/coins incl. £1 £2/3-D shapes/2-5-10 tables) + `src/ui/memory.ts` (DOM card grid with 3-D flip, each face spoken on flip, toasts, results modal with stars/coins/stickers/streak, `__sna.cards()/flip()/state()` hooks). `storage.memory` counts boards per year (`recordMemory`); island screen gets a "Memory Match" button.
+- Backlog P5 done (and Next #10 as the same feature): **Story Sentences** — `sentenceQ()` in `writing.ts` builds word-bubble sequence questions (`r-sentence`, `y1-sentence`, `y2-sentence`; 3–7 words, 1–3 decoys, never a repeated label). Reception always sees the sentence on the card; Y1/Y2 see it at d1, then listen-and-build (picture emoji only). Generic curriculum test now accepts space-joined sequences; targeted test checks word uniqueness, capital/end mark, decoys and length.
+- Test hygiene: pool-based session tests (sprint, boss) sliced `answer` on whatever the seeded pool drew; they now use a `solve()` helper that slices sequences item by item, so adding topics can't break them.
+- Tests: unit 227/227, tsc clean; e2e mobile full run 17/17 after Memory Match; after Story Sentences the 6 sequence-affected tests (sentence, spelling, Storm, Sprint, Boss, Memory) 6/6 and sentence+Storm ×2 4/4 (Storm was flaky once on the first run, passed on retry — same renderer timing as before). Desktop e2e not run (time).
+- Commits: cc84fea (Memory Match), 8401e7e (Story Sentences) — main.
+- Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins, P9 costumes (art).
+- Next: P6 Sound Hunt (phonics by ear, no owner input) or Next #9 (Y1/Y2 measurement & statistics topics); P7 adaptive practice after that.
