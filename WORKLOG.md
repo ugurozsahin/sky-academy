@@ -11,5 +11,5 @@ Append one dated entry per run (newest at the bottom). Keep entries short: what 
 - Bug found & fixed in `arena.ts`: slice hit-test used the fading visual trail, so a finger that paused >280 ms lost its next segment. Now tracks `lastPt` separately.
 - e2e: "real swipe" test was flaky on baseline (3/4 fails here) — pointer round trips take 400–800 ms under headless software rendering so bubbles drifted through/away from the stroke. Test now freezes the wave via the arena hook and approaches from a clear side; 8/8 passes.
 - Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins (visual style decision).
-- Tests: unit 191/191, tsc clean, e2e mobile 14/14 (desktop run see next entry / commit message).
+- Tests: unit 191/191, tsc clean, e2e mobile 14/14, e2e desktop 14/14. Commit 2a84fda (main).
 - Next: Proposed P1 (Ninja Sprint) or Next #9 (Y1/Y2 shape/measure/statistics topics) — both need no owner input.
