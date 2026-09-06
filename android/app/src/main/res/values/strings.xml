@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sky Ninja Academy</string>
+    <string name="title_activity_main">Sky Ninja Academy</string>
+    <string name="package_name">uk.skyninja.academy</string>
+    <string name="custom_url_scheme">uk.skyninja.academy</string>
+</resources>

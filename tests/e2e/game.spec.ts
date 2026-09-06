@@ -307,6 +307,28 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
 
+  test('back button steps back one screen: play → island → sky map (Android/browser history)', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'year1', 'y1-add');
+    await page.goBack();
+    await expect(page.locator('.isl-head b')).toContainText('Year 1');
+    await page.goBack();
+    await expect(page.locator('.islands.big')).toBeVisible();
+    await page.click('.island[data-year="reception"]');                          // forward again still works after a pop
+    await expect(page.locator('.isl-head b')).toContainText('Reception');
+    // in-app Quit pops the same history: one hardware back from the island then reaches the map (no dead press)
+    await page.click('.tab[data-s="maths"]'); await page.click('.topic[data-id="r-count"]');
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    await page.click('#pause'); await page.click('#quit');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('.islands.big')).toBeVisible();
+    await page.click('#rewards'); await expect(page.locator('.album')).toBeVisible();
+    await page.click('#back'); await expect(page.locator('.islands.big')).toBeVisible();
+    await page.goBack();                                                          // nothing stale left: back from the map goes before the app
+    expect(await page.evaluate(() => history.state)).toBeNull();
+  });
+
   test('endless Sky Storm ramps up and ends when lives run out', async ({ page }) => {
     await pickAvatar(page);
     await page.click('.island[data-year="year2"]');

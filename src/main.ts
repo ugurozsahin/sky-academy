@@ -7,14 +7,28 @@ import { load } from './storage';
 import type { YearInfo } from './curriculum';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
+// Each screen below the map pushes a history entry, so the Android back button (and the browser's) steps
+// back one screen — play → island → map — instead of leaving the app (#53).
+let year: YearInfo | null = null; let fromPop = false;
+const enter = (screen: string) => {
+  if (fromPop) { fromPop = false; return; }                                   // re-rendering after a pop: the entry already exists
+  if (history.state?.screen === screen) history.replaceState({ screen }, ''); else history.pushState({ screen }, '');
+};
+/** Go up one screen by popping history (so the stack stays [map, island?, play|memory?] / [map, rewards?]). */
+const up = () => { if (history.state?.screen) history.back(); else nav.map(); };
 const nav = {
   avatar: () => avatarScreen(() => nav.map()),
-  map: () => mapScreen(nav),
-  island: (year: YearInfo) => islandScreen(nav, year),
-  play: ((o: PlayOpts) => playScreen(o, () => nav.island(o.year), () => nav.play(o))) as StartPlay,
-  memory: (year: YearInfo) => memoryScreen({ year }, () => nav.island(year), () => nav.memory(year)),
-  rewards: () => rewardsScreen(nav),
+  map: () => { year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
+  island: (y: YearInfo) => { year = y; enter('island'); islandScreen(nav, y); },
+  play: ((o: PlayOpts) => { year = o.year; enter('play'); playScreen(o, up, () => nav.play(o)); }) as StartPlay,
+  memory: (y: YearInfo) => { year = y; enter('memory'); memoryScreen({ year: y }, up, () => nav.memory(y)); },
+  rewards: () => { enter('rewards'); rewardsScreen(nav); },
 };
+window.addEventListener('popstate', () => {
+  const s = history.state?.screen as string | undefined;   // the entry we landed on
+  fromPop = true;
+  if (s === 'island' && year) nav.island(year); else if (s === 'play' || s === 'memory' || s === 'rewards') { fromPop = false; history.back(); } else nav.map();
+});
 
 // ?reset=1 clears saved progress (used by tests).
 const params = new URLSearchParams(location.search);
