@@ -126,7 +126,7 @@ const rCapitals: Generator = (d, rng) => {
   const shown = upper ? l.toUpperCase() : l;
   const ans = upper ? l : l.toUpperCase();
   const ds = shuffle(rng, LETTERS.filter(x => x !== l)).slice(0, d === 1 ? 2 : 3).map(x => (upper ? x : x.toUpperCase()));
-  return wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown }, say: `Find the ${upper ? 'small' : 'capital'} letter that matches ${l}`, hint: upper ? 'Find the lowercase letter' : 'Find the capital letter' });
+  return wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown }, say: `Find the ${upper ? 'small' : 'capital'} letter that matches ${l}`, hint: upper ? 'Find the lower-case letter' : 'Find the capital letter' });
 };
 const rBuild: Generator = (d, rng) => {
   const [w, e] = pick(rng, CVC);
@@ -178,7 +178,7 @@ const y1Punct: Generator = (d, rng) => {
 };
 const y1Days: Generator = (d, rng) => {
   const day = pick(rng, DAYS);
-  if (d === 3) return spellQ(rng, day.toLowerCase(), '📅', 3);
+  if (d === 3) return spellQ(rng, day, '📅', 3);   // days keep their capital letter (Y1 grammar)
   const idx = ri(rng, 1, Math.min(4, day.length - 1));
   return gapQ(rng, day, idx, LETTERS, '📅', `Which letter is missing from ${day}?`);
 };
