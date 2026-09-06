@@ -4,7 +4,7 @@ import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
 import { Tracer } from '../game/tracing';
 import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak } from '../storage';
-import { say, sfx, sliceFx } from '../audio';
+import { haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, render, stars } from './dom';
 import { renderVisual } from './visuals';
 import { dojoRowsHTML } from './memory';
@@ -67,15 +67,15 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       else later(() => session.advance(), 900);
     },
     onWrong(q, _hit) {
-      lastOutcome = 'wrong'; sfx.wrong();
+      lastOutcome = 'wrong'; sfx.wrong(); haptic('wrong');
       toast(`Not quite — it was ${q.sequence ? q.answer : q.answer}`, 'bad'); showTaunt();
       if (arena) { arena.flash(q.sequence ? q.sequence[session.seqIndex] : q.answer); later(() => arena?.clearWave(), 700); }
       else later(() => session.advance(), 1200);
     },
     onMiss(q) { lastOutcome = 'miss'; sfx.miss(); toast(`Missed! The answer was ${q.answer}`, 'bad'); showTaunt(); },
     onProgress(label, done, total) { sfx.slice(); els.prompt.innerHTML = promptHTML(session.current!, done); if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow); if (done < total) say(label, false); },
-    onLives(n) { drawLives(n); if (n < prevLives) sfx.life(); prevLives = n; },
-    onStageClear(stage, st, acc) { sfx.stage(); showStageClear(stage, st, acc); },
+    onLives(n) { drawLives(n); if (n < prevLives) { sfx.life(); haptic('life'); } prevLives = n; },
+    onStageClear(stage, st, acc) { sfx.stage(); haptic('stage'); showStageClear(stage, st, acc); },
     onTime(s) { drawTimer(s); if (s <= 3 && s > 0) sfx.tap(); },
     onBoss(hp, max, kind) {
       drawHp(hp, max);
@@ -100,7 +100,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       onHit(b, viaSwipe) {
         if (!load().tutorialSeen) { save({ tutorialSeen: true }); hideTutorial(); }
         if (b.label === BOMB) { if (!session.waiting && !session.ended) { sfx.life(); toast('TNT! Hammer Man got you', 'bad'); showTaunt(); arena!.burst(b.x, b.y, '#ff3b1a', 30); session.bomb(); } return; }
-        const r = session.hit(b.label); if (r === 'ignored') return; if (viaSwipe) (sliceFx[av.fx] ?? sfx.slice)();
+        const r = session.hit(b.label); if (r === 'ignored') return; if (viaSwipe) { (sliceFx[av.fx] ?? sfx.slice)(); haptic('slice'); }
       },
       onFall(b) { if (b.label !== BOMB) session.fall(b.label); },
       onWaveEnd() { const delay = lastOutcome === 'correct' ? 650 : lastOutcome === 'wrong' ? 1300 : lastOutcome === 'miss' ? 1100 : 0; later(() => session.waveEnd(), delay); },

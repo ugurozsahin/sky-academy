@@ -54,6 +54,13 @@ export const sfx = {
   life: () => { tone(180, 0.3, 'sawtooth', 0.15, 90); noise(0.2, 0.1, 400); },
 };
 
+/** Haptic patterns (ms on / off). Vibration follows the sound toggle: muting the game also stills the phone. */
+export const HAPTICS = { slice: [12], correct: [15, 40, 25], wrong: [70], life: [40, 50, 40], stage: [30, 40, 30, 40, 90] } as const;
+export function haptic(kind: keyof typeof HAPTICS, nav: { vibrate?: (p: number | number[]) => boolean } = navigator): boolean {
+  if (!load().sound || typeof nav.vibrate !== 'function') return false;
+  try { return !!nav.vibrate([...HAPTICS[kind]]); } catch { return false; }
+}
+
 /** Minimal shape of SpeechSynthesisVoice so the ranking is testable in node. */
 export interface VoiceLike { name: string; lang: string; localService?: boolean }
 /**

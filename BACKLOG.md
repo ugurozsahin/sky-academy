@@ -40,7 +40,7 @@ Status: `todo` · `doing` · `done` · `later`
 | 12 | Parent dashboard (per-topic accuracy, time played) behind a "grown-ups" gate | todo |
 | 13 | PWA: offline install, home-screen icon, splash | todo |
 | 14 | Landscape layout polish for tablets | todo |
-| 15 | Haptics on slice (navigator.vibrate) | todo |
+| 15 | Haptics on slice (navigator.vibrate) | done |
 | 16 | Multiple profiles on one device (siblings) | todo |
 
 ## Later
@@ -77,3 +77,4 @@ Status: `todo` · `doing` · `done` · `later`
 | Train with Sensei: per-island adaptive mission over the 3 weakest topics (lowest accuracy → stars → plays; unplayed fill in); every mode records per-topic hits/tries; question card names the topic; sessions counted | v0.5 |
 | Daily Dojo: three challenges a day (volume · mode · focus, picked from the date), progress bars on the sky map, +10 🪙 per challenge and +25 🪙 for the set, ×1.25 per consecutive dojo day up to ×2; bonus rows on every results screen | v0.5 |
 | Mission certificate: "🎓 Certificate" on a won mission / Sensei session draws a 1200×850 PNG (child's name, mission, island, stars, accuracy, date, avatar) and shares it via the system share sheet or downloads it | v0.5 |
+| Haptics: short vibration on a swipe slice, a wrong slice, a lost life and a stage clear (follows the sound toggle; no-op where `navigator.vibrate` is missing) | v0.5 |
