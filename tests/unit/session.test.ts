@@ -3,7 +3,7 @@ import { Session, type SessionEvents } from '../../src/game/session';
 import { YEARS, topicById, topicsFor } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onEnd: vi.fn() });
+const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onEnd: vi.fn() });
 const Y1 = YEARS[1], R = YEARS[0];
 
 describe('mission session', () => {
@@ -97,6 +97,54 @@ describe('endless session', () => {
     const wrongOf = () => { const c = s.current!; const t = c.sequence ? c.sequence[s.seqIndex] : c.answer; return c.options.find(o => o !== t && !(c.sequence ?? []).includes(o)) ?? c.options.find(o => o !== t)!; };
     for (let i = 0; i < 3; i++) { expect(s.hit(wrongOf())).toBe('wrong'); if (!s.ended) s.advance(); }
     expect(ev.onEnd).toHaveBeenCalled(); expect(ev.onEnd.mock.calls[0][0].score).toBeGreaterThan(300);
+  });
+});
+
+describe('sprint session (60-second time attack)', () => {
+  const pool = topicsFor('year1').filter(t => t.mode !== 'tracing');
+  const wrongOf = (s: Session) => { const c = s.current!; const t = c.sequence ? c.sequence[s.seqIndex] : c.answer; return c.options.find(o => o !== t && !(c.sequence ?? []).includes(o)) ?? c.options.find(o => o !== t)!; };
+  it('starts with the full clock and never loses lives', () => {
+    const ev = events();
+    const s = new Session({ mode: 'sprint', year: Y1, pool, rng: rng(10) }, ev);
+    s.start();
+    expect(s.timeLeft).toBe(60_000); expect(s.secondsLeft).toBe(60);
+    expect(s.hit(wrongOf(s))).toBe('wrong'); expect(s.lives).toBe(Y1.lives); expect(ev.onLives).not.toHaveBeenCalled();
+    s.advance(); s.fall(s.current!.sequence ? s.current!.sequence[0] : s.current!.answer);
+    expect(s.lives).toBe(Y1.lives); expect(s.ended).toBe(false);
+    s.advance(); s.bomb(); expect(s.lives).toBe(Y1.lives);
+  });
+  it('tick emits once per whole second, keeps going between questions and ends won at zero', () => {
+    const ev = events();
+    const s = new Session({ mode: 'sprint', year: Y1, pool, rng: rng(11), seconds: 5 }, ev);
+    s.start();
+    s.tick(400); expect(ev.onTime).not.toHaveBeenCalled();            // 4.6 s left still displays as 5
+    s.tick(600); expect(ev.onTime).toHaveBeenLastCalledWith(4);
+    s.tick(-50); s.tick(0); expect(ev.onTime).toHaveBeenCalledTimes(1);
+    for (let i = 0; i < 3; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    s.tick(10_000);
+    expect(ev.onTime).toHaveBeenLastCalledWith(0); expect(s.timeLeft).toBe(0); expect(s.ended).toBe(true);
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.mode).toBe('sprint'); expect(r.won).toBe(true); expect(r.correct).toBe(3); expect(r.stars).toBe(1); expect(r.coins).toBe(3 + 5);
+    expect(s.hit('anything')).toBe('ignored');
+    s.tick(1000); expect(ev.onEnd).toHaveBeenCalledTimes(1);          // no double end
+  });
+  it('scores 10 per correct plus combo bonus, ramps difficulty and awards 3 stars for 12+ correct', () => {
+    const ev = events();
+    const s = new Session({ mode: 'sprint', year: YEARS[2], pool: topicsFor('year2').filter(t => t.mode !== 'tracing'), rng: rng(12) }, ev);
+    s.start();
+    expect(s.difficulty).toBe(1); expect(s.speed).toBeLessThanOrEqual(YEARS[2].speeds[1]);
+    s.hit(s.current!.answer); expect(s.score).toBe(10); s.advance();
+    for (let i = 0; i < 11; i++) { s.hit(s.current!.answer); s.advance(); }
+    expect(s.difficulty).toBe(3); expect(s.score).toBeGreaterThan(120);   // combo bonus on top of 12 × 10
+    s.tick(60_000);
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.stars).toBe(3); expect(r.coins).toBe(12 + 15);
+  });
+  it('tick is a no-op outside sprint mode', () => {
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(13) }, ev);
+    s.start(); s.tick(99_999);
+    expect(s.ended).toBe(false); expect(ev.onTime).not.toHaveBeenCalled();
   });
 });
 

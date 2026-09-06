@@ -122,6 +122,8 @@ img { -webkit-user-drag: none; }
 .storm img { width: 64px; height: 64px; object-fit: cover; object-position: 50% 20%; transform: scale(1.6); transform-origin: 50% 30%; border-radius: 50%; background: #0d1226; box-shadow: 0 0 0 3px #ff3b5c; }
 .storm .vport { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex: none; background: #0d1226; box-shadow: 0 0 0 3px #ff3b5c; }
 .storm span { text-align: left; } .storm b { display: block; font-size: 20px; } .storm small { color: var(--muted); }
+.storm.sprint { margin-top: 10px; background: linear-gradient(90deg, #1a3b2a, #1a2a44); border-color: #40e0a066; box-shadow: 0 0 30px #40e0a033, 0 8px 24px #0008; }
+.storm.sprint .vport { box-shadow: 0 0 0 3px #40e0a0; } .storm .vport.emoji { display: grid; place-items: center; font-size: 34px; }
 .foot { margin-top: 26px; text-align: center; color: #6c78a8; font-size: 12px; font-weight: 600; }
 
 /* ---------- rewards ---------- */
@@ -139,6 +141,7 @@ img { -webkit-user-drag: none; }
 .coin-row { display: flex; justify-content: center; gap: 10px; margin: -6px 0 12px; flex-wrap: wrap; }
 .coin-gain { font-size: 22px; font-weight: 700; color: #ffd87a; text-shadow: 0 0 14px #ffb02088; }
 .streak-pill { align-self: center; padding: 4px 10px; border-radius: 999px; background: #3b1a22; border: 1px solid #ff8a4c66; color: #ffb090; font-weight: 700; font-size: 14px; }
+.best-pill { align-self: center; padding: 4px 10px; border-radius: 999px; background: #1a3b2a; border: 1px solid #40e0a066; color: #a8ffd8; font-weight: 700; font-size: 14px; }
 .unlock { display: flex; align-items: center; gap: 10px; margin: 0 auto 8px; padding: 4px 12px 4px 6px; border-radius: 16px; background: linear-gradient(90deg, #2a2008, #1a1f44); border: 1px solid #ffb02088; box-shadow: 0 0 24px #ffb02044; max-width: 300px; text-align: left; animation: pop .5s .3s both cubic-bezier(.2, 1.4, .4, 1); }
 .unlock .figure { width: 52px; flex: none; } .unlock b { display: block; color: #ffd87a; } .unlock small { color: var(--muted); font-weight: 600; }
 
@@ -150,6 +153,9 @@ img { -webkit-user-drag: none; }
 .hud-top { width: 100%; max-width: 760px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .lives span { font-size: 22px; filter: drop-shadow(0 2px 4px #0008); transition: transform .3s, opacity .3s; display: inline-block; }
 .lives span.off { opacity: .22; transform: scale(.8); filter: grayscale(1); }
+.timer { font-size: 24px; font-weight: 700; padding: 4px 14px; border-radius: 999px; background: #1a3b2a; border: 1px solid #40e0a066; color: #a8ffd8; text-shadow: 0 2px 0 #0006; font-variant-numeric: tabular-nums; }
+.timer.hurry { background: #3b1a22; border-color: #ff3b5c; color: #ffb090; animation: hurry .5s ease-in-out infinite alternate; }
+@keyframes hurry { from { transform: scale(1); } to { transform: scale(1.12); } }
 .score { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; } .score small { font-size: 10px; letter-spacing: .1em; color: var(--muted); } .score b { font-size: 26px; text-shadow: 0 2px 0 #0006; }
 .qcard { width: 100%; max-width: 560px; margin-top: 8px; padding: 10px 14px 12px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px #0006, inset 0 0 40px color-mix(in srgb, var(--glow) 8%, transparent); text-align: center; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .qcard { cursor: pointer; }                                   /* tap anywhere on the card = hear the question again */

@@ -13,3 +13,8 @@ Append one dated entry per run (newest at the bottom). Keep entries short: what 
 - Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins (visual style decision).
 - Tests: unit 191/191, tsc clean, e2e mobile 14/14, e2e desktop 14/14. Commit 2a84fda (main).
 - Next: Proposed P1 (Ninja Sprint) or Next #9 (Y1/Y2 shape/measure/statistics topics) — both need no owner input.
+
+## 2026-09-06 04:40 (hourly routine, cloud)
+- Backlog P1 done: **Ninja Sprint** — `mode: 'sprint'` in `session.ts` (60 s clock via `tick(ms)`/`onTime`, no lives, 10 pts + combo bonus, difficulty ramps 1→2→3 at Q5/Q12, steady stage-2 speed; stars 1/6/12 correct, coins = correct + 5×stars). `storage.sprint` per-year best + `recordSprint()` (old saves migrate). Island screen: "Ninja Sprint" button under Sky Storm showing best. Play HUD: timer pill replaces hearts, turns red + pulses at ≤10 s, ticks at 3-2-1; clock freezes while paused. Results: "Time's up!", stars, "🏆 New best!" pill.
+- Tests: unit 196/196 (+4 sprint session, +1 storage), tsc clean, e2e mobile 15/15 (+1 sprint test: no lives lost, clock pauses, fast-forward → results → best saved).
+- Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins.

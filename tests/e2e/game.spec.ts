@@ -187,6 +187,38 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#endless small')).toContainText('best');
   });
 
+  test('Ninja Sprint: timed run with no lives ends on the clock and saves a best score', async ({ page }) => {
+    await pickAvatar(page);
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('#sprint small')).toContainText('best 0');
+    await page.click('#sprint');
+    await expect(page.locator('.play')).toBeVisible();
+    await expect(page.locator('#timer')).toContainText(/⏱ (60|59|58)/);
+    await expect(page.locator('#lives')).toHaveCount(0);
+    await expect(page.locator('#stage')).toHaveText('Q1');
+    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    await expect(page.locator('#score')).toHaveText('10');
+    await page.waitForFunction(() => window.__sna.session.questionsAsked > 1);
+    await waitForTarget(page); await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await expect(page.locator('.toast.bad')).toContainText('it was');
+    expect((await state(page)).lives).toBe(3);                              // a slip costs time, never a life
+    await page.click('#pause');
+    const frozen = (await state(page)).timeLeft;
+    await page.waitForTimeout(400);
+    expect((await state(page)).timeLeft).toBe(frozen);                      // the clock stops while paused
+    await page.click('#resume');
+    await page.waitForFunction((t) => window.__sna.state().timeLeft < t, frozen);
+    await page.evaluate(() => window.__sna.session.tick(60_000));            // fast-forward to the whistle
+    await expect(page.locator('#timer')).toHaveText('⏱ 0');
+    const results = page.locator('.results');
+    await expect(results.locator('h2')).toHaveText("Time's up!");
+    await expect(results.locator('.best-pill')).toBeVisible();
+    await expect(results.locator('.coin-gain')).toContainText('+6');         // 1 correct + 1 star × 5
+    await page.click('#home');
+    await expect(page.locator('#sprint small')).toContainText('best 10');
+  });
+
   test('first play shows the slice tutorial hand, which goes away after the first slice for good', async ({ page }) => {
     await pickAvatar(page);
     await startTopic(page, 'reception', 'r-count');

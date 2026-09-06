@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, load, reset, stickersFor, touchStreak, STICKER_IDS, STICKER_COST } from '../../src/storage';
+import { addCoins, load, recordSprint, reset, stickersFor, touchStreak, STICKER_IDS, STICKER_COST } from '../../src/storage';
 
 // minimal localStorage shim for node
 const mem: Record<string, string> = {};
@@ -20,6 +20,15 @@ describe('rewards storage', () => {
     mem['sna:v1'] = JSON.stringify({ v: 1, name: 'Old', coins: 5 });   // save written before the field existed
     reset(); mem['sna:v1'] = JSON.stringify({ v: 1, name: 'Old', coins: 5 });
     expect(load().name).toBe('Old'); expect(load().tutorialSeen).toBe(false); expect(load().streak.days).toBe(0);
+    expect(load().sprint).toEqual({});
+  });
+  it('sprint best is kept per year and only reports a new best when beaten', () => {
+    expect(recordSprint('year1', 0)).toBe(false);
+    expect(recordSprint('year1', 120)).toBe(true);
+    expect(recordSprint('year1', 120)).toBe(false);
+    expect(recordSprint('year1', 90)).toBe(false);
+    expect(recordSprint('year2', 30)).toBe(true);
+    expect(load().sprint).toEqual({ year1: 120, year2: 30 });
   });
   it('streak counts consecutive days only', () => {
     expect(touchStreak(new Date('2026-09-05T10:00:00Z'))).toBe(1);

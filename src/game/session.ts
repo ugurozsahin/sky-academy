@@ -1,7 +1,9 @@
 // Mission / endless session controller. Pure game logic (no DOM) so it can be unit-tested.
 import type { Difficulty, Question, Topic, YearInfo } from '../curriculum';
 
-export type Mode = 'mission' | 'endless';
+// mission = 5 staged waves with lives · endless = Sky Storm, ramps until lives run out · sprint = 60-second time attack, no lives
+export type Mode = 'mission' | 'endless' | 'sprint';
+export const SPRINT_SECONDS = 60;
 export interface SessionEvents {
   onQuestion: (q: Question, info: { stage: number; index: number; total: number; speed: number; labels: string[] }) => void;
   onCorrect: (q: Question, points: number, combo: number) => void;
@@ -10,29 +12,43 @@ export interface SessionEvents {
   onProgress: (label: string, done: number, total: number) => void;   // sequence step
   onLives: (lives: number) => void;
   onStageClear: (stage: number, stars: number, accuracy: number) => void;
+  onTime?: (secondsLeft: number) => void;               // sprint clock, once per whole second
   onEnd: (r: SessionResult) => void;
 }
 export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number }
-export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; rng?: () => number; stages?: number }
+export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; rng?: () => number; stages?: number; seconds?: number }
 
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
   correct = 0; attempts = 0; stageCorrect = 0; stageAttempts = 0; stageStars: number[] = [];
   current: Question | null = null; seqIndex = 0; waiting = false; ended = false; questionsAsked = 0;
+  timeLeft: number;                                     // ms, sprint only (0 otherwise)
   private rng: () => number; readonly stages: number;
   constructor(public o: SessionOpts, private ev: SessionEvents) {
     this.lives = o.year.lives; this.rng = o.rng ?? Math.random; this.stages = o.stages ?? o.year.speeds.length;
+    this.timeLeft = o.mode === 'sprint' ? (o.seconds ?? SPRINT_SECONDS) * 1000 : 0;
   }
   get perStage() { return this.o.year.perStage; }
+  get secondsLeft() { return Math.ceil(this.timeLeft / 1000); }
   get difficulty(): Difficulty {
     if (this.o.mode === 'mission') return this.o.year.diffs[Math.min(this.stage, this.o.year.diffs.length) - 1] ?? 3;
+    if (this.o.mode === 'sprint') return this.questionsAsked < 5 ? 1 : this.questionsAsked < 12 ? 2 : 3;
     return this.questionsAsked < 8 ? 1 : this.questionsAsked < 20 ? 2 : 3;
   }
   get speed() {
     const gentle = this.o.year.gentle;
     if (this.o.mode === 'mission') { const s = this.o.year.speeds[Math.min(this.stage, this.o.year.speeds.length) - 1] ?? 3; return this.current?.sequence ? Math.max(1, s - 1) : s; }
+    if (this.o.mode === 'sprint') { const s = this.o.year.speeds[1] ?? 2; return this.current?.sequence ? Math.max(1, s - 1) : s; }   // steady pace: the clock is the pressure
     const s = this.questionsAsked < 10 ? 1 : this.questionsAsked < 25 ? 2 : 3;
     return gentle ? Math.min(2, s) : s;
+  }
+  /** Sprint clock: advance by `ms`. Emits onTime when the displayed second changes; ends the run at zero. */
+  tick(ms: number) {
+    if (this.o.mode !== 'sprint' || this.ended || ms <= 0) return;
+    const before = this.secondsLeft;
+    this.timeLeft = Math.max(0, this.timeLeft - ms);
+    if (this.secondsLeft !== before) this.ev.onTime?.(this.secondsLeft);
+    if (this.timeLeft === 0) this.end(true);
   }
   /** Player hit a bomb / trap bubble: costs a life but the question continues. */
   bomb() {
@@ -100,7 +116,7 @@ export class Session {
     const q = this.current!; this.waiting = true;
     this.attempts++; this.correct++; this.stageAttempts++; this.stageCorrect++;
     this.combo++; this.bestCombo = Math.max(this.bestCombo, this.combo);
-    const base = this.o.mode === 'mission' ? 10 * this.stage : 10 + Math.min(20, Math.floor(this.questionsAsked / 5) * 5);
+    const base = this.o.mode === 'mission' ? 10 * this.stage : this.o.mode === 'sprint' ? 10 : 10 + Math.min(20, Math.floor(this.questionsAsked / 5) * 5);
     const points = base + (this.combo >= 3 ? Math.min(20, this.combo * 2) : 0);
     this.score += points;
     this.ev.onCorrect(q, points, this.combo);
@@ -111,13 +127,14 @@ export class Session {
     this.loseLife();
   }
   private loseLife() {
+    if (this.o.mode === 'sprint') return;               // no lives in a sprint: a slip only costs time
     this.lives = Math.max(0, this.lives - 1); this.ev.onLives(this.lives);
     if (this.lives === 0) this.end(false);
   }
   /** Called by the UI after feedback delay to move on. */
   advance() {
     if (this.ended) return;
-    if (this.o.mode === 'endless') { this.nextQuestion(); return; }
+    if (this.o.mode !== 'mission') { this.nextQuestion(); return; }
     this.index++;
     if (this.index >= this.perStage) {
       const acc = this.stageAttempts ? this.stageCorrect / this.stageAttempts : 0;
@@ -139,9 +156,11 @@ export class Session {
     if (this.ended) return;
     this.ended = true;
     const total = this.stageStars.reduce((s, x) => s + x, 0);
-    const stars = this.o.mode === 'mission' ? (won ? Math.max(1, Math.round(total / this.stages)) : 0) : (this.score >= 300 ? 3 : this.score >= 150 ? 2 : this.score >= 50 ? 1 : 0);
-    // Ninja coins: 1 per correct answer, +5 per stage star, +20 for a completed mission, endless: score/10
-    const coins = this.correct + total * 5 + (won && this.o.mode === 'mission' ? 20 : 0) + (this.o.mode === 'endless' ? Math.floor(this.score / 10) : 0);
+    const stars = this.o.mode === 'mission' ? (won ? Math.max(1, Math.round(total / this.stages)) : 0)
+      : this.o.mode === 'sprint' ? (this.correct >= 12 ? 3 : this.correct >= 6 ? 2 : this.correct >= 1 ? 1 : 0)
+      : (this.score >= 300 ? 3 : this.score >= 150 ? 2 : this.score >= 50 ? 1 : 0);
+    // Ninja coins: 1 per correct answer, +5 per stage star, +20 for a completed mission, endless: score/10, sprint: +5 per star
+    const coins = this.correct + total * 5 + (won && this.o.mode === 'mission' ? 20 : 0) + (this.o.mode === 'endless' ? Math.floor(this.score / 10) : 0) + (this.o.mode === 'sprint' ? stars * 5 : 0);
     this.ev.onEnd({ mode: this.o.mode, won, score: this.score, stars, stageStars: this.stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins });
   }
 }

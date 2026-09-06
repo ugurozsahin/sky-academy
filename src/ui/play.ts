@@ -1,27 +1,28 @@
 import { AVATARS, avatarById, cheerLine, praiseLine, VILLAIN } from '../avatars';
 import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
 import { Arena } from '../game/arena';
-import { Session, type SessionResult } from '../game/session';
+import { Session, type Mode, type SessionResult } from '../game/session';
 import { Tracer } from '../game/tracing';
-import { addCoins, load, recordEndless, recordTopic, save, touchStreak } from '../storage';
+import { addCoins, load, recordEndless, recordSprint, recordTopic, save, touchStreak } from '../storage';
 import { say, sfx, sliceFx } from '../audio';
 import { $, esc, render, stars } from './dom';
 import { renderVisual } from './visuals';
 
 const BOMB = '💣';
-export interface PlayOpts { year: YearInfo; topic?: Topic; mode: 'mission' | 'endless' }
+export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode }
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
   const tracing = o.topic?.mode === 'tracing';
-  const title = o.mode === 'endless' ? 'Sky Storm' : o.topic!.title;
+  const sprint = o.mode === 'sprint';
+  const title = o.mode === 'endless' ? 'Sky Storm' : sprint ? 'Ninja Sprint' : o.topic!.title;
   render(`
   <section class="screen play ${tracing ? 'tracing' : ''}" style="--glow:${av.glow}">
     ${tracing ? '' : '<canvas id="arena" aria-label="Game arena"></canvas>'}
     <div class="hud">
       <div class="hud-top">
         <button class="icon-btn" id="pause" aria-label="Pause">⏸</button>
-        <div class="lives" id="lives" aria-live="polite"></div>
+        ${sprint ? '<div class="timer" id="timer" aria-live="polite" aria-label="Time left"></div>' : '<div class="lives" id="lives" aria-live="polite"></div>'}
         <div class="score"><small>SCORE</small><b id="score">0</b></div>
       </div>
       <div class="qcard" id="qcard">
@@ -44,9 +45,9 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   const later = (fn: () => void, ms: number) => { const t = window.setTimeout(() => { if (alive) fn(); }, ms); timers.push(t); };
   const toast = (text: string, cls = '') => { els.toast.textContent = text; els.toast.className = `toast show ${cls}`; later(() => els.toast.classList.remove('show'), 1300); };
 
-  const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.mode === 'endless' ? topicsFor(o.year.id).filter(t => t.mode !== 'tracing') : undefined }, {
+  const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.mode !== 'tracing') : undefined }, {
     onQuestion(q, info) {
-      els.stage.textContent = o.mode === 'endless' ? `Q${session.questionsAsked}` : `${STAGE_NAMES[info.stage - 1] ?? 'Stage ' + info.stage} · ${info.index + 1}/${info.total}`;
+      els.stage.textContent = o.mode !== 'mission' ? `Q${session.questionsAsked}` : `${STAGE_NAMES[info.stage - 1] ?? 'Stage ' + info.stage} · ${info.index + 1}/${info.total}`;
       els.prompt.innerHTML = promptHTML(q, session.seqIndex); els.vis.innerHTML = renderVisual(q.visual); els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
       lastOutcome = 'none';
       if (tracing) { say(q.say ?? q.prompt); startTrace(q); return; }
@@ -71,11 +72,16 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     onProgress(label, done, total) { sfx.slice(); els.prompt.innerHTML = promptHTML(session.current!, done); if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow); if (done < total) say(label, false); },
     onLives(n) { drawLives(n); if (n < prevLives) sfx.life(); prevLives = n; },
     onStageClear(stage, st, acc) { sfx.stage(); showStageClear(stage, st, acc); },
-    onEnd(r) { later(() => showResults(r), lastOutcome === 'none' ? 0 : 900); },
+    onTime(s) { drawTimer(s); if (s <= 3 && s > 0) sfx.tap(); },
+    onEnd(r) { later(() => showResults(r), lastOutcome === 'none' || r.mode === 'sprint' ? 0 : 900); },
   });
   let prevLives = o.year.lives;
-  const drawLives = (n: number) => { els.lives.innerHTML = Array.from({ length: o.year.lives }, (_, i) => `<span class="${i < n ? 'on' : 'off'}">❤️</span>`).join(''); };
-  drawLives(o.year.lives);
+  const drawLives = (n: number) => { if (els.lives) els.lives.innerHTML = Array.from({ length: o.year.lives }, (_, i) => `<span class="${i < n ? 'on' : 'off'}">❤️</span>`).join(''); };
+  const drawTimer = (s: number) => { const t = $('#timer'); if (!t) return; t.textContent = `⏱ ${s}`; t.classList.toggle('hurry', s <= 10); };
+  drawLives(o.year.lives); drawTimer(session.secondsLeft);
+  // Sprint clock: real elapsed time, frozen while the pause overlay (or a result) has the arena paused.
+  let ticker = 0; let lastTick = 0;
+  if (sprint) ticker = window.setInterval(() => { const now = performance.now(); const dt = lastTick ? now - lastTick : 0; lastTick = now; if (!arena?.paused && !session.ended) session.tick(dt); }, 100);
 
   if (!tracing) {
     arena = new Arena($('#arena') as HTMLCanvasElement, {
@@ -132,21 +138,22 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   }
   function showResults(r: SessionResult) {
     arena && (arena.paused = true);
-    if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score); else recordEndless(o.year.id, r.score);
+    let newBest = false;
+    if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score); else if (o.mode === 'sprint') newBest = recordSprint(o.year.id, r.score); else recordEndless(o.year.id, r.score);
     const fresh = addCoins(r.coins); const streak = touchStreak();
     const stickerHTML = fresh.map(id => { const a = AVATARS.find(x => x.id === id); return `<div class="unlock" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${a ? a.img : VILLAIN.img}" alt=""></span><b>New sticker!</b><small>${a ? a.name : VILLAIN.name}</small></div>`; }).join('');
     if (fresh.length) later(() => sfx.stage(), 600);
-    const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉') : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
-    const headline = r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
+    const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉') : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪') : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
+    const headline = r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
     say(headline);
     els.overlay.hidden = false; els.overlay.innerHTML = `
       <div class="modal results">
         <div class="hero-big ${r.won ? '' : 'sad'}" style="--glow:${av.glow}"><img src="${av.img}" alt="${av.name}"><div class="speech">${esc(headline)}</div></div>
         <div class="medal">${medal}</div>
-        <h2>${r.mode === 'endless' ? 'Storm over!' : r.won ? 'Mission complete!' : 'Out of lives'}</h2>
-        ${r.mode === 'mission' ? `<div class="big-stars">${stars(r.stars)}</div>` : ''}
+        <h2>${r.mode === 'endless' ? 'Storm over!' : r.mode === 'sprint' ? "Time's up!" : r.won ? 'Mission complete!' : 'Out of lives'}</h2>
+        ${r.mode !== 'endless' ? `<div class="big-stars">${stars(r.stars)}</div>` : ''}
         <div class="statgrid"><div><b>${r.score}</b><small>score</small></div><div><b>${r.correct}/${r.attempts}</b><small>correct</small></div><div><b>×${r.bestCombo}</b><small>best combo</small></div></div>
-        <div class="coin-row"><span class="coin-gain">+${r.coins} 🪙</span>${streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : ''}</div>
+        <div class="coin-row"><span class="coin-gain">+${r.coins} 🪙</span>${newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : ''}</div>
         ${stickerHTML}
         <div class="row"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
@@ -162,7 +169,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
   $('#speak').addEventListener('click', repeatPrompt);
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
-  function cleanup() { alive = false; timers.forEach(clearTimeout); arena?.destroy(); tracer?.destroy(); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete (window as any).__sna; }
+  function cleanup() { alive = false; timers.forEach(clearTimeout); clearInterval(ticker); arena?.destroy(); tracer?.destroy(); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete (window as any).__sna; }
 
   // Test / accessibility hooks
   (window as any).__sna = {
@@ -170,7 +177,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     answer: () => { const q = session.current; if (!q) return false; if (tracing) { tracer?.autoTrace(); return true; } const label = q.sequence ? q.sequence[session.seqIndex] : q.answer; return arena!.hitLabel(label); },
     wrong: () => { const q = session.current; if (!q || !arena) return false; const target = q.sequence ? q.sequence[session.seqIndex] : q.answer; const b = arena.bubbles.find(x => x.launched && !x.dead && x.label !== target && x.label !== BOMB); return b ? arena.hitLabel(b.label) : false; },
     bubbles: () => arena?.bubbles.filter(b => b.launched && !b.dead).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })) ?? [],
-    state: () => ({ stage: session.stage, index: session.index, score: session.score, lives: session.lives, ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt, answer: session.current?.answer }),
+    state: () => ({ stage: session.stage, index: session.index, score: session.score, lives: session.lives, ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt, answer: session.current?.answer, timeLeft: session.timeLeft }),
   };
   session.start();
 }

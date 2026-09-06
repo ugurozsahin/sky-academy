@@ -9,6 +9,7 @@ export interface SaveData {
   speech: boolean;
   progress: Record<string, TopicProgress>;
   endless: Record<string, number>;   // year -> best score
+  sprint: Record<string, number>;    // year -> best Ninja Sprint score
   totalSlices: number;
   coins: number;                     // ninja coins earned (lifetime)
   stickers: string[];                // unlocked sticker ids
@@ -16,7 +17,7 @@ export interface SaveData {
   tutorialSeen: boolean;             // the "slice the bubble" demo hand has done its job
 }
 const KEY = 'sna:v1';
-const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false };
+const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false };
 
 let cache: SaveData | null = null;
 export function load(): SaveData {
@@ -37,6 +38,11 @@ export function recordTopic(topicId: string, stars: number, score: number) {
 }
 export function recordEndless(year: string, score: number) {
   const e = load().endless; if ((e[year] ?? 0) < score) save({ endless: { ...e, [year]: score } });
+}
+/** Ninja Sprint best per year. Returns true when `score` is a new personal best (a score of 0 never is). */
+export function recordSprint(year: string, score: number): boolean {
+  const s = load().sprint; if (score <= 0 || (s[year] ?? 0) >= score) return false;
+  save({ sprint: { ...s, [year]: score } }); return true;
 }
 /** Sticker album: unlocked by lifetime coins. Order = avatars then the villain. */
 export const STICKER_IDS = ['volt', 'blaze', 'splash', 'terra', 'gust', 'frost', 'sol', 'shadow', 'kai', 'bolt', 'hammer'];

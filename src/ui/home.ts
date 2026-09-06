@@ -2,9 +2,10 @@ import { AVATARS, avatarById, VILLAIN } from '../avatars';
 import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
 import { load, save, STICKER_IDS, STICKER_COST } from '../storage';
 import { sfx, say } from '../audio';
+import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { $, $$, render, stars } from './dom';
 
-export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: 'mission' | 'endless' }) => void;
+export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode }) => void;
 type Nav = { avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay; rewards: () => void };
 
 const ISLAND_BLURB: Record<YearInfo['id'], string> = { reception: 'First steps · counting, sounds & letters', year1: 'Number bonds, adding, phonics & spelling', year2: 'Times tables, money, time & tricky words' };
@@ -74,6 +75,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     </div>
     <div class="topics" id="topics"></div>
     <button class="btn storm" id="endless"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Sky Storm</b><small>Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}</small></span></button>
+    <button class="btn storm sprint" id="sprint"><span class="vport emoji">⏱️</span><span><b>Ninja Sprint</b><small>${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}</small></span></button>
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {
@@ -89,6 +91,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
   $$('.tab').forEach(b => b.addEventListener('click', () => { subject = b.dataset.s as 'maths' | 'writing'; $$('.tab').forEach(x => x.classList.toggle('on', x === b)); sfx.tap(); drawTopics(); }));
   $('#endless').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'endless' }); });
+  $('#sprint').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'sprint' }); });
 }
 
 /** Rewards: coins, streak and the sticker album. */

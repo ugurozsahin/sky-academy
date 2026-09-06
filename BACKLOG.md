@@ -18,7 +18,7 @@ Status: `todo` · `doing` · `done` · `later`
 ## Proposed by Claude (new game modes & ideas — owner to prioritise)
 | # | Item | Why | Status |
 |---|---|---|---|
-| P1 | **Ninja Sprint** — 60-second time attack per island (no lives, beat your best) | Short sessions, replay value, prepares for the Y4 Multiplication Tables Check format | todo |
+| P1 | **Ninja Sprint** — 60-second time attack per island (no lives, beat your best) | Short sessions, replay value, prepares for the Y4 Multiplication Tables Check format | done |
 | P2 | **Boss Battle** — Hammer Man health bar; each correct slice hits him, wrong slices heal him; win = animated KO | Emotional climax kids remember; uses villain art | todo |
 | P3 | **Balance the Scales** — pick the bubble that makes both sides equal (=), leads into Y2 equivalence & Y3 algebra thinking | Curriculum depth (equals as balance) | todo |
 | P4 | **Memory Match** (non-slice) — flip cards: number ↔ word, coin ↔ value, shape ↔ name | Calm mode for Reception, different pace | todo |
@@ -67,3 +67,4 @@ Status: `todo` · `doing` · `done` · `later`
 | Whole-primary roadmap doc (`docs/ROADMAP-PRIMARY.md`) | v0.3 |
 | First-play tutorial (animated hand slices a demo bubble, spoken cue), tap-the-card to repeat the question, child-friendly en-GB voice ranking | v0.4 |
 | Slice robustness: a paused finger no longer loses its stroke; real-swipe e2e made deterministic | v0.4 |
+| Ninja Sprint mode: 60-second time attack per island, no lives, clock pauses with the game, stars by correct count, per-year best + "New best!" | v0.5 |
