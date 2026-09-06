@@ -28,7 +28,7 @@ Status: `todo` · `doing` · `done` · `later`
 | P8 | **Dojo challenges** — daily 3 missions with bonus coins; streak multiplier | Retention, uses reward system | done |
 | P9 | Costumes / blade skins bought with coins (owner art) | Reward sink, personalisation | todo |
 | P10 | Two-player "Ninja Duel" on one device (split screen, same question) | Siblings/classroom fun | todo |
-| P11 | Teacher/parent print-outs: certificate PNG on mission complete | Motivation, shareable | todo |
+| P11 | Teacher/parent print-outs: certificate PNG on mission complete | Motivation, shareable | done |
 | P12 | Whole-primary expansion per `docs/ROADMAP-PRIMARY.md` (Y3–Y4 first; MTC sprint) | Owner asked to widen scope | todo |
 
 ## Next
@@ -76,3 +76,4 @@ Status: `todo` · `doing` · `done` · `later`
 | Sound Hunt topics (R/Y1): picture-free phonics by ear — three spoken keyword words, slice the grapheme (phase 2 → 3 → 5 + split digraphs); sound-alike graphemes never used as decoys; card shows the words only when read-aloud is off | v0.5 |
 | Train with Sensei: per-island adaptive mission over the 3 weakest topics (lowest accuracy → stars → plays; unplayed fill in); every mode records per-topic hits/tries; question card names the topic; sessions counted | v0.5 |
 | Daily Dojo: three challenges a day (volume · mode · focus, picked from the date), progress bars on the sky map, +10 🪙 per challenge and +25 🪙 for the set, ×1.25 per consecutive dojo day up to ×2; bonus rows on every results screen | v0.5 |
+| Mission certificate: "🎓 Certificate" on a won mission / Sensei session draws a 1200×850 PNG (child's name, mission, island, stars, accuracy, date, avatar) and shares it via the system share sheet or downloads it | v0.5 |

@@ -8,6 +8,7 @@ import { say, sfx, sliceFx } from '../audio';
 import { $, esc, render, stars } from './dom';
 import { renderVisual } from './visuals';
 import { dojoRowsHTML } from './memory';
+import { drawCertificate, shareCertificate, type CertInfo } from './certificate';
 
 const BOMB = '💣';
 export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
@@ -43,7 +44,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
 
   const els = { lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'), toast: $('#toast'), overlay: $('#overlay'), qcard: $('#qcard') };
   let lastOutcome: 'correct' | 'wrong' | 'miss' | 'none' = 'none';
-  let arena: Arena | null = null; let tracer: Tracer | null = null; let timers: number[] = []; let alive = true;
+  let arena: Arena | null = null; let tracer: Tracer | null = null; let timers: number[] = []; let alive = true; let lastResult: SessionResult | null = null;
   const later = (fn: () => void, ms: number) => { const t = window.setTimeout(() => { if (alive) fn(); }, ms); timers.push(t); };
   const toast = (text: string, cls = '') => { els.toast.textContent = text; els.toast.className = `toast show ${cls}`; later(() => els.toast.classList.remove('show'), 1300); };
 
@@ -164,6 +165,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉') : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪') : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
     const headline = r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
     say(headline);
+    const cert = certInfo(r); lastResult = r;
     els.overlay.hidden = false; els.overlay.innerHTML = `
       <div class="modal results">
         ${r.mode === 'boss' && r.won ? `<div class="ko" aria-hidden="true"><img src="${VILLAIN.img}" alt=""><b>K.O.</b></div>` : ''}
@@ -176,10 +178,19 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         ${dojoRowsHTML(dojo)}
         ${stickerHTML}
         <div class="row"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
+        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this mission">🎓 Certificate</button></div>' : ''}
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
+    if (cert) $('#cert').addEventListener('click', async () => {
+      sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
+      try { const how = await shareCertificate(await drawCertificate(cert), `sky-ninja-certificate-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`); toast(how === 'shared' ? 'Certificate shared!' : 'Certificate saved!', 'good'); }
+      catch { toast('Could not make the certificate', 'bad'); }
+      b.disabled = false;
+    });
   }
+  /** Certificate details for a won mission / Sensei session (null for the other modes and lost runs). */
+  const certInfo = (r: SessionResult): CertInfo | null => (r.won && o.mode === 'mission' ? { name: d.name, avatar: av, year: o.year.title, title: o.topic?.title ?? 'Sensei training', stars: r.stars, score: r.score, correct: r.correct, attempts: r.attempts, training } : null);
   function showPause() {
     arena && (arena.paused = true);
     els.overlay.hidden = false; els.overlay.innerHTML = `<div class="modal"><h2>Paused</h2><div class="row"><button class="btn primary big" id="resume">Resume</button><button class="btn big" id="quit">Quit</button></div></div>`;
@@ -198,6 +209,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     wrong: () => { const q = session.current; if (!q || !arena) return false; const target = q.sequence ? q.sequence[session.seqIndex] : q.answer; const b = arena.bubbles.find(x => x.launched && !x.dead && x.label !== target && x.label !== BOMB); return b ? arena.hitLabel(b.label) : false; },
     bubbles: () => arena?.bubbles.filter(b => b.launched && !b.dead).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })) ?? [],
     state: () => ({ stage: session.stage, index: session.index, score: session.score, lives: session.lives, ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt, answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp }),
+    certificate: async () => { const c = lastResult && certInfo(lastResult); return c ? (await drawCertificate(c)).toDataURL('image/png') : null; },   // PNG data URL of the certificate for the finished mission
   };
   session.start();
 }
