@@ -3,10 +3,11 @@ import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from
 import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
 import { Tracer } from '../game/tracing';
-import { addCoins, load, recordAccuracy, recordBossWin, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak } from '../storage';
+import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak } from '../storage';
 import { say, sfx, sliceFx } from '../audio';
 import { $, esc, render, stars } from './dom';
 import { renderVisual } from './visuals';
+import { dojoRowsHTML } from './memory';
 
 const BOMB = '💣';
 export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
@@ -155,9 +156,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
     else recordEndless(o.year.id, r.score);
     for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t.hits, t.tries);   // every mode teaches Sensei what is hard
-    const fresh = addCoins(r.coins); const streak = touchStreak();
+    const bySubject = (s: Topic['subject']) => Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicsFor(o.year.id).find(x => x.id === id)?.subject === s ? t.hits : 0), 0);
+    const dojo = recordDojo({ mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo, stars: r.stars, score: r.score, training, mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing') });
+    const fresh = addCoins(r.coins + dojo.coins); const streak = touchStreak();
     const stickerHTML = fresh.map(id => { const a = AVATARS.find(x => x.id === id); return `<div class="unlock" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${a ? a.img : VILLAIN.img}" alt=""></span><b>New sticker!</b><small>${a ? a.name : VILLAIN.name}</small></div>`; }).join('');
-    if (fresh.length) later(() => sfx.stage(), 600);
+    if (fresh.length || dojo.completed.length) later(() => sfx.stage(), 600);
     const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉') : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪') : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
     const headline = r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
     say(headline);
@@ -170,6 +173,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         ${r.mode !== 'endless' ? `<div class="big-stars">${stars(r.stars)}</div>` : ''}
         <div class="statgrid"><div><b>${r.score}</b><small>score</small></div><div><b>${r.correct}/${r.attempts}</b><small>correct</small></div><div><b>×${r.bestCombo}</b><small>best combo</small></div></div>
         <div class="coin-row"><span class="coin-gain">+${r.coins} 🪙</span>${newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : ''}</div>
+        ${dojoRowsHTML(dojo)}
         ${stickerHTML}
         <div class="row"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
       </div>`;

@@ -1,9 +1,10 @@
 import { AVATARS, avatarById, VILLAIN } from '../avatars';
 import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
-import { load, save, STICKER_IDS, STICKER_COST } from '../storage';
+import { dojoToday, load, save, STICKER_IDS, STICKER_COST } from '../storage';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { weakestTopics } from '../game/sensei';
+import { carriedStreak, dailyChallenges, multiplier, SET_BONUS } from '../game/dojo';
 import { $, $$, render, stars } from './dom';
 
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
@@ -31,6 +32,19 @@ function topbar(nav: Nav, rerender: () => void) {
   return { html, bind };
 }
 
+/** Daily Dojo card: today's three challenges, progress bars, bonus coins and the streak multiplier. */
+function dojoCard() {
+  const s = dojoToday(); const cs = dailyChallenges(s.date); const carried = carriedStreak(s, s.date); const mult = multiplier(carried);
+  const items = cs.map(c => { const p = Math.min(c.goal, s.progress[c.id] ?? 0); const done = s.done.includes(c.id); return `
+    <li class="dojo-item${done ? ' done' : ''}"><span class="ic">${c.icon}</span><span class="txt"><b>${c.title}</b><span class="isl-bar"><i style="width:${Math.round(100 * p / c.goal)}%"></i></span></span><span class="prog">${done ? `✓ +${Math.floor(c.bonus * mult)} 🪙` : `${p}/${c.goal}`}</span></li>`; }).join('');
+  return `
+    <div class="dojo${s.setDone ? ' complete' : ''}" id="dojo" aria-label="Daily Dojo challenges">
+      <div class="dojo-head"><b>🏯 Daily Dojo</b><small>${s.setDone ? `All done today · streak ${s.streak.days} day${s.streak.days === 1 ? '' : 's'}` : `Three challenges · bonus coins`}</small>${mult > 1 ? `<span class="pill mult">×${mult} streak</span>` : ''}</div>
+      <ul class="dojo-list">${items}</ul>
+      <small class="dojo-foot">${s.setDone ? 'Come back tomorrow for three new challenges' : `Finish all three → +${Math.floor(SET_BONUS * mult)} 🪙 bonus`}</small>
+    </div>`;
+}
+
 /** Sky Map: one decision — which island (year group). */
 export function mapScreen(nav: Nav) {
   const d = load();
@@ -50,6 +64,7 @@ export function mapScreen(nav: Nav) {
           <span class="isl-go">Go →</span>
         </button>`; }).join('')}
     </div>
+    ${dojoCard()}
     <footer class="foot">Sky Ninja Academy · aligned to EYFS & KS1 National Curriculum</footer>
   </section>`, 'bg-sky');
   tb.bind();

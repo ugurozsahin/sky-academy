@@ -1,4 +1,5 @@
 // Persistent player state (localStorage). Small, versioned, safe on failure.
+import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type DojoState } from './game/dojo';
 export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }   // hits/tries = lifetime slices (missions + Sensei training)
 export interface SaveData {
   v: 1;
@@ -18,9 +19,10 @@ export interface SaveData {
   stickers: string[];                // unlocked sticker ids
   streak: { last: string; days: number };   // daily play streak (ISO date)
   tutorialSeen: boolean;             // the "slice the bubble" demo hand has done its job
+  dojo: DojoState;                   // Daily Dojo challenges (progress resets each day)
 }
 const KEY = 'sna:v1';
-const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false };
+const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo('') };
 
 let cache: SaveData | null = null;
 export function load(): SaveData {
@@ -88,5 +90,12 @@ export function touchStreak(now = new Date()): number {
   const days = d.streak.last === today(y) ? d.streak.days + 1 : 1;
   save({ streak: { last: t, days } });
   return days;
+}
+/** Today's dojo state (rolled over to a fresh day when needed — not persisted until something is recorded). */
+export function dojoToday(now = new Date()): DojoState { return dojoFor(load().dojo, today(now)); }
+/** Feed a finished game to the Daily Dojo. Persists the state; the caller pays out `coins` (so sticker unlocks show). */
+export function recordDojo(e: DojoEvent, now = new Date()): DojoOutcome {
+  const out = applyEvent(load().dojo, e, today(now));
+  save({ dojo: out.state }); return out;
 }
 export function reset() { cache = null; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }

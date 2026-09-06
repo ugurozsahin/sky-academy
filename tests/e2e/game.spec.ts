@@ -62,7 +62,7 @@ async function solveCurrent(page: Page) {
   await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before);
 }
 /** Wait until a wrong bubble can be sliced on a live question — or the game has ended. */
-const waitForWrongOrEnd = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s) return false; if (s.ended) return true; if (s.waiting) return false; const c = window.__sna.session.current; const t = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; const bs = window.__sna.bubbles(); return bs.length > 1 && bs.some((b: any) => b.label === t); }, null, { timeout: 20000 });
+const waitForWrongOrEnd = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s) return false; if (s.ended) return true; if (s.waiting) return false; const c = window.__sna.session.current; const t = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; const bs = window.__sna.bubbles(); return bs.some((b: any) => b.label === t) && bs.some((b: any) => b.label !== t && b.label !== '💣'); }, null, { timeout: 20000 });   // a decoy must be in flight too (every 3rd Storm wave adds a TNT bubble, which never counts as a wrong slice)
 async function answerAll(page: Page, n: number) {
   for (let i = 0; i < n; i++) {
     await page.waitForFunction(() => { const s = window.__sna?.state(); return s && !s.waiting && window.__sna.bubbles().some((b: any) => b.label === (window.__sna.session.current.sequence ? window.__sna.session.current.sequence[window.__sna.session.seqIndex] : s.answer)); });
@@ -141,13 +141,14 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('h2')).toHaveText('Mission complete!');
     await expect(results.locator('.medal')).toHaveText('🥇');
     await expect(results.locator('.coin-gain')).toContainText('+120');   // 25 correct + 15 stars×5 + 20 mission
-    await expect(results.locator('.unlock')).toHaveCount(3);              // 120 coins → stickers at 30, 70, 120
+    await expect(results.locator('.unlock')).toHaveCount(3);              // 120 coins → stickers at 30, 70, 120 (dojo bonuses add at most 55, so never the 180 one)
+    const dojoBonus = (await results.locator('.dojo-bonus .gain').allTextContents()).reduce((n, t) => n + Number(t.replace(/\D/g, '')), 0);   // today's Daily Dojo may pay for the mission / 3 stars / no slips / combo
     await page.click('#home');
     await expect(page.locator('.island-screen')).toBeVisible();
     await expect(page.locator('.topic[data-id="r-count"] .stars')).toContainText('★★★');
     await page.click('#back');
     await expect(page.locator('.island[data-year="reception"] .isl-stars')).toContainText('★ 3/');
-    await expect(page.locator('#rewards b')).toHaveText('120');
+    await expect(page.locator('#rewards b')).toHaveText(String(120 + dojoBonus));
     await page.click('#rewards');
     await expect(page.locator('.rewards')).toBeVisible();
     await expect(page.locator('.sticker.got')).toHaveCount(3);
@@ -285,6 +286,30 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.coin-gain')).toContainText('+6');         // 1 correct + 1 star × 5
     await page.click('#home');
     await expect(page.locator('#sprint small')).toContainText('best 10');
+  });
+
+  test('Daily Dojo: three challenges on the sky map, progress survives a reload, bonus rows on results', async ({ page }) => {
+    await pickAvatar(page);
+    const items = page.locator('.dojo-item');
+    await expect(items).toHaveCount(3);
+    await expect(items.nth(0).locator('.prog')).toHaveText(/^0\/\d+$/);          // the volume challenge ("Answer N questions right")
+    await expect(page.locator('.dojo-foot')).toContainText('+25');               // set bonus, ×1 with no dojo streak yet
+    await expect(page.locator('.dojo-head .mult')).toHaveCount(0);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await expect(page.locator('.play')).toBeVisible();
+    await solveCurrent(page);
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    const results = page.locator('.results');
+    await expect(results.locator('h2')).toHaveText("Time's up!");
+    await expect(results.locator('.coin-gain')).toContainText('+6');             // the session's own coins stay separate from dojo bonuses
+    const bonusRows = await results.locator('.dojo-bonus').count();              // "Play a Ninja Sprint" is one of today's challenges only on some days
+    await page.click('#home');
+    await page.click('#back');
+    await expect(items.nth(0).locator('.prog')).toHaveText(/^1\/\d+$/);          // one correct answer counted
+    expect(await page.locator('.dojo-item.done').count()).toBe(bonusRows);
+    await page.goto('/');
+    await expect(page.locator('.dojo-item').nth(0).locator('.prog')).toHaveText(/^1\/\d+$/);
   });
 
   test('Boss Battle: correct slices hurt Hammer Man, a slip heals him, and the KO is counted', async ({ page }) => {

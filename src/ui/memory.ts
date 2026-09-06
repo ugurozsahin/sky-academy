@@ -2,10 +2,18 @@
 import { AVATARS, avatarById, cheerLine, praiseLine, VILLAIN } from '../avatars';
 import type { YearInfo } from '../curriculum';
 import { Memory, pickTheme, type Face } from '../game/memory';
-import { addCoins, load, recordMemory, touchStreak } from '../storage';
+import { addCoins, load, recordDojo, recordMemory, touchStreak } from '../storage';
 import { say, sfx } from '../audio';
 import { $, $$, esc, render, stars } from './dom';
 import { coinSVG } from './visuals';
+import type { DojoOutcome } from '../game/dojo';
+
+/** Results rows for Daily Dojo challenges finished by this game (shared by the play and memory screens). */
+export function dojoRowsHTML(d: DojoOutcome): string {
+  const rows = d.completed.map(c => `<div class="dojo-bonus"><span class="ic">${c.icon}</span><span><b>Dojo challenge done!</b><small>${esc(c.title)}</small></span><span class="gain">+${Math.floor(c.bonus * d.multiplier)} 🪙</span></div>`);
+  if (d.setDone) rows.push(`<div class="dojo-bonus set"><span class="ic">🏯</span><span><b>Daily Dojo complete!</b><small>All three challenges · ${d.state.streak.days}-day dojo streak</small></span><span class="gain">+${d.coins - d.completed.reduce((n, c) => n + Math.floor(c.bonus * d.multiplier), 0)} 🪙</span></div>`);
+  return rows.join('');
+}
 
 export interface MemoryOpts { year: YearInfo; theme?: string }
 
@@ -56,7 +64,8 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
 
   function finish() {
     const boards = recordMemory(o.year.id);
-    const fresh = addCoins(game.coins); const streak = touchStreak();
+    const dojo = recordDojo({ mode: 'memory', won: true, correct: game.pairs.length, attempts: game.moves, bestCombo: 0, stars: game.stars, score: game.score });
+    const fresh = addCoins(game.coins + dojo.coins); const streak = touchStreak();
     const stickerHTML = fresh.map(id => { const a = AVATARS.find(x => x.id === id); return `<div class="unlock" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${a ? a.img : VILLAIN.img}" alt=""></span><b>New sticker!</b><small>${a ? a.name : VILLAIN.name}</small></div>`; }).join('');
     if (fresh.length) later(() => sfx.stage(), 600);
     sfx.stage();
@@ -70,6 +79,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
         <div class="big-stars">${stars(game.stars)}</div>
         <div class="statgrid"><div><b>${game.score}</b><small>score</small></div><div><b>${game.moves}</b><small>turns</small></div><div><b>${boards}</b><small>boards</small></div></div>
         <div class="coin-row"><span class="coin-gain">+${game.coins} 🪙</span>${streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : ''}</div>
+        ${dojoRowsHTML(dojo)}
         ${stickerHTML}
         <div class="row"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
