@@ -35,16 +35,19 @@ async function swipeAnswer(page: Page) {
     return hit ? JSON.stringify(hit) : null;
   }, null, { timeout: 15000 });
   const label = JSON.parse(await b.jsonValue() as string).label as string;
-  const others = await page.evaluate(() => { // freeze every bubble where it is; never launch the rest of the wave
-    for (const x of window.__sna.arena.bubbles) { if (x.launched) { x.vx = 0; x.vy = 0; x._g = 0; } else x.launchAt = Infinity; }
-    return window.__sna.bubbles();
+  const { others, W, H, top } = await page.evaluate(() => { // freeze every bubble where it is; never launch the rest of the wave
+    const a = window.__sna.arena;
+    for (const x of a.bubbles) { if (x.launched) { x.vx = 0; x.vy = 0; x._g = 0; } else x.launchAt = Infinity; }
+    return { others: window.__sna.bubbles(), W: a.W, H: a.H, top: a.topInset };
   });
   const target = others.find((x: any) => x.label === label);   // position after the freeze, not before the round trip
-  // Approach from a side with no other bubble in the way (a stroke through a decoy counts as a wrong answer).
+  // Approach from a side with no other bubble in the way (a stroke through a decoy counts as a wrong answer),
+  // and whose start point is still on the canvas (edge bubbles sit r+8 from the side; the question card covers the top).
   const decoys = others.filter((x: any) => x.label !== target.label);
   const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-  const clear = (dx: number, dy: number) => decoys.every((o: any) => [1.6, 1.1, 0.6].every(k => Math.hypot(o.x - (target.x + dx * target.r * k), o.y - (target.y + dy * target.r * k)) > o.r * 1.2 + 4));
-  const [dx, dy] = dirs.find(([x, y]) => clear(x, y)) ?? dirs[0];
+  const onCanvas = (dx: number, dy: number) => { const sx = target.x + dx * target.r * 1.6, sy = target.y + dy * target.r * 1.6; return sx > 4 && sx < W - 4 && sy > top + 4 && sy < H - 4; };
+  const clear = (dx: number, dy: number) => onCanvas(dx, dy) && decoys.every((o: any) => [1.6, 1.1, 0.6].every(k => Math.hypot(o.x - (target.x + dx * target.r * k), o.y - (target.y + dy * target.r * k)) > o.r * 1.2 + 4));
+  const [dx, dy] = dirs.find(([x, y]) => clear(x, y)) ?? dirs.find(([x, y]) => onCanvas(x, y)) ?? dirs[0];
   await page.mouse.move(target.x + dx * target.r * 1.6, target.y + dy * target.r * 1.6);
   await page.mouse.down();
   for (let i = 1; i <= 4; i++) { const k = 1.6 - (1.8 * i) / 4; await page.mouse.move(target.x + dx * target.r * k, target.y + dy * target.r * k); }
