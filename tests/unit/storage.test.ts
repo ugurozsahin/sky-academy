@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, load, recordSprint, reset, stickersFor, touchStreak, STICKER_IDS, STICKER_COST } from '../../src/storage';
+import { addCoins, load, recordBossWin, recordSprint, reset, stickersFor, touchStreak, STICKER_IDS, STICKER_COST } from '../../src/storage';
 
 // minimal localStorage shim for node
 const mem: Record<string, string> = {};
@@ -29,6 +29,11 @@ describe('rewards storage', () => {
     expect(recordSprint('year1', 90)).toBe(false);
     expect(recordSprint('year2', 30)).toBe(true);
     expect(load().sprint).toEqual({ year1: 120, year2: 30 });
+  });
+  it('boss knock-outs are counted per year', () => {
+    expect(load().boss).toEqual({});
+    expect(recordBossWin('year1')).toBe(1); expect(recordBossWin('year1')).toBe(2); expect(recordBossWin('reception')).toBe(1);
+    expect(load().boss).toEqual({ year1: 2, reception: 1 });
   });
   it('streak counts consecutive days only', () => {
     expect(touchStreak(new Date('2026-09-05T10:00:00Z'))).toBe(1);

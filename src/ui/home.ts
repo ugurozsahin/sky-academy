@@ -76,6 +76,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     <div class="topics" id="topics"></div>
     <button class="btn storm" id="endless"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Sky Storm</b><small>Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}</small></span></button>
     <button class="btn storm sprint" id="sprint"><span class="vport emoji">⏱️</span><span><b>Ninja Sprint</b><small>${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}</small></span></button>
+    <button class="btn storm boss" id="boss"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Boss Battle</b><small>Knock out Hammer Man · KOs ${d.boss[year.id] ?? 0}</small></span></button>
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {
@@ -92,6 +93,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   $$('.tab').forEach(b => b.addEventListener('click', () => { subject = b.dataset.s as 'maths' | 'writing'; $$('.tab').forEach(x => x.classList.toggle('on', x === b)); sfx.tap(); drawTopics(); }));
   $('#endless').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'endless' }); });
   $('#sprint').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'sprint' }); });
+  $('#boss').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'boss' }); });
 }
 
 /** Rewards: coins, streak and the sticker album. */

@@ -19,7 +19,7 @@ Status: `todo` · `doing` · `done` · `later`
 | # | Item | Why | Status |
 |---|---|---|---|
 | P1 | **Ninja Sprint** — 60-second time attack per island (no lives, beat your best) | Short sessions, replay value, prepares for the Y4 Multiplication Tables Check format | done |
-| P2 | **Boss Battle** — Hammer Man health bar; each correct slice hits him, wrong slices heal him; win = animated KO | Emotional climax kids remember; uses villain art | todo |
+| P2 | **Boss Battle** — Hammer Man health bar; each correct slice hits him, wrong slices heal him; win = animated KO | Emotional climax kids remember; uses villain art | done |
 | P3 | **Balance the Scales** — pick the bubble that makes both sides equal (=), leads into Y2 equivalence & Y3 algebra thinking | Curriculum depth (equals as balance) | todo |
 | P4 | **Memory Match** (non-slice) — flip cards: number ↔ word, coin ↔ value, shape ↔ name | Calm mode for Reception, different pace | todo |
 | P5 | **Story Sentences** — slice words in order to build a sentence read aloud ("The cat sat on the mat.") | Writing composition / word order, uses sequence engine | todo |
@@ -68,3 +68,4 @@ Status: `todo` · `doing` · `done` · `later`
 | First-play tutorial (animated hand slices a demo bubble, spoken cue), tap-the-card to repeat the question, child-friendly en-GB voice ranking | v0.4 |
 | Slice robustness: a paused finger no longer loses its stroke; real-swipe e2e made deterministic | v0.4 |
 | Ninja Sprint mode: 60-second time attack per island, no lives, clock pauses with the game, stars by correct count, per-year best + "New best!" | v0.5 |
+| Boss Battle mode: Hammer Man health bar (8 HP), correct = hit (shake), slip = heal (+taunt), enraged speed at ≤3 HP, TNT bubbles, KO animation on results, KOs counted per island | v0.5 |

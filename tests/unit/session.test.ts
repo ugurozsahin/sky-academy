@@ -3,7 +3,7 @@ import { Session, type SessionEvents } from '../../src/game/session';
 import { YEARS, topicById, topicsFor } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onEnd: vi.fn() });
+const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
 const Y1 = YEARS[1], R = YEARS[0];
 
 describe('mission session', () => {
@@ -145,6 +145,38 @@ describe('sprint session (60-second time attack)', () => {
     const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(13) }, ev);
     s.start(); s.tick(99_999);
     expect(s.ended).toBe(false); expect(ev.onTime).not.toHaveBeenCalled();
+  });
+});
+
+describe('boss battle', () => {
+  const pool = topicsFor('year1').filter(t => t.mode !== 'tracing');
+  const wrongOf = (s: Session) => { const c = s.current!; const t = c.sequence ? c.sequence[s.seqIndex] : c.answer; return c.options.find(o => o !== t && !(c.sequence ?? []).includes(o)) ?? c.options.find(o => o !== t)!; };
+  it('correct slices hit the boss, slips heal him (capped at max), KO ends the battle won', () => {
+    const ev = events();
+    const s = new Session({ mode: 'boss', year: Y1, pool, rng: rng(20) }, ev);
+    s.start();
+    expect(s.bossMax).toBe(8); expect(s.bossHp).toBe(8);
+    expect(s.hit(wrongOf(s))).toBe('wrong'); expect(s.bossHp).toBe(8);                     // already full
+    expect(ev.onBoss).toHaveBeenLastCalledWith(8, 8, 'heal'); expect(s.lives).toBe(Y1.lives - 1);
+    s.advance(); s.hit(s.current!.answer); expect(s.bossHp).toBe(7); expect(ev.onBoss).toHaveBeenLastCalledWith(7, 8, 'hit');
+    s.advance(); s.fall(s.current!.sequence ? s.current!.sequence[0] : s.current!.answer); expect(s.bossHp).toBe(8);
+    s.advance();
+    for (let i = 0; i < 8; i++) { expect(s.ended).toBe(false); if (s.bossHp <= 3) expect(s.enraged).toBe(true); expect(s.hit(s.current!.answer)).toBe('correct'); if (!s.ended) s.advance(); }
+    expect(s.bossHp).toBe(0); expect(s.ended).toBe(true);
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.mode).toBe('boss'); expect(r.won).toBe(true); expect(r.correct).toBe(9); expect(r.attempts).toBe(11);
+    expect(r.stars).toBe(2); expect(r.coins).toBe(9 + 10 + 20);                                // 82% accuracy → 2 stars
+  });
+  it('speeds up when the boss is on his last 3 HP and is lost when lives run out', () => {
+    const ev = events();
+    const s = new Session({ mode: 'boss', year: YEARS[2], pool: topicsFor('year2').filter(t => t.mode !== 'tracing'), rng: rng(21), bossHp: 4 }, ev);
+    s.start();
+    expect(s.enraged).toBe(false); expect(s.speed).toBeLessThanOrEqual(YEARS[2].speeds[1]);
+    s.hit(s.current!.answer); s.advance();
+    expect(s.enraged).toBe(true); expect(s.speed).toBeLessThanOrEqual(YEARS[2].speeds[2]); expect(s.speed).toBeGreaterThanOrEqual(YEARS[2].speeds[1]);
+    for (let i = 0; i < YEARS[2].lives; i++) { expect(s.hit(wrongOf(s))).toBe('wrong'); if (!s.ended) s.advance(); }
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.won).toBe(false); expect(r.stars).toBe(0); expect(r.coins).toBe(1); expect(s.bossHp).toBe(4);
   });
 });
 

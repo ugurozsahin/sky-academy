@@ -219,6 +219,33 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#sprint small')).toContainText('best 10');
   });
 
+  test('Boss Battle: correct slices hurt Hammer Man, a slip heals him, and the KO is counted', async ({ page }) => {
+    await pickAvatar(page);
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('#boss small')).toContainText('KOs 0');
+    await page.click('#boss');
+    await expect(page.locator('.villain.boss img')).toBeVisible();
+    await expect(page.locator('#hp')).toHaveCSS('width', /px/);
+    const full = (await state(page)).bossHp; expect(full).toBe(8);
+    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    await page.waitForFunction(() => window.__sna.state().bossHp === 7);
+    await expect(page.locator('#villain')).toHaveClass(/hit/);
+    await page.waitForFunction(() => window.__sna.session.questionsAsked > 1);
+    await waitForTarget(page); await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction(() => window.__sna.state().bossHp === 8);           // healed
+    await expect(page.locator('.lives span.off')).toHaveCount(1);                     // and it still costs a life
+    await page.waitForFunction(() => window.__sna.session.questionsAsked > 2);
+    await page.evaluate(() => { window.__sna.session.bossHp = 1; });                  // skip to the final blow
+    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    const results = page.locator('.results');
+    await expect(results.locator('h2')).toHaveText('Knock-out!');
+    await expect(results.locator('.ko')).toBeVisible();
+    await expect(results.locator('.speech')).toContainText('K.O.');
+    await page.click('#home');
+    await expect(page.locator('#boss small')).toContainText('KOs 1');
+  });
+
   test('first play shows the slice tutorial hand, which goes away after the first slice for good', async ({ page }) => {
     await pickAvatar(page);
     await startTopic(page, 'reception', 'r-count');

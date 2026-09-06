@@ -124,6 +124,8 @@ img { -webkit-user-drag: none; }
 .storm span { text-align: left; } .storm b { display: block; font-size: 20px; } .storm small { color: var(--muted); }
 .storm.sprint { margin-top: 10px; background: linear-gradient(90deg, #1a3b2a, #1a2a44); border-color: #40e0a066; box-shadow: 0 0 30px #40e0a033, 0 8px 24px #0008; }
 .storm.sprint .vport { box-shadow: 0 0 0 3px #40e0a0; } .storm .vport.emoji { display: grid; place-items: center; font-size: 34px; }
+.storm.boss { margin-top: 10px; background: linear-gradient(90deg, #3b1a3b, #2a1a44); border-color: #b388ff66; box-shadow: 0 0 30px #b388ff33, 0 8px 24px #0008; }
+.storm.boss .vport, .storm.boss img { box-shadow: 0 0 0 3px #b388ff; }
 .foot { margin-top: 26px; text-align: center; color: #6c78a8; font-size: 12px; font-weight: 600; }
 
 /* ---------- rewards ---------- */
@@ -181,6 +183,19 @@ img { -webkit-user-drag: none; }
 .villain { position: absolute; right: 10px; bottom: calc(12px + var(--sab)); display: flex; align-items: flex-end; gap: 6px; pointer-events: none; }
 .villain img { width: 110px; height: 110px; object-fit: contain; filter: drop-shadow(0 0 14px #ff3b5c88) drop-shadow(0 6px 8px #000a); }
 .villain .bubble { background: #fff; color: #222; padding: 6px 10px; border-radius: 12px; font-weight: 700; font-size: 14px; margin-bottom: 40px; }
+.villain.boss { flex-wrap: wrap; justify-content: flex-end; width: 130px; }
+.villain .hp { width: 110px; height: 12px; border-radius: 999px; background: #0008; border: 1px solid #ff3b5c88; overflow: hidden; margin-bottom: 4px; order: -1; flex: none; }
+.villain .hp i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff3b5c, #ff8a4c); transition: width .35s ease; }
+.villain .hp i.low { background: linear-gradient(90deg, #ffd54f, #ff8a4c); }
+.villain.hit img { animation: vhit .45s ease-out; filter: drop-shadow(0 0 18px #fff) drop-shadow(0 6px 8px #000a); }
+.villain.heal img { animation: vheal .6s ease-out; filter: drop-shadow(0 0 18px #66e07d) drop-shadow(0 6px 8px #000a); }
+@keyframes vhit { 0% { transform: translateX(0) rotate(0); } 25% { transform: translateX(-14px) rotate(-12deg); } 55% { transform: translateX(9px) rotate(7deg); } 100% { transform: none; } }
+@keyframes vheal { 0% { transform: scale(1); } 40% { transform: scale(1.14); } 100% { transform: scale(1); } }
+.results .ko { position: absolute; left: 8px; top: 8px; width: 120px; pointer-events: none; }
+.results .ko img { width: 120px; height: 120px; object-fit: contain; animation: ko 1.6s ease-in forwards; filter: grayscale(.5) drop-shadow(0 8px 10px #000a); }
+.results .ko b { position: absolute; left: 10px; top: 20px; font-size: 34px; color: #ffd54f; -webkit-text-stroke: 1px #7a1a10; text-shadow: 0 3px 0 #7a1a10; transform: rotate(-12deg); animation: koText .5s ease-out both; }
+@keyframes ko { 0% { transform: rotate(0); opacity: 1; } 30% { transform: rotate(35deg) translateY(10px); } 100% { transform: rotate(140deg) translateY(260px); opacity: 0; } }
+@keyframes koText { from { transform: scale(0) rotate(-12deg); } to { transform: scale(1) rotate(-12deg); } }
 
 /* visuals in question card */
 .vis { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 4px 0; flex-wrap: wrap; }
@@ -222,7 +237,7 @@ img { -webkit-user-drag: none; }
 .statgrid div { background: #ffffff10; border-radius: 14px; padding: 10px 4px; } .statgrid b { display: block; font-size: 22px; } .statgrid small { color: var(--muted); font-weight: 600; }
 .confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: 26px; }
 .confetti i { position: absolute; top: -12px; left: calc(var(--x) * 1%); width: 8px; height: 14px; background: var(--c); border-radius: 2px; animation: conf var(--d) calc(var(--i) * -.13s) linear infinite; opacity: .9; }
-@media (prefers-reduced-motion: reduce) { .confetti i, .hero-big img, .isl-art, .bg-sky::after, .bg-play::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .confetti i, .hero-big img, .isl-art, .bg-sky::after, .bg-play::after, .villain img, .results .ko img, .timer { animation: none; } }
 @keyframes conf { to { transform: translateY(520px) rotate(720deg); } }
 
 @media (min-width: 720px) {

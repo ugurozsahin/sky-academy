@@ -3,7 +3,7 @@ import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from
 import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
 import { Tracer } from '../game/tracing';
-import { addCoins, load, recordEndless, recordSprint, recordTopic, save, touchStreak } from '../storage';
+import { addCoins, load, recordBossWin, recordEndless, recordSprint, recordTopic, save, touchStreak } from '../storage';
 import { say, sfx, sliceFx } from '../audio';
 import { $, esc, render, stars } from './dom';
 import { renderVisual } from './visuals';
@@ -14,8 +14,9 @@ export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode }
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
   const tracing = o.topic?.mode === 'tracing';
-  const sprint = o.mode === 'sprint';
-  const title = o.mode === 'endless' ? 'Sky Storm' : sprint ? 'Ninja Sprint' : o.topic!.title;
+  const sprint = o.mode === 'sprint'; const boss = o.mode === 'boss';
+  const villainMode = o.mode === 'endless' || boss;     // Hammer Man on screen, TNT bubbles in the mix
+  const title = o.mode === 'endless' ? 'Sky Storm' : sprint ? 'Ninja Sprint' : boss ? 'Boss Battle' : o.topic!.title;
   render(`
   <section class="screen play ${tracing ? 'tracing' : ''}" style="--glow:${av.glow}">
     ${tracing ? '' : '<canvas id="arena" aria-label="Game arena"></canvas>'}
@@ -33,7 +34,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       </div>
       ${tracing ? '<div class="trace-wrap"><canvas id="trace"></canvas><div class="trace-btns"><button class="btn" id="tclear">Clear</button><button class="btn primary" id="tcheck">Check ✓</button></div></div>' : ''}
       <div class="toast" id="toast" aria-live="polite"></div>
-      ${o.mode === 'endless' ? `<div class="villain" id="villain"><img src="${VILLAIN.img}" alt="Hammer Man"><span class="bubble" id="taunt" hidden></span></div>` : ''}
+      ${villainMode ? `<div class="villain${boss ? ' boss' : ''}" id="villain">${boss ? '<div class="hp" role="progressbar" aria-label="Hammer Man health"><i id="hp"></i></div>' : ''}<img src="${VILLAIN.img}" alt="Hammer Man"><span class="bubble" id="taunt" hidden></span></div>` : ''}
     </div>
     ${!tracing && !d.tutorialSeen ? '<div class="tutorial" id="tutorial" hidden aria-hidden="true"><div class="tut-bubble">3</div><div class="tut-hand">☝️</div><div class="tut-text">Slice the bubble!</div></div>' : ''}
     <div class="overlay" id="overlay" hidden></div>
@@ -51,7 +52,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       els.prompt.innerHTML = promptHTML(q, session.seqIndex); els.vis.innerHTML = renderVisual(q.visual); els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
       lastOutcome = 'none';
       if (tracing) { say(q.say ?? q.prompt); startTrace(q); return; }
-      const labels = o.mode === 'endless' && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence ? [...info.labels, BOMB] : info.labels;
+      const labels = villainMode && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence ? [...info.labels, BOMB] : info.labels;
       const spawn = () => { say(q.say ?? q.prompt); requestAnimationFrame(() => { arena!.topInset = els.qcard.getBoundingClientRect().bottom + 6; arena!.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3) }); }); };
       const demo = showTutorial();                // first ever play: animated hand first, bubbles a moment later
       if (demo) later(spawn, demo); else spawn();
@@ -73,12 +74,20 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     onLives(n) { drawLives(n); if (n < prevLives) sfx.life(); prevLives = n; },
     onStageClear(stage, st, acc) { sfx.stage(); showStageClear(stage, st, acc); },
     onTime(s) { drawTimer(s); if (s <= 3 && s > 0) sfx.tap(); },
+    onBoss(hp, max, kind) {
+      drawHp(hp, max);
+      const v = $('#villain'); if (!v) return;
+      v.classList.remove('hit', 'heal'); void v.offsetWidth; v.classList.add(kind);
+      if (kind === 'hit') { sfx.life(); if (hp > 0) toast(hp <= 3 ? 'Hammer Man is wobbling!' : 'Hit!', 'good'); }
+      else showTaunt();
+    },
     onEnd(r) { later(() => showResults(r), lastOutcome === 'none' || r.mode === 'sprint' ? 0 : 900); },
   });
   let prevLives = o.year.lives;
   const drawLives = (n: number) => { if (els.lives) els.lives.innerHTML = Array.from({ length: o.year.lives }, (_, i) => `<span class="${i < n ? 'on' : 'off'}">❤️</span>`).join(''); };
   const drawTimer = (s: number) => { const t = $('#timer'); if (!t) return; t.textContent = `⏱ ${s}`; t.classList.toggle('hurry', s <= 10); };
-  drawLives(o.year.lives); drawTimer(session.secondsLeft);
+  const drawHp = (hp: number, max: number) => { const h = $('#hp'); if (h) { h.style.width = `${Math.round(100 * hp / max)}%`; h.classList.toggle('low', hp <= 3); } };
+  drawLives(o.year.lives); drawTimer(session.secondsLeft); drawHp(session.bossHp, session.bossMax);
   // Sprint clock: real elapsed time, frozen while the pause overlay (or a result) has the arena paused.
   let ticker = 0; let lastTick = 0;
   if (sprint) ticker = window.setInterval(() => { const now = performance.now(); const dt = lastTick ? now - lastTick : 0; lastTick = now; if (!arena?.paused && !session.ended) session.tick(dt); }, 100);
@@ -139,18 +148,22 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   function showResults(r: SessionResult) {
     arena && (arena.paused = true);
     let newBest = false;
-    if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score); else if (o.mode === 'sprint') newBest = recordSprint(o.year.id, r.score); else recordEndless(o.year.id, r.score);
+    if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
+    else if (o.mode === 'sprint') newBest = recordSprint(o.year.id, r.score);
+    else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
+    else recordEndless(o.year.id, r.score);
     const fresh = addCoins(r.coins); const streak = touchStreak();
     const stickerHTML = fresh.map(id => { const a = AVATARS.find(x => x.id === id); return `<div class="unlock" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${a ? a.img : VILLAIN.img}" alt=""></span><b>New sticker!</b><small>${a ? a.name : VILLAIN.name}</small></div>`; }).join('');
     if (fresh.length) later(() => sfx.stage(), 600);
     const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉') : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪') : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
-    const headline = r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
+    const headline = r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
     say(headline);
     els.overlay.hidden = false; els.overlay.innerHTML = `
       <div class="modal results">
+        ${r.mode === 'boss' && r.won ? `<div class="ko" aria-hidden="true"><img src="${VILLAIN.img}" alt=""><b>K.O.</b></div>` : ''}
         <div class="hero-big ${r.won ? '' : 'sad'}" style="--glow:${av.glow}"><img src="${av.img}" alt="${av.name}"><div class="speech">${esc(headline)}</div></div>
         <div class="medal">${medal}</div>
-        <h2>${r.mode === 'endless' ? 'Storm over!' : r.mode === 'sprint' ? "Time's up!" : r.won ? 'Mission complete!' : 'Out of lives'}</h2>
+        <h2>${r.mode === 'endless' ? 'Storm over!' : r.mode === 'sprint' ? "Time's up!" : r.mode === 'boss' ? (r.won ? 'Knock-out!' : 'Hammer Man wins this round') : r.won ? 'Mission complete!' : 'Out of lives'}</h2>
         ${r.mode !== 'endless' ? `<div class="big-stars">${stars(r.stars)}</div>` : ''}
         <div class="statgrid"><div><b>${r.score}</b><small>score</small></div><div><b>${r.correct}/${r.attempts}</b><small>correct</small></div><div><b>×${r.bestCombo}</b><small>best combo</small></div></div>
         <div class="coin-row"><span class="coin-gain">+${r.coins} 🪙</span>${newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : ''}</div>
@@ -177,7 +190,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     answer: () => { const q = session.current; if (!q) return false; if (tracing) { tracer?.autoTrace(); return true; } const label = q.sequence ? q.sequence[session.seqIndex] : q.answer; return arena!.hitLabel(label); },
     wrong: () => { const q = session.current; if (!q || !arena) return false; const target = q.sequence ? q.sequence[session.seqIndex] : q.answer; const b = arena.bubbles.find(x => x.launched && !x.dead && x.label !== target && x.label !== BOMB); return b ? arena.hitLabel(b.label) : false; },
     bubbles: () => arena?.bubbles.filter(b => b.launched && !b.dead).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })) ?? [],
-    state: () => ({ stage: session.stage, index: session.index, score: session.score, lives: session.lives, ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt, answer: session.current?.answer, timeLeft: session.timeLeft }),
+    state: () => ({ stage: session.stage, index: session.index, score: session.score, lives: session.lives, ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt, answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp }),
   };
   session.start();
 }
