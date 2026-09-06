@@ -23,7 +23,7 @@ export class Arena {
   bubbles: Bubble[] = [];
   private particles: Particle[] = [];
   private trail: { x: number; y: number; t: number }[] = [];
-  private pointerDown = false; private downPos = { x: 0, y: 0 }; private moved = 0;
+  private pointerDown = false; private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600;
   paused = false; trailColor = '#7fe0ff'; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;
   time = 0;
@@ -139,7 +139,7 @@ export class Arena {
   private pos(e: PointerEvent) { const r = this.canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   private onDown = (e: PointerEvent) => {
     if (this.paused) return;
-    this.pointerDown = true; this.moved = 0; this.downPos = this.pos(e);
+    this.pointerDown = true; this.moved = 0; this.downPos = this.pos(e); this.lastPt = this.downPos;
     this.trail = [{ ...this.downPos, t: performance.now() }];
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     const b = this.bubbleAt(this.downPos.x, this.downPos.y);
@@ -147,13 +147,16 @@ export class Arena {
   };
   private onMove = (e: PointerEvent) => {
     if (!this.pointerDown || this.paused) return;
-    const p = this.pos(e); const prev = this.trail[this.trail.length - 1];
-    if (prev) { const d = Math.hypot(p.x - prev.x, p.y - prev.y); this.moved += d; if (d < 2) return; }
+    // Hit-test against the last pointer position, not the visual trail: the trail fades after 280ms,
+    // so a finger that pauses mid-stroke (or slow pointer events) must not lose its slice segment.
+    const p = this.pos(e); const prev = this.lastPt;
+    const d = Math.hypot(p.x - prev.x, p.y - prev.y); this.moved += d; if (d < 2) return;
+    this.lastPt = p;
     this.trail.push({ ...p, t: performance.now() });
     if (this.trail.length > 24) this.trail.shift();
     if (this.moved > 40 && this.trail.length % 6 === 0) this.onSwish?.();
-    if (++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, prev ? p.x - prev.x : 0, prev ? p.y - prev.y : 0);
-    if (prev) for (const b of this.bubbles) if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true);
+    if (++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);
+    for (const b of this.bubbles) if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true);
   };
   private onUp = () => { this.pointerDown = false; };
   private bubbleAt(x: number, y: number) {

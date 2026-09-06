@@ -21,18 +21,32 @@ async function startTopic(page: Page, year: string, topic: string) {
   await expect(page.locator('.play')).toBeVisible();
   await page.waitForFunction(() => window.__sna?.state().prompt);
 }
-/** Wait until the correct bubble is on screen, then swipe through it with a real pointer. */
+/**
+ * Real-pointer slice through the correct bubble. Pointer round trips are slow under headless software
+ * rendering (hundreds of ms each), so the wave is frozen in place first: this test checks the pointer →
+ * canvas → segment hit → session path, not the physics (the other tests cover flight and falling).
+ */
 async function swipeAnswer(page: Page) {
   const b = await page.waitForFunction(() => {
     const s = window.__sna; if (!s || s.state().waiting) return null;
     const label = s.session.current.sequence ? s.session.current.sequence[s.session.seqIndex] : s.session.current.answer;
-    const hit = s.bubbles().find((x: any) => x.label === label && x.y > 60 && x.y < window.innerHeight - 20 && Math.abs(x.vy) < 90); // near the apex, so it barely moves during the swipe
+    const hit = s.bubbles().find((x: any) => x.label === label && x.y > 60 && x.y < window.innerHeight - 20);
     return hit ? JSON.stringify(hit) : null;
   }, null, { timeout: 15000 });
-  const { x, y, r } = JSON.parse(await b.jsonValue() as string);
-  await page.mouse.move(x - r * 1.4, y - r * 0.2);
+  const label = JSON.parse(await b.jsonValue() as string).label as string;
+  const others = await page.evaluate(() => { // freeze every bubble where it is; never launch the rest of the wave
+    for (const x of window.__sna.arena.bubbles) { if (x.launched) { x.vx = 0; x.vy = 0; x._g = 0; } else x.launchAt = Infinity; }
+    return window.__sna.bubbles();
+  });
+  const target = others.find((x: any) => x.label === label);   // position after the freeze, not before the round trip
+  // Approach from a side with no other bubble in the way (a stroke through a decoy counts as a wrong answer).
+  const decoys = others.filter((x: any) => x.label !== target.label);
+  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const clear = (dx: number, dy: number) => decoys.every((o: any) => [1.6, 1.1, 0.6].every(k => Math.hypot(o.x - (target.x + dx * target.r * k), o.y - (target.y + dy * target.r * k)) > o.r * 1.2 + 4));
+  const [dx, dy] = dirs.find(([x, y]) => clear(x, y)) ?? dirs[0];
+  await page.mouse.move(target.x + dx * target.r * 1.6, target.y + dy * target.r * 1.6);
   await page.mouse.down();
-  for (let i = 1; i <= 6; i++) await page.mouse.move(x - r * 1.4 + (r * 2.8 * i) / 6, y - r * 0.2 + (r * 0.4 * i) / 6);
+  for (let i = 1; i <= 4; i++) { const k = 1.6 - (1.8 * i) / 4; await page.mouse.move(target.x + dx * target.r * k, target.y + dy * target.r * k); }
   await page.mouse.up();
 }
 const answer = (page: Page) => page.evaluate(() => window.__sna.answer());
@@ -171,6 +185,27 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.results h2')).toHaveText('Storm over!');
     await page.click('#home');
     await expect(page.locator('#endless small')).toContainText('best');
+  });
+
+  test('first play shows the slice tutorial hand, which goes away after the first slice for good', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'reception', 'r-count');
+    const tut = page.locator('#tutorial');
+    await expect(tut).toBeVisible();
+    await expect(tut).toContainText('Slice the bubble');
+    await page.waitForFunction(() => window.__sna.bubbles().some((b: any) => b.label === window.__sna.state().answer));
+    expect(await answer(page)).toBe(true);
+    await expect(tut).toBeHidden();
+    await page.click('#pause'); await page.click('#quit');
+    await startTopic(page, 'reception', 'r-count');
+    await expect(page.locator('#tutorial')).toHaveCount(0);                 // remembered: no demo on the second play
+  });
+
+  test('tapping the question card repeats it aloud (pulse feedback)', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'year1', 'y1-add');
+    await page.click('#qcard .prompt');
+    await expect(page.locator('#qcard')).toHaveClass(/pulse/);
   });
 
   test('pause and quit return home', async ({ page }) => {

@@ -13,9 +13,10 @@ export interface SaveData {
   coins: number;                     // ninja coins earned (lifetime)
   stickers: string[];                // unlocked sticker ids
   streak: { last: string; days: number };   // daily play streak (ISO date)
+  tutorialSeen: boolean;             // the "slice the bubble" demo hand has done its job
 }
 const KEY = 'sna:v1';
-const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 } };
+const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false };
 
 let cache: SaveData | null = null;
 export function load(): SaveData {

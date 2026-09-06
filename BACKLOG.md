@@ -10,8 +10,8 @@ Status: `todo` · `doing` · `done` · `later`
 | 2 | Island / home-screen art in the same illustration style as the ninjas (owner-generated: 3 floating islands, sky background, Sky Storm banner) | Visuals must not look cheap; current islands are simple CSS/SVG | todo |
 | 3 | Per-avatar celebration poses (owner-generated: "happy/victory" image per ninja) | Stage-clear moment is the emotional core | todo |
 | 4 | Bubble skin variants (cloud / lantern / scroll) to match Sky Islands theme | Current bubbles are generic glossy spheres | todo |
-| 5 | Tutorial on first play ("slice the bubble" animated hand) | 4-year-olds need a demo, not text | todo |
-| 6 | Speech: prefer a child-friendly en-GB voice; add "repeat" gesture (tap question card) | Reception can't read prompts | todo |
+| 5 | Tutorial on first play ("slice the bubble" animated hand) | 4-year-olds need a demo, not text | done |
+| 6 | Speech: prefer a child-friendly en-GB voice; add "repeat" gesture (tap question card) | Reception can't read prompts | done |
 | 7 | Hammer Man mini-events in Sky Storm (TNT bubbles = never slice; slicing costs a life) | Villain integration, more fun | done |
 | 8 | Daily streak + reward stickers (collectible cards of the ninjas) | Retention for kids | done |
 
@@ -65,3 +65,5 @@ Status: `todo` · `doing` · `done` · `later`
 | Reward system: ninja coins, sticker album (11 cards), daily streak, rewards screen, unlock celebration | v0.3 |
 | New topics/modes: Order Up (R/Y1/Y2), Number Line (Y1/Y2), 2-D & 3-D shapes; TNT bubbles from Hammer Man in Sky Storm | v0.3 |
 | Whole-primary roadmap doc (`docs/ROADMAP-PRIMARY.md`) | v0.3 |
+| First-play tutorial (animated hand slices a demo bubble, spoken cue), tap-the-card to repeat the question, child-friendly en-GB voice ranking | v0.4 |
+| Slice robustness: a paused finger no longer loses its stroke; real-swipe e2e made deterministic | v0.4 |

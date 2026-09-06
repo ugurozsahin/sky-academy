@@ -15,6 +15,12 @@ describe('rewards storage', () => {
     expect(load().coins).toBe(70); expect(load().stickers.length).toBe(2);
     expect(stickersFor(STICKER_COST[STICKER_COST.length - 1]).length).toBe(STICKER_IDS.length);
   });
+  it('tutorial flag defaults to unseen and survives old saves without the field', () => {
+    expect(load().tutorialSeen).toBe(false);
+    mem['sna:v1'] = JSON.stringify({ v: 1, name: 'Old', coins: 5 });   // save written before the field existed
+    reset(); mem['sna:v1'] = JSON.stringify({ v: 1, name: 'Old', coins: 5 });
+    expect(load().name).toBe('Old'); expect(load().tutorialSeen).toBe(false); expect(load().streak.days).toBe(0);
+  });
   it('streak counts consecutive days only', () => {
     expect(touchStreak(new Date('2026-09-05T10:00:00Z'))).toBe(1);
     expect(touchStreak(new Date('2026-09-05T20:00:00Z'))).toBe(1);   // same day

@@ -3,7 +3,7 @@ import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from
 import { Arena } from '../game/arena';
 import { Session, type SessionResult } from '../game/session';
 import { Tracer } from '../game/tracing';
-import { addCoins, load, recordEndless, recordTopic, touchStreak } from '../storage';
+import { addCoins, load, recordEndless, recordTopic, save, touchStreak } from '../storage';
 import { say, sfx, sliceFx } from '../audio';
 import { $, esc, render, stars } from './dom';
 import { renderVisual } from './visuals';
@@ -25,7 +25,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         <div class="score"><small>SCORE</small><b id="score">0</b></div>
       </div>
       <div class="qcard" id="qcard">
-        <div class="qhead"><span class="pill" id="stage"></span><span class="ttl">${esc(title)}</span><button class="icon-btn speak" id="speak" aria-label="Read the question aloud">🔊</button></div>
+        <div class="qhead"><span class="pill" id="stage"></span><span class="ttl">${esc(title)}</span><button class="icon-btn speak" id="speak" aria-label="Read the question aloud" title="Tap the card to hear it again">🔊</button></div>
         <div class="prompt" id="prompt"></div>
         <div class="vis-wrap" id="vis"></div>
         <div class="hint" id="hint"></div>
@@ -34,6 +34,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       <div class="toast" id="toast" aria-live="polite"></div>
       ${o.mode === 'endless' ? `<div class="villain" id="villain"><img src="${VILLAIN.img}" alt="Hammer Man"><span class="bubble" id="taunt" hidden></span></div>` : ''}
     </div>
+    ${!tracing && !d.tutorialSeen ? '<div class="tutorial" id="tutorial" hidden aria-hidden="true"><div class="tut-bubble">3</div><div class="tut-hand">☝️</div><div class="tut-text">Slice the bubble!</div></div>' : ''}
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
@@ -47,11 +48,12 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     onQuestion(q, info) {
       els.stage.textContent = o.mode === 'endless' ? `Q${session.questionsAsked}` : `${STAGE_NAMES[info.stage - 1] ?? 'Stage ' + info.stage} · ${info.index + 1}/${info.total}`;
       els.prompt.innerHTML = promptHTML(q, session.seqIndex); els.vis.innerHTML = renderVisual(q.visual); els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
-      say(q.say ?? q.prompt);
       lastOutcome = 'none';
-      if (tracing) { startTrace(q); return; }
+      if (tracing) { say(q.say ?? q.prompt); startTrace(q); return; }
       const labels = o.mode === 'endless' && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence ? [...info.labels, BOMB] : info.labels;
-      requestAnimationFrame(() => { arena!.topInset = els.qcard.getBoundingClientRect().bottom + 6; arena!.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3) }); });
+      const spawn = () => { say(q.say ?? q.prompt); requestAnimationFrame(() => { arena!.topInset = els.qcard.getBoundingClientRect().bottom + 6; arena!.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3) }); }); };
+      const demo = showTutorial();                // first ever play: animated hand first, bubbles a moment later
+      if (demo) later(spawn, demo); else spawn();
     },
     onCorrect(_q, points, combo) {
       lastOutcome = 'correct'; sfx.correct(); els.score.textContent = String(session.score);
@@ -78,6 +80,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   if (!tracing) {
     arena = new Arena($('#arena') as HTMLCanvasElement, {
       onHit(b, viaSwipe) {
+        if (!load().tutorialSeen) { save({ tutorialSeen: true }); hideTutorial(); }
         if (b.label === BOMB) { if (!session.waiting && !session.ended) { sfx.life(); toast('TNT! Hammer Man got you', 'bad'); showTaunt(); arena!.burst(b.x, b.y, '#ff3b1a', 30); session.bomb(); } return; }
         const r = session.hit(b.label); if (r === 'ignored') return; if (viaSwipe) (sliceFx[av.fx] ?? sfx.slice)();
       },
@@ -95,6 +98,21 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     }, av.glow);
     $('#tclear').onclick = () => { sfx.tap(); tracer?.clear(); };
     $('#tcheck').onclick = () => { const r = tracer!.result(); if (r.pass) { sfx.correct(); session.hit(q.answer); } else { toast(r.coverage < 0.6 ? 'Keep tracing — cover the whole letter' : 'Stay on the dotted lines', 'bad'); } };
+  }
+  /** First-play demo: show the animated hand over the arena; returns how long to hold the first wave (ms). */
+  function showTutorial(): number {
+    const t = $('#tutorial'); if (!t || !t.hidden) return 0;
+    if (load().tutorialSeen || session.questionsAsked > 1) return 0;   // only ever before the very first wave
+    t.hidden = false; say('Slice the bubble with your finger!');
+    later(hideTutorial, 9000);                    // never block play for long, even if the child just watches
+    return 1800;
+  }
+  function hideTutorial() { const t = $('#tutorial'); if (t) t.hidden = true; }
+  /** Repeat the prompt aloud (tap the question card, or the 🔊 button). */
+  function repeatPrompt() {
+    const q = session.current; if (!q) return;
+    say(q.say ?? q.prompt, true);
+    els.qcard.classList.remove('pulse'); void els.qcard.offsetWidth; els.qcard.classList.add('pulse');
   }
   function showTaunt() { const t = $('#taunt'); if (!t) return; t.textContent = VILLAIN.taunt[Math.floor(Math.random() * VILLAIN.taunt.length)]; t.hidden = false; later(() => (t.hidden = true), 1400); }
 
@@ -142,7 +160,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     $('#quit').addEventListener('click', () => { cleanup(); goHome(); });
   }
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
-  $('#speak').addEventListener('click', () => { const q = session.current; if (q) say(q.say ?? q.prompt, true); });
+  $('#speak').addEventListener('click', repeatPrompt);
+  els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
   function cleanup() { alive = false; timers.forEach(clearTimeout); arena?.destroy(); tracer?.destroy(); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete (window as any).__sna; }
 
   // Test / accessibility hooks
