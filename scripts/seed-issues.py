@@ -49,6 +49,7 @@ for it in seed['issues']:
         n = r['number']; time.sleep(0.6)
         api('PATCH', f'/repos/{REPO}/issues/{n}', {'body': with_workflow(it, n)})
         if it.get('state') == 'closed': api('PATCH', f'/repos/{REPO}/issues/{n}', {'state': 'closed', 'state_reason': 'completed'})
+    else: api('PATCH', f'/repos/{REPO}/issues/{n}', {'body': with_workflow(it, n), 'labels': it['labels']}); time.sleep(0.3)   # refresh body/labels of an existing issue
     created[it['title']] = n
     if it.get('key'): keys[it['key']] = n
 for it in seed['issues']:                       # second pass: cross-references
