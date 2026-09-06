@@ -1,80 +1,11 @@
-# Backlog — Sky Ninja Academy
+# Backlog — moved to GitHub Issues (2026-09-06)
 
-Owner (UG) prioritises this list. Claude proposes items and marks status; order changes only by the owner.
-Status: `todo` · `doing` · `done` · `later`
+The backlog now lives in **GitHub Issues**: https://github.com/ugurozsahin/sky-academy/issues
 
-## Now (v0.1 → v0.2)
-| # | Item | Why | Status |
-|---|---|---|---|
-| 1 | Playtest feedback round from owner + child | Real playability check on phone | todo |
-| 2 | Island / home-screen art in the same illustration style as the ninjas (owner-generated: 3 floating islands, sky background, Sky Storm banner) | Visuals must not look cheap; current islands are simple CSS/SVG | todo |
-| 3 | Per-avatar celebration poses (owner-generated: "happy/victory" image per ninja) | Stage-clear moment is the emotional core | todo |
-| 4 | Bubble skin variants (cloud / lantern / scroll) to match Sky Islands theme | Current bubbles are generic glossy spheres | todo |
-| 5 | Tutorial on first play ("slice the bubble" animated hand) | 4-year-olds need a demo, not text | done |
-| 6 | Speech: prefer a child-friendly en-GB voice; add "repeat" gesture (tap question card) | Reception can't read prompts | done |
-| 7 | Hammer Man mini-events in Sky Storm (TNT bubbles = never slice; slicing costs a life) | Villain integration, more fun | done |
-| 8 | Daily streak + reward stickers (collectible cards of the ninjas) | Retention for kids | done |
+- **Order**: issue **#46 "📌 Priority order (owner-maintained)"** is the single ordered list. The owner reorders it; Claude works top-down.
+- **Labels**: `priority:P1/P2/P3`, `owner-input` (needs the owner's art/decision), `routine-ok` (the hourly routine may take it), `later` (parked), plus area labels (`mode`, `curriculum`, `art`, `reward`, `platform`, `playtest`, `review`, `perf`, `debt`, `tests`).
+- **Workflow** (minimum scrum, in every issue): Refine → Develop (agent A, branch `claude/issue-<n>`, PR `Closes #<n>`) → Review (a *different* agent) → QA (the reviewer, full e2e + screenshots) → Owner action → Done (merged, WORKLOG, artifact republished, issue closed).
+- The 2026-09-06 code review findings are issues #26–#45 (label `review`).
+- Seed/bookkeeping: `scripts/issues-seed.json`, `scripts/seed-issues.py`, `scripts/issues-created.json`.
 
-## Proposed by Claude (new game modes & ideas — owner to prioritise)
-| # | Item | Why | Status |
-|---|---|---|---|
-| P1 | **Ninja Sprint** — 60-second time attack per island (no lives, beat your best) | Short sessions, replay value, prepares for the Y4 Multiplication Tables Check format | done |
-| P2 | **Boss Battle** — Hammer Man health bar; each correct slice hits him, wrong slices heal him; win = animated KO | Emotional climax kids remember; uses villain art | done |
-| P3 | **Balance the Scales** — pick the bubble that makes both sides equal (=), leads into Y2 equivalence & Y3 algebra thinking | Curriculum depth (equals as balance) | done |
-| P4 | **Memory Match** (non-slice) — flip cards: number ↔ word, coin ↔ value, shape ↔ name | Calm mode for Reception, different pace | done |
-| P5 | **Story Sentences** — slice words in order to build a sentence read aloud ("The cat sat on the mat.") | Writing composition / word order, uses sequence engine | done |
-| P6 | **Sound Hunt** — hear a sound (speech), slice the letter/digraph; picture-free phonics | Reception phonics without reading | done |
-| P7 | **Adaptive practice** — "Train with Sensei": auto-picks weakest topics from history | Mastery, parent-visible progress | done |
-| P8 | **Dojo challenges** — daily 3 missions with bonus coins; streak multiplier | Retention, uses reward system | done |
-| P9 | Costumes / blade skins bought with coins (owner art) | Reward sink, personalisation | todo |
-| P10 | Two-player "Ninja Duel" on one device (split screen, same question) | Siblings/classroom fun | todo |
-| P11 | Teacher/parent print-outs: certificate PNG on mission complete | Motivation, shareable | done |
-| P12 | Whole-primary expansion per `docs/ROADMAP-PRIMARY.md` (Y3–Y4 first; MTC sprint) | Owner asked to widen scope | todo |
-
-## Next
-| # | Item | Status |
-|---|---|---|
-| 9 | Year 1/2 shape, measurement, statistics topics (see docs/CURRICULUM.md "Not yet covered") | todo |
-| 10 | Sentence composition / word order mini-game (writing) | done (as P5 Story Sentences) |
-| 11 | Phonics phases (Little Wandle / Letters and Sounds order) for Reception | todo |
-| 12 | Parent dashboard (per-topic accuracy, time played) behind a "grown-ups" gate | todo |
-| 13 | PWA: offline install, home-screen icon, splash | todo |
-| 14 | Landscape layout polish for tablets | todo |
-| 15 | Haptics on slice (navigator.vibrate) | done |
-| 16 | Multiple profiles on one device (siblings) | todo |
-
-## Later
-| # | Item | Status |
-|---|---|---|
-| 17 | Accounts / cloud sync (owner: not a priority now) | later |
-| 18 | Year 3–6 content, times tables 3–12 | later |
-| 19 | Leaderboard — needs accounts | later |
-| 20 | Music / ambient soundtrack (owner: low priority) | later |
-| 21 | Localisation (Turkish UI toggle) | later |
-| 22 | Vercel auto-deploy from GitHub (live URL on every push to main; the Claude artifact then becomes a demo only) — owner: not now | later |
-
-## Done
-| Item | Version |
-|---|---|
-| Core loop: avatar → island → topic → 3-stage mission → stars/medals; endless Sky Storm | v0.1 |
-| 33 maths + 17 writing topics (R/Y1/Y2), pictorial visuals, tracing, spelling sequences | v0.1 |
-| Synth SFX, read-aloud (Web Speech), progress save, test hooks, 163 unit + 24 e2e tests | v0.1 |
-| Owner-supplied character art (10 ninjas + Hammer Man) integrated | v0.1 |
-| Sky Map → Island → Topics flow (one decision per screen), progress bars per island | v0.2 |
-| Element-specific slice trails, particles and sounds per avatar (fire, water, electric, earth, wind, ice, light, shadow, blade, robot) | v0.2 |
-| 5-stage missions (Apprentice → Legend) with per-year speed/difficulty tables | v0.3 |
-| Reward system: ninja coins, sticker album (11 cards), daily streak, rewards screen, unlock celebration | v0.3 |
-| New topics/modes: Order Up (R/Y1/Y2), Number Line (Y1/Y2), 2-D & 3-D shapes; TNT bubbles from Hammer Man in Sky Storm | v0.3 |
-| Whole-primary roadmap doc (`docs/ROADMAP-PRIMARY.md`) | v0.3 |
-| First-play tutorial (animated hand slices a demo bubble, spoken cue), tap-the-card to repeat the question, child-friendly en-GB voice ranking | v0.4 |
-| Slice robustness: a paused finger no longer loses its stroke; real-swipe e2e made deterministic | v0.4 |
-| Ninja Sprint mode: 60-second time attack per island, no lives, clock pauses with the game, stars by correct count, per-year best + "New best!" | v0.5 |
-| Boss Battle mode: Hammer Man health bar (8 HP), correct = hit (shake), slip = heal (+taunt), enraged speed at ≤3 HP, TNT bubbles, KO animation on results, KOs counted per island | v0.5 |
-| Balance the Scales topics (R/Y1/Y2) with a balance-scales visual: equals as balance, `a + b = ? + c` forms, tables in Y2 | v0.5 |
-| Memory Match mode: calm card-pairs screen (no slicing) per island — count/shapes/words (R), words/coins/2-D shapes/doubles (Y1), words/coins/3-D shapes/tables (Y2); stars by turns, coins, boards counted | v0.5 |
-| Story Sentences topics (R/Y1/Y2): slice the words of a spoken sentence in order (word bubbles via the sequence engine); Reception reads the sentence, Y1/Y2 listen-and-build from d2 | v0.5 |
-| Sound Hunt topics (R/Y1): picture-free phonics by ear — three spoken keyword words, slice the grapheme (phase 2 → 3 → 5 + split digraphs); sound-alike graphemes never used as decoys; card shows the words only when read-aloud is off | v0.5 |
-| Train with Sensei: per-island adaptive mission over the 3 weakest topics (lowest accuracy → stars → plays; unplayed fill in); every mode records per-topic hits/tries; question card names the topic; sessions counted | v0.5 |
-| Daily Dojo: three challenges a day (volume · mode · focus, picked from the date), progress bars on the sky map, +10 🪙 per challenge and +25 🪙 for the set, ×1.25 per consecutive dojo day up to ×2; bonus rows on every results screen | v0.5 |
-| Mission certificate: "🎓 Certificate" on a won mission / Sensei session draws a 1200×850 PNG (child's name, mission, island, stars, accuracy, date, avatar) and shares it via the system share sheet or downloads it | v0.5 |
-| Haptics: short vibration on a swipe slice, a wrong slice, a lost life and a stage clear (follows the sound toggle; no-op where `navigator.vibrate` is missing) | v0.5 |
+Everything that was in the old tables (v0.1–v0.5 Done rows included) is preserved in git history: `git show a2cb98c:BACKLOG.md`.

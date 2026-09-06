@@ -20,7 +20,8 @@ Vite + vanilla TypeScript (no framework), canvas arena, DOM HUD, localStorage. V
 - `window.__sna` hooks (`answer()`, `wrong()`, `bubbles()`, `state()`) are the e2e contract — keep them working.
 - Don't add dependencies without reason; no external assets except Google Fonts (Fredoka) and `public/avatars`.
 - Keep files small; prefer editing existing modules over new abstractions. Run `npm test` after logic changes, `npm run test:e2e` after UI changes.
-- Backlog lives in `BACKLOG.md` — the owner prioritises it; don't reorder it yourself.
+- Backlog lives in **GitHub Issues** (see `BACKLOG.md` for the labels). Order = issue #46, owner-maintained; never reorder it. Every issue carries the scrum checklist: Develop (branch `claude/issue-<n>`, PR `Closes #<n>`) → Review + QA by a *different* agent (spawn a fresh subagent, or leave it to the next routine run) → Owner action → Done. Never review your own PR.
+- British English everywhere (National Curriculum usage): maths, colour, grey, metre, practise (verb), learnt…
 - Env note: on the Mac-side Linux VM used by scheduled runs, Playwright browsers cannot be downloaded (network allowlist) — run unit tests + tsc there; e2e runs in cloud sessions.
 - Git remote: github.com/ugurozsahin/sky-academy (branch main). Hourly routine clones it in the cloud and pushes to main; after it runs, refresh this folder with `git pull --ff-only`.
 - Never delete or unset `.git/github-credentials` / `credential.helper store --file=.git/github-credentials` in the owner's Mac folder — it is the owner's token file that lets Claude sessions pull/push from the Mac-side VM.
