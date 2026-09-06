@@ -5,6 +5,8 @@ import { YEARS, topicById, topicsFor } from '../../src/curriculum';
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
 const Y1 = YEARS[1], R = YEARS[0];
+/** Answer the current question correctly: a sequence (spelling / sentence) is sliced item by item. */
+const solve = (s: Session) => { const c = s.current!; if (!c.sequence) return s.hit(c.answer); let r: ReturnType<Session['hit']> = 'ignored'; for (const l of c.sequence) r = s.hit(l); return r; };
 
 describe('mission session', () => {
   it('runs all stages of perStage questions and ends won with stars and coins', () => {
@@ -121,7 +123,7 @@ describe('sprint session (60-second time attack)', () => {
     s.tick(400); expect(ev.onTime).not.toHaveBeenCalled();            // 4.6 s left still displays as 5
     s.tick(600); expect(ev.onTime).toHaveBeenLastCalledWith(4);
     s.tick(-50); s.tick(0); expect(ev.onTime).toHaveBeenCalledTimes(1);
-    for (let i = 0; i < 3; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    for (let i = 0; i < 3; i++) { expect(solve(s)).toBe('correct'); s.advance(); }
     s.tick(10_000);
     expect(ev.onTime).toHaveBeenLastCalledWith(0); expect(s.timeLeft).toBe(0); expect(s.ended).toBe(true);
     const r = ev.onEnd.mock.calls[0][0];
@@ -134,8 +136,8 @@ describe('sprint session (60-second time attack)', () => {
     const s = new Session({ mode: 'sprint', year: YEARS[2], pool: topicsFor('year2').filter(t => t.mode !== 'tracing'), rng: rng(12) }, ev);
     s.start();
     expect(s.difficulty).toBe(1); expect(s.speed).toBeLessThanOrEqual(YEARS[2].speeds[1]);
-    s.hit(s.current!.answer); expect(s.score).toBe(10); s.advance();
-    for (let i = 0; i < 11; i++) { s.hit(s.current!.answer); s.advance(); }
+    solve(s); expect(s.score).toBe(10); s.advance();
+    for (let i = 0; i < 11; i++) { solve(s); s.advance(); }
     expect(s.difficulty).toBe(3); expect(s.score).toBeGreaterThan(120);   // combo bonus on top of 12 × 10
     s.tick(60_000);
     const r = ev.onEnd.mock.calls[0][0];
@@ -159,10 +161,10 @@ describe('boss battle', () => {
     expect(s.bossMax).toBe(8); expect(s.bossHp).toBe(8);
     expect(s.hit(wrongOf(s))).toBe('wrong'); expect(s.bossHp).toBe(8);                     // already full
     expect(ev.onBoss).toHaveBeenLastCalledWith(8, 8, 'heal'); expect(s.lives).toBe(Y1.lives - 1);
-    s.advance(); s.hit(s.current!.answer); expect(s.bossHp).toBe(7); expect(ev.onBoss).toHaveBeenLastCalledWith(7, 8, 'hit');
+    s.advance(); solve(s); expect(s.bossHp).toBe(7); expect(ev.onBoss).toHaveBeenLastCalledWith(7, 8, 'hit');
     s.advance(); s.fall(s.current!.sequence ? s.current!.sequence[0] : s.current!.answer); expect(s.bossHp).toBe(8);
     s.advance();
-    for (let i = 0; i < 8; i++) { expect(s.ended).toBe(false); if (s.bossHp <= 3) expect(s.enraged).toBe(true); expect(s.hit(s.current!.answer)).toBe('correct'); if (!s.ended) s.advance(); }
+    for (let i = 0; i < 8; i++) { expect(s.ended).toBe(false); if (s.bossHp <= 3) expect(s.enraged).toBe(true); expect(solve(s)).toBe('correct'); if (!s.ended) s.advance(); }
     expect(s.bossHp).toBe(0); expect(s.ended).toBe(true);
     const r = ev.onEnd.mock.calls[0][0];
     expect(r.mode).toBe('boss'); expect(r.won).toBe(true); expect(r.correct).toBe(9); expect(r.attempts).toBe(11);
@@ -173,7 +175,7 @@ describe('boss battle', () => {
     const s = new Session({ mode: 'boss', year: YEARS[2], pool: topicsFor('year2').filter(t => t.mode !== 'tracing'), rng: rng(21), bossHp: 4 }, ev);
     s.start();
     expect(s.enraged).toBe(false); expect(s.speed).toBeLessThanOrEqual(YEARS[2].speeds[1]);
-    s.hit(s.current!.answer); s.advance();
+    solve(s); s.advance();
     expect(s.enraged).toBe(true); expect(s.speed).toBeLessThanOrEqual(YEARS[2].speeds[2]); expect(s.speed).toBeGreaterThanOrEqual(YEARS[2].speeds[1]);
     for (let i = 0; i < YEARS[2].lives; i++) { expect(s.hit(wrongOf(s))).toBe('wrong'); if (!s.ended) s.advance(); }
     const r = ev.onEnd.mock.calls[0][0];

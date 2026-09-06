@@ -50,7 +50,7 @@ for (const topic of TOPICS) {
             expect(q.options.length).toBeLessThanOrEqual(10);
             for (const o of q.options) expect(o.trim().length).toBeGreaterThan(0);
             if (q.sequence) {
-              expect([q.sequence.join(''), q.sequence.join(',')]).toContain(q.answer);
+              expect([q.sequence.join(''), q.sequence.join(','), q.sequence.join(' ')]).toContain(q.answer);
               for (const l of q.sequence) expect(q.options).toContain(l);
             }
           }
@@ -101,6 +101,21 @@ describe('curriculum ranges', () => {
         expect(evalSide(l), q.prompt).toBe(evalSide(rr));
         expect(Number(q.answer)).toBeLessThanOrEqual(max);
         expect(Number(q.answer)).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+  it('Story Sentences: word bubbles are unique, sentences are well formed, decoys stay out of the sentence, length by year', () => {
+    for (const [id, maxWords] of [['r-sentence', 6], ['y1-sentence', 7], ['y2-sentence', 7]] as const) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 3);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 100; i++) {
+        const q = t.gen(d, r); const words = q.sequence!;
+        expect(words.length, q.answer).toBeLessThanOrEqual(maxWords); expect(words.length).toBeGreaterThanOrEqual(3);
+        expect(new Set(words).size, q.answer).toBe(words.length);                     // no repeated bubble label
+        expect(q.answer).toMatch(/^[A-Z].*[.!?]$/);                                   // capital letter … end mark
+        expect(q.options.length).toBeGreaterThan(words.length);                       // at least one decoy
+        const bare = (w: string) => w.toLowerCase().replace(/[.!?,]/g, '');
+        for (const o of q.options.filter(o => !words.includes(o))) expect(words.map(bare), q.answer).not.toContain(bare(o));
+        expect(q.visual?.type).toBe(d === 1 || id === 'r-sentence' ? 'sentence' : 'word');   // shown vs. spoken-only
       }
     }
   });

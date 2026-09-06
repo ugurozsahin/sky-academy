@@ -23,6 +23,45 @@ function spellQ(rng: Rng, word: string, hintEmoji?: string, decoys = 3): ReturnT
   return { prompt: hintEmoji ? `${hintEmoji}  Spell it!` : `Spell: ${word}`, say: `Spell the word ${word}`, answer: word, sequence: letters, options: shuffle(rng, [...uniq, ...ds]), visual: { type: 'word', text: word.replace(/./g, '_ ').trim(), emoji: hintEmoji }, hint: 'Slice the letters in order' };
 }
 
+/**
+ * Story Sentences: slice the words in order to build a sentence (sequence question with word bubbles).
+ * `show` = the sentence is printed on the card (reading + word order); otherwise only spoken (listen, remember, build).
+ */
+function sentenceQ(rng: Rng, sentence: string, emoji: string, decoyPool: string[], decoys: number, show: boolean): ReturnType<Generator> {
+  const words = sentence.split(' ');
+  const bare = (w: string) => w.toLowerCase().replace(/[.!?,]/g, '');
+  const used = new Set(words.map(bare));
+  const ds = shuffle(rng, decoyPool.filter(w => !used.has(bare(w)))).slice(0, Math.min(decoys, 10 - words.length));
+  return { prompt: 'Build the sentence', say: `Build the sentence: ${sentence}`, answer: sentence, sequence: words, options: shuffle(rng, [...words, ...ds]), wide: true,
+    visual: show ? { type: 'sentence', text: sentence } : { type: 'word', text: emoji }, hint: show ? 'Slice the words in order' : 'Listen, then slice the words in order' };
+}
+type Sent = [string, string];   // [sentence, picture]
+const R_SENTS: Sent[][] = [
+  [['I can run.', '🏃'], ['I can hop.', '🐰'], ['I like jam.', '🍯'], ['The cat sat.', '🐱'], ['The dog ran.', '🐶'], ['I see mum.', '👩'], ['We can jump.', '🤸'], ['It is hot.', '☀️'], ['The sun is up.', '🌅'], ['I am six.', '🎂']],
+  [['I like my hat.', '🎩'], ['The pig is pink.', '🐷'], ['Dad has a van.', '🚐'], ['The fox can run.', '🦊'], ['We go to bed.', '🛏️'], ['Mum has a cup.', '☕'], ['The bus is red.', '🚌'], ['I can see it.', '👀'], ['The hen has an egg.', '🐔'], ['My bag is big.', '👜']],
+  [['The cat sat on a mat.', '🐱'], ['I can see a red bus.', '🚌'], ['The dog is in the sun.', '🐶'], ['We had jam on toast.', '🍞'], ['The fish can swim fast.', '🐟'], ['I put my hat on.', '🎩'], ['A frog sat on the log.', '🐸'], ['My cat is on the bed.', '🛏️'], ['Can you see the moon?', '🌙'], ['The big pig is in mud.', '🐷']],
+];
+const Y1_SENTS: Sent[][] = [
+  [['The frog can jump high.', '🐸'], ['My mum has a red car.', '🚗'], ['We like to play outside.', '⚽'], ['The little bird can sing.', '🐦'], ['I have two pet fish.', '🐟'], ['The ship sails on the sea.', '🚢'], ['Can you see the rainbow?', '🌈'], ['The king has a gold crown.', '👑'], ['We went to the park.', '🌳'], ['My friend has a kite.', '🪁']],
+  [['The little dog ran very fast.', '🐶'], ['We had chips for our tea.', '🍟'], ['Can you find my blue sock?', '🧦'], ['The moon shines at night.', '🌙'], ['I love to read in bed.', '📖'], ['The sheep are in the field.', '🐑'], ['My dad made a big cake.', '🎂'], ['Is it raining today?', '🌧️'], ['The snail moved along slowly.', '🐌'], ['Look at that huge whale!', '🐋']],
+  [['The cat and the dog play.', '🐱'], ['We ran and jumped in the park.', '🌳'], ['I like apples and pears.', '🍎'], ['Is it a bird or an aeroplane?', '✈️'], ['She sang and we all clapped.', '🎤'], ['The boat rocked and the fish jumped.', '⛵'], ['Put on your coat and hat.', '🧥'], ['What a lovely sunny day!', '☀️'], ['He fell but he was fine.', '🩹'], ['We can swim or hop today.', '🏊']],
+];
+const Y2_SENTS: Sent[][] = [
+  [['The shiny red kite flew high.', '🪁'], ['Please shut the door quietly.', '🚪'], ['A tiny mouse hid under the chair.', '🐭'], ['The brave knight rode away.', '🏇'], ['Our class went to the museum.', '🏛️'], ['Do you like pizza or pasta?', '🍕'], ['The fluffy kitten chased a leaf.', '🐱'], ['Grandad grows tall yellow sunflowers.', '🌻'], ['What a wonderful surprise this is!', '🎁'], ['Wash your hands before lunch.', '🧼']],
+  [['Sam was late because he overslept.', '⏰'], ['The old man walked slowly home.', '👴'], ['We stayed inside because it rained.', '🌧️'], ['She smiled when she saw the puppy.', '🐶'], ['The rocket zoomed into dark space.', '🚀'], ['Would you like some sweet honey?', '🍯'], ['He was tired but he kept running.', '🏃'], ['The children built a huge sandcastle.', '🏖️'], ['My sister plays the violin beautifully.', '🎻'], ['Bring an umbrella if it rains.', '☂️']],
+  [['If it rains, we will stay inside.', '☂️'], ['You can play when you have finished.', '🎮'], ['The bird sang because it was happy.', '🐦'], ['We can walk or take the bus.', '🚌'], ['The dragon roared and the village shook.', '🐉'], ['Although it was cold, we went out.', '🧣'], ['Please tidy your room before dinner.', '🧹'], ['The clever fox found a secret path.', '🦊'], ['Everybody cheered when our team scored.', '⚽'], ['After lunch we painted colourful pictures.', '🎨']],
+];
+const R_DECOYS = ['dog', 'cat', 'sun', 'hat', 'pig', 'run', 'big', 'red', 'mum', 'bed', 'jam', 'bus', 'hop', 'cup', 'fox', 'egg'];
+const Y1_DECOYS = ['dog', 'cat', 'play', 'red', 'big', 'run', 'jump', 'fish', 'moon', 'park', 'cake', 'ship', 'hat', 'blue', 'fast', 'sing', 'apple', 'coat'];
+const Y2_DECOYS = ['because', 'when', 'and', 'but', 'quickly', 'happy', 'tiny', 'huge', 'garden', 'school', 'dragon', 'river', 'shiny', 'after', 'before', 'yellow', 'kite', 'mouse'];
+const sentGen = (banks: Sent[][], decoyPool: string[], decoys: [number, number, number], showUntil: number): Generator => (d, rng) => {
+  const [s, e] = pick(rng, banks[d - 1]);
+  return sentenceQ(rng, s, e, decoyPool, decoys[d - 1], d <= showUntil);
+};
+const rSentence = sentGen(R_SENTS, R_DECOYS, [1, 1, 2], 3);          // Reception always reads the sentence
+const y1Sentence = sentGen(Y1_SENTS, Y1_DECOYS, [2, 2, 2], 1);       // Y1/Y2: sentence shown at d1 only, then listen & build
+const y2Sentence = sentGen(Y2_SENTS, Y2_DECOYS, [2, 3, 3], 1);
+
 /** Missing-letter question: show word with a gap, options are letters. */
 function gapQ(rng: Rng, word: string, idx: number, distractPool: string[], emoji?: string, say?: string) {
   const ans = word[idx];
@@ -152,6 +191,7 @@ export const WRITING_TOPICS: Topic[] = [
   { id: 'r-sounds', title: 'Letter Sounds', icon: '🔊', subject: 'writing', year: 'reception', nc: 'ELG Writing: sounds to letters', gen: rLetterSound },
   { id: 'r-capitals', title: 'Big & Small Letters', icon: '🅰️', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: letters', gen: rCapitals },
   { id: 'r-build', title: 'Build a Word', icon: '🧱', subject: 'writing', year: 'reception', nc: 'ELG Writing: spell by sounds (CVC)', gen: rBuild },
+  { id: 'r-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'reception', nc: 'ELG Writing: simple sentences', gen: rSentence },
   { id: 'r-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'reception', nc: 'ELG Writing: form letters', mode: 'tracing', gen: rTrace },
   { id: 'y1-digraphs', title: 'Sound Pairs', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: digraphs', gen: y1Digraphs },
   { id: 'y1-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year1', nc: 'Y1 common exception words', gen: y1Spelling },
@@ -159,11 +199,13 @@ export const WRITING_TOPICS: Topic[] = [
   { id: 'y1-suffix', title: 'Endings -ing -ed -er', icon: '🏃', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: suffixes', gen: y1Suffix },
   { id: 'y1-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year1', nc: 'Y1 Grammar: capitals, . ? !', gen: y1Punct },
   { id: 'y1-days', title: 'Days of the Week', icon: '📅', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: days', gen: y1Days },
+  { id: 'y1-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year1', nc: 'Y1 Writing: sequence words into sentences, and', gen: y1Sentence },
   { id: 'y1-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Handwriting', mode: 'tracing', gen: y1Trace },
   { id: 'y2-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year2', nc: 'Y2 common exception words', gen: y2Spelling },
   { id: 'y2-contractions', title: "Contractions don't", icon: '✂️', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: contractions', gen: y2Contractions },
   { id: 'y2-suffix', title: 'Endings -ful -ly', icon: '🎀', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes', gen: y2Suffix },
   { id: 'y2-homophones', title: 'Sound-alike Words', icon: '👂', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: homophones', gen: y2Homophones },
   { id: 'y2-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: commas, apostrophes', gen: y2Punct },
+  { id: 'y2-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year2', nc: 'Y2 Writing: word order, conjunctions, noun phrases', gen: y2Sentence },
   { id: 'y2-trace', title: 'Trace Words', icon: '✍️', subject: 'writing', year: 'year2', nc: 'Y2 Handwriting', mode: 'tracing', gen: y2Trace },
 ];

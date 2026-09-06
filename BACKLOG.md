@@ -22,7 +22,7 @@ Status: `todo` · `doing` · `done` · `later`
 | P2 | **Boss Battle** — Hammer Man health bar; each correct slice hits him, wrong slices heal him; win = animated KO | Emotional climax kids remember; uses villain art | done |
 | P3 | **Balance the Scales** — pick the bubble that makes both sides equal (=), leads into Y2 equivalence & Y3 algebra thinking | Curriculum depth (equals as balance) | done |
 | P4 | **Memory Match** (non-slice) — flip cards: number ↔ word, coin ↔ value, shape ↔ name | Calm mode for Reception, different pace | done |
-| P5 | **Story Sentences** — slice words in order to build a sentence read aloud ("The cat sat on the mat.") | Writing composition / word order, uses sequence engine | todo |
+| P5 | **Story Sentences** — slice words in order to build a sentence read aloud ("The cat sat on the mat.") | Writing composition / word order, uses sequence engine | done |
 | P6 | **Sound Hunt** — hear a sound (speech), slice the letter/digraph; picture-free phonics | Reception phonics without reading | todo |
 | P7 | **Adaptive practice** — "Train with Sensei": auto-picks weakest topics from history | Mastery, parent-visible progress | todo |
 | P8 | **Dojo challenges** — daily 3 missions with bonus coins; streak multiplier | Retention, uses reward system | todo |
@@ -35,7 +35,7 @@ Status: `todo` · `doing` · `done` · `later`
 | # | Item | Status |
 |---|---|---|
 | 9 | Year 1/2 shape, measurement, statistics topics (see docs/CURRICULUM.md "Not yet covered") | todo |
-| 10 | Sentence composition / word order mini-game (writing) | todo |
+| 10 | Sentence composition / word order mini-game (writing) | done (as P5 Story Sentences) |
 | 11 | Phonics phases (Little Wandle / Letters and Sounds order) for Reception | todo |
 | 12 | Parent dashboard (per-topic accuracy, time played) behind a "grown-ups" gate | todo |
 | 13 | PWA: offline install, home-screen icon, splash | todo |
@@ -71,3 +71,4 @@ Status: `todo` · `doing` · `done` · `later`
 | Boss Battle mode: Hammer Man health bar (8 HP), correct = hit (shake), slip = heal (+taunt), enraged speed at ≤3 HP, TNT bubbles, KO animation on results, KOs counted per island | v0.5 |
 | Balance the Scales topics (R/Y1/Y2) with a balance-scales visual: equals as balance, `a + b = ? + c` forms, tables in Y2 | v0.5 |
 | Memory Match mode: calm card-pairs screen (no slicing) per island — count/shapes/words (R), words/coins/2-D shapes/doubles (Y1), words/coins/3-D shapes/tables (Y2); stars by turns, coins, boards counted | v0.5 |
+| Story Sentences topics (R/Y1/Y2): slice the words of a spoken sentence in order (word bubbles via the sequence engine); Reception reads the sentence, Y1/Y2 listen-and-build from d2 | v0.5 |

@@ -15,7 +15,7 @@ async function startTopic(page: Page, year: string, topic: string) {
   if (await page.locator('.island-screen').count()) await page.click('#back');
   await page.click(`.island[data-year="${year}"]`);
   await expect(page.locator('.island-screen')).toBeVisible();
-  const subjectTab = topic.includes('trace') || /-(sounds|capitals|build|digraphs|spelling|plurals|suffix|punct|days|contractions|homophones)$/.test(topic) ? 'writing' : 'maths';
+  const subjectTab = topic.includes('trace') || /-(sounds|capitals|build|digraphs|spelling|plurals|suffix|punct|days|contractions|homophones|sentence)$/.test(topic) ? 'writing' : 'maths';
   await page.click(`.tab[data-s="${subjectTab}"]`);
   await page.click(`.topic[data-id="${topic}"]`);
   await expect(page.locator('.play')).toBeVisible();
@@ -173,6 +173,21 @@ test.describe('Sky Ninja Academy', () => {
       if (i < word.length - 1) await expect(page.locator('.prompt .seq .got')).toHaveCount(i + 1);
     }
     await expect(page.locator('.toast.good')).toBeVisible();
+  });
+
+  test('Story Sentences: the sentence is shown, and its words must be sliced in order', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'reception', 'r-sentence');
+    const sentence = (await state(page)).answer as string;
+    const words = sentence.split(' ');
+    await expect(page.locator('.vis.sentence')).toHaveText(sentence);
+    await expect(page.locator('.prompt .seq span')).toHaveCount(words.length);
+    await page.waitForFunction(() => window.__sna.bubbles().length > 0);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);           // a word out of order is a slip
+    await expect(page.locator('.toast.bad')).toContainText('it was');
+    await page.waitForFunction(() => window.__sna.state().index === 1);
+    await solveCurrent(page);                                                          // whole sentence, word by word
+    await expect(page.locator('#score')).not.toHaveText('0');
   });
 
   test('letter tracing passes when the glyph is covered', async ({ page }) => {
