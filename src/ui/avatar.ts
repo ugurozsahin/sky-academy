@@ -21,12 +21,18 @@ export function avatarScreen(go: (s: 'home') => void) {
     <label class="name-row"><span>Your name</span><input id="name" maxlength="14" autocomplete="off" placeholder="Ninja" value="${esc(d.name)}"></label>
     <button id="go" class="btn primary big" ${d.avatar ? '' : 'disabled'}>Let's go! ⚔️</button>
   </section>`, 'bg-sky');
+  // if a tapped card sits under the sticky Let's go! button (last row: Bolt/Master), scroll it clear so it is never half-hidden — #51
+  const revealCard = (b: HTMLElement) => {
+    const go = $('#go') as HTMLElement | null;
+    if (go && b.getBoundingClientRect().bottom > go.getBoundingClientRect().top) b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   $$('.avatar-card').forEach(b => b.addEventListener('click', () => {
-    if (b.classList.contains('locked')) { sfx.wrong(); say(SENSEI_LINES.locked); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); return; }
+    if (b.classList.contains('locked')) { sfx.wrong(); say(SENSEI_LINES.locked); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); revealCard(b as HTMLElement); return; }
     $$('.avatar-card').forEach(x => x.classList.remove('sel')); b.classList.add('sel');
     const a = ALL_AVATARS.find(x => x.id === b.dataset.id)!;
     save({ avatar: a.id }); sfx.tap(); say(`${a.name}, the ${a.element}!`);
     ($('#go') as HTMLButtonElement).disabled = false;
+    revealCard(b as HTMLElement);
   }));
   $('#go').addEventListener('click', () => { save({ name: ($('#name') as HTMLInputElement).value.trim() }); sfx.correct(); go('home'); });
 }

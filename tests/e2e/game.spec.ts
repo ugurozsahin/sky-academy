@@ -119,6 +119,25 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.tutorial .tut-sensei img')).toHaveAttribute('src', /sensei/);
   });
 
+  test('avatar screen: the last card row is never left under the sticky Let\'s go! button (#51)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });        // the shortest phone we support
+    await page.goto('/?reset=1');
+    await expect(page.locator('.avatar-card')).toHaveCount(11);
+    const clearance = () => page.evaluate(() => {
+      const cards = document.querySelectorAll('.avatar-card');
+      const last = cards[cards.length - 1].getBoundingClientRect();  // Master, bottom-right
+      const go = (document.querySelector('#go') as HTMLElement).getBoundingClientRect();
+      return Math.round(go.top - last.bottom);                       // px between the last card and the button (≥ 0 = clear)
+    });
+    // From the top the last row is below the fold; tapping it must scroll it fully clear of the sticky button.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator('.avatar-card').last().click();               // locked Master → shakes and reveals itself
+    await expect.poll(clearance, { timeout: 3000 }).toBeGreaterThanOrEqual(0);
+    // and there is enough scroll runway to bring the row fully above the button
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    expect(await clearance()).toBeGreaterThanOrEqual(0);
+  });
+
   test('every year has maths and writing topics listed', async ({ page }) => {
     await pickAvatar(page);
     for (const y of ['reception', 'year1', 'year2']) {

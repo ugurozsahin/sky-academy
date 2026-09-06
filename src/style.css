@@ -84,6 +84,8 @@ img { -webkit-user-drag: none; }
 .name-row span { color: var(--muted); font-weight: 600; }
 .name-row input { flex: 1; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--line); background: #0b1030; color: var(--text); font-size: 18px; outline: none; }
 .name-row input:focus { border-color: var(--accent-2); }
+/* runway below the sticky Let's go! button so the last card row (Bolt/Master) is never left under it — #51 */
+.avatar-screen { padding-bottom: calc(84px + var(--sab)); scroll-padding-bottom: calc(84px + var(--sab)); }
 .avatar-screen #go { display: flex; margin: 0 auto; position: sticky; bottom: calc(12px + var(--sab)); z-index: 2; box-shadow: 0 10px 30px #000a; }
 
 /* ---------- home ---------- */
