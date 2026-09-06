@@ -396,6 +396,53 @@ const y2Duration: Generator = (d, rng) => {
   return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 120, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n === 60 ? 30 : n * 2] });
 };
 
+// ---------- Position & direction (#8 Phase 2) ----------
+// Four compass directions in clockwise order, each with its arrow; a turn moves that many quarter-steps round the ring.
+const DIRS: [string, string][] = [['up', '⬆️'], ['right', '➡️'], ['down', '⬇️'], ['left', '⬅️']];
+const ARROWS = DIRS.map(d => d[1]);
+const TURNS_Y1: [string, number][] = [['a quarter turn', 1], ['a half turn', 2], ['a whole turn', 4]];
+const TURNS_ALL: [string, number][] = [['a quarter turn', 1], ['a half turn', 2], ['a three-quarter turn', 3], ['a whole turn', 4]];
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** Direction faced after turning `steps` quarter-turns clockwise (or anti-clockwise) from `start` (indices into DIRS). */
+export const turnEnd = (start: number, steps: number, clockwise: boolean): number => (((start + (clockwise ? steps : -steps)) % 4) + 4) % 4;
+
+const y1Position: Generator = (d, rng) => {
+  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
+  if (kind === 0) {                                              // name the way an arrow points
+    const [word, arrow] = pick(rng, DIRS);
+    return wordQ(rng, `Which way does ${arrow} point?`, word, DIRS.map(x => x[0]).filter(w => w !== word), { say: 'Which way does the arrow point? Up, down, left or right?', hint: 'Slice the word' });
+  }
+  if (kind === 1) {                                              // pick the arrow for a direction
+    const [word, arrow] = pick(rng, DIRS);
+    return wordQ(rng, `Which arrow points ${word}?`, arrow, ARROWS.filter(a => a !== arrow), { say: `Which arrow points ${word}?`, hint: 'Slice the arrow' });
+  }
+  const [name, steps] = pick(rng, d === 3 ? TURNS_ALL : TURNS_Y1);   // where do you face after a turn?
+  const cw = rng() < 0.5, start = ri(rng, 0, 3), end = turnEnd(start, steps, cw);
+  return wordQ(rng, `Face ${DIRS[start][1]}, then ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way now?`, DIRS[end][1], ARROWS.filter(a => a !== DIRS[end][1]), {
+    say: `You are facing ${DIRS[start][0]}. Make ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way are you facing now?`, hint: 'Slice the arrow',
+  });
+};
+
+const y2Position: Generator = (d, rng) => {
+  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
+  if (kind === 0) {                                              // where do you face after a turn (all four turns, both directions)
+    const [name, steps] = pick(rng, TURNS_ALL);
+    const cw = rng() < 0.5, start = ri(rng, 0, 3), end = turnEnd(start, steps, cw);
+    return wordQ(rng, `Face ${DIRS[start][1]}, then ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way now?`, DIRS[end][1], ARROWS.filter(a => a !== DIRS[end][1]), {
+      say: `You are facing ${DIRS[start][0]}. Turn ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way are you facing now?`, hint: 'Slice the arrow',
+    });
+  }
+  if (kind === 1) {                                              // rotation as right angles
+    const [name, steps] = pick(rng, TURNS_ALL);
+    if (rng() < 0.5) return numQ(rng, `${cap(name)} = how many right angles?`, steps, { min: 0, max: 8, say: `How many right angles are the same as ${name}?`, distractors: [steps + 1, steps - 1, steps + 2] });
+    return wordQ(rng, `${steps} right angle${steps === 1 ? '' : 's'} = ?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), { say: `Which turn is the same as ${steps} right angle${steps === 1 ? '' : 's'}?`, hint: 'Slice the turn' });
+  }
+  const cw = rng() < 0.5, steps = pick(rng, [1, 2, 3]), start = ri(rng, 0, 3), end = turnEnd(start, steps, cw), name = TURNS_ALL[steps - 1][0];
+  return wordQ(rng, `Face ${DIRS[start][1]}, turn ${cw ? 'clockwise' : 'anti-clockwise'} to face ${DIRS[end][1]}. Which turn?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), {
+    say: `You turn ${cw ? 'clockwise' : 'anti-clockwise'} from ${DIRS[start][0]} to ${DIRS[end][0]}. Which turn was it?`, hint: 'Slice the turn',
+  });
+};
+
 export const MATHS_TOPICS: Topic[] = [
   // Reception — EYFS Early Learning Goals: Number, Numerical Patterns
   { id: 'r-count', title: 'Count It', icon: '🍎', subject: 'maths', year: 'reception', nc: 'ELG Number: count objects to 10', gen: rCount },
@@ -424,6 +471,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y1-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year1', nc: 'Y1 NPV: order numbers to 20', gen: y1Order },
   { id: 'y1-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 NPV: number line', gen: y1Line },
   { id: 'y1-shapes', title: '2-D Shapes', icon: '🔷', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: 2-D shapes', gen: y1Shapes },
+  { id: 'y1-position', title: 'Left, Right & Turns', icon: '🧭', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: position, direction, turns', gen: y1Position },
   { id: 'y1-length', title: 'Long & Tall', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: length & height', gen: y1Length },
   { id: 'y1-mass', title: 'Heavy & Light', icon: '🏋️', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: mass/weight', gen: y1Mass },
   { id: 'y1-capacity', title: 'Full & Empty', icon: '🥤', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: capacity & volume', gen: y1Capacity },
@@ -446,6 +494,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', gen: y2Order },
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
   { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes, faces', gen: y2Shapes },
+  { id: 'y2-position', title: 'Turns & Right Angles', icon: '🧭', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: position, direction, rotation as right angles', gen: y2Position },
   { id: 'y2-length', title: 'Length: cm & m', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: length (cm/m)', gen: y2Length },
   { id: 'y2-mass', title: 'Mass: g & kg', icon: '🏋️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: mass (g/kg)', gen: y2Mass },
   { id: 'y2-capacity', title: 'Capacity: ml & l', icon: '🥤', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: capacity (ml/l)', gen: y2Capacity },

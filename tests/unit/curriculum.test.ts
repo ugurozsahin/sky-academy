@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
+import { turnEnd } from '../../src/curriculum/maths';
 import type { Difficulty, Question } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT } from '../../src/curriculum/writing';
 
@@ -189,5 +190,49 @@ describe('curriculum ranges', () => {
       }
     }
     expect(checked).toBeGreaterThan(100);                                        // the comparison branch really did run
+  });
+});
+
+describe('Position & direction (#8 Phase 2)', () => {
+  const DIRS = ['up', 'right', 'down', 'left'];
+  const ARROWS: Record<string, string> = { up: '⬆️', right: '➡️', down: '⬇️', left: '⬅️' };
+  const word = (arrow: string) => Object.keys(ARROWS).find(k => ARROWS[k] === arrow)!;
+  const idx = (arrow: string) => DIRS.indexOf(word(arrow));
+
+  it('turnEnd rotates clockwise and anti-clockwise around the four directions', () => {
+    expect(DIRS[turnEnd(0, 1, true)]).toBe('right');    // quarter turn clockwise from up → right
+    expect(DIRS[turnEnd(0, 1, false)]).toBe('left');    // quarter turn anti-clockwise from up → left
+    expect(DIRS[turnEnd(0, 2, true)]).toBe('down');     // half turn → opposite (either way)
+    expect(DIRS[turnEnd(0, 2, false)]).toBe('down');
+    expect(DIRS[turnEnd(1, 3, true)]).toBe('up');       // three-quarter turn clockwise from right → up
+    expect(DIRS[turnEnd(2, 4, true)]).toBe('down');     // whole turn returns to start
+    for (let s = 0; s < 4; s++) expect(turnEnd(s, 4, true)).toBe(s);
+  });
+
+  it('every generated turn/right-angle answer is arithmetically correct', () => {
+    const TURN_RA: Record<string, number> = { 'a quarter turn': 1, 'a half turn': 2, 'a three-quarter turn': 3, 'a whole turn': 4 };
+    let checked = 0;
+    for (const id of ['y1-position', 'y2-position']) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 41);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
+        const q = t.gen(d, r); let m;
+        if ((m = q.prompt.match(/^Face (.+?), then (a .+? turn) (clockwise|anti-clockwise)\. Which way now\?$/))) {
+          const end = turnEnd(idx(m[1]), TURN_RA[m[2]], m[3] === 'clockwise');
+          expect(q.answer, q.prompt).toBe(ARROWS[DIRS[end]]); checked++;
+        } else if ((m = q.prompt.match(/^(A .+? turn) = how many right angles\?$/))) {
+          expect(Number(q.answer), q.prompt).toBe(TURN_RA[m[1].charAt(0).toLowerCase() + m[1].slice(1)]); checked++;
+        } else if ((m = q.prompt.match(/^(\d+) right angles? = \?$/))) {
+          expect(TURN_RA[q.answer], q.prompt).toBe(Number(m[1])); checked++;
+        } else if ((m = q.prompt.match(/^Face (.+?), turn (clockwise|anti-clockwise) to face (.+?)\. Which turn\?$/))) {
+          const end = turnEnd(idx(m[1]), TURN_RA[q.answer], m[2] === 'clockwise');
+          expect(ARROWS[DIRS[end]], q.prompt).toBe(m[3]); checked++;
+        } else if ((m = q.prompt.match(/^Which arrow points (\w+)\?$/))) {
+          expect(q.answer, q.prompt).toBe(ARROWS[m[1]]); checked++;
+        } else if ((m = q.prompt.match(/^Which way does (.+?) point\?$/))) {
+          expect(q.answer, q.prompt).toBe(word(m[1])); checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(300);
   });
 });
