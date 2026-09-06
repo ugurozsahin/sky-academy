@@ -306,6 +306,96 @@ const y2Balance: Generator = (d, rng) => {
   return balanceQ(rng, `${a} + ${b}`, `? − ${c}`, a + b + c, 100, { distractors: [a + b, a + b - c] });
 };
 
+// ---------- Measurement & time (Y1/Y2 Measurement) — issue #8 ----------
+// All text/spoken questions (no new visuals): the value is read aloud and shown in the hint, the child slices the answer.
+const COLOURS = ['red', 'blue', 'green', 'yellow', 'purple'];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const UNIT_WORD: Record<string, string> = { cm: 'centimetres', m: 'metres', g: 'grams', kg: 'kilograms', ml: 'millilitres', l: 'litres' };
+
+function uniqVals(rng: Rng, n: number, lo: number, hi: number): number[] {
+  const s = new Set<number>(); let guard = 0;
+  while (s.size < n && guard++ < 200) s.add(ri(rng, lo, hi));
+  return [...s];
+}
+/** Slice the coloured thing that is the biggest/smallest by a measured value (d1 = 2 things comparative, d2/3 = 3 things superlative). */
+function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: string, forms: [string, string, string, string], lo: number, hi: number): Question {
+  const n = d === 1 ? 2 : 3;                                   // forms = [compBig, compSmall, superBig, superSmall]
+  const cols = shuffle(rng, COLOURS).slice(0, n);
+  const vals = uniqVals(rng, n, lo, hi);
+  const big = rng() < 0.5;
+  const idx = vals.indexOf(big ? Math.max(...vals) : Math.min(...vals));
+  const adj = n === 2 ? (big ? forms[0] : forms[1]) : (big ? forms[2] : forms[3]);
+  const spoken = cols.map((c, i) => `the ${c} ${noun} is ${vals[i]} ${UNIT_WORD[unit]}`).join(', ');
+  return wordQ(rng, n === 2 ? `Which is ${adj}?` : `Which is the ${adj}?`, cols[idx], cols.filter((_, i) => i !== idx), {
+    hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '),
+    say: `${spoken}. Which one is ${n === 2 ? adj : 'the ' + adj}?`,
+  });
+}
+/** "Best unit" question: measure a familiar object in the smaller or larger standard unit. */
+function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string): Question {
+  const [thing, unit] = pick(rng, things);
+  return wordQ(rng, `Best unit for a ${thing}?`, unit, [unit === small ? large : small], {
+    say: `Would you ${verb} a ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`,
+  });
+}
+
+const y1Length: Generator = (d, rng) => rng() < 0.5
+  ? measureCompare(rng, d, pick(rng, ['pencil', 'ribbon', 'snake', 'straw', 'scarf']), 'cm', ['longer', 'shorter', 'longest', 'shortest'], d === 1 ? 3 : 5, d === 1 ? 12 : 40)
+  : measureCompare(rng, d, pick(rng, ['sunflower', 'tower', 'ladder', 'plant']), 'cm', ['taller', 'shorter', 'tallest', 'shortest'], d === 1 ? 5 : 10, d === 1 ? 20 : 60);
+const y1Mass: Generator = (d, rng) =>
+  measureCompare(rng, d, pick(rng, ['bag', 'parcel', 'box', 'basket']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], d === 1 ? 5 : 20, d === 1 ? 30 : 100);
+const y1Capacity: Generator = (d, rng) =>
+  measureCompare(rng, d, pick(rng, ['jug', 'cup', 'bottle', 'bucket']), 'ml', ['fuller', 'emptier', 'fullest', 'emptiest'], d === 1 ? 10 : 50, d === 1 ? 90 : 500);
+const y1Months: Generator = (d, rng) => {
+  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
+  if (kind === 0) { const i = ri(rng, 0, 6), after = rng() < 0.5, ans = DAYS[(i + (after ? 1 : 6)) % 7]; return wordQ(rng, `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?`, ans, shuffle(rng, DAYS.filter(x => x !== ans)).slice(0, 3), { say: `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?` }); }
+  if (kind === 1) { const [phrase, n] = pick(rng, [['days in a week', 7], ['months in a year', 12], ['seasons in a year', 4], ['days in a weekend', 2]] as [string, number][]); return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 20, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n + 2] }); }
+  const i = ri(rng, 0, 11), after = rng() < 0.5, ans = MONTHS[(i + (after ? 1 : 11)) % 12];
+  return wordQ(rng, `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, ans, shuffle(rng, MONTHS.filter(x => x !== ans)).slice(0, 3), { say: `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?` });
+};
+
+const y2Length: Generator = (d, rng) => {
+  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 3);
+  if (kind === 0) return measureCompare(rng, d, pick(rng, ['rope', 'ribbon', 'plank', 'path']), 'cm', ['longer', 'shorter', 'longest', 'shortest'], 10, 99);
+  if (kind === 1) return unitChoice(rng, [['pencil', 'cm'], ['finger', 'cm'], ['book', 'cm'], ['door', 'm'], ['room', 'm'], ['garden', 'm'], ['playground', 'm']], 'cm', 'm', 'measure');
+  if (kind === 2) { const [phrase, ans, ds] = pick(rng, [['1 metre', '100 cm', ['10 cm', '1000 cm', '50 cm']], ['half a metre', '50 cm', ['5 cm', '500 cm', '15 cm']], ['2 metres', '200 cm', ['20 cm', '2000 cm', '120 cm']]] as [string, string, string[]][]); return wordQ(rng, `${phrase} = ?`, ans, ds, { say: `How many centimetres is ${phrase}?` }); }
+  const a = ri(rng, 10, 50), b = ri(rng, 10, 50);
+  return wordQ(rng, `${a} cm + ${b} cm = ?`, `${a + b} cm`, [`${a + b + 10} cm`, `${a + b - 10} cm`, `${Math.abs(a - b)} cm`], { say: `${a} centimetres plus ${b} centimetres. How long altogether?` });
+};
+const y2Mass: Generator = (d, rng) => {
+  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
+  if (kind === 0) return measureCompare(rng, d, pick(rng, ['sack', 'box', 'parcel', 'melon']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], 50, 900);
+  if (kind === 1) return unitChoice(rng, [['feather', 'g'], ['apple', 'g'], ['coin', 'g'], ['cat', 'kg'], ['dog', 'kg'], ['bag of flour', 'kg']], 'g', 'kg', 'weigh');
+  const [phrase, ans, ds] = pick(rng, [['1 kilogram', '1000 g', ['100 g', '10 g', '500 g']], ['half a kilogram', '500 g', ['50 g', '5000 g', '250 g']], ['2 kilograms', '2000 g', ['200 g', '20 g', '1200 g']]] as [string, string, string[]][]);
+  return wordQ(rng, `${phrase} = ?`, ans, ds, { say: `How many grams is ${phrase}?` });
+};
+const y2Capacity: Generator = (d, rng) => {
+  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
+  if (kind === 0) return measureCompare(rng, d, pick(rng, ['bottle', 'jug', 'tank', 'flask']), 'ml', ['fuller', 'emptier', 'fullest', 'emptiest'], 50, 900);
+  if (kind === 1) return unitChoice(rng, [['teaspoon', 'ml'], ['cup', 'ml'], ['mug', 'ml'], ['bath', 'l'], ['bucket', 'l'], ['paddling pool', 'l']], 'ml', 'l', 'measure');
+  const [phrase, ans, ds] = pick(rng, [['1 litre', '1000 ml', ['100 ml', '10 ml', '500 ml']], ['half a litre', '500 ml', ['50 ml', '5000 ml', '250 ml']], ['2 litres', '2000 ml', ['200 ml', '20 ml', '1200 ml']]] as [string, string, string[]][]);
+  return wordQ(rng, `${phrase} = ?`, ans, ds, { say: `How many millilitres is ${phrase}?` });
+};
+const y2Temp: Generator = (d, rng) => {
+  if (d >= 2 && rng() < 0.4) {
+    const [thing, t] = pick(rng, [['ice', 0], ['a cold morning', 5], ['a warm room', 20], ['a hot bath', 40], ['a summer day', 28], ['inside a fridge', 4]] as [string, number][]);
+    const ds = uniqVals(rng, 4, Math.max(0, t - 8), t + 12).filter(x => x !== t).slice(0, 3).map(x => `${x}°C`);
+    return wordQ(rng, `Temperature of ${thing}?`, `${t}°C`, ds, { say: `About what temperature is ${thing}?` });
+  }
+  const warmer = rng() < 0.5;
+  const [ca, cb] = shuffle(rng, ['the town', 'the hill', 'the beach', 'the park', 'the wood', 'the lake']).slice(0, 2);
+  let a = ri(rng, 0, 35), b = a; while (b === a) b = ri(rng, 0, 35);
+  const first = warmer ? a > b : a < b;
+  return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });
+};
+const DURATIONS: [string, number][] = [['minutes in an hour', 60], ['seconds in a minute', 60], ['hours in a day', 24], ['days in a week', 7], ['days in a fortnight', 14], ['weeks in a year', 52], ['months in a year', 12], ['minutes in half an hour', 30], ['minutes in a quarter of an hour', 15], ['days in September', 30], ['days in July', 31]];
+const y2Duration: Generator = (d, rng) => {
+  if (rng() < 0.35) { const i = ri(rng, 0, 11), after = rng() < 0.5, ans = MONTHS[(i + (after ? 1 : 11)) % 12]; return wordQ(rng, `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, ans, shuffle(rng, MONTHS.filter(x => x !== ans)).slice(0, 3), { say: `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?` }); }
+  const [phrase, n] = pick(rng, d === 1 ? DURATIONS.slice(0, 8) : DURATIONS);
+  return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 120, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n === 60 ? 30 : n * 2] });
+};
+
 export const MATHS_TOPICS: Topic[] = [
   // Reception — EYFS Early Learning Goals: Number, Numerical Patterns
   { id: 'r-count', title: 'Count It', icon: '🍎', subject: 'maths', year: 'reception', nc: 'ELG Number: count objects to 10', gen: rCount },
@@ -334,6 +424,10 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y1-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year1', nc: 'Y1 NPV: order numbers to 20', gen: y1Order },
   { id: 'y1-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 NPV: number line', gen: y1Line },
   { id: 'y1-shapes', title: '2-D Shapes', icon: '🔷', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: 2-D shapes', gen: y1Shapes },
+  { id: 'y1-length', title: 'Long & Tall', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: length & height', gen: y1Length },
+  { id: 'y1-mass', title: 'Heavy & Light', icon: '🏋️', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: mass/weight', gen: y1Mass },
+  { id: 'y1-capacity', title: 'Full & Empty', icon: '🥤', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: capacity & volume', gen: y1Capacity },
+  { id: 'y1-months', title: 'Days & Months', icon: '📅', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time (days, weeks, months)', gen: y1Months },
   { id: 'y1-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year1', nc: 'Y1 A&S: equals sign, missing number', gen: y1Balance },
   // Year 2
   { id: 'y2-pv', title: 'Tens & Ones', icon: '🔟', subject: 'maths', year: 'year2', nc: 'Y2 NPV: place value', gen: y2PlaceValue },
@@ -352,6 +446,11 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', gen: y2Order },
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
   { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes, faces', gen: y2Shapes },
+  { id: 'y2-length', title: 'Length: cm & m', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: length (cm/m)', gen: y2Length },
+  { id: 'y2-mass', title: 'Mass: g & kg', icon: '🏋️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: mass (g/kg)', gen: y2Mass },
+  { id: 'y2-capacity', title: 'Capacity: ml & l', icon: '🥤', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: capacity (ml/l)', gen: y2Capacity },
+  { id: 'y2-temp', title: 'Temperature', icon: '🌡️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: temperature (°C)', gen: y2Temp },
+  { id: 'y2-duration', title: 'Time & Durations', icon: '⏳', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: time, durations, months', gen: y2Duration },
   { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },
 ];
 

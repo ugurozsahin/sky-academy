@@ -152,4 +152,42 @@ describe('curriculum ranges', () => {
       expect(q.answer).toBe(a < b ? '<' : a > b ? '>' : '=');
     }
   });
+
+  // #8 measurement & time: the generic suite checks structure; these check the domain facts it cannot infer.
+  it('Measurement/time (#8): duration, month and day facts are correct', () => {
+    const DUR: Record<string, number> = {
+      'minutes in an hour': 60, 'seconds in a minute': 60, 'hours in a day': 24, 'days in a week': 7,
+      'days in a fortnight': 14, 'weeks in a year': 52, 'months in a year': 12, 'minutes in half an hour': 30,
+      'minutes in a quarter of an hour': 15, 'days in September': 30, 'days in July': 31, 'seasons in a year': 4, 'days in a weekend': 2,
+    };
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (const id of ['y2-duration', 'y1-months']) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 21);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
+        const q = t.gen(d, r); let m;
+        if ((m = q.prompt.match(/^How many (.+)\?$/))) { expect(DUR[m[1]], q.prompt).toBeDefined(); expect(Number(q.answer), q.prompt).toBe(DUR[m[1]]); }
+        else if ((m = q.prompt.match(/^Which month comes (after|before) (\w+)\?$/))) { const j = MONTHS.indexOf(m[2]); expect(q.answer, q.prompt).toBe(MONTHS[(j + (m[1] === 'after' ? 1 : 11)) % 12]); }
+        else if ((m = q.prompt.match(/^Which day comes (after|before) (\w+)\?$/))) { const j = DAYS.indexOf(m[2]); expect(q.answer, q.prompt).toBe(DAYS[(j + (m[1] === 'after' ? 1 : 6)) % 7]); }
+      }
+    }
+  });
+  it('Measurement (#8): length/mass/capacity/temperature comparisons slice the correct extreme', () => {
+    let checked = 0;
+    for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp']) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 31);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 150; i++) {
+        const q = t.gen(d, r);
+        const m = q.prompt.match(/^Which (?:is|was) (?:the )?(\w+)\?$/);
+        if (!m || !q.hint || !q.hint.includes(':')) continue;                    // skip unit/conversion/add questions
+        const segs = q.hint.split(' · ').map(s => { const [label, rest] = s.split(': '); return [label, parseInt(rest, 10)] as [string, number]; });
+        const big = /^(long|tall|heav|full|warm)/.test(m[1]);                    // longer/longest/taller/heaviest/fuller/warmer …
+        const target = big ? Math.max(...segs.map(x => x[1])) : Math.min(...segs.map(x => x[1]));
+        const winner = segs.find(x => x[1] === target)![0];
+        expect(winner === q.answer || winner.startsWith(q.answer + ' '), `${id}: "${q.prompt}" | ${q.hint} | ans=${q.answer}`).toBe(true);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(100);                                        // the comparison branch really did run
+  });
 });
