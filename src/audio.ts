@@ -42,6 +42,8 @@ export const sliceFx: Record<string, () => void> = {
   blade: () => { noise(0.07, 0.22, 2500); tone(2400, 0.16, 'sine', 0.07, 1900, 0.02); },
   robot: () => { tone(880, 0.05, 'square', 0.08); tone(1320, 0.05, 'square', 0.08, undefined, 0.06); },
 };
+/** The Master Ninja's slice borrows a different element's sound each time. */
+sliceFx.master = () => { const keys = Object.keys(sliceFx).filter(k => k !== 'master'); sliceFx[keys[Math.floor(Math.random() * keys.length)]](); };
 
 export const sfx = {
   swish: () => noise(0.12, 0.12, 2500),                                   // blade trail

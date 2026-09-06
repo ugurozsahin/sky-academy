@@ -1,4 +1,4 @@
-import { AVATARS, avatarById, cheerLine, praiseLine, VILLAIN } from '../avatars';
+import { AVATARS, avatarById, cheerLine, praiseLine, SENSEI, SENSEI_LINES, senseiLine, VILLAIN } from '../avatars';
 import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
 import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
@@ -38,7 +38,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       <div class="toast" id="toast" aria-live="polite"></div>
       ${villainMode ? `<div class="villain${boss ? ' boss' : ''}" id="villain">${boss ? '<div class="hp" role="progressbar" aria-label="Hammer Man health"><i id="hp"></i></div>' : ''}<img src="${VILLAIN.img}" alt="Hammer Man"><span class="bubble" id="taunt" hidden></span></div>` : ''}
     </div>
-    ${!tracing && !d.tutorialSeen ? '<div class="tutorial" id="tutorial" hidden aria-hidden="true"><div class="tut-bubble">3</div><div class="tut-hand">☝️</div><div class="tut-text">Slice the bubble!</div></div>' : ''}
+    ${!tracing && !d.tutorialSeen ? `<div class="tutorial" id="tutorial" hidden aria-hidden="true"><div class="tut-sensei"><img src="${SENSEI.img}" alt=""></div><div class="tut-bubble">3</div><div class="tut-hand">☝️</div><div class="tut-text">Slice the bubble!</div></div>` : ''}
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
@@ -145,7 +145,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   function showTutorial(): number {
     const t = $('#tutorial'); if (!t || !t.hidden) return 0;
     if (load().tutorialSeen || session.questionsAsked > 1) return 0;   // only ever before the very first wave
-    t.hidden = false; say('Slice the bubble with your finger!');
+    t.hidden = false; say(SENSEI_LINES.tutorial);
     later(hideTutorial, 9000);                    // never block play for long, even if the child just watches
     return 1800;
   }
@@ -187,13 +187,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const stickerHTML = fresh.map(id => { const a = AVATARS.find(x => x.id === id); return `<div class="unlock" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${a ? a.img : VILLAIN.img}" alt=""></span><b>New sticker!</b><small>${a ? a.name : VILLAIN.name}</small></div>`; }).join('');
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), 600);
     const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉') : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪') : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
-    const headline = r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
+    const headline = training ? senseiLine(r.won, d.name) : r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
+    const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
     const cert = certInfo(r); lastResult = r;
     els.overlay.hidden = false; els.overlay.innerHTML = `
       <div class="modal results">
         ${r.mode === 'boss' && r.won ? `<div class="ko" aria-hidden="true"><img src="${VILLAIN.img}" alt=""><b>K.O.</b></div>` : ''}
-        <div class="hero-big ${r.won ? '' : 'sad'}" style="--glow:${av.glow}"><img src="${av.img}" alt="${av.name}"><div class="speech">${esc(headline)}</div></div>
+        <div class="hero-big ${r.won ? '' : 'sad'}${training ? ' sensei' : ''}" style="--glow:${speaker.glow}"><img src="${speaker.img}" alt="${speaker.name}"><div class="speech">${esc(headline)}</div></div>
         <div class="medal">${medal}</div>
         <h2>${r.mode === 'endless' ? 'Storm over!' : r.mode === 'sprint' ? "Time's up!" : r.mode === 'boss' ? (r.won ? 'Knock-out!' : 'Hammer Man wins this round') : r.won ? (training ? 'Training complete!' : 'Mission complete!') : 'Out of lives'}</h2>
         ${r.mode !== 'endless' ? `<div class="big-stars">${stars(r.stars)}</div>` : ''}

@@ -4,6 +4,15 @@ import type { TopicProgress } from '../storage';
 
 export const TRAIN_TOPICS = 3;
 
+/**
+ * Master Ninja unlock: every topic (all islands, tracing included) has at least one star.
+ * Returns how many topics are starred out of the total, so the locked card can show progress.
+ */
+export function masterProgress(topics: Topic[], progress: Record<string, TopicProgress>): { done: number; total: number; unlocked: boolean } {
+  const done = topics.filter(t => (progress[t.id]?.stars ?? 0) >= 1).length;
+  return { done, total: topics.length, unlocked: topics.length > 0 && done === topics.length };
+}
+
 /** Accuracy so far (0–1) from recorded slices; older saves without tallies fall back to their star rating. */
 export function accuracy(p: TopicProgress | undefined): number | null {
   if (!p || !p.plays) return null;

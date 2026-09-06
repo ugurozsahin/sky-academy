@@ -1,4 +1,4 @@
-import { AVATARS, avatarById, VILLAIN } from '../avatars';
+import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
 import { dojoToday, load, save, STICKER_IDS, STICKER_COST } from '../storage';
 import { sfx, say } from '../audio';
@@ -91,7 +91,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       <button class="tab${subject === 'writing' ? ' on' : ''}" data-s="writing" role="tab">✍️ Writing</button>
     </div>
     <div class="topics" id="topics"></div>
-    <button class="btn storm train" id="train"><span class="vport emoji">🥋</span><span><b>Train with Sensei</b><small>Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${d.training[year.id] ?? 0}</small></span></button>
+    <button class="btn storm train" id="train"><span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span><span><b>Train with Sensei</b><small>Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${d.training[year.id] ?? 0}</small></span></button>
     <button class="btn storm" id="endless"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Sky Storm</b><small>Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}</small></span></button>
     <button class="btn storm sprint" id="sprint"><span class="vport emoji">⏱️</span><span><b>Ninja Sprint</b><small>${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}</small></span></button>
     <button class="btn storm boss" id="boss"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Boss Battle</b><small>Knock out Hammer Man · KOs ${d.boss[year.id] ?? 0}</small></span></button>

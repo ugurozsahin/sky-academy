@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { TOPICS } from '../../src/curriculum';
 
 declare global { interface Window { __sna: any } }
 
@@ -78,6 +79,37 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.hero small')).toContainText('Blaze');
     await page.goto('/');
     await expect(page.locator('.home')).toBeVisible(); // remembered
+  });
+
+  test('Master Ninja is locked until every topic has a star, then becomes a playable avatar', async ({ page }) => {
+    await page.goto('/?reset=1');
+    const card = page.locator('.avatar-card[data-id="master"]');
+    await expect(page.locator('.avatar-card')).toHaveCount(11);
+    await expect(card).toHaveClass(/locked/);
+    await expect(card.locator('.lock')).toBeVisible();
+    await expect(card.locator('small')).toHaveText(`0/${TOPICS.length} topics ★`);
+    await card.click();
+    await expect(page.locator('#go')).toBeDisabled();                                 // a locked card never selects
+    await expect(card).not.toHaveClass(/sel/);
+    // Star every topic (as a finished player would have) and come back: the Master is unlocked.
+    await page.evaluate((ids) => {
+      const progress = Object.fromEntries(ids.map(id => [id, { stars: 1, best: 10, plays: 1 }]));
+      localStorage.setItem('sna:v1', JSON.stringify({ v: 1, name: 'Ada', avatar: null, progress }));
+    }, TOPICS.map(t => t.id));
+    await page.goto('/');
+    await expect(card).not.toHaveClass(/locked/);
+    await expect(card.locator('small')).toHaveText('Sensei of all elements');
+    await card.click();
+    await expect(card).toHaveClass(/sel/);
+    await page.click('#go');
+    await expect(page.locator('.hero small')).toContainText('Master Ninja');
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('#train img')).toHaveAttribute('src', /sensei/);         // Sensei fronts the training button
+    await page.click('.tab[data-s="maths"]'); await page.click('.topic[data-id="y1-add"]');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    expect(await page.evaluate(() => window.__sna.arena.fx)).toBe('master');             // the trail mixes every element
+    await expect(page.locator('.tutorial .tut-sensei img')).toHaveAttribute('src', /sensei/);
   });
 
   test('every year has maths and writing topics listed', async ({ page }) => {

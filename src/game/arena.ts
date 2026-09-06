@@ -6,9 +6,10 @@ export interface Bubble {
 }
 type PKind = 'dot' | 'ring' | 'shard' | 'text' | 'ember' | 'drop' | 'bolt' | 'rock' | 'leaf' | 'crystal' | 'star' | 'smoke' | 'pixel' | 'slash';
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; size: number; kind: PKind; text?: string; rot?: number }
-export type FxKind = 'fire' | 'water' | 'electric' | 'earth' | 'wind' | 'ice' | 'light' | 'shadow' | 'blade' | 'robot';
-const FX_PARTICLE: Record<FxKind, PKind> = { fire: 'ember', water: 'drop', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'crystal', light: 'star', shadow: 'smoke', blade: 'slash', robot: 'pixel' };
-const FX_COLORS: Record<FxKind, string[]> = { fire: ['#ff7a1a', '#ffd23a', '#ff3b1a'], water: ['#3ec9ff', '#9fe6ff', '#1a7fff'], electric: ['#2ea8ff', '#ffffff', '#9fe6ff'], earth: ['#a0622a', '#7ddc3a', '#6b4220'], wind: ['#7fe8c8', '#c8ffe9', '#5fcf5a'], ice: ['#9fe6ff', '#ffffff', '#5bb8e8'], light: ['#ffd23a', '#ffffff', '#ffb020'], shadow: ['#a855ff', '#5a2aa0', '#2a1050'], blade: ['#ffffff', '#ff3b5c', '#d8dce8'], robot: ['#ff5252', '#ffffff', '#9aa5cf'] };
+export type FxKind = 'fire' | 'water' | 'electric' | 'earth' | 'wind' | 'ice' | 'light' | 'shadow' | 'blade' | 'robot' | 'master';
+const ELEMENTS: FxKind[] = ['fire', 'water', 'electric', 'earth', 'wind', 'ice', 'light', 'shadow', 'blade', 'robot'];   // `master` draws from all of these
+const FX_PARTICLE: Record<FxKind, PKind> = { fire: 'ember', water: 'drop', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'crystal', light: 'star', shadow: 'smoke', blade: 'slash', robot: 'pixel', master: 'star' };
+const FX_COLORS: Record<FxKind, string[]> = { fire: ['#ff7a1a', '#ffd23a', '#ff3b1a'], water: ['#3ec9ff', '#9fe6ff', '#1a7fff'], electric: ['#2ea8ff', '#ffffff', '#9fe6ff'], earth: ['#a0622a', '#7ddc3a', '#6b4220'], wind: ['#7fe8c8', '#c8ffe9', '#5fcf5a'], ice: ['#9fe6ff', '#ffffff', '#5bb8e8'], light: ['#ffd23a', '#ffffff', '#ffb020'], shadow: ['#a855ff', '#5a2aa0', '#2a1050'], blade: ['#ffffff', '#ff3b5c', '#d8dce8'], robot: ['#ff5252', '#ffffff', '#9aa5cf'], master: ['#ffd87a', '#ffffff', '#ffb020'] };
 export interface ArenaCallbacks {
   onHit: (b: Bubble, viaSwipe: boolean) => void;   // player touched/sliced a bubble
   onFall: (b: Bubble) => void;                       // an un-hit bubble fell off screen
@@ -146,8 +147,9 @@ export class Arena {
   }
   /** Element-flavoured particles (trail wake or hit burst). */
   emitFx(x: number, y: number, n: number, dx: number, dy: number) {
-    const kind = FX_PARTICLE[this.fx]; const cols = FX_COLORS[this.fx];
     for (let i = 0; i < n; i++) {
+      const fx = this.fx === 'master' ? ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)] : this.fx;   // the Master mixes every element
+      const kind = FX_PARTICLE[fx]; const cols = FX_COLORS[fx];
       const c = cols[Math.floor(Math.random() * cols.length)];
       const a = Math.random() * Math.PI * 2, sp = n > 1 ? 80 + Math.random() * 220 : 20 + Math.random() * 60;
       let vx = Math.cos(a) * sp - dx * 2, vy = Math.sin(a) * sp - dy * 2, max = 0.5 + Math.random() * 0.4, size = 3 + Math.random() * 4;

@@ -1,6 +1,6 @@
 // Avatar roster. Art lives in public/avatars/<id>.webp (transparent character illustrations supplied by the project owner).
 // Replace the images to change the look — nothing else in the game depends on the artwork.
-export type Fx = 'fire' | 'water' | 'electric' | 'earth' | 'wind' | 'ice' | 'light' | 'shadow' | 'blade' | 'robot';
+export type Fx = 'fire' | 'water' | 'electric' | 'earth' | 'wind' | 'ice' | 'light' | 'shadow' | 'blade' | 'robot' | 'master';   // master = every element mixed
 export interface Avatar {
   id: string;
   name: string;
@@ -38,8 +38,30 @@ export const AVATARS: Avatar[] = [
 
 export const VILLAIN = { id: 'hammer', name: 'Hammer Man', img: 'avatars/hammer.webp', taunt: ['Too late!', 'You will never catch me!', 'BOOM!', 'Ha! Missed!'] };
 
+/**
+ * The Master Ninja (owner art: white hair, all elements). Two roles:
+ * - Sensei, the guide: face of Train with Sensei, the first-play tutorial and (later) the Lessons and the coin shop.
+ * - Playable 11th avatar `master`, locked until every topic on every island has at least one star (see `masterProgress`).
+ */
+export const MASTER: Avatar = { id: 'master', name: 'Master Ninja', element: 'Sensei of all elements', glow: '#ffd87a', img: 'avatars/sensei.webp', fx: 'master', focus: 0.3,
+  praise: ['Calm mind, sharp blade, {name}.', 'The student becomes the master, {name}.', 'Patience and practice, {name}. Well done.'], cheer: ['Steady.', 'Just so.', 'Wise.'] };
+export const SENSEI = MASTER;
+/** What Sensei says when a training session ends. */
+export const SENSEI_LINES = {
+  trained: ['Well trained, {name}. Practice makes a master.', 'Your trickiest topics grow easier, {name}.', 'Good focus, {name}. Tomorrow we train again.'],
+  tryAgain: ['Even a master stumbles, {name}. Rest, then train again.', 'Slow down and look closely, {name}. Try once more.'],
+  tutorial: 'Slice the bubble with your finger!',
+  locked: 'Earn a star on every topic to play as the Master Ninja.',
+};
+/** Every playable ninja, the Master last. */
+export const ALL_AVATARS: Avatar[] = [...AVATARS, MASTER];
+
 export function avatarById(id: string | null | undefined): Avatar {
-  return AVATARS.find(a => a.id === id) ?? AVATARS[0];
+  return ALL_AVATARS.find(a => a.id === id) ?? AVATARS[0];
+}
+export function senseiLine(won: boolean, childName: string, rnd = Math.random): string {
+  const pool = won ? SENSEI_LINES.trained : SENSEI_LINES.tryAgain;
+  return pool[Math.floor(rnd() * pool.length)].replace('{name}', childName || 'Ninja');
 }
 
 export function praiseLine(a: Avatar, childName: string, rnd = Math.random): string {
