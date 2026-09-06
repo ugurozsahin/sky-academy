@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, load, recordBossWin, recordMemory, recordSprint, reset, stickersFor, touchStreak, STICKER_IDS, STICKER_COST } from '../../src/storage';
+import { addCoins, load, recordAccuracy, recordBossWin, recordMemory, recordSprint, recordTopic, recordTraining, reset, stickersFor, touchStreak, STICKER_IDS, STICKER_COST } from '../../src/storage';
 
 // minimal localStorage shim for node
 const mem: Record<string, string> = {};
@@ -39,6 +39,16 @@ describe('rewards storage', () => {
     expect(load().memory).toEqual({});
     expect(recordMemory('reception')).toBe(1); expect(recordMemory('reception')).toBe(2); expect(recordMemory('year2')).toBe(1);
     expect(load().memory).toEqual({ reception: 2, year2: 1 });
+  });
+  it('topic accuracy accumulates across runs and keeps stars; training sessions are counted per year', () => {
+    recordTopic('y1-add', 2, 80);
+    recordAccuracy('y1-add', 5, 6); recordAccuracy('y1-add', 3, 4); recordAccuracy('y1-add', 0, 0);   // an empty tally changes nothing
+    expect(load().progress['y1-add']).toEqual({ stars: 2, best: 80, plays: 1, hits: 8, tries: 10 });
+    recordAccuracy('y1-sub', 1, 2);                                                                    // a topic met only in Sensei training / Sky Storm
+    expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 1, tries: 2 });
+    expect(load().training).toEqual({});
+    expect(recordTraining('year1')).toBe(1); expect(recordTraining('year1')).toBe(2);
+    expect(load().training).toEqual({ year1: 2 });
   });
   it('streak counts consecutive days only', () => {
     expect(touchStreak(new Date('2026-09-05T10:00:00Z'))).toBe(1);

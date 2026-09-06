@@ -3,9 +3,10 @@ import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
 import { load, save, STICKER_IDS, STICKER_COST } from '../storage';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
+import { weakestTopics } from '../game/sensei';
 import { $, $$, render, stars } from './dom';
 
-export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode }) => void;
+export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
 type Nav = { avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay; memory: (year: YearInfo) => void; rewards: () => void };
 
 const ISLAND_BLURB: Record<YearInfo['id'], string> = { reception: 'First steps · counting, sounds & letters', year1: 'Number bonds, adding, phonics & spelling', year2: 'Times tables, money, time & tricky words' };
@@ -61,6 +62,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   let subject = subjectInit;
   const idx = YEARS.indexOf(year);
   const tb = topbar(nav, () => islandScreen(nav, year, subject));
+  const weakest = weakestTopics(topicsFor(year.id), d.progress);
   render(`
   <section class="screen home island-screen">
     ${tb.html}
@@ -74,6 +76,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       <button class="tab${subject === 'writing' ? ' on' : ''}" data-s="writing" role="tab">✍️ Writing</button>
     </div>
     <div class="topics" id="topics"></div>
+    <button class="btn storm train" id="train"><span class="vport emoji">🥋</span><span><b>Train with Sensei</b><small>Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${d.training[year.id] ?? 0}</small></span></button>
     <button class="btn storm" id="endless"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Sky Storm</b><small>Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}</small></span></button>
     <button class="btn storm sprint" id="sprint"><span class="vport emoji">⏱️</span><span><b>Ninja Sprint</b><small>${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}</small></span></button>
     <button class="btn storm boss" id="boss"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Boss Battle</b><small>Knock out Hammer Man · KOs ${d.boss[year.id] ?? 0}</small></span></button>
@@ -92,6 +95,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   drawTopics();
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
   $$('.tab').forEach(b => b.addEventListener('click', () => { subject = b.dataset.s as 'maths' | 'writing'; $$('.tab').forEach(x => x.classList.toggle('on', x === b)); sfx.tap(); drawTopics(); }));
+  $('#train').addEventListener('click', () => { sfx.tap(); say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); });
   $('#endless').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'endless' }); });
   $('#sprint').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'sprint' }); });
   $('#boss').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'boss' }); });

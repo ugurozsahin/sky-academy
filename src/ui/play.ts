@@ -3,20 +3,20 @@ import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from
 import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
 import { Tracer } from '../game/tracing';
-import { addCoins, load, recordBossWin, recordEndless, recordSprint, recordTopic, save, touchStreak } from '../storage';
+import { addCoins, load, recordAccuracy, recordBossWin, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak } from '../storage';
 import { say, sfx, sliceFx } from '../audio';
 import { $, esc, render, stars } from './dom';
 import { renderVisual } from './visuals';
 
 const BOMB = '💣';
-export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode }
+export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
   const tracing = o.topic?.mode === 'tracing';
-  const sprint = o.mode === 'sprint'; const boss = o.mode === 'boss';
+  const sprint = o.mode === 'sprint'; const boss = o.mode === 'boss'; const training = o.mode === 'mission' && !!o.pool;
   const villainMode = o.mode === 'endless' || boss;     // Hammer Man on screen, TNT bubbles in the mix
-  const title = o.mode === 'endless' ? 'Sky Storm' : sprint ? 'Ninja Sprint' : boss ? 'Boss Battle' : o.topic!.title;
+  const title = o.mode === 'endless' ? 'Sky Storm' : sprint ? 'Ninja Sprint' : boss ? 'Boss Battle' : training ? 'Sensei Training' : o.topic!.title;
   render(`
   <section class="screen play ${tracing ? 'tracing' : ''}" style="--glow:${av.glow}">
     ${tracing ? '' : '<canvas id="arena" aria-label="Game arena"></canvas>'}
@@ -46,9 +46,10 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   const later = (fn: () => void, ms: number) => { const t = window.setTimeout(() => { if (alive) fn(); }, ms); timers.push(t); };
   const toast = (text: string, cls = '') => { els.toast.textContent = text; els.toast.className = `toast show ${cls}`; later(() => els.toast.classList.remove('show'), 1300); };
 
-  const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.mode !== 'tracing') : undefined }, {
+  const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.mode !== 'tracing') : undefined) }, {
     onQuestion(q, info) {
       els.stage.textContent = o.mode !== 'mission' ? `Q${session.questionsAsked}` : `${STAGE_NAMES[info.stage - 1] ?? 'Stage ' + info.stage} · ${info.index + 1}/${info.total}`;
+      if (training && session.currentTopic) $('.ttl').textContent = `${session.currentTopic.icon} ${session.currentTopic.title}`;   // Sensei: name the topic of each question
       els.prompt.innerHTML = q.listen && !load().speech ? esc(q.listen) : promptHTML(q, session.seqIndex); els.vis.innerHTML = renderVisual(q.visual); els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
       lastOutcome = 'none';
       if (tracing) { say(q.say ?? q.prompt); startTrace(q); return; }
@@ -149,9 +150,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     arena && (arena.paused = true);
     let newBest = false;
     if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
+    else if (training) { if (r.won) recordTraining(o.year.id); }
     else if (o.mode === 'sprint') newBest = recordSprint(o.year.id, r.score);
     else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
     else recordEndless(o.year.id, r.score);
+    for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t.hits, t.tries);   // every mode teaches Sensei what is hard
     const fresh = addCoins(r.coins); const streak = touchStreak();
     const stickerHTML = fresh.map(id => { const a = AVATARS.find(x => x.id === id); return `<div class="unlock" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${a ? a.img : VILLAIN.img}" alt=""></span><b>New sticker!</b><small>${a ? a.name : VILLAIN.name}</small></div>`; }).join('');
     if (fresh.length) later(() => sfx.stage(), 600);
@@ -163,7 +166,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         ${r.mode === 'boss' && r.won ? `<div class="ko" aria-hidden="true"><img src="${VILLAIN.img}" alt=""><b>K.O.</b></div>` : ''}
         <div class="hero-big ${r.won ? '' : 'sad'}" style="--glow:${av.glow}"><img src="${av.img}" alt="${av.name}"><div class="speech">${esc(headline)}</div></div>
         <div class="medal">${medal}</div>
-        <h2>${r.mode === 'endless' ? 'Storm over!' : r.mode === 'sprint' ? "Time's up!" : r.mode === 'boss' ? (r.won ? 'Knock-out!' : 'Hammer Man wins this round') : r.won ? 'Mission complete!' : 'Out of lives'}</h2>
+        <h2>${r.mode === 'endless' ? 'Storm over!' : r.mode === 'sprint' ? "Time's up!" : r.mode === 'boss' ? (r.won ? 'Knock-out!' : 'Hammer Man wins this round') : r.won ? (training ? 'Training complete!' : 'Mission complete!') : 'Out of lives'}</h2>
         ${r.mode !== 'endless' ? `<div class="big-stars">${stars(r.stars)}</div>` : ''}
         <div class="statgrid"><div><b>${r.score}</b><small>score</small></div><div><b>${r.correct}/${r.attempts}</b><small>correct</small></div><div><b>×${r.bestCombo}</b><small>best combo</small></div></div>
         <div class="coin-row"><span class="coin-gain">+${r.coins} 🪙</span>${newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : ''}</div>

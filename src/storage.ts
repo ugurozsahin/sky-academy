@@ -1,5 +1,5 @@
 // Persistent player state (localStorage). Small, versioned, safe on failure.
-export interface TopicProgress { stars: number; best: number; plays: number }
+export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }   // hits/tries = lifetime slices (missions + Sensei training)
 export interface SaveData {
   v: 1;
   name: string;
@@ -12,6 +12,7 @@ export interface SaveData {
   sprint: Record<string, number>;    // year -> best Ninja Sprint score
   boss: Record<string, number>;      // year -> Hammer Man knock-outs
   memory: Record<string, number>;    // year -> Memory Match boards completed
+  training: Record<string, number>;  // year -> Sensei training sessions completed
   totalSlices: number;
   coins: number;                     // ninja coins earned (lifetime)
   stickers: string[];                // unlocked sticker ids
@@ -19,7 +20,7 @@ export interface SaveData {
   tutorialSeen: boolean;             // the "slice the bubble" demo hand has done its job
 }
 const KEY = 'sna:v1';
-const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false };
+const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false };
 
 let cache: SaveData | null = null;
 export function load(): SaveData {
@@ -37,6 +38,17 @@ export function recordTopic(topicId: string, stars: number, score: number) {
   const p = load().progress[topicId] ?? { stars: 0, best: 0, plays: 0 };
   const next = { stars: Math.max(p.stars, stars), best: Math.max(p.best, score), plays: p.plays + 1 };
   save({ progress: { ...load().progress, [topicId]: next } });
+}
+/** Add answered questions to a topic's lifetime tally (Sensei picks the weakest topics from these). */
+export function recordAccuracy(topicId: string, hits: number, tries: number) {
+  if (tries <= 0) return;
+  const p = load().progress[topicId] ?? { stars: 0, best: 0, plays: 0 };
+  save({ progress: { ...load().progress, [topicId]: { ...p, hits: (p.hits ?? 0) + hits, tries: (p.tries ?? 0) + tries } } });
+}
+/** Count a completed Sensei training session for this year. Returns the new total. */
+export function recordTraining(year: string): number {
+  const t = load().training; const n = (t[year] ?? 0) + 1;
+  save({ training: { ...t, [year]: n } }); return n;
 }
 export function recordEndless(year: string, score: number) {
   const e = load().endless; if ((e[year] ?? 0) < score) save({ endless: { ...e, [year]: score } });

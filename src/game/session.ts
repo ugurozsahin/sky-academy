@@ -24,7 +24,8 @@ export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?:
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
   correct = 0; attempts = 0; stageCorrect = 0; stageAttempts = 0; stageStars: number[] = [];
-  current: Question | null = null; seqIndex = 0; waiting = false; ended = false; questionsAsked = 0;
+  current: Question | null = null; currentTopic: Topic | null = null; seqIndex = 0; waiting = false; ended = false; questionsAsked = 0;
+  byTopic: Record<string, { hits: number; tries: number }> = {};   // per-topic tally (pool modes feed Sensei's weakest-topic ranking)
   timeLeft: number;                                     // ms, sprint only (0 otherwise)
   bossHp: number; readonly bossMax: number;             // boss only (0 otherwise)
   private rng: () => number; readonly stages: number;
@@ -83,7 +84,7 @@ export class Session {
   }
   nextQuestion() {
     if (this.ended) return;
-    const topic = this.pickTopic();
+    const topic = this.pickTopic(); this.currentTopic = topic;
     let q = topic.gen(this.difficulty, this.rng);
     // avoid immediate repeats
     for (let i = 0; i < 5 && this.current && q.prompt === this.current.prompt && q.answer === this.current.answer; i++) q = topic.gen(this.difficulty, this.rng);
@@ -113,7 +114,7 @@ export class Session {
     const q = this.current; if (!q || this.waiting || this.ended) return;
     const isTarget = q.sequence ? label === q.sequence[this.seqIndex] : label === q.answer;
     if (!isTarget) return;
-    this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0;
+    this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false);
     this.ev.onMiss(q); this.bossHeal();
     if (!this.o.year.gentle) this.loseLife();
   }
@@ -122,13 +123,13 @@ export class Session {
     if (this.ended) return;
     if (!this.waiting) { // nothing decided (e.g. only decoys fell) – for sequences relaunch remaining letters
       if (this.current?.sequence) { this.respawn(); return; }
-      this.waiting = true; this.attempts++; this.stageAttempts++; this.ev.onMiss(this.current!); this.bossHeal(); if (!this.o.year.gentle) this.loseLife(); if (this.ended) return;
+      this.waiting = true; this.attempts++; this.stageAttempts++; this.tally(false); this.ev.onMiss(this.current!); this.bossHeal(); if (!this.o.year.gentle) this.loseLife(); if (this.ended) return;
     }
     this.advance();
   }
   private markCorrect() {
     const q = this.current!; this.waiting = true;
-    this.attempts++; this.correct++; this.stageAttempts++; this.stageCorrect++;
+    this.attempts++; this.correct++; this.stageAttempts++; this.stageCorrect++; this.tally(true);
     this.combo++; this.bestCombo = Math.max(this.bestCombo, this.combo);
     const base = this.o.mode === 'mission' ? 10 * this.stage : this.o.mode === 'sprint' ? 10 : 10 + Math.min(20, Math.floor(this.questionsAsked / 5) * 5);
     const points = base + (this.combo >= 3 ? Math.min(20, this.combo * 2) : 0);
@@ -137,9 +138,13 @@ export class Session {
     if (this.o.mode === 'boss') { this.bossHp = Math.max(0, this.bossHp - 1); this.ev.onBoss?.(this.bossHp, this.bossMax, 'hit'); if (this.bossHp === 0) this.end(true); }
   }
   private markWrong(label: string) {
-    const q = this.current!; this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0;
+    const q = this.current!; this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false);
     this.ev.onWrong(q, label); this.bossHeal();
     this.loseLife();
+  }
+  private tally(hit: boolean) {
+    const id = this.currentTopic?.id; if (!id) return;
+    const t = this.byTopic[id] ??= { hits: 0, tries: 0 }; t.tries++; if (hit) t.hits++;
   }
   private loseLife() {
     if (this.o.mode === 'sprint') return;               // no lives in a sprint: a slip only costs time

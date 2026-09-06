@@ -238,6 +238,24 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#endless small')).toContainText('best');
   });
 
+  test('Train with Sensei: a staged mission over the weakest topics, each question named by topic', async ({ page }) => {
+    await pickAvatar(page);
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('#train small')).toContainText('sessions 0');
+    await page.click('#train');
+    await expect(page.locator('.play')).toBeVisible();
+    await expect(page.locator('#stage')).toContainText('Apprentice · 1/6');            // mission rules: stages and lives
+    await expect(page.locator('#lives span')).toHaveCount(3);
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    const first = await page.evaluate(() => window.__sna.session.currentTopic.title as string);
+    await expect(page.locator('.ttl')).toHaveText(new RegExp(first));
+    await solveCurrent(page);
+    await expect.poll(() => page.evaluate(() => window.__sna.state().score)).toBeGreaterThan(0);
+    const pool = await page.evaluate(() => window.__sna.session.o.pool.map((t: any) => t.id));
+    expect(pool).toHaveLength(3);
+    expect(pool).toContain(await page.evaluate(() => window.__sna.session.currentTopic.id));
+  });
+
   test('Ninja Sprint: timed run with no lives ends on the clock and saves a best score', async ({ page }) => {
     await pickAvatar(page);
     await page.click('.island[data-year="year1"]');

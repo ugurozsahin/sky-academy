@@ -31,6 +31,22 @@ describe('mission session', () => {
     expect(r.won).toBe(true); expect(r.stars).toBe(3); expect(r.correct).toBe(Y1.perStage * s.stages); expect(r.score).toBeGreaterThan(0);
     expect(r.coins).toBe(Y1.perStage * s.stages + 3 * s.stages * 5 + 20);
   });
+  it('Sensei training: a mission over a pool tallies hits and tries per topic', () => {
+    const ev = events();
+    const pool = [topicById('y1-add')!, topicById('y1-sub')!];
+    const s = new Session({ mode: 'mission', year: Y1, pool, rng: rng(5) }, ev);
+    s.start();
+    for (let i = 0; i < Y1.perStage; i++) {
+      expect(pool).toContain(s.currentTopic);
+      if (i === 0) { const wrong = s.current!.options.find(o => o !== s.current!.answer)!; expect(s.hit(wrong)).toBe('wrong'); }
+      else expect(solve(s)).toBe('correct');
+      s.advance();
+    }
+    const tallies = Object.values(s.byTopic);
+    expect(Object.keys(s.byTopic).every(id => pool.some(t => t.id === id))).toBe(true);
+    expect(tallies.reduce((n, t) => n + t.tries, 0)).toBe(Y1.perStage);
+    expect(tallies.reduce((n, t) => n + t.hits, 0)).toBe(Y1.perStage - 1);
+  });
   it('wrong answers lose lives and 0 lives ends the game lost', () => {
     const ev = events();
     const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-sub')!, rng: rng(2) }, ev);

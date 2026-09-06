@@ -122,6 +122,9 @@ img { -webkit-user-drag: none; }
 .storm img { width: 64px; height: 64px; object-fit: cover; object-position: 50% 20%; transform: scale(1.6); transform-origin: 50% 30%; border-radius: 50%; background: #0d1226; box-shadow: 0 0 0 3px #ff3b5c; }
 .storm .vport { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex: none; background: #0d1226; box-shadow: 0 0 0 3px #ff3b5c; }
 .storm span { text-align: left; } .storm b { display: block; font-size: 20px; } .storm small { color: var(--muted); }
+.storm.train { margin-top: 18px; background: linear-gradient(90deg, #3b2e1a, #1a2a44); border-color: #ffb74d66; box-shadow: 0 0 30px #ffb74d33, 0 8px 24px #0008; }
+.storm.train .vport { box-shadow: 0 0 0 3px #ffb74d; }
+.storm.train + .storm { margin-top: 10px; }
 .storm.sprint { margin-top: 10px; background: linear-gradient(90deg, #1a3b2a, #1a2a44); border-color: #40e0a066; box-shadow: 0 0 30px #40e0a033, 0 8px 24px #0008; }
 .storm.sprint .vport { box-shadow: 0 0 0 3px #40e0a0; } .storm .vport.emoji { display: grid; place-items: center; font-size: 34px; }
 .storm.boss { margin-top: 10px; background: linear-gradient(90deg, #3b1a3b, #2a1a44); border-color: #b388ff66; box-shadow: 0 0 30px #b388ff33, 0 8px 24px #0008; }
