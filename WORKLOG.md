@@ -42,3 +42,12 @@ Append one dated entry per run (newest at the bottom). Keep entries short: what 
 - Commits: cc84fea (Memory Match), 8401e7e (Story Sentences) — main.
 - Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins, P9 costumes (art).
 - Next: P6 Sound Hunt (phonics by ear, no owner input) or Next #9 (Y1/Y2 measurement & statistics topics); P7 adaptive practice after that.
+
+## 2026-09-06 07:40 (hourly routine, cloud)
+- Backlog P6 done: **Sound Hunt** — `r-soundhunt` (d1 phase 2 sets 1–4, d2 all single-letter sounds + qu/x, d3 phase 3 digraphs/trigraphs) and `y1-soundhunt` (d1 phase 3, d2 phase 5 alternatives ay/ou/ie/ea/oy/ir/ue/aw/wh/ph/ew/oe/au, d3 + split digraphs a-e/i-e/o-e/u-e). Three keyword words are spoken ("Listen: sun, sock, sad. Which sound do they start with?"), the card shows only "🔊 Listen!" + a position hint, no visual. Decoys never share the answer's phoneme family (c/k, ai/ay/a-e, ee/ea, oi/oy, ur/ir/er, or/aw/au, oo/ue/ew, w/wh, f/ph). New `Question.listen`: with read-aloud off the card shows the three words instead (play.ts).
+- Backlog P7 done: **Train with Sensei** — `src/game/sensei.ts` `weakestTopics()` (accuracy ↑, stars ↑, plays ↑; unplayed topics fill in; never tracing). Island button "Train with Sensei" (icons of the 3 picked topics, session count) starts a normal 5-stage mission over that pool; the card names each question's topic. `Session.byTopic` tallies hits/tries per topic in every mode and results call `recordAccuracy()` (new `TopicProgress.hits/tries`, old saves fall back to stars); `storage.training` counts completed sessions.
+- Housekeeping: deleted `undefined/*.png` (2.6 MB of screenshots committed by the 04:40 run with an unset output dir).
+- Tests: unit 239/239 (+7 Sound Hunt, +3 sensei, +1 session, +1 storage), tsc clean, e2e mobile 19/19 after Sound Hunt and 20/20 after Sensei (full runs). Desktop e2e not run (time).
+- Commits: 58f335a (Sound Hunt + cleanup), b9da44a (Sensei) — main.
+- Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins, P9 costumes (art).
+- Next: P8 Dojo challenges (daily 3 missions, bonus coins, streak multiplier — no owner input) or Next #9 (Y1/Y2 measurement & statistics topics); P10 Ninja Duel after that.
