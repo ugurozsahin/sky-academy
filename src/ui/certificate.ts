@@ -55,14 +55,90 @@ function wrap(g: CanvasRenderingContext2D, text: string, x: number, y: number, m
   if (line) g.fillText(line, x, y);
 }
 
-/** Share the PNG through the system share sheet when files are supported, otherwise trigger a download. */
-export async function shareCertificate(c: HTMLCanvasElement, filename: string): Promise<'shared' | 'downloaded'> {
+/** How the certificate PNG reached the child (or was offered to them). */
+export type CertRoute = 'share' | 'save' | 'show' | 'download';
+export type CertOutcome = 'shared' | 'saved' | 'shown' | 'downloaded' | 'declined';
+
+/**
+ * Which delivery route to use, given what the runtime supports (pure, unit-tested).
+ * Priority: the system share sheet (phones) → the artifact viewer's save prompt →
+ * a full-screen "press & hold to save" view (artifact viewer with no downloads grant) →
+ * a plain `<a download>` (static / PWA build, no artifact runtime).
+ */
+export function certRoute(caps: { canShareFiles: boolean; claudeSave: boolean; claudeRuntime: boolean }): CertRoute {
+  if (caps.canShareFiles) return 'share';
+  if (caps.claudeSave) return 'save';
+  if (caps.claudeRuntime) return 'show';
+  return 'download';
+}
+
+interface DownloadsApi { save(r: { filename: string; data: Blob }): Promise<{ status: string }> }
+
+/** Resolve the artifact viewer's `downloads` capability, or null when this view can't run it. */
+async function claudeDownloads(): Promise<DownloadsApi | null> {
+  const claude = (window as { claude?: { use?(n: string): Promise<unknown> } }).claude;
+  if (!claude?.use) return null;
+  try {
+    const api = await Promise.race([
+      Promise.resolve(claude.use('downloads')),
+      new Promise<null>(r => setTimeout(() => r(null), 8000)),   // a host that never answers resolves null itself; don't leave the child waiting on it
+    ]);
+    return (api && typeof (api as DownloadsApi).save === 'function') ? api as DownloadsApi : null;
+  } catch { return null; }
+}
+
+/** Full-screen view of the certificate with a press-and-hold hint — the fallback where no save API works. */
+export function showCertificateFullscreen(c: HTMLCanvasElement): void {
+  document.querySelector('.cert-view')?.remove();
+  const wrap = document.createElement('div'); wrap.className = 'cert-view'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Your certificate');
+  const img = new Image(); img.className = 'cert-view-img'; img.alt = 'Your Sky Ninja Academy certificate'; img.src = c.toDataURL('image/png');
+  const hint = document.createElement('p'); hint.className = 'cert-view-hint'; hint.textContent = 'Press and hold the picture to save it 📥';
+  const done = document.createElement('button'); done.className = 'btn big'; done.textContent = 'Done';
+  const close = () => wrap.remove();
+  done.addEventListener('click', close);
+  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+  wrap.append(img, hint, done);
+  document.body.appendChild(wrap);
+}
+
+function triggerDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+async function saveViaClaude(dl: DownloadsApi, filename: string, blob: Blob, c: HTMLCanvasElement): Promise<CertOutcome> {
+  try { await dl.save({ filename, data: blob }); return 'saved'; }
+  catch (e) {
+    if ((e as { code?: string })?.code === 'declined') return 'declined';   // the grown-up said no — a friendly toast, no error
+    showCertificateFullscreen(c); return 'shown';                            // any other downloads error → the child can still save from the full-screen view
+  }
+}
+
+/**
+ * Get the certificate PNG to the child by the best route this runtime allows — it never silently does nothing.
+ * Web Share (files) → artifact `downloads` save prompt → full-screen press-and-hold view → `<a download>`.
+ */
+export async function deliverCertificate(c: HTMLCanvasElement, filename: string): Promise<CertOutcome> {
   const blob = await new Promise<Blob | null>(res => c.toBlob(res, 'image/png'));
   if (!blob) throw new Error('certificate: could not encode PNG');
   const file = new File([blob], filename, { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  if (nav.canShare?.({ files: [file] })) { try { await nav.share({ files: [file], title: 'Sky Ninja Academy certificate' }); return 'shared'; } catch { /* cancelled → fall through to download */ } }
-  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  return 'downloaded';
+  const canShareFiles = !!nav.canShare?.({ files: [file] });
+  const claudeRuntime = !!(window as { claude?: unknown }).claude;
+  const dl = claudeRuntime ? await claudeDownloads() : null;
+
+  switch (certRoute({ canShareFiles, claudeSave: !!dl, claudeRuntime })) {
+    case 'share':
+      try { await nav.share!({ files: [file], title: 'Sky Ninja Academy certificate' }); return 'shared'; }
+      catch { /* cancelled → step down to the next best route */ }
+      if (dl) return saveViaClaude(dl, filename, blob, c);
+      if (claudeRuntime) { showCertificateFullscreen(c); return 'shown'; }
+      triggerDownload(blob, filename); return 'downloaded';
+    case 'save':
+      return saveViaClaude(dl!, filename, blob, c);
+    case 'show':
+      showCertificateFullscreen(c); return 'shown';
+    default:
+      triggerDownload(blob, filename); return 'downloaded';
+  }
 }

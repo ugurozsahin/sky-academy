@@ -185,6 +185,28 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('#cert')).toBeVisible();                   // printable certificate for a completed mission
     const png = await page.evaluate(() => window.__sna.certificate());
     expect(png).toMatch(/^data:image\/png;base64,/); expect(png.length).toBeGreaterThan(20_000);
+
+    // #50: the 🎓 button always delivers — it never silently does nothing.
+    await page.evaluate(() => { (navigator as any).canShare = () => false; });   // exercise the non-share routes deterministically (headless can't complete a real Web Share)
+    // (a) artifact viewer WITH the downloads grant → the save prompt
+    await page.evaluate(() => {
+      (window as any).__saved = null;
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; return { status: 'saved' }; } } : null };
+    });
+    await page.click('#cert');
+    await expect(page.locator('#cert')).toBeEnabled();
+    await expect(page.locator('#toast')).toContainText('saved');
+    expect(await page.evaluate(() => (window as any).__saved)).toMatch(/^sky-ninja-certificate-.*\.png$/);
+    // (b) artifact viewer WITHOUT a downloads grant → the full-screen "press and hold" fallback
+    await page.evaluate(() => { (window as any).claude = { use: async () => null }; });
+    await page.click('#cert');
+    const certView = page.locator('.cert-view');
+    await expect(certView).toBeVisible();
+    await expect(certView.locator('.cert-view-hint')).toContainText('Press and hold');
+    await certView.getByRole('button', { name: 'Done' }).click();
+    await expect(certView).toHaveCount(0);
+    await page.evaluate(() => { delete (window as any).claude; });   // leave the runtime clean for the rest of the test
+
     await page.click('#home');
     await expect(page.locator('.island-screen')).toBeVisible();
     await expect(page.locator('.topic[data-id="r-count"] .stars')).toContainText('★★★');

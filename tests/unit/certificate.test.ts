@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { certificateText } from '../../src/ui/certificate';
+import { certificateText, certRoute } from '../../src/ui/certificate';
 import { AVATARS } from '../../src/avatars';
 
 const base = { name: 'Ada', avatar: AVATARS[0], year: 'Year 1', title: 'Number Bonds', stars: 3, score: 340, correct: 30, attempts: 30, date: new Date('2026-09-06T10:00:00Z') };
@@ -20,5 +20,21 @@ describe('mission certificate text', () => {
     expect(t.detail).toBe('21/25 correct (84%) · score 340');
     expect(certificateText({ ...base, stars: 1, attempts: 0, correct: 0 }).stars).toBe('★☆☆');
     expect(certificateText({ ...base, stars: 1, attempts: 0, correct: 0 }).detail).toContain('(0%)');
+  });
+});
+
+describe('certificate delivery route', () => {
+  it('prefers the system share sheet when files can be shared', () => {
+    expect(certRoute({ canShareFiles: true, claudeSave: true, claudeRuntime: true })).toBe('share');
+    expect(certRoute({ canShareFiles: true, claudeSave: false, claudeRuntime: false })).toBe('share');
+  });
+  it('uses the artifact save prompt when downloads are granted and sharing is unavailable', () => {
+    expect(certRoute({ canShareFiles: false, claudeSave: true, claudeRuntime: true })).toBe('save');
+  });
+  it('falls back to the full-screen view inside the artifact viewer without a downloads grant', () => {
+    expect(certRoute({ canShareFiles: false, claudeSave: false, claudeRuntime: true })).toBe('show');
+  });
+  it('uses a plain download in the static / PWA build with no artifact runtime', () => {
+    expect(certRoute({ canShareFiles: false, claudeSave: false, claudeRuntime: false })).toBe('download');
   });
 });

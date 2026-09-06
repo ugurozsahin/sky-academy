@@ -8,7 +8,7 @@ import { haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, fillAnswer, render, stars } from './dom';
 import { renderVisual } from './visuals';
 import { dojoRowsHTML } from './memory';
-import { drawCertificate, shareCertificate, type CertInfo } from './certificate';
+import { drawCertificate, deliverCertificate, type CertInfo } from './certificate';
 
 const BOMB = '💣';
 export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
@@ -219,7 +219,13 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
     if (cert) $('#cert').addEventListener('click', async () => {
       sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
-      try { const how = await shareCertificate(await drawCertificate(cert), `sky-ninja-certificate-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`); toast(how === 'shared' ? 'Certificate shared!' : 'Certificate saved!', 'good'); }
+      try {
+        const how = await deliverCertificate(await drawCertificate(cert), `sky-ninja-certificate-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
+        if (how === 'shared') toast('Certificate shared!', 'good');
+        else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
+        else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
+        // 'shown' opens the full-screen view with its own save hint, so no toast
+      }
       catch { toast('Could not make the certificate', 'bad'); }
       b.disabled = false;
     });

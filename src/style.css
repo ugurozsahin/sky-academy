@@ -310,6 +310,10 @@ img { -webkit-user-drag: none; }
 @keyframes fade { from { opacity: 0; } }
 .modal { position: relative; width: 100%; max-width: 440px; margin: auto; padding: 22px 18px; border-radius: 26px; background: linear-gradient(180deg, #1c2450, #10163a); border: 1px solid var(--line); text-align: center; box-shadow: 0 30px 60px #000a; animation: pop .35s cubic-bezier(.2, 1.4, .4, 1); }
 @keyframes pop { from { transform: scale(.7); opacity: 0; } }
+/* certificate full-screen fallback (artifact viewer with no downloads grant) */
+.cert-view { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px calc(16px + var(--sar, 0px)) calc(16px + var(--sab, 0px)) calc(16px + var(--sal, 0px)); background: #05081aee; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: fade .25s; }
+.cert-view-img { max-width: 100%; max-height: 72vh; border-radius: 12px; box-shadow: 0 20px 50px #000b; -webkit-touch-callout: default; user-select: none; }
+.cert-view-hint { margin: 0; color: #dff3ff; font-weight: 700; text-align: center; text-shadow: 0 2px 8px #000a; }
 .modal h2 { margin: 12px 0 6px; font-size: 28px; } .modal p { margin: 4px 0 14px; color: var(--muted); font-weight: 600; }
 .hero-big { position: relative; display: inline-block; margin-top: 4px; }
 .hero-big img { width: 200px; height: 200px; object-fit: contain; filter: drop-shadow(0 0 22px var(--glow)) drop-shadow(0 12px 16px #000a); animation: bounce 1.2s ease-in-out infinite; }

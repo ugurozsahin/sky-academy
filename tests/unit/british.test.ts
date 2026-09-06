@@ -34,7 +34,7 @@ function tsStrings(file: string, src: string): string[] {
   };
   visit(sf); return out;
 }
-const API_LITERALS = new Set(['center', 'theme-color']);   // canvas textAlign / meta name — never shown to a child
+const API_LITERALS = new Set(['center', 'theme-color', 'dialog']);   // canvas textAlign / meta name / ARIA role — never shown to a child
 /** Drop markup and `property:` names so CSS/HTML plumbing inside strings is not spell-checked. */
 const childText = (s: string) => s.replace(/<[^>]*>/g, ' ').replace(/\b[a-z-]+(?=\s*:)/g, ' ');
 const seeded = (seed: number) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
