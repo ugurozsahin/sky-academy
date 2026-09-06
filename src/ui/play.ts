@@ -3,7 +3,8 @@ import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from
 import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
 import { Tracer } from '../game/tracing';
-import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak } from '../storage';
+import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak, wallet } from '../storage';
+import { equippedItem } from '../game/shop';
 import { haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, fillAnswer, render, stars } from './dom';
 import { renderVisual } from './visuals';
@@ -15,6 +16,7 @@ export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: To
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
+  const skin = equippedItem(wallet(), 'trail')?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
   const tracing = o.topic?.mode === 'tracing';
   const sprint = o.mode === 'sprint'; const boss = o.mode === 'boss'; const training = o.mode === 'mission' && !!o.pool;
   const villainMode = o.mode === 'endless' || boss;     // Hammer Man on screen, TNT bubbles in the mix
@@ -134,7 +136,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         const gap = lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650;
         later(() => session.waveEnd(), Math.max(0, revealUntil - performance.now()) + gap);
       },
-    }, { trailColor: av.glow, fx: av.fx, onSwish: () => sfx.swish() });
+    }, { trailColor: skin?.color ?? av.glow, trailCore: skin?.core, fx: av.fx, onSwish: () => sfx.swish() });
   }
 
   function startTrace(q: Question) {
@@ -249,7 +251,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     answer: () => { const q = session.current; if (!q) return false; if (tracing) { tracer?.autoTrace(); return true; } const label = q.sequence ? q.sequence[session.seqIndex] : q.answer; return arena!.hitLabel(label); },
     wrong: () => { const q = session.current; if (!q || !arena) return false; const target = q.sequence ? q.sequence[session.seqIndex] : q.answer; const b = arena.bubbles.find(x => x.launched && !x.dead && x.label !== target && x.label !== BOMB); return b ? arena.hitLabel(b.label) : false; },
     bubbles: () => arena?.bubbles.filter(b => b.launched && !b.dead && !b.hit && !b.fade).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })) ?? [],
-    state: () => ({ stage: session.stage, index: session.index, score: session.score, lives: session.lives, ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt, answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp }),
+    state: () => ({ stage: session.stage, index: session.index, score: session.score, lives: session.lives, ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt, answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null }),
     certificate: async () => { const c = lastResult && certInfo(lastResult); return c ? (await drawCertificate(c)).toDataURL('image/png') : null; },   // PNG data URL of the certificate for the finished mission
   };
   session.start();

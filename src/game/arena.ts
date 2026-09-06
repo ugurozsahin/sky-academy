@@ -29,12 +29,13 @@ export class Arena {
   private pointerDown = false; private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600;
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
-  paused = false; frozen = false; trailColor = '#7fe0ff'; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;
+  paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
   time = 0;
 
-  constructor(public canvas: HTMLCanvasElement, private cb: ArenaCallbacks, opts: { trailColor?: string; fx?: FxKind; onSwish?: () => void } = {}) {
+  constructor(public canvas: HTMLCanvasElement, private cb: ArenaCallbacks, opts: { trailColor?: string; trailCore?: string; fx?: FxKind; onSwish?: () => void } = {}) {
     this.ctx = canvas.getContext('2d')!;
     if (opts.trailColor) this.trailColor = opts.trailColor;
+    if (opts.trailCore) this.trailCore = opts.trailCore;
     if (opts.fx) this.fx = opts.fx;
     this.onSwish = opts.onSwish;
     this.resize();
@@ -320,7 +321,7 @@ export class Arena {
         const a = this.trail[i - 1], b = this.trail[i];
         const age = Math.max(0, 1 - (now - b.t) / 280);
         const w = (pass === 0 ? wide : core) * age * (i / this.trail.length);
-        c.strokeStyle = pass === 0 ? hexA(this.trailColor, (fx === 'shadow' ? 0.5 : 0.35) * age) : (fx === 'fire' ? `rgba(255,230,150,${0.9 * age})` : fx === 'shadow' ? hexA(cols[1], 0.9 * age) : `rgba(255,255,255,${0.9 * age})`);
+        c.strokeStyle = pass === 0 ? hexA(this.trailColor, (fx === 'shadow' ? 0.5 : 0.35) * age) : this.trailCore ? hexA(this.trailCore, 0.9 * age) : (fx === 'fire' ? `rgba(255,230,150,${0.9 * age})` : fx === 'shadow' ? hexA(cols[1], 0.9 * age) : `rgba(255,255,255,${0.9 * age})`);
         c.lineWidth = Math.max(0.5, w);
         c.beginPath();
         if (fx === 'electric' && pass === 1) { // jagged lightning core

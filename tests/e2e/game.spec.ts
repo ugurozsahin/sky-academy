@@ -237,6 +237,36 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.sticker.got')).toHaveCount(3);
   });
 
+  test('ninja shop: buy a trail skin with the balance, stickers keep their lifetime unlocks, the skin is equipped', async ({ page }) => {
+    test.slow();   // three navigations, and each one waits ~12 s for the blocked Google Fonts stylesheet in the sandbox
+    const seed = async (patch: Record<string, unknown>) => {   // patch the save, then reopen the app (not reload(): the URL still carries ?reset=1)
+      await page.evaluate(p => { localStorage.setItem('sna:v1', JSON.stringify({ ...JSON.parse(localStorage.getItem('sna:v1')!), ...p })); }, patch);
+      await page.goto('/'); await expect(page.locator('.home')).toBeVisible();
+    };
+    await pickAvatar(page);
+    await seed({ coins: 200, spent: 100, stickers: ['volt', 'blaze', 'splash'] });                // lifetime 200, balance 100
+    await page.click('#rewards'); await page.click('#shop');
+    await expect(page.locator('.shop')).toBeVisible();
+    await expect(page.locator('#balance b')).toHaveText('100');
+    await expect(page.locator('.item[data-item="trail-element"] .pill.on')).toBeVisible();     // free default is equipped
+    await expect(page.locator('.item[data-item="trail-gold"] [data-buy]')).toBeDisabled();     // 200 coins needed, balance is 100
+    await seed({ spent: 0 });                                                                   // balance 200
+    await page.click('#rewards'); await page.click('#shop');
+    await page.click('.item[data-item="trail-gold"] [data-buy]');
+    await expect(page.locator('#balance b')).toHaveText('0');
+    await expect(page.locator('.item[data-item="trail-gold"]')).toHaveClass(/\bon\b/);
+    await expect(page.locator('.item[data-item="trail-element"] [data-equip]')).toBeVisible();
+    await page.click('#back');                                                                  // pops the history entry back to Rewards
+    await expect(page.locator('.rewards')).toBeVisible();
+    await expect(page.locator('.sticker.got')).toHaveCount(3);                                  // the seeded stickers are untouched by spending
+    await expect(page.locator('#rewards b')).toHaveText('0');                                   // the pill shows what is left to spend
+    expect(await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('sna:v1')!); return [d.coins, d.spent, d.owned, d.equipped]; }))
+      .toEqual([200, 200, ['trail-gold'], { trail: 'trail-gold' }]);                            // persisted
+    await page.click('#back'); await expect(page.locator('.islands.big')).toBeVisible();        // Rewards → sky map (pops its history entry)
+    await startTopic(page, 'reception', 'r-count');
+    expect(await page.evaluate(() => window.__sna.state().trail)).toEqual({ color: '#ffd23a', core: '#fff6c4' });
+  });
+
   test('reception is gentle: missed bubbles re-ask without losing lives', async ({ page }) => {
     await pickAvatar(page);
     await startTopic(page, 'reception', 'r-onemore');

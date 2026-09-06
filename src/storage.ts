@@ -1,5 +1,6 @@
 // Persistent player state (localStorage). Small, versioned, safe on failure.
 import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type DojoState } from './game/dojo';
+import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
 export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }   // hits/tries = lifetime slices (missions + Sensei training)
 export interface SaveData {
   v: 1;
@@ -20,9 +21,12 @@ export interface SaveData {
   streak: { last: string; days: number };   // daily play streak (ISO date)
   tutorialSeen: boolean;             // the "slice the bubble" demo hand has done its job
   dojo: DojoState;                   // Daily Dojo challenges (progress resets each day)
+  spent: number;                     // coins spent in the shop (#6) — balance = coins − spent, stickers still unlock from lifetime coins
+  owned: string[];                   // bought shop item ids
+  equipped: Partial<Record<ItemKind, string>>;   // equipped item per kind (missing = the free default)
 }
 const KEY = 'sna:v1';
-const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo('') };
+const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {} };
 
 let cache: SaveData | null = null;
 export function load(): SaveData {
@@ -97,5 +101,18 @@ export function dojoToday(now = new Date()): DojoState { return dojoFor(load().d
 export function recordDojo(e: DojoEvent, now = new Date()): DojoOutcome {
   const out = applyEvent(load().dojo, e, today(now));
   save({ dojo: out.state }); return out;
+}
+/** The spendable part of the save. */
+export function wallet(): Wallet { const d = load(); return { coins: d.coins, spent: d.spent || 0, owned: Array.isArray(d.owned) ? d.owned : [], equipped: d.equipped ?? {} }; }   // tolerant of hand-edited saves
+export const coinBalance = () => balance(wallet());
+/** Buy (and equip) a shop item. Returns false when it is already owned, unknown or too dear. */
+export function buyItem(id: string): boolean {
+  const r = buy(wallet(), id); if (!r.ok) return false;
+  save({ spent: r.wallet.spent, owned: r.wallet.owned, equipped: r.wallet.equipped }); return true;
+}
+/** Equip an owned item. Returns false when nothing changed. */
+export function equipItem(id: string): boolean {
+  const w = wallet(); const next = equip(w, id); if (next === w) return false;
+  save({ equipped: next.equipped }); return true;
 }
 export function reset() { cache = null; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }

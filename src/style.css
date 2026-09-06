@@ -341,3 +341,12 @@ img { -webkit-user-drag: none; }
 @media (max-height: 640px) {
   .qcard { padding: 6px 12px 8px; } .prompt { font-size: 26px; margin: 2px 0; } .hint { display: none; } .qcard.good .hint, .qcard.bad .hint { display: block; } .slot, .objs.two .slot { width: 20px; } .objs .obj { font-size: 16px; } .five { gap: 2px; padding: 2px; } .vis.objs, .objs .grp { gap: 2px; } .vis { margin: 2px 0; } .objs .obj { font-size: 20px; }
 }
+/* ---------- shop (#6) ---------- */
+.shop-btn { width: 100%; margin-top: 12px; flex-direction: column; gap: 0; } .shop-btn small { font-size: 13px; font-weight: 600; opacity: .8; }
+.shop h3 { margin: 16px 0 8px; font-size: 16px; color: #dfe6ff; } .shop .isl-head .coin-pill { margin-left: auto; height: 38px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.shop .item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; border-radius: 18px; background: var(--panel); border: 2px solid var(--line); text-align: center; }
+.shop .item .icon { font-size: 34px; line-height: 1; position: relative; } .shop .item b { font-size: 15px; } .shop .item small { color: var(--muted); font-weight: 600; font-size: 12px; min-height: 30px; }
+.shop .item .btn { padding: 12px 18px; min-height: 44px; font-size: 16px; margin-top: 4px; } .shop .item .pill.on { background: #1a3b2a; border-color: #40e0a066; color: #a8ffd8; margin-top: 8px; }
+.shop .item.on { border-color: #40e0a0; box-shadow: inset 0 0 30px #40e0a022; } .shop .item.poor { opacity: .75; } .shop .item.soon { border-style: dashed; opacity: .7; }
+.shop .swatch { position: absolute; left: -6px; right: -6px; bottom: -6px; height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--c), var(--k), var(--c)); box-shadow: 0 0 10px var(--c); }

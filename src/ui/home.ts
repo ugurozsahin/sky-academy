@@ -1,6 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
-import { dojoToday, load, save, STICKER_IDS, STICKER_COST } from '../storage';
+import { coinBalance, dojoToday, load, save, STICKER_IDS, STICKER_COST } from '../storage';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { weakestTopics } from '../game/sensei';
@@ -8,7 +8,7 @@ import { carriedStreak, dailyChallenges, multiplier, SET_BONUS } from '../game/d
 import { $, $$, render, stars } from './dom';
 
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
-type Nav = { avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay; memory: (year: YearInfo) => void; rewards: () => void };
+export type Nav = { avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay; memory: (year: YearInfo) => void; rewards: () => void; shop: () => void; up: () => void };
 
 const ISLAND_BLURB: Record<YearInfo['id'], string> = { reception: 'First steps · counting, sounds & letters', year1: 'Number bonds, adding, phonics & spelling', year2: 'Times tables, money, time & tricky words' };
 
@@ -18,7 +18,7 @@ function topbar(nav: Nav, rerender: () => void) {
     <header class="topbar">
       <button class="hero" id="change-av" aria-label="Change ninja" style="--glow:${av.glow}"><span class="portrait sm"><img src="${av.img}" alt="" style="--focus:${av.focus}"></span><span><b>${d.name || 'Ninja'}</b><small>${av.name} · ${av.element}</small></span></button>
       <div class="settings">
-        <button class="coin-pill" id="rewards" aria-label="Rewards: ${d.coins} coins">🪙 <b>${d.coins}</b>${d.streak.days > 1 ? ` <span class="streak">🔥${d.streak.days}</span>` : ''}</button>
+        <button class="coin-pill" id="rewards" aria-label="Rewards: ${coinBalance()} coins">🪙 <b>${coinBalance()}</b>${d.streak.days > 1 ? ` <span class="streak">🔥${d.streak.days}</span>` : ''}</button>
         <button class="icon-btn" id="snd" aria-label="Sound ${d.sound ? 'on' : 'off'}">${d.sound ? '🔊' : '🔇'}</button>
         <button class="icon-btn" id="spk" aria-label="Read aloud ${d.speech ? 'on' : 'off'}">${d.speech ? '🗣️' : '🤐'}</button>
       </div>
@@ -132,8 +132,9 @@ export function rewardsScreen(nav: Nav) {
   <section class="screen home rewards">
     ${tb.html}
     <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Ninja Rewards</b><small>Earn coins by answering — unlock every ninja sticker</small></div></div>
+    <button class="btn primary shop-btn" id="shop">🛍️ Ninja Shop <small>spend 🪙 ${coinBalance()}</small></button>
     <div class="reward-stats">
-      <div><b>🪙 ${d.coins}</b><small>coins</small></div>
+      <div><b>🪙 ${d.coins}</b><small>coins earned</small></div>
       <div><b>🔥 ${d.streak.days}</b><small>day streak</small></div>
       <div><b>${d.stickers.length}/${STICKER_IDS.length}</b><small>stickers</small></div>
     </div>
@@ -142,4 +143,5 @@ export function rewardsScreen(nav: Nav) {
   </section>`, 'bg-sky');
   tb.bind();
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
+  $('#shop').addEventListener('click', () => { sfx.tap(); nav.shop(); });
 }
