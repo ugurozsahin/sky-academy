@@ -85,6 +85,25 @@ describe('curriculum ranges', () => {
       expect(nums.some(n => [2, 5, 10].includes(n))).toBe(true);
     }
   });
+  it('Balance the Scales: both sides are equal once ? is filled in, within the year range', () => {
+    const evalSide = (s: string) => { // "3 + 4", "12 − 5", "2 × 5" (left to right, no precedence needed)
+      const t = s.split(' '); let acc = Number(t[0]);
+      for (let i = 1; i < t.length; i += 2) { const v = Number(t[i + 1]); acc = t[i] === '+' ? acc + v : t[i] === '−' ? acc - v : acc * v; }
+      return acc;
+    };
+    for (const [id, max] of [['r-balance', 10], ['y1-balance', 20], ['y2-balance', 100]] as const) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
+        const q = t.gen(d, r);
+        expect(q.visual?.type, id).toBe('scales');
+        expect(q.prompt.split('?').length, q.prompt).toBe(2);
+        const [l, rr] = q.prompt.replace('?', q.answer).split(' = ');
+        expect(evalSide(l), q.prompt).toBe(evalSide(rr));
+        expect(Number(q.answer)).toBeLessThanOrEqual(max);
+        expect(Number(q.answer)).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
   it('Year 2 compare answers are correct signs', () => {
     const t = TOPICS.find(x => x.id === 'y2-compare')!; const r = rng(10);
     for (let i = 0; i < 200; i++) {

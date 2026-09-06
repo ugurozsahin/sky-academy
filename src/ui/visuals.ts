@@ -53,6 +53,10 @@ export function renderVisual(v: Visual | undefined): string {
       const ticks = []; for (let n = v.from; n <= v.to; n += v.step ?? 1) ticks.push(n);
       return `<div class="vis"><div class="nline">${ticks.map(n => `<span class="${n === v.mark ? 'mark' : ''}">${n === v.mark ? '?' : n}</span>`).join('')}</div></div>`;
     }
+    case 'scales': {
+      const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;
+      return `<div class="vis"><div class="scales"><svg viewBox="0 0 260 34" class="beam" preserveAspectRatio="none"><path d="M34 8V34M226 8V34" class="str"/><path d="M22 8H238" class="bar"/><path d="M130 8L118 30H142Z" class="ful"/></svg>${pan(v.left)}<div class="pillar"></div>${pan(v.right)}</div></div>`;
+    }
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
     case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
   }

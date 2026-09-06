@@ -92,8 +92,9 @@ describe('endless session', () => {
     const ev = events();
     const s = new Session({ mode: 'endless', year: YEARS[2], pool: topicsFor('year2').filter(t => t.mode !== 'tracing'), rng: rng(8) }, ev);
     s.start();
-    for (let i = 0; i < 30; i++) { s.hit(s.current!.answer); s.advance(); }
-    expect(s.difficulty).toBe(3); expect(s.speed).toBe(3);
+    // answer 30 questions correctly (sequence questions are sliced letter by letter, in order)
+    for (let i = 0; i < 30; i++) { const c = s.current!; if (c.sequence) c.sequence.forEach(l => s.hit(l)); else s.hit(c.answer); s.advance(); }
+    expect(s.difficulty).toBe(3); expect(s.speed).toBe(3); expect(s.lives).toBe(YEARS[2].lives);
     const wrongOf = () => { const c = s.current!; const t = c.sequence ? c.sequence[s.seqIndex] : c.answer; return c.options.find(o => o !== t && !(c.sequence ?? []).includes(o)) ?? c.options.find(o => o !== t)!; };
     for (let i = 0; i < 3; i++) { expect(s.hit(wrongOf())).toBe('wrong'); if (!s.ended) s.advance(); }
     expect(ev.onEnd).toHaveBeenCalled(); expect(ev.onEnd.mock.calls[0][0].score).toBeGreaterThan(300);

@@ -271,6 +271,41 @@ const y2Shapes: Generator = (d, rng) => {
   return wordQ(rng, `A ${name} has…`, fact, shuffle(rng, SHAPES3D.filter(x => x[2] !== fact)).slice(0, 3).map(x => x[2]), { visual: { type: 'word', text: g }, say: `A ${name} has how many faces?` });
 };
 
+/** Balance the Scales: both pans must weigh the same — find the number that makes them equal (= as balance). */
+function balanceQ(rng: Rng, left: string, right: string, answer: number, max: number, extra: { say?: string; distractors?: number[]; pans?: [string, string] } = {}): Question {
+  const p = `${left} = ${right}`;
+  const [pl, pr] = extra.pans ?? [left, right];
+  return numQ(rng, p, answer, { min: 0, max, visual: { type: 'scales', left: pl, right: pr }, say: extra.say ?? `Balance the scales! ${symSay(p)}`, hint: 'Make both sides the same', distractors: extra.distractors });
+}
+const rBalance: Generator = (d, rng) => {
+  const emoji = pick(rng, OBJECTS);
+  if (d < 3) {
+    const n = ri(rng, 1, d === 1 ? 5 : 10);
+    return balanceQ(rng, `${n}`, '?', n, 10, { pans: [emoji.repeat(n), '?'], say: `Count the objects. How many make the scales balance?` });
+  }
+  const a = ri(rng, 3, 10), b = ri(rng, 1, a - 1);
+  return balanceQ(rng, `${a}`, `${b} + ?`, a - b, 10, { pans: [emoji.repeat(a), `${emoji.repeat(b)} + ?`], say: `${a} on the left, ${b} on the right. How many more make it balance?`, distractors: [a, b] });
+};
+const y1Balance: Generator = (d, rng) => {
+  if (d === 1) { const a = ri(rng, 1, 9), b = ri(rng, 1, 10 - a); return rng() < 0.5 ? balanceQ(rng, `${a} + ${b}`, '?', a + b, 20) : balanceQ(rng, '?', `${a} + ${b}`, a + b, 20); }
+  const a = ri(rng, 1, 15), b = ri(rng, 1, 20 - a), total = a + b;
+  const kind = d === 2 ? ri(rng, 0, 1) : ri(rng, 0, 3);
+  if (kind === 0) { const c = ri(rng, 1, total - 1); return balanceQ(rng, `${a} + ${b}`, `${c} + ?`, total - c, 20, { distractors: [total, c] }); }
+  if (kind === 1) { const c = ri(rng, 1, total - 1); return balanceQ(rng, `${a} + ${b}`, `? + ${c}`, total - c, 20, { distractors: [total, c] }); }
+  if (kind === 2 && total < 20) { const c = ri(rng, 1, 20 - total); return balanceQ(rng, `${a} + ${b}`, `? − ${c}`, total + c, 20, { distractors: [total, total - c] }); }
+  const big = ri(rng, 5, 20), small = ri(rng, 1, big - 1), c = ri(rng, 1, big - small);
+  return balanceQ(rng, `${big} − ${small}`, `? + ${c}`, big - small - c, 20, { distractors: [big - small, big] });
+};
+const y2Balance: Generator = (d, rng) => {
+  if (d === 1) { const a = ri(rng, 1, 15), b = ri(rng, 1, 20 - a), c = ri(rng, 1, a + b - 1); return balanceQ(rng, `${a} + ${b}`, rng() < 0.5 ? `${c} + ?` : `? + ${c}`, a + b - c, 20, { distractors: [a + b, c] }); }
+  const kind = d === 2 ? ri(rng, 0, 1) : ri(rng, 0, 3);
+  if (kind === 0) { const a = ri(rng, 10, 80), b = ri(rng, 1, 9), c = 10 * ri(rng, 1, Math.floor((a + b) / 10)); return balanceQ(rng, `${a} + ${b}`, `${c} + ?`, a + b - c, 100, { distractors: [a + b, c] }); }
+  if (kind === 1) { const a = ri(rng, 10, 80), b = 10 * ri(rng, 1, Math.floor((99 - a) / 10)), c = ri(rng, 1, 9); return balanceQ(rng, `${a} + ${b}`, `? + ${c}`, a + b - c, 100, { distractors: [a + b, a + b + c] }); }
+  if (kind === 2) { const t = pick(rng, [2, 5, 10]), n = ri(rng, 2, 10), c = ri(rng, 1, t * n - 1); return balanceQ(rng, `${n} × ${t}`, rng() < 0.5 ? `${c} + ?` : `? + ${c}`, t * n - c, 100, { distractors: [t * n, c] }); }
+  const a = ri(rng, 10, 70), b = ri(rng, 1, 20), c = ri(rng, 1, Math.max(1, 99 - a - b));
+  return balanceQ(rng, `${a} + ${b}`, `? − ${c}`, a + b + c, 100, { distractors: [a + b, a + b - c] });
+};
+
 export const MATHS_TOPICS: Topic[] = [
   // Reception — EYFS Early Learning Goals: Number, Numerical Patterns
   { id: 'r-count', title: 'Count It', icon: '🍎', subject: 'maths', year: 'reception', nc: 'ELG Number: count objects to 10', gen: rCount },
@@ -282,6 +317,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'r-sub', title: 'Taking Away', icon: '✂️', subject: 'maths', year: 'reception', nc: 'ELG Number: subtraction facts', gen: rSub },
   { id: 'r-counton', title: 'What Comes Next?', icon: '🔢', subject: 'maths', year: 'reception', nc: 'ELG Patterns: count beyond 20', gen: rCountOn },
   { id: 'r-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'reception', nc: 'ELG Patterns: compare and order to 10', gen: rOrder },
+  { id: 'r-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'reception', nc: 'ELG Number: composition, equal amounts', gen: rBalance },
   // Year 1
   { id: 'y1-bonds', title: 'Number Bonds', icon: '🔗', subject: 'maths', year: 'year1', nc: 'Y1 A&S: bonds within 20', gen: y1Bonds },
   { id: 'y1-add', title: 'Adding to 20', icon: '➕', subject: 'maths', year: 'year1', nc: 'Y1 A&S: add within 20', gen: y1Add },
@@ -298,6 +334,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y1-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year1', nc: 'Y1 NPV: order numbers to 20', gen: y1Order },
   { id: 'y1-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 NPV: number line', gen: y1Line },
   { id: 'y1-shapes', title: '2-D Shapes', icon: '🔷', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: 2-D shapes', gen: y1Shapes },
+  { id: 'y1-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year1', nc: 'Y1 A&S: equals sign, missing number', gen: y1Balance },
   // Year 2
   { id: 'y2-pv', title: 'Tens & Ones', icon: '🔟', subject: 'maths', year: 'year2', nc: 'Y2 NPV: place value', gen: y2PlaceValue },
   { id: 'y2-compare', title: 'Compare < > =', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 NPV: compare to 100', gen: y2Compare },
@@ -315,6 +352,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', gen: y2Order },
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
   { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes, faces', gen: y2Shapes },
+  { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },
 ];
 
 export type { Difficulty };

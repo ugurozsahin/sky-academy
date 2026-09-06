@@ -52,6 +52,17 @@ async function swipeAnswer(page: Page) {
 const answer = (page: Page) => page.evaluate(() => window.__sna.answer());
 const waitForTarget = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s || s.waiting) return false; const c = window.__sna.session.current; const label = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; return window.__sna.bubbles().some((b: any) => b.label === label); }, null, { timeout: 20000 });
 const state = (page: Page) => page.evaluate(() => window.__sna.state());
+/** Answer the current question via the hook and wait for the next one (a sequence question needs one slice per letter). */
+async function solveCurrent(page: Page) {
+  const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+  for (let k = 0; k < 8; k++) {
+    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    if (await page.evaluate(() => window.__sna.state().waiting)) break;   // decided; otherwise it was a step in a sequence
+  }
+  await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before);
+}
+/** Wait until a wrong bubble can be sliced on a live question — or the game has ended. */
+const waitForWrongOrEnd = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s) return false; if (s.ended) return true; if (s.waiting) return false; const c = window.__sna.session.current; const t = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; const bs = window.__sna.bubbles(); return bs.length > 1 && bs.some((b: any) => b.label === t); }, null, { timeout: 20000 });
 async function answerAll(page: Page, n: number) {
   for (let i = 0; i < n; i++) {
     await page.waitForFunction(() => { const s = window.__sna?.state(); return s && !s.waiting && window.__sna.bubbles().some((b: any) => b.label === (window.__sna.session.current.sequence ? window.__sna.session.current.sequence[window.__sna.session.seqIndex] : s.answer)); });
@@ -180,8 +191,16 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('.island[data-year="year2"]');
     await page.click('#endless');
     await expect(page.locator('.villain img')).toBeVisible();
-    for (let i = 0; i < 4; i++) { await waitForTarget(page); expect(await answer(page)).toBe(true); await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, i + 1); }
-    for (let i = 0; i < 3; i++) { await waitForTarget(page); await page.waitForFunction(() => window.__sna.bubbles().length > 1); expect(await page.evaluate(() => window.__sna.wrong())).toBe(true); await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, i + 5); }
+    for (let i = 0; i < 4; i++) await solveCurrent(page);
+    expect((await state(page)).score).toBeGreaterThan(30);
+    // slice wrong until the lives are gone (a wave missed under a slow renderer may already have cost one)
+    for (let i = 0; i < 4; i++) {
+      await waitForWrongOrEnd(page);
+      if ((await state(page)).ended) break;
+      const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+      expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+      await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before);
+    }
     await expect(page.locator('.results h2')).toHaveText('Storm over!');
     await page.click('#home');
     await expect(page.locator('#endless small')).toContainText('best');
@@ -196,10 +215,9 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#timer')).toContainText(/⏱ (60|59|58)/);
     await expect(page.locator('#lives')).toHaveCount(0);
     await expect(page.locator('#stage')).toHaveText('Q1');
-    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    await solveCurrent(page);
     await expect(page.locator('#score')).toHaveText('10');
-    await page.waitForFunction(() => window.__sna.session.questionsAsked > 1);
-    await waitForTarget(page); await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    await waitForWrongOrEnd(page);
     expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
     await expect(page.locator('.toast.bad')).toContainText('it was');
     expect((await state(page)).lives).toBe(3);                              // a slip costs time, never a life
@@ -227,17 +245,16 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.villain.boss img')).toBeVisible();
     await expect(page.locator('#hp')).toHaveCSS('width', /px/);
     const full = (await state(page)).bossHp; expect(full).toBe(8);
-    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    await solveCurrent(page);
     await page.waitForFunction(() => window.__sna.state().bossHp === 7);
     await expect(page.locator('#villain')).toHaveClass(/hit/);
-    await page.waitForFunction(() => window.__sna.session.questionsAsked > 1);
-    await waitForTarget(page); await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    await waitForWrongOrEnd(page);
     expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
     await page.waitForFunction(() => window.__sna.state().bossHp === 8);           // healed
     await expect(page.locator('.lives span.off')).toHaveCount(1);                     // and it still costs a life
     await page.waitForFunction(() => window.__sna.session.questionsAsked > 2);
     await page.evaluate(() => { window.__sna.session.bossHp = 1; });                  // skip to the final blow
-    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    await solveCurrent(page);
     const results = page.locator('.results');
     await expect(results.locator('h2')).toHaveText('Knock-out!');
     await expect(results.locator('.ko')).toBeVisible();
@@ -283,5 +300,13 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#pause'); await page.click('#quit');
     await startTopic(page, 'year2', 'y2-time');
     await expect(page.locator('.vis .clock')).toBeVisible();
+    await page.click('#pause'); await page.click('#quit');
+    await startTopic(page, 'year1', 'y1-balance');
+    await expect(page.locator('.vis .scales .pan')).toHaveCount(2);
+    const prompt = await page.evaluate(() => window.__sna.state().prompt as string);
+    expect(prompt).toContain('=');
+    await waitForTarget(page);
+    expect(await answer(page)).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__sna.state().score)).toBeGreaterThan(0);
   });
 });

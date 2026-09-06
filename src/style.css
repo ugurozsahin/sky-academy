@@ -211,6 +211,11 @@ img { -webkit-user-drag: none; }
 .frac { width: 110px; height: 110px; } .frac path { fill: #ffffff22; stroke: #fff; stroke-width: 2; } .frac path.sh { fill: var(--accent); }
 .bar { display: flex; gap: 3px; } .bar i { width: 34px; height: 26px; background: #ffffff22; border: 2px solid #fff; } .bar i.sh { background: var(--accent); }
 .nline { display: flex; gap: 8px; } .nline span { padding: 2px 6px; border-top: 3px solid #fff; } .nline .mark { color: var(--accent); }
+.scales { display: grid; grid-template-columns: 1fr 10px 1fr; column-gap: 4px; width: min(100%, 300px); align-items: start; margin-bottom: 6px; }
+.scales .beam { grid-column: 1 / -1; width: 100%; height: 34px; display: block; } .scales .beam .bar { stroke: #fff; stroke-width: 6; stroke-linecap: round; } .scales .beam .str { stroke: #fff; stroke-width: 2.5; } .scales .beam .ful { fill: var(--accent); }
+.scales .pan { min-height: 40px; margin: 0 4px; padding: 6px 4px; border: 3px solid #fff; border-top: none; border-radius: 0 0 18px 18px; background: #ffffff18; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; font-size: clamp(18px, 5vw, 24px); font-weight: 700; line-height: 1.15; }
+.scales .pan.many { font-size: clamp(15px, 4vw, 20px); letter-spacing: -.02em; }
+.scales .pillar { width: 10px; min-height: 100%; height: 100%; border-radius: 0 0 4px 4px; background: #fff; box-shadow: 0 4px 0 3px #ffffffaa; align-self: stretch; }
 .wordcard { gap: 12px; } .wordcard .emoji { font-size: 40px; } .wordcard .txt { font-size: clamp(26px, 7vw, 40px); font-weight: 700; letter-spacing: .12em; background: #ffffff14; padding: 2px 14px; border-radius: 12px; }
 .sentence { font-size: clamp(20px, 5vw, 28px); font-weight: 600; } .sentence .gap { border-bottom: 3px solid var(--accent); text-decoration: none; }
 .tracing .prompt { font-size: 22px; }

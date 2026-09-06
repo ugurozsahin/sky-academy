@@ -10,6 +10,7 @@ export type Visual =
   | { type: 'clock'; h: number; m: number }
   | { type: 'fraction'; parts: number; shaded: number; shape?: 'circle' | 'bar' }
   | { type: 'numberline'; from: number; to: number; mark?: number; step?: number }   // mark = hidden number shown as ?
+  | { type: 'scales'; left: string; right: string }     // balance scales: text/emoji on each pan ("3 + 4" / "? + 2")
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string };                  // sentence with a blank "_"
 

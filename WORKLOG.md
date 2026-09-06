@@ -22,3 +22,13 @@ Append one dated entry per run (newest at the bottom). Keep entries short: what 
 - Tests: unit 199/199 (+2 boss, +1 storage), tsc clean, e2e mobile 16/16 (+1 boss test), e2e desktop 16/16.
 - Commits: 915dd6b (Ninja Sprint), fdbde37 (Boss Battle) — both on main.
 - Next: P3 Balance the Scales (new topic + scales visual) — no owner input needed.
+
+## 2026-09-06 05:40 (hourly routine, cloud)
+- Backlog P3 done: **Balance the Scales** — new `scales` visual (`{ type: 'scales', left, right }`: beam + fulcrum SVG, two hanging pans, pillar) in `visuals.ts`/`style.css`; `balanceQ()` helper + three topics: `r-balance` (objects on one pan, `?` on the other; d3 `a = b + ?` with objects), `y1-balance` (d1 `a + b = ?` / `? = a + b`; d2 `a + b = c + ?`; d3 adds `a − b = ? + c`, `a + b = ? − c`, all within 20), `y2-balance` (d1 within 20; d2 2-digit ± ones/tens vs `c + ?`; d3 adds `n × t = ? + c` for 2/5/10 tables and `a + b = ? − c`, within 100). Distractors include the classic mistake (answer = left total) and the other operand.
+- Tests: targeted unit test evaluates both sides of every balance prompt with `?` filled in (200 × 3 difficulties × 3 topics) and checks year ranges; e2e visuals test now also opens `y1-balance`, expects two pans and scores via the hook.
+- Fixed a fragile unit test: endless-session test sliced `answer` for sequence questions (Order Up), silently losing lives before the deliberate wrong slices; it now slices sequences letter by letter and asserts full lives first.
+- Docs: `docs/CURRICULUM.md` lists the three topics.
+- e2e robustness: the random-pool tests (Sky Storm, Sprint, Boss) sliced `answer` once per question, which hangs on an Order Up / spelling sequence and, when the headless renderer stalls and a wave is missed, the "3 wrong slices" loop waited on a game that had already ended (seen once here: stuck at Q6 "Is it raining_"). New `solveCurrent()` / `waitForWrongOrEnd()` helpers slice sequences letter by letter and stop when the game ends.
+- Tests: unit 209/209, tsc clean, e2e mobile: full run 14/16 before the e2e fixes (both failures analysed above), then the 4 touched tests 8/8 with `--repeat-each 2`. Desktop e2e not run (time).
+- Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins.
+- Next: P4 Memory Match (non-slice card mode; needs a new screen, no owner input) or Next #9 (Y1/Y2 measurement & statistics topics).
