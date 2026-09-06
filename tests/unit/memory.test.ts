@@ -1,0 +1,73 @@
+import { describe, it, expect } from 'vitest';
+import { Memory, THEMES, pickTheme } from '../../src/game/memory';
+import { YEARS } from '../../src/curriculum';
+
+function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const faceKey = (f: { text: string; coin?: number }) => `${f.coin ? 'coin:' : ''}${f.text}`;
+
+describe('memory decks', () => {
+  it('every theme builds 4–8 pairs with distinct faces on each side, for every year', () => {
+    for (const y of YEARS) {
+      expect(THEMES[y.id].length).toBeGreaterThanOrEqual(3);
+      for (const theme of THEMES[y.id]) for (let seed = 1; seed <= 40; seed++) {
+        const pairs = theme.pairs(rng(seed));
+        const want = y.id === 'reception' ? 4 : y.id === 'year1' ? 6 : theme.id === 'shapes' || theme.id === 'words' ? 6 : 8;
+        expect(pairs.length, `${y.id}/${theme.id}`).toBe(want);
+        expect(new Set(pairs.map(p => faceKey(p.a))).size, `${y.id}/${theme.id} left faces`).toBe(pairs.length);
+        expect(new Set(pairs.map(p => faceKey(p.b))).size, `${y.id}/${theme.id} right faces`).toBe(pairs.length);
+        for (const p of pairs) { expect(faceKey(p.a)).not.toBe(faceKey(p.b)); expect(p.a.say.length).toBeGreaterThan(0); expect(p.b.say.length).toBeGreaterThan(0); }
+      }
+    }
+  });
+  it('year ranges: Reception counts to 6 and words to five, Y1 words within 20, Y2 words 21–99 and tables 2/5/10', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      for (const p of pickTheme('reception', rng(seed), 'count').pairs(rng(seed))) expect(Number(p.a.text)).toBeLessThanOrEqual(6);
+      for (const p of pickTheme('year1', rng(seed), 'words').pairs(rng(seed))) expect(Number(p.a.text)).toBeLessThanOrEqual(20);
+      for (const p of pickTheme('year2', rng(seed), 'words').pairs(rng(seed))) { expect(Number(p.a.text)).toBeGreaterThan(20); expect(Number(p.a.text)).toBeLessThan(100); }
+      for (const p of pickTheme('year2', rng(seed), 'tables').pairs(rng(seed))) { const [k, t] = p.a.text.split(' × ').map(Number); expect([2, 5, 10]).toContain(t); expect(k * t).toBe(Number(p.b.text)); }
+    }
+  });
+  it('coins are drawn as coins on one side and named on the other', () => {
+    const pairs = pickTheme('year2', rng(3), 'coins').pairs(rng(3));
+    expect(pairs.length).toBe(8);
+    for (const p of pairs) { expect(p.a.coin).toBeGreaterThan(0); expect(p.b.coin).toBeUndefined(); expect(p.b.text).toBe(p.a.text); }
+    expect(pairs.some(p => p.a.text.startsWith('£'))).toBe(true);
+  });
+  it('pickTheme falls back to a random theme of the year when the id is unknown', () => {
+    expect(THEMES.year1.map(t => t.id)).toContain(pickTheme('year1', rng(9), 'nope').id);
+  });
+});
+
+describe('memory game', () => {
+  const deck = () => pickTheme('year1', rng(1), 'words').pairs(rng(1));
+  const partner = (g: Memory, i: number) => g.cards.findIndex((c, k) => k !== i && c.pair === g.cards[i].pair);
+  const other = (g: Memory, i: number) => g.cards.findIndex((c, k) => c.pair !== g.cards[i].pair && !c.matched);
+  it('shuffles two cards per pair and starts face down', () => {
+    const g = new Memory(deck(), rng(2));
+    expect(g.cards.length).toBe(12); expect(g.cards.every(c => !c.up && !c.matched)).toBe(true);
+    expect(g.cards.map(c => c.pair).sort()).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+    expect(g.done).toBe(false); expect(g.stars).toBe(0); expect(g.coins).toBe(0);
+  });
+  it('a miss must be hidden before the next flip; a match locks both cards', () => {
+    const g = new Memory(deck(), rng(2));
+    expect(g.flip(0)).toBe('open'); expect(g.flip(0)).toBe('ignored');                // same card twice
+    expect(g.flip(other(g, 0))).toBe('miss'); expect(g.moves).toBe(1);
+    expect(g.flip(partner(g, 0))).toBe('ignored');                                    // two open cards: locked
+    g.hide(); expect(g.cards.filter(c => c.up).length).toBe(0);
+    expect(g.flip(0)).toBe('open'); expect(g.flip(partner(g, 0))).toBe('match');
+    expect(g.matched).toBe(1); expect(g.score).toBe(10); expect(g.moves).toBe(2);
+    expect(g.flip(0)).toBe('ignored'); expect(g.cards[0].matched).toBe(true);
+  });
+  it('perfect play earns 3 stars, streak bonuses and coins; sloppy play still finishes with 1 star', () => {
+    const g = new Memory(deck(), rng(2));
+    for (let i = 0; i < g.cards.length; i++) if (!g.cards[i].matched) expect(g.flip(i) === 'open' && g.flip(partner(g, i))).toBe('match');
+    expect(g.done).toBe(true); expect(g.moves).toBe(6); expect(g.stars).toBe(3);
+    expect(g.score).toBe(10 * 6 + 5 * (1 + 2 + 3 + 3 + 3)); expect(g.bestStreak).toBe(6);
+    expect(g.coins).toBe(6 * 2 + 15);
+    expect(g.flip(0)).toBe('ignored');                                                // finished board ignores flips
+    const s = new Memory(deck(), rng(2));
+    for (let n = 0; n < 12; n++) { s.flip(0); s.flip(other(s, 0)); s.hide(); }          // 12 wasted turns
+    for (let i = 0; i < s.cards.length; i++) if (!s.cards[i].matched) { s.flip(i); s.flip(partner(s, i)); }
+    expect(s.done).toBe(true); expect(s.moves).toBe(18); expect(s.stars).toBe(1); expect(s.coins).toBe(12 + 5);
+  });
+});

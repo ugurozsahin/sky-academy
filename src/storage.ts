@@ -11,6 +11,7 @@ export interface SaveData {
   endless: Record<string, number>;   // year -> best score
   sprint: Record<string, number>;    // year -> best Ninja Sprint score
   boss: Record<string, number>;      // year -> Hammer Man knock-outs
+  memory: Record<string, number>;    // year -> Memory Match boards completed
   totalSlices: number;
   coins: number;                     // ninja coins earned (lifetime)
   stickers: string[];                // unlocked sticker ids
@@ -18,7 +19,7 @@ export interface SaveData {
   tutorialSeen: boolean;             // the "slice the bubble" demo hand has done its job
 }
 const KEY = 'sna:v1';
-const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false };
+const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false };
 
 let cache: SaveData | null = null;
 export function load(): SaveData {
@@ -49,6 +50,11 @@ export function recordSprint(year: string, score: number): boolean {
 export function recordBossWin(year: string): number {
   const b = load().boss; const n = (b[year] ?? 0) + 1;
   save({ boss: { ...b, [year]: n } }); return n;
+}
+/** Count a completed Memory Match board for this year. Returns the new total. */
+export function recordMemory(year: string): number {
+  const m = load().memory; const n = (m[year] ?? 0) + 1;
+  save({ memory: { ...m, [year]: n } }); return n;
 }
 /** Sticker album: unlocked by lifetime coins. Order = avatars then the villain. */
 export const STICKER_IDS = ['volt', 'blaze', 'splash', 'terra', 'gust', 'frost', 'sol', 'shadow', 'kai', 'bolt', 'hammer'];

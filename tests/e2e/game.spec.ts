@@ -263,6 +263,40 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#boss small')).toContainText('KOs 1');
   });
 
+  test('Memory Match: cards flip, a miss turns back, pairs lock, and the finished board is counted', async ({ page }) => {
+    await pickAvatar(page, 'splash', 'Mia');
+    await page.click('.island[data-year="reception"]');
+    await expect(page.locator('#memory small')).toContainText('boards 0');
+    await page.click('#memory');
+    await expect(page.locator('.memory')).toBeVisible();
+    await expect(page.locator('.card')).toHaveCount(8);
+    await expect(page.locator('.card.up')).toHaveCount(0);
+    const cards = await page.evaluate(() => window.__sna.cards() as { pair: number; matched: boolean }[]);
+    const wrong = cards.findIndex((c, i) => i > 0 && c.pair !== cards[0].pair);
+    await page.click('.card[data-i="0"]');
+    await expect(page.locator('.card[data-i="0"]')).toHaveClass(/up/);
+    await page.click(`.card[data-i="${wrong}"]`);
+    await expect(page.locator('.toast.bad')).toContainText('Not a pair');
+    await expect(page.locator('.card.up')).toHaveCount(0);                              // both turn back over
+    expect((await state(page)).moves).toBe(1);
+    for (let i = 0; i < cards.length; i++) {
+      if (await page.evaluate((k) => window.__sna.cards()[k].matched, i)) continue;
+      const mate = cards.findIndex((c, k) => k !== i && c.pair === cards[i].pair);
+      await page.waitForFunction(() => !window.__sna.state().waiting);
+      expect(await page.evaluate((k) => window.__sna.flip(k), i)).toBe(true);
+      expect(await page.evaluate((k) => window.__sna.flip(k), mate)).toBe(true);
+      await expect(page.locator(`.card[data-i="${i}"]`)).toHaveClass(/matched/);
+    }
+    await expect(page.locator('#pairs b')).toHaveText('4');
+    const results = page.locator('.results');
+    await expect(results.locator('h2')).toHaveText('All pairs found!');
+    await expect(results.locator('.stars')).toContainText('★★★');                    // 5 turns for 4 pairs
+    await expect(results.locator('.coin-gain')).toContainText('+23');                  // 4 pairs × 2 + 3 stars × 5
+    await expect(results.locator('.speech')).toContainText('Mia');
+    await page.click('#home');
+    await expect(page.locator('#memory small')).toContainText('boards 1');
+  });
+
   test('first play shows the slice tutorial hand, which goes away after the first slice for good', async ({ page }) => {
     await pickAvatar(page);
     await startTopic(page, 'reception', 'r-count');

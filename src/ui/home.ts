@@ -6,7 +6,7 @@ import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { $, $$, render, stars } from './dom';
 
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode }) => void;
-type Nav = { avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay; rewards: () => void };
+type Nav = { avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay; memory: (year: YearInfo) => void; rewards: () => void };
 
 const ISLAND_BLURB: Record<YearInfo['id'], string> = { reception: 'First steps · counting, sounds & letters', year1: 'Number bonds, adding, phonics & spelling', year2: 'Times tables, money, time & tricky words' };
 
@@ -77,6 +77,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     <button class="btn storm" id="endless"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Sky Storm</b><small>Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}</small></span></button>
     <button class="btn storm sprint" id="sprint"><span class="vport emoji">⏱️</span><span><b>Ninja Sprint</b><small>${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}</small></span></button>
     <button class="btn storm boss" id="boss"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Boss Battle</b><small>Knock out Hammer Man · KOs ${d.boss[year.id] ?? 0}</small></span></button>
+    <button class="btn storm memory" id="memory"><span class="vport emoji">🃏</span><span><b>Memory Match</b><small>Calm card pairs, no slicing · boards ${d.memory[year.id] ?? 0}</small></span></button>
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {
@@ -94,6 +95,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   $('#endless').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'endless' }); });
   $('#sprint').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'sprint' }); });
   $('#boss').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'boss' }); });
+  $('#memory').addEventListener('click', () => { sfx.tap(); nav.memory(year); });
 }
 
 /** Rewards: coins, streak and the sticker album. */

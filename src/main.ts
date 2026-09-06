@@ -2,6 +2,7 @@ import './style.css';
 import { avatarScreen } from './ui/avatar';
 import { mapScreen, islandScreen, rewardsScreen, type StartPlay } from './ui/home';
 import { playScreen, type PlayOpts } from './ui/play';
+import { memoryScreen } from './ui/memory';
 import { load } from './storage';
 import type { YearInfo } from './curriculum';
 
@@ -11,6 +12,7 @@ const nav = {
   map: () => mapScreen(nav),
   island: (year: YearInfo) => islandScreen(nav, year),
   play: ((o: PlayOpts) => playScreen(o, () => nav.island(o.year), () => nav.play(o))) as StartPlay,
+  memory: (year: YearInfo) => memoryScreen({ year }, () => nav.island(year), () => nav.memory(year)),
   rewards: () => rewardsScreen(nav),
 };
 

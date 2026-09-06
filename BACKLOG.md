@@ -21,7 +21,7 @@ Status: `todo` · `doing` · `done` · `later`
 | P1 | **Ninja Sprint** — 60-second time attack per island (no lives, beat your best) | Short sessions, replay value, prepares for the Y4 Multiplication Tables Check format | done |
 | P2 | **Boss Battle** — Hammer Man health bar; each correct slice hits him, wrong slices heal him; win = animated KO | Emotional climax kids remember; uses villain art | done |
 | P3 | **Balance the Scales** — pick the bubble that makes both sides equal (=), leads into Y2 equivalence & Y3 algebra thinking | Curriculum depth (equals as balance) | done |
-| P4 | **Memory Match** (non-slice) — flip cards: number ↔ word, coin ↔ value, shape ↔ name | Calm mode for Reception, different pace | todo |
+| P4 | **Memory Match** (non-slice) — flip cards: number ↔ word, coin ↔ value, shape ↔ name | Calm mode for Reception, different pace | done |
 | P5 | **Story Sentences** — slice words in order to build a sentence read aloud ("The cat sat on the mat.") | Writing composition / word order, uses sequence engine | todo |
 | P6 | **Sound Hunt** — hear a sound (speech), slice the letter/digraph; picture-free phonics | Reception phonics without reading | todo |
 | P7 | **Adaptive practice** — "Train with Sensei": auto-picks weakest topics from history | Mastery, parent-visible progress | todo |
@@ -70,3 +70,4 @@ Status: `todo` · `doing` · `done` · `later`
 | Ninja Sprint mode: 60-second time attack per island, no lives, clock pauses with the game, stars by correct count, per-year best + "New best!" | v0.5 |
 | Boss Battle mode: Hammer Man health bar (8 HP), correct = hit (shake), slip = heal (+taunt), enraged speed at ≤3 HP, TNT bubbles, KO animation on results, KOs counted per island | v0.5 |
 | Balance the Scales topics (R/Y1/Y2) with a balance-scales visual: equals as balance, `a + b = ? + c` forms, tables in Y2 | v0.5 |
+| Memory Match mode: calm card-pairs screen (no slicing) per island — count/shapes/words (R), words/coins/2-D shapes/doubles (Y1), words/coins/3-D shapes/tables (Y2); stars by turns, coins, boards counted | v0.5 |
