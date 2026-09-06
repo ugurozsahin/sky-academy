@@ -226,7 +226,7 @@ const y2Punct: Generator = (d, rng) => {
   return wordQ(rng, s, p, [',', '.', '-'], { visual: { type: 'sentence', text: s }, say: 'Which mark shows something belongs to someone?', hint: 'Possessive apostrophe' });
 };
 const y2Trace: Generator = (d, rng) => {
-  const w = pick(rng, d === 1 ? Y1_CEW.filter(x => x.length <= 4) : Y2_CEW.filter(x => x.length <= (d === 2 ? 5 : 7)));
+  const w = pick(rng, d === 1 ? Y1_CEW.filter(x => x.length >= 2 && x.length <= 4) : Y2_CEW.filter(x => x.length <= (d === 2 ? 5 : 7)));
   return { prompt: `Trace: ${w}`, say: `Trace the word ${w}`, answer: w, options: [w], visual: { type: 'word', text: w } };
 };
 

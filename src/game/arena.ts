@@ -67,7 +67,8 @@ export class Arena {
   spawnWave(o: WaveOpts) {
     this.bubbles = []; this.frozen = false;
     const n = o.labels.length;
-    const r = Math.max(26, this.radius(!!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
+    let r = Math.max(26, this.radius(!!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
+    r = Math.min(r, ((this.W - 16) / 3 - 10) / 2);                               // at least three always fit across
     const T = o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4;              // seconds in the air
     const apexMin = this.topInset + r + 10;
     const usable = this.H - apexMin - r;
@@ -76,7 +77,7 @@ export class Arena {
     // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
     // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
     const perBatch = Math.max(3, Math.min(n, Math.floor((this.W - 16) / (2 * r + 10))));
-    const batchGap = T * 1000 * 0.62;
+    const batchGap = T * 1000 * (perBatch < n && perBatch <= 4 ? 0.8 : 0.62);   // narrow screens: the row is mostly down before the next rises
     const order = o.labels.map((_, i) => i).sort(() => Math.random() - 0.5);
     if (o.first) { const k = order.findIndex(i => o.labels[i] === o.first); if (k >= perBatch) { const j = Math.floor(Math.random() * perBatch); [order[j], order[k]] = [order[k], order[j]]; } }
     const margin = r + 8;
@@ -84,9 +85,10 @@ export class Arena {
     for (let k = 0; k < n; k++) {
       const i = order[k];
       const batch = Math.floor(k / perBatch), idx = k % perBatch, size = Math.min(perBatch, n - batch * perBatch);
-      // spread x across the width in shuffled slots so bubbles don't overlap
-      const slot = (idx + 0.5) / size;
-      const x = margin + span * Math.min(1, Math.max(0, slot + (Math.random() - 0.5) * ((size >= perBatch ? 0.3 : 0.6) / size)));   // tighter jitter when the row is full
+      // spread x across the width in shuffled slots so bubbles don't overlap; a full row uses the whole span edge to edge
+      const full = size >= perBatch && size > 1;
+      const slot = full ? idx / (size - 1) : (idx + 0.5) / size;
+      const x = margin + span * Math.min(1, Math.max(0, slot + (Math.random() - 0.5) * ((full ? 0.25 : 0.6) / size)));
       const apexY = apexMin + usable * (0.05 + Math.random() * 0.45);
       const h = this.H + r - apexY;
       const tUp = T / 2;
@@ -112,7 +114,10 @@ export class Arena {
     }
     if (o.good !== undefined && !shown) {
       const r = this.radius(o.good.length > 3);
-      this.bubbles.push({ id: this.nextId++, label: o.good, x: this.W / 2, y: this.topInset + (this.H - this.topInset) * 0.42, vx: 0, vy: 0, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, scale: 1, mark: 'good', markAt: now });
+      let x = this.W / 2; const y = this.topInset + (this.H - this.topInset) * 0.42;
+      const bad = this.bubbles.find(b => b.mark === 'bad' && !b.dead);
+      if (bad && Math.hypot(bad.x - x, bad.y - y) < 2.2 * r) x = bad.x < this.W / 2 ? Math.min(this.W - r - 8, bad.x + 2.4 * r) : Math.max(r + 8, bad.x - 2.4 * r);   // don't sit on the ✗ bubble
+      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, scale: 1, mark: 'good', markAt: now });
     }
   }
   /** Remove remaining bubbles (with a gentle fade) — used when the question is over. */
@@ -120,11 +125,6 @@ export class Arena {
     for (const b of this.bubbles) if (!b.dead) { b.dead = true; if (popColor && b.launched && !b.fade) this.burst(b.x, b.y, b.mark === 'good' ? GOOD : popColor, b.mark ? 14 : 6); }
     this.frozen = false;
     if (this.waveActive) { this.waveActive = false; this.cb.onWaveEnd(); }
-  }
-  /** Highlight a bubble (e.g. show the correct answer after a mistake). */
-  flash(label: string) {
-    const b = this.bubbles.find(x => x.label === label && !x.dead);
-    if (b) { this.burst(b.x, b.y, '#ffffff', 14); this.particles.push({ x: b.x, y: b.y, vx: 0, vy: -30, life: 0, max: 0.9, color: '#fff', size: b.r, kind: 'ring' }); }
   }
   /** Programmatic hit (tests / accessibility). */
   hitLabel(label: string) {
@@ -183,7 +183,7 @@ export class Arena {
     if (this.trail.length > 24) this.trail.shift();
     if (this.moved > 40 && this.trail.length % 6 === 0) this.onSwish?.();
     if (++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);
-    for (const b of this.bubbles) if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true);
+    for (const b of this.bubbles) { if (this.frozen) break; if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true); }
   };
   private onUp = () => { this.pointerDown = false; };
   private bubbleAt(x: number, y: number) {
@@ -236,7 +236,7 @@ export class Arena {
     let scale = b.scale;
     if (b.fade) { c.globalAlpha = 0.28; scale *= 0.9; }
     if (b.mark) {                                    // outcome spotlight: pop in, gentle pulse, a shake for a wrong slice
-      const age = (now - (b.markAt ?? now)) / 1000;
+      const age = Math.max(0, now - (b.markAt ?? now)) / 1000;
       scale *= Math.min(1, age / 0.16) * (1.18 + 0.05 * Math.sin(age * 9));
       if (b.mark === 'bad') c.translate(Math.sin(age * 45) * 6 * Math.max(0, 0.45 - age) / 0.45, 0);
     }

@@ -104,7 +104,7 @@ test.describe('Sky Ninja Academy', () => {
     await startTopic(page, 'year2', 'y2-tables');
     await page.waitForFunction(() => window.__sna.bubbles().length > 1);
     expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
-    await expect(page.locator('.toast.bad')).toContainText('it was');
+    await expect(page.locator('.toast.bad')).toContainText('Not quite');
     await expect(page.locator('.lives span.off')).toHaveCount(1);
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
@@ -188,7 +188,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.prompt .seq span')).toHaveCount(words.length);
     await waitForWrongOrEnd(page);                                                     // a decoy must be in the air, not just the first word
     expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);           // a word out of order is a slip
-    await expect(page.locator('.toast.bad')).toContainText('it was');
+    await expect(page.locator('.toast.bad')).toContainText('Not quite');
     await page.waitForFunction(() => window.__sna.state().index === 1);
     await solveCurrent(page);                                                          // whole sentence, word by word
     await expect(page.locator('#score')).not.toHaveText('0');
@@ -198,11 +198,12 @@ test.describe('Sky Ninja Academy', () => {
     await pickAvatar(page);
     await startTopic(page, 'year1', 'y1-add');
     await waitForTarget(page);
+    const expected = (await state(page)).answer as string;                        // read before the slice: the session moves on after the hold
     const t0 = Date.now(); expect(await answer(page)).toBe(true);
     // correct: wave frozen, the sliced bubble stays with a ✓, the card turns green with the answer filled in
     expect(await page.evaluate(() => window.__sna.arena.frozen)).toBe(true);
     expect(await page.evaluate(() => window.__sna.arena.bubbles.some((b: any) => b.mark === 'good' && !b.dead))).toBe(true);
-    await expect(page.locator('.qcard.good .prompt .ans')).toHaveText((await state(page)).answer as string);
+    await expect(page.locator('.qcard.good .prompt .ans')).toHaveText(expected);
     await expect(page.locator('.qcard.good .hint')).toContainText("that's right");
     await page.waitForFunction(() => window.__sna.state().index === 1 && !window.__sna.state().waiting);
     expect(Date.now() - t0).toBeGreaterThanOrEqual(1200);                       // a real pause before the next question
@@ -325,7 +326,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#score')).toHaveText('10');
     await waitForWrongOrEnd(page);
     expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
-    await expect(page.locator('.toast.bad')).toContainText('it was');
+    await expect(page.locator('.toast.bad')).toContainText('Not quite');
     expect((await state(page)).lives).toBe(3);                              // a slip costs time, never a life
     await page.click('#pause');
     const frozen = (await state(page)).timeLeft;

@@ -54,8 +54,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   const endWave = (hold: number) => { const id = waveId; revealUntil = performance.now() + hold; later(() => { if (waveId === id) arena?.clearWave('#ffffff'); }, hold); };
   function showOutcome(kind: 'correct' | 'wrong' | 'miss', q: Question) {
     els.qcard.classList.remove('good', 'bad'); els.qcard.classList.add(kind === 'correct' ? 'good' : 'bad');
-    if (!q.sequence) els.prompt.innerHTML = fillAnswer(q.prompt, q.answer);
-    els.hint.innerHTML = kind === 'correct' ? `<b class="ok">✓ ${esc(q.answer)}</b> — that's right!` : `${kind === 'wrong' ? '✗ Not this time.' : '⌛ Too slow!'} The answer is <b class="ok">${esc(q.answer)}</b>`;
+    if (!q.sequence && !(q.listen && !load().speech)) els.prompt.innerHTML = fillAnswer(q.prompt, q.answer);   // Sound Hunt with read-aloud off keeps its listen words
+    els.hint.innerHTML = kind === 'correct' ? `<b class="ok">✓ ${esc(q.answer)}</b> — that's right!` : `${kind === 'wrong' ? '✗ Not this time.' : 'It flew away!'} The answer is <b class="ok">${esc(q.answer)}</b>`;
   }
 
   const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.mode !== 'tracing') : undefined) }, {
@@ -82,12 +82,12 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     },
     onWrong(q, hit) {
       lastOutcome = 'wrong'; sfx.wrong(); haptic('wrong');
-      toast(`Not quite — it was ${q.answer}`, 'bad', HOLD.wrong); showTaunt();
+      toast('Not quite!', 'bad', HOLD.wrong); showTaunt();
       if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer, bad: hit }); showOutcome('wrong', q); endWave(HOLD.wrong); }
       else later(() => session.advance(), 1200);
     },
     onMiss(q) {
-      lastOutcome = 'miss'; sfx.miss(); toast(`Missed! The answer was ${q.answer}`, 'bad', HOLD.miss); showTaunt();
+      lastOutcome = 'miss'; sfx.miss(); toast('Missed!', 'bad', HOLD.miss); showTaunt();
       if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer }); showOutcome('miss', q); endWave(HOLD.miss); }
     },
     onProgress(label, done, total) { sfx.slice(); els.prompt.innerHTML = promptHTML(session.current!, done); if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow); if (done < total) say(label, false); },
@@ -138,7 +138,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     $('#tcheck').onclick = () => {
       const r = tracer!.result(); if (r.pass) { sfx.correct(); session.hit(q.answer); return; }
       const missing = r.glyphs.filter(g => g < 0.55).length;   // name the letter the child skipped
-      toast(r.outside > 0.45 ? 'Stay on the dotted lines' : q.answer.length > 1 && missing ? `Trace the "${[...q.answer][r.weakest]}" too — every letter!` : 'Keep tracing — cover the whole letter', 'bad');
+      toast(r.outside > 0.45 ? 'Stay on the dotted lines' : q.answer.length > 1 && missing ? `Trace the "${[...q.answer][r.weakest]}" too — every letter!` : `Keep tracing — cover the whole ${q.answer.length > 1 ? 'word' : 'letter'}`, 'bad');
     };
   }
   /** First-play demo: show the animated hand over the arena; returns how long to hold the first wave (ms). */
