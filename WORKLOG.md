@@ -19,5 +19,6 @@ Append one dated entry per run (newest at the bottom). Keep entries short: what 
 - Tests: unit 196/196 (+4 sprint session, +1 storage), tsc clean, e2e mobile 15/15 (+1 sprint test: no lives lost, clock pauses, fast-forward → results → best saved).
 - Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins.
 - Backlog P2 done: **Boss Battle** — `mode: 'boss'` (`BOSS_HP = 8`): correct slice → `bossHp−1` + `onBoss('hit')` (villain shake, white flash), wrong/miss → heal +1 capped at max + taunt; lives work as in missions (Reception gentle); `enraged` at ≤3 HP → stage-3 speed; TNT bubbles like Sky Storm; KO ends won, stars by accuracy (90/70 %), coins = correct + 5×stars + 20. `storage.boss` counts KOs per year (`recordBossWin`). Island button "Boss Battle · KOs n"; HUD health bar over Hammer Man (turns amber when low); results: "Knock-out!" + Hammer Man tumbling off with a K.O. stamp, or "Hammer Man wins this round".
-- Tests: unit 199/199 (+2 boss, +1 storage), tsc clean, e2e mobile 16/16 (+1 boss test). e2e desktop not run (time budget).
+- Tests: unit 199/199 (+2 boss, +1 storage), tsc clean, e2e mobile 16/16 (+1 boss test), e2e desktop 16/16.
+- Commits: 915dd6b (Ninja Sprint), fdbde37 (Boss Battle) — both on main.
 - Next: P3 Balance the Scales (new topic + scales visual) — no owner input needed.
