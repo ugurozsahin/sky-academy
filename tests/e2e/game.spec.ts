@@ -59,8 +59,9 @@ const state = (page: Page) => page.evaluate(() => window.__sna.state());
 /** Answer the current question via the hook and wait for the next one (a sequence question needs one slice per letter). */
 async function solveCurrent(page: Page) {
   const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
-  for (let k = 0; k < 8; k++) {
-    await waitForTarget(page); expect(await answer(page)).toBe(true);
+  for (let k = 0; k < 16; k++) {
+    await waitForTarget(page);
+    if (!await answer(page)) continue;                                   // the wave fell and respawned between the wait and the slice
     if (await page.evaluate(() => window.__sna.state().waiting)) break;   // decided; otherwise it was a step in a sequence
   }
   await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before);
@@ -330,6 +331,37 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#back'); await expect(page.locator('.islands.big')).toBeVisible();
     await page.goBack();                                                          // nothing stale left: back from the map goes before the app
     expect(await page.evaluate(() => history.state)).toBeNull();
+  });
+
+  test('a long sentence can be built without waiting: each word arrives in order, in its batch or the next', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'year2', 'y2-sentence');
+    // hardest form: 7 words + decoys, listen-and-build (the shape Sprint/Boss/Sensei serve within a minute)
+    const words = await page.evaluate(() => {
+      const s = window.__sna.session;
+      s.questionsAsked = 14; s.stage = 5; s.index = 0; s.nextQuestion();
+      return s.current.sequence as string[];
+    });
+    expect(words.length).toBeGreaterThanOrEqual(5);
+    await page.waitForFunction((n) => window.__sna.arena.bubbles.length >= n, words.length);
+    const batches = await page.evaluate((ws) => {
+      const bs = window.__sna.arena.bubbles, t0 = Math.min(...bs.map((b: any) => b.launchAt)), used = new Set<number>();
+      return ws.map((w: string) => { const k = bs.findIndex((b: any, i: number) => b.label === w && !used.has(i)); if (k < 0) throw new Error(`no bubble for "${w}"`); used.add(k); return Math.round(bs[k].launchAt - t0); });
+    }, words);
+    // the exact batch layout is unit-tested (dealOrdered); here the user-facing property: no long wait between words
+    for (let i = 1; i < batches.length; i++) expect(batches[i] - batches[i - 1]).toBeLessThanOrEqual(5000);
+    expect(Math.max(...batches)).toBeLessThanOrEqual(9000);                       // the last word is up within one wave, phone or tablet
+    // the first batch's words can be sliced back to back, in order, without waiting or losing a life
+    const lives0 = (await state(page)).lives;
+    // and once the air is clear, the next word's batch is pulled forward instead of making the child wait
+    const rushed = await page.evaluate(() => {
+      const a = window.__sna.arena, s = window.__sna.session;
+      for (const b of a.bubbles) if (b.launched) b.dead = true;                   // as if the first batch had been sliced
+      const next = s.current.sequence.find((w: string) => a.bubbles.some((b: any) => b.label === w && !b.launched));
+      a.rush(next);
+      return Math.round(a.bubbles.find((b: any) => b.label === next).launchAt - performance.now());
+    });
+    expect(rushed).toBeLessThan(500);                                             // the earned word comes up now, not in 3.5 s
   });
 
   test('endless Sky Storm ramps up and ends when lives run out', async ({ page }) => {

@@ -34,8 +34,11 @@ img { -webkit-user-drag: none; }
     radial-gradient(1px 1px at 8% 66%, #fff 60%, transparent), radial-gradient(1.5px 1.5px at 92% 58%, #fff 60%, transparent),
     radial-gradient(160px 60px at 20% 78%, #ffffff14, transparent 70%), radial-gradient(220px 70px at 75% 70%, #ffffff12, transparent 70%),
     radial-gradient(260px 80px at 45% 92%, #ffd9b81a, transparent 70%);
-  animation: drift 40s linear infinite alternate;
 }
+/* Only the menus drift: animating `background-position` on 13 gradients is not compositor-accelerated, and
+   over the play canvas it ate ~80 % of the frame budget (measured 0.17× real time on a 1280 px screen,
+   0.67× on a phone; 0.88× / 0.98× without it). See review issue #30. */
+.bg-sky::after { animation: drift 40s linear infinite alternate; }
 @keyframes drift { from { background-position: 0 0; } to { background-position: 40px 10px; } }
 
 .screen { max-width: 820px; margin: 0 auto; padding: calc(16px + var(--sat)) 16px calc(24px + var(--sab)); }
@@ -270,8 +273,8 @@ img { -webkit-user-drag: none; }
 .trace-btns { display: flex; gap: 10px; justify-content: center; }
 
 /* ---------- memory match ---------- */
-.memory { position: relative; display: flex; flex-direction: column; align-items: center; min-height: calc(var(--vh) * 100); padding-top: calc(10px + var(--sat)); }
-.memory .hud-top { max-width: 560px; }
+.screen.memory { position: relative; display: flex; flex-direction: column; align-items: center; min-height: calc(var(--vh) * 100); padding-top: calc(10px + var(--sat)); }   /* .screen: the island's Memory Match button also carries .memory (#63) */
+.screen.memory .hud-top { max-width: 560px; }
 .mstat { font-size: 18px; font-weight: 700; padding: 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .mem-head { cursor: pointer; }
 .cards { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 10px; width: 100%; max-width: 520px; margin-top: 14px; perspective: 900px; }
@@ -315,7 +318,7 @@ img { -webkit-user-drag: none; }
 .statgrid div { background: #ffffff10; border-radius: 14px; padding: 10px 4px; } .statgrid b { display: block; font-size: 22px; } .statgrid small { color: var(--muted); font-weight: 600; }
 .confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: 26px; }
 .confetti i { position: absolute; top: -12px; left: calc(var(--x) * 1%); width: 8px; height: 14px; background: var(--c); border-radius: 2px; animation: conf var(--d) calc(var(--i) * -.13s) linear infinite; opacity: .9; }
-@media (prefers-reduced-motion: reduce) { .confetti i, .hero-big img, .isl-art, .bg-sky::after, .bg-play::after, .villain img, .results .ko img, .timer, #stage .segs i.cur { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .confetti i, .hero-big img, .isl-art, .bg-sky::after, .villain img, .results .ko img, .timer, #stage .segs i.cur { animation: none; } }
 @keyframes conf { to { transform: translateY(520px) rotate(720deg); } }
 
 @media (min-width: 720px) {

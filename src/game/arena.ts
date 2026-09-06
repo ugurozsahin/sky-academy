@@ -15,7 +15,7 @@ export interface ArenaCallbacks {
   onFall: (b: Bubble) => void;                       // an un-hit bubble fell off screen
   onWaveEnd: () => void;                             // no live bubbles remain
 }
-export interface WaveOpts { labels: string[]; speed: number; wide?: boolean; gravity?: number; first?: string /* keep this label in the first batch */ }
+export interface WaveOpts { labels: string[]; speed: number; wide?: boolean; gravity?: number; ordered?: string[] /* sequence labels that must be sliced in this order */ }
 const GOOD = '#66e07d', BAD = '#ff5f6d';
 
 const PALETTE = ['#ff5f6d', '#ffa726', '#ffd54f', '#66e07d', '#40c4ff', '#b388ff', '#ff7ac6', '#4dd0e1'];
@@ -28,6 +28,7 @@ export class Arena {
   private trail: { x: number; y: number; t: number }[] = [];
   private pointerDown = false; private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600;
+  private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;
   time = 0;
 
@@ -71,16 +72,19 @@ export class Arena {
     let r = Math.max(26, this.radius(!!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
     r = Math.min(r, ((this.W - 16) / 3 - 10) / 2);                               // at least three always fit across
     const T = o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4;              // seconds in the air
+    this.waveT = T * 1000;
     const apexMin = this.topInset + r + 10;
     const usable = this.H - apexMin - r;
     const now = performance.now();
     const stagger = o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260;
     // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
     // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
-    const perBatch = Math.max(3, Math.min(n, Math.floor((this.W - 16) / (2 * r + 10))));
+    // A sequence must be sliced in order, so at most 4 bubbles ride each flight even on a wide screen:
+    // otherwise a tablet puts all 10 words up at once and the child has one 4-second flight for the lot.
+    const perBatch = Math.max(3, Math.min(o.ordered?.length ? 4 : n, Math.floor((this.W - 16) / (2 * r + 10))));
     const batchGap = T * 1000 * (perBatch < n && perBatch <= 4 ? 0.8 : 0.62);   // narrow screens: the row is mostly down before the next rises
-    const order = o.labels.map((_, i) => i).sort(() => Math.random() - 0.5);
-    if (o.first) { const k = order.findIndex(i => o.labels[i] === o.first); if (k >= perBatch) { const j = Math.floor(Math.random() * perBatch); [order[j], order[k]] = [order[k], order[j]]; } }
+    this.batchSpan = perBatch * stagger;
+    const order = o.ordered?.length ? dealOrdered(o.labels, o.ordered, perBatch) : o.labels.map((_, i) => i).sort(() => Math.random() - 0.5);
     const margin = r + 8;
     const span = this.W - margin * 2;
     for (let k = 0; k < n; k++) {
@@ -101,6 +105,21 @@ export class Arena {
       (this.bubbles[this.bubbles.length - 1] as any)._g = g;
     }
     this.waveActive = true;
+  }
+  /** Bring the batch holding `label` up now — used when the child has earned the next word of a sequence.
+   *  Never launches it under bubbles that are still rising (that is how waves used to pile up), and moves
+   *  only that one batch: the batches behind it are rushed in their own turn. */
+  rush(label?: string) {
+    const b = label ? this.bubbles.find(x => x.label === label && !x.launched && !x.dead) : undefined;
+    if (!b) return false;
+    const now = performance.now(), cutoff = b.launchAt;
+    let earliest = now;
+    for (const x of this.bubbles) if (x.launched && !x.dead && !x.hit) earliest = Math.max(earliest, x.launchAt + this.waveT / 2);   // wait for what is in the air to pass its apex
+    const shift = Math.max(0, cutoff - Math.max(now, earliest));
+    if (!shift) return false;
+    const end = cutoff + this.batchSpan;
+    for (const x of this.bubbles) if (!x.launched && !x.dead && x.launchAt >= cutoff && x.launchAt < end) x.launchAt -= shift;      // keep the batch's own stagger
+    return true;
   }
   /** Freeze the wave and show the outcome: the sliced bubble stays put with a ✓ (or ✗ beside the glowing right answer),
    *  the rest fade. If the right answer is no longer on screen (it fell, or is still queued) it pops in as a ghost bubble. */
@@ -316,6 +335,30 @@ export class Arena {
     }
     c.restore();
   }
+}
+
+/** Deal a sequence wave: the words that must be sliced in order are spread across the batches IN ORDER
+ *  (batch 1 gets the first few, batch 2 the next few…), decoys fill the remaining slots, and the position
+ *  inside a batch stays random. Without this the child slices word 1 and then waits seconds for word 2.
+ *  `ordered` must be a subset of `labels` (labels not present are skipped). */
+export function dealOrdered(labels: string[], ordered: string[], perBatch: number): number[] {
+  const pool = labels.map((l, i) => ({ l, i }));
+  const targets: number[] = [];
+  for (const label of ordered) { const k = pool.findIndex(x => x.l === label); if (k >= 0) targets.push(pool.splice(k, 1)[0].i); }
+  const decoys = pool.map(x => x.i).sort(() => Math.random() - 0.5);
+  const batches = Math.max(1, Math.ceil(labels.length / perBatch));
+  const perBatchTargets = Math.max(1, Math.ceil(targets.length / batches));
+  const out: number[] = [];
+  let t = 0, d = 0;
+  for (let b = 0; b < batches; b++) {
+    const slots = Math.min(perBatch, labels.length - out.length);
+    const batch: number[] = [];
+    while (batch.length < Math.min(perBatchTargets, slots) && t < targets.length) batch.push(targets[t++]);
+    while (batch.length < slots && d < decoys.length) batch.push(decoys[d++]);
+    while (batch.length < slots && t < targets.length) batch.push(targets[t++]);
+    out.push(...batch.sort(() => Math.random() - 0.5));
+  }
+  return out;
 }
 
 const glowCache = new Map<string, HTMLCanvasElement>();

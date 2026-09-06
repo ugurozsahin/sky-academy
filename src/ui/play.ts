@@ -78,7 +78,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
       if (tracing) { say(q.say ?? q.prompt); startTrace(q); return; }
       const labels = villainMode && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence ? [...info.labels, BOMB] : info.labels;
-      const spawn = () => { say(q.say ?? q.prompt); requestAnimationFrame(() => { arena!.topInset = els.qcard.getBoundingClientRect().bottom + 6; arena!.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), first: q.sequence ? q.sequence[session.seqIndex] : undefined }); }); };
+      const spawn = () => { say(q.say ?? q.prompt); requestAnimationFrame(() => { arena!.topInset = els.qcard.getBoundingClientRect().bottom + 6; arena!.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), ordered: q.sequence?.slice(session.seqIndex) }); }); };
       const demo = showTutorial();                // first ever play: animated hand first, bubbles a moment later
       if (demo) later(spawn, demo); else spawn();
       }
@@ -99,7 +99,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       lastOutcome = 'miss'; sfx.miss(); toast('Missed!', 'bad', HOLD.miss); showTaunt(); markSeg('bad');
       if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer }); showOutcome('miss', q); endWave(HOLD.miss); }
     },
-    onProgress(label, done, total) { sfx.slice(); els.prompt.innerHTML = promptHTML(session.current!, done); if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow); if (done < total) say(label, false); },
+    onProgress(label, done, total) { sfx.slice(); if (done < total) arena?.rush(session.current!.sequence![done]);   // the next word is earned: bring it up now instead of making the child wait for its batch
+       els.prompt.innerHTML = promptHTML(session.current!, done); if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow); if (done < total) say(label, false); },
     onLives(n) { drawLives(n); if (n < prevLives) { sfx.life(); haptic('life'); } prevLives = n; },
     onStageClear(stage, st, acc) { sfx.stage(); haptic('stage'); showStageClear(stage, st, acc); },
     onTime(s) { drawTimer(s); if (s <= 3 && s > 0) sfx.tap(); },
