@@ -1,0 +1,548 @@
+{
+ "labels": [
+  [
+   "priority:P1",
+   "d73a4a",
+   "Do next — owner's top priorities"
+  ],
+  [
+   "priority:P2",
+   "fbca04",
+   "Should do soon"
+  ],
+  [
+   "priority:P3",
+   "0e8a16",
+   "Nice to have"
+  ],
+  [
+   "later",
+   "cfd3d7",
+   "Parked by the owner — do not start"
+  ],
+  [
+   "owner-input",
+   "5319e7",
+   "Needs the owner's art or decision before/while implementing"
+  ],
+  [
+   "routine-ok",
+   "1d76db",
+   "The hourly routine may pick this up without asking"
+  ],
+  [
+   "mode",
+   "c5def5",
+   "New or changed game mode"
+  ],
+  [
+   "curriculum",
+   "bfd4f2",
+   "Topics / National Curriculum coverage"
+  ],
+  [
+   "art",
+   "f9d0c4",
+   "Visuals — owner supplies art or approves code-drawn visuals"
+  ],
+  [
+   "reward",
+   "fef2c0",
+   "Coins, stickers, shop, streaks"
+  ],
+  [
+   "review",
+   "d4c5f9",
+   "Finding from the 2026-09-06 code review"
+  ],
+  [
+   "perf",
+   "e99695",
+   "Performance on phones"
+  ],
+  [
+   "debt",
+   "ededed",
+   "Technical debt / maintainability"
+  ],
+  [
+   "tests",
+   "bfdadc",
+   "Test coverage or flakiness"
+  ],
+  [
+   "platform",
+   "c2e0c6",
+   "PWA, layout, haptics, profiles"
+  ],
+  [
+   "playtest",
+   "ff7f50",
+   "Found while playing with the child"
+  ]
+ ],
+ "issues": [
+  {
+   "title": "Playtest round 2 (owner + child on the phone)",
+   "labels": [
+    "priority:P1",
+    "owner-input",
+    "playtest"
+   ],
+   "body": "Round 1 (2026-09-06) found: outcome moved on too fast, mistakes not visible enough, long sentences overlapped, Trace Words too lenient. The first three shipped in 051ed5e; tracing is {{trace}}.\n\nNext round: play each mode on the phone and file one issue per finding with the `playtest` label.",
+   "owner_action": "play every mode on the phone with the child and file findings as `playtest` issues"
+  },
+  {
+   "title": "Outcome beat: slow down after a slice, spotlight the answer, pause before the next question",
+   "labels": [
+    "priority:P1",
+    "playtest"
+   ],
+   "state": "closed",
+   "body": "Owner feedback: after a slice everything moved on too quickly; mistakes should be obvious, the correct move should be highlighted even on success, and there should be a beat before the next question.\n\nShipped in 051ed5e: `arena.reveal()` freezes the wave, the sliced bubble stays with a ✓ (or ✗ beside the glowing right answer), the card turns green/red and fills the answer into the gap, then a hold (1 s / 1.8 s / 1.5 s) and a gap before the next wave. Sprint stays brisk.",
+   "owner_action": null
+  },
+  {
+   "title": "Long sentences: bubbles overlapped and were too hard even for adults",
+   "labels": [
+    "priority:P1",
+    "playtest"
+   ],
+   "state": "closed",
+   "body": "Shipped in 051ed5e: waves launch in batches sized to the screen width, radius shrinks for 7+ bubbles, the next word of a sequence is always in the first batch. e2e test samples the flight and asserts no overlap.",
+   "owner_action": null
+  },
+  {
+   "title": "Trace Words is far too lenient: tracing 2 of 3 letters passes",
+   "labels": [
+    "priority:P1",
+    "playtest",
+    "tests"
+   ],
+   "body": "Owner feedback: sensitivity is low; sometimes writing only 2 letters of a 3-letter word counts as success.\n\nCause: `Tracer.result()` measures coverage over the whole word mask, so 2/3 of the letters ≈ 66 % ≥ the 60 % pass threshold.\n\nFix: check coverage per letter (each glyph must be ≥ ~70 % covered), keep the outside-the-lines ratio, and add unit tests for `result()` with synthetic strokes (2 of 3 letters must fail).",
+   "key": "trace",
+   "owner_action": "confirm on the phone that 2 of 3 letters now fails and a full careful trace passes"
+  },
+  {
+   "title": "Master Ninja: Sensei guide + unlockable 11th avatar",
+   "labels": [
+    "priority:P1",
+    "art",
+    "routine-ok"
+   ],
+   "body": "Owner supplied the Master Ninja illustration (white hair, all elements) — `public/avatars/sensei.webp`.\n\nRole (owner decision 2026-09-06): both.\n1. **Sensei / guide**: face of *Train with Sensei* (island button + results speech bubble), the first-play tutorial, future Lessons, and the coin shop keeper.\n2. **Playable avatar `master`**: locked until every island's missions are complete (or all topics ≥ 1 star — decide and document); slice trail mixes all elements; praise lines in a calm master voice.\n\nDo not restyle the art.",
+   "owner_action": "approve where Sensei appears (screenshots) and the unlock rule for the playable avatar"
+  },
+  {
+   "title": "Coin shop — close the reward loop (trail skins, bubble skins, island decorations, costumes)",
+   "labels": [
+    "priority:P1",
+    "reward",
+    "art",
+    "owner-input",
+    "routine-ok"
+   ],
+   "body": "Owner: the reward system is insufficient because there is nothing to spend coins on.\n\nScope (owner picked all four, 2026-09-06):\n- **Slice-trail / particle skins** (code-drawn: gold, rainbow, stardust…) — owner approves visuals before they ship\n- **Bubble skins** (cloud / lantern / scroll — old backlog #4) — code-drawn, owner approval\n- **Island decorations** (lanterns, flags, huts on the island screen) — code SVG, owner approval\n- **Costumes** — owner-made art per avatar; Claude wires them in\n\nRoutine may build the shop infrastructure now (`storage.owned/equipped`, shop screen off the rewards screen, prices, equip flow, tests) with one placeholder trail skin; every visual goes to the owner for approval in a screenshot before merge.",
+   "owner_action": "approve every code-drawn skin/decoration from screenshots; supply costume art"
+  },
+  {
+   "title": "Dojo challenges — daily 3 missions with bonus coins and a streak multiplier",
+   "labels": [
+    "priority:P1",
+    "mode",
+    "reward",
+    "routine-ok"
+   ],
+   "body": "Old backlog P8. Three daily missions (one per island, seeded by date), bonus coins on completion, streak multiplier; ties into the existing daily streak. Unit tests for the daily seed and rewards; e2e for the dojo screen.",
+   "owner_action": "playtest the daily loop with the child after it ships"
+  },
+  {
+   "title": "Year 1/2 shape, measurement and statistics topics",
+   "labels": [
+    "priority:P1",
+    "curriculum",
+    "routine-ok"
+   ],
+   "body": "Old backlog #9. Cover the \"Not yet covered\" rows in docs/CURRICULUM.md: Y1/Y2 length/height, mass, capacity, temperature, time (durations, months), position/direction, Y2 statistics (pictograms, tally, block diagrams). Follow `.claude/skills/add-topic`.",
+   "owner_action": null
+  },
+  {
+   "title": "Parent dashboard behind a grown-ups gate",
+   "labels": [
+    "priority:P1",
+    "routine-ok"
+   ],
+   "body": "Old backlog #12. Per-topic accuracy (already recorded as hits/tries), stars, time played, weakest topics, per-mode bests; behind a simple grown-ups gate (e.g. hold 2 s or answer 7 × 8). Read-only, no accounts.",
+   "owner_action": "decide the grown-ups gate style; try the dashboard after it ships"
+  },
+  {
+   "title": "Lessons: progressive, homework-like lessons that stay in game mode",
+   "labels": [
+    "priority:P2",
+    "owner-input",
+    "mode"
+   ],
+   "body": "Owner idea (2026-09-06): keep the game mode but add *Lessons* — a progressive path, a bit like homework. **Not to be built yet** — the owner wants to plan it together over time. Use this issue to collect design notes (curriculum sequencing, what a lesson contains, how it relates to missions/Sensei/Dojo).",
+   "owner_action": "plan the lesson structure together with Claude before any development starts"
+  },
+  {
+   "title": "Y3–Y6 expansion (routine, background): Y3–Y4 first, MTC-style sprint",
+   "labels": [
+    "priority:P2",
+    "curriculum",
+    "routine-ok"
+   ],
+   "body": "Old backlog P12 + #18. Owner: the hourly routine should do this in the background while he focuses on KS1. Follow docs/ROADMAP-PRIMARY.md: Y3–Y4 first (times tables 3–12, MTC-format Sprint), then Y5–Y6. Blocked by {{review-years}} (year ids hard-coded in seven places) — do that first.",
+   "owner_action": "none until Y3–Y4 ship, then a playtest"
+  },
+  {
+   "title": "Island / home-screen art in the illustration style (owner art)",
+   "labels": [
+    "priority:P2",
+    "art",
+    "owner-input"
+   ],
+   "body": "Old backlog #2: 3 floating islands, sky background, Sky Storm banner in the same style as the ninjas. Owner generates; Claude integrates.",
+   "owner_action": "generate the island / sky / banner art in the ninja illustration style"
+  },
+  {
+   "title": "Per-avatar celebration poses (owner art)",
+   "labels": [
+    "priority:P2",
+    "art",
+    "owner-input"
+   ],
+   "body": "Old backlog #3: a happy/victory image per ninja for the stage-clear moment.",
+   "owner_action": "generate one happy/victory image per ninja"
+  },
+  {
+   "title": "Phonics phases order (Little Wandle / Letters and Sounds) for Reception",
+   "labels": [
+    "priority:P2",
+    "curriculum",
+    "routine-ok"
+   ],
+   "body": "Old backlog #11. Sound Hunt already follows phases 2→3→5; align the other Reception phonics topics and the difficulty ramp with the phase order.",
+   "owner_action": null
+  },
+  {
+   "title": "PWA: offline install, home-screen icon, splash",
+   "labels": [
+    "priority:P2",
+    "platform",
+    "routine-ok"
+   ],
+   "body": "Old backlog #13. Manifest, service worker (cache the built assets + avatars), icons. Keep the single-file artifact build working.",
+   "owner_action": null
+  },
+  {
+   "title": "Ninja Duel — two players on one device",
+   "labels": [
+    "priority:P3",
+    "mode"
+   ],
+   "body": "Old backlog P10. Split screen, same question, first correct slice wins the point.",
+   "owner_action": null
+  },
+  {
+   "title": "Certificate PNG on mission complete",
+   "labels": [
+    "priority:P3",
+    "reward"
+   ],
+   "body": "Old backlog P11. Canvas-rendered certificate with name, avatar, island, stars; share/save.",
+   "owner_action": null
+  },
+  {
+   "title": "Landscape layout polish for tablets",
+   "labels": [
+    "priority:P3",
+    "platform"
+   ],
+   "body": "Old backlog #14.",
+   "owner_action": null
+  },
+  {
+   "title": "Haptics on slice (navigator.vibrate)",
+   "labels": [
+    "priority:P3",
+    "platform",
+    "routine-ok"
+   ],
+   "body": "Old backlog #15. Short vibration on hit, longer on wrong; respect a settings toggle.",
+   "owner_action": null
+  },
+  {
+   "title": "Multiple profiles on one device (siblings)",
+   "labels": [
+    "priority:P3",
+    "platform"
+   ],
+   "body": "Old backlog #16.",
+   "owner_action": null
+  },
+  {
+   "title": "Accounts / cloud sync",
+   "labels": [
+    "later"
+   ],
+   "body": "Old backlog #17 — owner: not a priority now.",
+   "owner_action": null
+  },
+  {
+   "title": "Leaderboard — needs accounts",
+   "labels": [
+    "later"
+   ],
+   "body": "Old backlog #19.",
+   "owner_action": null
+  },
+  {
+   "title": "Music / ambient soundtrack",
+   "labels": [
+    "later"
+   ],
+   "body": "Old backlog #20 — owner: low priority.",
+   "owner_action": null
+  },
+  {
+   "title": "Localisation: Turkish UI toggle",
+   "labels": [
+    "later"
+   ],
+   "body": "Old backlog #21.",
+   "owner_action": null
+  },
+  {
+   "title": "Vercel auto-deploy from GitHub",
+   "labels": [
+    "later"
+   ],
+   "body": "Old backlog #22 — owner: not now (2026-09-06 confirmed). The Claude artifact stays the demo.",
+   "owner_action": null
+  },
+  {
+   "title": "review: adding a game mode means editing ~12 ternary chains in 5 files",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P1",
+    "routine-ok"
+   ],
+   "body": "Mode behaviour is scattered as `o.mode === 'endless' ? … : sprint ? … : boss ? …` chains (play.ts:19, 172-176, 181-189; session.ts:40-51, 134, 180-185; storage.ts:11-15, 53-70; home.ts:80-83, 99-102); Memory already had to bypass play.ts.\n\nFix: `src/game/modes.ts` with a `ModeSpec` table (id, title, blurb, hasLives, difficulty(n), speed(n, year), points, stars, coins, medal, headline, record); Session and play.ts read `MODES[o.mode]`; per-mode bests in one `bests: Record<Mode, Record<YearId, number>>`; island buttons rendered from the table. Do before Dojo/Duel.",
+   "owner_action": null
+  },
+  {
+   "title": "review: year ids and per-year assets hard-coded in seven places (blocks Y3–Y6)",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P1",
+    "routine-ok"
+   ],
+   "body": "`'reception' | 'year1' | 'year2'` is retyped in types.ts:37/44, storage.ts:7, home.ts:12, memory.ts:21; island art is CSS by index (.i0/.i1/.i2, grid repeat(3,1fr)); e2e picks tabs by a topic-id regex; the unit guard `Number(q.answer) <= 120` and integer-only `solve()` reject Y3+ answers.\n\nFix: export `YearId`, derive all unions from it; move blurb/art/maxAnswer onto `YearInfo`; `THEMES: Partial<Record<YearId, Theme[]>>` with fallback; island grid from `YEARS.length`; `data-subject` on topic buttons; range guard from `year.maxAnswer`.",
+   "key": "review-years",
+   "owner_action": null
+  },
+  {
+   "title": "review: per-bubble per-frame allocations in drawBubble (gradient + measureText loop)",
+   "labels": [
+    "review",
+    "perf",
+    "priority:P2",
+    "routine-ok"
+   ],
+   "body": "arena.ts drawBubble creates a radial gradient and two colour strings per bubble per frame and runs a `measureText` font-fit loop; with 8–10 word bubbles that is hundreds of measureText calls per frame on a phone.\n\nFix: compute font size once in spawnWave and store it on the Bubble; cache the bubble body as an offscreen sprite keyed `color|round(r)` like `glowSprite`.",
+   "owner_action": null
+  },
+  {
+   "title": "review: shadowBlur in the hot path (electric bolts, stars, tracer strokes)",
+   "labels": [
+    "review",
+    "perf",
+    "priority:P2",
+    "routine-ok"
+   ],
+   "body": "Volt is the default avatar and its bolt particles use shadowBlur=8 on every other pointer move and 8 per burst; Sol's stars use 10; the tracer paints every segment with shadowBlur=10 — the code itself notes shadowBlur is too slow on low-end devices.\n\nFix: replace glows with a second wide low-alpha stroke; drop the shadow in Tracer.paint; cap particles (~250).",
+   "owner_action": null
+  },
+  {
+   "title": "review: three full-screen layers repaint under the arena during play",
+   "labels": [
+    "review",
+    "perf",
+    "priority:P2",
+    "routine-ok"
+   ],
+   "body": "`.bg-play::after` animates 13 radial gradients via background-position (not compositor-accelerated) and `.qcard` uses backdrop-filter blur over the live canvas.\n\nFix: no `drift` animation on `.bg-play`; opaque-ish `.qcard` background without backdrop-filter inside `.play`.",
+   "owner_action": null
+  },
+  {
+   "title": "review: update() allocates per substep and render() runs while paused",
+   "labels": [
+    "review",
+    "perf",
+    "priority:P2",
+    "routine-ok"
+   ],
+   "body": "Up to 6 physics substeps per frame each allocate two filtered arrays (particles, trail); render repaints while paused or with nothing alive.\n\nFix: compact in place once after the substep loop; skip the draw when paused or empty (keep rAF).",
+   "owner_action": null
+  },
+  {
+   "title": "review: e2e runs in real game time (holds, stagger, 150 s mission test, retries: 1)",
+   "labels": [
+    "review",
+    "tests",
+    "priority:P2",
+    "routine-ok"
+   ],
+   "body": "Outcome holds (1–1.8 s), gaps, launch stagger and flight time make a mission test need 150 s and the config keeps `retries: 1` for flakiness.\n\nFix: a `?fast=N` query / `__sna.setSpeed(k)` that divides HOLD, gaps, T and stagger; run e2e at 4×; drop retries to expose real flakes.",
+   "owner_action": null
+  },
+  {
+   "title": "review: physics smuggled through `as any` (_g gravity, Tracer _size)",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P2",
+    "routine-ok"
+   ],
+   "body": "`(bubble as any)._g` hides per-bubble gravity from the Bubble type and the e2e swipe helper depends on it; `Tracer._size` is never read.\n\nFix: add `g: number` to Bubble; delete `_size`.",
+   "owner_action": null
+  },
+  {
+   "title": "review: window.__sna is untyped (`any`) in play.ts, memory.ts and the spec",
+   "labels": [
+    "review",
+    "debt",
+    "tests",
+    "priority:P2",
+    "routine-ok"
+   ],
+   "body": "The e2e contract is `(window as any).__sna` / `interface Window { __sna: any }`, so renaming a hook breaks tests only at runtime.\n\nFix: `src/ui/hooks.ts` with `PlayHooks`/`MemoryHooks` and a global Window declaration; `import type` in the spec.",
+   "owner_action": null
+  },
+  {
+   "title": "review: screen scaffolding duplicated between play.ts and memory.ts (later/toast/cleanup/results modal, esc, SHAPES, coin labels)",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P2",
+    "routine-ok"
+   ],
+   "body": "`later`, `toast`, `cleanup`, sticker map and results-modal markup are copy-pasted; `esc` defined twice; SHAPES2D/3D and the £/p label defined 2–3 times.\n\nFix: `src/ui/screen.ts` (`screenScope()`, `resultsModal()`), import `esc` from dom.ts, move SHAPES/coinLabel into curriculum/util.ts.",
+   "owner_action": null
+  },
+  {
+   "title": "review: play.ts is one 225-line closure with 30 lines over 180 chars",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P2",
+    "routine-ok"
+   ],
+   "body": "Session callbacks mix mode rules, DOM, audio and arena; nested ternaries >250 chars; hoisting oddities (show(), prevLives/drawLives used before declaration). Every future Edit has to reproduce those lines verbatim (token cost).\n\nFix: split into hud.ts (drawLives/Timer/Hp/toast/showOutcome) and overlays.ts (stage clear/results/pause); wrap at ~120 chars; same for home.ts 18/79-83 and style.css 97/222/292.",
+   "owner_action": null
+  },
+  {
+   "title": "review: dead code (Arena.flash, Arena.time, Bubble.scale, dom.wait, totalSlices, yearById)",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P3",
+    "routine-ok"
+   ],
+   "body": "Unused after the outcome-beat change: `Arena.flash()`, `Arena.time`, `Bubble.scale` (always 1), `dom.wait`, `SaveData.totalSlices`, `yearById`. `sensei.webp` is now used by the Master Ninja issue — keep it.\n\nFix: delete them.",
+   "owner_action": null
+  },
+  {
+   "title": "review: save format has a version field but no migration",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P3",
+    "routine-ok"
+   ],
+   "body": "`v: 1` / `sna:v1` are never read; load() shallow-merges DEFAULT with whatever was stored, so shape changes (bests record, Y3+) silently keep stale keys.\n\nFix: `migrate(raw)` switching on `raw.v`, called in load(); unit test with a v1 fixture.",
+   "owner_action": null
+  },
+  {
+   "title": "review: Tracer leaks canvas listeners per question",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P3",
+    "routine-ok"
+   ],
+   "body": "destroy() removes only the window listeners; pointerdown/pointermove on the shared #trace canvas are never removed and a new Tracer is built per question (~30 handler pairs per tracing mission).\n\nFix: remove canvas listeners in destroy(), or one Tracer with setText().",
+   "owner_action": null
+  },
+  {
+   "title": "review: speech cancel()+speak() on every call, per letter",
+   "labels": [
+    "review",
+    "perf",
+    "priority:P3",
+    "routine-ok"
+   ],
+   "body": "say() always cancels then speaks synchronously (drops/stutters on iOS/Android) and onProgress speaks every sliced letter.\n\nFix: cancel only when speaking/pending, defer speak by a tick after cancel, skip per-letter speech (SFX confirms the step) or coalesce on completion.",
+   "owner_action": null
+  },
+  {
+   "title": "review: noise() builds a fresh random AudioBuffer per SFX",
+   "labels": [
+    "review",
+    "perf",
+    "priority:P3",
+    "routine-ok"
+   ],
+   "body": "Each swish/slice allocates and fills a new buffer mid-frame.\n\nFix: one lazily built 0.5 s noise buffer, play sub-ranges with start(when, offset, duration).",
+   "owner_action": null
+  },
+  {
+   "title": "review: biased comparator shuffles despite a Fisher–Yates helper",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P3",
+    "routine-ok"
+   ],
+   "body": "session.ts:83 and arena.ts:80 use `.sort(() => rng() - 0.5)`; curriculum/util.ts exports `shuffle(rng, arr)`.\n\nFix: use `shuffle`.",
+   "owner_action": null
+  },
+  {
+   "title": "review: arena, visuals and tracing have zero unit tests",
+   "labels": [
+    "review",
+    "tests",
+    "priority:P3",
+    "routine-ok"
+   ],
+   "body": "segCircle, spawnWave batch layout, reveal()'s ghost rule, renderVisual string builders and Tracer.result() thresholds are covered only by slow e2e.\n\nFix: extract `layoutWave()` and `segCircle` as pure exports and unit-test them; string-assert renderVisual per Visual.type; unit-test Tracer.result() with synthetic strokes (ties in with the Trace Words bug).",
+   "owner_action": null
+  },
+  {
+   "title": "review: canvas font depends on Google Fonts with no readiness gate",
+   "labels": [
+    "review",
+    "perf",
+    "priority:P3",
+    "routine-ok"
+   ],
+   "body": "Bubble labels use Fredoka from fonts.googleapis.com with no `document.fonts` wait, so the first wave renders in the fallback font and pops mid-flight; the single-file build still needs network for the font.\n\nFix: `await document.fonts.load('800 24px Fredoka')` before the first spawnWave; inline the woff2 in bundle-single.mjs for the artifact build.",
+   "owner_action": null
+  },
+  {
+   "title": "review: `mode` naming collision (Session.Mode vs Topic.mode) and `.storm` class for every mode button",
+   "labels": [
+    "review",
+    "debt",
+    "priority:P3",
+    "routine-ok"
+   ],
+   "body": "Fix: rename `Topic.mode` → `Topic.input: 'bubbles' | 'tracing'`; `.storm` → `.mode-btn` with modifiers driven by the ModeSpec table.",
+   "owner_action": null
+  }
+ ],
+ "owner_action_default": "none expected"
+}
