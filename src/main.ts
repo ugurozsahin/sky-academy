@@ -4,6 +4,7 @@ import { mapScreen, islandScreen, rewardsScreen, type StartPlay } from './ui/hom
 import { playScreen, type PlayOpts } from './ui/play';
 import { memoryScreen } from './ui/memory';
 import { shopScreen } from './ui/shop';
+import { parentsScreen } from './ui/parents';
 import { load } from './storage';
 import type { YearInfo } from './curriculum';
 
@@ -25,12 +26,13 @@ const nav = {
   memory: (y: YearInfo) => { year = y; enter('memory'); memoryScreen({ year: y }, up, () => nav.memory(y)); },
   rewards: () => { enter('rewards'); rewardsScreen(nav); },
   shop: () => { enter('shop'); shopScreen(nav); },
+  parents: () => { enter('parents'); parentsScreen(nav); },
   up,
 };
 window.addEventListener('popstate', () => {
   const s = history.state?.screen as string | undefined;   // the entry we landed on
   fromPop = true;
-  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'play' || s === 'memory' || s === 'shop') { fromPop = false; history.back(); } else nav.map();
+  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'play' || s === 'memory' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else nav.map();
 });
 
 // ?reset=1 clears saved progress (used by tests).

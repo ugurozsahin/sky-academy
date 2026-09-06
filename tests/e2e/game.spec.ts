@@ -659,4 +659,29 @@ test.describe('Sky Ninja Academy', () => {
     expect(await answer(page)).toBe(true);
     await expect.poll(() => page.evaluate(() => window.__sna.state().score)).toBeGreaterThan(0);
   });
+
+  test('For grown-ups: a maths gate opens the read-only parent dashboard (#9)', async ({ page }) => {
+    await pickAvatar(page, 'volt', 'Ada');
+    await page.click('#grownups');
+    await expect(page.locator('.parents .gate')).toBeVisible();
+
+    // a wrong answer keeps the gate closed and warns the grown-up
+    await page.fill('#gate-input', '1');
+    await page.click('#gate-go');
+    await expect(page.locator('#gate-msg')).toBeVisible();
+    await expect(page.locator('.parents-dash')).toHaveCount(0);
+
+    // the correct product opens the dashboard
+    const q = await page.locator('#gate-q').textContent();          // e.g. "6 × 8"
+    const [a, b] = q!.split('×').map(s => parseInt(s.trim(), 10));
+    await page.fill('#gate-input', String(a * b));
+    await page.click('#gate-go');
+    await expect(page.locator('.parents-dash')).toBeVisible();
+    await expect(page.locator('.p-stats div')).toHaveCount(4);       // overall stat tiles
+    await expect(page.locator('.p-table tbody tr')).toHaveCount(3);  // one row per island
+
+    // back returns to the sky map
+    await page.click('#back');
+    await expect(page.locator('.map')).toBeVisible();
+  });
 });
