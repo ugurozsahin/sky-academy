@@ -58,6 +58,6 @@ Append one dated entry per run (newest at the bottom). Keep entries short: what 
 - Next #15 done: **Haptics** — `haptic(kind)` in `audio.ts` with patterns for slice / correct / wrong / life / stage, gated by the sound toggle, never throws; wired to swipe hits, wrong slices, lost lives and stage clears.
 - e2e fixes: the full-mission test now adds today's dojo bonus to the expected coin total (bonuses ≤ 55 so the sticker count stays 3); `waitForWrongOrEnd` waits for a real decoy in flight — at Q6 of Sky Storm only the target and the TNT bubble may be launched, and `wrong()` refuses the bomb (failed twice in the full run before the fix, 2/2 after).
 - Tests: unit 248/248 (+6 dojo, +2 certificate, +1 haptics), tsc clean; e2e mobile full run 19/21 before the two test fixes, then the affected tests (full mission, Storm, Dojo) 6/6 with `--repeat-each 2`, full mission again 1/1 with the certificate, play-path smoke after haptics (see commit). Desktop e2e not run (time).
-- Commits: e1a7b9b (Daily Dojo), cf2d748 (certificate), haptics — main.
+- Commits: e1a7b9b (Daily Dojo), cf2d748 (certificate), 33d84d1 (haptics + worklog) — main.
 - Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins, P9 costumes (art).
 - Next: P10 Ninja Duel (two-player split screen — sketch: two `Arena`s stacked on one canvas or two canvases, same question, first correct slice wins the point, best of 10; needs a duel HUD and a pure `Duel` scorer) — a full run's worth; alternatives if time is short: Next #9 (Y1/Y2 shape, measurement, statistics topics), #13 PWA.
