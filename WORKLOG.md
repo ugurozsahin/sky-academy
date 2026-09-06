@@ -29,6 +29,7 @@ Append one dated entry per run (newest at the bottom). Keep entries short: what 
 - Fixed a fragile unit test: endless-session test sliced `answer` for sequence questions (Order Up), silently losing lives before the deliberate wrong slices; it now slices sequences letter by letter and asserts full lives first.
 - Docs: `docs/CURRICULUM.md` lists the three topics.
 - e2e robustness: the random-pool tests (Sky Storm, Sprint, Boss) sliced `answer` once per question, which hangs on an Order Up / spelling sequence and, when the headless renderer stalls and a wave is missed, the "3 wrong slices" loop waited on a game that had already ended (seen once here: stuck at Q6 "Is it raining_"). New `solveCurrent()` / `waitForWrongOrEnd()` helpers slice sequences letter by letter and stop when the game ends.
+- Commit: c54d6db (main).
 - Tests: unit 209/209, tsc clean, e2e mobile: full run 14/16 before the e2e fixes (both failures analysed above), then the 4 touched tests 8/8 with `--repeat-each 2`. Desktop e2e not run (time).
 - Skipped (owner input): #1 playtest, #2/#3 owner art, #4 bubble skins.
 - Next: P4 Memory Match (non-slice card mode; needs a new screen, no owner input) or Next #9 (Y1/Y2 measurement & statistics topics).
