@@ -358,12 +358,15 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#train small')).toContainText('sessions 0');
     await page.click('#train');
     await expect(page.locator('.play')).toBeVisible();
-    await expect(page.locator('#stage')).toContainText('Apprentice · 1/6');            // mission rules: stages and lives
+    await expect(page.locator('#stage .sname')).toHaveText('Apprentice');            // mission rules: stages and lives
+    await expect(page.locator('#stage .segs i')).toHaveCount(6); await expect(page.locator('#stage .q')).toHaveText('1/6');   // progress bar (#55)
+    await expect(page.locator('#stage .segs i.cur')).toHaveCount(1);
     await expect(page.locator('#lives span')).toHaveCount(3);
     await page.waitForFunction(() => window.__sna?.state().prompt);
     const first = await page.evaluate(() => window.__sna.session.currentTopic.title as string);
     await expect(page.locator('.ttl')).toHaveText(new RegExp(first));
     await solveCurrent(page);
+    await expect(page.locator('#stage .segs i.good')).toHaveCount(1);              // the answered question turned green
     await expect.poll(() => page.evaluate(() => window.__sna.state().score)).toBeGreaterThan(0);
     const pool = await page.evaluate(() => window.__sna.session.o.pool.map((t: any) => t.id));
     expect(pool).toHaveLength(3);

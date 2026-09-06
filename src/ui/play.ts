@@ -51,6 +51,15 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
   const HOLD = sprint ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 };
   let waveId = 0; let revealUntil = 0;
+  // Mission progress (#55): stage name + one segment per question (green = right, red = slip, pulsing = current) + a small "3/6".
+  let segStage = 0; let segs: ('good' | 'bad' | '')[] = [];
+  function drawStage(stage: number, index: number, total: number) {
+    if (o.mode !== 'mission') { els.stage.textContent = `Q${session.questionsAsked}`; return; }
+    if (stage !== segStage) { segStage = stage; segs = Array.from({ length: total }, () => ''); }
+    const name = STAGE_NAMES[stage - 1] ?? `Stage ${stage}`;
+    els.stage.innerHTML = `<span class="sname">${esc(name)}</span><span class="segs" role="progressbar" aria-label="${esc(name)}: question ${index + 1} of ${total}" aria-valuenow="${index + 1}" aria-valuemin="1" aria-valuemax="${total}">${segs.map((k, i) => `<i class="${k}${i === index ? ' cur' : ''}"></i>`).join('')}</span><small class="q" aria-hidden="true">${index + 1}/${total}</small>`;
+  }
+  const markSeg = (k: 'good' | 'bad') => { if (o.mode === 'mission') { segs[session.index] = k; drawStage(session.stage, session.index, session.perStage); } };
   const endWave = (hold: number) => { const id = waveId; revealUntil = performance.now() + hold; later(() => { if (waveId === id) arena?.clearWave('#ffffff'); }, hold); };
   function showOutcome(kind: 'correct' | 'wrong' | 'miss', q: Question) {
     els.qcard.classList.remove('good', 'bad'); els.qcard.classList.add(kind === 'correct' ? 'good' : 'bad');
@@ -63,7 +72,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       // If a miss is still being shown (the answer fell and the session moved on at once), let the child see it before the next question.
       const wait = Math.max(0, revealUntil - performance.now()); if (wait > 0) { later(() => show(), wait + 450); return; } show();
       function show() {
-      els.stage.textContent = o.mode !== 'mission' ? `Q${session.questionsAsked}` : `${STAGE_NAMES[info.stage - 1] ?? 'Stage ' + info.stage} · ${info.index + 1}/${info.total}`;
+      drawStage(info.stage, info.index, info.total);
       if (training && session.currentTopic) $('.ttl').textContent = `${session.currentTopic.icon} ${session.currentTopic.title}`;   // Sensei: name the topic of each question
       els.prompt.innerHTML = q.listen && !load().speech ? esc(q.listen) : promptHTML(q, session.seqIndex); els.vis.innerHTML = renderVisual(q.visual); els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
       lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
@@ -75,19 +84,19 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       }
     },
     onCorrect(q, points, combo) {
-      lastOutcome = 'correct'; sfx.correct(); els.score.textContent = String(session.score);
+      lastOutcome = 'correct'; sfx.correct(); els.score.textContent = String(session.score); markSeg('good');
       const c = cheerLine(av); toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', HOLD.correct + 300);
       if (arena) { arena.reveal({ good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer }); arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, av.glow); showOutcome('correct', q); endWave(HOLD.correct); }
       else later(() => session.advance(), 900);
     },
     onWrong(q, hit) {
-      lastOutcome = 'wrong'; sfx.wrong(); haptic('wrong');
+      lastOutcome = 'wrong'; sfx.wrong(); haptic('wrong'); markSeg('bad');
       toast('Not quite!', 'bad', HOLD.wrong); showTaunt();
       if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer, bad: hit }); showOutcome('wrong', q); endWave(HOLD.wrong); }
       else later(() => session.advance(), 1200);
     },
     onMiss(q) {
-      lastOutcome = 'miss'; sfx.miss(); toast('Missed!', 'bad', HOLD.miss); showTaunt();
+      lastOutcome = 'miss'; sfx.miss(); toast('Missed!', 'bad', HOLD.miss); showTaunt(); markSeg('bad');
       if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer }); showOutcome('miss', q); endWave(HOLD.miss); }
     },
     onProgress(label, done, total) { sfx.slice(); els.prompt.innerHTML = promptHTML(session.current!, done); if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow); if (done < total) say(label, false); },

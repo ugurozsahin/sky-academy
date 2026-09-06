@@ -208,6 +208,14 @@ img { -webkit-user-drag: none; }
 .qhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .qhead .ttl { color: var(--muted); font-weight: 700; font-size: 13px; flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qhead .speak { width: 38px; height: 38px; font-size: 18px; }
+/* mission progress pill (#55): stage name · segments · 3/6 */
+#stage { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 9px; white-space: nowrap; }
+#stage .segs { display: inline-flex; gap: 3px; } #stage .segs i { display: block; width: 10px; height: 8px; border-radius: 3px; background: #ffffff2e; transition: background .25s; }
+#stage .segs i.good { background: var(--good); box-shadow: 0 0 6px #66e07d88; } #stage .segs i.bad { background: var(--bad); }
+#stage .segs i.cur { background: var(--accent); animation: segpulse 1s ease-in-out infinite; } #stage .segs i.cur.good { background: var(--good); animation: none; } #stage .segs i.cur.bad { background: var(--bad); animation: none; }
+@keyframes segpulse { 50% { transform: scaleY(1.5); opacity: .7; } }
+#stage .q { font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+@media (max-width: 400px) { #stage .sname { display: none; } #stage { padding-left: 8px; } #stage .segs i { width: 8px; } #stage .segs { gap: 2px; } }   /* phones: the title needs the room; the name stays in the aria-label */
 .prompt { font-size: clamp(28px, 7vw, 44px); font-weight: 700; margin: 4px 0 2px; text-shadow: 0 2px 0 #0008; letter-spacing: .02em; }
 .prompt .seq span { display: inline-block; min-width: .8em; margin: 0 .06em; border-bottom: 3px solid #ffffff55; }
 .prompt .seq .got { color: var(--good); border-color: var(--good); }
@@ -307,7 +315,7 @@ img { -webkit-user-drag: none; }
 .statgrid div { background: #ffffff10; border-radius: 14px; padding: 10px 4px; } .statgrid b { display: block; font-size: 22px; } .statgrid small { color: var(--muted); font-weight: 600; }
 .confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: 26px; }
 .confetti i { position: absolute; top: -12px; left: calc(var(--x) * 1%); width: 8px; height: 14px; background: var(--c); border-radius: 2px; animation: conf var(--d) calc(var(--i) * -.13s) linear infinite; opacity: .9; }
-@media (prefers-reduced-motion: reduce) { .confetti i, .hero-big img, .isl-art, .bg-sky::after, .bg-play::after, .villain img, .results .ko img, .timer { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .confetti i, .hero-big img, .isl-art, .bg-sky::after, .bg-play::after, .villain img, .results .ko img, .timer, #stage .segs i.cur { animation: none; } }
 @keyframes conf { to { transform: translateY(520px) rotate(720deg); } }
 
 @media (min-width: 720px) {
