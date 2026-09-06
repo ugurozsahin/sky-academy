@@ -135,7 +135,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       else if (tracer!.strokes >= 1 && r.outside > 0.6) toast('Stay on the dotted lines', 'bad');
     }, av.glow);
     $('#tclear').onclick = () => { sfx.tap(); tracer?.clear(); };
-    $('#tcheck').onclick = () => { const r = tracer!.result(); if (r.pass) { sfx.correct(); session.hit(q.answer); } else { toast(r.coverage < 0.6 ? 'Keep tracing — cover the whole letter' : 'Stay on the dotted lines', 'bad'); } };
+    $('#tcheck').onclick = () => {
+      const r = tracer!.result(); if (r.pass) { sfx.correct(); session.hit(q.answer); return; }
+      const missing = r.glyphs.filter(g => g < 0.55).length;   // name the letter the child skipped
+      toast(r.outside > 0.45 ? 'Stay on the dotted lines' : q.answer.length > 1 && missing ? `Trace the "${[...q.answer][r.weakest]}" too — every letter!` : 'Keep tracing — cover the whole letter', 'bad');
+    };
   }
   /** First-play demo: show the animated hand over the arena; returns how long to hold the first wave (ms). */
   function showTutorial(): number {

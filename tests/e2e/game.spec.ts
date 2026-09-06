@@ -186,7 +186,7 @@ test.describe('Sky Ninja Academy', () => {
     const words = sentence.split(' ');
     await expect(page.locator('.vis.sentence')).toHaveText(sentence);
     await expect(page.locator('.prompt .seq span')).toHaveCount(words.length);
-    await page.waitForFunction(() => window.__sna.bubbles().length > 0);
+    await waitForWrongOrEnd(page);                                                     // a decoy must be in the air, not just the first word
     expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);           // a word out of order is a slip
     await expect(page.locator('.toast.bad')).toContainText('it was');
     await page.waitForFunction(() => window.__sna.state().index === 1);
@@ -255,6 +255,21 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#tcheck');
     await expect(page.locator('.toast.bad')).toBeVisible();          // nothing traced yet
     expect(await answer(page)).toBe(true);                            // auto-trace
+    await expect(page.locator('.toast.good')).toBeVisible();
+    await page.waitForFunction(() => window.__sna.state().index === 1);
+  });
+
+  test('word tracing: 2 of 3 letters is not enough, every letter must be covered', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'year2', 'y2-trace');
+    const word = (await state(page)).answer as string;
+    expect(word.length).toBeGreaterThanOrEqual(2);
+    await page.evaluate((n) => window.__sna.tracer.autoTrace([...Array(n).keys()]), word.length - 1);   // every letter but the last
+    const r = await page.evaluate(() => window.__sna.tracer.result());
+    expect(r.coverage).toBeGreaterThan(0.3); expect(r.pass).toBe(false);
+    await page.click('#tcheck');
+    await expect(page.locator('.toast.bad')).toContainText('every letter');
+    await page.evaluate(() => window.__sna.tracer.autoTrace());                // the rest
     await expect(page.locator('.toast.good')).toBeVisible();
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });

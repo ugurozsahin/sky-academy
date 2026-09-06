@@ -1,9 +1,20 @@
 // Letter / word tracing: the child paints over a faint glyph; we measure how much of it they covered.
-export interface TraceResult { coverage: number; outside: number; pass: boolean }
+export interface TraceResult { coverage: number; outside: number; pass: boolean; glyphs: number[] /* coverage per letter */; weakest: number /* index of the least-covered letter */ }
+/** Pass rule (pure, unit-tested): every letter must be mostly covered — tracing 2 of 3 letters is not a word. */
+export const GLYPH_MIN = 0.55, WORD_MIN = 0.65, OUTSIDE_MAX = 0.45;
+export function scoreTrace(glyphHits: number[], glyphTotals: number[], insidePts: number, outsidePts: number): TraceResult {
+  const glyphs = glyphTotals.map((t, i) => (t ? glyphHits[i] / t : 1));
+  const total = glyphTotals.reduce((a, b) => a + b, 0), hits = glyphHits.reduce((a, b) => a + b, 0);
+  const coverage = total ? hits / total : 0;
+  const pts = insidePts + outsidePts; const outside = pts ? outsidePts / pts : 0;
+  let weakest = 0; glyphs.forEach((g, i) => { if (g < glyphs[weakest]) weakest = i; });
+  return { coverage, outside, glyphs, weakest, pass: coverage >= WORD_MIN && outside <= OUTSIDE_MAX && glyphs.every(g => g >= GLYPH_MIN) };
+}
 
 export class Tracer {
   private ctx: CanvasRenderingContext2D;
-  private mask!: Uint8Array; private covered!: Uint8Array; private mw = 0; private mh = 0; private total = 0; private hits = 0; private outsidePts = 0; private insidePts = 0;
+  private mask!: Uint8Array; private covered!: Uint8Array; private mw = 0; private mh = 0; private outsidePts = 0; private insidePts = 0;
+  private glyphHits: number[] = []; private glyphTotals: number[] = [];   // mask[i] = letter index + 1
   private drawing = false; private last: { x: number; y: number } | null = null; private W = 0; private H = 0; private brush = 14;
   strokes = 0; done = false;
   constructor(public canvas: HTMLCanvasElement, public text: string, private onProgress: (r: TraceResult) => void, public color = '#7fe0ff') {
@@ -12,7 +23,7 @@ export class Tracer {
     canvas.addEventListener('pointerdown', this.down); canvas.addEventListener('pointermove', this.move);
     window.addEventListener('pointerup', this.up); window.addEventListener('pointercancel', this.up);
   }
-  destroy() { window.removeEventListener('pointerup', this.up); window.removeEventListener('pointercancel', this.up); }
+  destroy() { this.canvas.removeEventListener('pointerdown', this.down); this.canvas.removeEventListener('pointermove', this.move); window.removeEventListener('pointerup', this.up); window.removeEventListener('pointercancel', this.up); }
   private font(size: number) { return `700 ${size}px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif`; }
   setup() {
     const rect = this.canvas.getBoundingClientRect();
@@ -27,14 +38,19 @@ export class Tracer {
     // build mask at half resolution
     const s = 0.5; this.mw = Math.ceil(this.W * s); this.mh = Math.ceil(this.H * s);
     const off = document.createElement('canvas'); off.width = this.mw; off.height = this.mh;
-    const oc = off.getContext('2d')!; oc.fillStyle = '#000'; oc.font = this.font(size * s); oc.textAlign = 'center'; oc.textBaseline = 'middle';
-    oc.fillText(this.text, this.mw / 2, this.mh / 2 + size * s * 0.05);
-    const data = oc.getImageData(0, 0, this.mw, this.mh).data;
-    this.mask = new Uint8Array(this.mw * this.mh); this.covered = new Uint8Array(this.mw * this.mh); this.total = 0;
-    for (let i = 0; i < this.mask.length; i++) if (data[i * 4 + 3] > 100) { this.mask[i] = 1; this.total++; }
-    this.hits = 0; this.outsidePts = 0; this.insidePts = 0; this.strokes = 0; this.done = false;
+    const oc = off.getContext('2d')!; oc.fillStyle = '#000'; oc.font = this.font(size * s); oc.textAlign = 'left'; oc.textBaseline = 'middle';
+    // one letter at a time, so coverage is judged per letter (mask value = letter index + 1)
+    const chars = [...this.text]; const left = this.mw / 2 - oc.measureText(this.text).width / 2, y = this.mh / 2 + size * s * 0.05;
+    this.mask = new Uint8Array(this.mw * this.mh); this.covered = new Uint8Array(this.mw * this.mh);
+    this.glyphHits = chars.map(() => 0); this.glyphTotals = chars.map(() => 0);
+    chars.forEach((ch, gi) => {
+      if (ch === ' ') return;
+      oc.clearRect(0, 0, this.mw, this.mh); oc.fillText(ch, left + oc.measureText(this.text.slice(0, gi)).width, y);
+      const data = oc.getImageData(0, 0, this.mw, this.mh).data;
+      for (let i = 0; i < this.mask.length; i++) if (data[i * 4 + 3] > 100 && !this.mask[i]) { this.mask[i] = gi + 1; this.glyphTotals[gi]++; }
+    });
+    this.outsidePts = 0; this.insidePts = 0; this.strokes = 0; this.done = false;
     this.redraw(size);
-    (this as any)._size = size;
   }
   private redraw(size: number) {
     const c = this.ctx; c.clearRect(0, 0, this.W, this.H);
@@ -63,19 +79,14 @@ export class Tracer {
     for (let dy = -tol; dy <= tol; dy++) for (let dx = -tol; dx <= tol; dx++) {
       const px = cx + dx, py = cy + dy; if (px < 0 || py < 0 || px >= this.mw || py >= this.mh) continue;
       const i = py * this.mw + px;
-      if (this.mask[i]) { inside = true; if (dx * dx + dy * dy <= r * r * 1.2 && !this.covered[i]) { this.covered[i] = 1; this.hits++; } }
+      if (this.mask[i]) { inside = true; if (dx * dx + dy * dy <= r * r * 1.2 && !this.covered[i]) { this.covered[i] = 1; this.glyphHits[this.mask[i] - 1]++; } }
     }
     if (inside) this.insidePts++; else this.outsidePts++;
   }
-  result(): TraceResult {
-    const coverage = this.total ? this.hits / this.total : 0;
-    const pts = this.insidePts + this.outsidePts;
-    const outside = pts ? this.outsidePts / pts : 0;
-    return { coverage, outside, pass: coverage >= 0.6 && outside <= 0.45 };
-  }
-  /** Test hook: trace the glyph programmatically by painting over every mask pixel. */
-  autoTrace() {
-    for (let y = 0; y < this.mh; y += 2) for (let x = 0; x < this.mw; x += 2) if (this.mask[y * this.mw + x]) this.mark(x / 0.5, y / 0.5);
+  result(): TraceResult { return scoreTrace(this.glyphHits, this.glyphTotals, this.insidePts, this.outsidePts); }
+  /** Test hook: trace the glyph programmatically by painting over every mask pixel (optionally only some letters). */
+  autoTrace(letters?: number[]) {
+    for (let y = 0; y < this.mh; y += 2) for (let x = 0; x < this.mw; x += 2) { const g = this.mask[y * this.mw + x]; if (g && (!letters || letters.includes(g - 1))) this.mark(x / 0.5, y / 0.5); }
     this.strokes++; const r = this.result(); if (r.pass) this.done = true; this.onProgress(r);
   }
 }
