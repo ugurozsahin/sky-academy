@@ -23,3 +23,4 @@ Vite + vanilla TypeScript (no framework), canvas arena, DOM HUD, localStorage. V
 - Backlog lives in `BACKLOG.md` — the owner prioritises it; don't reorder it yourself.
 - Env note: on the Mac-side Linux VM used by scheduled runs, Playwright browsers cannot be downloaded (network allowlist) — run unit tests + tsc there; e2e runs in cloud sessions.
 - Git remote: github.com/ugurozsahin/sky-academy (branch main). Hourly routine clones it in the cloud and pushes to main; after it runs, refresh this folder with `git pull --ff-only`.
+- Never delete or unset `.git/github-credentials` / `credential.helper store --file=.git/github-credentials` in the owner's Mac folder — it is the owner's token file that lets Claude sessions pull/push from the Mac-side VM.

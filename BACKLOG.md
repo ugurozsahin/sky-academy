@@ -51,6 +51,7 @@ Status: `todo` · `doing` · `done` · `later`
 | 19 | Leaderboard — needs accounts | later |
 | 20 | Music / ambient soundtrack (owner: low priority) | later |
 | 21 | Localisation (Turkish UI toggle) | later |
+| 22 | Vercel auto-deploy from GitHub (live URL on every push to main; the Claude artifact then becomes a demo only) — owner: not now | later |
 
 ## Done
 | Item | Version |
