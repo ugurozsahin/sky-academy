@@ -1,9 +1,10 @@
 // Mission / endless session controller. Pure game logic (no DOM) so it can be unit-tested.
 import type { Difficulty, Question, Topic, YearInfo } from '../curriculum';
+import { MODES, type Mode, type ModeCtx, type ModeSpec } from './modes';
 
 // mission = 5 staged waves with lives · endless = Sky Storm, ramps until lives run out · sprint = 60-second time attack, no lives
 // boss = Boss Battle: every correct slice hits Hammer Man, every slip heals him; KO him before your lives run out
-export type Mode = 'mission' | 'endless' | 'sprint' | 'boss';
+export type { Mode } from './modes';   // the mode names live in modes.ts alongside their behaviour table (#26)
 export const SPRINT_SECONDS = 60;
 export const BOSS_HP = 8;
 export interface SessionEvents {
@@ -31,35 +32,26 @@ export class Session {
   private rng: () => number; readonly stages: number;
   constructor(public o: SessionOpts, private ev: SessionEvents) {
     this.lives = o.year.lives; this.rng = o.rng ?? Math.random; this.stages = o.stages ?? o.year.speeds.length;
-    this.timeLeft = o.mode === 'sprint' ? (o.seconds ?? SPRINT_SECONDS) * 1000 : 0;
-    this.bossMax = o.mode === 'boss' ? (o.bossHp ?? BOSS_HP) : 0; this.bossHp = this.bossMax;
+    this.timeLeft = this.spec.timed ? (o.seconds ?? SPRINT_SECONDS) * 1000 : 0;
+    this.bossMax = this.spec.boss ? (o.bossHp ?? BOSS_HP) : 0; this.bossHp = this.bossMax;
   }
+  /** The behaviour table entry for this run's mode (#26). */
+  get spec(): ModeSpec { return MODES[this.o.mode]; }
+  private get ctx(): ModeCtx { return { year: this.o.year, stage: this.stage, questionsAsked: this.questionsAsked, sequence: !!this.current?.sequence, enraged: this.enraged }; }
   get perStage() { return this.o.year.perStage; }
   get secondsLeft() { return Math.ceil(this.timeLeft / 1000); }
-  get difficulty(): Difficulty {
-    if (this.o.mode === 'mission') return this.o.year.diffs[Math.min(this.stage, this.o.year.diffs.length) - 1] ?? 3;
-    if (this.o.mode === 'sprint') return this.questionsAsked < 5 ? 1 : this.questionsAsked < 12 ? 2 : 3;
-    if (this.o.mode === 'boss') return this.questionsAsked < 4 ? 1 : this.questionsAsked < 9 ? 2 : 3;
-    return this.questionsAsked < 8 ? 1 : this.questionsAsked < 20 ? 2 : 3;
-  }
-  get speed() {
-    const gentle = this.o.year.gentle;
-    if (this.o.mode === 'mission') { const s = this.o.year.speeds[Math.min(this.stage, this.o.year.speeds.length) - 1] ?? 3; return this.current?.sequence ? Math.max(1, s - 1) : s; }
-    if (this.o.mode === 'sprint') { const s = this.o.year.speeds[1] ?? 2; return this.current?.sequence ? Math.max(1, s - 1) : s; }   // steady pace: the clock is the pressure
-    if (this.o.mode === 'boss') { const s = this.o.year.speeds[this.enraged ? 2 : 1] ?? 2; return this.current?.sequence ? Math.max(1, s - 1) : s; }
-    const s = this.questionsAsked < 10 ? 1 : this.questionsAsked < 25 ? 2 : 3;
-    return gentle ? Math.min(2, s) : s;
-  }
+  get difficulty(): Difficulty { return this.spec.difficulty(this.ctx); }
+  get speed() { return this.spec.speed(this.ctx); }
   /** Boss with 3 HP or fewer fights faster. */
-  get enraged() { return this.o.mode === 'boss' && this.bossHp > 0 && this.bossHp <= 3; }
+  get enraged() { return this.spec.boss && this.bossHp > 0 && this.bossHp <= 3; }
   /** A slip lets the boss recover one HP (never above max). */
   private bossHeal() {
-    if (this.o.mode !== 'boss' || this.ended) return;
+    if (!this.spec.boss || this.ended) return;
     this.bossHp = Math.min(this.bossMax, this.bossHp + 1); this.ev.onBoss?.(this.bossHp, this.bossMax, 'heal');
   }
   /** Sprint clock: advance by `ms`. Emits onTime when the displayed second changes; ends the run at zero. */
   tick(ms: number) {
-    if (this.o.mode !== 'sprint' || this.ended || ms <= 0) return;
+    if (!this.spec.timed || this.ended || ms <= 0) return;
     const before = this.secondsLeft;
     this.timeLeft = Math.max(0, this.timeLeft - ms);
     if (this.secondsLeft !== before) this.ev.onTime?.(this.secondsLeft);
@@ -131,11 +123,11 @@ export class Session {
     const q = this.current!; this.waiting = true;
     this.attempts++; this.correct++; this.stageAttempts++; this.stageCorrect++; this.tally(true);
     this.combo++; this.bestCombo = Math.max(this.bestCombo, this.combo);
-    const base = this.o.mode === 'mission' ? 10 * this.stage : this.o.mode === 'sprint' ? 10 : 10 + Math.min(20, Math.floor(this.questionsAsked / 5) * 5);
+    const base = this.spec.basePoints(this.ctx);
     const points = base + (this.combo >= 3 ? Math.min(20, this.combo * 2) : 0);
     this.score += points;
     this.ev.onCorrect(q, points, this.combo);
-    if (this.o.mode === 'boss') { this.bossHp = Math.max(0, this.bossHp - 1); this.ev.onBoss?.(this.bossHp, this.bossMax, 'hit'); if (this.bossHp === 0) this.end(true); }
+    if (this.spec.boss) { this.bossHp = Math.max(0, this.bossHp - 1); this.ev.onBoss?.(this.bossHp, this.bossMax, 'hit'); if (this.bossHp === 0) this.end(true); }
   }
   private markWrong(label: string) {
     const q = this.current!; this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false);
@@ -147,14 +139,14 @@ export class Session {
     const t = this.byTopic[id] ??= { hits: 0, tries: 0 }; t.tries++; if (hit) t.hits++;
   }
   private loseLife() {
-    if (this.o.mode === 'sprint') return;               // no lives in a sprint: a slip only costs time
+    if (!this.spec.hasLives) return;                    // no lives in a sprint: a slip only costs time
     this.lives = Math.max(0, this.lives - 1); this.ev.onLives(this.lives);
     if (this.lives === 0) this.end(false);
   }
   /** Called by the UI after feedback delay to move on. */
   advance() {
     if (this.ended) return;
-    if (this.o.mode !== 'mission') { this.nextQuestion(); return; }
+    if (!this.spec.staged) { this.nextQuestion(); return; }
     this.index++;
     if (this.index >= this.perStage) {
       const acc = this.stageAttempts ? this.stageCorrect / this.stageAttempts : 0;
@@ -177,12 +169,10 @@ export class Session {
     this.ended = true;
     const total = this.stageStars.reduce((s, x) => s + x, 0);
     const acc = this.attempts ? this.correct / this.attempts : 0;
-    const stars = this.o.mode === 'mission' ? (won ? Math.max(1, Math.round(total / this.stages)) : 0)
-      : this.o.mode === 'sprint' ? (this.correct >= 12 ? 3 : this.correct >= 6 ? 2 : this.correct >= 1 ? 1 : 0)
-      : this.o.mode === 'boss' ? (won ? (acc >= 0.9 ? 3 : acc >= 0.7 ? 2 : 1) : 0)
-      : (this.score >= 300 ? 3 : this.score >= 150 ? 2 : this.score >= 50 ? 1 : 0);
-    // Ninja coins: 1 per correct answer, +5 per stage star, +20 for a completed mission, endless: score/10, sprint: +5 per star, boss: +5 per star +20 for the KO
-    const coins = this.correct + total * 5 + (won && this.o.mode !== 'endless' && this.o.mode !== 'sprint' ? 20 : 0) + (this.o.mode === 'endless' ? Math.floor(this.score / 10) : 0) + (this.o.mode === 'sprint' || this.o.mode === 'boss' ? stars * 5 : 0);
+    // End-stars and coins come from the mode's own rules in modes.ts (coins reads back the stars just computed).
+    const end = { won, score: this.score, correct: this.correct, accuracy: acc, stageStarsTotal: total, stages: this.stages, stars: 0 };
+    const stars = this.spec.stars(end);
+    const coins = this.spec.coins({ ...end, stars });
     this.ev.onEnd({ mode: this.o.mode, won, score: this.score, stars, stageStars: this.stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins });
   }
 }

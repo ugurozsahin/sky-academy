@@ -98,6 +98,19 @@ describe('guard rails', () => {
     expect(hits).toEqual(['/src/curriculum/types.ts']);
   });
 
+  // Incident 2026-09-06 (#26): per-mode behaviour was scattered as `o.mode === 'endless' ? … : sprint ? …`
+  // ternary chains across session.ts, play.ts, storage.ts and home.ts, so adding a mode meant editing ~12
+  // places. Difficulty/speed/points/stars/coins/lives now live in one MODES table (game/modes.ts) that the
+  // session reads via `this.spec`. The core-loop file must not compare `o.mode` to a mode literal again.
+  // (The UI/storage still carry a few presentation/persistence branches — tracked as the #26 follow-up.)
+  it('session behaviour comes from the MODES table, not mode-literal ternaries', () => {
+    const session = code(SOURCES['/src/game/session.ts']);
+    const modeLiterals = [...session.matchAll(/\bmode\s*[=!]==\s*'(mission|endless|sprint|boss)'/g)].map(m => m[0]);
+    expect(modeLiterals).toEqual([]);
+    const modes = code(SOURCES['/src/game/modes.ts']);
+    for (const m of ['mission', 'endless', 'sprint', 'boss']) expect(modes, `MODES has ${m}`).toContain(`${m}: {`);
+  });
+
   // Incident 2026-09-06: a review found `Tracer.destroy()` removing only the window listeners, so every
   // question stacked another pair on the shared canvas (#39). Anything that adds a listener must remove it.
   it('every addEventListener in src/game has a matching removeEventListener', () => {

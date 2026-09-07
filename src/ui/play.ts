@@ -2,6 +2,7 @@ import { AVATARS, avatarById, cheerLine, praiseLine, SENSEI, SENSEI_LINES, sense
 import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
 import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
+import { MODES } from '../game/modes';
 import { Tracer } from '../game/tracing';
 import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak, wallet } from '../storage';
 import { equippedItem } from '../game/shop';
@@ -18,9 +19,10 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   const d = load(); const av = avatarById(d.avatar);
   const skin = equippedItem(wallet(), 'trail')?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
   const tracing = o.topic?.mode === 'tracing';
-  const sprint = o.mode === 'sprint'; const boss = o.mode === 'boss'; const training = o.mode === 'mission' && !!o.pool;
-  const villainMode = o.mode === 'endless' || boss;     // Hammer Man on screen, TNT bubbles in the mix
-  const title = o.mode === 'endless' ? 'Sky Storm' : sprint ? 'Ninja Sprint' : boss ? 'Boss Battle' : training ? 'Sensei Training' : o.topic!.title;
+  const spec = MODES[o.mode];
+  const sprint = spec.timed; const boss = spec.boss; const training = spec.staged && !!o.pool;
+  const villainMode = spec.villain;                     // Hammer Man on screen, TNT bubbles in the mix
+  const title = spec.staged ? (training ? 'Sensei Training' : o.topic!.title) : spec.title;
   render(`
   <section class="screen play ${tracing ? 'tracing' : ''}" style="--glow:${av.glow}">
     ${tracing ? '' : '<canvas id="arena" aria-label="Game arena"></canvas>'}
@@ -200,6 +202,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), 600);
     const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉') : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪') : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
     const headline = training ? senseiLine(r.won, d.name) : r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
+    const rspec = MODES[r.mode];   // results heading from the mode table (mission distinguishes a Sensei-training win)
+    const heading = rspec.staged && r.won && training ? 'Training complete!' : r.won ? rspec.overHeadingWon : rspec.overHeadingLost;
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
     const cert = certInfo(r); lastResult = r;
@@ -208,7 +212,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         ${r.mode === 'boss' && r.won ? `<div class="ko" aria-hidden="true"><img src="${VILLAIN.img}" alt=""><b>K.O.</b></div>` : ''}
         <div class="hero-big ${r.won ? '' : 'sad'}${training ? ' sensei' : ''}" style="--glow:${speaker.glow}"><img src="${speaker.img}" alt="${speaker.name}"><div class="speech">${esc(headline)}</div></div>
         <div class="medal">${medal}</div>
-        <h2>${r.mode === 'endless' ? 'Storm over!' : r.mode === 'sprint' ? "Time's up!" : r.mode === 'boss' ? (r.won ? 'Knock-out!' : 'Hammer Man wins this round') : r.won ? (training ? 'Training complete!' : 'Mission complete!') : 'Out of lives'}</h2>
+        <h2>${heading}</h2>
         ${r.mode !== 'endless' ? `<div class="big-stars">${stars(r.stars)}</div>` : ''}
         <div class="statgrid"><div><b>${r.score}</b><small>score</small></div><div><b>${r.correct}/${r.attempts}</b><small>correct</small></div><div><b>×${r.bestCombo}</b><small>best combo</small></div></div>
         <div class="coin-row"><span class="coin-gain">+${r.coins} 🪙</span>${newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : ''}</div>
