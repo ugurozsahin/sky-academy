@@ -1,7 +1,7 @@
 // Canvas arena: bubbles fly up from the bottom; the player taps or slices them.
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
-  launchAt: number; launched: boolean; hit: boolean; dead: boolean; color: string; wobble: number; scale: number;
+  launchAt: number; launched: boolean; hit: boolean; dead: boolean; color: string; wobble: number;
   mark?: 'good' | 'bad'; markAt?: number; fade?: boolean;   // outcome reveal: spotlighted (✓/✗) or faded out
 }
 type PKind = 'dot' | 'ring' | 'shard' | 'text' | 'ember' | 'drop' | 'bolt' | 'rock' | 'leaf' | 'crystal' | 'star' | 'smoke' | 'pixel' | 'slash';
@@ -104,7 +104,7 @@ export class Arena {
       const vy = -Math.sqrt(2 * g * h);
       const vx = ((this.W / 2 - x) / this.W) * 30 * (Math.random() * 0.6 + 0.4);
       const launchAt = now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1);
-      this.bubbles.push({ id: this.nextId++, label: o.labels[i], x, y: this.H + r, vx, vy, g, r, launchAt, launched: false, hit: false, dead: false, color: PALETTE[(k * 3 + Math.floor(Math.random() * 3)) % PALETTE.length], wobble: Math.random() * Math.PI * 2, scale: 1 });
+      this.bubbles.push({ id: this.nextId++, label: o.labels[i], x, y: this.H + r, vx, vy, g, r, launchAt, launched: false, hit: false, dead: false, color: PALETTE[(k * 3 + Math.floor(Math.random() * 3)) % PALETTE.length], wobble: Math.random() * Math.PI * 2 });
     }
     this.waveActive = true;
   }
@@ -139,7 +139,7 @@ export class Arena {
       let x = this.W / 2; const y = this.topInset + (this.H - this.topInset) * 0.42;
       const bad = this.bubbles.find(b => b.mark === 'bad' && !b.dead);
       if (bad && Math.hypot(bad.x - x, bad.y - y) < 2.2 * r) x = bad.x < this.W / 2 ? Math.min(this.W - r - 8, bad.x + 2.4 * r) : Math.max(r + 8, bad.x - 2.4 * r);   // don't sit on the ✗ bubble
-      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, scale: 1, mark: 'good', markAt: now });
+      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now });
     }
   }
   /** Remove remaining bubbles (with a gentle fade) — used when the question is over. */
@@ -255,7 +255,7 @@ export class Arena {
   private drawBubble(c: CanvasRenderingContext2D, b: Bubble, now: number) {
     const wob = Math.sin(b.wobble) * 0.04;
     c.save(); c.translate(b.x, b.y);
-    let scale = b.scale;
+    let scale = 1;
     if (b.fade) { c.globalAlpha = 0.28; scale *= 0.9; }
     if (b.mark) {                                    // outcome spotlight: pop in, gentle pulse, a shake for a wrong slice
       const age = Math.max(0, now - (b.markAt ?? now)) / 1000;

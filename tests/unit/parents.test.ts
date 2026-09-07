@@ -7,7 +7,7 @@ import { freshDojo } from '../../src/game/dojo';
 const base: SaveData = {
   v: 1, name: 'Test', avatar: 'kai', year: 'year1', sound: true, speech: true,
   progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {},
-  totalSlices: 0, coins: 0, spent: 0, owned: [], equipped: {}, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''),
+  coins: 0, spent: 0, owned: [], equipped: {}, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''),
 };
 const p = (stars: number, plays: number, hits?: number, tries?: number): TopicProgress => ({ stars, best: 0, plays, hits, tries });
 // small deterministic rng

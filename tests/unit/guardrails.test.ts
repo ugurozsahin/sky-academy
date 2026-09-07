@@ -158,4 +158,19 @@ describe('guard rails', () => {
       expect({ file: f, leaked: [...added].filter(a => !removed.has(a)) }).toEqual({ file: f, leaked: [] });
     }
   });
+
+  // Incident 2026-09-06 (#37): dead code lingered after the outcome-beat refactor — `Bubble.scale` was
+  // always 1, `SaveData.totalSlices` was written but never read, and `dom.wait` / `yearById` were exported
+  // but imported nowhere. tsc's noUnusedLocals catches neither an unused *export* nor an always-constant
+  // field, so this rail keeps the four removed. (`Arena.time` was named in #37 too but is live — two e2e
+  // rails read it — and `Arena.flash` was already gone; neither is checked here.)
+  it('dead symbols removed in #37 stay gone', () => {
+    expect(SOURCES['/src/curriculum/index.ts'], 'yearById was unused').not.toContain('yearById');
+    expect(code(SOURCES['/src/ui/dom.ts']), 'dom.wait was unused').not.toMatch(/export\s+(?:const|function)\s+wait\b/);
+    expect(code(SOURCES['/src/storage.ts']), 'SaveData.totalSlices was never read').not.toContain('totalSlices');
+    const arena = code(SOURCES['/src/game/arena.ts']);
+    const from = arena.indexOf('interface Bubble');
+    const iface = arena.slice(from, arena.indexOf('}', from));
+    expect(iface, 'Bubble.scale was always 1').not.toContain('scale');
+  });
 });

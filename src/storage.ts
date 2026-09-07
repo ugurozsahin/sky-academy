@@ -16,7 +16,6 @@ export interface SaveData {
   boss: Record<string, number>;      // year -> Hammer Man knock-outs
   memory: Record<string, number>;    // year -> Memory Match boards completed
   training: Record<string, number>;  // year -> Sensei training sessions completed
-  totalSlices: number;
   coins: number;                     // ninja coins earned (lifetime)
   stickers: string[];                // unlocked sticker ids
   streak: { last: string; days: number };   // daily play streak (ISO date)
@@ -27,7 +26,7 @@ export interface SaveData {
   equipped: Partial<Record<ItemKind, string>>;   // equipped item per kind (missing = the free default)
 }
 const KEY = 'sna:v1';
-const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, totalSlices: 0, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {} };
+const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {} };
 
 let cache: SaveData | null = null;
 export function load(): SaveData {

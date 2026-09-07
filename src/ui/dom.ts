@@ -4,7 +4,6 @@ export const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<'
 export const app = () => document.getElementById('app')!;
 export function render(html: string, cls = '') { const a = app(); a.className = cls; a.innerHTML = html; window.scrollTo(0, 0); return a; }
 export const stars = (n: number, max = 3) => `<span class="stars" aria-label="${n} of ${max} stars">${'★'.repeat(n)}<i>${'★'.repeat(max - n)}</i></span>`;
-export const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 /** Fill the answer into a prompt with a gap: "3 + 4 = ?" → "3 + 4 = 7", "5, 6, 7, ?" → "…7, 8", "Mo_day" → "Monday", "5 ? 8" → "5 < 8".
  *  A "?" that ends a question sentence ("How many?") is left alone. */
 export function fillAnswer(prompt: string, answer: string): string {
