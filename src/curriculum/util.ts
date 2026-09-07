@@ -51,6 +51,14 @@ export function numberWord(n: number): string {
 export const coinLabel = (p: number) => p >= 100 ? `£${p / 100}` : `${p}p`;
 
 export const OBJECTS = ['🍎', '⭐', '🐟', '🎈', '🍪', '🦋', '🐸', '🚗', '🌼', '🧁'];
+
+// Canonical shape tables — one source for the maths shape topics (maths.ts) and Memory Match (game/memory.ts),
+// which used to keep their own copies at different arities (#35). The first four 2-D shapes are the
+// Reception-easy set (circle/square/triangle/rectangle) so Memory's `SHAPES_2D.slice(0, 4)` still holds.
+/** 2-D shapes: glyph, name, number of sides (circle = 0). */
+export const SHAPES_2D: readonly [string, string, number][] = [['▲', 'triangle', 3], ['■', 'square', 4], ['▬', 'rectangle', 4], ['●', 'circle', 0], ['⬟', 'pentagon', 5], ['⬢', 'hexagon', 6]];
+/** 3-D shapes: glyph, name, faces fact. */
+export const SHAPES_3D: readonly [string, string, string][] = [['🎲', 'cube', '6 faces'], ['⚽', 'sphere', '1 curved face'], ['🥫', 'cylinder', '2 flat faces'], ['🍦', 'cone', '1 flat face'], ['🔺', 'pyramid', '5 faces'], ['🧱', 'cuboid', '6 faces']];
 export function symSay(s: string): string {
   return s.replace(/×/g, ' times ').replace(/÷/g, ' divided by ').replace(/\+/g, ' plus ').replace(/[−-]/g, ' minus ').replace(/=/g, ' equals ').replace(/\?/g, ' what').replace(/\s+/g, ' ').trim();
 }

@@ -1,6 +1,6 @@
 // Maths topics for Reception (EYFS ELGs), Year 1 and Year 2 (National Curriculum KS1).
 import type { Difficulty, Generator, Question, Rng, Topic } from './types';
-import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel } from './util';
+import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel, SHAPES_2D, SHAPES_3D } from './util';
 
 const q = (prompt: string) => ({ prompt, say: symSay(prompt) });
 
@@ -255,19 +255,17 @@ function lineQ(rng: Rng, from: number, step: number, len: number): Question {
 const y1Line: Generator = (d, rng) => lineQ(rng, d === 1 ? 0 : ri(rng, 0, d === 2 ? 10 : 90), 1, 6);
 const y2Line: Generator = (d, rng) => { const step = d === 1 ? 1 : d === 2 ? pick(rng, [2, 5, 10]) : pick(rng, [2, 3, 5, 10]); return lineQ(rng, step * ri(rng, 0, d === 1 ? 90 : 6), step, 6); };
 
-/** Shapes (Y1 2-D, Y2 3-D) — properties and recognition. */
-const SHAPES2D: [string, string, number][] = [['▲', 'triangle', 3], ['■', 'square', 4], ['▬', 'rectangle', 4], ['●', 'circle', 0], ['⬟', 'pentagon', 5], ['⬢', 'hexagon', 6]];
-const SHAPES3D: [string, string, string][] = [['🎲', 'cube', '6 faces'], ['⚽', 'sphere', '1 curved face'], ['🥫', 'cylinder', '2 flat faces'], ['🍦', 'cone', '1 flat face'], ['🔺', 'pyramid', '5 faces'], ['🧱', 'cuboid', '6 faces']];
+/** Shapes (Y1 2-D, Y2 3-D) — properties and recognition. Tables live in util.ts (SHAPES_2D/SHAPES_3D). */
 const y1Shapes: Generator = (d, rng) => {
-  const [g, name, sides] = pick(rng, SHAPES2D);
-  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES2D.filter(x => x[1] !== name)).slice(0, 3).map(x => x[0]), { hint: 'Slice the shape' });
+  const [g, name, sides] = pick(rng, SHAPES_2D);
+  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES_2D.filter(x => x[1] !== name)).slice(0, 3).map(x => x[0]), { hint: 'Slice the shape' });
   if (sides === 0) return y1Shapes(d, rng);
   return numQ(rng, `How many sides has a ${name}?`, sides, { min: 0, max: 8, visual: { type: 'word', text: g }, distractors: [sides + 1, sides - 1, sides + 2] });
 };
 const y2Shapes: Generator = (d, rng) => {
-  const [g, name, fact] = pick(rng, SHAPES3D);
-  if (d === 1 || rng() < 0.5) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES3D.filter(x => x[1] !== name)).slice(0, 3).map(x => x[0]), { hint: 'Slice the 3-D shape' });
-  return wordQ(rng, `A ${name} has…`, fact, shuffle(rng, SHAPES3D.filter(x => x[2] !== fact)).slice(0, 3).map(x => x[2]), { visual: { type: 'word', text: g }, say: `A ${name} has how many faces?` });
+  const [g, name, fact] = pick(rng, SHAPES_3D);
+  if (d === 1 || rng() < 0.5) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES_3D.filter(x => x[1] !== name)).slice(0, 3).map(x => x[0]), { hint: 'Slice the 3-D shape' });
+  return wordQ(rng, `A ${name} has…`, fact, shuffle(rng, SHAPES_3D.filter(x => x[2] !== fact)).slice(0, 3).map(x => x[2]), { visual: { type: 'word', text: g }, say: `A ${name} has how many faces?` });
 };
 
 /** Balance the Scales: both pans must weigh the same — find the number that makes them equal (= as balance). */

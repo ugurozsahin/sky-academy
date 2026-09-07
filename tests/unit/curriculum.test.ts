@@ -3,7 +3,7 @@ import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd } from '../../src/curriculum/maths';
 import type { Difficulty, Question } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT } from '../../src/curriculum/writing';
-import { coinLabel } from '../../src/curriculum/util';
+import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
 // Deterministic RNG (mulberry32)
 function rng(seed: number) {
@@ -246,5 +246,21 @@ describe('coinLabel (#35 — one source for the £/p money label)', () => {
     expect(coinLabel(99)).toBe('99p');
     expect(coinLabel(100)).toBe('£1');
     expect(coinLabel(200)).toBe('£2');
+  });
+});
+
+describe('shape tables (#35 — one source for maths.ts and memory.ts)', () => {
+  it('2-D shapes carry correct side counts (circle = 0)', () => {
+    const sides = Object.fromEntries(SHAPES_2D.map(([, name, n]) => [name, n]));
+    expect(sides).toMatchObject({ triangle: 3, square: 4, rectangle: 4, circle: 0, pentagon: 5, hexagon: 6 });
+    expect(SHAPES_2D).toHaveLength(6);
+  });
+  it('the first four 2-D shapes are the Reception-easy set (Memory slices these for Reception)', () => {
+    expect(new Set(SHAPES_2D.slice(0, 4).map(([, name]) => name))).toEqual(new Set(['circle', 'square', 'triangle', 'rectangle']));
+  });
+  it('3-D shapes carry a faces fact and a distinct glyph each', () => {
+    expect(SHAPES_3D).toHaveLength(6);
+    expect(SHAPES_3D.every(([g, name, fact]) => g && name && /face/.test(fact))).toBe(true);
+    expect(new Set(SHAPES_3D.map(([g]) => g)).size).toBe(6);
   });
 });

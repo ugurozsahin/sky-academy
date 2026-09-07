@@ -1,6 +1,6 @@
 // Memory Match: flip two cards, keep the pairs. Pure logic + pair decks (no DOM) so it is unit-testable.
 import type { Rng, YearId } from '../curriculum';
-import { coinLabel, numberWord, OBJECTS, pick, ri, shuffle } from '../curriculum/util';
+import { coinLabel, numberWord, OBJECTS, pick, ri, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
 
 export interface Face { text: string; say: string; coin?: number; small?: boolean }  // coin = pence, drawn as a coin
 export interface Pair { a: Face; b: Face }
@@ -12,28 +12,28 @@ const txt = (text: string, say = text, small = false): Face => ({ text, say, sma
 const coin = (p: number): Face => ({ text: coinLabel(p), say: p >= 100 ? `${p / 100} pound${p > 100 ? 's' : ''}` : `${p} pence`, coin: p });
 const objs = (n: number, emoji: string): Face => ({ text: emoji.repeat(n), say: String(n) });
 const words = (rng: Rng, from: number, to: number, n: number): Pair[] => shuffle(rng, Array.from({ length: to - from + 1 }, (_, i) => from + i)).slice(0, n).map(v => ({ a: txt(String(v), numberWord(v)), b: txt(numberWord(v), numberWord(v), v > 20) }));
-const SHAPES2D: [string, string][] = [['●', 'circle'], ['■', 'square'], ['▲', 'triangle'], ['▬', 'rectangle'], ['⬟', 'pentagon'], ['⬢', 'hexagon']];
-const SHAPES3D: [string, string][] = [['🎲', 'cube'], ['⚽', 'sphere'], ['🥫', 'cylinder'], ['🍦', 'cone'], ['🔺', 'pyramid'], ['🧱', 'cuboid']];
-const shapes = (rng: Rng, list: [string, string][], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(([g, name]) => ({ a: txt(g, name), b: txt(name, name, name.length > 6) }));
+// Shape tables come from curriculum/util.ts (SHAPES_2D/SHAPES_3D); Memory only needs the glyph + name, so
+// `shapes()` reads the first two members and ignores the extra fact field (sides / faces).
+const shapes = (rng: Rng, list: readonly (readonly [string, string, ...unknown[]])[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(([g, name]) => ({ a: txt(g, name), b: txt(name, name, name.length > 6) }));
 const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
 
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
 export const THEMES: Partial<Record<YearId, Theme[]>> = {
   reception: [
     { id: 'count', title: 'Count & match', hint: 'Match each number to the same number of things', pairs: rng => { const e = pick(rng, OBJECTS); return shuffle(rng, [1, 2, 3, 4, 5, 6]).slice(0, 4).map(n => ({ a: txt(String(n), numberWord(n)), b: objs(n, e) })); } },
-    { id: 'shapes', title: 'Shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES2D.slice(0, 4), 4) },
+    { id: 'shapes', title: 'Shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES_2D.slice(0, 4), 4) },
     { id: 'words', title: 'Number words', hint: 'Match each number to its word', pairs: rng => words(rng, 1, 5, 4) },
   ],
   year1: [
     { id: 'words', title: 'Number words', hint: 'Match each number to its word', pairs: rng => words(rng, 1, 20, 6) },
     { id: 'coins', title: 'Coins', hint: 'Match each coin to its value', pairs: rng => coins(rng, [1, 2, 5, 10, 20, 50], 6) },
-    { id: 'shapes', title: '2-D shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES2D, 6) },
+    { id: 'shapes', title: '2-D shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES_2D, 6) },
     { id: 'doubles', title: 'Doubles', hint: 'Match each double to its answer', pairs: rng => shuffle(rng, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).slice(0, 6).map(n => ({ a: txt(`double ${n}`, `double ${n}`, true), b: txt(String(n * 2), numberWord(n * 2)) })) },
   ],
   year2: [
     { id: 'words', title: 'Number words', hint: 'Match each number to its word', pairs: rng => words(rng, 21, 99, 6) },
     { id: 'coins', title: 'Coins', hint: 'Match each coin to its value', pairs: rng => coins(rng, [1, 2, 5, 10, 20, 50, 100, 200], 8) },
-    { id: 'shapes', title: '3-D shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES3D, 6) },
+    { id: 'shapes', title: '3-D shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES_3D, 6) },
     { id: 'tables', title: 'Times tables', hint: 'Match each times-table fact to its answer', pairs: rng => {
       const facts: [number, number][] = []; const seen = new Set<number>();
       for (let guard = 0; facts.length < 8 && guard < 80; guard++) { const t = pick(rng, [2, 5, 10]), k = ri(rng, 2, 10); if (!seen.has(t * k)) { seen.add(t * k); facts.push([t, k]); } }
