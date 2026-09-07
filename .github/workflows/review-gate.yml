@@ -4,8 +4,9 @@
 # API refuses a formal CHANGES_REQUESTED review (422). A reviewer therefore blocks a PR with two marks —
 # it converts the PR to a **draft** and posts a comment beginning `REVIEW: CHANGES REQUESTED`. Those marks
 # were only a convention: a merging agent that did not read them merged straight over the review, which is
-# how #74 went in with five open review items. This job reads them and fails, and "never merge a PR whose CI
-# is not green" is already the first rule of every merge — so the review now rides on a rule that is obeyed.
+# how #74 went in with five open review items. This job reads them and stamps the status red, and "never merge
+# a PR whose CI is not green" is already the first rule of every merge — so the review now rides on a rule
+# that is obeyed. The job itself stays green; see the note below.
 #
 # The two markers are matched asymmetrically, and scripts/review-gate.mjs explains why at length: a false
 # positive on the block is red and self-correcting, a false positive on the clear silently lifts a real block.
