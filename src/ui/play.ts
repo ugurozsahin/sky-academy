@@ -11,6 +11,7 @@ import { $, esc, fillAnswer, render, stars } from './dom';
 import { renderVisual } from './visuals';
 import { dojoRowsHTML } from './memory';
 import { drawCertificate, deliverCertificate, type CertInfo } from './certificate';
+import type { PlayHooks } from './hooks';
 
 const BOMB = '💣';
 export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
@@ -247,10 +248,10 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
   $('#speak').addEventListener('click', repeatPrompt);
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
-  function cleanup() { alive = false; timers.forEach(clearTimeout); clearInterval(ticker); arena?.destroy(); tracer?.destroy(); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete (window as any).__sna; }
+  function cleanup() { alive = false; timers.forEach(clearTimeout); clearInterval(ticker); arena?.destroy(); tracer?.destroy(); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete window.__sna; }
 
-  // Test / accessibility hooks
-  (window as any).__sna = {
+  // Test / accessibility hooks — the typed PlayHooks contract (#34)
+  const hooks: PlayHooks = {
     session, arena, get tracer() { return tracer; },
     answer: () => { const q = session.current; if (!q) return false; if (tracing) { tracer?.autoTrace(); return true; } const label = q.sequence ? q.sequence[session.seqIndex] : q.answer; return arena!.hitLabel(label); },
     wrong: () => { const q = session.current; if (!q || !arena) return false; const target = q.sequence ? q.sequence[session.seqIndex] : q.answer; const b = arena.bubbles.find(x => x.launched && !x.dead && x.label !== target && x.label !== BOMB); return b ? arena.hitLabel(b.label) : false; },
@@ -258,6 +259,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     state: () => ({ stage: session.stage, index: session.index, score: session.score, lives: session.lives, ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt, answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null }),
     certificate: async () => { const c = lastResult && certInfo(lastResult); return c ? (await drawCertificate(c)).toDataURL('image/png') : null; },   // PNG data URL of the certificate for the finished mission
   };
+  window.__sna = hooks;
   session.start();
   return cleanup;                    // the router calls this when it leaves the screen (back button included) — see #73
 }

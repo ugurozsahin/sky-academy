@@ -67,6 +67,18 @@ describe('guard rails', () => {
     for (const hook of ['__sna', 'cards:', 'flip', 'state:']) expect(SOURCES['/src/ui/memory.ts']).toContain(hook);
   });
 
+  // #34: `window.__sna` was typed `any` in play.ts, memory.ts and the spec, so a renamed or dropped hook
+  // broke tests only at runtime. The screens now build the hooks as a typed PlayHooks/MemoryHooks from
+  // src/ui/hooks.ts, so tsc checks the contract. This rail keeps them typed: neither screen casts the global
+  // through `any`, and hooks.ts declares both interfaces. Re-adding `(window as any).__sna` turns it red.
+  it('the __sna hooks are typed via hooks.ts, not `any` (#34)', () => {
+    for (const f of ['/src/ui/play.ts', '/src/ui/memory.ts'])
+      expect(code(SOURCES[f]), `${f} must not cast window to any for __sna`).not.toMatch(/\(\s*window as any\s*\)\.__sna/);
+    const hooks = code(SOURCES['/src/ui/hooks.ts'] ?? '');
+    expect(hooks, 'hooks.ts declares PlayHooks').toContain('interface PlayHooks');
+    expect(hooks, 'hooks.ts declares MemoryHooks').toContain('interface MemoryHooks');
+  });
+
   // Incident 2026-09-06 (#73 review): play/memory own a rAF loop, timers and window listeners, but only the
   // buttons tore them down — the back button left a whole screen running. The router must dispose every
   // screen it replaces, and the e2e rail "leaving the play screen stops it" proves it at runtime.

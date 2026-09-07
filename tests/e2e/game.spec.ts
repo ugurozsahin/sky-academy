@@ -1,7 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 import { TOPICS } from '../../src/curriculum';
+import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 
-declare global { interface Window { __sna: any } }
+// The live screen sets `__sna` to PlayHooks or MemoryHooks; a given test knows which, so the spec views it as
+// the union of both surfaces (#34, replacing `__sna: any`). tests/e2e is outside tsconfig's `include`, so this
+// augmentation and the `__sna?: SnaHooks` one in hooks.ts never meet in a single type-check pass.
+declare global { interface Window { __sna: PlayHooks & MemoryHooks } }
 
 async function pickAvatar(page: Page, id = 'volt', name = 'Ada') {
   await page.goto('/?reset=1');

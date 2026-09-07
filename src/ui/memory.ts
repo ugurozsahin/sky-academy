@@ -7,6 +7,7 @@ import { say, sfx } from '../audio';
 import { $, $$, esc, render, stars } from './dom';
 import { coinSVG } from './visuals';
 import type { DojoOutcome } from '../game/dojo';
+import type { MemoryHooks } from './hooks';
 
 /** Results rows for Daily Dojo challenges finished by this game (shared by the play and memory screens). */
 export function dojoRowsHTML(d: DojoOutcome): string {
@@ -86,18 +87,19 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
   }
-  function cleanup() { alive = false; timers.forEach(clearTimeout); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete (window as any).__sna; }
+  function cleanup() { alive = false; timers.forEach(clearTimeout); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete window.__sna; }
   $('#back').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
   $('#speak').addEventListener('click', intro);
   $('#qcard').addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; intro(); });
 
-  // Test / accessibility hooks (same contract shape as the play screen where it makes sense)
-  (window as any).__sna = {
+  // Test / accessibility hooks (same contract shape as the play screen where it makes sense) — MemoryHooks (#34)
+  const hooks: MemoryHooks = {
     memory: game, theme: theme.id,
     cards: () => game.cards.map(c => ({ pair: c.pair, text: c.face.text, up: c.up, matched: c.matched })),
     flip,
     state: () => ({ mode: 'memory', moves: game.moves, matched: game.matched, pairs: game.pairs.length, score: game.score, ended: game.done, waiting: lock }),
   };
+  window.__sna = hooks;
   draw(); intro();
   return cleanup;                    // the router calls this when it leaves the screen (back button included) — see #73
 }
