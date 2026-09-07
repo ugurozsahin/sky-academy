@@ -1,0 +1,78 @@
+# Turns the review convention into a red check, so a blocked PR is impossible to miss.
+#
+# Why this exists: one GitHub token serves the owner and every agent, so every PR looks self-authored and the
+# API refuses a formal CHANGES_REQUESTED review (422). A reviewer therefore blocks a PR with two marks —
+# it converts the PR to a **draft** and posts a comment beginning `REVIEW: CHANGES REQUESTED`. Those marks
+# were only a convention: a merging agent that did not read them merged straight over the review, which is
+# how #74 went in with five open review items. This job reads them and fails, and "never merge a PR whose CI
+# is not green" is already the first rule of every merge — so the review now rides on a rule that is obeyed.
+#
+# The two markers are matched asymmetrically, and scripts/review-gate.mjs explains why at length: a false
+# positive on the block is red and self-correcting, a false positive on the clear silently lifts a real block.
+#
+# Clearing a block: the reviewer who set it posts `REVIEW: CLEARED` and marks the PR ready for review.
+# Nobody clears their own block, and pushing a fix does not clear it — that is the point of a review.
+#
+# It DOES run on `synchronize`, and must: a commit status belongs to one SHA, so a push to a blocked PR
+# produces a head carrying no `review-gate` status at all. Without this trigger the push would not preserve
+# the block, it would delete the evidence of it (#95 review). The block itself is comment-driven, so
+# re-stamping the new head simply re-applies it.
+#
+# Cost: the job is skipped for comments that never mention REVIEW: (a skipped job bills nothing), so this is
+# about a minute per PR event and per REVIEW: comment.
+name: Review gate
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, converted_to_draft, synchronize]
+  issue_comment:
+    types: [created, edited, deleted]
+concurrency:
+  # Two events in quick succession (comment, then Ready for review) must not race to stamp opposite states.
+  group: review-gate-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+permissions:
+  contents: read             # checkout, for the predicate module
+  statuses: write            # writes the `review-gate` status onto the PR head
+  pull-requests: read
+  issues: read
+jobs:
+  gate:
+    # Ordinary conversation must not spend a runner minute: only REVIEW: comments on a PR wake this up.
+    # `contains`, not `startsWith`: a marker preceded by a blank line or a quote would not have woken the job,
+    # and a block nobody evaluates publishes as green. Cheap to wake on a false positive, costly to miss one.
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event.issue.pull_request != null && contains(github.event.comment.body, 'REVIEW:'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4          # for scripts/review-gate.mjs, the tested predicate
+        with: { sparse-checkout: scripts/review-gate.mjs, sparse-checkout-cone-mode: false }
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const number = context.eventName === 'issue_comment'
+              ? context.payload.issue.number
+              : context.payload.pull_request.number;
+            const { owner, repo } = context.repo;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            if (pr.state !== 'open') { core.info(`#${number} is ${pr.state} — nothing to gate.`); return; }
+
+            const comments = await github.paginate(github.rest.issues.listComments,
+              { owner, repo, issue_number: number, per_page: 100 });
+            // The decision lives in scripts/review-gate.mjs so tests/unit/review-gate.test.ts can hold it to
+            // both directions — it has published green over a live block twice, and inline YAML cannot be tested.
+            const { blockState } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/review-gate.mjs`);
+            const { blocked, reasons } = blockState({ draft: pr.draft, comments });
+
+            const description = blocked ? `Blocked: ${reasons.join('; ')}`.slice(0, 140) : 'No open review block';
+            await github.rest.repos.createCommitStatus({
+              owner, repo, sha: pr.head.sha, context: 'review-gate',
+              state: blocked ? 'failure' : 'success',
+              description,
+              target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+            });
+            core.notice(`#${number}: ${description}`);
+            if (blocked) core.setFailed(
+              `${description}. The reviewer who set the block clears it with a REVIEW: CLEARED comment and ` +
+              `"Ready for review" — pushing a fix does not clear it.`);
