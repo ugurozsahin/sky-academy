@@ -63,6 +63,43 @@ STEP 3 — DEVELOP ONE ITEM, within the freeze above. Pick the first unchecked i
 
 **`Closes #<n>` finishes an issue — nothing less.** GitHub closes an issue the moment a PR carrying that keyword merges. If you are deferring part of the issue, write `Part of #<n>` instead and say what is left; #26 was auto-closed with its last item still open (the per-mode `bests` consolidation, deferred to ship with #38's save migration) and had to be reopened by hand.
 
+## Governance PRs: which way does it move the constraint?
+
+A PR that changes how the routine itself works — this file, `CLAUDE.md`, `BACKLOG.md`, the workflows, the guard
+rails — used to be left for the owner as a class, on the reasoning that a run should not merge changes to its
+own rules. Sound instinct, wrong cut. It conflates *an author must not land their own work* — true, and already
+enforced — with *a run must not land a rule change*, which is so broad that #96 sat open all day while the
+thing it fixed was live and unfixed.
+
+So every governance PR states, in one line near the top, **which way it moves the constraint**, and the answer
+decides who may merge it:
+
+- **Tightening** — it adds a check, a rail, a rule, a thing that must be true before something may happen; or
+  it only describes behaviour that already exists. Reviewed and merged like any other PR, by a run that did
+  not open it.
+- **Loosening** — after this change, something a run was not permitted to do it may now do: a constraint
+  removed, a budget raised, a gate that no longer gates, a wider licence to merge or to start work.
+  **Owner-gated. Never routine-merged, however obviously right it looks.**
+- **Mixed** — it does both. Owner-gated, and worth splitting instead.
+
+Three things to get right, because each is a way this rule could be gamed or misread:
+
+1. **Judge the constraint, not the signal.** The question is: *after this change, is there still something red
+   that a merge rule reads?* PR #97 stopped the review gate failing its own job, which sounds like a loosening
+   — but the `review-gate` status still goes red and rule 1 still reads it, so nothing a run may do changed.
+   That is neutral, and routine-mergeable. Meanwhile a change that quietly stops something being reported *is*
+   how a constraint decays, and "it only moved the notification" is exactly what an agent arguing for its own
+   convenience would say. Answer the sharp question, not the vague one.
+2. **"It only documents existing behaviour" is the cheapest cover story available**, because a run can describe
+   the behaviour it wishes existed. It counts as tightening, and the reviewer checks the description against
+   the code rather than against the PR body.
+3. **The reviewer's job includes disagreeing with the label.** A mislabelled loosening is then a visible,
+   arguable act instead of a silent non-decision — which is the whole gain over the old blanket rule.
+
+The point is asymmetry, the same asymmetry the review gate and the budget rails already use: an agent must not
+be able to vote itself more freedom, but an agent that wants the routine held to a higher standard should not
+have to wait a day for it.
+
 STEP 4 — NOTHING ELIGIBLE? Do not fall back to features. Instead: QA something that was merged without review (WORKLOG says which), lower a guard-rail budget you can genuinely lower, thicken the thin unit coverage of `arena`/`visuals`/`tracing` (#43), or write up what you would do next and why. Fix obvious low-risk bugs (wrong ranges, typos, failing tests) via a PR.
 
 STEP 5 — RECORD. Append a dated entry to WORKLOG.md on main (short: PRs reviewed/merged, item developed + PR link, tests, guard-rail budgets changed, what's next) and push. Report to the owner only for something noteworthy (a merge that changes play, a regression, a decision needed — list the open "Owner action" checkboxes).
