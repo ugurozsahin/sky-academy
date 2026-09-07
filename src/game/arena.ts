@@ -49,6 +49,8 @@ export class Arena {
   }
   destroy() {
     cancelAnimationFrame(this.raf);
+    this.canvas.removeEventListener('pointerdown', this.onDown);
+    this.canvas.removeEventListener('pointermove', this.onMove);
     window.removeEventListener('resize', this.resize);
     window.removeEventListener('pointerup', this.onUp);
     window.removeEventListener('pointercancel', this.onUp);

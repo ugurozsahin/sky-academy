@@ -23,7 +23,10 @@ function offenders(text: string): string[] {
   return out;
 }
 // Every source file, read through Vite (typed by vite/client — no @types/node needed).
-const SOURCES = import.meta.glob(['/src/**/*.ts', '/src/**/*.css', '/index.html'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+// No CSS here on purpose: Vite's css plugin returns an empty string for `?raw` outside the browser, so a
+// CSS scan would pass vacuously (found while writing the guard rails, #73). `content:` strings are rare and
+// not child-facing; if that changes, check them from an e2e test instead.
+const SOURCES = import.meta.glob(['/src/**/*.ts', '/index.html'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 /** Every string a TypeScript file can show: plain literals and the static parts of template literals (nested templates included). */
 function tsStrings(file: string, src: string): string[] {
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);

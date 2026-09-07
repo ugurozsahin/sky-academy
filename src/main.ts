@@ -18,15 +18,20 @@ const enter = (screen: string) => {
 };
 /** Go up one screen by popping history (so the stack stays [map, island?, play|memory?] / [map, rewards?]). */
 const up = () => { if (history.state?.screen) history.back(); else nav.map(); };
+// Play and Memory own a rAF loop, timers, speech and window listeners; replacing `#app` does not stop any of
+// them, so every route change tears the old screen down first. Missing this leaked a ticking Arena on every
+// back-button exit — see the guard rail in tests/e2e/game.spec.ts (#73).
+let dispose: (() => void) | null = null;
+const leave = () => { const d = dispose; dispose = null; d?.(); };
 const nav = {
-  avatar: () => avatarScreen(() => nav.map()),
-  map: () => { year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
-  island: (y: YearInfo) => { year = y; enter('island'); islandScreen(nav, y); },
-  play: ((o: PlayOpts) => { year = o.year; enter('play'); playScreen(o, up, () => nav.play(o)); }) as StartPlay,
-  memory: (y: YearInfo) => { year = y; enter('memory'); memoryScreen({ year: y }, up, () => nav.memory(y)); },
-  rewards: () => { enter('rewards'); rewardsScreen(nav); },
-  shop: () => { enter('shop'); shopScreen(nav); },
-  parents: () => { enter('parents'); parentsScreen(nav); },
+  avatar: () => { leave(); avatarScreen(() => nav.map()); },
+  map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
+  island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
+  play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play(o)); }) as StartPlay,
+  memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
+  rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },
+  shop: () => { leave(); enter('shop'); shopScreen(nav); },
+  parents: () => { leave(); enter('parents'); parentsScreen(nav); },
   up,
 };
 window.addEventListener('popstate', () => {

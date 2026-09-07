@@ -99,6 +99,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     state: () => ({ mode: 'memory', moves: game.moves, matched: game.matched, pairs: game.pairs.length, score: game.score, ended: game.done, waiting: lock }),
   };
   draw(); intro();
+  return cleanup;                    // the router calls this when it leaves the screen (back button included) — see #73
 }
 
 function faceHTML(f: Face): string {

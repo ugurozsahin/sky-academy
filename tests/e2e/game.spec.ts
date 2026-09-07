@@ -457,6 +457,63 @@ test.describe('Sky Ninja Academy', () => {
     expect(rushed).toBeLessThan(500);                                             // the earned word comes up now, not in 3.5 s
   });
 
+  // GUARD RAILS (#73) — see tests/unit/guardrails.test.ts for the rest. These need a browser.
+  // Headless software rendering on CI is well below a device's real frame rate, so the floor is set from the
+  // measured clean value with room to spare; the drift bug it guards against roughly halves it. Raise it only
+  // with fresh measurements from both projects.
+  const FPS_FLOOR = 30;   // clean: 60.4 on both projects; with the drift bug back: 19.9 (phone) / 4.3 (desktop).
+  // Half the clean rate, still well above the bug — a shared CI runner can be slow without going red.
+  test('guard rail: the play screen still renders at speed', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'reception', 'r-onemore');
+    await page.waitForFunction(() => window.__sna?.bubbles().length > 0);
+    // Incident 2026-09-06: `.bg-play::after` animated `background-position` over 13 gradients under the live
+    // canvas — the game ran at 0.17x real time on 1280x800 and 0.67x on a phone, so bubbles crawled and a
+    // 5.6 s flight took half a minute. Nothing noticed for weeks. This rail is that alarm.
+    // Measure FRAMES, not `arena.time`: the loop clamps dt to 0.1 s, so the arena clock only falls behind
+    // once frames pass 100 ms — it would sit at 1.00x while the game stuttered along at 11 fps (#73 review).
+    const [fps, ratio] = await page.evaluate(() => new Promise<[number, number]>(res => {
+      const a = window.__sna.arena, t0 = a.time, w0 = performance.now();
+      let frames = 0;
+      const tick = () => { frames++; const el = performance.now() - w0;
+        if (el < 2000) requestAnimationFrame(tick); else res([frames / (el / 1000), (a.time - t0) / (el / 1000)]); };
+      requestAnimationFrame(tick);
+    }));
+    console.log(`[guard rail] fps=${fps.toFixed(1)} ratio=${ratio.toFixed(2)}`);
+    expect(fps).toBeGreaterThan(FPS_FLOOR);  // clean: see the constant; with the drift bug back it halves
+    expect(ratio).toBeGreaterThan(0.8);      // and the arena clock still tracks the wall clock (loop alive)
+  });
+
+  test('guard rail: leaving the play screen stops it', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'reception', 'r-onemore');
+    await page.waitForFunction(() => window.__sna?.bubbles().length > 0);
+    // Incident 2026-09-06 (#73 review): only the Quit/Islands/Play-again buttons tore the screen down, so
+    // the back button left the old Arena's rAF loop running on a detached canvas — with its window listeners
+    // attached and `window.__sna` pointing at the dead session. Every play → back → play stacked another one.
+    const leaked = await page.evaluate(() => new Promise<any>(res => {
+      const dead = window.__sna.arena, t0 = dead.time;
+      history.back();
+      setTimeout(() => res({ advanced: +(dead.time - t0).toFixed(2), stillOnStage: document.body.contains(dead.canvas) }), 700);
+    }));
+    await expect(page.locator('.island-screen')).toBeVisible();
+    expect(leaked).toEqual({ advanced: 0, stillOnStage: false });
+  });
+
+  test('guard rail: no control inherits a full-screen rule, and the mode cards match', async ({ page }) => {
+    await pickAvatar(page);
+    await page.click('.island[data-year="year2"]');
+    // Incident 2026-09-06: the Memory Match *screen* rule was written on the bare `.memory` class, which the
+    // island's mode button also carries — that card rendered 844 px tall against 86 px for the others (#63).
+    const heights = await page.evaluate(() => [...document.querySelectorAll('.storm')].map(el => Math.round(el.getBoundingClientRect().height)));
+    expect(heights.length).toBeGreaterThanOrEqual(4);
+    expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(8);
+    const giant = await page.evaluate(() => [...document.querySelectorAll('button, .btn')]
+      .filter(el => el.getBoundingClientRect().height > window.innerHeight * 0.5)
+      .map(el => (el as HTMLElement).id || el.className));
+    expect(giant).toEqual([]);               // a button is never half the screen tall
+  });
+
   test('endless Sky Storm ramps up and ends when lives run out', async ({ page }) => {
     await pickAvatar(page);
     await page.click('.island[data-year="year2"]');

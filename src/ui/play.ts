@@ -255,6 +255,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     certificate: async () => { const c = lastResult && certInfo(lastResult); return c ? (await drawCertificate(c)).toDataURL('image/png') : null; },   // PNG data URL of the certificate for the finished mission
   };
   session.start();
+  return cleanup;                    // the router calls this when it leaves the screen (back button included) — see #73
 }
 
 function promptHTML(q: Question, done: number) {
