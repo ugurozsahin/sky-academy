@@ -41,7 +41,7 @@ async function swipeAnswer(page: Page) {
   const label = JSON.parse(await b.jsonValue() as string).label as string;
   const { others, W, H, top, ox, oy } = await page.evaluate(() => { // freeze every bubble where it is; never launch the rest of the wave
     const a = window.__sna.arena;
-    for (const x of a.bubbles) { if (x.launched) { x.vx = 0; x.vy = 0; x._g = 0; } else x.launchAt = Infinity; }
+    for (const x of a.bubbles) { if (x.launched) { x.vx = 0; x.vy = 0; x.g = 0; } else x.launchAt = Infinity; }
     // bubbles() returns canvas-space coords (arena.pos subtracts the canvas rect); the arena is now centred and
     // capped (#67), so page.mouse (viewport coords) must add the canvas box offset — 0 on a phone, non-zero on desktop.
     const rect = (document.getElementById('arena') as HTMLCanvasElement).getBoundingClientRect();

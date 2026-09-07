@@ -27,10 +27,11 @@ describe('guard rails', () => {
   });
 
   // Incident 2026-09-06: per-bubble gravity was smuggled through `(b as any)._g`, the e2e helpers then
-  // depended on it, and the type said nothing (#33). Budget: lower as #33 lands.
+  // depended on it, and the type said nothing (#33). Fixed: `Bubble.g` is a real field, read directly.
+  // Budget now zero — game logic carries no `as any`. Never raise this; a new one means a new hole to close.
   it('game logic does not smuggle state through `as any`', () => {
     const hits = inDir('/src/game/').flatMap(([f, s]) => [...code(s).matchAll(/as\s+any\b/g)].map(() => f));
-    expect(hits.length).toBeLessThanOrEqual(2);                         // #33 removes both; never raise this
+    expect(hits.length).toBeLessThanOrEqual(0);                         // #33 removed both; never raise this
   });
 
   // `shuffle(rng, arr)` exists in curriculum/util.ts; `.sort(() => rng() - 0.5)` is non-uniform and

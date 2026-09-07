@@ -1,6 +1,6 @@
 // Canvas arena: bubbles fly up from the bottom; the player taps or slices them.
 export interface Bubble {
-  id: number; label: string; x: number; y: number; vx: number; vy: number; r: number;
+  id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
   launchAt: number; launched: boolean; hit: boolean; dead: boolean; color: string; wobble: number; scale: number;
   mark?: 'good' | 'bad'; markAt?: number; fade?: boolean;   // outcome reveal: spotlighted (✓/✗) or faded out
 }
@@ -104,8 +104,7 @@ export class Arena {
       const vy = -Math.sqrt(2 * g * h);
       const vx = ((this.W / 2 - x) / this.W) * 30 * (Math.random() * 0.6 + 0.4);
       const launchAt = now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1);
-      this.bubbles.push({ id: this.nextId++, label: o.labels[i], x, y: this.H + r, vx, vy, r, launchAt, launched: false, hit: false, dead: false, color: PALETTE[(k * 3 + Math.floor(Math.random() * 3)) % PALETTE.length], wobble: Math.random() * Math.PI * 2, scale: 1 });
-      (this.bubbles[this.bubbles.length - 1] as any)._g = g;
+      this.bubbles.push({ id: this.nextId++, label: o.labels[i], x, y: this.H + r, vx, vy, g, r, launchAt, launched: false, hit: false, dead: false, color: PALETTE[(k * 3 + Math.floor(Math.random() * 3)) % PALETTE.length], wobble: Math.random() * Math.PI * 2, scale: 1 });
     }
     this.waveActive = true;
   }
@@ -140,7 +139,7 @@ export class Arena {
       let x = this.W / 2; const y = this.topInset + (this.H - this.topInset) * 0.42;
       const bad = this.bubbles.find(b => b.mark === 'bad' && !b.dead);
       if (bad && Math.hypot(bad.x - x, bad.y - y) < 2.2 * r) x = bad.x < this.W / 2 ? Math.min(this.W - r - 8, bad.x + 2.4 * r) : Math.max(r + 8, bad.x - 2.4 * r);   // don't sit on the ✗ bubble
-      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, scale: 1, mark: 'good', markAt: now });
+      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, scale: 1, mark: 'good', markAt: now });
     }
   }
   /** Remove remaining bubbles (with a gentle fade) — used when the question is over. */
@@ -237,8 +236,7 @@ export class Arena {
       if (b.dead) continue;
       if (this.frozen) { live++; b.wobble += dt * 3; continue; }        // outcome reveal: everything holds still
       if (!b.launched) { if (now >= b.launchAt) b.launched = true; else { live++; continue; } }
-      const g = (b as any)._g ?? this.g;
-      b.vy += g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.wobble += dt * 3;
+      b.vy += b.g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.wobble += dt * 3;
       if (b.y - b.r > this.H + 10 && b.vy > 0) { b.dead = true; this.cb.onFall(b); continue; }
       live++;
     }
