@@ -1,12 +1,14 @@
-# Builds the Android APK (Capacitor wrapper, issue #53) on every push to main and on v* tags.
-# Download: Actions → this run → "sky-ninja-academy-apk" artifact. A tag `vX.Y.Z` also attaches the APK to a GitHub Release.
+# Builds the Android APK (Capacitor wrapper, issue #53) on demand, on v* tags, and on PRs that touch the
+# Android side. NOT on every push to main any more: that spent ~3 minutes of a metered private-repo quota
+# per commit — roughly 90 minutes in the first two days — on an artifact nobody downloaded.
+# Want one now? Actions → "Android APK" → Run workflow. Then: this run → "sky-ninja-academy-apk".
+# A tag `vX.Y.Z` also attaches the APK to a GitHub Release.
 name: Android APK
 on:
   push:
-    branches: [main]
     tags: ['v*']
   pull_request:
-    paths: ['android/**', 'capacitor.config.ts', '.github/workflows/android.yml', 'package.json']   # web-only PRs skip the APK build; main always builds
+    paths: ['android/**', 'capacitor.config.ts', '.github/workflows/android.yml', 'package.json']   # web-only PRs skip the APK build
   workflow_dispatch:
 concurrency:
   group: android-${{ github.ref }}

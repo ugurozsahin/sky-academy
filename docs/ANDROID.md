@@ -3,7 +3,9 @@
 The game is wrapped with [Capacitor](https://capacitorjs.com): the Vite build in `dist/` is embedded in the APK, so it runs **offline** on a tablet or phone. App id `uk.skyninja.academy`, name "Sky Ninja Academy".
 
 ## Get the APK (no tools needed)
-1. GitHub → **Actions** → workflow **Android APK** → the latest green run on `main`.
+1. GitHub → **Actions** → workflow **Android APK** → **Run workflow** on `main`, and wait ~3 minutes.
+   (The APK is built on demand, not on every push: on a private repo that was ~3 metered minutes per commit
+   for an artifact nobody downloaded. A `v*` tag builds one too, and attaches it to the release.)
 2. Download the **sky-ninja-academy-apk** artifact (a zip), unzip → `sky-ninja-academy-<commit>.apk`.
 3. On the tablet: allow "install unknown apps" for your browser/file manager once, open the APK, install.
    **Updating:** each CI run signs the debug APK with a fresh key, so Android refuses to install a newer build over the old one (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) — you must uninstall first, **which deletes the saved progress on that tablet**. To keep one key across builds, create a debug keystore once (`keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -validity 10000 -dname CN=Android` ), then add the repo secret `ANDROID_DEBUG_KEYSTORE` = `base64 -i debug.keystore`; the workflow picks it up automatically. A proper release keystore is a follow-up.

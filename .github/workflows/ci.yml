@@ -1,14 +1,26 @@
-# Gate for every pull request (and every push to main): typecheck, unit tests + guard rails, build, e2e.
-# Until this existed the guard rails ran nowhere on a PR — they only fired after a merge, on the APK build,
-# and the browser rails not at all (#73 review). A red job here is the signal not to merge.
+# The gate for every change. A pull request gets the FULL run: unit tests + guard rails, build, and e2e on
+# mobile and desktop. A push to main gets the LIGHT run — that tree already passed e2e on its own PR minutes
+# earlier, so main only re-checks what a merge can break cheaply (types, unit, build). The full suite runs
+# against main once a night, which is what catches two PRs that were green apart and broken together.
+# Docs-only changes run nothing.
+#
+# Why the split: this is a private repo, so Actions minutes are metered (2,000/month on Free, 3,000 on Pro).
+# Measured 2026-09-07 — full run ~12 min, light run ~3 min, and shipping one issue used to cost ~42 min
+# because the same tree was tested on the PR and again on main, and the APK rebuilt on top of that.
 name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', '.claude/**', '.gitignore']
   pull_request:
-  workflow_dispatch:
+    paths-ignore: ['**.md', 'docs/**', '.claude/**', '.gitignore']
+  schedule:
+    - cron: '20 3 * * *'      # 03:20 UTC: the nightly full run against main
+  workflow_dispatch:           # …and a full run on demand, from any branch
 concurrency:
-  group: ci-${{ github.ref }}
+  # Keyed on the event too: a merge landing while the nightly is mid-run must not cancel it — a cancelled
+  # run reports nothing, so the one full check on main would vanish silently.
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
   test:
@@ -22,11 +34,14 @@ jobs:
       - name: Unit tests + guard rails
         run: npm test
       - run: npm run build          # `tsc --noEmit && vite build` — the typecheck lives here
+      # Everything below is the full run only: pull_request, the nightly schedule, or workflow_dispatch.
       - name: Install Playwright browsers
+        if: github.event_name != 'push'
         run: npx playwright install --with-deps chromium
       - name: End-to-end (mobile + desktop)
+        if: github.event_name != 'push'
         run: npx playwright test --project=mobile --project=desktop
-      - if: failure()
+      - if: failure() && github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-traces      # `reporter: list` writes no HTML report; the traces live here
