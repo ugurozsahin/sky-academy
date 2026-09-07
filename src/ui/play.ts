@@ -7,8 +7,9 @@ import { Tracer } from '../game/tracing';
 import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak, wallet } from '../storage';
 import { equippedItem } from '../game/shop';
 import { haptic, say, sfx, sliceFx } from '../audio';
-import { $, esc, fillAnswer, render, stars } from './dom';
+import { $, esc, fillAnswer, render } from './dom';
 import { screenScope, stickersHTML } from './screen';
+import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
 import { renderVisual } from './visuals';
 import { dojoRowsHTML } from './memory';
 import { drawCertificate, deliverCertificate, type CertInfo } from './certificate';
@@ -177,15 +178,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   function showStageClear(stage: number, st: number, acc: number) {
     arena && (arena.paused = true);
     const line = praiseLine(av, d.name); say(line);
-    els.overlay.hidden = false; els.overlay.innerHTML = `
-      <div class="modal celebrate">
-        <div class="confetti">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i};--x:${(i * 37) % 100};--d:${1.8 + (i % 5) * 0.35}s;--c:${['#ff5f6d', '#ffd54f', '#66e07d', '#40c4ff', '#b388ff'][i % 5]}"></i>`).join('')}</div>
-        <div class="hero-big" style="--glow:${av.glow}"><img src="${av.img}" alt="${av.name}"><div class="speech">${esc(line)}</div></div>
-        <h2>Stage ${stage} clear!</h2><span class="pill">${STAGE_NAMES[stage - 1] ?? ''}${stage < session.stages ? ` → next: ${STAGE_NAMES[stage] ?? ''}` : ' · mission done'}</span>
-        <div class="big-stars">${stars(st)}</div>
-        <p>${Math.round(acc * 100)}% correct · score ${session.score}</p>
-        <button class="btn primary big" id="next">${stage >= session.stages ? 'Finish mission 🏁' : 'Next stage →'}</button>
-      </div>`;
+    els.overlay.hidden = false;
+    els.overlay.innerHTML = stageClearHTML({ glow: av.glow, img: av.img, name: av.name, line, stage, stages: session.stages, starCount: st, acc, score: session.score });
     $('#next').addEventListener('click', () => { sfx.tap(); els.overlay.hidden = true; arena && (arena.paused = false); session.nextStage(); });
   }
   function showResults(r: SessionResult) {
@@ -209,20 +203,12 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
     const cert = certInfo(r); lastResult = r;
-    els.overlay.hidden = false; els.overlay.innerHTML = `
-      <div class="modal results">
-        ${r.mode === 'boss' && r.won ? `<div class="ko" aria-hidden="true"><img src="${VILLAIN.img}" alt=""><b>K.O.</b></div>` : ''}
-        <div class="hero-big ${r.won ? '' : 'sad'}${training ? ' sensei' : ''}" style="--glow:${speaker.glow}"><img src="${speaker.img}" alt="${speaker.name}"><div class="speech">${esc(headline)}</div></div>
-        <div class="medal">${medal}</div>
-        <h2>${heading}</h2>
-        ${r.mode !== 'endless' ? `<div class="big-stars">${stars(r.stars)}</div>` : ''}
-        <div class="statgrid"><div><b>${r.score}</b><small>score</small></div><div><b>${r.correct}/${r.attempts}</b><small>correct</small></div><div><b>×${r.bestCombo}</b><small>best combo</small></div></div>
-        <div class="coin-row"><span class="coin-gain">+${r.coins} 🪙</span>${newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : ''}</div>
-        ${dojoRowsHTML(dojo)}
-        ${stickerHTML}
-        <div class="row"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
-        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this mission">🎓 Certificate</button></div>' : ''}
-      </div>`;
+    els.overlay.hidden = false;
+    els.overlay.innerHTML = resultsHTML({
+      mode: r.mode, won: r.won, training, glow: speaker.glow, img: speaker.img, name: speaker.name,
+      headline, medal, heading, starCount: r.stars, score: r.score, correct: r.correct, attempts: r.attempts,
+      bestCombo: r.bestCombo, coins: r.coins, newBest, streak, dojoRows: dojoRowsHTML(dojo), stickerHTML, cert: !!cert,
+    });
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
     if (cert) $('#cert').addEventListener('click', async () => {
@@ -242,7 +228,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   const certInfo = (r: SessionResult): CertInfo | null => (r.won && o.mode === 'mission' ? { name: d.name, avatar: av, year: o.year.title, title: o.topic?.title ?? 'Sensei training', stars: r.stars, score: r.score, correct: r.correct, attempts: r.attempts, training } : null);
   function showPause() {
     arena && (arena.paused = true);
-    els.overlay.hidden = false; els.overlay.innerHTML = `<div class="modal"><h2>Paused</h2><div class="row"><button class="btn primary big" id="resume">Resume</button><button class="btn big" id="quit">Quit</button></div></div>`;
+    els.overlay.hidden = false; els.overlay.innerHTML = pauseHTML();
     $('#resume').addEventListener('click', () => { els.overlay.hidden = true; arena && (arena.paused = false); });
     $('#quit').addEventListener('click', () => { cleanup(); goHome(); });
   }
