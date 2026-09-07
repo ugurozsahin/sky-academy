@@ -40,7 +40,7 @@ export interface Topic {
   subject: 'maths' | 'writing';
   year: YearId;
   nc: string;             // curriculum reference (short)
-  mode?: 'bubbles' | 'tracing';
+  input?: 'bubbles' | 'tracing';   // how the child answers (default bubbles); named apart from Session.Mode (#45)
   gen: Generator;
 }
 

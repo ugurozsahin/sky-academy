@@ -125,19 +125,19 @@ img { -webkit-user-drag: none; }
 .topic:active { transform: scale(.97); } .topic:hover { border-color: #6d7fd6; }
 .topic .ic { font-size: 28px; line-height: 1; } .topic b { font-size: 16px; line-height: 1.15; }
 .topic .pill { position: absolute; top: 10px; right: 10px; }
-.storm { width: 100%; margin-top: 18px; padding: 10px 16px 10px 10px; justify-content: flex-start; gap: 14px; border-radius: 20px; background: linear-gradient(90deg, #3b1a22, #1a1f44); border: 1px solid #ff3b5c66; box-shadow: 0 0 30px #ff3b5c33, 0 8px 24px #0008; }
-.storm img { width: 64px; height: 64px; object-fit: cover; object-position: 50% 20%; transform: scale(1.6); transform-origin: 50% 30%; border-radius: 50%; background: #0d1226; box-shadow: 0 0 0 3px #ff3b5c; }
-.storm .vport { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex: none; background: #0d1226; box-shadow: 0 0 0 3px #ff3b5c; }
-.storm span { text-align: left; } .storm b { display: block; font-size: 20px; } .storm small { color: var(--muted); }
-.storm.train { margin-top: 18px; background: linear-gradient(90deg, #3b2e1a, #1a2a44); border-color: #ffb74d66; box-shadow: 0 0 30px #ffb74d33, 0 8px 24px #0008; }
-.storm.train .vport, .storm.train img { box-shadow: 0 0 0 3px #ffb74d; }
-.storm.train + .storm { margin-top: 10px; }
-.storm.sprint { margin-top: 10px; background: linear-gradient(90deg, #1a3b2a, #1a2a44); border-color: #40e0a066; box-shadow: 0 0 30px #40e0a033, 0 8px 24px #0008; }
-.storm.sprint .vport { box-shadow: 0 0 0 3px #40e0a0; } .storm .vport.emoji { display: grid; place-items: center; font-size: 34px; }
-.storm.boss { margin-top: 10px; background: linear-gradient(90deg, #3b1a3b, #2a1a44); border-color: #b388ff66; box-shadow: 0 0 30px #b388ff33, 0 8px 24px #0008; }
-.storm.boss .vport, .storm.boss img { box-shadow: 0 0 0 3px #b388ff; }
-.storm.memory { margin-top: 10px; background: linear-gradient(90deg, #1a2a44, #2a3b1a); border-color: #3ec9ff66; box-shadow: 0 0 30px #3ec9ff33, 0 8px 24px #0008; }
-.storm.memory .vport { box-shadow: 0 0 0 3px #3ec9ff; }
+.mode-btn { width: 100%; margin-top: 18px; padding: 10px 16px 10px 10px; justify-content: flex-start; gap: 14px; border-radius: 20px; background: linear-gradient(90deg, #3b1a22, #1a1f44); border: 1px solid #ff3b5c66; box-shadow: 0 0 30px #ff3b5c33, 0 8px 24px #0008; }
+.mode-btn img { width: 64px; height: 64px; object-fit: cover; object-position: 50% 20%; transform: scale(1.6); transform-origin: 50% 30%; border-radius: 50%; background: #0d1226; box-shadow: 0 0 0 3px #ff3b5c; }
+.mode-btn .vport { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex: none; background: #0d1226; box-shadow: 0 0 0 3px #ff3b5c; }
+.mode-btn span { text-align: left; } .mode-btn b { display: block; font-size: 20px; } .mode-btn small { color: var(--muted); }
+.mode-btn.train { margin-top: 18px; background: linear-gradient(90deg, #3b2e1a, #1a2a44); border-color: #ffb74d66; box-shadow: 0 0 30px #ffb74d33, 0 8px 24px #0008; }
+.mode-btn.train .vport, .mode-btn.train img { box-shadow: 0 0 0 3px #ffb74d; }
+.mode-btn.train + .mode-btn { margin-top: 10px; }
+.mode-btn.sprint { margin-top: 10px; background: linear-gradient(90deg, #1a3b2a, #1a2a44); border-color: #40e0a066; box-shadow: 0 0 30px #40e0a033, 0 8px 24px #0008; }
+.mode-btn.sprint .vport { box-shadow: 0 0 0 3px #40e0a0; } .mode-btn .vport.emoji { display: grid; place-items: center; font-size: 34px; }
+.mode-btn.boss { margin-top: 10px; background: linear-gradient(90deg, #3b1a3b, #2a1a44); border-color: #b388ff66; box-shadow: 0 0 30px #b388ff33, 0 8px 24px #0008; }
+.mode-btn.boss .vport, .mode-btn.boss img { box-shadow: 0 0 0 3px #b388ff; }
+.mode-btn.memory { margin-top: 10px; background: linear-gradient(90deg, #1a2a44, #2a3b1a); border-color: #3ec9ff66; box-shadow: 0 0 30px #3ec9ff33, 0 8px 24px #0008; }
+.mode-btn.memory .vport { box-shadow: 0 0 0 3px #3ec9ff; }
 .foot { margin-top: 26px; text-align: center; color: #6c78a8; font-size: 12px; font-weight: 600; }
 
 /* ---------- rewards ---------- */

@@ -108,7 +108,7 @@ describe('mission session', () => {
 describe('endless session', () => {
   it('ramps difficulty and ends on lives 0 with a score', () => {
     const ev = events();
-    const s = new Session({ mode: 'endless', year: YEARS[2], pool: topicsFor('year2').filter(t => t.mode !== 'tracing'), rng: rng(8) }, ev);
+    const s = new Session({ mode: 'endless', year: YEARS[2], pool: topicsFor('year2').filter(t => t.input !== 'tracing'), rng: rng(8) }, ev);
     s.start();
     // answer 30 questions correctly (sequence questions are sliced letter by letter, in order)
     for (let i = 0; i < 30; i++) { const c = s.current!; if (c.sequence) c.sequence.forEach(l => s.hit(l)); else s.hit(c.answer); s.advance(); }
@@ -120,7 +120,7 @@ describe('endless session', () => {
 });
 
 describe('sprint session (60-second time attack)', () => {
-  const pool = topicsFor('year1').filter(t => t.mode !== 'tracing');
+  const pool = topicsFor('year1').filter(t => t.input !== 'tracing');
   const wrongOf = (s: Session) => { const c = s.current!; const t = c.sequence ? c.sequence[s.seqIndex] : c.answer; return c.options.find(o => o !== t && !(c.sequence ?? []).includes(o)) ?? c.options.find(o => o !== t)!; };
   it('starts with the full clock and never loses lives', () => {
     const ev = events();
@@ -149,7 +149,7 @@ describe('sprint session (60-second time attack)', () => {
   });
   it('scores 10 per correct plus combo bonus, ramps difficulty and awards 3 stars for 12+ correct', () => {
     const ev = events();
-    const s = new Session({ mode: 'sprint', year: YEARS[2], pool: topicsFor('year2').filter(t => t.mode !== 'tracing'), rng: rng(12) }, ev);
+    const s = new Session({ mode: 'sprint', year: YEARS[2], pool: topicsFor('year2').filter(t => t.input !== 'tracing'), rng: rng(12) }, ev);
     s.start();
     expect(s.difficulty).toBe(1); expect(s.speed).toBeLessThanOrEqual(YEARS[2].speeds[1]);
     solve(s); expect(s.score).toBe(10); s.advance();
@@ -168,7 +168,7 @@ describe('sprint session (60-second time attack)', () => {
 });
 
 describe('boss battle', () => {
-  const pool = topicsFor('year1').filter(t => t.mode !== 'tracing');
+  const pool = topicsFor('year1').filter(t => t.input !== 'tracing');
   const wrongOf = (s: Session) => { const c = s.current!; const t = c.sequence ? c.sequence[s.seqIndex] : c.answer; return c.options.find(o => o !== t && !(c.sequence ?? []).includes(o)) ?? c.options.find(o => o !== t)!; };
   it('correct slices hit the boss, slips heal him (capped at max), KO ends the battle won', () => {
     const ev = events();
@@ -188,7 +188,7 @@ describe('boss battle', () => {
   });
   it('speeds up when the boss is on his last 3 HP and is lost when lives run out', () => {
     const ev = events();
-    const s = new Session({ mode: 'boss', year: YEARS[2], pool: topicsFor('year2').filter(t => t.mode !== 'tracing'), rng: rng(21), bossHp: 4 }, ev);
+    const s = new Session({ mode: 'boss', year: YEARS[2], pool: topicsFor('year2').filter(t => t.input !== 'tracing'), rng: rng(21), bossHp: 4 }, ev);
     s.start();
     expect(s.enraged).toBe(false); expect(s.speed).toBeLessThanOrEqual(YEARS[2].speeds[1]);
     solve(s); s.advance();
@@ -202,7 +202,7 @@ describe('boss battle', () => {
 describe('rewards', () => {
   it('bomb costs a life without ending the question', () => {
     const ev = events();
-    const s = new Session({ mode: 'endless', year: YEARS[2], pool: topicsFor('year2').filter(t => t.mode !== 'tracing'), rng: rng(9) }, ev);
+    const s = new Session({ mode: 'endless', year: YEARS[2], pool: topicsFor('year2').filter(t => t.input !== 'tracing'), rng: rng(9) }, ev);
     s.start(); const before = s.current; s.bomb();
     expect(s.lives).toBe(YEARS[2].lives - 1); expect(s.current).toBe(before); expect(s.waiting).toBe(false);
   });

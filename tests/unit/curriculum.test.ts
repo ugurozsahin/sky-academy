@@ -45,7 +45,7 @@ for (const topic of TOPICS) {
           const q: Question = topic.gen(d, r);
           expect(q.prompt.length).toBeGreaterThan(0);
           expect(q.answer.length).toBeGreaterThan(0);
-          if (topic.mode !== 'tracing') {
+          if (topic.input !== 'tracing') {
             // answer present, options unique, sensible count
             expect(q.options).toContain(q.sequence ? q.sequence[0] : q.answer);
             expect(new Set(q.options).size).toBe(q.options.length);

@@ -111,6 +111,20 @@ describe('guard rails', () => {
     for (const m of ['mission', 'endless', 'sprint', 'boss']) expect(modes, `MODES has ${m}`).toContain(`${m}: {`);
   });
 
+  // Incident 2026-09-06 (#45): `Topic.mode` ('bubbles'|'tracing') collided with `Session.Mode` (the play
+  // mode), and every island menu button carried the class `.storm` — so a screen rule written on a bare
+  // modifier like `.memory` could clobber a button (#63). A topic's answer style is now `Topic.input` and the
+  // buttons use `.mode-btn`. This rail keeps both from creeping back into the TS sources; the CSS rename and
+  // the "mode cards match" layout live in the e2e rail (vitest cannot read CSS text — see the header note).
+  it('a topic answers via `input`, and menu buttons use `.mode-btn` not `.storm` (#45)', () => {
+    expect(code(SOURCES['/src/curriculum/types.ts'])).toContain("input?: 'bubbles' | 'tracing'");
+    const topicMode = Object.entries(SOURCES).flatMap(([f, s]) => [...code(s).matchAll(/\bmode\??:\s*'bubbles'\s*\|\s*'tracing'/g)].map(() => f));
+    expect(topicMode).toEqual([]);                                     // no `Topic.mode` field anywhere
+    const stormClass = Object.entries(SOURCES).flatMap(([f, s]) => [...code(s).matchAll(/class="[^"]*\bstorm\b/g)].map(() => f));
+    expect(stormClass).toEqual([]);                                    // the `.storm` class is gone from markup
+    expect(code(SOURCES['/src/ui/home.ts'])).toContain('mode-btn');
+  });
+
   // Incident 2026-09-06: a review found `Tracer.destroy()` removing only the window listeners, so every
   // question stacked another pair on the shared canvas (#39). Anything that adds a listener must remove it.
   it('every addEventListener in src/game has a matching removeEventListener', () => {

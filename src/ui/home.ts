@@ -89,11 +89,11 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       <button class="tab${subject === 'writing' ? ' on' : ''}" data-s="writing" role="tab">✍️ Writing</button>
     </div>
     <div class="topics" id="topics"></div>
-    <button class="btn storm train" id="train"><span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span><span><b>Train with Sensei</b><small>Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${d.training[year.id] ?? 0}</small></span></button>
-    <button class="btn storm" id="endless"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Sky Storm</b><small>Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}</small></span></button>
-    <button class="btn storm sprint" id="sprint"><span class="vport emoji">⏱️</span><span><b>Ninja Sprint</b><small>${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}</small></span></button>
-    <button class="btn storm boss" id="boss"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Boss Battle</b><small>Knock out Hammer Man · KOs ${d.boss[year.id] ?? 0}</small></span></button>
-    <button class="btn storm memory" id="memory"><span class="vport emoji">🃏</span><span><b>Memory Match</b><small>Calm card pairs, no slicing · boards ${d.memory[year.id] ?? 0}</small></span></button>
+    <button class="btn mode-btn train" id="train"><span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span><span><b>Train with Sensei</b><small>Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${d.training[year.id] ?? 0}</small></span></button>
+    <button class="btn mode-btn" id="endless"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Sky Storm</b><small>Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}</small></span></button>
+    <button class="btn mode-btn sprint" id="sprint"><span class="vport emoji">⏱️</span><span><b>Ninja Sprint</b><small>${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}</small></span></button>
+    <button class="btn mode-btn boss" id="boss"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Boss Battle</b><small>Knock out Hammer Man · KOs ${d.boss[year.id] ?? 0}</small></span></button>
+    <button class="btn mode-btn memory" id="memory"><span class="vport emoji">🃏</span><span><b>Memory Match</b><small>Calm card pairs, no slicing · boards ${d.memory[year.id] ?? 0}</small></span></button>
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {
@@ -101,7 +101,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     $('#topics').innerHTML = list.map(t => { const p = d.progress[t.id]; return `
       <button class="topic" data-id="${t.id}" data-subject="${t.subject}" title="${t.nc}">
         <span class="ic">${t.icon}</span><b>${t.title}</b>
-        ${stars(p?.stars ?? 0)}${t.mode === 'tracing' ? '<small class="pill">tracing</small>' : ''}
+        ${stars(p?.stars ?? 0)}${t.input === 'tracing' ? '<small class="pill">tracing</small>' : ''}
       </button>`; }).join('');
     $$('.topic').forEach(b => b.addEventListener('click', () => { const t = list.find(x => x.id === b.dataset.id)!; sfx.tap(); nav.play({ year, topic: t, mode: 'mission' }); }));
   };

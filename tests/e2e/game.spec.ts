@@ -507,7 +507,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('.island[data-year="year2"]');
     // Incident 2026-09-06: the Memory Match *screen* rule was written on the bare `.memory` class, which the
     // island's mode button also carries — that card rendered 844 px tall against 86 px for the others (#63).
-    const heights = await page.evaluate(() => [...document.querySelectorAll('.storm')].map(el => Math.round(el.getBoundingClientRect().height)));
+    const heights = await page.evaluate(() => [...document.querySelectorAll('.mode-btn')].map(el => Math.round(el.getBoundingClientRect().height)));
     expect(heights.length).toBeGreaterThanOrEqual(4);
     expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(8);
     const giant = await page.evaluate(() => [...document.querySelectorAll('button, .btn')]

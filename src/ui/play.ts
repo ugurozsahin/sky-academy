@@ -18,7 +18,7 @@ export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: To
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
   const skin = equippedItem(wallet(), 'trail')?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
-  const tracing = o.topic?.mode === 'tracing';
+  const tracing = o.topic?.input === 'tracing';
   const spec = MODES[o.mode];
   const sprint = spec.timed; const boss = spec.boss; const training = spec.staged && !!o.pool;
   const villainMode = spec.villain;                     // Hammer Man on screen, TNT bubbles in the mix
@@ -71,7 +71,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     els.hint.innerHTML = kind === 'correct' ? `<b class="ok">✓ ${esc(q.answer)}</b> — that's right!` : `${kind === 'wrong' ? '✗ Not this time.' : 'It flew away!'} The answer is <b class="ok">${esc(q.answer)}</b>`;
   }
 
-  const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.mode !== 'tracing') : undefined) }, {
+  const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined) }, {
     onQuestion(q, info) {
       // If a miss is still being shown (the answer fell and the session moved on at once), let the child see it before the next question.
       const wait = Math.max(0, revealUntil - performance.now()); if (wait > 0) { later(() => show(), wait + 450); return; } show();

@@ -24,7 +24,7 @@ export function accuracy(p: TopicProgress | undefined): number | null {
  * Topics never played come after the played ones (in curriculum order) so a new player still gets a full set.
  */
 export function weakestTopics(topics: Topic[], progress: Record<string, TopicProgress>, n = TRAIN_TOPICS): Topic[] {
-  const playable = topics.filter(t => t.mode !== 'tracing');
+  const playable = topics.filter(t => t.input !== 'tracing');
   const played = playable.filter(t => accuracy(progress[t.id]) !== null);
   const key = (t: Topic) => { const p = progress[t.id]; return [accuracy(p)!, p.stars, p.plays]; };
   played.sort((a, b) => { const ka = key(a), kb = key(b); for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i]; return 0; });
