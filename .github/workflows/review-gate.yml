@@ -10,6 +10,8 @@
 # The two markers are matched asymmetrically, and scripts/review-gate.mjs explains why at length: a false
 # positive on the block is red and self-correcting, a false positive on the clear silently lifts a real block.
 #
+# Read the STATUS, never this workflow's run conclusion: the run is green whether or not it found a block.
+#
 # Clearing a block: the reviewer who set it posts `REVIEW: CLEARED` and marks the PR ready for review.
 # Nobody clears their own block, and pushing a fix does not clear it — that is the point of a review.
 #
@@ -72,7 +74,12 @@ jobs:
               description,
               target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
             });
+            // The RUN stays green even when the gate blocks. The signal is the `review-gate` status, which is
+            // red on the PR and is what the merge rule reads; failing the job as well only sent the owner a
+            // "run failed" email for every block, every re-block and every push to a blocked PR. Training him
+            // to ignore failure mail is the opposite of what a gate is for — the next one would be a real
+            // regression. A blocked PR is loud where it matters (the PR's own checks) and quiet in his inbox.
             core.notice(`#${number}: ${description}`);
-            if (blocked) core.setFailed(
+            if (blocked) core.warning(
               `${description}. The reviewer who set the block clears it with a REVIEW: CLEARED comment and ` +
               `"Ready for review" — pushing a fix does not clear it.`);
