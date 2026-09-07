@@ -25,13 +25,36 @@ export interface SaveData {
   owned: string[];                   // bought shop item ids
   equipped: Partial<Record<ItemKind, string>>;   // equipped item per kind (missing = the free default)
 }
-const KEY = 'sna:v1';
-const DEFAULT: SaveData = { v: 1, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {} };
+export const SAVE_VERSION = 1 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
+const KEY = 'sna:v1';                       // stable localStorage slot (its `v1` is historical; `raw.v` drives migration)
+const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {} };
+
+// A raw blob read back from storage: JSON of unknown shape (any past version, or hand-edited). Migrations walk it.
+type RawSave = Record<string, unknown>;
+// Each step upgrades a v(n) blob to v(n+1). Empty while we are still on v1 — this is the seam a future shape
+// change slots into (e.g. #26's per-mode `bests` record, or a Y3+ key change): the step drops the old keys and
+// writes the new ones, instead of leaning on load()'s merge, which silently keeps stale keys across a reshape.
+const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
+  // 1: s => { const { endless, sprint, boss, memory, training, ...rest } = s; return { ...rest, bests: { endless, sprint, boss, memory, training } }; },
+};
+
+/**
+ * Bring a raw stored blob up to the current SaveData shape. Drives off `raw.v`, not the key name, so a shape
+ * change gets a real migration step rather than load() papering over it. Tolerant of hand-edited / corrupt data:
+ * a non-object, or JSON that is not a save, falls back to a fresh default.
+ */
+export function migrate(raw: unknown): SaveData {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...DEFAULT };
+  let s = raw as RawSave;
+  let v = typeof s.v === 'number' ? s.v : SAVE_VERSION;   // a blob with no `v` predates versioning but shares the v1 shape
+  while (v < SAVE_VERSION && MIGRATIONS[v]) { s = MIGRATIONS[v](s); v++; }
+  return { ...DEFAULT, ...s, v: SAVE_VERSION };           // fill any missing keys and stamp the current version
+}
 
 let cache: SaveData | null = null;
 export function load(): SaveData {
   if (cache) return cache;
-  try { const raw = localStorage.getItem(KEY); cache = raw ? { ...DEFAULT, ...JSON.parse(raw) } : { ...DEFAULT }; }
+  try { const raw = localStorage.getItem(KEY); cache = raw ? migrate(JSON.parse(raw)) : { ...DEFAULT }; }
   catch { cache = { ...DEFAULT }; }
   return cache!;
 }

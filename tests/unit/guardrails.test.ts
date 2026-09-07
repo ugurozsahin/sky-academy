@@ -177,6 +177,18 @@ describe('guard rails', () => {
     expect(/tracer\??\.destroy\(\)/.test(cleanup), 'cleanup must dispose the Tracer on screen teardown').toBe(true);
   });
 
+  // #38: the save had a version field (`v`) and a versioned key (`sna:v1`) but neither drove anything — load()
+  // shallow-merged DEFAULT with the stored blob, so a shape change (a new bests record, Y3+ keys) would silently
+  // keep stale keys with no place to transform them. The fix routes load() through migrate(), which switches on
+  // `raw.v` and is the seam future shape changes slot into. This rail keeps load() from reverting to a raw merge.
+  it('storage.load() routes stored data through migrate() (#38)', () => {
+    const storage = code(SOURCES['/src/storage.ts']);
+    const load = storage.slice(storage.indexOf('function load'), storage.indexOf('function save'));
+    expect(/migrate\(/.test(load), 'load() must migrate the stored blob, not shallow-merge it').toBe(true);
+    expect(/\{\s*\.\.\.DEFAULT\s*,\s*\.\.\.JSON\.parse/.test(load)).toBe(false);   // the old shallow-merge is gone
+    expect(/switch\s*\(|MIGRATIONS\[/.test(code(SOURCES['/src/storage.ts']))).toBe(true);   // migrate keys off the version
+  });
+
   // Incident 2026-09-06 (#37): dead code lingered after the outcome-beat refactor — `Bubble.scale` was
   // always 1, `SaveData.totalSlices` was written but never read, and `dom.wait` / `yearById` were exported
   // but imported nowhere. tsc's noUnusedLocals catches neither an unused *export* nor an always-constant
