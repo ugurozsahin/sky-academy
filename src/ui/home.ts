@@ -3,6 +3,7 @@ import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
 import { coinBalance, dojoToday, load, save, STICKER_IDS, STICKER_COST } from '../storage';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
+import { MODES } from '../game/modes';
 import { weakestTopics } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS } from '../game/dojo';
 import { $, $$, render, stars } from './dom';
@@ -76,6 +77,26 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   let subject = subjectInit;
   const tb = topbar(nav, () => islandScreen(nav, year, subject));
   const weakest = weakestTopics(topicsFor(year.id), d.progress);
+  // The island menu in one table (#26): adding a mode button is one entry, not a new <button> line plus a new
+  // click handler. The three battle modes take their title from MODES; Sensei-training and Memory-Match are
+  // separate flows (not a Session.Mode), so they live here too rather than being forced into MODES.
+  const menu: { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void }[] = [
+    { id: 'train', mod: 'train', vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
+      title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${d.training[year.id] ?? 0}`,
+      go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
+    { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
+      title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}`,
+      go: () => nav.play({ year, mode: 'endless' }) },
+    { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
+      title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}`,
+      go: () => nav.play({ year, mode: 'sprint' }) },
+    { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
+      title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${d.boss[year.id] ?? 0}`,
+      go: () => nav.play({ year, mode: 'boss' }) },
+    { id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,
+      title: 'Memory Match', blurb: `Calm card pairs, no slicing · boards ${d.memory[year.id] ?? 0}`,
+      go: () => nav.memory(year) },
+  ];
   render(`
   <section class="screen home island-screen">
     ${tb.html}
@@ -89,11 +110,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       <button class="tab${subject === 'writing' ? ' on' : ''}" data-s="writing" role="tab">✍️ Writing</button>
     </div>
     <div class="topics" id="topics"></div>
-    <button class="btn mode-btn train" id="train"><span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span><span><b>Train with Sensei</b><small>Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${d.training[year.id] ?? 0}</small></span></button>
-    <button class="btn mode-btn" id="endless"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Sky Storm</b><small>Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}</small></span></button>
-    <button class="btn mode-btn sprint" id="sprint"><span class="vport emoji">⏱️</span><span><b>Ninja Sprint</b><small>${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}</small></span></button>
-    <button class="btn mode-btn boss" id="boss"><span class="vport"><img src="${VILLAIN.img}" alt=""></span><span><b>Boss Battle</b><small>Knock out Hammer Man · KOs ${d.boss[year.id] ?? 0}</small></span></button>
-    <button class="btn mode-btn memory" id="memory"><span class="vport emoji">🃏</span><span><b>Memory Match</b><small>Calm card pairs, no slicing · boards ${d.memory[year.id] ?? 0}</small></span></button>
+    ${menu.map(m => `<button class="btn mode-btn${m.mod ? ` ${m.mod}` : ''}" id="${m.id}">${m.vport}<span><b>${m.title}</b><small>${m.blurb}</small></span></button>`).join('\n    ')}
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {
@@ -108,11 +125,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   drawTopics();
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
   $$('.tab').forEach(b => b.addEventListener('click', () => { subject = b.dataset.s as 'maths' | 'writing'; $$('.tab').forEach(x => x.classList.toggle('on', x === b)); sfx.tap(); drawTopics(); }));
-  $('#train').addEventListener('click', () => { sfx.tap(); say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); });
-  $('#endless').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'endless' }); });
-  $('#sprint').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'sprint' }); });
-  $('#boss').addEventListener('click', () => { sfx.tap(); nav.play({ year, mode: 'boss' }); });
-  $('#memory').addEventListener('click', () => { sfx.tap(); nav.memory(year); });
+  menu.forEach(m => $(`#${m.id}`).addEventListener('click', () => { sfx.tap(); m.go(); }));
 }
 
 /** Rewards: coins, streak and the sticker album. */

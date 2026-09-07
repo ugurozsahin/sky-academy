@@ -111,6 +111,17 @@ describe('guard rails', () => {
     for (const m of ['mission', 'endless', 'sprint', 'boss']) expect(modes, `MODES has ${m}`).toContain(`${m}: {`);
   });
 
+  // #26 follow-up: the five island menu buttons were five hardcoded `<button class="btn mode-btn …">` lines,
+  // each with its own click handler, so adding a mode button meant editing several places. They now render
+  // from one `menu` table in islandScreen (the battle modes take their title from MODES; Sensei-training and
+  // Memory-Match are non-Mode flows that share the table). This rail keeps them single-sourced: the button-open
+  // markup appears exactly once (the `.map` template). Re-adding a hardcoded button makes it two → red.
+  it('island menu buttons render from one table, not hardcoded lines (#26)', () => {
+    const home = code(SOURCES['/src/ui/home.ts']);
+    const opens = [...home.matchAll(/class="btn mode-btn/g)];
+    expect(opens.length).toBe(1);
+  });
+
   // Incident 2026-09-06 (#45): `Topic.mode` ('bubbles'|'tracing') collided with `Session.Mode` (the play
   // mode), and every island menu button carried the class `.storm` — so a screen rule written on a bare
   // modifier like `.memory` could clobber a button (#63). A topic's answer style is now `Topic.input` and the
