@@ -160,6 +160,23 @@ describe('guard rails', () => {
     }
   });
 
+  // #39, second half: the rail above (destroy() unbinds the canvas listeners) only helps if the old Tracer is
+  // actually disposed. A new Tracer is built per question, so `play.ts` must dispose the previous one first —
+  // otherwise ~30 handler pairs stack on the shared #trace canvas over a tracing mission, the very leak #39
+  // named. This keeps the single construction site behind a disposal of the old tracer, and the screen
+  // teardown disposing it too. Moving `tracer?.destroy()` after `new Tracer(` (or dropping it) turns it red.
+  it('play.ts disposes the previous Tracer before building a new one (#39)', () => {
+    const play = code(SOURCES['/src/ui/play.ts']);
+    const ctors = [...play.matchAll(/new Tracer\(/g)];
+    expect(ctors.length).toBe(1);                                       // one construction site to reason about
+    const start = play.indexOf('function startTrace');
+    const before = play.slice(start, ctors[0].index);
+    expect({ inStartTrace: start >= 0 && start < ctors[0].index, disposesFirst: /tracer\??\.destroy\(\)/.test(before) })
+      .toEqual({ inStartTrace: true, disposesFirst: true });
+    const cleanup = play.slice(play.indexOf('function cleanup'));
+    expect(/tracer\??\.destroy\(\)/.test(cleanup), 'cleanup must dispose the Tracer on screen teardown').toBe(true);
+  });
+
   // Incident 2026-09-06 (#37): dead code lingered after the outcome-beat refactor — `Bubble.scale` was
   // always 1, `SaveData.totalSlices` was written but never read, and `dom.wait` / `yearById` were exported
   // but imported nowhere. tsc's noUnusedLocals catches neither an unused *export* nor an always-constant
