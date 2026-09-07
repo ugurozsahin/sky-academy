@@ -1,6 +1,6 @@
 // Memory Match: flip two cards, keep the pairs. Pure logic + pair decks (no DOM) so it is unit-testable.
 import type { Rng, YearId } from '../curriculum';
-import { numberWord, OBJECTS, pick, ri, shuffle } from '../curriculum/util';
+import { coinLabel, numberWord, OBJECTS, pick, ri, shuffle } from '../curriculum/util';
 
 export interface Face { text: string; say: string; coin?: number; small?: boolean }  // coin = pence, drawn as a coin
 export interface Pair { a: Face; b: Face }
@@ -9,7 +9,7 @@ export interface Card { pair: number; face: Face; up: boolean; matched: boolean 
 export type FlipResult = 'ignored' | 'open' | 'match' | 'miss';
 
 const txt = (text: string, say = text, small = false): Face => ({ text, say, small });
-const coin = (p: number): Face => ({ text: p >= 100 ? `£${p / 100}` : `${p}p`, say: p >= 100 ? `${p / 100} pound${p > 100 ? 's' : ''}` : `${p} pence`, coin: p });
+const coin = (p: number): Face => ({ text: coinLabel(p), say: p >= 100 ? `${p / 100} pound${p > 100 ? 's' : ''}` : `${p} pence`, coin: p });
 const objs = (n: number, emoji: string): Face => ({ text: emoji.repeat(n), say: String(n) });
 const words = (rng: Rng, from: number, to: number, n: number): Pair[] => shuffle(rng, Array.from({ length: to - from + 1 }, (_, i) => from + i)).slice(0, n).map(v => ({ a: txt(String(v), numberWord(v)), b: txt(numberWord(v), numberWord(v), v > 20) }));
 const SHAPES2D: [string, string][] = [['●', 'circle'], ['■', 'square'], ['▲', 'triangle'], ['▬', 'rectangle'], ['⬟', 'pentagon'], ['⬢', 'hexagon']];

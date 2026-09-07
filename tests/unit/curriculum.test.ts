@@ -3,6 +3,7 @@ import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd } from '../../src/curriculum/maths';
 import type { Difficulty, Question } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT } from '../../src/curriculum/writing';
+import { coinLabel } from '../../src/curriculum/util';
 
 // Deterministic RNG (mulberry32)
 function rng(seed: number) {
@@ -235,5 +236,15 @@ describe('Position & direction (#8 Phase 2)', () => {
       }
     }
     expect(checked).toBeGreaterThan(300);
+  });
+});
+
+describe('coinLabel (#35 — one source for the £/p money label)', () => {
+  it('shows pence under £1 and whole pounds at or above 100p', () => {
+    expect(coinLabel(1)).toBe('1p');
+    expect(coinLabel(50)).toBe('50p');
+    expect(coinLabel(99)).toBe('99p');
+    expect(coinLabel(100)).toBe('£1');
+    expect(coinLabel(200)).toBe('£2');
   });
 });

@@ -1,6 +1,6 @@
 // Maths topics for Reception (EYFS ELGs), Year 1 and Year 2 (National Curriculum KS1).
 import type { Difficulty, Generator, Question, Rng, Topic } from './types';
-import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay } from './util';
+import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel } from './util';
 
 const q = (prompt: string) => ({ prompt, say: symSay(prompt) });
 
@@ -108,11 +108,10 @@ const y1Doubles: Generator = (d, rng) => {
   return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 24, visual: d === 1 ? { type: 'tenframe', n, n2: n } : undefined });
 };
 const COINS = [1, 2, 5, 10, 20, 50, 100, 200];
-const coinName = (c: number) => c >= 100 ? `£${c / 100}` : `${c}p`;
 const y1Coins: Generator = (d, rng) => {
   if (d === 1) {
     const c = pick(rng, COINS.slice(0, 6));
-    return wordQ(rng, 'Which coin is this?', coinName(c), shuffle(rng, COINS.filter(x => x !== c)).slice(0, 3).map(coinName), { visual: { type: 'coins', coins: [c] }, say: 'How much is this coin worth?' });
+    return wordQ(rng, 'Which coin is this?', coinLabel(c), shuffle(rng, COINS.filter(x => x !== c)).slice(0, 3).map(coinLabel), { visual: { type: 'coins', coins: [c] }, say: 'How much is this coin worth?' });
   }
   const count = d === 2 ? 2 : 3;
   const coins = Array.from({ length: count }, () => pick(rng, [1, 2, 5, 10, 20]));

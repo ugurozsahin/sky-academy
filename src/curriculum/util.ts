@@ -47,6 +47,9 @@ export function numberWord(n: number): string {
   return o ? `${TENS[t]}-${NUM_WORDS[o]}` : TENS[t];
 }
 
+/** Money label: pence under £1 stay as `50p`, whole pounds show as `£2` (one source for the shops, coins and cards). */
+export const coinLabel = (p: number) => p >= 100 ? `£${p / 100}` : `${p}p`;
+
 export const OBJECTS = ['🍎', '⭐', '🐟', '🎈', '🍪', '🦋', '🐸', '🚗', '🌼', '🧁'];
 export function symSay(s: string): string {
   return s.replace(/×/g, ' times ').replace(/÷/g, ' divided by ').replace(/\+/g, ' plus ').replace(/[−-]/g, ' minus ').replace(/=/g, ' equals ').replace(/\?/g, ' what').replace(/\s+/g, ' ').trim();

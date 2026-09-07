@@ -1,4 +1,4 @@
-import { AVATARS, avatarById, cheerLine, praiseLine, SENSEI, SENSEI_LINES, senseiLine, VILLAIN } from '../avatars';
+import { avatarById, cheerLine, praiseLine, SENSEI, SENSEI_LINES, senseiLine, VILLAIN } from '../avatars';
 import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
 import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
@@ -8,6 +8,7 @@ import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndles
 import { equippedItem } from '../game/shop';
 import { haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, fillAnswer, render, stars } from './dom';
+import { screenScope, stickersHTML } from './screen';
 import { renderVisual } from './visuals';
 import { dojoRowsHTML } from './memory';
 import { drawCertificate, deliverCertificate, type CertInfo } from './certificate';
@@ -47,11 +48,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
-  const els = { lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'), toast: $('#toast'), overlay: $('#overlay'), qcard: $('#qcard') };
+  const els = { lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'), overlay: $('#overlay'), qcard: $('#qcard') };
   let lastOutcome: 'correct' | 'wrong' | 'miss' | 'none' = 'none';
-  let arena: Arena | null = null; let tracer: Tracer | null = null; let timers: number[] = []; let alive = true; let lastResult: SessionResult | null = null;
-  const later = (fn: () => void, ms: number) => { const t = window.setTimeout(() => { if (alive) fn(); }, ms); timers.push(t); };
-  const toast = (text: string, cls = '', ms = 1300) => { els.toast.textContent = text; els.toast.className = `toast show ${cls}`; later(() => els.toast.classList.remove('show'), ms); };
+  let arena: Arena | null = null; let tracer: Tracer | null = null; let lastResult: SessionResult | null = null;
+  const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
+  const { later, toast } = scope;
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
   const HOLD = sprint ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 };
@@ -199,7 +200,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const bySubject = (s: Topic['subject']) => Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicsFor(o.year.id).find(x => x.id === id)?.subject === s ? t.hits : 0), 0);
     const dojo = recordDojo({ mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo, stars: r.stars, score: r.score, training, mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing') });
     const fresh = addCoins(r.coins + dojo.coins); const streak = touchStreak();
-    const stickerHTML = fresh.map(id => { const a = AVATARS.find(x => x.id === id); return `<div class="unlock" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${a ? a.img : VILLAIN.img}" alt=""></span><b>New sticker!</b><small>${a ? a.name : VILLAIN.name}</small></div>`; }).join('');
+    const stickerHTML = stickersHTML(fresh);
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), 600);
     const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉') : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪') : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
     const headline = training ? senseiLine(r.won, d.name) : r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
@@ -248,7 +249,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
   $('#speak').addEventListener('click', repeatPrompt);
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
-  function cleanup() { alive = false; timers.forEach(clearTimeout); clearInterval(ticker); arena?.destroy(); tracer?.destroy(); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete window.__sna; }
+  function cleanup() { clearInterval(ticker); arena?.destroy(); tracer?.destroy(); scope.dispose(); }   // #35: dispose() stops timers, cancels speech and drops window.__sna
 
   // Test / accessibility hooks — the typed PlayHooks contract (#34)
   const hooks: PlayHooks = {

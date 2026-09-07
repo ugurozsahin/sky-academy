@@ -203,4 +203,22 @@ describe('guard rails', () => {
     const iface = arena.slice(from, arena.indexOf('}', from));
     expect(iface, 'Bubble.scale was always 1').not.toContain('scale');
   });
+
+  // #35: `esc` was defined twice — the shared export in dom.ts and a private copy in visuals.ts, exactly the
+  // copy-paste this issue set out to remove. This rail keeps HTML-escaping single-sourced in dom.ts.
+  it('esc (HTML escaping) is defined once, in dom.ts (#35)', () => {
+    const defs = Object.entries(SOURCES).filter(([, s]) => /(?:export\s+)?const\s+esc\s*=|function\s+esc\b/.test(code(s))).map(([f]) => f);
+    expect(defs).toEqual(['/src/ui/dom.ts']);
+  });
+
+  // #35: `later`, `toast` and the alive/timers teardown were copy-pasted between play.ts and memory.ts; they now
+  // come from screenScope() in screen.ts. This rail keeps both screens on the shared helper rather than re-rolling
+  // their own alive-guarded timer loop.
+  it('play + memory build on screenScope() rather than re-declaring the scaffolding (#35)', () => {
+    for (const f of ['/src/ui/play.ts', '/src/ui/memory.ts']) {
+      const s = code(SOURCES[f]);
+      expect(s, `${f} must use screenScope()`).toContain('screenScope(');
+      expect(/const\s+later\s*=\s*\(/.test(s), `${f} must not re-declare later`).toBe(false);
+    }
+  });
 });

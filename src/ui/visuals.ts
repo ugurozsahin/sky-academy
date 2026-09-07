@@ -1,7 +1,7 @@
 // Renders a Question.visual into HTML (inline SVG / emoji). Keeps pictorial support for non-readers.
 import type { Visual } from '../curriculum';
-
-const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+import { coinLabel } from '../curriculum/util';
+import { esc } from './dom';
 
 /** `n` objects in rows of five; slots past `keep` are crossed out ("take away"); at least one full row of slots is always shown. */
 export function fiveFrames(n: number, emoji: string, keep = n): string {
@@ -72,7 +72,7 @@ const DOT_LAYOUTS: Record<number, [number, number][]> = {
 
 export function coinSVG(p: number): string {
   const gold = p === 1 || p === 2 ? ['#c9803a', '#7a4a1c'] : p >= 100 ? ['#e6c250', '#8a6d1f'] : ['#d5d9e2', '#7d8594'];
-  const label = p >= 100 ? `£${p / 100}` : `${p}p`;
+  const label = coinLabel(p);
   const r = p === 1 ? 22 : p === 2 ? 26 : p === 5 ? 20 : p === 10 ? 25 : p === 20 ? 24 : p === 50 ? 28 : p === 100 ? 24 : 28;
   const shape = p === 20 || p === 50
     ? `<polygon points="${Array.from({ length: 7 }, (_, i) => { const a = i / 7 * Math.PI * 2 - Math.PI / 2; return `${(32 + r * Math.cos(a)).toFixed(1)},${(32 + r * Math.sin(a)).toFixed(1)}`; }).join(' ')}"/>`

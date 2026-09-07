@@ -1,10 +1,11 @@
 // Memory Match screen: a calm, non-slice card-flip mode. Cards are DOM buttons (no canvas).
-import { AVATARS, avatarById, cheerLine, praiseLine, VILLAIN } from '../avatars';
+import { avatarById, cheerLine, praiseLine } from '../avatars';
 import type { YearInfo } from '../curriculum';
 import { Memory, pickTheme, type Face } from '../game/memory';
 import { addCoins, load, recordDojo, recordMemory, touchStreak } from '../storage';
 import { say, sfx } from '../audio';
 import { $, $$, esc, render, stars } from './dom';
+import { screenScope, stickersHTML } from './screen';
 import { coinSVG } from './visuals';
 import type { DojoOutcome } from '../game/dojo';
 import type { MemoryHooks } from './hooks';
@@ -42,10 +43,9 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
-  let alive = true; let timers: number[] = []; let lock = false;
-  const later = (fn: () => void, ms: number) => { const t = window.setTimeout(() => { if (alive) fn(); }, ms); timers.push(t); };
-  const toastEl = $('#toast');
-  const toast = (text: string, cls = '') => { toastEl.textContent = text; toastEl.className = `toast show ${cls}`; later(() => toastEl.classList.remove('show'), 1200); };
+  let lock = false;
+  const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the play screen
+  const { later, toast } = scope;
   const cardEls = $$<HTMLButtonElement>('.card');
   const draw = () => {
     game.cards.forEach((c, i) => { const el = cardEls[i]; el.classList.toggle('up', c.up || c.matched); el.classList.toggle('matched', c.matched); el.disabled = c.matched; });
@@ -67,7 +67,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     const boards = recordMemory(o.year.id);
     const dojo = recordDojo({ mode: 'memory', won: true, correct: game.pairs.length, attempts: game.moves, bestCombo: 0, stars: game.stars, score: game.score });
     const fresh = addCoins(game.coins + dojo.coins); const streak = touchStreak();
-    const stickerHTML = fresh.map(id => { const a = AVATARS.find(x => x.id === id); return `<div class="unlock" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${a ? a.img : VILLAIN.img}" alt=""></span><b>New sticker!</b><small>${a ? a.name : VILLAIN.name}</small></div>`; }).join('');
+    const stickerHTML = stickersHTML(fresh);
     if (fresh.length) later(() => sfx.stage(), 600);
     sfx.stage();
     const headline = praiseLine(av, d.name); say(headline);
@@ -87,7 +87,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
   }
-  function cleanup() { alive = false; timers.forEach(clearTimeout); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete window.__sna; }
+  const cleanup = () => scope.dispose();   // #35: dispose() stops timers, cancels speech and drops window.__sna
   $('#back').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
   $('#speak').addEventListener('click', intro);
   $('#qcard').addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; intro(); });
