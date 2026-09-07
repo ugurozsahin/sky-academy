@@ -27,6 +27,13 @@ You never write code, never open a development PR, and never merge anything. Rep
 
 ## The checks
 
+**A check whose condition is met is a finding. Full stop.** Nothing in this document turns one into a pass:
+not that the cause is obvious, not that it clears itself tonight, not that somebody already knows. Where a
+check tells you to explain a benign cause, that changes the **wording** of the issue and the message — never
+whether you raise them. On its first run, 2026-09-07, this task reported "clean, all seven" while the nightly
+had never fired and the month was on course to pass every plan line: two findings, reported as none. A
+watchdog that says clean when it is not is worse than no watchdog, because it is believed.
+
 Run every check. A check that cannot be performed is a finding in its own right — say so rather than skipping
 it quietly, because "I could not tell" being reported as "fine" is the exact failure this task exists to catch.
 
@@ -46,16 +53,21 @@ your first finding and the only one you can report.
    job skips e2e, so this nightly is the only full e2e check a *merged* tree ever gets. **No run in the last
    26 hours is a finding**, equal in weight to a failed one: GitHub disables cron on repo inactivity, and a
    mistyped cron or a renamed workflow looks identical from here. When the cause is visibly benign and
-   self-clearing — the cron was added after the last firing time, so the first one is still ahead — **say so
-   and say what would make it serious**, e.g. "no full e2e has ever run on a merged tree; the schedule fires
-   tonight at 03:20 UTC; if it is still absent tomorrow, something is wrong." A first message whose correct
-   response is to do nothing must say that plainly, or it teaches him that these messages need no action.
-3. **Is the development routine alive?** Read the cadence from the routine itself rather than assuming — the
-   repo has called it "hourly" while it ran every three hours. Look at the newest `WORKLOG.md` heading whose
-   text marks it as a **routine** run (`(hourly routine, cloud)` and the like): interactive sessions and
-   addenda write entries too, and counting one of those as a heartbeat is this task's own failure mode. More
-   than two expected intervals with no routine entry is the finding — the routine is not running, or is
-   failing before it records anything, and nobody else would notice.
+   self-clearing — the cron was added after the last firing time, so the first one is still ahead — **you still
+   raise the finding and still open the issue**, and you put the explanation in it: "no full e2e has ever run
+   on a merged tree; the schedule fires tonight at 03:20 UTC; if it is still absent tomorrow, something is
+   wrong." A message whose correct response is to wait must say so plainly, but it is still a message.
+   Explicable is not the same as fine, and this very clause was read as an exemption on the first run.
+3. **Is the development routine alive?** Read the body of the issue titled `routine: heartbeat`: the routine
+   rewrites it with a UTC timestamp as the last thing every run does. Two missed intervals plus slack is the
+   finding — take the cadence from the routine rather than assuming, the repo has called it "hourly" while it
+   ran every three hours. **An open issue is not evidence of a pulse; a readable, recent timestamp is** — an
+   empty or unparseable body counts as stale, and that is the likeliest partial death, because the pulse is
+   written last and last is the most exposed place to run out of time. If no such issue exists in any state,
+   the routine has not run since this was introduced; if it exists but is closed, someone closed the pulse,
+   which is a finding, not a pass. Do not use WORKLOG.md for this: nothing reads it any more, and its headings
+   never distinguished a routine run from an interactive session anyway.
+
 4. **Is any PR stuck?** For each open PR: how long has it been open, and does its head carry a `review-gate`
    status (`/commits/<head sha>/status`)? Two exemptions, and only these two: a PR **parked on the owner**
    (its issue has an unticked "Owner action" gating a visual — the routine is told to leave those open, so it
@@ -74,23 +86,20 @@ your first finding and the only one you can report.
    session": you cannot tell who authored a PR — one token serves everyone, every PR is self-authored — and
    the WORKLOG heading and branch name are written by the very party you are checking, so a run that broke
    the freeze can present itself as a session. Look for evidence the **owner** asked: his own comment on the
-   issue or PR, or a WORKLOG line quoting a request of his. That is the one form a run cannot issue to
+   issue or PR — a WORKLOG line will not do, nothing reads that file and a run could write one itself. That is the one form a run cannot issue to
    itself. If you find it, the item is a documented exception; if you do not, raise the finding as a question
    — ask what authorised it, do not accuse.
-6. **Is the Actions budget on course?** Use **month-to-date**, not a projection from one day: sum the
-   wall-clock durations of runs created since the 1st (`/actions/runs?created=>=<first of the month>`). A
-   single day is a terrible predictor here — 2026-09-07 alone was ~530 minutes across 90 runs, most of them a
-   half-hour of block/clear testing that will never repeat, and projecting it would have claimed 15,900.
-   Do **not** trust `/actions/runs/<id>/timing`: on this repo it returns `total_ms: 0` for real runs, and a
-   billable total of zero means the endpoint is not reporting, not that nothing was spent — which is this
-   task's own failure mode, inside the check meant to catch it. The repo is private so minutes are metered
-   (2,000 a month on Free, 3,000 on Pro), **you cannot see which plan applies, and the quota is account-wide
-   rather than per repo** — so report month-to-date with the days elapsed **and the rate over the last three
-   days**, because dividing a hot week by a full month reads it as cool: on 7 September all 585 minutes of the
-   month fell on the 6th and 7th. Raise a finding when the month is on course to pass **2,000** — the Free
-   quota, the plan you cannot rule out — and say in it that 2,000 is the Free line and 3,000 the Pro one, so
-   the owner can judge which applies. A budget finding is one of the few things worth telling him about on an
-   otherwise clean run: a clean run is silent, but silence about an overage he is paying for is not a service.
+6. **Is the Actions budget on course?** Compute **two** numbers from the wall-clock durations of runs created
+   since the 1st (`/actions/runs?created=>=<first of the month>`, each rounded up to the minute), and put both
+   in your report: **(a)** month-to-date ÷ days elapsed × 30, and **(b)** the last three days ÷ 3 × 30. One
+   day is a terrible predictor, and a whole month divided by elapsed days reads a hot week as cool, so you
+   need both. **If either exceeds 2,000, it is a finding** — no judgement, and "most of that was one-off
+   testing" goes in the issue if it is true, it does not cancel the finding. 2,000 is the Free quota and 3,000
+   the Pro one; you cannot see which plan applies and the quota is account-wide rather than per repo, so give
+   the owner both lines and let him decide. Do **not** trust `/actions/runs/<id>/timing`: on this repo it
+   returns `total_ms: 0` for real runs, and a billable total of zero means the endpoint is not reporting, not
+   that nothing was spent.
+
 7. **Did anything merge that should not have?** For the last day's merges to main: none should have been
    merged while its `review-gate` status was red, and each should have a green CI run on the merged head —
    **except a docs-only merge, which correctly has none** (`ci.yml` path-ignores `**.md`, `docs/`, `.claude/`,
@@ -130,7 +139,10 @@ built to catch it, and it is why the dev routine gets a heartbeat from you and y
 
 Every run, findings or none, and **as the very last thing you do**: find the open issue titled
 `watchdog: heartbeat` (label `watchdog`) and replace its **body** with one line — the UTC timestamp of this
-run and a few words on the outcome (`2026-09-07T18:00Z — clean` / `— 1 finding, #123`). If none exists,
+run and a few words on the outcome and **the numbers you actually observed** — a clean run must
+carry its evidence, or a wrong "clean" is invisible afterwards:
+`2026-09-07T18:00Z — clean · nightly 1 run ok · budget mtd 638/7d, 3d 212/day · 3 PRs open · main green`, or
+`2026-09-07T17:35Z — 2 findings #104 #105 · nightly 0 runs · budget 3d 212/day`. If none exists,
 create it **with that line already in the body**, in the single `POST /issues` call that takes `title`, `body`
 and `labels` together — never create it empty and fill it afterwards, or a run that dies in between leaves an
 open issue with no timestamp, which ages into nothing and reads as a pulse forever. Never close it; it is not
