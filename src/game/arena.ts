@@ -1,4 +1,5 @@
 // Canvas arena: bubbles fly up from the bottom; the player taps or slices them.
+import { shuffle } from '../curriculum/util';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
   launchAt: number; launched: boolean; hit: boolean; dead: boolean; color: string; wobble: number;
@@ -87,7 +88,7 @@ export class Arena {
     const perBatch = Math.max(3, Math.min(o.ordered?.length ? 4 : n, Math.floor((this.W - 16) / (2 * r + 10))));
     const batchGap = T * 1000 * (perBatch < n && perBatch <= 4 ? 0.8 : 0.62);   // narrow screens: the row is mostly down before the next rises
     this.batchSpan = perBatch * stagger;
-    const order = o.ordered?.length ? dealOrdered(o.labels, o.ordered, perBatch) : o.labels.map((_, i) => i).sort(() => Math.random() - 0.5);
+    const order = o.ordered?.length ? dealOrdered(o.labels, o.ordered, perBatch) : shuffle(Math.random, o.labels.map((_, i) => i));
     const margin = r + 8;
     const span = this.W - margin * 2;
     for (let k = 0; k < n; k++) {
@@ -346,7 +347,7 @@ export function dealOrdered(labels: string[], ordered: string[], perBatch: numbe
   const pool = labels.map((l, i) => ({ l, i }));
   const targets: number[] = [];
   for (const label of ordered) { const k = pool.findIndex(x => x.l === label); if (k >= 0) targets.push(pool.splice(k, 1)[0].i); }
-  const decoys = pool.map(x => x.i).sort(() => Math.random() - 0.5);
+  const decoys = shuffle(Math.random, pool.map(x => x.i));
   const batches = Math.max(1, Math.ceil(labels.length / perBatch));
   const perBatchTargets = Math.max(1, Math.ceil(targets.length / batches));
   const out: number[] = [];
@@ -357,7 +358,7 @@ export function dealOrdered(labels: string[], ordered: string[], perBatch: numbe
     while (batch.length < Math.min(perBatchTargets, slots) && t < targets.length) batch.push(targets[t++]);
     while (batch.length < slots && d < decoys.length) batch.push(decoys[d++]);
     while (batch.length < slots && t < targets.length) batch.push(targets[t++]);
-    out.push(...batch.sort(() => Math.random() - 0.5));
+    out.push(...shuffle(Math.random, batch));
   }
   return out;
 }

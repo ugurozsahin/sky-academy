@@ -1,5 +1,6 @@
 // Mission / endless session controller. Pure game logic (no DOM) so it can be unit-tested.
 import type { Difficulty, Question, Topic, YearInfo } from '../curriculum';
+import { shuffle } from '../curriculum/util';
 import { MODES, type Mode, type ModeCtx, type ModeSpec } from './modes';
 
 // mission = 5 staged waves with lives · endless = Sky Storm, ramps until lives run out · sprint = 60-second time attack, no lives
@@ -72,7 +73,7 @@ export class Session {
   labelsFor(q: Question): string[] {
     if (!q.sequence) return q.options;
     const decoys = q.options.filter(o => !q.sequence!.includes(o));
-    return [...q.sequence.slice(this.seqIndex), ...decoys].sort(() => this.rng() - 0.5);
+    return shuffle(this.rng, [...q.sequence.slice(this.seqIndex), ...decoys]);
   }
   nextQuestion() {
     if (this.ended) return;

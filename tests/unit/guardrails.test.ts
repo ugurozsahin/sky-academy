@@ -35,13 +35,14 @@ describe('guard rails', () => {
   });
 
   // `shuffle(rng, arr)` exists in curriculum/util.ts; `.sort(() => rng() - 0.5)` is non-uniform and
-  // engine-dependent, so "random" order is quietly biased (#42). Budget: lower as #42 lands.
-  // The pattern covers the `(a, b) =>` form and a reversed `0.5 - rng()` as well as the bare one we have;
+  // engine-dependent, so "random" order is quietly biased (#42). #42 replaced all four (session.ts once,
+  // arena.ts ×3) with the Fisher–Yates helper, so the budget is now zero — never raise it.
+  // The pattern covers the `(a, b) =>` form and a reversed `0.5 - rng()` as well as the bare one we had;
   // it does not try to catch every way to write a biased comparator (`rng() > 0.5 ? 1 : -1`, say).
   it('no comparator shuffles', () => {
     const shuffle = /\.sort\(\s*\([^)]*\)\s*=>[^;\n]*?(?:(?:Math\.random|rng|random)\(\)[^;\n]*?0?\.5|0?\.5[^;\n]*?(?:Math\.random|rng|random)\(\))/g;
     const hits = Object.entries(SOURCES).flatMap(([f, s]) => [...code(s).matchAll(shuffle)].map(() => f));
-    expect(hits.length).toBeLessThanOrEqual(4);                         // #42 removes them; never raise this
+    expect(hits.length).toBeLessThanOrEqual(0);                         // #42 removed all four; never raise this
   });
 
   // `shadowBlur` is per-pixel CPU work; arena.ts itself notes it is "too slow on low-end devices", yet
