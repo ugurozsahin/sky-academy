@@ -76,7 +76,11 @@ describe('guard rails', () => {
     expect(main).toMatch(/dispose\s*=\s*memoryScreen\(/);
     // Match each route's *body*, not its layout: an equivalent reformat must not turn this red (#74 review).
     // The route names are read from the source, so a screen added later is covered without editing this test.
-    const routes = main.slice(main.indexOf('const nav = {')).split(/\n\s*(?=\w+:)/).slice(1);
+    // Bound the slice at the router's closing brace: unbounded, the LAST route's "body" ran to end of file, so
+    // any `leave()` written lower in main.ts made a genuinely broken route pass (#77 review).
+    const from = main.indexOf('const nav = {'), to = main.indexOf('\n};', from);
+    expect({ router: from >= 0 && to > from }).toEqual({ router: true });
+    const routes = main.slice(from, to).split(/\n\s*(?=\w+:)/).slice(1);
     const named = routes.map(r => [r.slice(0, r.indexOf(':')), r] as const).filter(([n]) => n !== 'up');
     expect(named.length).toBeGreaterThanOrEqual(7);                     // every screen the router can show
     for (const [screen, body] of named)
