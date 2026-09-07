@@ -491,13 +491,15 @@ test.describe('Sky Ninja Academy', () => {
     // Incident 2026-09-06 (#73 review): only the Quit/Islands/Play-again buttons tore the screen down, so
     // the back button left the old Arena's rAF loop running on a detached canvas — with its window listeners
     // attached and `window.__sna` pointing at the dead session. Every play → back → play stacked another one.
-    const leaked = await page.evaluate(() => new Promise<any>(res => {
-      const dead = window.__sna.arena, t0 = dead.time;
-      history.back();
-      setTimeout(() => res({ advanced: +(dead.time - t0).toFixed(2), stillOnStage: document.body.contains(dead.canvas) }), 700);
-    }));
+    // Sample only once the route change has finished: the arena legitimately ticks a frame or two between
+    // `history.back()` and `popstate` running, so measuring across the pop would flake at ~0.02 s (#74 review).
+    await page.evaluate(() => { (window as any).__deadArena = window.__sna.arena; history.back(); });
     await expect(page.locator('.island-screen')).toBeVisible();
-    expect(leaked).toEqual({ advanced: 0, stillOnStage: false });
+    const leaked = await page.evaluate(() => new Promise<any>(res => {
+      const dead = (window as any).__deadArena, t0 = dead.time;
+      setTimeout(() => res({ advanced: +(dead.time - t0).toFixed(2), sna: typeof window.__sna }), 500);
+    }));
+    expect(leaked).toEqual({ advanced: 0, sna: 'undefined' });   // no ticking loop, and the dead hooks are gone
   });
 
   test('guard rail: no control inherits a full-screen rule, and the mode cards match', async ({ page }) => {

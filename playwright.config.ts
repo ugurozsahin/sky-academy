@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
-const executablePath = process.env.PW_CHROMIUM || (process.platform === 'linux' ? '/opt/pw-browsers/chromium' : undefined);
+import { existsSync } from 'node:fs';
+// The cloud dev container ships Chromium at a fixed path and blocks `playwright install`; a GitHub runner
+// (and a laptop) has its own download under ~/.cache/ms-playwright. Point at the bundled binary only when it
+// is really there, or CI launches nothing and every e2e test fails (#74 review). PW_CHROMIUM overrides both.
+const bundled = '/opt/pw-browsers/chromium';
+const executablePath = process.env.PW_CHROMIUM || (existsSync(bundled) ? bundled : undefined);
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,

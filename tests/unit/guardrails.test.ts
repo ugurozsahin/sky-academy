@@ -35,9 +35,10 @@ describe('guard rails', () => {
 
   // `shuffle(rng, arr)` exists in curriculum/util.ts; `.sort(() => rng() - 0.5)` is non-uniform and
   // engine-dependent, so "random" order is quietly biased (#42). Budget: lower as #42 lands.
-  // The pattern covers the `(a, b) =>` form and a reversed `0.5 - rng()` as well as the bare one we have.
+  // The pattern covers the `(a, b) =>` form and a reversed `0.5 - rng()` as well as the bare one we have;
+  // it does not try to catch every way to write a biased comparator (`rng() > 0.5 ? 1 : -1`, say).
   it('no comparator shuffles', () => {
-    const shuffle = /\.sort\(\s*\([^)]*\)\s*=>[^;\n]*?(?:Math\.random|rng|random)\(\)[^;\n]*?0?\.5/g;
+    const shuffle = /\.sort\(\s*\([^)]*\)\s*=>[^;\n]*?(?:(?:Math\.random|rng|random)\(\)[^;\n]*?0?\.5|0?\.5[^;\n]*?(?:Math\.random|rng|random)\(\))/g;
     const hits = Object.entries(SOURCES).flatMap(([f, s]) => [...code(s).matchAll(shuffle)].map(() => f));
     expect(hits.length).toBeLessThanOrEqual(4);                         // #42 removes them; never raise this
   });
@@ -73,8 +74,13 @@ describe('guard rails', () => {
     const main = code(SOURCES['/src/main.ts']);
     expect(main).toMatch(/dispose\s*=\s*playScreen\(/);
     expect(main).toMatch(/dispose\s*=\s*memoryScreen\(/);
-    for (const screen of ['avatar', 'map', 'island', 'play', 'memory', 'rewards', 'shop'])
-      expect({ screen, disposes: new RegExp(`${screen}: \\(?[^)]*\\)? => \\{? *leave\\(\\)`).test(main) }).toEqual({ screen, disposes: true });
+    // Match each route's *body*, not its layout: an equivalent reformat must not turn this red (#74 review).
+    // The route names are read from the source, so a screen added later is covered without editing this test.
+    const routes = main.slice(main.indexOf('const nav = {')).split(/\n\s*(?=\w+:)/).slice(1);
+    const named = routes.map(r => [r.slice(0, r.indexOf(':')), r] as const).filter(([n]) => n !== 'up');
+    expect(named.length).toBeGreaterThanOrEqual(7);                     // every screen the router can show
+    for (const [screen, body] of named)
+      expect({ screen, disposes: /\bleave\(\)/.test(body) }).toEqual({ screen, disposes: true });
     for (const f of ['/src/ui/play.ts', '/src/ui/memory.ts']) expect(code(SOURCES[f])).toContain('return cleanup;');
   });
 
