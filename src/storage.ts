@@ -1,12 +1,13 @@
 // Persistent player state (localStorage). Small, versioned, safe on failure.
 import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type DojoState } from './game/dojo';
 import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
+import type { YearId } from './curriculum';
 export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }   // hits/tries = lifetime slices (missions + Sensei training)
 export interface SaveData {
   v: 1;
   name: string;
   avatar: string | null;
-  year: 'reception' | 'year1' | 'year2';
+  year: YearId;
   sound: boolean;
   speech: boolean;
   progress: Record<string, TopicProgress>;

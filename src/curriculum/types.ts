@@ -29,22 +29,30 @@ export interface Question {
 export type Difficulty = 1 | 2 | 3;
 export type Generator = (d: Difficulty, rng: Rng) => Question;
 
+// One string source of truth for every year group. Adding a year (Y3–Y6) means one
+// new YearId member + one YEARS entry — no unions or per-year assets to retype elsewhere.
+export type YearId = 'reception' | 'year1' | 'year2';
+
 export interface Topic {
   id: string;             // "y1-bonds"
   title: string;          // "Number Bonds"
   icon: string;           // emoji
   subject: 'maths' | 'writing';
-  year: 'reception' | 'year1' | 'year2';
+  year: YearId;
   nc: string;             // curriculum reference (short)
   mode?: 'bubbles' | 'tracing';
   gen: Generator;
 }
 
 export interface YearInfo {
-  id: 'reception' | 'year1' | 'year2';
+  id: YearId;
   title: string;
   short: string;
   age: string;
+  blurb: string;          // island subtitle (topics at a glance)
+  art: string;            // island illustration: an SVG data URI used as the .isl-art background
+  tint: string;           // island border tint (rgba hex)
+  maxAnswer: number;      // largest sensible numeric answer for this year (curriculum range guard)
   perStage: number;       // questions per stage
   lives: number;
   gentle: boolean;        // missed bubbles don't cost a life
@@ -53,8 +61,14 @@ export interface YearInfo {
 }
 export const STAGE_NAMES = ['Apprentice', 'Warrior', 'Master', 'Grandmaster', 'Legend'];
 
+// Island illustrations (code-drawn SVGs, no external assets). Kept beside the year they belong to
+// so a new year ships its own art without editing style.css.
+const ART_RECEPTION = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M18 34h84l-14 26H36z' fill='%235a3a2a'/%3E%3Cpath d='M30 42l18 12 12-8 16 10 14-14' stroke='%233d2618' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='34' rx='44' ry='9' fill='%2366c25a'/%3E%3Cellipse cx='60' cy='31' rx='40' ry='6' fill='%238fe07a'/%3E%3Crect x='52' y='12' width='16' height='20' rx='2' fill='%23ff6a3d'/%3E%3Cpath d='M46 12h28l-3 4H49z' fill='%23c92e12'/%3E%3Ccircle cx='60' cy='22' r='3' fill='%23ffe9a8'/%3E%3Ccircle cx='24' cy='28' r='5' fill='%23ffd54f'/%3E%3Ccircle cx='96' cy='27' r='4' fill='%23ff7ac6'/%3E%3C/svg%3E";
+const ART_YEAR1 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M16 36h88l-16 28H34z' fill='%234a3a5a'/%3E%3Cpath d='M28 44l20 12 14-9 14 11 16-15' stroke='%23302040' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='36' rx='46' ry='9' fill='%2359b0b8'/%3E%3Cellipse cx='60' cy='33' rx='42' ry='6' fill='%237fe0d8'/%3E%3Cpath d='M40 32l20-22 20 22z' fill='%23b8c4e6'/%3E%3Cpath d='M52 32l8-10 8 10z' fill='%23e8eeff'/%3E%3Crect x='82' y='18' width='4' height='14' fill='%23ffb020'/%3E%3Ccircle cx='84' cy='16' r='4' fill='%23ffe07a'/%3E%3C/svg%3E";
+const ART_YEAR2 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M14 38h92l-18 28H32z' fill='%233a2a4a'/%3E%3Cpath d='M26 46l22 12 14-9 14 11 18-15' stroke='%23261a34' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='38' rx='48' ry='9' fill='%237a5ad6'/%3E%3Cellipse cx='60' cy='35' rx='44' ry='6' fill='%23a98cff'/%3E%3Cpath d='M44 34V14h32v20' fill='%232a1f4a'/%3E%3Cpath d='M38 14h44l-4-6H42z' fill='%23ff3b5c'/%3E%3Cpath d='M48 34V20h8v14zM64 34V20h8v14z' fill='%23ffe07a'/%3E%3Ccircle cx='24' cy='30' r='4' fill='%233ec9ff'/%3E%3Ccircle cx='98' cy='28' r='5' fill='%23ffd54f'/%3E%3C/svg%3E";
+
 export const YEARS: YearInfo[] = [
-  { id: 'reception', title: 'Reception', short: 'R', age: 'Ages 4–5', perStage: 5, lives: 4, gentle: true, speeds: [1, 1, 1, 2, 2], diffs: [1, 1, 2, 2, 3] },
-  { id: 'year1', title: 'Year 1', short: 'Y1', age: 'Ages 5–6', perStage: 6, lives: 3, gentle: false, speeds: [1, 2, 2, 3, 3], diffs: [1, 2, 2, 3, 3] },
-  { id: 'year2', title: 'Year 2', short: 'Y2', age: 'Ages 6–7', perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3] },
+  { id: 'reception', title: 'Reception', short: 'R', age: 'Ages 4–5', blurb: 'First steps · counting, sounds & letters', art: ART_RECEPTION, tint: '#66c25a55', maxAnswer: 30, perStage: 5, lives: 4, gentle: true, speeds: [1, 1, 1, 2, 2], diffs: [1, 1, 2, 2, 3] },
+  { id: 'year1', title: 'Year 1', short: 'Y1', age: 'Ages 5–6', blurb: 'Number bonds, adding, phonics & spelling', art: ART_YEAR1, tint: '#59b0b855', maxAnswer: 120, perStage: 6, lives: 3, gentle: false, speeds: [1, 2, 2, 3, 3], diffs: [1, 2, 2, 3, 3] },
+  { id: 'year2', title: 'Year 2', short: 'Y2', age: 'Ages 6–7', blurb: 'Times tables, money, time & tricky words', art: ART_YEAR2, tint: '#7a5ad655', maxAnswer: 130, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3] },
 ];

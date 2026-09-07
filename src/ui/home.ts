@@ -10,8 +10,6 @@ import { $, $$, render, stars } from './dom';
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
 export type Nav = { avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay; memory: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void; up: () => void };
 
-const ISLAND_BLURB: Record<YearInfo['id'], string> = { reception: 'First steps · counting, sounds & letters', year1: 'Number bonds, adding, phonics & spelling', year2: 'Times tables, money, time & tricky words' };
-
 function topbar(nav: Nav, rerender: () => void) {
   const d = load(); const av = avatarById(d.avatar);
   const html = `
@@ -55,11 +53,11 @@ export function mapScreen(nav: Nav) {
   <section class="screen home map">
     ${tb.html}
     <h2 class="section-title">Where will you train today?</h2>
-    <div class="islands big">
+    <div class="islands big" style="--cols:${YEARS.length}">
       ${YEARS.map((y, i) => { const s = totalStars(y), m = maxStars(y); return `
-        <button class="island i${i}${y.id === d.year ? ' sel' : ''}" data-year="${y.id}" aria-label="${y.title} island">
-          <span class="isl-art"></span>
-          <span class="isl-text"><b>${y.title}</b><small>${y.age} · ${ISLAND_BLURB[y.id]}</small>
+        <button class="island${y.id === d.year ? ' sel' : ''}" data-year="${y.id}" style="--tint:${y.tint}" aria-label="${y.title} island">
+          <span class="isl-art" style="background-image:url(&quot;${y.art}&quot;);animation-delay:${(-1.3 * i).toFixed(1)}s"></span>
+          <span class="isl-text"><b>${y.title}</b><small>${y.age} · ${y.blurb}</small>
           <span class="isl-bar"><i style="width:${m ? Math.round(100 * s / m) : 0}%"></i></span><span class="isl-stars">★ ${s}/${m}</span></span>
           <span class="isl-go">Go →</span>
         </button>`; }).join('')}
@@ -76,16 +74,15 @@ export function mapScreen(nav: Nav) {
 export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'writing' = 'maths') {
   const d = load();
   let subject = subjectInit;
-  const idx = YEARS.indexOf(year);
   const tb = topbar(nav, () => islandScreen(nav, year, subject));
   const weakest = weakestTopics(topicsFor(year.id), d.progress);
   render(`
   <section class="screen home island-screen">
     ${tb.html}
-    <div class="isl-head i${idx}">
+    <div class="isl-head">
       <button class="icon-btn" id="back" aria-label="Back to the sky map">←</button>
-      <span class="isl-art"></span>
-      <div><b>${year.title} Island</b><small>${year.age} · ${ISLAND_BLURB[year.id]}</small></div>
+      <span class="isl-art" style="background-image:url(&quot;${year.art}&quot;)"></span>
+      <div><b>${year.title} Island</b><small>${year.age} · ${year.blurb}</small></div>
     </div>
     <div class="tabs" role="tablist">
       <button class="tab${subject === 'maths' ? ' on' : ''}" data-s="maths" role="tab">🔢 Maths</button>
@@ -102,7 +99,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   const drawTopics = () => {
     const list = topicsFor(year.id, subject);
     $('#topics').innerHTML = list.map(t => { const p = d.progress[t.id]; return `
-      <button class="topic" data-id="${t.id}" title="${t.nc}">
+      <button class="topic" data-id="${t.id}" data-subject="${t.subject}" title="${t.nc}">
         <span class="ic">${t.icon}</span><b>${t.title}</b>
         ${stars(p?.stars ?? 0)}${t.mode === 'tracing' ? '<small class="pill">tracing</small>' : ''}
       </button>`; }).join('');

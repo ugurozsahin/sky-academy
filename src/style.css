@@ -100,26 +100,23 @@ img { -webkit-user-drag: none; }
 .isl-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffb020, #ffd54f); box-shadow: 0 0 10px #ffb02088; }
 .islands.big .isl-stars { margin-top: 0; }
 .isl-go { align-self: center; padding: 10px 14px; border-radius: 999px; background: linear-gradient(180deg, #ffc44d, #ff9a1f); color: #2a1600; font-weight: 700; white-space: nowrap; box-shadow: 0 6px 16px #0006; }
-.i0.island { border-color: #66c25a55; } .i1.island { border-color: #59b0b855; } .i2.island { border-color: #7a5ad655; }
+/* Per-year border tint + island art come from YearInfo (--tint / .isl-art background), set inline in home.ts — no per-index rules, so a new year needs no CSS. */
 .isl-head { position: relative; display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 14px 12px 12px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); min-height: 92px; }
 .isl-head .isl-art { position: static; width: 96px; height: 64px; transform: none; animation: none; flex: none; }
 .isl-head b { display: block; font-size: 22px; } .isl-head small { color: var(--muted); font-weight: 600; }
-@media (min-width: 720px) { .islands.big { grid-template-columns: repeat(3, 1fr); } .islands.big .island { flex-direction: column; text-align: center; padding: 100px 14px 16px; } .islands.big .isl-art { left: 50%; top: 10px; transform: translateX(-50%); animation-name: hover; } .isl-text { align-items: center; width: 100%; } .isl-bar { width: 100%; } }
+@media (min-width: 720px) { .islands.big { grid-template-columns: repeat(var(--cols, 3), 1fr); } .islands.big .island { flex-direction: column; text-align: center; padding: 100px 14px 16px; } .islands.big .isl-art { left: 50%; top: 10px; transform: translateX(-50%); animation-name: hover; } .isl-text { align-items: center; width: 100%; } .isl-bar { width: 100%; } }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .hero { display: flex; align-items: center; gap: 12px; padding: 6px 12px 6px 6px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); text-align: left; }
 .hero b { display: block; font-size: 17px; } .hero small { color: var(--muted); }
 .settings { display: flex; gap: 8px; }
 .section-title { margin: 22px 4px 10px; font-size: 20px; color: #dfe6ff; }
-.islands { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.island { position: relative; padding: 78px 8px 12px; border-radius: var(--radius); background: var(--panel); border: 2px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 2px; overflow: hidden; transition: transform .15s, border-color .15s; }
+.islands { display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: 12px; }
+.island { position: relative; padding: 78px 8px 12px; border-radius: var(--radius); background: var(--panel); border: 2px solid var(--tint, var(--line)); display: flex; flex-direction: column; align-items: center; gap: 2px; overflow: hidden; transition: transform .15s, border-color .15s; }
 .island b { font-size: 18px; } .island small { color: var(--muted); font-weight: 600; } .isl-stars { margin-top: 6px; color: var(--accent); font-weight: 700; font-size: 14px; }
 .island.sel { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 12px 30px #0008, inset 0 0 40px #ffb02022; }
 .isl-art { position: absolute; top: 8px; left: 50%; width: 120px; height: 68px; transform: translateX(-50%); background-repeat: no-repeat; background-size: contain; background-position: center; animation: hover 4s ease-in-out infinite; }
-.i1 .isl-art { animation-delay: -1.3s; } .i2 .isl-art { animation-delay: -2.6s; }
+/* Hover stagger is set inline (animation-delay from the island index in home.ts). */
 @keyframes hover { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -5px); } }
-.i0 .isl-art { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M18 34h84l-14 26H36z' fill='%235a3a2a'/%3E%3Cpath d='M30 42l18 12 12-8 16 10 14-14' stroke='%233d2618' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='34' rx='44' ry='9' fill='%2366c25a'/%3E%3Cellipse cx='60' cy='31' rx='40' ry='6' fill='%238fe07a'/%3E%3Crect x='52' y='12' width='16' height='20' rx='2' fill='%23ff6a3d'/%3E%3Cpath d='M46 12h28l-3 4H49z' fill='%23c92e12'/%3E%3Ccircle cx='60' cy='22' r='3' fill='%23ffe9a8'/%3E%3Ccircle cx='24' cy='28' r='5' fill='%23ffd54f'/%3E%3Ccircle cx='96' cy='27' r='4' fill='%23ff7ac6'/%3E%3C/svg%3E"); }
-.i1 .isl-art { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M16 36h88l-16 28H34z' fill='%234a3a5a'/%3E%3Cpath d='M28 44l20 12 14-9 14 11 16-15' stroke='%23302040' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='36' rx='46' ry='9' fill='%2359b0b8'/%3E%3Cellipse cx='60' cy='33' rx='42' ry='6' fill='%237fe0d8'/%3E%3Cpath d='M40 32l20-22 20 22z' fill='%23b8c4e6'/%3E%3Cpath d='M52 32l8-10 8 10z' fill='%23e8eeff'/%3E%3Crect x='82' y='18' width='4' height='14' fill='%23ffb020'/%3E%3Ccircle cx='84' cy='16' r='4' fill='%23ffe07a'/%3E%3C/svg%3E"); }
-.i2 .isl-art { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M14 38h92l-18 28H32z' fill='%233a2a4a'/%3E%3Cpath d='M26 46l22 12 14-9 14 11 18-15' stroke='%23261a34' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='38' rx='48' ry='9' fill='%237a5ad6'/%3E%3Cellipse cx='60' cy='35' rx='44' ry='6' fill='%23a98cff'/%3E%3Cpath d='M44 34V14h32v20' fill='%232a1f4a'/%3E%3Cpath d='M38 14h44l-4-6H42z' fill='%23ff3b5c'/%3E%3Cpath d='M48 34V20h8v14zM64 34V20h8v14z' fill='%23ffe07a'/%3E%3Ccircle cx='24' cy='30' r='4' fill='%233ec9ff'/%3E%3Ccircle cx='98' cy='28' r='5' fill='%23ffd54f'/%3E%3C/svg%3E"); }
 .tabs { display: flex; gap: 8px; margin: 18px 0 10px; }
 .tab { flex: 1; padding: 12px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); font-weight: 700; font-size: 17px; color: var(--muted); }
 .tab.on { background: linear-gradient(180deg, #2f3d84, #1f2a63); color: #fff; border-color: #6d7fd6; }

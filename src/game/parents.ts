@@ -1,6 +1,6 @@
 // Parent dashboard: a read-only summary of a child's progress, behind a grown-ups gate.
 // Pure logic (no DOM) so it can be unit-tested. Reads only what storage.ts already records.
-import type { Rng, Topic, YearInfo } from '../curriculum';
+import type { Rng, Topic, YearId, YearInfo } from '../curriculum';
 import type { SaveData, TopicProgress } from '../storage';
 import { accuracy } from './sensei';
 
@@ -21,16 +21,16 @@ export function checkGate(input: string, answer: number): boolean {
 
 // ---------- Progress summary ----------
 export interface TopicStat {
-  id: string; title: string; icon: string; year: YearInfo['id']; subject: Topic['subject'];
+  id: string; title: string; icon: string; year: YearId; subject: Topic['subject'];
   stars: number; plays: number; hits: number; tries: number; accuracy: number | null;
 }
 export interface YearStat {
-  id: YearInfo['id']; title: string;
+  id: YearId; title: string;
   stars: number; maxStars: number; answered: number; correct: number; accuracy: number | null;
   topicsTried: number; topicsTotal: number;
 }
 export interface ModeBest {
-  id: YearInfo['id']; title: string;
+  id: YearId; title: string;
   endless: number; sprint: number; boss: number; memory: number; training: number;
 }
 export interface ParentSummary {

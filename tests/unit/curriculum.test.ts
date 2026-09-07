@@ -35,6 +35,7 @@ describe('topic registry', () => {
 });
 
 for (const topic of TOPICS) {
+  const maxAnswer = YEARS.find(y => y.id === topic.year)!.maxAnswer;   // NC answer ceiling for this year
   describe(`${topic.year} / ${topic.title} (${topic.id})`, () => {
     for (const d of [1, 2, 3] as Difficulty[]) {
       it(`difficulty ${d}: ${N} valid questions`, () => {
@@ -60,7 +61,7 @@ for (const topic of TOPICS) {
           const s = solve(q.prompt);
           if (s !== null) expect(Number(q.answer), q.prompt).toBe(s);
           // numeric answers never negative, never absurd for KS1
-          if (/^-?\d+$/.test(q.answer) && !q.sequence) { expect(Number(q.answer)).toBeGreaterThanOrEqual(0); expect(Number(q.answer)).toBeLessThanOrEqual(120); }
+          if (/^-?\d+$/.test(q.answer) && !q.sequence) { expect(Number(q.answer)).toBeGreaterThanOrEqual(0); expect(Number(q.answer), q.prompt).toBeLessThanOrEqual(maxAnswer); }
           seen.add(q.prompt + '|' + q.answer + '|' + JSON.stringify(q.visual ?? ''));
         }
         // variety: at least a handful of distinct questions

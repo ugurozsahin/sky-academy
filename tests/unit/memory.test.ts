@@ -8,8 +8,10 @@ const faceKey = (f: { text: string; coin?: number }) => `${f.coin ? 'coin:' : ''
 describe('memory decks', () => {
   it('every theme builds 4–8 pairs with distinct faces on each side, for every year', () => {
     for (const y of YEARS) {
-      expect(THEMES[y.id].length).toBeGreaterThanOrEqual(3);
-      for (const theme of THEMES[y.id]) for (let seed = 1; seed <= 40; seed++) {
+      const themes = THEMES[y.id];
+      expect(themes, `${y.id} has its own decks`).toBeDefined();
+      expect(themes!.length).toBeGreaterThanOrEqual(3);
+      for (const theme of themes!) for (let seed = 1; seed <= 40; seed++) {
         const pairs = theme.pairs(rng(seed));
         const want = y.id === 'reception' ? 4 : y.id === 'year1' ? 6 : theme.id === 'shapes' || theme.id === 'words' ? 6 : 8;
         expect(pairs.length, `${y.id}/${theme.id}`).toBe(want);
@@ -34,7 +36,7 @@ describe('memory decks', () => {
     expect(pairs.some(p => p.a.text.startsWith('£'))).toBe(true);
   });
   it('pickTheme falls back to a random theme of the year when the id is unknown', () => {
-    expect(THEMES.year1.map(t => t.id)).toContain(pickTheme('year1', rng(9), 'nope').id);
+    expect(THEMES.year1!.map(t => t.id)).toContain(pickTheme('year1', rng(9), 'nope').id);
   });
 });
 

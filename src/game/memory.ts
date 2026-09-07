@@ -1,5 +1,5 @@
 // Memory Match: flip two cards, keep the pairs. Pure logic + pair decks (no DOM) so it is unit-testable.
-import type { Rng, YearInfo } from '../curriculum';
+import type { Rng, YearId } from '../curriculum';
 import { numberWord, OBJECTS, pick, ri, shuffle } from '../curriculum/util';
 
 export interface Face { text: string; say: string; coin?: number; small?: boolean }  // coin = pence, drawn as a coin
@@ -18,7 +18,7 @@ const shapes = (rng: Rng, list: [string, string][], n: number): Pair[] => shuffl
 const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
 
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
-export const THEMES: Record<YearInfo['id'], Theme[]> = {
+export const THEMES: Partial<Record<YearId, Theme[]>> = {
   reception: [
     { id: 'count', title: 'Count & match', hint: 'Match each number to the same number of things', pairs: rng => { const e = pick(rng, OBJECTS); return shuffle(rng, [1, 2, 3, 4, 5, 6]).slice(0, 4).map(n => ({ a: txt(String(n), numberWord(n)), b: objs(n, e) })); } },
     { id: 'shapes', title: 'Shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES2D.slice(0, 4), 4) },
@@ -75,6 +75,8 @@ export class Memory {
   get coins() { return this.done ? this.matched * 2 + 5 * this.stars : 0; }
 }
 
-export function pickTheme(year: YearInfo['id'], rng: Rng = Math.random, id?: string): Theme {
-  const list = THEMES[year]; return list.find(t => t.id === id) ?? pick(rng, list);
+export function pickTheme(year: YearId, rng: Rng = Math.random, id?: string): Theme {
+  // Fall back to Reception's decks for any year that has no themes yet (e.g. Y3–Y6 before their own are added).
+  const list = THEMES[year] ?? THEMES.reception!;
+  return list.find(t => t.id === id) ?? pick(rng, list);
 }

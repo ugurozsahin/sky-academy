@@ -16,7 +16,7 @@ async function startTopic(page: Page, year: string, topic: string) {
   if (await page.locator('.island-screen').count()) await page.click('#back');
   await page.click(`.island[data-year="${year}"]`);
   await expect(page.locator('.island-screen')).toBeVisible();
-  const subjectTab = topic.includes('trace') || /-(sounds|soundhunt|capitals|build|digraphs|spelling|plurals|suffix|punct|days|contractions|homophones|sentence)$/.test(topic) ? 'writing' : 'maths';
+  const subjectTab = TOPICS.find(t => t.id === topic)?.subject ?? 'maths';   // from the registry, not a topic-id regex (#27)
   await page.click(`.tab[data-s="${subjectTab}"]`);
   await page.click(`.topic[data-id="${topic}"]`);
   await expect(page.locator('.play')).toBeVisible();
@@ -514,6 +514,18 @@ test.describe('Sky Ninja Academy', () => {
       .filter(el => el.getBoundingClientRect().height > window.innerHeight * 0.5)
       .map(el => (el as HTMLElement).id || el.className));
     expect(giant).toEqual([]);               // a button is never half the screen tall
+  });
+
+  test('guard rail: island art and grid come from year data, not a per-index CSS class (#27)', async ({ page }) => {
+    // Incident #27: island art/tint were keyed by `.i0/.i1/.i2` and the grid was a hard `repeat(3, 1fr)`,
+    // so a fourth year (Y3–Y6) drew no art and overflowed the row. Art now comes from YearInfo, inline.
+    await pickAvatar(page);
+    const arts = await page.$$eval('.islands .island .isl-art', els => els.map(el => getComputedStyle(el).backgroundImage));
+    expect(arts.length).toBeGreaterThanOrEqual(3);
+    for (const bg of arts) expect(bg).toContain('url(');     // each island draws its own art from data
+    expect(new Set(arts).size).toBe(arts.length);            // and the art is distinct per year
+    const style = await page.$eval('.islands', el => el.getAttribute('style') || '');
+    expect(style).toContain('--cols:');                      // grid tracks YEARS.length, so a new year needs no CSS
   });
 
   test('endless Sky Storm ramps up and ends when lives run out', async ({ page }) => {

@@ -88,6 +88,16 @@ describe('guard rails', () => {
     for (const f of ['/src/ui/play.ts', '/src/ui/memory.ts']) expect(code(SOURCES[f])).toContain('return cleanup;');
   });
 
+  // Incident 2026-09-06 (#27): the year union `'reception' | 'year1' | 'year2'` was retyped in four files
+  // and per-year assets keyed by island index, so a new year (Y3–Y6) meant editing seven places. It now
+  // lives once as `YearId` in curriculum/types.ts; every other union must derive from it. This rail counts
+  // the literal so a copy re-appearing goes red. (Not a budget — the source of truth stays at exactly one.)
+  it('the year union is defined once (YearId), not retyped', () => {
+    const union = /'reception'\s*\|\s*'year1'\s*\|\s*'year2'/g;
+    const hits = Object.entries(SOURCES).flatMap(([f, s]) => [...code(s).matchAll(union)].map(() => f));
+    expect(hits).toEqual(['/src/curriculum/types.ts']);
+  });
+
   // Incident 2026-09-06: a review found `Tracer.destroy()` removing only the window listeners, so every
   // question stacked another pair on the shared canvas (#39). Anything that adds a listener must remove it.
   it('every addEventListener in src/game has a matching removeEventListener', () => {
