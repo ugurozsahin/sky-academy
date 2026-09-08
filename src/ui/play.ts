@@ -7,8 +7,9 @@ import { Tracer } from '../game/tracing';
 import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak, wallet } from '../storage';
 import { equippedItem } from '../game/shop';
 import { haptic, say, sfx, sliceFx } from '../audio';
-import { $, esc, fillAnswer, render } from './dom';
+import { $, esc, render } from './dom';
 import { screenScope, stickersHTML } from './screen';
+import { createHud } from './hud';
 import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
 import { renderVisual } from './visuals';
 import { dojoRowsHTML } from './memory';
@@ -54,6 +55,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   let arena: Arena | null = null; let tracer: Tracer | null = null; let lastResult: SessionResult | null = null;
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
   const { later, toast } = scope;
+  const { drawLives, drawTimer, drawHp, showOutcome } = createHud(els, o.year.lives, () => load().speech);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
   const HOLD = sprint ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 };
@@ -68,11 +70,6 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   }
   const markSeg = (k: 'good' | 'bad') => { if (o.mode === 'mission') { segs[session.index] = k; drawStage(session.stage, session.index, session.perStage); } };
   const endWave = (hold: number) => { const id = waveId; revealUntil = performance.now() + hold; later(() => { if (waveId === id) arena?.clearWave('#ffffff'); }, hold); };
-  function showOutcome(kind: 'correct' | 'wrong' | 'miss', q: Question) {
-    els.qcard.classList.remove('good', 'bad'); els.qcard.classList.add(kind === 'correct' ? 'good' : 'bad');
-    if (!q.sequence && !(q.listen && !load().speech)) els.prompt.innerHTML = fillAnswer(q.prompt, q.answer);   // Sound Hunt with read-aloud off keeps its listen words
-    els.hint.innerHTML = kind === 'correct' ? `<b class="ok">✓ ${esc(q.answer)}</b> — that's right!` : `${kind === 'wrong' ? '✗ Not this time.' : 'It flew away!'} The answer is <b class="ok">${esc(q.answer)}</b>`;
-  }
 
   const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined) }, {
     onQuestion(q, info) {
@@ -121,9 +118,6 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     onEnd(r) { later(() => showResults(r), lastOutcome === 'none' || r.mode === 'sprint' ? 0 : Math.max(900, revealUntil - performance.now() + 300)); },
   });
   let prevLives = o.year.lives;
-  const drawLives = (n: number) => { if (els.lives) els.lives.innerHTML = Array.from({ length: o.year.lives }, (_, i) => `<span class="${i < n ? 'on' : 'off'}">❤️</span>`).join(''); };
-  const drawTimer = (s: number) => { const t = $('#timer'); if (!t) return; t.textContent = `⏱ ${s}`; t.classList.toggle('hurry', s <= 10); };
-  const drawHp = (hp: number, max: number) => { const h = $('#hp'); if (h) { h.style.width = `${Math.round(100 * hp / max)}%`; h.classList.toggle('low', hp <= 3); } };
   drawLives(o.year.lives); drawTimer(session.secondsLeft); drawHp(session.bossHp, session.bossMax);
   // Sprint clock: real elapsed time, frozen while the pause overlay (or a result) has the arena paused.
   let ticker = 0; let lastTick = 0;
