@@ -11,6 +11,7 @@ import { $, esc, render } from './dom';
 import { screenScope, stickersHTML } from './screen';
 import { createHud } from './hud';
 import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
+import { resultMedal, resultHeading } from './results';
 import { renderVisual } from './visuals';
 import { dojoRowsHTML } from './memory';
 import { drawCertificate, deliverCertificate, type CertInfo } from './certificate';
@@ -238,16 +239,13 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const fresh = addCoins(r.coins + dojo.coins); const streak = touchStreak();
     const stickerHTML = stickersHTML(fresh);
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), 600);
-    const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉')
-      : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪')
-      : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
+    const medal = resultMedal(r);
     const headline = training ? senseiLine(r.won, d.name)
       : r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!`
       : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!`
       : r.won ? praiseLine(av, d.name)
       : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
-    const rspec = MODES[r.mode];   // results heading from the mode table (mission distinguishes a Sensei-training win)
-    const heading = rspec.staged && r.won && training ? 'Training complete!' : r.won ? rspec.overHeadingWon : rspec.overHeadingLost;
+    const heading = resultHeading(r.mode, { won: r.won, training });   // from the mode table (mission distinguishes a Sensei-training win)
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
     const cert = certInfo(r); lastResult = r;
