@@ -15,6 +15,9 @@ import pkg from '../../package.json';
  * than no rail at all. Game wording is enforced separately in `british.test.ts` (#47).
  */
 const SOURCES = import.meta.glob('/src/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+// Vite's glob does not reach `.github/`, and an empty read would make the workflow rail pass vacuously — the
+// exact failure it exists to prevent — so this one file is read from disk, and its length is asserted first.
+const workflow = (name: string) => readFileSync(new URL(`../../.github/workflows/${name}`, import.meta.url), 'utf8');
 const inDir = (dir: string) => Object.entries(SOURCES).filter(([f]) => f.startsWith(dir));
 // Comments may name the very thing a rail bans, so rails strip them first. Crude on purpose: a `//` inside
 // a string literal would blank the rest of that line — no such line exists in src/, and a rail that reads
@@ -162,6 +165,26 @@ describe('guard rails', () => {
     const stormClass = Object.entries(SOURCES).flatMap(([f, s]) => [...code(s).matchAll(/class="[^"]*\bstorm\b/g)].map(() => f));
     expect(stormClass).toEqual([]);                                    // the `.storm` class is gone from markup
     expect(code(SOURCES['/src/ui/home.ts'])).toContain('mode-btn');
+  });
+
+  // Incident 2026-09-08 (#129 review): the gate's PREDICATE was tested and its TRIGGERS were not, so a rule
+  // that fires on a label shipped with `labeled` missing from the workflow — the label changed nothing, the
+  // status stayed green, and an unapproved visual would have merged. A check nobody can reach is not a check.
+  it('the review gate wakes on everything its rules depend on', () => {
+    const yml = workflow('review-gate.yml');
+    expect(yml.length).toBeGreaterThan(500);                            // never assert against an empty read
+    // Strip comments before matching: the header explains *why* `labeled` is subscribed, and matching the raw
+    // text let the rail read its own prose as the subscription — it passed with the trigger deleted (#129).
+    const code = yml.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
+    const on = code.slice(0, code.indexOf('jobs:'));
+    // Membership of the parsed list, not a substring of it: `includes('labeled')` is also true of `unlabeled`.
+    const types = [...on.matchAll(/types:\s*\[([^\]]*)\]/g)].flatMap(m => m[1].split(',').map(t => t.trim()));
+    expect(types.length).toBeGreaterThan(4);
+    for (const t of ['opened', 'labeled', 'unlabeled', 'converted_to_draft', 'ready_for_review', 'synchronize'])
+      expect({ trigger: t, subscribed: types.includes(t) }).toEqual({ trigger: t, subscribed: true });
+    const guard = code.slice(code.indexOf('if:'), code.indexOf('runs-on:') + 200);
+    for (const marker of ["'REVIEW:'", "'OWNER:'"])                     // both verdicts must wake the job
+      expect({ marker, wired: guard.includes(marker) }).toEqual({ marker, wired: true });
   });
 
   // Incident 2026-09-06: a review found `Tracer.destroy()` removing only the window listeners, so every

@@ -21,14 +21,17 @@
 # the block, it would delete the evidence of it (#95 review). The block itself is comment-driven, so
 # re-stamping the new head simply re-applies it.
 #
-# Cost: the job is skipped for comments that never mention REVIEW: (a skipped job bills nothing), so this is
-# about a minute per PR event and per REVIEW: comment.
+# Cost: the job is skipped for comments that open with neither marker (a skipped job bills nothing), so this
+# is about a minute per PR event and per REVIEW:/OWNER: comment. `labeled`/`unlabeled` are in the trigger list
+# because the `owner-approval` label is what puts a PR into the owner's hands — without them the label changes
+# nothing, the status stays green, and an unapproved new look merges. Labels move rarely on a PR, so the added
+# cost is small; the alternative is a rule that silently does not exist.
 name: Review gate
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, converted_to_draft, synchronize]
+    types: [opened, reopened, ready_for_review, converted_to_draft, synchronize, labeled, unlabeled]
   issue_comment:
-    types: [created, edited, deleted]
+    types: [created]
 concurrency:
   # Two events in quick succession (comment, then Ready for review) must not race to stamp opposite states.
   group: review-gate-${{ github.event.pull_request.number || github.event.issue.number }}
@@ -43,9 +46,25 @@ jobs:
     # Ordinary conversation must not spend a runner minute: only REVIEW: comments on a PR wake this up.
     # `contains`, not `startsWith`: a marker preceded by a blank line or a quote would not have woken the job,
     # and a block nobody evaluates publishes as green. Cheap to wake on a false positive, costly to miss one.
+    # Only a comment that *opens* with a marker wakes this, not one that merely mentions it: GitHub bills a
+    # whole minute per job however briefly it runs, and matching anywhere in the body cost 22 minutes a day —
+    # more than the nightly full suite — because the process quotes its own markers constantly.
+    # Safe to narrow *for the REVIEW markers*: blocking also requires the draft toggle and clearing requires
+    # "Ready for review", both `pull_request` events, so one of those always re-stamps — the comment trigger
+    # only makes it sooner.
+    #
+    # The OWNER markers get `contains`, deliberately asymmetric, because the owner's verdict carries no such
+    # companion event: if a comment typed after a blank line does not wake the job, his approval sits unread
+    # and the PR stays red until something else happens. He is a person writing a sentence, not an agent
+    # following a format, and he must not have to know that. The cost is bounded because his verdicts are rare
+    # — a few a week against dozens of REVIEW comments a day, which is what made the wide filter expensive.
     if: >-
       github.event_name == 'pull_request' ||
-      (github.event.issue.pull_request != null && contains(github.event.comment.body, 'REVIEW:'))
+      (github.event.issue.pull_request != null &&
+       (startsWith(github.event.comment.body, 'REVIEW:') ||
+        startsWith(github.event.comment.body, '**REVIEW:') ||
+        startsWith(github.event.comment.body, '> REVIEW:') ||
+        contains(github.event.comment.body, 'OWNER:')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -66,7 +85,7 @@ jobs:
             // The decision lives in scripts/review-gate.mjs so tests/unit/review-gate.test.ts can hold it to
             // both directions — it has published green over a live block twice, and inline YAML cannot be tested.
             const { blockState } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/review-gate.mjs`);
-            const { blocked, reasons } = blockState({ draft: pr.draft, comments });
+            const { blocked, reasons } = blockState({ draft: pr.draft, labels: pr.labels.map(l => l.name), comments });
 
             const description = blocked ? `Blocked: ${reasons.join('; ')}`.slice(0, 140) : 'No open review block';
             await github.rest.repos.createCommitStatus({

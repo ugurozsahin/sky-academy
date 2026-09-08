@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM helper shared with .github/workflows/review-gate.yml (see scripts/review-gate.d.ts)
-import { blockState, isChangesRequested, isCleared } from '../../scripts/review-gate.mjs';
+import { blockState, isChangesRequested, isCleared, isOwnerApproved, isOwnerRejected } from '../../scripts/review-gate.mjs';
 
 /**
  * The review gate decides whether a pull request may be merged. It has twice reported "no block" while a
@@ -9,7 +9,9 @@ import { blockState, isChangesRequested, isCleared } from '../../scripts/review-
  */
 const at = (n: number) => new Date(Date.UTC(2026, 8, 7, 12, n)).toISOString();
 const pr = (draft: boolean, ...bodies: string[]) =>
-  blockState({ draft, comments: bodies.map((body, i) => ({ body, created_at: at(i) })) });
+  blockState({ draft, labels: [], comments: bodies.map((body, i) => ({ body, created_at: at(i) })) });
+const gated = (...bodies: string[]) =>
+  blockState({ draft: false, labels: ['owner-approval'], comments: bodies.map((body, i) => ({ body, created_at: at(i) })) });
 
 describe('review gate', () => {
   // Loose on purpose: a reviewer who types the marker in bold, or in sentence case, still means it.
@@ -57,5 +59,31 @@ describe('review gate', () => {
 
   it('an unblocked PR with ordinary conversation is not blocked', () => {
     expect(pr(false, 'Nice.', 'Rebased onto main.', 'CI green.').blocked).toBe(false);
+  });
+
+  // The owner's verdict on something he has to look at. Same asymmetry as the review markers, for the same
+  // reason: a false REJECTED is red and self-correcting, a false APPROVED ships a visual he never saw.
+  describe("the owner's verdict", () => {
+    it('an owner-approval label blocks until he approves', () => {
+      expect(gated().blocked).toBe(true);
+      expect(gated('OWNER: APPROVED — looks right').blocked).toBe(false);
+      expect(gated('OWNER: REJECTED — the halo is too soft').blocked).toBe(true);
+    });
+
+    it('the newest verdict wins', () => {
+      expect(gated('OWNER: REJECTED', 'OWNER: APPROVED').blocked).toBe(false);
+      expect(gated('OWNER: APPROVED', 'OWNER: REJECTED').blocked).toBe(true);
+    });
+
+    it('a rejection blocks even without the label', () => {
+      expect(pr(false, 'OWNER: REJECTED — no').blocked).toBe(true);
+    });
+
+    it.each(['**OWNER: APPROVED**', '> OWNER: APPROVED', 'owner: approved',
+             'Reply OWNER: APPROVED when you are happy with it'])(
+      'does not read %j as approval', (body) => expect(isOwnerApproved(body)).toBe(false));
+
+    it.each(['OWNER: REJECTED — too bright', '**OWNER: REJECTED**', 'owner: rejected'])(
+      'reads %j as a rejection', (body) => expect(isOwnerRejected(body)).toBe(true));
   });
 });

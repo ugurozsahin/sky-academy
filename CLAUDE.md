@@ -1,7 +1,7 @@
 # Sky Ninja Academy — project context
 
 Slice-the-answer learning game for UK Reception / Year 1 / Year 2. Mobile-first, also desktop. English only.
-Owner priorities: playability, fun, visuals must look professional (art supplied by owner), tests at every step, low token use.
+Owner priorities: playability, fun, visuals must look professional (art supplied by owner), tests at every step, low token use. **His approval is for a NEW look only** — art, skins, a redesigned effect, anything answering "do you like it". Work whose acceptance criterion is that the look must *not* change is verified with before/after evidence by the reviewer, never sent to him. When a change does need him: label the PR `owner-approval`; he replies `OWNER: APPROVED` or `OWNER: REJECTED — reason`, and `review-gate` holds the PR red until he does. No agent ever writes those markers.
 
 ## Stack
 Vite + vanilla TypeScript (no framework), canvas arena, DOM HUD, localStorage. Vitest (unit) + Playwright (e2e, mobile + desktop projects).

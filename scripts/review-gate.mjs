@@ -20,25 +20,45 @@
  *     So: to clear a review you write the marker plainly, at the very start, in capitals. Nothing else counts.
  */
 
+/**
+ * The same asymmetry governs the owner's verdict on a change he has to look at (new art, a new FX look):
+ *   OWNER: REJECTED — matched loosely. A false positive keeps the PR red, which he notices and corrects.
+ *   OWNER: APPROVED — matched strictly. A false positive ships a visual he never saw.
+ * Neither marker is *verifiable*: one GitHub token serves the owner and every agent, so an agent could write
+ * `OWNER: APPROVED` itself. Nothing here can stop that — it is a convention agents are told never to forge,
+ * and the honest fix is a second identity (a machine account), not more code.
+ */
+
 /** Emphasis, quoting and heading marks stripped; whitespace collapsed; upper-cased. */
 const loose = (body) => (body || '').replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
 
 export const isChangesRequested = (body) => loose(body).startsWith('REVIEW: CHANGES REQUESTED');
 export const isCleared = (body) => (body || '').replace(/^\s+/, '').startsWith('REVIEW: CLEARED');
+export const isOwnerRejected = (body) => loose(body).startsWith('OWNER: REJECTED');
+export const isOwnerApproved = (body) => (body || '').replace(/^\s+/, '').startsWith('OWNER: APPROVED');
 
 /**
- * @param {{draft: boolean, comments: {body: string, created_at: string}[]}} pr
+ * @param {{draft: boolean, labels?: string[], comments: {body: string, created_at: string}[]}} pr
  * @returns {{blocked: boolean, reasons: string[]}} newest marker wins, so block → clear → block works.
  */
-export function blockState({ draft, comments }) {
-  let requested = null, cleared = null;
+export function blockState({ draft, labels, comments }) {
+  let requested = null, cleared = null, rejected = null, approved = null;
   for (const c of comments || []) {
     if (isChangesRequested(c.body)) requested = c.created_at;
     if (isCleared(c.body)) cleared = c.created_at;
+    if (isOwnerRejected(c.body)) rejected = c.created_at;
+    if (isOwnerApproved(c.body)) approved = c.created_at;
   }
   const openReview = requested !== null && (cleared === null || cleared < requested);
+  // `owner-approval` says a human has to look at this before it ships — a new look, not a refactor that
+  // must keep the old one. It clears only on OWNER: APPROVED; OWNER: REJECTED blocks on its own so the
+  // verdict is recorded rather than the label quietly disappearing.
+  const wantsOwner = (labels || []).includes('owner-approval');
+  const ownerSaidNo = rejected !== null && (approved === null || approved < rejected);
   const reasons = [];
   if (draft) reasons.push('the PR is a draft');
   if (openReview) reasons.push('a REVIEW: CHANGES REQUESTED comment has no later REVIEW: CLEARED');
+  if (ownerSaidNo) reasons.push('the owner rejected it (OWNER: REJECTED, no later OWNER: APPROVED)');
+  else if (wantsOwner && approved === null) reasons.push('labelled owner-approval and the owner has not written OWNER: APPROVED');
   return { blocked: reasons.length > 0, reasons };
 }
