@@ -403,7 +403,9 @@ function bodySprite(color: string, r: number): HTMLCanvasElement {
   c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-r * 0.35, -r * 0.45, r * 0.28, r * 0.16, -0.6, 0, Math.PI * 2); c.fill();
   bodyCache.set(key, cv); return cv;
 }
-function segCircle(x1: number, y1: number, x2: number, y2: number, cx: number, cy: number, r: number) {
+// True when the slice segment (x1,y1)→(x2,y2) passes within `r` of the bubble centre (cx,cy) — the swipe
+// hit test. Exported so the geometry is unit-tested directly rather than only through the slow e2e (#43).
+export function segCircle(x1: number, y1: number, x2: number, y2: number, cx: number, cy: number, r: number) {
   const dx = x2 - x1, dy = y2 - y1; const l2 = dx * dx + dy * dy;
   let t = l2 ? ((cx - x1) * dx + (cy - y1) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
   const px = x1 + t * dx, py = y1 + t * dy;

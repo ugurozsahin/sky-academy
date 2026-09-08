@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dealOrdered, fitLabel, labelFont } from '../../src/game/arena';
+import { dealOrdered, fitLabel, labelFont, segCircle } from '../../src/game/arena';
 
 describe('dealOrdered — sequence words are dealt in order across the batches (#62)', () => {
   const batchOf = (order: number[], perBatch: number, idx: number) => Math.floor(order.indexOf(idx) / perBatch);
@@ -48,5 +48,29 @@ describe('fitLabel — label font sized once at spawn, not per frame (#28)', () 
 
   it('labelFont carries the weight, size and the Fredoka fallback stack', () => {
     expect(labelFont(24)).toBe('800 24px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif');
+  });
+});
+
+describe('segCircle — swipe-through-bubble hit test (#43)', () => {
+  // A bubble of radius 20 at the origin.
+  it('a slice straight through the centre hits', () => {
+    expect(segCircle(-50, 0, 50, 0, 0, 0, 20)).toBe(true);
+  });
+  it('a slice that stays well clear misses', () => {
+    expect(segCircle(-50, 50, 50, 50, 0, 0, 20)).toBe(false);   // 50px above, radius 20
+  });
+  it('grazes when the nearest point is exactly on the rim, misses just past it', () => {
+    expect(segCircle(-50, 20, 50, 20, 0, 0, 20)).toBe(true);    // tangent: distance 20 === r
+    expect(segCircle(-50, 21, 50, 21, 0, 0, 20)).toBe(false);   // 21 > r
+  });
+  it('clamps to the segment ends — a stroke ending inside the bubble hits, its infinite line does not fool it', () => {
+    // The segment ends at (0,10), inside the bubble; the nearest point is that endpoint, not the projection.
+    expect(segCircle(-50, 10, 0, 10, 0, 0, 20)).toBe(true);
+    // The same infinite line passes through the centre, but the segment stops 40px short and to the side.
+    expect(segCircle(-50, 60, -40, 55, 0, 0, 20)).toBe(false);
+  });
+  it('a zero-length stroke (a tap that did not move) hits only when the point is inside', () => {
+    expect(segCircle(5, 5, 5, 5, 0, 0, 20)).toBe(true);         // l2 === 0, point within r
+    expect(segCircle(30, 0, 30, 0, 0, 0, 20)).toBe(false);      // point outside r
   });
 });
