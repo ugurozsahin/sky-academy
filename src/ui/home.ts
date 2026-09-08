@@ -9,7 +9,10 @@ import { carriedStreak, dailyChallenges, multiplier, SET_BONUS } from '../game/d
 import { $, $$, render, stars } from './dom';
 
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
-export type Nav = { avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay; memory: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void; up: () => void };
+export type Nav = {
+  avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
+  memory: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void; up: () => void;
+};
 
 function topbar(nav: Nav, rerender: () => void) {
   const d = load(); const av = avatarById(d.avatar);
@@ -67,7 +70,10 @@ export function mapScreen(nav: Nav) {
     <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS & KS1 National Curriculum</span><button class="foot-link" id="grownups" aria-label="For grown-ups">👤 For grown-ups</button></footer>
   </section>`, 'bg-sky');
   tb.bind();
-  $$('.island').forEach(b => b.addEventListener('click', () => { const y = YEARS.find(x => x.id === b.dataset.year)!; save({ year: y.id }); sfx.tap(); say(`${y.title} island`); nav.island(y); }));
+  $$('.island').forEach(b => b.addEventListener('click', () => {
+    const y = YEARS.find(x => x.id === b.dataset.year)!;
+    save({ year: y.id }); sfx.tap(); say(`${y.title} island`); nav.island(y);
+  }));
   $('#grownups').addEventListener('click', () => { sfx.tap(); nav.parents(); });
 }
 
@@ -110,7 +116,9 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       <button class="tab${subject === 'writing' ? ' on' : ''}" data-s="writing" role="tab">✍️ Writing</button>
     </div>
     <div class="topics" id="topics"></div>
-    ${menu.map(m => `<button class="btn mode-btn${m.mod ? ` ${m.mod}` : ''}" id="${m.id}">${m.vport}<span><b>${m.title}</b><small>${m.blurb}</small></span></button>`).join('\n    ')}
+    ${menu.map(m =>
+      `<button class="btn mode-btn${m.mod ? ` ${m.mod}` : ''}" id="${m.id}">${m.vport}<span><b>${m.title}</b><small>${m.blurb}</small></span></button>`
+    ).join('\n    ')}
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {
@@ -124,7 +132,10 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   };
   drawTopics();
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
-  $$('.tab').forEach(b => b.addEventListener('click', () => { subject = b.dataset.s as 'maths' | 'writing'; $$('.tab').forEach(x => x.classList.toggle('on', x === b)); sfx.tap(); drawTopics(); }));
+  $$('.tab').forEach(b => b.addEventListener('click', () => {
+    subject = b.dataset.s as 'maths' | 'writing';
+    $$('.tab').forEach(x => x.classList.toggle('on', x === b)); sfx.tap(); drawTopics();
+  }));
   menu.forEach(m => $(`#${m.id}`).addEventListener('click', () => { sfx.tap(); m.go(); }));
 }
 

@@ -243,6 +243,17 @@ describe('guard rails', () => {
     expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(5);
   });
 
+  // #36: home.ts (topbar/dojoCard/mapScreen/islandScreen/rewardsScreen) carried the same long-line token
+  // cost as play.ts — every Edit had to reproduce those lines verbatim. The non-HTML lines (the `Nav` type,
+  // the island and tab click handlers, and the menu.map interpolation) were wrapped (12→8). The 8 that
+  // remain are HTML template literals inside render(), where a newline would change the emitted markup —
+  // the irreducible floor here. Like the play.ts budget above, this only ratchets DOWN (e.g. if the
+  // style.css long lines or the session-callback object land next). Never raise it to go green.
+  it('home.ts long lines keep shrinking (#36 budget)', () => {
+    const over = SOURCES['/src/ui/home.ts'].split('\n').filter(l => l.length > 180).length;
+    expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(8);
+  });
+
   // #35: the 2-D and 3-D shape tables were copy-pasted in curriculum/maths.ts and game/memory.ts at
   // different arities. They are now one source, curriculum/util.ts (SHAPES_2D/SHAPES_3D), which both import.
   // This rail fails if a table-only glyph reappears in another source file — the marker of the shape table
