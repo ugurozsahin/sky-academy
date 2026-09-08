@@ -222,6 +222,15 @@ describe('guard rails', () => {
     }
   });
 
+  // #35: the end-of-run results-modal shell (hero/medal/heading/star row/stat grid/coin row/Play-again buttons)
+  // was copy-pasted between the play overlays and memory.ts, differing only in slots. It is now one
+  // resultsModal() in screen.ts that both screens fill. This rail keeps the shell single-sourced: the
+  // `<div class="modal results">` markup appears exactly once. Re-inlining a second results modal makes it two → red.
+  it('the results modal shell is built once, in screen.ts (#35)', () => {
+    const shells = Object.entries(SOURCES).flatMap(([f, s]) => [...code(s).matchAll(/<div class="modal results">/g)].map(() => f));
+    expect(shells).toEqual(['/src/ui/screen.ts']);
+  });
+
   // #36: play.ts was one long closure with ~30 lines over 180 chars; every Edit had to reproduce those
   // lines verbatim (token cost). The three overlay templates moved to overlays.ts (byte-identical HTML),
   // then the HUD writers (drawLives/Timer/Hp, showOutcome) to hud.ts. This *budget* records what is left

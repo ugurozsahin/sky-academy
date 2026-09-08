@@ -4,8 +4,8 @@ import type { YearInfo } from '../curriculum';
 import { Memory, pickTheme, type Face } from '../game/memory';
 import { addCoins, load, recordDojo, recordMemory, touchStreak } from '../storage';
 import { say, sfx } from '../audio';
-import { $, $$, esc, render, stars } from './dom';
-import { screenScope, stickersHTML } from './screen';
+import { $, $$, esc, render } from './dom';
+import { resultsModal, screenScope, stickersHTML } from './screen';
 import { coinSVG } from './visuals';
 import type { DojoOutcome } from '../game/dojo';
 import type { MemoryHooks } from './hooks';
@@ -72,18 +72,15 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     sfx.stage();
     const headline = praiseLine(av, d.name); say(headline);
     const medal = game.stars === 3 ? '🥇' : game.stars === 2 ? '🥈' : '🥉';
-    const ov = $('#overlay'); ov.hidden = false; ov.innerHTML = `
-      <div class="modal results">
-        <div class="hero-big" style="--glow:${av.glow}"><img src="${av.img}" alt="${av.name}"><div class="speech">${esc(headline)}</div></div>
-        <div class="medal">${medal}</div>
-        <h2>All pairs found!</h2>
-        <div class="big-stars">${stars(game.stars)}</div>
-        <div class="statgrid"><div><b>${game.score}</b><small>score</small></div><div><b>${game.moves}</b><small>turns</small></div><div><b>${boards}</b><small>boards</small></div></div>
-        <div class="coin-row"><span class="coin-gain">+${game.coins} 🪙</span>${streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : ''}</div>
-        ${dojoRowsHTML(dojo)}
-        ${stickerHTML}
-        <div class="row"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
-      </div>`;
+    const ov = $('#overlay'); ov.hidden = false; ov.innerHTML = resultsModal({
+      glow: av.glow, img: av.img, name: av.name, headline,
+      medal, heading: 'All pairs found!',
+      stars: game.stars,
+      stats: `<div><b>${game.score}</b><small>score</small></div><div><b>${game.moves}</b><small>turns</small></div><div><b>${boards}</b><small>boards</small></div>`,
+      coins: game.coins,
+      pills: streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : '',
+      dojoRows: dojoRowsHTML(dojo), stickerHTML,
+    });
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
   }

@@ -5,6 +5,7 @@ import { VILLAIN } from '../avatars';
 import { STAGE_NAMES } from '../curriculum';
 import type { Mode } from '../game/session';
 import { esc, stars } from './dom';
+import { resultsModal } from './screen';
 
 /** The mid-mission "Stage N clear!" celebration modal. */
 export interface StageClearData {
@@ -36,20 +37,18 @@ export interface ResultsData {
   dojoRows: string; stickerHTML: string; cert: boolean;
 }
 export function resultsHTML(d: ResultsData): string {
-  return `
-      <div class="modal results">
-        ${d.mode === 'boss' && d.won ? `<div class="ko" aria-hidden="true"><img src="${VILLAIN.img}" alt=""><b>K.O.</b></div>` : ''}
-        <div class="hero-big ${d.won ? '' : 'sad'}${d.training ? ' sensei' : ''}" style="--glow:${d.glow}"><img src="${d.img}" alt="${d.name}"><div class="speech">${esc(d.headline)}</div></div>
-        <div class="medal">${d.medal}</div>
-        <h2>${d.heading}</h2>
-        ${d.mode !== 'endless' ? `<div class="big-stars">${stars(d.starCount)}</div>` : ''}
-        <div class="statgrid"><div><b>${d.score}</b><small>score</small></div><div><b>${d.correct}/${d.attempts}</b><small>correct</small></div><div><b>×${d.bestCombo}</b><small>best combo</small></div></div>
-        <div class="coin-row"><span class="coin-gain">+${d.coins} 🪙</span>${d.newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${d.streak > 1 ? `<span class="streak-pill">🔥 ${d.streak}-day streak</span>` : ''}</div>
-        ${d.dojoRows}
-        ${d.stickerHTML}
-        <div class="row"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
-        ${d.cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this mission">🎓 Certificate</button></div>' : ''}
-      </div>`;
+  return resultsModal({
+    ko: d.mode === 'boss' && d.won ? `<div class="ko" aria-hidden="true"><img src="${VILLAIN.img}" alt=""><b>K.O.</b></div>` : undefined,
+    heroExtra: ` ${d.won ? '' : 'sad'}${d.training ? ' sensei' : ''}`,
+    glow: d.glow, img: d.img, name: d.name, headline: d.headline,
+    medal: d.medal, heading: d.heading,
+    stars: d.mode !== 'endless' ? d.starCount : undefined,
+    stats: `<div><b>${d.score}</b><small>score</small></div><div><b>${d.correct}/${d.attempts}</b><small>correct</small></div><div><b>×${d.bestCombo}</b><small>best combo</small></div>`,
+    coins: d.coins,
+    pills: `${d.newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${d.streak > 1 ? `<span class="streak-pill">🔥 ${d.streak}-day streak</span>` : ''}`,
+    dojoRows: d.dojoRows, stickerHTML: d.stickerHTML,
+    cert: d.cert,
+  });
 }
 
 /** The pause modal (no data). */
