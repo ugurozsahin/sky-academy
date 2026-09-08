@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 
@@ -252,6 +253,20 @@ describe('guard rails', () => {
   it('home.ts long lines keep shrinking (#36 budget)', () => {
     const over = SOURCES['/src/ui/home.ts'].split('\n').filter(l => l.length > 180).length;
     expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(8);
+  });
+
+  // #36: src/style.css carried the same long-line token cost — 65 rules packed declarations (and often
+  // several rule blocks, or a whole single-line @media) onto one line, so every Edit had to reproduce them
+  // verbatim. They were split so each declaration and each rule sits on its own line — a pure whitespace
+  // change, the minified build is byte-identical to main. Unlike the .ts budgets above this cannot be read
+  // through Vite's `?raw` (the css plugin blanks it — see the file header), so it reads the source from disk
+  // with fs; the length guard makes that a real check, not a vacuous empty read. CSS has no HTML-template
+  // floor, so the floor is 0. Ratchets DOWN only — never raise it to go green.
+  it('style.css long lines keep shrinking (#36 budget)', () => {
+    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    expect(css.length, 'style.css must be read from disk, not a blank ?raw import').toBeGreaterThan(1000);
+    const over = css.split('\n').filter(l => l.length > 180).length;
+    expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(0);
   });
 
   // #35: the 2-D and 3-D shape tables were copy-pasted in curriculum/maths.ts and game/memory.ts at
