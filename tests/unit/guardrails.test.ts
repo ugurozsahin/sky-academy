@@ -233,12 +233,14 @@ describe('guard rails', () => {
 
   // #36: play.ts was one long closure with ~30 lines over 180 chars; every Edit had to reproduce those
   // lines verbatim (token cost). The three overlay templates moved to overlays.ts (byte-identical HTML),
-  // then the HUD writers (drawLives/Timer/Hp, showOutcome) to hud.ts. This *budget* records what is left
-  // and only ever ratchets DOWN as the rest of #36 lands (the session-callback object, wrapping the
-  // remaining long lines). Never raise it to go green.
+  // then the HUD writers (drawLives/Timer/Hp, showOutcome) to hud.ts, then the remaining multi-statement,
+  // object-literal and nested-ternary one-liners were wrapped (24→5). The 5 that remain are the arena/HUD
+  // markup template literals, where a newline would change the emitted HTML — the irreducible floor here.
+  // This *budget* records what is left and only ever ratchets DOWN as the rest of #36 lands (the
+  // session-callback object). Never raise it to go green.
   it('play.ts long lines keep shrinking (#36 budget)', () => {
     const over = SOURCES['/src/ui/play.ts'].split('\n').filter(l => l.length > 180).length;
-    expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(24);
+    expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(5);
   });
 
   // #35: the 2-D and 3-D shape tables were copy-pasted in curriculum/maths.ts and game/memory.ts at

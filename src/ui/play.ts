@@ -71,18 +71,29 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   const markSeg = (k: 'good' | 'bad') => { if (o.mode === 'mission') { segs[session.index] = k; drawStage(session.stage, session.index, session.perStage); } };
   const endWave = (hold: number) => { const id = waveId; revealUntil = performance.now() + hold; later(() => { if (waveId === id) arena?.clearWave('#ffffff'); }, hold); };
 
-  const session = new Session({ mode: o.mode, year: o.year, topic: o.topic, pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined) }, {
+  const session = new Session({
+    mode: o.mode, year: o.year, topic: o.topic,
+    pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
+  }, {
     onQuestion(q, info) {
       // If a miss is still being shown (the answer fell and the session moved on at once), let the child see it before the next question.
       const wait = Math.max(0, revealUntil - performance.now()); if (wait > 0) { later(() => show(), wait + 450); return; } show();
       function show() {
       drawStage(info.stage, info.index, info.total);
       if (training && session.currentTopic) $('.ttl').textContent = `${session.currentTopic.icon} ${session.currentTopic.title}`;   // Sensei: name the topic of each question
-      els.prompt.innerHTML = q.listen && !load().speech ? esc(q.listen) : promptHTML(q, session.seqIndex); els.vis.innerHTML = renderVisual(q.visual); els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
+      els.prompt.innerHTML = q.listen && !load().speech ? esc(q.listen) : promptHTML(q, session.seqIndex);
+      els.vis.innerHTML = renderVisual(q.visual);
+      els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
       lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
       if (tracing) { say(q.say ?? q.prompt); startTrace(q); return; }
       const labels = villainMode && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence ? [...info.labels, BOMB] : info.labels;
-      const spawn = () => { say(q.say ?? q.prompt); requestAnimationFrame(() => { arena!.topInset = els.qcard.getBoundingClientRect().bottom + 6; arena!.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), ordered: q.sequence?.slice(session.seqIndex) }); }); };
+      const spawn = () => {
+        say(q.say ?? q.prompt);
+        requestAnimationFrame(() => {
+          arena!.topInset = els.qcard.getBoundingClientRect().bottom + 6;
+          arena!.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), ordered: q.sequence?.slice(session.seqIndex) });
+        });
+      };
       const demo = showTutorial();                // first ever play: animated hand first, bubbles a moment later
       if (demo) later(spawn, demo); else spawn();
       }
@@ -90,7 +101,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     onCorrect(q, points, combo) {
       lastOutcome = 'correct'; sfx.correct(); els.score.textContent = String(session.score); markSeg('good');
       const c = cheerLine(av); toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', HOLD.correct + 300);
-      if (arena) { arena.reveal({ good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer }); arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, av.glow); showOutcome('correct', q); endWave(HOLD.correct); }
+      if (arena) {
+        arena.reveal({ good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer });
+        arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, av.glow);
+        showOutcome('correct', q); endWave(HOLD.correct);
+      }
       else later(() => session.advance(), 900);
     },
     onWrong(q, hit) {
@@ -103,8 +118,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       lastOutcome = 'miss'; sfx.miss(); toast('Missed!', 'bad', HOLD.miss); showTaunt(); markSeg('bad');
       if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer }); showOutcome('miss', q); endWave(HOLD.miss); }
     },
-    onProgress(label, done, total) { sfx.slice(); if (done < total) arena?.rush(session.current!.sequence![done]);   // the next word is earned: bring it up now instead of making the child wait for its batch
-       els.prompt.innerHTML = promptHTML(session.current!, done); if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow); if (done < total) say(label, false); },
+    onProgress(label, done, total) {
+      sfx.slice();
+      // the next word is earned: bring it up now instead of making the child wait for its batch
+      if (done < total) arena?.rush(session.current!.sequence![done]);
+      els.prompt.innerHTML = promptHTML(session.current!, done);
+      if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow);
+      if (done < total) say(label, false);
+    },
     onLives(n) { drawLives(n); if (n < prevLives) { sfx.life(); haptic('life'); } prevLives = n; },
     onStageClear(stage, st, acc) { sfx.stage(); haptic('stage'); showStageClear(stage, st, acc); },
     onTime(s) { drawTimer(s); if (s <= 3 && s > 0) sfx.tap(); },
@@ -121,14 +142,27 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   drawLives(o.year.lives); drawTimer(session.secondsLeft); drawHp(session.bossHp, session.bossMax);
   // Sprint clock: real elapsed time, frozen while the pause overlay (or a result) has the arena paused.
   let ticker = 0; let lastTick = 0;
-  if (sprint) ticker = window.setInterval(() => { const now = performance.now(); const dt = lastTick ? now - lastTick : 0; lastTick = now; if (!arena?.paused && !session.ended) session.tick(dt); }, 100);
+  if (sprint) ticker = window.setInterval(() => {
+    const now = performance.now();
+    const dt = lastTick ? now - lastTick : 0;
+    lastTick = now;
+    if (!arena?.paused && !session.ended) session.tick(dt);
+  }, 100);
 
   if (!tracing) {
     arena = new Arena($('#arena') as HTMLCanvasElement, {
       onHit(b, viaSwipe) {
         if (!load().tutorialSeen) { save({ tutorialSeen: true }); hideTutorial(); }
-        if (b.label === BOMB) { if (!session.waiting && !session.ended) { sfx.life(); toast('TNT! Hammer Man got you', 'bad'); showTaunt(); arena!.burst(b.x, b.y, '#ff3b1a', 30); session.bomb(); } return; }
-        const r = session.hit(b.label); if (r === 'ignored') return; if (viaSwipe) { (sliceFx[av.fx] ?? sfx.slice)(); haptic('slice'); }
+        if (b.label === BOMB) {
+          if (!session.waiting && !session.ended) {
+            sfx.life(); toast('TNT! Hammer Man got you', 'bad'); showTaunt();
+            arena!.burst(b.x, b.y, '#ff3b1a', 30); session.bomb();
+          }
+          return;
+        }
+        const r = session.hit(b.label);
+        if (r === 'ignored') return;
+        if (viaSwipe) { (sliceFx[av.fx] ?? sfx.slice)(); haptic('slice'); }
       },
       onFall(b) { if (b.label !== BOMB) session.fall(b.label); },
       onWaveEnd() {   // let the outcome finish showing (the reveal may still be on screen), then a breath before the next question
@@ -149,7 +183,12 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     $('#tcheck').onclick = () => {
       const r = tracer!.result(); if (r.pass) { sfx.correct(); session.hit(q.answer); return; }
       const missing = r.glyphs.filter(g => g < 0.55).length;   // name the letter the child skipped
-      toast(r.outside > 0.45 ? 'Stay on the dotted lines' : q.answer.length > 1 && missing ? `Trace the "${[...q.answer][r.weakest]}" too — every letter!` : `Keep tracing — cover the whole ${q.answer.length > 1 ? 'word' : 'letter'}`, 'bad');
+      toast(
+        r.outside > 0.45 ? 'Stay on the dotted lines'
+          : q.answer.length > 1 && missing ? `Trace the "${[...q.answer][r.weakest]}" too — every letter!`
+          : `Keep tracing — cover the whole ${q.answer.length > 1 ? 'word' : 'letter'}`,
+        'bad',
+      );
     };
   }
   /** First-play demo: show the animated hand over the arena; returns how long to hold the first wave (ms). */
@@ -167,7 +206,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     say(q.say ?? q.prompt, true);
     els.qcard.classList.remove('pulse'); void els.qcard.offsetWidth; els.qcard.classList.add('pulse');
   }
-  function showTaunt() { const t = $('#taunt'); if (!t) return; t.textContent = VILLAIN.taunt[Math.floor(Math.random() * VILLAIN.taunt.length)]; t.hidden = false; later(() => (t.hidden = true), 1400); }
+  function showTaunt() {
+    const t = $('#taunt'); if (!t) return;
+    t.textContent = VILLAIN.taunt[Math.floor(Math.random() * VILLAIN.taunt.length)];
+    t.hidden = false; later(() => (t.hidden = true), 1400);
+  }
 
   function showStageClear(stage: number, st: number, acc: number) {
     arena && (arena.paused = true);
@@ -185,13 +228,24 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
     else recordEndless(o.year.id, r.score);
     for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t.hits, t.tries);   // every mode teaches Sensei what is hard
-    const bySubject = (s: Topic['subject']) => Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicsFor(o.year.id).find(x => x.id === id)?.subject === s ? t.hits : 0), 0);
-    const dojo = recordDojo({ mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo, stars: r.stars, score: r.score, training, mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing') });
+    const bySubject = (s: Topic['subject']) =>
+      Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicsFor(o.year.id).find(x => x.id === id)?.subject === s ? t.hits : 0), 0);
+    const dojo = recordDojo({
+      mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo,
+      stars: r.stars, score: r.score, training,
+      mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'),
+    });
     const fresh = addCoins(r.coins + dojo.coins); const streak = touchStreak();
     const stickerHTML = stickersHTML(fresh);
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), 600);
-    const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉') : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪') : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
-    const headline = training ? senseiLine(r.won, d.name) : r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!` : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!` : r.won ? praiseLine(av, d.name) : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
+    const medal = r.mode === 'endless' ? (r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉')
+      : r.mode === 'sprint' ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪')
+      : r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
+    const headline = training ? senseiLine(r.won, d.name)
+      : r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!`
+      : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!`
+      : r.won ? praiseLine(av, d.name)
+      : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
     const rspec = MODES[r.mode];   // results heading from the mode table (mission distinguishes a Sensei-training win)
     const heading = rspec.staged && r.won && training ? 'Training complete!' : r.won ? rspec.overHeadingWon : rspec.overHeadingLost;
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
@@ -219,7 +273,13 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     });
   }
   /** Certificate details for a won mission / Sensei session (null for the other modes and lost runs). */
-  const certInfo = (r: SessionResult): CertInfo | null => (r.won && o.mode === 'mission' ? { name: d.name, avatar: av, year: o.year.title, title: o.topic?.title ?? 'Sensei training', stars: r.stars, score: r.score, correct: r.correct, attempts: r.attempts, training } : null);
+  const certInfo = (r: SessionResult): CertInfo | null =>
+    r.won && o.mode === 'mission'
+      ? {
+          name: d.name, avatar: av, year: o.year.title, title: o.topic?.title ?? 'Sensei training',
+          stars: r.stars, score: r.score, correct: r.correct, attempts: r.attempts, training,
+        }
+      : null;
   function showPause() {
     arena && (arena.paused = true);
     els.overlay.hidden = false; els.overlay.innerHTML = pauseHTML();
@@ -234,11 +294,31 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   // Test / accessibility hooks — the typed PlayHooks contract (#34)
   const hooks: PlayHooks = {
     session, arena, get tracer() { return tracer; },
-    answer: () => { const q = session.current; if (!q) return false; if (tracing) { tracer?.autoTrace(); return true; } const label = q.sequence ? q.sequence[session.seqIndex] : q.answer; return arena!.hitLabel(label); },
-    wrong: () => { const q = session.current; if (!q || !arena) return false; const target = q.sequence ? q.sequence[session.seqIndex] : q.answer; const b = arena.bubbles.find(x => x.launched && !x.dead && x.label !== target && x.label !== BOMB); return b ? arena.hitLabel(b.label) : false; },
-    bubbles: () => arena?.bubbles.filter(b => b.launched && !b.dead && !b.hit && !b.fade).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })) ?? [],
-    state: () => ({ stage: session.stage, index: session.index, score: session.score, lives: session.lives, ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt, answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null }),
-    certificate: async () => { const c = lastResult && certInfo(lastResult); return c ? (await drawCertificate(c)).toDataURL('image/png') : null; },   // PNG data URL of the certificate for the finished mission
+    answer: () => {
+      const q = session.current; if (!q) return false;
+      if (tracing) { tracer?.autoTrace(); return true; }
+      const label = q.sequence ? q.sequence[session.seqIndex] : q.answer;
+      return arena!.hitLabel(label);
+    },
+    wrong: () => {
+      const q = session.current; if (!q || !arena) return false;
+      const target = q.sequence ? q.sequence[session.seqIndex] : q.answer;
+      const b = arena.bubbles.find(x => x.launched && !x.dead && x.label !== target && x.label !== BOMB);
+      return b ? arena.hitLabel(b.label) : false;
+    },
+    bubbles: () =>
+      arena?.bubbles.filter(b => b.launched && !b.dead && !b.hit && !b.fade)
+        .map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })) ?? [],
+    state: () => ({
+      stage: session.stage, index: session.index, score: session.score, lives: session.lives,
+      ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt,
+      answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null,
+    }),
+    // PNG data URL of the certificate for the finished mission
+    certificate: async () => {
+      const c = lastResult && certInfo(lastResult);
+      return c ? (await drawCertificate(c)).toDataURL('image/png') : null;
+    },
   };
   window.__sna = hooks;
   session.start();
