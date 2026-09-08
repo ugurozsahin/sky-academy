@@ -53,6 +53,19 @@ describe('guard rails', () => {
     expect(hits.length).toBeLessThanOrEqual(5);                         // #29 removes them; never raise this
   });
 
+  // #28: drawBubble built a radial gradient (+ two colour strings) and ran a `measureText` font-fit loop for
+  // every bubble every frame — hundreds of measureText calls per frame with a wide word wave on a phone. The
+  // body is now a cached sprite (bodySprite) and the label size is fitted once at spawn (fitLabel), so neither
+  // call may reappear in the per-frame draw path. Scoped to drawBubble's body: bodySprite/glowSprite and the
+  // ember particle legitimately build gradients elsewhere, and fitLabel measures once at spawn.
+  it('drawBubble does no per-frame gradient or measureText work (#28)', () => {
+    const src = code(SOURCES['/src/game/arena.ts']);
+    const from = src.indexOf('private drawBubble(');
+    expect(from).toBeGreaterThan(0);
+    const body = src.slice(from, from + 1 + src.slice(from + 1).indexOf('\n  private '));   // up to the next method
+    expect(body).not.toMatch(/createRadialGradient|measureText/);
+  });
+
   // CLAUDE.md: no dependencies without reason (Capacitor is the documented exception). A new one now has
   // to be argued for in the PR that adds it, because this rail goes red until the list is updated too.
   it('dependencies match the allowlist below (CLAUDE.md explains the rule)', () => {

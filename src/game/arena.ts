@@ -3,6 +3,7 @@ import { shuffle } from '../curriculum/util';   // uniform Fisher–Yates; `Math
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
   launchAt: number; launched: boolean; hit: boolean; dead: boolean; color: string; wobble: number;
+  fontSize: number;   // label font size, fitted once at spawn (#28) so the per-frame draw never runs a measureText loop
   mark?: 'good' | 'bad'; markAt?: number; fade?: boolean;   // outcome reveal: spotlighted (✓/✗) or faded out
 }
 type PKind = 'dot' | 'ring' | 'shard' | 'text' | 'ember' | 'drop' | 'bolt' | 'rock' | 'leaf' | 'crystal' | 'star' | 'smoke' | 'pixel' | 'slash';
@@ -105,7 +106,9 @@ export class Arena {
       const vy = -Math.sqrt(2 * g * h);
       const vx = ((this.W / 2 - x) / this.W) * 30 * (Math.random() * 0.6 + 0.4);
       const launchAt = now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1);
-      this.bubbles.push({ id: this.nextId++, label: o.labels[i], x, y: this.H + r, vx, vy, g, r, launchAt, launched: false, hit: false, dead: false, color: PALETTE[(k * 3 + Math.floor(Math.random() * 3)) % PALETTE.length], wobble: Math.random() * Math.PI * 2 });
+      const label = o.labels[i];
+      const fontSize = fitLabel(label, r, font => { this.ctx.font = font; return this.ctx.measureText(label).width; });   // #28: fit once here, not every frame
+      this.bubbles.push({ id: this.nextId++, label, x, y: this.H + r, vx, vy, g, r, launchAt, launched: false, hit: false, dead: false, color: PALETTE[(k * 3 + Math.floor(Math.random() * 3)) % PALETTE.length], wobble: Math.random() * Math.PI * 2, fontSize });
     }
     this.waveActive = true;
   }
@@ -140,7 +143,8 @@ export class Arena {
       let x = this.W / 2; const y = this.topInset + (this.H - this.topInset) * 0.42;
       const bad = this.bubbles.find(b => b.mark === 'bad' && !b.dead);
       if (bad && Math.hypot(bad.x - x, bad.y - y) < 2.2 * r) x = bad.x < this.W / 2 ? Math.min(this.W - r - 8, bad.x + 2.4 * r) : Math.max(r + 8, bad.x - 2.4 * r);   // don't sit on the ✗ bubble
-      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now });
+      const fontSize = fitLabel(o.good, r, font => { this.ctx.font = font; return this.ctx.measureText(o.good!).width; });
+      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now, fontSize });
     }
   }
   /** Remove remaining bubbles (with a gentle fade) — used when the question is over. */
@@ -268,19 +272,13 @@ export class Arena {
       const col = b.mark === 'good' ? GOOD : BAD;
       c.strokeStyle = col; c.lineWidth = 6; c.shadowColor = col; c.shadowBlur = 18; c.beginPath(); c.arc(0, 0, b.r + 7, 0, Math.PI * 2); c.stroke(); c.shadowBlur = 0;
     }
-    // glow (cached sprite — shadowBlur is too slow on low-end devices)
+    // glow + body: both cached offscreen sprites keyed `color|round(r)`. A per-frame radial gradient (two colour
+    // strings + a gradient object per bubble) and a shadowBlur are too slow on low-end devices (#28/#29).
     const g = glowSprite(b.color, b.r); c.drawImage(g, -g.width / 2, -g.height / 2);
-    const grd = c.createRadialGradient(-b.r * 0.35, -b.r * 0.4, b.r * 0.1, 0, 0, b.r);
-    grd.addColorStop(0, lighten(b.color, 0.55)); grd.addColorStop(0.55, b.color); grd.addColorStop(1, darken(b.color, 0.35));
-    c.fillStyle = grd; c.beginPath(); c.arc(0, 0, b.r, 0, Math.PI * 2); c.fill();
-    // rim + highlight
-    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2; c.stroke();
-    c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-b.r * 0.35, -b.r * 0.45, b.r * 0.28, b.r * 0.16, -0.6, 0, Math.PI * 2); c.fill();
-    // label
-    const text = b.label;
-    let fs = b.r * (text.length <= 2 ? 1.05 : text.length <= 4 ? 0.7 : text.length <= 7 ? 0.5 : 0.4);
-    c.font = `800 ${fs}px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif`;
-    while (c.measureText(text).width > b.r * 1.75 && fs > 10) { fs -= 1; c.font = `800 ${fs}px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif`; }
+    const body = bodySprite(b.color, b.r); c.drawImage(body, -body.width / 2, -body.height / 2);
+    // label — font size fitted once at spawn (#28), never in this per-frame path
+    const text = b.label; const fs = b.fontSize;
+    c.font = labelFont(fs);
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.lineJoin = 'round'; c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = 'rgba(20,20,40,.75)'; c.strokeText(text, 0, 2);
     c.fillStyle = '#fff'; c.fillText(text, 0, 2);
@@ -363,6 +361,17 @@ export function dealOrdered(labels: string[], ordered: string[], perBatch: numbe
   return out;
 }
 
+export const labelFont = (fs: number) => `800 ${fs}px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif`;
+
+// Fit a bubble label to its radius: a size from the character count, then shrunk until it fits `r * 1.75`.
+// Called once per bubble in spawnWave (#28) — `measure` sets the font and returns the text width — instead
+// of running the shrink loop in drawBubble every frame. Pure and canvas-free so it unit-tests directly.
+export function fitLabel(label: string, r: number, measure: (font: string) => number): number {
+  let fs = r * (label.length <= 2 ? 1.05 : label.length <= 4 ? 0.7 : label.length <= 7 ? 0.5 : 0.4);
+  while (measure(labelFont(fs)) > r * 1.75 && fs > 10) fs -= 1;
+  return fs;
+}
+
 const glowCache = new Map<string, HTMLCanvasElement>();
 function glowSprite(color: string, r: number): HTMLCanvasElement {
   const key = `${color}|${Math.round(r)}`;
@@ -373,6 +382,26 @@ function glowSprite(color: string, r: number): HTMLCanvasElement {
   grd.addColorStop(0, hexA(color, 0.55)); grd.addColorStop(1, hexA(color, 0));
   g.fillStyle = grd; g.fillRect(0, 0, size, size);
   glowCache.set(key, cv); return cv;
+}
+
+// The bubble body — a radial-shaded disc with a white rim and a top-left highlight — is identical for every
+// bubble of the same colour and (rounded) radius, so bake it once into an offscreen sprite keyed `color|round(r)`
+// like glowSprite (#28), rather than rebuilding the gradient and re-stroking the disc every frame. Only the
+// label and the outcome ✓/✗ badge, which vary per bubble/frame, stay in drawBubble.
+const bodyCache = new Map<string, HTMLCanvasElement>();
+function bodySprite(color: string, r: number): HTMLCanvasElement {
+  const key = `${color}|${Math.round(r)}`;
+  let cv = bodyCache.get(key);
+  if (cv) return cv;
+  const size = Math.ceil(r * 2 + 6);   // room for the 2px rim and its anti-aliasing
+  cv = document.createElement('canvas'); cv.width = cv.height = size;
+  const c = cv.getContext('2d')!; c.translate(size / 2, size / 2);
+  const grd = c.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r);
+  grd.addColorStop(0, lighten(color, 0.55)); grd.addColorStop(0.55, color); grd.addColorStop(1, darken(color, 0.35));
+  c.fillStyle = grd; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2; c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-r * 0.35, -r * 0.45, r * 0.28, r * 0.16, -0.6, 0, Math.PI * 2); c.fill();
+  bodyCache.set(key, cv); return cv;
 }
 function segCircle(x1: number, y1: number, x2: number, y2: number, cx: number, cy: number, r: number) {
   const dx = x2 - x1, dy = y2 - y1; const l2 = dx * dx + dy * dy;
