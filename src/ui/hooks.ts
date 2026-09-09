@@ -45,6 +45,10 @@ export interface PlayHooks {
   state(): PlayState;
   /** PNG data URL of the finished mission's certificate, or null. */
   certificate(): Promise<string | null>;
+  /** Test-only (#32): set the game-speed multiplier that compresses the holds, gap, stagger and flight time. */
+  setSpeed(k: number): void;
+  /** Test-only (#32): the effective outcome holds (ms) and the current speed multiplier. */
+  timing(): { speed: number; hold: { correct: number; wrong: number; miss: number } };
 }
 
 /** A memory card as the e2e spec reads it (a subset of `Card`). */

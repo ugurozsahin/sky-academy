@@ -6,6 +6,7 @@ import { memoryScreen } from './ui/memory';
 import { shopScreen } from './ui/shop';
 import { parentsScreen } from './ui/parents';
 import { load } from './storage';
+import { initGameSpeed } from './game/speed';
 import type { YearInfo } from './curriculum';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
@@ -43,6 +44,7 @@ window.addEventListener('popstate', () => {
 // ?reset=1 clears saved progress (used by tests).
 const params = new URLSearchParams(location.search);
 if (params.get('reset')) { try { localStorage.clear(); } catch { /* ignore */ } }
+initGameSpeed();   // #32: test-only `?fast=N` time compression; default 1 (ordinary play)
 if (load().avatar) nav.map(); else nav.avatar();
 
 // Keep the layout stable on mobile browsers whose toolbars resize the viewport.

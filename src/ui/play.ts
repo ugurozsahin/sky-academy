@@ -3,6 +3,7 @@ import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from
 import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
 import { MODES } from '../game/modes';
+import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import { Tracer } from '../game/tracing';
 import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak, wallet } from '../storage';
 import { equippedItem } from '../game/shop';
@@ -59,6 +60,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   const { drawLives, drawTimer, drawHp, showOutcome } = createHud(els, o.year.lives, () => load().speech);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
+  // Curriculum base holds (ms). #32: scaled(...) divides them by the test-only speed at each use site, so the
+  // game a child plays holds for the full time while the e2e suite can run them several times faster.
   const HOLD = sprint ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 };
   let waveId = 0; let revealUntil = 0;
   // Mission progress (#55): stage name + one segment per question (green = right, red = slip, pulsing = current) + a small "3/6".
@@ -78,7 +81,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   }, {
     onQuestion(q, info) {
       // If a miss is still being shown (the answer fell and the session moved on at once), let the child see it before the next question.
-      const wait = Math.max(0, revealUntil - performance.now()); if (wait > 0) { later(() => show(), wait + 450); return; } show();
+      const wait = Math.max(0, revealUntil - performance.now()); if (wait > 0) { later(() => show(), wait + scaled(450)); return; } show();
       function show() {
       drawStage(info.stage, info.index, info.total);
       if (training && session.currentTopic) $('.ttl').textContent = `${session.currentTopic.icon} ${session.currentTopic.title}`;   // Sensei: name the topic of each question
@@ -101,23 +104,23 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     },
     onCorrect(q, points, combo) {
       lastOutcome = 'correct'; sfx.correct(); els.score.textContent = String(session.score); markSeg('good');
-      const c = cheerLine(av); toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', HOLD.correct + 300);
+      const c = cheerLine(av); toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', scaled(HOLD.correct) + 300);
       if (arena) {
         arena.reveal({ good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer });
         arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, av.glow);
-        showOutcome('correct', q); endWave(HOLD.correct);
+        showOutcome('correct', q); endWave(scaled(HOLD.correct));
       }
       else later(() => session.advance(), 900);
     },
     onWrong(q, hit) {
       lastOutcome = 'wrong'; sfx.wrong(); haptic('wrong'); markSeg('bad');
-      toast('Not quite!', 'bad', HOLD.wrong); showTaunt();
-      if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer, bad: hit }); showOutcome('wrong', q); endWave(HOLD.wrong); }
+      toast('Not quite!', 'bad', scaled(HOLD.wrong)); showTaunt();
+      if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer, bad: hit }); showOutcome('wrong', q); endWave(scaled(HOLD.wrong)); }
       else later(() => session.advance(), 1200);
     },
     onMiss(q) {
-      lastOutcome = 'miss'; sfx.miss(); toast('Missed!', 'bad', HOLD.miss); showTaunt(); markSeg('bad');
-      if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer }); showOutcome('miss', q); endWave(HOLD.miss); }
+      lastOutcome = 'miss'; sfx.miss(); toast('Missed!', 'bad', scaled(HOLD.miss)); showTaunt(); markSeg('bad');
+      if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer }); showOutcome('miss', q); endWave(scaled(HOLD.miss)); }
     },
     onProgress(label, done, total) {
       sfx.slice();
@@ -167,7 +170,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       },
       onFall(b) { if (b.label !== BOMB) session.fall(b.label); },
       onWaveEnd() {   // let the outcome finish showing (the reveal may still be on screen), then a breath before the next question
-        const gap = lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650;
+        const gap = scaled(lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650);
         later(() => session.waveEnd(), Math.max(0, revealUntil - performance.now()) + gap);
       },
     }, {
@@ -326,6 +329,10 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       const c = lastResult && certInfo(lastResult);
       return c ? (await drawCertificate(c)).toDataURL('image/png') : null;
     },
+    // #32: test-only time compression — set the multiplier (affects the next wave's flight/stagger and the holds).
+    setSpeed: (k: number) => { setGameSpeed(k); },
+    // #32: effective outcome holds (ms) and the current multiplier — the normal-speed rail asserts the base holds.
+    timing: () => ({ speed: gameSpeed(), hold: { correct: scaled(HOLD.correct), wrong: scaled(HOLD.wrong), miss: scaled(HOLD.miss) } }),
   };
   window.__sna = hooks;
   session.start();

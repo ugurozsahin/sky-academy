@@ -8,7 +8,7 @@ const executablePath = process.env.PW_CHROMIUM || (existsSync(bundled) ? bundled
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
-  retries: 1,   // headless software rendering makes bubble timing occasionally flaky
+  retries: 0,   // #32: the suite now runs at 4× (tests/e2e set window.__SNA_FAST), so a flake is a real race to fix, not to silently retry
   reporter: [['list']],
   use: { baseURL: 'http://localhost:4173', trace: 'retain-on-failure', launchOptions: executablePath ? { executablePath } : {} },
   webServer: { command: 'npx vite preview --port 4173 --strictPort', url: 'http://localhost:4173', reuseExistingServer: true, timeout: 30_000 },

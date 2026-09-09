@@ -5,7 +5,7 @@ import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 // The live screen sets `__sna` to PlayHooks or MemoryHooks; a given test knows which, so the spec views it as
 // the union of both surfaces (#34, replacing `__sna: any`). tests/e2e is outside tsconfig's `include`, so this
 // augmentation and the `__sna?: SnaHooks` one in hooks.ts never meet in a single type-check pass.
-declare global { interface Window { __sna: PlayHooks & MemoryHooks } }
+declare global { interface Window { __sna: PlayHooks & MemoryHooks; __SNA_FAST?: number } }
 
 async function pickAvatar(page: Page, id = 'volt', name = 'Ada') {
   await page.goto('/?reset=1');
@@ -127,6 +127,14 @@ async function answerAll(page: Page, n: number) {
 }
 
 test.describe('Sky Ninja Academy', () => {
+  // #32: run the whole suite at 4× game speed. The app reads `window.__SNA_FAST` at boot (src/game/speed.ts)
+  // and divides only the scheduled waits — outcome holds, the inter-question gap, the launch stagger and the
+  // bubble flight time — so the suite runs in a fraction of real game time without touching the clock the
+  // guard rails read. One test below overrides this to 1 to pin the holds to their curriculum values.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => { window.__SNA_FAST = 4; });
+  });
+
   test('avatar selection is required, saved and shown on the home screen', async ({ page }) => {
     await pickAvatar(page, 'blaze', 'Zoe');
     await expect(page.locator('.hero b')).toHaveText('Zoe');
@@ -391,6 +399,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('outcome beat: a slice freezes the wave, spotlights the answer and fills in the card before moving on', async ({ page }) => {
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // #32: this test asserts the REAL outcome-beat pause (≥1200 ms) — it must run at game speed
     await pickAvatar(page);
     await startTopic(page, 'year1', 'y1-add');
     await waitForTarget(page);
@@ -415,6 +424,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('long sentences launch in batches that fit across the screen, never on top of each other', async ({ page }) => {
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // #32: samples flight every 400 ms over 2.4 s — tuned to real pacing; at 4× it would land on a miss-reveal freeze or a respawn, not free flight
     await pickAvatar(page);
     await startTopic(page, 'year2', 'y2-sentence');
     await page.waitForFunction(() => window.__sna.arena.bubbles.length >= 5);
@@ -586,6 +596,40 @@ test.describe('Sky Ninja Academy', () => {
       setTimeout(() => res({ advanced: +(dead.time - t0).toFixed(2), sna: typeof window.__sna }), 500);
     }));
     expect(leaked).toEqual({ advanced: 0, sna: 'undefined' });   // no ticking loop, and the dead hooks are gone
+  });
+
+  // #32: the suite runs at 4× (the beforeEach above), which compresses the outcome holds. This one test forces
+  // speed 1 and asserts the holds are the curriculum values the owner asked for (correct 1000, wrong 1800,
+  // miss 1500). Without it the fast suite verifies nothing about the holds, and the day someone changes a
+  // constant nobody would notice (the reason the issue asks for a normal-speed test).
+  test('guard rail: outcome holds are the curriculum values at speed 1 (#32)', async ({ page }) => {
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // overrides the suite's 4× for this test only
+    await pickAvatar(page);
+    await startTopic(page, 'reception', 'r-onemore');
+    expect(await page.evaluate(() => window.__sna.timing()))
+      .toEqual({ speed: 1, hold: { correct: 1000, wrong: 1800, miss: 1500 } });
+  });
+
+  // #32: prove the multiplier speeds the GAME, not the clock a rail reads. At 4× the holds compress
+  // (timing().speed === 4), but the arena clock must still track the wall clock (ratio ~1) and the loop must
+  // still render real frames. A multiplier that scaled `dt`/`Arena.time` instead would push the ratio towards
+  // 4 and pass the "renders at speed" rail on nonsense — the trap the acceptance criteria name explicitly.
+  test('guard rail: 4× speeds the game, not the clock the rails read (#32)', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'reception', 'r-onemore');
+    await page.waitForFunction(() => (window.__sna?.bubbles().length ?? 0) > 0);
+    expect(await page.evaluate(() => window.__sna.timing().speed)).toBe(4);
+    const [fps, ratio] = await page.evaluate(() => new Promise<[number, number]>(res => {
+      const a = window.__sna.arena!, t0 = a.time, w0 = performance.now();
+      let frames = 0;
+      const tick = () => { frames++; const el = performance.now() - w0;
+        if (el < 2000) requestAnimationFrame(tick); else res([frames / (el / 1000), (a.time - t0) / (el / 1000)]); };
+      requestAnimationFrame(tick);
+    }));
+    console.log(`[guard rail] fast=4 fps=${fps.toFixed(1)} ratio=${ratio.toFixed(2)}`);
+    expect(fps).toBeGreaterThan(FPS_FLOOR);   // the loop still renders real frames
+    expect(ratio).toBeGreaterThan(0.8);       // the arena clock still tracks wall time...
+    expect(ratio).toBeLessThan(1.5);          // ...and is NOT sped up 4× — the clock the rails read is untouched
   });
 
   test('guard rail: no control inherits a full-screen rule, and the mode cards match', async ({ page }) => {

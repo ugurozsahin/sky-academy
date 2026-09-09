@@ -1,5 +1,6 @@
 // Canvas arena: bubbles fly up from the bottom; the player taps or slices them.
 import { shuffle } from '../curriculum/util';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
+import { gameSpeed } from './speed';   // #32: test-only multiplier — divides flight time and stagger, never the clock
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
   launchAt: number; launched: boolean; hit: boolean; dead: boolean; color: string; wobble: number;
@@ -105,12 +106,13 @@ export class Arena {
     const n = o.labels.length;
     let r = Math.max(26, this.radius(!!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
     r = Math.min(r, ((this.W - 16) / 3 - 10) / 2);                               // at least three always fit across
-    const T = o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4;              // seconds in the air
+    const k = gameSpeed();   // #32: divide the air time and stagger (and so batchGap, which derives from T) under `?fast=N`
+    const T = (o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4) / k;        // seconds in the air
     this.waveT = T * 1000;
     const apexMin = this.topInset + r + 10;
     const usable = this.H - apexMin - r;
     const now = performance.now();
-    const stagger = o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260;
+    const stagger = (o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260) / k;
     // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
     // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
     // A sequence must be sliced in order, so at most 4 bubbles ride each flight even on a wide screen:
