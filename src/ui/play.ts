@@ -4,6 +4,7 @@ import { Arena } from '../game/arena';
 import { Session, type Mode, type SessionResult } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
+import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
 import { Tracer } from '../game/tracing';
 import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak, wallet } from '../storage';
 import { equippedItem } from '../game/shop';
@@ -64,6 +65,9 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   // game a child plays holds for the full time while the e2e suite can run them several times faster.
   const HOLD = sprint ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 };
   let waveId = 0; let revealUntil = 0;
+  // #44: false only until Fredoka is usable (or the capped wait gives up). The first wave is held back that
+  // long so its labels are measured and drawn in the real face; every wave after it spawns synchronously.
+  let fontsReady = false; fontReady().then(() => { fontsReady = true; });
   // Mission progress (#55): stage name + one segment per question (green = right, red = slip, pulsing = current) + a small "3/6".
   let segStage = 0; let segs: ('good' | 'bad' | '')[] = [];
   function drawStage(stage: number, index: number, total: number) {
@@ -99,7 +103,18 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         });
       };
       const demo = showTutorial();                // first ever play: animated hand first, bubbles a moment later
-      if (demo) later(spawn, demo); else spawn();
+      // #44: the very first wave waits for Fredoka. A bubble's label size is fitted once at spawn (#28) and
+      // every frame draws it with fillText, so a wave launched before the font lands is measured against the
+      // fallback face and then changes shape in mid-air while the child is reading it. Only the first wave
+      // pays: fontReady() caches, and `fontsReady` keeps every later spawn synchronous, exactly as before.
+      // The tutorial branch goes through the same gate (review of #139): `demo` is the child's first ever
+      // play, the one launch certain to have a cold font cache, and it used to be waved through on nothing
+      // but the coincidence that showTutorial()'s 1800 ms happens to exceed the 1200 ms cap.
+      const gatedSpawn = () => {
+        if (fontsReady) { spawn(); return; }
+        fontReady().then(() => { if (window.__sna === hooks) spawn(); });   // never into a torn-down screen
+      };
+      if (demo) later(gatedSpawn, demo); else gatedSpawn();
       }
     },
     onCorrect(q, points, combo) {

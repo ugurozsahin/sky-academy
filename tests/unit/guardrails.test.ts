@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
+import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 
 /**
  * GUARD RAILS (#73) — checks that fail the build so a mistake we have already made cannot come back.
@@ -328,5 +329,34 @@ describe('guard rails', () => {
       const files = Object.entries(SOURCES).filter(([, s]) => code(s).includes(glyph)).map(([f]) => f);
       expect(files, `${glyph} should live only in curriculum/util.ts`).toEqual(['/src/curriculum/util.ts']);
     }
+  });
+
+  // #44: the FIRST wave must spawn behind the font gate. Canvas text bakes in whichever face is loaded when
+  // fillText runs, and a bubble's label size is fitted once at spawn (#28) — so a wave launched before Fredoka
+  // lands is measured against the fallback face and then changes shape in mid-air while a child reads it.
+  // The gate is one line, sitting in the middle of the onQuestion closure, and trivially lost to a refactor.
+  // The second assertion is the exact line this replaced: `if (demo) later(spawn, demo); else spawn();`.
+  it('the first wave spawns behind the font gate (#44)', () => {
+    const play = SOURCES['/src/ui/play.ts'];
+    expect(play, 'play.ts must be readable').toBeTruthy();
+    expect(code(play)).toMatch(/fontReady\(\)\.then\([\s\S]{0,120}?spawn\(\)/);
+    expect(code(play), 'the ungated `else spawn()` is the bug this rail exists for').not.toMatch(/else\s+spawn\(\)\s*;/);
+    // ...and the tutorial branch goes through the gate too. `demo` is the child's first ever play — the one
+    // launch certain to have a cold font cache — and it was waved through on nothing but showTutorial()'s
+    // 1800 ms happening to exceed the 1200 ms cap, an accident of two unrelated constants (review of #139).
+    expect(code(play), 'the first-ever play must not skip the gate').not.toMatch(/later\(\s*spawn\s*,/);
+  });
+
+  // #44 again, the other half: the gate probes one concrete face, and it is only meaningful if index.html
+  // actually asks Google for that weight. Trim the `wght@` list and the gate would wait for a face that never
+  // arrives — every first wave then pays the full timeout AND still draws in the fallback. index.html is read
+  // from disk (Vite's glob does not reach it) and its length asserted, so an empty read cannot pass vacuously.
+  it('the font gate probes a weight index.html requests from Google (#44)', () => {
+    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+    expect(html.length, 'index.html must be read from disk, not a blank import').toBeGreaterThan(500);
+    const weights = /family=Fredoka:wght@([\d;]+)/.exec(html)?.[1].split(';') ?? [];
+    expect(weights.length, 'index.html should request Fredoka with an explicit wght@ list').toBeGreaterThan(0);
+    const probe = /^(\d+)\s/.exec(FONT_PROBE)?.[1];
+    expect(weights, `the gate probes weight ${probe}, which index.html must request`).toContain(probe);
   });
 });
