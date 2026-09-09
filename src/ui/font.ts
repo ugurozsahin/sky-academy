@@ -15,8 +15,8 @@
 // A slow or dead network must never stop a child playing, so the whole wait is capped: on timeout the game
 // starts anyway in the fallback face, exactly as it does today.
 
-/** The face the gate probes. 700 is the heaviest weight `index.html` asks Google for; the 800/900 the arena
- *  draws are synthesised by the browser from that face, so its arrival is what unblocks all of them. */
+/** The face the gate probes. 700 is the heaviest weight Fredoka has and the heaviest `index.html` asks Google
+ *  for, and every Fredoka draw in the app now names it, so this one face's arrival unblocks all of them. */
 export const FONT_PROBE = '700 24px "Fredoka"';
 /** Longest the first wave may be held back. Beyond this the fallback face is the lesser evil. */
 export const FONT_TIMEOUT_MS = 1200;

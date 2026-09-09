@@ -60,8 +60,9 @@ your first finding and the only one you can report.
    Explicable is not the same as fine, and this very clause was read as an exemption on the first run.
 3. **Is the development routine alive?** Read the body of the issue titled `routine: heartbeat`: the routine
    rewrites it with a UTC timestamp as the last thing every run does. Two missed intervals plus slack is the
-   finding — take the cadence from the routine rather than assuming, the repo has called it "hourly" while it
-   ran every three hours. **An open issue is not evidence of a pulse; a readable, recent timestamp is** — an
+   finding — take the cadence from the routine's own trigger rather than assuming. The repo has called it
+   "hourly" through more than one cadence change, and the trigger is still *named* "hourly dev run" while its
+   cron reads `37 */2 * * *` (every two hours, as of 2026-09-09), so the name is not evidence of anything. **An open issue is not evidence of a pulse; a readable, recent timestamp is** — an
    empty or unparseable body counts as stale, and that is the likeliest partial death, because the pulse is
    written last and last is the most exposed place to run out of time. If no such issue exists in any state,
    the routine has not run since this was introduced; if it exists but is closed, someone closed the pulse,

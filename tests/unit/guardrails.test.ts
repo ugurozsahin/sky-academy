@@ -431,4 +431,53 @@ describe('guard rails', () => {
     expect(steps, 'do not swallow apt failures; drop the unused source instead (#147)')
       .not.toMatch(/apt-get\s+update[^\n]*\|\|\s*true/);
   });
+
+  // Fredoka stops at 700: Google Fonts answers a request for `Fredoka:wght@800` with HTTP 400. So every
+  // 800/900 the app asked for named a face that does not exist. Measured, that changed nothing — Chromium
+  // picks the nearest declared face, and 700/800/900 come out with the same advance width and zero differing
+  // pixels (500 differs plainly, so the axis is live). Nothing was smeared; fitLabel measured what it drew.
+  //
+  // The rail is not about today's pixels, then. It is that the identical render is luck of this engine: the
+  // spec permits synthesising a heavier face and WebKit and older Android WebView do, so the same code can
+  // look different elsewhere. And "make it bolder" is the obvious move for anyone who thinks a label reads
+  // thin — the browser will silently oblige with a weight Google never served.
+  //
+  // Limits, stated plainly, because this reads text rather than proving anything:
+  //  - it catches a literal weight beside a size in a font string that also names Fredoka, and a literal
+  //    `font-weight="…"` attribute in inline SVG/HTML built in `src/**/*.ts` (that second form is how
+  //    visuals.ts's coin label escaped the first version of this rail — the review of #143 found it);
+  //  - `certificate.ts` passes its weight as an argument (`font(px, w = 700)`), so its call sites are
+  //    outside both forms. They are 500/600/700 today.
+  const FREDOKA_MAX = 700;
+  it('nothing in src/ asks Fredoka for a weight it does not have (#44)', () => {
+    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+    expect(html.length, 'index.html must be read from disk, not a blank import').toBeGreaterThan(500);
+    const served = (/family=Fredoka:wght@([\d;]+)/.exec(html)?.[1] ?? '').split(';').filter(Boolean);
+    expect(served.length, 'index.html should request Fredoka with an explicit wght@ list').toBeGreaterThan(0);
+    expect(Math.max(...served.map(Number)), 'Fredoka has no weight above 700').toBeLessThanOrEqual(FREDOKA_MAX);
+
+    const asked = Object.entries(SOURCES).flatMap(([f, s]) => [
+      // a canvas font string: `700 24px "Fredoka", …`
+      ...[...code(s).matchAll(/(\d{3})\s+[^\n;]{0,40}px[^\n;]{0,80}Fredoka/g)].map(m => `${f}: ${m[1]}`),
+      // an inline SVG/HTML attribute: `font-weight="700"`. These inherit --font (== the Fredoka stack) from
+      // `html, body` in style.css, so they are the same ask by another spelling, and the canvas pattern above
+      // cannot see them — there is no `px` size and no family named on the line.
+      ...[...code(s).matchAll(/font-weight="(\d{3})"/g)].map(m => `${f}: ${m[1]}`),
+    ]);
+    expect(asked.length, 'the rail found no font weights at all — it would pass vacuously').toBeGreaterThan(4);
+    expect(asked.filter(a => !served.includes(a.split(': ')[1])),
+      `every Fredoka weight in src/ must be one index.html asks Google for (${served.join(';')})`).toEqual([]);
+  });
+
+  // The same mistake in CSS. Read from disk: Vite's `?raw` returns an empty string for stylesheets outside
+  // the browser (see the note at the top of this file), so a glob-based CSS rail would pass vacuously.
+  // 800 is the value that is always wrong — 700 exists, and the one 900 left is on a ✕ that Fredoka has no
+  // glyph for, so it falls through to the system stack where 900 is a real designed weight.
+  it('no stylesheet rule asks Fredoka for a weight it does not have (#44)', () => {
+    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    expect(css.length, 'style.css must be read from disk, not a blank import').toBeGreaterThan(5000);
+    expect(css).toContain('--font: "Fredoka"');                          // the stack these weights resolve in
+    expect([...css.matchAll(/font-weight:\s*800/g)].length,
+      'Fredoka has no 800; use 700 and let the stroke or colour carry the weight').toBe(0);
+  });
 });

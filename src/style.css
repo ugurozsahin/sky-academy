@@ -546,7 +546,7 @@ img { -webkit-user-drag: none; }
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff8, #ffd54f 45%, #c8951a);
   color: #fff;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 46px;
   display: grid;
   place-items: center;
@@ -585,7 +585,7 @@ img { -webkit-user-drag: none; }
   border-radius: 999px;
   background: #fff;
   color: #1a1a2a;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 19px;
   box-shadow: 0 8px 20px #0006;
   white-space: nowrap;
@@ -733,6 +733,7 @@ img { -webkit-user-drag: none; }
 /* visuals in question card */
 .vis { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 4px 0; flex-wrap: wrap; }
 .objs .obj { font-size: clamp(22px, 5.5vw, 30px); line-height: 1.1; } .objs .obj.gone { opacity: .35; position: relative; }
+/* 900 stays here: ✕ is not a Fredoka glyph, so this falls through to the system stack where 900 is real. */
 .objs .obj.gone::after { content: "✕"; position: absolute; inset: 0; color: var(--bad); font-weight: 900; display: grid; place-items: center; font-size: 1.1em; }
 .vis.objs { flex-direction: column; gap: 4px; } .vis.objs.two { flex-direction: row; gap: 10px; align-items: center; }
 .objs .grp { display: flex; flex-direction: column; gap: 4px; align-items: center; max-width: 46%; }
@@ -869,11 +870,11 @@ img { -webkit-user-drag: none; }
   border: 2px solid #6d7fd6;
   color: #ffffff66;
   font-size: 34px;
-  font-weight: 800;
+  font-weight: 700;
   box-shadow: 0 8px 20px #0006, inset 0 0 24px color-mix(in srgb, var(--glow) 22%, transparent);
 }
 .card .front { background: #fff; color: #1a1a2a; border: 2px solid #ffffff; transform: rotateY(180deg); box-shadow: 0 8px 20px #0006; padding: 4px; overflow: hidden; }
-.card .txt { font-size: clamp(22px, 7vw, 36px); font-weight: 800; line-height: 1.05; text-align: center; overflow-wrap: anywhere; }
+.card .txt { font-size: clamp(22px, 7vw, 36px); font-weight: 700; line-height: 1.05; text-align: center; overflow-wrap: anywhere; }
 .card .txt.small { font-size: clamp(14px, 4vw, 20px); font-weight: 700; }
 .card .txt.glyph { font-size: clamp(36px, 11vw, 56px); }
 .card .txt.objs { font-size: clamp(14px, 4.2vw, 22px); letter-spacing: -.05em; line-height: 1.1; }
@@ -1095,7 +1096,7 @@ img { -webkit-user-drag: none; }
 .p-topics { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .p-topic { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
 .p-topic .ic { font-size: 22px; } .p-topic-t { flex: 1; min-width: 0; } .p-topic-t b { display: block; } .p-topic-t small { color: var(--muted); font-weight: 600; }
-.p-acc { font-weight: 800; font-size: 18px; }
+.p-acc { font-weight: 700; font-size: 18px; }
 .p-empty { color: var(--muted); font-weight: 600; }
 .p-table-wrap { overflow-x: auto; }
 .p-table { width: 100%; border-collapse: collapse; font-weight: 600; }

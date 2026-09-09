@@ -48,7 +48,7 @@ describe('fitLabel — label font sized once at spawn, not per frame (#28)', () 
   });
 
   it('labelFont carries the weight, size and the Fredoka fallback stack', () => {
-    expect(labelFont(24)).toBe('800 24px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif');
+    expect(labelFont(24)).toBe('700 24px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif');
   });
 });
 

@@ -420,7 +420,9 @@ export class Arena {
       const col = b.mark === 'good' ? GOOD : BAD, br = b.r * 0.36, bx = b.r * 0.74, by = -b.r * 0.74;
       c.fillStyle = col; c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill();
       c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.stroke();
-      c.font = `900 ${br * 1.5}px "Fredoka", "Baloo 2", system-ui, sans-serif`; c.lineWidth = 0; c.fillStyle = '#fff'; c.fillText(b.mark === 'good' ? '✓' : '✗', bx, by + 1);
+      // No Fredoka here on purpose: it has no ✓ or ✗ glyph, so this text has always come from the fallback
+      // stack, where 900 is a real designed weight. Naming Fredoka only invited someone to "fix" the 900.
+      c.font = `900 ${br * 1.5}px "Baloo 2", system-ui, sans-serif`; c.lineWidth = 0; c.fillStyle = '#fff'; c.fillText(b.mark === 'good' ? '✓' : '✗', bx, by + 1);
     }
     c.restore();
   }
@@ -435,7 +437,7 @@ export class Arena {
     const k = 1 - p.life / p.max;
     c.save(); c.globalAlpha = Math.max(0, k);
     if (p.kind === 'ring') { c.strokeStyle = p.color; c.lineWidth = 4 * k + 1; c.beginPath(); c.arc(p.x, p.y, p.size + (1 - k) * 90, 0, Math.PI * 2); c.stroke(); }
-    else if (p.kind === 'text') { c.font = `800 ${p.size}px "Fredoka", "Baloo 2", system-ui, sans-serif`; c.textAlign = 'center'; c.lineWidth = 5; c.strokeStyle = 'rgba(0,0,0,.6)'; c.strokeText(p.text!, p.x, p.y); c.fillStyle = p.color; c.fillText(p.text!, p.x, p.y); }
+    else if (p.kind === 'text') { c.font = `700 ${p.size}px "Fredoka", "Baloo 2", system-ui, sans-serif`; c.textAlign = 'center'; c.lineWidth = 5; c.strokeStyle = 'rgba(0,0,0,.6)'; c.strokeText(p.text!, p.x, p.y); c.fillStyle = p.color; c.fillText(p.text!, p.x, p.y); }
     else if (p.kind === 'shard') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 6); c.fillStyle = p.color; c.fillRect(-p.size, -p.size / 2, p.size * 2, p.size); }
     else if (p.kind === 'ember') { const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size); g.addColorStop(0, '#fff6c0'); g.addColorStop(0.4, p.color); g.addColorStop(1, 'rgba(255,60,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, p.size * (0.6 + 0.6 * k), 0, Math.PI * 2); c.fill(); }
     else if (p.kind === 'drop') { c.translate(p.x, p.y); c.rotate(Math.atan2(p.vy, p.vx) + Math.PI / 2); c.fillStyle = p.color; c.beginPath(); c.moveTo(0, -p.size * 1.6); c.quadraticCurveTo(p.size, 0, 0, p.size); c.quadraticCurveTo(-p.size, 0, 0, -p.size * 1.6); c.fill(); c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.arc(-p.size * 0.3, -p.size * 0.2, p.size * 0.25, 0, Math.PI * 2); c.fill(); }
@@ -512,7 +514,15 @@ export function compact<T>(arr: T[], keep: (v: T) => boolean): T[] {
   return arr;
 }
 
-export const labelFont = (fs: number) => `800 ${fs}px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif`;
+// 700 is the heaviest weight Fredoka actually has: Google Fonts answers a request for `wght@800` with HTTP
+// 400. Asking for 800 here therefore asked for a face that does not exist — and, measured, changed nothing:
+// Chromium picks the nearest declared face, so 700/800/900 render identically (same advance width, zero
+// differing pixels; 500 differs plainly, so the axis really is live). Nothing was ever smeared, and fitLabel
+// measured exactly what it draws. The reason to write 700 is that the identical render is luck of the engine
+// rather than construction — the spec permits synthesising a heavier face, and WebKit and older Android
+// WebView do — plus nobody should read "800" here and infer a heavier Fredoka exists.
+// Same reasoning at every other Fredoka call site: the ✓/✗ badge below, visuals.ts, and style.css.
+export const labelFont = (fs: number) => `700 ${fs}px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif`;
 
 // Fit a bubble label to its radius: a size from the character count, then shrunk until it fits `r * 1.75`.
 // Called once per bubble in spawnWave (#28) — `measure` sets the font and returns the text width — instead
