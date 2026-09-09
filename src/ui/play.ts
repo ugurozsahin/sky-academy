@@ -170,7 +170,15 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         const gap = lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650;
         later(() => session.waveEnd(), Math.max(0, revealUntil - performance.now()) + gap);
       },
-    }, { trailColor: skin?.color ?? av.glow, trailCore: skin?.core, fx: av.fx, onSwish: () => sfx.swish() });
+    }, {
+      trailColor: skin?.color ?? av.glow, trailCore: skin?.core, fx: av.fx,
+      onSwish: () => sfx.swish(),
+      // A tap throws the ninja's projectile: the whoosh goes with the throw, the element slice with the pop (#48).
+      onThrow: () => sfx.whoosh(),
+      onLand: () => { (sliceFx[av.fx] ?? sfx.slice)(); haptic('slice'); },
+      // The TNT blows up under the finger — never chase it with a star, or it would burst twice and reward the hit.
+      throwFor: b => b.label !== BOMB,
+    });
   }
 
   function startTrace(q: Question) {
@@ -311,6 +319,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       stage: session.stage, index: session.index, score: session.score, lives: session.lives,
       ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt,
       answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null,
+      shots: arena?.shotsThrown ?? 0,
     }),
     // PNG data URL of the certificate for the finished mission
     certificate: async () => {

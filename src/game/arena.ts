@@ -13,10 +13,29 @@ const ELEMENTS: FxKind[] = ['fire', 'water', 'electric', 'earth', 'wind', 'ice',
 const FX_PARTICLE: Record<FxKind, PKind> = { fire: 'ember', water: 'drop', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'crystal', light: 'star', shadow: 'smoke', blade: 'slash', robot: 'pixel', master: 'star' };
 const FX_COLORS: Record<FxKind, string[]> = { fire: ['#ff7a1a', '#ffd23a', '#ff3b1a'], water: ['#3ec9ff', '#9fe6ff', '#1a7fff'], electric: ['#2ea8ff', '#ffffff', '#9fe6ff'], earth: ['#a0622a', '#7ddc3a', '#6b4220'], wind: ['#7fe8c8', '#c8ffe9', '#5fcf5a'], ice: ['#9fe6ff', '#ffffff', '#5bb8e8'], light: ['#ffd23a', '#ffffff', '#ffb020'], shadow: ['#a855ff', '#5a2aa0', '#2a1050'], blade: ['#ffffff', '#ff3b5c', '#d8dce8'], robot: ['#ff5252', '#ffffff', '#9aa5cf'], master: ['#ffd87a', '#ffffff', '#ffb020'] };
 const MAX_PARTICLES = 250;   // #29: safety cap so a pathological burst can never grow the per-frame draw loop unbounded
+// A tap throws the ninja's own projectile (#48): it flies from the bottom of the arena to the bubble and pops
+// it on arrival. Score, lives and the outcome reveal are all settled at the tap — only the pop waits for the
+// landing, so the flight is decoration and never changes what the child earned.
+export interface Shot { target: Bubble; x0: number; y0: number; x: number; y: number; t: number; fx: FxKind; emit: number }
+export const SHOT_FLIGHT = 0.15;   // seconds in the air
+type ShotStyle = 'shuriken' | 'fireball' | 'orb' | 'bolt' | 'rock' | 'leaf' | 'shard' | 'star' | 'laser';
+export const SHOT_STYLE: Record<FxKind, ShotStyle> = { blade: 'shuriken', shadow: 'shuriken', master: 'shuriken', fire: 'fireball', water: 'orb', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'shard', light: 'star', robot: 'laser' };
+/** Where a shot is `t` seconds after the throw: a straight line to the target's current spot, a touch faster as it goes. */
+export function shotPose(x0: number, y0: number, tx: number, ty: number, t: number) {
+  const k = Math.min(1, Math.max(0, t / SHOT_FLIGHT)); const e = k * (0.7 + 0.3 * k);
+  return { x: x0 + (tx - x0) * e, y: y0 + (ty - y0) * e, angle: Math.atan2(ty - y0, tx - x0), done: k >= 1 };
+}
 export interface ArenaCallbacks {
   onHit: (b: Bubble, viaSwipe: boolean) => void;   // player touched/sliced a bubble
   onFall: (b: Bubble) => void;                       // an un-hit bubble fell off screen
   onWaveEnd: () => void;                             // no live bubbles remain
+}
+export interface ArenaOpts {
+  trailColor?: string; trailCore?: string; fx?: FxKind;
+  onSwish?: () => void;
+  onThrow?: () => void;                        // a projectile has just left the ninja's hand
+  onLand?: () => void;                         // it has reached the bubble and popped it
+  throwFor?: (b: Bubble) => boolean;           // false = pop this bubble instantly instead of throwing at it
 }
 export interface WaveOpts { labels: string[]; speed: number; wide?: boolean; gravity?: number; ordered?: string[] /* sequence labels that must be sliced in this order */ }
 const GOOD = '#66e07d', BAD = '#ff5f6d';
@@ -32,19 +51,24 @@ export class Arena {
   W = 0; H = 0; dpr = 1; topInset = 120;
   bubbles: Bubble[] = [];
   private particles: Particle[] = [];
+  shots: Shot[] = []; shotsThrown = 0;                          // projectiles in flight / thrown so far (the e2e reads the count)
   private trail: { x: number; y: number; t: number }[] = [];
   private pointerDown = false; private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600;
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
+  private onThrow?: () => void; private onLand?: () => void;
+  /** Which bubbles a tap throws a projectile at; anything else pops instantly, like a swipe (the TNT does — #48). */
+  private throwFor?: (b: Bubble) => boolean;
   time = 0;
 
-  constructor(public canvas: HTMLCanvasElement, private cb: ArenaCallbacks, opts: { trailColor?: string; trailCore?: string; fx?: FxKind; onSwish?: () => void } = {}) {
+  constructor(public canvas: HTMLCanvasElement, private cb: ArenaCallbacks, opts: ArenaOpts = {}) {
     this.ctx = canvas.getContext('2d')!;
     if (opts.trailColor) this.trailColor = opts.trailColor;
     if (opts.trailCore) this.trailCore = opts.trailCore;
     if (opts.fx) this.fx = opts.fx;
-    this.onSwish = opts.onSwish;
+    this.onSwish = opts.onSwish; this.onThrow = opts.onThrow; this.onLand = opts.onLand;
+    this.throwFor = opts.throwFor;
     this.resize();
     window.addEventListener('resize', this.resize);
     canvas.addEventListener('pointerdown', this.onDown);
@@ -77,7 +101,7 @@ export class Arena {
   }
 
   spawnWave(o: WaveOpts) {
-    this.bubbles = []; this.frozen = false;
+    this.bubbles = []; this.shots = []; this.frozen = false;
     const n = o.labels.length;
     let r = Math.max(26, this.radius(!!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
     r = Math.min(r, ((this.W - 16) / 3 - 10) / 2);                               // at least three always fit across
@@ -155,6 +179,7 @@ export class Arena {
   /** Remove remaining bubbles (with a gentle fade) — used when the question is over. */
   clearWave(popColor?: string) {
     for (const b of this.bubbles) if (!b.dead) { b.dead = true; if (popColor && b.launched && !b.fade) this.burst(b.x, b.y, b.mark === 'good' ? GOOD : popColor, b.mark ? 14 : 6); }
+    this.shots = [];                                // the question is over: a projectile still in the air is dropped (#48)
     this.frozen = false;
     if (this.waveActive) { this.waveActive = false; this.cb.onWaveEnd(); }
   }
@@ -226,9 +251,27 @@ export class Arena {
   }
   private hitBubble(b: Bubble, viaSwipe: boolean) {
     b.hit = true;
-    this.burst(b.x, b.y, b.color);
+    // A tap throws the ninja's projectile and the bubble pops when it lands; a swipe (and anything throwFor
+    // excludes, such as the TNT) pops here and now, exactly as before (#48).
+    const thrown = !viaSwipe && (this.throwFor ? this.throwFor(b) : true);
+    if (thrown) this.throwAt(b); else this.burst(b.x, b.y, b.color);
     this.cb.onHit(b, viaSwipe);
-    if (!b.mark) b.dead = true;                     // reveal() may keep it on screen as the spotlighted outcome
+    if (!thrown && !b.mark) b.dead = true;          // reveal() may keep it on screen as the spotlighted outcome
+  }
+  /** Throw the avatar's projectile from the bottom of the arena (the ninja's side), leaning towards the bubble. */
+  private throwAt(b: Bubble) {
+    const x0 = this.W / 2 + (b.x - this.W / 2) * 0.3, y0 = this.H + 12;
+    this.shots.push({ target: b, x0, y0, x: x0, y: y0, t: 0, fx: this.fx, emit: 0 });
+    this.shotsThrown++; this.onThrow?.();
+  }
+  private landShot(s: Shot) {
+    const t = s.target;
+    // The target may have been resolved while the star flew — cleared with the question, or fallen off screen.
+    // It burst then, so this landing is silent: the sound belongs to a pop the child can actually see.
+    const pops = !t.dead || !!t.mark;
+    if (pops) this.burst(t.x, t.y, t.color);
+    if (!t.mark) t.dead = true;
+    if (pops) this.onLand?.();
   }
 
   // ---------- loop ----------
@@ -247,10 +290,17 @@ export class Arena {
       if (this.frozen) { live++; b.wobble += dt * 3; continue; }        // outcome reveal: everything holds still
       if (!b.launched) { if (now >= b.launchAt) b.launched = true; else { live++; continue; } }
       b.vy += b.g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.wobble += dt * 3;
-      if (b.y - b.r > this.H + 10 && b.vy > 0) { b.dead = true; this.cb.onFall(b); continue; }
+      if (b.y - b.r > this.H + 10 && b.vy > 0) { b.dead = true; if (!b.hit) this.cb.onFall(b); continue; }   // a tapped bubble with a shot on the way is not a miss
       live++;
     }
     if (this.waveActive && live === 0) { this.waveActive = false; this.cb.onWaveEnd(); }
+    for (const s of this.shots) {                   // shots fly on even while the wave is frozen for the reveal
+      const p = shotPose(s.x0, s.y0, s.target.x, s.target.y, s.t += dt);
+      if (++s.emit % 2 === 0) this.emitFx(s.x, s.y, 1, (p.x - s.x) * 0.2, (p.y - s.y) * 0.2);   // element wake
+      s.x = p.x; s.y = p.y;
+      if (p.done) this.landShot(s);
+    }
+    this.shots = this.shots.filter(s => s.t < SHOT_FLIGHT);
     for (const p of this.particles) { p.life += dt; const g = p.kind === 'ring' || p.kind === 'text' || p.kind === 'bolt' || p.kind === 'slash' ? 0 : p.kind === 'ember' || p.kind === 'smoke' ? -120 : p.kind === 'leaf' || p.kind === 'star' ? 80 : p.kind === 'drop' ? 700 : 500; p.vy += g * dt; if (p.kind === 'leaf') p.vx += Math.sin(p.life * 9) * 40 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     this.particles = this.particles.filter(p => p.life < p.max);
     if (this.particles.length > MAX_PARTICLES) this.particles.splice(0, this.particles.length - MAX_PARTICLES);   // #29: hard cap, drop the oldest
@@ -261,7 +311,54 @@ export class Arena {
     for (const b of this.bubbles) { if (b.dead || !b.launched || b.mark) continue; this.drawBubble(c, b, now); }
     for (const b of this.bubbles) { if (!b.dead && b.launched && b.mark) this.drawBubble(c, b, now); }   // spotlighted on top
     for (const p of this.particles) this.drawParticle(c, p);
+    for (const s of this.shots) this.drawShot(c, s);
     this.drawTrail(c, now);
+  }
+  /** The projectile in flight, in the avatar's element (#48): a spinning shuriken for Kai / Dusk / the Master,
+   *  a fireball, a water orb, a bolt… No shadowBlur here — the #29 rail forbids it in a per-frame path. */
+  private drawShot(c: CanvasRenderingContext2D, s: Shot) {
+    const style = SHOT_STYLE[s.fx], cols = FX_COLORS[s.fx], r = 16;
+    const angle = shotPose(s.x0, s.y0, s.target.x, s.target.y, s.t).angle, spin = s.t * 40;
+    c.save(); c.translate(s.x, s.y);
+    if (style === 'shuriken') {
+      c.rotate(spin);
+      c.fillStyle = s.fx === 'blade' ? '#d8dce8' : s.fx === 'shadow' ? '#3a1a60' : '#ffd23a';
+      starPath(c, 4, r * 1.3, r * 0.4); c.fill();
+      c.strokeStyle = s.fx === 'shadow' ? cols[0] : 'rgba(255,255,255,.85)'; c.lineWidth = 1.5; c.stroke();
+      c.fillStyle = s.fx === 'blade' ? '#5a6070' : s.fx === 'shadow' ? cols[0] : '#fff6c4';
+      c.beginPath(); c.arc(0, 0, r * 0.28, 0, Math.PI * 2); c.fill();
+    } else if (style === 'fireball') {
+      c.fillStyle = cols[0]; c.beginPath(); c.arc(0, 0, r * 0.85, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#fff6c0'; c.beginPath(); c.arc(0, 0, r * 0.45, 0, Math.PI * 2); c.fill();
+    } else if (style === 'orb') {
+      c.fillStyle = cols[0]; c.beginPath(); c.arc(0, 0, r * 0.8, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = cols[1]; c.lineWidth = 2; c.stroke();
+      c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.arc(-r * 0.3, -r * 0.3, r * 0.25, 0, Math.PI * 2); c.fill();
+    } else if (style === 'bolt') {
+      c.rotate(angle); c.strokeStyle = cols[1]; c.lineWidth = 3; c.lineJoin = 'miter';
+      c.beginPath(); c.moveTo(-r * 1.4, 0); c.lineTo(-r * 0.4, -r * 0.6); c.lineTo(r * 0.2, r * 0.5); c.lineTo(r * 1.4, -r * 0.2); c.stroke();
+      c.strokeStyle = cols[0]; c.lineWidth = 1.2; c.stroke();
+    } else if (style === 'rock') {
+      c.rotate(spin * 0.4); c.fillStyle = cols[0];
+      c.beginPath(); c.moveTo(-r, -r * 0.4); c.lineTo(-r * 0.3, -r); c.lineTo(r * 0.8, -r * 0.6); c.lineTo(r, r * 0.4); c.lineTo(r * 0.1, r); c.lineTo(-r * 0.9, r * 0.5); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 1.5; c.stroke();
+    } else if (style === 'leaf') {
+      c.rotate(angle + Math.PI / 2); c.fillStyle = cols[0];
+      c.beginPath(); c.moveTo(0, -r * 1.4); c.quadraticCurveTo(r, 0, 0, r * 1.4); c.quadraticCurveTo(-r, 0, 0, -r * 1.4); c.fill();
+      c.strokeStyle = 'rgba(0,80,40,.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -r * 1.1); c.lineTo(0, r * 1.1); c.stroke();
+    } else if (style === 'shard') {
+      c.rotate(angle + Math.PI / 2); c.fillStyle = cols[0];
+      c.beginPath(); c.moveTo(0, -r * 1.5); c.lineTo(r * 0.55, 0); c.lineTo(0, r * 1.5); c.lineTo(-r * 0.55, 0); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 1.2; c.stroke();
+    } else if (style === 'star') {
+      c.rotate(spin); c.fillStyle = cols[0]; starPath(c, 8, r * 1.2, r * 0.5); c.fill();
+      c.fillStyle = cols[1]; c.beginPath(); c.arc(0, 0, r * 0.3, 0, Math.PI * 2); c.fill();
+    } else {                                        // laser: a short capsule along the flight line
+      c.rotate(angle); c.strokeStyle = cols[0]; c.lineCap = 'round'; c.lineWidth = 7;
+      c.beginPath(); c.moveTo(-r * 1.2, 0); c.lineTo(r * 1.2, 0); c.stroke();
+      c.strokeStyle = cols[1]; c.lineWidth = 2.5; c.stroke();
+    }
+    c.restore();
   }
   private drawBubble(c: CanvasRenderingContext2D, b: Bubble, now: number) {
     const wob = Math.sin(b.wobble) * 0.04;
@@ -421,6 +518,11 @@ function bodySprite(color: string, r: number): HTMLCanvasElement {
 }
 // True when the slice segment (x1,y1)→(x2,y2) passes within `r` of the bubble centre (cx,cy) — the swipe
 // hit test. Exported so the geometry is unit-tested directly rather than only through the slow e2e (#43).
+function starPath(c: CanvasRenderingContext2D, points: number, ro: number, ri: number) {
+  c.beginPath();
+  for (let i = 0; i < points * 2; i++) { const r = i % 2 ? ri : ro, a = i * Math.PI / points; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+  c.closePath();
+}
 export function segCircle(x1: number, y1: number, x2: number, y2: number, cx: number, cy: number, r: number) {
   const dx = x2 - x1, dy = y2 - y1; const l2 = dx * dx + dy * dy;
   let t = l2 ? ((cx - x1) * dx + (cy - y1) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));

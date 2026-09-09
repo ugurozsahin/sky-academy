@@ -47,6 +47,7 @@ sliceFx.master = () => { const keys = Object.keys(sliceFx).filter(k => k !== 'ma
 
 export const sfx = {
   swish: () => noise(0.12, 0.12, 2500),                                   // blade trail
+  whoosh: () => { noise(0.14, 0.1, 1200, 5000); tone(500, 0.12, 'sine', 0.05, 1300); },   // a thrown projectile (#48)
   slice: () => { noise(0.08, 0.2, 1800); tone(900, 0.08, 'triangle', 0.15, 300); },
   correct: () => { tone(660, 0.1, 'triangle', 0.2); tone(880, 0.12, 'triangle', 0.2, undefined, 0.09); tone(1320, 0.18, 'triangle', 0.2, undefined, 0.18); },
   wrong: () => { tone(220, 0.25, 'sawtooth', 0.12, 150); },

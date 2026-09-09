@@ -27,6 +27,8 @@ export interface PlayState {
   timeLeft: number;
   bossHp: number;
   trail: TrailSkin | null;
+  /** Projectiles thrown so far this screen (#48) — a swipe never throws one, a tapped TNT never does either. */
+  shots: number;
 }
 
 /** The `window.__sna` hooks set by the play screen. */

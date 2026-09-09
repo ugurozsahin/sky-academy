@@ -70,6 +70,19 @@ describe('guard rails', () => {
     expect(body).not.toMatch(/createRadialGradient|measureText/);
   });
 
+  // #48 review: tapping a TNT threw a ninja star at it, so the bomb burst once from play.ts's BOMB branch and
+  // again when the star landed — and the landing fired the avatar's *slice* sound, rewarding the child for
+  // hitting the bomb, while the exploded bubble kept falling for the 150 ms flight. The arena now asks
+  // `throwFor(b)` before throwing; play.ts answers false for the TNT so it pops under the finger. The e2e
+  // proves the behaviour; this rail catches the wiring being dropped in a refactor, where e2e cannot run.
+  it('a tapped TNT is never thrown at (#48)', () => {
+    const play = code(SOURCES['/src/ui/play.ts']);
+    expect(play).toMatch(/throwFor:\s*b\s*=>\s*b\.label\s*!==\s*BOMB/);
+    const arena = code(SOURCES['/src/game/arena.ts']);
+    expect(arena).toContain('this.throwFor ? this.throwFor(b) : true');   // the tap path consults it
+    expect(arena).toMatch(/if \(!b\.hit\) this\.cb\.onFall\(b\)/);      // a tapped bubble in flight is not a miss
+  });
+
   // CLAUDE.md: no dependencies without reason (Capacitor is the documented exception). A new one now has
   // to be argued for in the PR that adds it, because this rail goes red until the list is updated too.
   it('dependencies match the allowlist below (CLAUDE.md explains the rule)', () => {

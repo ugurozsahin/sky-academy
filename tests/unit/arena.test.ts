@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { dealOrdered, fitLabel, labelFont, segCircle } from '../../src/game/arena';
+import { SHOT_FLIGHT, SHOT_STYLE, dealOrdered, fitLabel, labelFont, segCircle, shotPose } from '../../src/game/arena';
+import { ALL_AVATARS } from '../../src/avatars';
 
 describe('dealOrdered — sequence words are dealt in order across the batches (#62)', () => {
   const batchOf = (order: number[], perBatch: number, idx: number) => Math.floor(order.indexOf(idx) / perBatch);
@@ -72,5 +73,33 @@ describe('segCircle — swipe-through-bubble hit test (#43)', () => {
   it('a zero-length stroke (a tap that did not move) hits only when the point is inside', () => {
     expect(segCircle(5, 5, 5, 5, 0, 0, 20)).toBe(true);         // l2 === 0, point within r
     expect(segCircle(30, 0, 30, 0, 0, 0, 20)).toBe(false);      // point outside r
+  });
+});
+
+describe('tap-to-pop projectile (#48)', () => {
+  it('flies straight from the throw point to the target and lands after SHOT_FLIGHT seconds', () => {
+    const start = shotPose(200, 800, 100, 300, 0);
+    expect(start).toMatchObject({ x: 200, y: 800, done: false });
+    const end = shotPose(200, 800, 100, 300, SHOT_FLIGHT);
+    expect(end.x).toBeCloseTo(100); expect(end.y).toBeCloseTo(300); expect(end.done).toBe(true);
+    const late = shotPose(200, 800, 100, 300, SHOT_FLIGHT * 3);              // never overshoots
+    expect(late.x).toBeCloseTo(100); expect(late.y).toBeCloseTo(300);
+    let prev = start;
+    for (let t = 0.01; t < SHOT_FLIGHT; t += 0.01) {                         // monotonic, and always on the line
+      const p = shotPose(200, 800, 100, 300, t);
+      expect(p.x).toBeLessThan(prev.x); expect(p.y).toBeLessThan(prev.y); expect(p.done).toBe(false);
+      expect((p.x - 200) / -100).toBeCloseTo((p.y - 800) / -500, 6);
+      prev = p;
+    }
+    expect(shotPose(0, 0, 100, 0, 0).angle).toBe(0);
+    expect(shotPose(0, 0, 0, -100, 0).angle).toBeCloseTo(-Math.PI / 2);
+  });
+  it('every avatar element has a projectile style; Kai, Dusk and the Master throw shuriken', () => {
+    for (const a of ALL_AVATARS) expect(SHOT_STYLE[a.fx], a.id).toBeTruthy();
+    expect(SHOT_STYLE.blade).toBe('shuriken');
+    expect(SHOT_STYLE.shadow).toBe('shuriken');
+    expect(SHOT_STYLE.master).toBe('shuriken');
+    expect(SHOT_STYLE.fire).toBe('fireball');
+    expect(SHOT_STYLE.robot).toBe('laser');
   });
 });

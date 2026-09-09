@@ -31,15 +31,9 @@ async function startTopic(page: Page, year: string, topic: string) {
  * rendering (hundreds of ms each), so the wave is frozen in place first: this test checks the pointer →
  * canvas → segment hit → session path, not the physics (the other tests cover flight and falling).
  */
-async function swipeAnswer(page: Page) {
-  const b = await page.waitForFunction(() => {
-    const s = window.__sna; if (!s || s.state().waiting) return null;
-    const label = s.session.current.sequence ? s.session.current.sequence[s.session.seqIndex] : s.session.current.answer;
-    const hit = s.bubbles().find((x: any) => x.label === label && x.y > 60 && x.y < window.innerHeight - 20);
-    return hit ? JSON.stringify(hit) : null;
-  }, null, { timeout: 15000 });
-  const label = JSON.parse(await b.jsonValue() as string).label as string;
-  const { others, W, H, top, ox, oy } = await page.evaluate(() => { // freeze every bubble where it is; never launch the rest of the wave
+/** Freeze every bubble where it is and read them back with the canvas box offset. */
+async function freezeWave(page: Page) {
+  return page.evaluate(() => {                      // freeze every bubble where it is; never launch the rest of the wave
     const a = window.__sna.arena;
     for (const x of a.bubbles) { if (x.launched) { x.vx = 0; x.vy = 0; x.g = 0; } else x.launchAt = Infinity; }
     // bubbles() returns canvas-space coords (arena.pos subtracts the canvas rect); the arena is now centred and
@@ -47,7 +41,22 @@ async function swipeAnswer(page: Page) {
     const rect = (document.getElementById('arena') as HTMLCanvasElement).getBoundingClientRect();
     return { others: window.__sna.bubbles(), W: a.W, H: a.H, top: a.topInset, ox: rect.left, oy: rect.top };
   });
+}
+/** Wait for the bubble that answers the current question, freeze the wave, and return it with its neighbours. */
+async function frozenTarget(page: Page) {
+  const b = await page.waitForFunction(() => {
+    const s = window.__sna; if (!s || s.state().waiting) return null;
+    const label = s.session.current.sequence ? s.session.current.sequence[s.session.seqIndex] : s.session.current.answer;
+    const hit = s.bubbles().find((x: any) => x.label === label && x.y > 60 && x.y < window.innerHeight - 20);
+    return hit ? JSON.stringify(hit) : null;
+  }, null, { timeout: 15000 });
+  const label = JSON.parse(await b.jsonValue() as string).label as string;
+  const { others, W, H, top, ox, oy } = await freezeWave(page);
   const target = others.find((x: any) => x.label === label);   // position after the freeze, not before the round trip
+  return { target, others, W, H, top, ox, oy };
+}
+async function swipeAnswer(page: Page) {
+  const { target, others, W, H, top, ox, oy } = await frozenTarget(page);
   // Approach from a side with no other bubble in the way (a stroke through a decoy counts as a wrong answer),
   // and whose start point is still on the canvas (edge bubbles sit r+8 from the side; the question card covers the top).
   const decoys = others.filter((x: any) => x.label !== target.label);
@@ -63,6 +72,40 @@ async function swipeAnswer(page: Page) {
 const answer = (page: Page) => page.evaluate(() => window.__sna.answer());
 const waitForTarget = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s || s.waiting) return false; const c = window.__sna.session.current; const label = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; return window.__sna.bubbles().some((b: any) => b.label === label); }, null, { timeout: 20000 });
 const state = (page: Page) => page.evaluate(() => window.__sna.state());
+/**
+ * Bring up a Sky Storm wave carrying a TNT. Bombs ride every third question (`play.ts`), but never a
+ * sequence one, and Storm draws its topic at random — so each attempt resets the counter to 5 and a sequence
+ * draw simply costs one question. Whether a wave carries a bomb is read straight off `arena.bubbles`, which
+ * includes bubbles that have not launched yet: `bubbles()` shows only launched ones, and a bomb can ride the
+ * second batch seconds later, so waiting on that would time out on a wave that does have one. Every predicate
+ * here returns a boolean — a JSON string would be truthy on the first frame and resolve the wait immediately.
+ */
+async function nextWaveWithBomb(page: Page) {
+  for (let k = 0; k < 3; k++) {
+    await page.evaluate(() => { window.__sna.session.questionsAsked = 5; });
+    await solveCurrent(page);                                            // the wave this spawns is "question 6"
+    const deadline = Date.now() + 12000;
+    let carries = false, settled = false;
+    while (Date.now() < deadline && !settled) {
+      const w = await page.evaluate(() => {
+        const s = window.__sna; if (!s || s.state().ended) return 'ended';
+        if (s.state().waiting) return null;
+        const all = s.arena!.bubbles; if (!all.length) return null;
+        if (all.every((b: any) => b.dead)) return null;                  // the previous wave, cleared but not yet replaced
+        return { bomb: all.some((b: any) => b.label === '💣'), allUp: all.every((b: any) => b.launched || b.dead) };
+      });
+      if (w === 'ended') throw new Error('the Storm ended before a TNT wave came up');
+      if (w) { carries = w.bomb; settled = w.bomb || w.allUp; }
+      if (!settled) await page.waitForTimeout(150);
+    }
+    if (!carries) continue;                                              // no TNT this time: answer it and retry
+    await page.waitForFunction(() => window.__sna.bubbles()              // now let it rise into a tappable spot
+      .some((b: any) => b.label === '💣' && b.vy < 0 && b.y > 80 && b.y < window.innerHeight - 40), null, { timeout: 15000 });
+    return;
+  }
+  throw new Error('no TNT wave after 3 attempts');
+}
+
 /** Answer the current question via the hook and wait for the next one (a sequence question needs one slice per letter). */
 async function solveCurrent(page: Page) {
   const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
@@ -159,6 +202,45 @@ test.describe('Sky Ninja Academy', () => {
     await swipeAnswer(page);
     await expect(page.locator('#score')).not.toHaveText('0');
     await expect(page.locator('.toast.good')).toBeVisible();
+  });
+
+  test('a tap throws the ninja star: scored at the tap, and a swipe throws nothing (#48)', async ({ page }) => {
+    await pickAvatar(page, 'kai');
+    await startTopic(page, 'year1', 'y1-add');
+    const { target, ox, oy } = await frozenTarget(page);
+    await page.mouse.click(ox + target.x, oy + target.y);                          // a single tap, no swipe
+    await expect(page.locator('#score')).not.toHaveText('0');                      // the score settles at the tap…
+    const s = await state(page); expect(s.shots).toBe(1); expect(s.waiting).toBe(true);
+    const live = await page.evaluate(() => window.__sna.bubbles().map((b: any) => b.label));
+    expect(live).not.toContain(target.label);                                      // …and the bubble is resolved there too
+    await expect(page.locator('.toast.good')).toBeVisible();
+    await page.waitForFunction(() => !window.__sna.state().waiting && window.__sna.bubbles().length > 0);
+    await swipeAnswer(page);
+    await expect(page.locator('.toast.good')).toBeVisible();
+    expect((await state(page)).shots).toBe(1);                                     // the slice popped it in place
+  });
+
+  // #48 review of PR #60: a tapped TNT threw a star at it, so it burst once from the BOMB branch and again
+  // when the star landed — and the landing played the avatar's slice sound, rewarding the child for hitting
+  // the bomb, while the exploded bubble kept falling for the 150 ms flight. Both failures are visible here:
+  // a thrown star would raise `shots`, and a bubble waiting to be popped on landing would still be alive.
+  test('a tapped TNT blows up under the finger — no star is thrown at it (#48)', async ({ page }) => {
+    await pickAvatar(page, 'blaze', 'Ivy');
+    await page.click('.island[data-year="year2"]');
+    await page.click('#endless');                                                  // Sky Storm: Hammer Man drops TNT in
+    await expect(page.locator('.villain img')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    await nextWaveWithBomb(page);
+    const { others, ox, oy } = await freezeWave(page);
+    const bomb = others.find((x: any) => x.label === '💣');
+    const before = await state(page);
+    await page.mouse.click(ox + bomb.x, oy + bomb.y);
+    await expect(page.locator('.toast.bad')).toContainText('TNT');
+    const after = await state(page);
+    expect(after.shots).toBe(before.shots);                                        // nothing was thrown at the bomb
+    expect(after.lives).toBe(before.lives - 1);
+    expect(await page.evaluate(() => window.__sna.arena!.bubbles.find((b: any) => b.label === '💣')!.dead)).toBe(true);
+    expect(await page.evaluate(() => window.__sna.arena!.shots.length)).toBe(0);    // and none is in flight
   });
 
   test('wrong slice loses a life and shows the answer; correct then continues', async ({ page }) => {
