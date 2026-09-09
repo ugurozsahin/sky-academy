@@ -68,8 +68,10 @@ export class Tracer {
   private move = (e: PointerEvent) => { if (!this.drawing || !this.last) return; const p = this.pos(e); this.paint(this.last, p); this.last = p; };
   private up = () => { if (!this.drawing) return; this.drawing = false; this.last = null; const r = this.result(); if (r.pass) this.done = true; this.onProgress(r); };
   private paint(a: { x: number; y: number }, b: { x: number; y: number }) {
-    const c = this.ctx; c.save(); c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = this.color; c.lineWidth = this.brush * 2; c.shadowColor = this.color; c.shadowBlur = 10;
-    c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke(); c.restore();
+    const c = this.ctx; c.save(); c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = this.color;
+    c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y);
+    c.globalAlpha = 0.35; c.lineWidth = this.brush * 2 + 8; c.stroke();   // #29: soft halo underlay instead of shadowBlur
+    c.globalAlpha = 1; c.lineWidth = this.brush * 2; c.stroke(); c.restore();
     const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
     for (let i = 0; i <= steps; i++) this.mark(a.x + (b.x - a.x) * i / steps, a.y + (b.y - a.y) * i / steps);
   }

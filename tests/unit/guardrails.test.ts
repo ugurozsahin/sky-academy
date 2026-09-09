@@ -49,11 +49,12 @@ describe('guard rails', () => {
     expect(hits.length).toBeLessThanOrEqual(0);                         // #42 removed all four; never raise this
   });
 
-  // `shadowBlur` is per-pixel CPU work; arena.ts itself notes it is "too slow on low-end devices", yet
-  // particle draws still use it (#29). Budget: lower as #29 lands.
+  // `shadowBlur` is per-pixel CPU work; arena.ts itself notes it is "too slow on low-end devices". #29 removed
+  // the last of it from the per-frame draw paths — the bolt/star particle glows, the outcome spotlight ring and
+  // the tracer stroke now draw a cheap translucent underlay halo instead. Budget is 0: never raise this.
   it('shadowBlur stays out of the per-frame draw paths', () => {
     const hits = inDir('/src/game/').flatMap(([f, s]) => [...code(s).matchAll(/shadowBlur/g)].map(() => f));
-    expect(hits.length).toBeLessThanOrEqual(5);                         // #29 removes them; never raise this
+    expect(hits.length).toBeLessThanOrEqual(0);                         // #29 removed them; never raise this
   });
 
   // #28: drawBubble built a radial gradient (+ two colour strings) and ran a `measureText` font-fit loop for

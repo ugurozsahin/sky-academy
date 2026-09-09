@@ -12,6 +12,7 @@ export type FxKind = 'fire' | 'water' | 'electric' | 'earth' | 'wind' | 'ice' | 
 const ELEMENTS: FxKind[] = ['fire', 'water', 'electric', 'earth', 'wind', 'ice', 'light', 'shadow', 'blade', 'robot'];   // `master` draws from all of these
 const FX_PARTICLE: Record<FxKind, PKind> = { fire: 'ember', water: 'drop', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'crystal', light: 'star', shadow: 'smoke', blade: 'slash', robot: 'pixel', master: 'star' };
 const FX_COLORS: Record<FxKind, string[]> = { fire: ['#ff7a1a', '#ffd23a', '#ff3b1a'], water: ['#3ec9ff', '#9fe6ff', '#1a7fff'], electric: ['#2ea8ff', '#ffffff', '#9fe6ff'], earth: ['#a0622a', '#7ddc3a', '#6b4220'], wind: ['#7fe8c8', '#c8ffe9', '#5fcf5a'], ice: ['#9fe6ff', '#ffffff', '#5bb8e8'], light: ['#ffd23a', '#ffffff', '#ffb020'], shadow: ['#a855ff', '#5a2aa0', '#2a1050'], blade: ['#ffffff', '#ff3b5c', '#d8dce8'], robot: ['#ff5252', '#ffffff', '#9aa5cf'], master: ['#ffd87a', '#ffffff', '#ffb020'] };
+const MAX_PARTICLES = 250;   // #29: safety cap so a pathological burst can never grow the per-frame draw loop unbounded
 export interface ArenaCallbacks {
   onHit: (b: Bubble, viaSwipe: boolean) => void;   // player touched/sliced a bubble
   onFall: (b: Bubble) => void;                       // an un-hit bubble fell off screen
@@ -19,6 +20,10 @@ export interface ArenaCallbacks {
 }
 export interface WaveOpts { labels: string[]; speed: number; wide?: boolean; gravity?: number; ordered?: string[] /* sequence labels that must be sliced in this order */ }
 const GOOD = '#66e07d', BAD = '#ff5f6d';
+// #29 glow-underlay colours: compile-time constants, hoisted out of the per-frame draw so drawParticle/drawBubble
+// never rebuild an rgba() string (arena's #28 rule — no per-frame colour strings). hexA/hexToRgb are hoisted fns.
+const BOLT_HALO = hexA('#2ea8ff', 0.4), STAR_HALO = hexA('#ffd23a', 0.4);
+const GOOD_HALO = hexA(GOOD, 0.35), BAD_HALO = hexA(BAD, 0.35);
 
 const PALETTE = ['#ff5f6d', '#ffa726', '#ffd54f', '#66e07d', '#40c4ff', '#b388ff', '#ff7ac6', '#4dd0e1'];
 
@@ -248,6 +253,7 @@ export class Arena {
     if (this.waveActive && live === 0) { this.waveActive = false; this.cb.onWaveEnd(); }
     for (const p of this.particles) { p.life += dt; const g = p.kind === 'ring' || p.kind === 'text' || p.kind === 'bolt' || p.kind === 'slash' ? 0 : p.kind === 'ember' || p.kind === 'smoke' ? -120 : p.kind === 'leaf' || p.kind === 'star' ? 80 : p.kind === 'drop' ? 700 : 500; p.vy += g * dt; if (p.kind === 'leaf') p.vx += Math.sin(p.life * 9) * 40 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     this.particles = this.particles.filter(p => p.life < p.max);
+    if (this.particles.length > MAX_PARTICLES) this.particles.splice(0, this.particles.length - MAX_PARTICLES);   // #29: hard cap, drop the oldest
     const cutoff = now - 280; this.trail = this.trail.filter(t => t.t > cutoff);
   }
   private render(now: number) {
@@ -270,7 +276,10 @@ export class Arena {
     c.rotate(b.mark ? 0 : wob); c.scale(scale, scale);
     if (b.mark) {
       const col = b.mark === 'good' ? GOOD : BAD;
-      c.strokeStyle = col; c.lineWidth = 6; c.shadowColor = col; c.shadowBlur = 18; c.beginPath(); c.arc(0, 0, b.r + 7, 0, Math.PI * 2); c.stroke(); c.shadowBlur = 0;
+      // #29: a soft translucent underlay ring instead of shadowBlur (per-pixel blur is too slow on low-end phones).
+      c.beginPath(); c.arc(0, 0, b.r + 7, 0, Math.PI * 2);
+      c.strokeStyle = b.mark === 'good' ? GOOD_HALO : BAD_HALO; c.lineWidth = 18; c.stroke();   // the halo
+      c.strokeStyle = col; c.lineWidth = 6; c.stroke();                // the crisp ring
     }
     // glow + body: both cached offscreen sprites keyed `color|round(r)`. A per-frame radial gradient (two colour
     // strings + a gradient object per bubble) and a shadowBlur are too slow on low-end devices (#28/#29).
@@ -290,6 +299,13 @@ export class Arena {
     }
     c.restore();
   }
+  // The 8-point star silhouette, built at the current transform. Defined once (not a per-frame closure) so the
+  // star particle can fill it twice — a scaled halo copy then the crisp copy — without allocating each frame (#29).
+  private starPath(c: CanvasRenderingContext2D, size: number) {
+    c.beginPath();
+    for (let i = 0; i < 8; i++) { const r = i % 2 ? size * 0.35 : size; const a = i * Math.PI / 4; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    c.closePath();
+  }
   private drawParticle(c: CanvasRenderingContext2D, p: Particle) {
     const k = 1 - p.life / p.max;
     c.save(); c.globalAlpha = Math.max(0, k);
@@ -298,11 +314,11 @@ export class Arena {
     else if (p.kind === 'shard') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 6); c.fillStyle = p.color; c.fillRect(-p.size, -p.size / 2, p.size * 2, p.size); }
     else if (p.kind === 'ember') { const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size); g.addColorStop(0, '#fff6c0'); g.addColorStop(0.4, p.color); g.addColorStop(1, 'rgba(255,60,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, p.size * (0.6 + 0.6 * k), 0, Math.PI * 2); c.fill(); }
     else if (p.kind === 'drop') { c.translate(p.x, p.y); c.rotate(Math.atan2(p.vy, p.vx) + Math.PI / 2); c.fillStyle = p.color; c.beginPath(); c.moveTo(0, -p.size * 1.6); c.quadraticCurveTo(p.size, 0, 0, p.size); c.quadraticCurveTo(-p.size, 0, 0, -p.size * 1.6); c.fill(); c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.arc(-p.size * 0.3, -p.size * 0.2, p.size * 0.25, 0, Math.PI * 2); c.fill(); }
-    else if (p.kind === 'bolt') { c.translate(p.x, p.y); c.rotate(p.rot ?? 0); c.strokeStyle = p.color; c.lineWidth = 2.5; c.lineJoin = 'miter'; c.shadowColor = '#2ea8ff'; c.shadowBlur = 8; c.beginPath(); c.moveTo(-p.size, 0); c.lineTo(-p.size * 0.3, -p.size * 0.5); c.lineTo(p.size * 0.1, p.size * 0.3); c.lineTo(p.size, -p.size * 0.4); c.stroke(); }
+    else if (p.kind === 'bolt') { c.translate(p.x, p.y); c.rotate(p.rot ?? 0); c.lineJoin = 'miter'; c.beginPath(); c.moveTo(-p.size, 0); c.lineTo(-p.size * 0.3, -p.size * 0.5); c.lineTo(p.size * 0.1, p.size * 0.3); c.lineTo(p.size, -p.size * 0.4); c.strokeStyle = BOLT_HALO; c.lineWidth = 7; c.stroke(); c.strokeStyle = p.color; c.lineWidth = 2.5; c.stroke(); }   // #29: halo underlay, not shadowBlur
     else if (p.kind === 'rock') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 4); c.fillStyle = p.color; c.beginPath(); c.moveTo(-p.size, -p.size * 0.4); c.lineTo(-p.size * 0.3, -p.size); c.lineTo(p.size * 0.8, -p.size * 0.6); c.lineTo(p.size, p.size * 0.4); c.lineTo(p.size * 0.1, p.size); c.lineTo(-p.size * 0.9, p.size * 0.5); c.closePath(); c.fill(); c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 1.5; c.stroke(); }
     else if (p.kind === 'leaf') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + Math.sin(p.life * 6)); c.fillStyle = p.color; c.beginPath(); c.moveTo(0, -p.size); c.quadraticCurveTo(p.size, 0, 0, p.size); c.quadraticCurveTo(-p.size, 0, 0, -p.size); c.fill(); c.strokeStyle = 'rgba(0,80,40,.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -p.size * 0.8); c.lineTo(0, p.size * 0.8); c.stroke(); }
     else if (p.kind === 'crystal') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 3); c.fillStyle = p.color; c.beginPath(); c.moveTo(0, -p.size * 1.4); c.lineTo(p.size * 0.6, 0); c.lineTo(0, p.size * 1.4); c.lineTo(-p.size * 0.6, 0); c.closePath(); c.fill(); c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 1; c.stroke(); }
-    else if (p.kind === 'star') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 2); c.fillStyle = p.color; c.shadowColor = '#ffd23a'; c.shadowBlur = 10; c.beginPath(); for (let i = 0; i < 8; i++) { const r = i % 2 ? p.size * 0.35 : p.size; const a = i * Math.PI / 4; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill(); }
+    else if (p.kind === 'star') { c.translate(p.x, p.y); c.rotate((p.rot ?? 0) + p.life * 2); c.fillStyle = STAR_HALO; c.save(); c.scale(1.35, 1.35); this.starPath(c, p.size); c.fill(); c.restore(); c.fillStyle = p.color; this.starPath(c, p.size); c.fill(); }   // #29: halo = a scaled fill of the star, NOT a stroke — stroking this concave path is slower than the old shadowBlur (measured)
     else if (p.kind === 'smoke') { c.globalAlpha = Math.max(0, k) * 0.55; c.fillStyle = p.color; c.beginPath(); c.arc(p.x, p.y, p.size * (0.5 + (1 - k)), 0, Math.PI * 2); c.fill(); }
     else if (p.kind === 'pixel') { c.fillStyle = p.color; c.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size); }
     else if (p.kind === 'slash') { c.translate(p.x, p.y); c.rotate(p.rot ?? 0); c.strokeStyle = p.color; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(-p.size, 0); c.lineTo(p.size, 0); c.stroke(); }
