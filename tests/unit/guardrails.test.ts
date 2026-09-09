@@ -359,4 +359,50 @@ describe('guard rails', () => {
     const probe = /^(\d+)\s/.exec(FONT_PROBE)?.[1];
     expect(weights, `the gate probes weight ${probe}, which index.html must request`).toContain(probe);
   });
+  // #31: `update()` runs up to six times per frame (the substep loop clamps each step to 1/60 s), and it used
+  // to rebuild `shots`, `particles` and `trail` with `.filter()` on every one of them — up to 18 throwaway
+  // arrays a frame, on the one path that must never stutter. The compaction now happens once, in `cull()`,
+  // which rewrites in place. This rail reads the substep body only: an allocation anywhere else in the file
+  // is fine, one in here is the bug coming back. It is a text check — it catches `.filter(`, `.map(`,
+  // `.slice(` and an array literal, which is how every version of this mistake has been written so far.
+  it('the physics substep allocates no arrays (#31)', () => {
+    const src = code(SOURCES['/src/game/arena.ts']);
+    const from = src.indexOf('private update(dt'), to = src.indexOf('private cull(');
+    expect(from, 'update() must exist and come before cull()').toBeGreaterThan(0);
+    expect(to, 'cull() must exist — it is where the compaction moved to').toBeGreaterThan(from);
+    const body = src.slice(from, to);
+    expect(body.length, 'the slice must actually hold the substep body').toBeGreaterThan(400);
+    expect(body).toContain('this.particles');                            // reading the right method
+    expect(body, 'update() must not rebuild an array with filter()').not.toContain('.filter(');
+    expect(body, 'update() must not allocate with map()').not.toContain('.map(');
+    expect(body, 'update() must not allocate with slice()').not.toContain('.slice(');
+    expect(body, 'update() must not build an array literal').not.toMatch(/=\s*\[/);
+  });
+
+  // #31 again, the half a reader gets wrong first: `cull()` must run every frame, NOT inside the
+  // `if (!this.paused)` branch that guards the substeps. The trail is culled against `now - 280`, so a paused
+  // arena that never culls keeps a stale trail and paints it the instant it resumes.
+  it('the per-frame cull runs even while the arena is paused (#31)', () => {
+    const loop = code(SOURCES['/src/game/arena.ts']).match(/private loop = \(now: number\) => \{[\s\S]*?\n  \};/)?.[0] ?? '';
+    expect(loop, 'the rAF loop must be readable for this rail to mean anything').toContain('requestAnimationFrame');
+    const paused = loop.indexOf('if (!this.paused)'), cull = loop.indexOf('this.cull(');
+    expect(paused, 'the substep loop is still guarded by !paused').toBeGreaterThan(-1);
+    expect(cull, 'cull() is called from the frame loop').toBeGreaterThan(-1);
+    expect(loop.slice(paused, cull), 'cull() must sit after that branch closes, not inside it').toContain('}');
+    expect(cull).toBeGreaterThan(paused);
+  });
+
+  // #31, the trap in skipping the draw: `resize()` assigns `canvas.width`, which wipes the bitmap. A resize
+  // can arrive while the arena is paused (rotate the phone on the pause overlay), and a paused render that
+  // skipped would leave the arena blank until the child resumed. `dirty` forces the one repaint that fixes it,
+  // so a `render` that skips must consult it and a `resize` that wipes must set it.
+  it('a resize repaints even while paused (#31)', () => {
+    const src = code(SOURCES['/src/game/arena.ts']);
+    const resize = src.slice(src.indexOf('resize = ()'), src.indexOf('radius(wide'));
+    expect(resize, 'the slice must hold resize()').toContain('canvas.width');
+    expect(resize, 'resize() wipes the bitmap, so it must mark it dirty').toContain('this.dirty = true');
+    const render = src.slice(src.indexOf('private render(now'), src.indexOf('private drawShot'));
+    expect(render, 'the slice must hold render()').toContain('clearRect');
+    expect(render, 'render() must not skip a frame the resize asked for').toContain('this.dirty');
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SHOT_FLIGHT, SHOT_STYLE, dealOrdered, fitLabel, labelFont, segCircle, shotPose } from '../../src/game/arena';
+import { SHOT_FLIGHT, SHOT_STYLE, compact, dealOrdered, fitLabel, labelFont, segCircle, shotPose } from '../../src/game/arena';
 import { ALL_AVATARS } from '../../src/avatars';
 
 describe('dealOrdered — sequence words are dealt in order across the batches (#62)', () => {
@@ -101,5 +101,35 @@ describe('tap-to-pop projectile (#48)', () => {
     expect(SHOT_STYLE.master).toBe('shuriken');
     expect(SHOT_STYLE.fire).toBe('fireball');
     expect(SHOT_STYLE.robot).toBe('laser');
+  });
+});
+
+describe('compact — the per-frame arrays are rewritten in place, not rebuilt (#31)', () => {
+  it('keeps what the predicate keeps, in the same order, in the same array', () => {
+    const arr = [1, 2, 3, 4, 5, 6];
+    const same = compact(arr, n => n % 2 === 0);
+    expect(same).toBe(arr);                       // the identity matters: `this.particles` is not reassigned
+    expect(arr).toEqual([2, 4, 6]);
+  });
+  it('order survives, which the trail polyline and the #29 particle cap both rely on', () => {
+    const trail = [{ t: 1 }, { t: 5 }, { t: 2 }, { t: 9 }, { t: 3 }];
+    compact(trail, p => p.t > 2);
+    expect(trail.map(p => p.t)).toEqual([5, 9, 3]);   // oldest → newest as they were, no sort
+  });
+  it('handles the empty, all-kept and all-dropped cases without leaving stale tail entries', () => {
+    expect(compact([] as number[], () => true)).toEqual([]);
+    expect(compact([1, 2, 3], () => true)).toEqual([1, 2, 3]);
+    const all = [1, 2, 3];
+    compact(all, () => false);
+    expect(all).toEqual([]);
+    expect(all.length).toBe(0);                   // `length = w` truncates; a splice-free rewrite must not leak
+  });
+  it('matches filter() for a random predicate, so swapping one for the other cannot change behaviour', () => {
+    for (let trial = 0; trial < 200; trial++) {
+      const src = Array.from({ length: 1 + Math.floor(Math.random() * 30) }, () => Math.floor(Math.random() * 10));
+      const keep = (n: number) => n < 5 + Math.floor(trial / 40);
+      const viaFilter = src.filter(keep);
+      expect(compact([...src], keep)).toEqual(viaFilter);
+    }
   });
 });

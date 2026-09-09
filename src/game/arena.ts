@@ -93,6 +93,7 @@ export class Arena {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(this.W * this.dpr); this.canvas.height = Math.round(this.H * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.dirty = true;                              // setting canvas.width wipes the bitmap — repaint once (#31)
   };
 
   /** Bubble radius scales with viewport; words get wider bubbles. */
@@ -282,6 +283,7 @@ export class Arena {
     if (dt > 0.5) dt = 0.016;                       // tab was hidden: don't jump
     dt = Math.min(dt, 0.1);
     if (!this.paused) { this.time += dt; for (let left = dt; left > 0; left -= 1 / 60) this.update(Math.min(left, 1 / 60), now); }
+    this.cull(now);
     this.render(now);
     this.raf = requestAnimationFrame(this.loop);
   };
@@ -297,19 +299,43 @@ export class Arena {
     }
     if (this.waveActive && live === 0) { this.waveActive = false; this.cb.onWaveEnd(); }
     for (const s of this.shots) {                   // shots fly on even while the wave is frozen for the reveal
+      if (s.t >= SHOT_FLIGHT) continue;             // already landed this frame; cull() takes it out below (#31)
       const p = shotPose(s.x0, s.y0, s.target.x, s.target.y, s.t += dt);
       if (++s.emit % 2 === 0) this.emitFx(s.x, s.y, 1, (p.x - s.x) * 0.2, (p.y - s.y) * 0.2);   // element wake
       s.x = p.x; s.y = p.y;
       if (p.done) this.landShot(s);
     }
-    this.shots = this.shots.filter(s => s.t < SHOT_FLIGHT);
     for (const p of this.particles) { p.life += dt; const g = p.kind === 'ring' || p.kind === 'text' || p.kind === 'bolt' || p.kind === 'slash' ? 0 : p.kind === 'ember' || p.kind === 'smoke' ? -120 : p.kind === 'leaf' || p.kind === 'star' ? 80 : p.kind === 'drop' ? 700 : 500; p.vy += g * dt; if (p.kind === 'leaf') p.vx += Math.sin(p.life * 9) * 40 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
-    this.particles = this.particles.filter(p => p.life < p.max);
-    if (this.particles.length > MAX_PARTICLES) this.particles.splice(0, this.particles.length - MAX_PARTICLES);   // #29: hard cap, drop the oldest
-    const cutoff = now - 280; this.trail = this.trail.filter(t => t.t > cutoff);
   }
+  /** Drop what is finished — once a frame, not once a substep (#31). `update()` runs up to six times per
+   *  frame, and each `filter()` there built a fresh array, so a busy frame threw away 18 of them for the
+   *  garbage collector to find. `compact` rewrites in place instead, and nothing between the substeps and
+   *  the draw can see the difference: the trail's cutoff is derived from `now`, which does not move within a
+   *  frame; a dead particle drawn one substep later would be at alpha 0 anyway, and it is gone before
+   *  `render` runs; and a landed shot is skipped by the `s.t >= SHOT_FLIGHT` guard in `update`, so deferring
+   *  its removal cannot land it twice. Runs even while paused, so the trail still ages out. */
+  private cull(now: number) {
+    compact(this.shots, s => s.t < SHOT_FLIGHT);
+    compact(this.particles, p => p.life < p.max);
+    if (this.particles.length > MAX_PARTICLES) this.particles.splice(0, this.particles.length - MAX_PARTICLES);   // #29: hard cap, drop the oldest
+    const cutoff = now - 280; compact(this.trail, t => t.t > cutoff);
+  }
+  /** Whether the canvas currently holds anything — set by `render`, so the clear that empties it still happens
+   *  exactly once after the final bubble goes (#31). Without it, skipping the draw would leave the last frame
+   *  painted for ever. */
+  private painted = false;
+  /** The bitmap no longer matches the model and must be repainted once, whatever the pause state. Only
+   *  `resize` sets it: assigning `canvas.width` wipes the bitmap, and a resize can arrive while paused. */
+  private dirty = true;
   private render(now: number) {
+    // Nothing to draw, or nothing that can change: keep the rAF loop alive (the e2e frame-rate rail counts
+    // frames, and the loop is what tears down cleanly) but leave the canvas alone. While paused the arena is
+    // frozen under an overlay, so the pixels already there are the correct picture (#31).
+    const empty = !this.bubbles.length && !this.particles.length && !this.shots.length && !this.trail.length;
+    if (!this.dirty && (this.paused || (empty && !this.painted))) return;
     const c = this.ctx; c.clearRect(0, 0, this.W, this.H);
+    this.painted = !empty; this.dirty = false;
+    if (empty) return;
     for (const b of this.bubbles) { if (b.dead || !b.launched || b.mark) continue; this.drawBubble(c, b, now); }
     for (const b of this.bubbles) { if (!b.dead && b.launched && b.mark) this.drawBubble(c, b, now); }   // spotlighted on top
     for (const p of this.particles) this.drawParticle(c, p);
@@ -474,6 +500,16 @@ export function dealOrdered(labels: string[], ordered: string[], perBatch: numbe
     out.push(...shuffle(Math.random, batch));
   }
   return out;
+}
+
+/** Drop the entries `keep` rejects, in place and in order, allocating nothing — `arr = arr.filter(keep)`
+ *  without the new array (#31). The order matters: the trail is drawn as a polyline from oldest to newest,
+ *  and the particle cap drops the oldest from the front. Returns the array so a call reads as an expression. */
+export function compact<T>(arr: T[], keep: (v: T) => boolean): T[] {
+  let w = 0;
+  for (let r = 0; r < arr.length; r++) if (keep(arr[r])) arr[w++] = arr[r];
+  arr.length = w;
+  return arr;
 }
 
 export const labelFont = (fs: number) => `800 ${fs}px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif`;
