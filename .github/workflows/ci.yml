@@ -35,6 +35,19 @@ jobs:
         run: npm test
       - run: npm run build          # `tsc --noEmit && vite build` — the typecheck lives here
       # Everything below is the full run only: pull_request, the nightly schedule, or workflow_dispatch.
+      # `--with-deps` runs `apt-get update` before it installs Playwright's system libraries, and the
+      # ubuntu-latest image ships Google's chrome-stable source in its apt list. On 2026-09-09 that
+      # repository served a Release file and a package index whose hashes disagreed; apt exited 100, the
+      # step died, and every job on this repo failed there for hours (#147) — pull requests and the nightly
+      # alike, each still paying for checkout, npm ci, unit tests and the build before dying.
+      # We install Chromium THROUGH Playwright and never install Google Chrome, so that repository is not a
+      # dependency of this project in any sense: dropping it takes a third party off our critical path.
+      # Deliberately not `apt-get update || true`, which would fix this outage by making every apt failure
+      # invisible, a real one included. Other vendor sources in the image can break the same way; this
+      # removes the one that has.
+      - name: Drop the apt sources we do not use (#147)
+        if: github.event_name != 'push'
+        run: sudo rm -fv /etc/apt/sources.list.d/google-chrome*.list /etc/apt/sources.list.d/google-chrome*.sources
       - name: Install Playwright browsers
         if: github.event_name != 'push'
         run: npx playwright install --with-deps chromium

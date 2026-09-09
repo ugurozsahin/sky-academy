@@ -405,4 +405,30 @@ describe('guard rails', () => {
     expect(render, 'the slice must hold render()').toContain('clearRect');
     expect(render, 'render() must not skip a frame the resize asked for').toContain('this.dirty');
   });
+
+  // Incident 2026-09-09 (#147): `npx playwright install --with-deps chromium` runs `apt-get update` first,
+  // the ubuntu-latest image ships Google's chrome-stable apt source, and that repository served a Release
+  // file and a package index whose SHA256s disagreed. apt exited 100, the install step died, and EVERY job
+  // on this repo failed at that line for hours — pull requests and the nightly on main alike — each still
+  // paying for checkout, npm ci, unit tests and the build first, on a repo already over its Actions quota
+  // (#119). We install Chromium through Playwright and never install Google Chrome, so a third party we do
+  // not use was a hard prerequisite for all of our CI. The workflow now deletes that source first.
+  //
+  // Comments are stripped before matching, because ci.yml's own comment names the file it deletes — the
+  // #129 failure exactly: a rail that reads its own prose passes with the line it guards deleted.
+  it('CI drops the Google Chrome apt source before installing browsers (#147)', () => {
+    const yml = workflow('ci.yml');
+    expect(yml.length, 'ci.yml must be read from disk, not a blank import').toBeGreaterThan(500);
+    const steps = yml.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
+    const install = steps.indexOf('playwright install --with-deps');
+    const drop = steps.indexOf('sources.list.d/google-chrome');
+    expect(install, 'ci.yml must still install the browsers').toBeGreaterThan(-1);
+    expect(drop, 'ci.yml must delete the google-chrome apt source (#147)').toBeGreaterThan(-1);
+    expect(drop < install, 'the deletion must run BEFORE the install, or apt-get update still reads it')
+      .toBe(true);
+    // `apt-get update || true` would end this outage by making every apt failure invisible, a real one
+    // included — the silent-degradation the rails exist to prevent. Remove the source, do not deafen apt.
+    expect(steps, 'do not swallow apt failures; drop the unused source instead (#147)')
+      .not.toMatch(/apt-get\s+update[^\n]*\|\|\s*true/);
+  });
 });
