@@ -143,7 +143,9 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       if (done < total) arena?.rush(session.current!.sequence![done]);
       els.prompt.innerHTML = promptHTML(session.current!, done);
       if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow);
-      if (done < total) say(label, false);
+      // queued, never interrupting: sliced letters arrive faster than they can be spoken, and a plain say()
+      // cuts each one off to start the next, so the child hears fragments instead of the word (#40)
+      if (done < total) say(label, false, { queue: true });
     },
     onLives(n) { drawLives(n); if (n < prevLives) { sfx.life(); haptic('life'); } prevLives = n; },
     onStageClear(stage, st, acc) { sfx.stage(); haptic('stage'); showStageClear(stage, st, acc); },

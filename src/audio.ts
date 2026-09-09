@@ -89,22 +89,44 @@ export function chooseVoice<T extends VoiceLike>(voices: T[]): T | null {
   return best;
 }
 let voice: SpeechSynthesisVoice | null | undefined;
-function pickVoice() {
+function pickVoice(s: { getVoices?: () => SpeechSynthesisVoice[] }) {
   if (voice !== undefined) return voice;
-  const vs = speechSynthesis.getVoices();
+  const vs = s.getVoices?.() ?? [];
   if (!vs.length) return null;                                              // voices not loaded yet: retry next time
   voice = chooseVoice(vs);
   return voice;
 }
-export function say(text: string, force = false) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+/** Minimal shape of `speechSynthesis`, so the cancel/queue behaviour is testable in node (#40). */
+export interface SynthLike {
+  speaking: boolean; pending: boolean;
+  cancel(): void; speak(u: SpeechSynthesisUtterance): void;
+  getVoices?: () => SpeechSynthesisVoice[];
+}
+/** The tick a cancelled engine is given before the next line is spoken (#40). A macrotask is the whole point:
+ *  `cancel()` finishes asynchronously, so a `speak()` in the same turn is what Android and iOS drop. */
+export const SAY_DEFER_MS = 0;
+let deferred: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Speak a line. Interrupts whatever is speaking, unless `queue` is set — then it waits its turn instead,
+ * which is what per-letter progress wants: cutting the previous letter off mid-word is the bug (#40).
+ *
+ * Two things this must not do, both of them faults we shipped: `cancel()` unconditionally, which on iOS and
+ * Android leaves the engine wedged often enough that the next line is simply never heard; and `speak()` in
+ * the same turn as a `cancel()`, which those engines drop on the floor.
+ */
+export function say(text: string, force = false, o: { queue?: boolean; synth?: SynthLike } = {}) {
+  const s = o.synth ?? (typeof window !== 'undefined' && 'speechSynthesis' in window ? speechSynthesis : null);
+  if (!s) return;
   if (!force && !load().speech) return;
   try {
-    speechSynthesis.cancel();
+    if (deferred !== undefined) { clearTimeout(deferred); deferred = undefined; }   // a line still waiting is stale now
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'en-GB'; u.rate = 0.9; u.pitch = 1.08;                       // a touch slower and brighter for young listeners
-    const v = pickVoice(); if (v) u.voice = v;
-    speechSynthesis.speak(u);
+    const v = pickVoice(s); if (v) u.voice = v;
+    if (o.queue || !(s.speaking || s.pending)) { s.speak(u); return; }    // nothing to interrupt, or nothing we want to
+    s.cancel();
+    deferred = setTimeout(() => { deferred = undefined; try { s.speak(u); } catch { /* ignore */ } }, SAY_DEFER_MS);
   } catch { /* ignore */ }
 }
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { voice = undefined; };

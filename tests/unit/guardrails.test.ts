@@ -432,6 +432,22 @@ describe('guard rails', () => {
       .not.toMatch(/apt-get\s+update[^\n]*\|\|\s*true/);
   });
 
+  // #40: say() interrupts by default, which is right for a new question and wrong for the letters of one
+  // word — sliced letters arrive faster than they can be spoken, so each say() cut the last one off and the
+  // child heard fragments. The queued form is easy to lose in a later edit of that callback (it looks like a
+  // stray option), and nothing else would fail if it were: the game would just quietly stop reading letters
+  // out. Behaviour is covered by audio.test.ts; this pins the one call site that must not interrupt.
+  it('per-letter progress speech is queued, never interrupting (#40)', () => {
+    const play = code(SOURCES['/src/ui/play.ts'] ?? '');
+    expect(play.length, 'play.ts must be read, not a blank import').toBeGreaterThan(1000);
+    const progress = play.slice(play.indexOf('onProgress('), play.indexOf('onLives('));
+    expect(progress.length, 'onProgress must still precede onLives in the session callbacks').toBeGreaterThan(50);
+    const says = [...progress.matchAll(/say\(([^\n]*?)\)[;,]/g)].map(m => m[1]);
+    expect(says.length, 'the rail found no say() in onProgress — it would pass vacuously').toBe(1);
+    expect(says[0], 'a per-letter say() must pass { queue: true } or it cancels the letter before it (#40)')
+      .toContain('queue: true');
+  });
+
   // Fredoka stops at 700: Google Fonts answers a request for `Fredoka:wght@800` with HTTP 400. So every
   // 800/900 the app asked for named a face that does not exist. Measured, that changed nothing — Chromium
   // picks the nearest declared face, and 700/800/900 come out with the same advance width and zero differing
