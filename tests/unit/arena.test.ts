@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SHOT_FLIGHT, SHOT_STYLE, compact, dealOrdered, fitLabel, labelFont, segCircle, shotPose } from '../../src/game/arena';
+import { SHOT_FLIGHT, SHOT_STYLE, compact, dealOrdered, fitLabel, labelFont, layoutWave, segCircle, shotPose } from '../../src/game/arena';
 import { ALL_AVATARS } from '../../src/avatars';
 
 describe('dealOrdered — sequence words are dealt in order across the batches (#62)', () => {
@@ -8,7 +8,7 @@ describe('dealOrdered — sequence words are dealt in order across the batches (
     const words = ['The', 'cat', 'sat', 'on', 'the', 'mat.', 'Yes'], decoys = ['dog', 'red', 'big'];
     for (let trial = 0; trial < 200; trial++) {
       const labels = [...words, ...decoys].sort(() => Math.random() - 0.5);
-      const order = dealOrdered(labels, words, 4);
+      const order = dealOrdered(labels, words, 4, Math.random);
       expect([...order].sort((a, b) => a - b)).toEqual(labels.map((_, i) => i));      // every bubble dealt exactly once
       const seen: number[] = []; const used = new Set<number>();
       for (const w of words) { const i = labels.findIndex((l, k) => l === w && !used.has(k)); used.add(i); seen.push(batchOf(order, 4, i)); }
@@ -20,9 +20,9 @@ describe('dealOrdered — sequence words are dealt in order across the batches (
     }
   });
   it('handles a single batch, repeated words and decoy-free waves', () => {
-    expect(dealOrdered(['a', 'b', 'c'], ['a', 'b', 'c'], 4)).toHaveLength(3);
+    expect(dealOrdered(['a', 'b', 'c'], ['a', 'b', 'c'], 4, Math.random)).toHaveLength(3);
     const labels = ['the', 'the', 'end', 'x'];
-    const order = dealOrdered(labels, ['the', 'the', 'end'], 2);
+    const order = dealOrdered(labels, ['the', 'the', 'end'], 2, Math.random);
     expect([...order].sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
     expect(Math.floor(order.indexOf(2) / 2)).toBeGreaterThanOrEqual(Math.floor(order.indexOf(0) / 2));   // duplicates keep their order too ('end' never before a 'the')
   });
@@ -131,5 +131,102 @@ describe('compact — the per-frame arrays are rewritten in place, not rebuilt (
       const viaFilter = src.filter(keep);
       expect(compact([...src], keep)).toEqual(viaFilter);
     }
+  });
+});
+
+// #43: spawnWave used to compute all of this inline, so the batch layout, the arcs and the launch timetable
+// were reachable only through the e2e suite — a 20-minute run to learn that bubbles overlap on a narrow
+// phone. layoutWave() is the same maths with the canvas, the clock and Math.random taken as arguments.
+describe('layoutWave — the wave the arena is about to spawn (#43)', () => {
+  // mulberry32: a deterministic Rng, so a plan can be asserted rather than only sampled
+  const seeded = (s: number) => () => { s |= 0; s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const PHONE = { W: 390, H: 844, topInset: 120 };
+  const TABLET = { W: 820, H: 1180, topInset: 300 };
+  const NARROW = { W: 240, H: 400, topInset: 60 };
+  const AIR_TIME = { 1: 5.6, 2: 4.4, 3: 3.4 } as const;
+  const labels = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1));
+  const plan = (o: object, geom = PHONE, speedK = 1, now = 0, seed = 1) =>
+    layoutWave({ speed: 2, labels: labels(6), ...o } as never, geom, speedK, now, seeded(seed));
+
+  it('is a pure function of its arguments — the same seed lays out the same wave', () => {
+    expect(plan({}, PHONE, 1, 500, 42)).toEqual(plan({}, PHONE, 1, 500, 42));
+    expect(plan({}, PHONE, 1, 500, 42)).not.toEqual(plan({}, PHONE, 1, 500, 43));   // and a different one does not
+  });
+
+  it('spawns exactly the labels it was given, once each', () => {
+    const p = plan({ labels: ['7', '7', '3', '9'] });
+    expect(p.bubbles.map(b => b.label).sort()).toEqual(['3', '7', '7', '9']);
+  });
+
+  it('keeps every bubble on screen — no bubble is ever clipped by an edge', () => {
+    for (const geom of [PHONE, TABLET, NARROW]) for (let n = 1; n <= 10; n++) for (let seed = 1; seed <= 30; seed++) {
+      const p = plan({ labels: labels(n) }, geom, 1, 0, seed);
+      for (const b of p.bubbles) {
+        expect(b.x - p.r, `${geom.W}x${geom.H} n=${n}`).toBeGreaterThanOrEqual(0);
+        expect(b.x + p.r, `${geom.W}x${geom.H} n=${n}`).toBeLessThanOrEqual(geom.W);
+      }
+    }
+  });
+
+  it('flies each bubble to an apex below the question card and back down in the wave time', () => {
+    for (const speed of [1, 2, 3] as const) for (let seed = 1; seed <= 20; seed++) {
+      const p = plan({ speed, labels: labels(5) }, PHONE, 1, 0, seed);
+      const T = AIR_TIME[speed];
+      expect(p.waveT).toBeCloseTo(T * 1000, 6);
+      for (const b of p.bubbles) {
+        expect(-b.vy / b.g, 'rise takes half the air time').toBeCloseTo(T / 2, 6);   // v = 0 at the apex
+        const apexY = PHONE.H + p.r - (b.vy * b.vy) / (2 * b.g);                     // h = v² / 2g above the floor
+        expect(apexY, 'never rises behind the question card').toBeGreaterThanOrEqual(PHONE.topInset + p.r + 10 - 1e-9);
+        expect(apexY, 'always rises clear of the bottom edge').toBeLessThanOrEqual(PHONE.H - p.r);
+      }
+    }
+  });
+
+  it('batches a long wave so a row always fits across the width, and three always fit', () => {
+    for (const geom of [PHONE, TABLET, NARROW]) {
+      const p = plan({ labels: labels(10) }, geom);
+      expect(p.perBatch, 'a row never wider than the arena').toBeLessThanOrEqual(Math.max(3, Math.floor((geom.W - 16) / (2 * p.r + 10))));
+      expect(p.perBatch).toBeGreaterThanOrEqual(3);
+      expect(3 * (2 * p.r + 10), 'the radius clamp keeps three across').toBeLessThanOrEqual(geom.W - 16 + 1e-9);
+    }
+  });
+
+  it('rides at most four bubbles per flight in a sequence, however wide the screen (#62)', () => {
+    const words = ['The', 'cat', 'sat', 'on', 'the', 'mat.', 'Yes', 'dog', 'red', 'big'];
+    const p = plan({ labels: words, ordered: words.slice(0, 7) }, TABLET);
+    expect(p.perBatch).toBe(4);                            // a tablet must not put all ten up at once
+    const batchOf = (label: string) => Math.floor(p.bubbles.findIndex(b => b.label === label) / p.perBatch);
+    for (let k = 1; k < 7; k++) expect(batchOf(words[k])).toBeGreaterThanOrEqual(batchOf(words[k - 1]));
+  });
+
+  it('launches in order: never before `now`, batch by batch, one stagger apart inside a batch', () => {
+    const now = 10_000;
+    const p = plan({ labels: labels(9) }, PHONE, 1, now);
+    for (let k = 1; k < p.bubbles.length; k++) expect(p.bubbles[k].launchAt).toBeGreaterThanOrEqual(p.bubbles[k - 1].launchAt);
+    expect(p.bubbles[0].launchAt).toBe(now);
+    const batch = (k: number) => Math.floor(k / p.perBatch);
+    for (let k = 0; k < p.bubbles.length; k++) {
+      const idx = k % p.perBatch, size = Math.min(p.perBatch, p.bubbles.length - batch(k) * p.perBatch);
+      expect(p.bubbles[k].launchAt).toBeCloseTo(now + batch(k) * p.batchGap + idx * p.stagger * (size > 6 ? 0.6 : 1), 6);
+    }
+    expect(p.batchSpan).toBeCloseTo(p.perBatch * p.stagger, 6);
+  });
+
+  it('#32: the speed multiplier divides the air time and the stagger, and nothing else', () => {
+    const slow = plan({ labels: labels(8) }, PHONE, 1, 0, 7);
+    const fast = plan({ labels: labels(8) }, PHONE, 4, 0, 7);
+    expect(fast.waveT).toBeCloseTo(slow.waveT / 4, 6);
+    expect(fast.stagger).toBeCloseTo(slow.stagger / 4, 6);
+    expect(fast.batchGap).toBeCloseTo(slow.batchGap / 4, 6);
+    expect(fast.r).toBe(slow.r);                                         // the wave looks the same, it just runs faster
+    expect(fast.bubbles.map(b => b.x)).toEqual(slow.bubbles.map(b => b.x));
+  });
+
+  it('shrinks the bubbles as a wave gets crowded, never below the readable floor', () => {
+    const few = plan({ labels: labels(4) }, TABLET).r;
+    const some = plan({ labels: labels(8) }, TABLET).r;                   // >= 7 labels: 0.9
+    const many = plan({ labels: labels(10) }, TABLET).r;                  // >= 9 labels: 0.8
+    expect(some).toBeLessThan(few); expect(many).toBeLessThan(some);
+    expect(many).toBeGreaterThanOrEqual(26);
   });
 });

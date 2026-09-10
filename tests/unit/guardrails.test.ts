@@ -542,4 +542,27 @@ describe('guard rails', () => {
     expect([...css.matchAll(/font-weight:\s*800/g)].length,
       'Fredoka has no 800; use 700 and let the stroke or colour carry the weight').toBe(0);
   });
+
+  // #43, found while writing this rail's own PR: pulling the wave layout out of spawnWave was meant to make
+  // it testable, and the first attempt still disagreed with `main` on a differential — `dealOrdered` held a
+  // *second* `Math.random`, in the per-batch shuffle, that the extraction had missed. That is the failure
+  // mode worth catching: a function that reads as pure but quietly draws from the global RNG cannot be
+  // seeded, so a test can only sample it. It looks covered and is not, and the disagreement shows up as a
+  // wave that plays subtly differently rather than as a red build. Both take `rng: Rng`; neither may reach.
+  it('the wave layout draws only from the rng it is given (#43)', () => {
+    const src = code(SOURCES['/src/game/arena.ts'] ?? '');
+    expect(src.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
+    for (const fn of ['layoutWave', 'dealOrdered']) {
+      const start = src.indexOf(`export function ${fn}(`);
+      expect(start, `${fn} must stay an exported, unit-testable function`).toBeGreaterThan(-1);
+      const next = src.indexOf('\nexport ', start + 1);
+      const body = src.slice(start, next === -1 ? src.length : next);
+      expect(body, `${fn} must take its randomness as an argument`).toContain('rng: Rng');
+      expect(body, `${fn} must draw from rng(), never Math.random — a hidden draw cannot be seeded`).not.toContain('Math.random');
+    }
+    // the seam only pays if the game still goes through it: one definition, one call, and spawnWave
+    // hands over the real clock and the real RNG rather than layoutWave reaching for them itself.
+    expect(src.split('layoutWave(').length - 1, 'layoutWave has one call site: spawnWave').toBe(2);
+    expect(src, 'spawnWave passes the speed multiplier, the clock and the RNG in').toContain('gameSpeed(), performance.now(), Math.random');
+  });
 });

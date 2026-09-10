@@ -1,5 +1,6 @@
 // Canvas arena: bubbles fly up from the bottom; the player taps or slices them.
 import { shuffle } from '../curriculum/util';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
+import type { Rng } from '../curriculum/types';
 import { gameSpeed } from './speed';   // #32: test-only multiplier — divides flight time and stagger, never the clock
 export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
@@ -97,50 +98,18 @@ export class Arena {
   };
 
   /** Bubble radius scales with viewport; words get wider bubbles. */
-  radius(wide: boolean) {
-    const base = Math.min(this.W, this.H) * 0.085;
-    return Math.max(30, Math.min(wide ? 64 : 54, wide ? base * 1.25 : base));
-  }
+  radius(wide: boolean) { return bubbleRadius(this.W, this.H, wide); }
 
   spawnWave(o: WaveOpts) {
     this.bubbles = []; this.shots = []; this.frozen = false;
-    const n = o.labels.length;
-    let r = Math.max(26, this.radius(!!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
-    r = Math.min(r, ((this.W - 16) / 3 - 10) / 2);                               // at least three always fit across
-    const k = gameSpeed();   // #32: divide the air time and stagger (and so batchGap, which derives from T) under `?fast=N`
-    const T = (o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4) / k;        // seconds in the air
-    this.waveT = T * 1000;
-    const apexMin = this.topInset + r + 10;
-    const usable = this.H - apexMin - r;
-    const now = performance.now();
-    const stagger = (o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260) / k;
-    // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
-    // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
-    // A sequence must be sliced in order, so at most 4 bubbles ride each flight even on a wide screen:
-    // otherwise a tablet puts all 10 words up at once and the child has one 4-second flight for the lot.
-    const perBatch = Math.max(3, Math.min(o.ordered?.length ? 4 : n, Math.floor((this.W - 16) / (2 * r + 10))));
-    const batchGap = T * 1000 * (perBatch < n && perBatch <= 4 ? 0.8 : 0.62);   // narrow screens: the row is mostly down before the next rises
-    this.batchSpan = perBatch * stagger;
-    const order = o.ordered?.length ? dealOrdered(o.labels, o.ordered, perBatch) : shuffle(Math.random, o.labels.map((_, i) => i));
-    const margin = r + 8;
-    const span = this.W - margin * 2;
-    for (let k = 0; k < n; k++) {
-      const i = order[k];
-      const batch = Math.floor(k / perBatch), idx = k % perBatch, size = Math.min(perBatch, n - batch * perBatch);
-      // spread x across the width in shuffled slots so bubbles don't overlap; a full row uses the whole span edge to edge
-      const full = size >= perBatch && size > 1;
-      const slot = full ? idx / (size - 1) : (idx + 0.5) / size;
-      const x = margin + span * Math.min(1, Math.max(0, slot + (Math.random() - 0.5) * ((full ? 0.25 : 0.6) / size)));
-      const apexY = apexMin + usable * (0.05 + Math.random() * 0.45);
-      const h = this.H + r - apexY;
-      const tUp = T / 2;
-      const g = 2 * h / (tUp * tUp);
-      const vy = -Math.sqrt(2 * g * h);
-      const vx = ((this.W / 2 - x) / this.W) * 30 * (Math.random() * 0.6 + 0.4);
-      const launchAt = now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1);
-      const label = o.labels[i];
-      const fontSize = fitLabel(label, r, font => { this.ctx.font = font; return this.ctx.measureText(label).width; });   // #28: fit once here, not every frame
-      this.bubbles.push({ id: this.nextId++, label, x, y: this.H + r, vx, vy, g, r, launchAt, launched: false, hit: false, dead: false, color: PALETTE[(k * 3 + Math.floor(Math.random() * 3)) % PALETTE.length], wobble: Math.random() * Math.PI * 2, fontSize });
+    // #43: every number below — radius, air time, batching, each bubble's arc, colour and launch moment —
+    // comes from the pure layoutWave() so it can be unit-tested without a canvas. All this method still does
+    // is fit each label to the measured font (#28, needs the 2D context) and push the bubbles.
+    const plan = layoutWave(o, { W: this.W, H: this.H, topInset: this.topInset }, gameSpeed(), performance.now(), Math.random);
+    this.waveT = plan.waveT; this.batchSpan = plan.batchSpan;
+    for (const p of plan.bubbles) {
+      const fontSize = fitLabel(p.label, plan.r, font => { this.ctx.font = font; return this.ctx.measureText(p.label).width; });   // #28: fit once here, not every frame
+      this.bubbles.push({ id: this.nextId++, label: p.label, x: p.x, y: this.H + plan.r, vx: p.vx, vy: p.vy, g: p.g, r: plan.r, launchAt: p.launchAt, launched: false, hit: false, dead: false, color: p.color, wobble: p.wobble, fontSize });
     }
     this.waveActive = true;
   }
@@ -484,11 +453,11 @@ export class Arena {
  *  (batch 1 gets the first few, batch 2 the next few…), decoys fill the remaining slots, and the position
  *  inside a batch stays random. Without this the child slices word 1 and then waits seconds for word 2.
  *  `ordered` must be a subset of `labels` (labels not present are skipped). */
-export function dealOrdered(labels: string[], ordered: string[], perBatch: number): number[] {
+export function dealOrdered(labels: string[], ordered: string[], perBatch: number, rng: Rng): number[] {
   const pool = labels.map((l, i) => ({ l, i }));
   const targets: number[] = [];
   for (const label of ordered) { const k = pool.findIndex(x => x.l === label); if (k >= 0) targets.push(pool.splice(k, 1)[0].i); }
-  const decoys = shuffle(Math.random, pool.map(x => x.i));
+  const decoys = shuffle(rng, pool.map(x => x.i));
   const batches = Math.max(1, Math.ceil(labels.length / perBatch));
   const perBatchTargets = Math.max(1, Math.ceil(targets.length / batches));
   const out: number[] = [];
@@ -499,7 +468,7 @@ export function dealOrdered(labels: string[], ordered: string[], perBatch: numbe
     while (batch.length < Math.min(perBatchTargets, slots) && t < targets.length) batch.push(targets[t++]);
     while (batch.length < slots && d < decoys.length) batch.push(decoys[d++]);
     while (batch.length < slots && t < targets.length) batch.push(targets[t++]);
-    out.push(...shuffle(Math.random, batch));
+    out.push(...shuffle(rng, batch));
   }
   return out;
 }
@@ -525,6 +494,65 @@ export function compact<T>(arr: T[], keep: (v: T) => boolean): T[] {
 export const labelFont = (fs: number) => `700 ${fs}px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif`;
 
 // Fit a bubble label to its radius: a size from the character count, then shrunk until it fits `r * 1.75`.
+/** Bubble radius for a viewport; words get wider bubbles. Pure so layoutWave needs no Arena instance. */
+export function bubbleRadius(W: number, H: number, wide: boolean): number {
+  const base = Math.min(W, H) * 0.085;
+  return Math.max(30, Math.min(wide ? 64 : 54, wide ? base * 1.25 : base));
+}
+
+/** The arena's shape, as much of it as the wave layout depends on. */
+export interface WaveGeom { W: number; H: number; topInset: number }
+/** One bubble's whole flight, fixed at launch: where it starts, its arc, when it goes up and what it wears. */
+export interface BubblePlan { label: string; x: number; vx: number; vy: number; g: number; launchAt: number; color: string; wobble: number }
+/** A laid-out wave: the values the arena keeps for itself, plus one plan per bubble in launch order. */
+export interface WavePlan { r: number; waveT: number; batchSpan: number; perBatch: number; batchGap: number; stagger: number; bubbles: BubblePlan[] }
+
+/**
+ * Lay out one wave (#43). Every number spawnWave used to compute inline lives here, and nothing here touches
+ * a canvas, a clock or `Math.random` — `now` and `rng` are arguments — so the batch layout, the arcs and the
+ * launch timetable are unit-testable instead of being reachable only through a 20-minute e2e run.
+ *
+ * `speedK` is the #32 test-only multiplier: it divides the air time and the stagger (and so batchGap, which
+ * derives from T), never the clock. Bubbles come back in launch order, so `bubbles[k]` is the k-th to rise.
+ */
+export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: number, rng: Rng): WavePlan {
+  const { W, H, topInset } = geom;
+  const n = o.labels.length;
+  let r = Math.max(26, bubbleRadius(W, H, !!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
+  r = Math.min(r, ((W - 16) / 3 - 10) / 2);                                    // at least three always fit across
+  const T = (o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4) / speedK;        // seconds in the air
+  const apexMin = topInset + r + 10;
+  const usable = H - apexMin - r;
+  const stagger = (o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260) / speedK;
+  // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
+  // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
+  // A sequence must be sliced in order, so at most 4 bubbles ride each flight even on a wide screen:
+  // otherwise a tablet puts all 10 words up at once and the child has one 4-second flight for the lot.
+  const perBatch = Math.max(3, Math.min(o.ordered?.length ? 4 : n, Math.floor((W - 16) / (2 * r + 10))));
+  const batchGap = T * 1000 * (perBatch < n && perBatch <= 4 ? 0.8 : 0.62);   // narrow screens: the row is mostly down before the next rises
+  const order = o.ordered?.length ? dealOrdered(o.labels, o.ordered, perBatch, rng) : shuffle(rng, o.labels.map((_, i) => i));
+  const margin = r + 8;
+  const span = W - margin * 2;
+  const bubbles: BubblePlan[] = [];
+  for (let k = 0; k < n; k++) {
+    const i = order[k];
+    const batch = Math.floor(k / perBatch), idx = k % perBatch, size = Math.min(perBatch, n - batch * perBatch);
+    // spread x across the width in shuffled slots so bubbles don't overlap; a full row uses the whole span edge to edge
+    const full = size >= perBatch && size > 1;
+    const slot = full ? idx / (size - 1) : (idx + 0.5) / size;
+    const x = margin + span * Math.min(1, Math.max(0, slot + (rng() - 0.5) * ((full ? 0.25 : 0.6) / size)));
+    const apexY = apexMin + usable * (0.05 + rng() * 0.45);
+    const h = H + r - apexY;
+    const tUp = T / 2;
+    const g = 2 * h / (tUp * tUp);
+    const vy = -Math.sqrt(2 * g * h);
+    const vx = ((W / 2 - x) / W) * 30 * (rng() * 0.6 + 0.4);
+    const launchAt = now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1);
+    bubbles.push({ label: o.labels[i], x, vx, vy, g, launchAt, color: PALETTE[(k * 3 + Math.floor(rng() * 3)) % PALETTE.length], wobble: rng() * Math.PI * 2 });
+  }
+  return { r, waveT: T * 1000, batchSpan: perBatch * stagger, perBatch, batchGap, stagger, bubbles };
+}
+
 // Called once per bubble in spawnWave (#28) — `measure` sets the font and returns the text width — instead
 // of running the shrink loop in drawBubble every frame. Pure and canvas-free so it unit-tests directly.
 export function fitLabel(label: string, r: number, measure: (font: string) => number): number {
