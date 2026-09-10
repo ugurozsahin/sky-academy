@@ -667,7 +667,8 @@ describe('guard rails', () => {
     const projects = [...code(cfg).matchAll(/name:\s*'([^']+)'/g)].map(m => m[1]);
     expect(projects.length, 'playwright.config.ts must declare its projects').toBeGreaterThanOrEqual(2);
 
-    const line = yml.split('\n').filter(l => !l.trim().startsWith('#')).find(l => l.includes('playwright test'));
+    const lines = yml.split('\n').filter(l => !l.trim().startsWith('#'));
+    const line = lines.find(l => l.includes('playwright test'));
     expect(line, 'ci.yml must still have an e2e step').toBeTruthy();
     expect(line, 'the e2e command must branch on the event, not run one fixed matrix')
       .toContain("github.event_name == 'pull_request'");
@@ -685,8 +686,30 @@ describe('guard rails', () => {
       expect(fullArm, `the nightly must run every declared project — '${p}' is missing (#141)`)
         .toContain(`--project=${p}`);
     }
-    // and the step must stay off the push-to-main run, which is what makes the nightly the only full check
-    expect(yml, 'the e2e step stays off the push run').toMatch(/if:\s*github\.event_name\s*!=\s*'push'/);
+    // and the step must stay off the push-to-main run, which is what makes the nightly the only full check.
+    // #162: read from the e2e STEP, never from the file. Three steps carry that same `if:` — the apt
+    // tidy-up (#147) and the browser install as well as e2e — so a whole-file match was satisfied by any
+    // one of them: deleting the guard from the e2e step alone left this rail green while e2e quietly
+    // rejoined every push to main, at ~3 metered minutes a merge on the very bill #141 exists to cut.
+    // The step is bounded by the next `- ` at its own indent, so a step gains no cover from its neighbours.
+    const stepAt = lines.findIndex(l => l.includes('playwright test'));
+    let from = stepAt;
+    while (from >= 0 && !/^\s*- /.test(lines[from])) from--;
+    expect(from, 'the e2e command must sit inside a workflow step').toBeGreaterThan(-1);
+    const dash = lines[from].indexOf('- ');
+    const sibling = new RegExp(`^\\s{${dash}}- `);
+    // ends at the next step at this indent, or at anything that dedents out of the steps list — so the slice
+    // is this step wherever it sits, including last, where "the next `- `" alone would run to end of file
+    const out = (l: string) => l.trim() !== '' && /^\s*/.exec(l)![0].length < dash;
+    let to = from + 1;
+    while (to < lines.length && !sibling.test(lines[to]) && !out(lines[to])) to++;
+    const step = lines.slice(from, to).join('\n');
+    expect(step, 'the located block is the e2e step itself').toContain('playwright test');
+    // a rail on the slicing above: widen it back to the file and this goes red rather than quietly passing
+    expect(lines.slice(from, to).filter(l => sibling.test(l)), 'the block is ONE step, not a run of them')
+      .toHaveLength(1);
+    expect(step, "the E2E STEP stays off the push run — another step carrying that `if:` is not cover (#162)")
+      .toMatch(/if:\s*github\.event_name\s*!=\s*'push'/);
   });
 
   // #138: fast mode (#32) is only sound while it is a *pure time compression* — the same game, fewer seconds.
