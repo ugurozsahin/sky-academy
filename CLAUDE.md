@@ -4,7 +4,7 @@ Slice-the-answer learning game for UK Reception / Year 1 / Year 2. Mobile-first,
 Owner priorities: playability, fun, visuals must look professional (art supplied by owner), tests at every step, low token use. **His approval is for a NEW look only** — art, skins, a redesigned effect, anything answering "do you like it". Work whose acceptance criterion is that the look must *not* change is verified with before/after evidence by the reviewer, never sent to him. When a change does need him: label the PR `owner-approval`; he replies `OWNER: APPROVED` or `OWNER: REJECTED — reason`, and `review-gate` holds the PR red until he does. No agent ever writes those markers.
 
 ## Stack
-Vite + vanilla TypeScript (no framework), canvas arena, DOM HUD, localStorage. Vitest (unit) + Playwright (e2e, mobile + desktop projects; **a pull request runs mobile only, the nightly runs the full matrix** — #141).
+Vite + vanilla TypeScript (no framework), canvas arena, DOM HUD, localStorage. Vitest (unit) + Playwright (e2e, mobile + desktop projects; **a pull request runs mobile only, the nightly runs the full matrix** — #141, **and a pull request runs e2e at all only when its diff can reach the game** — #176: `src/`, `index.html`, `public/`, `tests/e2e/`, `playwright.config.*`, `package*.json`, `ci.yml`. Unit tests and the build run on every pull request including a docs-only one, because the guard rails *are* documentation checks; the e2e step is skipped visibly, never the whole workflow, so no pull request is ever without a `CI` check.)
 `npm run dev` · `npm test` · `npm run build` · `npm run test:e2e` · `npm run test:all` · `node scripts/bundle-single.mjs` (single-file build) · APK: GitHub Actions "Android APK" (`docs/ANDROID.md`).
 
 ## Layout (read only what you need)

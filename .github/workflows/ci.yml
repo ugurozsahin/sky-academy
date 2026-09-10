@@ -1,9 +1,10 @@
-# The gate for every change. A pull request gets unit tests + guard rails, build, and e2e on the MOBILE
-# project only (#141). A push to main gets the LIGHT run — that tree already passed e2e on its own PR minutes
-# earlier, so main only re-checks what a merge can break cheaply (types, unit, build). The FULL matrix —
-# every project — runs against main once a night, which is what catches two PRs that were green apart and
-# broken together, and is now also the only place a desktop-only regression is caught. Docs-only changes run
-# nothing. Clearing a review block (undrafting a PR) re-runs the suite — see the trigger note below (#159).
+# The gate for every change. A pull request gets unit tests + guard rails and the build ALWAYS, and e2e on
+# the MOBILE project only (#141) and only when the diff can actually reach the game (#176). A push to main
+# gets the LIGHT run — that tree already passed e2e on its own PR minutes earlier, so main only re-checks
+# what a merge can break cheaply (types, unit, build). The FULL matrix — every project — runs against main
+# once a night, which is what catches two PRs that were green apart and broken together, and is now also the
+# only place a desktop-only regression is caught. Clearing a review block (undrafting a PR) re-runs the
+# suite — see the trigger note below (#159).
 #
 # Why the split: this is a private repo, so Actions minutes are metered (2,000/month on Free, 3,000 on Pro).
 # Measured 2026-09-07 — full run ~12 min, light run ~3 min, and shipping one issue used to cost ~42 min
@@ -40,7 +41,15 @@ on:
     # it. Draft pull requests already run CI on `opened` and `synchronize` — GitHub does not skip drafts —
     # so this adds one run per block cleared, not a run per draft.
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore: ['**.md', 'docs/**', '.claude/**', '.gitignore']
+    # DELIBERATELY no `paths-ignore` here (#176). It used to carry the same list as `push` above, which meant
+    # a docs-only pull request produced NO `CI` check at all — and the merge rules then need a carve-out
+    # saying that particular absence is fine, sitting next to a rule saying an absent check is a red light.
+    # Two readings of the same missing tick is how #150 was merged. Worse, the guard rails ARE documentation
+    # checks: tests/unit/guardrails.test.ts asserts that CLAUDE.md, BACKLOG.md and docs/ROUTINE-PROMPT.md
+    # agree and that the freeze lift still reads as one-time, so a pull request touching only those files is
+    # exactly the change those rails exist to catch, and it was the one shape they never ran on.
+    # The e2e step below is what gets filtered instead, so the saving is kept and the check is not.
+    # `push` keeps its filter: that tree passed on its own pull request minutes earlier.
   schedule:
     - cron: '20 3 * * *'      # 03:20 UTC: the nightly full run against main
   workflow_dispatch:           # …and a full run on demand, from any branch
@@ -55,9 +64,65 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The scope step below needs the merge base to diff against, and checkout's default depth of 1 does
+          # not have it. Unconditionally, NOT `${{ … == 'pull_request' && 0 || 1 }}`: GitHub's `&&`/`||`
+          # return the operand rather than a boolean, so that idiom silently collapses to `1` whenever the
+          # "true" branch is falsy — `0` here — and the diff would fail on every pull request. It would fail
+          # safe (the step then runs e2e), so nothing would go red; the filter would simply never once fire,
+          # which is the kind of defect that gets shipped and believed. 52 commits and 5 MB of history, so a
+          # full clone costs a fraction of a second and none of the ambiguity.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      # #176: e2e is ~90% of this repo's Actions bill and much of it is paid on changes that cannot move a
+      # pixel — the rails that enforce the documentation live in tests/unit/, so a governance pull request is
+      # almost never docs-only and used to drag the whole suite along with it. This step decides, once, from
+      # the pull request's real diff (three-dot, the same range GitHub's "Files changed" shows) whether the
+      # change can reach the game. The unit tests and the build are NOT filtered and never will be: they cost
+      # ~14 s, and they are the only check a documentation change has.
+      #
+      # Two properties this step must keep, both of them fail-safe:
+      #   - anything that is not a pull request (the nightly, workflow_dispatch, a push) answers `true`
+      #     without consulting the diff at all — the nightly is the one full check a merged tree gets;
+      #   - if the diff cannot be computed for ANY reason (a missing base sha, a shallow clone, git exiting
+      #     non-zero), it answers `true`. Skipping e2e because a git command failed would be a silent loss of
+      #     coverage that looks exactly like a saving, which is the failure mode this whole file is written
+      #     against — a stale tick and an absent one both read green.
+      # GAME_PATHS is the load-bearing line and tests/unit/guardrails.test.ts reads it FROM HERE, so it must
+      # stay a single-quoted one-liner. Adding a top-level directory under src/ that this regex does not
+      # cover turns that rail red, which is the point: `src/` is a prefix so that it never can.
+      - name: Can this change reach the game? (#176)
+        id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          GAME_PATHS='^(src/|index\.html$|public/|tests/e2e/|playwright\.config\.|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'
+          if [ "$EVENT" != 'pull_request' ]; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+            echo "### e2e: **running** — \`$EVENT\` is never filtered (#176)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if ! files=$(git diff --name-only "$BASE...$HEAD" 2>&1); then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+            echo "### e2e: **running** — could not diff \`$BASE...$HEAD\`, so e2e is not skipped (#176)" >> "$GITHUB_STEP_SUMMARY"
+            echo "$files"
+            exit 0
+          fi
+          echo "changed files:"; echo "$files"
+          if echo "$files" | grep -Eq "$GAME_PATHS"; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+            { echo "### e2e: **running** — the diff touches the game (#176)";
+              echo "$files" | grep -E "$GAME_PATHS" | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+            { echo "### e2e: **skipped** — nothing in this diff can reach the game (#176)";
+              echo "Unit tests, guard rails and the build ran as always. Changed files:";
+              echo "$files" | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Unit tests + guard rails
         run: npm test
       - run: npm run build          # `tsc --noEmit && vite build` — the typecheck lives here
@@ -72,11 +137,14 @@ jobs:
       # Deliberately not `apt-get update || true`, which would fix this outage by making every apt failure
       # invisible, a real one included. Other vendor sources in the image can break the same way; this
       # removes the one that has.
+      # These two exist only to make e2e possible, so they carry e2e's own condition (#176) as well as the
+      # push guard. Leaving them unfiltered would install a browser for a run that never opens one — about a
+      # minute of the ~2.9 the filter is there to save.
       - name: Drop the apt sources we do not use (#147)
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
         run: sudo rm -fv /etc/apt/sources.list.d/google-chrome*.list /etc/apt/sources.list.d/google-chrome*.sources
       - name: Install Playwright browsers
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
         run: npx playwright install --with-deps chromium
       # #141: a pull request runs the MOBILE project only; the nightly and workflow_dispatch run the whole
       # matrix. The game is mobile-first and the owner plays it on a phone and a tablet, so a desktop-only
@@ -94,8 +162,14 @@ jobs:
       # and opens a `watchdog` issue on a failure OR on no run in 26 hours (docs/WATCHDOG-PROMPT.md step 2),
       # and the dev routine re-checks it every 2 hours and treats a red nightly as that run's first work
       # (docs/ROUTINE-PROMPT.md STEP 1). Both read a conclusion, never an absence.
+      #
+      # #176 adds the second half of the condition: the step is skipped, visibly and with its reason in the
+      # run summary, when the pull request's diff cannot reach the game. The scope step above answers `true`
+      # for every non-pull-request event and for any diff it could not compute, so the nightly and
+      # workflow_dispatch are untouched by the filter — the one full check a merged tree gets is not
+      # something a path list may take away.
       - name: End-to-end (${{ github.event_name == 'pull_request' && 'mobile' || 'full matrix' }})
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
         run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile' || '--project=mobile --project=desktop' }}
       - if: failure() && github.event_name != 'push'
         uses: actions/upload-artifact@v4

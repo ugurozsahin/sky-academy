@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
@@ -810,6 +810,136 @@ describe('guard rails', () => {
     // Membership of the parsed list, never a substring of it: `includes('opened')` is true of `reopened` too.
     for (const t of ['opened', 'synchronize', 'reopened', 'ready_for_review'])
       expect({ trigger: t, subscribed: types.includes(t) }).toEqual({ trigger: t, subscribed: true });
+  });
+
+  // #176: e2e now runs on a pull request only when the diff can reach the game, decided by one regex in
+  // ci.yml's scope step. Every way this saving turns into a silent loss of coverage is a change to that one
+  // line or to the conditions that read it, so the rail reads all of them out of the workflow itself.
+  //
+  // The failure it is written against is specific and cheap to cause: someone adds a top-level directory
+  // under `src/` — `src/lessons/` for #10, say — while the filter enumerates the directories that existed
+  // when it was written. Nothing goes red, e2e silently stops covering the new code, and the first anyone
+  // knows is a regression on a child's phone. Today the filter uses the `src/` prefix and so covers any new
+  // directory for free; this rail is what makes that a property rather than an accident, because the moment
+  // an edit narrows the prefix to a list, a directory left off it turns this red.
+  //
+  // Prove it red both ways before trusting it: narrow `src/` to `src/game/` in ci.yml and the coverage half
+  // fails; widen the regex to `.` and the discrimination half fails. A filter that matches everything is a
+  // rail that has stopped filtering, and it reads as a passing test.
+  describe('e2e is filtered by path, and the filter cannot silently stop covering src/ (#176)', () => {
+    const yml = workflow('ci.yml');
+    const lines = yml.split('\n').filter(l => !l.trim().startsWith('#'));
+    // Read from the assignment in the scope step, not from a comment: ci.yml's own prose names these paths.
+    const raw = /GAME_PATHS='([^']+)'/.exec(lines.join('\n'))?.[1];
+    // A DELETED GAME_PATHS must fail the coverage rail, not slip past it. `new RegExp(undefined)` is `/(?:)/`
+    // — the empty pattern, which matches every string — so falling back to the raw value would have made
+    // "every src/ path is covered" pass with the filter gone and "nothing else is matched" the only rail
+    // left. Caught while proving these red: the coverage half went green against a ci.yml with no filter at
+    // all. `(?!)` is the opposite failure and the safe one — it matches nothing, so a missing filter reads
+    // as covering nothing.
+    const filter = () => new RegExp(raw ?? '(?!)');
+
+    it('ci.yml declares the path filter as a single readable regex', () => {
+      expect(yml.length, 'ci.yml must be read from disk, not a blank import').toBeGreaterThan(500);
+      expect(raw, "ci.yml must assign GAME_PATHS='<regex>' on one line — the rail below reads it from there")
+        .toBeTruthy();
+    });
+
+    it('every top-level entry under src/ is covered — a new directory cannot lose e2e', () => {
+      const re = filter();
+      const entries = readdirSync(new URL('../../src', import.meta.url), { withFileTypes: true });
+      expect(entries.length, 'src/ must be read from disk, not an empty listing').toBeGreaterThan(3);
+      for (const e of entries) {
+        const path = e.isDirectory() ? `src/${e.name}/some-new-file.ts` : `src/${e.name}`;
+        expect({ path, e2e: re.test(path) }, `a change to ${path} would skip e2e — add it to GAME_PATHS (#176)`)
+          .toEqual({ path, e2e: true });
+      }
+    });
+
+    it('and the other game paths the filter promises', () => {
+      const re = filter();
+      for (const path of ['index.html', 'public/avatars/ninja.webp', 'tests/e2e/game.spec.ts',
+                          'playwright.config.ts', 'package.json', 'package-lock.json',
+                          '.github/workflows/ci.yml'])
+        expect({ path, e2e: re.test(path) }).toEqual({ path, e2e: true });
+    });
+
+    // Without this half the rail above is satisfied by `GAME_PATHS='.'`, which skips nothing and reads green.
+    it('and it still discriminates — the shapes that pay for this change are not matched', () => {
+      const re = filter();
+      for (const path of ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'WORKLOG.md',
+                          'tests/unit/guardrails.test.ts', 'scripts/seed-issues.py',
+                          '.claude/skills/add-topic/SKILL.md', '.github/workflows/review-gate.yml'])
+        expect({ path, e2e: re.test(path) }, `${path} cannot reach the game, so it must not pay for e2e (#176)`)
+          .toEqual({ path, e2e: false });
+    });
+
+    // The filter is only sound because it fails towards running. Both defaults are load-bearing: the nightly
+    // is the one full check a merged tree gets (#141), and a diff that could not be computed must never read
+    // as "nothing changed" — that is a silent loss of coverage wearing a green tick, the #150 shape again.
+    it('the scope step fails towards running e2e, never towards skipping it', () => {
+      const at = lines.findIndex(l => l.includes('id: scope'));
+      expect(at, 'ci.yml must still have the scope step').toBeGreaterThan(-1);
+      const script = lines.slice(at, lines.findIndex(l => l.includes('Unit tests + guard rails'))).join('\n');
+      expect(script, 'a non-pull_request event must not consult the diff at all')
+        .toMatch(/EVENT"?\s*!=\s*'pull_request'\s*\]\s*;\s*then\s*\n\s*echo "e2e=true"/);
+      expect(script, 'a diff that cannot be computed must still run e2e')
+        .toMatch(/if ! files=\$\(git diff[^\n]*\n\s*echo "e2e=true"/);
+      expect((script.match(/echo "e2e=false"/g) ?? []).length,
+        'exactly one branch may skip e2e — the one that read the diff and found nothing').toBe(1);
+    });
+
+    // The three steps that exist only to run e2e must all carry the condition. Installing a browser for a
+    // run that never opens one is about a minute of the ~2.9 this change is worth.
+    it('the e2e step and its two setup steps all read the scope output', () => {
+      for (const name of ['playwright test', 'playwright install', 'sources.list.d/google-chrome']) {
+        const at = lines.findIndex(l => l.includes(name));
+        expect(at, `ci.yml must still have the ${name} step`).toBeGreaterThan(-1);
+        let from = at;
+        while (from >= 0 && !/^\s*- /.test(lines[from])) from--;
+        const dash = lines[from].indexOf('- ');
+        const sibling = new RegExp(`^\\s{${dash}}- `);
+        let to = from + 1;
+        while (to < lines.length && !sibling.test(lines[to])) to++;
+        const step = lines.slice(from, to).join('\n');
+        expect(step, `the ${name} step must be gated on the path filter (#176)`)
+          .toMatch(/steps\.scope\.outputs\.e2e\s*==\s*'true'/);
+      }
+    });
+
+    // Written because #176 itself was drafted with this bug and caught in self-review, not on a runner.
+    // GitHub's `&&`/`||` return the OPERAND, not a boolean, so `${{ cond && A || B }}` is a ternary only
+    // while A is truthy. `fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}` collapses to
+    // `1` in both branches, because `true && 0` is `0` and `0 || 1` is `1`. This file already leans on the
+    // idiom twice with string operands, so the next editor has two correct examples in front of them and no
+    // warning — and the failure is invisible: the clone is shallow, the diff fails, the scope step fails
+    // safe and runs e2e, and the filter simply never fires. Nothing goes red; the feature is just absent.
+    // Read from `lines`, never `yml`: the comment above names the very idiom this bans, and the first draft
+    // of this rail went red on its own explanation — the #129 failure, from the other side.
+    it('no `${{ … && <falsy> || … }}` — GitHub returns the operand, so that is not a ternary', () => {
+      const bad = [...lines.join('\n').matchAll(/\$\{\{([^}]*)\}\}/g)]
+        .map(m => m[1]).filter(e => /&&\s*(0|false|''|"")\s*\|\|/.test(e));
+      expect(bad, `these expressions always return their right-hand side:\n${bad.join('\n')}`).toHaveLength(0);
+    });
+
+    // #176's other half, and the reason it is a tightening rather than only a saving: a pull request used to
+    // be able to produce NO `CI` check at all, which the merge rules then had to carve out as an acceptable
+    // absence sitting next to "a missing check is a red light". The guard rails in this very file read
+    // CLAUDE.md, BACKLOG.md and docs/ROUTINE-PROMPT.md, so a documentation-only pull request is exactly the
+    // change they exist to catch and was the one shape they never ran on. `push` keeps its filter: that tree
+    // already passed on its own pull request minutes earlier.
+    it('a pull request always gets a CI check — no paths-ignore on the pull_request trigger', () => {
+      const from = lines.findIndex(l => l.startsWith('on:'));
+      const to = lines.findIndex(l => l.startsWith('jobs:'));
+      const on = lines.slice(from, to);
+      const at = on.findIndex(l => l.trim().startsWith('pull_request:'));
+      expect(at, 'ci.yml must still trigger on pull_request').toBeGreaterThan(-1);
+      const rest = on.slice(at + 1);
+      const end = rest.findIndex(l => /^ {0,2}\S/.test(l));
+      const block = rest.slice(0, end === -1 ? rest.length : end).join('\n');
+      expect(block, 'a docs-only pull request must still report a CI check — filter the e2e step, not the ' +
+        'workflow (#176)').not.toMatch(/paths-ignore/);
+    });
   });
 });
 
