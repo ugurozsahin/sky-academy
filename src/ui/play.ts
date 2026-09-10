@@ -60,6 +60,12 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
   // Curriculum base holds (ms). #32: scaled(...) divides them by the test-only speed at each use site, so the
   // game a child plays holds for the full time while the e2e suite can run them several times faster.
+  // #138: every scheduled beat THIS file still owns goes through scaled() — the tutorial hold before the
+  // first wave and its auto-hide, the taunt, the results cue. The beats that read HOLD (the outcome holds,
+  // the inter-question gap, the tracing advance, the results floor) moved to play-session.ts with #36 and
+  // are scaled there. One thing here deliberately is NOT scaled, and a guard rail would be wrong to touch
+  // it: the sprint ticker below samples the REAL clock — speed.ts must never speed the clock up, which is
+  // the mistake this repo has made four times.
   const HOLD = sprint ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 };
 
   // #36: the Session callbacks — the question beat, the outcome beat, the sprint clock, the boss reactions —
@@ -137,8 +143,10 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const t = $('#tutorial'); if (!t || !t.hidden) return 0;
     if (load().tutorialSeen || session.questionsAsked > 1) return 0;   // only ever before the very first wave
     t.hidden = false; say(SENSEI_LINES.tutorial);
-    later(hideTutorial, 9000);                    // never block play for long, even if the child just watches
-    return 1800;
+    later(hideTutorial, scaled(9000));            // never block play for long, even if the child just watches
+    // #138: the hold before the first wave is a game beat too. Shortening it at speed is safe now that the
+    // font gate is explicit (#44's gatedSpawn) rather than resting on 1800 ms happening to exceed the cap.
+    return scaled(1800);
   }
   function hideTutorial() { const t = $('#tutorial'); if (t) t.hidden = true; }
   /** Repeat the prompt aloud (tap the question card, or the 🔊 button). */
@@ -150,7 +158,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   function showTaunt() {
     const t = $('#taunt'); if (!t) return;
     t.textContent = VILLAIN.taunt[Math.floor(Math.random() * VILLAIN.taunt.length)];
-    t.hidden = false; later(() => (t.hidden = true), 1400);
+    t.hidden = false; later(() => (t.hidden = true), scaled(1400));   // #138
   }
 
   function showStageClear(stage: number, st: number, acc: number) {
@@ -178,7 +186,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     });
     const fresh = addCoins(r.coins + dojo.coins); const streak = touchStreak();
     const stickerHTML = stickersHTML(fresh);
-    if (fresh.length || dojo.completed.length) later(() => sfx.stage(), 600);
+    if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138
     const medal = resultMedal(r);
     const headline = training ? senseiLine(r.won, d.name)
       : r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!`

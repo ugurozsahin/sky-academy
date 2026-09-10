@@ -61,6 +61,11 @@ export interface PlaySession {
 // the mission segment, spotlight the answer under the card, freeze the wave for the hold — and differed
 // only in the rules below, so a fourth outcome is now a row rather than a fourth copy of the body.
 // `advance` is the no-arena (tracing) fallback; 0 is the miss path, where the session has already moved on.
+// #138: every scheduled beat in this file goes through scaled() — the outcome holds, the inter-question gap,
+// the tracing `advance` below, the results floor and the breath after it. The one exception is deliberate and
+// a guard rail would be wrong to touch it: `revealUntil - performance.now()` is real time still owed on a
+// hold that was already scaled when it began, so scaling it a second time would cut short the pause a child
+// sees. (The beats play.ts still owns — the tutorial hold, the taunt, the results cue — are scaled there.)
 const OUTCOME = {
   correct: { seg: 'good', taunt: false, hold: 'correct', advance: 900 },
   wrong: { seg: 'bad', taunt: true, hold: 'wrong', advance: 1200 },
@@ -97,7 +102,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     lastOutcome = kind; markSeg(rule.seg);
     if (rule.taunt) deps.showTaunt();
     const arena = deps.arena();
-    if (!arena) { if (rule.advance) deps.later(() => session.advance(), rule.advance); return; }
+    if (!arena) { if (rule.advance) deps.later(() => session.advance(), scaled(rule.advance)); return; }   // #138: the tracing path's own beat, scaled like every other
     arena.reveal(reveal); hud.showOutcome(kind, q); endWave(scaled(hold[rule.hold]));
   }
 
@@ -117,10 +122,21 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         if (deps.tracing) { say(q.say ?? q.prompt); deps.startTrace(q); return; }
         const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
         const labels = bomb ? [...info.labels, BOMB] : info.labels;
+        // #138: a spawn can be queued — behind the tutorial hold, or behind the font gate — and the session
+        // can move on while it waits, so it must check that its own question is still the one on screen.
+        // Without this, a wave that was superseded lands on top of the wave that replaced it: spawnWave()
+        // empties the array first, so the child is left holding the PREVIOUS question's bubbles — asked one
+        // question and handed another's answers. It was only ever reachable because the tutorial hold was
+        // 1.8 s of real time, longer than anything that raced with it; scaling that hold (play.ts) shortened
+        // the gap and the race came out. The rAF is checked too — it is a second deferral, and the frame
+        // after a queued spawn is exactly when a fast session moves on. Same idiom as endWave, other end.
+        const myWave = waveId;
         const spawn = () => {
+          if (waveId !== myWave) return;                                 // superseded while we waited
           const arena = deps.arena()!;
           say(q.say ?? q.prompt);
           requestAnimationFrame(() => {
+            if (waveId !== myWave) return;
             arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;
             arena.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), ordered: q.sequence?.slice(session.seqIndex) });
           });
@@ -177,8 +193,10 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       if (kind === 'hit') { sfx.life(); if (hp > 0) deps.toast(hp <= 3 ? 'Hammer Man is wobbling!' : 'Hit!', 'good'); }
       else deps.showTaunt();
     },
+    // #138: the floor and the breath after it are game beats and scale; `revealUntil - now` is real time
+    // already remaining on a hold that was itself scaled when it started, so it must NOT be scaled again.
     onEnd(r) {
-      const wait = lastOutcome === 'none' || r.mode === 'sprint' ? 0 : Math.max(900, revealUntil - performance.now() + 300);
+      const wait = lastOutcome === 'none' || r.mode === 'sprint' ? 0 : Math.max(scaled(900), revealUntil - performance.now() + scaled(300));
       deps.later(() => deps.showResults(r), wait);
     },
   });

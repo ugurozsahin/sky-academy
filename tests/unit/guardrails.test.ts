@@ -689,6 +689,62 @@ describe('guard rails', () => {
     expect(yml, 'the e2e step stays off the push run').toMatch(/if:\s*github\.event_name\s*!=\s*'push'/);
   });
 
+  // #138: fast mode (#32) is only sound while it is a *pure time compression* — the same game, fewer seconds.
+  // It shipped with two leaks. `layoutWave` divided the flight time but left `vx` in px/second, so at 4x a
+  // bubble drifted a quarter as far sideways as a child ever sees; and a handful of `later(...)` beats in
+  // play.ts kept their real-time literals, so they were part of the floor the suite could not get under.
+  // Neither failed anything — which is exactly what makes them worth a rail. A test written against the
+  // compressed trajectory would have been asserting a path the game does not have, and the next beat added
+  // in real time would be just as invisible as these were.
+  it('fast mode compresses time only — the drift scales with it and no beat is left in real time (#138)', () => {
+    const arena = code(SOURCES['/src/game/arena.ts'] ?? '');
+    expect(arena.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
+    // the one place a horizontal velocity is handed to a bubble: it must carry the speed multiplier
+    const vx = /const vx = ([^;]+);/.exec(arena)?.[1];
+    expect(vx, 'layoutWave must still compute a vx').toBeTruthy();
+    expect(vx, 'vx is px/second, so it scales with the speed multiplier or the arc is not the real one (#138)')
+      .toContain('speedK');
+
+    // and every scheduled beat goes through scaled(): a bare `later(fn, 1200)` is a real-time wait.
+    // BOTH files are counted, the same way #36's settle() rail counts both: the question beat, the outcome
+    // beat and the results beat live in play-session.ts now, so a rail scoped to play.ts alone would be green
+    // while the file that owns most of the beats went unwatched. play-session.ts has no bare-numeric later()
+    // today, so it starts at the floor — this rail costs nothing to widen and stops a whole file drifting.
+    const files = ['/src/ui/play.ts', '/src/ui/play-session.ts'];
+    for (const f of files) expect((SOURCES[f] ?? '').length, `${f} must be read, not a blank import`).toBeGreaterThan(1000);
+    const real = files.flatMap(f => code(SOURCES[f] ?? '').split('\n')
+      .filter(l => l.includes('later(') && /,\s*\d+\s*\)/.test(l)).map(l => `${f}: ${l.trim()}`));
+    expect(real, `a beat is still scheduled in real time — wrap it in scaled(...) (#138):\n${real.join('\n')}`)
+      .toEqual([]);
+
+    // the one thing the multiplier must never touch, restated here because #32's whole premise rests on it
+    const speed = code(SOURCES['/src/game/speed.ts'] ?? '');
+    expect(speed, 'scaled() divides a duration; it never multiplies a clock').toContain('ms / factor');
+    expect(SOURCES['/src/ui/play.ts'], 'the sprint clock still samples the real clock, not a scaled one')
+      .toContain('performance.now()');
+  });
+
+  // #138: found by the e2e suite while scaling the beats above. A spawn is queued twice over — behind the
+  // tutorial hold, then behind a requestAnimationFrame — and the session can move on in either gap. When it
+  // does, the superseded spawn still runs, and `spawnWave` empties the bubble array before filling it, so the
+  // PREVIOUS question's bubbles replace the current question's wave: the child is asked one thing and handed
+  // the answers to another. It hid for as long as the tutorial hold was 1.8 s of real time; the moment that
+  // hold scaled with the game speed, the desktop e2e caught it ("no bubble for <word>"). `endWave` already
+  // guards on the same `waveId` counter — this is that idiom applied to the other end of the wave.
+  // Reads play-session.ts: onQuestion and its spawn closure moved there with #36, and a rail left pointing at
+  // play.ts would have gone green on a file that no longer contains the code it claims to guard.
+  it('a queued spawn checks its question is still on screen before it lands (#138)', () => {
+    const play = code(SOURCES['/src/ui/play-session.ts'] ?? '');
+    expect(play.length, 'play-session.ts must be read, not a blank import').toBeGreaterThan(1000);
+    const from = play.indexOf('waveId++');
+    expect(play.indexOf('const spawn = () =>'), 'play-session.ts must still build its wave in a spawn() closure').toBeGreaterThan(from);
+    const body = play.slice(from, play.indexOf('spawnWave(', from));                 // the question's own wave, start to launch
+    expect(body, 'play-session.ts must still capture the wave id the spawn belongs to').toMatch(/=\s*waveId;/);
+    // one check per deferral: the timer/font gate, and the animation frame inside it
+    expect((body.match(/waveId !==/g) ?? []).length, 'both deferrals must drop a superseded spawn (#138)')
+      .toBeGreaterThanOrEqual(2);
+  });
+
   // Incident 2026-09-10 (#159): `on: pull_request` carried no `types:` list at all, so GitHub applied its
   // default — [opened, synchronize, reopened] — and `ready_for_review` is not in it. Undrafting is exactly
   // how a reviewer CLEARS a block here (CLAUDE.md, review-gate.yml), so the last step of the review protocol

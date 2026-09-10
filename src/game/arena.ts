@@ -546,7 +546,10 @@ export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: num
     const tUp = T / 2;
     const g = 2 * h / (tUp * tUp);
     const vy = -Math.sqrt(2 * g * h);
-    const vx = ((W / 2 - x) / W) * 30 * (rng() * 0.6 + 0.4);
+    // #138: `* speedK` is what makes fast mode a pure time compression. vx is px/SECOND and the flight lasts
+    // T/k seconds, so an unscaled vx drifts the bubble 1/k of the way across — a path no child ever sees.
+    // Scaling it keeps the whole trajectory identical at any speed: same apex, same landing x, less time.
+    const vx = ((W / 2 - x) / W) * 30 * (rng() * 0.6 + 0.4) * speedK;
     const launchAt = now + batch * batchGap + idx * stagger * (size > 6 ? 0.6 : 1);
     bubbles.push({ label: o.labels[i], x, vx, vy, g, launchAt, color: PALETTE[(k * 3 + Math.floor(rng() * 3)) % PALETTE.length], wobble: rng() * Math.PI * 2 });
   }

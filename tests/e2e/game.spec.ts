@@ -702,6 +702,35 @@ test.describe('Sky Ninja Academy', () => {
     expect(ratio).toBeLessThan(1.5);          // ...and is NOT sped up 4× — the clock the rails read is untouched
   });
 
+  // #138: a wave's spawn is deferred twice — behind the first-play tutorial hold, then behind a rAF — and the
+  // session can move on in either gap. The superseded spawn used to run anyway, and spawnWave() empties the
+  // bubble array before it fills it, so the PREVIOUS question's bubbles replaced the live wave: the child is
+  // asked one thing and handed the answers to another. It hid while the hold was 1800 ms of real time, longer
+  // than anything that raced with it, and surfaced as an intermittent `no bubble for "<word>"` on desktop the
+  // moment that hold started scaling with the game speed (450 ms at 4×).
+  // Pinned to speed 1 on purpose: the 1800 ms hold makes this a wide, deterministic window instead of the
+  // race that caught it, and the rail asserts the wave is still held before it does anything, so it cannot
+  // pass by arriving late and testing nothing.
+  test('guard rail: a superseded wave never replaces the live one (#138)', async ({ page }) => {
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // overrides the suite's 4× for this test only
+    await seedPlayer(page);                                       // a fresh save: tutorialSeen is false, so the first wave IS held
+    await startTopic(page, 'year1', 'y1-add');
+    await expect(page.locator('#tutorial')).toBeVisible();
+    // move the session on while the first wave is still behind the hold, and note what the live question wants
+    const want = await page.evaluate(() => {
+      const s = window.__sna.session;
+      if (window.__sna.arena!.bubbles.length) return null;         // the hold already fired: this rail would prove nothing
+      s.nextQuestion();
+      return { answer: s.current!.answer, options: [...s.current!.options] };
+    });
+    expect(want, 'the first wave must still be held back, or this rail is vacuous').not.toBeNull();
+    await page.waitForFunction(() => window.__sna.arena!.bubbles.length > 0);
+    await page.waitForTimeout(2200);                               // outlast the superseded spawn's 1800 ms hold
+    const labels = await page.evaluate(() => window.__sna.arena!.bubbles.map(b => b.label).sort());
+    expect(labels, 'the wave on screen belongs to the question on screen').toEqual([...want!.options].sort());
+    expect(labels).toContain(want!.answer);
+  });
+
   test('guard rail: no control inherits a full-screen rule, and the mode cards match', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year2"]');

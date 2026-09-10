@@ -212,7 +212,7 @@ describe('layoutWave — the wave the arena is about to spawn (#43)', () => {
     expect(p.batchSpan).toBeCloseTo(p.perBatch * p.stagger, 6);
   });
 
-  it('#32: the speed multiplier divides the air time and the stagger, and nothing else', () => {
+  it('#32: the speed multiplier divides the air time and the stagger, and speeds the drift to match (#138)', () => {
     const slow = plan({ labels: labels(8) }, PHONE, 1, 0, 7);
     const fast = plan({ labels: labels(8) }, PHONE, 4, 0, 7);
     expect(fast.waveT).toBeCloseTo(slow.waveT / 4, 6);
@@ -220,6 +220,30 @@ describe('layoutWave — the wave the arena is about to spawn (#43)', () => {
     expect(fast.batchGap).toBeCloseTo(slow.batchGap / 4, 6);
     expect(fast.r).toBe(slow.r);                                         // the wave looks the same, it just runs faster
     expect(fast.bubbles.map(b => b.x)).toEqual(slow.bubbles.map(b => b.x));
+    // #138: vx is px/second and fast mode shortens the second, so vx scales with it or the bubble drifts a
+    // quarter as far as a child ever sees. Nothing read it wrongly, but a test reasoning about lateral spread
+    // would have been reasoning about a trajectory the game does not have.
+    slow.bubbles.forEach((b, i) => expect(fast.bubbles[i].vx).toBeCloseTo(b.vx * 4, 9));
+  });
+
+  // #138: the property that makes fast mode a *pure time compression* rather than a different game — the path
+  // through the air is the same curve, walked faster. Apex and landing x are the two ends a test could pin.
+  it('#138: fast mode is the same flight in less time — same apex, same landing x, at every speed', () => {
+    for (const k of [1, 2, 4, 8]) for (const speed of [1, 2, 3] as const) for (let seed = 1; seed <= 15; seed++) {
+      const base = plan({ speed, labels: labels(6) }, PHONE, 1, 0, seed);
+      const fast = plan({ speed, labels: labels(6) }, PHONE, k, 0, seed);
+      const air = (p: typeof base) => p.waveT / 1000;                        // seconds from launch to landing
+      base.bubbles.forEach((b, i) => {
+        const f = fast.bubbles[i];
+        const where = `k=${k} speed=${speed} seed=${seed} bubble ${i}`;
+        expect(f.x, `${where}: launches from the same x`).toBeCloseTo(b.x, 9);
+        // apex height above the launch point is v²/2g — identical, since g and vy both come from the same rise
+        expect((f.vy * f.vy) / (2 * f.g), `${where}: reaches the same apex`)
+          .toBeCloseTo((b.vy * b.vy) / (2 * b.g), 6);
+        expect(f.x + f.vx * air(fast), `${where}: lands on the same x`)
+          .toBeCloseTo(b.x + b.vx * air(base), 6);
+      });
+    }
   });
 
   it('shrinks the bubbles as a wave gets crowded, never below the readable floor', () => {
