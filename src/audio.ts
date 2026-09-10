@@ -17,16 +17,37 @@ function tone(freq: number, dur: number, type: OscillatorType = 'sine', gain = 0
   g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + delay + dur);
   o.connect(g).connect(c.destination); o.start(c.currentTime + delay); o.stop(c.currentTime + delay + dur + 0.05);
 }
+/** Length of the one shared noise buffer. Every `noise()` duration must fit inside it — `noise is one shared
+ *  buffer` in guardrails.test.ts holds the SFX table to that, because a longer sound would run off the end of
+ *  the buffer and go quiet early while its gain ramp carried on. */
+export const NOISE_SECONDS = 0.5;
+let noiseBuf: AudioBuffer | null = null, noiseFor: BaseAudioContext | null = null;
+/**
+ * The white noise every swish, slice and elemental hit is cut from — built once, lazily, per context (#41).
+ *
+ * It used to be a fresh `createBuffer` per SFX, filled sample by sample with `Math.random()`: at 48 kHz a
+ * single 0.35 s wind wrote nearly 17,000 samples, mid-frame, and the trail fires a swish every few pointer
+ * moves. White noise is white noise, so one buffer serves the lot and each play takes a different slice.
+ */
+function noiseBuffer(c: BaseAudioContext): AudioBuffer {
+  if (noiseBuf && noiseFor === c) return noiseBuf;
+  const buf = c.createBuffer(1, Math.ceil(c.sampleRate * NOISE_SECONDS), c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;      // flat: the fade is a gain ramp now (see below)
+  noiseFor = c; return (noiseBuf = buf);
+}
 function noise(dur: number, gain = 0.2, hp = 1200, lp = 0) {
   const c = ac(); if (!c) return;
-  const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate); const d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-  const s = c.createBufferSource(); s.buffer = buf;
+  const t = c.currentTime;
+  const s = c.createBufferSource(); s.buffer = noiseBuffer(c);
   const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
-  const g = c.createGain(); g.gain.value = gain;
+  // The old per-SFX buffer carried its own linear 1 → 0 fade in its samples ((1 - i / d.length)). A shared
+  // buffer cannot, so the same envelope is a gain ramp instead — the identical shape, and what tone() has
+  // always done. Nothing about the sound changes; only where the fade is applied.
+  const g = c.createGain(); g.gain.setValueAtTime(gain, t); g.gain.linearRampToValueAtTime(0, t + dur);
   if (lp) { const l = c.createBiquadFilter(); l.type = 'lowpass'; l.frequency.value = lp; s.connect(f).connect(l).connect(g).connect(c.destination); }
   else s.connect(f).connect(g).connect(c.destination);
-  s.start();
+  s.start(t, Math.random() * Math.max(0, NOISE_SECONDS - dur), dur);   // a different slice of the buffer each time
 }
 
 /** Element-flavoured slice sounds, keyed by Avatar.fx. */

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
+import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 
 /**
@@ -437,6 +438,23 @@ describe('guard rails', () => {
   // child heard fragments. The queued form is easy to lose in a later edit of that callback (it looks like a
   // stray option), and nothing else would fail if it were: the game would just quietly stop reading letters
   // out. Behaviour is covered by audio.test.ts; this pins the one call site that must not interrupt.
+  // #41: every swish, slice and elemental hit used to allocate its own AudioBuffer and fill it with
+  // Math.random() mid-frame. One shared 0.5 s buffer replaced them, played as sub-ranges — which only works
+  // while no sound is longer than the buffer: a longer one runs off the end and goes silent early while its
+  // gain ramp carries on, and nothing would fail. `audio.test.ts` drives the real tables through a stand-in
+  // context and checks the bounds that way; this rail is the cheap text half, so a new sound that is too long
+  // is caught at the line that declares it rather than only when someone happens to listen.
+  it('no SFX asks for more noise than the one shared buffer holds (#41)', () => {
+    const audio = code(SOURCES['/src/audio.ts'] ?? '');
+    expect(audio.length, 'audio.ts must be read, not a blank import').toBeGreaterThan(1000);
+    const durations = [...audio.matchAll(/\bnoise\(\s*([\d.]+)/g)].map(m => Number(m[1]));
+    expect(durations.length, 'the rail found no noise() calls — it would pass vacuously').toBeGreaterThan(5);
+    for (const d of durations) expect(d, `noise(${d}) is longer than the shared buffer`).toBeLessThanOrEqual(NOISE_SECONDS);
+    // …and the buffer itself is built once, in one place. A second createBuffer is the old defect returning.
+    const allocs = Object.values(SOURCES).map(code).join('\n').match(/createBuffer\(/g) ?? [];
+    expect(allocs.length, 'AudioBuffers are allocated in exactly one place, noiseBuffer()').toBe(1);
+  });
+
   it('per-letter progress speech is queued, never interrupting (#40)', () => {
     const play = code(SOURCES['/src/ui/play.ts'] ?? '');
     expect(play.length, 'play.ts must be read, not a blank import').toBeGreaterThan(1000);

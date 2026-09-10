@@ -1,5 +1,5 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
-import { chooseVoice, haptic, HAPTICS, say, SAY_DEFER_MS, type SynthLike, voiceScore } from '../../src/audio';
+import { afterEach, beforeAll, describe, it, expect, vi } from 'vitest';
+import { chooseVoice, haptic, HAPTICS, NOISE_SECONDS, say, SAY_DEFER_MS, sfx, sliceFx, type SynthLike, voiceScore } from '../../src/audio';
 import { reset, save } from '../../src/storage';
 
 const mem: Record<string, string> = {};
@@ -106,5 +106,91 @@ describe('say() — speaking without wedging the phone (#40)', () => {
     save({ speech: true });
     const bad = { speaking: false, pending: false, cancel() {}, speak() { throw new Error('engine gone'); } } as SynthLike;
     expect(() => say('boom', false, { synth: bad })).not.toThrow();
+  });
+});
+
+// #41: noise() used to build a fresh AudioBuffer per SFX and fill it sample by sample with Math.random() —
+// ~17,000 samples for one 0.35 s wind, written mid-frame, and the blade trail fires a swish every few pointer
+// moves. It is now one lazily built 0.5 s buffer per context, played as sub-ranges. These tests drive the
+// real sfx/sliceFx tables through a stand-in AudioContext, so they check the behaviour, not the source text.
+type Start = { when: number; offset: number; duration: number };
+type Ramp = { kind: 'set' | 'linear'; value: number; at: number };
+const buffers: number[] = [];        // one entry per createBuffer call: its length in samples
+const starts: Start[] = [];
+const ramps: Ramp[] = [];
+const SAMPLE_RATE = 48000;
+function fakeAudio() {
+  const chain = <T extends object>(n: T) => Object.assign(n, { connect: (next: unknown) => next });
+  return {
+    sampleRate: SAMPLE_RATE, state: 'running', currentTime: 3, destination: {}, resume() {},
+    createBuffer: (_ch: number, length: number, sampleRate: number) => {
+      buffers.push(length);
+      return { length, sampleRate, duration: length / sampleRate, getChannelData: () => new Float32Array(length) };
+    },
+    createBufferSource: () => chain({
+      buffer: null as unknown,
+      start: (when = 0, offset = 0, duration = 0) => { starts.push({ when, offset, duration }); },
+    }),
+    createBiquadFilter: () => chain({ type: '', frequency: { value: 0 } }),
+    createGain: () => chain({ gain: {
+      value: 0,
+      setValueAtTime: (value: number, at: number) => { ramps.push({ kind: 'set', value, at }); },
+      linearRampToValueAtTime: (value: number, at: number) => { ramps.push({ kind: 'linear', value, at }); },
+      exponentialRampToValueAtTime: () => {},
+    } }),
+    createOscillator: () => chain({
+      type: '', frequency: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, start() {}, stop() {},
+    }),
+  };
+}
+
+describe('noise SFX share one buffer (#41)', () => {
+  beforeAll(() => {
+    // ac() reads window.AudioContext and caches the first context it builds, exactly as it does in the game,
+    // so the whole describe shares one — which is what lets the first test count buffers across every SFX.
+    (globalThis as any).window = { AudioContext: function () { return fakeAudio(); } };
+  });
+  afterEach(() => { buffers.length = 0; starts.length = 0; ramps.length = 0; });
+
+  it('builds exactly one 0.5 s buffer for the whole SFX table, however many sounds play', () => {
+    reset();
+    const plays = [...Object.values(sfx), ...Object.values(sliceFx)];
+    for (const play of plays) play();
+    for (const play of plays) play();                                       // and again: nothing is rebuilt
+    expect(buffers).toEqual([Math.ceil(SAMPLE_RATE * NOISE_SECONDS)]);      // one buffer, 0.5 s of it
+    expect(starts.length).toBeGreaterThan(20);                              // …serving a lot of noise sounds
+  });
+
+  it('keeps the linear 1 → 0 fade the old per-SFX buffer baked into its samples', () => {
+    reset(); sfx.swish();                                                   // noise(0.12, 0.12, 2500)
+    expect(ramps).toEqual([{ kind: 'set', value: 0.12, at: 3 }, { kind: 'linear', value: 0, at: 3.12 }]);
+  });
+
+  it('plays a different slice of the buffer each time, and never runs off the end of it', () => {
+    reset();
+    for (let i = 0; i < 40; i++) sfx.swish();
+    expect(new Set(starts.map(s => s.offset)).size).toBeGreaterThan(1);     // sub-ranges, not the same 0.12 s
+    for (const s of starts) {
+      expect(s.duration).toBeGreaterThan(0);
+      expect(s.offset).toBeGreaterThanOrEqual(0);
+      expect(s.offset + s.duration).toBeLessThanOrEqual(NOISE_SECONDS + 1e-9);
+    }
+  });
+
+  it('asks for a bounded sub-range per sound, never the whole buffer', () => {
+    reset();
+    for (const play of [...Object.values(sfx), ...Object.values(sliceFx)]) play();
+    // Every start() carries an explicit duration — the old code passed none and let the buffer run out, which
+    // is only equivalent while the buffer is the length of the sound.
+    expect(starts.every(s => s.duration > 0), 'start(when, offset, duration) — a bare start() plays 0.5 s').toBe(true);
+    expect(Math.max(...starts.map(s => s.duration))).toBe(0.35);             // wind, the longest sound there is
+    for (const s of starts) expect(s.offset + s.duration).toBeLessThanOrEqual(NOISE_SECONDS + 1e-9);
+  });
+
+  it('stays silent — and allocates nothing — while the sound toggle is off', () => {
+    reset(); save({ sound: false });
+    sfx.swish(); sliceFx.fire();
+    expect(starts).toEqual([]);
+    save({ sound: true });
   });
 });
