@@ -3,7 +3,7 @@
 # earlier, so main only re-checks what a merge can break cheaply (types, unit, build). The FULL matrix —
 # every project — runs against main once a night, which is what catches two PRs that were green apart and
 # broken together, and is now also the only place a desktop-only regression is caught. Docs-only changes run
-# nothing.
+# nothing. Clearing a review block (undrafting a PR) re-runs the suite — see the trigger note below (#159).
 #
 # Why the split: this is a private repo, so Actions minutes are metered (2,000/month on Free, 3,000 on Pro).
 # Measured 2026-09-07 — full run ~12 min, light run ~3 min, and shipping one issue used to cost ~42 min
@@ -14,6 +14,32 @@ on:
     branches: [main]
     paths-ignore: ['**.md', 'docs/**', '.claude/**', '.gitignore']
   pull_request:
+    # An explicit `types:` REPLACES GitHub's default list, it does not extend it, so the three defaults are
+    # restated here. Drop one of them from this line and CI silently stops running on that event — losing
+    # `synchronize` would mean a push to a pull request tests nothing at all. The rail in
+    # tests/unit/guardrails.test.ts asserts all four by name.
+    #
+    # The fourth one is #159's fix. A review blocks a merge here by converting the PR to a DRAFT, and the
+    # reviewer clears the block by marking it ready for review (CLAUDE.md, review-gate.yml) — a transition
+    # that is not in GitHub's default list. So the protocol's own happy path (block, draft, author fixes,
+    # reviewer clears, merge) ended on whatever run last happened, however old. On #150 that was a tick from
+    # 03:31Z read at 12:37Z: nine hours and four merges of `main` later, one of which (#155) had rewritten
+    # the very e2e helpers that PR's new guard rail called. The tick was green about a tree nobody was
+    # proposing to merge, and the reviewing run merged while saying it was waiting for a re-run that could
+    # not arrive. A stale tick is absence wearing a green tick.
+    # Subscribing fixes it because a pull_request run tests `refs/pull/N/merge` — the head merged with `main`
+    # AS OF THE RUN — so re-running the moment the block is cleared is evidence about the tree that lands.
+    #
+    # Cost, measured 2026-09-10, because #119 is watching this number: 17 undraft events in the 4.2 days to
+    # 09-10 (~29/week, or ~18/week once PR #95's six block/clear cycles are set aside as the outlier they
+    # are), against a pull-request run that costs ~4.0 min of wall clock now that #141 has landed — the four
+    # most recent were 4.45, 4.0, 3.7 and 4.1 min. That is ~70-115 min/week, about a fifth of the ~600
+    # min/week #141 itself just saved, and it is paid ONLY on pull requests a reviewer actually blocked.
+    # The concurrency group below absorbs the overlap rather than adding to it: an undraft arriving while a
+    # `synchronize` run for the same pull request is still going cancels that run instead of queueing beside
+    # it. Draft pull requests already run CI on `opened` and `synchronize` — GitHub does not skip drafts —
+    # so this adds one run per block cleared, not a run per draft.
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore: ['**.md', 'docs/**', '.claude/**', '.gitignore']
   schedule:
     - cron: '20 3 * * *'      # 03:20 UTC: the nightly full run against main

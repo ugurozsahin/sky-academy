@@ -688,4 +688,48 @@ describe('guard rails', () => {
     // and the step must stay off the push-to-main run, which is what makes the nightly the only full check
     expect(yml, 'the e2e step stays off the push run').toMatch(/if:\s*github\.event_name\s*!=\s*'push'/);
   });
+
+  // Incident 2026-09-10 (#159): `on: pull_request` carried no `types:` list at all, so GitHub applied its
+  // default — [opened, synchronize, reopened] — and `ready_for_review` is not in it. Undrafting is exactly
+  // how a reviewer CLEARS a block here (CLAUDE.md, review-gate.yml), so the last step of the review protocol
+  // fired no CI: #150 merged at 12:37Z on a tick from 03:31Z, four merges of `main` behind, one of which
+  // (#155) had rewritten the e2e helpers that PR's own new rail called. The reviewing run merged while
+  // saying it was waiting for a re-run that could not arrive. A stale tick is absence wearing a green tick,
+  // which is the same defect as reading a missing `review-gate` status as a pass.
+  //
+  // Two ways this regresses, and the rail names both because they look nothing alike:
+  //   - `ready_for_review` is dropped, or the whole `types:` line is deleted as redundant clutter — a tidy-up
+  //     that silently restores the default trio and puts the hole straight back;
+  //   - one of the three defaults is lost while editing the line, because an explicit `types:` REPLACES the
+  //     default rather than extending it. Losing `synchronize` would mean a push to a PR tests nothing.
+  // Comments are stripped first: ci.yml's own trigger note explains all four events at length, and a rail
+  // that reads its own prose passes with the line it guards deleted — the #129 failure, exactly.
+  it('CI re-runs when a blocked PR is undrafted, and still on the default three (#159)', () => {
+    const yml = workflow('ci.yml');
+    expect(yml.length, 'ci.yml must be read from disk, not a blank import').toBeGreaterThan(500);
+    const lines = yml.split('\n').filter(l => !l.trim().startsWith('#'));
+    const from = lines.findIndex(l => l.startsWith('on:'));
+    const to = lines.findIndex(l => l.startsWith('jobs:'));
+    expect(from, 'ci.yml must have an `on:` block').toBeGreaterThan(-1);
+    expect(to, 'ci.yml must have a `jobs:` block after it').toBeGreaterThan(from);
+    // Only the pull_request sub-block, so a `types:` belonging to `push` or a future trigger cannot answer
+    // for it — the bug was specific to which pull-request events CI subscribes to.
+    const on = lines.slice(from, to);
+    const at = on.findIndex(l => l.trim().startsWith('pull_request:'));
+    expect(at, 'ci.yml must still trigger on pull_request').toBeGreaterThan(-1);
+    const rest = on.slice(at + 1);
+    const end = rest.findIndex(l => /^ {0,2}\S/.test(l));            // the next key at pull_request's indent
+    const block = rest.slice(0, end === -1 ? rest.length : end).join('\n');
+
+    // Both YAML spellings, so reformatting the list is not a false red: `types: [a, b]` and a block sequence.
+    const flow = block.match(/types:\s*\[([^\]]*)\]/);
+    const seq = block.match(/types:[^\S\n]*\n((?:[^\S\n]*-[^\S\n]*\w+[^\S\n]*\n?)+)/);
+    const types = (flow ? flow[1].split(',') : (seq?.[1] ?? '').split('\n').map(l => l.replace(/^\s*-\s*/, '')))
+      .map(t => t.trim()).filter(Boolean);
+    expect(types.length, 'with no explicit `types:` GitHub applies [opened, synchronize, reopened] and ' +
+      'clearing a review block runs nothing (#159)').toBeGreaterThan(0);
+    // Membership of the parsed list, never a substring of it: `includes('opened')` is true of `reopened` too.
+    for (const t of ['opened', 'synchronize', 'reopened', 'ready_for_review'])
+      expect({ trigger: t, subscribed: types.includes(t) }).toEqual({ trigger: t, subscribed: true });
+  });
 });
