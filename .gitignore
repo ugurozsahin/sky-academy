@@ -6,3 +6,7 @@ playwright-report
 _to_delete
 Claude outputs
 _artifact_*.bundle
+
+# Signing keys: never commit (the debug key lives in .android/, see .android/README.md)
+*.keystore
+*.jks
