@@ -621,6 +621,53 @@ test.describe('Sky Ninja Academy', () => {
     expect(leaked).toEqual({ advanced: 0, sna: 'undefined' });   // no ticking loop, and the dead hooks are gone
   });
 
+  // #30: `.qcard` blurred the live arena through itself (`backdrop-filter: blur(8px)`). A backdrop filter over
+  // a moving canvas is re-filtered every frame and the compositor can cache none of it — this branch measured
+  // 43.0 → 46.7 fps on mobile under 6× CPU throttling, the earlier run on #30 got 49.0 → 54.8 on another
+  // machine. So the card drops the filter in play AND takes an opaque-ish background, and the rail pins both:
+  // the blur was hiding real ink. `topInset` bounds bubble apex only, so `floatText` (the score float on every
+  // correct answer) finishes ~20 px inside the card, and through a 22 %-transparent panel with no blur it
+  // reads as a sharp `+10` over the question text. Drop the opacity and the bleed-through comes back with
+  // nothing failing, which is exactly what a rail is for.
+  // Here rather than in `guardrails.test.ts` because Vitest cannot read CSS text (Vite's css plugin returns ''
+  // for `?raw` outside the browser), so a unit rail for it would pass vacuously; computed style in a real
+  // browser is the only honest way to ask. The filter half checks *overlap with the canvas*, not the one
+  // selector, so re-adding the blur under any new name — or on a new layer over the arena — still goes red.
+  // Sampled mid-play on purpose: the pause/results `.overlay` keeps its blur and is measured at zero size
+  // while hidden. That is not a hole — the arena stops rendering behind it (#31), so nothing re-filters.
+  test('guard rail: nothing blurs its backdrop over the live arena (#30)', async ({ page }) => {
+    await pickAvatar(page);
+    await startTopic(page, 'reception', 'r-onemore');
+    await page.waitForFunction(() => window.__sna?.bubbles().length > 0);
+    const found = await page.evaluate(() => {
+      const canvas = document.querySelector('#arena');
+      if (!canvas) return { canvas: false, card: false, blurred: ['#arena is missing'] };
+      const a = canvas.getBoundingClientRect();
+      const over = (r: DOMRect) => r.width > 0 && r.height > 0
+        && r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top;
+      // Any filter function, not just blur: `saturate()` over the canvas costs the same re-filter per frame.
+      const FILTERS = /blur|saturate|brightness|contrast|invert|grayscale|sepia|hue-rotate|drop-shadow|opacity/;
+      const blurred: string[] = [];
+      for (const el of document.querySelectorAll<HTMLElement>('*')) {
+        const s = getComputedStyle(el) as CSSStyleDeclaration & { webkitBackdropFilter?: string };
+        const bf = [s.backdropFilter, s.webkitBackdropFilter].filter(v => v && v !== 'none').join(' ');
+        if (FILTERS.test(bf) && over(el.getBoundingClientRect()))
+          blurred.push(`${el.id || el.className || el.tagName}: ${bf}`);
+      }
+      // The panel's own alpha is the other half: with no blur it is all that hides the score float.
+      const card = document.querySelector('.play .qcard');
+      const bg = card ? getComputedStyle(card).backgroundColor : '';
+      const alpha = /rgba?\([^)]*?,\s*([\d.]+)\s*\)/.exec(bg);
+      return { canvas: true, card: !!card, cardAlpha: alpha ? +alpha[1] : (bg ? 1 : 0), blurred };
+    });
+    expect(found.canvas, 'the arena canvas must be on screen, or this rail proves nothing').toBe(true);
+    expect(found.card, 'the question card must be on screen, or this rail proves nothing').toBe(true);
+    expect(found.blurred).toEqual([]);        // no backdrop filter over the arena — see #30 for the measurement
+    // Not a budget: the floor is what keeps `floatText` from reading through the card now the blur is gone.
+    expect(found.cardAlpha, 'the play question card must stay opaque-ish (#30): with no blur, its alpha is the '
+      + 'only thing hiding the score float that finishes inside it').toBeGreaterThanOrEqual(0.9);
+  });
+
   // #32: the suite runs at 4× (the beforeEach above), which compresses the outcome holds. This one test forces
   // speed 1 and asserts the holds are the curriculum values the owner asked for (correct 1000, wrong 1800,
   // miss 1500). Without it the fast suite verifies nothing about the holds, and the day someone changes a

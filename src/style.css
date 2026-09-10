@@ -517,6 +517,28 @@ img { -webkit-user-drag: none; }
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+/* ...but never in play, where the card sits over the arena canvas: a backdrop filter over a repainting canvas
+   is re-filtered every frame and the compositor can cache none of it. Two rules, and the second is not
+   optional — see review issue #30.
+   Measured under 6× CPU throttling on mobile, ABBA-ordered to cancel the arena's own drift: this branch got
+   43.0 → 46.7 fps (+8.6 %); the earlier measurement on #30, on a different machine, got 49.0 → 54.8
+   (+11.8 %). Both are noisy in the busy early samples and both agree once play quietens, because everything
+   then sits on the 60 fps vsync ceiling — which is why the first, unthrottled measurement called it noise.
+   The opaque-ish background replaces what the blur was actually doing. `topInset` bounds bubble *apex* only
+   (`arena.ts:113`); it does not stop the canvas painting there. `floatText` — the score float on every
+   correct answer (`play.ts:125`) and every sliced letter (`play.ts:145`) — starts at `topInset + 40` and
+   rises 66 px with zero gravity for `kind: 'text'`, finishing ~20 px INSIDE the card; slice-burst particles
+   reach ~210 px above their bubble. Against a 22 %-transparent panel that read through as a sharp `+10` over
+   the question text once the blur went. At .93 it does not. Measured on a frozen frame with the float behind
+   the card, against the blurred original: keeping `--panel` leaves a max local delta of 187/255 (the legible
+   float); .93 takes the card's mean delta to 3.35/255 with the float suppressed. A uniformly slightly darker
+   card, no bleed-through, and the whole frame-rate win.
+   Only `.play` is scoped: `.memory`'s card head and the overlay/certificate rules below blur static DOM. */
+.play .qcard {
+  background: rgba(16, 22, 48, .93);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 .qcard { cursor: pointer; }                                   /* tap anywhere on the card = hear the question again */
 .qcard.pulse { animation: qpulse .45s ease-out; }
 /* outcome beat: the card turns green/red, the answer is filled in, the hint says why */
