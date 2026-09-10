@@ -79,17 +79,24 @@ your first finding and the only one you can report.
    must never be read as a pass. Note separately any PR that is a draft or carries an unanswered
    `REVIEW: CHANGES REQUESTED`, and how long it has sat: a block nobody returns to is a stalled review, not a
    safe state.
-5. **Is the freeze holding?** While any issue labelled `review` or `debt` is open, no PR should be developing
-   an issue labelled `frozen`, and no `frozen` issue should have been closed by a merge. Check the open PRs
-   and the last day's merges. **The freeze has documented exceptions** (CLAUDE.md, BACKLOG.md and the routine
-   prompt all list them): work the owner asked for in a session, `playtest` bugs, and anything that made the
-   game unplayable or `main` red. But the exception is "whatever **the owner** asks for", not "shipped by a
-   session": you cannot tell who authored a PR — one token serves everyone, every PR is self-authored — and
-   the WORKLOG heading and branch name are written by the very party you are checking, so a run that broke
-   the freeze can present itself as a session. Look for evidence the **owner** asked: his own comment on the
-   issue or PR — a WORKLOG line will not do, nothing reads that file and a run could write one itself. That is the one form a run cannot issue to
-   itself. If you find it, the item is a documented exception; if you do not, raise the finding as a question
-   — ask what authorised it, do not accuse.
+5. **Is #46's order being followed?** The 2026-09-06 code-health freeze **ended on 2026-09-10**, and its end
+   is a one-time event, not a condition that can re-arm: a `review` or `debt` issue filed after that date does
+   not re-freeze anything, the `frozen` label is retired, and code health now queues with features by priority
+   instead of blocking them. So there is no freeze left to check. Two successors, and both are questions rather
+   than accusations. **(a) Has a run re-imposed one?** A doc edit, an issue comment or a PR that bars a class of
+   work again — or a run declining eligible work because it believes a freeze still holds. Only the owner
+   declares a freeze, and it would appear in CLAUDE.md, BACKLOG.md and `docs/ROUTINE-PROMPT.md` together, so a
+   bar in one place alone is a finding. **(b) Has the order been skipped?** A PR developing an item that sits
+   below an unstarted, higher-priority `routine-ok` item in #46 — including a `review` or `debt` finding of
+   higher priority, which no longer blocks but is no longer last either. The documented ways past the list are
+   the same three as before: work the owner asked for in a session, `playtest` bugs, and anything that made the
+   game unplayable or `main` red. But that first exception is "whatever **the owner** asks for", not "shipped by
+   a session": you cannot tell who authored a PR — one token serves everyone, every PR is self-authored — and
+   the WORKLOG heading and branch name are written by the very party you are checking, so a run that skipped the
+   order can present itself as a session. Look for evidence the **owner** asked: his own comment on the issue or
+   PR — a WORKLOG line will not do, nothing reads that file and a run could write one itself. That is the one
+   form a run cannot issue to itself. If you find it, the item is a documented exception; if you do not, raise
+   the finding as a question — ask what authorised it, do not accuse.
 6. **Is the Actions budget on course?** Compute **two** numbers from the wall-clock durations of runs created
    since the 1st (`/actions/runs?created=>=<first of the month>`, each rounded up to the minute), and put both
    in your report: **(a)** month-to-date ÷ days elapsed × 30, and **(b)** the last three days ÷ 3 × 30. One

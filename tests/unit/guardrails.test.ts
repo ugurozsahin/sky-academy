@@ -789,3 +789,36 @@ describe('guard rails', () => {
       expect({ trigger: t, subscribed: types.includes(t) }).toEqual({ trigger: t, subscribed: true });
   });
 });
+
+/**
+ * The owner's code-health freeze (2026-09-06) ended on 2026-09-10, once every `review`/`debt` issue the
+ * 6 September review produced was closed. It was worded as a *condition* — "while any issue labelled
+ * `review` or `debt` is open" — which the process kept re-arming every time a run filed a new finding about
+ * itself, so the wording that replaces it has to say in as many words that the lift is one-time. That
+ * sentence is the load-bearing one: without it the next `review` issue re-freezes the repo by reading.
+ *
+ * The three files each speak to a different reader — CLAUDE.md to an interactive session, BACKLOG.md to
+ * whoever looks up the labels, docs/ROUTINE-PROMPT.md to the routine itself — and CLAUDE.md says they change
+ * together. A rail is why a future edit cannot drop the lift from two of them and leave one run in 2026-09-06.
+ * (Reinstating a freeze is the owner's to declare, and would rewrite all three of these files at once — this
+ * rail going red on such a change is it working, not it objecting.)
+ */
+describe('the code-health freeze is over, in all three process files (2026-09-10)', () => {
+  const doc = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
+  const FILES = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'];
+
+  it.each(FILES)('%s records the lift, and that it cannot re-arm', (name) => {
+    const text = doc(name);
+    expect(text.length, 'a vacuous rail is worse than none').toBeGreaterThan(500);
+    expect(text, 'the file must say the freeze is over').toMatch(/the code-health freeze is over/i);
+    expect(text, 'and that a new review/debt issue does not re-freeze the repo')
+      .toMatch(/one-time event, not a condition that can re-arm/i);
+    expect(text, "and point at the owner's ordered list, which replaces it").toMatch(/#46/);
+  });
+
+  // The old rule, verbatim in the present tense, is what a run would act on if an edit put it back in one
+  // file only. Quoting it in the past tense ("was open") is how all three describe the history.
+  it.each(FILES)('%s does not still state the freeze as a live rule', (name) => {
+    expect(doc(name)).not.toMatch(/feature work while any issue labelled `review` or `debt` is open/i);
+  });
+});
