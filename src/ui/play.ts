@@ -11,7 +11,7 @@ import { equippedItem } from '../game/shop';
 import { haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { screenScope, stickersHTML } from './screen';
-import { createHud } from './hud';
+import { createHud, stageHTML, type Outcome } from './hud';
 import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
 import { resultMedal, resultHeading } from './results';
 import { renderVisual } from './visuals';
@@ -54,7 +54,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   </section>`, 'bg-play');
 
   const els = { lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'), overlay: $('#overlay'), qcard: $('#qcard') };
-  let lastOutcome: 'correct' | 'wrong' | 'miss' | 'none' = 'none';
+  let lastOutcome: Outcome | 'none' = 'none';
   let arena: Arena | null = null; let tracer: Tracer | null = null; let lastResult: SessionResult | null = null;
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
   const { later, toast } = scope;
@@ -73,11 +73,28 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   function drawStage(stage: number, index: number, total: number) {
     if (o.mode !== 'mission') { els.stage.textContent = `Q${session.questionsAsked}`; return; }
     if (stage !== segStage) { segStage = stage; segs = Array.from({ length: total }, () => ''); }
-    const name = STAGE_NAMES[stage - 1] ?? `Stage ${stage}`;
-    els.stage.innerHTML = `<span class="sname">${esc(name)}</span><span class="segs" role="progressbar" aria-label="${esc(name)}: question ${index + 1} of ${total}" aria-valuenow="${index + 1}" aria-valuemin="1" aria-valuemax="${total}">${segs.map((k, i) => `<i class="${k}${i === index ? ' cur' : ''}"></i>`).join('')}</span><small class="q" aria-hidden="true">${index + 1}/${total}</small>`;
+    els.stage.innerHTML = stageHTML(STAGE_NAMES[stage - 1] ?? `Stage ${stage}`, segs, index, total);
   }
   const markSeg = (k: 'good' | 'bad') => { if (o.mode === 'mission') { segs[session.index] = k; drawStage(session.stage, session.index, session.perStage); } };
   const endWave = (hold: number) => { const id = waveId; revealUntil = performance.now() + hold; later(() => { if (waveId === id) arena?.clearWave('#ffffff'); }, hold); };
+
+  // #36: onCorrect/onWrong/onMiss each carried a copy of the same closing beat — remember the outcome, mark
+  // the mission segment, spotlight the answer under the card, freeze the wave for the hold — and differed
+  // only in the rules below, so a fourth outcome is now a row rather than a fourth copy of the body.
+  // `advance` is the no-arena (tracing) fallback; 0 is the miss path, where the session has already moved on.
+  const OUTCOME = {
+    correct: { seg: 'good', taunt: false, hold: HOLD.correct, advance: 900 },
+    wrong: { seg: 'bad', taunt: true, hold: HOLD.wrong, advance: 1200 },
+    miss: { seg: 'bad', taunt: true, hold: HOLD.miss, advance: 0 },
+  } as const;
+  /** The beat every outcome shares. `reveal` is what the arena spotlights: the right answer, and the wrong bubble if one was cut. */
+  function settle(kind: Outcome, q: Question, reveal: { good: string; bad?: string }) {
+    const rule = OUTCOME[kind];
+    lastOutcome = kind; markSeg(rule.seg);
+    if (rule.taunt) showTaunt();
+    if (!arena) { if (rule.advance) later(() => session.advance(), rule.advance); return; }
+    arena.reveal(reveal); showOutcome(kind, q); endWave(scaled(rule.hold));
+  }
 
   const session = new Session({
     mode: o.mode, year: o.year, topic: o.topic,
@@ -118,24 +135,19 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       }
     },
     onCorrect(q, points, combo) {
-      lastOutcome = 'correct'; sfx.correct(); els.score.textContent = String(session.score); markSeg('good');
+      sfx.correct(); els.score.textContent = String(session.score);
       const c = cheerLine(av); toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', scaled(HOLD.correct) + 300);
-      if (arena) {
-        arena.reveal({ good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer });
-        arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, av.glow);
-        showOutcome('correct', q); endWave(scaled(HOLD.correct));
-      }
-      else later(() => session.advance(), 900);
+      if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, av.glow);
+      // a finished sequence spotlights its last letter; everything else spotlights the answer itself
+      settle('correct', q, { good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer });
     },
     onWrong(q, hit) {
-      lastOutcome = 'wrong'; sfx.wrong(); haptic('wrong'); markSeg('bad');
-      toast('Not quite!', 'bad', scaled(HOLD.wrong)); showTaunt();
-      if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer, bad: hit }); showOutcome('wrong', q); endWave(scaled(HOLD.wrong)); }
-      else later(() => session.advance(), 1200);
+      sfx.wrong(); haptic('wrong'); toast('Not quite!', 'bad', scaled(HOLD.wrong));
+      settle('wrong', q, { good: q.sequence ? q.sequence[session.seqIndex] : q.answer, bad: hit });
     },
     onMiss(q) {
-      lastOutcome = 'miss'; sfx.miss(); toast('Missed!', 'bad', scaled(HOLD.miss)); showTaunt(); markSeg('bad');
-      if (arena) { arena.reveal({ good: q.sequence ? q.sequence[session.seqIndex] : q.answer }); showOutcome('miss', q); endWave(scaled(HOLD.miss)); }
+      sfx.miss(); toast('Missed!', 'bad', scaled(HOLD.miss));
+      settle('miss', q, { good: q.sequence ? q.sequence[session.seqIndex] : q.answer });
     },
     onProgress(label, done, total) {
       sfx.slice();

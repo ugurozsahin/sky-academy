@@ -287,13 +287,41 @@ describe('guard rails', () => {
   // #36: play.ts was one long closure with ~30 lines over 180 chars; every Edit had to reproduce those
   // lines verbatim (token cost). The three overlay templates moved to overlays.ts (byte-identical HTML),
   // then the HUD writers (drawLives/Timer/Hp, showOutcome) to hud.ts, then the remaining multi-statement,
-  // object-literal and nested-ternary one-liners were wrapped (24→5). The 5 that remain are the arena/HUD
-  // markup template literals, where a newline would change the emitted HTML — the irreducible floor here.
-  // This *budget* records what is left and only ever ratchets DOWN as the rest of #36 lands (the
-  // session-callback object). Never raise it to go green.
+  // object-literal and nested-ternary one-liners were wrapped (24→5), and then the stage pill's 393-char
+  // innerHTML — the longest line in the file, and the only one of those 5 outside a render() template —
+  // moved to hud.ts as the pure `stageHTML` builder (5→4). The 4 that remain are the arena/HUD markup
+  // template literals inside render(), where a newline would change the emitted HTML — the irreducible
+  // floor here. This *budget* records what is left and only ever ratchets DOWN as the rest of #36 lands.
+  // Never raise it to go green.
   it('play.ts long lines keep shrinking (#36 budget)', () => {
     const over = SOURCES['/src/ui/play.ts'].split('\n').filter(l => l.length > 180).length;
-    expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(5);
+    expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(4);
+  });
+
+  // #36: the session's three outcome callbacks (onCorrect/onWrong/onMiss) each carried their own copy of the
+  // same closing beat — mark the mission segment, spotlight the answer under the card, freeze the wave for
+  // the hold — differing only in a sound, a toast and a hold. They now share one `settle()` driven by the
+  // OUTCOME table, the same shape as the MODES rail above. A fourth outcome, or a "just this once" copy of
+  // the beat back into a callback, is exactly how the triplication grew the first time and nothing else
+  // would fail: the game would still play, three near-identical bodies would drift apart quietly. Each of
+  // these calls therefore has exactly ONE site in play.ts, inside settle().
+  it('the outcome beat is one settle() path, not a copy per callback (#36)', () => {
+    const play = code(SOURCES['/src/ui/play.ts'] ?? '');
+    expect(play.length, 'play.ts must be read, not a blank import').toBeGreaterThan(1000);
+    for (const call of ['showOutcome(', 'endWave(scaled(', 'arena.reveal(', 'markSeg(']) {
+      const n = play.split(call).length - 1;
+      expect(n, `${call} belongs to settle() alone — put a new outcome in the OUTCOME table`).toBe(1);
+    }
+    for (const kind of ['correct', 'wrong', 'miss']) expect(play).toContain(`${kind}: { seg:`);
+  });
+
+  // #36, the same shape as the YearId rail above: `'correct' | 'wrong' | 'miss'` was written out in three
+  // places (play.ts's lastOutcome, hud.ts's outcomeHintHTML and showOutcome), so a fourth outcome meant
+  // finding all of them. It is `Outcome` in hud.ts now, and every other spelling derives from it.
+  it('the outcome union is defined once (Outcome), not retyped (#36)', () => {
+    const union = /'correct'\s*\|\s*'wrong'\s*\|\s*'miss'/g;
+    const hits = Object.entries(SOURCES).flatMap(([f, s]) => [...code(s).matchAll(union)].map(() => f));
+    expect(hits).toEqual(['/src/ui/hud.ts']);
   });
 
   // #36: home.ts (topbar/dojoCard/mapScreen/islandScreen/rewardsScreen) carried the same long-line token

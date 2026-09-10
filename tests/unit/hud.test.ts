@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { livesHTML, outcomeHintHTML } from '../../src/ui/hud';
+import { livesHTML, outcomeHintHTML, stageHTML } from '../../src/ui/hud';
 
 const plain = (s: string) => s.replace(/<[^>]+>/g, '');
 
@@ -14,6 +14,41 @@ describe('livesHTML (#36 — the play HUD lives row)', () => {
   it('renders exactly `total` hearts regardless of n', () => {
     expect(livesHTML(5, 5).match(/❤️/g)).toHaveLength(5);
     expect(livesHTML(1, 5).match(/❤️/g)).toHaveLength(5);
+  });
+});
+
+// #36: this markup was a 393-character `els.stage.innerHTML = ...` inside playScreen(), the longest line in
+// play.ts and the only one over 180 chars that was not a render() template. It is a pure builder now, so the
+// mission progress bar a grown-up reads over the child's shoulder — and its screen-reader labels — are
+// checked here rather than only through the e2e spec.
+describe('stageHTML (#36 — the mission stage pill)', () => {
+  const segs = ['good', 'bad', ''] as const;
+
+  it('names the stage and counts the question for a sighted reader', () => {
+    const h = stageHTML('Warm-up', segs, 2, 3);
+    expect(h).toContain('<span class="sname">Warm-up</span>');
+    expect(h).toContain('<small class="q" aria-hidden="true">3/3</small>');
+  });
+  it('marks the segments won, slipped and still to come, and pulses only the current one', () => {
+    expect(stageHTML('S', segs, 2, 3)).toContain('<i class="good"></i><i class="bad"></i><i class=" cur"></i>');
+    expect(stageHTML('S', segs, 0, 3)).toContain('<i class="good cur"></i><i class="bad"></i><i class=""></i>');
+  });
+  it('carries a progressbar a screen reader can announce', () => {
+    const h = stageHTML('Sprint finish', segs, 1, 3);
+    expect(h).toContain('role="progressbar"');
+    expect(h).toContain('aria-label="Sprint finish: question 2 of 3"');
+    expect(h).toContain('aria-valuenow="2"');
+    expect(h).toContain('aria-valuemin="1"');
+    expect(h).toContain('aria-valuemax="3"');
+  });
+  it('renders one segment per entry, and never marks a segment outside the stage', () => {
+    expect(stageHTML('S', ['', '', '', ''], 9, 4).match(/<i /g)).toHaveLength(4);
+    expect(stageHTML('S', ['', '', '', ''], 9, 4)).not.toContain('cur');
+  });
+  it('escapes HTML in the stage name, in the label as well as the text', () => {
+    const h = stageHTML('Ninjas <b>& stars</b>', segs, 0, 3);
+    expect(h).not.toContain('<b>');
+    expect(h.match(/&lt;b&gt;/g)).toHaveLength(2);            // once in .sname, once in the aria-label
   });
 });
 
