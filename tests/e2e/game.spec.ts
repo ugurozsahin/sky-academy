@@ -39,6 +39,16 @@ async function seedPlayer(page: Page, id = 'volt', name = 'Ada', extra: Record<s
   await page.goto('/');
   await expect(page.locator('.home')).toBeVisible();
 }
+/** Open the grown-ups dashboard from the map, answering the maths gate with the product it asks for. */
+async function openGrownUps(page: Page) {
+  await page.click('#grownups');
+  await expect(page.locator('.parents .gate')).toBeVisible();
+  const q = await page.locator('#gate-q').textContent();          // e.g. "6 × 8"
+  const [a, b] = q!.split('×').map(s => parseInt(s.trim(), 10));
+  await page.fill('#gate-input', String(a * b));
+  await page.click('#gate-go');
+  await expect(page.locator('.parents-dash')).toBeVisible();
+}
 async function startTopic(page: Page, year: string, topic: string) {
   if (await page.locator('.island-screen').count()) await page.click('#back');
   await page.click(`.island[data-year="${year}"]`);
@@ -985,5 +995,37 @@ test.describe('Sky Ninja Academy', () => {
     // back returns to the sky map
     await page.click('#back');
     await expect(page.locator('.map')).toBeVisible();
+  });
+
+  // #64: reinstalling the APK wipes localStorage, so the grown-up needs a way to carry the save across.
+  test('For grown-ups: the save code copies out and restores back (#64)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+
+    // the code is the save, and it carries the version that makes it recognisable
+    const code = await page.inputValue('#save-code');
+    const parsed = JSON.parse(code);
+    expect(parsed.v).toBe(1);
+    expect(parsed.name).toBe('Ada');
+
+    // a stray paste is refused, and nothing on the device changes
+    await page.fill('#restore-code', 'shopping list');
+    await page.click('#restore-go');                                  // first tap only warns
+    await expect(page.locator('#move-msg')).toHaveClass(/bad/);
+    await page.click('#restore-go');
+    await expect(page.locator('#move-msg')).toContainText('not a Sky Ninja Academy save');
+    await expect(page.locator('.isl-head b')).toContainText('Grown-ups dashboard');
+    expect(await page.inputValue('#save-code')).toBe(code);           // the save is untouched
+
+    // a real code from "the other device" lands, and the dashboard redraws from it
+    const other = JSON.stringify({ ...parsed, name: 'Rye', coins: 456 });
+    await page.fill('#restore-code', other);
+    await page.click('#restore-go');
+    await expect(page.locator('#move-msg')).toContainText('Tap Restore again');   // never on one tap
+    await page.click('#restore-go');
+    await expect(page.locator('#move-msg')).toContainText('Restored');
+    await expect(page.locator('.p-extra')).toContainText('456 coins');
+    await expect(page.locator('.isl-head small')).toContainText('Rye');
+    expect(JSON.parse(await page.inputValue('#save-code')).coins).toBe(456);
   });
 });

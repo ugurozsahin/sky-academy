@@ -1,5 +1,5 @@
 import { TOPICS, YEARS } from '../curriculum';
-import { load, STICKER_IDS } from '../storage';
+import { exportSave, importSave, load, STICKER_IDS } from '../storage';
 import { sfx } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
 import { $, esc, render } from './dom';
@@ -51,7 +51,63 @@ function dashHtml(sm: ParentSummary): string {
       <tbody>${modeRows}</tbody>
     </table></div>
 
-    <p class="p-note">Read-only summary from this device. Nothing is uploaded and there are no accounts. (Time-on-task isn't recorded yet.)</p>`;
+    <h3 class="p-h">Move to another device</h3>
+    <div class="p-move">
+      <p class="p-move-say">Reinstalling the app clears everything saved on this device. Copy this code first, then paste it into <b>Restore</b> on the other device (or on this one after reinstalling).</p>
+      <textarea class="p-code" id="save-code" rows="3" readonly aria-label="Your save code"></textarea>
+      <button class="btn" id="copy-code">Copy the code</button>
+      <textarea class="p-code" id="restore-code" rows="3" placeholder="Paste a code here to restore" aria-label="Paste a save code to restore"></textarea>
+      <button class="btn" id="restore-go">Restore</button>
+      <p class="p-move-msg" id="move-msg" role="status" hidden></p>
+    </div>
+
+    <p class="p-note">Everything above is read from this device, and the code never leaves it — nothing is uploaded and there are no accounts. (Time-on-task isn't recorded yet.)</p>`;
+}
+
+/**
+ * "Move to another device" (#64): show the save code, copy it, and restore one.
+ *
+ * Restoring replaces everything on the device, so it takes two taps — the first only warns. `redraw` re-runs
+ * the dashboard once a restore lands, because every number on the screen came from the save that was just
+ * replaced. The clipboard write can be refused (an insecure origin, a browser that withholds it), and that is
+ * not a failure worth a scary message: the text is selected instead so the grown-up can copy it by hand.
+ */
+function wireMove(redraw: () => void) {
+  const code = $<HTMLTextAreaElement>('#save-code');
+  const paste = $<HTMLTextAreaElement>('#restore-code');
+  const msg = $('#move-msg');
+  code.value = exportSave();
+
+  const say = (text: string, bad = false) => {
+    msg.textContent = text;
+    msg.classList.toggle('bad', bad);
+    msg.hidden = false;
+  };
+
+  const byHand = 'Select the code above and copy it by hand — this browser will not do it for us.';
+  $('#copy-code').addEventListener('click', () => {
+    sfx.tap();
+    code.select();
+    const written = navigator.clipboard?.writeText(code.value);
+    if (!written) { say(byHand); return; }
+    written.then(() => say('Copied. Paste it into Restore on the other device.')).catch(() => say(byHand));
+  });
+
+  let armed = false;
+  $('#restore-go').addEventListener('click', () => {
+    sfx.tap();
+    if (!paste.value.trim()) { armed = false; say('Paste a code into the box above first.', true); return; }
+    if (!armed) { armed = true; say('This replaces all the progress on this device. Tap Restore again to go ahead.', true); return; }
+    armed = false;
+    if (!importSave(paste.value.trim())) { say('That code is not a Sky Ninja Academy save.', true); return; }
+    sfx.correct();
+    redraw();
+    // `msg` belongs to the dashboard that redraw() just threw away, so the confirmation goes on the new one.
+    const fresh = $('#move-msg');
+    fresh.textContent = 'Restored — the progress below came from that code.';
+    fresh.classList.remove('bad');
+    fresh.hidden = false;
+  });
 }
 
 /** For grown-ups: a quick maths gate, then a read-only progress dashboard. */
@@ -88,6 +144,7 @@ export function parentsScreen(nav: Nav) {
       <div class="parents-dash">${dashHtml(sm)}</div>
     </section>`, 'bg-sky');
     $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
+    wireMove(() => drawDash());
   };
 
   drawGate();
