@@ -11,10 +11,48 @@ export function scoreTrace(glyphHits: number[], glyphTotals: number[], insidePts
   return { coverage, outside, glyphs, weakest, pass: coverage >= WORD_MIN && outside <= OUTSIDE_MAX && glyphs.every(g => g >= GLYPH_MIN) };
 }
 
+/** The mask is built at half the canvas resolution, so a canvas point maps to `x * MASK_SCALE` in the grid. */
+export const MASK_SCALE = 0.5;
+/** The faint glyph the child is tracing over, and how much of it they have covered.
+ *  `mask[i]` is the letter index + 1 (0 = blank paper); `covered[i]` is 1 once a stroke has claimed that cell. */
+export interface TraceGrid { mask: Uint8Array; covered: Uint8Array; mw: number; mh: number }
+/** What the pixel accounting has counted so far: cells covered per letter, and points on / off the glyph. */
+export interface TraceTally { glyphHits: number[]; insidePts: number; outsidePts: number }
+/** A point in canvas coordinates. */
+export interface TracePt { x: number; y: number }
+
+/**
+ * Mark one painted point (canvas coordinates) against the glyph (#43). The brush scans a square of half-res
+ * cells around the point, but only claims the ones inside its disc — so a stroke that merely grazes the
+ * glyph counts as *on* it without covering it, which is what stops a scribble passing. Cells are claimed at
+ * most once each, so re-tracing a letter cannot inflate its coverage.
+ *
+ * Mutates `grid.covered` and `tally` in place, and touches nothing else — no canvas, no clock, no randomness.
+ */
+export function markPoint(grid: TraceGrid, tally: TraceTally, x: number, y: number, brush: number): void {
+  const cx = Math.round(x * MASK_SCALE), cy = Math.round(y * MASK_SCALE);
+  const r = Math.ceil(brush * MASK_SCALE), tol = r * 2;
+  let inside = false;
+  for (let dy = -tol; dy <= tol; dy++) for (let dx = -tol; dx <= tol; dx++) {
+    const px = cx + dx, py = cy + dy; if (px < 0 || py < 0 || px >= grid.mw || py >= grid.mh) continue;
+    const i = py * grid.mw + px;
+    if (grid.mask[i]) { inside = true; if (dx * dx + dy * dy <= r * r * 1.2 && !grid.covered[i]) { grid.covered[i] = 1; tally.glyphHits[grid.mask[i] - 1]++; } }
+  }
+  if (inside) tally.insidePts++; else tally.outsidePts++;
+}
+
+/** Paint one stroke segment, sampled about every 4px so a fast swipe leaves no gaps (#43). Both endpoints are
+ *  marked, so a segment of length L marks `ceil(L/4) + 1` points and a tap (`a` and `b` the same point) marks
+ *  its one point twice — it counts 2 towards the inside/outside ratio. Pure apart from `grid`/`tally`. */
+export function paintStroke(grid: TraceGrid, tally: TraceTally, a: TracePt, b: TracePt, brush: number): void {
+  const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
+  for (let i = 0; i <= steps; i++) markPoint(grid, tally, a.x + (b.x - a.x) * i / steps, a.y + (b.y - a.y) * i / steps, brush);
+}
+
 export class Tracer {
   private ctx: CanvasRenderingContext2D;
-  private mask!: Uint8Array; private covered!: Uint8Array; private mw = 0; private mh = 0; private outsidePts = 0; private insidePts = 0;
-  private glyphHits: number[] = []; private glyphTotals: number[] = [];   // mask[i] = letter index + 1
+  private grid!: TraceGrid; private tally!: TraceTally;
+  private glyphTotals: number[] = [];   // cells in each letter's mask; the denominator scoreTrace divides by
   private drawing = false; private last: { x: number; y: number } | null = null; private W = 0; private H = 0; private brush = 14;
   strokes = 0; done = false;
   constructor(public canvas: HTMLCanvasElement, public text: string, private onProgress: (r: TraceResult) => void, public color = '#7fe0ff') {
@@ -36,20 +74,22 @@ export class Tracer {
     while (this.ctx.measureText(this.text).width > this.W * 0.85 && size > 20) { size -= 4; this.ctx.font = this.font(size); }
     this.brush = Math.max(10, size * 0.09);
     // build mask at half resolution
-    const s = 0.5; this.mw = Math.ceil(this.W * s); this.mh = Math.ceil(this.H * s);
-    const off = document.createElement('canvas'); off.width = this.mw; off.height = this.mh;
+    const s = MASK_SCALE, mw = Math.ceil(this.W * s), mh = Math.ceil(this.H * s);
+    const off = document.createElement('canvas'); off.width = mw; off.height = mh;
     const oc = off.getContext('2d')!; oc.fillStyle = '#000'; oc.font = this.font(size * s); oc.textAlign = 'left'; oc.textBaseline = 'middle';
     // one letter at a time, so coverage is judged per letter (mask value = letter index + 1)
-    const chars = [...this.text]; const left = this.mw / 2 - oc.measureText(this.text).width / 2, y = this.mh / 2 + size * s * 0.05;
-    this.mask = new Uint8Array(this.mw * this.mh); this.covered = new Uint8Array(this.mw * this.mh);
-    this.glyphHits = chars.map(() => 0); this.glyphTotals = chars.map(() => 0);
+    const chars = [...this.text]; const left = mw / 2 - oc.measureText(this.text).width / 2, y = mh / 2 + size * s * 0.05;
+    const mask = new Uint8Array(mw * mh);
+    this.grid = { mask, covered: new Uint8Array(mw * mh), mw, mh };
+    this.glyphTotals = chars.map(() => 0);
     chars.forEach((ch, gi) => {
       if (ch === ' ') return;
-      oc.clearRect(0, 0, this.mw, this.mh); oc.fillText(ch, left + oc.measureText(this.text.slice(0, gi)).width, y);
-      const data = oc.getImageData(0, 0, this.mw, this.mh).data;
-      for (let i = 0; i < this.mask.length; i++) if (data[i * 4 + 3] > 100 && !this.mask[i]) { this.mask[i] = gi + 1; this.glyphTotals[gi]++; }
+      oc.clearRect(0, 0, mw, mh); oc.fillText(ch, left + oc.measureText(this.text.slice(0, gi)).width, y);
+      const data = oc.getImageData(0, 0, mw, mh).data;
+      for (let i = 0; i < mask.length; i++) if (data[i * 4 + 3] > 100 && !mask[i]) { mask[i] = gi + 1; this.glyphTotals[gi]++; }
     });
-    this.outsidePts = 0; this.insidePts = 0; this.strokes = 0; this.done = false;
+    this.tally = { glyphHits: chars.map(() => 0), insidePts: 0, outsidePts: 0 };
+    this.strokes = 0; this.done = false;
     this.redraw(size);
   }
   private redraw(size: number) {
@@ -72,23 +112,14 @@ export class Tracer {
     c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y);
     c.globalAlpha = 0.35; c.lineWidth = this.brush * 2 + 8; c.stroke();   // #29: soft halo underlay instead of shadowBlur
     c.globalAlpha = 1; c.lineWidth = this.brush * 2; c.stroke(); c.restore();
-    const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
-    for (let i = 0; i <= steps; i++) this.mark(a.x + (b.x - a.x) * i / steps, a.y + (b.y - a.y) * i / steps);
+    // #43: the pixel accounting is the pure paintStroke/markPoint above — all this method does is the drawing.
+    paintStroke(this.grid, this.tally, a, b, this.brush);
   }
-  private mark(x: number, y: number) {
-    const s = 0.5, cx = Math.round(x * s), cy = Math.round(y * s), r = Math.ceil(this.brush * s), tol = r * 2;
-    let inside = false;
-    for (let dy = -tol; dy <= tol; dy++) for (let dx = -tol; dx <= tol; dx++) {
-      const px = cx + dx, py = cy + dy; if (px < 0 || py < 0 || px >= this.mw || py >= this.mh) continue;
-      const i = py * this.mw + px;
-      if (this.mask[i]) { inside = true; if (dx * dx + dy * dy <= r * r * 1.2 && !this.covered[i]) { this.covered[i] = 1; this.glyphHits[this.mask[i] - 1]++; } }
-    }
-    if (inside) this.insidePts++; else this.outsidePts++;
-  }
-  result(): TraceResult { return scoreTrace(this.glyphHits, this.glyphTotals, this.insidePts, this.outsidePts); }
+  result(): TraceResult { return scoreTrace(this.tally.glyphHits, this.glyphTotals, this.tally.insidePts, this.tally.outsidePts); }
   /** Test hook: trace the glyph programmatically by painting over every mask pixel (optionally only some letters). */
   autoTrace(letters?: number[]) {
-    for (let y = 0; y < this.mh; y += 2) for (let x = 0; x < this.mw; x += 2) { const g = this.mask[y * this.mw + x]; if (g && (!letters || letters.includes(g - 1))) this.mark(x / 0.5, y / 0.5); }
+    const { mask, mw, mh } = this.grid;
+    for (let y = 0; y < mh; y += 2) for (let x = 0; x < mw; x += 2) { const g = mask[y * mw + x]; if (g && (!letters || letters.includes(g - 1))) markPoint(this.grid, this.tally, x / MASK_SCALE, y / MASK_SCALE, this.brush); }
     this.strokes++; const r = this.result(); if (r.pass) this.done = true; this.onProgress(r);
   }
 }

@@ -565,4 +565,28 @@ describe('guard rails', () => {
     expect(src.split('layoutWave(').length - 1, 'layoutWave has one call site: spawnWave').toBe(2);
     expect(src, 'spawnWave passes the speed multiplier, the clock and the RNG in').toContain('gameSpeed(), performance.now(), Math.random');
   });
+
+  // #43: the tracing pass/fail rule is what decides whether a child gets their letter accepted, and the half
+  // of it that counts pixels — which cells a stroke claims, and whether a point landed on the glyph at all —
+  // used to live inside Tracer, where testing it needed a real canvas and so nothing tested it. Keeping it as
+  // pure exports over a plain grid is the whole reason it now has unit tests; folding it back into the class
+  // would silently return the pass rule to e2e-only cover, which is how it went untested for so long.
+  it('the tracing pixel accounting stays canvas-free and unit-testable (#43)', () => {
+    const src = code(SOURCES['/src/game/tracing.ts'] ?? '');
+    expect(src.length, 'tracing.ts must be read, not a blank import').toBeGreaterThan(1000);
+    for (const fn of ['markPoint', 'paintStroke']) {
+      const start = src.indexOf(`export function ${fn}(`);
+      expect(start, `${fn} must stay an exported, unit-testable function`).toBeGreaterThan(-1);
+      const next = src.indexOf('\nexport ', start + 1);
+      const body = src.slice(start, next === -1 ? src.length : next);
+      // a canvas, a DOM node or a pointer event in here and the accounting is untestable again
+      for (const reach of ['getContext', 'document.', 'this.', 'PointerEvent', 'getImageData'])
+        expect(body, `${fn} must stay pure: no ${reach}`).not.toContain(reach);
+    }
+    // and the class must actually go through them, rather than keeping a second copy of the maths
+    expect(src, 'Tracer.paint hands the stroke to paintStroke').toContain('paintStroke(this.grid, this.tally');
+    expect(src, 'Tracer.autoTrace marks through markPoint').toContain('markPoint(this.grid, this.tally');
+    expect(src.split('tally.glyphHits[').length - 1, 'only markPoint credits a letter').toBe(1);
+    expect(src.split('.covered[').length - 1, 'only markPoint claims a cell').toBe(2);   // the read and the write, both in markPoint
+  });
 });
