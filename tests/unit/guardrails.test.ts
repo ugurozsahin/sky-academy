@@ -289,13 +289,42 @@ describe('guard rails', () => {
   // then the HUD writers (drawLives/Timer/Hp, showOutcome) to hud.ts, then the remaining multi-statement,
   // object-literal and nested-ternary one-liners were wrapped (24→5), and then the stage pill's 393-char
   // innerHTML — the longest line in the file, and the only one of those 5 outside a render() template —
-  // moved to hud.ts as the pure `stageHTML` builder (5→4). The 4 that remain are the arena/HUD markup
-  // template literals inside render(), where a newline would change the emitted HTML — the irreducible
-  // floor here. This *budget* records what is left and only ever ratchets DOWN as the rest of #36 lands.
-  // Never raise it to go green.
+  // moved to hud.ts as the pure `stageHTML` builder (5→4), and finally the Session callbacks moved to
+  // play-session.ts (375→269 lines, and the budget stays at 4 — none of the four was theirs). The 4 that
+  // remain are the arena/HUD markup template literals inside render(), where a newline would change the
+  // emitted HTML — the irreducible floor here. This *budget* records what is left and only ever ratchets
+  // DOWN. Never raise it to go green.
   it('play.ts long lines keep shrinking (#36 budget)', () => {
     const over = SOURCES['/src/ui/play.ts'].split('\n').filter(l => l.length > 180).length;
     expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(4);
+  });
+
+  // #36: play-session.ts was carved out of the play.ts closure, so it starts at the floor the budget above
+  // spent four PRs reaching — no line over 180 chars, because it holds no `render()` template. Its budget is
+  // therefore 0 from the first day: a long callback line here is new debt, not inherited debt.
+  it('play-session.ts long lines keep shrinking (#36 budget)', () => {
+    const src = SOURCES['/src/ui/play-session.ts'] ?? '';
+    expect(src.length, 'play-session.ts must be read, not a blank import').toBeGreaterThan(1000);
+    expect(src.split('\n').filter(l => l.length > 180).length, 'wrap a long line — never raise this budget').toBeLessThanOrEqual(0);
+  });
+
+  // #36: the Session callback object was the last tenant of the 200-line playScreen() closure — the question
+  // beat, the outcome beat, the sprint clock and the boss reactions, wired in among the screen's markup,
+  // overlays and test hooks. It now lives in play-session.ts with the state only it touches, and the screen
+  // passes what the callbacks need. Nothing else would go red if a callback were moved back inline "just for
+  // this one fix": the game would still play, and the closure would start growing again exactly as it did the
+  // first time. The session is built where its callbacks are, so `new Session(` has one site in src/.
+  it('the Session callbacks live in play-session.ts, not back inside playScreen() (#36)', () => {
+    const beat = code(SOURCES['/src/ui/play-session.ts'] ?? '');
+    const play = code(SOURCES['/src/ui/play.ts'] ?? '');
+    expect(beat.length, 'play-session.ts must be read, not a blank import').toBeGreaterThan(1000);
+    const built = Object.entries(SOURCES).filter(([, src]) => /new Session\(/.test(code(src))).map(([f]) => f);
+    expect(built, 'the session is constructed where its callbacks are').toEqual(['/src/ui/play-session.ts']);
+    const callbacks = ['onQuestion', 'onCorrect', 'onWrong', 'onMiss', 'onProgress', 'onLives', 'onStageClear', 'onTime', 'onBoss', 'onEnd'];
+    for (const cb of callbacks) {
+      expect(beat, `${cb} belongs in play-session.ts`).toContain(`${cb}(`);
+      expect(play, `${cb} must not move back into play.ts`).not.toContain(`${cb}(`);
+    }
   });
 
   // #36: the session's three outcome callbacks (onCorrect/onWrong/onMiss) each carried their own copy of the
@@ -306,13 +335,16 @@ describe('guard rails', () => {
   // would fail: the game would still play, three near-identical bodies would drift apart quietly. Each of
   // these calls therefore has exactly ONE site in play.ts, inside settle().
   it('the outcome beat is one settle() path, not a copy per callback (#36)', () => {
-    const play = code(SOURCES['/src/ui/play.ts'] ?? '');
-    expect(play.length, 'play.ts must be read, not a blank import').toBeGreaterThan(1000);
+    // The callbacks moved to play-session.ts; both files are counted, so a copy of the beat left behind in
+    // play.ts — or a second one added beside settle() — is caught wherever it is written.
+    const files = ['/src/ui/play-session.ts', '/src/ui/play.ts'];
+    for (const f of files) expect((SOURCES[f] ?? '').length, `${f} must be read, not a blank import`).toBeGreaterThan(1000);
+    const beat = files.map(f => code(SOURCES[f] ?? '')).join('\n');
     for (const call of ['showOutcome(', 'endWave(scaled(', 'arena.reveal(', 'markSeg(']) {
-      const n = play.split(call).length - 1;
+      const n = beat.split(call).length - 1;
       expect(n, `${call} belongs to settle() alone — put a new outcome in the OUTCOME table`).toBe(1);
     }
-    for (const kind of ['correct', 'wrong', 'miss']) expect(play).toContain(`${kind}: { seg:`);
+    for (const kind of ['correct', 'wrong', 'miss']) expect(beat).toContain(`${kind}: { seg:`);
   });
 
   // #36, the same shape as the YearId rail above: `'correct' | 'wrong' | 'miss'` was written out in three
@@ -366,8 +398,8 @@ describe('guard rails', () => {
   // The gate is one line, sitting in the middle of the onQuestion closure, and trivially lost to a refactor.
   // The second assertion is the exact line this replaced: `if (demo) later(spawn, demo); else spawn();`.
   it('the first wave spawns behind the font gate (#44)', () => {
-    const play = SOURCES['/src/ui/play.ts'];
-    expect(play, 'play.ts must be readable').toBeTruthy();
+    const play = SOURCES['/src/ui/play-session.ts'];   // #36: onQuestion moved here with the rest of the callbacks
+    expect(play, 'play-session.ts must be readable').toBeTruthy();
     expect(code(play)).toMatch(/fontReady\(\)\.then\([\s\S]{0,120}?spawn\(\)/);
     expect(code(play), 'the ungated `else spawn()` is the bug this rail exists for').not.toMatch(/else\s+spawn\(\)\s*;/);
     // ...and the tutorial branch goes through the gate too. `demo` is the child's first ever play — the one
@@ -484,8 +516,8 @@ describe('guard rails', () => {
   });
 
   it('per-letter progress speech is queued, never interrupting (#40)', () => {
-    const play = code(SOURCES['/src/ui/play.ts'] ?? '');
-    expect(play.length, 'play.ts must be read, not a blank import').toBeGreaterThan(1000);
+    const play = code(SOURCES['/src/ui/play-session.ts'] ?? '');   // #36: onProgress moved here with the callbacks
+    expect(play.length, 'play-session.ts must be read, not a blank import').toBeGreaterThan(1000);
     const progress = play.slice(play.indexOf('onProgress('), play.indexOf('onLives('));
     expect(progress.length, 'onProgress must still precede onLives in the session callbacks').toBeGreaterThan(50);
     const says = [...progress.matchAll(/say\(([^\n]*?)\)[;,]/g)].map(m => m[1]);

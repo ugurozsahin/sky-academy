@@ -1,25 +1,23 @@
-import { avatarById, cheerLine, praiseLine, SENSEI, SENSEI_LINES, senseiLine, VILLAIN } from '../avatars';
-import { STAGE_NAMES, topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
+import { avatarById, praiseLine, SENSEI, SENSEI_LINES, senseiLine, VILLAIN } from '../avatars';
+import { topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
 import { Arena } from '../game/arena';
-import { Session, type Mode, type SessionResult } from '../game/session';
+import { type Mode, type SessionResult } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
-import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
 import { Tracer } from '../game/tracing';
 import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak, wallet } from '../storage';
 import { equippedItem } from '../game/shop';
 import { haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { screenScope, stickersHTML } from './screen';
-import { createHud, stageHTML, type Outcome } from './hud';
+import { createHud } from './hud';
+import { BOMB, createPlaySession } from './play-session';   // #36: the Session callbacks live in play-session.ts
 import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
 import { resultMedal, resultHeading } from './results';
-import { renderVisual } from './visuals';
 import { dojoRowsHTML } from './memory';
 import { drawCertificate, deliverCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
-const BOMB = '💣';
 export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) {
@@ -54,125 +52,30 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   </section>`, 'bg-play');
 
   const els = { lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'), overlay: $('#overlay'), qcard: $('#qcard') };
-  let lastOutcome: Outcome | 'none' = 'none';
   let arena: Arena | null = null; let tracer: Tracer | null = null; let lastResult: SessionResult | null = null;
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
   const { later, toast } = scope;
-  const { drawLives, drawTimer, drawHp, showOutcome } = createHud(els, o.year.lives, () => load().speech);   // #36: HUD writers live in hud.ts
+  const hud = createHud(els, o.year.lives, () => load().speech);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
   // Curriculum base holds (ms). #32: scaled(...) divides them by the test-only speed at each use site, so the
   // game a child plays holds for the full time while the e2e suite can run them several times faster.
   const HOLD = sprint ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 };
-  let waveId = 0; let revealUntil = 0;
-  // #44: false only until Fredoka is usable (or the capped wait gives up). The first wave is held back that
-  // long so its labels are measured and drawn in the real face; every wave after it spawns synchronously.
-  let fontsReady = false; fontReady().then(() => { fontsReady = true; });
-  // Mission progress (#55): stage name + one segment per question (green = right, red = slip, pulsing = current) + a small "3/6".
-  let segStage = 0; let segs: ('good' | 'bad' | '')[] = [];
-  function drawStage(stage: number, index: number, total: number) {
-    if (o.mode !== 'mission') { els.stage.textContent = `Q${session.questionsAsked}`; return; }
-    if (stage !== segStage) { segStage = stage; segs = Array.from({ length: total }, () => ''); }
-    els.stage.innerHTML = stageHTML(STAGE_NAMES[stage - 1] ?? `Stage ${stage}`, segs, index, total);
-  }
-  const markSeg = (k: 'good' | 'bad') => { if (o.mode === 'mission') { segs[session.index] = k; drawStage(session.stage, session.index, session.perStage); } };
-  const endWave = (hold: number) => { const id = waveId; revealUntil = performance.now() + hold; later(() => { if (waveId === id) arena?.clearWave('#ffffff'); }, hold); };
 
-  // #36: onCorrect/onWrong/onMiss each carried a copy of the same closing beat — remember the outcome, mark
-  // the mission segment, spotlight the answer under the card, freeze the wave for the hold — and differed
-  // only in the rules below, so a fourth outcome is now a row rather than a fourth copy of the body.
-  // `advance` is the no-arena (tracing) fallback; 0 is the miss path, where the session has already moved on.
-  const OUTCOME = {
-    correct: { seg: 'good', taunt: false, hold: HOLD.correct, advance: 900 },
-    wrong: { seg: 'bad', taunt: true, hold: HOLD.wrong, advance: 1200 },
-    miss: { seg: 'bad', taunt: true, hold: HOLD.miss, advance: 0 },
-  } as const;
-  /** The beat every outcome shares. `reveal` is what the arena spotlights: the right answer, and the wrong bubble if one was cut. */
-  function settle(kind: Outcome, q: Question, reveal: { good: string; bad?: string }) {
-    const rule = OUTCOME[kind];
-    lastOutcome = kind; markSeg(rule.seg);
-    if (rule.taunt) showTaunt();
-    if (!arena) { if (rule.advance) later(() => session.advance(), rule.advance); return; }
-    arena.reveal(reveal); showOutcome(kind, q); endWave(scaled(rule.hold));
-  }
-
-  const session = new Session({
+  // #36: the Session callbacks — the question beat, the outcome beat, the sprint clock, the boss reactions —
+  // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
+  // overlays and the test hooks, and hands the callbacks the few things they need from up here.
+  const { session, waveEnd } = createPlaySession({
     mode: o.mode, year: o.year, topic: o.topic,
     pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
   }, {
-    onQuestion(q, info) {
-      // If a miss is still being shown (the answer fell and the session moved on at once), let the child see it before the next question.
-      const wait = Math.max(0, revealUntil - performance.now()); if (wait > 0) { later(() => show(), wait + scaled(450)); return; } show();
-      function show() {
-      drawStage(info.stage, info.index, info.total);
-      if (training && session.currentTopic) $('.ttl').textContent = `${session.currentTopic.icon} ${session.currentTopic.title}`;   // Sensei: name the topic of each question
-      els.prompt.innerHTML = q.listen && !load().speech ? esc(q.listen) : promptHTML(q, session.seqIndex);
-      els.vis.innerHTML = renderVisual(q.visual);
-      els.hint.textContent = q.hint ?? (tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
-      lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
-      if (tracing) { say(q.say ?? q.prompt); startTrace(q); return; }
-      const labels = villainMode && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence ? [...info.labels, BOMB] : info.labels;
-      const spawn = () => {
-        say(q.say ?? q.prompt);
-        requestAnimationFrame(() => {
-          arena!.topInset = els.qcard.getBoundingClientRect().bottom + 6;
-          arena!.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), ordered: q.sequence?.slice(session.seqIndex) });
-        });
-      };
-      const demo = showTutorial();                // first ever play: animated hand first, bubbles a moment later
-      // #44: the very first wave waits for Fredoka. A bubble's label size is fitted once at spawn (#28) and
-      // every frame draws it with fillText, so a wave launched before the font lands is measured against the
-      // fallback face and then changes shape in mid-air while the child is reading it. Only the first wave
-      // pays: fontReady() caches, and `fontsReady` keeps every later spawn synchronous, exactly as before.
-      // The tutorial branch goes through the same gate (review of #139): `demo` is the child's first ever
-      // play, the one launch certain to have a cold font cache, and it used to be waved through on nothing
-      // but the coincidence that showTutorial()'s 1800 ms happens to exceed the 1200 ms cap.
-      const gatedSpawn = () => {
-        if (fontsReady) { spawn(); return; }
-        fontReady().then(() => { if (window.__sna === hooks) spawn(); });   // never into a torn-down screen
-      };
-      if (demo) later(gatedSpawn, demo); else gatedSpawn();
-      }
-    },
-    onCorrect(q, points, combo) {
-      sfx.correct(); els.score.textContent = String(session.score);
-      const c = cheerLine(av); toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', scaled(HOLD.correct) + 300);
-      if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, av.glow);
-      // a finished sequence spotlights its last letter; everything else spotlights the answer itself
-      settle('correct', q, { good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer });
-    },
-    onWrong(q, hit) {
-      sfx.wrong(); haptic('wrong'); toast('Not quite!', 'bad', scaled(HOLD.wrong));
-      settle('wrong', q, { good: q.sequence ? q.sequence[session.seqIndex] : q.answer, bad: hit });
-    },
-    onMiss(q) {
-      sfx.miss(); toast('Missed!', 'bad', scaled(HOLD.miss));
-      settle('miss', q, { good: q.sequence ? q.sequence[session.seqIndex] : q.answer });
-    },
-    onProgress(label, done, total) {
-      sfx.slice();
-      // the next word is earned: bring it up now instead of making the child wait for its batch
-      if (done < total) arena?.rush(session.current!.sequence![done]);
-      els.prompt.innerHTML = promptHTML(session.current!, done);
-      if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, av.glow);
-      // queued, never interrupting: sliced letters arrive faster than they can be spoken, and a plain say()
-      // cuts each one off to start the next, so the child hears fragments instead of the word (#40)
-      if (done < total) say(label, false, { queue: true });
-    },
-    onLives(n) { drawLives(n); if (n < prevLives) { sfx.life(); haptic('life'); } prevLives = n; },
-    onStageClear(stage, st, acc) { sfx.stage(); haptic('stage'); showStageClear(stage, st, acc); },
-    onTime(s) { drawTimer(s); if (s <= 3 && s > 0) sfx.tap(); },
-    onBoss(hp, max, kind) {
-      drawHp(hp, max);
-      const v = $('#villain'); if (!v) return;
-      v.classList.remove('hit', 'heal'); void v.offsetWidth; v.classList.add(kind);
-      if (kind === 'hit') { sfx.life(); if (hp > 0) toast(hp <= 3 ? 'Hammer Man is wobbling!' : 'Hit!', 'good'); }
-      else showTaunt();
-    },
-    onEnd(r) { later(() => showResults(r), lastOutcome === 'none' || r.mode === 'sprint' ? 0 : Math.max(900, revealUntil - performance.now() + 300)); },
+    training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
+    arena: () => arena,
+    mounted: () => window.__sna === hooks,        // the screen the callbacks were built for is still the live one
+    later, toast,
+    startTrace, showTutorial, showTaunt, showStageClear, showResults,
   });
-  let prevLives = o.year.lives;
-  drawLives(o.year.lives); drawTimer(session.secondsLeft); drawHp(session.bossHp, session.bossMax);
+  hud.drawLives(o.year.lives); hud.drawTimer(session.secondsLeft); hud.drawHp(session.bossHp, session.bossMax);
   // Sprint clock: real elapsed time, frozen while the pause overlay (or a result) has the arena paused.
   let ticker = 0; let lastTick = 0;
   if (sprint) ticker = window.setInterval(() => {
@@ -198,10 +101,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         if (viaSwipe) { (sliceFx[av.fx] ?? sfx.slice)(); haptic('slice'); }
       },
       onFall(b) { if (b.label !== BOMB) session.fall(b.label); },
-      onWaveEnd() {   // let the outcome finish showing (the reveal may still be on screen), then a breath before the next question
-        const gap = scaled(lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650);
-        later(() => session.waveEnd(), Math.max(0, revealUntil - performance.now()) + gap);
-      },
+      onWaveEnd: waveEnd,   // the beat lives with the callbacks (#36): it reads the outcome still being shown
     }, {
       trailColor: skin?.color ?? av.glow, trailCore: skin?.core, fx: av.fx,
       onSwish: () => sfx.swish(),
@@ -366,10 +266,4 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   window.__sna = hooks;
   session.start();
   return cleanup;                    // the router calls this when it leaves the screen (back button included) — see #73
-}
-
-function promptHTML(q: Question, done: number) {
-  if (!q.sequence) return esc(q.prompt);
-  const letters = q.sequence.map((l, i) => `<span class="${i < done ? 'got' : 'todo'}">${i < done ? esc(l) : '_'}</span>`).join('');
-  return `<span class="seq">${letters}</span>`;
 }

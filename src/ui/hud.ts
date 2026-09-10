@@ -54,3 +54,6 @@ export function createHud(els: HudEls, lives: number, speech: () => boolean) {
     },
   };
 }
+
+/** The writers `createHud` hands back — play.ts builds them, play-session.ts writes through them (#36). */
+export type Hud = ReturnType<typeof createHud>;
