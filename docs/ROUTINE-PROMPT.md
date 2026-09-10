@@ -73,6 +73,14 @@ STEP 3 — DEVELOP ONE ITEM, within the freeze above. Pick the first unchecked i
 
 **`Closes #<n>` finishes an issue — nothing less.** GitHub closes an issue the moment a PR carrying that keyword merges. If you are deferring part of the issue, write `Part of #<n>` instead and say what is left; #26 was auto-closed with its last item still open (the per-mode `bests` consolidation, deferred to ship with #38's save migration) and had to be reopened by hand.
 
+**And a closing keyword closes its issue wherever it appears in the body — inside a negation, a quotation, or the very sentence explaining why you are *not* closing it.** GitHub scans the whole body for `close`/`closes`/`closed`/`fix`/`fixes`/`fixed`/`resolve`/`resolves`/`resolved` followed by an issue reference (`#<n>`, `owner/repo#<n>` or the issue's URL) and has no notion of negation or context, so the sentence written to keep an issue open *is* the auto-close. PR #139 deferred half its issue, wrote `Part of #<n>` exactly as instructed, and then explained: "Left open so merging this does not close #<n> with that undone" — GitHub recorded a closing reference and shut issue 44 with the woff2 half undone, which the reviewing and merging agents had no way to see. So never put one of those words next to an issue reference unless you mean it: write "the issue stays open", or "#<n> remains open for Part B", and if the keyword is unavoidable break the link — `#&#8203;<n>`, or "issue 44" in words. **Backticks are not a fix.** GitHub's parser does ignore code spans and fenced blocks — that is why eight PRs whose only `Closes #<n>` sat in backticks closed nothing and had their issues shut by hand — so quoting cuts both ways and neither direction is something to rely on. Say plainly which one you mean, then check the body you actually wrote before you open the PR:
+
+```
+node scripts/review-gate.mjs body.md      # prints the issues that body would close, or "closes: nothing"
+```
+
+If that list is not exactly the issues you intend to close, fix the body, not the list. The rule, the keyword list and the real bodies that got this wrong are in `tests/unit/review-gate.test.ts`; the same line is in `CLAUDE.md` and `BACKLOG.md` — change all three together.
+
 ## Governance PRs: which way does it move the constraint?
 
 A PR that changes how the routine itself works — this file, `CLAUDE.md`, `BACKLOG.md`, the workflows, the guard

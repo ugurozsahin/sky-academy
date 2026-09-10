@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM helper shared with .github/workflows/review-gate.yml (see scripts/review-gate.d.ts)
-import { blockState, isChangesRequested, isCleared, isOwnerApproved, isOwnerRejected } from '../../scripts/review-gate.mjs';
+import { blockState, closingRefs, isChangesRequested, isCleared, isOwnerApproved, isOwnerRejected } from '../../scripts/review-gate.mjs';
 
 /**
  * The review gate decides whether a pull request may be merged. It has twice reported "no block" while a
@@ -85,5 +86,96 @@ describe('review gate', () => {
 
     it.each(['OWNER: REJECTED — too bright', '**OWNER: REJECTED**', 'owner: rejected'])(
       'reads %j as a rejection', (body) => expect(isOwnerRejected(body)).toBe(true));
+  });
+});
+
+/**
+ * #144 — a PR body that says "does not close #<n>" closes #<n> anyway.
+ *
+ * GitHub scans the body for a closing keyword next to an issue reference and has no notion of negation,
+ * quotation or context, so the sentence written to explain why an issue must stay open is itself the
+ * auto-close. It happened on PR #139: the body said `Part of #<n>`, the very next sentence explained that
+ * merging must not close the issue, and GitHub closed it with the woff2 half undone (issue 44, reopened by
+ * hand). Every expectation below is the *rule as written* in CLAUDE.md and docs/ROUTINE-PROMPT.md, so a run
+ * can check its body against this rather than remember a paragraph:
+ *     node scripts/review-gate.mjs body.md
+ */
+describe('closing references in a PR body (#144)', () => {
+  // The regression. Both sentences come from PR #139's real body, with the issue number kept.
+  it('reads a *negated* closing keyword as a close, because GitHub does', () => {
+    expect(closingRefs('Left open so merging this does not close #44 with that undone.')).toEqual([44]);
+    expect(closingRefs("## Deferred (why this doesn't close #26)")).toEqual([26]);          // PR #83, same trap
+  });
+
+  // ...and the wordings the rule tells you to use instead. These are the corrected bodies: they must be clean.
+  it.each([
+    'Part of #44 — the woff2-inlining half is deferred, so the issue stays open.',
+    '`Part of #44`. #44 remains open for Part B.',
+    'Half of this is deferred; issue 44 stays open until the woff2 inlining lands.',
+    'Deferred: the woff2 half. Does not #&#8203;44 — break the link when the keyword is unavoidable.',
+  ])('reports nothing for the corrected wording %j', (body) => expect(closingRefs(body)).toEqual([]));
+
+  it('takes the whole keyword list, either reference form, any case', () => {
+    expect(closingRefs('closes #1 · Closed #2 · FIX #3 · fixes #4 · Fixed #5')).toEqual([1, 2, 3, 4, 5]);
+    expect(closingRefs('resolve #6, resolves #7, RESOLVED: #8')).toEqual([6, 7, 8]);
+    expect(closingRefs('Fixes https://github.com/ugurozsahin/sky-academy/issues/9')).toEqual([9]);
+    expect(closingRefs('Closes ugurozsahin/sky-academy#10')).toEqual([10]);                  // cross-repo form
+    expect(closingRefs('Closes #62\nCloses #63')).toEqual([62, 63]);                         // PR #66, both real
+  });
+
+  it.each([
+    'Part of #44',                                    // the deferral wording, which is the point of the rule
+    'Re-opens #44 and supersedes #139',               // not a closing keyword
+    'This encloses #5 and is disclosed in #6',        // keywords need a word boundary, not a substring
+    'Closing notes: #7 is next',                      // "closing" is not one of GitHub's keywords
+    'See #8 for why',
+  ])('does not invent a close in %j', (body) => expect(closingRefs(body)).toEqual([]));
+
+  /**
+   * Code spans and fenced blocks are the one context GitHub really does ignore — and that cuts BOTH ways:
+   * PRs #125, #145, #149, #150, #151, #154, #156 and #163 each wrote their only `Closes` inside backticks
+   * and closed nothing (those issues were closed by hand at merge). So backticks are not a way to disarm a
+   * keyword you did not mean, and not a way to close an issue you did: say plainly which it is.
+   */
+  it('mirrors GitHub on code spans and fences, in both directions', () => {
+    expect(closingRefs('`Closes #28`')).toEqual([]);                                          // PR #125, verbatim
+    expect(closingRefs('```\nCloses #99\n```\nCloses #100')).toEqual([100]);
+    expect(closingRefs('`Closes #28` and, plainly, closes #29')).toEqual([29]);
+  });
+
+  // Checked on 2026-09-10 against every PR in this repo (73), with GraphQL closingIssuesReferences as the
+  // oracle: 73/73 agreement. These four are the accidents in that corpus — bodies that closed an issue while
+  // only *talking* about closing it. None of them is a mistake anyone would spot by reading the PR.
+  it.each([
+    ['#86', "**`Closes #<n>` finishes an issue, nothing less.** #83 used it while deliberately closed #26's last item", [26]],
+    ['#90', 'This is the trap that wrongly closed #26.', [26]],
+    ['#120', "with it merged the issue's remaining checkbox is done, so a reviewer can close #35 with the commit", [35]],
+    ['#139', 'Left open so merging this does not close #44 with that undone.', [44]],
+  ] as [string, string, number[]][])('PR %s closed an issue it was only discussing', (_pr, body, closed) =>
+    expect(closingRefs(body)).toEqual(closed));
+});
+
+/**
+ * The rule is worth nothing if it lives in one file. CLAUDE.md (interactive sessions), BACKLOG.md (the
+ * workflow line) and docs/ROUTINE-PROMPT.md (the routine's own prompt) all tell an agent how to write a PR
+ * body, and CLAUDE.md says in as many words that the three change together. This rail is why a future edit
+ * cannot quietly drop the rule from two of them.
+ */
+describe('the three process files carry the closing-keyword rule (#144)', () => {
+  const doc = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
+
+  it.each(['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'])('%s states it', (name) => {
+    const text = doc(name);
+    expect(text.length).toBeGreaterThan(500);                          // a vacuous rail is worse than none
+    expect(text).toMatch(/closing keyword/i);
+    expect(text).toMatch(/scripts\/review-gate\.mjs/);                 // and points at the check
+  });
+
+  // The docs quote the trap in order to warn about it. If one of them ever spells it out with a live issue
+  // number, the paragraph teaching the rule becomes a body that breaks it the moment anyone copies it.
+  it('and none of them spells the bad example out with a live issue number', () => {
+    for (const name of ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md']) {
+      expect(closingRefs(doc(name).replace(/`/g, ''))).toEqual([]);    // backticks stripped: the text itself
+    }
   });
 });

@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /**
  * Does an open review block stand on a pull request?
  *
@@ -61,4 +65,52 @@ export function blockState({ draft, labels, comments }) {
   if (ownerSaidNo) reasons.push('the owner rejected it (OWNER: REJECTED, no later OWNER: APPROVED)');
   else if (wantsOwner && approved === null) reasons.push('labelled owner-approval and the owner has not written OWNER: APPROVED');
   return { blocked: reasons.length > 0, reasons };
+}
+
+/**
+ * Which issues would GitHub close if this pull-request body were merged? (#144)
+ *
+ * GitHub scans a PR body for a closing keyword followed by an issue reference and has **no notion of
+ * negation, quotation or context**: the sentence written to explain why an issue must stay open closes it.
+ * PR #139 said `Part of #<n>` and, one line later, "Left open so merging this does not close #<n> with that
+ * undone" — GitHub recorded a closing reference and shut issue 44 with half its work undone.
+ *
+ * Measured against every pull request in this repo (73 of them, GraphQL `closingIssuesReferences` as the
+ * oracle, 2026-09-10) this agrees with GitHub on all of them: the four bodies that closed an issue by
+ * accident while only discussing it (#83, #86, #90, #139) and the eight whose only `Closes` sat inside
+ * backticks — see `withoutCode` below. It is a *predicate over text*, not a promise about GitHub's parser:
+ * treat a number it reports as one that will be closed, and never read silence as a licence to be careless.
+ */
+export const CLOSING_KEYWORDS = ['close', 'closes', 'closed', 'fix', 'fixes', 'fixed', 'resolve', 'resolves', 'resolved'];
+
+/**
+ * Code spans and fenced blocks are the one context GitHub's parser really does ignore — proven the hard way
+ * here: PRs #125, #145, #149, #150, #151, #154, #156 and #163 all wrote their only `Closes` inside backticks
+ * and closed nothing (a person closed those issues by hand at merge), so the cut runs both ways. Never
+ * *rely* on backticks to disarm a keyword you did not mean — write "the issue stays open", or break the
+ * link — and never rely on them to close one you did.
+ */
+const withoutCode = (body) => (body || '')
+  .replace(/^ {0,3}(```+|~~~+)[^\n]*\n[\s\S]*?^ {0,3}\1[^\n]*$/gm, ' ')   // fenced blocks, both fence styles
+  .replace(/^ {0,3}(?:```+|~~~+)[\s\S]*$/m, ' ')                          // an unclosed fence runs to the end
+  .replace(/``[\s\S]*?``|`[^`\n]*`/g, ' ');                               // inline code spans
+
+const REFERENCE = String.raw`(?:[\w.-]+\/[\w.-]+)?#(\d+)|https?:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/(\d+)`;
+const CLOSING = new RegExp(String.raw`\b(?:${CLOSING_KEYWORDS.join('|')})\b\s*:?\s+(?:${REFERENCE})`, 'gi');
+
+/**
+ * @param {string} body a pull-request body
+ * @returns {number[]} the issue numbers GitHub would treat as closing references, ascending, deduplicated.
+ */
+export function closingRefs(body) {
+  const hits = [...withoutCode(body).matchAll(CLOSING)].map((m) => Number(m[1] ?? m[2]));
+  return [...new Set(hits)].sort((a, b) => a - b);
+}
+
+// CLI: `node scripts/review-gate.mjs <file>` prints what that body would close, so a run can check its PR
+// body against what it actually means before opening the PR (docs/ROUTINE-PROMPT.md). Import-safe: it runs
+// only when this file is the entry point, so the review gate workflow's `await import(...)` is unaffected.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const refs = closingRefs(readFileSync(process.argv[2], 'utf8'));
+  console.log(refs.length ? `closes: ${refs.map((n) => '#' + n).join(', ')}` : 'closes: nothing');
 }
