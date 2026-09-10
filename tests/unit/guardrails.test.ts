@@ -617,4 +617,43 @@ describe('guard rails', () => {
     expect(body, 'it walks the avatar screen').toContain('await pickAvatar(page)');
     expect(body, 'and carries on into a mission').toContain('await startTopic(page');
   });
+
+  // #141: a pull request now runs the MOBILE project only, so the nightly is the only place a desktop-only
+  // regression is caught at all. That makes two silent failures possible, neither of which reddens anything:
+  //   - a project is added to `playwright.config.ts` (#116's portrait tablet is next) and wired into the PR
+  //     arm, or into neither — the first pays for a whole extra sequential leg on every PR, the second means
+  //     a project that exists but is never run;
+  //   - a later tidy-up collapses the ternary to one command and the nightly quietly stops running desktop,
+  //     which reads as a 4-minute saving and is actually the loss of the only desktop coverage there is.
+  // The rail therefore reads the config as the source of truth: every declared project must appear in the
+  // full-matrix arm, and the pull-request arm must name exactly one. Comments are stripped first — the step's
+  // own comment names both projects, and a rail that reads its own prose is the #129 failure.
+  it('CI runs one project on a pull request and every project on the nightly (#141)', () => {
+    const yml = workflow('ci.yml');
+    expect(yml.length, 'ci.yml must be read from disk, not a blank import').toBeGreaterThan(500);
+    const cfg = readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8');
+    const projects = [...code(cfg).matchAll(/name:\s*'([^']+)'/g)].map(m => m[1]);
+    expect(projects.length, 'playwright.config.ts must declare its projects').toBeGreaterThanOrEqual(2);
+
+    const line = yml.split('\n').filter(l => !l.trim().startsWith('#')).find(l => l.includes('playwright test'));
+    expect(line, 'ci.yml must still have an e2e step').toBeTruthy();
+    expect(line, 'the e2e command must branch on the event, not run one fixed matrix')
+      .toContain("github.event_name == 'pull_request'");
+    const [prArm, fullArm] = [...line!.matchAll(/'((?:--project=[\w-]+\s*)+)'/g)].map(m => m[1].trim());
+    expect(prArm, 'the pull-request arm must be a quoted --project list').toBeTruthy();
+    expect(fullArm, 'the full-matrix arm must be a quoted --project list').toBeTruthy();
+
+    // the PR arm: exactly one project, and one that really exists
+    const prProjects = prArm.split(/\s+/).map(a => a.replace('--project=', ''));
+    expect(prProjects.length, 'a pull request runs ONE project — each extra one is a whole extra leg (#141)').toBe(1);
+    expect(projects, `the PR project '${prProjects[0]}' must be declared in playwright.config.ts`).toContain(prProjects[0]);
+
+    // the nightly arm: every project, or a regression in the missing one is caught by nothing at all
+    for (const p of projects) {
+      expect(fullArm, `the nightly must run every declared project — '${p}' is missing (#141)`)
+        .toContain(`--project=${p}`);
+    }
+    // and the step must stay off the push-to-main run, which is what makes the nightly the only full check
+    expect(yml, 'the e2e step stays off the push run').toMatch(/if:\s*github\.event_name\s*!=\s*'push'/);
+  });
 });

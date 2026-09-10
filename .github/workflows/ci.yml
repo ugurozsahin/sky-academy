@@ -1,8 +1,9 @@
-# The gate for every change. A pull request gets the FULL run: unit tests + guard rails, build, and e2e on
-# mobile and desktop. A push to main gets the LIGHT run — that tree already passed e2e on its own PR minutes
-# earlier, so main only re-checks what a merge can break cheaply (types, unit, build). The full suite runs
-# against main once a night, which is what catches two PRs that were green apart and broken together.
-# Docs-only changes run nothing.
+# The gate for every change. A pull request gets unit tests + guard rails, build, and e2e on the MOBILE
+# project only (#141). A push to main gets the LIGHT run — that tree already passed e2e on its own PR minutes
+# earlier, so main only re-checks what a merge can break cheaply (types, unit, build). The FULL matrix —
+# every project — runs against main once a night, which is what catches two PRs that were green apart and
+# broken together, and is now also the only place a desktop-only regression is caught. Docs-only changes run
+# nothing.
 #
 # Why the split: this is a private repo, so Actions minutes are metered (2,000/month on Free, 3,000 on Pro).
 # Measured 2026-09-07 — full run ~12 min, light run ~3 min, and shipping one issue used to cost ~42 min
@@ -51,9 +52,25 @@ jobs:
       - name: Install Playwright browsers
         if: github.event_name != 'push'
         run: npx playwright install --with-deps chromium
-      - name: End-to-end (mobile + desktop)
+      # #141: a pull request runs the MOBILE project only; the nightly and workflow_dispatch run the whole
+      # matrix. The game is mobile-first and the owner plays it on a phone and a tablet, so a desktop-only
+      # regression landing on main and being caught by that night's run is the accepted trade.
+      #
+      # Why a project costs a whole run rather than a share of one: Playwright's `workers` defaults to half
+      # the logical cores and an ubuntu-latest runner has 2, so this suite runs on ONE worker — the e2e step
+      # prints `Running 78 tests using 1 worker`. Projects therefore run end to end, one after another, and
+      # the desktop leg is the slower of the two (1280x800 against the iPhone 13 viewport). Measured on run
+      # 34461649267: mobile 09:38:24 -> 09:41:07 (2m43s), desktop 09:41:07 -> 09:45:07 (4m00s), 6.8 m total.
+      # Dropping desktop from the PR run therefore takes ~4.0 min off it, not the ~half a project count
+      # suggests — and #116's third project will add its own full leg to the nightly for the same reason.
+      #
+      # A failing nightly is not silent: the watchdog task reads `?branch=main&event=schedule` every 6 hours
+      # and opens a `watchdog` issue on a failure OR on no run in 26 hours (docs/WATCHDOG-PROMPT.md step 2),
+      # and the dev routine re-checks it every 2 hours and treats a red nightly as that run's first work
+      # (docs/ROUTINE-PROMPT.md STEP 1). Both read a conclusion, never an absence.
+      - name: End-to-end (${{ github.event_name == 'pull_request' && 'mobile' || 'full matrix' }})
         if: github.event_name != 'push'
-        run: npx playwright test --project=mobile --project=desktop
+        run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile' || '--project=mobile --project=desktop' }}
       - if: failure() && github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
