@@ -7,6 +7,11 @@ import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 // augmentation and the `__sna?: SnaHooks` one in hooks.ts never meet in a single type-check pass.
 declare global { interface Window { __sna: PlayHooks & MemoryHooks; __SNA_FAST?: number } }
 
+/**
+ * Walk the avatar screen the way a child does, on a cleared save. Kept for the handful of tests that are
+ * *about* that screen — the pick itself, the Master Ninja unlock, the sticky-button layout — and for the one
+ * cold-start path below that proves seeding and walking land a test in the same place (#138).
+ */
 async function pickAvatar(page: Page, id = 'volt', name = 'Ada') {
   await page.goto('/?reset=1');
   await expect(page.locator('.avatar-screen')).toBeVisible();
@@ -14,6 +19,24 @@ async function pickAvatar(page: Page, id = 'volt', name = 'Ada') {
   await page.click(`.avatar-card[data-id="${id}"]`);
   await page.fill('#name', name);
   await page.click('#go');
+  await expect(page.locator('.home')).toBeVisible();
+}
+/**
+ * #138: land on the sky map with the avatar already chosen, by writing the save `avatarScreen` would have
+ * written (`src/storage.ts`: key `sna:v1`, `save({ avatar })` then `save({ name })`) before the app boots.
+ * A test that is not about the avatar screen gets the same starting state without rendering eleven portraits
+ * and making three round trips for them.
+ *
+ * The init script runs on **every** navigation in the page, so it writes only when the slot is empty — a test
+ * that reloads to check something persisted (the Daily Dojo, the remembered home screen) must find its own
+ * save, not this seed, waiting for it. That also makes `?reset=1` unnecessary: the context starts with an
+ * empty localStorage, so the seed *is* the clean slate.
+ */
+async function seedPlayer(page: Page, id = 'volt', name = 'Ada', extra: Record<string, unknown> = {}) {
+  await page.addInitScript(save => {
+    if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+  }, JSON.stringify({ v: 1, name, avatar: id, ...extra }));
+  await page.goto('/');
   await expect(page.locator('.home')).toBeVisible();
 }
 async function startTopic(page: Page, year: string, topic: string) {
@@ -194,7 +217,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('every year has maths and writing topics listed', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     for (const y of ['reception', 'year1', 'year2']) {
       await page.click(`.island[data-year="${y}"]`);
       await expect(page.locator('.isl-head b')).toContainText(y === 'reception' ? 'Reception' : y === 'year1' ? 'Year 1' : 'Year 2');
@@ -205,7 +228,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('real swipe slices the correct bubble and scores', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
     await swipeAnswer(page);
     await expect(page.locator('#score')).not.toHaveText('0');
@@ -213,7 +236,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('a tap throws the ninja star: scored at the tap, and a swipe throws nothing (#48)', async ({ page }) => {
-    await pickAvatar(page, 'kai');
+    await seedPlayer(page, 'kai');
     await startTopic(page, 'year1', 'y1-add');
     const { target, ox, oy } = await frozenTarget(page);
     await page.mouse.click(ox + target.x, oy + target.y);                          // a single tap, no swipe
@@ -233,7 +256,7 @@ test.describe('Sky Ninja Academy', () => {
   // the bomb, while the exploded bubble kept falling for the 150 ms flight. Both failures are visible here:
   // a thrown star would raise `shots`, and a bubble waiting to be popped on landing would still be alive.
   test('a tapped TNT blows up under the finger — no star is thrown at it (#48)', async ({ page }) => {
-    await pickAvatar(page, 'blaze', 'Ivy');
+    await seedPlayer(page, 'blaze', 'Ivy');
     await page.click('.island[data-year="year2"]');
     await page.click('#endless');                                                  // Sky Storm: Hammer Man drops TNT in
     await expect(page.locator('.villain img')).toBeVisible();
@@ -252,7 +275,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('wrong slice loses a life and shows the answer; correct then continues', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-tables');
     await page.waitForFunction(() => window.__sna.bubbles().length > 1);
     expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
@@ -262,7 +285,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('completing stage 1 shows the avatar celebrating with a praise line', async ({ page }) => {
-    await pickAvatar(page, 'kai', 'Sam');
+    await seedPlayer(page, 'kai', 'Sam');
     await startTopic(page, 'year1', 'y1-bonds');
     await answerAll(page, 6);
     const modal = page.locator('.celebrate');
@@ -277,7 +300,7 @@ test.describe('Sky Ninja Academy', () => {
 
   test('a full mission (5 stages) ends with results, medal, coins, a sticker and saved stars', async ({ page }) => {
     test.setTimeout(150_000);
-    await pickAvatar(page, 'terra');
+    await seedPlayer(page, 'terra');
     await startTopic(page, 'reception', 'r-count');
     const stages = await page.evaluate(() => window.__sna.session.stages);
     expect(stages).toBe(5);
@@ -337,7 +360,7 @@ test.describe('Sky Ninja Academy', () => {
       await page.evaluate(p => { localStorage.setItem('sna:v1', JSON.stringify({ ...JSON.parse(localStorage.getItem('sna:v1')!), ...p })); }, patch);
       await page.goto('/'); await expect(page.locator('.home')).toBeVisible();
     };
-    await pickAvatar(page);
+    await seedPlayer(page);
     await seed({ coins: 200, spent: 100, stickers: ['volt', 'blaze', 'splash'] });                // lifetime 200, balance 100
     await page.click('#rewards'); await page.click('#shop');
     await expect(page.locator('.shop')).toBeVisible();
@@ -362,7 +385,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('reception is gentle: missed bubbles re-ask without losing lives', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
     await page.waitForFunction(() => window.__sna.bubbles().length > 0);
     await page.waitForFunction(() => window.__sna.bubbles().length === 0, null, { timeout: 30000 }); // let the wave fall
@@ -371,7 +394,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('spelling: letters must be sliced in order', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-build');
     const word = (await state(page)).answer as string;
     await expect(page.locator('.prompt .seq span')).toHaveCount(word.length);
@@ -384,7 +407,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('Story Sentences: the sentence is shown, and its words must be sliced in order', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-sentence');
     const sentence = (await state(page)).answer as string;
     const words = sentence.split(' ');
@@ -400,7 +423,7 @@ test.describe('Sky Ninja Academy', () => {
 
   test('outcome beat: a slice freezes the wave, spotlights the answer and fills in the card before moving on', async ({ page }) => {
     await page.addInitScript(() => { window.__SNA_FAST = 1; });   // #32: this test asserts the REAL outcome-beat pause (≥1200 ms) — it must run at game speed
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
     await waitForTarget(page);
     const expected = (await state(page)).answer as string;                        // read before the slice: the session moves on after the hold
@@ -425,7 +448,7 @@ test.describe('Sky Ninja Academy', () => {
 
   test('long sentences launch in batches that fit across the screen, never on top of each other', async ({ page }) => {
     await page.addInitScript(() => { window.__SNA_FAST = 1; });   // #32: samples flight every 400 ms over 2.4 s — tuned to real pacing; at 4× it would land on a miss-reveal freeze or a respawn, not free flight
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-sentence');
     await page.waitForFunction(() => window.__sna.arena.bubbles.length >= 5);
     const info = await page.evaluate(() => { const a = window.__sna.arena; const r = a.bubbles[0].r; return { n: a.bubbles.length, fits: Math.floor((a.W - 16) / (2 * r + 10)), queued: a.bubbles.filter((b: any) => !b.launched).length }; });
@@ -439,7 +462,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('the play area is capped and centred on a wide screen, full-width on a phone (#67)', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-count');
     const m = await page.evaluate(() => {
       const c = document.getElementById('arena')!.getBoundingClientRect();
@@ -458,7 +481,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('Sound Hunt: nothing to read on the card; the words appear only when read-aloud is off', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-soundhunt');
     await expect(page.locator('.prompt')).toHaveText('🔊 Listen!');
     await expect(page.locator('.vis')).toHaveCount(0);                                 // picture-free: no clue on the card
@@ -475,7 +498,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('letter tracing passes when the glyph is covered', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-trace');
     await expect(page.locator('#trace')).toBeVisible();
     await page.click('#tcheck');
@@ -486,7 +509,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('word tracing: 2 of 3 letters is not enough, every letter must be covered', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-trace');
     const word = (await state(page)).answer as string;
     expect(word.length).toBeGreaterThanOrEqual(2);
@@ -501,7 +524,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('back button steps back one screen: play → island → sky map (Android/browser history)', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
     await page.goBack();
     await expect(page.locator('.isl-head b')).toContainText('Year 1');
@@ -523,7 +546,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('a long sentence can be built without waiting: each word arrives in order, in its batch or the next', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-sentence');
     // hardest form: 7 words + decoys, listen-and-build (the shape Sprint/Boss/Sensei serve within a minute)
     const words = await page.evaluate(() => {
@@ -560,7 +583,7 @@ test.describe('Sky Ninja Academy', () => {
   const FPS_FLOOR = 30;   // clean: 60.4 on both projects; with the drift bug back: 19.9 (phone) / 4.3 (desktop).
   // Half the clean rate, still well above the bug — a shared CI runner can be slow without going red.
   test('guard rail: the play screen still renders at speed', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
     await page.waitForFunction(() => window.__sna?.bubbles().length > 0);
     // Incident 2026-09-06: `.bg-play::after` animated `background-position` over 13 gradients under the live
@@ -581,7 +604,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('guard rail: leaving the play screen stops it', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
     await page.waitForFunction(() => window.__sna?.bubbles().length > 0);
     // Incident 2026-09-06 (#73 review): only the Quit/Islands/Play-again buttons tore the screen down, so
@@ -604,7 +627,7 @@ test.describe('Sky Ninja Academy', () => {
   // constant nobody would notice (the reason the issue asks for a normal-speed test).
   test('guard rail: outcome holds are the curriculum values at speed 1 (#32)', async ({ page }) => {
     await page.addInitScript(() => { window.__SNA_FAST = 1; });   // overrides the suite's 4× for this test only
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
     expect(await page.evaluate(() => window.__sna.timing()))
       .toEqual({ speed: 1, hold: { correct: 1000, wrong: 1800, miss: 1500 } });
@@ -615,7 +638,7 @@ test.describe('Sky Ninja Academy', () => {
   // still render real frames. A multiplier that scaled `dt`/`Arena.time` instead would push the ratio towards
   // 4 and pass the "renders at speed" rail on nonsense — the trap the acceptance criteria name explicitly.
   test('guard rail: 4× speeds the game, not the clock the rails read (#32)', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
     await page.waitForFunction(() => (window.__sna?.bubbles().length ?? 0) > 0);
     expect(await page.evaluate(() => window.__sna.timing().speed)).toBe(4);
@@ -633,7 +656,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('guard rail: no control inherits a full-screen rule, and the mode cards match', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await page.click('.island[data-year="year2"]');
     // Incident 2026-09-06: the Memory Match *screen* rule was written on the bare `.memory` class, which the
     // island's mode button also carries — that card rendered 844 px tall against 86 px for the others (#63).
@@ -649,7 +672,7 @@ test.describe('Sky Ninja Academy', () => {
   test('guard rail: island art and grid come from year data, not a per-index CSS class (#27)', async ({ page }) => {
     // Incident #27: island art/tint were keyed by `.i0/.i1/.i2` and the grid was a hard `repeat(3, 1fr)`,
     // so a fourth year (Y3–Y6) drew no art and overflowed the row. Art now comes from YearInfo, inline.
-    await pickAvatar(page);
+    await seedPlayer(page);
     const arts = await page.$$eval('.islands .island .isl-art', els => els.map(el => getComputedStyle(el).backgroundImage));
     expect(arts.length).toBeGreaterThanOrEqual(3);
     for (const bg of arts) expect(bg).toContain('url(');     // each island draws its own art from data
@@ -659,7 +682,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('endless Sky Storm ramps up and ends when lives run out', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await page.click('.island[data-year="year2"]');
     await page.click('#endless');
     await expect(page.locator('.villain img')).toBeVisible();
@@ -679,7 +702,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('Train with Sensei: a staged mission over the weakest topics, each question named by topic', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await page.click('.island[data-year="year1"]');
     await expect(page.locator('#train small')).toContainText('sessions 0');
     await page.click('#train');
@@ -700,7 +723,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('Ninja Sprint: timed run with no lives ends on the clock and saves a best score', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await page.click('.island[data-year="year1"]');
     await expect(page.locator('#sprint small')).toContainText('best 0');
     await page.click('#sprint');
@@ -731,7 +754,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('Daily Dojo: three challenges on the sky map, progress survives a reload, bonus rows on results', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     const items = page.locator('.dojo-item');
     await expect(items).toHaveCount(3);
     await expect(items.nth(0).locator('.prog')).toHaveText(/^0\/\d+$/);          // the volume challenge ("Answer N questions right")
@@ -755,7 +778,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('Boss Battle: correct slices hurt Hammer Man, a slip heals him, and the KO is counted', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await page.click('.island[data-year="year2"]');
     await expect(page.locator('#boss small')).toContainText('KOs 0');
     await page.click('#boss');
@@ -781,7 +804,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('Memory Match: cards flip, a miss turns back, pairs lock, and the finished board is counted', async ({ page }) => {
-    await pickAvatar(page, 'splash', 'Mia');
+    await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="reception"]');
     await expect(page.locator('#memory small')).toContainText('boards 0');
     await page.click('#memory');
@@ -814,6 +837,8 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#memory small')).toContainText('boards 1');
   });
 
+  // #138: the one test that still walks the whole cold start — avatar screen → sky map → island → play — so
+  // the path every other test now seeds past keeps a test of its own, end to end and in order.
   test('first play shows the slice tutorial hand, which goes away after the first slice for good', async ({ page }) => {
     await pickAvatar(page);
     await startTopic(page, 'reception', 'r-count');
@@ -829,14 +854,14 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('tapping the question card repeats it aloud (pulse feedback)', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
     await page.click('#qcard .prompt');
     await expect(page.locator('#qcard')).toHaveClass(/pulse/);
   });
 
   test('pause and quit return home', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-time');
     await page.click('#pause');
     await expect(page.locator('.modal h2')).toHaveText('Paused');
@@ -845,7 +870,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('question visuals render for pictorial topics', async ({ page }) => {
-    await pickAvatar(page);
+    await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-coins');
     await expect(page.locator('.vis .coin')).toHaveCount(1);
     await page.click('#pause'); await page.click('#quit');
@@ -862,7 +887,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('For grown-ups: a maths gate opens the read-only parent dashboard (#9)', async ({ page }) => {
-    await pickAvatar(page, 'volt', 'Ada');
+    await seedPlayer(page, 'volt', 'Ada');
     await page.click('#grownups');
     await expect(page.locator('.parents .gate')).toBeVisible();
 

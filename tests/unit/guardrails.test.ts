@@ -589,4 +589,32 @@ describe('guard rails', () => {
     expect(src.split('tally.glyphHits[').length - 1, 'only markPoint credits a letter').toBe(1);
     expect(src.split('.covered[').length - 1, 'only markPoint claims a cell').toBe(2);   // the read and the write, both in markPoint
   });
+
+  // #138: most e2e tests now seed the avatar into localStorage instead of walking the avatar screen, which is
+  // the right trade — but it is a trade that can be taken one step too far without anything going red. If the
+  // last `pickAvatar` call sites were "tidied" into `seedPlayer`, the avatar screen → sky map → island → play
+  // path would keep its own small tests and lose the only test that walks it all the way into a mission, and
+  // the suite would still be green. The seed's other silent failure is the init script: it runs on every
+  // navigation, so an unconditional write would quietly reset the save under any test that reloads to check
+  // something persisted (the Daily Dojo, the remembered home screen) — those tests would then be asserting
+  // against the seed rather than against what the game stored.
+  it('the e2e seed shortcut keeps a walked cold start, and never overwrites a save (#138)', () => {
+    const spec = readFileSync(new URL('../e2e/game.spec.ts', import.meta.url), 'utf8');
+    expect(spec.length, 'the e2e spec must be read, not an empty string').toBeGreaterThan(10000);
+    const src = code(spec);
+    // the storage slot the seed writes is the one the app reads — a rename in storage.ts must not be silent
+    const key = /const KEY = '([^']+)'/.exec(code(SOURCES['/src/storage.ts'] ?? ''))?.[1];
+    expect(key, 'storage.ts must still declare a KEY').toBeTruthy();
+    expect(src, `seedPlayer writes the save slot storage.ts reads (${key})`).toContain(`localStorage.getItem('${key}')`);
+    expect(src, 'seedPlayer seeds only an empty slot, so a reload reads what the test stored')
+      .toMatch(/if \(!localStorage\.getItem\('[^']+'\)\) localStorage\.setItem\(/);
+    // and at least two tests still walk the avatar screen, one of them all the way into a mission
+    expect(src.split('await pickAvatar(page').length - 1, 'the walked cold start keeps at least two tests')
+      .toBeGreaterThanOrEqual(2);
+    const tutorial = src.indexOf("test('first play shows the slice tutorial hand");
+    expect(tutorial, 'the cold-start-into-play test must still exist').toBeGreaterThan(-1);
+    const body = src.slice(tutorial, src.indexOf("\n  test('", tutorial + 1));
+    expect(body, 'it walks the avatar screen').toContain('await pickAvatar(page)');
+    expect(body, 'and carries on into a mission').toContain('await startTopic(page');
+  });
 });
