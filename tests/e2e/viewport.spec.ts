@@ -74,6 +74,23 @@ test.describe('tablet viewports (#116)', () => {
     await page.goto('/?reset=1');
     await expect(page.locator('.avatar-screen')).toBeVisible();
     await expectFitsViewport(page, 'avatar screen');
+    /*
+     * #110's vertical half, and an honest note about where it bites. Measured on `main` before the fix, the
+     * field sat at y=906 in an 844 px phone — off screen — but at y=582 on an 800x1280 tablet and y=571 at
+     * 768x1024, which is low but *on* screen. So "below the fold" is the phone's failure, and an
+     * in-viewport assertion here would have passed before the fix: it is kept because a tablet grid gains
+     * rows as cards or avatars are added, and paired with the ordering check, which is the thing that
+     * cannot pass vacuously at any viewport. The phone's own version lives in `game.spec.ts`.
+     */
+    await expect(page.locator('.avatar-card')).toHaveCount(11);
+    expect(await page.evaluate(() => window.scrollY), 'the screen must not have scrolled yet').toBe(0);
+    await expect(page.locator('#name'), '#110: the name field is below the fold on a tablet').toBeInViewport({ ratio: 1 });
+    const [nameBottom, gridTop] = await page.evaluate(() => [
+      document.querySelector('#name')!.getBoundingClientRect().bottom,
+      document.querySelector('.avatar-grid')!.getBoundingClientRect().top,
+    ]);
+    expect(nameBottom, '#110: the name field must be above the avatar grid, not after all eleven cards')
+      .toBeLessThanOrEqual(gridTop);
   });
 
   test('the sky map and an island fit across', async ({ page }) => {

@@ -1179,3 +1179,37 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
         .toBeGreaterThanOrEqual(900);
   });
 });
+
+/**
+ * #110: the opening screen's "Your name" field was the last thing on a long page — brand header, the full
+ * eleven-card grid, *then* the field — and `.avatar-grid` is `repeat(auto-fill, minmax(104px, 1fr))`, so the
+ * wider and taller the screen the further down it went. On a tablet it was below the fold behind every card.
+ * The e2e in `game.spec.ts` and `viewport.spec.ts` measures the rendered field against the viewport, but only
+ * at the geometries a project declares; this is the cheap exhaustive half, and it holds the *ordering*, which
+ * is the thing that cannot come back without someone moving the markup.
+ *
+ * `canStart` itself is tested for real in `avatar.test.ts` — this rail only checks that the screen routes
+ * both the initial attribute and the live re-check through it, because a hand-rolled second copy of the rule
+ * is exactly how the two drifted apart before.
+ */
+describe('the opening screen asks for a name where it can be seen (#110)', () => {
+  const src = readFileSync(new URL('../../src/ui/avatar.ts', import.meta.url), 'utf8');
+
+  it('the name row is rendered above the avatar grid', () => {
+    expect(src.length, 'avatar.ts must be read from disk as text, or this rail checks nothing').toBeGreaterThan(1_000);
+    const nameRow = src.indexOf('class="name-row"'), grid = src.indexOf('class="avatar-grid"');
+    expect(nameRow, 'the .name-row label must exist in the template (#110)').toBeGreaterThan(-1);
+    expect(grid, 'the .avatar-grid must exist in the template (#110)').toBeGreaterThan(-1);
+    expect(nameRow, 'the name field below the eleven cards IS #110 — it must be rendered before the grid')
+      .toBeLessThan(grid);
+  });
+
+  it('both the initial button state and the live re-check go through canStart', () => {
+    const go = src.match(/<button id="go"[^>]*?\$\{([^}]*)\}/)?.[1];
+    expect(go, 'the Let\'s go! button must compute its disabled state inline (#110)').toBeTruthy();
+    expect(go, 'it must ask canStart, not `d.avatar` alone — an empty name used to sail through')
+      .toMatch(/canStart\(/);
+    expect(src, 'and the name input must re-check on every keystroke, or the button never enables (#110)')
+      .toMatch(/#name[\s\S]*?addEventListener\('input'|addEventListener\('input'[\s\S]*?sync/);
+  });
+});

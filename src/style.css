@@ -153,10 +153,18 @@ img { -webkit-user-drag: none; }
   box-shadow: 0 0 0 1px var(--glow), 0 12px 34px #0008, inset 0 0 40px color-mix(in srgb, var(--glow) 18%, transparent);
   transform: translateY(-4px) scale(1.03);
 }
-.name-row { display: flex; align-items: center; gap: 12px; margin: 16px auto 12px; max-width: 420px; }
+/*
+ * #110: the name row sits *above* the avatar grid. Below it, the grid is `repeat(auto-fill, minmax(104px, 1fr))`
+ * — the wider and taller the screen, the further down "Your name" went, and on a tablet it was past the fold
+ * behind all eleven cards. Above the grid it is on screen at first paint at every viewport, and the margin is
+ * the header's spacing rather than the old gap between the grid and the button.
+ */
+.name-row { display: flex; align-items: center; gap: 12px; margin: 0 auto 8px; max-width: 420px; }
 .name-row span { color: var(--muted); font-weight: 600; }
 .name-row input { flex: 1; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--line); background: #0b1030; color: var(--text); font-size: 18px; outline: none; }
 .name-row input:focus { border-color: var(--accent-2); }
+/* The empty-name nudge (#110). `min-height` holds the line's space when it clears, so the grid never jumps. */
+.name-hint { max-width: 420px; margin: 0 auto 14px; min-height: 18px; color: var(--muted); font-weight: 600; font-size: 13px; text-align: center; }
 /* runway below the sticky Let's go! button so the last card row (Bolt/Master) is never left under it — #51 */
 .avatar-screen { padding-bottom: calc(84px + var(--sab)); scroll-padding-bottom: calc(84px + var(--sab)); }
 .avatar-screen #go { display: flex; margin: 0 auto; position: sticky; bottom: calc(12px + var(--sab)); z-index: 2; box-shadow: 0 10px 30px #000a; }

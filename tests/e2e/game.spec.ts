@@ -226,6 +226,54 @@ test.describe('Sky Ninja Academy', () => {
     expect(await clearance()).toBeGreaterThanOrEqual(0);
   });
 
+  /**
+   * #110, both halves. The field used to be the last thing on the page, under all eleven cards, and
+   * `Let's go!` only ever asked for an avatar — so a child could walk straight past it and every screen
+   * downstream fell back to the literal "Ninja", the printed certificate included.
+   *
+   * "Visible without hunting for it" is measured as *on screen at first paint, before anything scrolls*,
+   * which is the thing the old layout failed; `toBeInViewport` on its own would pass after a scroll.
+   */
+  test('avatar screen: the name field is on screen from the start, and is required (#110)', async ({ page }) => {
+    await page.goto('/?reset=1');
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await expect(page.locator('.avatar-card')).toHaveCount(11);
+
+    // On screen at first paint — no scrolling, and above the first row of cards rather than below the last.
+    expect(await page.evaluate(() => window.scrollY), 'the screen must not have scrolled yet').toBe(0);
+    await expect(page.locator('#name')).toBeInViewport({ ratio: 1 });
+    const [nameBottom, gridTop] = await page.evaluate(() => [
+      document.querySelector('#name')!.getBoundingClientRect().bottom,
+      document.querySelector('.avatar-grid')!.getBoundingClientRect().top,
+    ]);
+    expect(nameBottom, 'the name field must sit above the avatar grid, not below it (#110)').toBeLessThanOrEqual(gridTop);
+    await expect(page.locator('#name-hint')).toHaveText(/name/i);   // a friendly nudge, not an error
+
+    // Required: an avatar alone is not enough, and a space bar is not a name.
+    await expect(page.locator('#go')).toBeDisabled();
+    await page.click('.avatar-card[data-id="volt"]');
+    await expect(page.locator('#go')).toBeDisabled();
+    await page.fill('#name', '   ');
+    await expect(page.locator('#go')).toBeDisabled();
+    await page.fill('#name', 'Ada');
+    await expect(page.locator('#go')).toBeEnabled();
+    await expect(page.locator('#name-hint')).toBeEmpty();           // the nudge clears once there is a name
+    await page.fill('#name', '');                                   // and comes back if the name is cleared again
+    await expect(page.locator('#go')).toBeDisabled();
+    await expect(page.locator('#name-hint')).toHaveText(/name/i);
+
+    await page.fill('#name', 'Ada');
+    await page.click('#go');
+    await expect(page.locator('.home')).toBeVisible();
+
+    // A returning player re-enters the screen from home with both already set — never blocked, name kept.
+    await page.click('#change-av');
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await expect(page.locator('#name')).toHaveValue('Ada');
+    await expect(page.locator('#go')).toBeEnabled();
+    await expect(page.locator('#name-hint')).toBeEmpty();
+  });
+
   test('every year has maths and writing topics listed', async ({ page }) => {
     await seedPlayer(page);
     for (const y of ['reception', 'year1', 'year2']) {
