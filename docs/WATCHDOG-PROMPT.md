@@ -83,18 +83,25 @@ your first finding and the only one you can report.
    must never be read as a pass. Note separately any PR that is a draft or carries an unanswered
    `REVIEW: CHANGES REQUESTED`, and how long it has sat: a block nobody returns to is a stalled review, not a
    safe state.
-5. **Is #46's order being followed?** The 2026-09-06 code-health freeze **ended on 2026-09-10**, and its end
+5. **Is the priority order being followed?** The 2026-09-06 code-health freeze **ended on 2026-09-10**, and its end
    is a one-time event, not a condition that can re-arm: a `review` or `debt` issue filed after that date does
    not re-freeze anything, the `frozen` label is retired, and code health now queues with features by priority
    instead of blocking them. So there is no freeze left to check. Two successors, and both are questions rather
    than accusations. **(a) Has a run re-imposed one?** A doc edit, an issue comment or a PR that bars a class of
    work again — or a run declining eligible work because it believes a freeze still holds. Only the owner
    declares a freeze, and it would appear in CLAUDE.md, BACKLOG.md and `docs/ROUTINE-PROMPT.md` together, so a
-   bar in one place alone is a finding. **(b) Has the order been skipped?** A PR developing an item that sits
-   below an unstarted, higher-priority `routine-ok` item in #46 — including a `review` or `debt` finding of
-   higher priority, which no longer blocks but is no longer last either. The documented ways past the list are
-   the same three as before: work the owner asked for in a session, `playtest` bugs, and anything that made the
-   game unplayable or `main` red. But that first exception is "whatever **the owner** asks for", not "shipped by
+   bar in one place alone is a finding. **(b) Has the order been skipped?** Since 2026-09-11 the order is
+   **the labels, not a list** (#171), which is the version of this check you can actually evaluate: run the
+   same query `docs/ROUTINE-PROMPT.md` STEP 3 gives a run —
+   `/issues?state=open&labels=routine-ok`, drop `owner-input`/`owner-approval`, anything with an open PR
+   solving it, anything blocked by an open issue it references, and the two heartbeat issues; then highest
+   `priority:*`, oldest issue number first — and compare the issue it names with the issue each PR opened
+   since your last check actually develops. A PR developing a lower-priority issue while that one sat
+   unstarted is the finding, and the query is reproducible, so it is evidence rather than an impression.
+   (A `review` or `debt` finding no longer blocks everything, but it is no longer last either — it sorts by
+   its priority label like anything else.) The documented ways past the order are the same three as before:
+   work the owner asked for in a session, `playtest` bugs, and anything that made the game unplayable or
+   `main` red. But that first exception is "whatever **the owner** asks for", not "shipped by
    a session": you cannot tell who authored a PR — one token serves everyone, every PR is self-authored — and
    the branch name, the PR body and the heartbeat snapshot are all written by the very party you are checking,
    so a run that skipped the order can present itself as a session. Look for evidence the **owner** asked: his
@@ -128,8 +135,8 @@ every six hours teaches people to stop listening, which is how a real alarm gets
 When you do find something:
 
 - **Open one issue per distinct problem**, titled `watchdog: <what is wrong>`, labelled `watchdog` and
-  `priority:P1`, and add it to the top of the "🔧 Code health" section of issue #46 so the next development run
-  picks it up. Say what you observed, the API call or file you observed it in, when it started if you can tell,
+  `priority:P1`. The labels are what the next development run queries, so a correctly labelled issue is
+  already at the front of its queue — there is no list to add it to. Say what you observed, the API call or file you observed it in, when it started if you can tell,
   and what a fix would have to establish — not how to write it.
 - **Never open a second issue for a problem that already has an open `watchdog` issue.** Search first
   (`/issues?state=open&labels=watchdog`) and **exclude `watchdog: heartbeat` from that search** — the pulse is

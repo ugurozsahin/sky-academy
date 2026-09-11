@@ -1006,7 +1006,10 @@ describe('the code-health freeze is over, in all three process files (2026-09-10
     expect(text, 'the file must say the freeze is over').toMatch(/the code-health freeze is over/i);
     expect(text, 'and that a new review/debt issue does not re-freeze the repo')
       .toMatch(/one-time event, not a condition that can re-arm/i);
-    expect(text, "and point at the owner's ordered list, which replaces it").toMatch(/#46/);
+    // Was `/#46/` until 2026-09-11. The ordered list it pointed at is retired (#171) — what has to survive
+    // the edit is that the file still says how work IS chosen, or "the freeze is over" means nothing.
+    expect(text, 'and say how work is chosen instead — by the priority labels (#171)')
+      .toMatch(/priority labels/i);
   });
 
   // The old rule, verbatim in the present tense, is what a run would act on if an edit put it back in one
@@ -1211,5 +1214,54 @@ describe('the opening screen asks for a name where it can be seen (#110)', () =>
       .toMatch(/canStart\(/);
     expect(src, 'and the name input must re-check on every keystroke, or the button never enables (#110)')
       .toMatch(/#name[\s\S]*?addEventListener\('input'|addEventListener\('input'[\s\S]*?sync/);
+  });
+});
+
+/**
+ * #171 — the ordered list is retired, and the rail is about the *dependency*, not the issue number.
+ *
+ * A pinned issue held the order by hand, and a hand-kept list has to agree with the labels, the board and
+ * reality. It did not: four consecutive runs reported items carrying `review` that were missing from its code
+ * health section, its own "Four left" line went stale against its own checkboxes twice, and a session had to
+ * reconcile it with the board by hand. Worse, it was the run's *control flow* — STEP 3 said "pick the first
+ * unticked item in it" — so the one issue that could retire the list was the one issue no run could pick, and
+ * the owner had to place it at the top by hand to break that.
+ *
+ * The order is now the labels: highest `priority:*`, oldest issue first, among open `routine-ok` issues.
+ * There is nothing to keep in step, so the way this comes back is not a decision, it is a sentence — one
+ * instruction file quietly pointing at the list again. That is what this rail reads. It checks the live
+ * instruction files only: `docs/worklog/` is the archive and records what was true then, and this test file
+ * names the number constantly in exactly these comments.
+ *
+ * Prove it red by putting "work top-down through issue #4" + "6" back into any file in LIVE.
+ */
+describe('no live rule points at the retired priority-order issue (#171)', () => {
+  const root = new URL('../../', import.meta.url);
+  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md', 'README.md'];
+  // Built from parts so this rail's own source does not contain the string it bans — otherwise the file
+  // could never be checked by a sibling rail, and a reader grepping the repo gets a false hit here.
+  const RETIRED = '#' + '46';
+
+  it.each(LIVE)('%s does not route work through it', (name) => {
+    const text = readFileSync(new URL(name, root), 'utf8');
+    expect(text.length, `${name} must be read from disk as text, or this rail checks nothing`)
+      .toBeGreaterThan(300);
+    expect(text, `${name} still points at the retired ordered list — work is chosen from the labels (#171)`)
+      .not.toContain(RETIRED);
+  });
+
+  // The other half: removing the pointer is only right if something replaced it. A file with neither is a
+  // run with no way to choose what to do, which is the failure this issue was opened to avoid, not fix.
+  it('the routine still states the query that replaced it', () => {
+    const text = readFileSync(new URL('docs/ROUTINE-PROMPT.md', root), 'utf8');
+    expect(text, 'STEP 3 must name the label the query selects on').toMatch(/labels=routine-ok/);
+    expect(text, 'and the priority order').toMatch(/priority:P1`? before `?priority:P2/);
+    // `later` is how the owner parks something without arguing with its priority — #8 is `priority:P1`
+    // and parked. Leave it out of the drop list and the query hands the next run parked work.
+    expect(text, 'and that `later` is dropped, or parked work comes straight back')
+      .toMatch(/\*\*drop\*\* anything labelled `later`/);
+    expect(text, 'and the tie-break, or two runs can read the same repo and disagree')
+      .toMatch(/oldest first/i);
+    expect(text, 'and that the project board is not in the loop').toMatch(/nothing in this flow reads the project board/i);
   });
 });
