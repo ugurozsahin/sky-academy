@@ -1625,3 +1625,110 @@ describe('a bullet is never swallowed onto the line above it (#195)', () => {
     ]) expect(SWALLOWED.test(ok), `false positive on: ${ok}`).toBe(false);
   });
 });
+
+/**
+ * #180 — the agent skills and review agents this repository carries.
+ *
+ * Cloud sessions and scheduled runs see only three sources of skills: `.claude/` in the cloned repo, plugins
+ * declared in settings, and skills enabled on the owner's account. A plugin needs an interactive install, which
+ * no routine can perform, so everything is **vendored into the repo** and pinned to the commit it came from.
+ *
+ * Two failure modes this rail exists for. First, a vendored file that has quietly been edited or re-copied from
+ * a different commit: the pin in its header is the only thing that says which upstream text this is, so a file
+ * without one, or with the wrong SHA, is unpinned. Second, the skill list growing by accident — context cost is
+ * per skill, not per byte, because every description sits in every turn's context. **The allow-list below is the
+ * rail**: adding a skill or an agent means editing this list in the same pull request, which is where a reviewer
+ * can see it and ask why.
+ *
+ * Prove it red: drop a stray directory into `.claude/skills/`, or change a SHA in a vendored header.
+ */
+describe('the vendored skills and agents are pinned, and the list is the allow-list (#180)', () => {
+  const root = new URL('../../', import.meta.url);
+  const SUPERPOWERS = { repo: 'obra/superpowers', sha: 'b36e0829c6d0' };
+  const MARKETPLACE = { repo: 'anthropics/claude-plugins-official', sha: '3b600518a637' };
+
+  /** Every skill directory that may exist, and where it came from (`null` = written for this project). */
+  const SKILLS: Record<string, { repo: string; sha: string; path: string } | null> = {
+    'add-topic': null,
+    'verification-before-completion': { ...SUPERPOWERS, path: 'skills/verification-before-completion' },
+    'using-git-worktrees': { ...SUPERPOWERS, path: 'skills/using-git-worktrees' },
+    'systematic-debugging': { ...SUPERPOWERS, path: 'skills/systematic-debugging' },
+    'test-driven-development': { ...SUPERPOWERS, path: 'skills/test-driven-development' },
+  };
+  /** Every agent definition that may exist. All three are vendored review agents (#180). */
+  const AGENTS: Record<string, { repo: string; sha: string; path: string }> = {
+    'pr-test-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/pr-test-analyzer.md' },
+    'silent-failure-hunter': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/silent-failure-hunter.md' },
+    'type-design-analyzer': { ...MARKETPLACE, path: 'plugins/pr-review-toolkit/agents/type-design-analyzer.md' },
+  };
+  /** Vendored files kept byte-for-byte, with no header: a comment would have to go inside code or a licence. */
+  const VERBATIM = [
+    '.claude/skills/systematic-debugging/condition-based-waiting-example.ts',
+    '.claude/skills/systematic-debugging/find-polluter.sh',
+  ];
+
+  const dirs = (p: string) => readdirSync(new URL(p, root), { withFileTypes: true })
+    .filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  const files = (p: string) => readdirSync(new URL(p, root), { withFileTypes: true })
+    .filter((e) => e.isFile()).map((e) => e.name).sort();
+  const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
+
+  it('no skill directory and no agent exists that this list does not name', () => {
+    expect(dirs('.claude/skills'), 'a skill nobody listed is a skill nobody reviewed (#180)')
+      .toEqual(Object.keys(SKILLS).sort());
+    expect(files('.claude/agents'), 'same for an agent definition')
+      .toEqual(Object.keys(AGENTS).map((n) => `${n}.md`).sort());
+  });
+
+  it.each([
+    ...Object.keys(SKILLS).map((n) => [`.claude/skills/${n}/SKILL.md`] as const),
+    ...Object.keys(AGENTS).map((n) => [`.claude/agents/${n}.md`] as const),
+  ])('%s has frontmatter with a one-line description', (file) => {
+    const text = read(file);
+    const front = /^---\n([\s\S]*?)\n---\n/.exec(text);
+    expect(front, `${file} must open with YAML frontmatter, or nothing loads it`).not.toBeNull();
+    const description = /^description:[ \t]*(\S.*)$/m.exec(front![1]);
+    expect(description, `${file} needs a description — it is the only line that reaches every turn's context`)
+      .not.toBeNull();
+    expect(description![1], 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
+    expect(/^name:[ \t]*\S/m.test(front![1]), `${file} needs a name`).toBe(true);
+  });
+
+  it.each([
+    ...Object.entries(SKILLS).filter(([, v]) => v).map(([n, v]) => [`.claude/skills/${n}/SKILL.md`, v!] as const),
+    ...Object.entries(AGENTS).map(([n, v]) => [`.claude/agents/${n}.md`, v!] as const),
+  ])('%s carries the source and the pin it was copied from', (file, src) => {
+    const header = /<!-- vendored: (\S+) (\S+) @ ([0-9a-f]{12}) —/.exec(read(file));
+    expect(header, `${file} is vendored, so it must say where from and at which commit (#180)`).not.toBeNull();
+    expect(header![1], 'the source repository').toBe(src.repo);
+    expect(header![2], 'the path within it').toContain(src.path);
+    expect(header![3], 'and the pinned commit').toBe(src.sha);
+  });
+
+  it('every markdown file inside a vendored skill is pinned; the rest are kept verbatim and listed', () => {
+    for (const [name, src] of Object.entries(SKILLS)) {
+      if (!src) continue;
+      for (const f of files(`.claude/skills/${name}`)) {
+        const path = `.claude/skills/${name}/${f}`;
+        if (f.endsWith('.md')) {
+          expect(read(path), `${path} is vendored markdown without a pin`).toContain(`@ ${src.sha}`);
+        } else {
+          expect(VERBATIM, `${path} is not markdown: keep it byte-for-byte and list it here`).toContain(path);
+        }
+      }
+    }
+  });
+
+  it('relative links inside the vendored skills resolve to a file that was copied with them', () => {
+    for (const name of Object.keys(SKILLS)) {
+      for (const f of files(`.claude/skills/${name}`).filter((x) => x.endsWith('.md'))) {
+        const text = read(`.claude/skills/${name}/${f}`);
+        const siblings = files(`.claude/skills/${name}`);
+        for (const [, target] of text.matchAll(/\]\(([^):#]+\.(?:md|ts|sh))\)/g)) {
+          expect(siblings, `.claude/skills/${name}/${f} links to ${target}, which was not copied with it`)
+            .toContain(target.replace(/^\.\//, ''));
+        }
+      }
+    }
+  });
+});
