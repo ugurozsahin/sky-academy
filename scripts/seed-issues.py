@@ -24,7 +24,7 @@ WORKFLOW = """
 - [ ] **Review** — a *different* agent (fresh subagent, or the next routine run) reviews the PR diff against CLAUDE.md, the acceptance criteria and the tests; approves or requests changes in the PR
 - [ ] **QA** — the reviewer (never the developer) runs the full e2e (mobile + desktop) on the PR and plays the feature (screenshots); results recorded in the PR
 - [ ] **Owner action** — {owner}
-- [ ] **Done** — merged to `main`, WORKLOG entry, artifact republished if player-visible, issue closed with the commit hash
+- [ ] **Done** — merged to `main`, issue closed with the commit hash
 """
 def with_workflow(it, n):
     if it.get('state') == 'closed': return it['body']

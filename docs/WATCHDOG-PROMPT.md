@@ -66,8 +66,12 @@ your first finding and the only one you can report.
    empty or unparseable body counts as stale, and that is the likeliest partial death, because the pulse is
    written last and last is the most exposed place to run out of time. If no such issue exists in any state,
    the routine has not run since this was introduced; if it exists but is closed, someone closed the pulse,
-   which is a finding, not a pass. Do not use WORKLOG.md for this: nothing reads it any more, and its headings
-   never distinguished a routine run from an interactive session anyway.
+   which is a finding, not a pass. There is no WORKLOG.md to fall back on: it was archived to `docs/worklog/`
+   on 2026-09-10 (#178) and nothing writes it, so the pulse is not one record of two — it is the only one.
+   That makes an unreadable body a finding in its own right rather than something to cross-check elsewhere.
+   Since #178 the body is a short snapshot rather than a single line: the timestamp is still the first thing
+   in it, and a snapshot whose checks are there but whose **values** are missing ("nightly ok" with no
+   timestamp or head) is a run that may not have looked — worth a finding if it repeats, not on its own.
 
 4. **Is any PR stuck?** For each open PR: how long has it been open, and does its head carry a `review-gate`
    status (`/commits/<head sha>/status`)? Two exemptions, and only these two: a PR **parked on the owner**
@@ -92,11 +96,12 @@ your first finding and the only one you can report.
    the same three as before: work the owner asked for in a session, `playtest` bugs, and anything that made the
    game unplayable or `main` red. But that first exception is "whatever **the owner** asks for", not "shipped by
    a session": you cannot tell who authored a PR — one token serves everyone, every PR is self-authored — and
-   the WORKLOG heading and branch name are written by the very party you are checking, so a run that skipped the
-   order can present itself as a session. Look for evidence the **owner** asked: his own comment on the issue or
-   PR — a WORKLOG line will not do, nothing reads that file and a run could write one itself. That is the one
-   form a run cannot issue to itself. If you find it, the item is a documented exception; if you do not, raise
-   the finding as a question — ask what authorised it, do not accuse.
+   the branch name, the PR body and the heartbeat snapshot are all written by the very party you are checking,
+   so a run that skipped the order can present itself as a session. Look for evidence the **owner** asked: his
+   own comment on the issue or PR. A run's own account of why it was allowed will not do, wherever it is
+   written — that is precisely the thing it can author for itself. His comment is the one form it cannot.
+   If you find it, the item is a documented exception; if you do not, raise the finding as a question — ask
+   what authorised it, do not accuse.
 6. **Is the Actions budget on course?** Compute **two** numbers from the wall-clock durations of runs created
    since the 1st (`/actions/runs?created=>=<first of the month>`, each rounded up to the minute), and put both
    in your report: **(a)** month-to-date ÷ days elapsed × 30, and **(b)** the last three days ÷ 3 × 30. One

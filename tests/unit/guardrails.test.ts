@@ -867,7 +867,10 @@ describe('guard rails', () => {
     // Without this half the rail above is satisfied by `GAME_PATHS='.'`, which skips nothing and reads green.
     it('and it still discriminates — the shapes that pay for this change are not matched', () => {
       const re = filter();
-      for (const path of ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'WORKLOG.md',
+      // `docs/worklog/2026-09.md` replaces `WORKLOG.md` here (#178 archived it): the shape being asserted is
+      // "a markdown file that cannot reach the game", and pointing at a path that no longer exists would
+      // have made this line read as a leftover rather than a check.
+      for (const path of ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/worklog/2026-09.md',
                           'tests/unit/guardrails.test.ts', 'scripts/seed-issues.py',
                           '.claude/skills/add-topic/SKILL.md', '.github/workflows/review-gate.yml'])
         expect({ path, e2e: re.test(path) }, `${path} cannot reach the game, so it must not pay for e2e (#176)`)
@@ -973,5 +976,82 @@ describe('the code-health freeze is over, in all three process files (2026-09-10
   // file only. Quoting it in the past tense ("was open") is how all three describe the history.
   it.each(FILES)('%s does not still state the freeze as a live rule', (name) => {
     expect(doc(name)).not.toMatch(/feature work while any issue labelled `review` or `debt` is open/i);
+  });
+});
+
+/**
+ * #178 — the worklog is closed, and the habit is what needs the rail.
+ *
+ * `WORKLOG.md` had twelve-plus writers a day and zero readers *by rule*: CLAUDE.md said "nothing reads it"
+ * and docs/ROUTINE-PROMPT.md STEP 1 said "do not read it", while it grew ~17 KB a day with no rotation logic
+ * anywhere in the repository. The only rotation that ever happened was manual, and it happened because the
+ * file had already killed a run on the token limit at 94.8 KB. The second file reached 55 KB — about three
+ * days from doing it again — before the owner closed it on 2026-09-10.
+ *
+ * Deleting the instruction is not enough on its own, which is the whole reason these are rails rather than a
+ * note. A run reads an old PR description, sees a worklog line in it and copies the habit; that is exactly
+ * how the `claude/*` branch names survived their own rename (#160). So: the file may not come back to the
+ * root, and no live instruction may tell a run to write to it.
+ *
+ * The rails read the *literal filename* and ban instruction SHAPES, not the word itself — every one of these
+ * files still has to be able to say what happened and why, in the past tense, without going red. That is the
+ * #129 failure from the other side: a rail that cannot tolerate its own explanation gets deleted rather than
+ * obeyed. Prove them red by restoring `WORKLOG.md` to the root, and by putting "append a line to WORKLOG.md"
+ * back into any live instruction file.
+ */
+describe('the worklog is archived and nothing writes it again (#178)', () => {
+  const root = new URL('../../', import.meta.url);
+  // Live instructions — the files a run or a session actually acts on. `docs/worklog/` is deliberately NOT
+  // here: it is the archive, it describes itself in the past tense, and a rail that policed it would be
+  // policing history. `tests/` is not here either, for the reason in the block comment above.
+  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md',
+                'README.md', 'scripts/seed-issues.py'];
+  const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
+
+  it('WORKLOG.md is gone from the repository root, and the archive is still there', () => {
+    const entries = readdirSync(root).map(String);
+    expect(entries.length, 'the root must be read from disk, not an empty listing').toBeGreaterThan(10);
+    expect(entries, 'nothing appends to a worklog any more — the record goes to the heartbeat issue (#178)')
+      .not.toContain('WORKLOG.md');
+    // Without this half the rail above also passes if someone deletes the archive, which is the opposite
+    // mistake: those two files are the record of the project's first week and are kept on purpose.
+    const archived = readdirSync(new URL('docs/worklog/', root)).map(String);
+    expect(archived.filter(f => f.endsWith('.md')).length,
+      'docs/worklog/ must still hold the archive — it is history, not clutter').toBeGreaterThanOrEqual(2);
+  });
+
+  // Three shapes, each an instruction to write rather than a mention. A file may still say the file existed,
+  // where it went and why — that is what every one of these now does.
+  it.each(LIVE)('%s does not tell a run to write to it', (name) => {
+    const text = live(name);
+    expect(text.length, 'a vacuous rail is worse than none').toBeGreaterThan(200);
+    for (const [shape, re] of [
+      ['"append/write/record … to WORKLOG.md"', /\b(append|writ|add|record|put|log)\w*\b[^.\n]{0,50}\bto\s+`?WORKLOG\.md/i],
+      ['"… in WORKLOG.md"', /\bin\s+`?WORKLOG\.md/i],
+      ['"a WORKLOG entry"', /\bWORKLOG(\.md)?\s+entry\b/i],
+    ] as const)
+      expect({ file: name, shape, found: re.test(text) },
+        `${name} still instructs a run to write the worklog (${shape}) — the record goes to the heartbeat ` +
+        'issue body instead (#178)').toEqual({ file: name, shape, found: false });
+  });
+
+  // The trap #178 names explicitly: the heartbeat issue is the one record here that IS read, so an appended
+  // one rebuilds the unbounded file in the worst possible place. The instruction has to say "replace".
+  it('the routine is told to REPLACE the heartbeat body, never to append to it', () => {
+    const text = live('docs/ROUTINE-PROMPT.md');
+    expect(text, 'STEP 5 must say the heartbeat body is replaced').toMatch(/\*\*replace\*\*|\breplace\b[^.\n]{0,40}body/i);
+    expect(text, 'and say in as many words that it is never appended to').toMatch(/never append/i);
+    expect(text, 'and it is still written last, so a run that dies leaves a stale pulse')
+      .toMatch(/last, not first/i);
+  });
+
+  // The three-file rule: the routing table is the thing that stops the habit coming back as a new file
+  // somewhere else, so all three have to carry it.
+  it.each(['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'])('%s carries the record-routing rule', (name) => {
+    const text = live(name);
+    expect(text, 'the file must ask who reads a record before one is written')
+      .toMatch(/who opens this, and when/i);
+    expect(text, 'and route operational state to the heartbeat issue, overwritten')
+      .toMatch(/overwritten every run, never appended/i);
   });
 });
