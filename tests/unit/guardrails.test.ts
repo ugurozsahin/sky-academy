@@ -1378,3 +1378,88 @@ describe('branches are named for the change, and nothing matches on the old pref
       .toMatch(/`branch-name` job in `ci\.yml`/);
   });
 });
+
+/**
+ * #161 — a stale review block may be adopted by another agent.
+ *
+ * The rule it replaces was absolute: "only the reviewer who set the block clears it". Sessions are mortal and
+ * that rule is not, so on PR #150 the blocking session went quiet at 00:53Z, the developer fixed what it asked
+ * for, the owner approved at 06:55Z, and the PR still sat drafted and red for ~10 hours until a session broke
+ * it by hand. This is a LOOSENING — it lets an agent clear a block it did not set — which is why the four
+ * conditions have to survive verbatim in all three process files rather than being paraphrased into a licence.
+ *
+ * The figure has exactly one written form, `at least 4 hours old`, so it cannot drift between the files; the
+ * rail asserts the whole canonical paragraph, which is stronger than asserting the number alone.
+ *
+ * Two things this rail also pins, because each is the way the loosening would decay into the failure it fixes:
+ *
+ *  - **`scripts/review-gate.mjs` has no clock.** A block must never expire by itself — that is how #74 was
+ *    merged over five open review items. The gate reads marker ORDER (which `created_at` is later), never
+ *    elapsed time, so `Date.now` appearing in it at all means someone taught it to age a block out.
+ *  - **The absolute wording is gone from all three files.** Leaving it beside the new rule is worse than not
+ *    landing the rule: a run finds "only the reviewer who set it may clear it" and obeys the stricter of two
+ *    contradicting sentences, which is the stall again.
+ *
+ * Prove it red: drop the paragraph from any of the three files; change `4 hours` to `four hours` in one of
+ * them; put the retired absolute sentence back; or add `Date.now()` to the gate.
+ */
+describe('a stale review block may be adopted, and only under the four conditions (#161)', () => {
+  const root = new URL('../../', import.meta.url);
+  const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  const PROCESS = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'];
+
+  // The canonical paragraph, in the one form all three files must carry. Split across lines for readability
+  // only — it is rejoined with single spaces, so the assertion is on the exact prose in the files.
+  const CANON = [
+    '**A stale review block may be adopted (#161).** A `REVIEW: CHANGES REQUESTED` block may be cleared by an',
+    'agent that did not open the pull request when all four of these hold: the block is **at least 4 hours',
+    'old**; the session that set it has commented nowhere in the repository since; the adopting agent has',
+    're-derived the original objection against the current head and found it genuinely resolved; and its',
+    '`REVIEW: CLEARED` comment says in its own first lines that it is clearing another reviewer\'s block and',
+    'names the conditions that made that legitimate.',
+  ].join(' ');
+
+  it.each(PROCESS)('%s carries the adoption rule in the one canonical form', (name) => {
+    const text = read(name);
+    expect(text.length, `${name} must be read from disk as text, or this rail checks nothing`)
+      .toBeGreaterThan(300);
+    expect(text, `${name} must state the four conditions word for word — a paraphrase is how a loosening widens`)
+      .toContain(CANON);
+  });
+
+  it.each(PROCESS)('%s keeps the limits that did not move, and drops the absolute rule', (name) => {
+    const text = read(name);
+    expect(text, `${name} must still forbid clearing your own block, and a live reviewer's`)
+      .toContain('Clearing your own block is still forbidden, and so is clearing a live reviewer\'s');
+    expect(text, `${name} must say a block never expires on its own`).toContain('A block never expires by itself');
+    // Built from parts so this rail's own source is not what trips it.
+    expect(text, `${name} still carries the retired absolute rule, which contradicts the adoption rule (#161)`)
+      .not.toContain('Only the reviewer who set ');
+  });
+
+  // Acceptance criterion: STEP 2 tells a run how to check the two conditions it cannot eyeball.
+  it('STEP 2 gives the two mechanical checks, and fails closed without a session id', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    expect(text, 'age comes from the blocking comment itself').toMatch(/issues\/<pr>\/comments/);
+    expect(text, 'and the setter is identified by session URL, since one token serves every agent')
+      .toMatch(/https:\/\/claude\.ai\/code\/session_<id>/);
+    expect(text, 'with the repo-wide comment listing that makes silence checkable')
+      .toMatch(/issues\/comments\?sort=created/);
+    expect(text, 'and no session id must mean NOT adoptable, never "probably gone"')
+      .toMatch(/is not adoptable/i);
+  });
+
+  // The gate reports the block; it never ages one out. #74 is what an expiring block costs.
+  it('review-gate.mjs orders the markers and never reads a clock', () => {
+    const src = read('scripts/review-gate.mjs');
+    expect(src, 'the gate must still decide by marker order').toContain('created_at');
+    expect(src, 'but never by elapsed time — a block that expires by itself is #74 again')
+      .not.toMatch(/Date\.now|getTime\(\)|\b\d+\s*\*\s*60\s*\*\s*60\b/);
+  });
+
+  it('the watchdog tells the owner a stalled block is adoptable, not merely stuck', () => {
+    const text = read('docs/WATCHDOG-PROMPT.md');
+    expect(text, 'the stale-block step must name the rule').toMatch(/Since #161 such a block is adoptable/);
+    expect(text, 'and point at where the mechanical checks live').toMatch(/ROUTINE-PROMPT\.md` STEP 2/);
+  });
+});
