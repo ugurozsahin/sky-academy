@@ -1564,3 +1564,64 @@ describe('the project board is synced from the Mac, read by pulse in the cloud, 
     }
   });
 });
+
+/**
+ * #195 — a merge swallowed a bullet onto the line above, and nothing could see it.
+ *
+ * PR #194 resolved a conflict in `CLAUDE.md` and `BACKLOG.md` against `a986b44` and lost the newline between
+ * two bullets in each, giving `…Never review your own PR.- British English everywhere…` and `…nothing
+ * republishes in its place.- The 2026-09-06 code review findings…`. No wording was lost; the *shape* was. The
+ * British English rule stopped being a rule of its own and became the tail of the longest bullet in the file.
+ *
+ * Every rail in this file passed, because they all ask whether a phrase is present somewhere in the text. That
+ * is the gap: these four documents are the mechanism this project runs on, they are written as very long
+ * single-line paragraphs, and a contested merge of one is exactly where a newline goes missing unnoticed.
+ *
+ * The signature is exact rather than a matter of taste. A full stop followed immediately by `- ` occurs zero
+ * times in all four files on every commit up to `a986b44`, and once in each of the two damaged files at
+ * `ce95028`: the prose uses em dashes, and a real bullet begins a line. The same holds for the other list
+ * markers these files use.
+ *
+ * Prove it red: join any bullet in any of the four files to the line above it.
+ */
+describe('a bullet is never swallowed onto the line above it (#195)', () => {
+  const PROCESS = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md'];
+
+  // A sentence end, then a list marker, mid-line: `.- ` or `. 1. `. Deliberately narrow — the marker must be a
+  // hyphen or a number, and what precedes it a full stop, question or exclamation mark. Widening it to `*` or
+  // `+`, or to a closing backtick or bracket, fires on the real prose of these files (```review`- or `debt`-labelled```,
+  // ```(unit) + Playwright```, ```reads?* `docs/…````) — a rail that cries wolf on the documents it guards gets deleted.
+  const SWALLOWED = /[.!?]\s?(?:-|\d{1,2}\.)\s+\S/;
+
+  it.each(PROCESS)('%s has no bullet joined to the end of another line', (name) => {
+    const text = readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
+    expect(text.length, `${name} must be read from disk as text, or this rail checks nothing`)
+      .toBeGreaterThan(300);
+    const joined = text
+      .split('\n')
+      .map((line, i) => ({ line, n: i + 1 }))
+      .filter(({ line }) => SWALLOWED.test(line))
+      .map(({ line, n }) => `${name}:${n}: …${line.slice(Math.max(0, line.search(SWALLOWED) - 40), line.search(SWALLOWED) + 60)}…`);
+    expect(joined, `a merge has joined a bullet to the line above (#195 — this is what #194 did)`).toEqual([]);
+  });
+
+  // The rail is only worth having if it would have caught the real thing, so assert on the real thing.
+  it('catches the two joins #194 actually made', () => {
+    expect(SWALLOWED.test('…No agent publishes it instead. Never review your own PR.- British English everywhere'))
+      .toBe(true);
+    expect(SWALLOWED.test('…nothing republishes in its place.- The 2026-09-06 code review findings are issues'))
+      .toBe(true);
+  });
+
+  // And only if it stays quiet on the prose these files are actually written in.
+  it('does not fire on the ordinary prose of these documents', () => {
+    for (const ok of [
+      '- **Workflow**: Refine → Develop (agent A, branch `feature|fix|chore/<n>-<slug>`)',
+      'branch `chore/141-mobile-only-pr-matrix`, and the slug is lower case',
+      'the trigger is still named "…— hourly dev run" from when it fired hourly',
+      'Say "the issue stays open" instead; break the link (`#&#8203;<n>`, or "issue 44" in words)',
+      '`priority:P1` before `priority:P2` before `priority:P3`; an issue with no `priority:*` label sorts last',
+      'read it with `GET /repos/ugurozsahin/sky-academy/actions/runs?head_sha=<full head sha>`',
+    ]) expect(SWALLOWED.test(ok), `false positive on: ${ok}`).toBe(false);
+  });
+});
