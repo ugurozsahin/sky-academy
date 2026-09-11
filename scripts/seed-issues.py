@@ -20,7 +20,7 @@ WORKFLOW = """
 
 ### Workflow (minimum scrum — the developer and the reviewer/QA must be different agents)
 - [ ] **Refine** — acceptance criteria written at the top of this issue (Claude proposes, owner may adjust)
-- [ ] **Develop** — agent A: branch `claude/issue-{n}`, implement + tests (`npm test`, `npx tsc --noEmit`, e2e mobile), open a PR that says `Closes #{n}`
+- [ ] **Develop** — agent A: branch `feature|fix|chore/{n}-<slug>` (#160 — `fix/` for `bug`/`playtest`, `feature/` for `enhancement`, `chore/` for everything else), implement + tests (`npm test`, `npx tsc --noEmit`, e2e mobile), open a PR that says `Closes #{n}`
 - [ ] **Review** — a *different* agent (fresh subagent, or the next routine run) reviews the PR diff against CLAUDE.md, the acceptance criteria and the tests; approves or requests changes in the PR
 - [ ] **QA** — the reviewer (never the developer) runs the full e2e (mobile + desktop) on the PR and plays the feature (screenshots); results recorded in the PR
 - [ ] **Owner action** — {owner}

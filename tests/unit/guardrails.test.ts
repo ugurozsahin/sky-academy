@@ -1265,3 +1265,116 @@ describe('no live rule points at the retired priority-order issue (#171)', () =>
     expect(text, 'and that the project board is not in the loop').toMatch(/nothing in this flow reads the project board/i);
   });
 });
+
+/**
+ * #160 — branch names say what the change is, and the rail is about the *matcher*, not the prefix.
+ *
+ * Branch listings read `claude/affectionate-noether-cztizx` and `claude/bold-knuth-fbbwdx` — generated animal
+ * names that say nothing about the work, so a stale branch could not be judged without opening its PR and
+ * thirteen merged-but-undeleted ones had to be cleared by hand. The owner noticed twice and raised it to P1.
+ *
+ * The prefix is the easy half. Two things underneath it are why this is a rail and not a note:
+ *
+ * 1. **The escape clause, not the prefix, produced those names.** STEP 3 used to end "…or the branch this run
+ *    is told to push to if it has one", so a cloud run taking the harness-assigned branch was *obeying the
+ *    documented rule*. Rename the prefix and leave the clause and the next `claude/bold-knuth-*` is still
+ *    compliant. The clause now costs a line of disclosure in the PR body, which is what turns a departure
+ *    from silent into visible.
+ * 2. **STEP 2 matched on the old prefix.** "List open PRs from branches `claude/*`" is a behaviour, not
+ *    wording: under the new names that match returns an empty list, and a run that trusted it would report
+ *    "nothing to review" with work sitting open — a reviewer stops seeing PRs and nothing goes red. So the
+ *    rail reads the listing instruction as well as the naming one.
+ *
+ * The files may still *describe* `claude/*` in the past tense — every one of them has to be able to explain
+ * what was retired and why, which is the #129 lesson: a rail that cannot tolerate its own explanation gets
+ * deleted rather than obeyed. What is banned is the retired *instruction* form, `claude/issue-<n>`.
+ *
+ * Prove it red: put "branch `claude/issue-" + "<n>`" back into any file in LIVE, or change STEP 2 back to
+ * listing PRs by branch prefix.
+ */
+describe('branches are named for the change, and nothing matches on the old prefix (#160)', () => {
+  const root = new URL('../../', import.meta.url);
+  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md',
+                'README.md', 'scripts/seed-issues.py'];
+  const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  // Built from parts so this rail's own source does not contain the instruction form it bans.
+  const RETIRED = 'claude/' + 'issue-';
+
+  it.each(LIVE)('%s does not tell anyone to open a retired-style branch', (name) => {
+    const text = live(name);
+    expect(text.length, `${name} must be read from disk as text, or this rail checks nothing`)
+      .toBeGreaterThan(300);
+    expect(text, `${name} still hands out the retired branch name — the convention is feature|fix|chore (#160)`)
+      .not.toContain(RETIRED);
+  });
+
+  // The three process files carry this convention word for word, the same way they carry the freeze wording
+  // and the records rule. A mapping that drifts between them is a run guessing which file to believe.
+  const PROCESS = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'];
+  it.each(PROCESS)('%s states the prefix mapping in the one canonical form', (name) => {
+    const text = live(name);
+    expect(text, `${name} must map the three prefixes onto the labels, identically in all three files`)
+      .toContain('`fix/` for `bug`/`playtest`, `feature/` for `enhancement`, `chore/` for everything else');
+    expect(text, `${name} must give the branch shape, or the mapping has nothing to attach to`)
+      .toMatch(/<n>-<slug>/);
+  });
+
+  // The half that is a behaviour change. Losing this is not a typo: the reviewer's own listing goes empty
+  // and the run reports "nothing to review" while PRs sit open, with nothing red to say otherwise.
+  it('STEP 2 lists every open PR instead of matching a branch prefix', () => {
+    const text = live('docs/ROUTINE-PROMPT.md');
+    expect(text, 'STEP 2 must name the unfiltered listing call').toMatch(/pulls\?state=open/);
+    expect(text, 'and say plainly that branch name is not a filter').toMatch(/never filter by branch name/i);
+  });
+
+  // The clause that actually produced the old names, and the reason this half is a rail rather than prose.
+  //
+  // A scheduled run is handed a push branch and told not to use another without explicit permission, so the
+  // rule has to do two things a flat "name your own branch" cannot: say the assigned branch is not to be
+  // used, and say WHERE the permission comes from. A run weighing a repository file against the instruction
+  // it was launched with should be able to point at the owner giving it — not at this file alone, which is
+  // the one thing any agent editing the repo could have written for itself.
+  //
+  // Two runs on 2026-09-11 read the old wording and used the pinned branch, which is what a rule that only
+  // says "prefer" is worth. The remaining fallback is a REFUSED push, not an unencouraged one, and it still
+  // costs a line in the PR body: otherwise taking it is indistinguishable from ignoring the convention.
+  it('the assigned push branch is refused, and the permission is sourced', () => {
+    const text = live('docs/ROUTINE-PROMPT.md');
+    expect(text, 'the rule must say the session-assigned branch is not the one to use')
+      .toMatch(/do not use it/i);
+    expect(text, "and cite the owner's permission, or it is a file granting itself a licence")
+      .toMatch(/owner's explicit permission/i);
+    expect(text, 'and the fallback must be a refusal, not a preference').toMatch(/if the push is \*\*refused\*\*/i);
+    expect(text, 'and must still require the disclosure that makes it visible')
+      .toMatch(/BRANCH: PUSH REFUSED/);
+  });
+
+  // The owner asked for this one by name, and the reason is the gap every rail above has:
+  //
+  //   "The guard rail this issue asks for should check the PR's head branch name, which is where the rule
+  //    actually shows up, not just that the docs agree with each other."  — #160, 2026-09-10T18:12Z
+  //
+  // Everything in this file reads text from disk. A pull request whose own branch ignores the convention is
+  // green on all of it — which is exactly what happened while the convention was being written, on the pull
+  // request that introduced it. Only CI can see a head branch, so the check lives in `ci.yml` and this rail
+  // guards that it is still there and still means something: the pattern, the `pull_request` scoping, and
+  // the single documented exception.
+  //
+  // Prove it red by deleting the `branch-name` job, by loosening the pattern, or by dropping the marker.
+  it('CI reads the head branch itself, which no rail in this file can', () => {
+    const ci = readFileSync(new URL('.github/workflows/ci.yml', root), 'utf8');
+    expect(ci, 'the job the owner asked for must exist').toMatch(/^ {2}branch-name:$/m);
+    expect(ci, 'and enforce the three prefixes with an issue number and a slug')
+      .toContain("PATTERN='^(feature|fix|chore)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'");
+    // A push to main and the nightly have no head branch; failing them there would be nonsense, and a job
+    // that fails for a silly reason is a job someone deletes.
+    expect(ci, 'and run only where there is a head branch to judge')
+      .toMatch(/branch-name:[\s\S]{0,200}?if: github\.event_name == 'pull_request'/);
+    // Anchored: a reviewer quoting the marker in a sentence must not clear the check — #144's bug, which
+    // GitHub's own closing-keyword parser has and which cost this repo two wrongly-closed issues.
+    expect(ci, "and match the exception marker at a line start, not anywhere in the body")
+      .toContain("grep -Eq '^BRANCH: PUSH REFUSED'");
+    expect(live('docs/ROUTINE-PROMPT.md'), 'and the routine must tell a run the job exists')
+      .toMatch(/`branch-name` job in `ci\.yml`/);
+  });
+});

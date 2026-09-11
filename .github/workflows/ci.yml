@@ -186,3 +186,52 @@ jobs:
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # #160 — the rule shows up in the head branch name, so that is what this reads.
+  #
+  # The unit rails in tests/unit/guardrails.test.ts can only check that the instruction files agree with each
+  # other; they are green on a pull request whose own branch ignores the convention, which is exactly what
+  # happened while the convention was being written. The owner asked for this one by name (issue #160,
+  # 2026-09-10T18:12Z): "The guard rail this issue asks for should check the PR's head branch name, which is
+  # where the rule actually shows up, not just that the docs agree with each other."
+  #
+  # `pull_request` only: a push to main, the nightly and workflow_dispatch have no head branch to judge, and
+  # failing them on `main` would be nonsense. Costs a runner-second and needs no checkout.
+  #
+  # The ONE exception is the one the owner documented on that issue — a push the host REFUSES, not one a run
+  # would rather not make. It is claimed by a line in the pull request body beginning `BRANCH: PUSH REFUSED`,
+  # which then has to name the branch that was tried and quote the refusal, and it is deliberately loud: a
+  # marker in the body is visible to every reviewer, where a silent fallback in a rule was not. Runs pushing
+  # branches they name themselves is verified — a scheduled cloud run created and pushed
+  # `chore/160-branch-naming-pushtest` on 2026-09-11 — so this marker should be rare enough that a second one
+  # is worth investigating rather than accommodating.
+  branch-name:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Head branch follows feature|fix|chore/<issue>-<slug> (#160)
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          PATTERN='^(feature|fix|chore)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'
+          if printf '%s' "$HEAD_REF" | grep -Eq "$PATTERN"; then
+            echo "### branch name: **ok** — \`$HEAD_REF\` (#160)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # grep, not a glob: the marker must start a line, so a reviewer quoting it in a sentence does not
+          # clear the check the way a keyword buried in a body closes an issue (#144, the same class of bug).
+          if printf '%s' "$BODY" | grep -Eq '^BRANCH: PUSH REFUSED'; then
+            echo "### branch name: **exception claimed** — \`$HEAD_REF\` (#160)" >> "$GITHUB_STEP_SUMMARY"
+            echo "The body carries \`BRANCH: PUSH REFUSED\`. A reviewer must check it names the branch that" >> "$GITHUB_STEP_SUMMARY"
+            echo "was tried and quotes the refusal — this job cannot judge that, only that it was claimed." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "### branch name: **FAILED** — \`$HEAD_REF\` (#160)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branches are named for the change: \`feature|fix|chore/<issue>-<slug>\` — \`fix/\` for" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`bug\`/\`playtest\`, \`feature/\` for \`enhancement\`, \`chore/\` for everything else." >> "$GITHUB_STEP_SUMMARY"
+          echo "A run names its own branch; the branch a session was assigned is not to be used." >> "$GITHUB_STEP_SUMMARY"
+          echo "If the push was REFUSED, say so on its own line in the body, starting \`BRANCH: PUSH REFUSED\`," >> "$GITHUB_STEP_SUMMARY"
+          echo "naming the branch you tried and quoting the refusal." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
