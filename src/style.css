@@ -754,14 +754,34 @@ img { -webkit-user-drag: none; }
 
 /* visuals in question card */
 .vis { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 4px 0; flex-wrap: wrap; }
-.objs .obj { font-size: clamp(22px, 5.5vw, 30px); line-height: 1.1; } .objs .obj.gone { opacity: .35; position: relative; }
+.objs .obj { font-size: var(--obj); line-height: 1; } .objs .obj.gone { opacity: .35; position: relative; }
 /* 900 stays here: ✕ is not a Fredoka glyph, so this falls through to the system stack where 900 is real. */
 .objs .obj.gone::after { content: "✕"; position: absolute; inset: 0; color: var(--bad); font-weight: 900; display: grid; place-items: center; font-size: 1.1em; }
 .vis.objs { flex-direction: column; gap: 4px; } .vis.objs.two { flex-direction: row; gap: 10px; align-items: center; }
 .objs .grp { display: flex; flex-direction: column; gap: 4px; align-items: center; max-width: 46%; }
-.five { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; padding: 3px; background: #ffffff14; border: 1.5px solid #ffffff44; border-radius: 10px; }
+/*
+ * #107: the five-frame has ONE size, `--slot`, and the glyph is sized from it. It used to have two that
+ * could drift apart — the box from `min(6.5vw, 4.5vh)`, its contents from `5.5vw` alone — so on a tablet
+ * (wide relative to its height, or short) the box collapsed towards its floor while the glyph stayed near
+ * its cap and the emoji burst out of the frame, sometimes into the next slot along.
+ *
+ * `0.78` is a font metric, not a taste number. Every emoji in `OBJECTS` advances **1.248 em** — measured,
+ * and identical for all ten, because a colour-emoji face is monospaced — so a glyph is inside its slot
+ * only while `font-size <= slot / 1.248 = 0.801 * slot`. 0.78 keeps ~3% in hand there and still fits a
+ * 1.275 em Apple Color Emoji advance, the widest face the game can land on. `line-height: 1` for the same
+ * reason: at 1.1 the inline box was taller than the glyph needed and pushed the ink down in its slot.
+ *
+ * `--slot` is declared on `.five` rather than on `.vis.objs` so that every `.slot` has it however the
+ * frames are nested (the two-group layout puts a `.grp` in between).
+ */
+.five {
+  --slot: clamp(22px, min(7.2vw, 5vh), 40px);
+  --obj: calc(var(--slot) * 0.78);
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; padding: 3px;
+  background: #ffffff14; border: 1.5px solid #ffffff44; border-radius: 10px;
+}
 .slot {
-  width: clamp(20px, min(6.5vw, 4.5vh), 36px);
+  width: var(--slot);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -769,7 +789,8 @@ img { -webkit-user-drag: none; }
   background: #ffffff10;
   box-shadow: inset 0 0 0 1px #ffffff1c;
 }
-.objs.two .slot { width: clamp(22px, 5vw, 30px); } .objs.two .obj { font-size: clamp(18px, 4.2vw, 24px); } .objs .plus { font-size: 26px; font-weight: 700; color: var(--accent); }
+/* Two groups side by side get a smaller frame — one `--slot`, so the glyph follows it down (#107). */
+.objs.two .five { --slot: clamp(20px, min(5.6vw, 4vh), 32px); } .objs .plus { font-size: 26px; font-weight: 700; color: var(--accent); }
 .tenframe { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; padding: 4px; background: #ffffff18; border-radius: 8px; }
 .tenframe i { width: 24px; height: 24px; border-radius: 50%; background: #ffffff22; } .tenframe i.a { background: var(--accent); } .tenframe i.b { background: var(--accent-2); }
 .dots { width: 150px; height: 100px; } .dots circle { fill: #fff; }
@@ -1037,11 +1058,14 @@ img { -webkit-user-drag: none; }
   .qcard.good .hint, .qcard.bad .hint {
     display: block;
   }
-  .slot, .objs.two .slot {
-    width: 20px;
-  }
-  .objs .obj {
-    font-size: 16px;
+  /*
+   * #107, worst case: this block used to pin the slot to 20px and then set the glyph twice — `16px` and,
+   * eight lines later, `20px`, so the first was dead and a 20px emoji (24.96px of advance) sat in a 20px
+   * box, a quarter of it outside the frame. That is the band a tablet in landscape lands in, and it is
+   * the spill the bug was reported from. One `--slot` now, and the glyph follows it.
+   */
+  .five, .objs.two .five {
+    --slot: 24px;
   }
   .five {
     gap: 2px;
@@ -1052,9 +1076,6 @@ img { -webkit-user-drag: none; }
   }
   .vis {
     margin: 2px 0;
-  }
-  .objs .obj {
-    font-size: 20px;
   }
 }
 

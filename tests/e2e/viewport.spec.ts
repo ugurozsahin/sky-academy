@@ -79,25 +79,40 @@ test.describe('tablet viewports (#116)', () => {
   });
 
   /**
-   * #107: `.slot` is sized from `min(6.5vw, 4.5vh)` and the emoji inside it from `5.5vw` alone, so the box
-   * and its contents track different units. This measures the two boxes rather than reading the CSS, so
-   * #107's fix — whatever unit it lands on — is what turns it green.
+   * #107, fixed: the five-frame now has one size, `--slot`, and the glyph is `calc(var(--slot) * 0.78)`.
+   * This measures the two rendered boxes rather than reading the CSS, so it stays true whatever units a
+   * later change lands on.
    *
-   * What it actually caught, recorded here so #107 is not chased in the wrong place: the glyph paints
-   * **1.4 px past the right edge** of its slot at both 800x1280 and 1280x800, and is comfortably inside it
-   * top and bottom. That is a real containment breach by the mechanism #107 describes, but it is not the
-   * spill the owner saw on the device — headless Chromium here has no colour-emoji font, and the issue's
-   * own reading is that Android's Noto Color Emoji renders taller than the em box, which `line-height: 1.1`
-   * does not contain. Worth knowing before the fix is written: the arithmetic alone does not produce a
-   * visible overflow at any viewport CI can render, because `@media (max-height: 640px)` already pins both
-   * the slot and the font to 20 px below the height where `4.5vh` would undercut the 30 px font cap.
+   * One correction to what the `test.fixme` here used to say, because it would have sent the fix to the
+   * wrong place: it recorded "the arithmetic alone does not produce a visible overflow at any viewport CI
+   * can render, because `@media (max-height: 640px)` already pins both the slot and the font to 20 px".
+   * The block pins the slot to 20 px, but it set the font **twice** — `16px`, then `20px` eight lines
+   * later — so the effective pairing was a 20 px glyph in a 20 px box, and an emoji advances 1.248 em.
+   * Measured at 844x390 before the fix: **4.97 px outside the slot** for a single group and **9.95 px**
+   * for the two-group layout, which is half a slot and lands the glyph in its neighbour. That is the
+   * spill the owner reported, it is pure arithmetic, and it reproduces in headless Chromium.
    */
   test('objects stay inside their five-frame slots (#107)', async ({ page }) => {
-    test.fixme(true, '#107: the glyph paints ~1.4 px past the right edge of its slot at both tablet sizes');
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-count');
     await expect(page.locator('.objs .slot .obj').first()).toBeVisible();
     expect(await outsideItsBox(page, '.objs .slot', '.obj'),
       'an object painted outside its five-frame slot (#107)').toEqual([]);
+  });
+
+  /**
+   * The same containment in the band the bug was actually reported from (#107). `@media (max-height: 640px)`
+   * is a separate set of rules, and it was the worst offender of the lot — a tablet held in landscape lands
+   * here, so a check that only ever runs at 1280x800 would have left the real spill in place.
+   */
+  test('objects stay inside their slots on a short screen too (#107)', async ({ page }) => {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    await expect(page.locator('.objs .slot .obj').first()).toBeVisible();
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.five')!).getPropertyValue('--slot').trim()),
+      'the short-screen block must still set --slot, or this test is measuring the default (#107)').toBe('24px');
+    expect(await outsideItsBox(page, '.objs .slot', '.obj'),
+      'an object painted outside its five-frame slot on a short screen (#107)').toEqual([]);
   });
 });
