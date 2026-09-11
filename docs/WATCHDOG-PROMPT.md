@@ -134,6 +134,17 @@ your first finding and the only one you can report.
    run with `conclusion: null` as still going, not as failed. Where you genuinely cannot determine it, say so
    plainly rather than assuming it was fine.
 
+8. **Is the board sync alive?** You cannot reach the board yourself — Projects v2 is GraphQL-only and the
+   cloud GitHub proxy answers it 403 whatever token you hold — so read its pulse instead: the body of the
+   open issue titled `board: heartbeat` (label `watchdog`; exclude it from the duplicate search below like
+   the other two pulses). `scripts/board-sync.mjs` runs on the owner's Mac every 15 minutes as a launchd
+   agent and rewrites that body with a UTC timestamp and what it did, at least hourly (#158). **A timestamp
+   older than ~2 hours is a finding** — the Mac is asleep, the agent is unloaded, or the token expired (a
+   classic PAT with an expiry date; the log on the Mac, `~/Library/Logs/sky-academy-board-sync.log`, says
+   which). Missing in any state, closed, or a body you cannot parse a timestamp out of is the same finding —
+   an open issue is not a pulse, a readable recent timestamp is. Put the age you observed in your own pulse
+   (`board pulse 14 min`). It is not yours to fix and you cannot run the sync; tell the owner once.
+
 ## Reporting
 
 **A clean run is silent.** Report nothing to the owner, open nothing, write nothing — a watchdog that speaks

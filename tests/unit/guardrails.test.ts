@@ -1463,3 +1463,104 @@ describe('a stale review block may be adopted, and only under the four condition
     expect(text, 'and point at where the mechanical checks live').toMatch(/ROUTINE-PROMPT\.md` STEP 2/);
   });
 });
+
+/**
+ * #158 — the project board is a projection of the repository, synced from the owner's Mac, and never a
+ * second source of truth. No cloud session can reach it.
+ *
+ * The board's 44 cards sat in Backlog for four days because Projects v2 sets nothing by itself, and a session
+ * then backfilled it by hand — which is the state the retired pinned list was in before #171: a second thing
+ * that has to agree with the labels and does not. The first cut of this work told the ROUTINE to run the
+ * sync, with the token as a cloud secret; the Claude Code docs say the cloud GitHub proxy answers every
+ * non-PR GraphQL request 403 "regardless of the credentials you supply" and name Projects v2 as the example,
+ * so that instruction could only ever have produced a `NOT synced` line in every heartbeat. Three ways this
+ * decays, and a rail for each:
+ *
+ * 1. **A cloud instruction file tells a run to execute the sync again.** It cannot work, and the doc that
+ *    says so is the one a run reads. The live instruction files must not carry the run command at all, and
+ *    must say why, so the next agent who "fixes" it by adding the command back has to delete the sentence
+ *    explaining the 403 first.
+ * 2. **Nobody reads the pulse.** With the sync out of reach, the only way a cloud agent can tell a synced
+ *    board from a dead Mac job is the `board: heartbeat` issue the script rewrites at least hourly. STEP 1
+ *    and the watchdog's check 8 must both read it, and the heartbeat shape must carry the `- board:` line.
+ *    Drop any of those and a dead sync reads as a quiet board, which is this project's signature failure.
+ * 3. **The sync starts writing back.** The arrows point one way, repo → board, plus one pulse. The day the
+ *    script sets a label, closes an issue or edits a PR, the labels are no longer the input and the owner's
+ *    control surface has two authors. The rail reads the source for the endpoints and mutations that would
+ *    do that, and counts the call sites of the one write helper.
+ *
+ * Prove it red: put "`node scripts/board-sync.mjs`" into STEP 1, delete "board: heartbeat" from the
+ * watchdog's check 8, or add a third `restWrite(` call to the script.
+ */
+describe('the project board is synced from the Mac, read by pulse in the cloud, and never written back (#158)', () => {
+  const root = new URL('../../', import.meta.url);
+  const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  const CLOUD = ['docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md'];
+
+  it.each(CLOUD)('%s never tells a cloud run to execute the sync, and says why it cannot', (name) => {
+    const text = read(name);
+    expect(text.length).toBeGreaterThan(1000);
+    expect(text, 'a cloud session cannot run this — the GitHub proxy answers Projects v2 with 403')
+      .not.toMatch(/node scripts\/board-sync\.mjs/);
+    // Both files hard-wrap prose, so the two facts may sit on adjacent lines.
+    expect(text, 'and the file must say so, or the next edit adds the command back').toMatch(/Projects v2[\s\S]{0,300}403|403[\s\S]{0,300}Projects v2/);
+  });
+
+  it('the routine reads the pulse in STEP 1 and carries it in the STEP 5 snapshot', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    const step1 = text.slice(text.indexOf('STEP 1 —'), text.indexOf('STEP 2 —'));
+    const step5 = text.slice(text.indexOf('STEP 5 —'));
+    expect(step1.length, 'STEP 1 must be found by its heading').toBeGreaterThan(200);
+    expect(step5.length, 'STEP 5 must be found by its heading').toBeGreaterThan(200);
+    expect(step1, 'STEP 1 must name the pulse issue').toContain('`board: heartbeat`');
+    expect(step1, 'and treat a stale or unreadable pulse as a finding, not a pass').toMatch(/unparseable, missing or closed/);
+    expect(step5, 'the heartbeat shape must carry the board line').toMatch(/^- board: pulse /m);
+  });
+
+  it('the watchdog reads the same pulse and bounds its age', () => {
+    const text = read('docs/WATCHDOG-PROMPT.md');
+    expect(text).toContain('`board: heartbeat`');
+    expect(text, 'the age bound is the check').toMatch(/older than ~2 hours is a finding/);
+    expect(text, 'an open issue is not a pulse').toMatch(/an open issue is not a pulse/);
+  });
+
+  it('CLAUDE.md and BACKLOG.md tell a session where the sync runs, where the token lives, and what feeds Blocked', () => {
+    const claude = read('CLAUDE.md');
+    expect(claude, 'the launchd definition is how it runs').toContain('scripts/board-sync.plist');
+    expect(claude).toContain('.git/github-project-token');
+    expect(claude, 'the token file sits beside the credentials file, never inside it').toMatch(/beside — never inside/);
+    expect(claude, 'and a session must not be sent to the cloud for it').toMatch(/No cloud session can reach the board/);
+    expect(read('BACKLOG.md'), 'the label list must carry `blocked`, or the Blocked column has no input').toMatch(/`blocked` \(/);
+  });
+
+  it('the launchd agent runs the script every 15 minutes from the clone', () => {
+    const plist = read('scripts/board-sync.plist');
+    expect(plist).toContain('<string>scripts/board-sync.mjs</string>');
+    expect(plist).toMatch(/<key>StartInterval<\/key>\s*<integer>900<\/integer>/);
+    expect(plist).toContain('<string>com.sky-academy.board-sync</string>');
+    expect(plist, 'XML comments cannot contain a double hyphen; the doc inside must stay well-formed')
+      .not.toMatch(/<!--[\s\S]*?--[\s\S]*?-->/);
+  });
+
+  it('the sync writes Status, Priority, archive, add and its own pulse — and never a label, an issue state or a PR', () => {
+    const src = read('scripts/board-sync.mjs');
+    expect(src.length).toBeGreaterThan(1000);
+    expect(src, 'no label endpoint').not.toMatch(/\/labels\b/);
+    // Scoped to the write calls: the JSDoc types above `plan()` legitimately spell `state:'open'|'closed'`.
+    expect(src, 'no issue state in any write payload').not.toMatch(/restWrite\([^;]*\bstate\s*:/);
+    expect(src, 'no pull-request write').not.toMatch(/restWrite\([^)]*\/pulls/);
+    // One write helper, two call sites (create the pulse, edit the pulse). A third call is a new kind of
+    // write and must be argued for here, in this rail.
+    expect(src, 'the write helper must exist, or the count below counts nothing').toMatch(/const restWrite = async/);
+    expect(src.match(/restWrite\(/g)?.length, 'restWrite has exactly two pulse call sites').toBe(2);
+    expect(src, 'and the direct fetch calls are the GET pager, GraphQL and the write helper only')
+      .not.toMatch(/fetch\([^)]*\/repos\/[^)]*(PATCH|PUT|DELETE)/);
+    for (const forbidden of ['addLabelsToLabelable', 'removeLabelsFromLabelable', 'closeIssue', 'reopenIssue',
+      'updateIssue', 'updatePullRequest', 'mergePullRequest', 'closePullRequest']) {
+      expect(src, `the sync must never call ${forbidden}`).not.toContain(forbidden);
+    }
+    for (const allowed of ['updateProjectV2ItemFieldValue', 'clearProjectV2ItemFieldValue', 'archiveProjectV2Item', 'addProjectV2ItemById']) {
+      expect(src).toContain(allowed);
+    }
+  });
+});

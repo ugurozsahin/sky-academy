@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The board sync's launchd agent (#158): runs scripts/board-sync.mjs from the owner's Mac clone every
+  15 minutes. It runs HERE and not in the dev routine because Anthropic's cloud sessions cannot reach
+  Projects v2 at all (the GitHub proxy answers non-PR GraphQL with 403 whatever token is supplied — see the
+  comment at the top of board-sync.mjs). The token is read from `.git/github-project-token` in the clone.
+
+  Install (once, on the Mac; paths below are the owner's clone and the node the repo is tested on):
+      cp scripts/board-sync.plist ~/Library/LaunchAgents/com.sky-academy.board-sync.plist
+      launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.sky-academy.board-sync.plist
+  Check:   launchctl print gui/$(id -u)/com.sky-academy.board-sync | grep -E 'state|last exit'
+           tail ~/Library/Logs/sky-academy-board-sync.log
+  Remove:  launchctl bootout gui/$(id -u)/com.sky-academy.board-sync
+  It runs whatever is checked out in the clone, so the clone stays on `main` (`git pull - -ff-only` after a
+  routine run, as CLAUDE.md says). The log carries one `board: …` line per run; the issue `board: heartbeat`
+  carries the pulse the cloud agents read.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sky-academy.board-sync</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/ugurozsahin/.nvm/versions/node/v24.13.0/bin/node</string>
+    <string>scripts/board-sync.mjs</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/ugurozsahin/prj/claude/education-game</string>
+  <key>StartInterval</key>
+  <integer>900</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/ugurozsahin/Library/Logs/sky-academy-board-sync.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ugurozsahin/Library/Logs/sky-academy-board-sync.log</string>
+</dict>
+</plist>
