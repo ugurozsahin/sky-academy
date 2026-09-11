@@ -712,6 +712,43 @@ describe('guard rails', () => {
       .toMatch(/if:\s*github\.event_name\s*!=\s*'push'/);
   });
 
+  // #116: nothing in CI had ever rendered a tablet, which is the shared root of #107, #109 and #110. The
+  // fix is two projects that run ONE small spec file, and there are two ways that decays silently:
+  //   - a tablet project loses its `testMatch` and picks up the whole spec instead. Playwright gets one
+  //     worker on a 2-core runner, so a project costs a whole sequential leg (#141 measured mobile at 2m43s
+  //     and desktop at 4m00s) — two unrestricted tablet legs would be ~8 min a night on the bill #119 is
+  //     about, and nothing would go red to say so;
+  //   - `viewport.spec.ts` stops importing the shared assertion and the helper becomes dead code that
+  //     still reads as tablet coverage. #116 asks for it to be used by a spec for exactly that reason.
+  // The #141 rail above already holds every declared project into the nightly arm and the pull-request arm
+  // to one, so neither half is repeated here: this rail is only about what a tablet project may run.
+  // Split on the project boundary rather than by line, so reformatting the config cannot quietly blank it.
+  it('the tablet projects run only the viewport spec, which uses the shared assertion (#116)', () => {
+    const cfg = code(readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8'));
+    const parts = cfg.slice(cfg.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    expect(parts.length, 'playwright.config.ts must declare its projects, and be read from disk').toBeGreaterThanOrEqual(4);
+    expect(parts.filter(p => /name:\s*'tablet/.test(p)).length,
+      'a portrait tablet and a landscape one — the geometry #107 shows up on (#116)').toBeGreaterThanOrEqual(2);
+    for (const p of parts) {
+      const name = p.match(/name:\s*'([^']+)'/)![1];
+      if (name.startsWith('tablet')) {
+        expect(p, `'${name}' must be touch-driven, or it is the desktop project at another size (#116)`)
+          .toMatch(/hasTouch:\s*true/);
+        expect(p, `'${name}' must run the viewport spec only — an unrestricted tablet leg is ~4 min a night (#116)`)
+          .toMatch(/testMatch:\s*\/viewport\\\.spec\\\.ts\//);
+      } else {
+        expect(p, `'${name}' must skip the viewport spec, so the pull-request leg stays the suite it was (#141)`)
+          .toMatch(/testIgnore:\s*\/viewport\\\.spec\\\.ts\//);
+      }
+    }
+    const spec = readFileSync(new URL('../../tests/e2e/viewport.spec.ts', import.meta.url), 'utf8');
+    expect(spec.length, 'the tablet spec must be read from disk, not a stub').toBeGreaterThan(800);
+    expect(spec, 'the tablet spec must use the shared assertion, not its own copy of the measurement (#116)')
+      .toMatch(/from\s+'\.\/viewport'/);
+    expect(spec, 'and actually call it, or the helper is dead code that still reads as coverage (#116)')
+      .toMatch(/await expectFitsViewport\(/);
+  });
+
   // #138: fast mode (#32) is only sound while it is a *pure time compression* — the same game, fewer seconds.
   // It shipped with two leaks. `layoutWave` divided the flight time but left `vx` in px/second, so at 4x a
   // bubble drifted a quarter as far sideways as a child ever sees; and a handful of `later(...)` beats in

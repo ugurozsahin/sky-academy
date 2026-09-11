@@ -1,0 +1,103 @@
+import { test, expect, type Page } from '@playwright/test';
+import { expectFitsViewport, outsideItsBox } from './viewport';
+
+/**
+ * The tablet specs (#116). This file is the whole of what the `tablet` and `tablet-landscape` projects
+ * run, and the `mobile` and `desktop` projects skip it — see the `testMatch`/`testIgnore` pair in
+ * `playwright.config.ts` and the note there about metered minutes.
+ *
+ * Three bugs arrived from one tablet playtest (#107 objects overflowing their five-frame slots, #109 the
+ * grown-ups dashboard not fitting, #110 the opening screen's buried name field) and nothing in CI had
+ * ever rendered a tablet. Where a check fails on one of those three it is `test.fixme` naming the issue,
+ * not weakened or deleted: fixing the bug flips the test on, which is the only way this file can tell a
+ * bug that is still there from a check that stopped looking.
+ *
+ * The navigation helpers below are a deliberate small duplicate of the ones in `game.spec.ts`. Moving
+ * those out of that file would be the tidier change and it is not this issue's: a guard rail reads
+ * `seedPlayer` out of `game.spec.ts` by name to prove the seeded start still writes the save slot
+ * `storage.ts` reads (#138), so hoisting it silently turns that rail into a check on nothing.
+ */
+
+/** Land on the sky map with the avatar already chosen, exactly as `game.spec.ts` does (#138). */
+async function seedPlayer(page: Page, id = 'volt', name = 'Ada') {
+  await page.addInitScript(save => {
+    if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+  }, JSON.stringify({ v: 1, name, avatar: id }));
+  await page.goto('/');
+  await expect(page.locator('.home')).toBeVisible();
+}
+async function startTopic(page: Page, year: string, topic: string, subject = 'maths') {
+  await page.click(`.island[data-year="${year}"]`);
+  await expect(page.locator('.island-screen')).toBeVisible();
+  await page.click(`.tab[data-s="${subject}"]`);
+  await page.click(`.topic[data-id="${topic}"]`);
+  await expect(page.locator('.play')).toBeVisible();
+  await expect(page.locator('#prompt')).not.toBeEmpty();   // the first question is drawn: measured from the DOM, so this file needs no `window.__sna`
+}
+
+test.describe('tablet viewports (#116)', () => {
+  test('the avatar screen fits across', async ({ page }) => {
+    await page.goto('/?reset=1');
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await expectFitsViewport(page, 'avatar screen');
+  });
+
+  test('the sky map and an island fit across', async ({ page }) => {
+    await seedPlayer(page);
+    await expectFitsViewport(page, 'sky map');
+    await page.click('.island[data-year="reception"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expectFitsViewport(page, 'island screen');
+  });
+
+  test('the play screen fits across', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    await expectFitsViewport(page, 'play screen');
+  });
+
+  /**
+   * Red on the portrait tablet the day it was written, and it is #109: the dashboard lays itself out
+   * 936 px wide inside an 800 px viewport, so the page scrolls sideways and the right-hand column of
+   * every four-across row is off the screen. `min-width: 600px` turns `.p-stats` into four columns and
+   * `.p-years` into three, and 800 px is not enough for either. It passes in landscape, which is why the
+   * fixme is conditional rather than blanket — losing the landscape assertion to describe a portrait bug
+   * would be the coverage this project exists to add, given away in the same commit.
+   */
+  test('the grown-ups dashboard fits across', async ({ page }, testInfo) => {
+    test.fixme(testInfo.project.name === 'tablet',
+      '#109: the dashboard is 936 px wide inside an 800 px portrait tablet — fix it and this turns on');
+    await seedPlayer(page);
+    await page.click('#grownups');
+    await expect(page.locator('.parents .gate')).toBeVisible();
+    const q = await page.locator('#gate-q').textContent();          // e.g. "6 × 8"
+    const [a, b] = q!.split('×').map(s => parseInt(s.trim(), 10));
+    await page.fill('#gate-input', String(a * b));
+    await page.click('#gate-go');
+    await expect(page.locator('.parents-dash')).toBeVisible();
+    await expectFitsViewport(page, 'grown-ups dashboard');
+  });
+
+  /**
+   * #107: `.slot` is sized from `min(6.5vw, 4.5vh)` and the emoji inside it from `5.5vw` alone, so the box
+   * and its contents track different units. This measures the two boxes rather than reading the CSS, so
+   * #107's fix — whatever unit it lands on — is what turns it green.
+   *
+   * What it actually caught, recorded here so #107 is not chased in the wrong place: the glyph paints
+   * **1.4 px past the right edge** of its slot at both 800x1280 and 1280x800, and is comfortably inside it
+   * top and bottom. That is a real containment breach by the mechanism #107 describes, but it is not the
+   * spill the owner saw on the device — headless Chromium here has no colour-emoji font, and the issue's
+   * own reading is that Android's Noto Color Emoji renders taller than the em box, which `line-height: 1.1`
+   * does not contain. Worth knowing before the fix is written: the arithmetic alone does not produce a
+   * visible overflow at any viewport CI can render, because `@media (max-height: 640px)` already pins both
+   * the slot and the font to 20 px below the height where `4.5vh` would undercut the 30 px font cap.
+   */
+  test('objects stay inside their five-frame slots (#107)', async ({ page }) => {
+    test.fixme(true, '#107: the glyph paints ~1.4 px past the right edge of its slot at both tablet sizes');
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    await expect(page.locator('.objs .slot .obj').first()).toBeVisible();
+    expect(await outsideItsBox(page, '.objs .slot', '.obj'),
+      'an object painted outside its five-frame slot (#107)').toEqual([]);
+  });
+});

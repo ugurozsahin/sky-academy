@@ -168,9 +168,17 @@ jobs:
       # for every non-pull-request event and for any diff it could not compute, so the nightly and
       # workflow_dispatch are untouched by the filter — the one full check a merged tree gets is not
       # something a path list may take away.
+      #
+      # #116 adds `tablet` (800x1280) and `tablet-landscape` (1280x800) to the full matrix and NOT to the
+      # pull-request arm. Nothing in CI had ever rendered a tablet, which is the shared blind spot behind
+      # #107, #109 and #110; both projects are restricted in playwright.config.ts to tests/e2e/viewport.spec.ts,
+      # 5 tests each, so the pair is ~16 s on a runner rather than the ~8 min two unrestricted legs would cost.
+      # The pull-request arm stays at one project: putting a tablet on it is more metered minutes per pull
+      # request, and that is #119's open decision, not a run's to take. The #141 rail holds both halves —
+      # every declared project in the full arm, exactly one in the pull-request arm.
       - name: End-to-end (${{ github.event_name == 'pull_request' && 'mobile' || 'full matrix' }})
         if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
-        run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile' || '--project=mobile --project=desktop' }}
+        run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile' || '--project=mobile --project=desktop --project=tablet --project=tablet-landscape' }}
       - if: failure() && github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
