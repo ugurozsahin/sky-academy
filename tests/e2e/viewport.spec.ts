@@ -26,6 +26,40 @@ async function seedPlayer(page: Page, id = 'volt', name = 'Ada') {
   await page.goto('/');
   await expect(page.locator('.home')).toBeVisible();
 }
+/**
+ * The same, with progress in the save (#109). An empty dashboard passes a fits-the-viewport check
+ * vacuously: the "trickiest topics" and "going well" lists are not rendered at all until there is
+ * something to put in them, and every stat reads 0 or "—", which is the narrowest the cards ever are.
+ * Seeded, the widest strings the dashboard can produce are on screen when it is measured.
+ */
+async function seedProgress(page: Page, name = 'Ada') {
+  const progress: Record<string, { stars: number; best: number; plays: number; hits: number; tries: number }> = {};
+  for (const [i, id] of ['r-count', 'r-add', 'r-sub', 'y1-bonds', 'y1-add', 'y1-coins', 'y2-pv', 'y2-tables'].entries())
+    progress[id] = { stars: (i % 3) + 1, best: 40 + i, plays: 3 + i, hits: 30 + i, tries: 40 + i * 3 };
+  await page.addInitScript(save => {
+    if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+  }, JSON.stringify({
+    v: 1, name, avatar: 'volt', progress,
+    endless: { reception: 120, year1: 340, year2: 980 }, sprint: { reception: 45, year1: 88 },
+    boss: { reception: 2, year1: 7 }, memory: { reception: 4 }, training: { reception: 6, year2: 11 },
+    coins: 1250, streak: { last: '', days: 12 },
+  }));
+  await page.goto('/');
+  await expect(page.locator('.home')).toBeVisible();
+}
+
+/** Through the grown-ups maths gate and onto the dashboard (#109). */
+async function openDashboard(page: Page) {
+  await page.click('#grownups');
+  await expect(page.locator('.parents .gate')).toBeVisible();
+  const q = await page.locator('#gate-q').textContent();          // e.g. "6 × 8"
+  const [a, b] = q!.split('×').map(s => parseInt(s.trim(), 10));
+  await page.fill('#gate-input', String(a * b));
+  await page.click('#gate-go');
+  await expect(page.locator('.parents-dash')).toBeVisible();
+  await expect(page.locator('.p-year').first()).toBeVisible();     // the cards are drawn, not an empty shell
+}
+
 async function startTopic(page: Page, year: string, topic: string, subject = 'maths') {
   await page.click(`.island[data-year="${year}"]`);
   await expect(page.locator('.island-screen')).toBeVisible();
@@ -57,25 +91,49 @@ test.describe('tablet viewports (#116)', () => {
   });
 
   /**
-   * Red on the portrait tablet the day it was written, and it is #109: the dashboard lays itself out
-   * 936 px wide inside an 800 px viewport, so the page scrolls sideways and the right-hand column of
-   * every four-across row is off the screen. `min-width: 600px` turns `.p-stats` into four columns and
-   * `.p-years` into three, and 800 px is not enough for either. It passes in landscape, which is why the
-   * fixme is conditional rather than blanket — losing the landscape assertion to describe a portrait bug
-   * would be the coverage this project exists to add, given away in the same commit.
+   * #109, fixed. This was `test.fixme` on the portrait project: the dashboard laid itself out 936 px wide
+   * inside an 800 px viewport, so the page scrolled sideways and the right-hand column of every row was
+   * off screen. It is on now, and seeded with progress — an empty dashboard is the narrowest the cards
+   * ever are and would have passed this vacuously.
+   *
+   * The 936 px never depended on the viewport, which is why it was identical at 800x1280, 768x1024 and
+   * 810x1080: `.p-year-row span { min-width: 130px }` is a floor a flex item cannot shrink below, so the
+   * card's min-content width was 300 px, and a `1fr` grid track is `minmax(auto, 1fr)` — it never goes
+   * under min-content. `repeat(3, 1fr)` therefore came out 3x300 px at every width.
    */
-  test('the grown-ups dashboard fits across', async ({ page }, testInfo) => {
-    test.fixme(testInfo.project.name === 'tablet',
-      '#109: the dashboard is 936 px wide inside an 800 px portrait tablet — fix it and this turns on');
-    await seedPlayer(page);
-    await page.click('#grownups');
-    await expect(page.locator('.parents .gate')).toBeVisible();
-    const q = await page.locator('#gate-q').textContent();          // e.g. "6 × 8"
-    const [a, b] = q!.split('×').map(s => parseInt(s.trim(), 10));
-    await page.fill('#gate-input', String(a * b));
-    await page.click('#gate-go');
-    await expect(page.locator('.parents-dash')).toBeVisible();
+  test('the grown-ups dashboard fits across (#109)', async ({ page }) => {
+    await seedProgress(page);
+    await openDashboard(page);
     await expectFitsViewport(page, 'grown-ups dashboard');
+  });
+
+  /**
+   * The other two portrait-tablet geometries the issue names (#109). They are one test rather than two
+   * projects on purpose: a project costs a whole sequential leg of the nightly (see `playwright.config.ts`),
+   * and `setViewportSize` costs a reload.
+   */
+  for (const [w, h] of [[768, 1024], [810, 1080]] as const)
+    test(`the grown-ups dashboard fits a ${w}x${h} tablet (#109)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedProgress(page);
+      await openDashboard(page);
+      await expectFitsViewport(page, `grown-ups dashboard at ${w}x${h}`);
+    });
+
+  /**
+   * The second half of #109 — "scrolling does not work well" — and the reason `touch-action: pan-y` is
+   * *not* in the fix. A vertical drag can only be swallowed by a nested scroller that is actually
+   * scrollable, and at tablet widths the modes table is not: it is narrower than its wrapper. Measured
+   * rather than assumed, because that measurement is what decides whether the wrapper needs defending.
+   */
+  test('nothing nested scrolls sideways under the dashboard (#109)', async ({ page }) => {
+    await seedProgress(page);
+    await openDashboard(page);
+    expect(await page.evaluate(() => Array.from(document.querySelectorAll('.parents *'))
+      .filter(el => el.scrollWidth > el.clientWidth + 1)
+      .map(el => `${el.className} ${el.scrollWidth}>${el.clientWidth}`)),
+      'a horizontal scroller inside the dashboard can capture a vertical drag on a touch screen (#109)')
+      .toEqual([]);
   });
 
   /**

@@ -1129,8 +1129,16 @@ img { -webkit-user-drag: none; }
   font-weight: 600;
   font-size: 14px;
 }
+/*
+ * #109: this used to be `min-width: 130px`, which a flex item cannot shrink below. That one declaration set
+ * the whole `.p-year` card's min-content width to 300 px, and a grid track of `1fr` is `minmax(auto, 1fr)` —
+ * it never goes under min-content — so `repeat(3, 1fr)` came out 3x300 px however narrow the screen was and
+ * the page grew a horizontal scrollbar. `flex-basis` keeps the same 130 px preferred width wherever there is
+ * room for it, and `min-width: 0` lets the label shrink instead of the page.
+ */
 .p-year-row span {
-  min-width: 130px;
+  flex: 0 1 130px;
+  min-width: 0;
 }
 .p-year-row .isl-bar {
   flex: 1;
@@ -1141,7 +1149,17 @@ img { -webkit-user-drag: none; }
 .p-topic .ic { font-size: 22px; } .p-topic-t { flex: 1; min-width: 0; } .p-topic-t b { display: block; } .p-topic-t small { color: var(--muted); font-weight: 600; }
 .p-acc { font-weight: 700; font-size: 18px; }
 .p-empty { color: var(--muted); font-weight: 600; }
-.p-table-wrap { overflow-x: auto; }
+/*
+ * #109 asked whether this nested horizontal scroller is what makes the page scroll badly on a tablet.
+ * Measured: it is not one there. The table is 768/736/778 px wide at 800x1280, 768x1024 and 810x1080 and
+ * fits its wrapper at every one, so nothing inside it scrolls and nothing can capture a vertical drag; the
+ * phone (377 px of table in 358 px) is the only place it is a scroller at all. So `touch-action: pan-y`,
+ * which the issue floats, is not applied: the one viewport it would affect is the one that needs the
+ * sideways drag, and taking it away would put the Sensei column out of reach — hiding content rather than
+ * reflowing it. `overscroll-behavior-x` is the part that is safe everywhere: `html, body` already set
+ * `overscroll-behavior: none`, and this stops the table's own scroll chaining out of it at either end.
+ */
+.p-table-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
 .p-table { width: 100%; border-collapse: collapse; font-weight: 600; }
 .p-table th, .p-table td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line); }
 .p-table thead th { color: var(--muted); font-size: 13px; }
@@ -1159,7 +1177,17 @@ img { -webkit-user-drag: none; }
 .p-move-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--good); }
 .p-move-msg.bad { color: var(--bad); }
 
-@media (min-width: 600px) { .p-stats { grid-template-columns: repeat(4, 1fr); } .p-years { grid-template-columns: repeat(3, 1fr); } }
+/*
+ * #109: there used to be one breakpoint here, at 600 px, and it went straight to the layout drawn for a
+ * 1280 px desktop. A portrait tablet is ~800 px wide, so it took the four-up stat row and the three-up year
+ * grid inside a `.screen` capped at 820 px, and the cards had nowhere to go.
+ *
+ * Two tiers instead. 600-899 px is the portrait tablet: stats stay two-up (386 px tiles at 800 px, rather
+ * than four 186 px ones) and the year cards go two-up. The desktop grid waits for 900 px, which 1280x800
+ * clears, so that layout is the one it always was.
+ */
+@media (min-width: 600px) { .p-years { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 900px) { .p-stats { grid-template-columns: repeat(4, 1fr); } .p-years { grid-template-columns: repeat(3, 1fr); } }
 
 /* ---------- shop (#6) ---------- */
 .shop-btn { width: 100%; margin-top: 12px; flex-direction: column; gap: 0; } .shop-btn small { font-size: 13px; font-weight: 600; opacity: .8; }

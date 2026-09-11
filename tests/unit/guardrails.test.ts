@@ -1082,49 +1082,6 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
       .toMatch(/last, not first/i);
   });
 
-  // #107: the five-frame glyph outgrew its box because the box and its contents were sized from different
-  // units — `.slot` from `min(6.5vw, 4.5vh)`, `.obj` from `5.5vw` alone — so on a tablet the box collapsed
-  // towards its floor while the glyph stayed near its cap. The e2e in `viewport.spec.ts` measures the two
-  // rendered boxes, but only at the handful of viewports a project declares; this rail is the cheap
-  // complement #107 asks for by name, and it is the exhaustive half: it holds the *arithmetic* for every
-  // `--slot` the stylesheet declares, at every viewport, for the two-group and take-away variants too.
-  //
-  // 0.801 is not a preference. Every emoji in `OBJECTS` advances 1.248 em (measured: all ten identical,
-  // Noto Color Emoji's 2550/2048 design width), so a glyph is inside its slot only while
-  // font-size <= slot / 1.248 = 0.801 * slot. A ratio above that is the bug returning, whatever it looks
-  // like in the browser CI happens to have.
-  //
-  // The stylesheet is read with readFileSync, not the `?raw` glob at the top of this file: Vite's css
-  // plugin returns an empty string for CSS outside the browser, which would make this rail pass vacuously.
-  // The length assertion below is what proves it did not.
-  it('the five-frame glyph is sized from its slot, never from the viewport (#107)', () => {
-    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
-    expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
-    const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');   // comments may quote the very units the rail bans
-
-    const objFont = [...bare.matchAll(/\.objs\s+\.obj\s*\{[^}]*?font-size:\s*([^;}]+)/g)].map(m => m[1].trim());
-    expect(objFont.length, 'the object glyph must get its font-size somewhere (#107)').toBe(1);
-    // Two rules setting it is how the bug survived at short heights: the block set 16px and then 20px
-    // eight lines later, so the first was dead and nobody reading the first one saw the real pairing.
-    expect(objFont[0], 'the glyph must be sized from --obj, not from vw/vh — that divergence IS #107')
-      .toBe('var(--obj)');
-
-    const ratios = [...bare.matchAll(/--obj:\s*calc\(\s*var\(--slot\)\s*\*\s*([0-9.]+)\s*\)/g)].map(m => Number(m[1]));
-    const objDecls = [...bare.matchAll(/--obj:/g)].length;
-    expect(ratios.length, 'every --obj must be calc(var(--slot) * k) — a literal size can drift from the box')
-      .toBe(objDecls);
-    expect(objDecls, '--obj must be declared at least once (#107)').toBeGreaterThanOrEqual(1);
-    for (const k of ratios)
-      expect(k, `an emoji advances 1.248em, so ${k} * slot paints outside the slot — #107 exactly`)
-        .toBeLessThanOrEqual(0.801);
-
-    // The box half: if `.slot` goes back to its own viewport clamp, the single source of truth is gone and
-    // the ratio above is measured against a width nothing else uses.
-    const slotWidth = bare.match(/\.slot\s*\{[^}]*?width:\s*([^;}]+)/)?.[1].trim();
-    expect(slotWidth, 'the slot must take its width from --slot, so box and glyph cannot drift apart (#107)')
-      .toBe('var(--slot)');
-  });
-
   // The three-file rule: the routing table is the thing that stops the habit coming back as a new file
   // somewhere else, so all three have to carry it.
   it.each(['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'])('%s carries the record-routing rule', (name) => {
@@ -1133,5 +1090,92 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
       .toMatch(/who opens this, and when/i);
     expect(text, 'and route operational state to the heartbeat issue, overwritten')
       .toMatch(/overwritten every run, never appended/i);
+  });
+});
+
+/**
+ * The tablet layout rails (#107, #109). Both come from the same playtest and the same blind spot — nothing
+ * in CI had ever rendered a tablet — and both are the cheap exhaustive half of a check whose expensive half
+ * is an e2e in `tests/e2e/viewport.spec.ts` that can only measure the viewports a project declares.
+ *
+ * (The #107 rail below was written inside the `#178` worklog describe and is moved here unchanged: a
+ * failure printed under "the worklog is archived and nothing writes it again" sends the reader to the
+ * wrong rule. Raised reviewing PR #186.)
+ */
+describe('the tablet layout rails (#107, #109)', () => {
+// #107: the five-frame glyph outgrew its box because the box and its contents were sized from different
+// units — `.slot` from `min(6.5vw, 4.5vh)`, `.obj` from `5.5vw` alone — so on a tablet the box collapsed
+// towards its floor while the glyph stayed near its cap. The e2e in `viewport.spec.ts` measures the two
+// rendered boxes, but only at the handful of viewports a project declares; this rail is the cheap
+// complement #107 asks for by name, and it is the exhaustive half: it holds the *arithmetic* for every
+// `--slot` the stylesheet declares, at every viewport, for the two-group and take-away variants too.
+//
+// 0.801 is not a preference. Every emoji in `OBJECTS` advances 1.248 em (measured: all ten identical,
+// Noto Color Emoji's 2550/2048 design width), so a glyph is inside its slot only while
+// font-size <= slot / 1.248 = 0.801 * slot. A ratio above that is the bug returning, whatever it looks
+// like in the browser CI happens to have.
+//
+// The stylesheet is read with readFileSync, not the `?raw` glob at the top of this file: Vite's css
+// plugin returns an empty string for CSS outside the browser, which would make this rail pass vacuously.
+// The length assertion below is what proves it did not.
+it('the five-frame glyph is sized from its slot, never from the viewport (#107)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');   // comments may quote the very units the rail bans
+
+  const objFont = [...bare.matchAll(/\.objs\s+\.obj\s*\{[^}]*?font-size:\s*([^;}]+)/g)].map(m => m[1].trim());
+  expect(objFont.length, 'the object glyph must get its font-size somewhere (#107)').toBe(1);
+  // Two rules setting it is how the bug survived at short heights: the block set 16px and then 20px
+  // eight lines later, so the first was dead and nobody reading the first one saw the real pairing.
+  expect(objFont[0], 'the glyph must be sized from --obj, not from vw/vh — that divergence IS #107')
+    .toBe('var(--obj)');
+
+  const ratios = [...bare.matchAll(/--obj:\s*calc\(\s*var\(--slot\)\s*\*\s*([0-9.]+)\s*\)/g)].map(m => Number(m[1]));
+  const objDecls = [...bare.matchAll(/--obj:/g)].length;
+  expect(ratios.length, 'every --obj must be calc(var(--slot) * k) — a literal size can drift from the box')
+    .toBe(objDecls);
+  expect(objDecls, '--obj must be declared at least once (#107)').toBeGreaterThanOrEqual(1);
+  for (const k of ratios)
+    expect(k, `an emoji advances 1.248em, so ${k} * slot paints outside the slot — #107 exactly`)
+      .toBeLessThanOrEqual(0.801);
+
+  // The box half: if `.slot` goes back to its own viewport clamp, the single source of truth is gone and
+  // the ratio above is measured against a width nothing else uses.
+  const slotWidth = bare.match(/\.slot\s*\{[^}]*?width:\s*([^;}]+)/)?.[1].trim();
+  expect(slotWidth, 'the slot must take its width from --slot, so box and glyph cannot drift apart (#107)')
+    .toBe('var(--slot)');
+});
+
+  // #109: the grown-ups dashboard laid itself out 936 px wide inside an 800 px portrait tablet, at every
+  // tablet size alike, because the width never came from the viewport. `.p-year-row span` carried
+  // `min-width: 130px`, which a flex item cannot shrink below, so the `.p-year` card's min-content width
+  // was 300 px — and a `1fr` grid track is `minmax(auto, 1fr)`, which never goes under min-content. So
+  // `repeat(3, 1fr)` was 3x300 px however narrow the screen got, and the page grew a horizontal scrollbar.
+  //
+  // Two halves, because either one alone lets the bug back:
+  //   - no un-shrinkable floor on the row label, or the min-content width climbs again;
+  //   - the three-up desktop grid does not start at the 600 px breakpoint, or a ~800 px portrait tablet
+  //     takes a layout drawn for 1280 px and there is nowhere for the cards to go.
+  it('the dashboard year cards can shrink, and do not take the desktop grid on a tablet (#109)', () => {
+    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');   // comments quote the very declaration the rail bans
+
+    const row = bare.match(/\.p-year-row\s+span\s*\{([^}]*)\}/)?.[1];
+    expect(row, 'the .p-year-row label rule must exist, or this rail is measuring nothing (#109)').toBeTruthy();
+    const floor = row!.match(/(?:^|[;{\s])min-width:\s*([^;}]+)/)?.[1].trim();
+    expect(floor, 'the label needs min-width: 0 — a non-zero floor is exactly what made the card 300 px (#109)')
+      .toBe('0');
+    expect(row, 'and a flex-basis, so the 130 px preferred width survives wherever there is room for it')
+      .toMatch(/flex(-basis)?:\s*[^;}]*130px/);
+
+    // Every media query that hands `.p-years` a three-column grid must be a desktop-width one.
+    const tiers = [...bare.matchAll(/@media\s*\(min-width:\s*(\d+)px\)\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g)]
+      .map(m => ({ px: Number(m[1]), body: m[2] }));
+    const threeUp = tiers.filter(t => /\.p-years\s*\{[^}]*repeat\(\s*3\s*,/.test(t.body));
+    expect(threeUp.length, 'the three-up year grid must be declared in a min-width media query (#109)').toBeGreaterThanOrEqual(1);
+    for (const t of threeUp)
+      expect(t.px, `three year cards across at ${t.px}px puts the desktop grid on a portrait tablet — #109 exactly`)
+        .toBeGreaterThanOrEqual(900);
   });
 });
