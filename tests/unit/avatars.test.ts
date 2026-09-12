@@ -2,9 +2,44 @@ import { describe, it, expect } from 'vitest';
 import { ALL_AVATARS, AVATARS, avatarById, MASTER, praiseLine, SENSEI, SENSEI_LINES, senseiLine } from '../../src/avatars';
 import { masterProgress } from '../../src/game/sensei';
 import { TOPICS } from '../../src/curriculum';
-import type { TopicProgress } from '../../src/storage';
+import { STICKER_IDS, type TopicProgress } from '../../src/storage';
 
 const starred = (ids: string[], stars = 1): Record<string, TopicProgress> => Object.fromEntries(ids.map(id => [id, { stars, best: 0, plays: 1 }]));
+
+/*
+ * #112 — the owner played the game and read "Shadow · Shadow Ninja" off the top user card.
+ *
+ * Every card in the game renders a ninja as `name` next to `element` (`src/ui/home.ts:21`, the avatar picker
+ * at `src/ui/avatar.ts:31-33`, the read-aloud at `:55`, the certificate's signature line). That only reads
+ * well while the given name is distinct from the element it is printed beside — and the Shadow ninja was the
+ * one whose name was a substring of its own element, so the card said the same word twice.
+ *
+ * The fix is one field. The rail is here because the next avatar added is where it comes back: a roster is
+ * exactly the kind of list someone extends without re-reading what the card does with it.
+ */
+describe('a ninja\'s name reads well beside its element (#112)', () => {
+  it('no avatar repeats its own name inside its element', () => {
+    expect(ALL_AVATARS.length, 'an empty roster would pass every assertion below vacuously').toBeGreaterThan(10);
+    for (const a of ALL_AVATARS)
+      expect(a.element.toLowerCase().includes(a.name.toLowerCase()),
+        `"${a.name} · ${a.element}" says the same word twice — give ${a.id} a given name of its own`).toBe(false);
+  });
+
+  it('and no two of them share a name', () => {
+    const names = ALL_AVATARS.map(a => a.name.toLowerCase());
+    expect([...new Set(names)], 'two ninjas with one name are indistinguishable on the picker').toHaveLength(names.length);
+  });
+
+  it('the Shadow ninja is called Dusk, and still answers to the id every save stores', () => {
+    // The id, the slice effect and the artwork are deliberately NOT renamed: `avatar: 'shadow'` is what sits
+    // in localStorage and in STICKER_IDS, so a player who already chose this ninja keeps it.
+    const dusk = avatarById('shadow');
+    expect(dusk.name).toBe('Dusk');
+    expect(dusk.element).toBe('Shadow Ninja');
+    expect([dusk.id, dusk.fx, dusk.img]).toEqual(['shadow', 'shadow', 'avatars/shadow.webp']);
+    expect(STICKER_IDS, 'the sticker album is keyed by id, so it must not have moved').toContain('shadow');
+  });
+});
 
 describe('Master Ninja', () => {
   it('is the eleventh avatar, kept out of the free roster, and doubles as Sensei', () => {

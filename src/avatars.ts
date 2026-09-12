@@ -28,7 +28,9 @@ export const AVATARS: Avatar[] = [
     praise: ['Ice cool, {name}!', 'Crystal-clear thinking, {name}!', 'Cool as ice, {name}!'], cheer: ['Chill!', 'Cool!', 'Brr-illiant!'] },
   { id: 'sol', name: 'Sol', element: 'Light Ninja', glow: '#ffd23a', img: 'avatars/sol.webp', fx: 'light', focus: 0.3,
     praise: ['Shining bright, {name}!', 'Golden work, {name}!', 'You light up the sky, {name}!'], cheer: ['Shine!', 'Gleam!', 'Bright!'] },
-  { id: 'shadow', name: 'Shadow', element: 'Shadow Ninja', glow: '#a855ff', img: 'avatars/shadow.webp', fx: 'shadow', focus: 0.3,
+  // `id`, `fx` and `img` stay 'shadow': the id is the key stored in the save and in STICKER_IDS, so renaming
+  // it would drop the chosen ninja of every player who already picked this one (#112).
+  { id: 'shadow', name: 'Dusk', element: 'Shadow Ninja', glow: '#a855ff', img: 'avatars/shadow.webp', fx: 'shadow', focus: 0.3,
     praise: ['Silent and sharp, {name}!', 'Master of shadows, {name}!', 'Nobody saw that coming, {name}!'], cheer: ['Vanish!', 'Swift!', 'Sharp!'] },
   { id: 'kai', name: 'Kai', element: 'Ninja Boy', glow: '#ff3b5c', img: 'avatars/kai.webp', fx: 'blade', focus: 0.3,
     praise: ['A true ninja, {name}!', 'Master moves, {name}!', 'Sword-sharp thinking, {name}!'], cheer: ['Hi-ya!', 'Ninja!', 'Slice!'] },
