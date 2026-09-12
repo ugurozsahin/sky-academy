@@ -11,6 +11,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { SHOT_FLIGHT } from '../../src/game/arena';
 import { Session } from '../../src/game/session';
+import { BOMB } from '../../src/ui/play-session';   // #142: the real TNT label, so a scenario cannot pass against one the game never spawns
 import { YEARS } from '../../src/curriculum';
 import { ARENA_LISTENERS, FRAME, advanceUntil, createSim, rngFor, type Sim } from './sim/harness';
 
@@ -444,5 +445,151 @@ describe('the harness itself', () => {
     expect(Math.random, 'a failed construction must not leave Math.random seeded').toBe(PRISTINE.random);
     expect(globalThis.performance, 'nor the frozen clock installed').toBe(PRISTINE.performance);
     expect(globalThis.requestAnimationFrame, 'nor the fake rAF').toBe(PRISTINE.requestAnimationFrame);
+  });
+});
+
+/**
+ * #142, the TNT path — the second of the four behaviours the issue's Develop row still lists.
+ *
+ * The TNT is the one bubble whose *tap* behaves like a swipe: it pops under the finger instead of waiting for
+ * the ninja's projectile, because chasing it with a star would burst it twice and reward the hit (#48, and
+ * the comment at `src/ui/play.ts:117` says so in those words). That rule lives in two places — `throwFor` in
+ * the arena, `Session.bomb()` in the rules — and the seam between them is exactly the shape e2e is slowest at
+ * and this harness is fastest at: a pop, a projectile that is or is not thrown, and a life lost without the
+ * question ending.
+ *
+ * `BOMB` is imported rather than retyped so a scenario cannot pass against a label the game does not use.
+ */
+describe('#142: the TNT pops under the finger, costs a life, and does not end the question', () => {
+  /** The predicate `src/ui/play.ts:118` hands the arena, quoted rather than invented. */
+  const throwFor = (b: { label: string }) => b.label !== BOMB;
+
+  it('a tapped TNT pops here and now — no projectile is thrown', () => {
+    sim = createSim({ arena: { throwFor } });
+    sim.spawn({ labels: ['7', BOMB, '9'], speed: 2 });
+    const tnt = launched(sim, BOMB);
+
+    expect(sim.arena.hitLabel(tnt.label), 'the tap found the TNT').toBe(true);
+
+    // All three in the same frame: the burst is immediate, nothing is in the air, and the bubble is gone.
+    expect(sim.events.throws, 'a tapped TNT must not throw the ninja’s star').toBe(0);
+    expect(sim.arena.shots, 'nor leave one in flight').toHaveLength(0);
+    expect(sim.arena.shotsThrown, 'the counter the e2e hook reads stays put').toBe(0);
+    expect(tnt.dead, 'it pops under the finger rather than on arrival').toBe(true);
+    expect(sim.live().some(b => b.label === BOMB), 'and leaves the screen at once').toBe(false);
+    expect(sim.events.hits, 'reported as a tap, not a swipe').toEqual([{ label: BOMB, viaSwipe: false }]);
+  });
+
+  it('an ordinary bubble in the SAME wave still throws, and pops only when the star lands', () => {
+    sim = createSim({ arena: { throwFor } });
+    sim.spawn({ labels: ['7', BOMB, '9'], speed: 2 });
+    const b = launched(sim, '7');
+
+    sim.arena.hitLabel(b.label);
+    expect(sim.events.throws, 'a tap on an ordinary bubble throws one star').toBe(1);
+    expect(b.dead, 'which has not arrived yet, so nothing has popped').toBe(false);
+    expect(sim.events.lands).toBe(0);
+
+    // SHOT_FLIGHT is in seconds; the pop is on arrival, not on the tap.
+    sim.advance(SHOT_FLIGHT * 1000 + FRAME);
+    expect(sim.events.lands, 'the pop is the landing').toBe(1);
+    expect(b.dead).toBe(true);
+
+    // The predicate is consulted per bubble, so one wave really can hold both behaviours.
+    const tnt = launched(sim, BOMB);
+    sim.arena.hitLabel(tnt.label);
+    expect(sim.events.throws, 'and the TNT beside it still throws nothing').toBe(1);
+  });
+
+  it('with no throwFor at all, every tap throws — the TNT rule is opt-in, not the default', () => {
+    sim = createSim();                                   // no `throwFor`: the arena knows nothing about TNT
+    sim.spawn({ labels: ['7', BOMB, '9'], speed: 2 });
+    const tnt = launched(sim, BOMB);
+    sim.arena.hitLabel(tnt.label);
+    expect(sim.events.throws, 'the exclusion is the screen’s decision, not the arena’s').toBe(1);
+    expect(tnt.dead, 'so it waits for the star like anything else').toBe(false);
+  });
+
+  /**
+   * The seam. The arena reports the hit; `play.ts` reads the label and calls `session.bomb()`; the session
+   * decides what that costs. Written as the same three-line bridge `src/ui/play.ts` makes, so a scenario
+   * cannot pass because the harness modelled a rule the screen does not.
+   */
+  function bridged(mode: 'mission' | 'sprint', gentle: boolean) {
+    const year = { ...YEARS[gentle ? 0 : 1] };
+    const events: string[] = [];
+    const session = new Session(
+      { mode, year, topic: { id: 't', title: 't', icon: 't', gen: () => ({ prompt: 'q', answer: '7', options: ['7', '9'] }) } as never, rng: rngFor(2) },
+      {
+        onQuestion: () => { events.push('question'); }, onCorrect: () => { events.push('correct'); },
+        onWrong: () => { events.push('wrong'); }, onMiss: () => { events.push('miss'); }, onProgress: () => {},
+        onLives: (n) => { events.push(`lives:${n}`); }, onStageClear: () => {}, onEnd: () => { events.push('end'); },
+      });
+    session.start();
+    return { session, events };
+  }
+
+  it('a TNT in a live wave costs a life and leaves the question standing', () => {
+    const { session, events } = bridged('mission', false);
+    // A correct slice, then the next question — the beat the screen actually plays. `hit()` leaves the session
+    // `waiting` for the outcome reveal, and `bomb()` returns early while it is: a TNT in that gap is ignored,
+    // which is right (the wave the child is touching has already been cleared) and is asserted below.
+    session.hit('7');
+    expect(session.waiting, 'a correct slice parks the session on the reveal').toBe(true);
+    session.bomb();
+    expect(session.lives, 'so a TNT in that gap costs nothing').toBe(session.o.year.lives);
+    session.nextQuestion();
+    expect(session.combo, 'the combo survives the question boundary and is worth losing').toBe(1);
+    const livesBefore = session.lives;
+
+    sim = createSim({ arena: { throwFor } });
+    sim.spawn({ labels: ['7', '9', BOMB], speed: 2 });
+    const tnt = launched(sim, BOMB);
+    sim.arena.hitLabel(tnt.label);
+
+    // The bridge: play.ts reads the label off the hit and routes the TNT away from `hit()` (src/ui/play.ts:98).
+    for (const h of sim.events.hits.splice(0)) { if (h.label === BOMB) session.bomb(); else session.hit(h.label); }
+
+    expect(session.lives, 'the TNT costs a life').toBe(livesBefore - 1);
+    expect(session.combo, 'and breaks the combo').toBe(0);
+    expect(events.includes('wrong'), 'but it is never a wrong answer').toBe(false);
+    expect(events.includes('miss'), 'nor a miss').toBe(false);
+    expect(session.waiting, 'the question continues — the child can still slice the answer').toBe(false);
+    expect(session.current, 'and it is the same question').not.toBeNull();
+
+    // Which the child then does, and it still scores.
+    expect(session.hit('7'), 'the answer is still there to be sliced').toBe('correct');
+  });
+
+  it('a sprint has no lives, so the same TNT costs nothing but the combo', () => {
+    const { session } = bridged('sprint', false);
+    session.hit('7'); session.nextQuestion();
+    const combo = session.combo, lives = session.lives;
+    expect(combo, 'the combo is worth losing').toBeGreaterThan(0);
+
+    session.bomb();
+
+    expect(session.lives, 'loseLife() returns early when the mode has no lives').toBe(lives);
+    expect(session.combo, 'the combo still goes').toBe(0);
+    expect(session.ended, 'and a sprint is not ended by a TNT').toBe(false);
+  });
+
+  it('the last life ends the run, and a TNT after that changes nothing', () => {
+    const { session, events } = bridged('mission', false);
+    for (let i = 0; i < session.o.year.lives; i++) session.bomb();
+
+    expect(session.lives).toBe(0);
+    expect(session.ended, 'the run is over').toBe(true);
+    expect(events.filter(e => e === 'end'), 'exactly once').toHaveLength(1);
+
+    // Counting the life events, not just reading `lives`, is what makes this test about the `ended` guard.
+    // Without it the assertions below all still hold: `loseLife` clamps at zero and `end()` refuses to run
+    // twice, so the only trace a TNT after the whistle leaves is one more `onLives(0)` the HUD would redraw
+    // for. Asserting the count was green against the guard's removal until this line was added.
+    const lifeEvents = events.filter(e => e.startsWith('lives:')).length;
+    session.bomb();
+    expect(events.filter(e => e === 'end'), 'a TNT after the end must not end it twice').toHaveLength(1);
+    expect(events.filter(e => e.startsWith('lives:')), 'nor report a life it did not take').toHaveLength(lifeEvents);
+    expect(session.lives).toBe(0);
   });
 });
