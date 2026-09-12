@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
+// @ts-expect-error — plain ESM bundler helper (see scripts/bundle-single.d.ts); #15's rail asserts its output
+import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 
@@ -1959,5 +1961,63 @@ describe('the browserless simulation harness stubs the clock, the canvas and the
       expect(code(src), 'a unit test that needs Playwright belongs in tests/e2e')
         .not.toMatch(/(?:from|import|require)\s*\(?\s*['"](?:@playwright\/test|playwright|playwright-core)['"]/);
     }
+  });
+});
+
+/**
+ * #15 Part A — the two ways offline support ships broken without anything going red.
+ *
+ * These are TEXT rails and they say so: the behaviour is covered in `tests/unit/pwa.test.ts` and in the
+ * `offline (#15)` e2e test. What text can catch, and behaviour cannot, is somebody quietly reintroducing the
+ * shape of the mistake — a filename written into the worker by hand, or the build step that generates it
+ * dropped from `npm run build` so the worker silently stops being regenerated.
+ */
+describe('offline support cannot go stale on its own (#15)', () => {
+  const script = (name: string) => readFileSync(new URL(`../../scripts/${name}`, import.meta.url), 'utf8');
+  const root = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
+
+  it('reads the files it claims to check', () => {                    // a vacuous rail is worse than none
+    expect(script('sw-template.js').length).toBeGreaterThan(500);
+    expect(script('build-sw.mjs').length).toBeGreaterThan(500);
+  });
+
+  // The classic way a hand-rolled service worker ships broken: someone pastes today's hashed filename into
+  // the worker "just for now". It works until the next build, then serves an index.html asking offline for
+  // an asset nobody has — a blank sky that a reload cannot cure.
+  it('the worker template names no build asset — the precache list is generated', () => {
+    const t = script('sw-template.js');
+    expect(t, 'the precache list must still be a placeholder').toContain('__PRECACHE__');
+    expect(t, 'and the cache name must be derived from it').toContain('__CACHE_NAME__');
+    expect(code(t), 'a hashed filename in the template is a list written by hand').not.toMatch(/assets\/index-/);
+    expect(code(t), 'and so is a .webp path').not.toMatch(/avatars\/\w+\.webp/);
+  });
+
+  // If the generator stops running, `dist/` keeps the PREVIOUS deployment's sw.js — or none at all — and
+  // every check above still passes.
+  it('the build regenerates the worker every time', () => {
+    expect(pkg.scripts.build, '`npm run build` must run the generator after vite').toMatch(/vite build.*build-sw\.mjs/);
+    expect(root('.gitignore'), 'dist/ is a build output; a committed sw.js would be served stale').toMatch(/^dist$/m);
+  });
+
+  // The single-file page is hosted on an origin that is not ours and has no sw.js beside it. `src/pwa.ts`
+  // gates registration on the manifest link, so the bundler removing that link is the other half of one
+  // mechanism — and the two halves live in different files, which is exactly how they drift apart.
+  it('the single-file build strips the switch that turns the worker on', () => {
+    // Asserted on what the bundler PRODUCES, given the real `index.html`, rather than on its source text: a
+    // rail reading the source is red on a harmless refactor and green if the regex stops matching the file it
+    // is meant to strip. (Raised in review of #214.)
+    const head = root('index.html').match(/<head>([\s\S]*?)<\/head>/)![1];
+    expect(head, 'index.html must carry the link, or nothing registers anywhere').toMatch(/<link rel="manifest"/);
+    expect(stripHead(head), 'and the single-file page must not').not.toMatch(/<link rel="manifest"/);
+    expect(SOURCES['/src/pwa.ts'] ?? '', 'pwa.ts is the half that reads it').toContain('link[rel="manifest"]');
+    // The other half of the same mechanism: strip the link but keep the rest of the head.
+    expect(stripHead(head), 'the theme colour still has to survive').toMatch(/<meta name="theme-color"/);
+  });
+
+  // No `vite-plugin-pwa`, no `workbox-*`: #15's acceptance criteria rule them out and the dependency
+  // allow-list rail would fail them anyway. This states the intent next to the feature that would want them.
+  it('offline support added no dependency', () => {
+    const deps = Object.keys({ ...pkg.devDependencies, ...(pkg as { dependencies?: object }).dependencies ?? {} });
+    expect(deps.filter(d => /pwa|workbox|service-worker/i.test(d))).toEqual([]);
   });
 });

@@ -1077,3 +1077,91 @@ test.describe('Sky Ninja Academy', () => {
     expect(JSON.parse(await page.inputValue('#save-code')).coins).toBe(456);
   });
 });
+
+/**
+ * #15 Part A — offline play. The acceptance criterion for the whole feature is behavioural and there is no
+ * way to check it without a browser: the service worker, its install, its cache and its fetch handler are all
+ * browser machinery, and the unit tests deliberately stop at the two decisions that are not (whether to
+ * register, and what goes in the list).
+ *
+ * `vite preview` serves `dist/`, so this exercises the real generated `dist/sw.js` — including the precache
+ * list `scripts/build-sw.mjs` wrote from the real hashed filenames. That is the pairing that goes wrong: a
+ * worker whose list is stale installs perfectly and only fails once the network is gone.
+ */
+test.describe('offline (#15)', () => {
+  test('guard rail: the game still loads and plays with the network off', async ({ page, context }) => {
+    await seedPlayer(page);
+    // Wait for the worker to be in control. `ready` resolves on activation, and `controller` is what decides
+    // whether the NEXT navigation is served by it — asserting only `ready` would let this test pass on a
+    // reload that quietly went to the network.
+    await page.waitForFunction(() => navigator.serviceWorker?.controller != null, null, { timeout: 30_000 });
+    // Then wait for the ONE entry the offline launch cannot do without, by name. Counting entries ("more than
+    // five in some cache") would have been satisfied by a half-filled cache, and `waitForFunction` with an
+    // async predicate is not a shape worth betting a rail on. `expect.poll` over `page.evaluate` awaits the
+    // promise for certain, and what it asks is exactly what the next line needs to be true.
+    await expect.poll(async () => page.evaluate(async () => {
+      for (const k of await caches.keys()) if (await (await caches.open(k)).match('index.html')) return true;
+      return false;
+    }), { timeout: 30_000, message: 'the shell must be precached before the network goes' }).toBe(true);
+
+    // Everything the browser refuses or the app complains about while the network is down, so a failure here
+    // names its cause instead of leaving "element not found". The first CI run of this rail served the shell
+    // (200, asserted below) and then rendered nothing, and no log said which asset never arrived.
+    const failed: string[] = [];
+    // Provenance, not just success. Every previous version of this rail was satisfiable by Chromium's own
+    // HTTP cache, warmed by `seedPlayer` seconds earlier — which is exactly why reverting the `ignoreVary`
+    // fix did not reliably turn it red. `fromServiceWorker()` is the only thing that tells the two apart, so
+    // "the worker is installed and answers nothing" is now a named failure. (Raised in review of this PR.)
+    const fromNetwork: string[] = [];
+    page.on('response', r => { if (r.url().startsWith('http://localhost:4173') && !r.fromServiceWorker()) fromNetwork.push(r.url()); });
+    page.on('requestfailed', r => failed.push(`request failed: ${r.url()} — ${r.failure()?.errorText}`));
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+    page.on('console', m => { if (m.type() === 'error') failed.push(`console error: ${m.text()}`); });
+    const why = () => (failed.length ? `\nwhile offline:\n  ${failed.join('\n  ')}` : '\nwhile offline: nothing failed and nothing was logged');
+
+    await context.setOffline(true);
+    const served = await page.reload();
+    // Diagnose before asserting. If the worker did not answer the navigation, the next assertion fails with
+    // "element not found", which says nothing about why — and that is the one failure this rail is for.
+    expect(served?.status(), `the worker, not the network, must have served the reload${why()}`).toBe(200);
+    // Generous on purpose: this is a cold start with every byte coming out of Cache Storage, on a CI runner
+    // that has already been busy for minutes. The assertion is unchanged; only the patience is.
+    // try/catch rather than expect's message argument: that argument is evaluated when the call is made, and
+    // everything worth reporting happens during the wait that follows it.
+    try {
+      await expect(page.locator('.home')).toBeVisible({ timeout: 20_000 });
+    } catch (err) {
+      throw new Error(`the sky map must render with no network at all${why()}\n\n${(err as Error).message}`);
+    }
+
+    // Not just the shell. Three separate cached assets have to have arrived for this screen to be right, and
+    // each is checked for what it actually produced rather than for the element existing:
+    //   the JS bundle — the map rendered at all, and its islands respond;
+    //   an avatar webp — the portrait decoded, so it is art and not a broken image;
+    //   the CSS — a rule from the stylesheet is in effect.
+    const portrait = page.locator('#change-av img').first();
+    await expect(portrait).toBeVisible();
+    expect(await portrait.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0),
+      'the avatar art must come from the cache, not a broken image').toBe(true);
+    // `.hero { display: flex }` (src/style.css:232) against a <button>'s `inline-block` default. The previous
+    // version of this asked `.home` for `display` — and there is no `.home` rule in the stylesheet at all, so
+    // a <div>'s UA `block` satisfied it whether or not the CSS ever arrived. (Raised in review of this PR.)
+    expect(await page.locator('#change-av').evaluate(el => getComputedStyle(el).display),
+      'the stylesheet must have been served from the cache too').toBe('flex');
+
+    await page.click('.island[data-year="reception"]');
+    await expect(page.locator('.island-screen'), 'and the game is navigable offline, not just visible').toBeVisible();
+    await expect(page.locator('.topic').first()).toBeVisible();
+
+    // Nothing of ours may have failed to load. Google Fonts is allowed to (it is cross-origin and cannot be
+    // precached by URL — `src/ui/font.ts` degrades to the fallback face, which is #44's story, not this one).
+    const ours = failed.filter(f => f.includes('localhost') || f.includes('127.0.0.1'));
+    expect(ours, 'no same-origin request may fail while offline').toEqual([]);
+    // The assertion above is necessary and not sufficient: `requestfailed` fires only on a network-level
+    // failure, so it says nothing about WHO answered. This one does, and it is the one that fails if the
+    // worker stops serving and the HTTP cache quietly covers for it.
+    expect(fromNetwork, 'every same-origin response while offline must come from the service worker').toEqual([]);
+
+    await context.setOffline(false);
+  });
+});

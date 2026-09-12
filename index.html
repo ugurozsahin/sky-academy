@@ -9,6 +9,9 @@
   <meta name="description" content="Sky Ninja Academy — a slice-the-answer maths and writing game for Reception, Year 1 and Year 2 (EYFS & KS1)." />
   <title>Sky Ninja Academy</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23131a33'/%3E%3Ctext x='32' y='44' font-size='34' text-anchor='middle' fill='%233ec9ff' font-weight='700'%3E忍%3C/text%3E%3C/svg%3E" />
+  <!-- #15: the manifest link is also the switch that turns the service worker on (src/pwa.ts). The
+       single-file build strips it, because that page has no worker beside it. -->
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />

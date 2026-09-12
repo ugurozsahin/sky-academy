@@ -1,0 +1,15 @@
+{
+  "name": "Sky Ninja Academy",
+  "short_name": "Sky Ninja",
+  "description": "A slice-the-answer maths and writing game for Reception, Year 1 and Year 2 (EYFS & KS1).",
+  "lang": "en-GB",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#131a33",
+  "theme_color": "#131a33",
+  "categories": ["education", "games"]
+}

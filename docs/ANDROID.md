@@ -24,3 +24,8 @@ cd android && ./gradlew assembleDebug        # → app/build/outputs/apk/debug/a
 - Icons and splash screens are generated from the 忍 mark by `python3 scripts/android-assets.py` (owner art can replace them later).
 - Fonts: Fredoka is loaded from Google Fonts; offline the system font is used (inlining the font is issue #44).
 - The web build stays unchanged — the same `dist/` feeds the single-file artifact and the APK.
+- **No service worker inside the APK.** `dist/` carries one (#15) and `androidScheme: 'https'` makes
+  `https://localhost` a secure context, so it *would* register here. `src/pwa.ts` gates it out on the presence
+  of `window.Capacitor`: the APK already has every byte locally, and because that origin is identical for
+  every version of the app, a cache surviving an update would serve the previous release with no route back
+  but clearing app data. Offline play in the APK comes from the embedded `dist/`, not from a worker.

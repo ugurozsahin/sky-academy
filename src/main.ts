@@ -8,6 +8,7 @@ import { parentsScreen } from './ui/parents';
 import { load } from './storage';
 import { initGameSpeed } from './game/speed';
 import { fontReady } from './ui/font';
+import { startServiceWorker } from './pwa';
 import type { YearInfo } from './curriculum';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
@@ -51,6 +52,9 @@ initGameSpeed();   // #32: test-only `?fast=N` time compression; default 1 (ordi
 // full 1200 ms an offline APK always pays, is spent on the menus instead of out of a Sprint or Boss clock
 // that starts before the first wave spawns. (Raised reviewing #139.)
 void fontReady();
+// #15: offline play. Deliberately fire-and-forget and deliberately after the first screen is decided — a
+// worker that fails to register, or a browser that has none, must change nothing about the game starting.
+void startServiceWorker();
 if (load().avatar) nav.map(); else nav.avatar();
 
 // Keep the layout stable on mobile browsers whose toolbars resize the viewport.
