@@ -1732,3 +1732,89 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     }
   });
 });
+
+/**
+ * #177 — a run with nothing to review may take a second item, and the shape of that permission is the part
+ * that decays.
+ *
+ * The owner's reasoning (session, 2026-09-10) is that development was never the bottleneck here — review and
+ * conflict are — so the rule fills *idle* capacity and nothing else. That makes it **a condition, not a
+ * quota**, and the condition is self-limiting by construction: the moment second items produce a backlog,
+ * condition 1 stops being true and the run goes back to reviewing. Rewrite it as "two items per run" and the
+ * property is gone while the words still look like the rule.
+ *
+ * Two ways it fails quietly, and a rail each.
+ *
+ * First, condition 1 read as "no open pull requests at all". That is the reading that makes the rule never
+ * fire — a run has almost always just opened one of its own — so the files have to say in as many words that
+ * a pull request the run may not act on is not one it is skipping. Second, one pull request closing two
+ * issues: they must be reviewable, mergeable and blockable independently, and #139 is what a single body
+ * carrying two issue references does on its own.
+ *
+ * The three files each speak to a different reader — CLAUDE.md to an interactive session, BACKLOG.md to
+ * whoever looks up the labels, docs/ROUTINE-PROMPT.md to the routine itself — and all three say they change
+ * together, the same way they do for the freeze lift and the record-routing rule.
+ *
+ * Prove it red: drop the rule from one file, reword condition 1 as "no open pull requests", or turn it into a
+ * quota.
+ */
+describe('a run with nothing to review may take a second item, in all three process files (#177)', () => {
+  // Match against prose with its markdown taken off, not against the raw bytes. Three of these rails failed
+  // on their own subject first time round — `**start of the run**`, `*not* "no open…"`, and a sentence the
+  // line wrap split — which is a rail testing the author's formatting rather than the rule. Emphasis markers
+  // go, curly quotes fold to straight, and every run of whitespace becomes one space, so a re-wrap or a bolded
+  // phrase cannot turn a rule that is still stated into a red build.
+  const flat = (s: string) =>
+    s.replace(/[*_`]/g, '').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ');
+  const doc = (name: string) => flat(readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8'));
+  const FILES = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'];
+
+  it.each(FILES)('%s carries the rule, and its four conditions', (name) => {
+    const text = doc(name);
+    expect(text.length, 'a vacuous rail is worse than none').toBeGreaterThan(500);
+    expect(text, 'the file must state the permission itself')
+      .toMatch(/a run with nothing to review may take a second item/i);
+    expect(text, 'and that it is one more item, as its own pull request')
+      .toMatch(/second, separate pull request/i);
+    // Each of the four conditions, by the thing that makes it checkable rather than by its number: a
+    // renumbering must not be able to drop one.
+    expect(text, 'condition 1 — nothing is waiting for a review this run could do')
+      .toMatch(/waiting for a review (that|this) run could do/i);
+    expect(text, 'condition 2 — the ~45-minute clock runs from the start of the run, not the second item')
+      .toMatch(/from the start of the run/i);
+    expect(text, 'condition 3 — the second item cannot touch the first item’s files')
+      .toMatch(/disjoint/i);
+    expect(text, 'condition 4 — a WIP `Part of #<n>` push is not a finished first item')
+      .toMatch(/Part of #<n>/);
+  });
+
+  it.each(FILES)('%s keeps it a condition rather than a quota', (name) => {
+    const text = doc(name);
+    expect(text, 'the self-limiting property is the point, and it has to be stated')
+      .toMatch(/condition, not a quota/i);
+    // The rewrite that keeps the words and loses the property. #177 rules it out by name.
+    expect(text, 'a per-run allowance is exactly what the owner declined — the rule is idle capacity only')
+      .not.toMatch(/two items per run(?!["”])/i);
+  });
+
+  it.each(FILES)('%s says condition 1 is not "no open pull requests at all"', (name) => {
+    expect(doc(name), 'the misreading that makes the rule never fire has to be closed off in the text')
+      .toMatch(/not "no open pull requests at all"/i);
+  });
+
+  it.each(FILES)('%s forbids one pull request closing two issues', (name) => {
+    expect(doc(name), 'two items are two pull requests, or one going bad holds the other')
+      .toMatch(/never one pull request closing two issues/i);
+  });
+
+  // Without this line nobody can tell a rule that is never true from a rule nobody applied — and #178 moved
+  // the record it lands in, so the routine's own file has to name the new home rather than the worklog.
+  it('the routine records whether it took one, in the heartbeat snapshot', () => {
+    const raw = readFileSync(new URL('../../docs/ROUTINE-PROMPT.md', import.meta.url), 'utf8');
+    expect(doc('docs/ROUTINE-PROMPT.md'), 'STEP 3 must ask for the line').toMatch(/- second item:/);
+    expect(doc('docs/ROUTINE-PROMPT.md'), 'and name which condition failed when none was taken')
+      .toMatch(/which of the four conditions failed/i);
+    // Read raw here on purpose: the point is a line of the snapshot block, and `flat()` joins the lines.
+    expect(raw, 'and STEP 5 example snapshot must show the line itself').toMatch(/^- second item: /m);
+  });
+});

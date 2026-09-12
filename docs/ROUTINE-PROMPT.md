@@ -142,6 +142,48 @@ node scripts/review-gate.mjs body.md      # prints the issues that body would cl
 
 If that list is not exactly the issues you intend to close, fix the body, not the list. The rule, the keyword list and the real bodies that got this wrong are in `tests/unit/review-gate.test.ts`; the same line is in `CLAUDE.md` and `BACKLOG.md` — change all three together.
 
+**A run with nothing to review may take a second item (#177)** — as a second, separate pull request, and never
+more than one extra. This is the owner's, in session on 2026-09-10, and the shape matters as much as the
+permission. The bottleneck here has never been development: median pull-request open→merge is 1.2 hours and 64
+pull requests merged in 4.1 days, while what actually stalls work is **review and conflict** — #150 sat blocked
+for ten hours, #163 came back twice on stale green ticks, and three agents sharing one checkout corrupted each
+other's edits. Handing every run two items would double the review queue and the collision surface, which is
+the opposite of the fix. Filling *idle* capacity does not.
+
+So it is **a condition, not a quota**, and that is the property to preserve: the moment second items produce a
+backlog, condition 1 stops being true on its own and the run goes back to reviewing. Do not replace it with a
+counter, a rota or a "two items per run" allowance.
+
+Check all four after STEP 2 and STEP 3, in order, and stop at the first that fails:
+
+1. **No open pull request is waiting for a review this run could do.** `GET /repos/ugurozsahin/sky-academy/pulls?state=open`,
+   then discard only the ones you are *barred* from acting on: a pull request **this run opened**; one whose
+   newest `REVIEW:` comment is a `REVIEW: CHANGES REQUESTED` **this run may not clear** (your own, or another
+   session's that fails #161's four conditions — STEP 2 has the two mechanical checks); and one held **only**
+   by an `owner-approval` label with no `OWNER:` verdict on it yet. If anything survives that filter, go and
+   review it instead. Read this condition exactly as written: it is **not** "no open pull requests at all" — a
+   pull request you merged or blocked earlier this run has already left the list, and one you are barred from
+   touching is not work you are skipping. This condition is the entire self-limiting property.
+2. **Time is left in the run.** The ~45-minute clock above runs from the **start of the run**, not from the
+   second item. Past it, stop — the second item is subject to the same clock as the first.
+3. **The second item's file scope is disjoint from the first's.** The real test is the first pull request's
+   changed-file list (`GET /repos/ugurozsahin/sky-academy/pulls/<n>/files`); a different area label
+   (`curriculum` against `platform`, say) is the cheap heuristic that gets you to a candidate worth checking.
+   Two pull requests from one run conflicting with each other would be an entirely self-inflicted version of
+   the problem this repository has already hit three times.
+4. **The first item actually finished.** If you pushed it as WIP with `Part of #<n>`, you do not start another.
+
+Then choose the second item with the same STEP 3 query and open a **second, separate pull request** — never one
+pull request closing two issues. They have to be reviewable, mergeable and blockable independently, and one
+going bad must not hold the other. Say in that pull request what the second item costs in Actions minutes at
+the current rate: two items mean two CI runs, #119 is open, and the spending limit is deliberately closed.
+
+**Record it either way.** Your heartbeat snapshot (STEP 5) carries a `- second item:` line saying whether you
+took one and, when you did not, **which of the four conditions failed**. Without that nobody can tell a rule
+that is never true from a rule nobody applied, which is the failure this project keeps having with its own
+process. (#177 asks for that line in the worklog, which #178 closed a day later; operational state now lives in
+the heartbeat issue body, so it goes there instead — the same record, in the place that still has a reader.)
+
 ## Governance PRs: which way does it move the constraint?
 
 A PR that changes how the routine itself works — this file, `CLAUDE.md`, `BACKLOG.md`, the workflows, the guard
@@ -202,6 +244,7 @@ The shape — one summary line, then the checks, then anything you decided not t
 - watchdog pulse: ok — 2026-09-10T17:08Z (~5 h, inside ~14 h)
 - main: green · open PRs after this run: 1 (#182, mine)
 - board: pulse 2026-09-10T22:30Z (11 min old, inside ~2 h) — in step, 59 cards
+- second item: no — condition 1 failed (#180 was open and reviewable)
 - not done, and why: #107 (P1) is blocked by #116, which is open — skipped per STEP 3
 ```
 
