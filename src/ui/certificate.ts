@@ -64,12 +64,65 @@ export type CertOutcome = 'shared' | 'saved' | 'shown' | 'downloaded' | 'decline
  * Priority: the system share sheet (phones) → the artifact viewer's save prompt →
  * a full-screen "press & hold to save" view (artifact viewer with no downloads grant) →
  * a plain `<a download>` (static / PWA build, no artifact runtime).
+ *
+ * `nativeShell` is the Android APK's Capacitor WebView (#205). A stock Android WebView has no download
+ * handler, so `a.click()` on an `<a download>` is swallowed without a word: the child presses the button
+ * and nothing happens at all. `<a download>` is therefore never the last resort on a runtime that cannot
+ * honour it — the full-screen view is, because press-and-hold on an image works there.
  */
-export function certRoute(caps: { canShareFiles: boolean; claudeSave: boolean; claudeRuntime: boolean }): CertRoute {
+export function certRoute(caps: { canShareFiles: boolean; claudeSave: boolean; claudeRuntime: boolean; nativeShell: boolean }): CertRoute {
   if (caps.canShareFiles) return 'share';
   if (caps.claudeSave) return 'save';
   if (caps.claudeRuntime) return 'show';
+  if (caps.nativeShell) return 'show';
   return 'download';
+}
+
+/**
+ * Are we inside the Android APK's Capacitor WebView? (#205)
+ *
+ * Capacitor injects a `Capacitor` global into the WebView, so this needs no import and no dependency —
+ * `@capacitor/core` stays a devDependency of the build, never of the bundle.
+ *
+ * **One rule, on the answer rather than on which accessor exists.** An earlier version asked
+ * `isNativePlatform()` and otherwise read `cap.platform`, described as "the older spelling". That was
+ * simply wrong: the bridge this repository actually ships
+ * (`node_modules/@capacitor/android/capacitor/src/main/assets/native-bridge.js`) sets `cap.getPlatform`
+ * and `cap.isNativePlatform` and **no `cap.platform` at all**, so the fallback guarded a shape Capacitor
+ * never produces, and a bump that renamed `isNativePlatform` would have restored the silent no-op the
+ * comment claimed to prevent. Worse, `isNativePlatform: () => undefined` — a bridge mid-startup — took
+ * the *first* branch and returned `undefined` from a function declared `boolean`.
+ *
+ * So: collect whatever the bridge answers, and treat native as the default unless something says
+ * otherwise. The asymmetry is deliberate and is the same one the `catch` below argues for — a browser
+ * wrongly shown the full-screen view has seen its certificate; a WebView wrongly sent to `<a download>`
+ * has a button that does nothing, which is the bug.
+ */
+export function isNativeShell(w: Window & typeof globalThis = window): boolean {
+  try {
+    // The read is inside the `try` too: a getter-based polyfill — exactly the case the catch describes —
+    // used to throw straight past this function and toast "Could not make the certificate" for one that
+    // had drawn perfectly.
+    const cap = (w as { Capacitor?: { isNativePlatform?: () => unknown; getPlatform?: () => unknown; platform?: unknown } }).Capacitor;
+    if (!cap) return false;
+    const answers = [
+      typeof cap.isNativePlatform === 'function' ? cap.isNativePlatform() : undefined,
+      typeof cap.getPlatform === 'function' ? cap.getPlatform() : undefined,
+      cap.platform,                        // not in the shipped bridge; kept only for other embeddings
+    ];
+    // A definite YES wins outright, and it has to: the two accessors CAN disagree, and the shipped bridge
+    // can only ever disagree in one direction. `isNativePlatform` is a hard-coded `() => true` in a file
+    // that is injected on native only, while `getPlatform()` re-derives from `win.androidBridge` on every
+    // call and answers 'web' whenever that interface is not on the window *at that moment* — Capacitor's
+    // own code treats this as reachable, guarding `if (getPlatformId(win) === 'android')` before it
+    // installs `postToNative`. So `[true, 'web']` is the half-started Android shell, and a veto rule read
+    // it as a browser: the swallowed `<a download>` on exactly the runtime this exists for. It also made
+    // the function absurd — a bridge SAYING it is native scored lower than one saying nothing at all.
+    if (answers.some(a => a === true || (typeof a === 'string' && a !== 'web'))) return true;
+    return !answers.some(a => a === false || a === 'web');
+  } catch {
+    return true;
+  }
 }
 
 interface DownloadsApi { save(r: { filename: string; data: Blob }): Promise<{ status: string }> }
@@ -116,7 +169,9 @@ async function saveViaClaude(dl: DownloadsApi, filename: string, blob: Blob, c: 
 
 /**
  * Get the certificate PNG to the child by the best route this runtime allows — it never silently does nothing.
- * Web Share (files) → artifact `downloads` save prompt → full-screen press-and-hold view → `<a download>`.
+ * Web Share (files) → artifact `downloads` save prompt → full-screen press-and-hold view → `<a download>`,
+ * and on a native shell the full-screen view takes the last place instead, because that runtime swallows
+ * `<a download>` silently (#205).
  */
 export async function deliverCertificate(c: HTMLCanvasElement, filename: string): Promise<CertOutcome> {
   const blob = await new Promise<Blob | null>(res => c.toBlob(res, 'image/png'));
@@ -125,20 +180,28 @@ export async function deliverCertificate(c: HTMLCanvasElement, filename: string)
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
   const canShareFiles = !!nav.canShare?.({ files: [file] });
   const claudeRuntime = !!(window as { claude?: unknown }).claude;
+  const nativeShell = isNativeShell();
   const dl = claudeRuntime ? await claudeDownloads() : null;
 
-  switch (certRoute({ canShareFiles, claudeSave: !!dl, claudeRuntime })) {
+  // The one place `<a download>` is chosen, so the runtime that cannot honour it is ruled out in one
+  // place too. A cancelled share used to step down past this check straight to `triggerDownload`.
+  const lastResort = (): CertOutcome => {
+    if (nativeShell) { showCertificateFullscreen(c); return 'shown'; }
+    triggerDownload(blob, filename); return 'downloaded';
+  };
+
+  switch (certRoute({ canShareFiles, claudeSave: !!dl, claudeRuntime, nativeShell })) {
     case 'share':
       try { await nav.share!({ files: [file], title: 'Sky Ninja Academy certificate' }); return 'shared'; }
       catch { /* cancelled → step down to the next best route */ }
       if (dl) return saveViaClaude(dl, filename, blob, c);
       if (claudeRuntime) { showCertificateFullscreen(c); return 'shown'; }
-      triggerDownload(blob, filename); return 'downloaded';
+      return lastResort();
     case 'save':
       return saveViaClaude(dl!, filename, blob, c);
     case 'show':
       showCertificateFullscreen(c); return 'shown';
     default:
-      triggerDownload(blob, filename); return 'downloaded';
+      return lastResort();
   }
 }

@@ -2021,3 +2021,57 @@ describe('offline support cannot go stale on its own (#15)', () => {
     expect(deps.filter(d => /pwa|workbox|service-worker/i.test(d))).toEqual([]);
   });
 });
+
+/*
+ * #205 — the certificate button must never resolve to a no-op.
+ *
+ * The owner pressed it on the Android tablet and nothing happened: no share sheet, no picture, no error.
+ * `deliverCertificate`'s own contract says it "never silently does nothing", and the route it picked was
+ * `<a download>` — which a stock Android WebView swallows without a word, because it has no download
+ * handler. The bug was not a missing feature; it was a fallback that assumed a capability it never checked.
+ *
+ * So the rail is about the shape of the fallback rather than about Android: `<a download>` is reachable
+ * from exactly ONE place in the file, and that place rules out the runtime that cannot honour it. A second
+ * call site is how the first version of this fix still lost — `deliverCertificate`'s cancelled-share path
+ * stepped down past the check straight into `triggerDownload`.
+ *
+ * **What this block does NOT do, stated plainly so the next reader does not stop looking.** These are text
+ * checks over the source. They catch a verbatim revert cheaply, and they are blind to every mutation that
+ * keeps the text while changing the behaviour — severing the detector (`const nativeShell = false`), the
+ * same severing behind a helper, inlining the anchor so the identifier never appears, or dropping the call
+ * to `lastResort()`. All four were demonstrated green against this block alone. The thing that actually
+ * enforces the contract is `describe('deliverCertificate, actually run (#205)')` in
+ * `tests/unit/certificate.test.ts`, which runs the function against stubbed globals and kills all four.
+ * These rails are the cheap half of the pair, not the guarantee.
+ *
+ * Prove it red: call `triggerDownload` from a second place, or drop the `nativeShell` check in front of it.
+ */
+describe('`<a download>` stays reachable from one guarded place in the certificate (#205)', () => {
+  const cert = SOURCES['/src/ui/certificate.ts'] ?? '';
+
+  it('reads the file it claims to check', () => {
+    expect(cert.length, 'an empty read would make every rail below pass vacuously').toBeGreaterThan(2000);
+    expect(code(cert)).toContain('function triggerDownload');
+  });
+
+  it('only ever reaches `<a download>` from one place, so one check can rule out one runtime', () => {
+    const calls = [...code(cert).matchAll(/(?<!function )\btriggerDownload\s*\(/g)];
+    expect(calls.length, 'a second call site walks past the nativeShell check — that is how #205 happened')
+      .toBe(1);
+  });
+
+  it('rules out the native shell immediately before that call, and CALLS the view', () => {
+    // `showCertificateFullscreen` alone used to satisfy this — the identifier, not a call. Dropping the
+    // parentheses is tsc-clean and left the whole suite green while the tablet button did nothing again:
+    // the rail protecting the guard accepted the bug the guard exists to prevent. `\(` is the fix, and
+    // the behavioural assertion in certificate.test.ts ("the child must actually SEE the certificate")
+    // is what catches the spellings no text rail can — `void view;`, `if (Math.random() < 0) …`.
+    expect(code(cert), 'the last resort must SHOW the certificate, not merely name the function')
+      .toMatch(/if\s*\(\s*nativeShell\s*\)\s*\{[^}]*showCertificateFullscreen\s*\([^}]*\}\s*triggerDownload/);
+  });
+
+  it('and certRoute itself never sends a native shell to a download', () => {
+    expect(code(cert), 'certRoute must answer `show` for a native shell before it answers `download`')
+      .toMatch(/if\s*\(\s*caps\.nativeShell\s*\)\s*return\s*'show'\s*;[\s\S]{0,40}return\s*'download'/);
+  });
+});
