@@ -1415,10 +1415,11 @@ describe('a stale review block may be adopted, and only under the four condition
   const CANON = [
     '**A stale review block may be adopted (#161).** A `REVIEW: CHANGES REQUESTED` block may be cleared by an',
     'agent that did not open the pull request when all four of these hold: the block is **at least 4 hours',
-    'old**; the session that set it has commented nowhere in the repository since; the adopting agent has',
-    're-derived the original objection against the current head and found it genuinely resolved; and its',
-    '`REVIEW: CLEARED` comment says in its own first lines that it is clearing another reviewer\'s block and',
-    'names the conditions that made that legitimate.',
+    'old**; the session that set it has posted **no comment on that same pull request in the last 2 hours**',
+    '(a comment elsewhere in the repository does not protect the block — it is the signal that the reviewer',
+    'has moved on); the adopting agent has re-derived the original objection against the current head and',
+    'found it genuinely resolved; and its `REVIEW: CLEARED` comment says in its own first lines that it is',
+    'clearing another reviewer\'s block and names the conditions that made that legitimate.',
   ].join(' ');
 
   it.each(PROCESS)('%s carries the adoption rule in the one canonical form', (name) => {
@@ -1437,6 +1438,48 @@ describe('a stale review block may be adopted, and only under the four condition
     // Built from parts so this rail's own source is not what trips it.
     expect(text, `${name} still carries the retired absolute rule, which contradicts the adoption rule (#161)`)
       .not.toContain('Only the reviewer who set ');
+    // #213: the windowless repo-wide test is the one that made the loosening a dead letter. It must not
+    // survive anywhere beside the window that replaced it, in any of the three files.
+    expect(text, `${name} still carries #213's windowless repo-wide silence test`)
+      .not.toContain('commented nowhere in the repository');
+    expect(text, `${name} must state the window, and the figure has one written form`)
+      .toContain('in the last 2 hours');
+  });
+
+  /**
+   * #213 — the window is measured on the blocked pull request, never repo-wide.
+   *
+   * The owner's decision of 2026-09-12T08:40Z, and the whole of the fix. "Has this session written anything
+   * anywhere since" is ~always true — a reviewing run posts its block and then merges something, comments on
+   * an issue, or opens its own PR before it ends — so with no window the condition could never be satisfied
+   * and every block became permanently unadoptable. #204, #209, #214, #221 and #222 each stalled that way,
+   * with their authors' fixes pushed and CI green.
+   *
+   * A comment the setter left elsewhere is evidence it has moved ON, so it must never be read as evidence the
+   * block is live. That inversion is the way this would silently decay back: widen the window's scope from the
+   * PR to the repository and the rule is a dead letter again, with nothing red to say so.
+   *
+   * Prove it red: drop the "on this pull request only" sentence, or point the check back at the repo-wide
+   * `issues/comments` listing.
+   */
+  it('the silence window is scoped to the blocked pull request, not the repository (#213)', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    expect(text, 'STEP 2 must scope the window to the one pull request')
+      .toContain('**The window is measured on this pull request only, never repo-wide.**');
+    expect(text, 'and say that a comment elsewhere is the reviewer moving on, never a live block')
+      .toMatch(/moved on\*?\*?, so it does not protect the block/);
+    // The repo-wide listing is what condition 1 must no longer be checked against.
+    expect(text, 'the retired repo-wide listing must not be left standing as the check to run')
+      .not.toMatch(/issues\/comments\?sort=created/);
+  });
+
+  // The watchdog tells the owner which conditions already hold, so it must carry the same window.
+  it('the watchdog quotes the adoption conditions with the same window (#213)', () => {
+    const text = read('docs/WATCHDOG-PROMPT.md');
+    expect(text, 'the watchdog must not hand the owner the retired condition')
+      .not.toContain('commented\n   nowhere in the repository since');
+    expect(text, 'it must state the window it tells a run to check')
+      .toContain('no\n   comment on that same pull request in the last 2 hours');
   });
 
   // Acceptance criterion: STEP 2 tells a run how to check the two conditions it cannot eyeball.
@@ -1445,8 +1488,8 @@ describe('a stale review block may be adopted, and only under the four condition
     expect(text, 'age comes from the blocking comment itself').toMatch(/issues\/<pr>\/comments/);
     expect(text, 'and the setter is identified by session URL, since one token serves every agent')
       .toMatch(/https:\/\/claude\.ai\/code\/session_<id>/);
-    expect(text, 'with the repo-wide comment listing that makes silence checkable')
-      .toMatch(/issues\/comments\?sort=created/);
+    expect(text, 'with the window that makes silence checkable, read off the blocked PR itself (#213)')
+      .toMatch(/less than 2 hours old/);
     expect(text, 'and no session id must mean NOT adoptable, never "probably gone"')
       .toMatch(/is not adoptable/i);
   });
