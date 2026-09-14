@@ -9,10 +9,10 @@
 // the original bug in `src/game/arena.ts` and watching only the matching test fail — the exact edits and the
 // counts are in the PR body.
 import { afterEach, describe, expect, it } from 'vitest';
-import { SHOT_FLIGHT } from '../../src/game/arena';
-import { Session } from '../../src/game/session';
+import { SHOT_FLIGHT, type ArenaOpts } from '../../src/game/arena';
+import { Session, type SessionResult } from '../../src/game/session';
 import { BOMB } from '../../src/ui/play-session';   // #142: the real TNT label, so a scenario cannot pass against one the game never spawns
-import { YEARS } from '../../src/curriculum';
+import { YEARS, type Generator, type Topic, type YearInfo } from '../../src/curriculum';
 import { ARENA_LISTENERS, FRAME, advanceUntil, createSim, rngFor, type Sim } from './sim/harness';
 
 // Captured at module load, before any scenario has had the chance to install a stub. A baseline taken inside
@@ -57,6 +57,20 @@ function launched(s: Sim, label: string) {
   advanceUntil(s, () => s.live().some(b => b.label === label), `${label} never launched`);
   return s.live().find(b => b.label === label)!;
 }
+
+/** When the arena plans to launch `label` — a bubble the wave was dealt but that may still be queued. */
+function launchAtOf(s: Sim, label: string) {
+  const b = s.all().find(x => x.label === label);
+  if (!b) throw new Error(`${label} is not in the wave at all`);
+  return b.launchAt;
+}
+
+/**
+ * A fully typed `Topic` for a scenario that only cares about the generator. An `as never` on the literal
+ * would also compile a misspelt field (`answre`, `sequance`) clean, which for a file whose whole purpose is
+ * to catch what the browser tests miss is the wrong trade.
+ */
+const topicOf = (id: string, gen: Generator, extra: Partial<Topic> = {}): Topic => ({ id, title: id, icon: '🥷', subject: 'maths', year: 'year1', nc: 'test', gen, ...extra });
 
 describe('#48 regression: a projectile must not land on a wave that has already been cleared', () => {
   // The bug: `hitBubble` throws a projectile that takes SHOT_FLIGHT (150 ms) to arrive, and the pop — the
@@ -330,7 +344,7 @@ describe('the arena and the session together', () => {
     const year = { ...YEARS[gentle ? 0 : 1], lives: 3, gentle };
     const events: string[] = [];
     const session = new Session(
-      { mode: 'mission', year, topic: { id: 't', title: 't', icon: 't', gen: () => ({ prompt: 'q', answer, options: labels }) } as never, rng: rngFor(1) },
+      { mode: 'mission', year, topic: topicOf('t', () => ({ prompt: 'q', answer, options: labels }), { year: year.id }), rng: rngFor(1) },
       {
         onQuestion: () => {}, onCorrect: () => { events.push('correct'); }, onWrong: () => { events.push('wrong'); },
         onMiss: () => { events.push('miss'); }, onProgress: () => {}, onLives: (n) => { events.push(`lives:${n}`); },
@@ -438,7 +452,7 @@ describe('the harness itself', () => {
   it.each([
     ['inside the Arena constructor (a canvas with no layout)', { failCanvas: 'rect' } as const],
     ['inside the Arena constructor (getContext returns null)', { failCanvas: 'getContext' } as const],
-    ['while building the constructor argument (an opts getter)', { arena: { get fx(): never { throw new Error('opts exploded'); } } as never }],
+    ['while building the constructor argument (an opts getter)', { arena: { get fx(): never { throw new Error('opts exploded'); } } satisfies ArenaOpts }],
   ])('puts the globals back when construction throws %s', (_where, opts) => {
     expect(() => createSim(opts)).toThrow();
     // afterEach asserts this too, but naming it here is what makes the scenario legible on its own.
@@ -519,7 +533,7 @@ describe('#142: the TNT pops under the finger, costs a life, and does not end th
     const year = { ...YEARS[gentle ? 0 : 1] };
     const events: string[] = [];
     const session = new Session(
-      { mode, year, topic: { id: 't', title: 't', icon: 't', gen: () => ({ prompt: 'q', answer: '7', options: ['7', '9'] }) } as never, rng: rngFor(2) },
+      { mode, year, topic: topicOf('t', () => ({ prompt: 'q', answer: '7', options: ['7', '9'] }), { year: year.id }), rng: rngFor(2) },
       {
         onQuestion: () => { events.push('question'); }, onCorrect: () => { events.push('correct'); },
         onWrong: () => { events.push('wrong'); }, onMiss: () => { events.push('miss'); }, onProgress: () => {},
@@ -591,5 +605,246 @@ describe('#142: the TNT pops under the finger, costs a life, and does not end th
     expect(events.filter(e => e === 'end'), 'a TNT after the end must not end it twice').toHaveLength(1);
     expect(events.filter(e => e.startsWith('lives:')), 'nor report a life it did not take').toHaveLength(lifeEvents);
     expect(session.lives).toBe(0);
+  });
+});
+
+describe('#142: sequence progress rushes only the next earned batch', () => {
+  const sequence = ['one', 'two', 'three', 'four', 'five', 'six'];
+  const options = [...sequence, 'red', 'blue', 'green', 'gold', 'black', 'white'];
+
+  /**
+   * An ordered spelling question, Session ⟷ Arena, with nothing in between modelled. The bridge is written
+   * out here rather than imported — `src/ui/play-session.ts` has no bridge to import — so the two calls that
+   * matter are the same text as the screen's: `ordered: q.sequence?.slice(session.seqIndex)` on spawn and
+   * `rush(sequence[done])` on progress.
+   */
+  function orderedSequence(seed: number) {
+    const progress: string[] = [];
+    const speeds: number[] = [];
+    let correct = 0;
+    const s = sim = createSim({ seed });
+    const session = new Session(
+      {
+        // `speeds: [2]`, so the sequence handicap (`MODES.mission.speed`: one step slower for a sequence) is
+        // visible in what reaches the arena; at 1 both branches yield 1 and the handicap is unobservable.
+        mode: 'mission', year: { ...YEARS[1], perStage: 1, speeds: [2], diffs: [1] },
+        topic: topicOf('sequence', () => ({ prompt: 'Build it', answer: sequence.join(' '), options, sequence, wide: true }), { subject: 'writing' }),
+        rng: rngFor(seed), stages: 1,
+      },
+      {
+        onQuestion: (q, info) => { speeds.push(info.speed); s.spawn({ labels: info.labels, speed: info.speed, wide: true, ordered: q.sequence?.slice(session.seqIndex) }); },
+        onCorrect: () => { correct++; }, onWrong: () => {}, onMiss: () => {},
+        onProgress: (label, done, total) => {
+          progress.push(label);
+          if (done < total) s.arena.rush(session.current!.sequence![done]);
+        },
+        onLives: () => {}, onStageClear: () => {}, onEnd: () => {},
+      });
+    session.start();
+    expect(speeds, 'a sequence plays one speed step below the stage speed').toEqual([1]);
+    return { s, session, progress, correct: () => correct };
+  }
+
+  it('pulls the next word forward through the play bridge and completes in order', () => {
+    const { s, session, progress, correct } = orderedSequence(23);
+
+    const hitNext = (label: string) => {
+      const bubble = launched(s, label);
+      expect(s.arena.hitLabel(label), `${label} must be hittable when its turn arrives`).toBe(true);
+      const hit = s.events.hits.shift();
+      expect(hit, 'the arena must report the slice to the session bridge').toEqual({ label, viaSwipe: false });
+      return { bubble, result: session.hit(hit!.label) };
+    };
+
+    expect(hitNext('one').result).toBe('step');
+    const nextBefore = launchAtOf(s, 'three');
+    const laterBefore = launchAtOf(s, 'five');
+
+    expect(hitNext('two').result).toBe('step');
+    const nextAfter = launchAtOf(s, 'three');
+    const laterAfter = launchAtOf(s, 'five');
+    expect(nextAfter, 'earning word three pulls its batch forward').toBeLessThan(nextBefore);
+    expect(laterAfter, 'a later batch waits until it is earned in turn').toBe(laterBefore);
+
+    // Moving earlier is only the direction; the guard is the apex clamp in `Arena.rush` ("that is how waves
+    // used to pile up"). Deleting that line leaves `toBeLessThan` green — the batch simply arrives at `now`
+    // instead — so assert where it lands: after everything already in the air has stopped climbing. `vy < 0`
+    // is rising (canvas y grows downwards), and the clamp's `launchAt + waveT/2` is exactly each bubble's
+    // apex, since `layoutWave` gives every arc `vy = -g * T / 2`.
+    const airborne = s.all().filter(b => b.launched && !b.dead && !b.hit);
+    expect(airborne.length, 'nothing in the air = nothing for the rush to wait for').toBeGreaterThan(0);
+    const lastUp = airborne.reduce((a, b) => (b.launchAt > a.launchAt ? b : a));
+    expect(lastUp.vy, 'the wave above must still be climbing here, or the clamp is not being exercised').toBeLessThan(0);
+    launched(s, 'three');
+    expect(lastUp.vy, 'the earned batch rose through a wave that was still going up').toBeGreaterThanOrEqual(0);
+
+    // Every remaining step, not only the first two: the review found `rush` could stop working after two calls
+    // with the suite green, because `launched()` waits up to 20 s and an un-rushed batch arrives on its own.
+    // `dealOrdered` puts two words in each batch, so a word whose batch is already up is not rushed — its
+    // launch time must then be untouched, which is the "moves only that one batch" half of the contract.
+    for (const word of sequence.slice(2, -1)) {
+      const next = sequence[sequence.indexOf(word) + 1];
+      const queued = !s.all().find(b => b.label === next)!.launched;
+      const before = launchAtOf(s, next);
+      expect(hitNext(word).result).toBe('step');
+      if (queued) expect(launchAtOf(s, next), `earning ${next} must pull its batch forward`).toBeLessThan(before);
+      else expect(launchAtOf(s, next), `${next} was already up — nothing to rush`).toBe(before);
+    }
+    expect(hitNext(sequence.at(-1)!).result).toBe('correct');
+    expect(progress, 'each earned word is reported once, in the order the child earned them').toEqual(sequence);
+    expect(correct(), 'the whole ordered sequence settles exactly once').toBe(1);
+    expect(session.seqIndex).toBe(sequence.length);
+    expect(s.events.hits, 'every slice was reported exactly once').toEqual([]);
+  });
+
+  it('rush moves the batch holding the earned word, not merely the earliest batch still queued', () => {
+    // In every scenario above "the batch holding the next word" and "the earliest queued batch" coincide,
+    // because `dealOrdered` lays the words out in order — so a `rush` that ignored its label and moved
+    // whatever was queued first stayed green. Ask for a word two batches down while the batch before it is
+    // still queued: that batch must move, and the one in front of it must not.
+    const { s } = orderedSequence(23);
+    const three = launchAtOf(s, 'three'), five = launchAtOf(s, 'five');
+    expect(s.all().find(b => b.label === 'three')!.launched, 'the batch before is still queued').toBe(false);
+    expect(three, 'the layout must put three before five for this to test anything').toBeLessThan(five);
+    expect(s.arena.rush('five')).toBe(true);
+    expect(launchAtOf(s, 'five'), 'the batch holding the earned word moved').toBeLessThan(five);
+    expect(launchAtOf(s, 'three'), 'the batch in front of it did not').toBe(three);
+  });
+
+  it('a later word of the sequence sliced out of turn is wrong, not quiet progress', () => {
+    // `progress` above is a transcript of the test's own input — every hit is asserted to return 'step', which
+    // only happens when the label IS the target — so the ordering rule the whole `ordered`/`rush` machinery
+    // exists to serve was untested: crediting any sequence word out of turn (`q.sequence.includes(label)` in
+    // place of `label === target`, src/game/session.ts:95) left the entire unit suite green. It is reachable
+    // in real play: `perBatch` is 4 and `dealOrdered` puts two targets in the same batch, so word 2 is on
+    // screen — here it even rises first, at +840 ms against word 1's +1260 ms — while word 1 is still
+    // unearned. This needs its own scenario: a wrong answer sets `waiting`, which would strand the one above.
+    const { s, session, progress } = orderedSequence(23);
+    launched(s, 'two');
+    expect(session.seqIndex, 'word 1 is still unearned — that is what makes this slice out of turn').toBe(0);
+
+    expect(s.arena.hitLabel('two'), 'the child reaches the second word first').toBe(true);
+    const hit = s.events.hits.shift();
+    expect(hit).toEqual({ label: 'two', viaSwipe: false });
+    expect(session.hit(hit!.label), 'word 2 before word 1 is a wrong answer').toBe('wrong');
+    expect(session.seqIndex, 'and earns no step').toBe(0);
+    expect(progress, 'nor reports progress the child has not made').toEqual([]);
+    expect(s.events.hits, 'one slice, one report').toEqual([]);
+  });
+});
+
+describe('#142: the arena drives the whole mission stage machine', () => {
+  it('advances questions and stages, tops up lives, records stars, and ends once', () => {
+    // No `lives` override: `YEARS[1].lives` is what the top-up below is capped by, and the scenario's numbers
+    // are worked out against it, so pin it rather than restate it.
+    const year: YearInfo = { ...YEARS[1], perStage: 2, speeds: [1, 3], diffs: [1, 3] };
+    expect(year.lives, 'the top-up arithmetic below assumes a three-life year').toBe(3);
+    const questions: { stage: number; index: number; speed: number }[] = [];
+    const clears: { stage: number; stars: number; accuracy: number }[] = [];
+    const lives: number[] = [];
+    const misses: string[] = [];
+    const results: SessionResult[] = [];
+    let serial = 0;
+
+    sim = createSim({ seed: 31 });
+    const session = new Session(
+      {
+        mode: 'mission', year, stages: 2, rng: rngFor(31),
+        // Every wave is self-identifying — `a3` can only have come from question 3 — so a bubble left over
+        // from the previous wave can never satisfy an assertion meant for this one.
+        topic: topicOf('mission', () => { const n = ++serial; return { prompt: `q${n}`, answer: `a${n}`, options: [`a${n}`, `x${n}`] }; }),
+      },
+      {
+        onQuestion: (_q, info) => {
+          questions.push({ stage: info.stage, index: info.index, speed: info.speed });
+          sim!.spawn({ labels: info.labels, speed: info.speed });
+        },
+        onCorrect: () => {}, onWrong: () => {}, onProgress: () => {},
+        onMiss: q => { misses.push(q.answer); },
+        onLives: n => { lives.push(n); },
+        onStageClear: (stage, stars, accuracy) => { clears.push({ stage, stars, accuracy }); },
+        onEnd: result => { results.push(result); },
+      });
+
+    // The bridge `src/ui/play-session.ts` makes, in the arena's own order: falls are reported as they happen,
+    // the wave end after the last of them.
+    let handledWaves = 0;
+    const endWave = () => {
+      expect(sim!.events.waveEnds, 'the arena must report exactly one wave end per question').toBe(handledWaves + 1);
+      handledWaves++;
+      for (const label of sim!.events.falls.splice(0)) session.fall(label);
+      session.waveEnd();
+    };
+    /**
+     * Let the wave fall off the bottom un-sliced: the arena-driven miss, the one edge a slice never reaches.
+     * `waiting` is checked between the fall and the wave end because `Session.waveEnd` has its own "nothing
+     * was decided" fallback that also scores a miss — a `fall()` that did nothing would look identical by
+     * the end of the wave, and only the moment in between tells the two apart.
+     */
+    const letFall = (target: string, decoy: string) => {
+      const before = sim!.events.waveEnds;
+      // The decoy first, on its own, before the target has fallen: `Session.fall`'s "not the target — ignore
+      // it" branch is only observable while `waiting` is still false. Draining both falls in array order let
+      // the target latch `waiting` first and the decoy be swallowed by that instead, so deleting the guard
+      // (`if (!isTarget) return`) left the suite green.
+      const missesBefore = misses.length, livesBefore = session.lives;
+      session.fall(decoy);
+      expect(misses.length, 'a decoy falling past the bottom is not a miss').toBe(missesBefore);
+      expect(session.lives, 'and costs nothing').toBe(livesBefore);
+      expect(session.waiting, 'nor decides the question').toBe(false);
+      advanceUntil(sim!, () => sim!.events.falls.includes(target), `${target} never fell`);
+      for (const label of sim!.events.falls.splice(0)) session.fall(label);
+      expect(session.waiting, 'the question is decided by the fall itself, not by the wave ending').toBe(true);
+      advanceUntil(sim!, () => sim!.events.waveEnds > before, 'the wave never fell off the screen');
+      endWave();
+    };
+    const slice = (n: number, right: boolean) => {
+      const label = right ? `a${n}` : `x${n}`;
+      launched(sim!, label);
+      expect(sim!.arena.hitLabel(label)).toBe(true);
+      const hit = sim!.events.hits.shift();
+      expect(hit).toEqual({ label, viaSwipe: false });
+      expect(session.hit(hit!.label)).toBe(right ? 'correct' : 'wrong');
+      sim!.arena.clearWave();
+      endWave();
+    };
+
+    session.start();
+    letFall('a1', 'x1');
+    expect(misses, 'a target that falls past the bottom is a miss, reported through the arena').toEqual(['a1']);
+    expect(session.lives, 'a first-stage miss costs one life').toBe(2);
+    // Both stage-1 questions go, on purpose. With one slip the top-up reaches `year.lives` anyway
+    // (`min(3, 2 + 1)`), so the assertion below could not tell `Math.min(year.lives, lives + 1)` from the
+    // gentle branch's `this.lives = year.lives` leaking to every year: replacing the line outright left
+    // 789/789 green. Two slips separate them — a top-up gives 2, a refill would give 3.
+    slice(2, false);
+    expect(session.lives, 'and so does a wrong slice').toBe(1);
+    expect(clears).toEqual([{ stage: 1, stars: 1, accuracy: 0 }]);
+    expect(session.stage, 'the stage-clear overlay owns the transition').toBe(1);
+
+    session.nextStage();
+    expect(session.stage).toBe(2);
+    expect(session.lives, 'Year 1 gets ONE life back between stages, not a full refill').toBe(2);
+    slice(3, true);
+    slice(4, true);
+    expect(clears).toEqual([
+      { stage: 1, stars: 1, accuracy: 0 },
+      { stage: 2, stars: 3, accuracy: 1 },
+    ]);
+
+    session.nextStage();
+    expect(session.ended).toBe(true);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ won: true, stageStars: [1, 3], stars: 2, correct: 2, attempts: 4, questions: 4 });
+    expect(questions).toEqual([
+      { stage: 1, index: 0, speed: 1 }, { stage: 1, index: 1, speed: 1 },
+      { stage: 2, index: 0, speed: 3 }, { stage: 2, index: 1, speed: 3 },
+    ]);
+    expect(lives, 'a miss, a slip and one between-stage top-up are reported').toEqual([2, 1, 2]);
+    expect(sim.events.hits, 'every slice was reported exactly once').toEqual([]);
+    expect(sim.events.falls, 'every fall was bridged').toEqual([]);
+
+    session.nextStage();
+    expect(results, 'the finished mission cannot end twice').toHaveLength(1);
   });
 });

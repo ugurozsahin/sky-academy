@@ -15,9 +15,9 @@
 //
 // What it deliberately does NOT do is model any game rule. Every number here comes from the real `Arena` and
 // the real `Session`; if a scenario passes because the harness re-implemented a behaviour the game does not
-// have, the test is worse than no test at all. The one piece of wiring it owns is the three-line bridge from
-// the arena's callbacks to the session's methods — the same bridge `src/ui/play.ts` makes — and it is written
-// out below rather than hidden, so a reader can check it against the screen.
+// have, the test is worse than no test at all. It owns no bridge to the session either: every scenario that
+// needs one writes its own few lines, next to its assertions, so a reader can check them against the screen
+// (`src/ui/play-session.ts`) rather than trust a helper.
 import { Arena, type ArenaOpts, type Bubble, type WaveOpts } from '../../../src/game/arena';
 
 /** A small seeded PRNG (mulberry32): same seed, same stream, no dependency. */
