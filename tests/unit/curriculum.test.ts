@@ -264,3 +264,23 @@ describe('shape tables (#35 — one source for maths.ts and memory.ts)', () => {
     expect(new Set(SHAPES_3D.map(([g]) => g)).size).toBe(6);
   });
 });
+
+describe('no-voice curriculum fallbacks (#65)', () => {
+  it('never leaves a listen, hidden-sentence, or picture-only spelling question dependent on say()', () => {
+    for (const topic of TOPICS) {
+      const r = rng(topic.id.length + 65);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 30; i++) {
+        const q = topic.gen(d, r);
+        if (/listen/i.test(q.prompt)) expect(q.listen, `${topic.id} d${d}: ${q.prompt}`).toBeTruthy();
+        if (q.peek) expect(q.listen, `${topic.id} d${d}: a peek has nothing to show without listen`).toBeTruthy();   // the peek's contract, for every generator
+        if (q.sequence && q.prompt === 'Build the sentence' && q.visual?.type !== 'sentence') {
+          expect(q.listen, `${topic.id} d${d}: hidden sentence`).toBe(q.answer);
+          expect(q.peek, `${topic.id} d${d}: hidden sentence needs a visual memory beat`).toBe(true);
+        }
+        if (q.sequence && /spell/i.test(q.prompt)) {
+          expect(q.listen, `${topic.id} d${d}: picture-only spelling`).toBe(q.answer);
+        }
+      }
+    }
+  });
+});

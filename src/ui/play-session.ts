@@ -13,11 +13,10 @@ import { STAGE_NAMES, type Question } from '../curriculum';
 import type { Arena } from '../game/arena';
 import { Session, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed';   // #32: test-only time compression
-import { haptic, say, sfx } from '../audio';
-import { load } from '../storage';
+import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
 import { $, esc } from './dom';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
-import { stageHTML, type Hud, type Outcome } from './hud';
+import { promptMode, stageHTML, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
 
 /** The TNT bubble villain modes mix into a wave: it costs a life and never counts as a wrong answer (#48). */
@@ -26,6 +25,7 @@ export const BOMB = '💣';
 /** The HUD elements the callbacks write to — play.ts owns them and passes its own `els` straight in. */
 export interface PlaySessionEls {
   score: HTMLElement; stage: HTMLElement; prompt: HTMLElement; vis: HTMLElement; hint: HTMLElement; qcard: HTMLElement;
+  speak: HTMLElement;                 // the 🔊 button: relabelled or hidden with the prompt mode (#65)
 }
 
 /** Everything the callbacks need from the screen around them. Function-valued where the screen builds it later. */
@@ -55,7 +55,29 @@ export interface PlaySession {
   readonly session: Session;
   /** The arena's wave-end beat: let the outcome finish showing, then take a breath before the next question. */
   waveEnd(): void;
+  /**
+   * One of the screen's overlays (pause, stage clear, results) opened (`true`) or closed. The arena is paused
+   * while an overlay OR a sentence peek holds it, and a peek's clock stops while an overlay is open — so a
+   * child who pauses mid-peek finds the sentence still there on resume, with the rest of its time to run (#65).
+   */
+  hold(open: boolean): void;
+  /**
+   * The child tapped the card or 🔊. On a device that speaks the screen reads the line again; on one that
+   * cannot, a hidden sentence is shown again for the peek time. Returns true when it was handled here, so
+   * the button is never a no-op on a silent device (the #205 rule).
+   */
+  repeat(): boolean;
+  /** Stop the voice-capability subscription and any peek when the play screen is replaced. */
+  dispose(): void;
 }
+
+/** A visual equivalent of hearing a sentence once: look, remember, then build. */
+export const NO_VOICE_PEEK_MS = 3000;
+/** The 🔊 button's labels per prompt mode; `read` hides it — the words are already on the card. */
+const SPEAK_LABEL = {
+  hear: { aria: 'Read the question aloud', title: 'Tap the card to hear it again' },
+  peek: { aria: 'Show the sentence again', title: 'Tap the card to see it again' },
+} as const;
 
 // #36: onCorrect/onWrong/onMiss each carried a copy of the same closing beat — remember the outcome, mark
 // the mission segment, spotlight the answer under the card, freeze the wave for the hold — and differed
@@ -78,6 +100,14 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
   const mission = opts.mode === 'mission';        // only missions show the stage pill and its segments
   let lastOutcome: Outcome | 'none' = 'none';
   let waveId = 0; let revealUntil = 0;
+  let activeQuestion: Question | null = null;
+  // The peek (#65): a sentence shown for NO_VOICE_PEEK_MS of un-paused time, then hidden. `peekLeft` is the
+  // time still to run, `peekSince` when the current run started, `peekDone` what the hide releases (the wave
+  // launch, for the first peek of a question). `holdOpen` mirrors the pause overlay; `readThrough` marks a
+  // question whose verdict arrived after its bubbles launched, so its sentence stays readable instead.
+  let peekToken = 0; let peekActive = false; let peekLeft = 0; let peekSince = 0;
+  let peekDone: (() => void) | null = null;
+  let holdOpen = false; let readThrough = false;
   let prevLives = opts.year.lives;
   // #44: false only until Fredoka is usable (or the capped wait gives up). The first wave is held back that
   // long so its labels are measured and drawn in the real face; every wave after it spawns synchronously.
@@ -106,6 +136,58 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     arena.reveal(reveal); hud.showOutcome(kind, q); endWave(scaled(hold[rule.hold]));
   }
 
+  /** `arena.paused` has ONE writer outside arena.ts, and this is it (a guard rail counts): the screen's overlays
+   *  (`hold()`) and the peek are reasons, and this is the sum of them — plus a finished game, which the results
+   *  overlay pauses for good and nothing here may undo. */
+  function syncPaused() {
+    const arena = deps.arena();
+    if (arena) arena.paused = holdOpen || peekActive || session.ended;
+  }
+  /** Drop a peek without finishing it — a new question, a slice, or teardown made it moot. */
+  function releasePeek() {
+    if (!peekActive) return;
+    peekToken++; peekActive = false; peekDone = null;
+    syncPaused();
+  }
+  /** Show the sentence and start (or resume) its clock. `then` runs when it hides — nothing, for a repeat. */
+  function showPeek(q: Question, then: (() => void) | null) {
+    els.prompt.innerHTML = esc(q.listen!);
+    els.hint.textContent = 'Look, remember, then build it';
+    peekActive = true; peekLeft = scaled(NO_VOICE_PEEK_MS); peekDone = then;
+    syncPaused();
+    if (!holdOpen) runPeek(q);
+  }
+  function runPeek(q: Question) {
+    const token = ++peekToken; peekSince = performance.now();
+    deps.later(() => {
+      if (token !== peekToken || activeQuestion !== q || !deps.mounted()) return;
+      els.prompt.innerHTML = promptHTML(q, session.seqIndex);
+      els.hint.textContent = 'Slice the words in order';
+      const then = peekDone; peekActive = false; peekDone = null;
+      syncPaused();
+      then?.();
+    }, peekLeft);
+  }
+
+  /**
+   * Put the prompt on the card for the device's voice verdict (#65). Returns true when a peek is holding the
+   * wave back — the caller launches when it ends. `launched` says the bubbles are already up (a verdict that
+   * landed mid-wave): a peek cannot start under a live wave — "hide it before the bubbles launch" is the
+   * contract in types.ts — so that question reads its sentence through instead.
+   */
+  function renderQuestion(q: Question, launched: boolean): boolean {
+    const mode = promptMode(q, canHear());
+    releasePeek();
+    if (mode === 'peek' && launched) readThrough = true;
+    const reveal = mode === 'read' || readThrough;
+    els.speak.hidden = reveal;
+    if (!reveal) { els.speak.setAttribute('aria-label', SPEAK_LABEL[mode].aria); els.speak.setAttribute('title', SPEAK_LABEL[mode].title); }
+    if (mode === 'peek' && !launched) return true;
+    els.prompt.innerHTML = promptHTML(q, session.seqIndex, reveal);
+    els.hint.textContent = q.hint ?? (deps.tracing ? 'Trace over the dotted letters' : reveal ? 'Read, then slice the answer' : 'Tap or slice the answer');
+    return false;
+  }
+
   const session = new Session(opts, {
     onQuestion(q, info) {
       // If a miss is still being shown (the answer fell and the session moved on at once), let the child see it before the next question.
@@ -115,9 +197,9 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         // Sensei: name the topic of each question
         const t = session.currentTopic;
         if (deps.training && t) $('.ttl').textContent = `${t.icon} ${t.title}`;
-        els.prompt.innerHTML = q.listen && !load().speech ? esc(q.listen) : promptHTML(q, session.seqIndex);
+        activeQuestion = q; readThrough = false;
+        const peek = renderQuestion(q, false);
         els.vis.innerHTML = renderVisual(q.visual);
-        els.hint.textContent = q.hint ?? (deps.tracing ? 'Trace over the dotted letters' : 'Tap or slice the answer');
         lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
         if (deps.tracing) { say(q.say ?? q.prompt); deps.startTrace(q); return; }
         const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
@@ -153,7 +235,8 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
           if (fontsReady) { spawn(); return; }
           fontReady().then(() => { if (deps.mounted()) spawn(); });   // never into a torn-down screen
         };
-        if (demo) deps.later(gatedSpawn, demo); else gatedSpawn();
+        const launch = () => { if (demo) deps.later(gatedSpawn, demo); else gatedSpawn(); };
+        if (peek) showPeek(q, launch); else launch();   // #65: the peek owns the launch — it runs when the sentence hides
       }
     },
     onCorrect(q, points, combo) {
@@ -173,11 +256,13 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       settle('miss', q, { good: q.sequence ? q.sequence[session.seqIndex] : q.answer });
     },
     onProgress(label, done, total) {
+      releasePeek();
       sfx.slice();
       const arena = deps.arena();
       // the next word is earned: bring it up now instead of making the child wait for its batch
       if (done < total) arena?.rush(session.current!.sequence![done]);
-      els.prompt.innerHTML = promptHTML(session.current!, done);
+      const q = session.current!;
+      els.prompt.innerHTML = promptHTML(q, done, promptMode(q, canHear()) === 'read' || readThrough);
       if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, deps.av.glow);
       // queued, never interrupting: sliced letters arrive faster than they can be spoken, and a plain say()
       // cuts each one off to start the next, so the child hears fragments instead of the word (#40)
@@ -201,18 +286,44 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     },
   });
 
+  // Registered after `session` exists: `recordVoice` dispatches synchronously, and this reads the session. A
+  // verdict that lands mid-peek is left alone — the sentence is on the card and the wave launches when it hides.
+  const stopWatchingVoice = onVoiceStateChange(() => {
+    if (activeQuestion && !session.waiting && !peekActive && deps.mounted()) renderQuestion(activeQuestion, true);
+  });
+
   return {
     session,
     waveEnd() {   // let the outcome finish showing (the reveal may still be on screen), then a breath before the next question
       const gap = scaled(lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650);
       deps.later(() => session.waveEnd(), Math.max(0, revealUntil - performance.now()) + gap);
     },
+    hold(open) {
+      if (open === holdOpen) return;
+      holdOpen = open;
+      if (peekActive && activeQuestion) {
+        if (open) { peekLeft = Math.max(0, peekLeft - (performance.now() - peekSince)); peekToken++; }   // stop the clock
+        else runPeek(activeQuestion);                                                                 // and restart it
+      }
+      syncPaused();
+    },
+    repeat() {
+      const q = activeQuestion;
+      if (!q || session.waiting || readThrough || promptMode(q, canHear()) !== 'peek' || !deps.mounted()) return false;
+      if (!peekActive) showPeek(q, null);   // bubbles already up stay frozen while the child looks; nothing waits on it
+      return true;
+    },
+    dispose() { releasePeek(); stopWatchingVoice(); },
   };
 }
 
-/** The question prompt: a plain question, or the sequence so far with the letters still to come as gaps. */
-function promptHTML(q: Question, done: number) {
-  if (!q.sequence) return esc(q.prompt);
-  const letters = q.sequence.map((l, i) => `<span class="${i < done ? 'got' : 'todo'}">${i < done ? esc(l) : '_'}</span>`).join('');
-  return `<span class="seq">${letters}</span>`;
+/**
+ * The question prompt: a plain question, or the sequence so far with the letters still to come as gaps.
+ * `reveal` (#65, a device with no voice) shows the letters still to come as well — the word to copy AND the
+ * place in it, which are two different things a child needs — and prints the `listen` text for a plain question.
+ */
+function promptHTML(q: Question, done: number, reveal = false) {
+  if (!q.sequence) return esc(reveal && q.listen ? q.listen : q.prompt);
+  const items = q.sequence.map((l, i) => `<span class="${i < done ? 'got' : 'todo'}">${i < done || reveal ? esc(l) : '_'}</span>`);
+  return `<span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
 }

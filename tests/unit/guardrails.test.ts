@@ -56,6 +56,20 @@ describe('guard rails', () => {
   // `shadowBlur` is per-pixel CPU work; arena.ts itself notes it is "too slow on low-end devices". #29 removed
   // the last of it from the per-frame draw paths — the bolt/star particle glows, the outcome spotlight ring and
   // the tracer stroke now draw a cheap translucent underlay halo instead. Budget is 0: never raise this.
+  // #65 review: `arena.paused` used to have five writers across play.ts and play-session.ts, and correctness
+  // rested on two of them agreeing (a peek releasing under a stage-clear overlay would have restarted the wave
+  // behind it). Every reason to pause now flows through play-session's `syncPaused()` — the screen's overlays
+  // via `hold()`, the peek, and a finished game — so outside arena.ts there is exactly one assignment. A second
+  // one is a second owner, and this rail names it.
+  it('arena.paused has one writer outside arena.ts (#65)', () => {
+    const writers = Object.entries(SOURCES)
+      .filter(([f]) => f !== '/src/game/arena.ts')
+      .flatMap(([f, s]) => code(s).split('\n').filter(l => /\.paused\s*=[^=]/.test(l)).map(l => `${f}: ${l.trim()}`));
+    expect(writers, 'route a new pause reason through play-session\'s hold()/syncPaused(), never a direct write').toEqual([
+      '/src/ui/play-session.ts: if (arena) arena.paused = holdOpen || peekActive || session.ended;',
+    ]);
+  });
+
   it('shadowBlur stays out of the per-frame draw paths', () => {
     const hits = inDir('/src/game/').flatMap(([f, s]) => [...code(s).matchAll(/shadowBlur/g)].map(() => f));
     expect(hits.length).toBeLessThanOrEqual(0);                         // #29 removed them; never raise this

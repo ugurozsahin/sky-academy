@@ -24,6 +24,7 @@ export interface Question {
   hint?: string;          // small instruction text under the prompt
   wide?: boolean;         // options are words → bigger bubbles
   listen?: string;        // spoken-only question: shown on the card instead of `prompt` when read-aloud is off
+  peek?: boolean;         // no-voice sequence: show `listen` briefly, then hide it before the bubbles launch (#65)
 }
 
 export type Difficulty = 1 | 2 | 3;

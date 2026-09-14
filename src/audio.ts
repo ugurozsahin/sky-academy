@@ -1,5 +1,5 @@
 // Synthesised sound effects (Web Audio, no files) + Web Speech for reading prompts aloud.
-import { load } from './storage';
+import { load, save, type SaveData } from './storage';
 
 let ctx: AudioContext | null = null;
 function ac(): AudioContext | null {
@@ -112,9 +112,14 @@ export function chooseVoice<T extends VoiceLike>(voices: T[]): T | null {
 let voice: SpeechSynthesisVoice | null | undefined;
 function pickVoice(s: { getVoices?: () => SpeechSynthesisVoice[] }) {
   if (voice !== undefined) return voice;
-  const vs = s.getVoices?.() ?? [];
+  let vs: SpeechSynthesisVoice[];
+  // Third-party Android TTS engines populate this list and nothing validates it: one entry with no `lang`
+  // used to throw out of `voiceScore` — and, until #65's review, out of `say()`, where the catch marked the
+  // device mute for good. Choosing a voice is a nicety; it must never be evidence about the engine.
+  try { vs = s.getVoices?.() ?? []; } catch { return null; }
   if (!vs.length) return null;                                              // voices not loaded yet: retry next time
-  voice = chooseVoice(vs);
+  try { voice = chooseVoice(vs.filter(v => typeof v?.lang === 'string' && typeof v.name === 'string')); }
+  catch { voice = null; }
   return voice;
 }
 /** Minimal shape of `speechSynthesis`, so the cancel/queue behaviour is testable in node (#40). */
@@ -129,6 +134,139 @@ export const SAY_DEFER_MS = 0;
 let deferred: ReturnType<typeof setTimeout> | undefined;
 
 /**
+ * Whether this device can actually be heard (#65). One declaration, the save's — audio already imports
+ * storage, so the type flows this way and the two cannot drift apart.
+ *   `unknown` — never probed on this device (or the verdict was cleared); the game is optimistic until it knows.
+ *   `yes`     — an utterance really started this launch, or did on a previous one and nothing has said otherwise.
+ *   `no`      — no engine at all, or a line was handed to the engine and it neither started nor was taken back
+ *               within `VOICE_START_MS`. Stored, and probed afresh on the next launch.
+ */
+export type VoiceState = SaveData['voice'];
+/**
+ * How long, in total, the engine may hold lines of ours without starting one before the device is called
+ * mute. The first utterance on a cold Android TTS process is routinely 1–3 s, and that is the population this
+ * exists for; a wrong `no` is the expensive direction (phonics stops being phonics), a slow `no` costs a few
+ * spoken lines. Not scaled: this measures the device, not a game beat.
+ */
+export const VOICE_START_MS = 4000;
+let observedVoice: VoiceState | undefined;      // this launch's verdict; `undefined` until a line settles it
+let voiceDeadline: ReturnType<typeof setTimeout> | undefined;
+let silentMs = 0;                               // this launch: how long the engine has held a line of ours without starting it
+let pendingSince: number | undefined;           // when the line the engine currently holds was handed over
+let pendingLine: SpeechSynthesisUtterance | undefined;   // and which line that is — an old line's late `canceled` must not stop a new line's clock
+const voiceListeners = new Set<(state: VoiceState) => void>();
+
+// Read through `window` rather than the bare global so a node test can stand a fake engine up as the default
+// and exercise `canHear()` the way the screens call it. `SpeechSynthesisUtterance` is feature-detected too: an
+// engine object with no way to build a line is no engine, and saying so here beats a throw looking like one.
+const defaultSynth = (): SynthLike | null =>
+  typeof window !== 'undefined' && window.speechSynthesis && typeof SpeechSynthesisUtterance === 'function'
+    ? window.speechSynthesis : null;
+
+function clearVoiceDeadline() {
+  if (voiceDeadline !== undefined) clearTimeout(voiceDeadline);
+  voiceDeadline = undefined;
+}
+/** A line is with the engine: the silence clock runs from now, and the verdict falls when it reaches the budget. */
+function startSilence(line: SpeechSynthesisUtterance) {
+  stopSilence();
+  pendingSince = performance.now(); pendingLine = line;
+  voiceDeadline = setTimeout(() => {
+    pendingSince = undefined; silentMs = VOICE_START_MS;
+    if (observedVoice !== 'yes') recordVoice('no');
+  }, VOICE_START_MS - silentMs);
+}
+/**
+ * The engine no longer holds a line of ours. `bank` (the default) adds the silence so far to the launch's
+ * total — a newer line replacing one the engine sat on is evidence; `hush()` passes false, because a line
+ * cut off by a screen change says nothing about the engine and must not add up to a verdict.
+ */
+function stopSilence(bank = true) {
+  if (bank && pendingSince !== undefined) silentMs = Math.min(VOICE_START_MS, silentMs + performance.now() - pendingSince);
+  pendingSince = undefined; pendingLine = undefined;
+  clearVoiceDeadline();
+}
+
+function recordVoice(state: VoiceState) {
+  clearVoiceDeadline();
+  pendingSince = undefined; pendingLine = undefined;
+  if (state === 'yes') silentMs = 0;
+  const changed = (observedVoice ?? load().voice) !== state;               // the value canHear() has been reading
+  observedVoice = state;
+  if (!changed) return;                                                    // a stored verdict confirmed: nothing to redraw
+  save({ voice: state });                                                   // load()/save() swallow storage faults themselves
+  for (const listener of voiceListeners) {
+    // One listener re-renders the question card; a throw there must not abort the others, and must not escape
+    // say(), whose caller spawns the wave on the very next line — a throw would leave the child with no bubbles.
+    try { listener(state); } catch (e) { console.error('voice listener failed', e); }
+  }
+}
+
+/** Last observed device capability. `unknown` is optimistic only until the first real utterance is probed. */
+export function voiceState(synth: SynthLike | null = defaultSynth()): VoiceState {
+  if (!synth) return 'no';
+  return observedVoice ?? load().voice;
+}
+
+/** Read-aloud is useful only when it is enabled and the device has not proved silent. */
+export function canHear(synth: SynthLike | null = defaultSynth()): boolean {
+  return load().speech && voiceState(synth) !== 'no';
+}
+
+/** Re-render the current question when an honest speech probe changes the available fallback. */
+export function onVoiceStateChange(listener: (state: VoiceState) => void): () => void {
+  voiceListeners.add(listener);
+  return () => { voiceListeners.delete(listener); };
+}
+
+/** Start a fresh launch probe. A new module load does this naturally; tests call it between cases. */
+export function resetVoiceProbe() {
+  clearVoiceDeadline();
+  observedVoice = undefined; silentMs = 0; pendingSince = undefined; pendingLine = undefined;
+  voice = undefined;
+}
+
+/**
+ * Stop speaking and drop any line still waiting — the screen is going away (#35). Owned here rather than
+ * calling `speechSynthesis.cancel()` from the screen, because a cancel is also the one thing that must void
+ * the probe: a line cut off by a screen change is no evidence that the engine is silent, so its time is
+ * dropped, not banked — three quick screen changes on a cold engine must not add up to a `no`.
+ */
+export function hush(synth: SynthLike | null = defaultSynth()) {
+  if (deferred !== undefined) { clearTimeout(deferred); deferred = undefined; }
+  stopSilence(false);
+  try { synth?.cancel(); } catch { /* an engine that will not even cancel has nothing left to stop */ }
+}
+
+/**
+ * The probe (#65): every line handed to the engine is evidence until the launch has a verdict. Any sign that
+ * a line is being spoken is a `yes` — `onstart`, but also `onboundary`, `onresume`, and an `onend` on a line
+ * we did not take back: Android WebView and older Chrome are known to speak a line and fire only `end`, and
+ * a device that really spoke must never be told it cannot. The only negative signal is *silence with a line
+ * pending*: the clock runs while the engine holds a line of ours and has not started it, stops when we take
+ * the line back (`hush()` drops that time; `say()` replacing a line the engine sat on banks it), and the
+ * verdict is `no` when it reaches `VOICE_START_MS` in total. Summed across lines, deliberately: a mute
+ * device answering a quick child gets a new line every couple of seconds, and a clock that restarted with
+ * each one would never fall — while a slow engine handed 4 s of lines in a row has had its chance. An empty
+ * `getVoices()` is evidence of nothing in either direction — Android WebView returns `[]` forever on devices
+ * that speak perfectly well — so it plays no part.
+ */
+function armVoiceProbe(utterance: SpeechSynthesisUtterance) {
+  if (observedVoice === 'yes') return;
+  const spoke = () => recordVoice('yes');
+  utterance.onstart = spoke; utterance.onboundary = spoke; utterance.onresume = spoke;
+  // `end` counts only while the line is still ours: some engines fire it for a line they were told to cancel,
+  // and that line was never heard.
+  utterance.onend = () => { if (pendingLine === utterance) spoke(); };
+  utterance.onerror = e => {
+    // Taken back (by us, or by anything else calling cancel()): the clock stops. Any other error leaves it
+    // running — a later line may still start, and if none does the device really cannot be heard.
+    if (pendingLine === utterance && (e.error === 'canceled' || e.error === 'interrupted')) stopSilence();
+  };
+  startSilence(utterance);
+}
+
+/**
  * Speak a line. Interrupts whatever is speaking, unless `queue` is set — then it waits its turn instead,
  * which is what per-letter progress wants: cutting the previous letter off mid-word is the bug (#40).
  *
@@ -136,18 +274,32 @@ let deferred: ReturnType<typeof setTimeout> | undefined;
  * Android leaves the engine wedged often enough that the next line is simply never heard; and `speak()` in
  * the same turn as a `cancel()`, which those engines drop on the floor.
  */
-export function say(text: string, force = false, o: { queue?: boolean; synth?: SynthLike } = {}) {
-  const s = o.synth ?? (typeof window !== 'undefined' && 'speechSynthesis' in window ? speechSynthesis : null);
-  if (!s) return;
+export function say(text: string, force = false, o: { queue?: boolean; synth?: SynthLike | null } = {}) {
   if (!force && !load().speech) return;
-  try {
-    if (deferred !== undefined) { clearTimeout(deferred); deferred = undefined; }   // a line still waiting is stale now
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-GB'; u.rate = 0.9; u.pitch = 1.08;                       // a touch slower and brighter for young listeners
-    const v = pickVoice(s); if (v) u.voice = v;
-    if (o.queue || !(s.speaking || s.pending)) { s.speak(u); return; }    // nothing to interrupt, or nothing we want to
-    s.cancel();
-    deferred = setTimeout(() => { deferred = undefined; try { s.speak(u); } catch { /* ignore */ } }, SAY_DEFER_MS);
-  } catch { /* ignore */ }
+  const s = o.synth === undefined ? defaultSynth() : o.synth;
+  if (!s) { recordVoice('no'); return; }                                    // no engine at all — the one verdict that needs no probe
+  if (deferred !== undefined) { clearTimeout(deferred); deferred = undefined; }   // a line still waiting is stale now
+  // Nothing below may throw into the caller: `say()` runs on the line before the wave spawns, and a throw
+  // there is a question card with no bubbles (#65 review). An engine whose utterance constructor throws
+  // cannot be handed a line at all — that is the missing-engine verdict, not a hiccup.
+  let u: SpeechSynthesisUtterance;
+  try { u = new SpeechSynthesisUtterance(text); } catch { recordVoice('no'); return; }
+  u.lang = 'en-GB'; u.rate = 0.9; u.pitch = 1.08;                           // a touch slower and brighter for young listeners
+  try { const v = pickVoice(s); if (v) u.voice = v; } catch { /* a voice is a nicety; the default will do */ }
+  // Only the engine call may count against the device. A `speak()` (or `cancel()`) that throws is a line that
+  // can never start: the probe is armed BEFORE the engine is asked, so the deadline is left running — a device
+  // that throws on every line is called mute in VOICE_START_MS, one that merely hiccupped is judged by the next.
+  if (o.queue || !(s.speaking || s.pending)) {                              // nothing to interrupt, or nothing we want to
+    armVoiceProbe(u);
+    try { s.speak(u); } catch { /* the deadline decides */ }
+    return;
+  }
+  stopSilence();                                                            // the line being cut off banks its silence
+  armVoiceProbe(u);                                                         // and the replacement owns the clock from here
+  try { s.cancel(); } catch { /* the engine would not even cancel: the deferred speak() and the deadline decide */ }
+  deferred = setTimeout(() => {
+    deferred = undefined;
+    try { s.speak(u); } catch { /* the deadline decides */ }
+  }, SAY_DEFER_MS);
 }
-if (typeof window !== 'undefined' && 'speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { voice = undefined; };
+if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.onvoiceschanged = () => { voice = undefined; };

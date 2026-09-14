@@ -1,6 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 import { TOPICS } from '../../src/curriculum';
+import { SAVE_VERSION } from '../../src/storage';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
+
+declare global {
+  interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
+}
 
 // The live screen sets `__sna` to PlayHooks or MemoryHooks; a given test knows which, so the spec views it as
 // the union of both surfaces (#34, replacing `__sna: any`). tests/e2e is outside tsconfig's `include`, so this
@@ -555,6 +560,126 @@ test.describe('Sky Ninja Academy', () => {
     expect(listen.split(' · ')).toHaveLength(3);
   });
 
+  /** #65: an engine that exists but never speaks — `speechSynthesis` present, no voices, `speak()` fires nothing. The APK's WebView without a TTS engine looks exactly like this (and so does headless Chromium). */
+  const stubSilentEngine = (page: Page, keepLastLine = false) => page.addInitScript(keep => {
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        speaking: false, pending: false, getVoices: () => [], cancel: () => {}, onvoiceschanged: null,
+        speak: (u: SpeechSynthesisUtterance) => { if (keep) window.__lastVoiceLine = u; },
+      },
+    });
+  }, keepLastLine);
+  const storedVoice = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).voice as string);
+
+  // #65, one test per topic rather than one walk through all of them: the walk ran to ~60 s on a loaded desktop
+  // runner and was reported as "page.goto hangs" — the test budget expiring mid-navigation, not a wedged page.
+  test('no voice: Sound Hunt prints its keywords, mid-wave and without a pause, and stays answerable (#65)', async ({ page }) => {
+    await stubSilentEngine(page);
+    await seedPlayer(page, 'volt', 'Ada', { speech: true, voice: 'unknown', tutorialSeen: true });
+    // `unknown` is optimistic, so the first card may show "🔊 Listen!" until the probe's silence budget
+    // (VOICE_START_MS, real time, summed across the lines the questions hand it) runs out; then the keywords.
+    await startTopic(page, 'reception', 'r-soundhunt');
+    await expect.poll(() => storedVoice(page), { timeout: 10000 }).toBe('no');
+    await expect.poll(() => page.evaluate(() => document.querySelector('.prompt')!.textContent === window.__sna.session.current.listen)).toBe(true);
+    const keywords = await page.evaluate(() => window.__sna.session.current.listen as string);
+    expect(keywords.split(' · ')).toHaveLength(3);
+    expect(await page.evaluate(() => window.__sna.arena!.paused), 'a verdict landing mid-wave never freezes the bubbles').toBe(false);
+    await expect(page.locator('#speak')).toBeHidden();                        // the words are on the card: no dead 🔊
+    await answerAll(page, 1);                                                 // and the question can actually be answered
+  });
+
+  test('no voice: Build a Word shows the whole word to copy AND the place in it (#65)', async ({ page }) => {
+    await stubSilentEngine(page);
+    await seedPlayer(page, 'volt', 'Ada', { speech: true, voice: 'no', tutorialSeen: true });
+    await startTopic(page, 'reception', 'r-build');
+    const word = await page.evaluate(() => window.__sna.session.current.answer as string);
+    await expect(page.locator('.prompt')).toHaveText(word);
+    await expect(page.locator('.prompt .seq span')).toHaveCount(word.length);
+    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    await expect(page.locator('.prompt .seq .got')).toHaveCount(1);           // progress is still shown …
+    await expect(page.locator('.prompt')).toHaveText(word);                   // … and the copy word stays for every letter
+    await solveCurrent(page);                                                 // the rest of the word is sliceable in order
+  });
+
+  test('no voice: a Story Sentence is shown, survives a pause, hides, can be shown again, and is buildable (#65)', async ({ page }) => {
+    await stubSilentEngine(page);
+    await seedPlayer(page, 'volt', 'Ada', { speech: true, voice: 'no', tutorialSeen: true });
+    await startTopic(page, 'year1', 'y1-sentence');
+    await waitForTarget(page);                                                // the d1 wave (sentence shown) is up …
+    const sentence = await page.evaluate(() => {
+      const s = window.__sna.session;
+      s.stage = 2; s.index = 0; s.nextQuestion();                             // … when the hook jumps to d2 (listen-and-build)
+      return s.current.answer;
+    });
+    await expect(page.locator('.prompt')).toHaveText(sentence);
+    await expect(page.locator('#speak')).toHaveAttribute('aria-label', 'Show the sentence again');
+    // The d1 bubbles are still the arena's wave: a launch under the overlay would replace them with d2's.
+    const held = await page.evaluate(() => window.__sna.bubbles().map(b => b.label));
+    await page.click('#pause');
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.waitForTimeout(1500);                                          // twice the peek at 4×: it would have expired
+    await expect(page.locator('.prompt'), 'a child who pauses mid-look keeps the sentence').toHaveText(sentence);
+    expect(await page.evaluate(() => window.__sna.arena!.paused)).toBe(true);
+    expect(await page.evaluate(() => window.__sna.bubbles().map(b => b.label)), 'nothing launches under the overlay').toEqual(held);
+    await page.click('#resume');
+    await expect(page.locator('.prompt .seq')).toBeVisible({ timeout: 3000 }); // the rest of the look runs from the resume
+    await expect(page.locator('.prompt')).not.toHaveText(sentence);
+    await expect.poll(() => page.evaluate(() => window.__sna.arena!.paused)).toBe(false);
+    await waitForTarget(page);                                                // the bubbles launch only after the visual memory beat
+    // the card tap is the repeat on a silent device: the sentence comes back for a look, bubbles frozen, then goes again
+    await page.click('#speak');
+    await expect(page.locator('.prompt')).toHaveText(sentence);
+    expect(await page.evaluate(() => window.__sna.arena!.paused)).toBe(true);
+    await expect(page.locator('.prompt .seq')).toBeVisible({ timeout: 3000 });
+    await expect.poll(() => page.evaluate(() => window.__sna.arena!.paused)).toBe(false);
+    await solveCurrent(page);                                                 // and the sentence can be built
+  });
+
+  test('no voice: the grown-ups dashboard says so once, to the grown-up (#65)', async ({ page }) => {
+    await stubSilentEngine(page);
+    await seedPlayer(page, 'volt', 'Ada', { speech: true, voice: 'no', tutorialSeen: true });
+    await openGrownUps(page);
+    await expect(page.locator('.voice-note')).toContainText('Settings → Accessibility → Text-to-speech');
+    expect(await page.locator('.voice-note').count()).toBe(1);
+  });
+
+  test('a late voice verdict never resumes a game the child paused (#65)', async ({ page }) => {
+    await stubSilentEngine(page, true);
+    await seedPlayer(page, 'volt', 'Ada', { speech: true, voice: 'unknown', tutorialSeen: true });
+    await startTopic(page, 'year1', 'y1-add');
+    await page.click('#pause');
+    await expect(page.locator('#resume')).toBeVisible();
+    expect(await page.evaluate(() => {
+      const u = window.__lastVoiceLine;
+      if (!u?.onstart) return false;
+      u.onstart(new Event('start') as SpeechSynthesisEvent); return true;
+    })).toBe(true);
+    await expect.poll(() => storedVoice(page)).toBe('yes');
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => window.__sna.arena!.paused)).toBe(true);
+  });
+
+  test('resuming during a no-voice sentence waits for the memory peek to finish (#65)', async ({ page }) => {
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });
+    await stubSilentEngine(page);
+    await seedPlayer(page, 'volt', 'Ada', { speech: true, voice: 'no', tutorialSeen: true });
+    expect(await storedVoice(page), 'the seed must survive the v1 → v2 migration, or this test starts in the wrong state').toBe('no');
+    await startTopic(page, 'year1', 'y1-sentence');
+    const sentence = await page.evaluate(() => {
+      const s = window.__sna.session;
+      s.stage = 2; s.index = 0; s.nextQuestion();
+      return s.current.answer;
+    });
+    await expect(page.locator('.prompt')).toHaveText(sentence);
+    await page.click('#pause');
+    await page.click('#resume');
+    expect(await page.evaluate(() => window.__sna.arena!.paused)).toBe(true);
+    await expect(page.locator('.prompt .seq')).toBeVisible({ timeout: 5000 });
+    await expect.poll(() => page.evaluate(() => window.__sna.arena!.paused)).toBe(false);
+    await waitForTarget(page);
+  });
+
   test('letter tracing passes when the glyph is covered', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-trace');
@@ -1053,7 +1178,7 @@ test.describe('Sky Ninja Academy', () => {
     // the code is the save, and it carries the version that makes it recognisable
     const code = await page.inputValue('#save-code');
     const parsed = JSON.parse(code);
-    expect(parsed.v).toBe(1);
+    expect(parsed.v).toBe(SAVE_VERSION);
     expect(parsed.name).toBe('Ada');
 
     // a stray paste is refused, and nothing on the device changes

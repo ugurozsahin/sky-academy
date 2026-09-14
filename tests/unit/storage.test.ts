@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, exportSave, importSave, load, migrate, recordAccuracy, recordBossWin, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, stickersFor, touchStreak, SAVE_VERSION, STICKER_IDS, STICKER_COST } from '../../src/storage';
+import { addCoins, exportSave, importSave, load, migrate, recordAccuracy, recordBossWin, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, SAVE_VERSION, STICKER_IDS, STICKER_COST } from '../../src/storage';
 
 // minimal localStorage shim for node
 const mem: Record<string, string> = {};
@@ -69,6 +69,7 @@ describe('save migration (#38)', () => {
     expect(stored.year).toBe('year1');
     expect(stored.coins).toBe(42);
     expect(stored.sprint).toEqual({ year1: 200 });
+    expect(stored.voice).toBe('unknown');            // v1 → v2 adds the launch-to-launch TTS verdict (#65)
     expect(stored.tutorialSeen).toBe(false);         // key absent in the blob → filled from DEFAULT
     expect(stored.boss).toEqual({});
     expect(stored.owned).toEqual([]);
@@ -81,6 +82,27 @@ describe('save migration (#38)', () => {
     expect(migrated.coins).toBe(5);
   });
 
+  // #65 review: `migrate` used to read a blob with no `v` as *current*, which skips every migration. That is
+  // invisible while the only step is additive (the DEFAULT merge fills the key anyway), and it is precisely
+  // the reshaping step (#26's `bests`) that would have been skipped — so the version read is pinned here.
+  it('reads a blob with no `v` as v1, so it walks every migration from the start', () => {
+    expect(saveVersionOf({})).toBe(1);
+    expect(saveVersionOf({ name: 'Old' })).toBe(1);
+    expect(saveVersionOf({ v: SAVE_VERSION })).toBe(SAVE_VERSION);
+    expect(saveVersionOf({ v: 'two' })).toBe(1);        // a mangled version is treated as the oldest, never as current
+  });
+
+  // #65 review: `{ ...s, voice: 'unknown' }` put the key AFTER the spread, so a v1 blob that already carried
+  // a verdict (an e2e seed, a save restored from a newer device) came out `unknown` — and the e2e tests
+  // seeded with `voice: 'no'` did not start in the state they claimed.
+  it('v1 → v2 keeps a voice verdict the blob already carries and adds one only when it is missing', () => {
+    expect(migrate({ v: 1, name: 'Seed', voice: 'no' }).voice).toBe('no');
+    expect(migrate({ v: 1, name: 'Seed', voice: 'yes' }).voice).toBe('yes');
+    expect(migrate({ v: 1, name: 'Seed' }).voice).toBe('unknown');
+    expect(migrate({ name: 'Older', voice: 'no' }).voice).toBe('no');   // pre-versioning blobs walk the same step
+    expect(migrate({ v: 1, name: 'Seed', voice: 'maybe' }).voice, 'a value outside the union is not a verdict').toBe('unknown');
+  });
+
   it('falls back to a fresh default for corrupt or non-object data', () => {
     for (const bad of [null, undefined, 42, 'nonsense', [] as unknown]) {
       const d = migrate(bad);
@@ -91,7 +113,7 @@ describe('save migration (#38)', () => {
   });
 
   it('is idempotent — migrating an already-current save changes nothing', () => {
-    const once = migrate({ v: 1, name: 'Zed', coins: 9 });
+    const once = migrate({ v: SAVE_VERSION, name: 'Zed', coins: 9, voice: 'yes' });
     expect(migrate(once)).toEqual(once);
   });
 

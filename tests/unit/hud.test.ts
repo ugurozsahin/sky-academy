@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { livesHTML, outcomeHintHTML, stageHTML } from '../../src/ui/hud';
+import { createHud, livesHTML, outcomeHintHTML, promptMode, stageHTML } from '../../src/ui/hud';
+import type { Question } from '../../src/curriculum';
 
 const plain = (s: string) => s.replace(/<[^>]+>/g, '');
 
@@ -68,5 +69,40 @@ describe('outcomeHintHTML (#36 — the outcome reveal under the question card)',
   it('escapes HTML in the answer', () => {
     expect(outcomeHintHTML('wrong', '5 < 8')).toContain('5 &lt; 8');
     expect(outcomeHintHTML('correct', '5 < 8')).not.toContain('5 < 8');
+  });
+});
+
+// #65: `promptMode` is the one place the hear/read/peek decision is made, and the outcome reveal is one of its
+// three readers — the one with no test until the 17:41Z review pointed at it. A reveal that ignored the mode
+// would overwrite a silent device's listen-words card with the filled-in answer.
+describe('promptMode and the outcome reveal (#65)', () => {
+  const el = () => ({ innerHTML: '', textContent: '', classList: { add() {}, remove() {} } }) as unknown as HTMLElement;
+  const soundHunt: Question = { prompt: '🔊 Listen!', answer: 's', options: ['s', 'a'], listen: 'sun · sock · sad' };
+  const sum: Question = { prompt: '3 + 4 = ?', answer: '7', options: ['7', '9'] };
+
+  it('decides hear / read / peek from listen, peek and whether the device can be heard', () => {
+    expect(promptMode(sum, true)).toBe('hear');
+    expect(promptMode(sum, false)).toBe('hear');                     // nothing to read instead: the prompt is the question
+    expect(promptMode(soundHunt, true)).toBe('hear');
+    expect(promptMode(soundHunt, false)).toBe('read');
+    expect(promptMode({ ...soundHunt, peek: true }, false)).toBe('peek');
+    expect(promptMode({ ...soundHunt, peek: true }, true)).toBe('hear');
+  });
+
+  it('the reveal fills the answer into a heard prompt and leaves a read card\'s listen words alone', () => {
+    let audible = true;
+    const els = { lives: el(), qcard: el(), prompt: el(), hint: el() };
+    const hud = createHud(els, 3, () => audible);
+    els.prompt.innerHTML = '3 + 4 = ?';
+    hud.showOutcome('correct', sum);
+    expect(els.prompt.innerHTML).toContain('<span class="ans">7</span>');
+    els.prompt.innerHTML = 'sun · sock · sad';
+    hud.showOutcome('wrong', soundHunt);
+    expect(els.prompt.innerHTML, 'the device can be heard: the ordinary prompt is revealed').not.toBe('sun · sock · sad');
+    audible = false;
+    els.prompt.innerHTML = 'sun · sock · sad';
+    hud.showOutcome('wrong', soundHunt);
+    expect(els.prompt.innerHTML, 'a silent device keeps the words it was reading').toBe('sun · sock · sad');
+    expect(els.hint.innerHTML).toContain('<b class="ok">s</b>');
   });
 });

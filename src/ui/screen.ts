@@ -1,6 +1,7 @@
 // Shared scaffolding for the full-screen game screens (play + memory). These were copy-pasted between the two
 // screens (#35): the alive-guarded timer helper, the #toast helper, teardown, and the "new sticker" markup.
 import { AVATARS, VILLAIN } from '../avatars';
+import { hush } from '../audio';
 import { $, esc, stars } from './dom';
 
 export interface ScreenScope {
@@ -26,7 +27,7 @@ export function screenScope(): ScreenScope {
       const el = $('#toast'); el.textContent = text; el.className = `toast show ${cls}`;
       scope.later(() => el.classList.remove('show'), ms);
     },
-    dispose() { alive = false; timers.forEach(clearTimeout); try { speechSynthesis.cancel(); } catch { /* ignore */ } delete window.__sna; },
+    dispose() { alive = false; timers.forEach(clearTimeout); hush(); delete window.__sna; },   // hush() also voids the voice probe (#65)
   };
   return scope;
 }

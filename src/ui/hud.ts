@@ -39,17 +39,31 @@ export const outcomeHintHTML = (kind: Outcome, answer: string): string =>
 export interface HudEls { lives: HTMLElement; qcard: HTMLElement; prompt: HTMLElement; hint: HTMLElement }
 
 /**
- * HUD writers bound to the play screen's elements. `speech()` is read fresh on every reveal so the
- * read-aloud toggle takes effect at once (Sound Hunt with read-aloud off keeps its listen words).
+ * How a question's prompt is presented on this device (#65) — the one place the listen/peek/audible decision
+ * is spelled out, so the card, the outcome reveal and the progress cue cannot disagree about it.
+ *   `hear` — read aloud; the card shows the ordinary prompt.
+ *   `read` — the `listen` text stays on the card (Sound Hunt's keywords, the word to spell).
+ *   `peek` — the `listen` text is shown for a moment, then hidden before the bubbles launch (Story Sentences d2+).
  */
-export function createHud(els: HudEls, lives: number, speech: () => boolean) {
+export type PromptMode = 'hear' | 'read' | 'peek';
+export function promptMode(q: Pick<Question, 'listen' | 'peek'>, audible: boolean): PromptMode {
+  if (!q.listen || audible) return 'hear';
+  return q.peek ? 'peek' : 'read';
+}
+
+/**
+ * HUD writers bound to the play screen's elements. `audible()` — read-aloud on AND the device can be heard
+ * (#65) — is read fresh on every reveal so the toggle and the voice verdict take effect at once (Sound Hunt
+ * without a voice keeps its listen words).
+ */
+export function createHud(els: HudEls, lives: number, audible: () => boolean) {
   return {
     drawLives(n: number) { if (els.lives) els.lives.innerHTML = livesHTML(n, lives); },
     drawTimer(s: number) { const t = $('#timer'); if (!t) return; t.textContent = `⏱ ${s}`; t.classList.toggle('hurry', s <= 10); },
     drawHp(hp: number, max: number) { const h = $('#hp'); if (h) { h.style.width = `${Math.round(100 * hp / max)}%`; h.classList.toggle('low', hp <= 3); } },
     showOutcome(kind: Outcome, q: Question) {
       els.qcard.classList.remove('good', 'bad'); els.qcard.classList.add(kind === 'correct' ? 'good' : 'bad');
-      if (!q.sequence && !(q.listen && !speech())) els.prompt.innerHTML = fillAnswer(q.prompt, q.answer);   // Sound Hunt with read-aloud off keeps its listen words
+      if (!q.sequence && promptMode(q, audible()) === 'hear') els.prompt.innerHTML = fillAnswer(q.prompt, q.answer);   // a `read` card keeps its listen words
       els.hint.innerHTML = outcomeHintHTML(kind, q.answer);
     },
   };

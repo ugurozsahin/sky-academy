@@ -706,6 +706,7 @@ img { -webkit-user-drag: none; }
 .prompt { font-size: clamp(28px, 7vw, 44px); font-weight: 700; margin: 4px 0 2px; text-shadow: 0 2px 0 #0008; letter-spacing: .02em; }
 .prompt .seq span { display: inline-block; min-width: .8em; margin: 0 .06em; border-bottom: 3px solid #ffffff55; }
 .prompt .seq .got { color: var(--good); border-color: var(--good); }
+.prompt .seq.reveal .todo { opacity: .6; }   /* #65: no voice — the letters still to come are shown to copy, dimmer than the ones earned */
 .hint { color: var(--muted); font-size: 14px; font-weight: 600; }
 .toast {
   margin-top: 10px;

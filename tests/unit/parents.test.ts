@@ -5,7 +5,7 @@ import { STICKER_IDS, type SaveData, type TopicProgress } from '../../src/storag
 import { freshDojo } from '../../src/game/dojo';
 
 const base: SaveData = {
-  v: 1, name: 'Test', avatar: 'kai', year: 'year1', sound: true, speech: true,
+  v: 2, name: 'Test', avatar: 'kai', year: 'year1', sound: true, speech: true, voice: 'unknown',
   progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {},
   coins: 0, spent: 0, owned: [], equipped: {}, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''),
 };

@@ -1,6 +1,6 @@
 import { TOPICS, YEARS } from '../curriculum';
 import { exportSave, importSave, load, STICKER_IDS } from '../storage';
-import { sfx } from '../audio';
+import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
 import { $, esc, render } from './dom';
 
@@ -13,7 +13,7 @@ function topicRow(s: TopicStat): string {
   return `<li class="p-topic"><span class="ic">${s.icon}</span><span class="p-topic-t"><b>${esc(s.title)}</b><small>${s.hits}/${s.tries} right · ${'★'.repeat(s.stars)}${'☆'.repeat(3 - s.stars)}</small></span><span class="p-acc">${showPct(s.accuracy)}</span></li>`;
 }
 
-function dashHtml(sm: ParentSummary): string {
+function dashHtml(sm: ParentSummary, noVoice = false): string {
   const modeRows = sm.modes.map(m => `
     <tr><th scope="row">${esc(m.title)}</th><td>${m.endless}</td><td>${m.sprint}</td><td>${m.boss}</td><td>${m.memory}</td><td>${m.training}</td></tr>`).join('');
   const yearCards = sm.years.map(y => `
@@ -36,6 +36,7 @@ function dashHtml(sm: ParentSummary): string {
       <div><b>${sm.topicsTried}/${sm.topicsTotal}</b><small>topics tried</small></div>
     </div>
     <div class="p-extra"><span>🔥 ${sm.streakDays}-day streak</span><span>🪙 ${sm.coins} coins</span><span>🏷️ ${sm.stickers}/${sm.stickersTotal} stickers</span></div>
+    ${noVoice ? '<p class="p-note voice-note">This device has no speaking voice installed, so the game is showing the words instead. On Android: Settings → Accessibility → Text-to-speech.</p>' : ''}
 
     <h3 class="p-h">By island</h3>
     <div class="p-years">${yearCards}</div>
@@ -141,7 +142,7 @@ export function parentsScreen(nav: Nav) {
     render(`
     <section class="screen home parents dash">
       <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Grown-ups dashboard</b><small>How ${esc(load().name || 'your ninja')} is getting on</small></div></div>
-      <div class="parents-dash">${dashHtml(sm)}</div>
+      <div class="parents-dash">${dashHtml(sm, voiceState() === 'no')}</div>
     </section>`, 'bg-sky');
     $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
     wireMove(() => drawDash());

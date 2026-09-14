@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, it, expect, vi } from 'vitest';
-import { chooseVoice, haptic, HAPTICS, NOISE_SECONDS, say, SAY_DEFER_MS, sfx, sliceFx, type SynthLike, voiceScore } from '../../src/audio';
-import { reset, save } from '../../src/storage';
+import { canHear, chooseVoice, haptic, HAPTICS, hush, NOISE_SECONDS, onVoiceStateChange, resetVoiceProbe, say, SAY_DEFER_MS, sfx, sliceFx, type SynthLike, VOICE_START_MS, voiceScore, voiceState } from '../../src/audio';
+import { load, reset, save } from '../../src/storage';
 
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
@@ -40,24 +40,339 @@ describe('voice choice for young listeners', () => {
 // faults on a phone: cancel() completes asynchronously, so Android and iOS drop a speak() issued in the same
 // turn, and cancelling an idle engine wedges it often enough that the next line is never heard. The engine is
 // injected here because node has no speechSynthesis — the same trick haptic() uses for navigator.vibrate.
-class FakeUtterance { lang = ''; rate = 1; pitch = 1; voice: unknown = null; constructor(public text: string) {} }
+class FakeUtterance {
+  lang = ''; rate = 1; pitch = 1; voice: unknown = null;
+  onstart: ((event: Event) => unknown) | null = null;
+  onend: ((event: Event) => unknown) | null = null;
+  onboundary: ((event: Event) => unknown) | null = null;
+  onresume: ((event: Event) => unknown) | null = null;
+  onerror: ((event: { error: string }) => unknown) | null = null;
+  constructor(public text: string) {}
+}
 (globalThis as any).SpeechSynthesisUtterance = FakeUtterance;
 /** Records what the game asked the engine to do, in order: `cancel` or the text of a `speak`. */
-function fakeSynth(state: { speaking?: boolean; pending?: boolean } = {}) {
+function fakeSynth(state: { speaking?: boolean; pending?: boolean; starts?: boolean; voices?: VoiceLike[] } = {}) {
   const calls: string[] = [];
+  const utterances: FakeUtterance[] = [];
   return {
-    calls,
+    calls, utterances,
     synth: {
       get speaking() { return !!state.speaking; },
       get pending() { return !!state.pending; },
-      cancel() { calls.push('cancel'); state.speaking = false; state.pending = false; },
-      speak(u: SpeechSynthesisUtterance) { calls.push(u.text); state.speaking = true; },
+      // A real engine fires `error: 'canceled'` on every line it drops; `interrupted` on the one it was saying.
+      cancel() { calls.push('cancel'); state.speaking = false; state.pending = false; for (const u of utterances.splice(0)) u.onerror?.({ error: 'canceled' }); },
+      speak(u: SpeechSynthesisUtterance) {
+        calls.push(u.text); utterances.push(u as unknown as FakeUtterance); state.speaking = true;
+        if (state.starts !== false) u.onstart?.(new Event('start') as SpeechSynthesisEvent);
+      },
+      getVoices() { return (state.voices ?? [v('Daniel', 'en-GB')]) as SpeechSynthesisVoice[]; },
     } as SynthLike,
   };
 }
 
+type VoiceLike = ReturnType<typeof v>;
+
+// #65: the probe. `onstart` is the only positive evidence; a line handed to the engine that neither started nor
+// was taken back within VOICE_START_MS is the only negative evidence. Everything else — an empty voice list, a
+// malformed voice entry, a line we cancelled ourselves — is evidence of nothing, and these cases pin that.
+describe('voice capability detection (#65)', () => {
+  afterEach(() => { resetVoiceProbe(); vi.useRealTimers(); reset(); });
+  // `performance` is faked with the timers: the probe banks silence by the clock, and the two must agree.
+  const fresh = () => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); };
+
+  it('marks a missing speech engine unavailable immediately and persists the verdict', () => {
+    reset(); resetVoiceProbe();
+    say('Hello', false, { synth: null });
+    expect(load().voice).toBe('no');
+    expect(voiceState(null)).toBe('no');
+    expect(canHear(null)).toBe(false);
+  });
+
+  it('writes nothing about a missing engine when read-aloud is off and nobody asked for speech', () => {
+    reset(); save({ speech: false }); resetVoiceProbe();
+    say('Hello', false, { synth: null });
+    expect(load().voice, 'a verdict the user did not ask for is not stored').toBe('unknown');
+    say('Hello', true, { synth: null });
+    expect(load().voice, 'a forced line is a request, and an absent engine is the answer').toBe('no');
+  });
+
+  it('a line that starts is a yes, at once and persisted', () => {
+    fresh();
+    const { synth } = fakeSynth();
+    say('Hello', false, { synth });
+    expect(voiceState(synth)).toBe('yes');
+    expect(load().voice).toBe('yes');
+  });
+
+  it('a line that never starts is a no only after VOICE_START_MS, and a start before then wins', () => {
+    fresh();
+    const { synth, utterances } = fakeSynth({ starts: false });
+    say('Hello', false, { synth });
+    vi.advanceTimersByTime(VOICE_START_MS - 1);
+    expect(load().voice, 'silence inside the window is not yet a verdict').toBe('unknown');
+    utterances[0].onstart?.(new Event('start'));
+    vi.advanceTimersByTime(1);
+    expect(voiceState(synth)).toBe('yes');
+  });
+
+  it('marks a silent engine unavailable when nothing starts within VOICE_START_MS', () => {
+    fresh();
+    const { synth } = fakeSynth({ starts: false });
+    say('Hello', false, { synth });
+    vi.advanceTimersByTime(VOICE_START_MS);
+    expect(voiceState(synth)).toBe('no');
+    expect(load().voice).toBe('no');
+  });
+
+  it('an empty voice list is evidence of nothing: Android WebView returns [] on devices that speak', () => {
+    fresh();
+    const { synth } = fakeSynth({ voices: [] });                     // starts, as such a device does
+    say('Hello', false, { synth });
+    expect(voiceState(synth), 'the line started, so the device speaks, voices or no voices').toBe('yes');
+    fresh();
+    const mute = fakeSynth({ voices: [], starts: false }).synth;
+    say('Hello', false, { synth: mute });
+    vi.advanceTimersByTime(VOICE_START_MS - 1);
+    expect(load().voice, 'and an empty list is not a shortcut to no either').toBe('unknown');
+  });
+
+  it('one malformed voice entry never condemns a device whose engine speaks', () => {
+    // Third-party Android TTS engines populate getVoices() with entries that have no `lang`; ranking one used
+    // to throw out of say() and the catch recorded `no` for good.
+    fresh();
+    const { synth, calls } = fakeSynth({ voices: [{ name: 'Broken' } as unknown as VoiceLike, v('Daniel', 'en-GB')] });
+    say('Hello', false, { synth });
+    expect(calls).toEqual(['Hello']);
+    expect(voiceState(synth)).toBe('yes');
+    expect(load().voice).toBe('yes');
+    fresh();
+    const throwing = fakeSynth().synth;
+    throwing.getVoices = () => { throw new Error('voice list unavailable'); };
+    say('Hello', false, { synth: throwing });
+    expect(voiceState(throwing), 'a voice list that throws is a nicety we do without').toBe('yes');
+  });
+
+  it('a line we take back is not evidence — a stored yes survives a launch whose first line is cut off', () => {
+    fresh(); save({ voice: 'yes' }); resetVoiceProbe();
+    const { synth, calls } = fakeSynth({ starts: false });
+    say('Reception island', false, { synth });                       // handed over, never started …
+    hush(synth);                                                     // … and cancelled by the screen change
+    expect(calls).toEqual(['Reception island', 'cancel']);
+    vi.advanceTimersByTime(VOICE_START_MS * 2);
+    expect(voiceState(synth), 'nothing was learnt: the stored verdict stands').toBe('yes');
+    expect(load().voice).toBe('yes');
+  });
+
+  it('silence adds up across lines: a mute device answering a quick child still gets its verdict', () => {
+    // Each question hands the engine a new line and takes the last one back; a clock that restarted with every
+    // line would never fall on a device where questions turn over faster than VOICE_START_MS.
+    fresh();
+    const state = { starts: false, speaking: false };
+    const { synth } = fakeSynth(state);
+    for (let i = 0; i < 3; i++) {
+      say(`Question ${i + 1}`, false, { synth });
+      vi.advanceTimersByTime(VOICE_START_MS / 4);                    // a quarter of the budget each, engine silent throughout
+      expect(load().voice, `after ${i + 1} silent quarters`).toBe('unknown');
+      state.speaking = true;                                         // the engine claims to be busy with it …
+    }
+    say('Question 4', false, { synth });                             // … so this one interrupts: cancel, then speak
+    vi.advanceTimersByTime(SAY_DEFER_MS + VOICE_START_MS / 4 - 1);
+    expect(load().voice, 'a whisker short of the budget').toBe('unknown');
+    vi.advanceTimersByTime(1);
+    expect(voiceState(synth), 'four silent quarters make a mute device').toBe('no');
+  });
+
+  it('time between lines is not silence: a stored yes survives a launch that only ever cuts its lines short', () => {
+    fresh(); save({ voice: 'yes' }); resetVoiceProbe();
+    const { synth } = fakeSynth({ starts: false });
+    for (let i = 0; i < 20; i++) {                                   // twenty screen changes, each cutting a line off at once
+      say(`Screen ${i}`, false, { synth });
+      hush(synth);
+      vi.advanceTimersByTime(1000);                                  // a second of nothing pending, twenty times over
+    }
+    expect(voiceState(synth), 'nothing was ever held long enough to be silent about').toBe('yes');
+  });
+
+  it('a newer line interrupting the probe line hands the probe on, deadline included', () => {
+    fresh();
+    const state = { starts: false, speaking: false };
+    const { synth, calls, utterances } = fakeSynth(state);
+    say('Island', false, { synth });
+    state.speaking = true;                                           // the engine is busy with it (or says it is)
+    say('Question', false, { synth });                               // interrupts: cancel now, speak next tick
+    expect(calls).toEqual(['Island', 'cancel']);
+    vi.advanceTimersByTime(SAY_DEFER_MS);
+    expect(calls).toEqual(['Island', 'cancel', 'Question']);
+    vi.advanceTimersByTime(VOICE_START_MS - 1);
+    expect(load().voice, 'the replacement line owns the deadline now').toBe('unknown');
+    utterances.at(-1)!.onstart?.(new Event('start'));
+    expect(voiceState(synth)).toBe('yes');
+  });
+
+  it('an engine that throws on speak() is judged by the deadline, not condemned on the spot', () => {
+    fresh();
+    const bad = { speaking: false, pending: false, cancel() {}, speak() { throw new Error('busy'); } } as SynthLike;
+    say('Hello', false, { synth: bad });
+    expect(load().voice, 'one hiccup is not a verdict').toBe('unknown');
+    vi.advanceTimersByTime(VOICE_START_MS);
+    expect(voiceState(bad), 'but a line that could never start counts when nothing else did').toBe('no');
+  });
+
+  it('a mid-launch recovery is heard: a later line that starts turns this launch\'s no into a yes', () => {
+    fresh();
+    const state = { starts: false };
+    const { synth, utterances } = fakeSynth(state);
+    say('Hello', false, { synth });
+    vi.advanceTimersByTime(VOICE_START_MS);
+    expect(voiceState(synth)).toBe('no');
+    state.starts = true;
+    say('Again', false, { synth });                                  // interrupts the silent line: cancel, then speak next tick
+    vi.advanceTimersByTime(SAY_DEFER_MS);
+    expect(utterances.at(-1)!.onstart, 'every line is probed until the device proves it speaks').toBeTruthy();
+    expect(voiceState(synth)).toBe('yes');
+    expect(load().voice).toBe('yes');
+  });
+
+  it('re-probes a stored no on the next launch and tells the active screen when it recovers', () => {
+    reset(); save({ voice: 'no' }); resetVoiceProbe();
+    const changes: string[] = [];
+    const stop = onVoiceStateChange(state => { changes.push(state); });
+    const { synth } = fakeSynth();
+    say('Hello', false, { synth });
+    stop();
+    expect(load().voice).toBe('yes');
+    expect(canHear(synth)).toBe(true);
+    expect(changes).toEqual(['yes']);
+  });
+
+  it('a verdict that merely confirms the stored one wakes no listener', () => {
+    fresh(); save({ voice: 'no' }); resetVoiceProbe();
+    const changes: string[] = [];
+    const stop = onVoiceStateChange(state => { changes.push(state); });
+    say('Hello', false, { synth: fakeSynth({ starts: false }).synth });
+    vi.advanceTimersByTime(VOICE_START_MS);
+    stop();
+    expect(changes, 'the screen already rendered for a silent device; a redraw would restart a peek').toEqual([]);
+  });
+
+  it('a listener that throws neither escapes say() nor silences the listeners after it', () => {
+    fresh();
+    const heard: string[] = [];
+    const stopBad = onVoiceStateChange(() => { throw new Error('render failed'); });
+    const stopGood = onVoiceStateChange(state => { heard.push(state); });
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(() => say('Hello', false, { synth: fakeSynth().synth })).not.toThrow();
+      expect(heard).toEqual(['yes']);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally { stopBad(); stopGood(); spy.mockRestore(); }
+  });
+
+  it('hush() drops a line still waiting its turn and clears the deadline, so a dead screen writes nothing', () => {
+    fresh();
+    const state = { starts: false, speaking: true };
+    const { synth, calls } = fakeSynth(state);
+    say('Next question', false, { synth });                          // deferred behind the cancel
+    hush(synth);
+    vi.advanceTimersByTime(SAY_DEFER_MS + VOICE_START_MS);
+    expect(calls.filter(c => c !== 'cancel'), 'the deferred line never reached the engine').toEqual([]);
+    expect(load().voice, 'and no verdict fired against a screen that no longer exists').toBe('unknown');
+  });
+
+  it('a throwing cancel() never escapes say(), and the engine is still judged by the deadline', () => {
+    // The 17:41Z review: say() runs on the line before the wave spawns, so a throw here is a card with no
+    // bubbles — and with the probe armed only after cancel(), that engine also never got a verdict.
+    fresh();
+    const bad = { speaking: true, pending: false, cancel() { throw new Error('cancel unsupported'); }, speak() {} } as SynthLike;
+    say('Island', false, { synth: bad });                            // idle path: handed over, never starts
+    (bad as { speaking: boolean }).speaking = true;
+    expect(() => say('Question', false, { synth: bad })).not.toThrow();
+    vi.advanceTimersByTime(SAY_DEFER_MS + VOICE_START_MS);
+    expect(voiceState(bad), 'the line could never start: the deadline still decides').toBe('no');
+  });
+
+  it('an utterance constructor that throws is the missing-engine verdict, not a throw into the game', () => {
+    fresh();
+    const Real = (globalThis as any).SpeechSynthesisUtterance;
+    (globalThis as any).SpeechSynthesisUtterance = class { constructor() { throw new Error('no utterances here'); } };
+    try {
+      expect(() => say('Hello', false, { synth: fakeSynth().synth })).not.toThrow();
+      expect(load().voice).toBe('no');
+    } finally { (globalThis as any).SpeechSynthesisUtterance = Real; }
+  });
+
+  it('an engine that speaks but only ever fires end (or boundary) is a yes, not a permanent no', () => {
+    // Android WebView and older Chrome speak a line and fire `end` without `start`; condemning them prints
+    // Sound Hunt's keywords and tells the parent to install a voice they have.
+    fresh();
+    const a = fakeSynth({ starts: false });
+    say('Hello', false, { synth: a.synth });
+    vi.advanceTimersByTime(1000);
+    a.utterances[0].onend?.(new Event('end'));
+    expect(voiceState(a.synth)).toBe('yes');
+    fresh();
+    const b = fakeSynth({ starts: false });
+    say('Hello', false, { synth: b.synth });
+    b.utterances[0].onboundary?.(new Event('boundary'));
+    expect(voiceState(b.synth)).toBe('yes');
+  });
+
+  it('an end fired for a line we cancelled is not a yes — that line was never heard', () => {
+    fresh();
+    const { synth, utterances } = fakeSynth({ starts: false });
+    say('Island', false, { synth });
+    const line = utterances[0];
+    hush(synth);                                                     // taken back; some engines still fire `end` for it
+    line.onend?.(new Event('end'));
+    expect(load().voice).toBe('unknown');
+  });
+
+  it('a late canceled error from the old line does not stop the new line\'s clock', () => {
+    // Real engines fire `canceled` asynchronously — after the replacement line has been armed. The identity
+    // guard on the handler is what keeps the new clock running; the fake fires synchronously, so this delivers
+    // the old line's error by hand, in the real order.
+    fresh();
+    const state = { starts: false, speaking: false };
+    const { synth, utterances } = fakeSynth(state);
+    synth.cancel = () => { state.speaking = false; };                // a cancel that fires nothing yet
+    say('Island', false, { synth });
+    const old = utterances[0];
+    state.speaking = true;
+    say('Question', false, { synth });
+    vi.advanceTimersByTime(SAY_DEFER_MS);
+    old.onerror?.({ error: 'canceled' });                            // arrives after `Question` was handed over
+    vi.advanceTimersByTime(VOICE_START_MS);
+    expect(voiceState(synth), 'the new line sat silent for the whole budget').toBe('no');
+  });
+
+  it('hush() drops a cut line\'s time; a newer line replacing a silent one banks it', () => {
+    fresh();
+    const a = fakeSynth({ starts: false });
+    for (let i = 0; i < 3; i++) { say(`Screen ${i}`, false, { synth: a.synth }); vi.advanceTimersByTime(1500); hush(a.synth); }
+    expect(load().voice, 'three screen changes on a cold engine are not a verdict').toBe('unknown');
+    fresh();
+    const state = { starts: false, speaking: false };
+    const b = fakeSynth(state);
+    for (let i = 0; i < 3; i++) { say(`Question ${i}`, false, { synth: b.synth }); vi.advanceTimersByTime(1500); state.speaking = true; }
+    expect(voiceState(b.synth), 'three questions the engine sat on are').toBe('no');
+  });
+
+  it('the silence budget is a device number, pinned to the range the review argued for', () => {
+    // Every other case here advances the clock by the constant, so a wrong constant passes them all: 200 ms
+    // would condemn every slow-but-working engine, a minute would leave a child on a silent card for it.
+    expect(VOICE_START_MS).toBeGreaterThanOrEqual(3000);
+    expect(VOICE_START_MS).toBeLessThanOrEqual(6000);
+  });
+
+  it('{ synth: undefined } means the default engine, exactly as leaving it out does', () => {
+    reset(); resetVoiceProbe();
+    say('Hello', false, { synth: undefined });                       // node: no default engine → `no`, same as say('Hello')
+    expect(load().voice).toBe('no');
+  });
+});
+
 describe('say() — speaking without wedging the phone (#40)', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => { resetVoiceProbe(); vi.useRealTimers(); });
 
   it('does not cancel an engine that is not speaking', () => {
     reset(); const { calls, synth } = fakeSynth();

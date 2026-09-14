@@ -7,7 +7,7 @@ import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-
 import { Tracer } from '../game/tracing';
 import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak, wallet } from '../storage';
 import { equippedItem } from '../game/shop';
-import { haptic, say, sfx, sliceFx } from '../audio';
+import { canHear, haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { screenScope, stickersHTML } from './screen';
 import { createHud } from './hud';
@@ -51,11 +51,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
-  const els = { lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'), overlay: $('#overlay'), qcard: $('#qcard') };
+  const els = {
+    lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'),
+    overlay: $('#overlay'), qcard: $('#qcard'), speak: $('#speak'),
+  };
   let arena: Arena | null = null; let tracer: Tracer | null = null; let lastResult: SessionResult | null = null;
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
   const { later, toast } = scope;
-  const hud = createHud(els, o.year.lives, () => load().speech);   // #36: HUD writers live in hud.ts
+  const hud = createHud(els, o.year.lives, canHear);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
   // Curriculum base holds (ms). #32: scaled(...) divides them by the test-only speed at each use site, so the
@@ -71,7 +74,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   // #36: the Session callbacks — the question beat, the outcome beat, the sprint clock, the boss reactions —
   // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
-  const { session, waveEnd } = createPlaySession({
+  const playSession = createPlaySession({
     mode: o.mode, year: o.year, topic: o.topic,
     pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
   }, {
@@ -81,6 +84,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     later, toast,
     startTrace, showTutorial, showTaunt, showStageClear, showResults,
   });
+  const { session, waveEnd } = playSession;
   hud.drawLives(o.year.lives); hud.drawTimer(session.secondsLeft); hud.drawHp(session.bossHp, session.bossMax);
   // Sprint clock: real elapsed time, frozen while the pause overlay (or a result) has the arena paused.
   let ticker = 0; let lastTick = 0;
@@ -149,10 +153,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     return scaled(1800);
   }
   function hideTutorial() { const t = $('#tutorial'); if (t) t.hidden = true; }
-  /** Repeat the prompt aloud (tap the question card, or the 🔊 button). */
+  /** Repeat the prompt (tap the question card, or the 🔊 button): aloud, or — on a device that cannot be
+   *  heard — the hidden sentence is shown again (#65). Never a no-op on a silent device (the #205 rule). */
   function repeatPrompt() {
     const q = session.current; if (!q) return;
-    say(q.say ?? q.prompt, true);
+    if (!playSession.repeat()) say(q.say ?? q.prompt, true);
     els.qcard.classList.remove('pulse'); void els.qcard.offsetWidth; els.qcard.classList.add('pulse');
   }
   function showTaunt() {
@@ -162,14 +167,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   }
 
   function showStageClear(stage: number, st: number, acc: number) {
-    arena && (arena.paused = true);
+    playSession.hold(true);                       // #65: the one writer of arena.paused is play-session's syncPaused()
     const line = praiseLine(av, d.name); say(line);
     els.overlay.hidden = false;
     els.overlay.innerHTML = stageClearHTML({ glow: av.glow, img: av.img, name: av.name, line, stage, stages: session.stages, starCount: st, acc, score: session.score });
-    $('#next').addEventListener('click', () => { sfx.tap(); els.overlay.hidden = true; arena && (arena.paused = false); session.nextStage(); });
+    $('#next').addEventListener('click', () => { sfx.tap(); els.overlay.hidden = true; playSession.hold(false); session.nextStage(); });
   }
   function showResults(r: SessionResult) {
-    arena && (arena.paused = true);
+    playSession.hold(true);                       // the game is over: syncPaused() also reads session.ended, so nothing here can undo it
     let newBest = false;
     if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
     else if (training) { if (r.won) recordTraining(o.year.id); }
@@ -227,15 +232,18 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         }
       : null;
   function showPause() {
-    arena && (arena.paused = true);
+    playSession.hold(true);                       // #65: pauses the arena, and stops a sentence peek's clock with it
     els.overlay.hidden = false; els.overlay.innerHTML = pauseHTML();
-    $('#resume').addEventListener('click', () => { els.overlay.hidden = true; arena && (arena.paused = false); });
+    $('#resume').addEventListener('click', () => { els.overlay.hidden = true; playSession.hold(false); });
     $('#quit').addEventListener('click', () => { cleanup(); goHome(); });
   }
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
   $('#speak').addEventListener('click', repeatPrompt);
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
-  function cleanup() { clearInterval(ticker); arena?.destroy(); tracer?.destroy(); scope.dispose(); }   // #35: dispose() stops timers, cancels speech and drops window.__sna
+  // #35: dispose() stops timers, cancels speech and drops window.__sna.
+  function cleanup() {
+    clearInterval(ticker); playSession.dispose(); arena?.destroy(); tracer?.destroy(); scope.dispose();
+  }
 
   // Test / accessibility hooks — the typed PlayHooks contract (#34)
   const hooks: PlayHooks = {

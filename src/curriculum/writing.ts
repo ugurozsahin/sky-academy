@@ -63,7 +63,7 @@ function spellQ(rng: Rng, word: string, hintEmoji?: string, decoys = 3): ReturnT
   const pool = LETTERS.filter(l => !letters.includes(l));
   const uniq = [...new Set(letters)];
   const ds = shuffle(rng, pool).slice(0, Math.max(1, Math.min(decoys, 10 - uniq.length)));
-  return { prompt: hintEmoji ? `${hintEmoji}  Spell it!` : `Spell: ${word}`, say: `Spell the word ${word}`, answer: word, sequence: letters, options: shuffle(rng, [...uniq, ...ds]), visual: { type: 'word', text: word.replace(/./g, '_ ').trim(), emoji: hintEmoji }, hint: 'Slice the letters in order' };
+  return { prompt: hintEmoji ? `${hintEmoji}  Spell it!` : `Spell: ${word}`, say: `Spell the word ${word}`, answer: word, sequence: letters, options: shuffle(rng, [...uniq, ...ds]), visual: { type: 'word', text: word.replace(/./g, '_ ').trim(), emoji: hintEmoji }, hint: 'Slice the letters in order', listen: word };
 }
 
 /**
@@ -76,7 +76,8 @@ function sentenceQ(rng: Rng, sentence: string, emoji: string, decoyPool: string[
   const used = new Set(words.map(bare));
   const ds = shuffle(rng, decoyPool.filter(w => !used.has(bare(w)))).slice(0, Math.min(decoys, 10 - words.length));
   return { prompt: 'Build the sentence', say: `Build the sentence: ${sentence}`, answer: sentence, sequence: words, options: shuffle(rng, [...words, ...ds]), wide: true,
-    visual: show ? { type: 'sentence', text: sentence } : { type: 'word', text: emoji }, hint: show ? 'Slice the words in order' : 'Listen, then slice the words in order' };
+    visual: show ? { type: 'sentence', text: sentence } : { type: 'word', text: emoji }, hint: show ? 'Slice the words in order' : 'Listen, then slice the words in order',
+    listen: show ? undefined : sentence, peek: !show };
 }
 type Sent = [string, string];   // [sentence, picture]
 const R_SENTS: Sent[][] = [
