@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SHOT_FLIGHT, SHOT_STYLE, compact, dealOrdered, fitLabel, labelFont, layoutWave, segCircle, shotPose } from '../../src/game/arena';
+import { SHOT_FLIGHT, SHOT_STYLE, compact, dealOrdered, fitLabel, labelFont, layoutWave, reanchorBubble, segCircle, shotPose } from '../../src/game/arena';
 import { ALL_AVATARS } from '../../src/avatars';
 
 describe('dealOrdered — sequence words are dealt in order across the batches (#62)', () => {
@@ -252,5 +252,112 @@ describe('layoutWave — the wave the arena is about to spawn (#43)', () => {
     const many = plan({ labels: labels(10) }, TABLET).r;                  // >= 9 labels: 0.8
     expect(some).toBeLessThan(few); expect(many).toBeLessThan(some);
     expect(many).toBeGreaterThanOrEqual(26);
+  });
+});
+
+// #146: the phone is rotated mid-mission. The arena's box goes from 390×844 to 600×390, and until this was
+// fixed every bubble kept the coordinates it was laid out with — all of them below the shorter canvas, so the
+// arena painted nothing at all while the wave played on invisibly. Worse than invisible: `update`'s fall test
+// (`b.y - b.r > H + 10 && b.vy > 0`) fired immediately for every bubble already on its way down, so the child
+// was charged a life per bubble, in Year 1 and Year 2, for a rotation.
+describe('re-anchoring a wave when the arena is resized (#146)', () => {
+  const PORTRAIT = { W: 390, H: 844 }, LANDSCAPE = { W: 600, H: 390 };
+  /** A bubble as `layoutWave` leaves it, stepped forward to `risen` px above the launch line. */
+  const airborne = (risen: number, box = PORTRAIT, over = { vy: -400, g: 180, x: 195 }) =>
+    ({ x: over.x, y: box.H + 33 - risen, vx: 8, vy: over.vy, g: over.g, r: 33 });
+
+  it('keeps a bubble the child can see inside the shorter box', () => {
+    const b = airborne(300);                                  // mid-flight, well inside the portrait box
+    expect(b.y).toBeGreaterThan(LANDSCAPE.H);                 // …and off the bottom of the landscape box as-is
+    reanchorBubble(b, PORTRAIT, LANDSCAPE);
+    expect(b.y).toBeGreaterThan(0);
+    expect(b.y).toBeLessThan(LANDSCAPE.H);
+  });
+
+  it('does not charge the child a life for rotating the phone', () => {
+    // `update`'s exact predicate for an un-hit bubble that has gone: this is the line that calls `onFall`,
+    // which is what costs a life in Year 1 and Year 2.
+    const fallen = (b: { y: number; r: number; vy: number }, H: number) => b.y - b.r > H + 10 && b.vy > 0;
+    // The **control** is what makes this a test rather than an identity. `b.y - b.r <= H + 10` alone holds
+    // for every `risen >= 0` and every `sy > 0` once the re-anchor has run — it is algebra, not evidence, and
+    // an earlier version of this test asserted exactly that and could not fail. So each case checks three
+    // things: that the un-re-anchored coordinate really would have read as fallen (or the case proves
+    // nothing), that the re-anchored one does not, and that the bubble is still the same fraction of the way
+    // up the box — because a bubble slammed back onto the launch line has not "fallen" either, and is just as
+    // wrong. Only bubbles low enough in portrait to land under the shrunken floor can serve as controls,
+    // which is why the list stops at 400 and not 800.
+    for (const risen of [20, 100, 300, 400]) {
+      const stale = airborne(risen, PORTRAIT, { vy: 120, g: 180, x: 195 });   // vy > 0: on its way down
+      expect(fallen(stale, LANDSCAPE.H), `risen ${risen}: bad control — this bubble does not read as fallen even un-re-anchored`).toBe(true);
+
+      const b = airborne(risen, PORTRAIT, { vy: 120, g: 180, x: 195 });
+      reanchorBubble(b, PORTRAIT, LANDSCAPE);
+      expect(fallen(b, LANDSCAPE.H), `a bubble ${risen}px up the portrait screen read as fallen after the rotation`).toBe(false);
+      expect((LANDSCAPE.H + b.r - b.y) / LANDSCAPE.H, `risen ${risen}: the bubble is no longer where the child last saw it`)
+        .toBeCloseTo(risen / PORTRAIT.H, 6);
+    }
+  });
+
+  it('re-anchors rather than teleports: the bubble lands on the beat it was always going to land on', () => {
+    const b = airborne(400);
+    const apexT = b.vy / b.g;                                 // seconds to the top of the arc
+    reanchorBubble(b, PORTRAIT, LANDSCAPE);
+    expect(b.vy / b.g).toBeCloseTo(apexT, 10);                // timing untouched…
+    expect(b.vy ** 2 / (2 * b.g)).toBeCloseTo((400 ** 2 / (2 * 180)) * (LANDSCAPE.H / PORTRAIT.H), 6);   // …height scaled
+  });
+
+  it('scales the height risen by the height ratio, and x by the width ratio', () => {
+    const b = airborne(422);                                  // exactly half the portrait box
+    reanchorBubble(b, PORTRAIT, LANDSCAPE);
+    expect(LANDSCAPE.H + b.r - b.y).toBeCloseTo(422 * (LANDSCAPE.H / PORTRAIT.H), 6);
+    expect(b.x).toBeCloseTo(195 * (LANDSCAPE.W / PORTRAIT.W), 6);
+    expect(b.vx).toBeCloseTo(8 * (LANDSCAPE.W / PORTRAIT.W), 6);
+  });
+
+  it('never leaves a bubble off the RIGHT side of a narrower box', () => {
+    const b = airborne(300, { W: 900, H: 844 }, { vy: -400, g: 180, x: 880 });
+    reanchorBubble(b, { W: 900, H: 844 }, { W: 390, H: 844 });
+    expect(b.x).toBeGreaterThanOrEqual(b.r);
+    expect(b.x).toBeLessThanOrEqual(390 - b.r);
+  });
+
+  it('never leaves a bubble off the LEFT side of a narrower box — the rotation a child comes back through', () => {
+    // The other half of the clamp, and the half that is actually reached in play. `layoutWave` puts the
+    // leftmost bubble at `margin = r + 8`, so rotating **landscape → portrait** takes x ≈ 41 to
+    // 41 × 390/844 ≈ 19 — inside the radius, with half the bubble off the left edge. The radius deliberately
+    // does not scale (#28), which is precisely what makes this reachable: only `Math.max(b.r, …)` catches it.
+    // The case above cannot stand in for this one — it starts at x = 880 and lands on the upper bound, so the
+    // lower bound never fires there and could be deleted with the whole suite still green.
+    const from = { W: 844, H: 390 };
+    const b = airborne(200, from, { vy: -300, g: 150, x: 41 });
+    expect(b.x * (PORTRAIT.W / from.W)).toBeLessThan(b.r);    // the control: unclamped, it lands inside the radius
+    reanchorBubble(b, from, PORTRAIT);
+    expect(b.x, 'half the bubble hangs off the left edge').toBeGreaterThanOrEqual(b.r);
+    expect(b.x).toBeLessThanOrEqual(PORTRAIT.W - b.r);
+  });
+
+  it('re-anchors a height-only resize — the commonest one on a phone', () => {
+    // Browser chrome hiding, or the keyboard opening, changes H and leaves W alone, and every other case here
+    // moves both axes. This pins the maths for a one-axis ratio only: `Arena.reanchor`'s `sx === 1 && sy === 1`
+    // early-out is a private method behind a canvas, so no pure test reaches it — relaxing it to `||` would
+    // skip this resize entirely and still leave the suite green. Said plainly rather than implied, because a
+    // rail is worth what its name is true of.
+    const b = airborne(300, PORTRAIT, { vy: 120, g: 180, x: 195 });
+    reanchorBubble(b, PORTRAIT, { W: PORTRAIT.W, H: 600 });
+    expect(b.x, 'width did not change, so x must not move').toBe(195);
+    expect(600 + b.r - b.y).toBeCloseTo(300 * (600 / PORTRAIT.H), 6);
+  });
+
+  it('rotating there and back puts the bubble where it was', () => {
+    const b = airborne(500), before = { ...b };
+    reanchorBubble(b, PORTRAIT, LANDSCAPE);
+    reanchorBubble(b, LANDSCAPE, PORTRAIT);
+    for (const k of ['x', 'y', 'vx', 'vy', 'g'] as const) expect(b[k]).toBeCloseTo(before[k], 6);
+  });
+
+  it('leaves the radius alone — the label font was fitted to it once at spawn (#28)', () => {
+    const b = airborne(300);
+    reanchorBubble(b, PORTRAIT, LANDSCAPE);
+    expect(b.r).toBe(33);
   });
 });

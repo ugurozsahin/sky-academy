@@ -90,12 +90,30 @@ export class Arena {
   }
   resize = () => {
     const rect = this.canvas.getBoundingClientRect();
+    const from: ArenaBox = { W: this.W, H: this.H };
     this.W = Math.max(1, rect.width); this.H = Math.max(1, rect.height);
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(this.W * this.dpr); this.canvas.height = Math.round(this.H * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    // #146: a wave is laid out once, at spawn, for the arena it was spawned in. Rotating the phone used to
+    // leave every bubble at coordinates from the old box — below the shorter canvas, so the arena painted
+    // nothing while the wave played on invisibly, and `update`'s fall test below fired at once for every
+    // bubble already on its way down, costing a life per bubble in Year 1 and Year 2. Re-anchor instead.
+    if (from.W > 0 && from.H > 0) this.reanchor(from, { W: this.W, H: this.H });
     this.dirty = true;                              // setting canvas.width wipes the bitmap — repaint once (#31)
   };
+  /** Move everything the arena is holding into the resized box (#146). Pure maths lives in `reanchorBubble`. */
+  private reanchor(from: ArenaBox, to: ArenaBox) {
+    const sx = to.W / from.W, sy = to.H / from.H;
+    if (sx === 1 && sy === 1) return;
+    for (const b of this.bubbles) reanchorBubble(b, from, to);
+    for (const p of this.particles) { p.x *= sx; p.y *= sy; p.vx *= sx; p.vy *= sy; }
+    for (const s of this.shots) { s.x *= sx; s.y *= sy; s.x0 *= sx; s.y0 *= sy; }
+    for (const t of this.trail) { t.x *= sx; t.y *= sy; }
+    // The question card moves too, and its measured bottom is what bounds the next wave's apex
+    // (`play-session.ts` re-measures on the next question; this keeps the one in between in the box).
+    this.topInset = Math.min(this.topInset * sy, to.H * 0.5);
+  }
 
   /** Bubble radius scales with viewport; words get wider bubbles. */
   radius(wide: boolean) { return bubbleRadius(this.W, this.H, wide); }
@@ -500,6 +518,34 @@ export function bubbleRadius(W: number, H: number, wide: boolean): number {
   return Math.max(30, Math.min(wide ? 64 : 54, wide ? base * 1.25 : base));
 }
 
+/** The arena's drawable box, in CSS pixels. */
+export interface ArenaBox { W: number; H: number }
+/**
+ * Re-anchor one in-flight bubble from the box it was laid out in into the box the arena now has (#146).
+ *
+ * A bubble's whole flight is fixed at launch (`layoutWave`): it starts on the launch line just below the
+ * bottom edge, at `y = H + r`, and rises on a parabola set by `vy` and `g`. So the move that keeps the
+ * picture the child is watching is to map that launch line onto the new one and scale the height risen
+ * from it — `x` and `vx` by the width ratio, the rise and `vy`/`g` by the height ratio.
+ *
+ * Scaling `vy` and `g` by the same factor is what makes this a re-anchor rather than a teleport: the rise
+ * `vy²/2g` scales by `sy` exactly, while the time to the apex (`vy/g`) and the time still left in the air
+ * are both unchanged, so a bubble lands on the beat it was always going to land on. The radius deliberately
+ * does not scale — the label's font size was fitted to it once at spawn (#28), and a bubble that changed
+ * size mid-flight would re-open that.
+ */
+export function reanchorBubble(b: { x: number; y: number; vx: number; vy: number; g: number; r: number }, from: ArenaBox, to: ArenaBox) {
+  const sx = to.W / from.W, sy = to.H / from.H;
+  const risen = (from.H + b.r) - b.y;                      // height above the launch line, which may be negative on the way out
+  b.y = to.H + b.r - risen * sy;
+  b.vy *= sy; b.g *= sy;
+  // A narrower box must not leave a bubble hanging off either side. The left bound is the one play reaches:
+  // `layoutWave` starts the leftmost bubble at `margin = r + 8`, so landscape → portrait scales x below `r`.
+  // Where the box is narrower than the bubble (`to.W < 2 * b.r`) the two bounds cross and the right one wins,
+  // putting x below `b.r` — `bubbleRadius` caps r at 64, so that needs a viewport under 128 CSS px.
+  b.x = Math.min(to.W - b.r, Math.max(b.r, b.x * sx));
+  b.vx *= sx;
+}
 /** The arena's shape, as much of it as the wave layout depends on. */
 export interface WaveGeom { W: number; H: number; topInset: number }
 /** One bubble's whole flight, fixed at launch: where it starts, its arc, when it goes up and what it wears. */

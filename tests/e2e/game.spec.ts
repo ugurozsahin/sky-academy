@@ -800,6 +800,49 @@ test.describe('Sky Ninja Academy', () => {
     expect(ratio).toBeGreaterThan(0.8);      // and the arena clock still tracks the wall clock (loop alive)
   });
 
+  // #146: rotating the phone mid-mission used to blank the arena completely — measured at 0 painted pixels
+  // in landscape while bubbles kept spawning and falling, with the picture only coming back on rotating to
+  // portrait again. A wave is laid out once, for the box it was spawned in, so every bubble sat below the
+  // shorter canvas; and `update`'s fall test fired at once for every bubble already on its way down, which in
+  // Year 1 and Year 2 costs a life each. The child was playing blind AND being charged for it.
+  // Measured in painted pixels rather than by reading the arena's own numbers, because the original report
+  // was a rendering symptom and the canvas is the only thing that can answer it honestly.
+  test('guard rail: rotating to landscape keeps the arena painted, and costs no lives (#146)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-bonds');          // Year 1: a missed bubble costs a life
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    const painted = () => page.evaluate(() => new Promise<number>(res => requestAnimationFrame(() => requestAnimationFrame(() => {
+      const c = document.querySelector('canvas#arena') as HTMLCanvasElement;
+      const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+      let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+      res(n);
+    }))));
+    const before = { painted: await painted(), lives: (await page.evaluate(() => window.__sna.state())).lives };
+    expect(before.painted).toBeGreaterThan(0);             // the control: it paints in portrait
+
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.waitForFunction(() => window.__sna.arena!.W > window.__sna.arena!.H);
+    const after = { painted: await painted(), lives: (await page.evaluate(() => window.__sna.state())).lives };
+    console.log(`[guard rail #146] painted portrait=${before.painted} landscape=${after.painted} lives ${before.lives} -> ${after.lives}`);
+    expect(after.painted, 'the arena went blank when the phone was rotated').toBeGreaterThan(0);
+    expect(after.lives, 'rotating the phone cost the child a life').toBe(before.lives);
+
+    // …and the bubbles are in the box the child is now looking at. Asserted on the *rising* ones only: a
+    // bubble already on its way out of the bottom is legitimately below the line, and scaling keeps it there.
+    // Running this on desktop is what taught me that — the first version of this check called such a bubble
+    // stray and went red on a viewport CI would not have run until tonight.
+    const inBox = await page.evaluate(() => {
+      const a = window.__sna.arena!, bs = window.__sna.bubbles();
+      return {
+        rising: bs.filter(b => b.vy < 0).length,
+        risingOutside: bs.filter(b => b.vy < 0 && (b.y - b.r > a.H || b.y + b.r < 0)).length,
+        offSide: bs.filter(b => b.x < 0 || b.x > a.W).length,
+      };
+    });
+    expect(inBox.rising, 'no bubble was rising, so the check below proved nothing').toBeGreaterThan(0);
+    expect(inBox, 'a bubble was left outside the resized arena').toMatchObject({ risingOutside: 0, offSide: 0 });
+  });
+
   test('guard rail: leaving the play screen stops it', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
