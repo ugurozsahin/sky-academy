@@ -1,8 +1,27 @@
 // Mission certificate: a printable PNG (landscape, 1200×850) drawn on an offscreen canvas, then shared
 // (Web Share with files, e.g. iOS/Android) or downloaded. No DOM beyond the canvas; text is built by a pure helper.
-import type { Avatar } from '../avatars';
+import { avatarById, type Avatar } from '../avatars';
+import type { StoredCert } from '../storage';
 
 export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date?: Date; training?: boolean }
+
+/**
+ * Rebuild a drawable certificate from what the save keeps (#205). Certificates are stored as data, not as a
+ * PNG, so this is the only thing standing between the album and `drawCertificate()` — if a field ever goes
+ * missing from `StoredCert`, this function stops compiling, which is the point of it existing now rather than
+ * with the list screen.
+ *
+ * The date is read at local noon: `new Date('2026-09-14')` is UTC midnight, which `toLocaleDateString('en-GB')`
+ * renders as the *previous* day anywhere west of Greenwich, so a child in the Americas would find yesterday's
+ * date on this morning's certificate.
+ */
+export function certFromStored(c: StoredCert): CertInfo {
+  return {
+    name: c.name, avatar: avatarById(c.avatar), year: c.year, title: c.title,
+    stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
+    date: new Date(`${c.date}T12:00:00`), training: c.training,
+  };
+}
 export interface CertText { heading: string; awarded: string; child: string; reason: string; detail: string; stars: string; date: string; signed: string }
 
 /** The words on the certificate (pure, unit-tested). */

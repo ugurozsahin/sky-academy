@@ -5,6 +5,7 @@ import pkg from '../../package.json';
 import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
+import { MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205: the rail below holds the migration ladder complete
 
 /**
  * GUARD RAILS (#73) — checks that fail the build so a mistake we have already made cannot come back.
@@ -256,6 +257,17 @@ describe('guard rails', () => {
     expect(/migrate\(/.test(load), 'load() must migrate the stored blob, not shallow-merge it').toBe(true);
     expect(/\{\s*\.\.\.DEFAULT\s*,\s*\.\.\.JSON\.parse/.test(load)).toBe(false);   // the old shallow-merge is gone
     expect(/switch\s*\(|MIGRATIONS\[/.test(code(SOURCES['/src/storage.ts']))).toBe(true);   // migrate keys off the version
+  });
+
+  // The other half of #38, found while writing the first real step (#205, v1 → v2): migrate()'s ladder is
+  // `while (v < SAVE_VERSION && MIGRATIONS[v])`, so a version bumped without a step does not fail, it walks
+  // straight past the loop and lands back on `{ ...DEFAULT, ...s }` — exactly the shallow merge the rail above
+  // forbids, reached by the one route it cannot see. A reshaping bump done that way would keep the old keys
+  // and look fine in every test that only reads the new ones.
+  it('every version below SAVE_VERSION has a migration step (#205)', () => {
+    for (let v = 1; v < SAVE_VERSION; v++)
+      expect(MIGRATIONS[v], `SAVE_VERSION is ${SAVE_VERSION} but no MIGRATIONS[${v}] step: migrate() would skip v${v} saves`).toBeTypeOf('function');
+    expect(Object.keys(MIGRATIONS).length, 'a step above SAVE_VERSION never runs').toBe(SAVE_VERSION - 1);
   });
 
   // Incident 2026-09-06 (#37): dead code lingered after the outcome-beat refactor — `Bubble.scale` was

@@ -385,6 +385,20 @@ test.describe('Sky Ninja Academy', () => {
     const png = await page.evaluate(() => window.__sna.certificate());
     expect(png).toMatch(/^data:image\/png;base64,/); expect(png.length).toBeGreaterThan(20_000);
 
+    // #205: the certificate is filed the moment it is *earned*, before the 🎓 button is touched — on the
+    // Android tablet that button does nothing at all, and that is exactly the child whose certificate has
+    // to survive the results overlay closing. Asserted here, above the delivery routes, so a regression
+    // that only files on a successful save cannot hide behind the two that work.
+    const album = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs);
+    expect(album).toHaveLength(1);
+    // `name` and `avatar` are the two fields `fileCertificate()` reads from the save rather than copying from
+    // `CertInfo`, so they are the wiring nothing else checks: with `avatar` dropped, every certificate a child
+    // has earned silently redraws with the default ninja's face, because `avatarById` is total by design.
+    // Both come from this test's own seed — `seedPlayer(page, 'terra')`, whose `name` default is 'Ada'.
+    expect(album[0]).toMatchObject({ id: 'reception:r-count', year: 'Reception', training: false, name: 'Ada', avatar: 'terra' });
+    expect(album[0].stars).toBeGreaterThan(0);
+    expect(album[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
     // #50: the 🎓 button always delivers — it never silently does nothing.
     await page.evaluate(() => { (navigator as any).canShare = () => false; });   // exercise the non-share routes deterministically (headless can't complete a real Web Share)
     // (a) artifact viewer WITH the downloads grant → the save prompt
@@ -1178,7 +1192,7 @@ test.describe('Sky Ninja Academy', () => {
     // the code is the save, and it carries the version that makes it recognisable
     const code = await page.inputValue('#save-code');
     const parsed = JSON.parse(code);
-    expect(parsed.v).toBe(SAVE_VERSION);
+    expect(parsed.v, 'read from storage.ts, not written out: a literal here goes red on every bump').toBe(SAVE_VERSION);
     expect(parsed.name).toBe('Ada');
 
     // a stray paste is refused, and nothing on the device changes

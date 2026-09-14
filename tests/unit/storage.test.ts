@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, exportSave, importSave, load, migrate, recordAccuracy, recordBossWin, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, SAVE_VERSION, STICKER_IDS, STICKER_COST } from '../../src/storage';
+import { addCoins, certificates, exportSave, fileCert, importSave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, STICKER_IDS, STICKER_COST, type StoredCert } from '../../src/storage';
+import { certFromStored } from '../../src/ui/certificate';
 
 // minimal localStorage shim for node
 const mem: Record<string, string> = {};
@@ -92,6 +93,14 @@ describe('save migration (#38)', () => {
     expect(saveVersionOf({ v: 'two' })).toBe(1);        // a mangled version is treated as the oldest, never as current
   });
 
+  // …and the consequence of that read, which is the part a future reshaping step depends on: the step really
+  // runs on a pre-versioning blob. `saveVersionOf` returning 1 and the ladder acting on it are two different
+  // claims, and only this one goes red if the `while` is ever restructured.
+  it('runs every migration step on a pre-versioning blob, not just the last one', () => {
+    const junk = migrate({ name: 'Old', certs: 'not an album' as unknown });   // only the v1 → v2 step drops this
+    expect(junk.certs).toEqual([]);
+  });
+
   // #65 review: `{ ...s, voice: 'unknown' }` put the key AFTER the spread, so a v1 blob that already carried
   // a verdict (an e2e seed, a save restored from a newer device) came out `unknown` — and the e2e tests
   // seeded with `voice: 'no'` did not start in the state they claimed.
@@ -101,6 +110,14 @@ describe('save migration (#38)', () => {
     expect(migrate({ v: 1, name: 'Seed' }).voice).toBe('unknown');
     expect(migrate({ name: 'Older', voice: 'no' }).voice).toBe('no');   // pre-versioning blobs walk the same step
     expect(migrate({ v: 1, name: 'Seed', voice: 'maybe' }).voice, 'a value outside the union is not a verdict').toBe('unknown');
+  });
+
+  // The two features that shared the v1 → v2 step must both land on one blob — the fold is the thing a
+  // future reader is most likely to get wrong, so it is pinned rather than left to the two suites above.
+  it('the single v1 → v2 step carries both the voice verdict and the certificate album', () => {
+    const both = migrate({ v: 1, name: 'Seed', voice: 'yes', certs: 'not an album' as unknown });
+    expect(both.voice).toBe('yes');
+    expect(both.certs).toEqual([]);
   });
 
   it('falls back to a fresh default for corrupt or non-object data', () => {
@@ -124,6 +141,107 @@ describe('save migration (#38)', () => {
     expect(load().name).toBe('NoVersion');
     expect(load().coins).toBe(3);
     expect(load().boss).toEqual({});                 // shape completed from DEFAULT
+  });
+});
+
+// #205: a certificate used to live only as long as the results overlay was open. On the Android tablet the
+// save button does nothing at all, so for that child it never existed. These keep it.
+describe('certificate album (#205)', () => {
+  beforeEach(() => reset());
+  const cert = (p: Partial<StoredCert> = {}): StoredCert => ({
+    id: 'year1:y1-bonds', name: 'Ada', avatar: 'volt', year: 'Year 1', title: 'Number bonds',
+    stars: 2, score: 80, correct: 8, attempts: 10, date: '2026-09-14', ...p,
+  });
+
+  it('keeps one entry per mission, and keeps the best run of it', () => {
+    const three = cert({ stars: 3, score: 120, date: '2026-09-12' });
+    const one = cert({ stars: 1, score: 20, date: '2026-09-14' });
+    // Replaying the same mission badly must not take the three-star certificate away.
+    expect(fileCert([three], one)).toEqual([three]);
+    expect(fileCert([one], three)).toEqual([three]);
+    // Same stars → the higher score wins; an equal run replaces the old, so a renamed child's name follows.
+    expect(fileCert([cert({ score: 80 })], cert({ score: 90 }))[0].score).toBe(90);
+    expect(fileCert([cert({ score: 90 })], cert({ score: 80 }))[0].score).toBe(90);
+    expect(fileCert([cert({ name: 'Ada' })], cert({ name: 'Rey' }))[0].name).toBe('Rey');
+  });
+
+  it('files a different mission alongside, most recently earned first', () => {
+    const bonds = cert();
+    const sensei = cert({ id: 'year1:sensei', title: 'Sensei training', training: true });
+    const album = fileCert(fileCert([], bonds), sensei);
+    expect(album.map(c => c.id)).toEqual(['year1:sensei', 'year1:y1-bonds']);
+    // Re-earning the older one moves it back to the front without duplicating it.
+    expect(fileCert(album, cert({ stars: 3 })).map(c => c.id)).toEqual(['year1:y1-bonds', 'year1:sensei']);
+  });
+
+  it('caps the album, dropping the oldest', () => {
+    let album: StoredCert[] = [];
+    for (let i = 0; i < CERT_CAP + 5; i++) album = fileCert(album, cert({ id: `year1:t${i}` }));
+    expect(album.length).toBe(CERT_CAP);
+    expect(album[0].id).toBe(`year1:t${CERT_CAP + 4}`);                 // newest kept
+    expect(album.some(c => c.id === 'year1:t0')).toBe(false);           // oldest dropped
+  });
+
+  it('records through the save, and survives a reload', () => {
+    expect(certificates()).toEqual([]);
+    recordCert(cert());
+    recordCert(cert({ id: 'year1:sensei', training: true }));
+    expect(certificates().map(c => c.id)).toEqual(['year1:sensei', 'year1:y1-bonds']);
+    const stored = JSON.parse(mem['sna:v1']);                           // what a reload would read back
+    expect(stored.certs.length).toBe(2);
+  });
+
+  it('an export carries the album, and a v1 code from an older build still imports', () => {
+    recordCert(cert({ stars: 3 }));
+    const code = exportSave();
+    reset();
+    expect(importSave(code)).toBe(true);
+    expect(certificates()[0].stars).toBe(3);
+    reset();
+    expect(importSave(JSON.stringify({ v: 1, name: 'Old', coins: 5 })), 'a v1 code predates the album').toBe(true);
+    expect(certificates()).toEqual([]);
+  });
+
+  it('a hand-edited album cannot take the list down with it', () => {
+    // The fixture is the point. `'nonsense'`, `null` and `42` are all rejected by the `typeof === 'object'`
+    // clause alone, so an album of only those would leave every field check dead. The entries that actually
+    // reach a save are the plausible ones: an empty object, a partial, and a truncated paste of a save code —
+    // which is exactly how these codes travel between devices (#64).
+    const partial = { id: 'year1:y1-bonds', title: 'Number bonds' };
+    const truncated = { id: 'year1:y1-add', title: 'Adding', name: 'Ada', year: 'Year 1', date: '2026-09-14', stars: 3 };
+    save({ certs: ['nonsense', null, 42, {}, partial, truncated, { ...cert(), stars: NaN }, cert()] as unknown as StoredCert[] });
+    expect(certificates()).toEqual([cert()]);
+    save({ certs: 'not an album' as unknown as StoredCert[] });
+    expect(certificates()).toEqual([]);
+  });
+
+  // The bug a half-checked guard makes rather than prevents: `{ id, title }` passed the first version of
+  // `isCert`, and `fileCert` then compared a real `stars: 3` against `undefined` — `3 > undefined` is false —
+  // so the junk won every comparison and the earned certificate could never be filed. Storing junk is a
+  // nuisance; losing the reward the child actually earned is the thing `fileCert`'s own docblock rules out.
+  it('a junk entry under a mission id cannot lock out the certificate a child earns', () => {
+    save({ certs: [{ id: 'year1:y1-bonds', title: 'junk' }] as unknown as StoredCert[] });
+    const earned = cert({ stars: 3, score: 120 });
+    expect(recordCert(earned)).toEqual([earned]);
+    expect(certificates()[0].stars, 'the three-star run the child actually earned').toBe(3);
+  });
+
+  // The album is data, not PNGs, so the only thing that makes it a certificate again is this function —
+  // and the only thing that makes *that* safe is every field drawCertificate() reads being stored.
+  it('redraws into the certificate it was earned as', () => {
+    const c = certFromStored(cert({ avatar: 'volt' }));
+    expect(c.name).toBe('Ada'); expect(c.year).toBe('Year 1'); expect(c.title).toBe('Number bonds');
+    expect(c.stars).toBe(2); expect(c.score).toBe(80); expect(c.correct).toBe(8); expect(c.attempts).toBe(10);
+    expect(c.avatar.id).toBe('volt');
+    expect(certFromStored(cert({ avatar: 'no-such-ninja' })).avatar.id, 'a missing ninja still draws').toBeTruthy();
+    // The date is read at LOCAL noon, and this is the assertion that says so. The rendered-string check below
+    // cannot carry it alone: CI runs `ubuntu-latest` in UTC, where `new Date('2026-09-14')` — the very
+    // regression the fix exists to prevent — renders as 14 September too, so that string was green in the one
+    // zone that ever runs it. Local hours are 12 under the fix in every zone, and the runner's own offset
+    // under the regression (0 in UTC, 20 in New York, 1 in London): red everywhere except a runner at exactly
+    // UTC+12, where midnight UTC *is* local noon and there is no wrong day left to catch.
+    expect(c.date!.getHours(), 'read at local noon — UTC midnight renders as the previous day west of Greenwich').toBe(12);
+    expect(c.date!.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })).toBe('14 September 2026');
   });
 });
 

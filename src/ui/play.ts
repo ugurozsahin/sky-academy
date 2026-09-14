@@ -5,7 +5,10 @@ import { type Mode, type SessionResult } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import { Tracer } from '../game/tracing';
-import { addCoins, load, recordAccuracy, recordBossWin, recordDojo, recordEndless, recordSprint, recordTopic, recordTraining, save, touchStreak, wallet } from '../storage';
+import {
+  addCoins, load, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless,
+  recordSprint, recordTopic, recordTraining, save, today, touchStreak, wallet,
+} from '../storage';
 import { equippedItem } from '../game/shop';
 import { canHear, haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
@@ -202,6 +205,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
     const cert = certInfo(r); lastResult = r;
+    if (cert) fileCertificate(cert);   // #205: filed when it is *earned*, not when the button works
     els.overlay.hidden = false;
     els.overlay.innerHTML = resultsHTML({
       mode: r.mode, won: r.won, training, glow: speaker.glow, img: speaker.img, name: speaker.name,
@@ -221,6 +225,19 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       }
       catch { toast('Could not make the certificate', 'bad'); }
       b.disabled = false;
+    });
+  }
+  /**
+   * Keep the certificate this mission earned (#205). It is filed the moment the results overlay is built,
+   * not from the 🎓 button: the bug this issue opened with is a device where pressing that button does
+   * nothing at all, and the child who most needs the certificate kept is the one it silently failed for.
+   */
+  function fileCertificate(c: CertInfo) {
+    recordCert({
+      id: `${o.year.id}:${training ? 'sensei' : o.topic?.id ?? 'mission'}`,
+      name: c.name, avatar: d.avatar, year: c.year, title: c.title,
+      stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
+      date: today(), training: c.training,
     });
   }
   /** Certificate details for a won mission / Sensei session (null for the other modes and lost runs). */

@@ -3,6 +3,23 @@ import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type 
 import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
 import type { YearId } from './curriculum';
 export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }   // hits/tries = lifetime slices (missions + Sensei training)
+/**
+ * One earned certificate, kept as **data rather than a PNG** (#205): `certFromStored()` in `ui/certificate.ts`
+ * turns it back into the `CertInfo` that `drawCertificate()` draws, so a stored certificate costs a few dozen
+ * bytes instead of ~300 KB of base64 in localStorage, and it redraws in whatever the certificate looks like
+ * today. Before this, a certificate existed only for as long as the results overlay was open: a child on a
+ * device where no save route works (the Android WebView — the bug this issue opened with) had no way back to it.
+ */
+export interface StoredCert {
+  id: string;             // the mission it was earned for: `<year id>:<topic id>`, or `<year id>:sensei` for training
+  name: string;           // the child's name at the time — the certificate says who it was awarded to
+  avatar: string | null;  // avatar id, resolved through avatarById() when redrawn, so a missing one still draws
+  year: string;           // year *title* as it appears on the certificate ("Year 1"); the id lives in `id`
+  title: string;          // mission title ("Number bonds"), or "Sensei training"
+  stars: number; score: number; correct: number; attempts: number;
+  date: string;           // ISO day (yyyy-mm-dd), drawn as the award date
+  training?: boolean;
+}
 export interface SaveData {
   v: 2;
   name: string;
@@ -25,21 +42,31 @@ export interface SaveData {
   spent: number;                     // coins spent in the shop (#6) — balance = coins − spent, stickers still unlock from lifetime coins
   owned: string[];                   // bought shop item ids
   equipped: Partial<Record<ItemKind, string>>;   // equipped item per kind (missing = the free default)
+  certs: StoredCert[];               // certificates earned, most recently filed first (#205)
 }
 export const SAVE_VERSION = 2 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
 const KEY = 'sna:v1';                       // stable localStorage slot (its `v1` is historical; `raw.v` drives migration)
-const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {} };
+const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [] };
 
 // A raw blob read back from storage: JSON of unknown shape (any past version, or hand-edited). Migrations walk it.
 type RawSave = Record<string, unknown>;
-// Each step upgrades a v(n) blob to v(n+1). Empty while we are still on v1 — this is the seam a future shape
-// change slots into (e.g. #26's per-mode `bests` record, or a Y3+ key change): the step drops the old keys and
-// writes the new ones, instead of leaning on load()'s merge, which silently keeps stale keys across a reshape.
-const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
-  // v1 → v2 (#65): the launch-to-launch TTS verdict. A blob that already carries a valid one (an e2e seed, a
-  // save restored from a newer device) keeps it; anything else — absent, or a value outside the union — becomes
-  // `unknown`, so the key never carries a verdict the detector could not have written.
-  1: s => ({ ...s, voice: s.voice === 'yes' || s.voice === 'no' ? s.voice : 'unknown' }),
+// Each step upgrades a v(n) blob to v(n+1): it drops the old keys and writes the new ones, instead of leaning
+// on load()'s merge, which silently keeps stale keys across a reshape. Exported for the rail in
+// guardrails.test.ts that holds every version below SAVE_VERSION to having a step — a bump with no step walks
+// straight past the `while` below and lands back on the merge this seam exists to replace.
+export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
+  // v1 → v2: **one step, two features.** #65 (the TTS verdict) and #205 (the certificate album) each took the
+  // save to v2 in parallel branches; they are one shape change from the app's point of view, so they are one
+  // step rather than a version each — a ladder that counted features would say who shipped when instead of
+  // what the save looks like. The two keys are treated differently on purpose and both are deliberate:
+  // `voice` is *preserved when valid* (an e2e seed, or a save restored from a newer device, carries a real
+  // verdict worth keeping) and otherwise normalised, so the key never holds a verdict the detector could not
+  // have written; `certs` is *filtered*, because its job is to drop anything that is not an album entry.
+  1: s => ({
+    ...s,
+    voice: s.voice === 'yes' || s.voice === 'no' ? s.voice : 'unknown',
+    certs: Array.isArray(s.certs) ? s.certs.filter(isCert) : [],
+  }),
 };
 
 /**
@@ -114,6 +141,42 @@ export function addCoins(n: number): string[] {
   const unlocked = stickersFor(coins); const fresh = unlocked.filter(id => !d.stickers.includes(id));
   save({ coins, stickers: unlocked });
   return fresh;
+}
+/** Certificate album cap. Far above the mission count, so it only ever trims a hand-edited or imported save. */
+export const CERT_CAP = 60;
+// A stored certificate has to survive a hand-edited save without taking the album down with it. Still not
+// #174's full validator — it checks types, not values — but it checks **every field an entry is used
+// through**, because a half-checked entry is worse than an unchecked one here: `{ id, title }` alone passed
+// an earlier version of this guard, and then `fileCert`'s `c.stars > prev.stars` compared a real 3 against
+// `undefined`, which is `false`, so the junk entry won every comparison and a child who had genuinely earned
+// three stars could never be given that certificate. A guard that lets a partial object through does not
+// merely fail to help; it manufactures a `prev` that beats everything.
+const isCert = (c: unknown): c is StoredCert => {
+  if (!c || typeof c !== 'object' || Array.isArray(c)) return false;
+  const x = c as Record<string, unknown>;
+  return typeof x.id === 'string' && typeof x.title === 'string' && typeof x.name === 'string'
+    && typeof x.year === 'string' && typeof x.date === 'string'
+    && [x.stars, x.score, x.correct, x.attempts].every(n => typeof n === 'number' && Number.isFinite(n));
+};
+/**
+ * File a certificate into the album (pure). One entry per mission (`c.id`) — replaying a mission does not earn
+ * a second award for it — and the entry kept is the **best** run, not simply the newest: a child who plays a
+ * three-star mission again and does worse must not lose the certificate they earned, which is the one outcome
+ * a reward has to rule out. Better = more stars, then a higher score; an equal run replaces the old one, so the
+ * name and avatar follow a child who has since changed either. The kept entry moves to the front either way, so
+ * the album reads most recently earned first. Capped at `cap`, oldest dropped.
+ */
+export function fileCert(list: StoredCert[], c: StoredCert, cap = CERT_CAP): StoredCert[] {
+  const prev = list.find(x => x.id === c.id);
+  const better = !prev || (c.stars !== prev.stars ? c.stars > prev.stars : c.score >= prev.score);
+  return [better ? c : prev, ...list.filter(x => x.id !== c.id)].slice(0, Math.max(0, cap));
+}
+/** Every certificate earned, most recently filed first. Tolerant of a hand-edited save. */
+export function certificates(): StoredCert[] { const c = load().certs; return Array.isArray(c) ? c.filter(isCert) : []; }
+/** Record the certificate a won mission earned. Returns the album as it now stands. */
+export function recordCert(c: StoredCert): StoredCert[] {
+  const certs = fileCert(certificates(), c);
+  save({ certs }); return certs;
 }
 export const today = (now = new Date()) => now.toISOString().slice(0, 10);
 /** Update the daily streak for a play today. Returns the streak length. */
