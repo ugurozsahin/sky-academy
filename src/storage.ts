@@ -74,26 +74,76 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
  * change gets a real migration step rather than load() papering over it. Tolerant of hand-edited / corrupt data:
  * a non-object, or JSON that is not a save, falls back to a fresh default.
  */
-/** The shape version a raw blob is in. A blob with no `v` predates versioning but shares the v1 shape, so it
- *  walks every migration from 1 — reading it as *current* would skip them all and hand a reshaping step stale keys. */
-export const saveVersionOf = (s: RawSave): number => (typeof s.v === 'number' ? s.v : 1);
+/** A version we cannot migrate from: not a number we wrote, so the ladder has no honest starting rung (#232). */
+export const UNREADABLE_VERSION = 0;
+/** The shape version a raw blob is in. A blob with **no** `v` predates versioning but shares the v1 shape, so it
+ *  walks every migration from 1 — reading it as *current* would skip them all and hand a reshaping step stale keys.
+ *  A `v` that is *present* but not a whole number ≥ 1 (`"2"`, `null`, `{}`, `1.5`, `-3`) is a different case and
+ *  used to land on 1 as well: that re-ran the whole ladder over data that had already been migrated, which is
+ *  harmless for an additive step and silently destructive for a reshaping one (#232). It now reads as
+ *  UNREADABLE_VERSION, which `migrate()` refuses rather than guesses at. */
+export const saveVersionOf = (s: RawSave): number => {
+  if (s.v === undefined) return 1;
+  return typeof s.v === 'number' && Number.isInteger(s.v) && s.v >= 1 ? s.v : UNREADABLE_VERSION;
+};
+/**
+ * Whether the ladder can bring this blob to the current shape: a readable version, at or below ours (#232).
+ *
+ * A blob from a **newer** build is the case this exists for. `migrate()` used to fall straight through the
+ * `while` (`3 < 2` is false) to a return that stamps `v: SAVE_VERSION` over v3-shaped data; `load()` cached
+ * that and the next `save()` wrote it back, so the newer save was permanently relabelled as the older shape,
+ * with whatever the newer version added sitting unrecognised and whatever it *renamed* read under its old
+ * name. `importSave()` has always refused this case for the same reason — migrations only run forwards —
+ * and this is `load()`'s half of the same rule.
+ */
+export const isMigratable = (s: RawSave): boolean => {
+  const v = saveVersionOf(s);
+  return v !== UNREADABLE_VERSION && v <= SAVE_VERSION;
+};
 export function migrate(raw: unknown): SaveData {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...DEFAULT };
   let s = raw as RawSave;
+  // Never stamp SAVE_VERSION over a version we could not read (#232). A fresh default is what this *session*
+  // sees; keeping the stored blob intact is `save()`'s half, via the read-only latch below.
+  if (!isMigratable(s)) return { ...DEFAULT };
   let v = saveVersionOf(s);
   while (v < SAVE_VERSION && MIGRATIONS[v]) { s = MIGRATIONS[v](s); v++; }
   return { ...DEFAULT, ...s, v: SAVE_VERSION };           // fill any missing keys and stamp the current version
 }
 
 let cache: SaveData | null = null;
+/**
+ * Set when `load()` read a blob this build cannot migrate — a newer version, or a `v` it cannot read (#232).
+ * While it is set the session runs on defaults and `save()` writes nothing, so the stored blob survives:
+ * a child whose tablet is on a newer build keeps their progress even after the phone has opened the save.
+ * Refusing *and resetting* would have been two lines, but it throws away a save the other device still reads.
+ */
+let readOnly = false;
+/**
+ * Whether this session is running on defaults over a stored save it refused to touch (#232).
+ *
+ * Exported because the refusal is otherwise **silent**: the child plays, nothing persists, and nothing says so.
+ * That is the right trade for a newer save — the alternative destroys a save their other device still reads —
+ * but it is a state a grown-up should eventually be told about, and this is the hook a "your progress is not
+ * being saved" notice would read. That notice is #232's own related item and is not built here.
+ */
+export const isReadOnlySave = () => readOnly;
 export function load(): SaveData {
   if (cache) return cache;
-  try { const raw = localStorage.getItem(KEY); cache = raw ? migrate(JSON.parse(raw)) : { ...DEFAULT }; }
-  catch { cache = { ...DEFAULT }; }
+  try {
+    const raw = localStorage.getItem(KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    readOnly = !!parsed && typeof parsed === 'object' && !Array.isArray(parsed) && !isMigratable(parsed as RawSave);
+    cache = raw ? migrate(parsed) : { ...DEFAULT };
+  }
+  catch { readOnly = false; cache = { ...DEFAULT }; }
   return cache!;
 }
 export function save(patch: Partial<SaveData> = {}): SaveData {
   cache = { ...load(), ...patch };
+  // #232: the blob on disk is newer than this build, or carries a version we cannot read. The session keeps
+  // working against `cache`; writing would relabel it as our shape and make the loss permanent.
+  if (readOnly) return cache;
   try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* private mode etc. */ }
   return cache;
 }
@@ -208,7 +258,7 @@ export function equipItem(id: string): boolean {
   const w = wallet(); const next = equip(w, id); if (next === w) return false;
   save({ equipped: next.equipped }); return true;
 }
-export function reset() { cache = null; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }
+export function reset() { cache = null; readOnly = false; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232)
 
 /**
  * The save as a code the grown-up can copy to another device (#64). Every APK the workflow builds is signed
@@ -236,5 +286,6 @@ export function importSave(text: string): boolean {
   const next = migrate(raw);
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* private mode etc. */ }
   cache = next;
+  readOnly = false;   // #232: the grown-up deliberately replaced the blob, so there is no longer one to protect
   return true;
 }

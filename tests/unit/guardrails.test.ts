@@ -5,7 +5,7 @@ import pkg from '../../package.json';
 import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
-import { MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205: the rail below holds the migration ladder complete
+import { isMigratable, migrate, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, and one-directional
 
 /**
  * GUARD RAILS (#73) — checks that fail the build so a mistake we have already made cannot come back.
@@ -268,6 +268,30 @@ describe('guard rails', () => {
     for (let v = 1; v < SAVE_VERSION; v++)
       expect(MIGRATIONS[v], `SAVE_VERSION is ${SAVE_VERSION} but no MIGRATIONS[${v}] step: migrate() would skip v${v} saves`).toBeTypeOf('function');
     expect(Object.keys(MIGRATIONS).length, 'a step above SAVE_VERSION never runs').toBe(SAVE_VERSION - 1);
+  });
+
+  // The third face of the same seam (#232): the ladder only runs forwards, so a blob from a *newer* build fails
+  // `v < SAVE_VERSION` immediately and fell through to `{ ...DEFAULT, ...s, v: SAVE_VERSION }` — which relabels
+  // v(n+1) data as ours. load() cached it and the next save() wrote it back, making the loss permanent, with
+  // whatever the newer version renamed read under its old name. importSave() had refused a newer code from the
+  // start for exactly this reason; load() did not. The sequence is ordinary: the APK and the web build do not
+  // update together (#64), so one device is routinely a version ahead of the other.
+  //
+  // This rail is **behavioural on purpose.** A text rail here could check that `isMigratable` is still called
+  // and would stay green through any change that kept the identifier and broke the comparison — #205's lesson.
+  // The full behaviour (the untouched blob, the read-only latch, the cleared latch) is held in storage.test.ts;
+  // this is the one-line invariant that must never come back, sitting in the incident log with the other two.
+  it('a save from a newer build is never relabelled as this version (#232)', () => {
+    const future = { v: SAVE_VERSION + 1, name: 'Tablet', coins: 500 };
+    const out = migrate(future);
+    expect(out.coins, 'a newer blob must not come through carrying its data under our version stamp').toBe(0);
+    expect(out.name, 'refused, so the session runs on a fresh default').toBe('');
+    // …and the same for a `v` we cannot read at all, which used to re-run the whole ladder over migrated data.
+    for (const bad of [{ v: 'two' }, { v: null }, { v: 1.5 }, { v: 0 }, { v: -1 }])
+      expect(isMigratable(bad as Record<string, unknown>), `${JSON.stringify(bad)} must not be treated as migratable`).toBe(false);
+    // The guard must not overreach: everything we can read still migrates.
+    for (let v = 1; v <= SAVE_VERSION; v++) expect(isMigratable({ v }), `v${v} is readable`).toBe(true);
+    expect(isMigratable({}), 'a pre-versioning blob is readable as v1').toBe(true);
   });
 
   // Incident 2026-09-06 (#37): dead code lingered after the outcome-beat refactor — `Bubble.scale` was

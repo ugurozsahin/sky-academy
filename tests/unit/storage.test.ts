@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, certificates, exportSave, fileCert, importSave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, STICKER_IDS, STICKER_COST, type StoredCert } from '../../src/storage';
+import { addCoins, certificates, exportSave, fileCert, importSave, isMigratable, isReadOnlySave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, STICKER_IDS, STICKER_COST, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 
 // minimal localStorage shim for node
@@ -90,7 +90,12 @@ describe('save migration (#38)', () => {
     expect(saveVersionOf({})).toBe(1);
     expect(saveVersionOf({ name: 'Old' })).toBe(1);
     expect(saveVersionOf({ v: SAVE_VERSION })).toBe(SAVE_VERSION);
-    expect(saveVersionOf({ v: 'two' })).toBe(1);        // a mangled version is treated as the oldest, never as current
+    // A *mangled* version used to land on 1 as well, on the reasoning that the oldest rung is safer than
+    // pretending it is current. #232 split the two cases: absent still means v1, but a `v` that is present and
+    // unreadable now reads as UNREADABLE_VERSION, because re-running the ladder over data that has already been
+    // migrated is only harmless while every step is additive. Still never read as current, which was the point.
+    expect(saveVersionOf({ v: 'two' })).toBe(UNREADABLE_VERSION);
+    expect(saveVersionOf({ v: 'two' })).not.toBe(SAVE_VERSION);
   });
 
   // …and the consequence of that read, which is the part a future reshaping step depends on: the step really
@@ -309,5 +314,90 @@ describe('save export / import (#64)', () => {
     const code = exportSave();
     expect(JSON.parse(code).v).toBe(SAVE_VERSION);    // the version is what makes a code recognisable
     expect(importSave(code)).toBe(true);
+  });
+});
+
+/**
+ * #232 — a save from a **newer** build must never be relabelled as this build's shape.
+ *
+ * `migrate()` ended `while (v < SAVE_VERSION && MIGRATIONS[v]) …; return { ...DEFAULT, ...s, v: SAVE_VERSION }`.
+ * A `{ v: 3 }` blob fails the loop condition immediately (`3 < 2` is false) and falls through to a return that
+ * stamps `v: 2` over v3-shaped data — then `load()` caches it and the next `save()` writes it back, so the
+ * mislabelling is permanent, with whatever v3 added sitting unrecognised and whatever v3 *renamed* read under
+ * its old name. `importSave()` has always refused a newer code for exactly this reason; this is `load()`'s half.
+ *
+ * The sequence is ordinary, not exotic: the APK and the web build do not update together (#64 is the whole
+ * reason the save code exists), so one device is routinely a version ahead of the other.
+ *
+ * Behaviour chosen: **refuse and keep the blob untouched.** The session runs on defaults and `save()` writes
+ * nothing, so downgrading a build and upgrading again does not cost the child their progress. Refusing *and
+ * resetting* was the two-line alternative and was rejected: it discards a save the other device can still read.
+ *
+ * These are behavioural, and deliberately so — the text rail in `guardrails.test.ts` can see that the guard is
+ * still called, but not that it still works, so it is these tests that hold the behaviour (#205's lesson).
+ */
+describe('a save from a newer build is refused, not down-stamped (#232)', () => {
+  const KEY = 'sna:v1';
+  beforeEach(() => reset());
+
+  it('never stamps SAVE_VERSION over a version it could not read', () => {
+    expect(migrate({ v: SAVE_VERSION + 1, name: 'Future' }).v).not.toBe(SAVE_VERSION + 1);
+    // The fault itself: the returned save must not claim to be our shape when the input was not.
+    for (const blob of [{ v: SAVE_VERSION + 1 }, { v: SAVE_VERSION + 9 }, { v: 'two' }, { v: null }, { v: {} }, { v: 1.5 }, { v: -3 }, { v: 0 }]) {
+      expect(isMigratable(blob as Record<string, unknown>), `${JSON.stringify(blob)} is not migratable`).toBe(false);
+      expect(migrate(blob).name, `${JSON.stringify(blob)} must yield a fresh default, not a relabelled blob`).toBe('');
+    }
+    // …while everything we *can* read still migrates exactly as before.
+    for (let v = 1; v <= SAVE_VERSION; v++) expect(isMigratable({ v })).toBe(true);
+    expect(isMigratable({})).toBe(true);                     // pre-versioning blobs are readable as v1
+    expect(migrate({ v: 1, name: 'Kai' }).name).toBe('Kai');
+  });
+
+  it('leaves the newer blob on disk, and save() does not overwrite it', () => {
+    const newer = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Tablet', coins: 500, somethingV3: 'kept' });
+    localStorage.setItem(KEY, newer);
+    expect(load().name, 'the session runs on defaults').toBe('');
+    expect(load().coins).toBe(0);
+    expect(isReadOnlySave(), 'the read-only latch is set').toBe(true);
+    save({ coins: 7 });                                      // an ordinary gameplay write
+    expect(localStorage.getItem(KEY), 'the stored blob is byte-for-byte untouched').toBe(newer);
+    expect(load().coins, 'but the running session still sees its own state').toBe(7);
+  });
+
+  it('an unreadable `v` is refused the same way, rather than re-running the ladder over migrated data', () => {
+    const mangled = JSON.stringify({ v: 'two', name: 'Mangled', coins: 3 });
+    localStorage.setItem(KEY, mangled);
+    expect(load().name).toBe('');
+    expect(isReadOnlySave()).toBe(true);
+    save({ coins: 99 });
+    expect(localStorage.getItem(KEY)).toBe(mangled);
+  });
+
+  it('an ordinary save still writes, and the latch clears on reset and on a deliberate import', () => {
+    localStorage.setItem(KEY, JSON.stringify({ v: SAVE_VERSION + 1, name: 'Tablet' }));
+    expect(load().name).toBe('');
+    expect(isReadOnlySave()).toBe(true);
+
+    // importSave() is the grown-up deliberately replacing the blob, so the protection ends with it.
+    reset();
+    localStorage.setItem(KEY, JSON.stringify({ v: SAVE_VERSION + 1, name: 'Tablet' }));
+    load();
+    expect(importSave(JSON.stringify({ ...load(), v: SAVE_VERSION, name: 'Chosen' })), 'a readable code restores').toBe(true);
+    expect(isReadOnlySave(), 'and the latch is cleared by it').toBe(false);
+    save({ coins: 4 });
+    expect(JSON.parse(localStorage.getItem(KEY)!).coins, 'writes resume').toBe(4);
+
+    // reset() removes the blob there was something to protect, so the latch goes with it.
+    reset();
+    expect(isReadOnlySave()).toBe(false);
+    save({ coins: 11 });
+    expect(JSON.parse(localStorage.getItem(KEY)!).coins).toBe(11);
+  });
+
+  it('importSave() still refuses a newer code, unchanged', () => {
+    reset(); save({ name: 'Here', coins: 12 });
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION + 1, name: 'Future' }))).toBe(false);
+    expect(load().name, 'a refused code changes nothing').toBe('Here');
+    expect(load().coins).toBe(12);
   });
 });
