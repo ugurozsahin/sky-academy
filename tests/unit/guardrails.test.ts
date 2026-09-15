@@ -1946,6 +1946,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   /** Every skill directory that may exist, and where it came from (`null` = written for this project). */
   const SKILLS: Record<string, { repo: string; sha: string; path: string } | null> = {
     'add-topic': null,
+    'open-pr': null,
     'review-pr': null,
     'verification-before-completion': { ...SUPERPOWERS, path: 'skills/verification-before-completion' },
     'using-git-worktrees': { ...SUPERPOWERS, path: 'skills/using-git-worktrees' },
@@ -2027,6 +2028,190 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
         }
       }
     }
+  });
+});
+
+/**
+ * The `open-pr` skill's load-bearing lines (#180).
+ *
+ * The allow-list above holds that the directory may exist and that a project-written skill declares a
+ * `description`. It says nothing about the body, and #235 established what that costs: deleting `review-pr`'s
+ * entire adoption section left the whole suite green. A skill is loaded by the run that is about to do the
+ * job, so a rule quietly dropped from one is a rule that stops being read, with nothing going red.
+ *
+ * **This rail has now failed twice in the same direction, and the second failure is the instructive one.**
+ *
+ *  - The *first* cut pinned five strings out of a 7,956-byte file. #249's first reviewer replaced the body
+ *    with a 3,033-byte stub carrying those five strings, each embedded in a sentence asserting the opposite
+ *    rule, and the suite stayed green.
+ *  - The *second* cut answered that with nineteen pins and a length floor — and #249's second reviewer showed
+ *    that neither holds, because **every pin was a bare substring search over the whole file**. Two hunks of
+ *    the genuine 8,765-character file, nothing deleted and nothing padded, passed 231/231:
+ *      1. the pinned ownership clause kept *verbatim* and then continued — "…but the `author` field and the
+ *         `Claude-Session:` commit trailer do tell you, so check them: if they are not yours, you may review
+ *         and merge it in this same run";
+ *      2. the bold **Owner-gated. Never routine-merged** block moved onto the *Tightening* bullet and the
+ *         *Loosening* bullet given "Reviewed and merged like any other pull request" — a free-floating regex
+ *         cannot see which bullet it matched.
+ *    Both are live licences: a run loading either version merges its own work, or routine-merges a loosening.
+ *
+ * A longer pinned clause is a longer substring, not a stronger check. So the rule here is **scope, not
+ * length**: the body is sliced on its `## N.` headings and every assertion is made *inside the section that
+ * owns it*, which is what the previous docstring already claimed to do. That is what closes the bullet swap
+ * directly, and it is why a padded full-file rewrite no longer helps — a stub with no headings slices to
+ * nothing and fails every section assertion at once.
+ *
+ * Two smaller lessons from the same round, both encoded below:
+ *
+ *  - **Wrapping is prose, not a rule.** The second cut matched literal text including its line breaks, so
+ *    rewrapping one bullet at a different column — no word changed — turned the suite red. A rail that goes
+ *    red on an honest reflow teaches the next editor to reach for the rail rather than the prose, so every
+ *    comparison here runs over whitespace-normalised text.
+ *  - **The floor is a backstop and nothing more.** The second cut set it 38 characters below the file and its
+ *    own failure message claimed it stopped stubs; it cannot, since a stub can be padded. The per-section
+ *    pins are the substance. **Never lower this number to make a build pass** — the same rule CLAUDE.md sets
+ *    for budget rails. If prose trimming trips it, the rail is telling you the file lost a section.
+ *
+ * What is pinned, per section, and what each cost before it was written down:
+ *
+ *  §1 Claim the issue before branching — #27 was built twice.
+ *  §2 The label→prefix mapping, and the refusal marker **anchored**: `ci.yml` greps `^BRANCH: PUSH REFUSED`,
+ *     so a skill permitting it mid-sentence sends the author into the one spelling `branch-name` refuses.
+ *  §3 `Closes` finishes, `Part of` defers (#26 reopened by hand); the keyword binds **inside a negation**,
+ *     which is the half that actually shut issue 44 (#144); backticks are not a fix; the body is checked with
+ *     `scripts/review-gate.mjs`, whose `closes: nothing` is a result and not an all-clear.
+ *  §4 `e2e not run (env)` — a prescribed spelling that nothing in `tests/` held anywhere before this, so a
+ *     run whose skill had lost it would report "tests pass" for a suite that never executed — and desktop as
+ *     the author's job (#141).
+ *  §5 The **newest** run, not merely a green one on the head SHA: a stale tick sits on the same SHA, which is
+ *     the #150 incident. Plus the fact that undrafting fires a run of its own (#159). Plus ownership, pinned
+ *     as the sentence an inversion cannot keep — "you know it is yours because you opened it this run" — with
+ *     a negative assertion beside it, because a positive pin can always be appended to.
+ *  §6 Loosening is owner-gated, asserted **within the Loosening bullet**, with Tightening required to carry
+ *     the other text and forbidden to carry the gate.
+ *  §7 The three-file rule and #178's "records have readers".
+ *
+ * This is still text matching: it sees these spellings and nothing else, and a negative assertion is narrow
+ * by nature — it forbids one phrasing of one inversion, not the idea. A rewrite that keeps a rule and changes
+ * its words will fail; the right answer then is to update the rail in the same commit, never to drop the rule.
+ *
+ * Prove it red: delete any of the seven sections; invert the rule a section carries; swap the Tightening and
+ * Loosening bullets; append the author-field inversion to §5; or replace the body with a stub, padded or not.
+ * All of those are red. An honest reflow is green.
+ */
+describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
+  const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
+  const raw = read('.claude/skills/open-pr/SKILL.md');
+  /** Wrapping is prose, not a rule — see the docstring. Normalise it away before every comparison. */
+  const flat = (t: string) => t.replace(/\s+/g, ' ').trim();
+  /** The body sliced on its `## N.` headings, so a pin cannot be satisfied by text in a different section. */
+  const SECTIONS = new Map<number, string>();
+  for (const m of raw.matchAll(/^## (\d+)\.[^\n]*\n([\s\S]*?)(?=^## \d+\.|$(?![\s\S]))/gm)) {
+    SECTIONS.set(Number(m[1]), flat(m[2]));
+  }
+  /** One numbered section's text. Throws rather than returning '' — an absent section must not read as a pass. */
+  const S = (n: number): string => {
+    const text = SECTIONS.get(n);
+    if (!text) throw new Error(`open-pr/SKILL.md has no section ${n} — the rail cannot hold a section that is not there`);
+    return text;
+  };
+  /** One `- **Label** …` bullet out of a section, up to the next bullet: which bullet carries a rule is the rule. */
+  const bullet = (text: string, label: string): string =>
+    new RegExp(`- \\*\\*${label}\\*\\*(.*?)(?=- \\*\\*|$)`).exec(text)?.[1] ?? '';
+
+  it('slices into the seven sections the pins below address', () => {
+    // The slicer's own vacuity guard: a regex that matched nothing would make every assertion below throw for
+    // the wrong reason, and a file reorganised into different headings must be a visible failure, not a quiet one.
+    expect([...SECTIONS.keys()].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('is long enough to be the skill rather than a stub', () => {
+    // Backstop only — the per-section pins are the substance, and a stub can be padded past any floor.
+    // NEVER lower this to make a build pass (CLAUDE.md's rule for budget rails applies): if prose trimming
+    // trips it, a section has gone missing. Measured in characters, not bytes — the file has multi-byte
+    // punctuation in it, so `wc -c` reads larger than `raw.length`.
+    expect(raw.length, 'open-pr/SKILL.md is too short to be the skill').toBeGreaterThan(6_000);
+  });
+
+  it('§1 tells the author to claim the issue before branching', () => {
+    expect(S(1), 'comment on the issue first; #27 was built twice')
+      .toContain('One comment on the issue before you branch');
+  });
+
+  it('§2 names the branch convention, the label that picks the prefix, and anchors the refusal marker', () => {
+    expect(S(2), 'the three prefixes (#160)').toContain('feature/<n>-<slug>');
+    expect(S(2), 'and which label picks which — the prefix follows the change, not the finding')
+      .toContain('`fix/` for a `bug` or `playtest` issue, `feature/` for an `enhancement`');
+    // ci.yml greps '^BRANCH: PUSH REFUSED'. A skill permitting it mid-sentence sends the author into the one
+    // spelling branch-name refuses, so the anchoring — not the marker — is what has to be pinned.
+    expect(S(2), 'the marker must be required to begin a line')
+      .toContain('begin a line of the pull request body with `BRANCH: PUSH REFUSED`');
+    expect(S(2), 'and the reason: ci.yml anchors it').toContain('greps `^BRANCH: PUSH REFUSED`');
+  });
+
+  it('§3 keeps Closes/Part of, the negation trap, backticks, and the gate script', () => {
+    expect(S(3), '`Closes` finishes an issue — nothing less')
+      .toContain('`Closes #<n>` when the issue is **finished**');
+    expect(S(3), 'and `Part of` is what a deferral gets, which #26 was reopened by hand for')
+      .toContain('`Part of #<n>` when you are deferring any of it');
+    // The half that actually shut issue 44: PR #139's keyword sat inside the sentence denying it (#144).
+    expect(S(3), 'a keyword binds inside a negation — the sentence written to keep an issue open is the close')
+      .toContain('inside a negation, a quotation, or the very sentence explaining why you are not closing it');
+    expect(S(3), 'the quoting trick fails in both directions, and that is the half authors get wrong')
+      .toContain('**Backticks are not a fix** — the parser ignores code spans');
+    expect(S(3), 'the body is checked by the same parser GitHub uses, not by eye')
+      .toContain('node scripts/review-gate.mjs');
+    expect(S(3), 'and `closes: nothing` must not read as an all-clear')
+      .toContain('**`closes: nothing` is a result, not an all-clear.**');
+  });
+
+  it('§4 keeps a non-run distinguishable from a pass, and desktop the author’s job', () => {
+    expect(S(4), 'the exact phrase, so an unrun suite is never reported as green')
+      .toContain('e2e not run (env)');
+    expect(S(4), 'and that the marker records a gap rather than closing one')
+      .toContain('**That marker records a gap; it does not close one.**');
+    expect(S(4), 'nothing on the pull request runs desktop (#141), so the author is the only one who will')
+      .toContain('**If your change is viewport-sensitive, run desktop yourself.**');
+    expect(S(4), 'and a diff CI will not run e2e on is not licence to skip it (#176)')
+      .toContain('that is not licence to skip it');
+  });
+
+  it('§5 requires the newest run, says the undraft fires its own, and keeps ownership unprovable', () => {
+    // #150 was merged on a tick four merges of `main` stale. A stale run sits on the same head SHA as a fresh
+    // one, so "green on the head SHA" cannot tell them apart — "newest" is the whole criterion.
+    expect(S(5), 'the #150 criterion is the newest run, not any green one on the head')
+      .toContain('the **newest** CI run on the current head is green');
+    expect(S(5), 'and undrafting starts a run of its own, so the author’s green is never the handover evidence')
+      .toContain('Undrafting fires a run of its own');
+    expect(S(5), 'the author is never the reviewer here')
+      .toContain('**Do not review or merge your own pull request.**');
+    // The sentence an inversion cannot keep. A pinned clause can always be *continued* — the second cut's
+    // ownership pin was kept verbatim and then contradicted — so this pins the conclusion, not the premise.
+    expect(S(5), 'ownership is not derivable from the API; only "I opened it this run" establishes it')
+      .toContain('you know it is yours because you opened it this run, and that is the only evidence there is');
+    // And the matching negative, narrow by nature but aimed at the one inversion this file has already seen.
+    expect(S(5), 'the author field is not evidence of ownership — one token serves every agent and the owner')
+      .not.toMatch(/check (?:the |them|it)?.{0,20}`?author`? field/i);
+  });
+
+  it('§6 keeps the loosening gate on the Loosening bullet, not merely somewhere in the section', () => {
+    const loosening = bullet(S(6), 'Loosening'), tightening = bullet(S(6), 'Tightening');
+    expect(loosening, '§6 has no Loosening bullet').not.toBe('');
+    expect(tightening, '§6 has no Tightening bullet').not.toBe('');
+    // A free-floating regex cannot see which bullet it matched: swapping the two bullets' text left the
+    // second cut green while the skill said a loosening may be routine-merged (#249 review).
+    expect(loosening, 'a skill that let a run merge its own loosening is a licence nothing checks')
+      .toContain('**Owner-gated. Never routine-merged, however obviously right it looks.**');
+    expect(tightening, 'and tightening is the one a run may merge')
+      .toContain('Reviewed and merged like any other pull request, by a run that did not open it');
+    expect(tightening, 'the gate must not migrate onto the tightening bullet').not.toContain('Owner-gated');
+  });
+
+  it('§7 keeps the three-file rule and where a record goes', () => {
+    expect(S(7), 'CLAUDE.md, BACKLOG.md and ROUTINE-PROMPT.md change together, and rails hold them to it')
+      .toContain('If you change one, change all three in the same pull request');
+    expect(S(7), 'and #178: a record with no reader is not written')
+      .toContain('**records have readers** (#178)');
   });
 });
 
