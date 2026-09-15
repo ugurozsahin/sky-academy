@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd } from '../../src/curriculum/maths';
 import type { Difficulty, Question } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
 // Deterministic RNG (mulberry32)
@@ -282,5 +282,145 @@ describe('no-voice curriculum fallbacks (#65)', () => {
         }
       }
     }
+  });
+});
+
+/**
+ * Reception phonics follows the phase order (#14). Sound Hunt always did; `r-sounds`, `r-build`,
+ * `r-capitals` and `r-trace` drew from the whole alphabet at every difficulty, so stage 1 could ask a
+ * phase-2 child for `jam` or offer `z` as a decoy.
+ *
+ * What this pins is the *pool*, not a word list — the bank may grow without touching this test, but a letter
+ * no child at that stage has met cannot appear, as the answer or as a decoy. Both halves matter: the second
+ * is the one the old code got wrong even where the first was accidentally right.
+ *
+ * Prove it red: put `LETTERS` back as the decoy pool in `rLetterSound`, `rCapitals` or `spellQ`'s Reception
+ * call, or drop the `rWords(d)` filter — each turns the phase-2 half red on its own topic. The nesting case
+ * below goes red if the pools are ever made disjoint instead of cumulative.
+ */
+describe('Reception phonics follows the phase order (#14)', () => {
+  const RECEPTION_PHONICS = ['r-sounds', 'r-build', 'r-capitals', 'r-trace'];
+  /** Every letter the child is shown or asked to slice: the answer, the options, and the word on the card. */
+  const lettersOf = (q: Question) => {
+    const card = q.visual?.type === 'word' ? q.visual.text : '';
+    return [...(q.answer + q.options.join('') + card).toLowerCase()].filter(c => /[a-z]/.test(c));
+  };
+
+  it('the pools are cumulative, so no stage is narrower than the one before it', () => {
+    expect(R_LETTERS_P2.length, 'phase 2 is the first fifteen single-letter sounds').toBe(15);
+    // The order itself, not just the count: swapping `r` out for `h` keeps every length and the uniqueness
+    // check green while stage 1 teaches a different fifteen letters than the Little Wandle order we cite.
+    expect(R_LETTERS_P2.join(''), 'Little Wandle / Letters and Sounds phase 2, sets 1-5').toBe('satpinmdgockeur');
+    for (const l of R_LETTERS_P2) expect(R_LETTERS_ALL, `${l} must survive into the wider pool`).toContain(l);
+    // 25, not 26: `qu` is two letters and there is no bare `q` sound, so PHASE2B rightly lists neither.
+    expect(R_LETTERS_ALL.length).toBe(25);
+    expect(R_LETTERS_ALL).not.toContain('q');
+    expect(new Set(R_LETTERS_ALL).size, 'a letter listed in two phases would skew every pick').toBe(25);
+  });
+
+  it.each(RECEPTION_PHONICS)('%s: difficulty 1 uses phase 2 letters only, answer and decoys alike', (id) => {
+    const t = TOPICS.find(x => x.id === id)!;
+    const r = rng(1400);
+    for (let i = 0; i < 400; i++) {
+      const q = t.gen(1, r);
+      for (const c of lettersOf(q))
+        expect(R_LETTERS_P2, `${id} d1 showed "${c}" (${q.prompt} → ${q.answer}), which is not a phase 2 letter`).toContain(c);
+    }
+  });
+
+  it.each(RECEPTION_PHONICS)('%s: difficulties 2 and 3 stay inside the single-letter sounds', (id) => {
+    const t = TOPICS.find(x => x.id === id)!;
+    const r = rng(1401);
+    // r-trace d3 is letter *formation*, which covers all 26 whatever phase the sound belongs to.
+    const pool = (d: Difficulty) => (id === 'r-trace' && d === 3 ? [...'abcdefghijklmnopqrstuvwxyz'] : R_LETTERS_ALL);
+    for (const d of [2, 3] as Difficulty[])
+      for (let i = 0; i < 400; i++) {
+        const q = t.gen(d, r);
+        for (const c of lettersOf(q))
+          expect(pool(d), `${id} d${d} showed "${c}" (${q.prompt} → ${q.answer})`).toContain(c);
+      }
+  });
+
+  /**
+   * The direction the first version of this suite did not test (review of PR #241). `d1 ⊆ d2` is only half of
+   * "nested": it is satisfied just as well by a ramp that never widens, and `rLetters = d === 1 ? P2 : P2` —
+   * every Reception topic stuck on fifteen letters for ever, the whole point of #14 silently gone — left all
+   * 864 green. Reaching *outside* phase 2 is the half that says the ramp still exists.
+   */
+  it.each(RECEPTION_PHONICS)('%s: difficulties 2 and 3 both actually widen past phase 2', (id) => {
+    const t = TOPICS.find(x => x.id === id)!;
+    const r = rng(1403);
+    // Both difficulties, not just d2 — d3 is where the second version of this test was still blind. Pinning
+    // d2 alone leaves `d === 2 ? ALL : P2` green: stage 3 back on the fifteen phase-2 letters while stage 2 is
+    // wide, i.e. stage 3 NARROWER than stage 2, which is the nesting invariant broken in the plainest way.
+    // The containment test above cannot see it either, because P2 ⊆ ALL holds whichever way round they go.
+    for (const d of [2, 3] as Difficulty[]) {
+      const seen = new Set<string>();
+      for (let i = 0; i < 400; i++) for (const c of lettersOf(t.gen(d, r))) seen.add(c);
+      const beyond = [...seen].filter(c => !R_LETTERS_P2.includes(c));
+      expect(beyond.length, `${id} d${d} never left phase 2 — the ramp has stopped widening`).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * The PR's one documented departure from the phase order, and it was held only by prose and by a test
+   * *allowance*: the d2/d3 case permits 26 letters for r-trace but asserted nothing outside the pool was
+   * reachable, so dropping the exception kept the suite green. `q` is the only letter the exception adds —
+   * which is exactly the case the exception is argued from — so `q` is what pins it.
+   */
+  it('r-trace difficulty 3 still reaches `q`, the letter its exception exists for', () => {
+    const t = TOPICS.find(x => x.id === 'r-trace')!;
+    const r = rng(1404);
+    const seen = new Set<string>();
+    for (let i = 0; i < 400; i++) for (const c of lettersOf(t.gen(3, r))) seen.add(c);
+    expect([...seen], 'letter formation covers all 26 — d3 must still offer `q`').toContain('q');
+  });
+
+  /**
+   * The bank is addressed by fixed index, so "three letters" is a correctness invariant and not a style note:
+   * `rLetterSound` reads index 2 for the final sound and index 1 for the medial one. Adding `frog` leaves the
+   * whole suite green and asks a child "which sound does frog end with?" over a `fr_g` card with `o` marked
+   * correct — 117 times in 4 000 draws when I measured it. This PR grew the bank from 26 entries to 34, which
+   * is what makes the trap worth a rail rather than a comment.
+   */
+  it('every word in the CVC bank is exactly three letters — the generators address them by index', () => {
+    expect(CVC.length, 'the bank must be read, not an empty import').toBeGreaterThan(20);
+    for (const [w] of CVC) expect(w, `"${w}" is not a three-letter word; rLetterSound reads index 1 and 2`).toMatch(/^[a-z]{3}$/);
+  });
+
+  /**
+   * `spellQ` gained a `from` parameter in PR #241 and its default is the whole alphabet, because Year 1/2
+   * spelling should keep it. Nothing held it to that: defaulting `from` to the Reception pool silently
+   * narrowed every Y1/Y2 spelling question's decoys and left the suite green.
+   */
+  it('spellQ keeps the whole alphabet for Year 1 — only Reception passes a narrower pool', () => {
+    const t = TOPICS.find(x => x.id === 'y1-spelling')!;
+    const r = rng(1405);
+    // Only the DECOYS can see this. `y1Spelling` d3 takes the spellQ path just half the time, and the other
+    // path passes LETTERS itself; the answer word is a CEW and carries letters beyond phase 2 whatever the
+    // pool is. So: spellQ questions only (they are the ones with a `sequence`), options minus the word's own
+    // letters. The first version of this test asserted over everything and was vacuous — it stayed green
+    // under the very mutation it is named for.
+    const decoys = new Set<string>();
+    let spellQs = 0;
+    for (let i = 0; i < 600; i++) {
+      const q = t.gen(3, r);
+      if (!q.sequence) continue;
+      spellQs++;
+      const inWord = new Set([...q.answer]);
+      for (const o of q.options) if (!inWord.has(o)) decoys.add(o);
+    }
+    expect(spellQs, 'the spellQ path must actually be reached, or this test proves nothing').toBeGreaterThan(50);
+    const beyondP2 = [...decoys].filter(c => !R_LETTERS_P2.includes(c));
+    expect(beyondP2.length, 'Y1 spelling decoys must not be narrowed to the Reception phase-2 pool').toBeGreaterThan(2);
+  });
+
+  it('stage 1 still has enough words to play — the phase filter must not starve it', () => {
+    const t = TOPICS.find(x => x.id === 'r-build')!;
+    const r = rng(1402);
+    const words = new Set<string>();
+    for (let i = 0; i < 400; i++) words.add(t.gen(1, r).answer);
+    // A phase-2-only bank that shrank to a handful would make stage 1 repeat itself long before the stage ends.
+    expect(words.size, 'phase-2-spellable CVC words available at stage 1').toBeGreaterThanOrEqual(12);
   });
 });

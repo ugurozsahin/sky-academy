@@ -5,8 +5,15 @@ import { ri, pick, shuffle, wordQ } from './util';
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
 const VOWELS = ['a', 'e', 'i', 'o', 'u'];
 
-// Phonics word bank: [word, emoji]
-const CVC: [string, string][] = [['cat', '🐱'], ['dog', '🐶'], ['sun', '☀️'], ['bus', '🚌'], ['hat', '🎩'], ['pig', '🐷'], ['cup', '☕'], ['bed', '🛏️'], ['fox', '🦊'], ['bag', '👜'], ['pen', '🖊️'], ['egg', '🥚'], ['hen', '🐔'], ['box', '📦'], ['jam', '🍯'], ['map', '🗺️'], ['bat', '🦇'], ['web', '🕸️'], ['cow', '🐮'], ['leg', '🦵'], ['bug', '🐛'], ['van', '🚐'], ['mug', '🍺'], ['net', '🥅'], ['zip', '🤐'], ['log', '🪵']];
+// Phonics word bank: [word, emoji]. The first block is spellable with phase 2 letters alone, which is what
+// Reception stage 1 draws from (#14) — it is listed first only for reading; nothing depends on the order.
+//
+// EVERY ENTRY MUST BE EXACTLY THREE LETTERS, and a rail in tests/unit/curriculum.test.ts holds it there.
+// `rLetterSound` addresses the sounds by fixed index — 2 for the final sound, 1 for the medial — so a
+// four-letter word here does not merely read oddly, it ships a WRONG ANSWER: `frog` at difficulty 2 asks
+// "which sound does frog end with?", shows `fr_g` and marks `o` correct. Exported for that rail alone.
+export const CVC: [string, string][] = [['cat', '🐱'], ['dog', '🐶'], ['sun', '☀️'], ['pig', '🐷'], ['cup', '☕'], ['pen', '🖊️'], ['egg', '🥚'], ['map', '🗺️'], ['mug', '🍺'], ['net', '🥅'], ['tap', '🚰'], ['pot', '🍲'], ['pin', '📌'], ['rug', '🧶'], ['nut', '🥜'], ['cap', '🧢'], ['rat', '🐀'], ['pan', '🍳'],
+  ['bus', '🚌'], ['hat', '🎩'], ['bed', '🛏️'], ['fox', '🦊'], ['bag', '👜'], ['hen', '🐔'], ['box', '📦'], ['jam', '🍯'], ['bat', '🦇'], ['web', '🕸️'], ['cow', '🐮'], ['leg', '🦵'], ['bug', '🐛'], ['van', '🚐'], ['zip', '🤐'], ['log', '🪵']];
 const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['moth', 'th', '🦋'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['coin', 'oi', '🪙'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
 const DIGRAPHS = ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh', 'qu', 'ck'];
 
@@ -42,6 +49,34 @@ export const SPLIT: Sound[] = [   // split digraphs (phase 5)
   ['a-e', 'ai', 'middle', ['cake', 'make', 'lake', 'gate']], ['i-e', 'igh', 'middle', ['bike', 'kite', 'time', 'line']], ['o-e', 'oa', 'middle', ['bone', 'home', 'nose', 'rope']], ['u-e', 'oo', 'middle', ['cube', 'tube', 'June', 'flute']],
 ];
 const LETTER_SOUNDS = [...PHASE2, ...PHASE2B];
+
+/**
+ * Reception letter pools, in the Little Wandle / Letters and Sounds order (#14).
+ *
+ * Derived from the Sound Hunt banks above rather than written out again, and that is the point: `PHASE2` and
+ * `PHASE2B` are the single home of the phase order, so a letter moved between phases moves for every
+ * Reception topic at once. Sound Hunt already walked the order; `r-sounds`, `r-build`, `r-capitals` and
+ * `r-trace` drew from the whole alphabet at every difficulty, so stage 1 could ask a phase-2 child for `jam`
+ * or offer `z` as a decoy — a ramp orthogonal to the one the child is actually being taught on.
+ *
+ * `qu` is dropped: these pools answer "which letter", and `qu` is two. That also means the full pool is 25
+ * letters, not 26 — there is no bare `q` sound in English, and `PHASE2B` is right not to list one.
+ */
+const singles = (ss: Sound[]) => ss.map(s => s[0]).filter(g => g.length === 1);
+export const R_LETTERS_P2 = singles(PHASE2);                              // phase 2: the first fifteen
+// Deduplicated at construction rather than only asserted in a test: a letter listed in two phases would skew
+// every `pick` towards it, and this is where the nesting invariant already lives.
+export const R_LETTERS_ALL = [...new Set([...R_LETTERS_P2, ...singles(PHASE2B)])];   // every single-letter sound
+/**
+ * The phase a Reception difficulty draws from. Deliberately nested (d1 ⊆ d2 = d3) rather than disjoint: a
+ * child at stage 3 has not stopped knowing the phase-2 letters, and a pool that dropped them would make the
+ * later stages *narrower*. The existing ramps — where the sound sits, how many decoys, upper case — are
+ * unchanged and stack on top of this one.
+ */
+const rLetters = (d: 1 | 2 | 3) => (d === 1 ? R_LETTERS_P2 : R_LETTERS_ALL);
+/** The CVC words spellable with the letters that difficulty has met. Answer and decoys both obey it. */
+const rWords = (d: 1 | 2 | 3) => { const pool = rLetters(d); return CVC.filter(([w]) => [...w].every(c => pool.includes(c))); };
+
 /** Sound Hunt: three keyword words are spoken (never shown); slice the grapheme for the sound they share. */
 function soundQ(rng: Rng, pool: Sound[], distractPool: Sound[], decoys: number): Question {
   const [g, ph, pos, words] = pick(rng, pool);
@@ -58,9 +93,12 @@ export const Y2_CEW = ['door', 'floor', 'poor', 'because', 'find', 'kind', 'mind
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 /** Spelling by slicing letters in order (sequence question). */
-function spellQ(rng: Rng, word: string, hintEmoji?: string, decoys = 3): ReturnType<Generator> {
+// `from` is the letter pool the decoys are drawn from (#14). It defaults to the whole alphabet, which is
+// right for Year 1/2 spelling; Reception passes its phase pool, because a decoy the child has not been
+// taught is the same fault as an answer they have not been taught.
+function spellQ(rng: Rng, word: string, hintEmoji?: string, decoys = 3, from: string[] = LETTERS): ReturnType<Generator> {
   const letters = word.split('');
-  const pool = LETTERS.filter(l => !letters.includes(l));
+  const pool = from.filter(l => !letters.includes(l));
   const uniq = [...new Set(letters)];
   const ds = shuffle(rng, pool).slice(0, Math.max(1, Math.min(decoys, 10 - uniq.length)));
   return { prompt: hintEmoji ? `${hintEmoji}  Spell it!` : `Spell: ${word}`, say: `Spell the word ${word}`, answer: word, sequence: letters, options: shuffle(rng, [...uniq, ...ds]), visual: { type: 'word', text: word.replace(/./g, '_ ').trim(), emoji: hintEmoji }, hint: 'Slice the letters in order', listen: word };
@@ -115,26 +153,31 @@ function gapQ(rng: Rng, word: string, idx: number, distractPool: string[], emoji
 }
 
 // ---------- Reception ----------
+// The word and the decoys both come from the difficulty's phase pool (#14). The middle-sound question keeps
+// VOWELS as its decoys, which needs no filtering: all five vowels are phase 2 set 1–4 letters already.
 const rLetterSound: Generator = (d, rng) => {
-  const [w, e] = pick(rng, CVC);
-  if (d === 1) return gapQ(rng, w, 0, LETTERS, e, `${w}. Which sound does ${w} start with?`);
-  if (d === 2) return gapQ(rng, w, 2, LETTERS, e, `${w}. Which sound does ${w} end with?`);
+  const [w, e] = pick(rng, rWords(d));
+  if (d === 1) return gapQ(rng, w, 0, rLetters(d), e, `${w}. Which sound does ${w} start with?`);
+  if (d === 2) return gapQ(rng, w, 2, rLetters(d), e, `${w}. Which sound does ${w} end with?`);
   return gapQ(rng, w, 1, VOWELS, e, `${w}. Which sound is in the middle of ${w}?`);
 };
 const rCapitals: Generator = (d, rng) => {
-  const l = pick(rng, LETTERS);
+  const l = pick(rng, rLetters(d));
   const upper = rng() < 0.5;
   const shown = upper ? l.toUpperCase() : l;
   const ans = upper ? l : l.toUpperCase();
-  const ds = shuffle(rng, LETTERS.filter(x => x !== l)).slice(0, d === 1 ? 2 : 3).map(x => (upper ? x : x.toUpperCase()));
+  const ds = shuffle(rng, rLetters(d).filter(x => x !== l)).slice(0, d === 1 ? 2 : 3).map(x => (upper ? x : x.toUpperCase()));
   return wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown }, say: `Find the ${upper ? 'small' : 'capital'} letter that matches ${l}`, hint: upper ? 'Find the lower-case letter' : 'Find the capital letter' });
 };
 const rBuild: Generator = (d, rng) => {
-  const [w, e] = pick(rng, CVC);
-  return spellQ(rng, w, e, d === 1 ? 2 : d === 2 ? 3 : 4);
+  const [w, e] = pick(rng, rWords(d));
+  return spellQ(rng, w, e, d === 1 ? 2 : d === 2 ? 3 : 4, rLetters(d));
 };
+// Tracing is letter *formation*, so difficulty 3 keeps the whole alphabet — a child learns to write `q` and
+// the handwriting ELG covers all 26, whatever phase the sound belongs to. Stages 1 and 2 still follow the
+// phase order, so the letters a child traces first are the ones they are being taught to read first.
 const rTrace: Generator = (d, rng) => {
-  const l = pick(rng, LETTERS);
+  const l = pick(rng, d === 3 ? LETTERS : rLetters(d));
   const upper = d === 3 ? rng() < 0.5 : d === 2 ? rng() < 0.25 : false;
   const t = upper ? l.toUpperCase() : l;
   return { prompt: `Trace the letter ${t}`, say: `Trace the letter ${l}`, answer: t, options: [t], visual: { type: 'word', text: t } };

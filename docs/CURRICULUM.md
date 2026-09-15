@@ -14,12 +14,12 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-counton | Numerical Patterns: count beyond 20 | what comes next |
 | r-order | Numerical Patterns: compare/order | slice 3 numbers smallest→biggest |
 | r-balance | Number: composition, equal amounts | balance scales: objects on one pan, ? on the other (d3: `a = b + ?`) |
-| r-sounds | Literacy Writing: sounds→letters | initial/final/medial sound of CVC words |
+| r-sounds | Literacy Writing: sounds→letters | initial/final/medial sound of CVC words; the word and the decoys follow the phase order (d1 phase 2 letters, d2–3 all single-letter sounds) |
 | r-soundhunt | Word Reading: say a sound for each letter | Sound Hunt: three keyword words are spoken, nothing to read; slice the grapheme (d1 phase 2 sets 1–4, d2 all single letters + qu, d3 phase 3 digraphs/trigraphs); sound-alike graphemes never appear as decoys |
-| r-capitals | Word Reading: letters | match A↔a |
-| r-build | Writing: spell by sounds | slice letters in order (CVC) |
+| r-capitals | Word Reading: letters | match A↔a; letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
+| r-build | Writing: spell by sounds | slice letters in order (CVC); word and decoy letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
 | r-sentence | Writing: simple sentences | Story Sentences: sentence shown + read aloud, slice the words in order (3 → 6 words, 1–2 decoys) |
-| r-trace | Writing: form letters | trace on canvas |
+| r-trace | Writing: form letters | trace on canvas; d1–2 follow the phase order, d3 is the whole alphabet — formation covers all 26 whatever phase the sound is in |
 
 ## Year 1 — 6 q/stage, 3 lives
 y1-bonds (bonds within 20) · y1-add / y1-sub (within 20, incl. 0) · y1-missing (missing-number problems) · y1-doubles · y1-skip (count in 2s/5s/10s) · y1-moreless (to 100) · y1-words (1–20 in words) · y1-half (½, ¼ of quantities) · y1-arrays (M&D via arrays) · y1-coins (recognise coins) · y1-time (o'clock, half past) · y1-order (order to 20) · y1-line (number line, hidden number) · y1-shapes (2-D shapes, sides) · y1-position (direction of an arrow, pick the arrow, whole/half/quarter turns clockwise & anti-clockwise) · y1-length (compare length & height, cm read from the hint) · y1-mass (heavier/lighter, g) · y1-capacity (fuller/emptier, ml) · y1-months (day & month order, days in a week/weekend, seasons) · y1-balance (= as balance: `a + b = ? + c`, `a − b = ? + c`, `a + b = ? − c` within 20)
@@ -30,7 +30,8 @@ y2-pv (tens/ones) · y2-compare (< > =) · y2-skip (2,3,5,10 incl. backwards) ·
 Writing: y2-spelling (64 CEW) · y2-contractions · y2-suffix (-ful -less -ness -ly -ment) · y2-homophones · y2-punct (commas in lists, possessive apostrophe) · y2-sentence (Story Sentences: 5–7 words, expanded noun phrases, `because`/`when`/`if`, commands & exclamations; d1 shown, d2–3 listen & build) · y2-trace (words)
 
 ## Difficulty convention
-d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms. Missions have 5 stages (Apprentice, Warrior, Master, Grandmaster, Legend); each year maps stages → (difficulty, speed) in `YEARS[].diffs/speeds`.
+d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
+Reception phonics adds a second, cumulative dimension (#14): the letters a difficulty may use follow the Little Wandle / Letters and Sounds order — d1 phase 2 only, d2–3 every single-letter sound — for the answer **and** the decoys. The pools are derived from the Sound Hunt banks in `writing.ts`, so the phase order has one home. Missions have 5 stages (Apprentice, Warrior, Master, Grandmaster, Legend); each year maps stages → (difficulty, speed) in `YEARS[].diffs/speeds`.
 
 ## Not yet covered (candidates)
 Statistics (Y2 pictograms, tally, block diagrams) — wants a drawn `visuals.ts` case, so left for a follow-up on #8 (position/direction shipped as y1-position/y2-position using directional-arrow emoji, no drawn art); free sentence composition (Story Sentences covers word order only), handwriting joins, phonics phase-by-phase sequencing as a mission order (Sound Hunt covers phases 2–5 by ear), Year 3+.
