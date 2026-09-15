@@ -146,6 +146,40 @@ your first finding and the only one you can report.
    an open issue is not a pulse, a readable recent timestamp is. Put the age you observed in your own pulse
    (`board pulse 14 min`). It is not yours to fix and you cannot run the sync; tell the owner once.
 
+9. **Can an APK still be built — on `main`?** `GET /repos/ugurozsahin/sky-academy/actions/workflows/android.yml/runs?branch=main&per_page=1`.
+   Two filters, and both are load-bearing.
+   **The workflow filter has to be the path, not a query parameter.** `/actions/runs?workflow=android.yml`
+   looks plausible and is wrong: that endpoint takes `actor`, `branch`, `event`, `status`, `created`,
+   `head_sha`, `check_suite_id` and `exclude_pull_requests`, and **silently ignores anything else**, so
+   `?workflow=` hands you the newest run in the whole repository — here, with a routine every two hours,
+   almost always a `CI` or `Review gate` run.
+   **The branch filter is what makes the answer about `main`.** This workflow's `pull_request:` trigger is its
+   only frequent one, so an unfiltered list is dominated by pull-request runs on somebody's branch. Without
+   `?branch=main` the newest run is usually a green pull request sitting on top of a red `main` — which is not
+   hypothetical: on 2026-09-15 the two newest runs were green pull-request builds of the very fix for #236,
+   above the `workflow_dispatch` failure that was `main`'s actual state.
+   Confirm both, because a dropped or mistyped filter is exactly the failure this check is made of: **if the
+   run's `name` is not `Android APK`, or its `head_branch` is not `main`, that is a finding in its own right**,
+   not a pass. A `pull_request` run builds somebody's merge ref and says nothing about `main`.
+   **`success` is the pass.** A `null` conclusion with `queued` or `in_progress` is not a finding while it is
+   young — but bound it the way check 1 does: this workflow's `timeout-minutes` is 30, so anything still
+   `null` after ~45 minutes is stuck, and a run that never leaves `queued` is what an exhausted Actions quota
+   looks like. Everything else is a finding: `failure`, and also `timed_out`, `startup_failure` (what
+   malformed workflow YAML produces — in a file agents edit), `cancelled`, `action_required`, `stale` and
+   `neutral`.
+   Then read `head_sha` against `main`'s tip, as check 1 does: a run that belongs to an older commit is not a
+   finding on that ground, but the green you are reading is not about the current tip — **say which commit it
+   covers**, and if that run is a *failure* on a commit `main` has since moved past, say so in the issue, because
+   the fix may already be in and one `workflow_dispatch` on `main` would settle it.
+   Two things that are **not** findings: an old run, because nobody is obliged to build an APK (put its age in
+   your pulse and leave it); and an empty list, which means the workflow has never run on `main` — one line to
+   the owner, not an issue.
+   This check exists because that workflow runs only on `workflow_dispatch`, a `v*` tag, or a pull request
+   touching the Android paths: on an ordinary week nothing runs it on `main`, so a break sits there silently
+   until the owner wants an APK on the tablet — which is exactly how #236 was found, by him, at the moment he
+   needed the build. Reading it costs no Actions minutes. Name the run's URL and the failing step in the
+   issue, since the cause is usually in a third-party action's output rather than in our code.
+
 ## Reporting
 
 **A clean run is silent.** Report nothing to the owner, open nothing, write nothing — a watchdog that speaks

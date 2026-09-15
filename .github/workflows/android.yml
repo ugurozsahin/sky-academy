@@ -30,7 +30,15 @@ jobs:
         run: npm run build
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
+      # `packages` is named explicitly, and that is the point of naming it (#236). Left to its default the
+      # action asks sdkmanager for `tools platform-tools`, and `tools` is the retired legacy SDK Tools
+      # package: Google removed it from the repository, so every APK build died on "Failed to find package
+      # 'tools'" — a third-party default deciding what we install, changing under us, with nothing here to
+      # read. The platform and build-tools are deliberately NOT listed: AGP downloads the ones
+      # android/variables.gradle asks for (compileSdkVersion) once this step has accepted the licences, and
+      # a list here would be a second place to keep in step with that file.
       - uses: android-actions/setup-android@v3
+        with: { packages: 'platform-tools' }
       - uses: gradle/actions/setup-gradle@v4
       - name: Copy the web build into the Android project
         run: npx cap sync android

@@ -990,6 +990,7 @@ describe('guard rails', () => {
       expect(bad, `these expressions always return their right-hand side:\n${bad.join('\n')}`).toHaveLength(0);
     });
 
+
     // #176's other half, and the reason it is a tightening rather than only a saving: a pull request used to
     // be able to produce NO `CI` check at all, which the merge rules then had to carve out as an acceptable
     // absence sitting next to "a missing check is a red light". The guard rails in this very file read
@@ -1008,6 +1009,108 @@ describe('guard rails', () => {
       expect(block, 'a docs-only pull request must still report a CI check — filter the e2e step, not the ' +
         'workflow (#176)').not.toMatch(/paths-ignore/);
     });
+  });
+
+  // #236: every "Android APK" run failed at the SDK step — `Warning: Failed to find package 'tools'`, then
+  // sdkmanager exit 1 — because `android-actions/setup-android` was called with no inputs and its DEFAULT is
+  // `packages: 'tools platform-tools'`. `tools` is the retired legacy SDK Tools package; Google removed it
+  // from the repository and nothing here said otherwise. Nothing in this repository had changed.
+  //
+  // What this rail can and cannot do, stated plainly: it could not have predicted Google's retirement, and it
+  // is not a build. What it catches is the shape that made us vulnerable — an input we do not control, left to
+  // a third party's default — plus the retired name coming back. The workflow runs only on `workflow_dispatch`,
+  // a `v*` tag, or a pull request touching the Android paths, so nothing else would tell us it is broken until
+  // someone wants an APK; the watchdog's check on the last run's conclusion (docs/WATCHDOG-PROMPT.md) is the
+  // other half. Prove it red in EVERY spelling, not the convenient one — two earlier versions of this rail
+  // were green for some of these, and each row below is #236 restored verbatim, so each must fail:
+  //     the `with:` line dropped entirely (the original bug)
+  //     with: { packages: 'tools platform-tools' }
+  //     with: { packages: "tools platform-tools" }
+  //     with: { packages: 'tools platform-tools' }   # a trailing comment
+  //     with: { packages: "tools platform-tools", accept-android-sdk-licenses: true }
+  //     with:
+  //       packages: tools platform-tools
+  //     with:
+  //       packages: tools platform-tools   # a trailing comment
+  //     with: { packages: '' }                       — installs nothing
+  // And these must stay GREEN, or the rail is a false alarm on a correct workflow:
+  //     with: { packages: 'platform-tools' }   ·   the same double-quoted   ·   the same with a trailing comment
+  //     with: { packages: "platform-tools", accept-android-sdk-licenses: true }
+  //     with:
+  //       packages: platform-tools
+  it('the Android SDK step names its packages, and never the retired `tools` (#236)', () => {
+    const yml = workflow('android.yml');
+    expect(yml.length, 'android.yml must be read, not an empty file').toBeGreaterThan(500);
+    const lines = yml.split('\n').filter(l => !l.trim().startsWith('#'));
+    // EVERY setup-android step, not the first: a second one added later would install whatever it liked.
+    const steps = lines.map((l, i) => [l, i] as const)
+      .filter(([l]) => /uses:\s*android-actions\/setup-android@/.test(l)).map(([, i]) => i);
+    expect(steps.length, 'the APK build must still set the Android SDK up through the action this rail reads')
+      .toBeGreaterThan(0);
+    for (const at of steps) {
+    // The step's own `with:` block: the lines under it, up to the next step (`- uses:` / `- name:` / `- run:`).
+    const body = [];
+    for (const line of lines.slice(at + 1)) { if (/^\s*-\s/.test(line)) break; body.push(line); }
+    // The key itself — `(?:\{\s*)?packages` — so a sibling like `extra-packages:` is not read as this one.
+    const withLine = body.find(l => /^\s*(?:with:\s*\{\s*)?packages\s*:/.test(l));
+    expect(withLine, "name `packages` on the step — the action's default asks for the retired `tools`").toBeTruthy();
+    // End the value where YAML ends it, rather than taking the rest of the line and scrubbing it. Two earlier
+    // versions of this line were the same bug as #236 itself, one level up — an input that could not be read,
+    // degraded into a pass: first `'([^']*)'` with `?? ''`, which let a double-quoted or block-form list
+    // extract nothing; then a strip-and-trim chain whose brace removal ran before the comment removal, so a
+    // trailing `# comment` left a quote welded to the first token and `'tools` no longer equalled `tools`.
+    // A quoted scalar is read first (a space inside quotes is not a terminator), otherwise the value runs to
+    // the flow map's `,` or `}`, or to a `#`. Anything that does not then look like a plain package list is
+    // RED — never scrubbed into something assertable.
+    const m = /packages\s*:\s*(?:'([^']*)'|"([^"]*)"|([^,}#]*))/.exec(withLine!);
+    expect(m, 'this rail must be able to read the packages value; unreadable is red, never a pass').toBeTruthy();
+    const asked = (m![1] ?? m![2] ?? m![3] ?? '').trim();
+    expect(asked, 'keep `packages` a plain space-separated list this rail can read — and not empty, which installs nothing')
+      .toMatch(/^[A-Za-z0-9][A-Za-z0-9;._\- ]*$/);
+    // What must be there, as well as what must not: `packages: ''` installs nothing and would otherwise be green.
+    expect(asked, 'the step must still ask for the package the build needs')
+      .toContain('platform-tools');
+    // Word-boundary matched on purpose: `platform-tools` is the package we do want, and a plain `includes`
+    // would read it as the retired one and go red on a correct workflow.
+    expect(asked.split(/\s+/).filter(Boolean), '`tools` was retired by Google; sdkmanager cannot resolve it')
+      .not.toContain('tools');
+    }
+  });
+
+  // #236 review: nothing pinned the watchdog's check 9, so deleting it left the suite green — and that check
+  // is the only thing that would notice a *future* APK break of a different cause, since the rail above is a
+  // text check and not a build. Every other watchdog rule in this file is held by a rail that quotes its
+  // wording; this is check 9's.
+  it('the watchdog reads the APK workflow through the per-workflow endpoint, and judges every conclusion (#236)', () => {
+    // Read from disk like the other prompt rails: Vite's glob covers `/src/**` only, and `docs/` is not in it.
+    const text = readFileSync(new URL('../../docs/WATCHDOG-PROMPT.md', import.meta.url), 'utf8');
+    expect(text.length, 'the watchdog prompt must be read, not an empty file').toBeGreaterThan(1000);
+    // Assert against CHECK 9's own slice, not the whole document: `cancelled` also appears in check 1, so a
+    // document-wide search let check 9's conclusion list be gutted while riding on its neighbour — and it let
+    // the whole check be relocated verbatim under a "retired checks" heading with every assertion still green.
+    // Inside the "## The checks" section, not merely somewhere in the file: a check moved verbatim under a
+    // "retired checks" heading keeps its number and its wording, and a document-wide search reads as green.
+    const checks = text.slice(text.indexOf('\n## The checks'));
+    const section = checks.slice(0, checks.indexOf('\n## ', 1));
+    expect(section.length, 'the checks section must be read, not an empty slice').toBeGreaterThan(2000);
+    const at = section.indexOf('9. **Can an APK still be built');
+    expect(at, 'check 9 must exist, in the checks a run performs — it is the only thing watching the APK')
+      .toBeGreaterThan(0);
+    const check9 = section.slice(at);
+    expect(check9, 'and it must be about main, not about whichever branch ran last')
+      .toMatch(/on `main`\?/);
+    expect(check9, 'read through the per-workflow endpoint, filtered to main')
+      .toContain('/actions/workflows/android.yml/runs?branch=main');
+    expect(check9, 'never `?workflow=`, which that endpoint ignores — it returns the newest run in the repository')
+      .toMatch(/`\/actions\/runs\?workflow=android\.yml`\n   looks plausible and is wrong/);
+    expect(check9, "both filters must be confirmed on the run itself — a dropped one is this check's own failure mode")
+      .toMatch(/if the\n   run's `name` is not `Android APK`, or its `head_branch` is not `main`/);
+    expect(check9, '`success` is the pass — `failure` alone would wave through timed_out and startup_failure')
+      .toMatch(/\*\*`success` is the pass\.\*\*/);
+    for (const conclusion of ['timed_out', 'startup_failure', 'cancelled', 'action_required', 'stale', 'neutral'])
+      expect(check9, `${conclusion} must be named as a finding, not left to the reader`).toContain(conclusion);
+    expect(check9, 'and a run stuck at null must be bounded, as check 1 bounds it — a permanent queue is a dead quota')
+      .toMatch(/45 minutes/);
   });
 });
 
