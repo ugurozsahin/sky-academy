@@ -130,3 +130,64 @@ describe('clockSVG — hand angles (#43)', () => {
     expect(h).toContain('y2="18.0"');                         // 50 - 32·cos(0°)
   });
 });
+
+/**
+ * Y2 statistics charts (#8). The drawing *is* the data for this topic, so each row must show its own count:
+ * a pictogram divides by the key, a tally groups in fives, a block diagram draws one block each.
+ *
+ * Prove it red: drop the `/ each` from the pictogram row, or the gate-stroke class from the fifth tally mark.
+ */
+describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
+  const rows = [{ label: '🍎 apples', n: 6 }, { label: '🍌 bananas', n: 4 }, { label: '🍓 strawberries', n: 2 }];
+
+  /** Symbols per row, in order — an aggregate count cannot see a row drawn with its neighbour's data. */
+  const perRow = (html: string, re: RegExp) => html.split('class="chart-row"').slice(1).map(seg => (seg.match(re) ?? []).length);
+
+  it('a pictogram draws n / each symbols per row and states its key', () => {
+    const h = renderVisual({ type: 'chart', kind: 'pictogram', rows, icon: '⭐', each: 2 });
+    // Per row, not summed: 6/4/2 with a key of 2 is 3/2/1, and shifting a row's data past its neighbour
+    // keeps the total at 6 while making every question in the topic unanswerable (#8 review).
+    expect(perRow(h, /class="pic"/g)).toEqual([3, 2, 1]);
+    expect(h).toContain('1 ⭐ = 2');
+    // A key of one is the absence of a key, not the sentence "1 ⭐ = 1".
+    expect(renderVisual({ type: 'chart', kind: 'pictogram', rows, icon: '⭐', each: 1 })).not.toContain('class="key"');
+  });
+
+  it('a key it cannot honour draws one symbol per child rather than rounding to a number nobody has', () => {
+    // `Visual` is public and `each` is an unconstrained number on it. Rounding used to invent the data:
+    // n=7 with a key of 2 drew 4 symbols — 8 children — for a question whose answer is 7.
+    const odd = [{ label: 'a', n: 7 }];
+    expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, each: 2 }), /class="pic"/g)).toEqual([7]);
+    expect(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, each: 2 })).not.toContain('class="key"');
+    // And a key of zero used to throw RangeError out of renderVisual, aborting the card before its bubbles.
+    for (const each of [0, -2, 1.5]) {
+      expect(() => renderVisual({ type: 'chart', kind: 'pictogram', rows, each }), `each=${each}`).not.toThrow();
+      expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows, each }), /class="pic"/g)).toEqual([6, 4, 2]);
+    }
+  });
+
+  it('a tally groups in fives, and the fifth mark is the gate stroke rather than a fifth upright', () => {
+    const h = renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: '🐶 dogs', n: 7 }] });
+    expect(count(h, /class="tal five"/g)).toBe(1);             // one complete gate
+    expect(h).toContain('<span class="tal five">||||</span>'); // four uprights; the stroke is drawn in CSS
+    expect(h).toContain('<span class="tal">||</span>');        // and the remaining two
+    expect(count(renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'x', n: 10 }] }), /class="tal five"/g)).toBe(2);
+    expect(renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'x', n: 5 }] })).not.toContain('<span class="tal">');
+  });
+
+  it('a block diagram draws one block per child', () => {
+    const h = renderVisual({ type: 'chart', kind: 'block', rows });
+    expect(perRow(h, /class="blk"/g)).toEqual([6, 4, 2]);
+    expect(count(h, /class="chart-row"/g)).toBe(3);
+  });
+
+  it('a tally draws each row its own marks, not the chart total', () => {
+    const h = renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'a', n: 7 }, { label: 'b', n: 3 }] });
+    expect(perRow(h, /class="tal five"/g)).toEqual([1, 0]);
+    expect(perRow(h, /class="tal"/g)).toEqual([1, 1]);
+  });
+
+  it('escapes the category label rather than trusting it as markup', () => {
+    expect(renderVisual({ type: 'chart', kind: 'block', rows: [{ label: '<b>x</b>', n: 1 }] })).toContain('&lt;b&gt;');
+  });
+});

@@ -286,6 +286,78 @@ describe('no-voice curriculum fallbacks (#65)', () => {
 });
 
 /**
+ * Y2 statistics (#8). The generic suite checks the answer is among the options and in range, but it cannot
+ * know that the *chart* shows that answer — and a chart that disagrees with its question is the whole way
+ * this topic can be wrong while looking right. So re-derive every answer from the visual's own data.
+ *
+ * Prove it red: make `counts` in `y2Stats` one bigger than the row it draws, or drop the multiple-of-`each`
+ * rule for a pictogram — both leave the generic suite green.
+ */
+describe('Charts & Tallies: the chart shows the number the question asks for (#8)', () => {
+  const t = TOPICS.find(x => x.id === 'y2-stats')!;
+  /** Difficulty is the topic's whole progression, so it is pinned to the chart and to the questions asked. */
+  const WANT_KIND = { 1: 'tally', 2: 'pictogram', 3: 'block' } as const;
+  const WANT_ASKS = { 1: ['one'], 2: ['one', 'total'], 3: ['total', 'more', 'most'] } as const;
+  const shapeOf = (prompt: string) => prompt.startsWith('How many more') ? 'more'
+    : prompt.startsWith('How many children') ? 'total'
+    : prompt.startsWith('Which did') ? 'most' : 'one';
+  it.each([1, 2, 3] as Difficulty[])('difficulty %s: every answer is re-derivable from the rows drawn', (d) => {
+    const r = rng(500 + d);
+    const shapesSeen = new Set<string>();
+    for (let i = 0; i < 300; i++) {
+      const q = t.gen(d, r);
+      expect(q.visual?.type, q.prompt).toBe('chart');
+      const v = q.visual as Extract<Question['visual'], { type: 'chart' }>;
+      expect(v.rows.length).toBe(3);
+      // The half the first version of this block was missing: every assertion below re-derives the answer
+      // from the visual itself, which any internally consistent chart satisfies — including a d1 tally
+      // returned to a d3 caller. Relating `d` to what is actually served is what catches that (#8 review).
+      expect(v.kind, `d${d} must serve a ${WANT_KIND[d]}`).toBe(WANT_KIND[d]);
+      expect(WANT_ASKS[d], `d${d} must not ask "${q.prompt}"`).toContain(shapeOf(q.prompt));
+      shapesSeen.add(shapeOf(q.prompt));
+      for (const row of v.rows) {
+        expect(row.n, `${q.prompt} — a count must be a positive whole number`).toBeGreaterThan(0);
+        // A block diagram draws one block per child, so the row length is a layout budget, not just a number:
+        // raising the roll to 30 would run a row off a phone and nothing else would notice.
+        if (v.kind === 'block') expect(row.n, 'a block row must stay short enough to fit a phone').toBeLessThanOrEqual(10);
+      }
+      // The pictogram symbol must not be one of the categories it is counting.
+      if (v.kind === 'pictogram') for (const row of v.rows) expect(row.label).not.toContain(v.icon);
+      // A pictogram draws n / each symbols: a count that is not a whole multiple of the key draws a lie.
+      if (v.kind === 'pictogram') for (const row of v.rows) expect(row.n % (v.each ?? 1), `${q.prompt} key=${v.each}`).toBe(0);
+      else expect(v.each ?? 1, 'only a pictogram has a key').toBe(1);
+
+      const rowFor = (icon: string) => v.rows.find(x => x.label.startsWith(icon))!;
+      let expected: string;
+      let m: RegExpMatchArray | null;
+      if (q.prompt === 'How many children altogether?') expected = String(v.rows.reduce((a, b) => a + b.n, 0));
+      else if ((m = q.prompt.match(/^How many more (\S+) than (\S+)\?$/))) {
+        const a = rowFor(m[1]).n, b = rowFor(m[2]).n;
+        // Strict: "how many more" is re-rolled off an equal pair, so it is never negative *and* never zero.
+        // The first version let equality through and answered 0 in 11.6% of d3 `more` draws, while treating
+        // the same degenerate data as an emergency in `most` — two branches, opposite treatment (#8 review).
+        expect(a, q.prompt).toBeGreaterThan(b);
+        expected = String(a - b);
+      } else if (q.prompt === 'Which did most children choose?') {
+        const top = Math.max(...v.rows.map(x => x.n));
+        expect(v.rows.filter(x => x.n === top).length, 'a tie would make two options correct').toBe(1);
+        expected = v.rows.find(x => x.n === top)!.label.split(' ').slice(1).join(' ');
+      } else {
+        m = q.prompt.match(/^How many chose (\S+)\?$/);
+        expect(m, `unrecognised prompt shape: ${q.prompt}`).not.toBeNull();
+        expected = String(rowFor(m![1]).n);
+      }
+      expect(q.answer, q.prompt).toBe(expected);
+    }
+    // Containment alone ("the ask is allowed") is satisfied by a difficulty that quietly stops asking most of
+    // what it promises — deleting `more` and `most` from d3, the whole of the stretch, left the suite green.
+    // Coverage is what pins the progression rather than merely permitting it (#8 review).
+    expect([...shapesSeen].sort(), `d${d} must actually ask all of ${WANT_ASKS[d].join(', ')} in 300 draws`)
+      .toEqual([...WANT_ASKS[d]].sort());
+  });
+});
+
+/**
  * Reception phonics follows the phase order (#14). Sound Hunt always did; `r-sounds`, `r-build`,
  * `r-capitals` and `r-trace` drew from the whole alphabet at every difficulty, so stage 1 could ask a
  * phase-2 child for `jam` or offer `z` as a decoy.

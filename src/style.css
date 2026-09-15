@@ -833,6 +833,18 @@ img { -webkit-user-drag: none; }
 .frac { width: 110px; height: 110px; } .frac path { fill: #ffffff22; stroke: #fff; stroke-width: 2; } .frac path.sh { fill: var(--accent); }
 .bar { display: flex; gap: 3px; } .bar i { width: 34px; height: 26px; background: #ffffff22; border: 2px solid #fff; } .bar i.sh { background: var(--accent); }
 .nline { display: flex; gap: 8px; } .nline span { padding: 2px 6px; border-top: 3px solid #fff; } .nline .mark { color: var(--accent); }
+/* Y2 statistics (#8): pictogram, tally chart and block diagram share one grid — category label, then the data. */
+.chart { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; width: min(100%, 320px); font-size: clamp(0.8rem, 3.2vw, 1rem); }
+/* `.chart-row`, not `.row`: a global `.row` exists and relying on specificity is the class collision a rail already watches for. */
+.chart .chart-row { display: contents; }
+.chart .cat { text-align: right; align-self: center; white-space: nowrap; }
+.chart .data { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; min-height: 22px; }
+.chart .pic { font-size: clamp(1rem, 4.4vw, 1.4rem); line-height: 1; }
+.chart .blk { width: clamp(14px, 4.4vw, 20px); height: clamp(14px, 4.4vw, 20px); background: var(--accent-2); border: 2px solid #fff; border-radius: 3px; }
+.chart .tal { font-family: monospace; letter-spacing: 2px; margin-right: 6px; position: relative; }
+/* The fifth mark is the gate stroke drawn across the four uprights, which is how a child is taught to read a five. */
+.chart .tal.five::after { content: ''; position: absolute; inset: 10% -2px auto -2px; height: 0; border-top: 2px solid currentColor; transform: rotate(-20deg); }
+.chart .key { grid-column: 1 / -1; text-align: center; opacity: 0.85; font-size: 0.8em; }
 .scales { display: grid; grid-template-columns: 1fr 10px 1fr; column-gap: 4px; width: min(100%, 300px); align-items: start; margin-bottom: 6px; }
 .scales .beam {
   grid-column: 1 / -1;

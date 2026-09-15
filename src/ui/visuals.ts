@@ -60,9 +60,35 @@ export function renderVisual(v: Visual | undefined): string {
       const pan = (s: string) => `<div class="pan${Array.from(s).length > 6 ? ' many' : ''}">${esc(s)}</div>`;
       return `<div class="vis"><div class="scales"><svg viewBox="0 0 260 34" class="beam" preserveAspectRatio="none"><path d="M34 8V34M226 8V34" class="str"/><path d="M22 8H238" class="bar"/><path d="M130 8L118 30H142Z" class="ful"/></svg>${pan(v.left)}<div class="pillar"></div>${pan(v.right)}</div></div>`;
     }
+    case 'chart': {
+      // `Visual` is a public type and `each` is an unconstrained number on it, so the drawing defends itself:
+      // a key that is zero, negative, fractional or does not divide the row draws one symbol per child rather
+      // than rounding to a count the data does not have. A picture that lies is worse here than a plain one,
+      // and `each: 0` used to throw `RangeError` out of `renderVisual` — uncaught in `play-session.ts`'s
+      // `show()`, which would abort before `spawnWave` and leave a question card with no bubbles (#8 review).
+      const wanted = v.each ?? 1;
+      const usable = Number.isInteger(wanted) && wanted > 0 && v.rows.every(r => r.n % wanted === 0);
+      const each = usable ? wanted : 1;
+      const icon = v.icon ?? '⭐';
+      const body = v.rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
+      // The key is the whole point of a pictogram — without it the picture is a different number from the data.
+      const key = v.kind === 'pictogram' && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
+      return `<div class="vis"><div class="chart ${v.kind}">${body}${key}</div></div>`;
+    }
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
     case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
   }
+}
+
+/** One chart row's data cell. Tally groups in fives (four uprights and a gate stroke), the way a child is taught to read them. */
+function chartRow(kind: 'pictogram' | 'tally' | 'block', n: number, each: number, icon: string): string {
+  if (kind === 'block') return Array.from({ length: n }, () => '<i class="blk"></i>').join('');
+  if (kind === 'pictogram') return Array.from({ length: n / each }, () => `<span class="pic">${icon}</span>`).join('');
+  let html = '';
+  for (let i = 0; i < Math.floor(n / 5); i++) html += '<span class="tal five">||||</span>';
+  const rest = n % 5;
+  if (rest) html += `<span class="tal">${'|'.repeat(rest)}</span>`;
+  return html;
 }
 
 const DOT_LAYOUTS: Record<number, [number, number][]> = {

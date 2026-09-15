@@ -11,6 +11,9 @@ export type Visual =
   | { type: 'fraction'; parts: number; shaded: number; shape?: 'circle' | 'bar' }
   | { type: 'numberline'; from: number; to: number; mark?: number; step?: number }   // mark = hidden number shown as ?
   | { type: 'scales'; left: string; right: string }     // balance scales: text/emoji on each pan ("3 + 4" / "? + 2")
+  // Categorical data (Y2 statistics): one row per category, `n` = the count it stands for. `kind` picks the
+  // chart; `each` is the pictogram key (one symbol = `each` of the thing), so the drawing shows n / each symbols.
+  | { type: 'chart'; kind: 'pictogram' | 'tally' | 'block'; rows: { label: string; n: number }[]; icon?: string; each?: number }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string };                  // sentence with a blank "_"
 

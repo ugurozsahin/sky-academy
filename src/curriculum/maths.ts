@@ -386,6 +386,82 @@ const y2Temp: Generator = (d, rng) => {
   const first = warmer ? a > b : a < b;
   return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });
 };
+// Y2 statistics (#8). Each survey is three categories the child picks out by emoji, so the chart can be read
+// without reading the words — the labels carry the emoji and so does the prompt.
+const SURVEYS: readonly { what: string; rows: readonly [string, string][] }[] = [
+  { what: 'fruit', rows: [['🍎', 'apples'], ['🍌', 'bananas'], ['🍓', 'strawberries']] },
+  { what: 'pet', rows: [['🐶', 'dogs'], ['🐱', 'cats'], ['🐰', 'rabbits']] },
+  { what: 'way to school', rows: [['🚌', 'bus'], ['🚗', 'car'], ['🚲', 'bike']] },
+  { what: 'colour', rows: [['🔴', 'red'], ['🔵', 'blue'], ['🟢', 'green']] },
+  { what: 'playtime game', rows: [['⚽', 'football'], ['🪢', 'skipping'], ['🏃', 'tag']] },
+];
+/**
+ * A pictogram's symbol is deliberately **not** one of the categories. Drawing every row with the first
+ * category's emoji made the cats row four dogs, which is the one place a topic premised on "the chart can be
+ * read without reading the words" worked against itself (#8 review). A neutral symbol keys as "1 ⭐ = 2" and
+ * claims to be nothing.
+ */
+const PICTO_SYMBOL = '⭐';
+
+/**
+ * Reading categorical data: tally chart (d1), pictogram with a key (d2), block diagram (d3).
+ * The visual carries the data and the prompt never repeats it — that is the skill being practised, so a
+ * question whose `say` read the counts aloud would answer itself for a child listening.
+ *
+ * Degenerate data is prevented before the question is phrased, never recovered from afterwards: a tie makes
+ * "which was most" two-answered and an equal pair makes "how many more" zero. Both are re-rolled **at the
+ * difficulty asked for**. An earlier version recursed into `y2Stats(1, rng)` on a tie, which quietly served a
+ * Legend-stage child the d1 tally chart in 5.3% of d3 draws, and terminated only because d1 happens to force
+ * `ask = 'one'` — a guard twenty-five lines away from the recursion it was holding up (#8 review).
+ */
+const y2Stats: Generator = (d, rng) => {
+  const survey = pick(rng, SURVEYS);
+  const kind = d === 1 ? 'tally' : d === 2 ? 'pictogram' : 'block';
+  // The pictogram key is the whole of its difficulty: counts must be whole multiples of `each` or the drawing lies.
+  const each = kind === 'pictogram' ? pick(rng, [2, 5]) : 1;
+  const roll = () => survey.rows.map(() => ri(rng, 1, kind === 'block' ? 9 : 6) * each);
+  const ask = d === 1 ? 'one' : pick(rng, d === 2 ? ['one', 'total'] : ['total', 'more', 'most']);
+
+  let counts = roll();
+  const [i, j] = shuffle(rng, [0, 1, 2]).slice(0, 2);
+  // Bounded, and each re-roll keeps `kind`, `each` and `ask` exactly as generated.
+  const degenerate = () => ask === 'most'
+    ? counts.filter(n => n === Math.max(...counts)).length > 1
+    : ask === 'more' && counts[i] === counts[j];
+  for (let tries = 0; tries < 20 && degenerate(); tries++) counts = roll();
+  // The terminator: a re-roll can be unlucky twenty times, so end it deterministically rather than loop on.
+  if (degenerate()) counts[ask === 'most' ? 0 : i] = Math.max(...counts) + each;
+
+  const rows = survey.rows.map(([icon, name], k) => ({ label: `${icon} ${name}`, n: counts[k] }));
+  const visual: Question['visual'] = { type: 'chart', kind, rows, icon: PICTO_SYMBOL, each };
+  const chart = kind === 'tally' ? 'tally chart' : kind === 'pictogram' ? 'pictogram' : 'block diagram';
+
+  if (ask === 'total') {
+    const total = counts.reduce((a, b) => a + b, 0);
+    return numQ(rng, `How many children altogether?`, total, {
+      visual, hint: `Add up the ${chart}`, say: `Look at the ${chart}. How many children are there altogether?`,
+    });
+  }
+  if (ask === 'more') {
+    const [hi, lo] = counts[i] > counts[j] ? [i, j] : [j, i];   // never a negative answer, and never zero
+    const [hiIcon, hiName] = survey.rows[hi], [loIcon, loName] = survey.rows[lo];
+    return numQ(rng, `How many more ${hiIcon} than ${loIcon}?`, counts[hi] - counts[lo], {
+      visual, say: `Look at the ${chart}. How many more children chose ${hiName} than ${loName}?`,
+    });
+  }
+  if (ask === 'most') {
+    const best = counts.indexOf(Math.max(...counts));
+    return wordQ(rng, `Which did most children choose?`, survey.rows[best][1],
+      survey.rows.filter((_, k) => k !== best).map(r => r[1]),
+      { visual, say: `Look at the ${chart}. Which one did most children choose?` });
+  }
+  const k = ri(rng, 0, survey.rows.length - 1);
+  const [icon] = survey.rows[k];
+  return numQ(rng, `How many chose ${icon}?`, counts[k], {
+    visual, hint: `Read the ${chart}`, say: `Look at the ${chart}. How many children chose this one?`,
+  });
+};
+
 const DURATIONS: [string, number][] = [['minutes in an hour', 60], ['seconds in a minute', 60], ['hours in a day', 24], ['days in a week', 7], ['days in a fortnight', 14], ['weeks in a year', 52], ['months in a year', 12], ['minutes in half an hour', 30], ['minutes in a quarter of an hour', 15], ['days in September', 30], ['days in July', 31]];
 const y2Duration: Generator = (d, rng) => {
   if (rng() < 0.35) { const i = ri(rng, 0, 11), after = rng() < 0.5, ans = MONTHS[(i + (after ? 1 : 11)) % 12]; return wordQ(rng, `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, ans, shuffle(rng, MONTHS.filter(x => x !== ans)).slice(0, 3), { say: `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?` }); }
@@ -498,6 +574,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y2-temp', title: 'Temperature', icon: '🌡️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: temperature (°C)', gen: y2Temp },
   { id: 'y2-duration', title: 'Time & Durations', icon: '⏳', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: time, durations, months', gen: y2Duration },
   { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },
+  { id: 'y2-stats', title: 'Charts & Tallies', icon: '📊', subject: 'maths', year: 'year2', nc: 'Y2 Statistics: pictograms, tally charts, block diagrams', gen: y2Stats },
 ];
 
 export type { Difficulty };

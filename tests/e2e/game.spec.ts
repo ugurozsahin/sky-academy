@@ -347,6 +347,42 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
 
+  test('statistics: the tally chart, then the pictogram and its key, reach the card (#8)', async ({ page }) => {
+    // Reaching difficulty 2 means playing out stage 1, which is longer than the 60 s default — the same
+    // reason the full-mission test raises its own. The pictogram is the only chart with arithmetic in its
+    // rendering, so paying ~40 s once is worth more than leaving it unrendered in a browser.
+    test.setTimeout(120_000);
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-stats');
+    // Stage 1 is difficulty 1, the tally chart. The drawing is the data for this topic, so if it does not
+    // reach the card the question is unanswerable — a unit test of the renderer cannot see that.
+    await expect(page.locator('.vis .chart.tally')).toBeVisible();
+    await expect(page.locator('.vis .chart .chart-row')).toHaveCount(3);
+    await expect(page.locator('.vis .chart .tal').first()).toBeVisible();
+    // `bubbles().length > 1` is not enough to slice: it is true while the answer bubble is still to launch,
+    // which is why every other topic test waits on `waitForTarget` for the labelled bubble itself.
+    await waitForTarget(page);
+    expect(await answer(page)).toBe(true);
+    // No `|| ended` here: the one assertion meant to prove the question was answered must not also pass on a
+    // session that ended for some other reason (#8 review).
+    await page.waitForFunction(() => window.__sna.state().index > 0);
+
+    // Stage 2 is difficulty 2, the pictogram — the kind with real arithmetic in its rendering, and the only
+    // place the key line exists. Without this it never rendered in a browser at any viewport. The stage
+    // length is read from the session rather than copied from `YEARS`, so this does not rot if it changes.
+    const perStage = await page.evaluate(() => window.__sna.session.perStage as number);
+    await answerAll(page, perStage - 1);
+    await expect(page.locator('.celebrate h2')).toContainText('Stage 1 clear');
+    await page.click('#next');
+    await expect(page.locator('.vis .chart.pictogram')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('.vis .chart .key')).toContainText(/^1 \S+ = [25]$/);
+    const pics = await page.locator('.vis .chart .pic').count();
+    expect(pics).toBeGreaterThan(0);
+    // The symbol is deliberately not one of the categories, so no row is drawn in another row's emoji.
+    const symbol = (await page.locator('.vis .chart .key').innerText()).split(' ')[1];
+    for (const label of await page.locator('.vis .chart .cat').allInnerTexts()) expect(label).not.toContain(symbol);
+  });
+
   test('completing stage 1 shows the avatar celebrating with a praise line', async ({ page }) => {
     await seedPlayer(page, 'kai', 'Sam');
     await startTopic(page, 'year1', 'y1-bonds');
