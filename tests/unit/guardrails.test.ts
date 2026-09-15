@@ -1533,6 +1533,128 @@ describe('a stale review block may be adopted, and only under the four condition
     expect(text, 'the stale-block step must name the rule').toMatch(/Since #161 such a block is adoptable/);
     expect(text, 'and point at where the mechanical checks live').toMatch(/ROUTINE-PROMPT\.md` STEP 2/);
   });
+
+  /**
+   * And nothing under `.claude/` may carry a fourth copy of the conditions.
+   *
+   * The three rails above hold the three process files identical to each other. They cannot see a copy that
+   * lives somewhere else, and PR #235's first cut put one in `.claude/skills/review-pr/SKILL.md` — a
+   * paraphrase, in the reviewer's own words. The reviewing agent demonstrated what that costs: changing
+   * `at least 4 hours old` to `at least 20 minutes old` in the skill, and swapping the pull-request-scoped
+   * silence window for #213's retired repo-wide one, each left all 855 tests green. A run reading the skill
+   * and not STEP 2 would then have adopted a twenty-minute-old block — which is clearing a live reviewer's.
+   *
+   * `.claude/` is the scope because it is the context a run loads *about to do this job*: a skill's body
+   * arrives in the turn its description triggers, and an agent definition arrives with the agent. A widened
+   * condition anywhere else is a bug; a widened condition here is one the run is actively reading.
+   *
+   * **The first cut of this rail matched only the canonical phrasings, and that was the wrong half.** Its
+   * author argued a widening "has no reason to reword condition 3"; #235's second reviewer showed it has
+   * every reason, with a paraphrase that said "re-checked the objection against the current head" instead of
+   * "re-derived the original objection" and carried a twenty-minute window and #213's retired repo-wide
+   * silence test straight past the rail. A rail keyed to the words of the *correct* rule catches the
+   * harmless copy and waves the harmful one through, which is the exact failure mode #235 itself was
+   * blocked for twice.
+   *
+   * So the rule below is keyed on what a widener **cannot** drop. To grant a licence you must say when it
+   * applies, which takes a figure and a time unit; and the conditions live in three files this repository
+   * holds identical, so a `.claude/` document that discusses adoption at all has exactly one correct thing
+   * to do — point at them. Hence: talk about adoption and you must name STEP 2 and must state no window of
+   * your own. The canonical fragments are kept as well, because a verbatim copy-paste is the likeliest
+   * accident and costs nothing to catch.
+   *
+   * What this rail is NOT, said plainly rather than implied:
+   *  - It does not police `docs/`, where a decision record may legitimately quote the rule.
+   *  - It reads markdown only. A non-`.md` file under `.claude/` is invisible to it, and to the `#180`
+   *    per-file check as well (that one skips project-written entries via `if (!src) continue`), so
+   *    `.claude/skills/review-pr/adoption.txt` would carry a widened paraphrase unseen. #238's territory.
+   *  - "Discusses adoption" is itself a text match (`REVIEW: CHANGES REQUESTED` or `#161`). A document that
+   *    granted the licence while naming neither would pass — but it would also be unreadable as a rule.
+   *
+   * Prove it red four ways: restate a condition verbatim in a skill; reword one and add a window; delete
+   * review-pr's pointer at STEP 2; or narrow the walk so it no longer reaches the skills.
+   */
+  describe('no .claude/ document carries a second copy of the adoption conditions (#161)', () => {
+    // Built from parts so this rail's own source, and the CANON above, are not what trips it.
+    const FRAGMENTS = [
+      ['at least 4 ', 'hours old'],
+      ['in the last ', '2 hours'],
+      ['no comment on ', 'that same pull request'],
+      ['re-derived the ', 'original objection'],
+      // The two wordings this repository has already had to retire, and so the likeliest to be copied back.
+      ['Only the reviewer ', 'who set '],
+      ['commented nowhere ', 'in the repository'],
+    ].map((p) => p.join(''));
+    /** A figure and a time unit: what stating a window takes, in any wording a widener could choose. */
+    const WINDOW = /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty|sixty)[\s-]*(?:minute|hour|day|week)s?\b/i;
+    /** A document is talking about *this* protocol, rather than using the English word "adopt", if it names it. */
+    const ABOUT_BLOCKS = /REVIEW: CHANGES REQUESTED|#161/;
+
+    const walk = (dir: string): string[] => readdirSync(new URL(dir, root), { withFileTypes: true })
+      .flatMap((e) => (e.isDirectory() ? walk(`${dir}${e.name}/`) : e.name.endsWith('.md') ? [`${dir}${e.name}`] : []));
+    const docs = walk('.claude/');
+
+    // A count is not the files that matter: narrowing the walk to one vendored skill still cleared a
+    // `toBeGreaterThan(4)` floor while never reaching the file the rail exists for. Name them instead, and
+    // derive the list from the filesystem so a skill added later joins the scope without anyone remembering.
+    it('the walk reaches every skill and agent document', () => {
+      const shallow = (p: string) => readdirSync(new URL(p, root), { withFileTypes: true });
+      const expected = [
+        ...shallow('.claude/skills/').filter((e) => e.isDirectory()).map((e) => `.claude/skills/${e.name}/SKILL.md`),
+        ...shallow('.claude/agents/').filter((e) => e.isFile()).map((e) => `.claude/agents/${e.name}`),
+      ];
+      expect(expected.length, 'the independent listing must find something, or it cannot cross-check anything')
+        .toBeGreaterThan(4);
+      for (const file of expected) {
+        expect(docs, `the walk missed ${file} — a rail that does not read a file cannot hold it`).toContain(file);
+      }
+      expect(docs, 'and above all the reviewing skill, which is the one that auto-loads for this job')
+        .toContain('.claude/skills/review-pr/SKILL.md');
+    });
+
+    it.each(docs)('%s restates no adoption condition', (file) => {
+      const text = read(file);
+      for (const fragment of FRAGMENTS) {
+        expect(text, `${file} restates an adoption condition — point at ROUTINE-PROMPT.md STEP 2 instead, `
+          + 'because a paraphrase of a loosening is a licence nothing checks (#161)')
+          .not.toContain(fragment);
+      }
+    });
+
+    // The half the fragments cannot hold: a reworded copy. Keyed on the figure a licence needs to be usable.
+    it.each(docs)('%s states no window of its own, and points at STEP 2 if it discusses adoption', (file) => {
+      const text = read(file);
+      if (!ABOUT_BLOCKS.test(text)) return;                  // not about this protocol; vendored bodies land here
+      const window = WINDOW.exec(text);
+      expect(window?.[0], `${file} states a time window beside the block protocol. The four conditions live in `
+        + 'CLAUDE.md, BACKLOG.md and ROUTINE-PROMPT.md STEP 2 and nowhere else; a figure here is a licence (#161)')
+        .toBeUndefined();
+      expect(text, `${file} discusses block adoption without naming ROUTINE-PROMPT.md — a pointer is the only `
+        + 'correct thing a .claude/ document can do with a loosening (#161)')
+        .toContain('ROUTINE-PROMPT.md');
+    });
+
+    // And the pointer itself is pinned, not merely permitted: the rail above forbids the wrong text, this
+    // requires the right text. Deleting review-pr's whole adoption section left the suite green without it.
+    it('the reviewing skill keeps its pointer and its fail-closed rule', () => {
+      const text = read('.claude/skills/review-pr/SKILL.md');
+      expect(text, 'the skill must send the reader to STEP 2 for the conditions')
+        .toMatch(/Adopting someone else's stale block \(#161\)/);
+      expect(text, 'and keep the rule that needs no conditions to state: no session id, no adoption')
+        .toContain('not adoptable at all');
+      expect(text, 'and the two things adoption never licenses')
+        .toContain("Clearing your own block, or a live reviewer's, is forbidden");
+    });
+
+    // FRAGMENTS is a hand-written echo of CANON: retune the figures legitimately in all three process files
+    // and the numeric fragments become dead strings with nothing going red. (#235's reviewer warned the join
+    // splits `at least 4 hours old` across two entries so this could not be asserted directly — checked, and
+    // it does not: the `**` falls outside the phrase, so plain containment works.)
+    it.each(FRAGMENTS.slice(0, 4))('the canonical paragraph still contains %s', (fragment) => {
+      expect(CANON, 'a fragment absent from CANON is a dead string, and the rail above is weaker than it reads')
+        .toContain(fragment);
+    });
+  });
 });
 
 /**
@@ -1721,6 +1843,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   /** Every skill directory that may exist, and where it came from (`null` = written for this project). */
   const SKILLS: Record<string, { repo: string; sha: string; path: string } | null> = {
     'add-topic': null,
+    'review-pr': null,
     'verification-before-completion': { ...SUPERPOWERS, path: 'skills/verification-before-completion' },
     'using-git-worktrees': { ...SUPERPOWERS, path: 'skills/using-git-worktrees' },
     'systematic-debugging': { ...SUPERPOWERS, path: 'skills/systematic-debugging' },
