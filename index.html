@@ -12,6 +12,10 @@
   <!-- #15: the manifest link is also the switch that turns the service worker on (src/pwa.ts). The
        single-file build strips it, because that page has no worker beside it. -->
   <link rel="manifest" href="manifest.webmanifest" />
+  <!-- #15 Part B: Safari never reads the manifest's icons, so the iOS home screen needs its own PNG or it
+       screenshots the page instead. Stripped by scripts/bundle-single.mjs along with the manifest link,
+       because the single-file page is hosted on somebody else's origin with no icons/ beside it. -->
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />

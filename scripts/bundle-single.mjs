@@ -19,7 +19,11 @@ export function stripHead(head) {
   return head
     .replace(/<script[^>]*><\/script>/g, '')
     .replace(/<link rel="stylesheet"[^>]*assets[^>]*>/g, '')
-    .replace(/<link rel="manifest"[^>]*>/g, '');
+    .replace(/<link rel="manifest"[^>]*>/g, '')
+    // #15 Part B: the Apple icon is a real file under `icons/`, and nothing ships beside the single page.
+    // A dangling one is only a 404 rather than a fault, but it is a 404 asking somebody else's origin for a
+    // picture of our ninja, and this function's job is that the page references nothing it has not inlined.
+    .replace(/<link rel="apple-touch-icon"[^>]*>/g, '');
 }
 
 // Importing this file must not build anything: `tests/unit/guardrails.test.ts` imports `stripHead` to assert

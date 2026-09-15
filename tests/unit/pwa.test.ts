@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { MANIFEST_SELECTOR, registerServiceWorker, type RegisterEnv } from '../../src/pwa';
 // @ts-expect-error — plain ESM build helper, run by `npm run build` (see scripts/build-sw.d.ts)
@@ -176,5 +176,85 @@ describe('the precache list is read from the build, never written down (#15)', (
     // `String.replace` with a string needle substitutes the FIRST occurrence only, so a second copy would
     // ship as the literal placeholder. Presence was not enough to check. (Raised in review of #214.)
     expect(() => renderSw("'__CACHE_NAME__' '__CACHE_NAME__' __PRECACHE__", ['a'])).toThrow(/2 times/);
+  });
+});
+
+/**
+ * #15 Part B — the home-screen icon.
+ *
+ * The manifest is the only thing that says what an icon *is*, and nothing about a wrong one is visible from
+ * inside the game: an installed tile is drawn by the operating system, long after the tab that installed it
+ * has gone. So every assertion below reads the **bytes on disk** and compares them with what the manifest
+ * claims about them. A rail that only re-read the manifest would confirm the manifest agrees with itself.
+ *
+ * The three failures worth naming, because each ships silently:
+ *   - a declared size that is not the file's real size. Android scales it and the tile is soft, or it
+ *     rejects the icon and falls back to a screenshot of the page.
+ *   - a declared type that is not the file's real format. `image/png` on a WebP is refused outright.
+ *   - an `any` icon declared `maskable`. Nothing fails; the platform simply crops the ninja's head off.
+ *
+ * Prove them red: change a `sizes` or a `type` in public/manifest.webmanifest, point one at a file that is
+ * not there, or regenerate an icon at the wrong size.
+ */
+describe('installed icons (#15 Part B)', () => {
+  const bytes = (rel: string) => readFileSync(new URL(`../../public/${rel}`, import.meta.url));
+
+  /** Pixel size straight out of the header — PNG's IHDR, or WebP's VP8X canvas size. */
+  function dimensions(b: Buffer): { w: number; h: number; kind: string } {
+    if (b.subarray(1, 4).toString('latin1') === 'PNG') return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), kind: 'image/png' };
+    if (b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP') {
+      // Only the extended (VP8X) form carries the canvas size in a fixed place; that is what the generator
+      // emits. A plain VP8/VP8L file would land here and be reported as unknown rather than guessed at.
+      if (b.subarray(12, 16).toString('latin1') !== 'VP8X') return { w: 0, h: 0, kind: 'image/webp (not VP8X)' };
+      const le24 = (at: number) => 1 + (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16));
+      return { w: le24(24), h: le24(27), kind: 'image/webp' };
+    }
+    return { w: 0, h: 0, kind: 'unknown' };
+  }
+
+  it('every icon the manifest declares is really there, at the size and in the format it claims', () => {
+    expect(manifest.icons, 'no icons array means the installed tile is a screenshot of the page').toBeInstanceOf(Array);
+    expect(manifest.icons.length).toBeGreaterThan(0);
+    for (const icon of manifest.icons) {
+      const b = bytes(icon.src);
+      expect(b.length, `${icon.src} is empty`).toBeGreaterThan(0);
+      const { w, h, kind } = dimensions(b);
+      expect(kind, `${icon.src} is declared ${icon.type} and is not one`).toBe(icon.type);
+      expect(`${w}x${h}`, `${icon.src} is declared ${icon.sizes} and is ${w}x${h}`).toBe(icon.sizes);
+      expect(w, `${icon.src} must be square`).toBe(h);
+    }
+  });
+
+  it('declares an `any` icon at 192 and 512, and a `maskable` one — they cannot be the same file', () => {
+    const by = (purpose: string, size: string) =>
+      manifest.icons.filter((i: { purpose: string; sizes: string }) => i.purpose === purpose && i.sizes === size);
+    expect(by('any', '192x192'), 'Android asks for 192 for the home screen').toHaveLength(1);
+    expect(by('any', '512x512'), '512 any is what the install prompt and the splash are drawn from').toHaveLength(1);
+    expect(by('maskable', '512x512'), 'without a maskable icon the platform crops the `any` one').toHaveLength(1);
+    // The distinction is the whole reason there are two 512s. One file serving both purposes means either the
+    // art is cropped on Android or the tile is a small ninja adrift in a large square everywhere else.
+    expect(by('maskable', '512x512')[0].src).not.toBe(by('any', '512x512')[0].src);
+    // And they must actually differ in pixels, not only in name — the maskable one insets the art.
+    expect(bytes(by('maskable', '512x512')[0].src).equals(bytes(by('any', '512x512')[0].src)),
+      'the maskable icon is the `any` icon under another name').toBe(false);
+  });
+
+  it('the Apple icon the page links is a real PNG, because Safari never reads the manifest', () => {
+    const href = html.match(/<link rel="apple-touch-icon" href="([^"]+)"/)?.[1];
+    expect(href, 'iOS has no other way to be told, and screenshots the page without it').toBeTruthy();
+    const { w, h, kind } = dimensions(bytes(href!));
+    expect(kind, 'iOS will not take a WebP here, and fails to a screenshot without saying so').toBe('image/png');
+    expect(`${w}x${h}`).toBe('180x180');
+  });
+
+  it('ships no icon nothing points at — every file in public/icons/ is declared', () => {
+    const declared = new Set<string>([
+      ...manifest.icons.map((i: { src: string }) => i.src.replace(/^icons\//, '')),
+      ...[...html.matchAll(/href="icons\/([^"]+)"/g)].map(m => m[1]),
+    ]);
+    const onDisk = readdirSync(new URL('../../public/icons/', import.meta.url));
+    // Every one of these is precached and downloaded by every player on first install, so an icon left
+    // behind by a rename is not clutter — it is weight, and the service worker will never let go of it.
+    expect([...onDisk].sort(), 'an undeclared icon is dead weight in the precache').toEqual([...declared].sort());
   });
 });

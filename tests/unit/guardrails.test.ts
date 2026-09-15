@@ -2206,6 +2206,21 @@ describe('offline support cannot go stale on its own (#15)', () => {
     expect(stripHead(head), 'the theme colour still has to survive').toMatch(/<meta name="theme-color"/);
   });
 
+  // #15 Part B added a second head link that points at a file, and the single-file page ships alone. The
+  // rule this states is the general one the manifest case is an instance of: after stripping, the page
+  // references nothing it has not inlined. Asserted on the OUTPUT, for the reason the rail above gives.
+  it('the single-file page asks nobody else for our icons', () => {
+    const head = root('index.html').match(/<head>([\s\S]*?)<\/head>/)![1];
+    expect(head, 'index.html must carry the Apple icon, or the iOS home screen is a screenshot')
+      .toMatch(/<link rel="apple-touch-icon"/);
+    // A reference, not the spelling: the comment above the link says the word `icons/` too, and a rail that
+    // could not tell a comment from an `href` would be red on the explanation of why it is green.
+    expect(stripHead(head), 'the inlined page has no icons/ beside it, wherever it is hosted')
+      .not.toMatch(/(?:href|src)="icons\//);
+    // The data-URI favicon is inlined already and must survive: it is the only mark the single page has.
+    expect(stripHead(head), 'the inline favicon is not a file and must stay').toMatch(/<link rel="icon" href="data:/);
+  });
+
   // No `vite-plugin-pwa`, no `workbox-*`: #15's acceptance criteria rule them out and the dependency
   // allow-list rail would fail them anyway. This states the intent next to the feature that would want them.
   it('offline support added no dependency', () => {
