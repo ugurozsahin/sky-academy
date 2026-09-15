@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, certificates, exportSave, fileCert, importSave, isMigratable, isReadOnlySave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, STICKER_IDS, STICKER_COST, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { addCoins, certificates, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, STICKER_IDS, STICKER_COST, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 
 // minimal localStorage shim for node
@@ -364,13 +364,19 @@ describe('a save from a newer build is refused, not down-stamped (#232)', () => 
     expect(load().coins, 'but the running session still sees its own state').toBe(7);
   });
 
-  it('an unreadable `v` is refused the same way, rather than re-running the ladder over migrated data', () => {
+  // Review of the first cut: refusing to *read* an unreadable `v` and refusing to *write* over it are two
+  // decisions, and only the first is #232's. A shape no build ever wrote has nothing on the other side to
+  // preserve, so latching it would leave the device silently unable to save for good — `reset()` has no
+  // caller in the app and `?reset` cannot be typed into a Capacitor WebView. It resets instead.
+  it('an unreadable `v` is refused as data, but writes resume so the device is not bricked', () => {
     const mangled = JSON.stringify({ v: 'two', name: 'Mangled', coins: 3 });
     localStorage.setItem(KEY, mangled);
-    expect(load().name).toBe('');
-    expect(isReadOnlySave()).toBe(true);
+    expect(load().name, 'the ladder does not run over it').toBe('');
+    expect(isReadOnlySave(), 'and it is NOT latched — nothing is being protected').toBe(false);
     save({ coins: 99 });
-    expect(localStorage.getItem(KEY)).toBe(mangled);
+    expect(localStorage.getItem(KEY), 'the corrupt blob is replaced').not.toBe(mangled);
+    expect(JSON.parse(localStorage.getItem(KEY)!).coins).toBe(99);
+    expect(JSON.parse(localStorage.getItem(KEY)!).v, 'with a version we can read next time').toBe(SAVE_VERSION);
   });
 
   it('an ordinary save still writes, and the latch clears on reset and on a deliberate import', () => {
@@ -387,11 +393,87 @@ describe('a save from a newer build is refused, not down-stamped (#232)', () => 
     save({ coins: 4 });
     expect(JSON.parse(localStorage.getItem(KEY)!).coins, 'writes resume').toBe(4);
 
-    // reset() removes the blob there was something to protect, so the latch goes with it.
+    // reset() removes the blob there was something to protect, so the latch goes with it. Asserted from a
+    // *freshly latched* state: the first cut checked it here, after importSave() had already cleared the
+    // latch, so deleting `readOnly = false` from reset() left every test green (review finding 4).
+    reset();   // drop the cache first: load() recomputes the latch only on a miss
+    localStorage.setItem(KEY, JSON.stringify({ v: SAVE_VERSION + 1, name: 'Tablet' }));
+    load();
+    expect(isReadOnlySave(), 'latched again before reset() is exercised').toBe(true);
     reset();
-    expect(isReadOnlySave()).toBe(false);
+    expect(isReadOnlySave(), 'reset() clears the latch on its own').toBe(false);
     save({ coins: 11 });
     expect(JSON.parse(localStorage.getItem(KEY)!).coins).toBe(11);
+  });
+
+  // The other mutant that survived the first cut, and it is #232 through a second door: moving
+  // `readOnly = false` to the top of importSave() lifts the protection for a code that is then REFUSED.
+  // The grown-up on the older phone pastes the tablet's newer code, it is correctly rejected — and the
+  // next ordinary save() relabels the tablet's blob anyway.
+  it('a REFUSED import leaves the latch exactly as it was', () => {
+    const newer = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Tablet', coins: 500 });
+    localStorage.setItem(KEY, newer);
+    load();
+    expect(isReadOnlySave()).toBe(true);
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION + 1, name: 'AlsoNewer' })), 'a newer code is refused').toBe(false);
+    expect(isReadOnlySave(), 'and refusing it must not lift the protection').toBe(true);
+    expect(importSave('not json at all'), 'so must a malformed one').toBe(false);
+    expect(isReadOnlySave()).toBe(true);
+    save({ coins: 1 });
+    expect(localStorage.getItem(KEY), 'the newer blob is still intact').toBe(newer);
+  });
+
+  // Review finding 3: the latch was lifted before anything knew the replacement had landed. If setItem
+  // throws (private mode, a WebView with DOM storage off, quota), the newer blob is still on disk — and
+  // clearing the latch there lets the next ordinary save() relabel it, which is #232 restored through the
+  // one line this fix added. Narrow window (a failed write, then a later successful one), but it is the
+  // exact failure the rest of the PR exists to prevent.
+  it('a failed import write leaves the protection in place', () => {
+    const newer = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Tablet', coins: 500 });
+    reset();
+    localStorage.setItem(KEY, newer);
+    load();
+    expect(isReadOnlySave()).toBe(true);
+
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try {
+      importSave(JSON.stringify({ v: SAVE_VERSION, name: 'Chosen', coins: 1 }));
+    } finally {
+      (localStorage as unknown as { setItem: unknown }).setItem = realSet;
+    }
+    expect(isReadOnlySave(), 'the write did not land, so the newer blob is still there to protect').toBe(true);
+    save({ coins: 3 });
+    expect(localStorage.getItem(KEY), 'and it is still intact').toBe(newer);
+  });
+
+  // The review's blocking 1, and the worst of the four: under the latch `load()` is a fresh default, so
+  // exporting it handed the grown-up a **valid** code carrying no progress — and `parents.ts` tells them to
+  // paste it into Restore on the other device, which is the one holding the real save. The protection
+  // mechanism became a better data-loss path than the bug it fixed.
+  it('exportSave() moves the real stored blob under the latch, never a blank default', () => {
+    const newer = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Ada', coins: 500, somethingV3: 'kept' });
+    localStorage.setItem(KEY, newer);
+    expect(load().name, 'the session still runs on defaults').toBe('');
+    expect(isReadOnlySave()).toBe(true);
+    const code = exportSave();
+    expect(code, 'the code is the stored save, byte for byte').toBe(newer);
+    expect(JSON.parse(code).coins, 'so it carries the progress that actually exists').toBe(500);
+    expect(JSON.parse(code).v, 'and it still declares the newer version').toBe(SAVE_VERSION + 1);
+    // …which means an older build refuses it rather than silently importing a blank, and the good device
+    // (whose SAVE_VERSION is higher) is the one that can read it.
+    reset(); save({ name: 'Ada', coins: 500 });
+    expect(importSave(code), 'this build cannot read it, so it declines').toBe(false);
+    expect(load().coins, 'and the device it was pasted into is untouched').toBe(500);
+  });
+
+  it('exportSave() is unchanged when there is no latch', () => {
+    reset(); save({ name: 'Kai', coins: 21 });
+    const code = exportSave();
+    expect(JSON.parse(code).name).toBe('Kai');
+    expect(JSON.parse(code).coins).toBe(21);
+    expect(JSON.parse(code).v).toBe(SAVE_VERSION);
+    expect(importSave(code)).toBe(true);
   });
 
   it('importSave() still refuses a newer code, unchanged', () => {

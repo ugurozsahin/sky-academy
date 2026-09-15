@@ -5,7 +5,7 @@ import pkg from '../../package.json';
 import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
-import { isMigratable, migrate, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, and one-directional
+import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
 
 /**
  * GUARD RAILS (#73) — checks that fail the build so a mistake we have already made cannot come back.
@@ -281,6 +281,34 @@ describe('guard rails', () => {
   // and would stay green through any change that kept the identifier and broke the comparison — #205's lesson.
   // The full behaviour (the untouched blob, the read-only latch, the cleared latch) is held in storage.test.ts;
   // this is the one-line invariant that must never come back, sitting in the incident log with the other two.
+  // Found reviewing the first cut of the rail below, and the sharper half of the same incident (#232):
+  // refusing to *write* is only half the protection, because `exportSave()` is a second route to the stored
+  // blob. Under the latch `load()` is a fresh default, so the export box in the grown-ups screen offered a
+  // **valid** code carrying no progress — and `parents.ts` tells the grown-up to paste it into Restore on
+  // the other device, which is the device holding the real save. The mechanism added to stop a save being
+  // destroyed became a better way to destroy it. Behavioural, for the same reason as the rail below: a text
+  // rail could see that `exportSave` mentions the latch and not that the code it hands out is the right one.
+  it('exportSave() never offers a blank default as the child’s save (#232)', () => {
+    const KEY = 'sna:v1';
+    // This file has no jsdom environment, so the one rail here that exercises storage brings its own slot.
+    const mem: Record<string, string> = {};
+    (globalThis as unknown as { localStorage: Storage }).localStorage = {
+      getItem: (k: string) => mem[k] ?? null,
+      setItem: (k: string, v: string) => { mem[k] = v; },
+      removeItem: (k: string) => { delete mem[k]; },
+      clear: () => { for (const k in mem) delete mem[k]; },
+      key: () => null, length: 0,
+    } as Storage;
+    const newer = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Ada', coins: 500 });
+    reset();
+    localStorage.setItem(KEY, newer);
+    expect(load().coins, 'the session runs on defaults, which is correct').toBe(0);
+    const code = exportSave();
+    expect(JSON.parse(code).coins, 'but the exported code must carry the progress that exists, not the default').toBe(500);
+    expect(code, 'the honest thing to move is the stored blob itself').toBe(newer);
+    reset();
+  });
+
   it('a save from a newer build is never relabelled as this version (#232)', () => {
     const future = { v: SAVE_VERSION + 1, name: 'Tablet', coins: 500 };
     const out = migrate(future);
