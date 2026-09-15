@@ -848,3 +848,69 @@ describe('#142: the arena drives the whole mission stage machine', () => {
     expect(results, 'the finished mission cannot end twice').toHaveLength(1);
   });
 });
+
+/**
+ * Bubble collisions are wired into the running arena (#108).
+ *
+ * These exist because of a review finding, and the finding was bad enough to be worth writing down: every
+ * other test of this feature calls `resolveCollisions` directly, so all three of these mutations left the
+ * whole 942-test suite green and `tsc` clean —
+ *
+ *   1. delete the `resolveCollisions(...)` call in `update()` — bubbles pass through each other again;
+ *   2. invert the restitution ternary — ordered waves bounce hard and ordinary waves damp;
+ *   3. `this.orderedWave = false` in `spawnWave` — damping never applies to anything.
+ *
+ * The entire feature could be removed from the game with nothing going red. The e2e was no backstop either:
+ * its only overlap assertion tolerates a quarter of a bubble and passed on `main` before the feature existed.
+ * These three scenarios drive the REAL `Arena` frame by frame and each mutation above turns one of them red.
+ */
+describe('bubbles collide in the running arena, not just in the pure function (#108)', () => {
+  /** Two live bubbles, placed overlapping by hand, and the arena stepped one frame over them. */
+  const twoOverlapping = (opts: { ordered?: string[] }, vx: number) => {
+    sim?.destroy(); sim = null;          // a scenario that builds two sims must not leak the first one
+    sim = createSim({ W: 390, H: 760 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, ...opts });
+    sim.advance(1200);                                   // let the first batch get airborne
+    const up = sim.all().filter(b => b.launched && !b.dead);
+    expect(up.length, 'need two bubbles in the air to collide').toBeGreaterThanOrEqual(2);
+    const [a, b] = up;
+    // Put them head-on and overlapping. These are the arena's own Bubble objects, so the next frame runs the
+    // real update() over them — nothing here re-implements a rule.
+    a.x = 180; a.y = 400; a.vx = vx; a.vy = 0;
+    b.x = 180 + (a.r + b.r) * 0.6; b.y = 400; b.vx = -vx; b.vy = 0;
+    sim.frame();
+    return { a, b, gap: Math.hypot(b.x - a.x, b.y - a.y), min: a.r + b.r };
+  };
+
+  it('separates an overlapping pair — the resolver is actually called from update()', () => {
+    // Mutation 1 (delete the call) leaves the pair exactly where it was put, and this goes red.
+    const { gap, min } = twoOverlapping({}, 0);
+    expect(gap, 'the arena pushed them apart').toBeGreaterThanOrEqual(min - 0.05);
+  });
+
+  it('bounces an ordinary wave harder than an ordered one — the restitution actually reaches the solver', () => {
+    // Kills mutation 2 (inverted ternary) and mutation 3 (`orderedWave` never set): both make these equal,
+    // or swap them. Measured through the real arena, not by reading a constant.
+    const p = twoOverlapping({}, 240); const plain = p.b.vx - p.a.vx;       // how fast they part
+    const s = twoOverlapping({ ordered: ['1', '2'] }, 240); const seq = s.b.vx - s.a.vx;
+    expect(plain, 'an ordinary wave bounces').toBeGreaterThan(0);
+    expect(seq, 'an ordered wave still bounces, just softly').toBeGreaterThan(0);
+    expect(seq, 'a sequence wave must bounce LESS, so a required label is not knocked out of reach')
+      .toBeLessThan(plain * 0.9);
+  });
+
+  it('holds the no-overlap invariant across a whole wave in the real arena', () => {
+    sim = createSim({ W: 390, H: 760 });
+    sim.spawn({ labels: ['1', '2', '3', '4', '5', '6', '7', '8'], speed: 3 });
+    for (let f = 0; f < 600; f++) {
+      sim.frame();
+      const up = sim.all().filter(b => b.launched && !b.dead);
+      for (let i = 0; i < up.length; i++) for (let j = i + 1; j < up.length; j++) {
+        const p = up[i], q = up[j];
+        expect(Math.hypot(q.x - p.x, q.y - p.y), `frame ${f}: ${p.label} and ${q.label} overlap in the arena`)
+          .toBeGreaterThanOrEqual(p.r + q.r - 0.05);
+      }
+      if (up.length === 0 && f > 60) break;
+    }
+  });
+});

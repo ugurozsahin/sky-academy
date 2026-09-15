@@ -56,7 +56,7 @@ export class Arena {
   shots: Shot[] = []; shotsThrown = 0;                          // projectiles in flight / thrown so far (the e2e reads the count)
   private trail: { x: number; y: number; t: number }[] = [];
   private pointerDown = false; private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
-  private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600;
+  private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
   private onThrow?: () => void; private onLand?: () => void;
@@ -120,6 +120,7 @@ export class Arena {
 
   spawnWave(o: WaveOpts) {
     this.bubbles = []; this.shots = []; this.frozen = false;
+    this.orderedWave = !!o.ordered?.length;         // #108: damp collisions so a sequence bubble is never stranded
     // #43: every number below — radius, air time, batching, each bubble's arc, colour and launch moment —
     // comes from the pure layoutWave() so it can be unit-tested without a canvas. All this method still does
     // is fit each label to the measured font (#28, needs the 2D context) and push the bubbles.
@@ -284,6 +285,11 @@ export class Arena {
       if (b.y - b.r > this.H + 10 && b.vy > 0) { b.dead = true; if (!b.hit) this.cb.onFall(b); continue; }   // a tapped bubble with a shot on the way is not a miss
       live++;
     }
+    // #108: bubbles collide with each other. Skipped while `frozen` — the outcome reveal holds everything
+    // still, and the e2e freeze helper predicts a bubble's position from its fixed `g`, which only stays true
+    // while nothing else can move it. `ordered` sequence waves bounce softly so a required label cannot be
+    // knocked out of reach before its batch is up.
+    if (!this.frozen) resolveCollisions(this.bubbles, { W: this.W, H: this.H, topInset: this.topInset }, this.orderedWave ? COLLIDE.damped : COLLIDE.bounce);
     if (this.waveActive && live === 0) { this.waveActive = false; this.cb.onWaveEnd(); }
     for (const s of this.shots) {                   // shots fly on even while the wave is frozen for the reveal
       if (s.t >= SHOT_FLIGHT) continue;             // already landed this frame; cull() takes it out below (#31)
@@ -548,6 +554,123 @@ export function reanchorBubble(b: { x: number; y: number; vx: number; vy: number
 }
 /** The arena's shape, as much of it as the wave layout depends on. */
 export interface WaveGeom { W: number; H: number; topInset: number }
+
+/**
+ * Bubble-to-bubble collision (#108).
+ *
+ * Until this, two bubbles were two independent ballistic arcs and nothing stopped them crossing: overlap was
+ * only ever avoided *statistically*, by the slot layout in `layoutWave` and by batching, so on a busy wave
+ * they slid through each other on screen. This resolves them for real.
+ *
+ * Kept pure and out of the draw path on purpose, like `layoutWave` above (#43): it takes plain numbers and a
+ * geometry, so the no-overlap invariant is unit-testable frame by frame without a canvas or a browser.
+ *
+ * `n` is small — at most ~10 live bubbles — so the O(n²) pair sweep the issue sanctions is what this does,
+ * with no broad phase. `ITERS` passes let a three-body pile converge instead of leaving a pair still sunk
+ * into each other after one pass; the bounds clamp runs inside the loop, so a bubble pushed off the side is
+ * put back and the *next* pass fixes any overlap that reintroduced.
+ */
+export const COLLIDE = {
+  /** Restitution stays below 1 so a pile loses energy instead of gaining it. */
+  bounce: 0.75,
+  /** `ordered` sequence waves bounce softly: the issue's instruction is to damp them rather than drop the
+   *  feature, because a stranded sequence bubble is unplayable in a way a dull bounce is not. */
+  damped: 0.35,
+  // There is deliberately NO absolute speed cap here. The first cut had one (900 px/s) and it was a bug:
+  // `clampIntoArena` applied it to every live bubble whether or not it had touched anything, so it was not a
+  // limit on what a bounce may add — it was a global speed limit on the wave, and `layoutWave` launches
+  // faster than it. `|v0| = 4h/T` with `T = base / speedK`, so launch speed grows with arena height and with
+  // `speedK`: an 800x1180 tablet at stage 3 already launches at 931 px/s and was throttled from the first
+  // frame two bubbles were airborne, and at the `__SNA_FAST = 4` the e2e suite runs at, a phone wave cleared
+  // in 23 frames instead of 50 with an apex of 688 in a 760-high arena — bubbles that barely left the launch
+  // line. #138 made `speedK` a pure time compression ("same apex, same landing x, less time") and a fixed
+  // px/s number silently undid it. A constant cannot be right when the quantity it bounds is a function of
+  // `H` and `speedK`; the bound belongs on the impulse, relative to the pair it acts on. See `capToPair`.
+  /** Separation passes per frame. Six, not one: a three-body pile needs more than a single sweep to come
+   *  apart, and the wall clamp inside the loop can push a bubble back into a neighbour that a later pass
+   *  then has to undo. At <= 6 live bubbles this is ~90 distance checks a frame. */
+  iters: 6,
+} as const;
+
+/** The part of a bubble collision cares about — so a test can build one without a label or a font size. */
+export interface Collidable { x: number; y: number; vx: number; vy: number; g: number; r: number; launched: boolean; dead: boolean }
+
+/**
+ * A bubble is in flight when something is still moving it. A bubble with no gravity and no velocity has been
+ * *pinned* — which is what `freezeWave` in the e2e spec does to make a wave's coordinates predictable before
+ * it clicks one, and #108 requires that those tests stay deterministic. Nothing in play is ever pinned: every
+ * launched bubble carries its own `g`, fixed at launch and never zero, so this excludes the test's frozen
+ * wave and nothing else. (The outcome reveal is handled separately, by `frozen` in `update`.)
+ */
+const inFlight = (b: Collidable) => b.g !== 0 || b.vx !== 0 || b.vy !== 0;
+
+/**
+ * Separate every overlapping pair and bounce them apart, in place. Equal masses, so the impulse is the
+ * symmetric one; an approaching pair only.
+ *
+ * Bubbles that have not launched yet are still parked below the floor and are left alone — colliding them
+ * there would shove the queue sideways before the child ever sees it. So are pinned ones; see `inFlight`.
+ */
+export function resolveCollisions(
+  bubbles: readonly Collidable[],                 // elements are mutated; the array never is
+  geom: WaveGeom,
+  restitution: typeof COLLIDE.bounce | typeof COLLIDE.damped = COLLIDE.bounce,   // only these two are meaningful
+) {
+  const live = bubbles.filter(b => b.launched && !b.dead && inFlight(b));
+  if (live.length < 2) return;
+  for (let pass = 0; pass < COLLIDE.iters; pass++) {
+    for (let i = 0; i < live.length; i++) {
+      for (let j = i + 1; j < live.length; j++) {
+        const a = live[i], b = live[j];
+        const min = a.r + b.r;
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let d = Math.hypot(dx, dy);
+        // `!(d < min)`, not `d >= min`: with a NaN coordinate `d >= min` is false, so the pair would NOT be
+        // skipped and both positions would be overwritten with NaN, which six passes then spread across the
+        // wave — and a NaN bubble never satisfies the cull test in `update`, so the wave would never end.
+        // No live path produces NaN today; this is the cheap direction to be wrong in.
+        if (!(d < min)) continue;
+        // Exactly concentric: there is no direction to separate along, so pick one. `d` stays 0 so the pair
+        // is pushed the full `min` apart — deriving the normal from a faked `d` would leave them on top of
+        // each other with `half` computed as zero.
+        const nx = d === 0 ? 1 : dx / d, ny = d === 0 ? 0 : dy / d, half = (min - d) / 2;
+        a.x -= nx * half; a.y -= ny * half;
+        b.x += nx * half; b.y += ny * half;
+        const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+        if (vn < 0) {                                   // approaching — separating pairs keep their velocity
+          const fastest = Math.max(Math.hypot(a.vx, a.vy), Math.hypot(b.vx, b.vy));   // BEFORE the impulse
+          const jn = (-(1 + restitution) * vn) / 2;
+          a.vx -= jn * nx; a.vy -= jn * ny;
+          b.vx += jn * nx; b.vy += jn * ny;
+          capToPair(a, fastest); capToPair(b, fastest);
+        }
+      }
+    }
+    for (const b of live) clampIntoArena(b, geom);
+  }
+}
+
+/** Keep a bubble inside the play area and below the HUD (#108). Position only — see `COLLIDE` on why no
+ *  absolute speed cap lives here. */
+function clampIntoArena(b: Collidable, geom: WaveGeom) {
+  b.x = Math.min(geom.W - b.r, Math.max(b.r, b.x));
+  const ceiling = geom.topInset + b.r;
+  if (b.y < ceiling) { b.y = ceiling; if (b.vy < 0) b.vy = 0; }   // never above topInset, never still climbing there
+}
+
+/**
+ * A bounce may not leave a bubble faster than the faster of the two was *before* it (#108).
+ *
+ * Scale-free on purpose: it is expressed in terms of the pair's own speeds, so it means the same thing on a
+ * phone and on a tablet, at 1x and at 4x, and it can never touch a bubble that has not collided. An equal-mass
+ * impulse with restitution below 1 cannot raise the pair's kinetic energy, but it can move energy between the
+ * two, so a glancing hit can leave one of them at up to `hypot(v1, v2)` — faster than either arrived. This is
+ * the guard for that, and nothing more.
+ */
+function capToPair(b: Collidable, fastest: number) {
+  const sp = Math.hypot(b.vx, b.vy);
+  if (sp > fastest && sp > 0) { const k = fastest / sp; b.vx *= k; b.vy *= k; }
+}
 /** One bubble's whole flight, fixed at launch: where it starts, its arc, when it goes up and what it wears. */
 export interface BubblePlan { label: string; x: number; vx: number; vy: number; g: number; launchAt: number; color: string; wobble: number }
 /** A laid-out wave: the values the arena keeps for itself, plus one plan per bubble in launch order. */

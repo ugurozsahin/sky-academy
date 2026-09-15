@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SHOT_FLIGHT, SHOT_STYLE, compact, dealOrdered, fitLabel, labelFont, layoutWave, reanchorBubble, segCircle, shotPose } from '../../src/game/arena';
+import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type Collidable, compact, dealOrdered, fitLabel, labelFont, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
 import { ALL_AVATARS } from '../../src/avatars';
 
 describe('dealOrdered — sequence words are dealt in order across the batches (#62)', () => {
@@ -359,5 +359,196 @@ describe('re-anchoring a wave when the arena is resized (#146)', () => {
     const b = airborne(300);
     reanchorBubble(b, PORTRAIT, LANDSCAPE);
     expect(b.r).toBe(33);
+  });
+});
+
+/**
+ * Bubble-to-bubble collision (#108).
+ *
+ * Before this, two bubbles were two independent ballistic arcs: they crossed and overlapped on screen, and
+ * the only thing keeping them apart was the slot layout in `layoutWave` and the batching — statistics, not a
+ * rule. These pin the rule. `resolveCollisions` is pure (it takes plain numbers and a `WaveGeom`), so the
+ * no-overlap invariant is checked on every simulated frame of a whole flight without a canvas or a browser.
+ *
+ * Prove it red: drop the positional-separation step, the impulse, the bounds clamp or the speed cap in
+ * `src/game/arena.ts` and one of these fails — each is asserted on its own.
+ */
+describe('bubbles collide instead of passing through each other (#108)', () => {
+  const GEOM = { W: 390, H: 700, topInset: 120 };
+  const ball = (o: Partial<Collidable> = {}): Collidable =>
+    ({ x: 100, y: 400, vx: 0, vy: 0, g: 600, r: 30, launched: true, dead: false, ...o });
+  // The issue allows "a sub-pixel epsilon during the resolve step", and this is that epsilon made explicit.
+  // A positional solver that also has to honour the arena walls converges rather than closing exactly: the
+  // measured worst residual across the full-flight scenario below is 0.000137 px, so 1/100 of a pixel is two
+  // orders of magnitude of headroom and still far below anything a display can show. Asserting exact
+  // non-overlap instead would be asserting something float arithmetic cannot deliver.
+  const EPS = 0.01;
+  const overlapping = (bs: Collidable[]) => {
+    for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+      const a = bs[i], b = bs[j];
+      if (a.dead || b.dead || !a.launched || !b.launched) continue;
+      if (Math.hypot(b.x - a.x, b.y - a.y) < a.r + b.r - EPS) return [a, b] as const;
+    }
+    return null;
+  };
+
+  it('separates a head-on pair and sends them back the way they came', () => {
+    const a = ball({ x: 180, vx: 120 }), b = ball({ x: 220, vx: -120 });   // 40 apart, radii sum 60 — sunk in
+    resolveCollisions([a, b], GEOM);
+    expect(b.x - a.x, 'no overlap left after the resolve').toBeGreaterThanOrEqual(a.r + b.r - EPS);
+    expect(a.vx, 'the left bubble is turned back to the left').toBeLessThan(0);
+    expect(b.vx, 'and the right one to the right').toBeGreaterThan(0);
+  });
+
+  it('conserves momentum and does not add energy — restitution is below 1', () => {
+    const a = ball({ x: 180, vx: 120 }), b = ball({ x: 220, vx: -40 });
+    const p0 = a.vx + b.vx, e0 = a.vx ** 2 + b.vx ** 2;
+    resolveCollisions([a, b], GEOM);
+    expect(a.vx + b.vx, 'equal masses, symmetric impulse').toBeCloseTo(p0, 6);
+    expect(a.vx ** 2 + b.vx ** 2, 'a bounce may never make a pile livelier than it was').toBeLessThan(e0 + 1e-9);
+  });
+
+  it('leaves a separating pair alone, so a bounce cannot be applied twice', () => {
+    const a = ball({ x: 185, vx: -50 }), b = ball({ x: 215, vx: 50 });     // overlapping but already parting
+    resolveCollisions([a, b], GEOM);
+    expect(a.vx, 'still moving left at the same speed').toBe(-50);
+    expect(b.vx).toBe(50);
+    expect(b.x - a.x, 'but pushed apart all the same').toBeGreaterThanOrEqual(a.r + b.r - EPS);
+  });
+
+  it('holds the no-overlap invariant on every frame of a full wave flight', () => {
+    // A real wave's worth of bubbles, launched into each other, integrated at the arena's own 1/60 substep
+    // for a full flight. The invariant is asserted every frame, not just at the end — a resolve that lets a
+    // pair sink in and pushes them out later would pass an end-state check and look wrong on screen.
+    // Six bubbles of r 22 is what `layoutWave` actually puts up at once in a 390-wide arena — its `perBatch`
+    // is `floor((W - 16) / (2r + 10))`, so a denser row than this is not a wave the game can produce and
+    // asserting on one would only be measuring the resolver against an impossible pile. They start clear of
+    // each other and are given crossing horizontal speeds, so the collisions happen in flight.
+    const bs: Collidable[] = [];
+    for (let i = 0; i < 6; i++) bs.push(ball({ x: 45 + i * 60, y: 620, vx: (2.5 - i) * 34, vy: -430 - (i % 3) * 30, r: 22 }));
+    expect(overlapping(bs), 'the starting layout must itself be legal').toBeNull();
+    const dt = 1 / 60, g = 600;
+    let fastestEver = Math.max(...bs.map(b => Math.hypot(b.vx, b.vy)));
+    for (let frame = 0; frame < 240; frame++) {
+      for (const b of bs) { b.vy += g * dt; b.x += b.vx * dt; b.y += b.vy * dt; }
+      fastestEver = Math.max(fastestEver, ...bs.map(b => Math.hypot(b.vx, b.vy)));   // gravity legitimately adds
+      resolveCollisions(bs, GEOM);
+      const bad = overlapping(bs);
+      expect(bad, `frame ${frame}: two bubbles overlap`).toBeNull();
+      for (const b of bs) {
+        expect(b.x, `frame ${frame}: pushed off the left`).toBeGreaterThanOrEqual(b.r - EPS);
+        expect(b.x, `frame ${frame}: pushed off the right`).toBeLessThanOrEqual(GEOM.W - b.r + EPS);
+        expect(b.y, `frame ${frame}: pushed up under the HUD`).toBeGreaterThanOrEqual(GEOM.topInset + b.r - EPS);
+        // Against the fastest speed the WAVE ever had, not against the implementation's own constant. The
+        // first cut asserted `<= COLLIDE.maxSpeed`, which is true for any cap — including one low enough to
+        // halve the flight, which is exactly the bug that shipped past it.
+        expect(Math.hypot(b.vx, b.vy), `frame ${frame}: flung faster than anything in the wave`)
+          .toBeLessThanOrEqual(fastestEver + EPS);
+      }
+    }
+  });
+
+  it('does not retime or reshape a REAL wave, at the geometries and speeds the game actually produces', () => {
+    // This is the test the first cut needed and did not have, and the reason a serious bug shipped past a
+    // green suite. Every other scenario in this block hand-builds `vy: -430, g: 600` — the one regime where
+    // an absolute speed cap cannot bite before the cull line. The game does not launch at 430.
+    //
+    // `layoutWave` sets |v0| = 4h/T with T = base/speedK, so launch speed grows with arena HEIGHT and with
+    // speedK. The first cut capped every live bubble at a fixed 900 px/s, so:
+    //   * an 800x1180 tablet at stage 3 launches at 931 and was throttled from the first frame — a real
+    //     child on a real device, and the tablet is what the Android APK targets;
+    //   * at __SNA_FAST = 4, which the WHOLE e2e suite runs at, a phone stage-3 wave cleared in 23 frames
+    //     instead of 50 with an apex of 688 in a 760-high arena. The e2e passed 52/52 anyway, because
+    //     nothing there asserts apex and a faster wave only makes the waiting tests quicker.
+    // Driven from the real layoutWave so the numbers cannot drift back to a regime the bug cannot reach.
+    const flight = (W: number, H: number, speedK: number, stage: 1 | 2 | 3, collide: boolean) => {
+      const geom = { W, H, topInset: 120 };
+      const plan = layoutWave({ labels: ['1', '2', '3', '4', '5', '6'], speed: stage }, geom, speedK, 0, () => 0.5);
+      const bs: Collidable[] = plan.bubbles.map(b =>
+        ({ x: b.x, y: H + plan.r, vx: b.vx, vy: b.vy, g: b.g, r: plan.r, launched: true, dead: false }));
+      let apex = H, last = -1; const gone = new Set<number>();
+      for (let f = 0; f < 1200 && gone.size < bs.length; f++) {
+        for (const b of bs) { b.vy += b.g / 60; b.x += b.vx / 60; b.y += b.vy / 60; }
+        if (collide) resolveCollisions(bs, geom);
+        for (const b of bs) if (b.y < apex) apex = b.y;
+        bs.forEach((b, i) => { if (!gone.has(i) && b.y - b.r > H + 10 && b.vy > 0) { gone.add(i); last = f; } });
+      }
+      expect(gone.size, 'every bubble must clear, or the comparison means nothing').toBe(bs.length);
+      return { last, apex };
+    };
+    const cases: [string, number, number, number, 1 | 2 | 3][] = [
+      ['phone 390x760 @1x stage 3', 390, 760, 1, 3],
+      ['tablet 800x1180 @1x stage 3', 800, 1180, 1, 3],   // |v0| = 931: over the old 900 cap at ordinary speed
+      ['phone @4x stage 1', 390, 760, 4, 1],              // the e2e suite's own speed
+      ['phone @4x stage 3', 390, 760, 4, 3],              // was 23 frames instead of 50, apex 688 of 760
+      ['tablet @4x stage 3', 800, 1180, 4, 3],
+    ];
+    for (const [name, W, H, k, stage] of cases) {
+      const off = flight(W, H, k, stage, false), on = flight(W, H, k, stage, true);
+      expect(on.last - off.last, `${name}: collisions retimed the wave`).toBe(0);
+      expect(on.apex, `${name}: collisions changed how high the wave rises`).toBeCloseTo(off.apex, 6);
+    }
+  });
+
+  it('leaves a pinned wave exactly where it is — the e2e freeze helper depends on it', () => {
+    // `freezeWave` in tests/e2e/game.spec.ts stops a wave by zeroing vx, vy and g, then clicks a bubble at
+    // the coordinates it read back. Nudging those bubbles apart afterwards moves the target out from under
+    // the click: that is a real regression this caught, not a hypothetical one (#108).
+    const pinned = [ball({ x: 180, y: 400, g: 0 }), ball({ x: 210, y: 400, g: 0 })];   // overlapping and pinned
+    resolveCollisions(pinned, GEOM);
+    expect(pinned.map(b => [b.x, b.y]), 'a pinned wave is not a wave in flight').toEqual([[180, 400], [210, 400]]);
+  });
+
+  it('does not change how long a wave takes to clear (#108: "speed unchanged")', () => {
+    // The issue's "speeds stay as they are" has two halves. The first is structural and the diff answers it:
+    // no T, stagger, batching or arc is touched. The second is an *outcome* — "collisions must not make a
+    // wave measurably faster or slower to clear" — and collisions plainly do change trajectories, so it
+    // needs measuring rather than asserting. This runs the same wave twice, with the resolver off and on,
+    // and compares the frame the last bubble falls past the arena's own cull line (`y - r > H + 10`).
+    //
+    // Measured difference: ONE frame out of ~110, i.e. 0.017 s on a ~1.8 s flight. The tolerance below is
+    // six frames — 6x the measured value and a tenth of a second, far under anything a child could feel —
+    // so this fails on a real regression rather than on arithmetic noise.
+    //
+    // What it is actually sensitive to, measured rather than assumed: dropping `maxSpeed` to 120 takes the
+    // difference to 30 frames and this goes red. Raising `bounce` past 1 does NOT trip it — that is the
+    // energy assertion above doing its job, not this one. Said plainly because a rail is worth what its
+    // name is true of: this one holds the *timing* half of "speeds stay as they are", not the whole of it.
+    const clearFrame = (collide: boolean) => {
+      const bs: Collidable[] = [];
+      for (let i = 0; i < 6; i++) bs.push(ball({ x: 45 + i * 60, y: 620, vx: (2.5 - i) * 34, vy: -430 - (i % 3) * 30, r: 22 }));
+      const gone = new Set<number>(); let last = -1;
+      for (let f = 0; f < 600 && gone.size < bs.length; f++) {
+        for (const b of bs) { b.vy += 600 / 60; b.x += b.vx / 60; b.y += b.vy / 60; }
+        if (collide) resolveCollisions(bs, GEOM);
+        bs.forEach((b, i) => { if (!gone.has(i) && b.y - b.r > GEOM.H + 10 && b.vy > 0) { gone.add(i); last = f; } });
+      }
+      expect(gone.size, 'every bubble must actually clear, or the comparison is meaningless').toBe(bs.length);
+      return last;
+    };
+    expect(Math.abs(clearFrame(true) - clearFrame(false)), 'collisions must not retime the wave').toBeLessThanOrEqual(6);
+  });
+
+  it('never collides a bubble that has not launched yet', () => {
+    // Unlaunched bubbles are parked in a stack below the floor waiting for their batch; colliding them there
+    // would shove the queue sideways before the child has seen any of it.
+    const waiting = [ball({ x: 195, y: 730, launched: false }), ball({ x: 195, y: 730, launched: false })];
+    resolveCollisions(waiting, GEOM);
+    expect(waiting.map(b => b.x), 'the queue is left exactly as it was').toEqual([195, 195]);
+  });
+
+  it('bounces an ordered sequence wave more softly, so a required label is not knocked away', () => {
+    const hard = [ball({ x: 180, vx: 200 }), ball({ x: 220, vx: -200 })];
+    const soft = [ball({ x: 180, vx: 200 }), ball({ x: 220, vx: -200 })];
+    resolveCollisions(hard, GEOM, COLLIDE.bounce);
+    resolveCollisions(soft, GEOM, COLLIDE.damped);
+    expect(Math.abs(soft[0].vx), 'damped waves come away slower than the full bounce').toBeLessThan(Math.abs(hard[0].vx));
+  });
+
+  it('separates a pair sitting exactly on top of one another', () => {
+    const a = ball({ x: 195, y: 400 }), b = ball({ x: 195, y: 400 });
+    resolveCollisions([a, b], GEOM);
+    expect(Math.hypot(b.x - a.x, b.y - a.y), 'concentric is a real case and must not divide by zero')
+      .toBeGreaterThanOrEqual(a.r + b.r - EPS);
   });
 });
