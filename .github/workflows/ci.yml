@@ -1,10 +1,10 @@
 # The gate for every change. A pull request gets unit tests + guard rails and the build ALWAYS, and e2e on
-# the MOBILE project only (#141) and only when the diff can actually reach the game (#176). A push to main
+# the MOBILE project only (#81) and only when the diff can actually reach the game (#96). A push to main
 # gets the LIGHT run — that tree already passed e2e on its own PR minutes earlier, so main only re-checks
 # what a merge can break cheaply (types, unit, build). The FULL matrix — every project — runs against main
 # once a night, which is what catches two PRs that were green apart and broken together, and is now also the
 # only place a desktop-only regression is caught. Clearing a review block (undrafting a PR) re-runs the
-# suite — see the trigger note below (#159).
+# suite — see the trigger note below (#88).
 #
 # Why the split: this is a private repo, so Actions minutes are metered (2,000/month on Free, 3,000 on Pro).
 # Measured 2026-09-07 — full run ~12 min, light run ~3 min, and shipping one issue used to cost ~42 min
@@ -20,31 +20,31 @@ on:
     # `synchronize` would mean a push to a pull request tests nothing at all. The rail in
     # tests/unit/guardrails.test.ts asserts all four by name.
     #
-    # The fourth one is #159's fix. A review blocks a merge here by converting the PR to a DRAFT, and the
+    # The fourth one is #88's fix. A review blocks a merge here by converting the PR to a DRAFT, and the
     # reviewer clears the block by marking it ready for review (CLAUDE.md, review-gate.yml) — a transition
     # that is not in GitHub's default list. So the protocol's own happy path (block, draft, author fixes,
-    # reviewer clears, merge) ended on whatever run last happened, however old. On #150 that was a tick from
-    # 03:31Z read at 12:37Z: nine hours and four merges of `main` later, one of which (#155) had rewritten
+    # reviewer clears, merge) ended on whatever run last happened, however old. On ugurozsahin/sky-academy-private-archive#150 that was a tick from
+    # 03:31Z read at 12:37Z: nine hours and four merges of `main` later, one of which (ugurozsahin/sky-academy-private-archive#155) had rewritten
     # the very e2e helpers that PR's new guard rail called. The tick was green about a tree nobody was
     # proposing to merge, and the reviewing run merged while saying it was waiting for a re-run that could
     # not arrive. A stale tick is absence wearing a green tick.
     # Subscribing fixes it because a pull_request run tests `refs/pull/N/merge` — the head merged with `main`
     # AS OF THE RUN — so re-running the moment the block is cleared is evidence about the tree that lands.
     #
-    # Cost, measured 2026-09-10, because #119 is watching this number: 17 undraft events in the 4.2 days to
-    # 09-10 (~29/week, or ~18/week once PR #95's six block/clear cycles are set aside as the outlier they
-    # are), against a pull-request run that costs ~4.0 min of wall clock now that #141 has landed — the four
+    # Cost, measured 2026-09-10, because #74 is watching this number: 17 undraft events in the 4.2 days to
+    # 09-10 (~29/week, or ~18/week once PR ugurozsahin/sky-academy-private-archive#95's six block/clear cycles are set aside as the outlier they
+    # are), against a pull-request run that costs ~4.0 min of wall clock now that #81 has landed — the four
     # most recent were 4.45, 4.0, 3.7 and 4.1 min. That is ~70-115 min/week, about a fifth of the ~600
-    # min/week #141 itself just saved, and it is paid ONLY on pull requests a reviewer actually blocked.
+    # min/week #81 itself just saved, and it is paid ONLY on pull requests a reviewer actually blocked.
     # The concurrency group below absorbs the overlap rather than adding to it: an undraft arriving while a
     # `synchronize` run for the same pull request is still going cancels that run instead of queueing beside
     # it. Draft pull requests already run CI on `opened` and `synchronize` — GitHub does not skip drafts —
     # so this adds one run per block cleared, not a run per draft.
     types: [opened, synchronize, reopened, ready_for_review]
-    # DELIBERATELY no `paths-ignore` here (#176). It used to carry the same list as `push` above, which meant
+    # DELIBERATELY no `paths-ignore` here (#96). It used to carry the same list as `push` above, which meant
     # a docs-only pull request produced NO `CI` check at all — and the merge rules then need a carve-out
     # saying that particular absence is fine, sitting next to a rule saying an absent check is a red light.
-    # Two readings of the same missing tick is how #150 was merged. Worse, the guard rails ARE documentation
+    # Two readings of the same missing tick is how ugurozsahin/sky-academy-private-archive#150 was merged. Worse, the guard rails ARE documentation
     # checks: tests/unit/guardrails.test.ts asserts that CLAUDE.md, BACKLOG.md and docs/ROUTINE-PROMPT.md
     # agree and that the freeze lift still reads as one-time, so a pull request touching only those files is
     # exactly the change those rails exist to catch, and it was the one shape they never ran on.
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      # #176: e2e is ~90% of this repo's Actions bill and much of it is paid on changes that cannot move a
+      # #96: e2e is ~90% of this repo's Actions bill and much of it is paid on changes that cannot move a
       # pixel — the rails that enforce the documentation live in tests/unit/, so a governance pull request is
       # almost never docs-only and used to drag the whole suite along with it. This step decides, once, from
       # the pull request's real diff (three-dot, the same range GitHub's "Files changed" shows) whether the
@@ -93,7 +93,7 @@ jobs:
       # GAME_PATHS is the load-bearing line and tests/unit/guardrails.test.ts reads it FROM HERE, so it must
       # stay a single-quoted one-liner. Adding a top-level directory under src/ that this regex does not
       # cover turns that rail red, which is the point: `src/` is a prefix so that it never can.
-      - name: Can this change reach the game? (#176)
+      - name: Can this change reach the game? (#96)
         id: scope
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -103,23 +103,23 @@ jobs:
           GAME_PATHS='^(src/|index\.html$|public/|tests/e2e/|playwright\.config\.|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'
           if [ "$EVENT" != 'pull_request' ]; then
             echo "e2e=true" >> "$GITHUB_OUTPUT"
-            echo "### e2e: **running** — \`$EVENT\` is never filtered (#176)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### e2e: **running** — \`$EVENT\` is never filtered (#96)" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           if ! files=$(git diff --name-only "$BASE...$HEAD" 2>&1); then
             echo "e2e=true" >> "$GITHUB_OUTPUT"
-            echo "### e2e: **running** — could not diff \`$BASE...$HEAD\`, so e2e is not skipped (#176)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### e2e: **running** — could not diff \`$BASE...$HEAD\`, so e2e is not skipped (#96)" >> "$GITHUB_STEP_SUMMARY"
             echo "$files"
             exit 0
           fi
           echo "changed files:"; echo "$files"
           if echo "$files" | grep -Eq "$GAME_PATHS"; then
             echo "e2e=true" >> "$GITHUB_OUTPUT"
-            { echo "### e2e: **running** — the diff touches the game (#176)";
+            { echo "### e2e: **running** — the diff touches the game (#96)";
               echo "$files" | grep -E "$GAME_PATHS" | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "e2e=false" >> "$GITHUB_OUTPUT"
-            { echo "### e2e: **skipped** — nothing in this diff can reach the game (#176)";
+            { echo "### e2e: **skipped** — nothing in this diff can reach the game (#96)";
               echo "Unit tests, guard rails and the build ran as always. Changed files:";
               echo "$files" | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -130,23 +130,23 @@ jobs:
       # `--with-deps` runs `apt-get update` before it installs Playwright's system libraries, and the
       # ubuntu-latest image ships Google's chrome-stable source in its apt list. On 2026-09-09 that
       # repository served a Release file and a package index whose hashes disagreed; apt exited 100, the
-      # step died, and every job on this repo failed there for hours (#147) — pull requests and the nightly
+      # step died, and every job on this repo failed there for hours (#85) — pull requests and the nightly
       # alike, each still paying for checkout, npm ci, unit tests and the build before dying.
       # We install Chromium THROUGH Playwright and never install Google Chrome, so that repository is not a
       # dependency of this project in any sense: dropping it takes a third party off our critical path.
       # Deliberately not `apt-get update || true`, which would fix this outage by making every apt failure
       # invisible, a real one included. Other vendor sources in the image can break the same way; this
       # removes the one that has.
-      # These two exist only to make e2e possible, so they carry e2e's own condition (#176) as well as the
+      # These two exist only to make e2e possible, so they carry e2e's own condition (#96) as well as the
       # push guard. Leaving them unfiltered would install a browser for a run that never opens one — about a
       # minute of the ~2.9 the filter is there to save.
-      - name: Drop the apt sources we do not use (#147)
+      - name: Drop the apt sources we do not use (#85)
         if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
         run: sudo rm -fv /etc/apt/sources.list.d/google-chrome*.list /etc/apt/sources.list.d/google-chrome*.sources
       - name: Install Playwright browsers
         if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
         run: npx playwright install --with-deps chromium
-      # #141: a pull request runs the MOBILE project only; the nightly and workflow_dispatch run the whole
+      # #81: a pull request runs the MOBILE project only; the nightly and workflow_dispatch run the whole
       # matrix. The game is mobile-first and the owner plays it on a phone and a tablet, so a desktop-only
       # regression landing on main and being caught by that night's run is the accepted trade.
       #
@@ -156,25 +156,25 @@ jobs:
       # the desktop leg is the slower of the two (1280x800 against the iPhone 13 viewport). Measured on run
       # 34461649267: mobile 09:38:24 -> 09:41:07 (2m43s), desktop 09:41:07 -> 09:45:07 (4m00s), 6.8 m total.
       # Dropping desktop from the PR run therefore takes ~4.0 min off it, not the ~half a project count
-      # suggests — and #116's third project will add its own full leg to the nightly for the same reason.
+      # suggests — and #72's third project will add its own full leg to the nightly for the same reason.
       #
       # A failing nightly is not silent: the watchdog task reads `?branch=main&event=schedule` every 6 hours
       # and opens a `watchdog` issue on a failure OR on no run in 26 hours (docs/WATCHDOG-PROMPT.md step 2),
       # and the dev routine re-checks it every 2 hours and treats a red nightly as that run's first work
       # (docs/ROUTINE-PROMPT.md STEP 1). Both read a conclusion, never an absence.
       #
-      # #176 adds the second half of the condition: the step is skipped, visibly and with its reason in the
+      # #96 adds the second half of the condition: the step is skipped, visibly and with its reason in the
       # run summary, when the pull request's diff cannot reach the game. The scope step above answers `true`
       # for every non-pull-request event and for any diff it could not compute, so the nightly and
       # workflow_dispatch are untouched by the filter — the one full check a merged tree gets is not
       # something a path list may take away.
       #
-      # #116 adds `tablet` (800x1280) and `tablet-landscape` (1280x800) to the full matrix and NOT to the
+      # #72 adds `tablet` (800x1280) and `tablet-landscape` (1280x800) to the full matrix and NOT to the
       # pull-request arm. Nothing in CI had ever rendered a tablet, which is the shared blind spot behind
-      # #107, #109 and #110; both projects are restricted in playwright.config.ts to tests/e2e/viewport.spec.ts,
+      # #63, #65 and #66; both projects are restricted in playwright.config.ts to tests/e2e/viewport.spec.ts,
       # 5 tests each, so the pair is ~16 s on a runner rather than the ~8 min two unrestricted legs would cost.
       # The pull-request arm stays at one project: putting a tablet on it is more metered minutes per pull
-      # request, and that is #119's open decision, not a run's to take. The #141 rail holds both halves —
+      # request, and that is #74's open decision, not a run's to take. The #81 rail holds both halves —
       # every declared project in the full arm, exactly one in the pull-request arm.
       - name: End-to-end (${{ github.event_name == 'pull_request' && 'mobile' || 'full matrix' }})
         if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
@@ -187,11 +187,11 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  # #160 — the rule shows up in the head branch name, so that is what this reads.
+  # #89 — the rule shows up in the head branch name, so that is what this reads.
   #
   # The unit rails in tests/unit/guardrails.test.ts can only check that the instruction files agree with each
   # other; they are green on a pull request whose own branch ignores the convention, which is exactly what
-  # happened while the convention was being written. The owner asked for this one by name (issue #160,
+  # happened while the convention was being written. The owner asked for this one by name (issue #89,
   # 2026-09-10T18:12Z): "The guard rail this issue asks for should check the PR's head branch name, which is
   # where the rule actually shows up, not just that the docs agree with each other."
   #
@@ -210,25 +210,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Head branch follows feature|fix|chore/<issue>-<slug> (#160)
+      - name: Head branch follows feature|fix|chore/<issue>-<slug> (#89)
         env:
           HEAD_REF: ${{ github.head_ref }}
           BODY: ${{ github.event.pull_request.body }}
         run: |
           PATTERN='^(feature|fix|chore)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'
           if printf '%s' "$HEAD_REF" | grep -Eq "$PATTERN"; then
-            echo "### branch name: **ok** — \`$HEAD_REF\` (#160)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### branch name: **ok** — \`$HEAD_REF\` (#89)" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           # grep, not a glob: the marker must start a line, so a reviewer quoting it in a sentence does not
-          # clear the check the way a keyword buried in a body closes an issue (#144, the same class of bug).
+          # clear the check the way a keyword buried in a body closes an issue (#83, the same class of bug).
           if printf '%s' "$BODY" | grep -Eq '^BRANCH: PUSH REFUSED'; then
-            echo "### branch name: **exception claimed** — \`$HEAD_REF\` (#160)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### branch name: **exception claimed** — \`$HEAD_REF\` (#89)" >> "$GITHUB_STEP_SUMMARY"
             echo "The body carries \`BRANCH: PUSH REFUSED\`. A reviewer must check it names the branch that" >> "$GITHUB_STEP_SUMMARY"
             echo "was tried and quotes the refusal — this job cannot judge that, only that it was claimed." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          echo "### branch name: **FAILED** — \`$HEAD_REF\` (#160)" >> "$GITHUB_STEP_SUMMARY"
+          echo "### branch name: **FAILED** — \`$HEAD_REF\` (#89)" >> "$GITHUB_STEP_SUMMARY"
           echo "Branches are named for the change: \`feature|fix|chore/<issue>-<slug>\` — \`fix/\` for" >> "$GITHUB_STEP_SUMMARY"
           echo "\`bug\`/\`playtest\`, \`feature/\` for \`enhancement\`, \`chore/\` for everything else." >> "$GITHUB_STEP_SUMMARY"
           echo "A run names its own branch; the branch a session was assigned is not to be used." >> "$GITHUB_STEP_SUMMARY"

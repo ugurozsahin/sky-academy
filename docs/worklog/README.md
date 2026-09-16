@@ -1,4 +1,4 @@
-# Worklog archive — closed 2026-09-10 (#178)
+# Worklog archive — closed 2026-09-10 (#98)
 
 Two files, and nothing appends to either again:
 
@@ -34,5 +34,5 @@ is in `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`, and the short vers
 | history — what happened, when, in what order | `git log` and the pull request list |
 
 `tests/unit/guardrails.test.ts` fails if `WORKLOG.md` comes back to the repository root, or if a live
-instruction starts telling a run to write to it again. Habits survive their own rename (#160), which is why
+instruction starts telling a run to write to it again. Habits survive their own rename (#89), which is why
 that is a check rather than a note.

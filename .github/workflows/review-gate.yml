@@ -4,7 +4,7 @@
 # API refuses a formal CHANGES_REQUESTED review (422). A reviewer therefore blocks a PR with two marks —
 # it converts the PR to a **draft** and posts a comment beginning `REVIEW: CHANGES REQUESTED`. Those marks
 # were only a convention: a merging agent that did not read them merged straight over the review, which is
-# how #74 went in with five open review items. This job reads them and stamps the status red, and "never merge
+# how ugurozsahin/sky-academy-private-archive#74 went in with five open review items. This job reads them and stamps the status red, and "never merge
 # a PR whose CI is not green" is already the first rule of every merge — so the review now rides on a rule
 # that is obeyed. The job itself stays green; see the note below.
 #
@@ -18,7 +18,7 @@
 #
 # It DOES run on `synchronize`, and must: a commit status belongs to one SHA, so a push to a blocked PR
 # produces a head carrying no `review-gate` status at all. Without this trigger the push would not preserve
-# the block, it would delete the evidence of it (#95 review). The block itself is comment-driven, so
+# the block, it would delete the evidence of it (ugurozsahin/sky-academy-private-archive#95 review). The block itself is comment-driven, so
 # re-stamping the new head simply re-applies it.
 #
 # Cost: the job is skipped for comments that open with neither marker (a skipped job bills nothing), so this

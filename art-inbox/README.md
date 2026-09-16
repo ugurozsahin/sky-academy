@@ -11,7 +11,7 @@ One image per ninja, named by the ninja's **id** — not its display name:
 
     art-inbox/win-volt.png, art-inbox/win-blaze.png, …
 
-**`shadow` keeps that filename** even though the character is now called *Dusk* (#112): the id is
+**`shadow` keeps that filename** even though the character is now called *Dusk* (#68): the id is
 what the save file stores, so renaming it would drop every player's chosen ninja.
 
 - PNG (or WEBP) with a **transparent background**, square-ish, **512–1024 px** on the long side.

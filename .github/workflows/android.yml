@@ -1,4 +1,4 @@
-# Builds the Android APK (Capacitor wrapper, issue #53) on demand, on v* tags, and on PRs that touch the
+# Builds the Android APK (Capacitor wrapper, issue #51) on demand, on v* tags, and on PRs that touch the
 # Android side. NOT on every push to main any more: that spent ~3 minutes of a metered private-repo quota
 # per commit — roughly 90 minutes in the first two days — on an artifact nobody downloaded.
 # Want one now? Actions → "Android APK" → Run workflow. Then: this run → "sky-ninja-academy-apk".
@@ -30,7 +30,7 @@ jobs:
         run: npm run build
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
-      # `packages` is named explicitly, and that is the point of naming it (#236). Left to its default the
+      # `packages` is named explicitly, and that is the point of naming it (#129). Left to its default the
       # action asks sdkmanager for `tools platform-tools`, and `tools` is the retired legacy SDK Tools
       # package: Google removed it from the repository, so every APK build died on "Failed to find package
       # 'tools'" — a third-party default deciding what we install, changing under us, with nothing here to
