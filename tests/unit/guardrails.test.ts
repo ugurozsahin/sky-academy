@@ -215,6 +215,10 @@ describe('guard rails', () => {
     expect(types.length).toBeGreaterThan(4);
     for (const t of ['opened', 'labeled', 'unlabeled', 'converted_to_draft', 'ready_for_review', 'synchronize'])
       expect({ trigger: t, subscribed: types.includes(t) }).toEqual({ trigger: t, subscribed: true });
+    // #131: the six `pull_request` types above all passed with `issue_comment:` deleted from `on:` — nothing
+    // checked that the subscription re-stamping a REVIEW:/OWNER: comment onto the status still exists.
+    expect({ event: 'issue_comment', subscribed: on.includes('issue_comment') })
+      .toEqual({ event: 'issue_comment', subscribed: true });
     const guard = code.slice(code.indexOf('if:'), code.indexOf('runs-on:') + 200);
     for (const marker of ["'REVIEW:'", "'OWNER:'"])                     // both verdicts must wake the job
       expect({ marker, wired: guard.includes(marker) }).toEqual({ marker, wired: true });
