@@ -2035,6 +2035,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'add-guard-rail': null,
     'add-topic': null,
     'design-language': null,
+    'frontend-design': { ...MARKETPLACE, path: 'plugins/frontend-design/skills/frontend-design' },
     'open-pr': null,
     'review-pr': null,
     'verification-before-completion': { ...SUPERPOWERS, path: 'skills/verification-before-completion' },
@@ -2052,6 +2053,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   const VERBATIM = [
     '.claude/skills/systematic-debugging/condition-based-waiting-example.ts',
     '.claude/skills/systematic-debugging/find-polluter.sh',
+    '.claude/skills/frontend-design/LICENSE.txt',
   ];
 
   const dirs = (p: string) => readdirSync(new URL(p, root), { withFileTypes: true })
