@@ -593,23 +593,6 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
-  test('Sound Hunt: nothing to read on the card; the words appear only when read-aloud is off', async ({ page }) => {
-    await seedPlayer(page);
-    await startTopic(page, 'reception', 'r-soundhunt');
-    await expect(page.locator('.prompt')).toHaveText('🔊 Listen!');
-    await expect(page.locator('.vis')).toHaveCount(0);                                 // picture-free: no clue on the card
-    const q = await page.evaluate(() => window.__sna.session.current);
-    expect(q.say).toMatch(/^Listen: \w+, \w+, \w+\. Which sound/);                    // the sound is carried by spoken keywords only
-    await waitForTarget(page); expect(await answer(page)).toBe(true);
-    await expect.poll(() => page.evaluate(() => window.__sna.state().score)).toBeGreaterThan(0);
-    await page.click('#pause'); await page.click('#quit');
-    await page.click('#spk');                                                          // read-aloud off → the card shows the words instead
-    await startTopic(page, 'reception', 'r-soundhunt');
-    const listen = await page.evaluate(() => window.__sna.session.current.listen as string);
-    await expect(page.locator('.prompt')).toHaveText(listen);
-    expect(listen.split(' · ')).toHaveLength(3);
-  });
-
   /** #65: an engine that exists but never speaks — `speechSynthesis` present, no voices, `speak()` fires nothing. The APK's WebView without a TTS engine looks exactly like this (and so does headless Chromium). */
   const stubSilentEngine = (page: Page, keepLastLine = false) => page.addInitScript(keep => {
     Object.defineProperty(window, 'speechSynthesis', {
@@ -620,7 +603,44 @@ test.describe('Sky Ninja Academy', () => {
       },
     });
   }, keepLastLine);
+  /**
+   * #131: the opposite stub — an engine that starts every line synchronously, so the probe verdicts `yes`
+   * straight away instead of racing the real 4 s `VOICE_START_MS` budget against however long the rest of a
+   * test's actions take on a loaded runner. Headless Chromium exposes `speechSynthesis` but this container
+   * never actually starts a line through it, which is exactly `stubSilentEngine`'s shape by accident rather
+   * than by choice — a test that wants the spoken path and does not stub anything is at the mercy of that.
+   */
+  const stubSpeakingEngine = (page: Page) => page.addInitScript(() => {
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        speaking: false, pending: false, getVoices: () => [], cancel: () => {}, onvoiceschanged: null,
+        speak: (u: SpeechSynthesisUtterance) => { (u.onstart as ((e: Event) => void) | null)?.(new Event('start')); },
+      },
+    });
+  });
   const storedVoice = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).voice as string);
+
+  test('Sound Hunt: nothing to read on the card; the words appear only when read-aloud is off', async ({ page }) => {
+    await stubSpeakingEngine(page);
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-soundhunt');
+    await expect(page.locator('.prompt')).toHaveText('🔊 Listen!');
+    await expect(page.locator('.vis')).toHaveCount(0);                                 // picture-free: no clue on the card
+    const q = await page.evaluate(() => window.__sna.session.current);
+    expect(q.say).toMatch(/^Listen: \w+, \w+, \w+\. Which sound/);                    // the sound is carried by spoken keywords only
+    await waitForTarget(page); expect(await answer(page)).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__sna.state().score)).toBeGreaterThan(0);
+    // The stub actually started every line above (#131): the engine verdict is `yes`, so the keywords below
+    // are read-aloud being turned off, not a real-time probe verdict landing by coincidence.
+    await expect.poll(() => storedVoice(page)).toBe('yes');
+    await page.click('#pause'); await page.click('#quit');
+    await page.click('#spk');                                                          // read-aloud off → the card shows the words instead
+    await startTopic(page, 'reception', 'r-soundhunt');
+    const listen = await page.evaluate(() => window.__sna.session.current.listen as string);
+    await expect(page.locator('.prompt')).toHaveText(listen);
+    expect(listen.split(' · ')).toHaveLength(3);
+  });
 
   // #65, one test per topic rather than one walk through all of them: the walk ran to ~60 s on a loaded desktop
   // runner and was reported as "page.goto hangs" — the test budget expiring mid-navigation, not a wedged page.
