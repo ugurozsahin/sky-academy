@@ -1945,6 +1945,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
 
   /** Every skill directory that may exist, and where it came from (`null` = written for this project). */
   const SKILLS: Record<string, { repo: string; sha: string; path: string } | null> = {
+    'add-guard-rail': null,
     'add-topic': null,
     'open-pr': null,
     'review-pr': null,
@@ -2212,6 +2213,375 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
       .toContain('If you change one, change all three in the same pull request');
     expect(S(7), 'and #178: a record with no reader is not written')
       .toContain('**records have readers** (#178)');
+  });
+});
+
+/**
+ * The `add-guard-rail` skill's load-bearing lines (#180).
+ *
+ * This is the skill a run loads when it is about to write a rail, so a rule dropped from it is a rule that
+ * stops being read at the exact moment it applies — with nothing going red, which is the failure `open-pr`'s
+ * rail above was built (twice) to answer. The method is the one that round arrived at, and it is copied
+ * deliberately rather than reinvented: **slice the body on its `## N.` headings and assert inside the section
+ * that owns the rule**, because every escape found so far was a bare substring satisfied by text somewhere
+ * else in the file.
+ *
+ * What is pinned, per section, and why each is load-bearing rather than merely true:
+ *
+ *  §1 A rail names its incident. Without that the next editor who meets it red deletes it instead of asking,
+ *     which is how a rail is lost without anyone deciding to lose it.
+ *  §2 The four homes, asserted **per table row** rather than anywhere in the section — which home a kind of
+ *     rail belongs to *is* the rule, and a free-floating match cannot see which row it landed in. Plus the
+ *     one placement that produces a permanently green rail: Vitest reads CSS as an empty string, so a CSS
+ *     rail written in `guardrails.test.ts` passes vacuously for ever. That sentence is the whole reason the
+ *     e2e spec has a `guard rail:` section at all.
+ *  §3 Assert that the rail read what it claims to read. A glob matching nothing and a file renamed out from
+ *     under a path both look exactly like a pass.
+ *  §4 Proved red by restoring the bug *before* it is made green — the rule CLAUDE.md states and this file
+ *     demonstrates — together with the limit that makes it more than a slogan: a text rail cannot see a
+ *     mutation that keeps every identifier (#205's `showCertificateFullscreen;`), so a behavioural test has
+ *     to sit beside it.
+ *  §5 **The one-directional budget rule, with a negative beside it.** This is the highest-value pin in the
+ *     file: a skill saying a budget may be raised when the rise is justified is a live licence to switch off
+ *     any rail in the repository, and it would read perfectly reasonably. The positive pin cannot hold that
+ *     on its own — a pinned clause can always be *continued* — so a detector for the permission itself runs
+ *     beside it, over the **whole file** (below).
+ *  §6 Scope, not length, and the slicer that **throws** on a missing section. An absent section returning ''
+ *     makes every assertion over it pass, which is the vacuity failure of §3 one level up.
+ *  §7 Both runs in the body, and the rule that a rail is never weakened quietly.
+ *
+ * **The first cut of this rail was blocked, and all four objections reproduced.** Each is a way a scoped
+ * text rail decays that the `open-pr` round had not yet met, so each is written down here rather than only
+ * fixed:
+ *
+ *  1. **A negative in one voice is not a negative.** The first cut forbade `may … raise` and nothing else, so
+ *     `a budget may be **raised** when the rise is justified` walked straight past it — the exact sentence
+ *     this docstring names as the threat, because `raise\b` does not match `raised`. `Raising N is
+ *     acceptable` passed too. A single phrasing is not a rule, and the fix is not a longer alternation
+ *     either: `WIDENER` below pairs a *raise word* with a *permission word* inside one sentence, and
+ *     **self-tests positively** — a `.not.toMatch` whose pattern matches nothing passes for ever, which is
+ *     §3's own vacuity failure applied to a negative, and the case §3 did not cover.
+ *  2. **A duplicate heading silently replaces a section.** `SECTIONS.set` is last-write-wins and the keys are
+ *     a set, so `1,2,3,4,5,5,6,7` satisfied `toEqual([1..7])`. Gutting §5 to a licence and appending the
+ *     genuine §5 at the end as a decoy left every pin green *and the file longer*: the reader meets the
+ *     licence, the rail reads the decoy. Duplicates are now collected and asserted empty.
+ *  3. **Per-row scoping is only as good as the row lookup.** The first cut pinned three of §2's four rows and
+ *     never row 1 — the home most rails go to — so it could be pointed at the vacuous one or deleted
+ *     outright. Worse, `row()` took the first *substring* hit, which is the "which row did I match" failure
+ *     the scoping was supposed to end, moved down one level. First cells are now compared **exactly**, the
+ *     full list is pinned in order, and a lookup matching other than exactly one row fails.
+ *  4. **Text outside every section is text outside every pin.** The preamble is not sliced, so a licence
+ *     sentence above `## 1.` was green. The widener detector therefore runs over the whole file, not §5, and
+ *     the preamble's substance is pinned.
+ *
+ * **A second review round found three more, and the first is the one to learn from.** The fix above turned
+ * the licence detector from one phrasing into a raise word paired with a *permission* word — and every rule
+ * in this skill is written as a bare imperative, which has no modal. So `Raise N to the new count when a
+ * refactor adds cases` was green while the test asserting it was called *"in every voice one would be
+ * written in"*. That claim, and a matching "in any voice" in this docstring, were false as written; both are
+ * gone. The detector now anchors on a **budget symbol** and vetoes on **negation**, which is what lets the
+ * vocabulary be wide without firing on the prose of a document about moving rails about:
+ *
+ *  5. **A negative with no polarity is loud in the wrong direction.** `It is never legitimate to raise N`
+ *     went red — an author making §5 *more* emphatic met an inexplicable failure, which is exactly how §6
+ *     says a rail teaches people to edit the rail rather than the prose. The real file survived only because
+ *     the pinned clause happens to carry no permission word: luck, not design.
+ *  6. **Heading text is outside every slice.** The slicer discarded the heading tail, so the rule was
+ *     reversible in title form — `## 5. A budget number only ever goes down` → `## 5. A budget number moves
+ *     with the count`, green. That is finding 4 of the first round in the instance that matters most, which
+ *     is worth saying plainly: the lesson was written into §6 and the same class of hole was left open one
+ *     line above it.
+ *  7. **The guard that is a separate `it` is a guard an `it.only` can skip.** The duplicate-heading check now
+ *     lives inside `S()`, so a decoy fails every pin rather than one test.
+ *
+ * The limit, stated here because §7 of the skill asks for exactly this and a rail that will not say it of
+ * itself has no standing to ask: **these are containment checks, and containment cannot prove the absence of
+ * a sentence contradicting what it found** (#257). The detector pairs vocabulary, not meaning — a licence
+ * written without a budget word, or with a raise word this list does not carry, would pass, and the sentence
+ * splitter is a regex over full stops. What it now covers is stated by the two self-tests below rather than
+ * by adjectives here, because that is the only claim that cannot rot. A rewrite that keeps a rule and
+ * changes its words will fail here; the answer then is to update this rail in the same commit, never to drop
+ * the rule.
+ *
+ * Prove it red: delete any of the seven sections, give one a duplicate heading, or add an unnumbered one;
+ * reverse a section's heading text; change or delete any row of §2's table; write a licence to raise a budget
+ * anywhere in the file, imperative or modal; drop one of §6's four lessons; gut the preamble; replace the
+ * body with a stub, padded or not.
+ */
+describe('the add-guard-rail skill keeps the rules that were paid for (#180)', () => {
+  const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
+  const raw = read('.claude/skills/add-guard-rail/SKILL.md');
+  /** Wrapping is prose, not a rule (the lesson of #249's second cut). Normalise it away before comparing. */
+  const flat = (t: string) => t.replace(/\s+/g, ' ').trim();
+  /** The body sliced on its `## N.` headings, both flattened and raw — the table in §2 needs its newlines. */
+  const SECTIONS = new Map<number, { flat: string; raw: string; heading: string }>();
+  /** Headings seen twice. `set` is last-write-wins and the keys are a set, so a decoy copy is invisible here. */
+  const DUPLICATE_HEADINGS: number[] = [];
+  for (const m of raw.matchAll(/^## (\d+)\.([^\n]*)\n([\s\S]*?)(?=^## \d+\.|$(?![\s\S]))/gm)) {
+    const n = Number(m[1]);
+    if (SECTIONS.has(n)) DUPLICATE_HEADINGS.push(n);
+    SECTIONS.set(n, { flat: flat(m[3]), raw: m[3], heading: flat(m[2]) });
+  }
+  /** Every `## ` heading in the file, numbered or not: an `## Appendix` after §7 is invisible to the keys guard. */
+  const ALL_HEADINGS = [...raw.matchAll(/^## ([^\n]*)/gm)].map((m) => flat(m[1]));
+  /**
+   * Everything above `## 1.` — sliced into no section, so covered by no pin unless one is put here. A missing
+   * `## 1.` makes `search` answer -1, and `slice(0, -1)` would quietly hand back the whole document, turning a
+   * scoped pin into whole-file containment; the index is checked rather than trusted.
+   */
+  const PREAMBLE_END = raw.search(/^## 1\./m);
+  const PREAMBLE = PREAMBLE_END < 0 ? '' : flat(raw.slice(0, PREAMBLE_END));
+  /**
+   * One section's text. Throws on absent *and* on empty — an empty body satisfies every `toContain`-free pass
+   * — and on a duplicated heading, so a decoy copy fails **every** pin rather than only the one `it` that
+   * checks for it. That separation was the gap: an `it.only` or a `.skip` elsewhere in this block would
+   * otherwise leave all the pins green against a file whose real section had been gutted.
+   */
+  const S = (n: number): string => {
+    if (DUPLICATE_HEADINGS.length) throw new Error(`add-guard-rail/SKILL.md repeats heading(s) ${DUPLICATE_HEADINGS.join(', ')} — the pinned section may be a decoy`);
+    const s = SECTIONS.get(n);
+    if (!s?.flat) throw new Error(`add-guard-rail/SKILL.md has no section ${n} — the rail cannot hold a section that is not there`);
+    return s.flat;
+  };
+  /**
+   * A section's markdown table as trimmed cells per row, the `| --- |` separator dropped — **the header row is
+   * kept**, so a pin over the first column carries its label. Dropping it instead would mean deleting the real
+   * header silently promotes row 1 into its place and loses a home with nothing going red.
+   *
+   * Throws on a missing section for the reason §6 of the skill gives: a slicer that answers `[]` makes every
+   * assertion over it pass, and the next pin added here would be vacuous. Both call sites are protected today;
+   * this is so the third one is too.
+   */
+  const table = (n: string | number): string[][] => {
+    const s = SECTIONS.get(Number(n));
+    if (!s) throw new Error(`add-guard-rail/SKILL.md has no section ${n} — a table cannot be read from a section that is not there`);
+    return s.raw.split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith('|'))
+      .map((l) => l.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim()))
+      .filter((cells) => !/^-+$/.test(cells[1] ?? ''));
+  };
+  /**
+   * One table row, keyed on its first cell **exactly**. The first cut used `includes`, so the first substring
+   * hit won and a row could absorb another's key — the "which row did I match" failure per-row scoping exists
+   * to end, one level down. Other than exactly one match is a failure, never a silent `''`.
+   */
+  const row = (n: number, key: string): string => {
+    const hits = table(n).filter((cells) => cells[0] === key);
+    expect(hits, `§${n}'s table must have exactly one row whose first cell is ${key}`).toHaveLength(1);
+    return flat(hits[0].slice(1).join(' '));
+  };
+
+  /**
+   * A sentence that would let a budget get bigger. Three cuts to get here, and the shape of each failure is
+   * the lesson:
+   *
+   *  1. `may … raise` — one phrasing. `may be raised` walked past it, which is the wording this block's own
+   *     docstring uses to *name* the threat.
+   *  2. a raise word **and a permission word** — two vocabularies, which reads like a rule but needs a modal.
+   *     Every other line in this skill is a bare imperative ("Lower N when you remove a case"), so the
+   *     natural way to write the licence was the one shape it could not see: *"Raise N to the new count when
+   *     a refactor adds cases."* A test named "in every voice" was green over exactly that.
+   *  3. what is here: a **budget symbol** and a **bigger word** in one sentence, **unless the sentence
+   *     forbids it**. Anchoring on the budget is what lets the vocabulary be wide without firing on the prose
+   *     of a document about moving rails about — "A rail can be lifted into the e2e spec" names no budget.
+   *     The polarity veto is the other half: without it `It is never legitimate to raise N` went red, so an
+   *     author making §5 *more* emphatic met an inexplicable failure — precisely how §6 says a rail teaches
+   *     people to edit the rail instead of the prose.
+   *
+   * No permission word is required any more, so the imperative is covered. Self-tested in both directions
+   * below, on the sentences that escaped cut 2 and on the honest prose that cut 2 fired on.
+   */
+  const BUDGET = /\bN\b|budget|\bnumbers?\b|\bcounts?\b|threshold|\bfloors?\b/i;
+  // `set` is the verb only — `\bset\b` alone fired on "its keys are a set", in the §6 bullet about decoy
+  // headings, where "the heading number" supplied the budget word. A rail red on its own prose is the defect
+  // this whole section is about, so the verb is matched with its object rather than bare.
+  const BIGGER = /\brais\w*|increas\w*|bump\w*|widen\w*|grow\w*|\bris(?:e|es|ing)\b|updat\w*|adjust\w*|\bset(?:s|ting)?\s+(?:it|its|the|a|N)\b|track\w*|reflect\w*|loosen\w*|relax\w*|lift\w*|\bgoes? up\b/i;
+  const FORBIDS = /\bnever\b|\bnot\b|n't\b|\bcannot\b|\bno\b|\bnothing\b|forbid\w*|\bonly ever\b|one-directional/i;
+  const widening = (t: string) => flat(t).split(/(?<=[.!?])\s+/)
+    .filter((s) => BUDGET.test(s) && BIGGER.test(s) && !FORBIDS.test(s));
+
+  it('slices into the seven sections the pins below address, each heading exactly once', () => {
+    // The slicer's own vacuity guard: a file reorganised into different headings must fail visibly here
+    // rather than making every assertion below throw for the wrong reason.
+    expect([...SECTIONS.keys()].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    // And the half the keys cannot show. `set` is last-write-wins, so a gutted §5 followed by a verbatim
+    // decoy `## 5.` at the end of the file satisfied every pin below while the reader met the gutted one —
+    // and made the file *longer*, clearing the floor comfortably.
+    expect(DUPLICATE_HEADINGS, 'a second `## N.` heading makes the pinned section a decoy the reader never sees')
+      .toEqual([]);
+    // And no unnumbered heading: an `## Appendix` after §7 is invisible to the keys guard and its text lands
+    // inside §7's slice, so a licence written there is covered by nothing.
+    expect(ALL_HEADINGS.filter((h) => !/^\d+\./.test(h)), 'the file has exactly seven numbered sections and no others')
+      .toEqual([]);
+  });
+
+  it('the heading of each section carries its rule, not just the body', () => {
+    // The slicer discarded the heading tail, so every pin read the body only — which made the rule reversible
+    // in title form: `## 5. A budget number only ever goes down` → `## 5. A budget number moves with the
+    // count` was green. This is the 16:49Z review's own finding 4 (text the slicer does not reach is text no
+    // pin covers), in the instance that matters most.
+    const H = (n: number) => SECTIONS.get(n)?.heading ?? '';
+    expect(H(1)).toContain('Name the incident');
+    expect(H(2)).toContain('homes');
+    expect(H(3)).toContain('A rail that cannot fail is worse than no rail');
+    expect(H(4)).toContain('Prove it red by restoring the bug, before you make it green');
+    expect(H(5), 'the direction is the rule, and it belongs in the title too')
+      .toContain('A budget number only ever goes down');
+    expect(H(6)).toContain('Scope, not length');
+    expect(H(7)).toContain('both runs');
+  });
+
+  it('the widener-detector fires on a licence, imperative and passive alike', () => {
+    // A detector that matches nothing passes for ever — §3's own vacuity failure, applied to a negative. The
+    // first four escaped cut 1 (active voice only); the last four escaped cut 2, which needed a modal and so
+    // was blind to the imperative — the voice every other rule in this skill is written in.
+    for (const licence of [
+      'In practice a budget may be raised when the rise is justified in the pull request body.',
+      'Raising N is acceptable when a refactor legitimately adds cases.',
+      'Increasing N is acceptable where the reviewer signs off on the reason.',
+      'You may raise N when justified.',
+      'Raise N to the new count when a refactor adds cases, and set it wherever reality puts it.',
+      'Budgets track reality: when a refactor adds cases, update N to the new count.',
+      'A rise in N is fine when the refactor that caused it is named in the body.',
+      'Raise N when a refactor adds cases.',
+    ]) expect(widening(licence), `a licence went undetected: ${licence}`).toHaveLength(1);
+  });
+
+  it('and stays quiet on a prohibition, and on prose about moving rails about', () => {
+    // The other half of the same defect. `RAISE && PERMISSION` had no polarity, so making the rule *more*
+    // emphatic turned the suite red; and without the budget anchor, ordinary sentences about relocating a
+    // rail collided with it — in a document whose whole subject is where rails go.
+    for (const honest of [
+      'Lower N when you remove a case. Never raise it to make a build pass.',
+      'It is never legitimate to raise N.',
+      'A rail can be lifted into the e2e spec when it needs a browser.',
+      'Relaxing the glob is fine when the walk still reaches the file.',
+      'A budget number only ever goes down.',
+    ]) expect(widening(honest), `false positive on: ${honest}`).toEqual([]);
+  });
+
+  it('nothing anywhere in the file permits raising a budget', () => {
+    // Over the WHOLE file rather than §5: the preamble is sliced into no section, so a licence sentence
+    // above `## 1.` was green against every per-section pin the first cut had.
+    expect(widening(raw), 'a skill permitting a raised budget is a licence to switch off any rail here')
+      .toEqual([]);
+  });
+
+  it('the preamble states what a rail is for, so it cannot be gutted or repurposed', () => {
+    expect(PREAMBLE, 'the distinction the whole skill rests on').toContain('A guard rail is not test coverage');
+    expect(PREAMBLE, 'and what a rail is instead')
+      .toContain('one specific mistake we have already made cannot come back silently');
+  });
+
+  it('is long enough to be the skill rather than a stub', () => {
+    // Backstop only — the per-section pins are the substance, and a stub can be padded past any floor.
+    // NEVER lower this to make a build pass: if prose trimming trips it, a section has gone missing.
+    //
+    // Note the direction. A *budget* is a maximum and only ever comes down; this is a minimum, so tightening
+    // it means raising it, and 6,500 against a 9,691-character file was 33% of slack doing nothing. Raised to
+    // a real backstop with room for honest trimming.
+    expect(raw.length, 'add-guard-rail/SKILL.md is too short to be the skill').toBeGreaterThan(9_000);
+  });
+
+  it('§1 requires the rail to name the incident it prevents', () => {
+    expect(S(1), 'a rail whose comment names no incident is deleted by whoever next meets it red')
+      .toContain('**A rail with no incident behind it is a style preference**');
+  });
+
+  it('§2 lists exactly the four homes, and nothing is dropped or renamed', () => {
+    // The first cut pinned three rows and never row 1 — the home most rails go to — so it could be pointed
+    // at the vacuous one or deleted outright, both green. Pinning the whole first column closes deletion,
+    // renaming, a key absorbed into another row, and a fifth home nobody reviewed.
+    //
+    // Sorted, because row *order* is presentation: which row comes first carries no rule, and the same
+    // argument that made every comparison here whitespace-normalised says a rail must not go red on an
+    // honest reorder. What each row is *for* is the rule, and the test below holds that per row.
+    expect(table(2).map((cells) => cells[0]).sort(), 'the four homes a rail can live in, and the header above them')
+      .toEqual([
+        'Where',
+        '`tests/unit/guardrails.test.ts`',
+        '`tests/e2e/game.spec.ts`, named `guard rail: …`',
+        '`tests/unit/british.test.ts`',
+        'a job in `.github/workflows/ci.yml`',
+      ].sort());
+  });
+
+  it('§2 says what each home is for, and rules out the one that is green for ever', () => {
+    // Which row a purpose sits in is the rule: swapping two purposes between rows changes where a rail is
+    // told to go while every free-floating string in the section is still present.
+    expect(row(2, '`tests/unit/guardrails.test.ts`'), 'the default home is text and structure, not behaviour')
+      .toContain('text and structure');
+    expect(row(2, '`tests/e2e/game.spec.ts`, named `guard rail: …`'), 'the e2e spec is for a rail needing a browser')
+      .toContain('browser');
+    expect(row(2, '`tests/unit/british.test.ts`'), 'game wording is enforced separately (#47)').toContain('wording');
+    expect(row(2, 'a job in `.github/workflows/ci.yml`'), 'a workflow job is for what the tests cannot see (#160)')
+      .toContain('#160');
+    // The placement fact that makes the e2e section necessary at all: Vite's css plugin answers `?raw` with
+    // an empty string outside the browser, so a CSS rail written in Vitest reads nothing and is green for ever.
+    expect(S(2), 'a CSS rail in Vitest is a permanently green tick asserting the thing is safe')
+      .toContain('a CSS rail written in Vitest passes vacuously');
+    expect(S(2), 'and it must say where such a rail goes instead').toContain('CSS rails live in the e2e spec');
+  });
+
+  it('§3 requires the rail to assert that it read what it claims to read', () => {
+    expect(S(3), 'a vacuous rail is not a no-op, it is a green tick asserting safety')
+      .toContain('A vacuous rail is not a neutral no-op: it is a green tick asserting the thing is safe');
+    expect(S(3), 'so the read itself is asserted first').toContain('**assert first that it read it**');
+  });
+
+  it('§4 keeps red-before-green, and says what a text rail cannot see', () => {
+    expect(S(4), 'CLAUDE.md’s rule: the bug is restored and the rail watched to fail')
+      .toContain('put the bug back and watch the rail fail');
+    // The half that makes it more than a slogan: #205 shipped past a text rail with every identifier intact.
+    expect(S(4), 'a text rail is blind to a mutation that keeps the identifiers and changes the behaviour')
+      .toContain('**A text rail cannot see a mutation that keeps every identifier and changes what happens**');
+    expect(S(4), 'and the answer to that is a behavioural test beside it')
+      .toContain('a behavioural test has to sit beside it');
+  });
+
+  it('§5 keeps the budget rule one-directional, and does not permit raising one', () => {
+    expect(S(5), 'a budget records debt that exists today, and comes down as the debt does')
+      .toContain('Lower N when you remove a case');
+    expect(S(5), 'the rule that is the whole point of a budget rail')
+      .toContain('**Lower N when you remove a case. Never raise it to make a build pass**');
+    expect(S(5), 'and why: a raised budget is not a new value, it is the rail switched off')
+      .toContain('it is the rail switched off');
+    // The negative that belongs with these pins lives in `nothing anywhere in the file permits raising a
+    // budget` above, over the whole file rather than this section: the first cut scoped it to §5 and a
+    // licence sentence in the unsliced preamble was green.
+  });
+
+  it('§6 answers substring escapes with scope, and makes a missing section throw', () => {
+    expect(S(6), 'the escape itself: a pin is a substring of the whole file, so the file can contradict it')
+      .toContain('a pinned string is a substring of the whole file');
+    expect(S(6), 'and the answer is scope rather than a longer pin')
+      .toContain('A longer pinned clause is a longer substring, not a stronger check');
+    expect(S(6), 'assertions are made inside the part that owns the rule')
+      .toContain('assert inside the part that owns the rule');
+    // An absent section returning '' makes every assertion over it pass — §3's vacuity failure one level up.
+    expect(S(6), 'the slicer must throw on a missing section, not skip it')
+      .toContain('**throws when the section is missing**');
+    expect(S(6), 'a floor is a backstop, and it is a budget number too').toContain('so it does not go down either');
+    // The three lessons this pull request's own review rounds paid for. The rail block records them in its
+    // docstring, but the skill is the artefact a future run actually loads, so they have to be held here too
+    // — deleting all three left the suite green and the file only 1,195 characters shorter.
+    expect(S(6), 'the decoy-heading escape (review round 1, finding 2)')
+      .toContain('**A repeated heading is a decoy.**');
+    expect(S(6), 'text the slicer does not reach (review round 1, finding 4; round 2, finding 3)')
+      .toContain('**Text outside every slice is text outside every pin.**');
+    expect(S(6), 'and a negative that matches nothing (review round 1, finding 1)')
+      .toContain('**Self-test a negative.**');
+  });
+
+  it('§7 asks for both runs in the body, and forbids weakening a rail quietly', () => {
+    expect(S(7), 'the mutation that restored the bug and the failure it produced, then the same rail green')
+      .toContain('**both runs**');
+    expect(S(7), 'the rail says in its own comment what it cannot catch (#256, #257)')
+      .toContain("Finish the rail's comment with its limits");
+    expect(S(7), 'a rail that is wrong is fixed in the open, with the reason in the commit')
+      .toContain('**If a rail blocks you and you think it is wrong, say so in the pull request.**');
+    expect(S(7), 'and never quietly').toContain('Never weaken or delete one quietly');
   });
 });
 
