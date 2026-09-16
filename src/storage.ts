@@ -115,9 +115,33 @@ export const isFutureSave = (s: RawSave): boolean => {
   const v = saveVersionOf(s);
   return v !== UNREADABLE_VERSION && v > SAVE_VERSION;
 };
+/**
+ * Drop any field `migrate()` would otherwise carry through unchanged if it is the wrong *type* (#95 review):
+ * a version-valid blob like `{ v: 1, streak: null }` or `{ v: 1, dojo: null }` used to reach the merge below
+ * untouched, and then `topbar()`'s `d.streak.days`, `dojoCard()`'s `dojoFor(load().dojo, …)` (`s.date` on a
+ * `null` `s`), and every `record*()` writer below (`load().progress[id]` etc.) threw the moment they read it —
+ * not just the two call sites (`parentSummary()`, the map's star tally) the original fix touched. Deleting the
+ * bad field here, rather than guarding each reader, means a *new* call site gets this for free: every reader
+ * goes through `load()` → `migrate()`, so nothing downstream needs to know this hazard exists. The deleted key
+ * is filled back in from `DEFAULT` by the `{ ...DEFAULT, ...s }` merge below, exactly as a missing key already is.
+ */
+function sanitizeTypes(s: RawSave): RawSave {
+  const clean: RawSave = { ...s };
+  const isRecord = (x: unknown) => !!x && typeof x === 'object' && !Array.isArray(x);
+  for (const k of ['progress', 'endless', 'sprint', 'boss', 'memory', 'training', 'equipped', 'streak', 'dojo'] as const) {
+    if (k in clean && !isRecord(clean[k])) delete clean[k];
+  }
+  for (const k of ['stickers', 'owned'] as const) {
+    if (k in clean && !Array.isArray(clean[k])) delete clean[k];
+  }
+  for (const k of ['coins', 'spent'] as const) {
+    if (k in clean && typeof clean[k] !== 'number') delete clean[k];
+  }
+  return clean;
+}
 export function migrate(raw: unknown): SaveData {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...DEFAULT };
-  let s = raw as RawSave;
+  let s = sanitizeTypes(raw as RawSave);
   // Never stamp SAVE_VERSION over a version we could not read (#232). A fresh default is what this *session*
   // sees; keeping the stored blob intact is `save()`'s half, via the read-only latch below.
   if (!isMigratable(s)) return { ...DEFAULT };
