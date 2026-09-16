@@ -82,7 +82,7 @@ your first finding and the only one you can report.
    any whose head carries **no** `review-gate` status — that head has not been judged, and a missing status
    must never be read as a pass. Note separately any PR that is a draft or carries an unanswered
    `REVIEW: CHANGES REQUESTED`, and how long it has sat: a block nobody returns to is a stalled review, not a
-   safe state. **Since #90 such a block is adoptable, so say so rather than only reporting that it is stuck:**
+   safe state. **Since #161 such a block is adoptable, so say so rather than only reporting that it is stuck:**
    another agent may clear it once the block is at least 4 hours old, the session that set it has posted no
    comment on that same pull request in the last 2 hours (a comment elsewhere in the repository does not
    protect the block), and that agent has re-derived the objection against the current head. The
