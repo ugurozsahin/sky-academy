@@ -1,7 +1,7 @@
 // Persistent player state (localStorage). Small, versioned, safe on failure.
 import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type DojoState } from './game/dojo';
 import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
-import type { YearId } from './curriculum';
+import { TOPICS, YEARS, type YearId } from './curriculum';
 export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }   // hits/tries = lifetime slices (missions + Sensei training)
 /**
  * One earned certificate, kept as **data rather than a PNG** (#205): `certFromStored()` in `ui/certificate.ts`
@@ -131,14 +131,51 @@ export function recordMemory(year: string): number {
   const m = load().memory; const n = (m[year] ?? 0) + 1;
   save({ memory: { ...m, [year]: n } }); return n;
 }
-/** Sticker album: unlocked by lifetime coins. Order = avatars then the villain. */
+/** Sticker album (#114). Order = avatars then the villain. The first three stay a fast, purely-coin win —
+ * a four- or five-year-old needs a visible result in the first session or two. The other eight unlock from
+ * achievements instead of more coins, because coins are a pure volume metric: a child could replay one easy
+ * topic and empty the album without ever touching a second topic, a boss, or a harder year. */
 export const STICKER_IDS = ['volt', 'blaze', 'splash', 'terra', 'gust', 'frost', 'sol', 'shadow', 'kai', 'bolt', 'hammer'];
-export const STICKER_COST = [30, 70, 120, 180, 250, 330, 420, 520, 630, 750, 900];
-export function stickersFor(coins: number) { return STICKER_IDS.filter((_, i) => coins >= STICKER_COST[i]); }
-/** Add coins, return newly unlocked sticker ids. */
+export const STICKER_COST = [30, 70, 120];
+export function stickersFor(coins: number): string[] {
+  return STICKER_IDS.slice(0, STICKER_COST.length).filter((_, i) => coins >= STICKER_COST[i]);
+}
+const topicsStarred = (d: SaveData) => Object.values(d.progress).filter(p => p.stars > 0).length;
+const islandsWithAStar = (d: SaveData) => YEARS.filter(y => TOPICS.some(t => t.year === y.id && (d.progress[t.id]?.stars ?? 0) > 0)).length;
+const islandFullyStarred = (d: SaveData) => YEARS.some(y => TOPICS.filter(t => t.year === y.id).every(t => (d.progress[t.id]?.stars ?? 0) > 0));
+const totalBossWins = (d: SaveData) => Object.values(d.boss).reduce((n, x) => n + x, 0);
+const totalMemoryBoards = (d: SaveData) => Object.values(d.memory).reduce((n, x) => n + x, 0);
+const bestSprintAnyYear = (d: SaveData) => Object.values(d.sprint).reduce((best, x) => Math.max(best, x), 0);
+export const TOPICS_STARRED_GOAL = 5;
+export const SPRINT_STICKER_SCORE = 150;   // roughly a 3-star sprint (12+ correct) once the combo bonus is in
+/** One achievement per non-coin sticker. `progress` is pure over the save, for the rewards screen's hint text
+ * and progress bar; the sticker is earned once `done >= goal`. */
+export interface Achievement { id: string; title: string; progress: (d: SaveData) => { done: number; goal: number } }
+export const ACHIEVEMENTS: Achievement[] = [
+  { id: 'terra', title: `Star ${TOPICS_STARRED_GOAL} topics`, progress: d => ({ done: Math.min(topicsStarred(d), TOPICS_STARRED_GOAL), goal: TOPICS_STARRED_GOAL }) },
+  { id: 'gust', title: 'Star a topic on every island', progress: d => ({ done: islandsWithAStar(d), goal: YEARS.length }) },
+  { id: 'frost', title: '3-day streak', progress: d => ({ done: Math.min(d.streak.days, 3), goal: 3 }) },
+  { id: 'sol', title: '7-day streak', progress: d => ({ done: Math.min(d.streak.days, 7), goal: 7 }) },
+  { id: 'shadow', title: 'Beat Hammer Man once', progress: d => ({ done: Math.min(totalBossWins(d), 1), goal: 1 }) },
+  { id: 'kai', title: 'Finish a Memory Match board', progress: d => ({ done: Math.min(totalMemoryBoards(d), 1), goal: 1 }) },
+  { id: 'bolt', title: `Score ${SPRINT_STICKER_SCORE}+ in Ninja Sprint`, progress: d => ({ done: Math.min(bestSprintAnyYear(d), SPRINT_STICKER_SCORE), goal: SPRINT_STICKER_SCORE }) },
+  { id: 'hammer', title: 'Star every topic on one island', progress: d => ({ done: islandFullyStarred(d) ? 1 : 0, goal: 1 }) },
+];
+/** Every sticker the save currently qualifies for, coins and achievements together. A sticker already in
+ * `d.stickers` is never dropped even when the stat behind it later falls (a streak resets to zero) — this
+ * only ever adds ids on top of what is already recorded, which is what "nothing is ever taken away" means
+ * for a save that earned stickers under an earlier version of this rule (#114). */
+export function evaluateStickers(d: SaveData): string[] {
+  const earned = new Set(d.stickers);
+  stickersFor(d.coins).forEach(id => earned.add(id));
+  for (const a of ACHIEVEMENTS) if (a.progress(d).done >= a.progress(d).goal) earned.add(a.id);
+  return STICKER_IDS.filter(id => earned.has(id));
+}
+/** Add coins, return newly unlocked sticker ids (coin thresholds and any achievement the same play session
+ * just satisfied — every mode records its own stats before calling this, so `d` already reflects them). */
 export function addCoins(n: number): string[] {
   const d = load(); const coins = d.coins + Math.max(0, n);
-  const unlocked = stickersFor(coins); const fresh = unlocked.filter(id => !d.stickers.includes(id));
+  const unlocked = evaluateStickers({ ...d, coins }); const fresh = unlocked.filter(id => !d.stickers.includes(id));
   save({ coins, stickers: unlocked });
   return fresh;
 }
