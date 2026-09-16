@@ -54,10 +54,11 @@ describe('shop storage', () => {
     expect(buyItem(gold.id)).toBe(false);
     expect(JSON.parse(mem['sna:v1']).owned).toEqual([gold.id]);
   });
-  it('earning after spending raises the balance and still unlocks stickers from lifetime coins', () => {
-    addCoins(210); expect(buyItem(gold.id)).toBe(true); expect(coinBalance()).toBe(10);   // lifetime 210, spent 200
-    const fresh = addCoins(50); expect(fresh).toEqual(['gust']);             // lifetime 260 → the 250 sticker (5th), unaffected by spending
+  it('earning after spending raises the balance without unlocking more coin stickers, and spending never touches sticker unlocks (#114)', () => {
+    addCoins(210); expect(buyItem(gold.id)).toBe(true); expect(coinBalance()).toBe(10);   // lifetime 210, spent 200 — already past all three coin stickers
+    const fresh = addCoins(50); expect(fresh).toEqual([]);                  // lifetime 260 — the rest of the album is earned, not bought (#114)
     expect(coinBalance()).toBe(60);
+    expect(load().stickers).toEqual(['volt', 'blaze', 'splash']);           // only the coin-tier three, unaffected by spending or by coins climbing further
   });
   it('equipItem switches between owned items and refuses unowned ones', () => {
     expect(equipItem(gold.id)).toBe(false);

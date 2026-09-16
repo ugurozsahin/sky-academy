@@ -1,7 +1,7 @@
 // Persistent player state (localStorage). Small, versioned, safe on failure.
 import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type DojoState } from './game/dojo';
 import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
-import type { YearId } from './curriculum';
+import { TOPICS, YEARS, type YearId } from './curriculum';
 export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }   // hits/tries = lifetime slices (missions + Sensei training)
 /**
  * One earned certificate, kept as **data rather than a PNG** (#205): `certFromStored()` in `ui/certificate.ts`
@@ -74,26 +74,97 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
  * change gets a real migration step rather than load() papering over it. Tolerant of hand-edited / corrupt data:
  * a non-object, or JSON that is not a save, falls back to a fresh default.
  */
-/** The shape version a raw blob is in. A blob with no `v` predates versioning but shares the v1 shape, so it
- *  walks every migration from 1 — reading it as *current* would skip them all and hand a reshaping step stale keys. */
-export const saveVersionOf = (s: RawSave): number => (typeof s.v === 'number' ? s.v : 1);
+/** A version we cannot migrate from: not a number we wrote, so the ladder has no honest starting rung (#232). */
+export const UNREADABLE_VERSION = 0;
+/** The shape version a raw blob is in. A blob with **no** `v` predates versioning but shares the v1 shape, so it
+ *  walks every migration from 1 — reading it as *current* would skip them all and hand a reshaping step stale keys.
+ *  A `v` that is *present* but not a whole number ≥ 1 (`"2"`, `null`, `{}`, `1.5`, `-3`) is a different case and
+ *  used to land on 1 as well: that re-ran the whole ladder over data that had already been migrated, which is
+ *  harmless for an additive step and silently destructive for a reshaping one (#232). It now reads as
+ *  UNREADABLE_VERSION, which `migrate()` refuses rather than guesses at. */
+export const saveVersionOf = (s: RawSave): number => {
+  if (s.v === undefined) return 1;
+  return typeof s.v === 'number' && Number.isInteger(s.v) && s.v >= 1 ? s.v : UNREADABLE_VERSION;
+};
+/**
+ * Whether the ladder can bring this blob to the current shape: a readable version, at or below ours (#232).
+ *
+ * A blob from a **newer** build is the case this exists for. `migrate()` used to fall straight through the
+ * `while` (`3 < 2` is false) to a return that stamps `v: SAVE_VERSION` over v3-shaped data; `load()` cached
+ * that and the next `save()` wrote it back, so the newer save was permanently relabelled as the older shape,
+ * with whatever the newer version added sitting unrecognised and whatever it *renamed* read under its old
+ * name. `importSave()` has always refused this case for the same reason — migrations only run forwards —
+ * and this is `load()`'s half of the same rule.
+ */
+export const isMigratable = (s: RawSave): boolean => {
+  const v = saveVersionOf(s);
+  return v !== UNREADABLE_VERSION && v <= SAVE_VERSION;
+};
+/**
+ * A blob from a **newer** build specifically — readable version, above ours. This is the only case the
+ * read-only latch protects, and the distinction is load-bearing (review of #232's first cut).
+ *
+ * Both this and an unreadable `v` are refused by `isMigratable`, because neither can be brought to our shape.
+ * But *not writing* is a separate decision from *not reading*, and it is only justified here: a newer blob is
+ * a real save that the child's other device can still open, so overwriting it destroys progress that exists.
+ * An unreadable `v` is a shape **no build ever wrote**, so there is nothing on the other side to preserve —
+ * latching it would brick saving on the device for good, with no route back (`reset()` has no caller in the
+ * app and `?reset` cannot be typed into a Capacitor WebView), which is strictly worse than starting clean.
+ */
+export const isFutureSave = (s: RawSave): boolean => {
+  const v = saveVersionOf(s);
+  return v !== UNREADABLE_VERSION && v > SAVE_VERSION;
+};
 export function migrate(raw: unknown): SaveData {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...DEFAULT };
   let s = raw as RawSave;
+  // Never stamp SAVE_VERSION over a version we could not read (#232). A fresh default is what this *session*
+  // sees; keeping the stored blob intact is `save()`'s half, via the read-only latch below.
+  if (!isMigratable(s)) return { ...DEFAULT };
   let v = saveVersionOf(s);
   while (v < SAVE_VERSION && MIGRATIONS[v]) { s = MIGRATIONS[v](s); v++; }
   return { ...DEFAULT, ...s, v: SAVE_VERSION };           // fill any missing keys and stamp the current version
 }
 
 let cache: SaveData | null = null;
+/**
+ * Set when `load()` read a blob from a **newer build** (#232). While it is set the session runs on defaults
+ * and `save()` writes nothing, so the stored blob survives: a child whose tablet is on a newer build keeps
+ * their progress even after the phone has opened the save. Refusing *and resetting* would have been two
+ * lines, but it throws away a save the other device still reads.
+ *
+ * Deliberately **not** set for an unreadable `v` — see `isFutureSave` for why that case resets instead.
+ * Every read of the save while this is set is reporting state that is not the child's: `exportSave()` has to
+ * know that (it moves the stored blob instead), and the dashboard eventually should too (issue 266).
+ */
+let readOnly = false;
+/**
+ * Whether this session is running on defaults over a stored save it refused to touch (#232).
+ *
+ * Exported because the refusal is otherwise **silent**: the child plays, nothing persists, and nothing says so.
+ * That is the right trade for a newer save — the alternative destroys a save their other device still reads —
+ * but it is a state a grown-up should eventually be told about, and this is the hook a "your progress is not
+ * being saved" notice would read. That notice is #232's own related item and is not built here.
+ */
+export const isReadOnlySave = () => readOnly;
 export function load(): SaveData {
   if (cache) return cache;
-  try { const raw = localStorage.getItem(KEY); cache = raw ? migrate(JSON.parse(raw)) : { ...DEFAULT }; }
-  catch { cache = { ...DEFAULT }; }
+  try {
+    const raw = localStorage.getItem(KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    // Only a *newer* blob is protected. An unreadable `v` is still refused as data (migrate returns the
+    // default) but writes resume, so the next save() replaces the corrupt blob and the device recovers.
+    readOnly = !!parsed && typeof parsed === 'object' && !Array.isArray(parsed) && isFutureSave(parsed as RawSave);
+    cache = raw ? migrate(parsed) : { ...DEFAULT };
+  }
+  catch { readOnly = false; cache = { ...DEFAULT }; }
   return cache!;
 }
 export function save(patch: Partial<SaveData> = {}): SaveData {
   cache = { ...load(), ...patch };
+  // #232: the blob on disk is newer than this build, or carries a version we cannot read. The session keeps
+  // working against `cache`; writing would relabel it as our shape and make the loss permanent.
+  if (readOnly) return cache;
   try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* private mode etc. */ }
   return cache;
 }
@@ -131,14 +202,61 @@ export function recordMemory(year: string): number {
   const m = load().memory; const n = (m[year] ?? 0) + 1;
   save({ memory: { ...m, [year]: n } }); return n;
 }
-/** Sticker album: unlocked by lifetime coins. Order = avatars then the villain. */
+/** Sticker album (#114). Order = avatars then the villain. The first three stay a fast, purely-coin win —
+ * a four- or five-year-old needs a visible result in the first session or two. The other eight unlock from
+ * achievements instead of more coins, because coins are a pure volume metric: a child could replay one easy
+ * topic and empty the album without ever touching a second topic, a boss, or a harder year. */
 export const STICKER_IDS = ['volt', 'blaze', 'splash', 'terra', 'gust', 'frost', 'sol', 'shadow', 'kai', 'bolt', 'hammer'];
-export const STICKER_COST = [30, 70, 120, 180, 250, 330, 420, 520, 630, 750, 900];
-export function stickersFor(coins: number) { return STICKER_IDS.filter((_, i) => coins >= STICKER_COST[i]); }
-/** Add coins, return newly unlocked sticker ids. */
+export const STICKER_COST = [30, 70, 120];
+export function stickersFor(coins: number): string[] {
+  return STICKER_IDS.slice(0, STICKER_COST.length).filter((_, i) => coins >= STICKER_COST[i]);
+}
+/** A field that should be a plain `Record<string, …>`, tolerant of a hand-edited or corrupted save (#270
+ * review): `importSave()` only checks `v`, so a blob like `{ v: 2, boss: null }` reaches here untouched, and
+ * `Object.values()` on that throws. Every coin award now runs every achievement check, so a corruption in any
+ * one field used to break only the mode that read it and now broke coin-earning app-wide; this reads as empty
+ * instead, matching `wallet()`'s existing tolerance for the same class of blob. */
+const safeRecord = <T>(x: unknown): Record<string, T> => (x && typeof x === 'object' && !Array.isArray(x)) ? x as Record<string, T> : {};
+const topicsStarred = (d: SaveData) => Object.values(safeRecord<TopicProgress>(d.progress)).filter(p => (p?.stars ?? 0) > 0).length;
+const islandsWithAStar = (d: SaveData) => { const p = safeRecord<TopicProgress>(d.progress); return YEARS.filter(y => TOPICS.some(t => t.year === y.id && (p[t.id]?.stars ?? 0) > 0)).length; };
+const islandFullyStarred = (d: SaveData) => {
+  const p = safeRecord<TopicProgress>(d.progress);
+  return YEARS.some(y => { const ts = TOPICS.filter(t => t.year === y.id); return ts.length > 0 && ts.every(t => (p[t.id]?.stars ?? 0) > 0); });
+};
+const sumOf = (x: unknown) => Object.values(safeRecord<number>(x)).reduce((n: number, v) => n + (typeof v === 'number' ? v : 0), 0);
+const totalBossWins = (d: SaveData) => sumOf(d.boss);
+const totalMemoryBoards = (d: SaveData) => sumOf(d.memory);
+const bestSprintAnyYear = (d: SaveData) => Object.values(safeRecord<number>(d.sprint)).reduce((best: number, v) => Math.max(best, typeof v === 'number' ? v : 0), 0);
+export const TOPICS_STARRED_GOAL = 5;
+export const SPRINT_STICKER_SCORE = 150;   // roughly a 3-star sprint (12+ correct) once the combo bonus is in
+/** One achievement per non-coin sticker. `progress` is pure over the save, for the rewards screen's hint text
+ * and progress bar; the sticker is earned once `done >= goal`. */
+export interface Achievement { id: string; title: string; progress: (d: SaveData) => { done: number; goal: number } }
+export const ACHIEVEMENTS: Achievement[] = [
+  { id: 'terra', title: `Star ${TOPICS_STARRED_GOAL} topics`, progress: d => ({ done: Math.min(topicsStarred(d), TOPICS_STARRED_GOAL), goal: TOPICS_STARRED_GOAL }) },
+  { id: 'gust', title: 'Star a topic on every island', progress: d => ({ done: islandsWithAStar(d), goal: YEARS.length }) },
+  { id: 'frost', title: '3-day streak', progress: d => ({ done: Math.min(d.streak.days, 3), goal: 3 }) },
+  { id: 'sol', title: '7-day streak', progress: d => ({ done: Math.min(d.streak.days, 7), goal: 7 }) },
+  { id: 'shadow', title: 'Beat Hammer Man once', progress: d => ({ done: Math.min(totalBossWins(d), 1), goal: 1 }) },
+  { id: 'kai', title: 'Finish a Memory Match board', progress: d => ({ done: Math.min(totalMemoryBoards(d), 1), goal: 1 }) },
+  { id: 'bolt', title: `Score ${SPRINT_STICKER_SCORE}+ in Ninja Sprint`, progress: d => ({ done: Math.min(bestSprintAnyYear(d), SPRINT_STICKER_SCORE), goal: SPRINT_STICKER_SCORE }) },
+  { id: 'hammer', title: 'Star every topic on one island', progress: d => ({ done: islandFullyStarred(d) ? 1 : 0, goal: 1 }) },
+];
+/** Every sticker the save currently qualifies for, coins and achievements together. A sticker already in
+ * `d.stickers` is never dropped even when the stat behind it later falls (a streak resets to zero) — this
+ * only ever adds ids on top of what is already recorded, which is what "nothing is ever taken away" means
+ * for a save that earned stickers under an earlier version of this rule (#114). */
+export function evaluateStickers(d: SaveData): string[] {
+  const earned = new Set(d.stickers);
+  stickersFor(d.coins).forEach(id => earned.add(id));
+  for (const a of ACHIEVEMENTS) if (a.progress(d).done >= a.progress(d).goal) earned.add(a.id);
+  return STICKER_IDS.filter(id => earned.has(id));
+}
+/** Add coins, return newly unlocked sticker ids (coin thresholds and any achievement the same play session
+ * just satisfied — every mode records its own stats before calling this, so `d` already reflects them). */
 export function addCoins(n: number): string[] {
   const d = load(); const coins = d.coins + Math.max(0, n);
-  const unlocked = stickersFor(coins); const fresh = unlocked.filter(id => !d.stickers.includes(id));
+  const unlocked = evaluateStickers({ ...d, coins }); const fresh = unlocked.filter(id => !d.stickers.includes(id));
   save({ coins, stickers: unlocked });
   return fresh;
 }
@@ -208,7 +326,7 @@ export function equipItem(id: string): boolean {
   const w = wallet(); const next = equip(w, id); if (next === w) return false;
   save({ equipped: next.equipped }); return true;
 }
-export function reset() { cache = null; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }
+export function reset() { cache = null; readOnly = false; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232)
 
 /**
  * The save as a code the grown-up can copy to another device (#64). Every APK the workflow builds is signed
@@ -216,7 +334,18 @@ export function reset() { cache = null; try { localStorage.removeItem(KEY); } ca
  * the child's coins, stars and streak, with it. Until the signing key is stable this is the way progress
  * survives a reinstall, and it is the same code #20's profiles and #16's second player would move about.
  */
-export function exportSave(): string { return JSON.stringify(load()); }
+export function exportSave(): string {
+  load();   // settles the latch against what is actually on disk before we decide what to hand over
+  // #232 review: under the latch `load()` is a fresh default, so exporting it would hand the grown-up a
+  // **valid** code carrying no progress — and `parents.ts` invites them to paste it into Restore on the
+  // other device, which is the device holding the real save. That would destroy it through the very
+  // mechanism added to protect it. The stored blob *is* the child's save, so move that instead: the newer
+  // device reads it, and an older one refuses it in importSave() exactly as it refuses any newer code.
+  if (readOnly) {
+    try { const raw = localStorage.getItem(KEY); if (raw) return raw; } catch { /* private mode etc. */ }
+  }
+  return JSON.stringify(load());
+}
 
 /**
  * Restore a save from an exported code, replacing what is on this device. Returns false and changes nothing
@@ -234,7 +363,13 @@ export function importSave(text: string): boolean {
   const v = (raw as RawSave).v;
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > SAVE_VERSION) return false;
   const next = migrate(raw);
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* private mode etc. */ }
+  let wrote = false;
+  try { localStorage.setItem(KEY, JSON.stringify(next)); wrote = true; } catch { /* private mode etc. */ }
   cache = next;
+  // #232 review: only lift the protection if the replacement actually landed. If setItem threw, the newer
+  // blob is still on disk — clearing the latch here would let the next ordinary save() relabel it, which is
+  // #232 restored through this very line. (The swallowed catch and the unconditional `true` are older
+  // faults, tracked in issue 266, and are not widened here.)
+  if (wrote) readOnly = false;
   return true;
 }

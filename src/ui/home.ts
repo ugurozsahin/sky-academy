@@ -1,6 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
-import { coinBalance, dojoToday, load, save, STICKER_IDS, STICKER_COST } from '../storage';
+import { ACHIEVEMENTS, coinBalance, dojoToday, load, save, STICKER_IDS, STICKER_COST } from '../storage';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { MODES } from '../game/modes';
@@ -145,22 +145,28 @@ export function rewardsScreen(nav: Nav) {
   const tb = topbar(nav, () => rewardsScreen(nav));
   const cards = STICKER_IDS.map((id, i) => {
     const a = AVATARS.find(x => x.id === id); const img = a ? a.img : VILLAIN.img; const name = a ? a.name : VILLAIN.name; const sub = a ? a.element : 'Villain';
-    const got = d.stickers.includes(id); const need = STICKER_COST[i];
-    return `<div class="sticker${got ? ' got' : ''}" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${img}" alt=""></span><b>${got ? name : '???'}</b><small>${got ? sub : `🪙 ${need}`}</small></div>`;
+    const got = d.stickers.includes(id);
+    const ach = ACHIEVEMENTS.find(x => x.id === id);
+    const prog = !got && ach ? ach.progress(d) : null;
+    const hint = i < STICKER_COST.length ? `🪙 ${STICKER_COST[i]}` : (ach?.title ?? '');
+    return `<div class="sticker${got ? ' got' : ''}" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${img}" alt=""></span><b>${got ? name : '???'}</b><small>${got ? sub : hint}</small>${prog ? `<span class="isl-bar"><i style="width:${Math.min(100, Math.round(100 * prog.done / prog.goal))}%"></i></span><small class="prog">${prog.done}/${prog.goal}</small>` : ''}</div>`;
   }).join('');
-  const nextIdx = STICKER_COST.findIndex(c => d.coins < c);
-  const next = nextIdx === -1 ? null : STICKER_COST[nextIdx];
+  const nextCoinIdx = STICKER_COST.findIndex(c => d.coins < c);
+  const nextCoin = nextCoinIdx === -1 ? null : STICKER_COST[nextCoinIdx];
+  const banner = d.stickers.length === STICKER_IDS.length ? 'Album complete — legendary!'
+    : nextCoin ? `<span>Next sticker at 🪙 ${nextCoin}</span><span class="isl-bar"><i style="width:${Math.min(100, Math.round(100 * d.coins / nextCoin))}%"></i></span>`
+    : 'The rest of the album is earned by playing, not by coins — see each sticker below';
   render(`
   <section class="screen home rewards">
     ${tb.html}
-    <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Ninja Rewards</b><small>Earn coins by answering — unlock every ninja sticker</small></div></div>
+    <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Ninja Rewards</b><small>Earn coins for a fast start — the rest of the album comes from playing</small></div></div>
     <button class="btn primary shop-btn" id="shop">🛍️ Ninja Shop <small>spend 🪙 ${coinBalance()}</small></button>
     <div class="reward-stats">
       <div><b>🪙 ${d.coins}</b><small>coins earned</small></div>
       <div><b>🔥 ${d.streak.days}</b><small>day streak</small></div>
       <div><b>${d.stickers.length}/${STICKER_IDS.length}</b><small>stickers</small></div>
     </div>
-    ${next ? `<div class="next-sticker"><span>Next sticker at 🪙 ${next}</span><span class="isl-bar"><i style="width:${Math.min(100, Math.round(100 * d.coins / next))}%"></i></span></div>` : '<div class="next-sticker">Album complete — legendary!</div>'}
+    <div class="next-sticker">${banner}</div>
     <div class="album">${cards}</div>
   </section>`, 'bg-sky');
   tb.bind();
