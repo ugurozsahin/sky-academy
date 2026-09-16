@@ -1346,6 +1346,23 @@ test.describe('Sky Ninja Academy', () => {
     // every navigation, which would mask exactly the thing this assertion checks.)
     expect(await page.evaluate(() => localStorage.getItem('sna:v1'))).toBeNull();
   });
+
+  // Caught in review: the on-screen back arrow was the only place the post-reset invariant was enforced, so
+  // the hardware/browser back button — a more natural gesture here than reaching for the arrow — fell through
+  // main.ts's popstate handler straight to the map, with an empty profile (#115, review on PR #274).
+  test('For grown-ups: the hardware/browser back button after a reset also lands on onboarding, not the map (#115)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 150 });
+    await openGrownUps(page);
+
+    await page.click('#start-again');
+    await page.fill('#reset-word', 'RESET');
+    await page.click('#reset-go');
+    await expect(page.locator('.reset-modal h2')).toContainText('All cleared');
+
+    await page.goBack();   // instead of tapping "Continue" or the on-screen arrow
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await expect(page.locator('.avatar-card.sel')).toHaveCount(0);
+  });
 });
 
 /**

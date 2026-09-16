@@ -8,6 +8,18 @@ type Nav = { map: () => void; avatar: () => void };
 /** The word a grown-up must type to confirm "Start again" — deliberately not a single tap a child could land on. */
 const RESET_WORD = 'RESET';
 
+/**
+ * Set from a confirmed-but-not-undone reset until the grown-ups screen is left, by whichever route. Module
+ * level, not a local in `drawDash()`'s closure, because the hardware/browser back button never runs through
+ * that closure's `#back` click handler — it goes straight to `popstate` in `main.ts` (#53), which has no other
+ * way to know a reset just happened. Without this, the invariant "leaving this screen after a reset always
+ * goes to onboarding, never to the map with an empty profile" held for the on-screen tap and not for the OS
+ * back gesture — reviewed and caught on #274.
+ */
+let pendingReset = false;
+export const isPendingReset = () => pendingReset;
+export const clearPendingReset = () => { pendingReset = false; };
+
 const showPct = (x: number | null) => (x === null ? '—' : `${pct(x)}%`);
 const bar = (frac: number) => `<span class="isl-bar"><i style="width:${Math.round(100 * Math.max(0, Math.min(1, frac)))}%"></i></span>`;
 
@@ -173,9 +185,6 @@ export function parentsScreen(nav: Nav) {
   };
 
   const drawDash = () => {
-    // Once a reset has happened, leaving this screen — by "Continue" or the back arrow alike — must land on
-    // onboarding, never on the map with an empty profile (#115). "Undo" is the only way out of that state.
-    let wasReset = false;
     let snapshot: SaveData | null = null;
 
     const sm = parentSummary(load(), TOPICS, YEARS, STICKER_IDS.length);
@@ -185,7 +194,10 @@ export function parentsScreen(nav: Nav) {
       <div class="parents-dash">${dashHtml(sm, voiceState() === 'no')}</div>
       <div class="overlay" id="reset-overlay" hidden></div>
     </section>`, 'bg-sky');
-    $('#back').addEventListener('click', () => { sfx.tap(); if (wasReset) nav.avatar(); else nav.map(); });
+    // Once a reset has happened, leaving this screen — by "Continue", the back arrow, or the hardware/browser
+    // back button (main.ts's popstate handler reads `isPendingReset()` directly) — must land on onboarding,
+    // never on the map with an empty profile (#115). "Undo" is the only way out of that state.
+    $('#back').addEventListener('click', () => { sfx.tap(); if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else nav.map(); });
     wireMove(() => drawDash());
 
     const overlay = $('#reset-overlay');
@@ -205,15 +217,16 @@ export function parentsScreen(nav: Nav) {
         sfx.tap();
         snapshot = load();       // kept in memory only — the "Undo" affordance below is what can bring it back
         reset();
-        wasReset = true;
+        pendingReset = true;
         overlay.innerHTML = resetDoneHTML();
         $('#reset-undo').addEventListener('click', () => {
           sfx.tap();
           if (snapshot) save(snapshot);   // save() replaces every key, so this restores the snapshot exactly
+          clearPendingReset();
           closeOverlay();
           drawDash();
         });
-        $('#reset-continue').addEventListener('click', () => { sfx.tap(); nav.avatar(); });
+        $('#reset-continue').addEventListener('click', () => { sfx.tap(); clearPendingReset(); nav.avatar(); });
       });
       input.focus();
     });
