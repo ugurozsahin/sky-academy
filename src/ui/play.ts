@@ -25,7 +25,9 @@ export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: To
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
-  const skin = equippedItem(wallet(), 'trail')?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
+  const equippedTrail = equippedItem(wallet(), 'trail');
+  const skin = equippedTrail?.trail;
+  const fx = equippedTrail?.fx ?? av.fx;
   const tracing = o.topic?.input === 'tracing';
   const spec = MODES[o.mode];
   const sprint = spec.timed; const boss = spec.boss; const training = spec.staged && !!o.pool;
@@ -111,16 +113,16 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         }
         const r = session.hit(b.label);
         if (r === 'ignored') return;
-        if (viaSwipe) { (sliceFx[av.fx] ?? sfx.slice)(); haptic('slice'); }
+        if (viaSwipe) { (sliceFx[fx] ?? sfx.slice)(); haptic('slice'); }
       },
       onFall(b) { if (b.label !== BOMB) session.fall(b.label); },
       onWaveEnd: waveEnd,   // the beat lives with the callbacks (#36): it reads the outcome still being shown
     }, {
-      trailColor: skin?.color ?? av.glow, trailCore: skin?.core, fx: av.fx,
+      trailColor: skin?.color ?? av.glow, trailCore: skin?.core, fx,
       onSwish: () => sfx.swish(),
       // A tap throws the ninja's projectile: the whoosh goes with the throw, the element slice with the pop (#48).
       onThrow: () => sfx.whoosh(),
-      onLand: () => { (sliceFx[av.fx] ?? sfx.slice)(); haptic('slice'); },
+      onLand: () => { (sliceFx[fx] ?? sfx.slice)(); haptic('slice'); },
       // The TNT blows up under the finger — never chase it with a star, or it would burst twice and reward the hit.
       throwFor: b => b.label !== BOMB,
     });
@@ -284,6 +286,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       stage: session.stage, index: session.index, score: session.score, lives: session.lives,
       ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt,
       answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null,
+      fx,
       shots: arena?.shotsThrown ?? 0,
     }),
     // PNG data URL of the certificate for the finished mission

@@ -497,6 +497,30 @@ test.describe('Sky Ninja Academy', () => {
     expect(await page.evaluate(() => window.__sna.state().trail)).toEqual({ color: '#ffd23a', core: '#fff6c4' });
   });
 
+  test('ninja shop: buy an element trail, arena picks up new effect and colours', async ({ page }) => {
+    test.slow();
+    const seed = async (patch: Record<string, unknown>) => {
+      await page.evaluate(p => { localStorage.setItem('sna:v1', JSON.stringify({ ...JSON.parse(localStorage.getItem('sna:v1')!), ...p })); }, patch);
+      await page.goto('/'); await expect(page.locator('.home')).toBeVisible();
+    };
+    await seedPlayer(page, 'volt');
+    await seed({ coins: 60, spent: 0 });
+    await page.click('#rewards'); await page.click('#shop');
+    await expect(page.locator('.shop')).toBeVisible();
+    await expect(page.locator('#balance b')).toHaveText('60');
+    await page.click('.item[data-item="trail-fire"] [data-buy]');
+    await expect(page.locator('#balance b')).toHaveText('10');
+    await expect(page.locator('.item[data-item="trail-fire"]')).toHaveClass(/\bon\b/);
+    await page.click('#back');
+    await expect(page.locator('.rewards')).toBeVisible();
+    await page.click('#back');
+    await expect(page.locator('.islands.big')).toBeVisible();
+    await startTopic(page, 'reception', 'r-count');
+    expect(await page.evaluate(() => window.__sna.state().trail)).toEqual({ color: '#ff7a1a', core: '#ffd23a' });
+    expect(await page.evaluate(() => window.__sna.state().fx)).toBe('fire');
+    expect(await page.evaluate(() => window.__sna.arena?.fx)).toBe('fire');
+  });
+
   test('reception is gentle: missed bubbles re-ask without losing lives', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { balance, buy, canBuy, equip, equippedItem, itemById, SHOP_ITEMS, type Wallet } from '../../src/game/shop';
+import { FX_COLORS, type FxKind } from '../../src/game/arena';
 import { addCoins, buyItem, coinBalance, equipItem, load, reset, wallet } from '../../src/storage';
 
 const mem: Record<string, string> = {};
@@ -64,5 +65,55 @@ describe('shop storage', () => {
     addCoins(gold.price); buyItem(gold.id);
     expect(equipItem('trail-element')).toBe(true); expect(load().equipped.trail).toBe('trail-element');
     expect(equipItem(gold.id)).toBe(true); expect(load().equipped.trail).toBe(gold.id);
+  });
+});
+
+describe('ninja shop element trails (#69)', () => {
+  const elements: FxKind[] = ['fire', 'water', 'electric', 'earth', 'wind', 'ice', 'light', 'shadow', 'blade', 'robot'];
+
+  it('catalogue contains every element trail with matching colours and effect', () => {
+    for (const el of elements) {
+      const item = SHOP_ITEMS.find(i => i.id === `trail-${el}`);
+      expect(item).toBeDefined();
+      expect(item?.kind).toBe('trail');
+      expect(item?.fx).toBe(el);
+      expect(item?.trail?.color).toBe(FX_COLORS[el][0]);
+      expect(item?.trail?.core).toBe(FX_COLORS[el][1]);
+    }
+  });
+
+  it('excludes master element from the shop catalogue', () => {
+    expect(SHOP_ITEMS.some(i => i.fx === 'master')).toBe(false);
+    expect(SHOP_ITEMS.some(i => i.id.includes('master'))).toBe(false);
+  });
+
+  it('enforces unique ids and strictly ascending prices in the trail ladder', () => {
+    const trails = SHOP_ITEMS.filter(i => i.kind === 'trail');
+    const ids = trails.map(i => i.id);
+    expect(new Set(ids).size).toBe(trails.length);
+
+    for (let i = 1; i < trails.length; i++) {
+      expect(trails[i].price).toBeGreaterThan(trails[i - 1].price);
+    }
+    expect(trails[0].id).toBe('trail-element');
+    expect(trails[0].price).toBe(0);
+    expect(trails[trails.length - 1].id).toBe('trail-gold');
+    expect(trails[trails.length - 1].price).toBe(200);
+  });
+
+  it('buying all element trails preserves lifetime coins and sticker unlocks', () => {
+    reset();
+    const totalCost = SHOP_ITEMS.filter(i => i.price > 0).reduce((sum, i) => sum + i.price, 0);
+    addCoins(totalCost + 100);
+    const initialStickers = load().stickers.length;
+    const initialLifetimeCoins = load().coins;
+
+    for (const item of SHOP_ITEMS.filter(i => i.price > 0)) {
+      expect(buyItem(item.id)).toBe(true);
+    }
+
+    expect(load().coins).toBe(initialLifetimeCoins);
+    expect(load().stickers.length).toBe(initialStickers);
+    expect(coinBalance()).toBe(100);
   });
 });

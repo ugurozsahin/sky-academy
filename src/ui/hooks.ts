@@ -6,7 +6,7 @@
 // checks the contract at the source, before the tests ever run. Keep these shapes in step with the objects
 // assigned in play.ts / memory.ts and the properties the spec reads.
 import type { Session } from '../game/session';
-import type { Arena } from '../game/arena';
+import type { Arena, FxKind } from '../game/arena';
 import type { Tracer } from '../game/tracing';
 import type { Memory } from '../game/memory';
 import type { TrailSkin } from '../game/shop';
@@ -27,6 +27,7 @@ export interface PlayState {
   timeLeft: number;
   bossHp: number;
   trail: TrailSkin | null;
+  fx: FxKind;
   /** Projectiles thrown so far this screen (#48) — a swipe never throws one, a tapped TNT never does either. */
   shots: number;
 }

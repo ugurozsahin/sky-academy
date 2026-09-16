@@ -1,8 +1,10 @@
 // Coin shop (#6): the catalogue and the pure buy / equip rules. Coins are never taken away — `coins` stays the
 // lifetime total (stickers unlock from it); spending adds to `spent`, and the balance is what is left to spend.
+import type { FxKind } from './arena';
+
 export type ItemKind = 'trail' | 'bubble' | 'decor' | 'costume';
 export interface TrailSkin { color: string; core: string }          // slice-trail colours (glow + bright core)
-export interface ShopItem { id: string; kind: ItemKind; name: string; blurb: string; icon: string; price: number; trail?: TrailSkin }
+export interface ShopItem { id: string; kind: ItemKind; name: string; blurb: string; icon: string; price: number; trail?: TrailSkin; fx?: FxKind }
 export interface Wallet { coins: number; spent: number; owned: string[]; equipped: Partial<Record<ItemKind, string>> }
 
 export const KIND_LABEL: Record<ItemKind, string> = { trail: 'Slice trails', bubble: 'Bubble skins', decor: 'Island decorations', costume: 'Costumes' };
@@ -10,6 +12,16 @@ export const KIND_LABEL: Record<ItemKind, string> = { trail: 'Slice trails', bub
 /** Price 0 = everyone owns it (the default of its kind). Skins are code-drawn placeholders until the owner approves each look. */
 export const SHOP_ITEMS: ShopItem[] = [
   { id: 'trail-element', kind: 'trail', name: 'Element Trail', blurb: "Your ninja's own element", icon: '✨', price: 0 },
+  { id: 'trail-fire', kind: 'trail', name: 'Fire Trail', blurb: 'A blaze of glowing embers', icon: '🔥', price: 50, trail: { color: '#ff7a1a', core: '#ffd23a' }, fx: 'fire' },
+  { id: 'trail-water', kind: 'trail', name: 'Water Trail', blurb: 'A cool splash of droplets', icon: '💧', price: 65, trail: { color: '#3ec9ff', core: '#9fe6ff' }, fx: 'water' },
+  { id: 'trail-electric', kind: 'trail', name: 'Electric Trail', blurb: 'Crackling bolts of lightning', icon: '⚡', price: 80, trail: { color: '#2ea8ff', core: '#ffffff' }, fx: 'electric' },
+  { id: 'trail-earth', kind: 'trail', name: 'Earth Trail', blurb: 'Rolling pebbles and moss', icon: '🌿', price: 95, trail: { color: '#a0622a', core: '#7ddc3a' }, fx: 'earth' },
+  { id: 'trail-wind', kind: 'trail', name: 'Wind Trail', blurb: 'A swirling breeze of fresh leaves', icon: '🍃', price: 110, trail: { color: '#7fe8c8', core: '#c8ffe9' }, fx: 'wind' },
+  { id: 'trail-ice', kind: 'trail', name: 'Ice Trail', blurb: 'Frosty sparkles of sharp crystal', icon: '❄️', price: 125, trail: { color: '#9fe6ff', core: '#ffffff' }, fx: 'ice' },
+  { id: 'trail-light', kind: 'trail', name: 'Light Trail', blurb: 'A warm shine of sparkling stars', icon: '☀️', price: 140, trail: { color: '#ffd23a', core: '#ffffff' }, fx: 'light' },
+  { id: 'trail-shadow', kind: 'trail', name: 'Shadow Trail', blurb: 'A quiet mist of midnight smoke', icon: '🌑', price: 155, trail: { color: '#a855ff', core: '#5a2aa0' }, fx: 'shadow' },
+  { id: 'trail-blade', kind: 'trail', name: 'Blade Trail', blurb: 'A razor-sharp katana slash', icon: '⚔️', price: 170, trail: { color: '#ffffff', core: '#ff3b5c' }, fx: 'blade' },
+  { id: 'trail-robot', kind: 'trail', name: 'Robot Trail', blurb: 'A techno beam of glowing pixels', icon: '🤖', price: 185, trail: { color: '#ff5252', core: '#ffffff' }, fx: 'robot' },
   { id: 'trail-gold', kind: 'trail', name: 'Golden Trail', blurb: 'A shimmering gold slice', icon: '🌟', price: 200, trail: { color: '#ffd23a', core: '#fff6c4' } },
 ];
 
