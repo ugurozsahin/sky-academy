@@ -1457,6 +1457,34 @@ describe('no live rule points at the retired priority-order issue (#171)', () =>
 });
 
 /**
+ * #157 — the priority order left `priority:P0` unstated, so two runs could read it two different ways.
+ *
+ * STEP 3 said "priority:P1 before priority:P2 before priority:P3" and stopped there, while
+ * `scripts/board-sync.mjs`'s own `PRIORITIES` array already orders `['P0', 'P1', 'P2', 'P3']` — the board has
+ * been treating P0 as the most urgent all along while the routine's own ordering rule had no answer for it: a
+ * P0 issue was neither one of the three enumerated levels nor "no `priority:*` label". Determinism is the
+ * entire point of STEP 3 — two runs reading the same repo state must pick the same issue — and an unrecognised
+ * label breaks that guarantee, which is exactly what #157 found while running the query for real.
+ *
+ * Prove it red: drop `priority:P0` back out of the STEP 3 sentence.
+ */
+describe('STEP 3 states where priority:P0 sorts (#157)', () => {
+  const root = new URL('../../', import.meta.url);
+
+  it('P0 is named ahead of P1 in the ordering rule', () => {
+    const text = readFileSync(new URL('docs/ROUTINE-PROMPT.md', root), 'utf8');
+    expect(text, 'STEP 3 must say priority:P0 outranks priority:P1, or a P0 issue sorts nowhere')
+      .toMatch(/priority:P0`? before `?priority:P1/);
+  });
+
+  it('agrees with the order scripts/board-sync.mjs already uses', () => {
+    const boardSync = readFileSync(new URL('scripts/board-sync.mjs', root), 'utf8');
+    expect(boardSync, 'the board-sync PRIORITIES array is the other place this order is encoded')
+      .toMatch(/PRIORITIES\s*=\s*\[\s*'P0',\s*'P1',\s*'P2',\s*'P3'\s*\]/);
+  });
+});
+
+/**
  * #160 — branch names say what the change is, and the rail is about the *matcher*, not the prefix.
  *
  * Branch listings read `claude/affectionate-noether-cztizx` and `claude/bold-knuth-fbbwdx` — generated animal
