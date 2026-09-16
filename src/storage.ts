@@ -74,26 +74,97 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
  * change gets a real migration step rather than load() papering over it. Tolerant of hand-edited / corrupt data:
  * a non-object, or JSON that is not a save, falls back to a fresh default.
  */
-/** The shape version a raw blob is in. A blob with no `v` predates versioning but shares the v1 shape, so it
- *  walks every migration from 1 — reading it as *current* would skip them all and hand a reshaping step stale keys. */
-export const saveVersionOf = (s: RawSave): number => (typeof s.v === 'number' ? s.v : 1);
+/** A version we cannot migrate from: not a number we wrote, so the ladder has no honest starting rung (#232). */
+export const UNREADABLE_VERSION = 0;
+/** The shape version a raw blob is in. A blob with **no** `v` predates versioning but shares the v1 shape, so it
+ *  walks every migration from 1 — reading it as *current* would skip them all and hand a reshaping step stale keys.
+ *  A `v` that is *present* but not a whole number ≥ 1 (`"2"`, `null`, `{}`, `1.5`, `-3`) is a different case and
+ *  used to land on 1 as well: that re-ran the whole ladder over data that had already been migrated, which is
+ *  harmless for an additive step and silently destructive for a reshaping one (#232). It now reads as
+ *  UNREADABLE_VERSION, which `migrate()` refuses rather than guesses at. */
+export const saveVersionOf = (s: RawSave): number => {
+  if (s.v === undefined) return 1;
+  return typeof s.v === 'number' && Number.isInteger(s.v) && s.v >= 1 ? s.v : UNREADABLE_VERSION;
+};
+/**
+ * Whether the ladder can bring this blob to the current shape: a readable version, at or below ours (#232).
+ *
+ * A blob from a **newer** build is the case this exists for. `migrate()` used to fall straight through the
+ * `while` (`3 < 2` is false) to a return that stamps `v: SAVE_VERSION` over v3-shaped data; `load()` cached
+ * that and the next `save()` wrote it back, so the newer save was permanently relabelled as the older shape,
+ * with whatever the newer version added sitting unrecognised and whatever it *renamed* read under its old
+ * name. `importSave()` has always refused this case for the same reason — migrations only run forwards —
+ * and this is `load()`'s half of the same rule.
+ */
+export const isMigratable = (s: RawSave): boolean => {
+  const v = saveVersionOf(s);
+  return v !== UNREADABLE_VERSION && v <= SAVE_VERSION;
+};
+/**
+ * A blob from a **newer** build specifically — readable version, above ours. This is the only case the
+ * read-only latch protects, and the distinction is load-bearing (review of #232's first cut).
+ *
+ * Both this and an unreadable `v` are refused by `isMigratable`, because neither can be brought to our shape.
+ * But *not writing* is a separate decision from *not reading*, and it is only justified here: a newer blob is
+ * a real save that the child's other device can still open, so overwriting it destroys progress that exists.
+ * An unreadable `v` is a shape **no build ever wrote**, so there is nothing on the other side to preserve —
+ * latching it would brick saving on the device for good, with no route back (`reset()` has no caller in the
+ * app and `?reset` cannot be typed into a Capacitor WebView), which is strictly worse than starting clean.
+ */
+export const isFutureSave = (s: RawSave): boolean => {
+  const v = saveVersionOf(s);
+  return v !== UNREADABLE_VERSION && v > SAVE_VERSION;
+};
 export function migrate(raw: unknown): SaveData {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...DEFAULT };
   let s = raw as RawSave;
+  // Never stamp SAVE_VERSION over a version we could not read (#232). A fresh default is what this *session*
+  // sees; keeping the stored blob intact is `save()`'s half, via the read-only latch below.
+  if (!isMigratable(s)) return { ...DEFAULT };
   let v = saveVersionOf(s);
   while (v < SAVE_VERSION && MIGRATIONS[v]) { s = MIGRATIONS[v](s); v++; }
   return { ...DEFAULT, ...s, v: SAVE_VERSION };           // fill any missing keys and stamp the current version
 }
 
 let cache: SaveData | null = null;
+/**
+ * Set when `load()` read a blob from a **newer build** (#232). While it is set the session runs on defaults
+ * and `save()` writes nothing, so the stored blob survives: a child whose tablet is on a newer build keeps
+ * their progress even after the phone has opened the save. Refusing *and resetting* would have been two
+ * lines, but it throws away a save the other device still reads.
+ *
+ * Deliberately **not** set for an unreadable `v` — see `isFutureSave` for why that case resets instead.
+ * Every read of the save while this is set is reporting state that is not the child's: `exportSave()` has to
+ * know that (it moves the stored blob instead), and the dashboard eventually should too (issue 266).
+ */
+let readOnly = false;
+/**
+ * Whether this session is running on defaults over a stored save it refused to touch (#232).
+ *
+ * Exported because the refusal is otherwise **silent**: the child plays, nothing persists, and nothing says so.
+ * That is the right trade for a newer save — the alternative destroys a save their other device still reads —
+ * but it is a state a grown-up should eventually be told about, and this is the hook a "your progress is not
+ * being saved" notice would read. That notice is #232's own related item and is not built here.
+ */
+export const isReadOnlySave = () => readOnly;
 export function load(): SaveData {
   if (cache) return cache;
-  try { const raw = localStorage.getItem(KEY); cache = raw ? migrate(JSON.parse(raw)) : { ...DEFAULT }; }
-  catch { cache = { ...DEFAULT }; }
+  try {
+    const raw = localStorage.getItem(KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    // Only a *newer* blob is protected. An unreadable `v` is still refused as data (migrate returns the
+    // default) but writes resume, so the next save() replaces the corrupt blob and the device recovers.
+    readOnly = !!parsed && typeof parsed === 'object' && !Array.isArray(parsed) && isFutureSave(parsed as RawSave);
+    cache = raw ? migrate(parsed) : { ...DEFAULT };
+  }
+  catch { readOnly = false; cache = { ...DEFAULT }; }
   return cache!;
 }
 export function save(patch: Partial<SaveData> = {}): SaveData {
   cache = { ...load(), ...patch };
+  // #232: the blob on disk is newer than this build, or carries a version we cannot read. The session keeps
+  // working against `cache`; writing would relabel it as our shape and make the loss permanent.
+  if (readOnly) return cache;
   try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* private mode etc. */ }
   return cache;
 }
@@ -208,7 +279,7 @@ export function equipItem(id: string): boolean {
   const w = wallet(); const next = equip(w, id); if (next === w) return false;
   save({ equipped: next.equipped }); return true;
 }
-export function reset() { cache = null; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }
+export function reset() { cache = null; readOnly = false; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232)
 
 /**
  * The save as a code the grown-up can copy to another device (#64). Every APK the workflow builds is signed
@@ -216,7 +287,18 @@ export function reset() { cache = null; try { localStorage.removeItem(KEY); } ca
  * the child's coins, stars and streak, with it. Until the signing key is stable this is the way progress
  * survives a reinstall, and it is the same code #20's profiles and #16's second player would move about.
  */
-export function exportSave(): string { return JSON.stringify(load()); }
+export function exportSave(): string {
+  load();   // settles the latch against what is actually on disk before we decide what to hand over
+  // #232 review: under the latch `load()` is a fresh default, so exporting it would hand the grown-up a
+  // **valid** code carrying no progress — and `parents.ts` invites them to paste it into Restore on the
+  // other device, which is the device holding the real save. That would destroy it through the very
+  // mechanism added to protect it. The stored blob *is* the child's save, so move that instead: the newer
+  // device reads it, and an older one refuses it in importSave() exactly as it refuses any newer code.
+  if (readOnly) {
+    try { const raw = localStorage.getItem(KEY); if (raw) return raw; } catch { /* private mode etc. */ }
+  }
+  return JSON.stringify(load());
+}
 
 /**
  * Restore a save from an exported code, replacing what is on this device. Returns false and changes nothing
@@ -234,7 +316,13 @@ export function importSave(text: string): boolean {
   const v = (raw as RawSave).v;
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > SAVE_VERSION) return false;
   const next = migrate(raw);
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* private mode etc. */ }
+  let wrote = false;
+  try { localStorage.setItem(KEY, JSON.stringify(next)); wrote = true; } catch { /* private mode etc. */ }
   cache = next;
+  // #232 review: only lift the protection if the replacement actually landed. If setItem threw, the newer
+  // blob is still on disk — clearing the latch here would let the next ordinary save() relabel it, which is
+  // #232 restored through this very line. (The swallowed catch and the unconditional `true` are older
+  // faults, tracked in issue 266, and are not widened here.)
+  if (wrote) readOnly = false;
   return true;
 }
