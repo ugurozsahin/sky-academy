@@ -76,6 +76,13 @@ describe('guard rails', () => {
     expect(hits.length).toBeLessThanOrEqual(0);                         // #29 removed them; never raise this
   });
 
+  // #115: the grown-ups "Start again" reset must use the existing .overlay modal for its confirmation — a
+  // native confirm()/alert()/prompt() looks foreign in this game and blocks Playwright's unattended e2e run.
+  it('the grown-ups reset flow never uses a native dialog (#115)', () => {
+    const src = code(SOURCES['/src/ui/parents.ts']);
+    expect(src).not.toMatch(/\b(?:confirm|alert|prompt)\s*\(/);
+  });
+
   // #28: drawBubble built a radial gradient (+ two colour strings) and ran a `measureText` font-fit loop for
   // every bubble every frame — hundreds of measureText calls per frame with a wide word wave on a phone. The
   // body is now a cached sprite (bodySprite) and the label size is fitted once at spawn (fitLabel), so neither

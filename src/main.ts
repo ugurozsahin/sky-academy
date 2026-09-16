@@ -4,7 +4,7 @@ import { mapScreen, islandScreen, rewardsScreen, type StartPlay } from './ui/hom
 import { playScreen, type PlayOpts } from './ui/play';
 import { memoryScreen } from './ui/memory';
 import { shopScreen } from './ui/shop';
-import { parentsScreen } from './ui/parents';
+import { clearPendingReset, isPendingReset, parentsScreen } from './ui/parents';
 import { load } from './storage';
 import { initGameSpeed } from './game/speed';
 import { fontReady } from './ui/font';
@@ -40,7 +40,10 @@ const nav = {
 window.addEventListener('popstate', () => {
   const s = history.state?.screen as string | undefined;   // the entry we landed on
   fromPop = true;
-  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'play' || s === 'memory' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else nav.map();
+  // The grown-ups screen's guarded reset (#115) must land on onboarding, never the map with an empty profile,
+  // however it is left — including the hardware/browser back button landing here rather than through
+  // parents.ts's own `#back` click handler.
+  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'play' || s === 'memory' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else nav.map();
 });
 
 // ?reset=1 clears saved progress (used by tests).
