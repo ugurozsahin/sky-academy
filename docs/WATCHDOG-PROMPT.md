@@ -67,9 +67,9 @@ your first finding and the only one you can report.
    written last and last is the most exposed place to run out of time. If no such issue exists in any state,
    the routine has not run since this was introduced; if it exists but is closed, someone closed the pulse,
    which is a finding, not a pass. There is no WORKLOG.md to fall back on: it was archived to `docs/worklog/`
-   on 2026-09-10 (#178) and nothing writes it, so the pulse is not one record of two — it is the only one.
+   on 2026-09-10 (#98) and nothing writes it, so the pulse is not one record of two — it is the only one.
    That makes an unreadable body a finding in its own right rather than something to cross-check elsewhere.
-   Since #178 the body is a short snapshot rather than a single line: the timestamp is still the first thing
+   Since #98 the body is a short snapshot rather than a single line: the timestamp is still the first thing
    in it, and a snapshot whose checks are there but whose **values** are missing ("nightly ok" with no
    timestamp or head) is a run that may not have looked — worth a finding if it repeats, not on its own.
 
@@ -82,13 +82,13 @@ your first finding and the only one you can report.
    any whose head carries **no** `review-gate` status — that head has not been judged, and a missing status
    must never be read as a pass. Note separately any PR that is a draft or carries an unanswered
    `REVIEW: CHANGES REQUESTED`, and how long it has sat: a block nobody returns to is a stalled review, not a
-   safe state. **Since #161 such a block is adoptable, so say so rather than only reporting that it is stuck:**
+   safe state. **Since #90 such a block is adoptable, so say so rather than only reporting that it is stuck:**
    another agent may clear it once the block is at least 4 hours old, the session that set it has posted no
    comment on that same pull request in the last 2 hours (a comment elsewhere in the repository does not
    protect the block), and that agent has re-derived the objection against the current head. The
    issue you file names that rule, points at `docs/ROUTINE-PROMPT.md` STEP 2 for the two mechanical checks, and
    says which of them already hold — a run reading "stalled, 9 hours" does not know it is allowed to act, which
-   is how #150 sat drafted and red through an owner approval until a session broke it by hand. One exception
+   is how ugurozsahin/sky-academy-private-archive#150 sat drafted and red through an owner approval until a session broke it by hand. One exception
    worth stating in the issue when it applies: a blocking comment carrying **no** session URL cannot be adopted
    at all, because the setter's silence cannot be checked, so that one needs the owner rather than the next run.
 5. **Is the priority order being followed?** The 2026-09-06 code-health freeze **ended on 2026-09-10**, and its end
@@ -99,7 +99,7 @@ your first finding and the only one you can report.
    work again — or a run declining eligible work because it believes a freeze still holds. Only the owner
    declares a freeze, and it would appear in CLAUDE.md, BACKLOG.md and `docs/ROUTINE-PROMPT.md` together, so a
    bar in one place alone is a finding. **(b) Has the order been skipped?** Since 2026-09-11 the order is
-   **the labels, not a list** (#171), which is the version of this check you can actually evaluate: run the
+   **the labels, not a list** (#94), which is the version of this check you can actually evaluate: run the
    same query `docs/ROUTINE-PROMPT.md` STEP 3 gives a run —
    `/issues?state=open&labels=routine-ok`, drop `owner-input`/`owner-approval`, anything with an open PR
    solving it, anything blocked by an open issue it references, and the two heartbeat issues; then highest
@@ -139,7 +139,7 @@ your first finding and the only one you can report.
    cloud GitHub proxy answers it 403 whatever token you hold — so read its pulse instead: the body of the
    open issue titled `board: heartbeat` (label `watchdog`; exclude it from the duplicate search below like
    the other two pulses). `scripts/board-sync.mjs` runs on the owner's Mac every 15 minutes as a launchd
-   agent and rewrites that body with a UTC timestamp and what it did, at least hourly (#158). **A timestamp
+   agent and rewrites that body with a UTC timestamp and what it did, at least hourly (#87). **A timestamp
    older than ~2 hours is a finding** — the Mac is asleep, the agent is unloaded, or the token expired (a
    classic PAT with an expiry date; the log on the Mac, `~/Library/Logs/sky-academy-board-sync.log`, says
    which). Missing in any state, closed, or a body you cannot parse a timestamp out of is the same finding —
@@ -156,7 +156,7 @@ your first finding and the only one you can report.
    **The branch filter is what makes the answer about `main`.** This workflow's `pull_request:` trigger is its
    only frequent one, so an unfiltered list is dominated by pull-request runs on somebody's branch. Without
    `?branch=main` the newest run is usually a green pull request sitting on top of a red `main` — which is not
-   hypothetical: on 2026-09-15 the two newest runs were green pull-request builds of the very fix for #236,
+   hypothetical: on 2026-09-15 the two newest runs were green pull-request builds of the very fix for #129,
    above the `workflow_dispatch` failure that was `main`'s actual state.
    Confirm both, because a dropped or mistyped filter is exactly the failure this check is made of: **if the
    run's `name` is not `Android APK`, or its `head_branch` is not `main`, that is a finding in its own right**,
@@ -176,7 +176,7 @@ your first finding and the only one you can report.
    the owner, not an issue.
    This check exists because that workflow runs only on `workflow_dispatch`, a `v*` tag, or a pull request
    touching the Android paths: on an ordinary week nothing runs it on `main`, so a break sits there silently
-   until the owner wants an APK on the tablet — which is exactly how #236 was found, by him, at the moment he
+   until the owner wants an APK on the tablet — which is exactly how #129 was found, by him, at the moment he
    needed the build. Reading it costs no Actions minutes. Name the run's URL and the failing step in the
    issue, since the cause is usually in a third-party action's output rather than in our code.
 
@@ -215,7 +215,7 @@ Every run, findings or none, and **as the very last thing you do**: find the ope
 run and a few words on the outcome and **the numbers you actually observed** — a clean run must
 carry its evidence, or a wrong "clean" is invisible afterwards:
 `2026-09-07T18:00Z — clean · nightly 1 run ok · budget mtd 638/7d, 3d 212/day · 3 PRs open · main green`, or
-`2026-09-07T17:35Z — 2 findings #104 #105 · nightly 0 runs · budget 3d 212/day`. If none exists,
+`2026-09-07T17:35Z — 2 findings ugurozsahin/sky-academy-private-archive#104 ugurozsahin/sky-academy-private-archive#105 · nightly 0 runs · budget 3d 212/day`. If none exists,
 create it **with that line already in the body**, in the single `POST /issues` call that takes `title`, `body`
 and `labels` together — never create it empty and fill it afterwards, or a run that dies in between leaves an
 open issue with no timestamp, which ages into nothing and reads as a pulse forever. Never close it; it is not
