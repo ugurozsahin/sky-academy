@@ -1294,6 +1294,58 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.isl-head small')).toContainText('Rye');
     expect(JSON.parse(await page.inputValue('#save-code')).coins).toBe(456);
   });
+
+  // #115: a guarded "Start again" on the grown-ups screen — for handing the tablet to a new child.
+  test('For grown-ups: "Start again" requires the typed word, and cancelling changes nothing (#115)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 200 });
+    await openGrownUps(page);
+
+    await page.click('#start-again');
+    await expect(page.locator('.reset-modal h2')).toContainText('Start again?');
+    await expect(page.locator('#reset-go')).toBeDisabled();
+
+    // a wrong or partial word never arms the button
+    await page.fill('#reset-word', 'reset');
+    await expect(page.locator('#reset-go')).toBeDisabled();
+    await page.fill('#reset-word', 'RESET');
+    await expect(page.locator('#reset-go')).toBeEnabled();
+
+    // cancelling closes the modal and touches nothing on the device
+    await page.click('#reset-cancel');
+    await expect(page.locator('.reset-modal')).toHaveCount(0);
+    await expect(page.locator('.p-extra')).toContainText('200 coins');
+    await page.click('#back');
+    await expect(page.locator('.map')).toBeVisible();
+  });
+
+  test('For grown-ups: "Start again" clears the device and lands on onboarding; Undo brings it all back (#115)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 300 });
+    await openGrownUps(page);
+
+    await page.click('#start-again');
+    await page.fill('#reset-word', 'RESET');
+    await page.click('#reset-go');
+    await expect(page.locator('.reset-modal h2')).toContainText('All cleared');
+
+    // Undo, while still on this screen, restores the dashboard exactly as it was
+    await page.click('#reset-undo');
+    await expect(page.locator('.reset-modal')).toHaveCount(0);
+    await expect(page.locator('.p-extra')).toContainText('300 coins');
+    await expect(page.locator('.isl-head small')).toContainText('Ada');
+
+    // doing it again and continuing this time lands on onboarding with an empty profile
+    await page.click('#start-again');
+    await page.fill('#reset-word', 'RESET');
+    await page.click('#reset-go');
+    await page.click('#reset-continue');
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await expect(page.locator('#go')).toBeDisabled();
+    await expect(page.locator('.avatar-card.sel')).toHaveCount(0);
+    // reset() removes the key outright rather than writing fresh defaults over it — nothing from Ada is left
+    // to read back on the next launch. (Not reloaded here: seedPlayer's init script re-seeds an empty slot on
+    // every navigation, which would mask exactly the thing this assertion checks.)
+    expect(await page.evaluate(() => localStorage.getItem('sna:v1'))).toBeNull();
+  });
 });
 
 /**

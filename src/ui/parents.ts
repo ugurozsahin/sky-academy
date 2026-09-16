@@ -1,10 +1,12 @@
 import { TOPICS, YEARS } from '../curriculum';
-import { exportSave, importSave, load, STICKER_IDS } from '../storage';
+import { exportSave, importSave, load, reset, save, STICKER_IDS, type SaveData } from '../storage';
 import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
 import { $, esc, render } from './dom';
 
-type Nav = { map: () => void };
+type Nav = { map: () => void; avatar: () => void };
+/** The word a grown-up must type to confirm "Start again" — deliberately not a single tap a child could land on. */
+const RESET_WORD = 'RESET';
 
 const showPct = (x: number | null) => (x === null ? '—' : `${pct(x)}%`);
 const bar = (frac: number) => `<span class="isl-bar"><i style="width:${Math.round(100 * Math.max(0, Math.min(1, frac)))}%"></i></span>`;
@@ -62,7 +64,40 @@ function dashHtml(sm: ParentSummary, noVoice = false): string {
       <p class="p-move-msg" id="move-msg" role="status" hidden></p>
     </div>
 
-    <p class="p-note">Everything above is read from this device, and the code never leaves it — nothing is uploaded and there are no accounts. (Time-on-task isn't recorded yet.)</p>`;
+    <p class="p-note">Everything above is read from this device, and the code never leaves it — nothing is uploaded and there are no accounts. (Time-on-task isn't recorded yet.)</p>
+
+    <div class="p-reset">
+      <p class="p-reset-say">Handing the tablet to a different child, or want a fresh start? This clears everything on this device.</p>
+      <button class="btn bad" id="start-again">Start again</button>
+    </div>`;
+}
+
+/** The confirmation modal: a deliberate typed word, not a single tap, before anything is cleared. */
+function resetConfirmHTML(): string {
+  return `
+      <div class="modal reset-modal">
+        <h2>Start again?</h2>
+        <p>This clears everything on this device: progress, stars, coins, stickers, streak, name and ninja. It cannot be undone once you leave this screen.</p>
+        <label class="reset-label" for="reset-word">Type ${RESET_WORD} to confirm</label>
+        <input id="reset-word" class="gate-input reset-input" type="text" autocomplete="off" autocapitalize="characters" aria-label="Type ${RESET_WORD} to confirm">
+        <div class="reset-actions">
+          <button class="btn" id="reset-cancel">Cancel</button>
+          <button class="btn bad" id="reset-go" disabled>Start again</button>
+        </div>
+      </div>`;
+}
+
+/** Shown for as long as the grown-up stays on this screen after resetting — the one chance to undo. */
+function resetDoneHTML(): string {
+  return `
+      <div class="modal reset-modal">
+        <h2>All cleared</h2>
+        <p>This device is back to a fresh start. You can undo this until you leave this screen — after that it is gone.</p>
+        <div class="reset-actions">
+          <button class="btn" id="reset-undo">Undo</button>
+          <button class="btn primary" id="reset-continue">Continue</button>
+        </div>
+      </div>`;
 }
 
 /**
@@ -138,14 +173,50 @@ export function parentsScreen(nav: Nav) {
   };
 
   const drawDash = () => {
+    // Once a reset has happened, leaving this screen — by "Continue" or the back arrow alike — must land on
+    // onboarding, never on the map with an empty profile (#115). "Undo" is the only way out of that state.
+    let wasReset = false;
+    let snapshot: SaveData | null = null;
+
     const sm = parentSummary(load(), TOPICS, YEARS, STICKER_IDS.length);
     render(`
     <section class="screen home parents dash">
       <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Grown-ups dashboard</b><small>How ${esc(load().name || 'your ninja')} is getting on</small></div></div>
       <div class="parents-dash">${dashHtml(sm, voiceState() === 'no')}</div>
+      <div class="overlay" id="reset-overlay" hidden></div>
     </section>`, 'bg-sky');
-    $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
+    $('#back').addEventListener('click', () => { sfx.tap(); if (wasReset) nav.avatar(); else nav.map(); });
     wireMove(() => drawDash());
+
+    const overlay = $('#reset-overlay');
+    const closeOverlay = () => { overlay.hidden = true; overlay.innerHTML = ''; };
+
+    $('#start-again').addEventListener('click', () => {
+      sfx.tap();
+      overlay.hidden = false;
+      overlay.innerHTML = resetConfirmHTML();
+      const input = $<HTMLInputElement>('#reset-word');
+      const go = $<HTMLButtonElement>('#reset-go');
+      const update = () => { go.disabled = input.value.trim() !== RESET_WORD; };
+      input.addEventListener('input', update);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter' && !go.disabled) go.click(); });
+      $('#reset-cancel').addEventListener('click', () => { sfx.tap(); closeOverlay(); });
+      go.addEventListener('click', () => {
+        sfx.tap();
+        snapshot = load();       // kept in memory only — the "Undo" affordance below is what can bring it back
+        reset();
+        wasReset = true;
+        overlay.innerHTML = resetDoneHTML();
+        $('#reset-undo').addEventListener('click', () => {
+          sfx.tap();
+          if (snapshot) save(snapshot);   // save() replaces every key, so this restores the snapshot exactly
+          closeOverlay();
+          drawDash();
+        });
+        $('#reset-continue').addEventListener('click', () => { sfx.tap(); nav.avatar(); });
+      });
+      input.focus();
+    });
   };
 
   drawGate();

@@ -311,3 +311,38 @@ describe('save export / import (#64)', () => {
     expect(importSave(code)).toBe(true);
   });
 });
+
+// #115: the grown-ups "Start again" action clears the save through this function rather than a raw
+// `localStorage.clear()`, so this is the one place the reset behaviour needs pinning.
+describe('reset() (#115)', () => {
+  it('returns every key to its default value, and the result is already the current shape', () => {
+    save({ name: 'Ada', avatar: 'volt', year: 'year2', sound: false, speech: false, voice: 'yes', coins: 500 });
+    recordTopic('add-10', 3, 44); recordSprint('year1', 90); recordBossWin('year1'); recordMemory('year1');
+    recordTraining('year1'); addCoins(500); touchStreak(new Date('2026-09-10T09:00:00Z'));
+    recordCert({ id: 'year1:add-10', name: 'Ada', avatar: 'volt', year: 'Year 1', title: 'Add 10', stars: 3, score: 44, correct: 4, attempts: 4, date: '2026-09-10' });
+
+    reset();
+    const d = load();
+    expect(d.name).toBe(''); expect(d.avatar).toBeNull(); expect(d.year).toBe('reception');
+    expect(d.sound).toBe(true); expect(d.speech).toBe(true); expect(d.voice).toBe('unknown');
+    expect(d.progress).toEqual({});
+    expect(d.endless).toEqual({}); expect(d.sprint).toEqual({}); expect(d.boss).toEqual({});
+    expect(d.memory).toEqual({}); expect(d.training).toEqual({});
+    expect(d.coins).toBe(0); expect(d.spent).toBe(0); expect(d.stickers).toEqual([]);
+    expect(d.streak).toEqual({ last: '', days: 0 }); expect(d.tutorialSeen).toBe(false);
+    expect(d.owned).toEqual([]); expect(d.equipped).toEqual({}); expect(d.certs).toEqual([]);
+    expect(d.v).toBe(SAVE_VERSION);
+    expect(migrate(d)).toEqual(d);   // already the current shape — passing it through migrate() changes nothing
+  });
+
+  it('a save() made before leaving the screen brings a reset player back exactly (the "Undo" affordance)', () => {
+    save({ name: 'Ada', avatar: 'volt', coins: 120 }); addCoins(0); recordTopic('add-10', 2, 30);
+    const snapshot = load();   // what the grown-ups screen keeps in memory before calling reset()
+
+    reset();
+    expect(load().name).toBe('');
+
+    save(snapshot);            // "Undo" — save() replaces the whole record because the patch already has every key
+    expect(load()).toEqual(snapshot);
+  });
+});

@@ -1198,6 +1198,22 @@ img { -webkit-user-drag: none; }
 .p-move-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--good); }
 .p-move-msg.bad { color: var(--bad); }
 
+/* "Start again" — a guarded full reset (#115) */
+/* The dashboard is the one screen under `.overlay` that scrolls taller than one viewport (personal bests,
+   move-to-another-device, this section all add up), so `.overlay`'s `position: absolute` — sized to `#app`,
+   which grows with the page — would centre the modal on the whole document rather than what is on screen.
+   Fixed, scoped to this overlay only: play/memory never scroll past one viewport, so their behaviour is
+   unchanged; this one now centres on the viewport wherever the grown-up has scrolled to. */
+#reset-overlay { position: fixed; }
+.p-reset { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; text-align: center; }
+.p-reset-say { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.btn.bad { background: linear-gradient(180deg, #ff8a80, #ff5f6d); color: #2a0a0a; border-color: #ffb4bb; text-shadow: 0 1px 0 #fff5; }
+.reset-modal p { text-align: left; line-height: 1.45; }
+.reset-label { display: block; margin: 4px 0 8px; font-weight: 700; text-align: left; }
+.reset-input { width: 100%; box-sizing: border-box; }
+.reset-actions { display: flex; gap: 10px; margin-top: 6px; }
+.reset-actions .btn { flex: 1; }
+
 /*
  * #109: there used to be one breakpoint here, at 600 px, and it went straight to the layout drawn for a
  * 1280 px desktop. A portrait tablet is ~800 px wide, so it took the four-up stat row and the three-up year
