@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, certificates, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, STICKER_IDS, STICKER_COST, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { addCoins, ACHIEVEMENTS, certificates, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
+import { topicsFor } from '../../src/curriculum';
 
 // minimal localStorage shim for node
 const mem: Record<string, string> = {};
@@ -8,13 +9,86 @@ const mem: Record<string, string> = {};
 
 describe('rewards storage', () => {
   beforeEach(() => reset());
-  it('unlocks stickers in order as coins accumulate', () => {
+  it('unlocks the first three stickers in order as coins accumulate, and no further (#114)', () => {
     expect(stickersFor(0)).toEqual([]);
     expect(addCoins(29)).toEqual([]);
     expect(addCoins(1)).toEqual([STICKER_IDS[0]]);           // 30 → first sticker
     expect(addCoins(40)).toEqual([STICKER_IDS[1]]);          // 70 → second
     expect(load().coins).toBe(70); expect(load().stickers.length).toBe(2);
-    expect(stickersFor(STICKER_COST[STICKER_COST.length - 1]).length).toBe(STICKER_IDS.length);
+    expect(stickersFor(STICKER_COST[STICKER_COST.length - 1]).length).toBe(STICKER_COST.length);   // 120 unlocks exactly the three coin stickers
+    expect(addCoins(1_000_000)).toEqual([STICKER_IDS[2]]);   // a huge coin pile still stops at the third — the rest is earned, not bought
+    expect(load().stickers).toEqual(STICKER_IDS.slice(0, 3));
+  });
+  it('the eight achievements are 1:1 with the non-coin stickers, in order', () => {
+    expect(ACHIEVEMENTS.map(a => a.id)).toEqual(STICKER_IDS.slice(STICKER_COST.length));
+  });
+  it('star 5 different topics unlocks terra; four is not enough', () => {
+    const d = () => load();
+    for (let i = 0; i < TOPICS_STARRED_GOAL - 1; i++) recordTopic(`t${i}`, 1, 10);
+    expect(evaluateStickers(d())).not.toContain('terra');
+    recordTopic(`t${TOPICS_STARRED_GOAL - 1}`, 1, 10);
+    expect(evaluateStickers(d())).toContain('terra');
+  });
+  it('gust needs a star on every island, not just one', () => {
+    recordTopic('r-count', 1, 5); recordTopic('y1-bonds', 1, 5);            // reception + year1 only
+    expect(evaluateStickers(load())).not.toContain('gust');
+    recordTopic('y2-tables', 1, 5);                                         // + year2 → all three
+    expect(evaluateStickers(load())).toContain('gust');
+  });
+  it('frost and sol read the same streak at their two different thresholds', () => {
+    for (let i = 0; i < 3; i++) touchStreak(new Date(Date.UTC(2026, 8, 1 + i)));
+    expect(load().streak.days).toBe(3);
+    expect(evaluateStickers(load())).toContain('frost');
+    expect(evaluateStickers(load())).not.toContain('sol');
+    for (let i = 3; i < 7; i++) touchStreak(new Date(Date.UTC(2026, 8, 1 + i)));
+    expect(load().streak.days).toBe(7);
+    expect(evaluateStickers(load())).toContain('sol');
+  });
+  it('shadow and kai fire from a single win in any year, and bolt from a sprint score at the threshold', () => {
+    expect(evaluateStickers(load())).not.toContain('shadow');
+    recordBossWin('reception');
+    expect(evaluateStickers(load())).toContain('shadow');
+    expect(evaluateStickers(load())).not.toContain('kai');
+    recordMemory('year2');
+    expect(evaluateStickers(load())).toContain('kai');
+    recordSprint('year1', SPRINT_STICKER_SCORE - 1);
+    expect(evaluateStickers(load())).not.toContain('bolt');
+    recordSprint('year1', SPRINT_STICKER_SCORE);
+    expect(evaluateStickers(load())).toContain('bolt');
+  });
+  it('hammer needs every topic on one island starred, not just most of them', () => {
+    const reception = topicsFor('reception');
+    reception.slice(0, -1).forEach(t => recordTopic(t.id, 1, 10));           // every topic but the last
+    expect(evaluateStickers(load())).not.toContain('hammer');
+    recordTopic(reception[reception.length - 1].id, 1, 10);                  // the last one too
+    expect(evaluateStickers(load())).toContain('hammer');
+  });
+  it('a sticker earned under an old rule is never taken away by a recompute that no longer sees the reason (#114)', () => {
+    save({ coins: 900, stickers: [...STICKER_IDS] });                       // an old save: every sticker unlocked purely from lifetime coins
+    expect(addCoins(1)).toEqual([]);                                        // nothing newly crosses a threshold…
+    expect(load().stickers).toEqual(STICKER_IDS);                           // …and nothing already held is dropped, even with no achievement behind it
+  });
+  it('spending coins in the shop never changes which stickers are unlocked (#114)', () => {
+    addCoins(120);
+    const before = load().stickers;
+    save({ spent: 100 });                                                  // the shop's own write — coins (lifetime) is untouched by it
+    expect(evaluateStickers(load())).toEqual(before);
+  });
+  // #270 review: importSave() only checks `v`, so a hand-edited or corrupted "Restore" code such as
+  // `{ v: 2, boss: null }` reaches evaluateStickers() untouched. Before this, only the one mode reading that
+  // field (recordBossWin, say) would throw, and only when the child opened it; because every coin award now
+  // runs every achievement check, a corruption in any single field used to take coin-earning down app-wide.
+  it('a corrupted achievement field never breaks addCoins() — every mode reads all four now (#270)', () => {
+    for (const bad of [{ progress: null }, { boss: null }, { memory: 'not an object' }, { sprint: [] }]) {
+      reset();
+      expect(importSave(JSON.stringify({ v: SAVE_VERSION, name: 'Bad', coins: 5, ...bad })), JSON.stringify(bad)).toBe(true);
+      expect(() => addCoins(10), `addCoins() must not throw on ${JSON.stringify(bad)}`).not.toThrow();
+    }
+  });
+  it('a corrupted number inside boss/memory/sprint is skipped rather than breaking the sum (#270)', () => {
+    reset();
+    importSave(JSON.stringify({ v: SAVE_VERSION, coins: 0, boss: { year1: 'two', reception: 1 } }));
+    expect(evaluateStickers(load())).toContain('shadow');   // the one real win still counts
   });
   it('tutorial flag defaults to unseen and survives old saves without the field', () => {
     expect(load().tutorialSeen).toBe(false);
@@ -74,6 +148,15 @@ describe('save migration (#38)', () => {
     expect(stored.tutorialSeen).toBe(false);         // key absent in the blob → filled from DEFAULT
     expect(stored.boss).toEqual({});
     expect(stored.owned).toEqual([]);
+  });
+
+  it('a save migrated from an old version keeps every sticker it already earned, achievement-based or not (#114)', () => {
+    // A save from before #114: all 11 stickers unlocked purely from lifetime coins, no achievement stats at all.
+    const stored = migrate({ v: 1, name: 'Old', coins: 900, stickers: [...STICKER_IDS] });
+    expect(stored.stickers).toEqual(STICKER_IDS);       // migrate() itself never re-evaluates — it only fills and stamps
+    reset(); save(stored);
+    expect(addCoins(0)).toEqual([]);                    // and playing afterwards does not drop any of them either
+    expect(load().stickers).toEqual(STICKER_IDS);
   });
 
   it('stamps the current version onto a pre-versioning blob that has no `v`', () => {

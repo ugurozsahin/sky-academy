@@ -415,7 +415,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('h2')).toHaveText('Mission complete!');
     await expect(results.locator('.medal')).toHaveText('🥇');
     await expect(results.locator('.coin-gain')).toContainText('+120');   // 25 correct + 15 stars×5 + 20 mission
-    await expect(results.locator('.unlock')).toHaveCount(3);              // 120 coins → stickers at 30, 70, 120 (dojo bonuses add at most 55, so never the 180 one)
+    await expect(results.locator('.unlock')).toHaveCount(3);              // 120 coins → the three coin stickers at 30, 70, 120 (#114: the rest is achievement-based, not more coins)
     const dojoBonus = (await results.locator('.dojo-bonus .gain').allTextContents()).reduce((n, t) => n + Number(t.replace(/\D/g, '')), 0);   // today's Daily Dojo may pay for the mission / 3 stars / no slips / combo
     await expect(results.locator('#cert')).toBeVisible();                   // printable certificate for a completed mission
     const png = await page.evaluate(() => window.__sna.certificate());
