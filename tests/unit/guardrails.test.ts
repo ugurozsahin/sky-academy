@@ -2036,6 +2036,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'add-topic': null,
     'design-language': null,
     'open-pr': null,
+    'qa-screenshot': null,
     'review-pr': null,
     'verification-before-completion': { ...SUPERPOWERS, path: 'skills/verification-before-completion' },
     'using-git-worktrees': { ...SUPERPOWERS, path: 'skills/using-git-worktrees' },
