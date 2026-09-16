@@ -1386,6 +1386,41 @@ test.describe('Sky Ninja Academy', () => {
 });
 
 /**
+ * #95: `importSave()` only checks the version, so a hand-edited or corrupted "Restore" paste can carry
+ * `progress` (or the other per-year record fields) as anything, and every screen that used to index it
+ * directly — the map's star tally, the island screen's mode blurbs, the grown-ups dashboard — threw on the
+ * very next launch. The unit tests pin `parentSummary()`; this is the same corrupted blob reaching the real
+ * screens, which no unit test can (`home.ts`/`avatar.ts` render through `document`, with no jsdom in this
+ * suite).
+ */
+test.describe('a corrupted save does not brick the app (#95)', () => {
+  test('guard rail: the map, an island, and the grown-ups dashboard all still render on a null-shaped save', async ({ page }) => {
+    // pageerror only — an uncaught exception is the actual failure mode this rail guards (d.progress[id]
+    // throwing when d.progress itself is not an object). A console `error` also catches unrelated resource-load
+    // noise (a blocked font fetch, say), which is not what this test is about and would make it flaky for a
+    // reason that has nothing to do with #95.
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    await seedPlayer(page, 'volt', 'Ada', {
+      progress: null, endless: null, sprint: 'not an object', boss: [], training: 42,
+    });
+    // seedPlayer already asserts `.home` (the map) rendered — the corrupted blob alone would have thrown
+    // inside mapScreen's star tally before this point if the fix were not in place.
+    expect(failed, `while landing on the map${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    expect(failed, `while opening an island${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+
+    await page.click('#back');
+    await openGrownUps(page);   // renders parentSummary() over the same corrupted save
+    await expect(page.locator('.parents-dash')).toContainText('0');   // nothing played, but it renders rather than throwing
+    expect(failed, `while opening the grown-ups dashboard${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+  });
+});
+
+/**
  * #15 Part A — offline play. The acceptance criterion for the whole feature is behavioural and there is no
  * way to check it without a browser: the service worker, its install, its cache and its fetch handler are all
  * browser machinery, and the unit tests deliberately stop at the two decisions that are not (whether to

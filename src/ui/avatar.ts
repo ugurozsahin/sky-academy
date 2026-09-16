@@ -1,7 +1,7 @@
 import { ALL_AVATARS, MASTER, SENSEI_LINES } from '../avatars';
 import { TOPICS } from '../curriculum';
 import { masterProgress } from '../game/sensei';
-import { load, save } from '../storage';
+import { load, safeRecord, save, type TopicProgress } from '../storage';
 import { sfx, say } from '../audio';
 import { $, $$, esc, render } from './dom';
 
@@ -20,7 +20,7 @@ const NAME_HINT = 'Pop your name in and we will cheer you on! ✍️';
 
 export function avatarScreen(go: (s: 'home') => void) {
   const d = load();
-  const master = masterProgress(TOPICS, d.progress);   // the 11th ninja unlocks when every topic has a star
+  const master = masterProgress(TOPICS, safeRecord<TopicProgress>(d.progress));   // #95: tolerant of a hand-edited/corrupted save; the 11th ninja unlocks when every topic has a star
   render(`
   <section class="screen avatar-screen">
     <header class="brand"><span class="kanji">忍</span><h1>Sky Ninja<br><span>Academy</span></h1><p class="tag">Choose your ninja</p></header>

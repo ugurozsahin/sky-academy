@@ -2,6 +2,7 @@
 // Pure logic (no DOM) so it can be unit-tested. Reads only what storage.ts already records.
 import type { Rng, Topic, YearId, YearInfo } from '../curriculum';
 import type { SaveData, TopicProgress } from '../storage';
+import { safeRecord } from '../storage';
 import { accuracy } from './sensei';
 
 // ---------- Grown-ups gate ----------
@@ -55,7 +56,13 @@ function stat(t: Topic, p: TopicProgress | undefined): TopicStat {
 
 /** Build the whole read-only dashboard model from the save. `stickersTotal` is passed in so storage stays the source of the album size. */
 export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[], stickersTotal: number): ParentSummary {
-  const stats = topics.map(t => stat(t, data.progress[t.id]));
+  // #95: `data` can be a hand-edited or corrupted "Restore" paste — importSave() only checks the version, so
+  // any of these fields can arrive as anything. Read the same tolerant way storage.ts's own achievement
+  // calculations already do, rather than indexing `data.progress` directly and throwing on the dashboard.
+  const progress = safeRecord<TopicProgress>(data.progress);
+  const endless = safeRecord<number>(data.endless), sprint = safeRecord<number>(data.sprint);
+  const boss = safeRecord<number>(data.boss), memory = safeRecord<number>(data.memory), training = safeRecord<number>(data.training);
+  const stats = topics.map(t => stat(t, progress[t.id]));
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   const acc = (correct: number, answered: number) => (answered > 0 ? correct / answered : null);
 
@@ -76,8 +83,8 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
 
   const modes: ModeBest[] = years.map(y => ({
     id: y.id, title: y.title,
-    endless: data.endless[y.id] ?? 0, sprint: data.sprint[y.id] ?? 0,
-    boss: data.boss[y.id] ?? 0, memory: data.memory[y.id] ?? 0, training: data.training[y.id] ?? 0,
+    endless: endless[y.id] ?? 0, sprint: sprint[y.id] ?? 0,
+    boss: boss[y.id] ?? 0, memory: memory[y.id] ?? 0, training: training[y.id] ?? 0,
   }));
 
   return {

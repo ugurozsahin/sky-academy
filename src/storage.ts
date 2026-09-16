@@ -215,8 +215,15 @@ export function stickersFor(coins: number): string[] {
  * review): `importSave()` only checks `v`, so a blob like `{ v: 2, boss: null }` reaches here untouched, and
  * `Object.values()` on that throws. Every coin award now runs every achievement check, so a corruption in any
  * one field used to break only the mode that read it and now broke coin-earning app-wide; this reads as empty
- * instead, matching `wallet()`'s existing tolerance for the same class of blob. */
-const safeRecord = <T>(x: unknown): Record<string, T> => (x && typeof x === 'object' && !Array.isArray(x)) ? x as Record<string, T> : {};
+ * instead, matching `wallet()`'s existing tolerance for the same class of blob.
+ *
+ * Exported for #95: `d.progress` is read the same unguarded way outside this file — `home.ts`'s star tally and
+ * topic list, `avatar.ts`'s `masterProgress()`, `game/parents.ts`'s `parentSummary()` — and `d.progress[id]`
+ * throws the moment `d.progress` itself is not an object, which a hand-edited or corrupted "Restore" paste can
+ * produce (`{ v: 1, progress: null }` passes `importSave()`'s version check and is written straight through).
+ * `#270` chose *accept the import, make every reader tolerant* over rejecting the blob at the door — this is
+ * that same fix reaching the readers #270 did not touch. */
+export const safeRecord = <T>(x: unknown): Record<string, T> => (x && typeof x === 'object' && !Array.isArray(x)) ? x as Record<string, T> : {};
 const topicsStarred = (d: SaveData) => Object.values(safeRecord<TopicProgress>(d.progress)).filter(p => (p?.stars ?? 0) > 0).length;
 const islandsWithAStar = (d: SaveData) => { const p = safeRecord<TopicProgress>(d.progress); return YEARS.filter(y => TOPICS.some(t => t.year === y.id && (p[t.id]?.stars ?? 0) > 0)).length; };
 const islandFullyStarred = (d: SaveData) => {
