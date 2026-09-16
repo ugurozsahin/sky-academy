@@ -74,6 +74,22 @@ describe('rewards storage', () => {
     save({ spent: 100 });                                                  // the shop's own write — coins (lifetime) is untouched by it
     expect(evaluateStickers(load())).toEqual(before);
   });
+  // #270 review: importSave() only checks `v`, so a hand-edited or corrupted "Restore" code such as
+  // `{ v: 2, boss: null }` reaches evaluateStickers() untouched. Before this, only the one mode reading that
+  // field (recordBossWin, say) would throw, and only when the child opened it; because every coin award now
+  // runs every achievement check, a corruption in any single field used to take coin-earning down app-wide.
+  it('a corrupted achievement field never breaks addCoins() — every mode reads all four now (#270)', () => {
+    for (const bad of [{ progress: null }, { boss: null }, { memory: 'not an object' }, { sprint: [] }]) {
+      reset();
+      expect(importSave(JSON.stringify({ v: SAVE_VERSION, name: 'Bad', coins: 5, ...bad })), JSON.stringify(bad)).toBe(true);
+      expect(() => addCoins(10), `addCoins() must not throw on ${JSON.stringify(bad)}`).not.toThrow();
+    }
+  });
+  it('a corrupted number inside boss/memory/sprint is skipped rather than breaking the sum (#270)', () => {
+    reset();
+    importSave(JSON.stringify({ v: SAVE_VERSION, coins: 0, boss: { year1: 'two', reception: 1 } }));
+    expect(evaluateStickers(load())).toContain('shadow');   // the one real win still counts
+  });
   it('tutorial flag defaults to unseen and survives old saves without the field', () => {
     expect(load().tutorialSeen).toBe(false);
     mem['sna:v1'] = JSON.stringify({ v: 1, name: 'Old', coins: 5 });   // save written before the field existed

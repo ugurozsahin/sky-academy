@@ -140,12 +140,22 @@ export const STICKER_COST = [30, 70, 120];
 export function stickersFor(coins: number): string[] {
   return STICKER_IDS.slice(0, STICKER_COST.length).filter((_, i) => coins >= STICKER_COST[i]);
 }
-const topicsStarred = (d: SaveData) => Object.values(d.progress).filter(p => p.stars > 0).length;
-const islandsWithAStar = (d: SaveData) => YEARS.filter(y => TOPICS.some(t => t.year === y.id && (d.progress[t.id]?.stars ?? 0) > 0)).length;
-const islandFullyStarred = (d: SaveData) => YEARS.some(y => TOPICS.filter(t => t.year === y.id).every(t => (d.progress[t.id]?.stars ?? 0) > 0));
-const totalBossWins = (d: SaveData) => Object.values(d.boss).reduce((n, x) => n + x, 0);
-const totalMemoryBoards = (d: SaveData) => Object.values(d.memory).reduce((n, x) => n + x, 0);
-const bestSprintAnyYear = (d: SaveData) => Object.values(d.sprint).reduce((best, x) => Math.max(best, x), 0);
+/** A field that should be a plain `Record<string, …>`, tolerant of a hand-edited or corrupted save (#270
+ * review): `importSave()` only checks `v`, so a blob like `{ v: 2, boss: null }` reaches here untouched, and
+ * `Object.values()` on that throws. Every coin award now runs every achievement check, so a corruption in any
+ * one field used to break only the mode that read it and now broke coin-earning app-wide; this reads as empty
+ * instead, matching `wallet()`'s existing tolerance for the same class of blob. */
+const safeRecord = <T>(x: unknown): Record<string, T> => (x && typeof x === 'object' && !Array.isArray(x)) ? x as Record<string, T> : {};
+const topicsStarred = (d: SaveData) => Object.values(safeRecord<TopicProgress>(d.progress)).filter(p => (p?.stars ?? 0) > 0).length;
+const islandsWithAStar = (d: SaveData) => { const p = safeRecord<TopicProgress>(d.progress); return YEARS.filter(y => TOPICS.some(t => t.year === y.id && (p[t.id]?.stars ?? 0) > 0)).length; };
+const islandFullyStarred = (d: SaveData) => {
+  const p = safeRecord<TopicProgress>(d.progress);
+  return YEARS.some(y => { const ts = TOPICS.filter(t => t.year === y.id); return ts.length > 0 && ts.every(t => (p[t.id]?.stars ?? 0) > 0); });
+};
+const sumOf = (x: unknown) => Object.values(safeRecord<number>(x)).reduce((n: number, v) => n + (typeof v === 'number' ? v : 0), 0);
+const totalBossWins = (d: SaveData) => sumOf(d.boss);
+const totalMemoryBoards = (d: SaveData) => sumOf(d.memory);
+const bestSprintAnyYear = (d: SaveData) => Object.values(safeRecord<number>(d.sprint)).reduce((best: number, v) => Math.max(best, typeof v === 'number' ? v : 0), 0);
 export const TOPICS_STARRED_GOAL = 5;
 export const SPRINT_STICKER_SCORE = 150;   // roughly a 3-star sprint (12+ correct) once the combo bonus is in
 /** One achievement per non-coin sticker. `progress` is pure over the save, for the rewards screen's hint text
