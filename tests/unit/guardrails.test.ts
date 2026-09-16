@@ -2034,6 +2034,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   const SKILLS: Record<string, { repo: string; sha: string; path: string } | null> = {
     'add-guard-rail': null,
     'add-topic': null,
+    'design-language': null,
     'open-pr': null,
     'review-pr': null,
     'verification-before-completion': { ...SUPERPOWERS, path: 'skills/verification-before-completion' },
