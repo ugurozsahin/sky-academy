@@ -346,6 +346,31 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'terra');
   });
 
+  /** #67 acceptance: "progress is obvious to a child" — a small dot rail across the two first-run steps. */
+  test('onboarding: the wizard progress rail advances from step 1 to step 2, and is not shown to a returning player', async ({ page }) => {
+    await page.goto('/?reset=1');
+    await expect(page.locator('.wizard-progress')).toHaveAttribute('aria-label', 'Step 1 of 2');
+    await expect(page.locator('.wizard-progress .dot.active')).toHaveCount(1);
+
+    await page.click('.avatar-card[data-id="blaze"]');
+    await page.fill('#name', 'Zoe');
+    await page.click('#go');
+
+    await expect(page.locator('.intro-card')).toBeVisible();
+    await expect(page.locator('.wizard-progress')).toHaveAttribute('aria-label', 'Step 2 of 2');
+    await expect(page.locator('.wizard-progress .dot.active')).toHaveCount(1);
+    // it is the *second* dot that is active on step 2, not still the first
+    await expect(page.locator('.wizard-progress .dot').nth(1)).toHaveClass(/active/);
+
+    await page.click('#intro-go');
+    await expect(page.locator('.home')).toBeVisible();
+
+    // a returning player re-entering via #change-av is not mid-wizard — no step rail to show them
+    await page.click('#change-av');
+    await expect(page.locator('.change-avatar')).toBeVisible();
+    await expect(page.locator('.wizard-progress')).toHaveCount(0);
+  });
+
   test('every year has maths and writing topics listed', async ({ page }) => {
     await seedPlayer(page);
     for (const y of ['reception', 'year1', 'year2']) {

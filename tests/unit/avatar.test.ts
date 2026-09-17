@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canStart } from '../../src/ui/avatar';
+import { canStart, wizardProgress } from '../../src/ui/avatar';
 
 /**
  * #110: `Let's go!` used to need only an avatar, so a child could walk straight past "Your name" — which sat
@@ -34,5 +34,34 @@ describe('canStart — the avatar screen lets a player through (#110)', () => {
 
   it('undefined avatar and undefined-ish saves behave like no avatar', () => {
     expect(canStart(undefined, 'Ada')).toBe(false);
+  });
+});
+
+/**
+ * #67 acceptance: "progress is obvious to a child". The step count is spoken once, in the element's own
+ * aria-label, so a screen reader is not left to count decorative dots.
+ */
+describe('wizardProgress — the first-run wizard step rail', () => {
+  it('marks exactly the current step active, and none other', () => {
+    const html = wizardProgress(1, 2);
+    expect(html.match(/class="dot active"/g)?.length).toBe(1);
+    expect(html.match(/class="dot"/g)?.length).toBe(1);
+  });
+
+  it('the second step is active on step 2, not the first', () => {
+    const html = wizardProgress(2, 2);
+    const [first, second] = html.split('</span>');
+    expect(first).not.toMatch(/active/);
+    expect(second).toMatch(/active/);
+  });
+
+  it('names the step in a screen-reader label, not as visible dot text', () => {
+    expect(wizardProgress(1, 2)).toContain('aria-label="Step 1 of 2"');
+    expect(wizardProgress(2, 2)).toContain('aria-label="Step 2 of 2"');
+  });
+
+  it('every dot is decorative, so a screen reader reads the label once, not the dots', () => {
+    const html = wizardProgress(1, 2);
+    expect(html.match(/aria-hidden="true"/g)?.length).toBe(2);
   });
 });

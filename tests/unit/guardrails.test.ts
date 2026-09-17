@@ -1422,6 +1422,29 @@ describe('the opening screen asks for a name where it can be seen (#110)', () =>
 });
 
 /**
+ * #67 acceptance: "progress is obvious to a child" — both first-run wizard steps must actually call
+ * `wizardProgress()`, not just define it. A helper nobody renders is not progress being obvious to anyone.
+ */
+describe('the first-run wizard shows its progress rail on every step (#67)', () => {
+  const src = readFileSync(new URL('../../src/ui/avatar.ts', import.meta.url), 'utf8');
+
+  it('avatarScreen (step 1) renders wizardProgress(1, 2)', () => {
+    const avatarScreenBody = src.slice(src.indexOf('export function avatarScreen'), src.indexOf('export function changeAvatarScreen'));
+    expect(avatarScreenBody).toMatch(/\$\{wizardProgress\(1,\s*2\)\}/);
+  });
+
+  it('introScreen (step 2) renders wizardProgress(2, 2)', () => {
+    const introScreenBody = src.slice(src.indexOf('export function introScreen'));
+    expect(introScreenBody).toMatch(/\$\{wizardProgress\(2,\s*2\)\}/);
+  });
+
+  it('changeAvatarScreen (returning players, not the wizard) shows no progress rail', () => {
+    const changeScreenBody = src.slice(src.indexOf('export function changeAvatarScreen'), src.indexOf('export function introScreen'));
+    expect(changeScreenBody, 'a returning player is not mid-wizard — no step rail to show them').not.toMatch(/wizardProgress/);
+  });
+});
+
+/**
  * #171 — the ordered list is retired, and the rail is about the *dependency*, not the issue number.
  *
  * A pinned issue held the order by hand, and a hand-kept list has to agree with the labels, the board and
