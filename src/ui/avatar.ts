@@ -18,12 +18,24 @@ export const canStart = (avatar: string | null | undefined, name: string) => !!a
 /** Friendly, not an error: the tone of the sensei lines, never red text at a five-year-old (#110). */
 const NAME_HINT = 'Pop your name in and we will cheer you on! ✍️';
 
+/**
+ * First-run wizard progress (#67 acceptance: "progress is obvious to a child"). The dots are decorative
+ * (`aria-hidden`); the step count lives once, in the `aria-label`, so a screen reader says it plainly instead
+ * of counting spans.
+ */
+export function wizardProgress(step: number, total: number) {
+  const dots = Array.from({ length: total }, (_, i) =>
+    `<span class="dot${i + 1 === step ? ' active' : ''}" aria-hidden="true"></span>`).join('');
+  return `<p class="wizard-progress" aria-label="Step ${step} of ${total}">${dots}</p>`;
+}
+
 export function avatarScreen(go: (s: 'home') => void) {
   const d = load();
   const master = masterProgress(TOPICS, safeRecord<TopicProgress>(d.progress));   // #95: tolerant of a hand-edited/corrupted save; the 11th ninja unlocks when every topic has a star
   render(`
   <section class="screen avatar-screen">
     <header class="brand"><span class="kanji">忍</span><h1>Sky Ninja<br><span>Academy</span></h1><p class="tag">Choose your ninja</p></header>
+    ${wizardProgress(1, 2)}
     <label class="name-row"><span>Your name</span><input id="name" maxlength="14" autocomplete="off" aria-describedby="name-hint" placeholder="Ninja" value="${esc(d.name)}"></label>
     <p class="name-hint" id="name-hint" aria-live="polite">${hasName(d.name) ? '' : NAME_HINT}</p>
     <div class="avatar-grid" role="list">
@@ -108,6 +120,7 @@ export function introScreen(finish: () => void) {
   render(`
   <section class="screen avatar-screen intro-screen">
     <div class="intro-card" style="--glow:${avatar.glow}">
+      ${wizardProgress(2, 2)}
       <span class="figure"><img src="${avatar.img}" alt=""></span>
       <h1 id="intro-heading" tabindex="-1">Hello, ${esc(d.name || 'Ninja')}!</h1>
       <p class="intro-text">${esc(line)}</p>
