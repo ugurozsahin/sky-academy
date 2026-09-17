@@ -78,3 +78,25 @@ file under `scripts/`.
 - **A genuinely new look** (art, skins, a redesigned effect) is `owner-approval`, decided by the owner looking
   at the real thing, not by a screenshot standing in for his verdict. A shot here is for your own review
   judgement on the way to labelling it, not a substitute for his `OWNER: APPROVED`.
+
+## Owner-approval PRs: send the shot, don't just say how to make one (#184)
+
+No cloud/routine session has a way to attach a binary image to a GitHub PR body, and screenshots are
+explicitly never repository content (above) — so a `Closes`/`Part of` line reading "run `shot.mjs` yourself to
+see it" is a real gap when nobody is watching the run that opened the PR. `SendUserFile` closes it: it
+delivers a file into *the session*, not into a live chat specifically, so it is there whenever the owner next
+opens that session — attended or not, exactly like the rest of a routine run's transcript.
+
+So whenever a PR is labelled `owner-approval`, **in addition to** the reproduction steps a reviewer would use
+(the `shot.mjs` command, per "Running it" above — that stays, and stays first):
+
+1. Take the shot(s) yourself, following the bounds above (mobile viewport, at most three, only the screens
+   the diff touches).
+2. Call `SendUserFile` on the resulting PNG(s) before or right after opening the PR, with a one-line caption
+   naming the PR.
+3. Say in the PR body that the screenshots were sent to the session, so a reviewer reading it later (who
+   cannot see that session) understands why there is no attached image on GitHub itself.
+
+This is additive to the existing owner-approval process (`CLAUDE.md`), not a replacement for it: the owner's
+verdict is still his own `OWNER: APPROVED`/`OWNER: REJECTED` comment, never inferred from anything a screenshot
+shows.
