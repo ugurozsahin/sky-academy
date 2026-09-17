@@ -1522,6 +1522,42 @@ describe('STEP 3 states where priority:P0 sorts (#157)', () => {
 });
 
 /**
+ * #194 — STEP 2 (PR review) had no priority ordering at all; STEP 3 (issue selection) already did.
+ *
+ * STEP 3's rules 4/5 make issue selection deterministic: highest \`priority:*\` wins, oldest first as the
+ * tie-break. STEP 2 only ever said "For each, oldest first" -- a run could send a P0 fix's PR to review dead
+ * last behind three older, lower-priority PRs, and two runs reading the same open-PR list would still agree
+ * with each other, but on an order that ignores the very labels STEP 3 treats as authoritative for the same
+ * backlog.
+ *
+ * This rail pins the same two things #157's does, one level up: STEP 2 names the priority order, agrees with
+ * STEP 3's own P0-before-P1 wording rather than drifting into a second, differently-worded copy, and still
+ * states oldest-first as the tie-break rather than losing it in the rewrite. The slice is STEP 2's own text
+ * only -- STEP 3 already contains this wording, so a rail that searched the whole file could pass on STEP 3's
+ * copy alone while STEP 2 stayed exactly as it was before #194.
+ *
+ * Prove it red by reverting STEP 2 to "For each, oldest first: check out the branch" with nothing about
+ * priority in between.
+ */
+describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
+  const root = new URL('../../', import.meta.url);
+
+  it('STEP 2 states a priority order for the PR list, not just STEP 3', () => {
+    const text = readFileSync(new URL('docs/ROUTINE-PROMPT.md', root), 'utf8');
+    const step2Start = text.indexOf('STEP 2 — REVIEW');
+    const step3Start = text.indexOf('STEP 3 — DEVELOP');
+    expect(step2Start, 'STEP 2 must exist in the live routine prompt').toBeGreaterThan(-1);
+    expect(step3Start, 'STEP 3 must exist in the live routine prompt').toBeGreaterThan(step2Start);
+    const step2 = text.slice(step2Start, step3Start);
+    expect(step2.length, 'STEP 2 must be read from disk as text, or this rail checks nothing').toBeGreaterThan(500);
+    expect(step2, 'STEP 2 must order the PR list by the priority label of the issue each PR closes (#194)')
+      .toMatch(/priority:P0`? before `?priority:P1/);
+    expect(step2, 'and it must still keep the age tie-break, or two runs can disagree on which PR goes first')
+      .toMatch(/oldest first/i);
+  });
+});
+
+/**
  * #160 — branch names say what the change is, and the rail is about the *matcher*, not the prefix.
  *
  * Branch listings read `claude/affectionate-noether-cztizx` and `claude/bold-knuth-fbbwdx` — generated animal
