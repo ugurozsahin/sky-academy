@@ -3062,13 +3062,20 @@ describe('.claude/rules/*.md declare paths, and every path matches something rea
   const ALL_FILES = walkAll('');
 
   const pathMatches = (pattern: string, candidate: string): boolean => {
+    // #178 review: a bare wildcard with no directory in front of it ("**" or "*") must never pass by
+    // matching some unrelated top-level file — the whole point of this rail is to make an entirely unscoped
+    // rule file impossible to ship silently (mirroring #179's exists('**')/exists('*') === false), and this
+    // matcher's own regex path would otherwise reduce "**" to `[^/]*` and let it match e.g. "CLAUDE.md".
+    if (pattern === '**' || pattern === '*') return false;
     if (pattern.endsWith('/**')) {
       const prefix = pattern.slice(0, -3);
       return candidate === prefix || candidate.startsWith(`${prefix}/`);
     }
     if (pattern.includes('*')) {
+      // #178 review (minor, silent-failure-hunter): the escape set omitted `?`, so a literal `?` in a
+      // future pattern would be read as a regex quantifier instead of a literal character.
       const re = new RegExp(`^${pattern.split('/').map((seg) =>
-        seg.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')).join('/')}$`);
+        seg.replace(/[.+^${}()|[\]\\?]/g, '\\$&').replace(/\*/g, '[^/]*')).join('/')}$`);
       return re.test(candidate);
     }
     return candidate === pattern;
@@ -3080,9 +3087,28 @@ describe('.claude/rules/*.md declare paths, and every path matches something rea
     const text = readFileSync(new URL(`${RULES_DIR}/${name}`, root), 'utf8');
     return /^---\n([\s\S]*?)\n---\n/.exec(text);
   };
-  const pathsList = (front: string) => {
-    const block = /^paths:\n((?:[ \t]*-[ \t]*.+\n?)+)/m.exec(front);
-    return block ? [...block[1].matchAll(/-[ \t]*"?([^"\n]+?)"?[ \t]*$/gm)].map((m) => m[1]) : null;
+  // #178 review, CRITICAL (silent-failure-hunter, reproduced independently): the old regex
+  // `/^paths:\n((?:[ \t]*-[ \t]*.+\n?)+)/m` required every list line to be immediately consecutive, so a
+  // blank line or a `#` comment dropped between two entries silently truncated the captured list with no
+  // null and no failure — a rail claiming "every path matches something real" that could itself skip paths
+  // with no signal. Fixed the same way sibling PR #179 fixed the identical bug in its own pathsList: walk
+  // every line after `paths:`, keep `-`-prefixed ones, skip (not stop at) a blank/comment line, and only a
+  // new top-level key or other content ends the list.
+  const pathsList = (front: string): string[] | null => {
+    const idx = front.search(/^paths:[ \t]*$/m);
+    if (idx === -1) return null;
+    const listLines: string[] = [];
+    for (const line of front.slice(idx).split('\n').slice(1)) {
+      if (/^[ \t]*-/.test(line)) { listLines.push(line); continue; }
+      if (/^[ \t]*(#.*)?$/.test(line)) continue;   // blank / comment line — skip, keep scanning
+      break;                                          // a new top-level key or other content ends the list
+    }
+    const entries = listLines.map((l) => {
+      const rest = l.replace(/^[ \t]*-[ \t]*/, '');
+      const quoted = /^"([^"]*)"[ \t]*$/.exec(rest);
+      return (quoted ? quoted[1] : rest).trimEnd();
+    });
+    return entries.length ? entries : null;
   };
 
   it('the independent walk found something to check candidate paths against', () => {
@@ -3109,5 +3135,35 @@ describe('.claude/rules/*.md declare paths, and every path matches something rea
         `${name}'s paths: entry "${pattern}" matches nothing in the repo — a rule scoped to nothing never loads`)
         .toBe(true);
     }
+  });
+
+  it('a comment or blank line between two paths: entries does not silently drop the entries after it (#178 review, CRITICAL)', () => {
+    const front = 'paths:\n  - "src/curriculum/**"\n  # a comment someone adds later\n\n  - "tests/unit/curriculum.test.ts"\n';
+    expect(pathsList(front)).toEqual(['src/curriculum/**', 'tests/unit/curriculum.test.ts']);
+  });
+
+  it('an unparseable paths: entry is kept, not silently dropped', () => {
+    const front = 'paths:\n  - ""\n  - "src/curriculum/**"\n';
+    expect(pathsList(front)).toEqual(['', 'src/curriculum/**']);   // kept, so it fails the real-path check below, not vanishes
+  });
+
+  it('paths: with no top-level key at all still returns null, not an empty array', () => {
+    expect(pathsList('no paths key here')).toBeNull();
+    expect(pathsList('paths:\n')).toBeNull();
+  });
+
+  it('a bare "**" or "*" pattern never matches by accident — an unscoped rule must fail, not sail through', () => {
+    // Reproduced before the fix: pattern.split('/') on a slash-free "**" produced a single segment,
+    // `[^/]*` x2 in the regex reduces to "match anything with no slash", so e.g. pathMatches('**', 'CLAUDE.md')
+    // returned true — a rule scoped to nothing would pass this rail exactly like a properly-scoped one.
+    expect(pathMatches('**', 'CLAUDE.md')).toBe(false);
+    expect(pathMatches('*', 'package.json')).toBe(false);
+    // Sanity: a real directory-prefixed pattern still matches.
+    expect(pathMatches('src/curriculum/**', 'src/curriculum/maths.ts')).toBe(true);
+  });
+
+  it('a literal "?" in a pattern is escaped, not read as a regex quantifier', () => {
+    expect(pathMatches('src/curriculum/*.ts?', 'src/curriculum/maths.ts')).toBe(false);
+    expect(pathMatches('src/curriculum/*.ts?', 'src/curriculum/maths.ts?')).toBe(true);
   });
 });
