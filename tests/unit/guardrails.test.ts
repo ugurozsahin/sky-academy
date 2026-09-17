@@ -3694,7 +3694,11 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
     expect(mcpEntry, 'no PreToolUse entry matches an mcp__github__ tool name').toBeDefined();
     // Scoped to the write-capable tools, not every mcp__github__ tool (a read like list_issues has no `body`
     // to check and would just cost a subprocess call on every read for nothing).
-    for (const tool of ['add_issue_comment', 'issue_write', 'pull_request_review_write', 'create_pull_request'])
+    // #221 review: the first version of this rail asserted only 4 of these 8 names, so a regression dropping
+    // any of the other four from the regex would have shipped past it silently.
+    for (const tool of ['add_issue_comment', 'issue_write', 'pull_request_review_write', 'update_pull_request',
+                         'update_issue_comment', 'create_pull_request', 'add_comment_to_pending_review',
+                         'add_reply_to_pull_request_comment'])
       expect({ tool, matched: mcpEntry.matcher.includes(tool) }, `${tool} must be in the MCP hook's matcher`)
         .toEqual({ tool, matched: true });
     const mcpHook = (mcpEntry.hooks ?? [])[0];
@@ -3807,6 +3811,28 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
       'REVIEW: CLEARED\n\nThis comment discusses the OWNER: APPROVED marker in prose, same as CLAUDE.md does.')),
       'a marker mentioned mid-body is not a verdict — scripts/review-gate.mjs would not treat it as one either').toBe(false);
     expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'Pushed abc123, addressing the review. Ready for re-review.'))).toBe(false);
+  });
+
+  // #221 review (session_01Y2hmFMHngKVepeNBXZ4jEs): the strict path used `sed`/`grep` with `^`, which anchors
+  // to the start of EVERY LINE of a multi-line string, not the start of the whole body — unlike the real
+  // `isOwnerApproved` in scripts/review-gate.mjs, a true whole-string `.startsWith()`. A body whose first line
+  // is ordinary prose and whose SECOND line happens to open with "OWNER: APPROVED" (exactly the shape this
+  // project's own comments produce constantly, quoting the marker mid-discussion) was denied even though the
+  // marker was nowhere near the start. Fixed by switching the strict check to bash's own whole-string glob
+  // match (`[[ "$strict" == 'OWNER: APPROVED'* ]]`), which does not split on embedded newlines the way a
+  // line-oriented tool does. None of the tests above would have caught this: every case they cover puts the
+  // marker on the first non-blank line.
+  it('MCP-tool marker hook: allows OWNER: APPROVED-shaped text on a LATER line of an otherwise-unrelated body (#221 review)', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd,
+      'Looks good overall.\nOWNER: APPROVED - clearly quoting CLAUDE.md style here\nRest of comment.')),
+      'the marker is not at the start of the BODY, only at the start of a later line — review-gate.mjs would not treat this as a verdict').toBe(false);
+  });
+
+  // The hook's own asymmetry (APPROVED strict/literal, REJECTED loose/markdown-stripped) means a bold-wrapped
+  // "**OWNER: APPROVED**" does NOT start literally with "OWNER: APPROVED" and must be allowed — worth pinning
+  // explicitly rather than leaving it as something only the REJECTED sibling test documents.
+  it('MCP-tool marker hook: allows a bold-wrapped **OWNER: APPROVED**, per the hook\'s own strict/loose asymmetry', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '**OWNER: APPROVED**'))).toBe(false);
   });
 
   it('MCP-tool marker hook: allows a body with no body field at all', () => {

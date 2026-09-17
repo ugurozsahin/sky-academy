@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "body=$(jq -r '.tool_input.body // empty'); strict=$(printf '%s' \"$body\" | sed 's/^[[:space:]]*//'); loose=$(printf '%s' \"$body\" | tr -d '*_`>#' | tr -s '[:space:]' ' ' | sed 's/^ *//' | tr '[:lower:]' '[:upper:]'); if printf '%s' \"$strict\" | grep -q '^OWNER: APPROVED' || printf '%s' \"$loose\" | grep -q '^OWNER: REJECTED'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"No agent ever writes an OWNER: APPROVED / OWNER: REJECTED marker (CLAUDE.md, #101 layer 0) - only the human owner writes these, in the GitHub UI. This MCP tool call would have posted one at the start of its body, the same shape scripts/review-gate.mjs treats as a real verdict - not just a mention of the marker in prose.\"}}'; fi"
+            "command": "body=$(jq -r '.tool_input.body // empty'); ws=\"${body%%[![:space:]]*}\"; strict=\"${body#\"$ws\"}\"; loose=$(printf '%s' \"$body\" | tr -d '*_`>#' | tr -s '[:space:]' ' ' | sed 's/^ *//' | tr '[:lower:]' '[:upper:]'); if [[ \"$strict\" == 'OWNER: APPROVED'* ]] || printf '%s' \"$loose\" | grep -q '^OWNER: REJECTED'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"No agent ever writes an OWNER: APPROVED / OWNER: REJECTED marker (CLAUDE.md, #101 layer 0) - only the human owner writes these, in the GitHub UI. This MCP tool call would have posted one at the start of its body, the same shape scripts/review-gate.mjs treats as a real verdict - not just a mention of the marker in prose.\"}}'; fi"
           }
         ]
       }
