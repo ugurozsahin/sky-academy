@@ -1430,6 +1430,23 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
     expect(failed, `while opening the grown-ups dashboard${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
   });
 
+  // Third review round on PR #171: sanitizeTypes() originally covered only object/array/number fields.
+  // `name` is the one field a person freely types into the Restore box, and `esc(d.name)`/`hasName(d.name)`
+  // in avatarScreen() both throw on a non-string — "Change ninja" from the map is a screen every returning
+  // player can reach, not an edge case.
+  test('guard rail: the avatar screen ("Change ninja") still opens on a save with a wrong-typed name', async ({ page }) => {
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    await seedPlayer(page, 'volt', 'Ada', { name: 123, sound: 'yes', tutorialSeen: 'true' });
+    expect(failed, `while landing on the map${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+
+    await page.click('#change-av');
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await expect(page.locator('#name')).toHaveValue('');   // the corrupted name was dropped, not rendered as "123"
+    expect(failed, `while opening the avatar screen${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+  });
+
   // Review finding 3: the reader fix is what lets a player reach the topic list on a corrupted save in the
   // first place — before it, they crashed at the map. Finishing a mission there used to throw in recordTopic()/
   // recordAccuracy() instead, since importSave() had written the corruption straight to the stored blob and

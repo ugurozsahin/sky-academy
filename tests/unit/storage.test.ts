@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
+import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
 
 // minimal localStorage shim for node
@@ -422,6 +423,37 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     const kept = migrate({ v: 1, streak: { last: '2026-09-10', days: 4 }, coins: 12 });
     expect(kept.streak).toEqual({ last: '2026-09-10', days: 4 });
     expect(kept.coins).toBe(12);
+  });
+
+  // Second review round on PR #171: the object/array/number branches above missed every primitive field —
+  // `name` above all, since it is the one field a person freely types into the Restore box, and
+  // `avatarScreen()`'s `esc(d.name)`/`hasName(d.name)` both throw on a non-string.
+  it('migrate() drops a wrong-typed primitive field too, not just object/array/number ones', () => {
+    const m = migrate({
+      v: 1, name: 123, avatar: 42, year: false, voice: 'maybe-ish', sound: 'yes', speech: 1, tutorialSeen: 'true',
+    });
+    expect(m.name).toBe('');
+    expect(m.avatar).toBeNull();
+    expect(m.year).toBe('reception');
+    expect(m.voice).toBe('unknown');
+    expect(m.sound).toBe(true);
+    expect(m.speech).toBe(true);
+    expect(m.tutorialSeen).toBe(false);
+    // valid values, including the legitimate `avatar: null`, are kept exactly as given
+    const kept = migrate({ v: 1, name: 'Kai', avatar: null, year: 'year2', voice: 'yes', sound: false });
+    expect(kept.name).toBe('Kai');
+    expect(kept.avatar).toBeNull();
+    expect(kept.year).toBe('year2');
+    expect(kept.voice).toBe('yes');
+    expect(kept.sound).toBe(false);
+  });
+
+  it('a corrupted name does not brick the avatar screen — importSave() then avatarScreen()-shaped reads', () => {
+    expect(importSave(JSON.stringify({ v: 1, name: 123, avatar: 'volt' }))).toBe(true);
+    const d = load();
+    expect(typeof d.name).toBe('string');
+    expect(() => esc(d.name)).not.toThrow();
+    expect(() => d.name.trim()).not.toThrow();
   });
 
   it('every record*() writer, touchStreak() and recordDojo() survive a save corrupted in every field they touch', () => {

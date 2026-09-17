@@ -137,6 +137,19 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['coins', 'spent'] as const) {
     if (k in clean && typeof clean[k] !== 'number') delete clean[k];
   }
+  // #171 review: the object/array/number branches above missed every primitive-typed field — `name` most of
+  // all, since it is the one field a person freely types into the Restore box. `avatarScreen()`'s `esc(d.name)`
+  // (`dom.ts`) and `hasName(d.name)` (`.trim()`) both throw on a non-string, and `migrate({ v: 1, name: 123
+  // })` used to hand that straight through: no branch here checked it, so a wrong-typed `name` is exactly as
+  // reachable as the `progress`/`streak`/`dojo` cases above, on a screen every returning player opens.
+  for (const k of ['name', 'year'] as const) {
+    if (k in clean && typeof clean[k] !== 'string') delete clean[k];
+  }
+  if ('avatar' in clean && clean.avatar !== null && typeof clean.avatar !== 'string') delete clean.avatar;
+  if ('voice' in clean && clean.voice !== 'unknown' && clean.voice !== 'yes' && clean.voice !== 'no') delete clean.voice;
+  for (const k of ['sound', 'speech', 'tutorialSeen'] as const) {
+    if (k in clean && typeof clean[k] !== 'boolean') delete clean[k];
+  }
   return clean;
 }
 export function migrate(raw: unknown): SaveData {
