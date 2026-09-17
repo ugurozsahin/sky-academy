@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 // @ts-expect-error — plain ESM bundler helper (see scripts/bundle-single.d.ts); #15's rail asserts its output
@@ -3092,5 +3092,102 @@ describe('`<a download>` stays reachable from one guarded place in the certifica
   it('and certRoute itself never sends a native shell to a download', () => {
     expect(code(cert), 'certRoute must answer `show` for a native shell before it answers `download`')
       .toMatch(/if\s*\(\s*caps\.nativeShell\s*\)\s*return\s*'show'\s*;[\s\S]{0,40}return\s*'download'/);
+  });
+});
+
+// #101 (part 1, layer 2): `.claude/rules/*.md` files scope context by path — a run touching `src/curriculum/`
+// should not carry the Android build's rules. An unconditional rule here is just CLAUDE.md with extra steps,
+// so every file must declare `paths:`, and every declared path must point at something real: a rule scoped to
+// a path nothing matches would load never and describe nothing, which is worse than no rule at all.
+describe('.claude/rules/ files are path-scoped, and every path is real (#101)', () => {
+  const root = new URL('../../', import.meta.url);
+  const ruleFiles = readdirSync(new URL('.claude/rules', root)).filter((f) => f.endsWith('.md'));
+
+  it('at least one rule file exists — a vacuous rail is worse than none', () => {
+    expect(ruleFiles.length).toBeGreaterThan(0);
+  });
+
+  const exists = (p: string): boolean => {
+    // `**` and a trailing `*` both describe "everything under here" — the rail checks the concrete directory
+    // or file in front of the wildcard actually exists, not that the wildcard itself resolves to anything.
+    const base = p.replace(/\/\*\*$/, '').replace(/\*+$/, '');
+    // #179 review: a degenerate base — "" (the whole entry was a bare wildcard, e.g. "**" or "*") or one
+    // that escapes the repo root (a leading "/" or a "../" segment) — must never resolve to something real
+    // by accident. `new URL('', root)` is the repo root itself, which always exists, so an entirely
+    // unscoped `paths: ["**"]` used to sail through this check: reproduced directly (base "" →
+    // statSync(root) → isDirectory true) before this fix, exactly the "unconditional rule" case the rail's
+    // own docstring says it exists to catch.
+    if (!base || base.startsWith('/') || base.split('/').includes('..')) return false;
+    try {
+      const resolved = new URL(base, root);
+      if (!resolved.pathname.startsWith(root.pathname)) return false;   // stays inside the repo
+      const s = statSync(resolved);
+      return s.isFile() || s.isDirectory();
+    } catch {
+      return false;
+    }
+  };
+
+  // Walks every line after `paths:` and keeps only `-`-prefixed ones, skipping (not stopping at) a blank or
+  // `#` comment line in between. An earlier version of this matcher required every list line to be
+  // immediately consecutive: a comment or blank line dropped between two entries silently truncated the
+  // captured list, so a path after the break was never checked for existing on disk — a rail claiming "every
+  // path matches something real" that could itself skip paths with no signal. Reproduced and fixed in review.
+  const pathsList = (front: string): string[] | null => {
+    const idx = front.search(/^paths:[ \t]*$/m);
+    if (idx === -1) return null;
+    const listLines: string[] = [];
+    for (const line of front.slice(idx).split('\n').slice(1)) {
+      if (/^[ \t]*-/.test(line)) { listLines.push(line); continue; }
+      if (/^[ \t]*(#.*)?$/.test(line)) continue;   // blank / comment line — skip, keep scanning
+      break;                                        // a new top-level key or other content ends the list
+    }
+    // #179 review: the old extraction regex required at least one non-quote character inside the value, so
+    // an unparseable line (an empty `- ""`, or a trailing comment after the value) silently vanished from
+    // `entries` instead of failing loud — one bad line among several good ones shipped with zero existence
+    // check and no signal. This always keeps one string per list line, even a wrong or empty one, so a
+    // malformed entry fails the real-path check below with the exact text named, rather than being dropped.
+    const entries = listLines.map((l) => {
+      const rest = l.replace(/^[ \t]*-[ \t]*/, '');
+      const quoted = /^"([^"]*)"[ \t]*$/.exec(rest);
+      return (quoted ? quoted[1] : rest).trimEnd();
+    });
+    return entries.length ? entries : null;
+  };
+
+  it.each(ruleFiles)('%s has a paths: list, and every path matches something in the repo', (file) => {
+    const text = readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8');
+    const front = /^---\n([\s\S]*?)\n---\n/.exec(text);
+    expect(front, `${file} must open with YAML frontmatter, or nothing ever loads it by path`).not.toBeNull();
+    const paths = pathsList(front![1]);
+    expect(paths, `${file} needs a non-empty paths: list — an unconditional rule belongs in CLAUDE.md instead`)
+      .not.toBeNull();
+    for (const p of paths!) expect(exists(p), `${file}'s path "${p}" matches nothing in the repo`).toBe(true);
+  });
+
+  it('a comment or blank line between two paths: entries does not silently drop the entries after it', () => {
+    const front = 'paths:\n  - "src/game/**"\n  # a comment\n\n  - "src/ui/play.ts"\n';
+    expect(pathsList(front)).toEqual(['src/game/**', 'src/ui/play.ts']);
+    expect(pathsList('paths:\n')).toBeNull();
+    expect(pathsList('no paths key here')).toBeNull();
+  });
+
+  it('a degenerate or repo-escaping path never reads as real by accident (#179 review, CRITICAL)', () => {
+    // The whole point of this rail is to make an unscoped rule file impossible to ship silently — these are
+    // exactly the inputs it must reject.
+    expect(exists('**')).toBe(false);
+    expect(exists('*')).toBe(false);
+    expect(exists('')).toBe(false);
+    expect(exists('/etc/passwd')).toBe(false);
+    expect(exists('../CLAUDE.md')).toBe(false);
+    expect(exists('src/curriculum/../../../../etc/passwd')).toBe(false);
+    // Sanity: a real path — with and without a trailing wildcard — still passes.
+    expect(exists('src/curriculum/**')).toBe(true);
+    expect(exists('CLAUDE.md')).toBe(true);
+  });
+
+  it('an unparseable paths: entry fails the real-path check with its own text, not a silent drop', () => {
+    const front = 'paths:\n  - ""\n  - "src/curriculum/**"\n';
+    expect(pathsList(front)).toEqual(['', 'src/curriculum/**']);   // kept, not dropped — exists('') is false
   });
 });
