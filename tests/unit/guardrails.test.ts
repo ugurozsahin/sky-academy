@@ -2028,43 +2028,45 @@ describe('a stale review block may be adopted, and only under the four condition
 });
 
 /**
- * #204/#207 — two process rules decided in session on 2026-09-17, both landing in BACKLOG.md only.
+ * #204/#207 — two process rules decided in session on 2026-09-17.
  *
- * CLAUDE.md and docs/ROUTINE-PROMPT.md are both pinned at zero headroom by the byte-budget rail #101 added
- * (PR #198) — every byte this PR could add to either would need an equal cut elsewhere first, and finding
- * that cut is the outstanding "layer 4" migration, not this PR's job. BACKLOG.md carries no such budget and
- * STEP 1 already has every run read it in full, so both rules land there, worded so they stand on their own
- * without a "STEP 2.5" heading that does not exist in `docs/ROUTINE-PROMPT.md` today.
+ * Both land in \`docs/ROUTINE-PROMPT.md\` only — the one file every run demonstrably reads in full every
+ * time (STEP 1) — not the usual three-file pattern and not \`BACKLOG.md\`, which the owner is retiring.
+ * \`CLAUDE.md\` and \`docs/ROUTINE-PROMPT.md\` were both pinned at zero headroom by #101's byte-budget rail
+ * (PR #198); landing these here meant trimming narrative asides elsewhere in the same file by a matching or
+ * greater amount — historical incident detail, not rule content — so the budget rail stays exactly as
+ * strict as #101 left it. \`CLAUDE.md\` is untouched by this change.
  *
- * Prove it red: drop either paragraph from BACKLOG.md, or let CLAUDE.md / docs/ROUTINE-PROMPT.md grow past
- * their pinned budget in service of these rules instead of respecting it.
+ * Prove it red: drop either paragraph, or let either file's budget rail regress.
  */
 describe('a run fixes a stalled block before it starts new work, oldest first (#204)', () => {
   const root = new URL('../../', import.meta.url);
   const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 
-  // The canonical paragraph. Split across lines for readability only — it is rejoined with single
-  // spaces, so the assertion is on the exact prose in BACKLOG.md.
   const CANON = [
-    '**A run fixes a stalled block before it starts new work (#204).** Before STEP 3, a run looks for',
-    'the single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES',
-    'REQUESTED` — one it did not itself set in its own review pass this run, and with no new commit and',
-    'no new comment on that PR in the last 30 minutes. If one exists, the run pushes a fix addressing',
-    'the review\'s findings and comments `Pushed <sha>, addressing <what>` (the same content floor as',
-    '#199/#200, session URL included); it does not post `REVIEW: CLEARED` itself — clearing a block',
-    'still needs the original reviewer or #161\'s four conditions, unchanged.',
+    '**A run fixes a stalled block before it starts new work (#204).** Before STEP 3, look for the',
+    'single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`',
+    '— one you did not set in your own review pass this run, with no new commit and no new comment on it',
+    'in the last 30 minutes (a debounce, in case someone is fixing it right now). If one exists, push a',
+    'fix addressing the review\'s findings and comment `Pushed <sha>, addressing <what>` (#199/#200\'s',
+    'content floor); never post `REVIEW: CLEARED` yourself — clearing still needs the original reviewer',
+    'or #161\'s four conditions.',
   ].join(' ');
 
-  it('BACKLOG.md carries the stalled-block rule in its canonical form', () => {
-    const text = read('BACKLOG.md');
-    expect(text, 'BACKLOG.md must state the rule word for word — a paraphrase is how this widens or narrows')
+  it('docs/ROUTINE-PROMPT.md carries the stalled-block rule in its canonical form', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    expect(text, 'must state the rule word for word — a paraphrase is how this widens or narrows')
       .toContain(CANON);
   });
 
-  it('the rule does not let a run clear the block it just fixed', () => {
-    expect(CANON, 'pushing a fix must stay distinct from clearing a review — that needs the original '
-      + 'reviewer or #161')
-      .toContain('it does not post `REVIEW: CLEARED` itself');
+  it('the rule sits between STEP 2 and STEP 3, and does not let a run clear its own fix', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    const step2 = text.indexOf('STEP 2 — REVIEW & QA FIRST');
+    const step25 = text.indexOf('STEP 2.5 — FIX A STALLED BLOCK');
+    const step3 = text.indexOf('STEP 3 — DEVELOP ONE ITEM');
+    expect(step25, 'STEP 2.5 must exist, after STEP 2').toBeGreaterThan(step2);
+    expect(step3, 'STEP 3 must still follow STEP 2.5, never be skipped').toBeGreaterThan(step25);
+    expect(text).toContain('never post `REVIEW: CLEARED` yourself');
   });
 });
 
@@ -2073,24 +2075,22 @@ describe('a gh-posted body does not carry a duplicated, unrelated footer (#207)'
   const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 
   const CANON = [
-    '**A `gh`-posted body can carry a duplicated, unrelated footer (#207).** `gh issue comment`, `gh pr',
-    'comment` and `gh pr create --body` run in an environment that appends its own `_Generated by',
-    '[Claude Code](...)_` line after an `---` rule — sometimes twice, with two different links — and',
-    'that footer is not part of this repo\'s content floor and is outside any session\'s control once it',
-    'chooses `gh` for the write. Post a comment, an issue body or a PR body with the REST API directly',
-    'instead; `gh` stays first choice for everything that carries no authored body — reading, labels,',
-    'draft/ready-for-review, merging, checks.',
+    '**A `gh`-posted body can carry a duplicated, unrelated footer (#207).** `gh issue comment`/`gh pr',
+    'comment`/`gh pr create --body` come back with their own `_Generated by [Claude Code](...)_` line',
+    'after an `---` rule — sometimes twice, different links — which is not this repo\'s content floor and',
+    'is outside your control once you choose `gh` for the write. Post a comment, issue body or PR body',
+    'with the REST API directly instead; `gh` stays first choice for reads and anything with no authored',
+    'body.',
   ].join(' ');
 
-  it('BACKLOG.md carries the gh-footer rule in its canonical form', () => {
-    const text = read('BACKLOG.md');
-    expect(text, 'BACKLOG.md must state the rule word for word').toContain(CANON);
+  it('docs/ROUTINE-PROMPT.md carries the gh-footer rule in its canonical form', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    expect(text, 'must state the rule word for word').toContain(CANON);
   });
 
-  it('docs/ROUTINE-PROMPT.md still tries gh first for everything else, unmodified by this rule', () => {
+  it('the gh-first default for reads and non-body writes survives', () => {
     const text = read('docs/ROUTINE-PROMPT.md');
-    expect(text, 'the gh-first default for reads and non-body writes must survive')
-      .toContain('try `gh` first, else the REST API');
+    expect(text).toContain('try `gh` first, else the REST API');
   });
 });
 
