@@ -11,7 +11,9 @@ wins and this file is the bug.
 ## 1. Say you are starting, on the issue
 
 One comment on the issue before you branch. It is the only thing that stops two runs shipping the same item —
-which has happened (#27 was built twice). Reading the open pull request list is the other half; do both.
+which has happened (#27 was built twice). Reading the open pull request list is the other half; do both. Sign
+it with your session URL, like every other comment you post here (#199) — a one-line "starting on this" is
+still enough to clear the content floor (#200) as long as it says what it means.
 
 ## 2. Name the branch yourself
 
@@ -57,6 +59,9 @@ deliberately did **not** do, the tests you ran, and which guard-rail budgets mov
   with work outstanding shuts the issue with the rest undone; #26 had to be reopened by hand.
 - Write an **"Owner action"** section only when there is one. An empty one on every pull request is why he
   stopped reading them.
+- Ends with its own `Session: https://claude.ai/code/session_<id>` line (#199) — every comment and issue in
+  this repository does, the pull request body included. The CLI's own auto-generated footer at the bottom is
+  not a substitute for this line; write it yourself.
 
 **A closing keyword closes its issue wherever it appears in the body** — inside a negation, a quotation, or
 the very sentence explaining why you are not closing it. GitHub scans the whole body for `close`/`fix`/
@@ -132,9 +137,13 @@ serves every agent and the owner, so every pull request here looks self-authored
 you opened it this run, and that is the only evidence there is. Tick "Develop" on the issue and leave the rest
 to a different agent.
 
-If a reviewer later asks for changes, push the fix and say what changed. **Pushing a fix does not clear a
-review, and you never undraft to get past one** — not even your own block on someone else's work. The reviewer
-who set it is the one who lifts it.
+If a reviewer later asks for changes, push the fix and say what changed — in a comment shaped like the
+review it answers (#200): open `Pushed <sha>, addressing <what>`, resolve each blocking finding by the
+reviewer's own numbering so it is easy to match them up, state the tests you ran, and close `Ready for
+re-review`, never `REVIEW: CLEARED` — that mark stays the reviewer's, whatever you just fixed. End with your
+session URL (#199), the same as everything else you post here. **Pushing a fix does not clear a review, and
+you never undraft to get past one** — not even your own block on someone else's work. The reviewer who set it
+is the one who lifts it.
 
 ## 6. Governance pull requests say which way they move the constraint
 
