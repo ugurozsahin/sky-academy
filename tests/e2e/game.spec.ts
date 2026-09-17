@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { TOPICS } from '../../src/curriculum';
 import { SAVE_VERSION } from '../../src/storage';
+import { itemById } from '../../src/game/shop';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 
 declare global {
@@ -587,6 +588,19 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#back'); await expect(page.locator('.islands.big')).toBeVisible();        // Rewards → sky map (pops its history entry)
     await startTopic(page, 'reception', 'r-count');
     expect(await page.evaluate(() => window.__sna.state().trail)).toEqual({ color: '#ffd23a', core: '#fff6c4' });
+  });
+
+  test('ninja shop: a bought element trail overrides the avatar\'s own effect, not just its colour (#69)', async ({ page }) => {
+    const water = itemById('trail-water')!;                                       // volt (the default seed avatar) is electric, not water
+    await seedPlayer(page, 'volt', 'Ada', { coins: water.price, spent: 0 });
+    await page.click('#rewards'); await page.click('#shop');
+    await page.click(`.item[data-item="${water.id}"] [data-buy]`);
+    await expect(page.locator(`.item[data-item="${water.id}"]`)).toHaveClass(/\bon\b/);
+    await page.click('#back'); await expect(page.locator('.rewards')).toBeVisible();
+    await page.click('#back'); await expect(page.locator('.islands.big')).toBeVisible();
+    await startTopic(page, 'reception', 'r-count');
+    expect(await page.evaluate(() => window.__sna.arena!.fx)).toBe('water');      // not volt's own 'electric'
+    expect(await page.evaluate(() => window.__sna.state().trail)).toEqual(water.trail);
   });
 
   test('reception is gentle: missed bubbles re-ask without losing lives', async ({ page }) => {
