@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM helper shared with .github/workflows/review-gate.yml (see scripts/review-gate.d.ts)
-import { blockState, closingRefs, hasSessionUrl, isChangesRequested, isCleared, isOwnerApproved, isOwnerRejected } from '../../scripts/review-gate.mjs';
+import { blockState, closingRefs, hasSessionUrl, isAdoptionClear, isChangesRequested, isCleared, isOwnerApproved, isOwnerRejected } from '../../scripts/review-gate.mjs';
 
 /**
  * The review gate decides whether a pull request may be merged. It has twice reported "no block" while a
@@ -144,6 +144,54 @@ describe('the block carries a session URL (#189)', () => {
     const description = `Blocked: ${blocked.reasons.join('; ')}`;
     expect(blocked.reasons).toHaveLength(3);   // draft, no-CLEARED, no-session-url
     expect(description.length).toBeLessThanOrEqual(140);
+  });
+});
+
+/**
+ * #195 — the clearing side of #189/#191's gap: an adopting REVIEW: CLEARED comment (one that opens with
+ * "Clearing another reviewer's block", #161's own phrasing, and matches every real adoption on record —
+ * PR #171, both of them) must carry its own session URL too, or the adoption itself is unattributable.
+ * An ordinary clear by the reviewer who set the block never needs to say this, so isAdoptionClear only
+ * matches text a plain "REVIEW: CLEARED — fps fixed" would never contain by accident.
+ */
+describe("a REVIEW: CLEARED adopting another reviewer's block carries its own session URL (#195)", () => {
+  const requestWithUrl = 'REVIEW: CHANGES REQUESTED — the fps floor is wrong\n\nSession: https://claude.ai/code/session_01MGtjdpxyeGtFJMYeYp3t8B';
+  const adoptionNoUrl = "REVIEW: CLEARED\n\nClearing another reviewer's block, adopted under #161. Verified the fps floor fix directly.";
+  const adoptionWithUrl = "REVIEW: CLEARED\n\nClearing another reviewer's block, adopted under #161.\n\nSession: https://claude.ai/code/session_01C2pKTDxG5Ajirpyv3FqQdZ";
+  const ordinaryClear = 'REVIEW: CLEARED — fps fixed, verified locally';
+
+  it.each([
+    ["REVIEW: CLEARED\n\nClearing another reviewer's block, adopted under #161.", true],
+    ['REVIEW: CLEARED\n\nclearing another reviewers block under #161', true],
+    ['REVIEW: CLEARED — fps fixed, verified locally', false],
+    ["REVIEW: CHANGES REQUESTED — another reviewer's block awaits", false],
+    ["Clearing another reviewer's block, adopted under #161.", false],  // right phrasing, but no REVIEW: CLEARED marker at all
+  ])('reads %j as an adoption clear: %s', (body, expected) => expect(isAdoptionClear(body)).toBe(expected));
+
+  it('adds a distinct reason when the current clear is an adoption with no session URL of its own', () => {
+    const blocked = pr(false, requestWithUrl, adoptionNoUrl);
+    expect(blocked.blocked).toBe(true);
+    expect(blocked.reasons).toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+  });
+
+  it('does not add the reason when the adopting clear carries its own session URL', () => {
+    const blocked = pr(false, requestWithUrl, adoptionWithUrl);
+    expect(blocked.reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+  });
+
+  it('does not add the reason for an ordinary (non-adoption) clear, session URL or not', () => {
+    const blocked = pr(false, requestWithUrl, ordinaryClear);
+    expect(blocked.reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+  });
+
+  it('is silent when the adoption clear is not the PR\'s current state (superseded by a later block)', () => {
+    const blocked = pr(false, requestWithUrl, adoptionNoUrl, requestWithUrl);
+    expect(blocked.reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+  });
+
+  it('is silent when there is no clear at all', () => {
+    expect(pr(false).reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+    expect(pr(false, requestWithUrl).reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
   });
 });
 
