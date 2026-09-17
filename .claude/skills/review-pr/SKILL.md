@@ -99,7 +99,7 @@ each; this is the checklist.
 ## 6. Then decide, and make the decision visible
 
 **Merge** — squash into `main`, tick Review/QA/Done on the issue, and comment with the test results, which
-projects you ran, and the commit hash.
+projects you ran, and the commit hash — ending, like every comment you post here, with your session URL (#199).
 
 **Block** — do both marks, or the block does not exist and the next run merges straight over it:
 
@@ -107,13 +107,16 @@ projects you ran, and the commit hash.
 2. Comment beginning exactly `REVIEW: CHANGES REQUESTED`, then say precisely what must change. Separate
    **blocking** items from notes you are not holding the pull request for, so the author knows what is owed.
    **Include your session URL** — a block written without one can only ever be cleared by the session that set
-   it, which is the stall #161 exists to end.
+   it, which is the stall #161 exists to end. (This was already the rule for this one comment before #199 made
+   it the rule for all of them; it does not change here.)
 
 Do **not** fix it yourself in the same run. The reviewer who set the block is the one who clears it.
 
-**Clearing.** The reviewer who set a block clears it, with a `REVIEW: CLEARED` comment and "Ready for review".
-Pushing a fix does not clear a review, and nobody undrafts a pull request to get past one, their own included.
-Undrafting fires a fresh CI run (#159), so the merging run waits for **that** run, not the tick underneath.
+**Clearing.** The reviewer who set a block clears it, with a `REVIEW: CLEARED` comment, its own session URL
+(#199 — this used to be required only when the clear was a #161 adoption; it is simpler now, and no less
+true, to say every `REVIEW: CLEARED` comment carries one) and "Ready for review". Pushing a fix does not clear
+a review, and nobody undrafts a pull request to get past one, their own included. Undrafting fires a fresh CI
+run (#159), so the merging run waits for **that** run, not the tick underneath.
 
 **Adopting someone else's stale block (#161): go and read the conditions, do not take them from here.**
 They are in `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` STEP 2, word for word in all three, and a
