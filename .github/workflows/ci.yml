@@ -62,7 +62,19 @@ on:
 concurrency:
   # Keyed on the event too: a merge landing while the nightly is mid-run must not cancel it — a cancelled
   # run reports nothing, so the one full check on main would vanish silently.
-  group: ci-${{ github.ref }}-${{ github.event_name }}
+  #
+  # #206: a push additionally gets its own commit in the key. Without it, two merges to main land in the
+  # same group (`ci-refs/heads/main-push`) whenever they are within the workflow's run time of each other —
+  # PR #190 and PR #193 merged 3 seconds apart on 2026-09-17 and the second push's `cancel-in-progress`
+  # killed the first's still-running check, which reports nothing rather than a failure. That first commit's
+  # own tree was never actually checked; it only turned out fine because #193 happened to be a fast-follow
+  # rebased on top of it. A genuinely broken merge landing the same way would go straight from "cancelled" to
+  # "nobody looks" — the failure mode `push`'s green ticks are the only defence against, since main gets no
+  # pull-request run of its own. Folding `github.sha` into a push's group makes every push's group unique, so
+  # `cancel-in-progress` never fires between two pushes — it still fires within one PR's own `synchronize`
+  # runs (`refs/pull/<n>/merge` is stable across those) and within the nightly/`workflow_dispatch` group,
+  # which is the overlap this mechanism exists to absorb (#88).
+  group: ci-${{ github.ref }}-${{ github.event_name }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: true
 jobs:
   test:
