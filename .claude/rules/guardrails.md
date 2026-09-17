@@ -6,6 +6,11 @@ paths:
 
 # Guard rails and scripts (#101)
 
+- `tests/unit/guardrails.test.ts` and the `guard rail:` tests in the e2e spec encode mistakes already made —
+  render frame rate, screen teardown on a route change, screen-class CSS collisions, `as any` in game logic,
+  comparator shuffles, `shadowBlur`, the dependency allowlist, listener pairing; British English lives in
+  `british.test.ts`. They are text/DOM checks, not proofs: they catch the exact spellings and the exact
+  screens named in their comments.
 - A *budget* rail (a frame-rate number, a byte count, a line count…) records existing debt. It may only be
   lowered when the debt it measures is genuinely reduced — never raised to make a build pass.
 - Prove a rail red before making it green: reproduce the bug the rail exists to catch, watch the rail fail on
