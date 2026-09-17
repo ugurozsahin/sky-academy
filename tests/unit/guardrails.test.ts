@@ -1700,6 +1700,32 @@ describe('a stale review block may be adopted, and only under the four condition
   });
 
   /**
+   * #191 — the clearing side of #161 had the same gap as the blocking side, one level down.
+   *
+   * #189 made scripts/review-gate.mjs flag a REVIEW: CHANGES REQUESTED comment with no session URL, because
+   * the four adoption conditions are evaluated against the BLOCKING comment's id and a block with none can
+   * never be adopted. Checking the CLEARING side turned up the same inconsistency: PR #171's first REVIEW:
+   * CLEARED comment was itself a #161 adoption and carried no session URL of its own anywhere in its body,
+   * even while reasoning about *other* comments' URLs to justify the adoption. Its second REVIEW: CLEARED
+   * comment, also an adoption, did carry one — so this is inconsistent practice, not a rule nobody follows.
+   *
+   * Deliberately NOT a gating change: blockState() never reads the clearing comment for a session URL, and
+   * this rail does not ask it to — retroactively treating an already-accepted clear as invalid would
+   * re-block pull requests that were correctly unblocked under the rule as actually written, which is a much
+   * bigger behaviour change than this documentation gap justifies. This is a documentation-only tightening:
+   * one sentence, pinned in the three process files, same pattern as every other #161 change.
+   *
+   * Prove it red: drop the new sentence from any one of the three files.
+   */
+  it.each(PROCESS)('%s requires a #161-adopting REVIEW: CLEARED comment to carry its own session URL (#191)', (name) => {
+    const text = read(name);
+    expect(text, `${name} must require the clearing session to identify itself the same way the blocking `
+      + 'session does, when the clear is itself a #161 adoption')
+      .toContain('When that REVIEW: CLEARED comment is the adoption itself, it carries the clearing '
+        + "session's own URL too");
+  });
+
+  /**
    * #213 — the window is measured on the blocked pull request, never repo-wide.
    *
    * The owner's decision of 2026-09-12T08:40Z, and the whole of the fix. "Has this session written anything
