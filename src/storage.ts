@@ -21,7 +21,7 @@ export interface StoredCert {
   training?: boolean;
 }
 export interface SaveData {
-  v: 2;
+  v: 3;
   name: string;
   avatar: string | null;
   year: YearId;
@@ -43,10 +43,11 @@ export interface SaveData {
   owned: string[];                   // bought shop item ids
   equipped: Partial<Record<ItemKind, string>>;   // equipped item per kind (missing = the free default)
   certs: StoredCert[];               // certificates earned, most recently filed first (#205)
+  onboarded: boolean;                // the first-run wizard (#67) has been completed or skipped past
 }
-export const SAVE_VERSION = 2 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
+export const SAVE_VERSION = 3 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
 const KEY = 'sna:v1';                       // stable localStorage slot (its `v1` is historical; `raw.v` drives migration)
-const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [] };
+const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [], onboarded: false };
 
 // A raw blob read back from storage: JSON of unknown shape (any past version, or hand-edited). Migrations walk it.
 type RawSave = Record<string, unknown>;
@@ -66,6 +67,13 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
     ...s,
     voice: s.voice === 'yes' || s.voice === 'no' ? s.voice : 'unknown',
     certs: Array.isArray(s.certs) ? s.certs.filter(isCert) : [],
+  }),
+  // v2 → v3: #67's onboarding wizard needs a flag to tell "never onboarded" from "already played". A blob
+  // that already has an avatar chosen was onboarded under the old single-screen flow, so it counts as done —
+  // the acceptance criterion is that no existing player is sent back through the wizard by this update.
+  2: s => ({
+    ...s,
+    onboarded: typeof s.onboarded === 'boolean' ? s.onboarded : !!s.avatar,
   }),
 };
 
@@ -115,9 +123,46 @@ export const isFutureSave = (s: RawSave): boolean => {
   const v = saveVersionOf(s);
   return v !== UNREADABLE_VERSION && v > SAVE_VERSION;
 };
+/**
+ * Drop any field `migrate()` would otherwise carry through unchanged if it is the wrong *type* (#95 review):
+ * a version-valid blob like `{ v: 1, streak: null }` or `{ v: 1, dojo: null }` used to reach the merge below
+ * untouched, and then `topbar()`'s `d.streak.days`, `dojoCard()`'s `dojoFor(load().dojo, …)` (`s.date` on a
+ * `null` `s`), and every `record*()` writer below (`load().progress[id]` etc.) threw the moment they read it —
+ * not just the two call sites (`parentSummary()`, the map's star tally) the original fix touched. Deleting the
+ * bad field here, rather than guarding each reader, means a *new* call site gets this for free: every reader
+ * goes through `load()` → `migrate()`, so nothing downstream needs to know this hazard exists. The deleted key
+ * is filled back in from `DEFAULT` by the `{ ...DEFAULT, ...s }` merge below, exactly as a missing key already is.
+ */
+function sanitizeTypes(s: RawSave): RawSave {
+  const clean: RawSave = { ...s };
+  const isRecord = (x: unknown) => !!x && typeof x === 'object' && !Array.isArray(x);
+  for (const k of ['progress', 'endless', 'sprint', 'boss', 'memory', 'training', 'equipped', 'streak', 'dojo'] as const) {
+    if (k in clean && !isRecord(clean[k])) delete clean[k];
+  }
+  for (const k of ['stickers', 'owned'] as const) {
+    if (k in clean && !Array.isArray(clean[k])) delete clean[k];
+  }
+  for (const k of ['coins', 'spent'] as const) {
+    if (k in clean && typeof clean[k] !== 'number') delete clean[k];
+  }
+  // #171 review: the object/array/number branches above missed every primitive-typed field — `name` most of
+  // all, since it is the one field a person freely types into the Restore box. `avatarScreen()`'s `esc(d.name)`
+  // (`dom.ts`) and `hasName(d.name)` (`.trim()`) both throw on a non-string, and `migrate({ v: 1, name: 123
+  // })` used to hand that straight through: no branch here checked it, so a wrong-typed `name` is exactly as
+  // reachable as the `progress`/`streak`/`dojo` cases above, on a screen every returning player opens.
+  for (const k of ['name', 'year'] as const) {
+    if (k in clean && typeof clean[k] !== 'string') delete clean[k];
+  }
+  if ('avatar' in clean && clean.avatar !== null && typeof clean.avatar !== 'string') delete clean.avatar;
+  if ('voice' in clean && clean.voice !== 'unknown' && clean.voice !== 'yes' && clean.voice !== 'no') delete clean.voice;
+  for (const k of ['sound', 'speech', 'tutorialSeen', 'onboarded'] as const) {
+    if (k in clean && typeof clean[k] !== 'boolean') delete clean[k];
+  }
+  return clean;
+}
 export function migrate(raw: unknown): SaveData {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...DEFAULT };
-  let s = raw as RawSave;
+  let s = sanitizeTypes(raw as RawSave);
   // Never stamp SAVE_VERSION over a version we could not read (#232). A fresh default is what this *session*
   // sees; keeping the stored blob intact is `save()`'s half, via the read-only latch below.
   if (!isMigratable(s)) return { ...DEFAULT };
@@ -215,8 +260,15 @@ export function stickersFor(coins: number): string[] {
  * review): `importSave()` only checks `v`, so a blob like `{ v: 2, boss: null }` reaches here untouched, and
  * `Object.values()` on that throws. Every coin award now runs every achievement check, so a corruption in any
  * one field used to break only the mode that read it and now broke coin-earning app-wide; this reads as empty
- * instead, matching `wallet()`'s existing tolerance for the same class of blob. */
-const safeRecord = <T>(x: unknown): Record<string, T> => (x && typeof x === 'object' && !Array.isArray(x)) ? x as Record<string, T> : {};
+ * instead, matching `wallet()`'s existing tolerance for the same class of blob.
+ *
+ * Exported for #95: `d.progress` is read the same unguarded way outside this file — `home.ts`'s star tally and
+ * topic list, `avatar.ts`'s `masterProgress()`, `game/parents.ts`'s `parentSummary()` — and `d.progress[id]`
+ * throws the moment `d.progress` itself is not an object, which a hand-edited or corrupted "Restore" paste can
+ * produce (`{ v: 1, progress: null }` passes `importSave()`'s version check and is written straight through).
+ * `#270` chose *accept the import, make every reader tolerant* over rejecting the blob at the door — this is
+ * that same fix reaching the readers #270 did not touch. */
+export const safeRecord = <T>(x: unknown): Record<string, T> => (x && typeof x === 'object' && !Array.isArray(x)) ? x as Record<string, T> : {};
 const topicsStarred = (d: SaveData) => Object.values(safeRecord<TopicProgress>(d.progress)).filter(p => (p?.stars ?? 0) > 0).length;
 const islandsWithAStar = (d: SaveData) => { const p = safeRecord<TopicProgress>(d.progress); return YEARS.filter(y => TOPICS.some(t => t.year === y.id && (p[t.id]?.stars ?? 0) > 0)).length; };
 const islandFullyStarred = (d: SaveData) => {

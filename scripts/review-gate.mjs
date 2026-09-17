@@ -42,13 +42,24 @@ export const isOwnerRejected = (body) => loose(body).startsWith('OWNER: REJECTED
 export const isOwnerApproved = (body) => (body || '').replace(/^\s+/, '').startsWith('OWNER: APPROVED');
 
 /**
+ * A REVIEW: CHANGES REQUESTED comment must carry its own session URL (docs/ROUTINE-PROMPT.md, #161's two
+ * mechanical checks): the setter's silence is measured from the id in *this* comment, and “if the blocking
+ * comment carries no session id at all, condition 1 cannot be evaluated and the block is not adoptable: fail
+ * closed and leave it for the owner.” That rule was prose only — nothing read the comment for the URL, so a
+ * reviewing session that forgot the footer produced a block silently nobody but the owner could ever clear,
+ * discovered only by reading the PR by hand or waiting for the 8-hour watchdog check (#189; live instances:
+ * PR #160, cleared only by the owner's direct intervention, and PR #179).
+ */
+export const hasSessionUrl = (body) => /https:\/\/claude\.ai\/code\/session_[A-Za-z0-9]+/.test(body || '');
+
+/**
  * @param {{draft: boolean, labels?: string[], comments: {body: string, created_at: string}[]}} pr
  * @returns {{blocked: boolean, reasons: string[]}} newest marker wins, so block → clear → block works.
  */
 export function blockState({ draft, labels, comments }) {
-  let requested = null, cleared = null, rejected = null, approved = null;
+  let requested = null, requestedHasSession = false, cleared = null, rejected = null, approved = null;
   for (const c of comments || []) {
-    if (isChangesRequested(c.body)) requested = c.created_at;
+    if (isChangesRequested(c.body)) { requested = c.created_at; requestedHasSession = hasSessionUrl(c.body); }
     if (isCleared(c.body)) cleared = c.created_at;
     if (isOwnerRejected(c.body)) rejected = c.created_at;
     if (isOwnerApproved(c.body)) approved = c.created_at;
@@ -62,6 +73,7 @@ export function blockState({ draft, labels, comments }) {
   const reasons = [];
   if (draft) reasons.push('the PR is a draft');
   if (openReview) reasons.push('a REVIEW: CHANGES REQUESTED comment has no later REVIEW: CLEARED');
+  if (openReview && !requestedHasSession) reasons.push('no session URL — unadoptable per #161');
   if (ownerSaidNo) reasons.push('the owner rejected it (OWNER: REJECTED, no later OWNER: APPROVED)');
   else if (wantsOwner && approved === null) reasons.push('labelled owner-approval and the owner has not written OWNER: APPROVED');
   return { blocked: reasons.length > 0, reasons };

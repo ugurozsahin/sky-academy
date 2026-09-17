@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM helper shared with .github/workflows/review-gate.yml (see scripts/review-gate.d.ts)
-import { blockState, closingRefs, isChangesRequested, isCleared, isOwnerApproved, isOwnerRejected } from '../../scripts/review-gate.mjs';
+import { blockState, closingRefs, hasSessionUrl, isChangesRequested, isCleared, isOwnerApproved, isOwnerRejected } from '../../scripts/review-gate.mjs';
 
 /**
  * The review gate decides whether a pull request may be merged. It has twice reported "no block" while a
@@ -49,7 +49,7 @@ describe('review gate', () => {
     expect(pr(true).blocked).toBe(true);
     expect(pr(false, 'REVIEW: CHANGES REQUESTED').blocked).toBe(true);
     expect(pr(false).blocked).toBe(false);
-    expect(pr(true, 'REVIEW: CHANGES REQUESTED').reasons).toHaveLength(2);
+    expect(pr(true, 'REVIEW: CHANGES REQUESTED').reasons).toHaveLength(3);   // draft, no-CLEARED, no-session-url (#189)
   });
 
   it('the newest marker wins, so block → clear → block still blocks', () => {
@@ -86,6 +86,64 @@ describe('review gate', () => {
 
     it.each(['OWNER: REJECTED — too bright', '**OWNER: REJECTED**', 'owner: rejected'])(
       'reads %j as a rejection', (body) => expect(isOwnerRejected(body)).toBe(true));
+  });
+});
+
+/**
+ * #189 — a REVIEW: CHANGES REQUESTED comment with no session URL blocks the PR exactly as before, but is
+ * unadoptable under #161 (docs/ROUTINE-PROMPT.md: "if the blocking comment carries no session id at all,
+ * condition 1 cannot be evaluated ... fail closed and leave it for the owner"). Confirmed live on PR #160
+ * (cleared only by the owner's direct intervention) and PR #179 (open, still missing it). This must be a
+ * loud reason on the block, not a silent stall discovered hours later.
+ */
+describe('the block carries a session URL (#189)', () => {
+  const withUrl = 'REVIEW: CHANGES REQUESTED — the fps floor is wrong\n\nSession: https://claude.ai/code/session_01MGtjdpxyeGtFJMYeYp3t8B';
+  const withoutUrl = 'REVIEW: CHANGES REQUESTED — the fps floor is wrong';
+
+  it.each([
+    'Session: https://claude.ai/code/session_01MGtjdpxyeGtFJMYeYp3t8B',
+    'https://claude.ai/code/session_014Zmk2ZfxgaWVtGeCwHxysY',
+    '(session https://claude.ai/code/session_abc123XYZ)',
+  ])('reads %j as carrying a session URL', (body) => expect(hasSessionUrl(body)).toBe(true));
+
+  it.each([
+    'REVIEW: CHANGES REQUESTED — the fps floor is wrong',
+    'see https://claude.ai/code/PR-notes for context',                 // not a session link
+    'session 01MGtjdpxyeGtFJMYeYp3t8B (no url)',                       // an id with no URL is not enough
+  ])('does not read %j as carrying a session URL', (body) => expect(hasSessionUrl(body)).toBe(false));
+
+  it('adds a distinct reason when the open block has no session URL', () => {
+    const blocked = pr(false, withoutUrl);
+    expect(blocked.blocked).toBe(true);
+    expect(blocked.reasons).toContain('no session URL — unadoptable per #161');
+  });
+
+  it('does not add the reason when the open block carries a session URL', () => {
+    const blocked = pr(false, withUrl);
+    expect(blocked.blocked).toBe(true);
+    expect(blocked.reasons).not.toContain('no session URL — unadoptable per #161');
+  });
+
+  it('is silent when there is no open block at all', () => {
+    expect(pr(false).reasons).not.toContain('no session URL — unadoptable per #161');
+    expect(pr(false, withoutUrl, 'REVIEW: CLEARED').reasons)
+      .not.toContain('no session URL — unadoptable per #161');
+  });
+
+  it('newest marker wins: only the currently-open block is checked for a session URL', () => {
+    // an old, url-less block was cleared; the new, currently-open block does carry one — no reason.
+    expect(pr(false, withoutUrl, 'REVIEW: CLEARED', withUrl).reasons)
+      .not.toContain('no session URL — unadoptable per #161');
+    // the reverse: an old block had a URL and was cleared; the new, currently-open block does not — reason fires.
+    expect(pr(false, withUrl, 'REVIEW: CLEARED', withoutUrl).reasons)
+      .toContain('no session URL — unadoptable per #161');
+  });
+
+  it('a draft PR with a url-less block reports both reasons, under the 140-char status budget', () => {
+    const blocked = pr(true, withoutUrl);
+    const description = `Blocked: ${blocked.reasons.join('; ')}`;
+    expect(blocked.reasons).toHaveLength(3);   // draft, no-CLEARED, no-session-url
+    expect(description.length).toBeLessThanOrEqual(140);
   });
 });
 

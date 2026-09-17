@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 // @ts-expect-error — plain ESM bundler helper (see scripts/bundle-single.d.ts); #15's rail asserts its output
@@ -222,6 +222,20 @@ describe('guard rails', () => {
     expect(types.length).toBeGreaterThan(4);
     for (const t of ['opened', 'labeled', 'unlabeled', 'converted_to_draft', 'ready_for_review', 'synchronize'])
       expect({ trigger: t, subscribed: types.includes(t) }).toEqual({ trigger: t, subscribed: true });
+    // #131: the six `pull_request` types above all passed with `issue_comment:` deleted from `on:` — nothing
+    // checked that the subscription re-stamping a REVIEW:/OWNER: comment onto the status still exists.
+    expect({ event: 'issue_comment', subscribed: on.includes('issue_comment') })
+      .toEqual({ event: 'issue_comment', subscribed: true });
+    // #160 review: the check above only matched the substring `issue_comment`, so a regression that keeps
+    // the `issue_comment:` key but narrows its `types:` to something excluding `created` — the one type a
+    // fresh REVIEW:/OWNER: comment fires as — left this rail green while #131's exact failure mode came back.
+    // Scoped to the `issue_comment:` block itself (not the whole `on`), the same way the `pull_request` types
+    // are pinned above, so a narrowed list is caught rather than only a deleted key.
+    const issueCommentBlock = on.slice(on.indexOf('issue_comment:'), on.indexOf('concurrency:'));
+    const issueCommentTypes = [...issueCommentBlock.matchAll(/types:\s*\[([^\]]*)\]/g)]
+      .flatMap(m => m[1].split(',').map(t => t.trim()));
+    expect({ event: 'issue_comment', type: 'created', subscribed: issueCommentTypes.includes('created') })
+      .toEqual({ event: 'issue_comment', type: 'created', subscribed: true });
     const guard = code.slice(code.indexOf('if:'), code.indexOf('runs-on:') + 200);
     for (const marker of ["'REVIEW:'", "'OWNER:'"])                     // both verdicts must wake the job
       expect({ marker, wired: guard.includes(marker) }).toEqual({ marker, wired: true });
@@ -1408,6 +1422,29 @@ describe('the opening screen asks for a name where it can be seen (#110)', () =>
 });
 
 /**
+ * #67 acceptance: "progress is obvious to a child" — both first-run wizard steps must actually call
+ * `wizardProgress()`, not just define it. A helper nobody renders is not progress being obvious to anyone.
+ */
+describe('the first-run wizard shows its progress rail on every step (#67)', () => {
+  const src = readFileSync(new URL('../../src/ui/avatar.ts', import.meta.url), 'utf8');
+
+  it('avatarScreen (step 1) renders wizardProgress(1, 2)', () => {
+    const avatarScreenBody = src.slice(src.indexOf('export function avatarScreen'), src.indexOf('export function changeAvatarScreen'));
+    expect(avatarScreenBody).toMatch(/\$\{wizardProgress\(1,\s*2\)\}/);
+  });
+
+  it('introScreen (step 2) renders wizardProgress(2, 2)', () => {
+    const introScreenBody = src.slice(src.indexOf('export function introScreen'));
+    expect(introScreenBody).toMatch(/\$\{wizardProgress\(2,\s*2\)\}/);
+  });
+
+  it('changeAvatarScreen (returning players, not the wizard) shows no progress rail', () => {
+    const changeScreenBody = src.slice(src.indexOf('export function changeAvatarScreen'), src.indexOf('export function introScreen'));
+    expect(changeScreenBody, 'a returning player is not mid-wizard — no step rail to show them').not.toMatch(/wizardProgress/);
+  });
+});
+
+/**
  * #171 — the ordered list is retired, and the rail is about the *dependency*, not the issue number.
  *
  * A pinned issue held the order by hand, and a hand-kept list has to agree with the labels, the board and
@@ -1660,6 +1697,32 @@ describe('a stale review block may be adopted, and only under the four condition
       .not.toContain('commented nowhere in the repository');
     expect(text, `${name} must state the window, and the figure has one written form`)
       .toContain('in the last 2 hours');
+  });
+
+  /**
+   * #191 — the clearing side of #161 had the same gap as the blocking side, one level down.
+   *
+   * #189 made scripts/review-gate.mjs flag a REVIEW: CHANGES REQUESTED comment with no session URL, because
+   * the four adoption conditions are evaluated against the BLOCKING comment's id and a block with none can
+   * never be adopted. Checking the CLEARING side turned up the same inconsistency: PR #171's first REVIEW:
+   * CLEARED comment was itself a #161 adoption and carried no session URL of its own anywhere in its body,
+   * even while reasoning about *other* comments' URLs to justify the adoption. Its second REVIEW: CLEARED
+   * comment, also an adoption, did carry one — so this is inconsistent practice, not a rule nobody follows.
+   *
+   * Deliberately NOT a gating change: blockState() never reads the clearing comment for a session URL, and
+   * this rail does not ask it to — retroactively treating an already-accepted clear as invalid would
+   * re-block pull requests that were correctly unblocked under the rule as actually written, which is a much
+   * bigger behaviour change than this documentation gap justifies. This is a documentation-only tightening:
+   * one sentence, pinned in the three process files, same pattern as every other #161 change.
+   *
+   * Prove it red: drop the new sentence from any one of the three files.
+   */
+  it.each(PROCESS)('%s requires a #161-adopting REVIEW: CLEARED comment to carry its own session URL (#191)', (name) => {
+    const text = read(name);
+    expect(text, `${name} must require the clearing session to identify itself the same way the blocking `
+      + 'session does, when the clear is itself a #161 adoption')
+      .toContain('When that REVIEW: CLEARED comment is the adoption itself, it carries the clearing '
+        + "session's own URL too");
   });
 
   /**
@@ -3032,21 +3095,128 @@ describe('`<a download>` stays reachable from one guarded place in the certifica
   });
 });
 
+// #101 (part 1, layer 2): `.claude/rules/*.md` files scope context by path — a run touching `src/curriculum/`
+// should not carry the Android build's rules. An unconditional rule here is just CLAUDE.md with extra steps,
+// so every file must declare `paths:`, and every declared path must point at something real: a rule scoped to
+// a path nothing matches would load never and describe nothing, which is worse than no rule at all.
+describe('.claude/rules/ files are path-scoped, and every path is real (#101)', () => {
+  const root = new URL('../../', import.meta.url);
+  const ruleFiles = readdirSync(new URL('.claude/rules', root)).filter((f) => f.endsWith('.md'));
+
+  it('at least one rule file exists — a vacuous rail is worse than none', () => {
+    expect(ruleFiles.length).toBeGreaterThan(0);
+  });
+
+  const exists = (p: string): boolean => {
+    // `**` and a trailing `*` both describe "everything under here" — the rail checks the concrete directory
+    // or file in front of the wildcard actually exists, not that the wildcard itself resolves to anything.
+    const base = p.replace(/\/\*\*$/, '').replace(/\*+$/, '');
+    // #179 review: a degenerate base — "" (the whole entry was a bare wildcard, e.g. "**" or "*") or one
+    // that escapes the repo root (a leading "/" or a "../" segment) — must never resolve to something real
+    // by accident. `new URL('', root)` is the repo root itself, which always exists, so an entirely
+    // unscoped `paths: ["**"]` used to sail through this check: reproduced directly (base "" →
+    // statSync(root) → isDirectory true) before this fix, exactly the "unconditional rule" case the rail's
+    // own docstring says it exists to catch.
+    if (!base || base.startsWith('/') || base.split('/').includes('..')) return false;
+    try {
+      const resolved = new URL(base, root);
+      if (!resolved.pathname.startsWith(root.pathname)) return false;   // stays inside the repo
+      const s = statSync(resolved);
+      return s.isFile() || s.isDirectory();
+    } catch {
+      return false;
+    }
+  };
+
+  // Walks every line after `paths:` and keeps only `-`-prefixed ones, skipping (not stopping at) a blank or
+  // `#` comment line in between. An earlier version of this matcher required every list line to be
+  // immediately consecutive: a comment or blank line dropped between two entries silently truncated the
+  // captured list, so a path after the break was never checked for existing on disk — a rail claiming "every
+  // path matches something real" that could itself skip paths with no signal. Reproduced and fixed in review.
+  const pathsList = (front: string): string[] | null => {
+    const idx = front.search(/^paths:[ \t]*$/m);
+    if (idx === -1) return null;
+    const listLines: string[] = [];
+    for (const line of front.slice(idx).split('\n').slice(1)) {
+      if (/^[ \t]*-/.test(line)) { listLines.push(line); continue; }
+      if (/^[ \t]*(#.*)?$/.test(line)) continue;   // blank / comment line — skip, keep scanning
+      break;                                        // a new top-level key or other content ends the list
+    }
+    // #179 review: the old extraction regex required at least one non-quote character inside the value, so
+    // an unparseable line (an empty `- ""`, or a trailing comment after the value) silently vanished from
+    // `entries` instead of failing loud — one bad line among several good ones shipped with zero existence
+    // check and no signal. This always keeps one string per list line, even a wrong or empty one, so a
+    // malformed entry fails the real-path check below with the exact text named, rather than being dropped.
+    const entries = listLines.map((l) => {
+      const rest = l.replace(/^[ \t]*-[ \t]*/, '');
+      const quoted = /^"([^"]*)"[ \t]*$/.exec(rest);
+      return (quoted ? quoted[1] : rest).trimEnd();
+    });
+    return entries.length ? entries : null;
+  };
+
+  it.each(ruleFiles)('%s has a paths: list, and every path matches something in the repo', (file) => {
+    const text = readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8');
+    const front = /^---\n([\s\S]*?)\n---\n/.exec(text);
+    expect(front, `${file} must open with YAML frontmatter, or nothing ever loads it by path`).not.toBeNull();
+    const paths = pathsList(front![1]);
+    expect(paths, `${file} needs a non-empty paths: list — an unconditional rule belongs in CLAUDE.md instead`)
+      .not.toBeNull();
+    for (const p of paths!) expect(exists(p), `${file}'s path "${p}" matches nothing in the repo`).toBe(true);
+  });
+
+  it('a comment or blank line between two paths: entries does not silently drop the entries after it', () => {
+    const front = 'paths:\n  - "src/game/**"\n  # a comment\n\n  - "src/ui/play.ts"\n';
+    expect(pathsList(front)).toEqual(['src/game/**', 'src/ui/play.ts']);
+    expect(pathsList('paths:\n')).toBeNull();
+    expect(pathsList('no paths key here')).toBeNull();
+  });
+
+  it('a degenerate or repo-escaping path never reads as real by accident (#179 review, CRITICAL)', () => {
+    // The whole point of this rail is to make an unscoped rule file impossible to ship silently — these are
+    // exactly the inputs it must reject.
+    expect(exists('**')).toBe(false);
+    expect(exists('*')).toBe(false);
+    expect(exists('')).toBe(false);
+    expect(exists('/etc/passwd')).toBe(false);
+    expect(exists('../CLAUDE.md')).toBe(false);
+    expect(exists('src/curriculum/../../../../etc/passwd')).toBe(false);
+    // Sanity: a real path — with and without a trailing wildcard — still passes.
+    expect(exists('src/curriculum/**')).toBe(true);
+    expect(exists('CLAUDE.md')).toBe(true);
+  });
+
+  it('an unparseable paths: entry fails the real-path check with its own text, not a silent drop', () => {
+    const front = 'paths:\n  - ""\n  - "src/curriculum/**"\n';
+    expect(pathsList(front)).toEqual(['', 'src/curriculum/**']);   // kept, not dropped — exists('') is false
+  });
+});
+
 /**
- * Layer 2 rule files (#101) — `.claude/rules/<topic>.md`, loaded only when a session touches a path that
- * matches its `paths:` frontmatter, rather than costing every turn the way `CLAUDE.md` does. Two ways this
- * decays silently, neither of which `tsc` or a missing-import error would ever catch: a rule with no
- * `paths:` list never gets scoped-loaded by anything, so wording moved out of `CLAUDE.md` into one is read by
- * nobody; and a `paths:` entry that matches nothing real quietly stops mattering the day the file or
- * directory it named is renamed or removed.
+ * Layer 2 rule files (#101), curriculum.md specifically — `.claude/rules/<topic>.md`, loaded only when a
+ * session touches a path that matches its `paths:` frontmatter, rather than costing every turn the way
+ * `CLAUDE.md` does. Two ways this decays silently, neither of which `tsc` or a missing-import error would
+ * ever catch: a rule with no `paths:` list never gets scoped-loaded by anything, so wording moved out of
+ * `CLAUDE.md` into one is read by nobody; and a `paths:` entry that matches nothing real quietly stops
+ * mattering the day the file or directory it named is renamed or removed.
+ *
+ * Scoped to `curriculum.md` alone, not every `.claude/rules/*.md` file: the sibling describe block above
+ * ("`.claude/rules/` files are path-scoped, and every path is real") already covers the other six rule
+ * files (android/e2e/game/governance/guardrails/style) with a disk-truth `exists()` checker. This block's
+ * own independent file walk (`ALL_FILES`) deliberately excludes `android/` as a generated tree not worth
+ * walking — fine for `curriculum.md`, which never points there, but it would wrongly fail `android.md`'s own
+ * `android/**` entry if this ran against every rule file. Running both validators over the same six files
+ * would also mean they could silently drift apart on what "matches something real" means. One rule file, one
+ * validator, no double coverage.
  *
  * This is a path-glob check, not a full glob engine: it understands an exact file path and a `<dir>/**`
- * prefix, which is what every rule file here needs. Extend `pathMatches` before adding a `paths:` pattern
- * shaped differently (a single-segment `*`, for instance).
+ * prefix, which is what `curriculum.md` needs. Extend `pathMatches` before adding a `paths:` pattern shaped
+ * differently (a single-segment `*`, for instance).
  *
- * Prove it red: add a `paths:` entry naming a file that does not exist, or a rule file with no frontmatter.
+ * Prove it red: add a `paths:` entry to `curriculum.md` naming a file that does not exist, or drop its
+ * frontmatter.
  */
-describe('.claude/rules/*.md declare paths, and every path matches something real (#101)', () => {
+describe('.claude/rules/curriculum.md declares paths, and every path matches something real (#101)', () => {
   const root = new URL('../../', import.meta.url);
   const RULES_DIR = '.claude/rules';
 
@@ -3081,8 +3251,7 @@ describe('.claude/rules/*.md declare paths, and every path matches something rea
     return candidate === pattern;
   };
 
-  const ruleFiles = readdirSync(new URL(`${RULES_DIR}/`, root), { withFileTypes: true })
-    .filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name).sort();
+  const ruleFiles = ['curriculum.md'];
   const frontMatter = (name: string) => {
     const text = readFileSync(new URL(`${RULES_DIR}/${name}`, root), 'utf8');
     return /^---\n([\s\S]*?)\n---\n/.exec(text);

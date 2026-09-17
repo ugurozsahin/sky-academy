@@ -7,7 +7,7 @@ import { freshDojo } from '../../src/game/dojo';
 const base: SaveData = {
   v: SAVE_VERSION, name: 'Test', avatar: 'kai', year: 'year1', sound: true, speech: true, voice: 'unknown',
   progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, certs: [],
-  coins: 0, spent: 0, owned: [], equipped: {}, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''),
+  coins: 0, spent: 0, owned: [], equipped: {}, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), onboarded: true,
 };
 const p = (stars: number, plays: number, hits?: number, tries?: number): TopicProgress => ({ stars, best: 0, plays, hits, tries });
 // small deterministic rng
@@ -98,6 +98,28 @@ describe('parent dashboard summary', () => {
     expect(sm.coins).toBe(70);
     expect(sm.stickers).toBe(2);
     expect(sm.streakDays).toBe(4);
+  });
+
+  // #95: importSave() only checks the version, so a hand-edited or corrupted "Restore" paste can carry any of
+  // these fields as anything — `{ v: 1, progress: null }` passes the version check and is written straight
+  // through. parentSummary() used to index `data.progress[t.id]` directly and throw the moment `progress`
+  // itself was not an object; it now reads every per-topic/per-year field the same tolerant way storage.ts's
+  // own achievement calculations already do (#270).
+  it('never throws on a corrupted save, and reads every affected field as empty', () => {
+    const corrupted: SaveData = {
+      ...base,
+      progress: null as unknown as SaveData['progress'],
+      endless: null as unknown as SaveData['endless'],
+      sprint: 'not an object' as unknown as SaveData['sprint'],
+      boss: [] as unknown as SaveData['boss'],
+      memory: undefined as unknown as SaveData['memory'],
+      training: 42 as unknown as SaveData['training'],
+    };
+    let sm: ReturnType<typeof parentSummary>;
+    expect(() => { sm = parentSummary(corrupted, TOPICS, YEARS, STICKER_IDS.length); }).not.toThrow();
+    expect(sm!.topicsTried).toBe(0);
+    expect(sm!.starsEarned).toBe(0);
+    expect(sm!.modes.every(m => m.endless === 0 && m.sprint === 0 && m.boss === 0 && m.memory === 0 && m.training === 0)).toBe(true);
   });
 
   it('pct rounds and passes null through', () => {

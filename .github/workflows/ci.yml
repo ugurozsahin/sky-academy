@@ -51,7 +51,13 @@ on:
     # The e2e step below is what gets filtered instead, so the saving is kept and the check is not.
     # `push` keeps its filter: that tree passed on its own pull request minutes earlier.
   schedule:
-    - cron: '20 3 * * *'      # 03:20 UTC: the nightly full run against main
+    - cron: '37 4 * * *'      # 04:37 UTC: the nightly full run against main. Moved off '20 3' (#141):
+                              # GitHub delays/drops schedule events near round-number/top-of-hour
+                              # times under load, and #141 measured '20 3' firing 4.5-5.5h late and
+                              # drifting ~25-35 min later each day (confirmed again 2026-09-17: the
+                              # first nightly on this migrated repo still fired ~5h20m late). ':37' is
+                              # the same minute the dev routine's own cron already uses, for the same
+                              # reason. If this still drifts, the problem is not the minute.
   workflow_dispatch:           # …and a full run on demand, from any branch
 concurrency:
   # Keyed on the event too: a merge landing while the nightly is mid-run must not cancel it — a cancelled

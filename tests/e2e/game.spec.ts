@@ -24,6 +24,8 @@ async function pickAvatar(page: Page, id = 'volt', name = 'Ada') {
   await page.click(`.avatar-card[data-id="${id}"]`);
   await page.fill('#name', name);
   await page.click('#go');
+  await expect(page.locator('.intro-card')).toBeVisible();   // #67: first run continues into the introduction
+  await page.click('#intro-go');
   await expect(page.locator('.home')).toBeVisible();
 }
 /**
@@ -202,6 +204,8 @@ test.describe('Sky Ninja Academy', () => {
     await card.click();
     await expect(card).toHaveClass(/sel/);
     await page.click('#go');
+    await expect(page.locator('.intro-card')).toBeVisible();   // #67: first run continues into the introduction
+    await page.click('#intro-go');
     await expect(page.locator('.hero small')).toContainText('Master Ninja');
     await page.click('.island[data-year="year1"]');
     await expect(page.locator('#train img')).toHaveAttribute('src', /sensei/);         // Sensei fronts the training button
@@ -269,14 +273,102 @@ test.describe('Sky Ninja Academy', () => {
 
     await page.fill('#name', 'Ada');
     await page.click('#go');
+    // #67: first run continues into the introduction step, not straight to the map.
+    await expect(page.locator('.intro-card')).toBeVisible();
+    await page.click('#intro-go');
     await expect(page.locator('.home')).toBeVisible();
 
-    // A returning player re-enters the screen from home with both already set — never blocked, name kept.
+    // A returning player re-enters via #change-av for the ninja only (#67) — never the name field again,
+    // and never the introduction a second time.
     await page.click('#change-av');
+    await expect(page.locator('.change-avatar')).toBeVisible();
+    await expect(page.locator('#name')).toHaveCount(0);
+    await expect(page.locator('.intro-card')).toHaveCount(0);
+    await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'volt');
+    await page.click('#change-save');
+    await expect(page.locator('.home')).toBeVisible();
+  });
+
+  /**
+   * #67: the introduction step. First run only, personalised, read aloud, skippable, and never shown again —
+   * a returning save already carries `onboarded: true` (set by the wizard, or by `migrate()` for anyone who
+   * already has an avatar chosen — `storage.test.ts` covers that half without a browser).
+   */
+  test('onboarding: the introduction greets the child by name, reads aloud, and is skippable', async ({ page }) => {
+    await stubSilentEngine(page, true);   // #65: headless Chromium's engine never actually starts a line
+    await page.goto('/?reset=1');
+    await page.click('.avatar-card[data-id="blaze"]');
+    await page.fill('#name', 'Zoe');
+    await page.click('#go');
+
+    await expect(page.locator('.intro-card')).toBeVisible();
+    await expect(page.locator('#intro-heading')).toHaveText(/Zoe/);
+    await expect(page.locator('.intro-text')).toContainText('Zoe');
+    await expect(page.locator('#intro-heading')).toBeFocused();          // focus moves to the new step (#67 a11y)
+    await expect.poll(() => page.evaluate(() => window.__lastVoiceLine?.text)).toContain('Zoe');   // read aloud
+
+    await page.click('#intro-skip');
+    await expect(page.locator('.home')).toBeVisible();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).onboarded)).toBe(true);
+
+    // A fresh load of the same profile never shows the wizard again.
+    await page.goto('/');
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('.avatar-screen')).toHaveCount(0);
+  });
+
+  test('onboarding: hardware/browser back moves between the avatar step and the introduction', async ({ page }) => {
+    await page.goto('/?reset=1');
+    await page.click('.avatar-card[data-id="volt"]');
+    await page.fill('#name', 'Ada');
+    await page.click('#go');
+    await expect(page.locator('.intro-card')).toBeVisible();
+
+    await page.goBack();
     await expect(page.locator('.avatar-screen')).toBeVisible();
-    await expect(page.locator('#name')).toHaveValue('Ada');
-    await expect(page.locator('#go')).toBeEnabled();
-    await expect(page.locator('#name-hint')).toBeEmpty();
+    await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'volt');   // the pick was not lost
+
+    await page.goForward();
+    await expect(page.locator('.intro-card')).toBeVisible();
+
+    await page.click('#intro-go');
+    await expect(page.locator('.home')).toBeVisible();
+  });
+
+  test('onboarding: a reload mid-wizard does not lose the ninja that was already picked', async ({ page }) => {
+    await page.goto('/?reset=1');
+    await page.click('.avatar-card[data-id="terra"]');
+    // Closing the app before the name/introduction steps must not lose the avatar choice (#67 acceptance).
+    // Plain reload would re-clear the profile — `?reset=1` wipes storage on every load it appears in, this
+    // test's own first line included — so the next launch is `/`, exactly like a real relaunch would be.
+    await page.goto('/');
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'terra');
+  });
+
+  /** #67 acceptance: "progress is obvious to a child" — a small dot rail across the two first-run steps. */
+  test('onboarding: the wizard progress rail advances from step 1 to step 2, and is not shown to a returning player', async ({ page }) => {
+    await page.goto('/?reset=1');
+    await expect(page.locator('.wizard-progress')).toHaveAttribute('aria-label', 'Step 1 of 2');
+    await expect(page.locator('.wizard-progress .dot.active')).toHaveCount(1);
+
+    await page.click('.avatar-card[data-id="blaze"]');
+    await page.fill('#name', 'Zoe');
+    await page.click('#go');
+
+    await expect(page.locator('.intro-card')).toBeVisible();
+    await expect(page.locator('.wizard-progress')).toHaveAttribute('aria-label', 'Step 2 of 2');
+    await expect(page.locator('.wizard-progress .dot.active')).toHaveCount(1);
+    // it is the *second* dot that is active on step 2, not still the first
+    await expect(page.locator('.wizard-progress .dot').nth(1)).toHaveClass(/active/);
+
+    await page.click('#intro-go');
+    await expect(page.locator('.home')).toBeVisible();
+
+    // a returning player re-entering via #change-av is not mid-wizard — no step rail to show them
+    await page.click('#change-av');
+    await expect(page.locator('.change-avatar')).toBeVisible();
+    await expect(page.locator('.wizard-progress')).toHaveCount(0);
   });
 
   test('every year has maths and writing topics listed', async ({ page }) => {
@@ -1209,7 +1301,8 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#memory small')).toContainText('boards 1');
   });
 
-  // #138: the one test that still walks the whole cold start — avatar screen → sky map → island → play — so
+  // #138: the one test that still walks the whole cold start — avatar screen → intro (#67) → sky map → island
+  // → play — so
   // the path every other test now seeds past keeps a test of its own, end to end and in order.
   test('first play shows the slice tutorial hand, which goes away after the first slice for good', async ({ page }) => {
     await pickAvatar(page);
@@ -1382,6 +1475,116 @@ test.describe('Sky Ninja Academy', () => {
     await page.goBack();   // instead of tapping "Continue" or the on-screen arrow
     await expect(page.locator('.avatar-screen')).toBeVisible();
     await expect(page.locator('.avatar-card.sel')).toHaveCount(0);
+  });
+});
+
+/**
+ * #95: `importSave()` only checks the version, so a hand-edited or corrupted "Restore" paste can carry
+ * `progress` (or the other per-year record fields) as anything, and every screen that used to index it
+ * directly — the map's star tally, the island screen's mode blurbs, the grown-ups dashboard — threw on the
+ * very next launch. The unit tests pin `parentSummary()`; this is the same corrupted blob reaching the real
+ * screens, which no unit test can (`home.ts`/`avatar.ts` render through `document`, with no jsdom in this
+ * suite).
+ *
+ * Review of the first cut (PR #171): the fix guarded two readers only, and `topbar()`'s `d.streak.days`,
+ * `dojoCard()` (`dojo`) and every `record*()` writer in `storage.ts` still threw on the same corrupted save
+ * — the last of those only reachable once a player could get past the map at all, which this PR's own fix
+ * is what newly lets them do. `streak`/`dojo` join the seed below, and the second test plays a full mission
+ * to completion on the corrupted save — the round trip finding 3 named, not just surviving the read side.
+ */
+test.describe('a corrupted save does not brick the app (#95)', () => {
+  // This describe block sits outside the main one (line 167), so it does not inherit its `beforeEach` — without
+  // this, the full-mission test below ran at 1× speed instead of the suite's 4×, ~3x slower for no reason.
+  test.beforeEach(async ({ page }) => { await page.addInitScript(() => { window.__SNA_FAST = 4; }); });
+
+  test('guard rail: the map, an island, and the grown-ups dashboard all still render on a null-shaped save', async ({ page }) => {
+    // pageerror only — an uncaught exception is the actual failure mode this rail guards (d.progress[id]
+    // throwing when d.progress itself is not an object). A console `error` also catches unrelated resource-load
+    // noise (a blocked font fetch, say), which is not what this test is about and would make it flaky for a
+    // reason that has nothing to do with #95.
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    await seedPlayer(page, 'volt', 'Ada', {
+      progress: null, endless: null, sprint: 'not an object', boss: [], training: 42, streak: null, dojo: null,
+    });
+    // seedPlayer already asserts `.home` (the map) rendered — the corrupted blob alone would have thrown
+    // inside mapScreen's star tally, topbar's streak badge, or the Daily Dojo card before this point if the
+    // fix were not in place.
+    expect(failed, `while landing on the map${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    expect(failed, `while opening an island${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+
+    await page.click('#back');
+    await openGrownUps(page);   // renders parentSummary() over the same corrupted save
+    await expect(page.locator('.parents-dash')).toContainText('0');   // nothing played, but it renders rather than throwing
+    expect(failed, `while opening the grown-ups dashboard${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+  });
+
+  // Third review round on PR #171: sanitizeTypes() originally covered only object/array/number fields.
+  // `name` is the one field a person freely types into the Restore box, and `esc(d.name)`/`hasName(d.name)`
+  // in avatarScreen() both throw on a non-string — "Change ninja" from the map is a screen every returning
+  // player can reach, not an edge case.
+  // #67 update: "Change ninja" (`#change-av`, returning players) is now `changeAvatarScreen`, which never
+  // renders `d.name` at all — the crash this rail guarded against cannot occur on that screen any more. The
+  // name field now lives only on the first-run `avatarScreen` (unchanged), so that half of the rail moves
+  // there rather than being dropped.
+  test('guard rail: "Change ninja" does not crash on a save with a wrong-typed name, and never touches name at all (#171, #67)', async ({ page }) => {
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    await seedPlayer(page, 'volt', 'Ada', { name: 123, sound: 'yes', tutorialSeen: 'true' });
+    expect(failed, `while landing on the map${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+
+    await page.click('#change-av');
+    await expect(page.locator('.change-avatar')).toBeVisible();
+    await expect(page.locator('#name')).toHaveCount(0);   // #67: this screen no longer asks for or shows a name
+    expect(failed, `while opening "Change ninja"${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+  });
+
+  test('guard rail: the first-run avatar screen still opens on a save with a wrong-typed name (#171)', async ({ page }) => {
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    await page.addInitScript(save => {
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({ v: 1, name: 123, sound: 'yes', tutorialSeen: 'true' }));   // no avatar → not onboarded
+    await page.goto('/');
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await expect(page.locator('#name')).toHaveValue('');   // the corrupted name was dropped, not rendered as "123"
+    expect(failed, `while opening the first-run avatar screen${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+  });
+
+  // Review finding 3: the reader fix is what lets a player reach the topic list on a corrupted save in the
+  // first place — before it, they crashed at the map. Finishing a mission there used to throw in recordTopic()/
+  // recordAccuracy() instead, since importSave() had written the corruption straight to the stored blob and
+  // every writer indexed into it unguarded. Playing an entire mission to completion is the round trip the
+  // unit tests (which call the writers directly) cannot stand in for.
+  test('guard rail: a full mission still saves stars and coins on a corrupted save', async ({ page }) => {
+    test.setTimeout(150_000);
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    await seedPlayer(page, 'volt', 'Ada', {
+      progress: null, endless: null, sprint: 'not an object', boss: [], memory: undefined, training: 42,
+      streak: null, dojo: null,
+    });
+    await startTopic(page, 'reception', 'r-count');   // matches the known-fast full-mission path above (line 400)
+    const stages = await page.evaluate(() => window.__sna.session.stages);
+    const perStage = await page.evaluate(() => window.__sna.session.perStage);
+    for (let stage = 1; stage <= stages; stage++) {
+      await answerAll(page, perStage);
+      await expect(page.locator('.celebrate')).toBeVisible();
+      await page.click('#next');
+    }
+    await expect(page.locator('.results')).toBeVisible();
+    expect(failed, `while playing a full mission${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.progress['r-count'].stars).toBeGreaterThan(0);
+    expect(saved.coins).toBeGreaterThan(0);
   });
 });
 

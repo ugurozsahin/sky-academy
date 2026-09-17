@@ -54,6 +54,7 @@ export const SENSEI_LINES = {
   tryAgain: ['Even a master stumbles, {name}. Rest, then train again.', 'Slow down and look closely, {name}. Try once more.'],
   tutorial: 'Slice the bubble with your finger!',
   locked: 'Earn a star on every topic to play as the Master Ninja.',
+  welcome: "Welcome to Sky Ninja Academy, {name}. I am your Sensei. Slice the bubble with the correct answer to complete each mission. Let's begin.",
 };
 /** Every playable ninja, the Master last. */
 export const ALL_AVATARS: Avatar[] = [...AVATARS, MASTER];
@@ -64,6 +65,10 @@ export function avatarById(id: string | null | undefined): Avatar {
 export function senseiLine(won: boolean, childName: string, rnd = Math.random): string {
   const pool = won ? SENSEI_LINES.trained : SENSEI_LINES.tryAgain;
   return pool[Math.floor(rnd() * pool.length)].replace('{name}', childName || 'Ninja');
+}
+/** Sensei's first-run greeting (#67), personalised the same way as `senseiLine`. */
+export function welcomeLine(childName: string): string {
+  return SENSEI_LINES.welcome.replace('{name}', childName || 'Ninja');
 }
 
 export function praiseLine(a: Avatar, childName: string, rnd = Math.random): string {
