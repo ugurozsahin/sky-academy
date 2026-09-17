@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 // @ts-expect-error — plain ESM bundler helper (see scripts/bundle-single.d.ts); #15's rail asserts its output
@@ -3029,5 +3029,42 @@ describe('`<a download>` stays reachable from one guarded place in the certifica
   it('and certRoute itself never sends a native shell to a download', () => {
     expect(code(cert), 'certRoute must answer `show` for a native shell before it answers `download`')
       .toMatch(/if\s*\(\s*caps\.nativeShell\s*\)\s*return\s*'show'\s*;[\s\S]{0,40}return\s*'download'/);
+  });
+});
+
+// #101 (part 1, layer 2): `.claude/rules/*.md` files scope context by path — a run touching `src/curriculum/`
+// should not carry the Android build's rules. An unconditional rule here is just CLAUDE.md with extra steps,
+// so every file must declare `paths:`, and every declared path must point at something real: a rule scoped to
+// a path nothing matches would load never and describe nothing, which is worse than no rule at all.
+describe('.claude/rules/ files are path-scoped, and every path is real (#101)', () => {
+  const root = new URL('../../', import.meta.url);
+  const ruleFiles = readdirSync(new URL('.claude/rules', root)).filter((f) => f.endsWith('.md'));
+
+  it('at least one rule file exists — a vacuous rail is worse than none', () => {
+    expect(ruleFiles.length).toBeGreaterThan(0);
+  });
+
+  const exists = (p: string): boolean => {
+    // `**` and a trailing `*` both describe "everything under here" — the rail checks the concrete directory
+    // or file in front of the wildcard actually exists, not that the wildcard itself resolves to anything.
+    const base = p.replace(/\/\*\*$/, '').replace(/\*+$/, '');
+    try {
+      const s = statSync(new URL(base, root));
+      return s.isFile() || s.isDirectory();
+    } catch {
+      return false;
+    }
+  };
+
+  it.each(ruleFiles)('%s has a paths: list, and every path matches something in the repo', (file) => {
+    const text = readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8');
+    const front = /^---\n([\s\S]*?)\n---\n/.exec(text);
+    expect(front, `${file} must open with YAML frontmatter, or nothing ever loads it by path`).not.toBeNull();
+    const pathsBlock = /^paths:\n((?:[ \t]*-.+\n?)+)/m.exec(front![1]);
+    expect(pathsBlock, `${file} needs a paths: list — an unconditional rule belongs in CLAUDE.md instead`)
+      .not.toBeNull();
+    const paths = [...pathsBlock![1].matchAll(/-\s*"?([^"\n]+)"?/g)].map((m) => m[1].trim());
+    expect(paths.length, `${file}'s paths: list must not be empty`).toBeGreaterThan(0);
+    for (const p of paths) expect(exists(p), `${file}'s path "${p}" matches nothing in the repo`).toBe(true);
   });
 });
