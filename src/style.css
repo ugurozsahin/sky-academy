@@ -1253,7 +1253,7 @@ img { -webkit-user-drag: none; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   padding: 12px 8px;
   border-radius: 18px;
   background: var(--panel);
@@ -1263,10 +1263,14 @@ img { -webkit-user-drag: none; }
 .shop .item .icon {
   font-size: 34px;
   line-height: 1;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 .shop .item b {
   font-size: 15px;
+  margin-top: 2px;
 }
 .shop .item small {
   color: var(--muted);
@@ -1288,10 +1292,7 @@ img { -webkit-user-drag: none; }
 }
 .shop .item.on { border-color: #40e0a0; box-shadow: inset 0 0 30px #40e0a022; } .shop .item.poor { opacity: .75; } .shop .item.soon { border-style: dashed; opacity: .7; }
 .shop .swatch {
-  position: absolute;
-  left: -6px;
-  right: -6px;
-  bottom: -6px;
+  width: 30px;
   height: 6px;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--c), var(--k), var(--c));
