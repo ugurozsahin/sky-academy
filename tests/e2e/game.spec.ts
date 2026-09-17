@@ -24,6 +24,8 @@ async function pickAvatar(page: Page, id = 'volt', name = 'Ada') {
   await page.click(`.avatar-card[data-id="${id}"]`);
   await page.fill('#name', name);
   await page.click('#go');
+  await expect(page.locator('.intro-card')).toBeVisible();   // #67: first run continues into the introduction
+  await page.click('#intro-go');
   await expect(page.locator('.home')).toBeVisible();
 }
 /**
@@ -202,6 +204,8 @@ test.describe('Sky Ninja Academy', () => {
     await card.click();
     await expect(card).toHaveClass(/sel/);
     await page.click('#go');
+    await expect(page.locator('.intro-card')).toBeVisible();   // #67: first run continues into the introduction
+    await page.click('#intro-go');
     await expect(page.locator('.hero small')).toContainText('Master Ninja');
     await page.click('.island[data-year="year1"]');
     await expect(page.locator('#train img')).toHaveAttribute('src', /sensei/);         // Sensei fronts the training button
@@ -269,14 +273,77 @@ test.describe('Sky Ninja Academy', () => {
 
     await page.fill('#name', 'Ada');
     await page.click('#go');
+    // #67: first run continues into the introduction step, not straight to the map.
+    await expect(page.locator('.intro-card')).toBeVisible();
+    await page.click('#intro-go');
     await expect(page.locator('.home')).toBeVisible();
 
-    // A returning player re-enters the screen from home with both already set — never blocked, name kept.
+    // A returning player re-enters via #change-av for the ninja only (#67) — never the name field again,
+    // and never the introduction a second time.
     await page.click('#change-av');
+    await expect(page.locator('.change-avatar')).toBeVisible();
+    await expect(page.locator('#name')).toHaveCount(0);
+    await expect(page.locator('.intro-card')).toHaveCount(0);
+    await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'volt');
+    await page.click('#change-save');
+    await expect(page.locator('.home')).toBeVisible();
+  });
+
+  /**
+   * #67: the introduction step. First run only, personalised, read aloud, skippable, and never shown again —
+   * a returning save already carries `onboarded: true` (set by the wizard, or by `migrate()` for anyone who
+   * already has an avatar chosen — `storage.test.ts` covers that half without a browser).
+   */
+  test('onboarding: the introduction greets the child by name, reads aloud, and is skippable', async ({ page }) => {
+    await stubSilentEngine(page, true);   // #65: headless Chromium's engine never actually starts a line
+    await page.goto('/?reset=1');
+    await page.click('.avatar-card[data-id="blaze"]');
+    await page.fill('#name', 'Zoe');
+    await page.click('#go');
+
+    await expect(page.locator('.intro-card')).toBeVisible();
+    await expect(page.locator('#intro-heading')).toHaveText(/Zoe/);
+    await expect(page.locator('.intro-text')).toContainText('Zoe');
+    await expect(page.locator('#intro-heading')).toBeFocused();          // focus moves to the new step (#67 a11y)
+    await expect.poll(() => page.evaluate(() => window.__lastVoiceLine?.text)).toContain('Zoe');   // read aloud
+
+    await page.click('#intro-skip');
+    await expect(page.locator('.home')).toBeVisible();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).onboarded)).toBe(true);
+
+    // A fresh load of the same profile never shows the wizard again.
+    await page.goto('/');
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('.avatar-screen')).toHaveCount(0);
+  });
+
+  test('onboarding: hardware/browser back moves between the avatar step and the introduction', async ({ page }) => {
+    await page.goto('/?reset=1');
+    await page.click('.avatar-card[data-id="volt"]');
+    await page.fill('#name', 'Ada');
+    await page.click('#go');
+    await expect(page.locator('.intro-card')).toBeVisible();
+
+    await page.goBack();
     await expect(page.locator('.avatar-screen')).toBeVisible();
-    await expect(page.locator('#name')).toHaveValue('Ada');
-    await expect(page.locator('#go')).toBeEnabled();
-    await expect(page.locator('#name-hint')).toBeEmpty();
+    await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'volt');   // the pick was not lost
+
+    await page.goForward();
+    await expect(page.locator('.intro-card')).toBeVisible();
+
+    await page.click('#intro-go');
+    await expect(page.locator('.home')).toBeVisible();
+  });
+
+  test('onboarding: a reload mid-wizard does not lose the ninja that was already picked', async ({ page }) => {
+    await page.goto('/?reset=1');
+    await page.click('.avatar-card[data-id="terra"]');
+    // Closing the app before the name/introduction steps must not lose the avatar choice (#67 acceptance).
+    // Plain reload would re-clear the profile — `?reset=1` wipes storage on every load it appears in, this
+    // test's own first line included — so the next launch is `/`, exactly like a real relaunch would be.
+    await page.goto('/');
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'terra');
   });
 
   test('every year has maths and writing topics listed', async ({ page }) => {
@@ -1209,7 +1276,8 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#memory small')).toContainText('boards 1');
   });
 
-  // #138: the one test that still walks the whole cold start — avatar screen → sky map → island → play — so
+  // #138: the one test that still walks the whole cold start — avatar screen → intro (#67) → sky map → island
+  // → play — so
   // the path every other test now seeds past keeps a test of its own, end to end and in order.
   test('first play shows the slice tutorial hand, which goes away after the first slice for good', async ({ page }) => {
     await pickAvatar(page);
@@ -1434,7 +1502,11 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
   // `name` is the one field a person freely types into the Restore box, and `esc(d.name)`/`hasName(d.name)`
   // in avatarScreen() both throw on a non-string — "Change ninja" from the map is a screen every returning
   // player can reach, not an edge case.
-  test('guard rail: the avatar screen ("Change ninja") still opens on a save with a wrong-typed name', async ({ page }) => {
+  // #67 update: "Change ninja" (`#change-av`, returning players) is now `changeAvatarScreen`, which never
+  // renders `d.name` at all — the crash this rail guarded against cannot occur on that screen any more. The
+  // name field now lives only on the first-run `avatarScreen` (unchanged), so that half of the rail moves
+  // there rather than being dropped.
+  test('guard rail: "Change ninja" does not crash on a save with a wrong-typed name, and never touches name at all (#171, #67)', async ({ page }) => {
     const failed: string[] = [];
     page.on('pageerror', e => failed.push(`page error: ${e.message}`));
 
@@ -1442,9 +1514,22 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
     expect(failed, `while landing on the map${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
 
     await page.click('#change-av');
+    await expect(page.locator('.change-avatar')).toBeVisible();
+    await expect(page.locator('#name')).toHaveCount(0);   // #67: this screen no longer asks for or shows a name
+    expect(failed, `while opening "Change ninja"${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+  });
+
+  test('guard rail: the first-run avatar screen still opens on a save with a wrong-typed name (#171)', async ({ page }) => {
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    await page.addInitScript(save => {
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({ v: 1, name: 123, sound: 'yes', tutorialSeen: 'true' }));   // no avatar → not onboarded
+    await page.goto('/');
     await expect(page.locator('.avatar-screen')).toBeVisible();
     await expect(page.locator('#name')).toHaveValue('');   // the corrupted name was dropped, not rendered as "123"
-    expect(failed, `while opening the avatar screen${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+    expect(failed, `while opening the first-run avatar screen${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
   });
 
   // Review finding 3: the reader fix is what lets a player reach the topic list on a corrupted save in the
