@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 // @ts-expect-error — plain ESM bundler helper (see scripts/bundle-single.d.ts); #15's rail asserts its output
@@ -3617,15 +3618,16 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
  * is committed so a cloud/routine session gets these hooks the same way it gets committed rules and skills —
  * `~/.claude/settings.json` is not read there.
  *
- * This rail checks the hooks exist "by name" the way the issue asks: by the distinguishing text each hook's
- * command must contain, not by re-implementing (and so duplicating the risk of silently drifting from) the
- * matching logic itself. It does not execute the hook commands — `scripts/`-style tests do that by piping
- * synthesized stdin, which is how each hook here was proved to fire before this PR (see the PR body); a unit
- * test re-invoking `bash -c` against a hand-rolled shell string would be testing the test's own shell escaping
- * as much as the hook.
+ * PR #217 review (session_011U9Jb5evcfFDNFPyPWyTFd): the first version of this rail only checked hook
+ * *shape* (JSON structure, substring presence) and never ran a single hook's shell logic — which is exactly
+ * how two real bypasses shipped undetected: `git push -uf` (a combined short-flag cluster) slipped past the
+ * force-push regex, and `>> "WORKLOG.md"` / `>> /abs/path/WORKLOG.md` both slipped past the WORKLOG.md regex.
+ * The structural checks below stay (they catch a hook being deleted or silently un-scoped), but every hook's
+ * actual shell command is now also executed against synthesized stdin — the same pipe-testing this PR's body
+ * already did by hand — so a future regex regression fails a test, not a review.
  *
- * Prove it red: delete any one of the three hook entries (or the file) and watch the corresponding assertion
- * fail.
+ * Prove it red: delete any one of the three hook entries (or the file) and watch the structural assertions
+ * fail; revert either regex fix and watch the matching execution assertion fail.
  */
 describe('.claude/settings.json declares the three #101 layer-0 hooks by name', () => {
   const root = new URL('../../', import.meta.url);
@@ -3657,11 +3659,29 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
     expect(forceHook.command, 'the git-push hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
   });
 
-  it('a hook denies a command carrying an OWNER: APPROVED / OWNER: REJECTED marker', () => {
-    const commands = allPreToolUseCommands(readSettings());
-    const markerHook = commands.find((c) => c.includes('OWNER: APPROVED') && c.includes('OWNER: REJECTED'));
-    expect(markerHook, 'no PreToolUse hook checks for both OWNER: markers').toBeDefined();
-    expect(markerHook, 'the marker hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  // #217 review: a single `.find()` across every command only proves *some* hook mentions both markers — it
+  // would stay green if either the `gh`-scoped or the `curl`-scoped hook were deleted outright, since the
+  // other alone still satisfies the search. Assert each independently, plus the `if:`/`api.github.com` gates
+  // that keep the hook from firing on prose (the false positive this PR's body already describes finding).
+  it('a hook denies a `gh` command carrying an OWNER: APPROVED / OWNER: REJECTED marker', () => {
+    const ghHook = (readSettings().hooks.PreToolUse as any[])
+      .flatMap((e) => e.hooks ?? [])
+      .find((h: any) => typeof h.if === 'string' && h.if.includes('gh'));
+    expect(ghHook, 'no hook is `if`-scoped to `gh` commands').toBeDefined();
+    expect(ghHook.command, 'the gh-scoped hook must check for both markers').toContain('OWNER: APPROVED');
+    expect(ghHook.command, 'the gh-scoped hook must check for both markers').toContain('OWNER: REJECTED');
+    expect(ghHook.command, 'the gh-scoped hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+
+  it('a hook denies a `curl`-to-api.github.com command carrying an OWNER: marker', () => {
+    const curlHook = (readSettings().hooks.PreToolUse as any[])
+      .flatMap((e) => e.hooks ?? [])
+      .find((h: any) => typeof h.if === 'string' && h.if.includes('curl'));
+    expect(curlHook, 'no hook is `if`-scoped to `curl` commands').toBeDefined();
+    expect(curlHook.command, 'the curl-scoped hook must also gate on api.github.com, or every curl command would be checked').toContain('api.github.com');
+    expect(curlHook.command, 'the curl-scoped hook must check for both markers').toContain('OWNER: APPROVED');
+    expect(curlHook.command, 'the curl-scoped hook must check for both markers').toContain('OWNER: REJECTED');
+    expect(curlHook.command, 'the curl-scoped hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
   });
 
   it('a hook denies writing to WORKLOG.md at the repo root, both via Bash and via Write/Edit', () => {
@@ -3676,5 +3696,63 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
     const writeWorklogHook = (writeEntry.hooks ?? []).find((h: any) => typeof h.command === 'string' && h.command.includes('WORKLOG.md'));
     expect(writeWorklogHook, 'the Write|Edit entry must itself check for WORKLOG.md').toBeDefined();
     expect(writeWorklogHook.command, 'the Write/Edit WORKLOG.md hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+});
+
+/**
+ * #217 review: the structural rail above cannot see what a hook's shell logic actually matches — that gap is
+ * exactly how `git push -uf` and `>> "WORKLOG.md"` shipped as live bypasses. These tests run each hook's real
+ * `command` string in a real `bash -c`, feeding it the same synthesized `tool_input` stdin JSON PreToolUse
+ * hooks receive, and assert on its actual stdout (empty = allow, a `deny` JSON blob = deny) — proof, not
+ * shape-matching. `execFileSync('bash', ['-c', command])` runs the hook exactly as the harness would.
+ */
+describe('.claude/settings.json layer-0 hooks: executed against synthesized stdin (#217 review)', () => {
+  const root = new URL('../../', import.meta.url);
+  const settingsPath = new URL('.claude/settings.json', root);
+  const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+
+  const bashHooks: any[] = settings.hooks.PreToolUse[0].hooks;
+  const forceHookCmd = bashHooks.find((h) => typeof h.if === 'string' && h.if.includes('git push')).command;
+  const ghMarkerHookCmd = bashHooks.find((h) => typeof h.if === 'string' && h.if.includes('gh')).command;
+  const curlMarkerHookCmd = bashHooks.find((h) => typeof h.if === 'string' && h.if.includes('curl')).command;
+  const worklogBashHookCmd = bashHooks.find((h) => !h.if && typeof h.command === 'string' && h.command.includes('WORKLOG.md')).command;
+
+  const runHook = (command: string, toolInputCommand: string): unknown => {
+    const stdin = JSON.stringify({ tool_input: { command: toolInputCommand } });
+    const out = execFileSync('bash', ['-c', command], { input: stdin, encoding: 'utf8' });
+    return out.trim() === '' ? null : JSON.parse(out);
+  };
+
+  const isDeny = (result: unknown) => (result as any)?.hookSpecificOutput?.permissionDecision === 'deny';
+
+  it('force-push hook: denies --force, -f, --force-with-lease, and a combined -uf/-fu cluster', () => {
+    expect(isDeny(runHook(forceHookCmd, 'git push --force origin main'))).toBe(true);
+    expect(isDeny(runHook(forceHookCmd, 'git push -f origin main'))).toBe(true);
+    expect(isDeny(runHook(forceHookCmd, 'git push --force-with-lease origin main'))).toBe(true);
+    expect(isDeny(runHook(forceHookCmd, 'git push -uf origin main')), '#217 review: a combined short-flag cluster must not bypass this').toBe(true);
+    expect(isDeny(runHook(forceHookCmd, 'git push -fu origin main'))).toBe(true);
+  });
+
+  it('force-push hook: allows a plain push and a branch name that merely contains the word "force"', () => {
+    expect(isDeny(runHook(forceHookCmd, 'git push -u origin feature/1-x'))).toBe(false);
+    expect(isDeny(runHook(forceHookCmd, 'git push -u origin fix/1-force-push-test'))).toBe(false);
+  });
+
+  it('OWNER-marker hooks: deny a gh/curl command carrying either marker, allow one that does not', () => {
+    expect(isDeny(runHook(ghMarkerHookCmd, "gh pr comment 1 --body 'OWNER: APPROVED'"))).toBe(true);
+    expect(isDeny(runHook(ghMarkerHookCmd, "gh pr comment 1 --body 'OWNER: REJECTED - no'"))).toBe(true);
+    expect(isDeny(runHook(ghMarkerHookCmd, "gh pr comment 1 --body 'REVIEW: CLEARED'"))).toBe(false);
+    expect(isDeny(runHook(curlMarkerHookCmd, "curl -X POST https://api.github.com/repos/x/y/issues/1/comments -d 'body=OWNER: APPROVED'"))).toBe(true);
+    expect(isDeny(runHook(curlMarkerHookCmd, "curl -X POST https://api.github.com/repos/x/y/issues/1/comments -d 'body=REVIEW: CLEARED'"))).toBe(false);
+  });
+
+  it('WORKLOG.md Bash hook: denies a bare, absolute-path, and quoted-filename append to the root file', () => {
+    expect(isDeny(runHook(worklogBashHookCmd, 'echo x >> WORKLOG.md'))).toBe(true);
+    expect(isDeny(runHook(worklogBashHookCmd, 'echo x >> /home/user/sky-academy/WORKLOG.md')), '#217 review: an absolute path must not bypass this').toBe(true);
+    expect(isDeny(runHook(worklogBashHookCmd, 'echo x >> "WORKLOG.md"')), '#217 review: quoting the filename must not bypass this').toBe(true);
+  });
+
+  it('WORKLOG.md Bash hook: allows an append to the archived docs/worklog/*.md path', () => {
+    expect(isDeny(runHook(worklogBashHookCmd, 'echo x >> docs/worklog/2026-09.md'))).toBe(false);
   });
 });

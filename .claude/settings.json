@@ -7,7 +7,7 @@
           {
             "type": "command",
             "if": "Bash(git push *)",
-            "command": "cmd=$(jq -r '.tool_input.command'); if printf '%s' \"$cmd\" | grep -Eq -- '--force(-with-lease)?|(^| )-f( |$)'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Force-push denied by a PreToolUse hook (CLAUDE.md / .claude/rules/guardrails.md, #101 layer 0): never force-push without the user explicitly asking for it in this session.\"}}'; fi"
+            "command": "cmd=$(jq -r '.tool_input.command'); if printf '%s' \"$cmd\" | grep -Eq -- '--force(-with-lease)?|(^| )-[a-zA-Z]*f[a-zA-Z]*( |$)'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Force-push denied by a PreToolUse hook (CLAUDE.md / .claude/rules/guardrails.md, #101 layer 0): never force-push without the user explicitly asking for it in this session.\"}}'; fi"
           },
           {
             "type": "command",
@@ -21,7 +21,7 @@
           },
           {
             "type": "command",
-            "command": "cmd=$(jq -r '.tool_input.command'); if printf '%s' \"$cmd\" | grep -Eq '>>[[:space:]]*(\\./)?WORKLOG\\.md([[:space:]]|$)'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WORKLOG.md at the repo root is retired (#98): nothing appends to it again. See docs/worklog/ and BACKLOG.md - Where a record goes.\"}}'; fi"
+            "command": "cmd=$(jq -r '.tool_input.command'); unq=$(printf '%s' \"$cmd\" | tr -d '\\047\"'); if printf '%s' \"$unq\" | grep -Eq '>>[[:space:]]*([^[:space:]]*/)?WORKLOG\\.md([[:space:]]|$)'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WORKLOG.md at the repo root is retired (#98): nothing appends to it again. See docs/worklog/ and BACKLOG.md - Where a record goes.\"}}'; fi"
           }
         ]
       },
