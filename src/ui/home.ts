@@ -1,6 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
-import { ACHIEVEMENTS, coinBalance, dojoToday, load, save, STICKER_IDS, STICKER_COST } from '../storage';
+import { ACHIEVEMENTS, coinBalance, dojoToday, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { MODES } from '../game/modes';
@@ -50,7 +50,11 @@ function dojoCard() {
 /** Sky Map: one decision — which island (year group). */
 export function mapScreen(nav: Nav) {
   const d = load();
-  const totalStars = (y: YearInfo) => topicsFor(y.id).reduce((s, t) => s + (d.progress[t.id]?.stars ?? 0), 0);
+  // #95: a hand-edited or corrupted "Restore" paste can carry `progress` as anything — importSave() only
+  // checks the version — so this reads it the same tolerant way storage.ts's own achievement calculations do,
+  // rather than indexing `d.progress` directly and throwing on the map screen the moment it is not an object.
+  const progress = safeRecord<TopicProgress>(d.progress);
+  const totalStars = (y: YearInfo) => topicsFor(y.id).reduce((s, t) => s + (progress[t.id]?.stars ?? 0), 0);
   const maxStars = (y: YearInfo) => topicsFor(y.id).length * 3;
   const tb = topbar(nav, () => mapScreen(nav));
   render(`
@@ -82,25 +86,31 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   const d = load();
   let subject = subjectInit;
   const tb = topbar(nav, () => islandScreen(nav, year, subject));
-  const weakest = weakestTopics(topicsFor(year.id), d.progress);
+  const progress = safeRecord<TopicProgress>(d.progress);   // #95: same tolerance as mapScreen's totalStars
+  const weakest = weakestTopics(topicsFor(year.id), progress);
+  // #95: the four per-year best/count fields have the same hazard as `progress` — a hand-edited or corrupted
+  // "Restore" paste can carry any of them as anything, and `d.training[year.id]` throws the moment `d.training`
+  // itself is not an object, which `importSave()`'s version-only check does not rule out.
+  const training = safeRecord<number>(d.training), endless = safeRecord<number>(d.endless);
+  const sprint = safeRecord<number>(d.sprint), boss = safeRecord<number>(d.boss), memory = safeRecord<number>(d.memory);
   // The island menu in one table (#26): adding a mode button is one entry, not a new <button> line plus a new
   // click handler. The three battle modes take their title from MODES; Sensei-training and Memory-Match are
   // separate flows (not a Session.Mode), so they live here too rather than being forced into MODES.
   const menu: { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void }[] = [
     { id: 'train', mod: 'train', vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
-      title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${d.training[year.id] ?? 0}`,
+      title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${training[year.id] ?? 0}`,
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
-      title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${d.endless[year.id] ?? 0}`,
+      title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
       go: () => nav.play({ year, mode: 'endless' }) },
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
-      title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${d.sprint[year.id] ?? 0}`,
+      title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
       go: () => nav.play({ year, mode: 'sprint' }) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
-      title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${d.boss[year.id] ?? 0}`,
+      title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
       go: () => nav.play({ year, mode: 'boss' }) },
     { id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,
-      title: 'Memory Match', blurb: `Calm card pairs, no slicing · boards ${d.memory[year.id] ?? 0}`,
+      title: 'Memory Match', blurb: `Calm card pairs, no slicing · boards ${memory[year.id] ?? 0}`,
       go: () => nav.memory(year) },
   ];
   render(`
@@ -123,7 +133,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   tb.bind();
   const drawTopics = () => {
     const list = topicsFor(year.id, subject);
-    $('#topics').innerHTML = list.map(t => { const p = d.progress[t.id]; return `
+    $('#topics').innerHTML = list.map(t => { const p = progress[t.id]; return `
       <button class="topic" data-id="${t.id}" data-subject="${t.subject}" title="${t.nc}">
         <span class="ic">${t.icon}</span><b>${t.title}</b>
         ${stars(p?.stars ?? 0)}${t.input === 'tracing' ? '<small class="pill">tracing</small>' : ''}

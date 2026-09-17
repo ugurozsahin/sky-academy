@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, ACHIEVEMENTS, certificates, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
+import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
 
 // minimal localStorage shim for node
@@ -397,6 +398,84 @@ describe('save export / import (#64)', () => {
     const code = exportSave();
     expect(JSON.parse(code).v).toBe(SAVE_VERSION);    // the version is what makes a code recognisable
     expect(importSave(code)).toBe(true);
+  });
+});
+
+/**
+ * #95 review: the original fix guarded two readers (`parentSummary()`, the map's star tally) but not `streak`,
+ * `dojo`, or the `record*()` writers below — a corrupted `{ v: 1, streak: null }` or `{ v: 1, dojo: null }`
+ * still threw, and finishing a topic on a `{ v: 1, progress: null }` save (which the reader fix now lets a
+ * player *reach*) threw in `recordTopic()` instead. `migrate()` now drops any field of the wrong type before
+ * the `DEFAULT` merge, so every reader gets this for free — these pin the behaviour these tests could not see
+ * from `parentSummary()`/`home.ts` alone.
+ */
+describe('a corrupted save is normalised at the door, not just at two readers (#95)', () => {
+  beforeEach(() => reset());
+
+  it('migrate() drops a wrong-typed field instead of carrying it through', () => {
+    const m = migrate({ v: 1, streak: null, dojo: null, equipped: 'nope', owned: {}, coins: 'lots' });
+    expect(m.streak).toEqual({ last: '', days: 0 });
+    expect(m.dojo.date).toBe('');
+    expect(m.equipped).toEqual({});
+    expect(m.owned).toEqual([]);
+    expect(m.coins).toBe(0);
+    // a validly-shaped value is left exactly as given, not replaced
+    const kept = migrate({ v: 1, streak: { last: '2026-09-10', days: 4 }, coins: 12 });
+    expect(kept.streak).toEqual({ last: '2026-09-10', days: 4 });
+    expect(kept.coins).toBe(12);
+  });
+
+  // Second review round on PR #171: the object/array/number branches above missed every primitive field —
+  // `name` above all, since it is the one field a person freely types into the Restore box, and
+  // `avatarScreen()`'s `esc(d.name)`/`hasName(d.name)` both throw on a non-string.
+  it('migrate() drops a wrong-typed primitive field too, not just object/array/number ones', () => {
+    const m = migrate({
+      v: 1, name: 123, avatar: 42, year: false, voice: 'maybe-ish', sound: 'yes', speech: 1, tutorialSeen: 'true',
+    });
+    expect(m.name).toBe('');
+    expect(m.avatar).toBeNull();
+    expect(m.year).toBe('reception');
+    expect(m.voice).toBe('unknown');
+    expect(m.sound).toBe(true);
+    expect(m.speech).toBe(true);
+    expect(m.tutorialSeen).toBe(false);
+    // valid values, including the legitimate `avatar: null`, are kept exactly as given
+    const kept = migrate({ v: 1, name: 'Kai', avatar: null, year: 'year2', voice: 'yes', sound: false });
+    expect(kept.name).toBe('Kai');
+    expect(kept.avatar).toBeNull();
+    expect(kept.year).toBe('year2');
+    expect(kept.voice).toBe('yes');
+    expect(kept.sound).toBe(false);
+  });
+
+  it('a corrupted name does not brick the avatar screen — importSave() then avatarScreen()-shaped reads', () => {
+    expect(importSave(JSON.stringify({ v: 1, name: 123, avatar: 'volt' }))).toBe(true);
+    const d = load();
+    expect(typeof d.name).toBe('string');
+    expect(() => esc(d.name)).not.toThrow();
+    expect(() => d.name.trim()).not.toThrow();
+  });
+
+  it('every record*() writer, touchStreak() and recordDojo() survive a save corrupted in every field they touch', () => {
+    expect(importSave(JSON.stringify({
+      v: 1, name: 'Bad', progress: null, endless: null, sprint: 'nope', boss: [], memory: undefined, training: 42,
+      streak: null, dojo: null,
+    }))).toBe(true);
+
+    expect(() => recordTopic('y1-add', 2, 40)).not.toThrow();
+    expect(() => recordAccuracy('y1-add', 3, 4)).not.toThrow();
+    expect(() => recordTraining('year1')).not.toThrow();
+    expect(() => recordEndless('year1', 50)).not.toThrow();
+    expect(() => recordSprint('year1', 20)).not.toThrow();
+    expect(() => recordBossWin('year1')).not.toThrow();
+    expect(() => recordMemory('year1')).not.toThrow();
+    expect(() => touchStreak(new Date('2026-09-16T10:00:00Z'))).not.toThrow();
+    expect(() => recordDojo({ mode: 'mission', won: true, correct: 5, attempts: 5, bestCombo: 3, stars: 3, score: 90 })).not.toThrow();
+    expect(() => dojoToday(new Date('2026-09-16T10:00:00Z'))).not.toThrow();
+
+    // and the writes actually landed — this is recovery, not merely surviving
+    expect(load().progress['y1-add']).toMatchObject({ stars: 2 });
+    expect(load().endless.year1).toBe(50);
   });
 });
 
