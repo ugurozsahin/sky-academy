@@ -1085,6 +1085,33 @@ describe('guard rails', () => {
     });
   });
 
+  // #206: `concurrency.group` used to be `ci-${{ github.ref }}-${{ github.event_name }}` with no commit in
+  // it, so two pushes to `main` within the workflow's run time landed in the SAME group
+  // (`ci-refs/heads/main-push`) and `cancel-in-progress` killed the earlier one. PR #190 and PR #193 merged
+  // 3 seconds apart on 2026-09-17; #190's run was cancelled by #193's push and never reported a conclusion at
+  // all — benign only because #193 happened to be a fast-follow rebased on top of #190's tree, so its own
+  // green run re-tested #190's changes as a superset. A genuinely unrelated pair, or a broken second commit
+  // whose own run is *also* cancelled by a third, goes straight from "cancelled" to "nobody looks" — main
+  // gets no other check on a push (#89's split reserves the full suite for the nightly). The fix folds
+  // `github.sha` into a push's group so every push gets a group nothing else can collide with; `pull_request`
+  // and `schedule`/`workflow_dispatch` are untouched; keyed on `ref`+`event_name` alone, which is #88's own
+  // fix for the opposite direction (an undraft must still cancel a stale `synchronize` run for the SAME PR).
+  it('a push to main cannot cancel another push\'s CI run (#206)', () => {
+    const yml = workflow('ci.yml');
+    const lines = yml.split('\n').filter(l => !l.trim().startsWith('#'));
+    const at = lines.findIndex(l => l.trim().startsWith('group:') && l.includes('ci-'));
+    expect(at, 'ci.yml must still declare the concurrency group').toBeGreaterThan(-1);
+    const group = lines[at];
+    // The two events #206 was never about must keep colliding on ref+event alone — a pull_request's group is
+    // the same across its own `synchronize` runs (#88), and schedule/workflow_dispatch have nothing to key on.
+    expect(group, 'a push must be singled out — the fix must not touch every event').toMatch(/event_name\s*==\s*'push'/);
+    expect(group, 'a push\'s group must fold in the commit so no two pushes ever share one')
+      .toMatch(/event_name\s*==\s*'push'[\s\S]*github\.sha/);
+    // The falsy-ternary trap this file already bans two rails up: the branch taken when the event IS 'push'
+    // must not itself be a falsy literal, or GitHub's `&&`/`||` fall through to the non-push branch anyway.
+    expect(group).not.toMatch(/&&\s*(0|false|''|"")\s*\|\|/);
+  });
+
   // #236: every "Android APK" run failed at the SDK step — `Warning: Failed to find package 'tools'`, then
   // sdkmanager exit 1 — because `android-actions/setup-android` was called with no inputs and its DEFAULT is
   // `packages: 'tools platform-tools'`. `tools` is the retired legacy SDK Tools package; Google removed it
