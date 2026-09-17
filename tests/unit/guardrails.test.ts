@@ -3372,3 +3372,47 @@ describe('.claude/rules/curriculum.md declares paths, and every path matches som
     expect(pathMatches('src/curriculum/*.ts?', 'src/curriculum/maths.ts?')).toBe(true);
   });
 });
+
+/**
+ * #101 — the two byte-budget rails the issue's own "Guard rail (tightening)" section asks for, so the
+ * migration to layer 2 (`.claude/rules/`) is a ratchet rather than a one-off tidy-up that regrows silently.
+ *
+ * Both budgets land at this PR's own size, not the issue's eventual target (CLAUDE.md's stated goal is
+ * ≤ 4 KB — nowhere near it yet, because most of the always-loaded content this issue is about hasn't moved
+ * out yet). That is deliberate: a budget rail records existing debt and only ever ratchets down as more
+ * content genuinely moves to a scoped `.claude/rules/*.md` file or a skill, never up to let a PR that grew
+ * either file back in. This PR itself moves the `window.__sna` bullet and the Android/Capacitor detail out
+ * of `CLAUDE.md`'s always-loaded `## Rules` into pointers at `.claude/rules/game.md` and `android.md` (both
+ * already hold the real content, landed by #179) — a net reduction, which is what lets the rail land below
+ * the pre-PR size rather than merely freezing it.
+ *
+ * `docs/ROUTINE-PROMPT.md` is untouched by this PR, so its budget lands at its current size: a pure
+ * ratchet-lock stopping it from growing bigger via some *other* PR while the rest of #101 (layer 4 — moving
+ * the freeze/governance/guard-rail prose out of the routine's own instructions into pointers) is still
+ * outstanding.
+ *
+ * Prove it red: pad either file past its budget with a comment and watch the corresponding test fail.
+ */
+describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#101)', () => {
+  const root = new URL('../../', import.meta.url);
+  const bytes = (name: string) => statSync(new URL(name, root)).size;
+
+  // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
+  // green.
+  const CLAUDE_MD_BUDGET = 17_609;
+  const ROUTINE_PROMPT_BUDGET = 42_221;
+
+  it('CLAUDE.md stays at or under its budget', () => {
+    const size = bytes('CLAUDE.md');
+    expect(size, 'CLAUDE.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
+    expect(size, `CLAUDE.md grew to ${size} bytes — move the new content to a scoped `
+      + '.claude/rules/*.md file or a skill rather than raising this budget').toBeLessThanOrEqual(CLAUDE_MD_BUDGET);
+  });
+
+  it('docs/ROUTINE-PROMPT.md stays at or under its budget', () => {
+    const size = bytes('docs/ROUTINE-PROMPT.md');
+    expect(size, 'docs/ROUTINE-PROMPT.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
+    expect(size, `docs/ROUTINE-PROMPT.md grew to ${size} bytes — a "how" line belongs in a layer 2/3 pointer, `
+      + 'not back in the routine\'s own flow, rather than raising this budget').toBeLessThanOrEqual(ROUTINE_PROMPT_BUDGET);
+  });
+});
