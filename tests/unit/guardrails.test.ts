@@ -3056,15 +3056,40 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
     }
   };
 
+  // Walks every line after `paths:` and keeps only `-`-prefixed ones, skipping (not stopping at) a blank or
+  // `#` comment line in between. An earlier version of this matcher required every list line to be
+  // immediately consecutive: a comment or blank line dropped between two entries silently truncated the
+  // captured list, so a path after the break was never checked for existing on disk — a rail claiming "every
+  // path matches something real" that could itself skip paths with no signal. Reproduced and fixed in review.
+  const pathsList = (front: string): string[] | null => {
+    const idx = front.search(/^paths:[ \t]*$/m);
+    if (idx === -1) return null;
+    const listLines: string[] = [];
+    for (const line of front.slice(idx).split('\n').slice(1)) {
+      if (/^[ \t]*-/.test(line)) { listLines.push(line); continue; }
+      if (/^[ \t]*(#.*)?$/.test(line)) continue;   // blank / comment line — skip, keep scanning
+      break;                                        // a new top-level key or other content ends the list
+    }
+    const entries = listLines
+      .map((l) => /-[ \t]*"?([^"\n]+?)"?[ \t]*$/.exec(l)?.[1])
+      .filter((e): e is string => e !== undefined);
+    return entries.length ? entries : null;
+  };
+
   it.each(ruleFiles)('%s has a paths: list, and every path matches something in the repo', (file) => {
     const text = readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8');
     const front = /^---\n([\s\S]*?)\n---\n/.exec(text);
     expect(front, `${file} must open with YAML frontmatter, or nothing ever loads it by path`).not.toBeNull();
-    const pathsBlock = /^paths:\n((?:[ \t]*-.+\n?)+)/m.exec(front![1]);
-    expect(pathsBlock, `${file} needs a paths: list — an unconditional rule belongs in CLAUDE.md instead`)
+    const paths = pathsList(front![1]);
+    expect(paths, `${file} needs a non-empty paths: list — an unconditional rule belongs in CLAUDE.md instead`)
       .not.toBeNull();
-    const paths = [...pathsBlock![1].matchAll(/-\s*"?([^"\n]+)"?/g)].map((m) => m[1].trim());
-    expect(paths.length, `${file}'s paths: list must not be empty`).toBeGreaterThan(0);
-    for (const p of paths) expect(exists(p), `${file}'s path "${p}" matches nothing in the repo`).toBe(true);
+    for (const p of paths!) expect(exists(p), `${file}'s path "${p}" matches nothing in the repo`).toBe(true);
+  });
+
+  it('a comment or blank line between two paths: entries does not silently drop the entries after it', () => {
+    const front = 'paths:\n  - "src/game/**"\n  # a comment\n\n  - "src/ui/play.ts"\n';
+    expect(pathsList(front)).toEqual(['src/game/**', 'src/ui/play.ts']);
+    expect(pathsList('paths:\n')).toBeNull();
+    expect(pathsList('no paths key here')).toBeNull();
   });
 });
