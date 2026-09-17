@@ -1198,20 +1198,38 @@ describe('guard rails', () => {
  */
 describe('the e2e server proves it is serving the build on disk, not a leftover from elsewhere (#123)', () => {
   const config = readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8');
+  const spec = readFileSync(new URL('../../tests/e2e/00-build-identity.spec.ts', import.meta.url), 'utf8');
 
   it('reuseExistingServer is still true — this is a port-collision fix, not a removal of the fast local loop', () => {
     expect(config).toMatch(/reuseExistingServer:\s*true/);
   });
 
-  it('the preview port is derived, never the bare literal 4173 shared across baseURL and webServer', () => {
+  // Review of this PR (#187): matching the derivation tokens anywhere in the file — including the comment
+  // above the code, which already contains all three — let a partial revert that guts the actual wiring
+  // while leaving the prose pass every check here. `use:`/`webServer:` must be built from the SAME
+  // identifier (`baseURL`, `port` or the raw expression), not merely mention derivation somewhere.
+  it('baseURL and webServer are wired to the same derived value, and it is not the bare literal 4173', () => {
     expect(config, 'the exact incident #123 names: one hard-coded port two checkouts can both bind')
       .not.toMatch(/localhost:4173/);
     expect(config, 'a derivation must exist — cwd-based by default, with an env override')
       .toMatch(/createHash|process\.env\.PW_PORT|process\.env\.PORT/);
+    const useBlock = config.match(/use:\s*\{[^}]*\}/)?.[0];
+    const serverBlock = config.match(/webServer:\s*\{[^}]*\}/)?.[0];
+    expect(useBlock, '`use: {...}` must exist and be read from disk').toBeTruthy();
+    expect(serverBlock, '`webServer: {...}` must exist and be read from disk').toBeTruthy();
+    // `baseURL` is used as a shorthand property (`{ baseURL, ... }`), so a colon is not required — what must
+    // NOT be true is a hard-coded `http://localhost:<port>` string literal sitting where the identifier
+    // belongs, which is exactly what a partial revert (fix the comment, forget the wiring) would leave behind.
+    expect(useBlock, 'use.baseURL must reference the derived value, not a re-typed literal').toMatch(/\bbaseURL\b/);
+    expect(useBlock, 'and must not be a hard-coded URL string sitting next to it').not.toMatch(/baseURL:\s*['"`]http/);
+    expect(serverBlock, 'webServer.url/command must reference the same derived value').toMatch(/baseURL|\$\{port\}/);
+    expect(serverBlock, 'and must not hard-code a URL/port string either').not.toMatch(/url:\s*['"`]http:\/\/localhost:\d/);
   });
 
-  it('an e2e spec asserts the served build matches dist/, and says so if it does not', () => {
-    const spec = readFileSync(new URL('../../tests/e2e/00-build-identity.spec.ts', import.meta.url), 'utf8');
+  // Review of this PR (#187): checking that ingredient substrings appear (the hash regex, the fetch call)
+  // never confirmed the actual comparison exists — a regression swapping `.toBe(local)` for e.g. `.toBeTruthy()`
+  // on `served` alone would still pass every check that only grepped for ingredients.
+  it('the identity spec actually compares served vs local, not just gathers both and stops', () => {
     expect(spec.length, 'must be a real test, not an empty placeholder').toBeGreaterThan(500);
     expect(spec, 'the comparison is the build-sw.mjs cache name, not a weaker liveness check')
       .toMatch(/sna-\[0-9a-f\]\{12\}/);
@@ -1220,13 +1238,33 @@ describe('the e2e server proves it is serving the build on disk, not a leftover 
       .toMatch(/page\.request\.get/);
     expect(spec, 'and the failure message must tell a human what to do about it, per #123\'s own ask')
       .toMatch(/vite preview/);
+    expect(spec, 'must assert served equals local — gathering both and never comparing them is not a check')
+      .toMatch(/\)\.toBe\(local\)/);
   });
 
-  it('the identity spec is not excluded from either default project (mobile, desktop)', () => {
-    // testIgnore: /viewport\.spec\.ts/ is what mobile/desktop exclude; confirm the new file's name cannot
-    // ever match that pattern, so a future rename cannot silently drop this check from the projects that
-    // are the whole point of it (tablet only ever runs viewport.spec.ts and shares no server state that matters here).
-    expect('00-build-identity.spec.ts').not.toMatch(/viewport\.spec\.ts/);
+  // Review of this PR (#187): the original version of this rail compared two string literals defined inside
+  // itself ('00-build-identity.spec.ts' against /viewport\.spec\.ts/) — true by construction, and green
+  // whatever `playwright.config.ts` actually declares. This reads the REAL `testIgnore`/`testMatch` patterns
+  // out of the config text and tests the real filename against them, the way the #116 tablet rail above does.
+  it('the identity spec is not excluded from either default project, by the config\'s ACTUAL patterns (#123)', () => {
+    const filename = '00-build-identity.spec.ts';
+    const parts = config.slice(config.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    expect(parts.length, 'playwright.config.ts must declare its projects, and be read from disk').toBeGreaterThanOrEqual(4);
+    const defaultProjects = parts.filter(p => /name:\s*'(mobile|desktop)'/.test(p));
+    expect(defaultProjects.length, 'both default projects must be found by name').toBe(2);
+    for (const p of defaultProjects) {
+      const name = p.match(/name:\s*'([^']+)'/)![1];
+      const ignore = p.match(/testIgnore:\s*\/([^/]+)\//);
+      if (ignore) {
+        expect(new RegExp(ignore[1]).test(filename), `'${name}''s real testIgnore (/${ignore[1]}/) must not exclude the identity spec`)
+          .toBe(false);
+      }
+      const match = p.match(/testMatch:\s*\/([^/]+)\//);
+      if (match) {
+        expect(new RegExp(match[1]).test(filename), `'${name}' declares testMatch — the identity spec must match it, or it never runs there`)
+          .toBe(true);
+      }
+    }
   });
 });
 

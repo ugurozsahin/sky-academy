@@ -11,11 +11,19 @@ const executablePath = process.env.PW_CHROMIUM || (existsSync(bundled) ? bundled
 // whichever server happened to start first, so the second worktree's tests silently run against the FIRST
 // worktree's build — no error, a green or red run that is evidence about the wrong tree. `PW_PORT`/`PORT`
 // still override it for anyone who wants one explicit port back; the default is derived from `process.cwd()`
-// so two different checkouts get two different ports and simply cannot collide, while re-running inside the
+// so two different checkouts get two different ports and mostly cannot collide, while re-running inside the
 // SAME checkout still lands on the same port and keeps `reuseExistingServer`'s fast local loop.
 // This narrows the collision, it does not by itself prove the served build is the right one — that is what
 // `tests/e2e/00-build-identity.spec.ts` checks, loudly, every run (#123's "make the failure loud, not silent").
-const port = Number(process.env.PW_PORT || process.env.PORT) ||
+// Review of #187 (#123): `Number(x) || fallback` on a typo'd override (`PW_PORT=abc`) used to fail
+// silently back to the hashed default with no warning that the explicit override was rejected — the exact
+// "absence read as fine" shape this project keeps guard rails against. A malformed override is now a loud
+// startup error instead.
+const portOverride = process.env.PW_PORT || process.env.PORT;
+if (portOverride !== undefined && !/^\d+$/.test(portOverride)) {
+  throw new Error(`PW_PORT/PORT must be a plain integer port, got "${portOverride}"`);
+}
+const port = portOverride ? Number(portOverride) :
   4200 + (parseInt(createHash('sha1').update(process.cwd()).digest('hex').slice(0, 4), 16) % 300);
 const baseURL = `http://localhost:${port}`;
 export default defineConfig({
