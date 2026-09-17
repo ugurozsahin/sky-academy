@@ -3684,6 +3684,26 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
     expect(curlHook.command, 'the curl-scoped hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
   });
 
+  // #101: PR #217's own body left this as a known gap — the two Bash-scoped marker hooks above only see a
+  // forgery attempt made over `gh`/`curl`; a session posting via an MCP GitHub tool call directly
+  // (`add_issue_comment`, `issue_write`, `pull_request_review_write`, …) isn't a Bash command at all, so
+  // nothing caught that path, which is how this repository's own comments are actually posted.
+  it('a hook denies an MCP GitHub write-tool call whose body opens with an OWNER: marker', () => {
+    const mcpEntry = (readSettings().hooks.PreToolUse as any[])
+      .find((e) => typeof e.matcher === 'string' && e.matcher.includes('mcp__github__'));
+    expect(mcpEntry, 'no PreToolUse entry matches an mcp__github__ tool name').toBeDefined();
+    // Scoped to the write-capable tools, not every mcp__github__ tool (a read like list_issues has no `body`
+    // to check and would just cost a subprocess call on every read for nothing).
+    for (const tool of ['add_issue_comment', 'issue_write', 'pull_request_review_write', 'create_pull_request'])
+      expect({ tool, matched: mcpEntry.matcher.includes(tool) }, `${tool} must be in the MCP hook's matcher`)
+        .toEqual({ tool, matched: true });
+    const mcpHook = (mcpEntry.hooks ?? [])[0];
+    expect(mcpHook?.command, 'the MCP-tool hook must read .tool_input.body, not .tool_input.command').toContain('.tool_input.body');
+    expect(mcpHook?.command, 'the MCP-tool hook must check for both markers').toContain('OWNER: APPROVED');
+    expect(mcpHook?.command, 'the MCP-tool hook must check for both markers').toContain('OWNER: REJECTED');
+    expect(mcpHook?.command, 'the MCP-tool hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+
   it('a hook denies writing to WORKLOG.md at the repo root, both via Bash and via Write/Edit', () => {
     const settings = readSettings();
     const bashCommands = allPreToolUseCommands(settings);
@@ -3754,5 +3774,43 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
 
   it('WORKLOG.md Bash hook: allows an append to the archived docs/worklog/*.md path', () => {
     expect(isDeny(runHook(worklogBashHookCmd, 'echo x >> docs/worklog/2026-09.md'))).toBe(false);
+  });
+
+  // #101 (MCP-tool gap): unlike the Bash hooks above, EVERY call an MCP write-tool hook sees really does post
+  // its `body` to GitHub — there is no `if: Bash(gh *)`-style filter that rules out "this call can't post
+  // anyway". A first draft of this hook denied on a bare substring match, which meant it fired on any comment
+  // that merely *mentions* a marker in prose — exactly the false positive #217's Bash hook already hit once,
+  // rediscovered here live: pipe-testing a body that quoted "OWNER: APPROVED" mid-sentence (this project's own
+  // review comments do this constantly, this file included) got denied. Fixed to mirror `isOwnerApproved`/
+  // `isOwnerRejected` in scripts/review-gate.mjs exactly: the marker only counts at the START of the body.
+  const mcpEntry = (settings.hooks.PreToolUse as any[]).find((e) => typeof e.matcher === 'string' && e.matcher.includes('mcp__github__'));
+  const mcpMarkerHookCmd = mcpEntry.hooks[0].command;
+
+  const runBodyHook = (command: string, body: string): unknown => {
+    const stdin = JSON.stringify({ tool_input: { body } });
+    const out = execFileSync('bash', ['-c', command], { input: stdin, encoding: 'utf8' });
+    return out.trim() === '' ? null : JSON.parse(out);
+  };
+
+  it('MCP-tool marker hook: denies a body that opens with OWNER: APPROVED (plain, or after leading whitespace)', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '  \nOWNER: APPROVED\n\nLooks great'))).toBe(true);
+  });
+
+  it('MCP-tool marker hook: denies a body that opens with OWNER: REJECTED, matched loosely like review-gate.mjs', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: REJECTED - not yet'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '**OWNER: REJECTED** - not yet ready')), 'bold markdown at the start must still count, same as REVIEW: CHANGES REQUESTED\'s own loose match').toBe(true);
+  });
+
+  it('MCP-tool marker hook: allows a body that only mentions a marker in prose, not at the start (#101 false positive)', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd,
+      'REVIEW: CLEARED\n\nThis comment discusses the OWNER: APPROVED marker in prose, same as CLAUDE.md does.')),
+      'a marker mentioned mid-body is not a verdict — scripts/review-gate.mjs would not treat it as one either').toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'Pushed abc123, addressing the review. Ready for re-review.'))).toBe(false);
+  });
+
+  it('MCP-tool marker hook: allows a body with no body field at all', () => {
+    const out = execFileSync('bash', ['-c', mcpMarkerHookCmd], { input: JSON.stringify({ tool_input: {} }), encoding: 'utf8' });
+    expect(out.trim()).toBe('');
   });
 });

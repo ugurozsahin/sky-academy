@@ -33,6 +33,15 @@
             "command": "fp=$(jq -r '.tool_input.file_path // empty'); base=$(basename \"$fp\" 2>/dev/null); dir=$(dirname \"$fp\" 2>/dev/null); if [ \"$base\" = \"WORKLOG.md\" ] && { [ \"$dir\" = \".\" ] || [ \"$dir\" = \"$(pwd)\" ]; }; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WORKLOG.md at the repo root is retired (#98): nothing writes to it again. See docs/worklog/ and BACKLOG.md - Where a record goes.\"}}'; fi"
           }
         ]
+      },
+      {
+        "matcher": "mcp__github__(add_issue_comment|issue_write|pull_request_review_write|update_pull_request|update_issue_comment|create_pull_request|add_comment_to_pending_review|add_reply_to_pull_request_comment)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "body=$(jq -r '.tool_input.body // empty'); strict=$(printf '%s' \"$body\" | sed 's/^[[:space:]]*//'); loose=$(printf '%s' \"$body\" | tr -d '*_`>#' | tr -s '[:space:]' ' ' | sed 's/^ *//' | tr '[:lower:]' '[:upper:]'); if printf '%s' \"$strict\" | grep -q '^OWNER: APPROVED' || printf '%s' \"$loose\" | grep -q '^OWNER: REJECTED'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"No agent ever writes an OWNER: APPROVED / OWNER: REJECTED marker (CLAUDE.md, #101 layer 0) - only the human owner writes these, in the GitHub UI. This MCP tool call would have posted one at the start of its body, the same shape scripts/review-gate.mjs treats as a real verdict - not just a mention of the marker in prose.\"}}'; fi"
+          }
+        ]
       }
     ]
   }
