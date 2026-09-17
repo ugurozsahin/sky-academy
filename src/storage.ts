@@ -21,7 +21,7 @@ export interface StoredCert {
   training?: boolean;
 }
 export interface SaveData {
-  v: 2;
+  v: 3;
   name: string;
   avatar: string | null;
   year: YearId;
@@ -43,10 +43,11 @@ export interface SaveData {
   owned: string[];                   // bought shop item ids
   equipped: Partial<Record<ItemKind, string>>;   // equipped item per kind (missing = the free default)
   certs: StoredCert[];               // certificates earned, most recently filed first (#205)
+  onboarded: boolean;                // the first-run wizard (#67) has been completed or skipped past
 }
-export const SAVE_VERSION = 2 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
+export const SAVE_VERSION = 3 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
 const KEY = 'sna:v1';                       // stable localStorage slot (its `v1` is historical; `raw.v` drives migration)
-const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [] };
+const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [], onboarded: false };
 
 // A raw blob read back from storage: JSON of unknown shape (any past version, or hand-edited). Migrations walk it.
 type RawSave = Record<string, unknown>;
@@ -66,6 +67,13 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
     ...s,
     voice: s.voice === 'yes' || s.voice === 'no' ? s.voice : 'unknown',
     certs: Array.isArray(s.certs) ? s.certs.filter(isCert) : [],
+  }),
+  // v2 → v3: #67's onboarding wizard needs a flag to tell "never onboarded" from "already played". A blob
+  // that already has an avatar chosen was onboarded under the old single-screen flow, so it counts as done —
+  // the acceptance criterion is that no existing player is sent back through the wizard by this update.
+  2: s => ({
+    ...s,
+    onboarded: typeof s.onboarded === 'boolean' ? s.onboarded : !!s.avatar,
   }),
 };
 
@@ -147,7 +155,7 @@ function sanitizeTypes(s: RawSave): RawSave {
   }
   if ('avatar' in clean && clean.avatar !== null && typeof clean.avatar !== 'string') delete clean.avatar;
   if ('voice' in clean && clean.voice !== 'unknown' && clean.voice !== 'yes' && clean.voice !== 'no') delete clean.voice;
-  for (const k of ['sound', 'speech', 'tutorialSeen'] as const) {
+  for (const k of ['sound', 'speech', 'tutorialSeen', 'onboarded'] as const) {
     if (k in clean && typeof clean[k] !== 'boolean') delete clean[k];
   }
   return clean;
