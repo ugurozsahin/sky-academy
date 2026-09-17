@@ -363,6 +363,53 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'terra');
   });
 
+  /**
+   * Review on PR #197: a reload while sitting on the name or intro step leaves that step's history entry
+   * current (unlike a fresh boot, a same-URL reload reuses the entry in place rather than pushing a new
+   * one), but boot always restarts at `chooseNinjaScreen` regardless of what that entry says. A fresh
+   * walk-through then pushes two *more* entries on top of the stale one, and finishing unwinds a fixed
+   * `history.go(-2)` — which landed back on the stale entry instead of the map, so "Let's go!" silently did
+   * nothing. Reproduced independently before the fix (real build, real reload, real Chromium) and confirmed
+   * fixed by gating the popstate handler's `onboard-name`/`onboard-intro` branches on `!load().onboarded`:
+   * once the wizard is finished, a stale wizard-tagged entry from before the reload is inert no matter how
+   * a later back-navigation reaches it.
+   */
+  for (const step of ['name', 'intro'] as const) {
+    test(`onboarding: a reload on the ${step} step does not strand "Let's go!" (#197 review)`, async ({ page }) => {
+      // Plain `/`, not `/?reset=1` — each test already gets a fresh, storage-free browser context, and this
+      // test's own final back-navigation must never revisit a `?reset=1` URL still sitting in history: doing
+      // so would re-trigger the reset param's storage wipe, which is a test-harness artefact, not this bug.
+      await page.goto('/');
+      await page.click('.avatar-card[data-id="volt"]');
+      await page.click('#next');
+      await page.fill('#name', 'Ada');
+      if (step === 'intro') { await page.click('#go'); await expect(page.locator('.intro-card')).toBeVisible(); }
+      else await expect(page.locator('#name')).toBeVisible();
+
+      await page.goto('/');   // a real relaunch, mid-wizard — the stale history entry this regression needs
+
+      // The wizard restarts at step 1 (chooseNinjaScreen always does, regardless of the stale entry), with
+      // the ninja already picked carried over from storage.
+      await expect(page.locator('.avatar-screen')).toBeVisible();
+      await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'volt');
+
+      // Walking the wizard through to the end must actually reach the map this time.
+      await page.click('#next');
+      await expect(page.locator('#name')).toBeVisible();
+      await page.fill('#name', 'Ada');
+      await page.click('#go');
+      await expect(page.locator('.intro-card')).toBeVisible();
+      await page.click('#intro-go');
+      await expect(page.locator('.home')).toBeVisible();
+
+      // And the stale entry from before the reload, wherever `history.go(-2)` actually left it in the
+      // stack, is inert: one more hardware back does not resurrect a wizard screen now that onboarding is
+      // done.
+      await page.goBack();
+      await expect(page.locator('.avatar-screen')).toHaveCount(0);
+    });
+  }
+
   /** #67 acceptance: "progress is obvious to a child" — a small dot rail across all three first-run steps. */
   test('onboarding: the wizard progress rail advances across all three steps, and is not shown to a returning player', async ({ page }) => {
     await page.goto('/?reset=1');

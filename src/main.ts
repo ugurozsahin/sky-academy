@@ -57,7 +57,15 @@ window.addEventListener('popstate', () => {
   // The grown-ups screen's guarded reset (#115) must land on onboarding, never the map with an empty profile,
   // however it is left — including the hardware/browser back button landing here rather than through
   // parents.ts's own `#back` click handler.
-  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro') { fromPop = false; leave(); renderIntro(); } else if (s === 'onboard-name') { fromPop = false; leave(); renderName(); } else if (s === 'play' || s === 'memory' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
+  //
+  // 'onboard-name'/'onboard-intro' only mean anything while `onboarded` is still false (#197 review): a
+  // reload mid-wizard leaves that step's entry as the current one, but boot always restarts at step 1
+  // regardless, and a fresh walk-through then pushes new entries *on top of* the stale one rather than
+  // replacing it. Without the `!load().onboarded` guard, finishing the wizard a second time — or a later
+  // hardware-back press — could land back on that stale entry and silently re-show a wizard step to a
+  // player who has already finished onboarding. Once `onboarded` is true, every history entry from before
+  // it is inert as far as the wizard is concerned; only the map (or wherever `nav.map()` sends it next) is.
+  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro' && !load().onboarded) { fromPop = false; leave(); renderIntro(); } else if (s === 'onboard-name' && !load().onboarded) { fromPop = false; leave(); renderName(); } else if (s === 'play' || s === 'memory' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
 });
 
 // ?reset=1 clears saved progress (used by tests).
