@@ -165,10 +165,15 @@ img { -webkit-user-drag: none; }
 .name-row input:focus { border-color: var(--accent-2); }
 /* The empty-name nudge (#110). `min-height` holds the line's space when it clears, so the grid never jumps. */
 .name-hint { max-width: 420px; margin: 0 auto 14px; min-height: 18px; color: var(--muted); font-weight: 600; font-size: 13px; text-align: center; }
-/* runway below the sticky Let's go! button so the last card row (Bolt/Master) is never left under it — #51 */
+/* runway below the sticky Continue/Let's go! button so the last card row (Bolt/Master) is never left under it — #51 */
 .avatar-screen { padding-bottom: calc(84px + var(--sab)); scroll-padding-bottom: calc(84px + var(--sab)); }
-.avatar-screen #go { display: flex; margin: 0 auto; position: sticky; bottom: calc(12px + var(--sab)); z-index: 2; box-shadow: 0 10px 30px #000a; }
+.avatar-screen #go, .avatar-screen #next { display: flex; margin: 0 auto; position: sticky; bottom: calc(12px + var(--sab)); z-index: 2; box-shadow: 0 10px 30px #000a; }
 .change-avatar #change-save { display: flex; margin: 20px auto 0; }
+
+/* The name step's chosen-ninja reminder (#67 wizard split): a small figure, not the full avatar-card treatment. */
+.name-preview { max-width: 420px; margin: 0 auto 16px; text-align: center; }
+.name-preview .figure { width: clamp(72px, 22vw, 104px); margin: 0 auto 6px; }
+.name-preview b { display: block; color: var(--text); font-weight: 700; }
 
 /*
  * First-run wizard progress (#67): a small dot rail, decorative only — the "Step X of N" text lives in the

@@ -1,5 +1,5 @@
 import './style.css';
-import { avatarScreen, changeAvatarScreen, introScreen } from './ui/avatar';
+import { chooseNinjaScreen, changeAvatarScreen, introScreen, nameScreen } from './ui/avatar';
 import { mapScreen, islandScreen, rewardsScreen, type StartPlay } from './ui/home';
 import { playScreen, type PlayOpts } from './ui/play';
 import { memoryScreen } from './ui/memory';
@@ -26,15 +26,21 @@ const up = () => { if (history.state?.screen) history.back(); else nav.map(); };
 // back-button exit — see the guard rail in tests/e2e/game.spec.ts (#73).
 let dispose: (() => void) | null = null;
 const leave = () => { const d = dispose; dispose = null; d?.(); };
-// The first-run wizard (#67): avatarScreen (choose ninja + name) → introScreen (Sensei's welcome, first run
-// only) → map. A returning player re-entering via `#change-av` (home.ts) gets changeAvatarScreen instead —
-// ninja only, straight back to home — because `onboarded` is already true by the time that button exists.
-const renderIntro = () => introScreen(() => { save({ onboarded: true }); history.back(); });
+// The first-run wizard (#67): chooseNinjaScreen (pick a ninja) → nameScreen (the child's name) → introScreen
+// (Sensei's welcome, first run only) → map. A returning player re-entering via `#change-av` (home.ts) gets
+// changeAvatarScreen instead — ninja only, straight back to home — because `onboarded` is already true by
+// the time that button exists.
+//
+// Finishing the wizard unwinds both of its pushed history entries (onboard-name, onboard-intro) in one go —
+// history.back() only undoes one, which would leave a dead onboard-name entry between the map and the start
+// of a fresh session's history and land there instead of the map on the next hardware-back press.
+const renderIntro = () => introScreen(() => { save({ onboarded: true }); history.go(-2); });
+const renderName = () => nameScreen(() => { enter('onboard-intro'); renderIntro(); });
 const nav = {
   avatar: () => {
     leave(); fromPop = false;
     if (load().onboarded) { changeAvatarScreen(() => nav.map()); return; }
-    avatarScreen(() => { enter('onboard-intro'); renderIntro(); });
+    chooseNinjaScreen(() => { enter('onboard-name'); renderName(); });
   },
   map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
   island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
@@ -51,7 +57,15 @@ window.addEventListener('popstate', () => {
   // The grown-ups screen's guarded reset (#115) must land on onboarding, never the map with an empty profile,
   // however it is left — including the hardware/browser back button landing here rather than through
   // parents.ts's own `#back` click handler.
-  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro') { fromPop = false; leave(); renderIntro(); } else if (s === 'play' || s === 'memory' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
+  //
+  // 'onboard-name'/'onboard-intro' only mean anything while `onboarded` is still false (#197 review): a
+  // reload mid-wizard leaves that step's entry as the current one, but boot always restarts at step 1
+  // regardless, and a fresh walk-through then pushes new entries *on top of* the stale one rather than
+  // replacing it. Without the `!load().onboarded` guard, finishing the wizard a second time — or a later
+  // hardware-back press — could land back on that stale entry and silently re-show a wizard step to a
+  // player who has already finished onboarding. Once `onboarded` is true, every history entry from before
+  // it is inert as far as the wizard is concerned; only the map (or wherever `nav.map()` sends it next) is.
+  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro' && !load().onboarded) { fromPop = false; leave(); renderIntro(); } else if (s === 'onboard-name' && !load().onboarded) { fromPop = false; leave(); renderName(); } else if (s === 'play' || s === 'memory' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
 });
 
 // ?reset=1 clears saved progress (used by tests).
