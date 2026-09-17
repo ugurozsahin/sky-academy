@@ -15,8 +15,7 @@ Vite + vanilla TypeScript (no framework), canvas arena, DOM HUD, localStorage. V
 - `tests/unit/*.test.ts`, `tests/e2e/game.spec.ts`, `scripts/` (screenshots, single-file bundle, art extraction).
 
 ## Rules
-- Every topic generator must pass `tests/unit/curriculum.test.ts` (answer in options, unique options, arithmetic verified, KS1 ranges). Add a topic = add generator + registry entry (see `.claude/skills/add-topic`).
-- Difficulty 1/2/3 = mission stages. Reception is "gentle" (missed bubbles cost no life). Keep numbers within NC ranges (R ≤10, Y1 ≤20, Y2 ≤100).
+- Curriculum generator rules (answer/option checks, difficulty stages, NC ranges) → `.claude/rules/curriculum.md`, loaded when a session touches `src/curriculum/**` or `tests/unit/curriculum.test.ts` (#101).
 - `window.__sna` hooks (`answer()`, `wrong()`, `bubbles()`, `state()`) are the e2e contract — keep them working.
 - Don't add dependencies without reason (Capacitor for the Android APK is the one exception — see `docs/ANDROID.md`; `android/` is generated, only touch it via `npx cap`/`scripts/android-assets.py`); no external assets except Google Fonts (Fredoka) and `public/avatars`.
 - Keep files small; prefer editing existing modules over new abstractions. Run `npm test` after logic changes, `npm run test:e2e` after UI changes (mobile is the default project a PR is judged on — run desktop too when a change could be viewport-sensitive, since nothing else will until that night).

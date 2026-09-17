@@ -3191,3 +3191,148 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
     expect(pathsList(front)).toEqual(['', 'src/curriculum/**']);   // kept, not dropped — exists('') is false
   });
 });
+
+/**
+ * Layer 2 rule files (#101), curriculum.md specifically — `.claude/rules/<topic>.md`, loaded only when a
+ * session touches a path that matches its `paths:` frontmatter, rather than costing every turn the way
+ * `CLAUDE.md` does. Two ways this decays silently, neither of which `tsc` or a missing-import error would
+ * ever catch: a rule with no `paths:` list never gets scoped-loaded by anything, so wording moved out of
+ * `CLAUDE.md` into one is read by nobody; and a `paths:` entry that matches nothing real quietly stops
+ * mattering the day the file or directory it named is renamed or removed.
+ *
+ * Scoped to `curriculum.md` alone, not every `.claude/rules/*.md` file: the sibling describe block above
+ * ("`.claude/rules/` files are path-scoped, and every path is real") already covers the other six rule
+ * files (android/e2e/game/governance/guardrails/style) with a disk-truth `exists()` checker. This block's
+ * own independent file walk (`ALL_FILES`) deliberately excludes `android/` as a generated tree not worth
+ * walking — fine for `curriculum.md`, which never points there, but it would wrongly fail `android.md`'s own
+ * `android/**` entry if this ran against every rule file. Running both validators over the same six files
+ * would also mean they could silently drift apart on what "matches something real" means. One rule file, one
+ * validator, no double coverage.
+ *
+ * This is a path-glob check, not a full glob engine: it understands an exact file path and a `<dir>/**`
+ * prefix, which is what `curriculum.md` needs. Extend `pathMatches` before adding a `paths:` pattern shaped
+ * differently (a single-segment `*`, for instance).
+ *
+ * Prove it red: add a `paths:` entry to `curriculum.md` naming a file that does not exist, or drop its
+ * frontmatter.
+ */
+describe('.claude/rules/curriculum.md declares paths, and every path matches something real (#101)', () => {
+  const root = new URL('../../', import.meta.url);
+  const RULES_DIR = '.claude/rules';
+
+  // Excludes generated/vendored trees a rule should never need to point at, and the ones too large to walk
+  // for no benefit (node_modules, the generated Android project).
+  const IGNORE = new Set(['node_modules', '.git', 'dist', 'test-results', 'playwright-report', 'android', '.android']);
+  const walkAll = (dir: string): string[] => readdirSync(new URL(dir || '.', root), { withFileTypes: true })
+    .flatMap((e) => {
+      if (IGNORE.has(e.name)) return [];
+      const p = `${dir}${e.name}`;
+      return e.isDirectory() ? walkAll(`${p}/`) : [p];
+    });
+  const ALL_FILES = walkAll('');
+
+  const pathMatches = (pattern: string, candidate: string): boolean => {
+    // #178 review: a bare wildcard with no directory in front of it ("**" or "*") must never pass by
+    // matching some unrelated top-level file — the whole point of this rail is to make an entirely unscoped
+    // rule file impossible to ship silently (mirroring #179's exists('**')/exists('*') === false), and this
+    // matcher's own regex path would otherwise reduce "**" to `[^/]*` and let it match e.g. "CLAUDE.md".
+    if (pattern === '**' || pattern === '*') return false;
+    if (pattern.endsWith('/**')) {
+      const prefix = pattern.slice(0, -3);
+      return candidate === prefix || candidate.startsWith(`${prefix}/`);
+    }
+    if (pattern.includes('*')) {
+      // #178 review (minor, silent-failure-hunter): the escape set omitted `?`, so a literal `?` in a
+      // future pattern would be read as a regex quantifier instead of a literal character.
+      const re = new RegExp(`^${pattern.split('/').map((seg) =>
+        seg.replace(/[.+^${}()|[\]\\?]/g, '\\$&').replace(/\*/g, '[^/]*')).join('/')}$`);
+      return re.test(candidate);
+    }
+    return candidate === pattern;
+  };
+
+  const ruleFiles = ['curriculum.md'];
+  const frontMatter = (name: string) => {
+    const text = readFileSync(new URL(`${RULES_DIR}/${name}`, root), 'utf8');
+    return /^---\n([\s\S]*?)\n---\n/.exec(text);
+  };
+  // #178 review, CRITICAL (silent-failure-hunter, reproduced independently): the old regex
+  // `/^paths:\n((?:[ \t]*-[ \t]*.+\n?)+)/m` required every list line to be immediately consecutive, so a
+  // blank line or a `#` comment dropped between two entries silently truncated the captured list with no
+  // null and no failure — a rail claiming "every path matches something real" that could itself skip paths
+  // with no signal. Fixed the same way sibling PR #179 fixed the identical bug in its own pathsList: walk
+  // every line after `paths:`, keep `-`-prefixed ones, skip (not stop at) a blank/comment line, and only a
+  // new top-level key or other content ends the list.
+  const pathsList = (front: string): string[] | null => {
+    const idx = front.search(/^paths:[ \t]*$/m);
+    if (idx === -1) return null;
+    const listLines: string[] = [];
+    for (const line of front.slice(idx).split('\n').slice(1)) {
+      if (/^[ \t]*-/.test(line)) { listLines.push(line); continue; }
+      if (/^[ \t]*(#.*)?$/.test(line)) continue;   // blank / comment line — skip, keep scanning
+      break;                                          // a new top-level key or other content ends the list
+    }
+    const entries = listLines.map((l) => {
+      const rest = l.replace(/^[ \t]*-[ \t]*/, '');
+      const quoted = /^"([^"]*)"[ \t]*$/.exec(rest);
+      return (quoted ? quoted[1] : rest).trimEnd();
+    });
+    return entries.length ? entries : null;
+  };
+
+  it('the independent walk found something to check candidate paths against', () => {
+    expect(ALL_FILES.length, 'an empty listing would make every match below pass vacuously').toBeGreaterThan(100);
+  });
+
+  it('at least one rule file exists — an empty directory would pass every check below vacuously', () => {
+    expect(ruleFiles.length).toBeGreaterThan(0);
+  });
+
+  it.each(ruleFiles)('%s has frontmatter with a non-empty paths: list', (name) => {
+    const front = frontMatter(name);
+    expect(front, `${name} must open with YAML frontmatter, or nothing ever scopes it to a path`).not.toBeNull();
+    const entries = pathsList(front![1]);
+    expect(entries, `${name} needs a paths: list — that is what makes it layer 2, not CLAUDE.md with extra steps`)
+      .not.toBeNull();
+    expect(entries!.length, `${name}'s paths: list is present but empty`).toBeGreaterThan(0);
+  });
+
+  it.each(ruleFiles)('%s: every listed path matches at least one real file in the repo', (name) => {
+    const entries = pathsList(frontMatter(name)![1])!;
+    for (const pattern of entries) {
+      expect(ALL_FILES.some((f) => pathMatches(pattern, f)),
+        `${name}'s paths: entry "${pattern}" matches nothing in the repo — a rule scoped to nothing never loads`)
+        .toBe(true);
+    }
+  });
+
+  it('a comment or blank line between two paths: entries does not silently drop the entries after it (#178 review, CRITICAL)', () => {
+    const front = 'paths:\n  - "src/curriculum/**"\n  # a comment someone adds later\n\n  - "tests/unit/curriculum.test.ts"\n';
+    expect(pathsList(front)).toEqual(['src/curriculum/**', 'tests/unit/curriculum.test.ts']);
+  });
+
+  it('an unparseable paths: entry is kept, not silently dropped', () => {
+    const front = 'paths:\n  - ""\n  - "src/curriculum/**"\n';
+    expect(pathsList(front)).toEqual(['', 'src/curriculum/**']);   // kept, so it fails the real-path check below, not vanishes
+  });
+
+  it('paths: with no top-level key at all still returns null, not an empty array', () => {
+    expect(pathsList('no paths key here')).toBeNull();
+    expect(pathsList('paths:\n')).toBeNull();
+  });
+
+  it('a bare "**" or "*" pattern never matches by accident — an unscoped rule must fail, not sail through', () => {
+    // Reproduced before the fix: pattern.split('/') on a slash-free "**" produced a single segment,
+    // `[^/]*` x2 in the regex reduces to "match anything with no slash", so e.g. pathMatches('**', 'CLAUDE.md')
+    // returned true — a rule scoped to nothing would pass this rail exactly like a properly-scoped one.
+    expect(pathMatches('**', 'CLAUDE.md')).toBe(false);
+    expect(pathMatches('*', 'package.json')).toBe(false);
+    // Sanity: a real directory-prefixed pattern still matches.
+    expect(pathMatches('src/curriculum/**', 'src/curriculum/maths.ts')).toBe(true);
+  });
+
+  it('a literal "?" in a pattern is escaped, not read as a regex quantifier', () => {
+    expect(pathMatches('src/curriculum/*.ts?', 'src/curriculum/maths.ts')).toBe(false);
+    expect(pathMatches('src/curriculum/*.ts?', 'src/curriculum/maths.ts?')).toBe(true);
+  });
+});
