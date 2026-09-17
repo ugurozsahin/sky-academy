@@ -21,7 +21,7 @@ const ELEMENT_TRAILS: { fx: FxKind; name: string; icon: string; blurb: string; p
   { fx: 'wind', name: 'Wind Trail', icon: '🍃', blurb: 'Breezy leaves swirl behind your slice', price: 100 },
   { fx: 'ice', name: 'Ice Trail', icon: '❄️', blurb: 'Frosty crystals shimmer with every slice', price: 115 },
   { fx: 'light', name: 'Light Trail', icon: '💡', blurb: 'Golden sparkles light up your slice', price: 130 },
-  { fx: 'shadow', name: 'Shadow Trail', icon: '🌑', blurb: 'Wisps of smoke curl behind your slice', price: 145 },
+  { fx: 'shadow', name: 'Shadow Trail', icon: '👻', blurb: 'Wisps of smoke curl behind your slice', price: 145 },
   { fx: 'blade', name: 'Blade Trail', icon: '⚔️', blurb: 'Sharp steel flashes with every slice', price: 160 },
   { fx: 'robot', name: 'Robot Trail', icon: '🤖', blurb: 'Pixel sparks flicker behind your slice', price: 175 },
 ];
