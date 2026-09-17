@@ -44,9 +44,9 @@ your first finding and the only one you can report.
    `conclusion` must be `success`; `cancelled` is not a pass. A run still going has `conclusion: null` and is
    **not** a finding: a light push run takes ~3 minutes and a full one ~12, so say it is in progress and move
    on rather than reporting a failure that has not happened. **But bound it.** `timeout-minutes` is 30, so
-   anything still `null` after ~45 minutes is stuck, and a run that never leaves `queued` is what an exhausted
-   Actions quota looks like — which is also what check 6 would be failing to tell you at the same moment, in
-   the same direction. Past 45 minutes it is a finding. Check its `head_sha` against main's tip: after a
+   anything still `null` after ~45 minutes is stuck — on this now-public repo a run that never leaves
+   `queued` is far more likely a GitHub Actions outage or a workflow misconfiguration than an exhausted quota
+   (check 6, retired 2026-09-17, is why quota is no longer the first guess). Past 45 minutes it is a finding. Check its `head_sha` against main's tip: after a
    docs-only merge the newest run belongs to an older commit, which is correct and not a finding, but it does
    mean the green you are reading is not about the current tip. Say which commit it covers.
 2. **Did the nightly run, and did it pass?** `/actions/runs?branch=main&event=schedule&per_page=1`. The push
@@ -117,16 +117,17 @@ your first finding and the only one you can report.
    written — that is precisely the thing it can author for itself. His comment is the one form it cannot.
    If you find it, the item is a documented exception; if you do not, raise the finding as a question — ask
    what authorised it, do not accuse.
-6. **Is the Actions budget on course?** Compute **two** numbers from the wall-clock durations of runs created
-   since the 1st (`/actions/runs?created=>=<first of the month>`, each rounded up to the minute), and put both
-   in your report: **(a)** month-to-date ÷ days elapsed × 30, and **(b)** the last three days ÷ 3 × 30. One
-   day is a terrible predictor, and a whole month divided by elapsed days reads a hot week as cool, so you
-   need both. **If either exceeds 2,000, it is a finding** — no judgement, and "most of that was one-off
-   testing" goes in the issue if it is true, it does not cancel the finding. 2,000 is the Free quota and 3,000
-   the Pro one; you cannot see which plan applies and the quota is account-wide rather than per repo, so give
-   the owner both lines and let him decide. Do **not** trust `/actions/runs/<id>/timing`: on this repo it
-   returns `total_ms: 0` for real runs, and a billable total of zero means the endpoint is not reporting, not
-   that nothing was spent.
+6. **Retired 2026-09-17 — Actions budget/quota.** This check used to compute a month-to-date and a
+   3-day-projected Actions-minutes figure and flag either one for crossing the 2,000 (Free) / 3,000 (Pro)
+   monthly quota that applied while the repo was private. The repo went public on 2026-09-16, and GitHub
+   Actions on standard GitHub-hosted runners is free and unmetered for public repositories — there is no
+   monthly quota left for those two numbers to be compared against, so this check now performs no
+   computation and produces no finding. **Do not revive it from memory of an earlier run** if the repo is
+   ever made private again, or if a workflow starts using a self-hosted or a larger (metered) runner — check
+   the repo's actual visibility and runner types first, because "public" is exactly the kind of fact this
+   file warned elsewhere not to assume unchanged. The prior check's own caveat is worth keeping if it is ever
+   revived: `/actions/runs/<id>/timing` returned `total_ms: 0` for real runs on this repo, which meant "not
+   reporting", never "free."
 
 7. **Did anything merge that should not have?** For the last day's merges to main: none should have been
    merged while its `review-gate` status was red, and each should have a green CI run on the merged head —
@@ -214,8 +215,8 @@ Every run, findings or none, and **as the very last thing you do**: find the ope
 `watchdog: heartbeat` (label `watchdog`) and replace its **body** with one line — the UTC timestamp of this
 run and a few words on the outcome and **the numbers you actually observed** — a clean run must
 carry its evidence, or a wrong "clean" is invisible afterwards:
-`2026-09-07T18:00Z — clean · nightly 1 run ok · budget mtd 638/7d, 3d 212/day · 3 PRs open · main green`, or
-`2026-09-07T17:35Z — 2 findings ugurozsahin/sky-academy-private-archive#104 ugurozsahin/sky-academy-private-archive#105 · nightly 0 runs · budget 3d 212/day`. If none exists,
+`2026-09-07T18:00Z — clean · nightly 1 run ok · 3 PRs open · main green`, or
+`2026-09-07T17:35Z — 2 findings #104 #105 · nightly 0 runs`. If none exists,
 create it **with that line already in the body**, in the single `POST /issues` call that takes `title`, `body`
 and `labels` together — never create it empty and fill it afterwards, or a run that dies in between leaves an
 open issue with no timestamp, which ages into nothing and reads as a pulse forever. Never close it; it is not
