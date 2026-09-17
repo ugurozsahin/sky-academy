@@ -3031,3 +3031,83 @@ describe('`<a download>` stays reachable from one guarded place in the certifica
       .toMatch(/if\s*\(\s*caps\.nativeShell\s*\)\s*return\s*'show'\s*;[\s\S]{0,40}return\s*'download'/);
   });
 });
+
+/**
+ * Layer 2 rule files (#101) — `.claude/rules/<topic>.md`, loaded only when a session touches a path that
+ * matches its `paths:` frontmatter, rather than costing every turn the way `CLAUDE.md` does. Two ways this
+ * decays silently, neither of which `tsc` or a missing-import error would ever catch: a rule with no
+ * `paths:` list never gets scoped-loaded by anything, so wording moved out of `CLAUDE.md` into one is read by
+ * nobody; and a `paths:` entry that matches nothing real quietly stops mattering the day the file or
+ * directory it named is renamed or removed.
+ *
+ * This is a path-glob check, not a full glob engine: it understands an exact file path and a `<dir>/**`
+ * prefix, which is what every rule file here needs. Extend `pathMatches` before adding a `paths:` pattern
+ * shaped differently (a single-segment `*`, for instance).
+ *
+ * Prove it red: add a `paths:` entry naming a file that does not exist, or a rule file with no frontmatter.
+ */
+describe('.claude/rules/*.md declare paths, and every path matches something real (#101)', () => {
+  const root = new URL('../../', import.meta.url);
+  const RULES_DIR = '.claude/rules';
+
+  // Excludes generated/vendored trees a rule should never need to point at, and the ones too large to walk
+  // for no benefit (node_modules, the generated Android project).
+  const IGNORE = new Set(['node_modules', '.git', 'dist', 'test-results', 'playwright-report', 'android', '.android']);
+  const walkAll = (dir: string): string[] => readdirSync(new URL(dir || '.', root), { withFileTypes: true })
+    .flatMap((e) => {
+      if (IGNORE.has(e.name)) return [];
+      const p = `${dir}${e.name}`;
+      return e.isDirectory() ? walkAll(`${p}/`) : [p];
+    });
+  const ALL_FILES = walkAll('');
+
+  const pathMatches = (pattern: string, candidate: string): boolean => {
+    if (pattern.endsWith('/**')) {
+      const prefix = pattern.slice(0, -3);
+      return candidate === prefix || candidate.startsWith(`${prefix}/`);
+    }
+    if (pattern.includes('*')) {
+      const re = new RegExp(`^${pattern.split('/').map((seg) =>
+        seg.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')).join('/')}$`);
+      return re.test(candidate);
+    }
+    return candidate === pattern;
+  };
+
+  const ruleFiles = readdirSync(new URL(`${RULES_DIR}/`, root), { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name).sort();
+  const frontMatter = (name: string) => {
+    const text = readFileSync(new URL(`${RULES_DIR}/${name}`, root), 'utf8');
+    return /^---\n([\s\S]*?)\n---\n/.exec(text);
+  };
+  const pathsList = (front: string) => {
+    const block = /^paths:\n((?:[ \t]*-[ \t]*.+\n?)+)/m.exec(front);
+    return block ? [...block[1].matchAll(/-[ \t]*"?([^"\n]+?)"?[ \t]*$/gm)].map((m) => m[1]) : null;
+  };
+
+  it('the independent walk found something to check candidate paths against', () => {
+    expect(ALL_FILES.length, 'an empty listing would make every match below pass vacuously').toBeGreaterThan(100);
+  });
+
+  it('at least one rule file exists — an empty directory would pass every check below vacuously', () => {
+    expect(ruleFiles.length).toBeGreaterThan(0);
+  });
+
+  it.each(ruleFiles)('%s has frontmatter with a non-empty paths: list', (name) => {
+    const front = frontMatter(name);
+    expect(front, `${name} must open with YAML frontmatter, or nothing ever scopes it to a path`).not.toBeNull();
+    const entries = pathsList(front![1]);
+    expect(entries, `${name} needs a paths: list — that is what makes it layer 2, not CLAUDE.md with extra steps`)
+      .not.toBeNull();
+    expect(entries!.length, `${name}'s paths: list is present but empty`).toBeGreaterThan(0);
+  });
+
+  it.each(ruleFiles)('%s: every listed path matches at least one real file in the repo', (name) => {
+    const entries = pathsList(frontMatter(name)![1])!;
+    for (const pattern of entries) {
+      expect(ALL_FILES.some((f) => pathMatches(pattern, f)),
+        `${name}'s paths: entry "${pattern}" matches nothing in the repo — a rule scoped to nothing never loads`)
+        .toBe(true);
+    }
+  });
+});
