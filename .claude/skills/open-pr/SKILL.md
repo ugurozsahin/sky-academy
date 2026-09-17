@@ -138,8 +138,13 @@ who set it is the one who lifts it.
 
 ## 6. Governance pull requests say which way they move the constraint
 
-If the diff touches `CLAUDE.md`, `BACKLOG.md`, `docs/ROUTINE-PROMPT.md`, the workflows or the guard rails, put
-one line near the top of the body:
+A pull request that changes how the routine itself works — `CLAUDE.md`, `BACKLOG.md`,
+`docs/ROUTINE-PROMPT.md`, the workflows, the guard rails — used to be left for the owner as a class, on the
+reasoning that a run should not merge changes to its own rules. Sound instinct, wrong cut: it conflates *an
+author must not land their own work* — true, and already enforced by §5 above — with *a run must not land a
+rule change*, which is so broad that PR #96 sat open all day while the thing it fixed was live and unfixed.
+
+So every governance pull request states, in one line near the top, which way it moves the constraint:
 
 - **Tightening** — it adds a check, a rail or a rule, or it only describes behaviour that already exists.
   Reviewed and merged like any other pull request, by a run that did not open it.
@@ -147,11 +152,21 @@ one line near the top of the body:
   Never routine-merged, however obviously right it looks.**
 - **Mixed** — both. Owner-gated, and worth splitting instead.
 
-Judge the constraint, not the signal: *after this change, is there still something red that a merge rule
-reads?* And note that "it only documents existing behaviour" is the cheapest cover story available, because a
-run can describe the behaviour it wishes existed — so the reviewer checks your description against the code.
+Three things to get right:
 
-`docs/ROUTINE-PROMPT.md` has the full rule and the reasoning.
+1. **Judge the constraint, not the signal.** The question is *after this change, is there still something red
+   that a merge rule reads?* PR #97 stopped the review gate failing its own job, which sounds like a loosening
+   — but `review-gate` still goes red and §5 above still reads it, so nothing a run may do changed. That is
+   neutral and routine-mergeable; a change that quietly stops something being *reported*, by contrast, is how a
+   constraint actually decays.
+2. **"It only documents existing behaviour" is the cheapest cover story available**, because a run can describe
+   the behaviour it wishes existed. It counts as tightening, so the reviewer checks the description against the
+   code, not against the pull request body.
+3. **The reviewer's job includes disagreeing with the label.** A mislabelled loosening is then a visible,
+   arguable act instead of a silent non-decision.
+
+The point is asymmetry: an agent must not be able to vote itself more freedom, but an agent that wants the
+routine held to a higher standard should not have to wait a day for it.
 
 ## 7. Three files that change together
 
