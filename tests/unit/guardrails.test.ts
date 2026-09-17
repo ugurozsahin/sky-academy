@@ -1188,6 +1188,87 @@ describe('guard rails', () => {
 });
 
 /**
+ * #123: `playwright.config.ts` used to hard-code `localhost:4173` in both `use.baseURL` and `webServer`,
+ * with `reuseExistingServer: true`. Two worktrees reviewing two pull requests then attach to whichever
+ * server happened to start first — the served app comes from one checkout, the spec file from another, and
+ * nothing anywhere says they disagree. It cost a routine run four fabricated test failures before it was
+ * caught (see the issue). These two rails hold the fix in place: the port must be derived rather than a bare
+ * literal shared with `reuseExistingServer`, and a real e2e test must fail loudly the moment the served build
+ * and the local `dist/` disagree, so the failure mode becomes impossible to miss instead of merely rarer.
+ */
+describe('the e2e server proves it is serving the build on disk, not a leftover from elsewhere (#123)', () => {
+  const config = readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8');
+  const spec = readFileSync(new URL('../../tests/e2e/00-build-identity.spec.ts', import.meta.url), 'utf8');
+
+  it('reuseExistingServer is still true — this is a port-collision fix, not a removal of the fast local loop', () => {
+    expect(config).toMatch(/reuseExistingServer:\s*true/);
+  });
+
+  // Review of this PR (#187): matching the derivation tokens anywhere in the file — including the comment
+  // above the code, which already contains all three — let a partial revert that guts the actual wiring
+  // while leaving the prose pass every check here. `use:`/`webServer:` must be built from the SAME
+  // identifier (`baseURL`, `port` or the raw expression), not merely mention derivation somewhere.
+  it('baseURL and webServer are wired to the same derived value, and it is not the bare literal 4173', () => {
+    expect(config, 'the exact incident #123 names: one hard-coded port two checkouts can both bind')
+      .not.toMatch(/localhost:4173/);
+    expect(config, 'a derivation must exist — cwd-based by default, with an env override')
+      .toMatch(/createHash|process\.env\.PW_PORT|process\.env\.PORT/);
+    const useBlock = config.match(/use:\s*\{[^}]*\}/)?.[0];
+    const serverBlock = config.match(/webServer:\s*\{[^}]*\}/)?.[0];
+    expect(useBlock, '`use: {...}` must exist and be read from disk').toBeTruthy();
+    expect(serverBlock, '`webServer: {...}` must exist and be read from disk').toBeTruthy();
+    // `baseURL` is used as a shorthand property (`{ baseURL, ... }`), so a colon is not required — what must
+    // NOT be true is a hard-coded `http://localhost:<port>` string literal sitting where the identifier
+    // belongs, which is exactly what a partial revert (fix the comment, forget the wiring) would leave behind.
+    expect(useBlock, 'use.baseURL must reference the derived value, not a re-typed literal').toMatch(/\bbaseURL\b/);
+    expect(useBlock, 'and must not be a hard-coded URL string sitting next to it').not.toMatch(/baseURL:\s*['"`]http/);
+    expect(serverBlock, 'webServer.url/command must reference the same derived value').toMatch(/baseURL|\$\{port\}/);
+    expect(serverBlock, 'and must not hard-code a URL/port string either').not.toMatch(/url:\s*['"`]http:\/\/localhost:\d/);
+  });
+
+  // Review of this PR (#187): checking that ingredient substrings appear (the hash regex, the fetch call)
+  // never confirmed the actual comparison exists — a regression swapping `.toBe(local)` for e.g. `.toBeTruthy()`
+  // on `served` alone would still pass every check that only grepped for ingredients.
+  it('the identity spec actually compares served vs local, not just gathers both and stops', () => {
+    expect(spec.length, 'must be a real test, not an empty placeholder').toBeGreaterThan(500);
+    expect(spec, 'the comparison is the build-sw.mjs cache name, not a weaker liveness check')
+      .toMatch(/sna-\[0-9a-f\]\{12\}/);
+    expect(spec, 'must read the locally built service worker').toMatch(/dist.*sw\.js/);
+    expect(spec, 'must actually fetch the served one over the network, not just assume it')
+      .toMatch(/page\.request\.get/);
+    expect(spec, 'and the failure message must tell a human what to do about it, per #123\'s own ask')
+      .toMatch(/vite preview/);
+    expect(spec, 'must assert served equals local — gathering both and never comparing them is not a check')
+      .toMatch(/\)\.toBe\(local\)/);
+  });
+
+  // Review of this PR (#187): the original version of this rail compared two string literals defined inside
+  // itself ('00-build-identity.spec.ts' against /viewport\.spec\.ts/) — true by construction, and green
+  // whatever `playwright.config.ts` actually declares. This reads the REAL `testIgnore`/`testMatch` patterns
+  // out of the config text and tests the real filename against them, the way the #116 tablet rail above does.
+  it('the identity spec is not excluded from either default project, by the config\'s ACTUAL patterns (#123)', () => {
+    const filename = '00-build-identity.spec.ts';
+    const parts = config.slice(config.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    expect(parts.length, 'playwright.config.ts must declare its projects, and be read from disk').toBeGreaterThanOrEqual(4);
+    const defaultProjects = parts.filter(p => /name:\s*'(mobile|desktop)'/.test(p));
+    expect(defaultProjects.length, 'both default projects must be found by name').toBe(2);
+    for (const p of defaultProjects) {
+      const name = p.match(/name:\s*'([^']+)'/)![1];
+      const ignore = p.match(/testIgnore:\s*\/([^/]+)\//);
+      if (ignore) {
+        expect(new RegExp(ignore[1]).test(filename), `'${name}''s real testIgnore (/${ignore[1]}/) must not exclude the identity spec`)
+          .toBe(false);
+      }
+      const match = p.match(/testMatch:\s*\/([^/]+)\//);
+      if (match) {
+        expect(new RegExp(match[1]).test(filename), `'${name}' declares testMatch — the identity spec must match it, or it never runs there`)
+          .toBe(true);
+      }
+    }
+  });
+});
+
+/**
  * The owner's code-health freeze (2026-09-06) ended on 2026-09-10, once every `review`/`debt` issue the
  * 6 September review produced was closed. It was worded as a *condition* — "while any issue labelled
  * `review` or `debt` is open" — which the process kept re-arming every time a run filed a new finding about
@@ -1972,6 +2053,73 @@ describe('a stale review block may be adopted, and only under the four condition
       expect(CANON, 'a fragment absent from CANON is a dead string, and the rail above is weaker than it reads')
         .toContain(fragment);
     });
+  });
+});
+
+/**
+ * #204/#207 — two process rules decided in session on 2026-09-17.
+ *
+ * Both land in \`docs/ROUTINE-PROMPT.md\` only — the one file every run demonstrably reads in full every
+ * time (STEP 1) — not the usual three-file pattern and not \`BACKLOG.md\`, which the owner is retiring.
+ * \`CLAUDE.md\` and \`docs/ROUTINE-PROMPT.md\` were both pinned at zero headroom by #101's byte-budget rail
+ * (PR #198); landing these here meant trimming narrative asides elsewhere in the same file by a matching or
+ * greater amount — historical incident detail, not rule content — so the budget rail stays exactly as
+ * strict as #101 left it. \`CLAUDE.md\` is untouched by this change.
+ *
+ * Prove it red: drop either paragraph, or let either file's budget rail regress.
+ */
+describe('a run fixes a stalled block before it starts new work, oldest first (#204)', () => {
+  const root = new URL('../../', import.meta.url);
+  const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
+
+  const CANON = [
+    '**A run fixes a stalled block before it starts new work (#204).** Before STEP 3, look for the',
+    'single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`',
+    '— one you did not set in your own review pass this run, with no new commit and no new comment on it',
+    'in the last 30 minutes (a debounce, in case someone is fixing it right now). If one exists, push a',
+    'fix addressing the review\'s findings and comment `Pushed <sha>, addressing <what>` (#199/#200\'s',
+    'content floor); never post `REVIEW: CLEARED` yourself — clearing still needs the original reviewer',
+    'or #161\'s four conditions.',
+  ].join(' ');
+
+  it('docs/ROUTINE-PROMPT.md carries the stalled-block rule in its canonical form', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    expect(text, 'must state the rule word for word — a paraphrase is how this widens or narrows')
+      .toContain(CANON);
+  });
+
+  it('the rule sits between STEP 2 and STEP 3, and does not let a run clear its own fix', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    const step2 = text.indexOf('STEP 2 — REVIEW & QA FIRST');
+    const step25 = text.indexOf('STEP 2.5 — FIX A STALLED BLOCK');
+    const step3 = text.indexOf('STEP 3 — DEVELOP ONE ITEM');
+    expect(step25, 'STEP 2.5 must exist, after STEP 2').toBeGreaterThan(step2);
+    expect(step3, 'STEP 3 must still follow STEP 2.5, never be skipped').toBeGreaterThan(step25);
+    expect(text).toContain('never post `REVIEW: CLEARED` yourself');
+  });
+});
+
+describe('a gh-posted body does not carry a duplicated, unrelated footer (#207)', () => {
+  const root = new URL('../../', import.meta.url);
+  const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
+
+  const CANON = [
+    '**A `gh`-posted body can carry a duplicated, unrelated footer (#207).** `gh issue comment`/`gh pr',
+    'comment`/`gh pr create --body` come back with their own `_Generated by [Claude Code](...)_` line',
+    'after an `---` rule — sometimes twice, different links — which is not this repo\'s content floor and',
+    'is outside your control once you choose `gh` for the write. Post a comment, issue body or PR body',
+    'with the REST API directly instead; `gh` stays first choice for reads and anything with no authored',
+    'body.',
+  ].join(' ');
+
+  it('docs/ROUTINE-PROMPT.md carries the gh-footer rule in its canonical form', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    expect(text, 'must state the rule word for word').toContain(CANON);
+  });
+
+  it('the gh-first default for reads and non-body writes survives', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    expect(text).toContain('try `gh` first, else the REST API');
   });
 });
 
@@ -3399,5 +3547,50 @@ describe('.claude/rules/curriculum.md declares paths, and every path matches som
   it('a literal "?" in a pattern is escaped, not read as a regex quantifier', () => {
     expect(pathMatches('src/curriculum/*.ts?', 'src/curriculum/maths.ts')).toBe(false);
     expect(pathMatches('src/curriculum/*.ts?', 'src/curriculum/maths.ts?')).toBe(true);
+  });
+});
+
+/**
+ * #101 — the two byte-budget rails the issue's own "Guard rail (tightening)" section asks for, so the
+ * migration to layer 2 (`.claude/rules/`) is a ratchet rather than a one-off tidy-up that regrows silently.
+ *
+ * Both budgets land at the latest PR's own size, not the issue's eventual target (CLAUDE.md's stated goal is
+ * ≤ 4 KB — nowhere near it yet, because most of the always-loaded content this issue is about hasn't moved
+ * out yet). That is deliberate: a budget rail records existing debt and only ever ratchets down as more
+ * content genuinely moves to a scoped `.claude/rules/*.md` file or a skill, never up to let a PR that grew
+ * either file back in. The `CLAUDE.md` budget has moved down twice this way: the `window.__sna`/Android
+ * bullets moved to `.claude/rules/game.md`/`android.md` first, then the "Guard rails" paragraph's mistake
+ * list moved to `.claude/rules/guardrails.md` (both already held the real content) — each a net reduction,
+ * which is what lets the rail land below the pre-move size rather than merely freezing it.
+ *
+ * Both budgets moved back **up** once, deliberately: #199/#200 added the session-URL and content-floor rules
+ * to the shared #161-adjacent paragraph in all three governance files (the three-file rule), which is a
+ * genuine, owner-facing content addition, not padding — the same justification #198 itself used to *set*
+ * these budgets to their own landing size in the first place. `docs/ROUTINE-PROMPT.md` also gained STEP 2.5
+ * (#204) in the same window, landing both figures at this PR's own merged size.
+ *
+ * Prove it red: pad either file past its budget with a comment and watch the corresponding test fail.
+ */
+describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#101)', () => {
+  const root = new URL('../../', import.meta.url);
+  const bytes = (name: string) => statSync(new URL(name, root)).size;
+
+  // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
+  // green.
+  const CLAUDE_MD_BUDGET = 18_999;
+  const ROUTINE_PROMPT_BUDGET = 44_034;
+
+  it('CLAUDE.md stays at or under its budget', () => {
+    const size = bytes('CLAUDE.md');
+    expect(size, 'CLAUDE.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
+    expect(size, `CLAUDE.md grew to ${size} bytes — move the new content to a scoped `
+      + '.claude/rules/*.md file or a skill rather than raising this budget').toBeLessThanOrEqual(CLAUDE_MD_BUDGET);
+  });
+
+  it('docs/ROUTINE-PROMPT.md stays at or under its budget', () => {
+    const size = bytes('docs/ROUTINE-PROMPT.md');
+    expect(size, 'docs/ROUTINE-PROMPT.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
+    expect(size, `docs/ROUTINE-PROMPT.md grew to ${size} bytes — a "how" line belongs in a layer 2/3 pointer, `
+      + 'not back in the routine\'s own flow, rather than raising this budget').toBeLessThanOrEqual(ROUTINE_PROMPT_BUDGET);
   });
 });

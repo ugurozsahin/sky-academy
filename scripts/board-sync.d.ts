@@ -19,6 +19,8 @@ export declare function desiredStatus(issue: IssueLike, repo: Repo): string;
 export declare function desiredPriority(labels: string[]): string | null;
 export declare function plan(input: { items: Item[]; openIssues: IssueLike[]; repo: Repo }): Change[];
 export declare function summary(changes: Change[], cards: number, dryRun: boolean, limit?: number): string;
+export interface HeartbeatIssue { number: number; created_at: string; title: string; pull_request?: object }
+export declare function pickHeartbeat(open: HeartbeatIssue[]): HeartbeatIssue[];
 export declare const PULSE: Readonly<{ title: string; labels: string[] }>;
 export declare const PULSE_REFRESH_MS: number;
 export declare function pulseTime(body: string | null | undefined): Date | null;

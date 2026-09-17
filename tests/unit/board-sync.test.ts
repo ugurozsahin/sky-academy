@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM helper run by the routine from the shell (see scripts/board-sync.d.ts)
-import { PULSE, STATUS, branchIssue, desiredPriority, desiredStatus, isNonWork, linkedIssues, plan, pulseLine, pulseNeeded, pulseTime, resolveProjectToken, summary } from '../../scripts/board-sync.mjs';
-import type { Change, Item, IssueLike, Repo } from '../../scripts/board-sync';
+import { PULSE, STATUS, branchIssue, desiredPriority, desiredStatus, isNonWork, linkedIssues, pickHeartbeat, plan, pulseLine, pulseNeeded, pulseTime, resolveProjectToken, summary } from '../../scripts/board-sync.mjs';
+import type { Change, HeartbeatIssue, Item, IssueLike, Repo } from '../../scripts/board-sync';
 
 /**
  * The board is a projection of the repository (#158): every Status is derived from state the repo already
@@ -200,6 +200,35 @@ describe('board sync: the pulse the cloud agents read', () => {
     expect(PULSE.title).toBe('board: heartbeat');
     expect(PULSE.labels).toEqual(['watchdog']);                 // which is what makes it non-work above
     expect(isNonWork({ title: PULSE.title, labels: PULSE.labels })).toBe(true);
+  });
+});
+
+describe("board sync: a duplicate heartbeat issue does not steal the pulse's identity (#125)", () => {
+  const issue = (number: number, created_at: string, extra: Partial<{ title: string; pull_request: object }> = {}) => ({
+    number, created_at, title: PULSE.title, pull_request: undefined, ...extra,
+  });
+
+  const pick = (open: HeartbeatIssue[]): HeartbeatIssue[] => pickHeartbeat(open) as HeartbeatIssue[];
+
+  it('picks the oldest candidate, not whichever the API happened to list first', () => {
+    // #125: #105 and #124 were both created within 21 seconds of each other, and a plain Array.find over
+    // an API response in an arbitrary order would have picked whichever GitHub happened to return first —
+    // a different one on every run. Sorting by created_at fixes the pick to the oldest, every time,
+    // whatever order the input arrives in.
+    const newestFirst: HeartbeatIssue[] = [issue(164, '2026-09-16T14:03:13Z'), issue(124, '2026-09-16T10:26:58Z'), issue(105, '2026-09-16T10:26:37Z')];
+    expect(pick(newestFirst).map((i) => i.number)).toEqual([105, 124, 164]);
+    const oldestFirst: HeartbeatIssue[] = [issue(105, '2026-09-16T10:26:37Z'), issue(124, '2026-09-16T10:26:58Z'), issue(164, '2026-09-16T14:03:13Z')];
+    expect(pick(oldestFirst).map((i) => i.number)).toEqual([105, 124, 164]);
+    // Same set, listed in yet another order — the pick must not depend on it.
+    const shuffled: HeartbeatIssue[] = [issue(124, '2026-09-16T10:26:58Z'), issue(164, '2026-09-16T14:03:13Z'), issue(105, '2026-09-16T10:26:37Z')];
+    expect(pick(shuffled)[0].number).toBe(105);
+  });
+
+  it('ignores a pull request carrying the same label, and returns nothing when there is no candidate', () => {
+    const withPR: HeartbeatIssue[] = [{ number: 55, created_at: '2026-09-16T09:00:00Z', title: PULSE.title, pull_request: {} }, issue(105, '2026-09-16T10:26:37Z')];
+    expect(pick(withPR).map((i) => i.number)).toEqual([105]);
+    expect(pick([])).toEqual([]);
+    expect(pick([{ number: 9, created_at: '2026-09-16T09:00:00Z', title: 'board: something else', pull_request: undefined }])).toEqual([]);
   });
 });
 
