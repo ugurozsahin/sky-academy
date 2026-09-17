@@ -1599,7 +1599,7 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
  * worker whose list is stale installs perfectly and only fails once the network is gone.
  */
 test.describe('offline (#15)', () => {
-  test('guard rail: the game still loads and plays with the network off', async ({ page, context }) => {
+  test('guard rail: the game still loads and plays with the network off', async ({ page, context, baseURL }) => {
     await seedPlayer(page);
     // Wait for the worker to be in control. `ready` resolves on activation, and `controller` is what decides
     // whether the NEXT navigation is served by it — asserting only `ready` would let this test pass on a
@@ -1623,7 +1623,11 @@ test.describe('offline (#15)', () => {
     // fix did not reliably turn it red. `fromServiceWorker()` is the only thing that tells the two apart, so
     // "the worker is installed and answers nothing" is now a named failure. (Raised in review of this PR.)
     const fromNetwork: string[] = [];
-    page.on('response', r => { if (r.url().startsWith('http://localhost:4173') && !r.fromServiceWorker()) fromNetwork.push(r.url()); });
+    // #123 review: the port is now derived (playwright.config.ts), never the bare literal '4173' —
+    // that literal here would make this whole provenance check permanently vacuous the moment the
+    // derived port stopped being 4173, which is every run by default now. baseURL is the same value
+    // the page itself was navigated with, so this stays correct whatever the port derives to.
+    page.on('response', r => { if (r.url().startsWith(baseURL!) && !r.fromServiceWorker()) fromNetwork.push(r.url()); });
     page.on('requestfailed', r => failed.push(`request failed: ${r.url()} — ${r.failure()?.errorText}`));
     page.on('pageerror', e => failed.push(`page error: ${e.message}`));
     page.on('console', m => { if (m.type() === 'error') failed.push(`console error: ${m.text()}`); });

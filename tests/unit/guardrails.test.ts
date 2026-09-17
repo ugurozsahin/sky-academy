@@ -1188,6 +1188,87 @@ describe('guard rails', () => {
 });
 
 /**
+ * #123: `playwright.config.ts` used to hard-code `localhost:4173` in both `use.baseURL` and `webServer`,
+ * with `reuseExistingServer: true`. Two worktrees reviewing two pull requests then attach to whichever
+ * server happened to start first — the served app comes from one checkout, the spec file from another, and
+ * nothing anywhere says they disagree. It cost a routine run four fabricated test failures before it was
+ * caught (see the issue). These two rails hold the fix in place: the port must be derived rather than a bare
+ * literal shared with `reuseExistingServer`, and a real e2e test must fail loudly the moment the served build
+ * and the local `dist/` disagree, so the failure mode becomes impossible to miss instead of merely rarer.
+ */
+describe('the e2e server proves it is serving the build on disk, not a leftover from elsewhere (#123)', () => {
+  const config = readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8');
+  const spec = readFileSync(new URL('../../tests/e2e/00-build-identity.spec.ts', import.meta.url), 'utf8');
+
+  it('reuseExistingServer is still true — this is a port-collision fix, not a removal of the fast local loop', () => {
+    expect(config).toMatch(/reuseExistingServer:\s*true/);
+  });
+
+  // Review of this PR (#187): matching the derivation tokens anywhere in the file — including the comment
+  // above the code, which already contains all three — let a partial revert that guts the actual wiring
+  // while leaving the prose pass every check here. `use:`/`webServer:` must be built from the SAME
+  // identifier (`baseURL`, `port` or the raw expression), not merely mention derivation somewhere.
+  it('baseURL and webServer are wired to the same derived value, and it is not the bare literal 4173', () => {
+    expect(config, 'the exact incident #123 names: one hard-coded port two checkouts can both bind')
+      .not.toMatch(/localhost:4173/);
+    expect(config, 'a derivation must exist — cwd-based by default, with an env override')
+      .toMatch(/createHash|process\.env\.PW_PORT|process\.env\.PORT/);
+    const useBlock = config.match(/use:\s*\{[^}]*\}/)?.[0];
+    const serverBlock = config.match(/webServer:\s*\{[^}]*\}/)?.[0];
+    expect(useBlock, '`use: {...}` must exist and be read from disk').toBeTruthy();
+    expect(serverBlock, '`webServer: {...}` must exist and be read from disk').toBeTruthy();
+    // `baseURL` is used as a shorthand property (`{ baseURL, ... }`), so a colon is not required — what must
+    // NOT be true is a hard-coded `http://localhost:<port>` string literal sitting where the identifier
+    // belongs, which is exactly what a partial revert (fix the comment, forget the wiring) would leave behind.
+    expect(useBlock, 'use.baseURL must reference the derived value, not a re-typed literal').toMatch(/\bbaseURL\b/);
+    expect(useBlock, 'and must not be a hard-coded URL string sitting next to it').not.toMatch(/baseURL:\s*['"`]http/);
+    expect(serverBlock, 'webServer.url/command must reference the same derived value').toMatch(/baseURL|\$\{port\}/);
+    expect(serverBlock, 'and must not hard-code a URL/port string either').not.toMatch(/url:\s*['"`]http:\/\/localhost:\d/);
+  });
+
+  // Review of this PR (#187): checking that ingredient substrings appear (the hash regex, the fetch call)
+  // never confirmed the actual comparison exists — a regression swapping `.toBe(local)` for e.g. `.toBeTruthy()`
+  // on `served` alone would still pass every check that only grepped for ingredients.
+  it('the identity spec actually compares served vs local, not just gathers both and stops', () => {
+    expect(spec.length, 'must be a real test, not an empty placeholder').toBeGreaterThan(500);
+    expect(spec, 'the comparison is the build-sw.mjs cache name, not a weaker liveness check')
+      .toMatch(/sna-\[0-9a-f\]\{12\}/);
+    expect(spec, 'must read the locally built service worker').toMatch(/dist.*sw\.js/);
+    expect(spec, 'must actually fetch the served one over the network, not just assume it')
+      .toMatch(/page\.request\.get/);
+    expect(spec, 'and the failure message must tell a human what to do about it, per #123\'s own ask')
+      .toMatch(/vite preview/);
+    expect(spec, 'must assert served equals local — gathering both and never comparing them is not a check')
+      .toMatch(/\)\.toBe\(local\)/);
+  });
+
+  // Review of this PR (#187): the original version of this rail compared two string literals defined inside
+  // itself ('00-build-identity.spec.ts' against /viewport\.spec\.ts/) — true by construction, and green
+  // whatever `playwright.config.ts` actually declares. This reads the REAL `testIgnore`/`testMatch` patterns
+  // out of the config text and tests the real filename against them, the way the #116 tablet rail above does.
+  it('the identity spec is not excluded from either default project, by the config\'s ACTUAL patterns (#123)', () => {
+    const filename = '00-build-identity.spec.ts';
+    const parts = config.slice(config.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    expect(parts.length, 'playwright.config.ts must declare its projects, and be read from disk').toBeGreaterThanOrEqual(4);
+    const defaultProjects = parts.filter(p => /name:\s*'(mobile|desktop)'/.test(p));
+    expect(defaultProjects.length, 'both default projects must be found by name').toBe(2);
+    for (const p of defaultProjects) {
+      const name = p.match(/name:\s*'([^']+)'/)![1];
+      const ignore = p.match(/testIgnore:\s*\/([^/]+)\//);
+      if (ignore) {
+        expect(new RegExp(ignore[1]).test(filename), `'${name}''s real testIgnore (/${ignore[1]}/) must not exclude the identity spec`)
+          .toBe(false);
+      }
+      const match = p.match(/testMatch:\s*\/([^/]+)\//);
+      if (match) {
+        expect(new RegExp(match[1]).test(filename), `'${name}' declares testMatch — the identity spec must match it, or it never runs there`)
+          .toBe(true);
+      }
+    }
+  });
+});
+
+/**
  * The owner's code-health freeze (2026-09-06) ended on 2026-09-10, once every `review`/`debt` issue the
  * 6 September review produced was closed. It was worded as a *condition* — "while any issue labelled
  * `review` or `debt` is open" — which the process kept re-arming every time a run filed a new finding about
