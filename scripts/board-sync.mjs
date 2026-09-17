@@ -242,11 +242,37 @@ const restWrite = async (token, method, path, payload) => {
   return res.json();
 };
 
+/**
+ * Among open issues carrying the pulse label, the ones actually titled `board: heartbeat` (never a pull
+ * request, which can carry the same label for other reasons). #125: a duplicate can exist — two runs have
+ * raced the create path within the same window before now — and `Array.prototype.find` on an unsorted API
+ * response then picks whichever the API happens to list first, which silently moves the pulse's identity
+ * to a different issue number between runs. A reader who bookmarked the old number sees it go stale and
+ * wrongly reports the sync as dead. Sorting by `created_at` fixes the identity to the OLDEST candidate —
+ * the one every prompt has already been reading — so an accidental new duplicate never steals the pulse
+ * out from under whoever already knows the real one's number.
+ * @param {{number:number, created_at:string, title:string, pull_request?:object}[]} open
+ * @returns {{number:number, created_at:string, title:string, pull_request?:object}[]}
+ */
+export function pickHeartbeat(open) {
+  const candidates = open
+    .filter((i) => !i.pull_request && i.title === PULSE.title)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  return candidates;
+}
+
 async function writePulse(token, line, changes, now = new Date()) {
   const open = await api(token, `/issues?state=open&labels=${PULSE.labels[0]}`);
-  const existing = open.find((i) => !i.pull_request && i.title === PULSE.title);
+  const candidates = pickHeartbeat(open);
+  const existing = candidates[0] || null;
   if (existing && !pulseNeeded(existing.body, now, changes)) return 'pulse kept';
-  const body = pulseLine(now, line);
+  // #125: surface a duplicate rather than silently resolving it — closing an issue is not this script's
+  // job (CLAUDE.md: "the sync never writes a label, closes an issue or touches a PR"), but a reader of the
+  // pulse should not have to discover a stale twin by accident.
+  const dupeNote = candidates.length > 1
+    ? ` [${candidates.length} open '${PULSE.title}' issues found (#125) — writing to the oldest, #${existing.number}; the rest are stale duplicates, close them by hand]`
+    : '';
+  const body = pulseLine(now, line + dupeNote);
   if (existing) await restWrite(token, 'PATCH', `/issues/${existing.number}`, { body });
   else await restWrite(token, 'POST', '/issues', { title: PULSE.title, body, labels: PULSE.labels });
   return existing ? 'pulse written' : 'pulse created';
