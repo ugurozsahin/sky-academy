@@ -222,6 +222,20 @@ describe('guard rails', () => {
     expect(types.length).toBeGreaterThan(4);
     for (const t of ['opened', 'labeled', 'unlabeled', 'converted_to_draft', 'ready_for_review', 'synchronize'])
       expect({ trigger: t, subscribed: types.includes(t) }).toEqual({ trigger: t, subscribed: true });
+    // #131: the six `pull_request` types above all passed with `issue_comment:` deleted from `on:` — nothing
+    // checked that the subscription re-stamping a REVIEW:/OWNER: comment onto the status still exists.
+    expect({ event: 'issue_comment', subscribed: on.includes('issue_comment') })
+      .toEqual({ event: 'issue_comment', subscribed: true });
+    // #160 review: the check above only matched the substring `issue_comment`, so a regression that keeps
+    // the `issue_comment:` key but narrows its `types:` to something excluding `created` — the one type a
+    // fresh REVIEW:/OWNER: comment fires as — left this rail green while #131's exact failure mode came back.
+    // Scoped to the `issue_comment:` block itself (not the whole `on`), the same way the `pull_request` types
+    // are pinned above, so a narrowed list is caught rather than only a deleted key.
+    const issueCommentBlock = on.slice(on.indexOf('issue_comment:'), on.indexOf('concurrency:'));
+    const issueCommentTypes = [...issueCommentBlock.matchAll(/types:\s*\[([^\]]*)\]/g)]
+      .flatMap(m => m[1].split(',').map(t => t.trim()));
+    expect({ event: 'issue_comment', type: 'created', subscribed: issueCommentTypes.includes('created') })
+      .toEqual({ event: 'issue_comment', type: 'created', subscribed: true });
     const guard = code.slice(code.indexOf('if:'), code.indexOf('runs-on:') + 200);
     for (const marker of ["'REVIEW:'", "'OWNER:'"])                     // both verdicts must wake the job
       expect({ marker, wired: guard.includes(marker) }).toEqual({ marker, wired: true });
