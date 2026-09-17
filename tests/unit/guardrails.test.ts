@@ -3048,8 +3048,17 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
     // `**` and a trailing `*` both describe "everything under here" — the rail checks the concrete directory
     // or file in front of the wildcard actually exists, not that the wildcard itself resolves to anything.
     const base = p.replace(/\/\*\*$/, '').replace(/\*+$/, '');
+    // #179 review: a degenerate base — "" (the whole entry was a bare wildcard, e.g. "**" or "*") or one
+    // that escapes the repo root (a leading "/" or a "../" segment) — must never resolve to something real
+    // by accident. `new URL('', root)` is the repo root itself, which always exists, so an entirely
+    // unscoped `paths: ["**"]` used to sail through this check: reproduced directly (base "" →
+    // statSync(root) → isDirectory true) before this fix, exactly the "unconditional rule" case the rail's
+    // own docstring says it exists to catch.
+    if (!base || base.startsWith('/') || base.split('/').includes('..')) return false;
     try {
-      const s = statSync(new URL(base, root));
+      const resolved = new URL(base, root);
+      if (!resolved.pathname.startsWith(root.pathname)) return false;   // stays inside the repo
+      const s = statSync(resolved);
       return s.isFile() || s.isDirectory();
     } catch {
       return false;
@@ -3070,9 +3079,16 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
       if (/^[ \t]*(#.*)?$/.test(line)) continue;   // blank / comment line — skip, keep scanning
       break;                                        // a new top-level key or other content ends the list
     }
-    const entries = listLines
-      .map((l) => /-[ \t]*"?([^"\n]+?)"?[ \t]*$/.exec(l)?.[1])
-      .filter((e): e is string => e !== undefined);
+    // #179 review: the old extraction regex required at least one non-quote character inside the value, so
+    // an unparseable line (an empty `- ""`, or a trailing comment after the value) silently vanished from
+    // `entries` instead of failing loud — one bad line among several good ones shipped with zero existence
+    // check and no signal. This always keeps one string per list line, even a wrong or empty one, so a
+    // malformed entry fails the real-path check below with the exact text named, rather than being dropped.
+    const entries = listLines.map((l) => {
+      const rest = l.replace(/^[ \t]*-[ \t]*/, '');
+      const quoted = /^"([^"]*)"[ \t]*$/.exec(rest);
+      return (quoted ? quoted[1] : rest).trimEnd();
+    });
     return entries.length ? entries : null;
   };
 
@@ -3091,5 +3107,24 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
     expect(pathsList(front)).toEqual(['src/game/**', 'src/ui/play.ts']);
     expect(pathsList('paths:\n')).toBeNull();
     expect(pathsList('no paths key here')).toBeNull();
+  });
+
+  it('a degenerate or repo-escaping path never reads as real by accident (#179 review, CRITICAL)', () => {
+    // The whole point of this rail is to make an unscoped rule file impossible to ship silently — these are
+    // exactly the inputs it must reject.
+    expect(exists('**')).toBe(false);
+    expect(exists('*')).toBe(false);
+    expect(exists('')).toBe(false);
+    expect(exists('/etc/passwd')).toBe(false);
+    expect(exists('../CLAUDE.md')).toBe(false);
+    expect(exists('src/curriculum/../../../../etc/passwd')).toBe(false);
+    // Sanity: a real path — with and without a trailing wildcard — still passes.
+    expect(exists('src/curriculum/**')).toBe(true);
+    expect(exists('CLAUDE.md')).toBe(true);
+  });
+
+  it('an unparseable paths: entry fails the real-path check with its own text, not a silent drop', () => {
+    const front = 'paths:\n  - ""\n  - "src/curriculum/**"\n';
+    expect(pathsList(front)).toEqual(['', 'src/curriculum/**']);   // kept, not dropped — exists('') is false
   });
 });
