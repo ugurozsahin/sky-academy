@@ -1391,9 +1391,12 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
  * #110: the opening screen's "Your name" field was the last thing on a long page — brand header, the full
  * eleven-card grid, *then* the field — and `.avatar-grid` is `repeat(auto-fill, minmax(104px, 1fr))`, so the
  * wider and taller the screen the further down it went. On a tablet it was below the fold behind every card.
- * The e2e in `game.spec.ts` and `viewport.spec.ts` measures the rendered field against the viewport, but only
- * at the geometries a project declares; this is the cheap exhaustive half, and it holds the *ordering*, which
- * is the thing that cannot come back without someone moving the markup.
+ *
+ * #67's wizard split (choose ninja, then name, as two separate screens) turned the ordering guarantee into a
+ * stronger one: `nameScreen` never renders `.avatar-grid` at all, so there is nothing left for the field to
+ * be buried under, on any viewport. This rail now holds *that* — the two screens' markup stays disjoint —
+ * because indirecting them back through one shared template is exactly how the field could end up back
+ * below a grid.
  *
  * `canStart` itself is tested for real in `avatar.test.ts` — this rail only checks that the screen routes
  * both the initial attribute and the live re-check through it, because a hand-rolled second copy of the rule
@@ -1401,45 +1404,57 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
  */
 describe('the opening screen asks for a name where it can be seen (#110)', () => {
   const src = readFileSync(new URL('../../src/ui/avatar.ts', import.meta.url), 'utf8');
+  const chooseNinjaBody = src.slice(src.indexOf('export function chooseNinjaScreen'), src.indexOf('export function nameScreen'));
+  const nameScreenBody = src.slice(src.indexOf('export function nameScreen'), src.indexOf('export function changeAvatarScreen'));
 
-  it('the name row is rendered above the avatar grid', () => {
+  it('chooseNinjaScreen (step 1) has the avatar grid and no name field', () => {
     expect(src.length, 'avatar.ts must be read from disk as text, or this rail checks nothing').toBeGreaterThan(1_000);
-    const nameRow = src.indexOf('class="name-row"'), grid = src.indexOf('class="avatar-grid"');
-    expect(nameRow, 'the .name-row label must exist in the template (#110)').toBeGreaterThan(-1);
-    expect(grid, 'the .avatar-grid must exist in the template (#110)').toBeGreaterThan(-1);
-    expect(nameRow, 'the name field below the eleven cards IS #110 — it must be rendered before the grid')
-      .toBeLessThan(grid);
+    expect(chooseNinjaBody, 'the .avatar-grid must exist in step 1 (#110)').toContain('class="avatar-grid"');
+    expect(chooseNinjaBody, 'step 1 must never ask for a name — nothing on it can bury the name field (#110)')
+      .not.toContain('class="name-row"');
+  });
+
+  it('nameScreen (step 2) has the name field and no avatar grid to bury it under', () => {
+    expect(nameScreenBody, 'the .name-row label must exist in step 2 (#110)').toContain('class="name-row"');
+    expect(nameScreenBody, 'step 2 must never render the avatar grid — the whole point of splitting the wizard is that nothing competes with the name field for space (#110)')
+      .not.toContain('class="avatar-grid"');
   });
 
   it('both the initial button state and the live re-check go through canStart', () => {
-    const go = src.match(/<button id="go"[^>]*?\$\{([^}]*)\}/)?.[1];
+    const go = nameScreenBody.match(/<button id="go"[^>]*?\$\{([^}]*)\}/)?.[1];
     expect(go, 'the Let\'s go! button must compute its disabled state inline (#110)').toBeTruthy();
     expect(go, 'it must ask canStart, not `d.avatar` alone — an empty name used to sail through')
       .toMatch(/canStart\(/);
-    expect(src, 'and the name input must re-check on every keystroke, or the button never enables (#110)')
+    expect(nameScreenBody, 'and the name input must re-check on every keystroke, or the button never enables (#110)')
       .toMatch(/#name[\s\S]*?addEventListener\('input'|addEventListener\('input'[\s\S]*?sync/);
   });
 });
 
 /**
- * #67 acceptance: "progress is obvious to a child" — both first-run wizard steps must actually call
+ * #67 acceptance: "progress is obvious to a child" — all three first-run wizard steps must actually call
  * `wizardProgress()`, not just define it. A helper nobody renders is not progress being obvious to anyone.
  */
 describe('the first-run wizard shows its progress rail on every step (#67)', () => {
   const src = readFileSync(new URL('../../src/ui/avatar.ts', import.meta.url), 'utf8');
 
-  it('avatarScreen (step 1) renders wizardProgress(1, 2)', () => {
-    const avatarScreenBody = src.slice(src.indexOf('export function avatarScreen'), src.indexOf('export function changeAvatarScreen'));
-    expect(avatarScreenBody).toMatch(/\$\{wizardProgress\(1,\s*2\)\}/);
+  it('chooseNinjaScreen (step 1) renders wizardProgress(1, 3)', () => {
+    const chooseNinjaBody = src.slice(src.indexOf('export function chooseNinjaScreen'), src.indexOf('export function nameScreen'));
+    expect(chooseNinjaBody).toMatch(/\$\{wizardProgress\(1,\s*3\)\}/);
   });
 
-  it('introScreen (step 2) renders wizardProgress(2, 2)', () => {
+  it('nameScreen (step 2) renders wizardProgress(2, 3)', () => {
+    const nameScreenBody = src.slice(src.indexOf('export function nameScreen'), src.indexOf('export function changeAvatarScreen'));
+    expect(nameScreenBody).toMatch(/\$\{wizardProgress\(2,\s*3\)\}/);
+  });
+
+  it('introScreen (step 3) renders wizardProgress(3, 3)', () => {
     const introScreenBody = src.slice(src.indexOf('export function introScreen'));
-    expect(introScreenBody).toMatch(/\$\{wizardProgress\(2,\s*2\)\}/);
+    expect(introScreenBody).toMatch(/\$\{wizardProgress\(3,\s*3\)\}/);
   });
 
   it('changeAvatarScreen (returning players, not the wizard) shows no progress rail', () => {
     const changeScreenBody = src.slice(src.indexOf('export function changeAvatarScreen'), src.indexOf('export function introScreen'));
+    expect(changeScreenBody.length, 'changeAvatarScreen must be found before introScreen, or this rail checks nothing').toBeGreaterThan(100);
     expect(changeScreenBody, 'a returning player is not mid-wizard — no step rail to show them').not.toMatch(/wizardProgress/);
   });
 });

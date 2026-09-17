@@ -450,7 +450,7 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
 
   // Second review round on PR #171: the object/array/number branches above missed every primitive field —
   // `name` above all, since it is the one field a person freely types into the Restore box, and
-  // `avatarScreen()`'s `esc(d.name)`/`hasName(d.name)` both throw on a non-string.
+  // `nameScreen()`'s `esc(d.name)`/`hasName(d.name)` both throw on a non-string.
   it('migrate() drops a wrong-typed primitive field too, not just object/array/number ones', () => {
     const m = migrate({
       v: 1, name: 123, avatar: 42, year: false, voice: 'maybe-ish', sound: 'yes', speech: 1, tutorialSeen: 'true',
@@ -471,7 +471,7 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     expect(kept.sound).toBe(false);
   });
 
-  it('a corrupted name does not brick the avatar screen — importSave() then avatarScreen()-shaped reads', () => {
+  it('a corrupted name does not brick the name screen — importSave() then nameScreen()-shaped reads', () => {
     expect(importSave(JSON.stringify({ v: 1, name: 123, avatar: 'volt' }))).toBe(true);
     const d = load();
     expect(typeof d.name).toBe('string');

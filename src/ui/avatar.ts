@@ -29,15 +29,17 @@ export function wizardProgress(step: number, total: number) {
   return `<p class="wizard-progress" aria-label="Step ${step} of ${total}">${dots}</p>`;
 }
 
-export function avatarScreen(go: (s: 'home') => void) {
+/**
+ * First-run wizard, step 1 (#67): the ninja pick, on its own screen so it fits one viewport without
+ * competing with the name field for space. Continue needs only an avatar — the name is step 2's job.
+ */
+export function chooseNinjaScreen(go: () => void) {
   const d = load();
   const master = masterProgress(TOPICS, safeRecord<TopicProgress>(d.progress));   // #95: tolerant of a hand-edited/corrupted save; the 11th ninja unlocks when every topic has a star
   render(`
-  <section class="screen avatar-screen">
+  <section class="screen avatar-screen choose-ninja-screen">
     <header class="brand"><span class="kanji">忍</span><h1>Sky Ninja<br><span>Academy</span></h1><p class="tag">Choose your ninja</p></header>
-    ${wizardProgress(1, 2)}
-    <label class="name-row"><span>Your name</span><input id="name" maxlength="14" autocomplete="off" aria-describedby="name-hint" placeholder="Ninja" value="${esc(d.name)}"></label>
-    <p class="name-hint" id="name-hint" aria-live="polite">${hasName(d.name) ? '' : NAME_HINT}</p>
+    ${wizardProgress(1, 3)}
     <div class="avatar-grid" role="list">
       ${ALL_AVATARS.map(a => { const locked = a.id === MASTER.id && !master.unlocked && d.avatar !== MASTER.id; /* an earned Master is never taken away */ return `
         <button class="avatar-card${d.avatar === a.id ? ' sel' : ''}${locked ? ' locked' : ''}" data-id="${a.id}" style="--glow:${a.glow}" role="listitem" aria-label="${a.name}, ${a.element}${locked ? `, locked: ${master.done} of ${master.total} topics starred` : ''}" ${locked ? 'aria-disabled="true"' : ''}>
@@ -45,41 +47,63 @@ export function avatarScreen(go: (s: 'home') => void) {
           <b>${a.name}</b><small>${locked ? `${master.done}/${master.total} topics ★` : a.element}</small>
         </button>`; }).join('')}
     </div>
-    <button id="go" class="btn primary big" ${canStart(d.avatar, d.name) ? '' : 'disabled'}>Let's go! ⚔️</button>
+    <button id="next" class="btn primary big" ${d.avatar ? '' : 'disabled'}>Continue ➡️</button>
   </section>`, 'bg-sky');
-  // #110: the button follows both fields, so it cannot be reached with either one missing. `sel` is the
-  // selection the screen actually shows, which is also what a returning player arrives with pre-set.
-  const nameEl = $('#name') as HTMLInputElement, goBtn = $('#go') as HTMLButtonElement, hint = $('#name-hint');
-  const sync = () => {
-    goBtn.disabled = !canStart($('.avatar-card.sel')?.dataset.id, nameEl.value);
-    hint.textContent = hasName(nameEl.value) ? '' : NAME_HINT;
-  };
-  nameEl.addEventListener('input', sync);
-  // if a tapped card sits under the sticky Let's go! button (last row: Bolt/Master), scroll it clear so it is never half-hidden — #51
+  const nextBtn = $('#next') as HTMLButtonElement;
+  // if a tapped card sits under the sticky Continue button (last row: Bolt/Master), scroll it clear so it is never half-hidden — #51
   const revealCard = (b: HTMLElement) => {
-    const go = $('#go') as HTMLElement | null;
-    if (go && b.getBoundingClientRect().bottom > go.getBoundingClientRect().top) b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const next = $('#next') as HTMLElement | null;
+    if (next && b.getBoundingClientRect().bottom > next.getBoundingClientRect().top) b.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
   $$('.avatar-card').forEach(b => b.addEventListener('click', () => {
     if (b.classList.contains('locked')) { sfx.wrong(); say(SENSEI_LINES.locked); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); revealCard(b as HTMLElement); return; }
     $$('.avatar-card').forEach(x => x.classList.remove('sel')); b.classList.add('sel');
     const a = ALL_AVATARS.find(x => x.id === b.dataset.id)!;
     save({ avatar: a.id }); sfx.tap(); say(`${a.name}, the ${a.element}!`);
-    sync();
+    nextBtn.disabled = false;
     revealCard(b as HTMLElement);
   }));
-  $('#go').addEventListener('click', () => { save({ name: ($('#name') as HTMLInputElement).value.trim() }); sfx.correct(); go('home'); });
+  $('#next').addEventListener('click', () => go());
+}
+
+/**
+ * First-run wizard, step 2 (#67): the name field, alone on its own screen — nothing else on it to bury it
+ * under or to scroll past, which is the stronger version of the #110 fix now that the two are split. The
+ * chosen ninja from step 1 is shown alongside it so the choice still reads as one flow.
+ */
+export function nameScreen(go: () => void) {
+  const d = load();
+  const avatar = avatarById(d.avatar);
+  render(`
+  <section class="screen avatar-screen name-screen">
+    <header class="brand"><span class="kanji">忍</span><h1>Sky Ninja<br><span>Academy</span></h1><p class="tag" id="name-heading" tabindex="-1">What's your name?</p></header>
+    ${wizardProgress(2, 3)}
+    <div class="name-preview" style="--glow:${avatar.glow}"><span class="figure"><img src="${avatar.img}" alt=""></span><b>${esc(avatar.name)}</b></div>
+    <label class="name-row"><span>Your name</span><input id="name" maxlength="14" autocomplete="off" aria-describedby="name-hint" placeholder="Ninja" value="${esc(d.name)}"></label>
+    <p class="name-hint" id="name-hint" aria-live="polite">${hasName(d.name) ? '' : NAME_HINT}</p>
+    <button id="go" class="btn primary big" ${canStart(d.avatar, d.name) ? '' : 'disabled'}>Let's go! ⚔️</button>
+  </section>`, 'bg-sky');
+  // #110: the button follows both fields, so it cannot be reached with either one missing — the avatar is
+  // already fixed by the time this screen renders, so only the name re-checks live.
+  const nameEl = $('#name') as HTMLInputElement, goBtn = $('#go') as HTMLButtonElement, hint = $('#name-hint');
+  const sync = () => {
+    goBtn.disabled = !canStart(d.avatar, nameEl.value);
+    hint.textContent = hasName(nameEl.value) ? '' : NAME_HINT;
+  };
+  nameEl.addEventListener('input', sync);
+  ($('#name-heading') as HTMLElement).focus();   // focus moves to the new step (#67 a11y)
+  $('#go').addEventListener('click', () => { save({ name: nameEl.value.trim() }); sfx.correct(); go(); });
 }
 
 /**
  * Returning-player re-entry (#67): change ninja only, never asks for the name again — a returning child is
  * not marched through it a second time. `#change-av` on the home screen (`src/ui/home.ts`) calls this once
- * the first-run wizard is complete; `avatarScreen` above stays the unchanged first-run screen.
+ * the first-run wizard is complete; `chooseNinjaScreen` above stays the unchanged first-run step.
  *
- * Deliberately a near-duplicate of the grid markup above rather than a shared helper: `avatarScreen`'s
- * `.name-row`/`.avatar-grid` ordering and its `canStart(`-gated `#go` button are held byte-for-byte by the
- * guard rail in `tests/unit/guardrails.test.ts` (#110) — indirecting the grid through a shared function would
- * move that text without changing what it guarantees, which is exactly the kind of drift the rail exists to
+ * Deliberately a near-duplicate of the grid markup in `chooseNinjaScreen` rather than a shared helper: the
+ * guard rail in `tests/unit/guardrails.test.ts` (#110) holds that screen's markup byte-for-byte, and this
+ * screen never renders a name field at all — indirecting the grid through a shared function would move that
+ * text without changing what either rail guarantees, which is exactly the kind of drift the rail exists to
  * catch. A dozen duplicated lines is the safer trade.
  */
 export function changeAvatarScreen(go: () => void) {
@@ -120,7 +144,7 @@ export function introScreen(finish: () => void) {
   render(`
   <section class="screen avatar-screen intro-screen">
     <div class="intro-card" style="--glow:${avatar.glow}">
-      ${wizardProgress(2, 2)}
+      ${wizardProgress(3, 3)}
       <span class="figure"><img src="${avatar.img}" alt=""></span>
       <h1 id="intro-heading" tabindex="-1">Hello, ${esc(d.name || 'Ninja')}!</h1>
       <p class="intro-text">${esc(line)}</p>

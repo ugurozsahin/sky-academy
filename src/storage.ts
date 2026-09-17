@@ -146,10 +146,10 @@ function sanitizeTypes(s: RawSave): RawSave {
     if (k in clean && typeof clean[k] !== 'number') delete clean[k];
   }
   // #171 review: the object/array/number branches above missed every primitive-typed field — `name` most of
-  // all, since it is the one field a person freely types into the Restore box. `avatarScreen()`'s `esc(d.name)`
+  // all, since it is the one field a person freely types into the Restore box. `nameScreen()`'s `esc(d.name)`
   // (`dom.ts`) and `hasName(d.name)` (`.trim()`) both throw on a non-string, and `migrate({ v: 1, name: 123
   // })` used to hand that straight through: no branch here checked it, so a wrong-typed `name` is exactly as
-  // reachable as the `progress`/`streak`/`dojo` cases above, on a screen every returning player opens.
+  // reachable as the `progress`/`streak`/`dojo` cases above, on a screen every first-run wizard can reach.
   for (const k of ['name', 'year'] as const) {
     if (k in clean && typeof clean[k] !== 'string') delete clean[k];
   }

@@ -20,8 +20,9 @@ declare global { interface Window { __sna: PlayHooks & MemoryHooks; __SNA_FAST?:
 async function pickAvatar(page: Page, id = 'volt', name = 'Ada') {
   await page.goto('/?reset=1');
   await expect(page.locator('.avatar-screen')).toBeVisible();
-  await expect(page.locator('#go')).toBeDisabled();
+  await expect(page.locator('#next')).toBeDisabled();
   await page.click(`.avatar-card[data-id="${id}"]`);
+  await page.click('#next');                                 // #67: ninja step → name step, its own screen
   await page.fill('#name', name);
   await page.click('#go');
   await expect(page.locator('.intro-card')).toBeVisible();   // #67: first run continues into the introduction
@@ -29,8 +30,8 @@ async function pickAvatar(page: Page, id = 'volt', name = 'Ada') {
   await expect(page.locator('.home')).toBeVisible();
 }
 /**
- * #138: land on the sky map with the avatar already chosen, by writing the save `avatarScreen` would have
- * written (`src/storage.ts`: key `sna:v1`, `save({ avatar })` then `save({ name })`) before the app boots.
+ * #138: land on the sky map with the avatar already chosen, by writing the save `chooseNinjaScreen`/`nameScreen`
+ * would have written (`src/storage.ts`: key `sna:v1`, `save({ avatar })` then `save({ name })`) before the app boots.
  * A test that is not about the avatar screen gets the same starting state without rendering eleven portraits
  * and making three round trips for them.
  *
@@ -191,7 +192,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(card.locator('.lock')).toBeVisible();
     await expect(card.locator('small')).toHaveText(`0/${TOPICS.length} topics ★`);
     await card.click();
-    await expect(page.locator('#go')).toBeDisabled();                                 // a locked card never selects
+    await expect(page.locator('#next')).toBeDisabled();                               // a locked card never selects
     await expect(card).not.toHaveClass(/sel/);
     // Star every topic (as a finished player would have) and come back: the Master is unlocked.
     await page.evaluate((ids) => {
@@ -203,6 +204,8 @@ test.describe('Sky Ninja Academy', () => {
     await expect(card.locator('small')).toHaveText('Sensei of all elements');
     await card.click();
     await expect(card).toHaveClass(/sel/);
+    await page.click('#next');
+    await expect(page.locator('#name')).toHaveValue('Ada');   // carried over from the seeded save
     await page.click('#go');
     await expect(page.locator('.intro-card')).toBeVisible();   // #67: first run continues into the introduction
     await page.click('#intro-go');
@@ -216,15 +219,15 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.tutorial .tut-sensei img')).toHaveAttribute('src', /sensei/);
   });
 
-  test('avatar screen: the last card row is never left under the sticky Let\'s go! button (#51)', async ({ page }) => {
+  test('avatar screen: the last card row is never left under the sticky Continue button (#51)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });        // the shortest phone we support
     await page.goto('/?reset=1');
     await expect(page.locator('.avatar-card')).toHaveCount(11);
     const clearance = () => page.evaluate(() => {
       const cards = document.querySelectorAll('.avatar-card');
       const last = cards[cards.length - 1].getBoundingClientRect();  // Master, bottom-right
-      const go = (document.querySelector('#go') as HTMLElement).getBoundingClientRect();
-      return Math.round(go.top - last.bottom);                       // px between the last card and the button (≥ 0 = clear)
+      const next = (document.querySelector('#next') as HTMLElement).getBoundingClientRect();
+      return Math.round(next.top - last.bottom);                     // px between the last card and the button (≥ 0 = clear)
     });
     // From the top the last row is below the fold; tapping it must scroll it fully clear of the sticky button.
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -236,31 +239,34 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   /**
-   * #110, both halves. The field used to be the last thing on the page, under all eleven cards, and
-   * `Let's go!` only ever asked for an avatar — so a child could walk straight past it and every screen
-   * downstream fell back to the literal "Ninja", the printed certificate included.
+   * #110, both halves — now the wizard-split version (#67). The field used to be the last thing on a page
+   * that also carried all eleven cards, and `Let's go!` only ever asked for an avatar — so a child could walk
+   * straight past it and every screen downstream fell back to the literal "Ninja", the printed certificate
+   * included. Splitting the ninja pick and the name onto their own screens makes "visible without hunting
+   * for it" structural rather than a matter of ordering: the name screen has nothing else on it to be under.
    *
    * "Visible without hunting for it" is measured as *on screen at first paint, before anything scrolls*,
    * which is the thing the old layout failed; `toBeInViewport` on its own would pass after a scroll.
    */
-  test('avatar screen: the name field is on screen from the start, and is required (#110)', async ({ page }) => {
+  test('avatar wizard: the name field is on screen from the start, and is required (#110, #67)', async ({ page }) => {
     await page.goto('/?reset=1');
     await expect(page.locator('.avatar-screen')).toBeVisible();
     await expect(page.locator('.avatar-card')).toHaveCount(11);
+    await expect(page.locator('#name'), 'step 1 has no name field at all to bury (#110)').toHaveCount(0);
 
-    // On screen at first paint — no scrolling, and above the first row of cards rather than below the last.
+    // Required: an avatar alone advances past step 1, but not further.
+    await expect(page.locator('#next')).toBeDisabled();
+    await page.click('.avatar-card[data-id="volt"]');
+    await expect(page.locator('#next')).toBeEnabled();
+    await page.click('#next');
+
+    // Step 2: on screen at first paint — no scrolling, nothing else on the screen to sit below.
     expect(await page.evaluate(() => window.scrollY), 'the screen must not have scrolled yet').toBe(0);
+    await expect(page.locator('.avatar-grid'), 'step 2 has no avatar grid to bury the name field under (#110)').toHaveCount(0);
     await expect(page.locator('#name')).toBeInViewport({ ratio: 1 });
-    const [nameBottom, gridTop] = await page.evaluate(() => [
-      document.querySelector('#name')!.getBoundingClientRect().bottom,
-      document.querySelector('.avatar-grid')!.getBoundingClientRect().top,
-    ]);
-    expect(nameBottom, 'the name field must sit above the avatar grid, not below it (#110)').toBeLessThanOrEqual(gridTop);
     await expect(page.locator('#name-hint')).toHaveText(/name/i);   // a friendly nudge, not an error
 
-    // Required: an avatar alone is not enough, and a space bar is not a name.
-    await expect(page.locator('#go')).toBeDisabled();
-    await page.click('.avatar-card[data-id="volt"]');
+    // A space bar is not a name.
     await expect(page.locator('#go')).toBeDisabled();
     await page.fill('#name', '   ');
     await expect(page.locator('#go')).toBeDisabled();
@@ -298,6 +304,7 @@ test.describe('Sky Ninja Academy', () => {
     await stubSilentEngine(page, true);   // #65: headless Chromium's engine never actually starts a line
     await page.goto('/?reset=1');
     await page.click('.avatar-card[data-id="blaze"]');
+    await page.click('#next');
     await page.fill('#name', 'Zoe');
     await page.click('#go');
 
@@ -317,16 +324,26 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.avatar-screen')).toHaveCount(0);
   });
 
-  test('onboarding: hardware/browser back moves between the avatar step and the introduction', async ({ page }) => {
+  test('onboarding: hardware/browser back moves between all three wizard steps', async ({ page }) => {
     await page.goto('/?reset=1');
     await page.click('.avatar-card[data-id="volt"]');
+    await page.click('#next');
+    await expect(page.locator('#name')).toBeVisible();
     await page.fill('#name', 'Ada');
     await page.click('#go');
     await expect(page.locator('.intro-card')).toBeVisible();
 
+    // step 3 → step 2: the name typed before moving on was not lost
+    await page.goBack();
+    await expect(page.locator('#name')).toHaveValue('Ada');
+
+    // step 2 → step 1: the ninja picked two steps back was not lost either
     await page.goBack();
     await expect(page.locator('.avatar-screen')).toBeVisible();
-    await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'volt');   // the pick was not lost
+    await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'volt');
+
+    await page.goForward();
+    await expect(page.locator('#name')).toHaveValue('Ada');
 
     await page.goForward();
     await expect(page.locator('.intro-card')).toBeVisible();
@@ -346,21 +363,29 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.avatar-card.sel')).toHaveAttribute('data-id', 'terra');
   });
 
-  /** #67 acceptance: "progress is obvious to a child" — a small dot rail across the two first-run steps. */
-  test('onboarding: the wizard progress rail advances from step 1 to step 2, and is not shown to a returning player', async ({ page }) => {
+  /** #67 acceptance: "progress is obvious to a child" — a small dot rail across all three first-run steps. */
+  test('onboarding: the wizard progress rail advances across all three steps, and is not shown to a returning player', async ({ page }) => {
     await page.goto('/?reset=1');
-    await expect(page.locator('.wizard-progress')).toHaveAttribute('aria-label', 'Step 1 of 2');
+    await expect(page.locator('.wizard-progress')).toHaveAttribute('aria-label', 'Step 1 of 3');
     await expect(page.locator('.wizard-progress .dot.active')).toHaveCount(1);
+    await expect(page.locator('.wizard-progress .dot').nth(0)).toHaveClass(/active/);
 
     await page.click('.avatar-card[data-id="blaze"]');
+    await page.click('#next');
+
+    await expect(page.locator('#name')).toBeVisible();
+    await expect(page.locator('.wizard-progress')).toHaveAttribute('aria-label', 'Step 2 of 3');
+    await expect(page.locator('.wizard-progress .dot.active')).toHaveCount(1);
+    await expect(page.locator('.wizard-progress .dot').nth(1)).toHaveClass(/active/);
+
     await page.fill('#name', 'Zoe');
     await page.click('#go');
 
     await expect(page.locator('.intro-card')).toBeVisible();
-    await expect(page.locator('.wizard-progress')).toHaveAttribute('aria-label', 'Step 2 of 2');
+    await expect(page.locator('.wizard-progress')).toHaveAttribute('aria-label', 'Step 3 of 3');
     await expect(page.locator('.wizard-progress .dot.active')).toHaveCount(1);
-    // it is the *second* dot that is active on step 2, not still the first
-    await expect(page.locator('.wizard-progress .dot').nth(1)).toHaveClass(/active/);
+    // it is the *third* dot that is active on step 3, not the first or second
+    await expect(page.locator('.wizard-progress .dot').nth(2)).toHaveClass(/active/);
 
     await page.click('#intro-go');
     await expect(page.locator('.home')).toBeVisible();
@@ -1452,7 +1477,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#reset-go');
     await page.click('#reset-continue');
     await expect(page.locator('.avatar-screen')).toBeVisible();
-    await expect(page.locator('#go')).toBeDisabled();
+    await expect(page.locator('#next')).toBeDisabled();
     await expect(page.locator('.avatar-card.sel')).toHaveCount(0);
     // reset() removes the key outright rather than writing fresh defaults over it — nothing from Ada is left
     // to read back on the next launch. (Not reloaded here: seedPlayer's init script re-seeds an empty slot on
@@ -1525,12 +1550,12 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
 
   // Third review round on PR #171: sanitizeTypes() originally covered only object/array/number fields.
   // `name` is the one field a person freely types into the Restore box, and `esc(d.name)`/`hasName(d.name)`
-  // in avatarScreen() both throw on a non-string — "Change ninja" from the map is a screen every returning
+  // in nameScreen() both throw on a non-string — "Change ninja" from the map is a screen every returning
   // player can reach, not an edge case.
   // #67 update: "Change ninja" (`#change-av`, returning players) is now `changeAvatarScreen`, which never
   // renders `d.name` at all — the crash this rail guarded against cannot occur on that screen any more. The
-  // name field now lives only on the first-run `avatarScreen` (unchanged), so that half of the rail moves
-  // there rather than being dropped.
+  // name field now lives only on the first-run wizard's `nameScreen` (split from the ninja pick in #67's
+  // follow-up), so that half of the rail moves there rather than being dropped.
   test('guard rail: "Change ninja" does not crash on a save with a wrong-typed name, and never touches name at all (#171, #67)', async ({ page }) => {
     const failed: string[] = [];
     page.on('pageerror', e => failed.push(`page error: ${e.message}`));
@@ -1544,7 +1569,7 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
     expect(failed, `while opening "Change ninja"${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
   });
 
-  test('guard rail: the first-run avatar screen still opens on a save with a wrong-typed name (#171)', async ({ page }) => {
+  test('guard rail: the first-run wizard still opens on a save with a wrong-typed name, and the name step sanitises it (#171, #67)', async ({ page }) => {
     const failed: string[] = [];
     page.on('pageerror', e => failed.push(`page error: ${e.message}`));
 
@@ -1552,9 +1577,16 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
       if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
     }, JSON.stringify({ v: 1, name: 123, sound: 'yes', tutorialSeen: 'true' }));   // no avatar → not onboarded
     await page.goto('/');
+    // Step 1 never reads d.name at all, so the corrupted value cannot crash it — confirmed by the absence of
+    // a page error, not by anything visible on this screen.
     await expect(page.locator('.avatar-screen')).toBeVisible();
+    expect(failed, `while opening step 1${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+
+    // Step 2 is where the corrupted name would actually be read (esc()/hasName()) and rendered.
+    await page.click('.avatar-card[data-id="volt"]');
+    await page.click('#next');
     await expect(page.locator('#name')).toHaveValue('');   // the corrupted name was dropped, not rendered as "123"
-    expect(failed, `while opening the first-run avatar screen${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+    expect(failed, `while opening the name step${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
   });
 
   // Review finding 3: the reader fix is what lets a player reach the topic list on a corrupted save in the
