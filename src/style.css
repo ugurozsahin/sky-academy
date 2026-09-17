@@ -168,6 +168,16 @@ img { -webkit-user-drag: none; }
 /* runway below the sticky Let's go! button so the last card row (Bolt/Master) is never left under it — #51 */
 .avatar-screen { padding-bottom: calc(84px + var(--sab)); scroll-padding-bottom: calc(84px + var(--sab)); }
 .avatar-screen #go { display: flex; margin: 0 auto; position: sticky; bottom: calc(12px + var(--sab)); z-index: 2; box-shadow: 0 10px 30px #000a; }
+.change-avatar #change-save { display: flex; margin: 20px auto 0; }
+
+/* Wizard introduction step (#67): one card, centred, nothing else competing for a first-run child's attention. */
+.intro-screen { display: flex; align-items: center; justify-content: center; min-height: calc(100 * var(--vh, 1vh)); padding: 24px; }
+.intro-card { max-width: 420px; width: 100%; padding: clamp(20px, 5vw, 32px); border-radius: var(--radius); background: var(--panel); }
+.intro-card { border: 1px solid var(--line); text-align: center; }
+.intro-card .figure { width: clamp(96px, 30vw, 160px); margin: 0 auto 14px; }
+.intro-card h1 { margin: 0 0 12px; font-size: clamp(24px, 6vw, 32px); outline: none; }
+.intro-card .intro-text { margin: 0 0 22px; color: var(--text); font-size: 17px; line-height: 1.5; }
+.intro-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
 /* ---------- home ---------- */
 .islands.big { grid-template-columns: 1fr; gap: 14px; }

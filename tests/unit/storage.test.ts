@@ -209,6 +209,29 @@ describe('save migration (#38)', () => {
     expect(both.certs).toEqual([]);
   });
 
+  // #67: the onboarding wizard needs a flag that tells "never played" from "already onboarded", and no
+  // existing player may be sent back through it by this update — an existing save with an avatar already
+  // counts as onboarded, whatever version it started at.
+  it('v2 → v3 marks a save with an avatar already chosen as onboarded, so no current player replays the wizard', () => {
+    expect(migrate({ v: 2, name: 'Rey', avatar: 'kai' }).onboarded).toBe(true);
+    expect(migrate({ v: 1, name: 'Rey', avatar: 'kai' }).onboarded, 'a v1 blob walks both steps to the same result').toBe(true);
+  });
+  it('v2 → v3 leaves a save with no avatar chosen not onboarded', () => {
+    expect(migrate({ v: 2, name: '' }).onboarded).toBe(false);
+    expect(migrate({ v: 2, name: '', avatar: null }).onboarded).toBe(false);
+  });
+  it('v2 → v3 keeps an explicit onboarded value the blob already carries, avatar or not', () => {
+    expect(migrate({ v: 2, avatar: 'kai', onboarded: false }).onboarded).toBe(false);
+    expect(migrate({ v: 2, avatar: null, onboarded: true }).onboarded).toBe(true);
+  });
+  it('a brand-new profile (nothing ever stored) is not onboarded', () => {
+    expect(load().onboarded).toBe(false);
+  });
+  it('a non-boolean onboarded is dropped by sanitizeTypes, then re-derived from avatar by the migration step', () => {
+    expect(migrate({ v: 2, avatar: 'kai', onboarded: 'yes' as unknown }).onboarded).toBe(true);
+    expect(migrate({ v: 2, avatar: null, onboarded: 'yes' as unknown }).onboarded).toBe(false);
+  });
+
   it('falls back to a fresh default for corrupt or non-object data', () => {
     for (const bad of [null, undefined, 42, 'nonsense', [] as unknown]) {
       const d = migrate(bad);

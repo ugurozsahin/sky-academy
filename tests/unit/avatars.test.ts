@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ALL_AVATARS, AVATARS, avatarById, MASTER, praiseLine, SENSEI, SENSEI_LINES, senseiLine } from '../../src/avatars';
+import { ALL_AVATARS, AVATARS, avatarById, MASTER, praiseLine, SENSEI, SENSEI_LINES, senseiLine, welcomeLine } from '../../src/avatars';
 import { masterProgress } from '../../src/game/sensei';
 import { TOPICS } from '../../src/curriculum';
 import { STICKER_IDS, type TopicProgress } from '../../src/storage';
@@ -56,7 +56,13 @@ describe('Master Ninja', () => {
     expect(praiseLine(MASTER, 'Ada', () => 0)).toBe('Calm mind, sharp blade, Ada.');
     expect(senseiLine(true, 'Ada', () => 0)).toBe('Well trained, Ada. Practice makes a master.');
     expect(senseiLine(false, '', () => 0.99)).toMatch(/Ninja/);
-    for (const l of [...MASTER.praise, ...SENSEI_LINES.trained, ...SENSEI_LINES.tryAgain]) expect(l).not.toMatch(/!/);   // no shouting
+    // #67's welcome line joins the lines already checked here, so a future Sensei line keeps the same calm voice.
+    for (const l of [...MASTER.praise, ...SENSEI_LINES.trained, ...SENSEI_LINES.tryAgain, SENSEI_LINES.welcome]) expect(l).not.toMatch(/!/);   // no shouting
+  });
+  it('greets the child by name in the first-run wizard (#67), and falls back to "Ninja" the same way senseiLine does', () => {
+    expect(welcomeLine('Ada')).toBe(SENSEI_LINES.welcome.replace('{name}', 'Ada'));
+    expect(welcomeLine('')).toMatch(/Ninja/);
+    expect(welcomeLine('')).not.toMatch(/\{name\}/);
   });
   it('unlocks only when every topic on every island has at least one star', () => {
     const ids = TOPICS.map(t => t.id);
