@@ -3609,3 +3609,72 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
       + 'not back in the routine\'s own flow, rather than raising this budget').toBeLessThanOrEqual(ROUTINE_PROMPT_BUDGET);
   });
 });
+
+/**
+ * #101 layer 0 — the three PreToolUse hooks the issue's "Layer 0 — hooks to add (three, no more)" section
+ * asks for: enforcement that costs no context on every turn, for three mistakes already made or explicitly
+ * feared (a force-push, a forged OWNER: marker, a write to the retired root WORKLOG.md). `.claude/settings.json`
+ * is committed so a cloud/routine session gets these hooks the same way it gets committed rules and skills —
+ * `~/.claude/settings.json` is not read there.
+ *
+ * This rail checks the hooks exist "by name" the way the issue asks: by the distinguishing text each hook's
+ * command must contain, not by re-implementing (and so duplicating the risk of silently drifting from) the
+ * matching logic itself. It does not execute the hook commands — `scripts/`-style tests do that by piping
+ * synthesized stdin, which is how each hook here was proved to fire before this PR (see the PR body); a unit
+ * test re-invoking `bash -c` against a hand-rolled shell string would be testing the test's own shell escaping
+ * as much as the hook.
+ *
+ * Prove it red: delete any one of the three hook entries (or the file) and watch the corresponding assertion
+ * fail.
+ */
+describe('.claude/settings.json declares the three #101 layer-0 hooks by name', () => {
+  const root = new URL('../../', import.meta.url);
+  const settingsPath = new URL('.claude/settings.json', root);
+
+  const readSettings = () => JSON.parse(readFileSync(settingsPath, 'utf8'));
+
+  // Every "command" string anywhere under hooks.PreToolUse, across every matcher entry — flattened, because
+  // this rail cares only that each rule exists somewhere in the file, not which matcher entry it lives under.
+  const allPreToolUseCommands = (settings: any): string[] => (settings?.hooks?.PreToolUse ?? [])
+    .flatMap((entry: any) => (entry?.hooks ?? []))
+    .map((hook: any) => hook?.command)
+    .filter((c: unknown): c is string => typeof c === 'string');
+
+  it('.claude/settings.json exists and parses as JSON with a hooks.PreToolUse array', () => {
+    const settings = readSettings();
+    expect(Array.isArray(settings?.hooks?.PreToolUse), '.claude/settings.json must declare hooks.PreToolUse').toBe(true);
+    expect(settings.hooks.PreToolUse.length, 'an empty PreToolUse list would pass every check below vacuously').toBeGreaterThan(0);
+  });
+
+  it('a hook denies a git push carrying --force/-f/--force-with-lease', () => {
+    // The hook is filtered to `git push` via its own `if:` field, not by grepping "git push" out of the
+    // command body — check the `if:` filter directly instead of guessing at the command text's shape.
+    const entry = (readSettings().hooks.PreToolUse as any[])
+      .find((e) => (e.hooks ?? []).some((h: any) => typeof h.if === 'string' && h.if.includes('git push')));
+    expect(entry, 'no PreToolUse entry filters on `if: "Bash(git push *)"` or similar').toBeDefined();
+    const forceHook = entry.hooks.find((h: any) => typeof h.if === 'string' && h.if.includes('git push'));
+    expect(forceHook.command, 'the git-push hook must actually check for a force flag').toMatch(/force/i);
+    expect(forceHook.command, 'the git-push hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+
+  it('a hook denies a command carrying an OWNER: APPROVED / OWNER: REJECTED marker', () => {
+    const commands = allPreToolUseCommands(readSettings());
+    const markerHook = commands.find((c) => c.includes('OWNER: APPROVED') && c.includes('OWNER: REJECTED'));
+    expect(markerHook, 'no PreToolUse hook checks for both OWNER: markers').toBeDefined();
+    expect(markerHook, 'the marker hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+
+  it('a hook denies writing to WORKLOG.md at the repo root, both via Bash and via Write/Edit', () => {
+    const settings = readSettings();
+    const bashCommands = allPreToolUseCommands(settings);
+    const bashWorklogHook = bashCommands.find((c) => c.includes('WORKLOG.md') && c.includes('"permissionDecision":"deny"'));
+    expect(bashWorklogHook, 'no Bash-matcher hook denies a WORKLOG.md append').toBeDefined();
+
+    const writeEntry = (settings.hooks.PreToolUse as any[])
+      .find((e) => typeof e.matcher === 'string' && /Write/.test(e.matcher) && /Edit/.test(e.matcher));
+    expect(writeEntry, 'no PreToolUse entry matches Write|Edit for the WORKLOG.md file guard').toBeDefined();
+    const writeWorklogHook = (writeEntry.hooks ?? []).find((h: any) => typeof h.command === 'string' && h.command.includes('WORKLOG.md'));
+    expect(writeWorklogHook, 'the Write|Edit entry must itself check for WORKLOG.md').toBeDefined();
+    expect(writeWorklogHook.command, 'the Write/Edit WORKLOG.md hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+});
