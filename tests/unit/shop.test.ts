@@ -14,6 +14,25 @@ describe('coin shop rules (#6)', () => {
     for (const kind of new Set(SHOP_ITEMS.map(i => i.kind))) expect(SHOP_ITEMS.filter(i => i.kind === kind && i.price === 0).length).toBe(1);
     for (const i of SHOP_ITEMS) expect(Number.isInteger(i.price) && i.price >= 0).toBe(true);
   });
+  it('element trails (#69): every element is buyable, master is never for sale, colour+fx come from the same source, prices form a ladder', () => {
+    const trails = SHOP_ITEMS.filter(i => i.kind === 'trail');
+    const elements = ['fire', 'water', 'electric', 'earth', 'wind', 'ice', 'light', 'shadow', 'blade', 'robot'];
+    for (const el of elements) {
+      const it = itemById(`trail-${el}`);
+      expect(it, `trail-${el} must exist`).toBeDefined();
+      expect(it!.fx).toBe(el);
+      expect(it!.trail?.color).toBeTruthy();
+      expect(it!.trail?.core).toBeTruthy();
+    }
+    expect(trails.some(i => i.fx === 'master')).toBe(false);           // the all-topics reward is never for sale
+    expect(itemById('trail-element')!.fx).toBeUndefined();             // the free default keeps the avatar's own element
+    const prices = trails.map(i => i.price);
+    expect(prices).toEqual([...prices].sort((a, b) => a - b));         // strictly the ladder the owner asked for
+    expect(new Set(prices).size).toBe(prices.length);                  // no two trails share a price
+    const paid = prices.filter(p => p > 0);
+    expect(paid[0]).toBeGreaterThan(0);                                 // the cheapest paid trail is still a real price
+    expect(Math.max(...paid)).toBe(itemById('trail-gold')!.price);     // gold stays the premium item at the top
+  });
   it('balance is lifetime coins minus spent, never negative', () => {
     expect(balance(w(200, { spent: 150 }))).toBe(50);
     expect(balance(w(10, { spent: 30 }))).toBe(0);
@@ -65,5 +84,16 @@ describe('shop storage', () => {
     addCoins(gold.price); buyItem(gold.id);
     expect(equipItem('trail-element')).toBe(true); expect(load().equipped.trail).toBe('trail-element');
     expect(equipItem(gold.id)).toBe(true); expect(load().equipped.trail).toBe(gold.id);
+  });
+  it('buying all ten element trails never costs a single sticker — coins stay lifetime, only spent grows (#69)', () => {
+    const trails = SHOP_ITEMS.filter(i => i.kind === 'trail' && i.price > 0);
+    const total = trails.reduce((sum, i) => sum + i.price, 0);
+    addCoins(total + 30);                                              // 30 past every trail's cost, past the first coin sticker (30)
+    const stickersBeforeSpending = load().stickers.length;
+    for (const it of trails) expect(buyItem(it.id)).toBe(true);
+    expect(load().coins).toBe(total + 30);                             // lifetime total is untouched by spending
+    expect(load().spent).toBe(total);
+    expect(load().stickers.length).toBe(stickersBeforeSpending);       // spending ten trails unlocked no new sticker and lost none
+    expect(load().owned.sort()).toEqual(trails.map(i => i.id).sort());
   });
 });
