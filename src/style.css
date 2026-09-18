@@ -388,7 +388,7 @@ img { -webkit-user-drag: none; }
 .sticker.got { border-color: var(--glow); box-shadow: inset 0 0 30px color-mix(in srgb, var(--glow) 16%, transparent); }
 /* "My certificates" (#110): a row per earned certificate, next to the sticker album. */
 .cert-empty {
-  margin: 0;
+  margin: 12px 0 0;
   padding: 14px 16px;
   border-radius: 16px;
   background: var(--panel);
@@ -397,7 +397,7 @@ img { -webkit-user-drag: none; }
   font-weight: 600;
   text-align: center;
 }
-.cert-list { display: flex; flex-direction: column; gap: 8px; }
+.cert-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .cert-row {
   display: flex;
   align-items: center;
