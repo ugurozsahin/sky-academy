@@ -126,6 +126,8 @@ jobs:
             // The decision lives in scripts/review-gate.mjs so tests/unit/review-gate.test.ts can hold it to
             // both directions — it has published green over a live block twice, and inline YAML cannot be tested.
             const { blockState } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/review-gate.mjs`);
+            // Pass the comments whole: blockState() reads each one's `author_association` to decide whether its
+            // marker counts (#215). Trimming them to {body, created_at} here would make every marker a stranger's.
             const { blocked, reasons } = blockState({ draft: pr.draft, labels: pr.labels.map(l => l.name), comments });
 
             const description = blocked ? `Blocked: ${reasons.join('; ')}`.slice(0, 140) : 'No open review block';
