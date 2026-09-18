@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { certAlbumHTML, certificateText, certRoute, deliverCertificate, isNativeShell } from '../../src/ui/certificate';
+import { certAlbumHTML, certificateText, certRoute, deliverCertificate, hasCapacitorShare, isNativeShell } from '../../src/ui/certificate';
 import { AVATARS } from '../../src/avatars';
 import type { StoredCert } from '../../src/storage';
 
@@ -59,7 +59,7 @@ describe('mission certificate text', () => {
 });
 
 const caps = (o: Partial<Parameters<typeof certRoute>[0]> = {}) =>
-  ({ canShareFiles: false, claudeSave: false, claudeRuntime: false, nativeShell: false, ...o });
+  ({ canShareFiles: false, claudeSave: false, claudeRuntime: false, nativeShell: false, capacitorShare: false, ...o });
 
 describe('certificate delivery route', () => {
   it('prefers the system share sheet when files can be shared', () => {
@@ -81,7 +81,7 @@ describe('certificate delivery route', () => {
   // `<a download>`, and a stock Android WebView has no download handler: `a.click()` is swallowed in
   // silence. `deliverCertificate` promises it "never silently does nothing", and this is where it lied.
   describe('inside the Android APK WebView (#205)', () => {
-    it('shows the certificate rather than a download the WebView will swallow', () => {
+    it('shows the certificate rather than a download the WebView will swallow, when the share plugins are missing', () => {
       expect(certRoute(caps({ nativeShell: true }))).toBe('show');
     });
     it('still prefers a real share sheet or save prompt when the WebView offers one', () => {
@@ -94,11 +94,54 @@ describe('certificate delivery route', () => {
     it('never resolves to a download on a native shell, for any combination of the other capabilities', () => {
       for (const canShareFiles of [true, false])
         for (const claudeSave of [true, false])
-          for (const claudeRuntime of [true, false]) {
-            const r = certRoute({ canShareFiles, claudeSave, claudeRuntime, nativeShell: true });
-            expect(r, `share=${canShareFiles} save=${claudeSave} runtime=${claudeRuntime}`).not.toBe('download');
-          }
+          for (const claudeRuntime of [true, false])
+            for (const capacitorShare of [true, false]) {
+              const r = certRoute({ canShareFiles, claudeSave, claudeRuntime, nativeShell: true, capacitorShare });
+              expect(r, `share=${canShareFiles} save=${claudeSave} runtime=${claudeRuntime} capacitor=${capacitorShare}`).not.toBe('download');
+            }
     });
+
+    // #110: the real fix for the tablet — a working share sheet instead of the full-screen fallback,
+    // when the Filesystem/Share plugins the APK ships are actually there.
+    describe('the Capacitor share route (#110)', () => {
+      it('is chosen ahead of the full-screen view once the plugins answer', () => {
+        expect(certRoute(caps({ nativeShell: true, capacitorShare: true }))).toBe('capacitor');
+      });
+      it('still falls back to the full-screen view if the plugins are reported missing', () => {
+        expect(certRoute(caps({ nativeShell: true, capacitorShare: false }))).toBe('show');
+      });
+      it('never applies outside a native shell — capacitorShare alone is not enough', () => {
+        expect(certRoute(caps({ capacitorShare: true }))).toBe('download');
+      });
+      // claudeRuntime (an artifact-viewer host) is never also the Android shell in practice, but the
+      // priority order says which would win if it ever were — and it should, per certRoute's own comment.
+      it('the artifact viewer\'s own save prompt still wins over the Capacitor route, by priority', () => {
+        expect(certRoute(caps({ nativeShell: true, capacitorShare: true, claudeRuntime: true }))).toBe('show');
+      });
+    });
+  });
+});
+
+describe('hasCapacitorShare (#110)', () => {
+  const win = (Capacitor: unknown) => ({ Capacitor }) as unknown as Window & typeof globalThis;
+
+  it('is false with no Capacitor global at all', () => {
+    expect(hasCapacitorShare(win(undefined))).toBe(false);
+  });
+  it('is false when Capacitor is present but neither plugin registered', () => {
+    expect(hasCapacitorShare(win({ Plugins: {} }))).toBe(false);
+    expect(hasCapacitorShare(win({}))).toBe(false);
+  });
+  it('is false with only one of the two plugins', () => {
+    expect(hasCapacitorShare(win({ Plugins: { Filesystem: {} } }))).toBe(false);
+    expect(hasCapacitorShare(win({ Plugins: { Share: {} } }))).toBe(false);
+  });
+  it('is true once both plugins have registered', () => {
+    expect(hasCapacitorShare(win({ Plugins: { Filesystem: {}, Share: {} } }))).toBe(true);
+  });
+  it('does not throw on a throwing accessor, the same shape isNativeShell already guards against', () => {
+    const throwing = { get Plugins() { throw new Error('bridge not ready'); } };
+    expect(hasCapacitorShare(win(throwing))).toBe(false);
   });
 });
 
@@ -304,5 +347,40 @@ describe('deliverCertificate, actually run (#205)', () => {
     const how = await deliverCertificate(fakeCanvas(), 'cert.png');
     expect(how, 'a half-started bridge must not resolve to the swallowed download').toBe('shown');
     expect(dom.downloadClicks()).toBe(0);
+  });
+
+  // #110: the actual fix for the tablet, not just the safe fallback #205 shipped first.
+  it('shares via the Capacitor plugins on the tablet when they are present', async () => {
+    const written: unknown[] = []; const shared: unknown[] = [];
+    dom = stubBrowser({
+      capacitor: {
+        isNativePlatform: () => true,
+        Plugins: {
+          Filesystem: { writeFile: (o: unknown) => { written.push(o); return Promise.resolve({ uri: 'file:///cache/cert.png' }); } },
+          Share: { share: (o: unknown) => { shared.push(o); return Promise.resolve(); } },
+        },
+      },
+    });
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    expect(how, 'a working share sheet, not the full-screen fallback, is the point of #110').toBe('shared');
+    expect(written).toEqual([{ path: 'cert.png', data: 'AAA', directory: 'CACHE' }]);
+    expect(shared).toEqual([{ url: 'file:///cache/cert.png', title: 'Sky Ninja Academy certificate', dialogTitle: 'Share your certificate' }]);
+    expect(dom.downloadClicks()).toBe(0);
+  });
+
+  it('falls back to the full-screen view, never to a swallowed download, if the plugin call itself fails', async () => {
+    dom = stubBrowser({
+      capacitor: {
+        isNativePlatform: () => true,
+        Plugins: {
+          Filesystem: { writeFile: () => Promise.reject(new Error('cache full')) },
+          Share: { share: () => Promise.resolve() },
+        },
+      },
+    });
+    const how = await deliverCertificate(fakeCanvas(), 'cert.png');
+    expect(how).toBe('shown');
+    expect(dom.downloadClicks(), 'a failed native share must still never fall through to <a download>').toBe(0);
+    expect(dom.shownFullscreen()).toBe(true);
   });
 });

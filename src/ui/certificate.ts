@@ -95,24 +95,32 @@ function wrap(g: CanvasRenderingContext2D, text: string, x: number, y: number, m
 }
 
 /** How the certificate PNG reached the child (or was offered to them). */
-export type CertRoute = 'share' | 'save' | 'show' | 'download';
+export type CertRoute = 'share' | 'save' | 'capacitor' | 'show' | 'download';
 export type CertOutcome = 'shared' | 'saved' | 'shown' | 'downloaded' | 'declined';
 
 /**
  * Which delivery route to use, given what the runtime supports (pure, unit-tested).
  * Priority: the system share sheet (phones) → the artifact viewer's save prompt →
- * a full-screen "press & hold to save" view (artifact viewer with no downloads grant) →
- * a plain `<a download>` (static / PWA build, no artifact runtime).
+ * the Capacitor share sheet (Android APK, when the plugins are actually there) →
+ * a full-screen "press & hold to save" view (artifact viewer with no downloads grant, or a native shell
+ * whose plugins are missing) → a plain `<a download>` (static / PWA build, no artifact runtime).
  *
  * `nativeShell` is the Android APK's Capacitor WebView (#205). A stock Android WebView has no download
  * handler, so `a.click()` on an `<a download>` is swallowed without a word: the child presses the button
  * and nothing happens at all. `<a download>` is therefore never the last resort on a runtime that cannot
  * honour it — the full-screen view is, because press-and-hold on an image works there.
+ *
+ * `capacitorShare` (#110) is `nativeShell` plus the `Filesystem`/`Share` plugins actually being present on
+ * the bridge — the APK ships them (see `shareViaCapacitor` below), but the check stays capability-based
+ * rather than assuming every native build carries them, the same reasoning `isNativeShell` already uses.
+ * `claudeRuntime` still wins over it: an artifact-viewer host is never also the Android shell, but if that
+ * ever changed, its own save prompt is the better route.
  */
-export function certRoute(caps: { canShareFiles: boolean; claudeSave: boolean; claudeRuntime: boolean; nativeShell: boolean }): CertRoute {
+export function certRoute(caps: { canShareFiles: boolean; claudeSave: boolean; claudeRuntime: boolean; nativeShell: boolean; capacitorShare: boolean }): CertRoute {
   if (caps.canShareFiles) return 'share';
   if (caps.claudeSave) return 'save';
   if (caps.claudeRuntime) return 'show';
+  if (caps.nativeShell && caps.capacitorShare) return 'capacitor';
   if (caps.nativeShell) return 'show';
   return 'download';
 }
@@ -162,6 +170,48 @@ export function isNativeShell(w: Window & typeof globalThis = window): boolean {
   } catch {
     return true;
   }
+}
+
+/**
+ * The Capacitor `Filesystem`/`Share` plugins (#110), read off the same injected global `isNativeShell` above
+ * already reads — no import, so a web build that never runs inside the APK never bundles them. Both plugins
+ * register themselves onto `Capacitor.Plugins` under their class name; this only asks whether they answered.
+ */
+interface CapFilesystem { writeFile(o: { path: string; data: string; directory: string }): Promise<{ uri: string }> }
+interface CapShare { share(o: { url?: string; title?: string; dialogTitle?: string }): Promise<void> }
+
+function capPlugins(w: Window & typeof globalThis = window): { Filesystem?: CapFilesystem; Share?: CapShare } | null {
+  try {
+    const cap = (w as { Capacitor?: { Plugins?: { Filesystem?: CapFilesystem; Share?: CapShare } } }).Capacitor;
+    return cap?.Plugins ?? null;
+  } catch { return null; }
+}
+
+/** Are both plugins this route needs actually on the bridge? (pure capability check, no I/O) */
+export function hasCapacitorShare(w: Window & typeof globalThis = window): boolean {
+  const p = capPlugins(w);
+  return !!p?.Filesystem && !!p?.Share;
+}
+
+/**
+ * Write the certificate PNG into the app's cache directory and hand it to the Android share sheet (#110).
+ * `directory: 'CACHE'` matches Capacitor's own `Directory.Cache` enum value, kept as a string so this file
+ * still imports nothing from `@capacitor/filesystem` — only the plugin's *shape* is typed, above.
+ *
+ * Returns `false` on any failure (a missing plugin, a full cache, a share-sheet cancel counts as `Share`
+ * resolving normally on Android so this only turns false on a real error) — the caller falls back to the
+ * full-screen view, never to `<a download>`, for the same reason `certRoute` never chooses it here.
+ */
+async function shareViaCapacitor(c: HTMLCanvasElement, filename: string): Promise<boolean> {
+  const plugins = capPlugins();
+  if (!plugins?.Filesystem || !plugins?.Share) return false;
+  try {
+    const dataUrl = c.toDataURL('image/png');
+    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+    const { uri } = await plugins.Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+    await plugins.Share.share({ url: uri, title: 'Sky Ninja Academy certificate', dialogTitle: 'Share your certificate' });
+    return true;
+  } catch { return false; }
 }
 
 interface DownloadsApi { save(r: { filename: string; data: Blob }): Promise<{ status: string }> }
@@ -232,6 +282,7 @@ export async function deliverCertificate(c: HTMLCanvasElement, filename: string)
   const claudeRuntime = !!(window as { claude?: unknown }).claude;
   const nativeShell = isNativeShell();
   const dl = claudeRuntime ? await claudeDownloads() : null;
+  const capacitorShare = nativeShell && hasCapacitorShare();
 
   // The one place `<a download>` is chosen, so the runtime that cannot honour it is ruled out in one
   // place too. A cancelled share used to step down past this check straight to `triggerDownload`.
@@ -240,7 +291,7 @@ export async function deliverCertificate(c: HTMLCanvasElement, filename: string)
     triggerDownload(blob, filename); return 'downloaded';
   };
 
-  switch (certRoute({ canShareFiles, claudeSave: !!dl, claudeRuntime, nativeShell })) {
+  switch (certRoute({ canShareFiles, claudeSave: !!dl, claudeRuntime, nativeShell, capacitorShare })) {
     case 'share':
       try { await nav.share!({ files: [file], title: 'Sky Ninja Academy certificate' }); return 'shared'; }
       catch { /* cancelled → step down to the next best route */ }
@@ -249,6 +300,9 @@ export async function deliverCertificate(c: HTMLCanvasElement, filename: string)
       return lastResort();
     case 'save':
       return saveViaClaude(dl!, filename, blob, c);
+    case 'capacitor':
+      if (await shareViaCapacitor(c, filename)) return 'shared';
+      showCertificateFullscreen(c); return 'shown';   // the plugin call itself failed — never fall to <a download>
     case 'show':
       showCertificateFullscreen(c); return 'shown';
     default:
