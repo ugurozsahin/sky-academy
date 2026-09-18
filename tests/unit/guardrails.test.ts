@@ -3885,6 +3885,43 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
     expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER:\u200BAPPROVED')), 'ZWSP after the colon must deny').toBe(true);
   });
 
+  // #221 fourth round (self-found during post-merge verification, session_011U9Jb5evcfFDNFPyPWyTFd): the third
+  // review's fix only tested an invisible character adjacent to the colon or the space already present in
+  // "OWNER: APPROVED" — at those two boundary positions, collapsing a run of invisible characters to a single
+  // space reproduces the marker exactly, because a space already belonged there. Placed strictly INSIDE a word
+  // instead (between two ordinary letters, where no whitespace belongs), the same collapse-to-a-space behaviour
+  // inserts a space that was never part of the marker — "APP<ZWSP>ROVED" becomes "APP ROVED", which no longer
+  // starts with "APPROVED" — so the check silently fails to deny, while GitHub still renders the zero-width
+  // character as nothing, so a human reads the posted comment as a genuine, unbroken "OWNER: APPROVED".
+  // Fixed by no longer collapsing invisible/format/control characters into a space at all: they are zero-width,
+  // so deleting them outright leaves no visual gap for a human to notice either way, and it stops them from
+  // fabricating a word-breaking space that was never there. Ordinary whitespace (`\s`, which also covers a
+  // visibly-wide character like NBSP) is still collapsed to a single space afterwards, unchanged from before —
+  // a real gap in the text should still break the marker, since a human would see that gap regardless.
+  // Proved red first: ran this exact case against the pre-fix (third-review) hook, watched it wrongly allow.
+  it('MCP-tool marker hook: denies an invisible character placed strictly inside a word, with no adjacent whitespace (#221 fourth review)', () => {
+    const cases: [string, string][] = [
+      ['ZWSP', '​'], ['ZWNJ', '‌'], ['ZWJ', '‍'], ['word joiner', '⁠'],
+      ['BOM', '﻿'], ['soft hyphen', '­'], ['LRM', '‎'], ['RLM', '‏'],
+    ];
+    for (const [name, ch] of cases) {
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must deny`).toBe(true);
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OW${ch}NER: APPROVED`)), `${name} inside OWNER must deny`).toBe(true);
+    }
+    // stacked invisible characters mid-word must not collapse into a single fabricated space either
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: AP​﻿­PROVED')), 'stacked invisible characters mid-word must deny').toBe(true);
+    // a genuinely visible gap (NBSP has real width, unlike the characters above) should still break the
+    // marker and correctly NOT deny — this is not a bypass, a human would see the broken word too
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: AP PROVED'))).toBe(false);
+    // every previously-fixed case must still pass unmodified
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '​OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER:​APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '**OWNER: APPROVED**'))).toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'This discusses OWNER: APPROVED in prose.'))).toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'Looks good.\nOWNER: APPROVED - quoting style\nRest.'))).toBe(false);
+  });
+
   it('MCP-tool marker hook: allows a body with no body field at all', () => {
     const out = execFileSync('bash', ['-c', mcpMarkerHookCmd], { input: JSON.stringify({ tool_input: {} }), encoding: 'utf8' });
     expect(out.trim()).toBe('');
