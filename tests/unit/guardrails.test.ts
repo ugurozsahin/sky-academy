@@ -2702,7 +2702,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
  *     a negative assertion beside it, because a positive pin can always be appended to.
  *  §6 Loosening is owner-gated, asserted **within the Loosening bullet**, with Tightening required to carry
  *     the other text and forbidden to carry the gate.
- *  §7 The three-file rule and #178's "records have readers".
+ *  §7 One home per rule (docs/decisions/001) and #178's "records have readers".
  *
  * This is still text matching: it sees these spellings and nothing else, and a negative assertion is narrow
  * by nature — it forbids one phrasing of one inversion, not the idea. A rewrite that keeps a rule and changes
@@ -2820,9 +2820,9 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
     expect(tightening, 'the gate must not migrate onto the tightening bullet').not.toContain('Owner-gated');
   });
 
-  it('§7 keeps the three-file rule and where a record goes', () => {
-    expect(S(7), 'CLAUDE.md, BACKLOG.md and ROUTINE-PROMPT.md change together, and rails hold them to it')
-      .toContain('If you change one, change all three in the same pull request');
+  it('§7 points at the one-home-per-rule decision and says where a record goes', () => {
+    expect(S(7), 'the skill must send a run to the decision, not restate it')
+      .toContain('docs/decisions/001-one-home-per-rule.md');
     expect(S(7), 'and #178: a record with no reader is not written')
       .toContain('**records have readers** (#178)');
   });

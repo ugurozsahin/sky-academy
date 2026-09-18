@@ -10,15 +10,12 @@ paths:
 
 # Governance files (#101)
 
-- The three-file rule: `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` carry identical wording for the
-  freeze history, records-have-readers, the stale-block adoption rule's four conditions (#161) and the
-  second-item rule's four eligibility conditions (#97) — change all three together. A rail in
-  `tests/unit/guardrails.test.ts` holds them to it. **Three exceptions (#216 §1):** #161's session-URL
-  requirement (#191, below), the #97 heartbeat-recording obligation (below) and the freeze history's
-  retired-`frozen`-label rule (below) each have real code enforcement, so each's prose lives here once, as a
-  pointer from the three files, rather than triplicated like the rest — the second-item rule's own four
-  eligibility conditions, the freeze's broader one-time-lift narrative and records-have-readers stay
-  triplicated until each individually earns the same bar.
+- **Each rule has one home; every other file points at it** (`docs/decisions/001-one-home-per-rule.md`, which
+  replaces the three-file rule and #216 §1's enforcement bar). Removing a duplicate is ordinary work as long
+  as the home still carries the rule. Four paragraphs are still copied into `CLAUDE.md`, `BACKLOG.md` and
+  `docs/ROUTINE-PROMPT.md` — the freeze history, records-have-readers, the #161 adoption conditions, the #97
+  second-item conditions. That is debt: until a paragraph is reduced to its home, change its copies together,
+  which `tests/unit/guardrails.test.ts` still checks.
 - **A `REVIEW: CLEARED` comment that is itself a #161 adoption carries its own session URL too (#191)** — the
   same footer every comment carries (#199), so a later reader is not left guessing which session cleared a
   stale block from an unmarked comment. Enforced in code: `hasSessionUrl()` inside `scripts/review-gate.mjs`'s
@@ -40,7 +37,7 @@ paths:
   #98).** Enforced in code: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to
   issue #62 whose body carries two or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — the
   structural signature of a new summary tacked onto the old one instead of replacing it. **This is not a
-  collapse like the two bullets above**, and does not belong in the "Three exceptions" count: records-have-readers
+  collapse like the two bullets above**: records-have-readers
   spans several kinds of record (the PR body, an issue or `docs/decisions/`, `git log`), of which this hook
   covers only the one instruction a run still needs to see inline while it is running STEP 5 — the same reason
   the `- second item:` line above stays inline rather than collapsing to a bare pointer. `CLAUDE.md`,
