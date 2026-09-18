@@ -1013,11 +1013,18 @@ test.describe('Sky Ninja Academy', () => {
       return s.current.sequence as string[];
     });
     expect(words.length).toBeGreaterThanOrEqual(5);
-    await page.waitForFunction((n) => window.__sna.arena.bubbles.length >= n, words.length);
-    const batches = await page.evaluate((ws) => {
-      const bs = window.__sna.arena.bubbles, t0 = Math.min(...bs.map((b: any) => b.launchAt)), used = new Set<number>();
-      return ws.map((w: string) => { const k = bs.findIndex((b: any, i: number) => b.label === w && !used.has(i)); if (k < 0) throw new Error(`no bubble for "${w}"`); used.add(k); return Math.round(bs[k].launchAt - t0); });
+    // nextQuestion() only updates session state; the arena's own wave spawns a frame (or a reveal-hold) later
+    // (play-session.ts's onQuestion), so a bubble count alone can pass against the PREVIOUS wave's leftover
+    // bubbles before the new one lands. Waiting for every target word to resolve to a distinct bubble — not
+    // just enough of them — waits out that gap instead of racing it (a bug this test itself used to hit
+    // intermittently in the nightly full matrix: "no bubble for ..." read stale bubbles from the wave before).
+    const batchesHandle = await page.waitForFunction((ws) => {
+      const bs = window.__sna.arena.bubbles, used = new Set<number>(), idxs: number[] = [];
+      for (const w of ws) { const k = bs.findIndex((b: any, i: number) => b.label === w && !used.has(i)); if (k < 0) return false; used.add(k); idxs.push(k); }
+      const t0 = Math.min(...bs.map((b: any) => b.launchAt));
+      return idxs.map(k => Math.round(bs[k].launchAt - t0));
     }, words);
+    const batches = await batchesHandle.jsonValue();
     // the exact batch layout is unit-tested (dealOrdered); here the user-facing property: no long wait between words
     for (let i = 1; i < batches.length; i++) expect(batches[i] - batches[i - 1]).toBeLessThanOrEqual(5000);
     expect(Math.max(...batches)).toBeLessThanOrEqual(9000);                       // the last word is up within one wave, phone or tablet
