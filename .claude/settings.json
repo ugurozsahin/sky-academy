@@ -48,6 +48,10 @@
           {
             "type": "command",
             "command": "d=$(jq -r 'if (.tool_input.labels // []) | index(\"frozen\") then \"1\" else \"0\" end'); if [ \"$d\" = \"1\" ]; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"The frozen label is retired (CLAUDE.md / .claude/rules/governance.md, #101 layer 0): the code-health freeze the owner lifted on 2026-09-10 (issue #36) is a one-time event that does not re-arm, and no run may apply the frozen label to any issue to reinstate it. Only the owner decides to freeze work again, and that decision does not go through this label.\"}}'; fi"
+          },
+          {
+            "type": "command",
+            "command": "d=$(jq -r 'if (.tool_input.method == \"update\") and (.tool_input.issue_number == 62) and (((.tool_input.body // \"\") | [scan(\"(^|\\n)[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2})?Z — \")] | length) > 1) then \"1\" else \"0\" end'); if [ \"$d\" = \"1\" ]; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"The routine heartbeat (issue #62) must be overwritten each run, never appended to (CLAUDE.md / BACKLOG.md - records have readers, #98/#101 layer 0): this update body contains two or more UTC-timestamp summary lines (the YYYY-MM-DDTHH:MMZ format every heartbeat snapshot starts with), which is the signature of a new summary tacked onto the old one instead of replacing it.\"}}'; fi"
           }
         ]
       }
