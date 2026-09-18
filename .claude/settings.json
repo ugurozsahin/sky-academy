@@ -33,6 +33,15 @@
             "command": "fp=$(jq -r '.tool_input.file_path // empty'); base=$(basename \"$fp\" 2>/dev/null); dir=$(dirname \"$fp\" 2>/dev/null); if [ \"$base\" = \"WORKLOG.md\" ] && { [ \"$dir\" = \".\" ] || [ \"$dir\" = \"$(pwd)\" ]; }; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"WORKLOG.md at the repo root is retired (#98): nothing writes to it again. See docs/worklog/ and BACKLOG.md - Where a record goes.\"}}'; fi"
           }
         ]
+      },
+      {
+        "matcher": "mcp__github__(add_issue_comment|issue_write|pull_request_review_write|update_pull_request|update_issue_comment|create_pull_request|add_comment_to_pending_review|add_reply_to_pull_request_comment)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "body=$(jq -r '.tool_input.body // empty'); printf '%s' \"$body\" | node -e 'let b=\"\";process.stdin.on(\"data\",d=>b+=d);process.stdin.on(\"end\",()=>{const norm=s=>s.replace(/[\\p{Cf}\\p{Cc}\\p{Default_Ignorable_Code_Point}\u3164\ufe0f]+/gu,\"\").replace(/\\s+/g,\" \").trim();const strict=norm(b);const loose=norm(b.replace(/[*_`>#]/g,\"\")).toUpperCase();if(/^OWNER: ?APPROVED/.test(strict)||/^OWNER: ?REJECTED/.test(loose)){process.stdout.write(JSON.stringify({\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"No agent ever writes an OWNER: APPROVED / OWNER: REJECTED marker (CLAUDE.md, #101 layer 0) - only the human owner writes these, in the GitHub UI. This MCP tool call would have posted one at the start of its body, the same shape scripts/review-gate.mjs treats as a real verdict - not just a mention of the marker in prose. Strict/loose checks delete every character in the UNION of Unicode Cf (format), Cc (control) and Default_Ignorable_Code_Point, plus Hangul filler U+3164 and variation selector U+FE0F, wherever they sit in the body - a union, not a swap, because round five replaced Cf/Cc with Default_Ignorable_Code_Point and silently dropped real Cf characters (Egyptian Hieroglyph format controls, Interlinear Annotation marks) that Default_Ignorable does not cover - then collapses remaining ordinary whitespace to a single space, so no zero-width or format character anywhere in the marker can break the match while GitHub still renders it invisibly (#221 sixth review).\"}}));}});'"
+          }
+        ]
       }
     ]
   }

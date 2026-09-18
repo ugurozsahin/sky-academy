@@ -3783,6 +3783,30 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
     expect(curlHook.command, 'the curl-scoped hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
   });
 
+  // #101: PR #217's own body left this as a known gap — the two Bash-scoped marker hooks above only see a
+  // forgery attempt made over `gh`/`curl`; a session posting via an MCP GitHub tool call directly
+  // (`add_issue_comment`, `issue_write`, `pull_request_review_write`, …) isn't a Bash command at all, so
+  // nothing caught that path, which is how this repository's own comments are actually posted.
+  it('a hook denies an MCP GitHub write-tool call whose body opens with an OWNER: marker', () => {
+    const mcpEntry = (readSettings().hooks.PreToolUse as any[])
+      .find((e) => typeof e.matcher === 'string' && e.matcher.includes('mcp__github__'));
+    expect(mcpEntry, 'no PreToolUse entry matches an mcp__github__ tool name').toBeDefined();
+    // Scoped to the write-capable tools, not every mcp__github__ tool (a read like list_issues has no `body`
+    // to check and would just cost a subprocess call on every read for nothing).
+    // #221 review: the first version of this rail asserted only 4 of these 8 names, so a regression dropping
+    // any of the other four from the regex would have shipped past it silently.
+    for (const tool of ['add_issue_comment', 'issue_write', 'pull_request_review_write', 'update_pull_request',
+                         'update_issue_comment', 'create_pull_request', 'add_comment_to_pending_review',
+                         'add_reply_to_pull_request_comment'])
+      expect({ tool, matched: mcpEntry.matcher.includes(tool) }, `${tool} must be in the MCP hook's matcher`)
+        .toEqual({ tool, matched: true });
+    const mcpHook = (mcpEntry.hooks ?? [])[0];
+    expect(mcpHook?.command, 'the MCP-tool hook must read .tool_input.body, not .tool_input.command').toContain('.tool_input.body');
+    expect(mcpHook?.command, 'the MCP-tool hook must check for both markers').toContain('OWNER: APPROVED');
+    expect(mcpHook?.command, 'the MCP-tool hook must check for both markers').toContain('OWNER: REJECTED');
+    expect(mcpHook?.command, 'the MCP-tool hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+
   it('a hook denies writing to WORKLOG.md at the repo root, both via Bash and via Write/Edit', () => {
     const settings = readSettings();
     const bashCommands = allPreToolUseCommands(settings);
@@ -3853,6 +3877,231 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
 
   it('WORKLOG.md Bash hook: allows an append to the archived docs/worklog/*.md path', () => {
     expect(isDeny(runHook(worklogBashHookCmd, 'echo x >> docs/worklog/2026-09.md'))).toBe(false);
+  });
+
+  // #101 (MCP-tool gap): unlike the Bash hooks above, EVERY call an MCP write-tool hook sees really does post
+  // its `body` to GitHub — there is no `if: Bash(gh *)`-style filter that rules out "this call can't post
+  // anyway". A first draft of this hook denied on a bare substring match, which meant it fired on any comment
+  // that merely *mentions* a marker in prose — exactly the false positive #217's Bash hook already hit once,
+  // rediscovered here live: pipe-testing a body that quoted "OWNER: APPROVED" mid-sentence (this project's own
+  // review comments do this constantly, this file included) got denied. Fixed to mirror `isOwnerApproved`/
+  // `isOwnerRejected` in scripts/review-gate.mjs exactly: the marker only counts at the START of the body.
+  const mcpEntry = (settings.hooks.PreToolUse as any[]).find((e) => typeof e.matcher === 'string' && e.matcher.includes('mcp__github__'));
+  const mcpMarkerHookCmd = mcpEntry.hooks[0].command;
+
+  const runBodyHook = (command: string, body: string): unknown => {
+    const stdin = JSON.stringify({ tool_input: { body } });
+    const out = execFileSync('bash', ['-c', command], { input: stdin, encoding: 'utf8' });
+    return out.trim() === '' ? null : JSON.parse(out);
+  };
+
+  it('MCP-tool marker hook: denies a body that opens with OWNER: APPROVED (plain, or after leading whitespace)', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '  \nOWNER: APPROVED\n\nLooks great'))).toBe(true);
+  });
+
+  it('MCP-tool marker hook: denies a body that opens with OWNER: REJECTED, matched loosely like review-gate.mjs', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: REJECTED - not yet'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '**OWNER: REJECTED** - not yet ready')), 'bold markdown at the start must still count, same as REVIEW: CHANGES REQUESTED\'s own loose match').toBe(true);
+  });
+
+  it('MCP-tool marker hook: allows a body that only mentions a marker in prose, not at the start (#101 false positive)', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd,
+      'REVIEW: CLEARED\n\nThis comment discusses the OWNER: APPROVED marker in prose, same as CLAUDE.md does.')),
+      'a marker mentioned mid-body is not a verdict — scripts/review-gate.mjs would not treat it as one either').toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'Pushed abc123, addressing the review. Ready for re-review.'))).toBe(false);
+  });
+
+  // #221 review (session_01Y2hmFMHngKVepeNBXZ4jEs): the strict path used `sed`/`grep` with `^`, which anchors
+  // to the start of EVERY LINE of a multi-line string, not the start of the whole body — unlike the real
+  // `isOwnerApproved` in scripts/review-gate.mjs, a true whole-string `.startsWith()`. A body whose first line
+  // is ordinary prose and whose SECOND line happens to open with "OWNER: APPROVED" (exactly the shape this
+  // project's own comments produce constantly, quoting the marker mid-discussion) was denied even though the
+  // marker was nowhere near the start. Fixed by switching the strict check to bash's own whole-string glob
+  // match (`[[ "$strict" == 'OWNER: APPROVED'* ]]`), which does not split on embedded newlines the way a
+  // line-oriented tool does. None of the tests above would have caught this: every case they cover puts the
+  // marker on the first non-blank line.
+  it('MCP-tool marker hook: allows OWNER: APPROVED-shaped text on a LATER line of an otherwise-unrelated body (#221 review)', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd,
+      'Looks good overall.\nOWNER: APPROVED - clearly quoting CLAUDE.md style here\nRest of comment.')),
+      'the marker is not at the start of the BODY, only at the start of a later line — review-gate.mjs would not treat this as a verdict').toBe(false);
+  });
+
+  // The hook's own asymmetry (APPROVED strict/literal, REJECTED loose/markdown-stripped) means a bold-wrapped
+  // "**OWNER: APPROVED**" does NOT start literally with "OWNER: APPROVED" and must be allowed — worth pinning
+  // explicitly rather than leaving it as something only the REJECTED sibling test documents.
+  it('MCP-tool marker hook: allows a bold-wrapped **OWNER: APPROVED**, per the hook\'s own strict/loose asymmetry', () => {
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '**OWNER: APPROVED**'))).toBe(false);
+  });
+
+  // #221 second review (session_01PX6diT4gEtApGgdssyY1ve): the strict/loose bash checks used `[[:space:]]`/
+  // `tr -s '[:space:]'`, POSIX classes that only recognise ASCII whitespace. A body opening with an invisible
+  // Unicode character — zero-width space, BOM, NBSP, soft hyphen — sailed through both checks undenied, because
+  // stripping "leading whitespace" never touched the invisible character sitting in front of the marker. GitHub
+  // renders these invisibly, so a posted comment reads as a real owner verdict to a human while bypassing the
+  // one mechanical stop against a forged one. Fixed by moving the strict/loose checks into `node -e` and
+  // stripping a small set of zero-width/format characters (ZWSP U+200B, ZWNJ U+200C, ZWJ U+200D, word joiner
+  // U+2060, BOM U+FEFF, soft hyphen U+00AD) alongside ordinary `\s`, which in JS already covers NBSP.
+  it('MCP-tool marker hook: denies a marker preceded by an invisible Unicode character (#221 second review)', () => {
+    for (const [name, ch] of [
+      ['ZWSP', '​'], ['BOM', '﻿'], ['NBSP', ' '], ['soft hyphen', '­'],
+      ['ZWNJ', '‌'], ['ZWJ', '‍'], ['word joiner', '⁠'],
+    ] as const) {
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, ch + 'OWNER: APPROVED')), `${name} before OWNER: APPROVED must still deny`).toBe(true);
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, ch + 'OWNER: REJECTED - no')), `${name} before OWNER: REJECTED must still deny`).toBe(true);
+    }
+  });
+
+
+  // #221 third review (session_017EiTZv7sPtAckGDSxSHHDU): the second review's fix only stripped a LEADING
+  // run of invisible characters (an anchored strip), so a character placed INSIDE the marker itself was
+  // never touched and sailed through denied by neither check. The reviewer also found the enumerated
+  // character list itself was incomplete (LRM, RLM, ALM, the Mongolian vowel separator, an RTL override and
+  // a tag character all bypassed it too, none in the second review's list of six). Fixed by switching from
+  // an anchored strip of an enumerated list to a GLOBAL collapse (every run, anywhere in the body, not just
+  // the start) of ordinary `\s` plus the Unicode `Cf` (format) and `Cc` (control) general categories, which
+  // covers all six of the second review's characters plus LRM/RLM/ALM/the Mongolian separator/the RTL
+  // override/tag characters as one class, rather than growing the enumerated list one discovery at a time.
+  // Two characters the reviewer listed sit outside Cf/Cc (Hangul filler U+3164 is category Lo, variation
+  // selector U+FE0F is category Mn — both categories too broad to strip wholesale without also eating real
+  // Hangul letters or combining accent marks), so those two are still listed explicitly alongside the class.
+  it('MCP-tool marker hook: denies an invisible character placed INSIDE the marker, and a wider character set (#221 third review)', () => {
+    const marker = 'OWNER: APPROVED';
+    const cases: [string, string][] = [
+      ['LRM', '\u200E'], ['RLM', '\u200F'], ['ALM', '\u061C'], ['Mongolian vowel separator', '\u180E'],
+      ['RTL override', '\u202E'], ['Hangul filler', '\u3164'], ['variation selector', '\uFE0F'],
+      ['tag character', '\u{E0001}'],
+    ];
+    for (const [name, ch] of cases) {
+      // leading (the position the second review's fix already covered — re-checked against the wider set)
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, ch + marker)), `${name} leading must deny`).toBe(true);
+      // mid-marker: after the colon, and after the space — the position the second review's fix missed
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER:' + ch + 'APPROVED')), `${name} after the colon must deny`).toBe(true);
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: ' + ch + 'APPROVED')), `${name} after the space must deny`).toBe(true);
+    }
+    // the same mid-marker placement for one of the second review's own six characters (ZWSP), to pin the
+    // new GLOBAL-strip behaviour directly against the regression it fixes, not just the wider character set
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER:\u200BAPPROVED')), 'ZWSP after the colon must deny').toBe(true);
+  });
+
+  // #221 fourth round (self-found during post-merge verification, session_011U9Jb5evcfFDNFPyPWyTFd): the third
+  // review's fix only tested an invisible character adjacent to the colon or the space already present in
+  // "OWNER: APPROVED" — at those two boundary positions, collapsing a run of invisible characters to a single
+  // space reproduces the marker exactly, because a space already belonged there. Placed strictly INSIDE a word
+  // instead (between two ordinary letters, where no whitespace belongs), the same collapse-to-a-space behaviour
+  // inserts a space that was never part of the marker — "APP<ZWSP>ROVED" becomes "APP ROVED", which no longer
+  // starts with "APPROVED" — so the check silently fails to deny, while GitHub still renders the zero-width
+  // character as nothing, so a human reads the posted comment as a genuine, unbroken "OWNER: APPROVED".
+  // Fixed by no longer collapsing invisible/format/control characters into a space at all: they are zero-width,
+  // so deleting them outright leaves no visual gap for a human to notice either way, and it stops them from
+  // fabricating a word-breaking space that was never there. Ordinary whitespace (`\s`, which also covers a
+  // visibly-wide character like NBSP) is still collapsed to a single space afterwards, unchanged from before —
+  // a real gap in the text should still break the marker, since a human would see that gap regardless.
+  // Proved red first: ran this exact case against the pre-fix (third-review) hook, watched it wrongly allow.
+  it('MCP-tool marker hook: denies an invisible character placed strictly inside a word, with no adjacent whitespace (#221 fourth review)', () => {
+    const cases: [string, string][] = [
+      ['ZWSP', '​'], ['ZWNJ', '‌'], ['ZWJ', '‍'], ['word joiner', '⁠'],
+      ['BOM', '﻿'], ['soft hyphen', '­'], ['LRM', '‎'], ['RLM', '‏'],
+    ];
+    for (const [name, ch] of cases) {
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must deny`).toBe(true);
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OW${ch}NER: APPROVED`)), `${name} inside OWNER must deny`).toBe(true);
+    }
+    // stacked invisible characters mid-word must not collapse into a single fabricated space either
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: AP​﻿­PROVED')), 'stacked invisible characters mid-word must deny').toBe(true);
+    // a genuinely visible gap (NBSP has real width, unlike the characters above) should still break the
+    // marker and correctly NOT deny — this is not a bypass, a human would see the broken word too
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: AP PROVED'))).toBe(false);
+    // every previously-fixed case must still pass unmodified
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '​OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER:​APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '**OWNER: APPROVED**'))).toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'This discusses OWNER: APPROVED in prose.'))).toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'Looks good.\nOWNER: APPROVED - quoting style\nRest.'))).toBe(false);
+  });
+
+
+  // #221 fifth review (session_017EiTZv7sPtAckGDSxSHHDU): the fourth review's fix deleted a hand-picked
+  // Cf/Cc-plus-two-stragglers set, which happened to cover every character the first four rounds had tried
+  // but was still not exhaustive — Unicode has other invisible-when-unsupported characters outside Cf/Cc
+  // entirely (the Mn — nonspacing mark — general category has combining marks and variation selectors that
+  // render as nothing when not attached to a base character they modify). Fixed by replacing the ad hoc
+  // Cf/Cc-plus-stragglers list with Unicode's own `Default_Ignorable_Code_Point` binary property — the
+  // property Unicode maintains specifically for "should be ignored by default when otherwise unsupported",
+  // which is exactly this hook's threat model — combined with `\p{Cc}` (kept separately for real control
+  // characters, since `Default_Ignorable_Code_Point` and `Cc` are largely disjoint sets and literal newlines
+  // still need folding). This covers every character found across all five review rounds as one class,
+  // rather than enumerating another one-off exception.
+  it('MCP-tool marker hook: denies invisible characters outside the Cf/Cc categories the fourth review covered (#221 fifth review)', () => {
+    const cases: [string, string][] = [
+      ['Combining Grapheme Joiner', '\u034F'], ['Mongolian Free Variation Selector-1', '\u180B'],
+      ['Variation Selector-17', '\u{E0100}'], ['Khmer Vowel Inherent AQ', '\u17B4'],
+    ];
+    for (const [name, ch] of cases) {
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must deny`).toBe(true);
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `${ch}OWNER: APPROVED`)), `${name} leading must deny`).toBe(true);
+    }
+    // every character from every prior round must still deny, at every position already pinned
+    const priorChars: [string, string][] = [
+      ['ZWSP', '\u200B'], ['LRM', '\u200E'], ['RLM', '\u200F'], ['ALM', '\u061C'],
+      ['Mongolian vowel separator', '\u180E'], ['RTL override', '\u202E'],
+      ['Hangul filler', '\u3164'], ['variation selector', '\uFE0F'], ['tag character', '\u{E0001}'],
+    ];
+    for (const [name, ch] of priorChars) {
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must still deny`).toBe(true);
+    }
+    // a genuine visible gap must still correctly NOT deny — not a bypass, a human would see the break
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APP\u00A0ROVED')), 'NBSP mid-word must not deny').toBe(false);
+    // every previously-fixed case must still pass unmodified
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '**OWNER: APPROVED**'))).toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'This discusses OWNER: APPROVED in prose.'))).toBe(false);
+  });
+
+
+  // #221 sixth review (session_017EiTZv7sPtAckGDSxSHHDU, catching its own round-5 recommendation): swapping
+  // the round-4 set (`\p{Cf}` + `\p{Cc}` + two stragglers) for `\p{Default_Ignorable_Code_Point}` + `\p{Cc}`
+  // was a REPLACEMENT, not a union, and `Default_Ignorable_Code_Point` is not a superset of `Cf` — some real
+  // Cf (format) characters are deliberately excluded from Default_Ignorable in the Unicode Character Database
+  // (Unicode's own position is that a conformant renderer should support them, not silently ignore them), but
+  // GitHub's comment renderer does not implement their semantics either, so they render as nothing in
+  // practice — same bypass shape as every character found so far. Confirmed as an actual regression: these
+  // four characters were correctly denied by round 4 (`\p{Cf}` alone caught them) and became silently allowed
+  // by round 5's swap. Fixed by taking the UNION of every class found useful so far — `Cf`, `Cc`,
+  // `Default_Ignorable_Code_Point`, plus the two stragglers outside all three — rather than trying again to
+  // find one clean replacement set. The reviewer's own conclusion, worth recording: an addition to the
+  // accumulated set has been sound every round; an attempt to simplify it by swapping for something cleaner
+  // has reopened a previously-closed gap both times it was tried (round 3's global-vs-anchored swap did not
+  // have this problem, but round 5's category swap did) — so this round only adds, it does not replace.
+  it('MCP-tool marker hook: denies real Cf format characters that Default_Ignorable_Code_Point alone dropped (#221 sixth review)', () => {
+    const cases: [string, string][] = [
+      ['Egyptian Hieroglyph format control', '\u{13430}'], ['Interlinear Annotation Anchor', '\uFFF9'],
+      ['Interlinear Annotation Separator', '\uFFFA'], ['Interlinear Annotation Terminator', '\uFFFB'],
+    ];
+    for (const [name, ch] of cases) {
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must deny`).toBe(true);
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `${ch}OWNER: APPROVED`)), `${name} leading must deny`).toBe(true);
+    }
+    // every character from every prior round (rounds 1-5, 18 characters) must still deny
+    const priorChars: [string, string][] = [
+      ['ZWSP', '\u200B'], ['LRM', '\u200E'], ['Hangul filler', '\u3164'], ['variation selector', '\uFE0F'],
+      ['Combining Grapheme Joiner', '\u034F'], ['Mongolian Free Variation Selector-1', '\u180B'],
+      ['Variation Selector-17', '\u{E0100}'], ['Khmer Vowel Inherent AQ', '\u17B4'],
+    ];
+    for (const [name, ch] of priorChars) {
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must still deny`).toBe(true);
+    }
+    // real visible gaps and ordinary allow-cases must still behave exactly as before
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APP\u00A0ROVED')), 'NBSP mid-word must not deny').toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '**OWNER: APPROVED**'))).toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'This discusses OWNER: APPROVED in prose.'))).toBe(false);
+  });
+
+  it('MCP-tool marker hook: allows a body with no body field at all', () => {
+    const out = execFileSync('bash', ['-c', mcpMarkerHookCmd], { input: JSON.stringify({ tool_input: {} }), encoding: 'utf8' });
+    expect(out.trim()).toBe('');
   });
 });
 
