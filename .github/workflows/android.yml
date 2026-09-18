@@ -20,15 +20,15 @@ jobs:
     permissions:
       contents: write          # the tag step attaches the APK to a GitHub Release
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - name: Unit tests + typecheck
         run: npx tsc --noEmit && npm test
       - name: Web build
         run: npm run build
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: 21 }
       # `packages` is named explicitly, and that is the point of naming it (#129). Left to its default the
       # action asks sdkmanager for `tools platform-tools`, and `tools` is the retired legacy SDK Tools
@@ -37,9 +37,9 @@ jobs:
       # read. The platform and build-tools are deliberately NOT listed: AGP downloads the ones
       # android/variables.gradle asks for (compileSdkVersion) once this step has accepted the licences, and
       # a list here would be a second place to keep in step with that file.
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with: { packages: 'platform-tools' }
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
       - name: Copy the web build into the Android project
         run: npx cap sync android
       - name: Stable debug signing key (optional secret ANDROID_DEBUG_KEYSTORE = base64 of a debug.keystore, password "android")
@@ -50,12 +50,12 @@ jobs:
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
       - name: Rename
         run: cp android/app/build/outputs/apk/debug/app-debug.apk sky-ninja-academy-${{ github.sha }}.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: sky-ninja-academy-apk
           path: sky-ninja-academy-*.apk
           retention-days: 30
       - name: Attach to the release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with: { files: sky-ninja-academy-*.apk }
