@@ -43,6 +43,17 @@
           }
         ]
       }
+    ],
+    "InstructionsLoaded": [
+      {
+        "matcher": "path_glob_match",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.file_path' >> \"${CLAUDE_PROJECT_DIR:-.}/.claude/instructions-loaded.log\""
+          }
+        ]
+      }
     ]
   }
 }
