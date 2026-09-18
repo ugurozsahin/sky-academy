@@ -1,0 +1,534 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, describe, expect, it } from 'vitest';
+// @ts-expect-error — plain ESM, run by Claude Code as a PreToolUse hook (.claude/settings.json)
+import { forcePush, ownerMarker as bashOwnerMarker, worklogAppend } from '../../.claude/hooks/bash-guard.mjs';
+// @ts-expect-error — plain ESM hook script
+import { check as writeCheck } from '../../.claude/hooks/write-guard.mjs';
+// @ts-expect-error — plain ESM hook script
+import { frozenLabel, heartbeatAppend, ownerMarker, secondItem } from '../../.claude/hooks/github-write-guard.mjs';
+
+/**
+ * The layer-0 hooks (#101): `.claude/settings.json` runs one script per tool family before the tool call,
+ * and a script denies by printing a PreToolUse `deny`. The rules are pure functions in `.claude/hooks/*.mjs`,
+ * so most cases below call them directly; the wiring tests at the end run the real command strings out of
+ * `.claude/settings.json`, the way the harness does.
+ *
+ * Prove one red: break a regex in a hook script, or point a settings.json command at a file that is not there.
+ */
+const root = fileURLToPath(new URL('../../', import.meta.url));
+const settings = JSON.parse(readFileSync(join(root, '.claude/settings.json'), 'utf8'));
+
+type Check<T> = (input: T) => string | null;
+const asDeny = (reason: string | null) =>
+  reason ? { hookSpecificOutput: { permissionDecision: 'deny', permissionDecisionReason: reason } } : null;
+const isDeny = (result: unknown) => (result as any)?.hookSpecificOutput?.permissionDecision === 'deny';
+const runHook = (check: Check<string>, command: string) => asDeny(check(command));
+const runBodyHook = (check: Check<{ body: string }>, body: string) => asDeny(check({ body }));
+const runIssueWriteHook = (input: Record<string, unknown>) => asDeny(secondItem(input));
+const runLabelsHook = (input: Record<string, unknown>) => asDeny(frozenLabel(input));
+const runAppendHook = (input: Record<string, unknown>) => asDeny(heartbeatAppend(input));
+
+// The CANON check shells out to `curl`, so it runs as the real script with a fake `curl` first on PATH.
+const runCanonHook = (input: Record<string, unknown>, env: NodeJS.ProcessEnv = process.env): unknown => {
+  const out = execFileSync('node', [join(root, '.claude/hooks/github-write-guard.mjs')],
+    { input: JSON.stringify({ tool_input: input }), encoding: 'utf8', env });
+  return out.trim() === '' ? null : JSON.parse(out);
+};
+
+describe('layer-0 hooks: what each rule denies and allows', () => {
+  // #231: the hook's `if:` filter is best-effort (Claude Code runs the hook anyway on `$()`, backticks or
+  // `$VAR`), and the old check read any ` -f ` as a force flag — so it denied commands that push nothing.
+  it('force-push hook: leaves a command that is not a git push alone, whatever flags it carries (#231)', () => {
+    for (const cmd of ['rm -rf dist', 'tail -f build.log', 'gh api repos/o/r/issues -f title=x',
+                       'echo "$(date)" && rm -rf "$TMP"', 'git commit -m "push -f later"', 'git log --oneline -f'])
+      expect({ cmd, denied: isDeny(runHook(forcePush, cmd)) }).toEqual({ cmd, denied: false });
+  });
+
+  it('force-push hook: still finds the push inside a compound command, behind git options, or as a +refspec', () => {
+    for (const cmd of ['cd repo && git push --force', 'git -C /tmp/x push -f origin main', 'git push origin +main',
+                       'git push --force-if-includes origin main', 'echo $(git push -f)'])
+      expect({ cmd, denied: isDeny(runHook(forcePush, cmd)) }).toEqual({ cmd, denied: true });
+  });
+
+  it('force-push hook: denies --force, -f, --force-with-lease, and a combined -uf/-fu cluster', () => {
+    expect(isDeny(runHook(forcePush, 'git push --force origin main'))).toBe(true);
+    expect(isDeny(runHook(forcePush, 'git push -f origin main'))).toBe(true);
+    expect(isDeny(runHook(forcePush, 'git push --force-with-lease origin main'))).toBe(true);
+    expect(isDeny(runHook(forcePush, 'git push -uf origin main')), '#217 review: a combined short-flag cluster must not bypass this').toBe(true);
+    expect(isDeny(runHook(forcePush, 'git push -fu origin main'))).toBe(true);
+  });
+
+  it('force-push hook: allows a plain push and a branch name that merely contains the word "force"', () => {
+    expect(isDeny(runHook(forcePush, 'git push -u origin feature/1-x'))).toBe(false);
+    expect(isDeny(runHook(forcePush, 'git push -u origin fix/1-force-push-test'))).toBe(false);
+  });
+
+  it('OWNER-marker hooks: deny a gh/curl command carrying either marker, allow one that does not', () => {
+    expect(isDeny(runHook(bashOwnerMarker, "gh pr comment 1 --body 'OWNER: APPROVED'"))).toBe(true);
+    expect(isDeny(runHook(bashOwnerMarker, "gh pr comment 1 --body 'OWNER: REJECTED - no'"))).toBe(true);
+    expect(isDeny(runHook(bashOwnerMarker, "gh pr comment 1 --body 'REVIEW: CLEARED'"))).toBe(false);
+    expect(isDeny(runHook(bashOwnerMarker, "curl -X POST https://api.github.com/repos/x/y/issues/1/comments -d 'body=OWNER: APPROVED'"))).toBe(true);
+    expect(isDeny(runHook(bashOwnerMarker, "curl -X POST https://api.github.com/repos/x/y/issues/1/comments -d 'body=REVIEW: CLEARED'"))).toBe(false);
+  });
+
+  it('WORKLOG.md Bash hook: denies a bare, absolute-path, and quoted-filename append to the root file', () => {
+    expect(isDeny(runHook(worklogAppend, 'echo x >> WORKLOG.md'))).toBe(true);
+    expect(isDeny(runHook(worklogAppend, 'echo x >> /home/user/sky-academy/WORKLOG.md')), '#217 review: an absolute path must not bypass this').toBe(true);
+    expect(isDeny(runHook(worklogAppend, 'echo x >> "WORKLOG.md"')), '#217 review: quoting the filename must not bypass this').toBe(true);
+  });
+
+  it('WORKLOG.md Bash hook: allows an append to the archived docs/worklog/*.md path', () => {
+    expect(isDeny(runHook(worklogAppend, 'echo x >> docs/worklog/2026-09.md'))).toBe(false);
+  });
+
+  // #101 (MCP-tool gap): unlike the Bash hooks above, EVERY call an MCP write-tool hook sees really does post
+  // its `body` to GitHub — there is no `if: Bash(gh *)`-style filter that rules out "this call can't post
+  // anyway". A first draft of this hook denied on a bare substring match, which meant it fired on any comment
+  // that merely *mentions* a marker in prose — exactly the false positive #217's Bash hook already hit once,
+  // rediscovered here live: pipe-testing a body that quoted "OWNER: APPROVED" mid-sentence (this project's own
+  // review comments do this constantly, this file included) got denied. Fixed to mirror `isOwnerApproved`/
+  // `isOwnerRejected` in scripts/review-gate.mjs exactly: the marker only counts at the START of the body.
+  it('MCP-tool marker hook: denies a body that opens with OWNER: APPROVED (plain, or after leading whitespace)', () => {
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(ownerMarker, '  \nOWNER: APPROVED\n\nLooks great'))).toBe(true);
+  });
+
+  it('MCP-tool marker hook: denies a body that opens with OWNER: REJECTED, matched loosely like review-gate.mjs', () => {
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER: REJECTED - not yet'))).toBe(true);
+    expect(isDeny(runBodyHook(ownerMarker, '**OWNER: REJECTED** - not yet ready')), 'bold markdown at the start must still count, same as REVIEW: CHANGES REQUESTED\'s own loose match').toBe(true);
+  });
+
+  it('MCP-tool marker hook: allows a body that only mentions a marker in prose, not at the start (#101 false positive)', () => {
+    expect(isDeny(runBodyHook(ownerMarker,
+      'REVIEW: CLEARED\n\nThis comment discusses the OWNER: APPROVED marker in prose, same as CLAUDE.md does.')),
+      'a marker mentioned mid-body is not a verdict — scripts/review-gate.mjs would not treat it as one either').toBe(false);
+    expect(isDeny(runBodyHook(ownerMarker, 'Pushed abc123, addressing the review. Ready for re-review.'))).toBe(false);
+  });
+
+  // #221 review (session_01Y2hmFMHngKVepeNBXZ4jEs): the strict path used `sed`/`grep` with `^`, which anchors
+  // to the start of EVERY LINE of a multi-line string, not the start of the whole body — unlike the real
+  // `isOwnerApproved` in scripts/review-gate.mjs, a true whole-string `.startsWith()`. A body whose first line
+  // is ordinary prose and whose SECOND line happens to open with "OWNER: APPROVED" (exactly the shape this
+  // project's own comments produce constantly, quoting the marker mid-discussion) was denied even though the
+  // marker was nowhere near the start. Fixed by switching the strict check to bash's own whole-string glob
+  // match (`[[ "$strict" == 'OWNER: APPROVED'* ]]`), which does not split on embedded newlines the way a
+  // line-oriented tool does. None of the tests above would have caught this: every case they cover puts the
+  // marker on the first non-blank line.
+  it('MCP-tool marker hook: allows OWNER: APPROVED-shaped text on a LATER line of an otherwise-unrelated body (#221 review)', () => {
+    expect(isDeny(runBodyHook(ownerMarker,
+      'Looks good overall.\nOWNER: APPROVED - clearly quoting CLAUDE.md style here\nRest of comment.')),
+      'the marker is not at the start of the BODY, only at the start of a later line — review-gate.mjs would not treat this as a verdict').toBe(false);
+  });
+
+  // The hook's own asymmetry (APPROVED strict/literal, REJECTED loose/markdown-stripped) means a bold-wrapped
+  // "**OWNER: APPROVED**" does NOT start literally with "OWNER: APPROVED" and must be allowed — worth pinning
+  // explicitly rather than leaving it as something only the REJECTED sibling test documents.
+  it('MCP-tool marker hook: allows a bold-wrapped **OWNER: APPROVED**, per the hook\'s own strict/loose asymmetry', () => {
+    expect(isDeny(runBodyHook(ownerMarker, '**OWNER: APPROVED**'))).toBe(false);
+  });
+
+  // #221 second review (session_01PX6diT4gEtApGgdssyY1ve): the strict/loose bash checks used `[[:space:]]`/
+  // `tr -s '[:space:]'`, POSIX classes that only recognise ASCII whitespace. A body opening with an invisible
+  // Unicode character — zero-width space, BOM, NBSP, soft hyphen — sailed through both checks undenied, because
+  // stripping "leading whitespace" never touched the invisible character sitting in front of the marker. GitHub
+  // renders these invisibly, so a posted comment reads as a real owner verdict to a human while bypassing the
+  // one mechanical stop against a forged one. Fixed by moving the strict/loose checks into `node -e` and
+  // stripping a small set of zero-width/format characters (ZWSP U+200B, ZWNJ U+200C, ZWJ U+200D, word joiner
+  // U+2060, BOM U+FEFF, soft hyphen U+00AD) alongside ordinary `\s`, which in JS already covers NBSP.
+  it('MCP-tool marker hook: denies a marker preceded by an invisible Unicode character (#221 second review)', () => {
+    for (const [name, ch] of [
+      ['ZWSP', '​'], ['BOM', '﻿'], ['NBSP', ' '], ['soft hyphen', '­'],
+      ['ZWNJ', '‌'], ['ZWJ', '‍'], ['word joiner', '⁠'],
+    ] as const) {
+      expect(isDeny(runBodyHook(ownerMarker, ch + 'OWNER: APPROVED')), `${name} before OWNER: APPROVED must still deny`).toBe(true);
+      expect(isDeny(runBodyHook(ownerMarker, ch + 'OWNER: REJECTED - no')), `${name} before OWNER: REJECTED must still deny`).toBe(true);
+    }
+  });
+
+
+  // #221 third review (session_017EiTZv7sPtAckGDSxSHHDU): the second review's fix only stripped a LEADING
+  // run of invisible characters (an anchored strip), so a character placed INSIDE the marker itself was
+  // never touched and sailed through denied by neither check. The reviewer also found the enumerated
+  // character list itself was incomplete (LRM, RLM, ALM, the Mongolian vowel separator, an RTL override and
+  // a tag character all bypassed it too, none in the second review's list of six). Fixed by switching from
+  // an anchored strip of an enumerated list to a GLOBAL collapse (every run, anywhere in the body, not just
+  // the start) of ordinary `\s` plus the Unicode `Cf` (format) and `Cc` (control) general categories, which
+  // covers all six of the second review's characters plus LRM/RLM/ALM/the Mongolian separator/the RTL
+  // override/tag characters as one class, rather than growing the enumerated list one discovery at a time.
+  // Two characters the reviewer listed sit outside Cf/Cc (Hangul filler U+3164 is category Lo, variation
+  // selector U+FE0F is category Mn — both categories too broad to strip wholesale without also eating real
+  // Hangul letters or combining accent marks), so those two are still listed explicitly alongside the class.
+  it('MCP-tool marker hook: denies an invisible character placed INSIDE the marker, and a wider character set (#221 third review)', () => {
+    const marker = 'OWNER: APPROVED';
+    const cases: [string, string][] = [
+      ['LRM', '\u200E'], ['RLM', '\u200F'], ['ALM', '\u061C'], ['Mongolian vowel separator', '\u180E'],
+      ['RTL override', '\u202E'], ['Hangul filler', '\u3164'], ['variation selector', '\uFE0F'],
+      ['tag character', '\u{E0001}'],
+    ];
+    for (const [name, ch] of cases) {
+      // leading (the position the second review's fix already covered — re-checked against the wider set)
+      expect(isDeny(runBodyHook(ownerMarker, ch + marker)), `${name} leading must deny`).toBe(true);
+      // mid-marker: after the colon, and after the space — the position the second review's fix missed
+      expect(isDeny(runBodyHook(ownerMarker, 'OWNER:' + ch + 'APPROVED')), `${name} after the colon must deny`).toBe(true);
+      expect(isDeny(runBodyHook(ownerMarker, 'OWNER: ' + ch + 'APPROVED')), `${name} after the space must deny`).toBe(true);
+    }
+    // the same mid-marker placement for one of the second review's own six characters (ZWSP), to pin the
+    // new GLOBAL-strip behaviour directly against the regression it fixes, not just the wider character set
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER:\u200BAPPROVED')), 'ZWSP after the colon must deny').toBe(true);
+  });
+
+  // #221 fourth round (self-found during post-merge verification, session_011U9Jb5evcfFDNFPyPWyTFd): the third
+  // review's fix only tested an invisible character adjacent to the colon or the space already present in
+  // "OWNER: APPROVED" — at those two boundary positions, collapsing a run of invisible characters to a single
+  // space reproduces the marker exactly, because a space already belonged there. Placed strictly INSIDE a word
+  // instead (between two ordinary letters, where no whitespace belongs), the same collapse-to-a-space behaviour
+  // inserts a space that was never part of the marker — "APP<ZWSP>ROVED" becomes "APP ROVED", which no longer
+  // starts with "APPROVED" — so the check silently fails to deny, while GitHub still renders the zero-width
+  // character as nothing, so a human reads the posted comment as a genuine, unbroken "OWNER: APPROVED".
+  // Fixed by no longer collapsing invisible/format/control characters into a space at all: they are zero-width,
+  // so deleting them outright leaves no visual gap for a human to notice either way, and it stops them from
+  // fabricating a word-breaking space that was never there. Ordinary whitespace (`\s`, which also covers a
+  // visibly-wide character like NBSP) is still collapsed to a single space afterwards, unchanged from before —
+  // a real gap in the text should still break the marker, since a human would see that gap regardless.
+  // Proved red first: ran this exact case against the pre-fix (third-review) hook, watched it wrongly allow.
+  it('MCP-tool marker hook: denies an invisible character placed strictly inside a word, with no adjacent whitespace (#221 fourth review)', () => {
+    const cases: [string, string][] = [
+      ['ZWSP', '​'], ['ZWNJ', '‌'], ['ZWJ', '‍'], ['word joiner', '⁠'],
+      ['BOM', '﻿'], ['soft hyphen', '­'], ['LRM', '‎'], ['RLM', '‏'],
+    ];
+    for (const [name, ch] of cases) {
+      expect(isDeny(runBodyHook(ownerMarker, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must deny`).toBe(true);
+      expect(isDeny(runBodyHook(ownerMarker, `OW${ch}NER: APPROVED`)), `${name} inside OWNER must deny`).toBe(true);
+    }
+    // stacked invisible characters mid-word must not collapse into a single fabricated space either
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER: AP​﻿­PROVED')), 'stacked invisible characters mid-word must deny').toBe(true);
+    // a genuinely visible gap (NBSP has real width, unlike the characters above) should still break the
+    // marker and correctly NOT deny — this is not a bypass, a human would see the broken word too
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER: AP PROVED'))).toBe(false);
+    // every previously-fixed case must still pass unmodified
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(ownerMarker, '​OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER:​APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(ownerMarker, '**OWNER: APPROVED**'))).toBe(false);
+    expect(isDeny(runBodyHook(ownerMarker, 'This discusses OWNER: APPROVED in prose.'))).toBe(false);
+    expect(isDeny(runBodyHook(ownerMarker, 'Looks good.\nOWNER: APPROVED - quoting style\nRest.'))).toBe(false);
+  });
+
+
+  // #221 fifth review (session_017EiTZv7sPtAckGDSxSHHDU): the fourth review's fix deleted a hand-picked
+  // Cf/Cc-plus-two-stragglers set, which happened to cover every character the first four rounds had tried
+  // but was still not exhaustive — Unicode has other invisible-when-unsupported characters outside Cf/Cc
+  // entirely (the Mn — nonspacing mark — general category has combining marks and variation selectors that
+  // render as nothing when not attached to a base character they modify). Fixed by replacing the ad hoc
+  // Cf/Cc-plus-stragglers list with Unicode's own `Default_Ignorable_Code_Point` binary property — the
+  // property Unicode maintains specifically for "should be ignored by default when otherwise unsupported",
+  // which is exactly this hook's threat model — combined with `\p{Cc}` (kept separately for real control
+  // characters, since `Default_Ignorable_Code_Point` and `Cc` are largely disjoint sets and literal newlines
+  // still need folding). This covers every character found across all five review rounds as one class,
+  // rather than enumerating another one-off exception.
+  it('MCP-tool marker hook: denies invisible characters outside the Cf/Cc categories the fourth review covered (#221 fifth review)', () => {
+    const cases: [string, string][] = [
+      ['Combining Grapheme Joiner', '\u034F'], ['Mongolian Free Variation Selector-1', '\u180B'],
+      ['Variation Selector-17', '\u{E0100}'], ['Khmer Vowel Inherent AQ', '\u17B4'],
+    ];
+    for (const [name, ch] of cases) {
+      expect(isDeny(runBodyHook(ownerMarker, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must deny`).toBe(true);
+      expect(isDeny(runBodyHook(ownerMarker, `${ch}OWNER: APPROVED`)), `${name} leading must deny`).toBe(true);
+    }
+    // every character from every prior round must still deny, at every position already pinned
+    const priorChars: [string, string][] = [
+      ['ZWSP', '\u200B'], ['LRM', '\u200E'], ['RLM', '\u200F'], ['ALM', '\u061C'],
+      ['Mongolian vowel separator', '\u180E'], ['RTL override', '\u202E'],
+      ['Hangul filler', '\u3164'], ['variation selector', '\uFE0F'], ['tag character', '\u{E0001}'],
+    ];
+    for (const [name, ch] of priorChars) {
+      expect(isDeny(runBodyHook(ownerMarker, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must still deny`).toBe(true);
+    }
+    // a genuine visible gap must still correctly NOT deny — not a bypass, a human would see the break
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER: APP\u00A0ROVED')), 'NBSP mid-word must not deny').toBe(false);
+    // every previously-fixed case must still pass unmodified
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(ownerMarker, '**OWNER: APPROVED**'))).toBe(false);
+    expect(isDeny(runBodyHook(ownerMarker, 'This discusses OWNER: APPROVED in prose.'))).toBe(false);
+  });
+
+
+  // #221 sixth review (session_017EiTZv7sPtAckGDSxSHHDU, catching its own round-5 recommendation): swapping
+  // the round-4 set (`\p{Cf}` + `\p{Cc}` + two stragglers) for `\p{Default_Ignorable_Code_Point}` + `\p{Cc}`
+  // was a REPLACEMENT, not a union, and `Default_Ignorable_Code_Point` is not a superset of `Cf` — some real
+  // Cf (format) characters are deliberately excluded from Default_Ignorable in the Unicode Character Database
+  // (Unicode's own position is that a conformant renderer should support them, not silently ignore them), but
+  // GitHub's comment renderer does not implement their semantics either, so they render as nothing in
+  // practice — same bypass shape as every character found so far. Confirmed as an actual regression: these
+  // four characters were correctly denied by round 4 (`\p{Cf}` alone caught them) and became silently allowed
+  // by round 5's swap. Fixed by taking the UNION of every class found useful so far — `Cf`, `Cc`,
+  // `Default_Ignorable_Code_Point`, plus the two stragglers outside all three — rather than trying again to
+  // find one clean replacement set. The reviewer's own conclusion, worth recording: an addition to the
+  // accumulated set has been sound every round; an attempt to simplify it by swapping for something cleaner
+  // has reopened a previously-closed gap both times it was tried (round 3's global-vs-anchored swap did not
+  // have this problem, but round 5's category swap did) — so this round only adds, it does not replace.
+  it('MCP-tool marker hook: denies real Cf format characters that Default_Ignorable_Code_Point alone dropped (#221 sixth review)', () => {
+    const cases: [string, string][] = [
+      ['Egyptian Hieroglyph format control', '\u{13430}'], ['Interlinear Annotation Anchor', '\uFFF9'],
+      ['Interlinear Annotation Separator', '\uFFFA'], ['Interlinear Annotation Terminator', '\uFFFB'],
+    ];
+    for (const [name, ch] of cases) {
+      expect(isDeny(runBodyHook(ownerMarker, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must deny`).toBe(true);
+      expect(isDeny(runBodyHook(ownerMarker, `${ch}OWNER: APPROVED`)), `${name} leading must deny`).toBe(true);
+    }
+    // every character from every prior round (rounds 1-5, 18 characters) must still deny
+    const priorChars: [string, string][] = [
+      ['ZWSP', '\u200B'], ['LRM', '\u200E'], ['Hangul filler', '\u3164'], ['variation selector', '\uFE0F'],
+      ['Combining Grapheme Joiner', '\u034F'], ['Mongolian Free Variation Selector-1', '\u180B'],
+      ['Variation Selector-17', '\u{E0100}'], ['Khmer Vowel Inherent AQ', '\u17B4'],
+    ];
+    for (const [name, ch] of priorChars) {
+      expect(isDeny(runBodyHook(ownerMarker, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must still deny`).toBe(true);
+    }
+    // real visible gaps and ordinary allow-cases must still behave exactly as before
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER: APP\u00A0ROVED')), 'NBSP mid-word must not deny').toBe(false);
+    expect(isDeny(runBodyHook(ownerMarker, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(ownerMarker, '**OWNER: APPROVED**'))).toBe(false);
+    expect(isDeny(runBodyHook(ownerMarker, 'This discusses OWNER: APPROVED in prose.'))).toBe(false);
+  });
+
+  it('MCP-tool marker hook: allows a body with no body field at all', () => {
+    expect(ownerMarker({})).toBeNull();
+  });
+
+  // #101 Layer 4 / #216 §1: the #97 second-item rule ("the run's heartbeat snapshot says whether it took one
+  // and, if not, which condition failed") had no check beyond the three files agreeing with each other in
+  // prose — nothing stopped an actual heartbeat update from landing without the line #97 asks for. This hook
+  // is the one piece of #97 with real behavioural enforcement, which is what #216 §1's bar requires before a
+  // triplicated rule's copy may collapse to a pointer (as #191's session-URL requirement already did, #235).
+  // Scoped to only the routine heartbeat's own `update` calls (issue #62) — a `create` never needs this (the
+  // issue exists already; #62 has never been recreated) and no other issue_write call is this rule's business.
+  it('#97 second-item hook: denies an update to the routine heartbeat (#62) whose body has no `- second item:` line', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: '2026-09-18T00:00Z — did stuff\n- nightly: ok\n- main: green' }))).toBe(true);
+  });
+
+  it('#97 second-item hook: allows an update to #62 whose body carries the line, wherever it sits', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'stuff\n- second item: no — condition 1 failed\n- main: green' }))).toBe(false);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: '- second item: yes, PR #77' }))).toBe(false);
+  });
+
+  it('#97 second-item hook: only scopes to issue #62 — a different issue_write is not this rule\'s business', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 61, body: 'watchdog pulse, no second-item line — never develops' }))).toBe(false);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 236, body: 'an ordinary issue body with no such line' }))).toBe(false);
+  });
+
+  it('#97 second-item hook: only scopes to `update` — a `create` call is not gated (the issue already exists)', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'create', issue_number: 62, body: 'a brand new issue body, no line' }))).toBe(false);
+  });
+
+  it('#97 second-item hook: a mention of "second item" in prose, not as its own `- second item:` line, still denies', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'we discussed the second item rule casually but never wrote the line' }))).toBe(true);
+  });
+
+  // #101 Layer 4 / #216 §1: the freeze-history rule's one enforceable piece — see the structural test above
+  // ("a hook denies applying the `frozen` label") for why this, and not the broader lift narrative, is what
+  // collapses. `.tool_input.labels` is a real array on `issue_write` (create and update alike), so this reads
+  // it directly rather than grepping a command string, which is also what keeps a body merely discussing the
+  // retired label (this file included) from tripping it.
+  it('frozen-label hook: denies an issue_write update whose labels include `frozen`', () => {
+    expect(isDeny(runLabelsHook({ method: 'update', issue_number: 5, labels: ['frozen', 'priority:P1'] }))).toBe(true);
+  });
+
+  it('frozen-label hook: denies an issue_write create whose labels include `frozen`', () => {
+    expect(isDeny(runLabelsHook({ method: 'create', labels: ['frozen'] }))).toBe(true);
+  });
+
+  it('frozen-label hook: allows ordinary labels, and a body that only discusses the retired label in prose', () => {
+    expect(isDeny(runLabelsHook({ method: 'update', issue_number: 5, labels: ['priority:P1', 'routine-ok'] }))).toBe(false);
+    expect(isDeny(runLabelsHook({ body: 'Label `frozen` is retired — see BACKLOG.md.' }))).toBe(false);
+  });
+
+  it('frozen-label hook: allows a call with no labels field at all', () => {
+    expect(frozenLabel({})).toBeNull();
+  });
+
+  // #98/#101 Layer 4 / #216 §1: records-have-readers' "overwritten every run, never appended" piece — see the
+  // structural test above for why this, and not the rule's other records, is what collapses. The hook reads
+  // the new body only (it never sees the old one), so it denies on the structural signature of an append — two
+  // or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — rather than diffing against history.
+  it('heartbeat-append hook: denies an update to #62 whose body carries two heartbeat-shaped timestamp lines', () => {
+    expect(isDeny(runAppendHook({
+      method: 'update',
+      issue_number: 62,
+      body: '2026-09-16T22:41Z — merged #101\n\n- nightly: ok\n\n2026-09-18T13:36Z — reviewed and merged PR #242\n- second item: no',
+    }))).toBe(true);
+  });
+
+  it('heartbeat-append hook: allows an ordinary single-summary replace, including one that mentions other timestamps mid-line', () => {
+    expect(isDeny(runAppendHook({
+      method: 'update',
+      issue_number: 62,
+      body: '2026-09-18T13:36Z — reviewed and merged PR #242\n- watchdog pulse: ok — issue #61 body timestamped 2026-09-18T11:09:35Z (~2h27m old)\n- second item: no',
+    }))).toBe(false);
+  });
+
+  it('heartbeat-append hook: allows a body with no heartbeat-shaped timestamp line at all (a different failure mode, not this rule\'s business)', () => {
+    expect(isDeny(runAppendHook({ method: 'update', issue_number: 62, body: 'no timestamp here, just prose' }))).toBe(false);
+  });
+
+  it('heartbeat-append hook: only scopes to issue #62 and to `update`', () => {
+    const twoTimestamps = '2026-09-18T11:00Z — a\n2026-09-18T13:36Z — b';
+    expect(isDeny(runAppendHook({ method: 'update', issue_number: 61, body: twoTimestamps }))).toBe(false);
+    expect(isDeny(runAppendHook({ method: 'create', issue_number: 62, body: twoTimestamps }))).toBe(false);
+  });
+
+  // #101 Layer 4 / #216 §1 — CANON's two mechanical conditions, exercised against the REAL hook command
+  // extracted from .claude/settings.json (not a reimplementation), with a fake `curl` on PATH standing in for
+  // the GitHub API. This is deliberate, not a shortcut: a real network call inside `npm test` would make every
+  // PR's CI depend on api.github.com being reachable, for a hook that fires on a rare event (a #161 adoption
+  // clear) — one flaky network blip would fail CI on unrelated changes. A fake curl gives full, deterministic
+  // coverage of every branch (including the success path) without that dependency. tests/unit/adoption-check
+  // .test.ts covers the pure decision logic on its own; this covers the wiring around it — the classification
+  // (isAdoptionClear), the escape hatches, and that a real curl exit code / real curl stdout drive the result.
+  const fakeCurlDir = mkdtempSync(join(tmpdir(), 'canon-hook-fake-curl-'));
+  const withFakeCurl = (script: string): NodeJS.ProcessEnv => {
+    writeFileSync(join(fakeCurlDir, 'curl'), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+    return { ...process.env, PATH: `${fakeCurlDir}:${process.env.PATH}`, GITHUB_TOKEN: 'test-token' };
+  };
+  afterAll(() => rmSync(fakeCurlDir, { recursive: true, force: true }));
+
+  const ADOPTION_BODY = "REVIEW: CLEARED\n\nClearing another reviewer's block, adopted under #161.";
+
+  it('CANON hook: allows a comment that is not an adoption clear, without ever invoking curl', () => {
+    // The fake curl exits nonzero unconditionally — if it were invoked, the run would deny, not allow.
+    const env = withFakeCurl('exit 1');
+    expect(runCanonHook({ issue_number: 244, body: 'Looks good, merging.' }, env)).toBeNull();
+    expect(runCanonHook({ issue_number: 244, body: 'REVIEW: CLEARED — fps fixed' }, env)).toBeNull();
+  });
+
+  it('CANON hook: denies when there is neither issue_number nor pullNumber, without invoking curl', () => {
+    const env = withFakeCurl('exit 1');
+    expect(isDeny(runCanonHook({ body: ADOPTION_BODY }, env))).toBe(true);
+  });
+
+  // #245 review: of the seven MCP tools this hook's matcher group covers, only add_issue_comment/issue_write
+  // carry issue_number — pull_request_review_write, update_pull_request, add_comment_to_pending_review and
+  // add_reply_to_pull_request_comment use pullNumber (or neither), so a genuine adoption-clear posted through
+  // any of those would have hit the "no issue_number" deny branch every time. Falls back to pullNumber too.
+  it('CANON hook: reads pullNumber when issue_number is absent, and still reaches the live check', () => {
+    const env = withFakeCurl('printf \'%s\' \'[]\'');
+    const v = runCanonHook({ pullNumber: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/no open REVIEW: CHANGES REQUESTED block/);
+  });
+
+  it('CANON hook: denies when neither GITHUB_TOKEN nor GH_TOKEN is set, without invoking curl', () => {
+    const { GITHUB_TOKEN, GH_TOKEN, ...rest } = withFakeCurl('exit 1');
+    expect(isDeny(runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, rest))).toBe(true);
+  });
+
+  it('CANON hook: fails closed when curl itself fails', () => {
+    const env = withFakeCurl('exit 1');
+    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/could not read this pull request comments/);
+  });
+
+  it('CANON hook: fails closed when curl returns something that is not a JSON array', () => {
+    const env = withFakeCurl('echo "{}"');
+    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/unexpected response/);
+  });
+
+  it('CANON hook: denies on age when the live block is not old enough', () => {
+    const comments = JSON.stringify([
+      { body: `REVIEW: CHANGES REQUESTED — see above. https://claude.ai/code/session_AAAA1111`, created_at: new Date().toISOString() },
+    ]).replace(/'/g, "'\\''");
+    const env = withFakeCurl(`printf '%s' '${comments}'`);
+    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/CANON's age condition is not yet met/);
+  });
+
+  it('CANON hook: allows the write once the live block is old enough and its session has gone quiet on this pull request', () => {
+    const comments = JSON.stringify([
+      { body: `REVIEW: CHANGES REQUESTED — see above. https://claude.ai/code/session_AAAA1111`, created_at: '2020-01-01T00:00:00Z' },
+    ]).replace(/'/g, "'\\''");
+    const env = withFakeCurl(`printf '%s' '${comments}'`);
+    expect(runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env)).toBeNull();
+  });
+
+  it('CANON hook: fails closed when there is no open block to adopt on the live pull request', () => {
+    const env = withFakeCurl('printf \'%s\' \'[]\'');
+    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/no open REVIEW: CHANGES REQUESTED block/);
+  });
+});
+
+describe('layer-0 hooks: the root WORKLOG.md write guard', () => {
+  it('denies the root file by relative or absolute path, and allows docs/worklog/ and a nested WORKLOG.md', () => {
+    expect(writeCheck({ file_path: 'WORKLOG.md' }, root)).toMatch(/retired/);
+    expect(writeCheck({ file_path: join(root, 'WORKLOG.md') }, root)).toMatch(/retired/);
+    expect(writeCheck({ file_path: join(root, 'docs/worklog/2026-09.md') }, root)).toBeNull();
+    expect(writeCheck({ file_path: join(root, 'docs/WORKLOG.md') }, root)).toBeNull();
+    expect(writeCheck({}, root)).toBeNull();
+  });
+});
+
+/**
+ * The rules above are only as good as their wiring. These run the command strings exactly as
+ * `.claude/settings.json` declares them, in a shell with `CLAUDE_PROJECT_DIR` set, as the harness does.
+ */
+describe('layer-0 hooks: .claude/settings.json runs them', () => {
+  const entry = (matcher: string) => (settings.hooks.PreToolUse as any[]).find((e) => e.matcher.startsWith(matcher));
+  const runWired = (matcher: string, toolInput: Record<string, unknown>): unknown => {
+    const out = execFileSync('sh', ['-c', entry(matcher).hooks[0].command],
+      { input: JSON.stringify({ tool_input: toolInput }), encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
+    return out.trim() === '' ? null : JSON.parse(out);
+  };
+
+  it('every PreToolUse hook command names a script that exists under .claude/hooks/', () => {
+    const commands = (settings.hooks.PreToolUse as any[]).flatMap((e) => e.hooks).map((h) => h.command as string);
+    expect(commands.length).toBeGreaterThanOrEqual(3);
+    for (const command of commands) {
+      const script = command.match(/\.claude\/hooks\/[\w-]+\.mjs/)?.[0];
+      expect(script, `no hook script named in: ${command}`).toBeDefined();
+      expect(existsSync(join(root, script!)), `${script} does not exist`).toBe(true);
+    }
+  });
+
+  it('Bash: denies a force-push, a forged owner marker and a WORKLOG.md append; allows an ordinary command', () => {
+    expect(isDeny(runWired('Bash', { command: 'git push --force origin main' }))).toBe(true);
+    expect(isDeny(runWired('Bash', { command: "gh pr comment 1 --body 'OWNER: APPROVED'" }))).toBe(true);
+    expect(isDeny(runWired('Bash', { command: 'echo x >> WORKLOG.md' }))).toBe(true);
+    expect(runWired('Bash', { command: 'npm test' })).toBeNull();
+  });
+
+  it('Write|Edit: denies the root WORKLOG.md and allows any other file', () => {
+    expect(isDeny(runWired('Write', { file_path: join(root, 'WORKLOG.md') }))).toBe(true);
+    expect(runWired('Write', { file_path: join(root, 'src/main.ts') })).toBeNull();
+  });
+
+  it('MCP GitHub writes: every body-carrying tool is matched, and each rule denies through the real command', () => {
+    for (const tool of ['add_issue_comment', 'issue_write', 'pull_request_review_write', 'update_pull_request',
+                        'update_issue_comment', 'create_pull_request', 'add_comment_to_pending_review',
+                        'add_reply_to_pull_request_comment'])
+      expect({ tool, matched: entry('mcp__github__').matcher.includes(tool) }).toEqual({ tool, matched: true });
+    expect(isDeny(runWired('mcp__github__', { body: 'OWNER: APPROVED' }))).toBe(true);
+    expect(isDeny(runWired('mcp__github__', { method: 'update', issue_number: 62, body: 'no line here' }))).toBe(true);
+    expect(isDeny(runWired('mcp__github__', { method: 'create', labels: ['frozen'] }))).toBe(true);
+    expect(runWired('mcp__github__', { body: 'Pushed abc123. Ready for re-review.' })).toBeNull();
+  });
+
+  it('unreadable stdin allows the call rather than blocking every tool', () => {
+    const out = execFileSync('node', [join(root, '.claude/hooks/bash-guard.mjs')], { input: 'not json', encoding: 'utf8' });
+    expect(out).toBe('');
+  });
+
+  // #101's verification aid: logs which path-scoped rule file loaded, and when. Pinned so it is not lost quietly.
+  it('declares an InstructionsLoaded logger scoped to path_glob_match', () => {
+    const logger = (settings.hooks.InstructionsLoaded as any[]).find((e) => e.matcher === 'path_glob_match');
+    expect(logger?.hooks?.[0]?.command).toContain('.file_path');
+  });
+});
