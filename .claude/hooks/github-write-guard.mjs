@@ -15,7 +15,7 @@ const REPO = 'ugurozsahin/sky-academy';
 // APPROVED strictly, REJECTED with emphasis and case forgiven. Characters GitHub renders as nothing are
 // deleted first, so none of them can hide inside the marker. The set is a UNION on purpose (#221): swapping
 // Cf/Cc for Default_Ignorable_Code_Point once dropped real format characters. Add to it, never replace.
-const INVISIBLE = /[\p{Cf}\p{Cc}\p{Default_Ignorable_Code_Point}ㅤ️]+/gu;
+const INVISIBLE = /[\p{Cf}\p{Cc}\p{Default_Ignorable_Code_Point}\u3164\ufe0f]+/gu;
 const norm = (s) => s.replace(INVISIBLE, '').replace(/\s+/g, ' ').trim();
 
 export const ownerMarker = ({ body }) => {
@@ -48,10 +48,9 @@ export const frozenLabel = ({ labels }) => Array.isArray(labels) && labels.inclu
  * setter's silence cannot be verified, a stale block must not clear on nobody's say-so.
  */
 export const canon = (input, env = process.env) => {
-  const body = input.body ?? '';
-  if (!isAdoptionClear(body)) return null;
   const prefix = "REVIEW: CLEARED claims to adopt another reviewer's block (CANON, .claude/rules/governance.md, #101 layer 0): ";
   try {
+    if (!isAdoptionClear(input.body ?? '')) return null;
     const issue = input.issue_number || input.pullNumber;
     if (!issue) return prefix + 'no issue_number or pullNumber on this tool call, cannot tell which pull request is being adopted';
     const token = env.GITHUB_TOKEN || env.GH_TOKEN;

@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM, run by Claude Code as a PreToolUse hook (.claude/settings.json)
-import { forcePush, ownerMarker as bashOwnerMarker, worklogAppend } from '../../.claude/hooks/bash-guard.mjs';
+import { check as bashCheck, forcePush, ownerMarker as bashOwnerMarker, worklogAppend } from '../../.claude/hooks/bash-guard.mjs';
+// @ts-expect-error — plain ESM hook helper
+import { commands } from '../../.claude/hooks/shell.mjs';
 // @ts-expect-error — plain ESM hook script
 import { check as writeCheck } from '../../.claude/hooks/write-guard.mjs';
 // @ts-expect-error — plain ESM hook script
@@ -52,6 +54,67 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     for (const cmd of ['cd repo && git push --force', 'git -C /tmp/x push -f origin main', 'git push origin +main',
                        'git push --force-if-includes origin main', 'echo $(git push -f)'])
       expect({ cmd, denied: isDeny(runHook(forcePush, cmd)) }).toEqual({ cmd, denied: true });
+  });
+
+  // PR #255 review: the first rewrite matched text up to the next `;`, `)` or newline, so a force flag after
+  // any of those inside the same push was never seen — a regression from the grep it replaced. The guard now
+  // parses the command (`.claude/hooks/shell.mjs`), so these are ordinary arguments of one push.
+  it('force-push hook: sees a force flag after a line continuation, a quoted separator or a substitution (PR #255 review)', () => {
+    for (const cmd of ['git push origin \\\n  --force main',
+                       'git push origin "$(git branch --show-current)" --force',
+                       'git push origin "some;branch" --force',
+                       '"git" push --force', 'env GIT_TRACE=1 git push -f', 'sh -c "git push --force"',
+                       '$GIT push --force origin main', 'if true; then git push -f; fi',
+                       'git push origin main;git push -f', '(cd repo && time git push -f)',
+                       'git push --force-with-lease=main:abc123 origin main', 'git --git-dir /x/.git push -f'])
+      expect({ cmd, denied: isDeny(runHook(forcePush, cmd)) }).toEqual({ cmd, denied: true });
+  });
+
+  it('force-push hook: push options that are not a force are allowed', () => {
+    for (const cmd of ['git push --follow-tags origin main', 'git push -o ci.skip origin main',
+                       'git push origin HEAD:refs/heads/fix/1-x', 'git push --set-upstream origin chore/2-fix-f'])
+      expect({ cmd, denied: isDeny(runHook(forcePush, cmd)) }).toEqual({ cmd, denied: false });
+  });
+
+  it('force-push hook: text that only looks like a push is not one', () => {
+    for (const cmd of ['echo "git push --force"', "grep -rn 'git push -f' docs", 'cat <<EOF\ngit push --force\nEOF',
+                       'git log --grep="push --force"', 'git push origin main # never --force'])
+      expect({ cmd, denied: isDeny(runHook(forcePush, cmd)) }).toEqual({ cmd, denied: false });
+  });
+
+  it('OWNER-marker hook: a quoted or run-time command name still counts as the call it is (PR #255 review)', () => {
+    for (const cmd of ['"gh" pr comment 1 --body "OWNER: APPROVED"',
+                       'T=gh; $T pr comment 1 --body "OWNER: APPROVED"',
+                       'echo "OWNER: APPROVED" | gh pr comment 1 --body-file -',
+                       'gh pr comment 1 --body-file - <<EOF\nOWNER: REJECTED - no\nEOF',
+                       'gh pr comment 1 --body "$(printf "OWNER: APPROVED")"'])
+      expect({ cmd, denied: isDeny(runHook(bashOwnerMarker, cmd)) }).toEqual({ cmd, denied: true });
+  });
+
+  it('OWNER-marker hook: a marker in prose, with no gh or curl call on the line, is not a forgery (PR #255 review)', () => {
+    for (const cmd of ['git commit -m "docs: mention the OWNER: APPROVED marker, not gh comment"',
+                       "grep -rn 'OWNER: APPROVED' docs",
+                       'curl https://example.com -d "OWNER: APPROVED"'])
+      expect({ cmd, denied: isDeny(runHook(bashOwnerMarker, cmd)) }).toEqual({ cmd, denied: false });
+  });
+
+  it('WORKLOG.md Bash hook: only a real append redirect counts, not text that mentions one', () => {
+    for (const cmd of ['echo "do not run: echo x >> WORKLOG.md"', 'cat <<EOF > notes.md\necho x >> WORKLOG.md\nEOF'])
+      expect({ cmd, denied: isDeny(runHook(worklogAppend, cmd)) }).toEqual({ cmd, denied: false });
+    for (const cmd of ['echo x >>WORKLOG.md', 'date 2>&1 >> ./WORKLOG.md', 'sh -c "echo x >> WORKLOG.md"'])
+      expect({ cmd, denied: isDeny(runHook(worklogAppend, cmd)) }).toEqual({ cmd, denied: true });
+  });
+
+  it('the shell parser splits statements, strips quotes, and keeps heredoc bodies out of the commands', () => {
+    expect(commands('A=1 env -i git -C "my dir" push origin main && echo done | tee out.txt')
+      .map((c: any) => [c.name, ...c.args])).toEqual([['git', '-C', 'my dir', 'push', 'origin', 'main'], ['echo', 'done'], ['tee', 'out.txt']]);
+    expect(commands('python3 - <<\'PY\'\nimport os; os.system("git push --force")\nPY\nls').map((c: any) => c.name)).toEqual(['python3', 'ls']);
+    expect(commands('echo a >> "x y.md" 2> err.log')[0].redirects).toEqual([{ op: '>>', target: 'x y.md' }, { op: '>', target: 'err.log' }]);
+  });
+
+  it('the Bash guard allows an ordinary command, and a call that carries no command at all', () => {
+    expect(bashCheck({ command: 'echo ok' })).toBeNull();
+    expect(bashCheck({})).toBeNull();
   });
 
   it('force-push hook: denies --force, -f, --force-with-lease, and a combined -uf/-fu cluster', () => {
@@ -410,7 +473,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     expect(isDeny(runCanonHook({ body: ADOPTION_BODY }, env))).toBe(true);
   });
 
-  // #245 review: of the seven MCP tools this hook's matcher group covers, only add_issue_comment/issue_write
+  // #245 review: of the eight MCP tools this hook's matcher group covers, only add_issue_comment/issue_write
   // carry issue_number — pull_request_review_write, update_pull_request, add_comment_to_pending_review and
   // add_reply_to_pull_request_comment use pullNumber (or neither), so a genuine adoption-clear posted through
   // any of those would have hit the "no issue_number" deny branch every time. Falls back to pullNumber too.
