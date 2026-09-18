@@ -6,4 +6,4 @@ export declare function precacheList(files: string[]): string[];
 /** `name\0size\0sha256` per file, read from disk — the cache name is derived from this, not from the names. */
 export declare function fingerprints(dir: string, list: string[], read?: (p: string) => Buffer | string): string[];
 export declare function cacheName(prints: string[]): string;
-export declare function renderSw(template: string, list: string[], prints?: string[]): string;
+export declare function renderSw(template: string, list: string[], prints: string[]): string;
