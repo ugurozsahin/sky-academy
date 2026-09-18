@@ -124,6 +124,23 @@ export interface SimEvents {
 export interface Sim {
   readonly arena: Arena;
   readonly events: SimEvents;
+  /**
+   * Drains and returns everything queued on `hits` or `falls` so far, leaving the queue empty (#126).
+   *
+   * `events.hits`/`events.falls` are still there to read directly — this is only for the common case of
+   * "everything since I last looked", so a scenario does not have to spell `.splice(0)` itself and risk
+   * comparing against a queue it forgot to empty.
+   */
+  take<K extends 'hits' | 'falls'>(key: K): SimEvents[K];
+  /**
+   * Drains and returns the wave-end count observed so far, resetting it to zero (#126).
+   *
+   * `waveEnds` is a monotonic counter, not a queue, so a scenario that wants "exactly one since I last
+   * checked" used to hand-maintain its own running total to subtract from it — `handledWaves` in
+   * `tests/unit/sim.test.ts`'s mission scenario, deleted once this existed. `events.waveEnds` is still there
+   * for a scenario that only ever wants the running total (compared with `toBe(n)`).
+   */
+  drainWaveEnds(): number;
   /** Virtual milliseconds since the harness was installed. */
   now(): number;
   /** Run one animation frame (1/60 s). */
@@ -222,8 +239,20 @@ export function createSim(opts: SimOpts = {}): Sim {
     for (const [id, fn] of [...raf]) { raf.delete(id); fn(t); }
   };
 
+  function take<K extends 'hits' | 'falls'>(key: K): SimEvents[K] {
+    const drained = events[key];
+    events[key] = [] as SimEvents[K];
+    return drained;
+  }
+  const drainWaveEnds = () => {
+    const n = events.waveEnds;
+    events.waveEnds = 0;
+    return n;
+  };
+
   return {
     arena, events,
+    take, drainWaveEnds,
     now: () => t,
     frame,
     advance(ms: number) {

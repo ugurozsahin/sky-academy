@@ -767,12 +767,11 @@ describe('#142: the arena drives the whole mission stage machine', () => {
       });
 
     // The bridge `src/ui/play-session.ts` makes, in the arena's own order: falls are reported as they happen,
-    // the wave end after the last of them.
-    let handledWaves = 0;
+    // the wave end after the last of them. `drainWaveEnds()` both reads and resets the count (#126), so
+    // "exactly one since I last checked" is the assertion itself rather than a hand-maintained running total.
     const endWave = () => {
-      expect(sim!.events.waveEnds, 'the arena must report exactly one wave end per question').toBe(handledWaves + 1);
-      handledWaves++;
-      for (const label of sim!.events.falls.splice(0)) session.fall(label);
+      expect(sim!.drainWaveEnds(), 'the arena must report exactly one wave end per question').toBe(1);
+      for (const label of sim!.take('falls')) session.fall(label);
       session.waveEnd();
     };
     /**
@@ -793,7 +792,7 @@ describe('#142: the arena drives the whole mission stage machine', () => {
       expect(session.lives, 'and costs nothing').toBe(livesBefore);
       expect(session.waiting, 'nor decides the question').toBe(false);
       advanceUntil(sim!, () => sim!.events.falls.includes(target), `${target} never fell`);
-      for (const label of sim!.events.falls.splice(0)) session.fall(label);
+      for (const label of sim!.take('falls')) session.fall(label);
       expect(session.waiting, 'the question is decided by the fall itself, not by the wave ending').toBe(true);
       advanceUntil(sim!, () => sim!.events.waveEnds > before, 'the wave never fell off the screen');
       endWave();
