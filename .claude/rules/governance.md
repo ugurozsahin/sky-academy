@@ -13,11 +13,12 @@ paths:
 - The three-file rule: `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` carry identical wording for the
   freeze history, records-have-readers, the stale-block adoption rule's four conditions (#161) and the
   second-item rule's four eligibility conditions (#97) — change all three together. A rail in
-  `tests/unit/guardrails.test.ts` holds them to it. **Two exceptions (#216 §1):** #161's session-URL
-  requirement (#191, below) and the #97 heartbeat-recording obligation (below) both have real code
-  enforcement, so each's prose lives here once, as a pointer from the three files, rather than triplicated
-  like the rest — the second-item rule's own four eligibility conditions, freeze history and
-  records-have-readers stay triplicated until each individually earns the same bar.
+  `tests/unit/guardrails.test.ts` holds them to it. **Three exceptions (#216 §1):** #161's session-URL
+  requirement (#191, below), the #97 heartbeat-recording obligation (below) and the freeze history's
+  retired-`frozen`-label rule (below) each have real code enforcement, so each's prose lives here once, as a
+  pointer from the three files, rather than triplicated like the rest — the second-item rule's own four
+  eligibility conditions, the freeze's broader one-time-lift narrative and records-have-readers stay
+  triplicated until each individually earns the same bar.
 - **A `REVIEW: CLEARED` comment that is itself a #161 adoption carries its own session URL too (#191)** — the
   same footer every comment carries (#199), so a later reader is not left guessing which session cleared a
   stale block from an unmarked comment. Enforced in code: `hasSessionUrl()` inside `scripts/review-gate.mjs`'s
@@ -41,6 +42,17 @@ paths:
   every such issue was closed (the last four on 2026-09-10); the decision is recorded on issue #36. What made
   it work — review/QA by a different agent, the guard rails, budgets that only go down — stays; only the
   blanket bar on feature work is gone, permanently: the lift does not re-arm on a future `review`/`debt` issue.
+- **No issue ever carries the retired `frozen` label again (#101).** Enforced in code: a `PreToolUse` hook in
+  `.claude/settings.json` denies an `issue_write` create or update whose `labels` include `frozen` — the one
+  actionable rule the freeze's history leaves behind, since "no run reinstates a freeze on its own" has no
+  other concrete action to catch. That is what makes this one piece of the freeze-history rule collapsible
+  under #216 §1's bar, the same way #191's session-URL requirement and the #97 recording obligation were. The
+  freeze's broader one-time-lift narrative above (the dates, the reasoning, "does not re-arm") has no such
+  enforcement point — nothing stops a run from *arguing* a class of work should be barred again, only from
+  applying this one label — so that narrative stays triplicated in `CLAUDE.md`, `BACKLOG.md` and
+  `docs/ROUTINE-PROMPT.md` until it, too, earns real enforcement. `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
+  (the two of the three that ever mentioned the retired label) each carry a pointer here instead of restating
+  it.
 - A PR touching a governance file states in one line whether it **tightens** the constraints on a run (a check,
   a rail, a rule, or describing behaviour that already exists — ordinary work) or **loosens** them (a
   constraint removed, a budget raised, a gate that no longer gates — owner-gated, never routine-merged). See

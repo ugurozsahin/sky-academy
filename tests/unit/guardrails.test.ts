@@ -1981,6 +1981,35 @@ describe('a stale review block may be adopted, and only under the four condition
   });
 
   /**
+   * #101/#216 §1 — the freeze-history rule's one mechanically actionable piece, "no issue carries `frozen`
+   * again", now has real enforcement: a `PreToolUse` hook denies an `issue_write` create/update whose
+   * `labels` include `frozen`. That is the piece real enough to collapse, the same bar #191 and #97's
+   * recording obligation cleared — the freeze's broader one-time-lift narrative (the dates, the reasoning,
+   * "does not re-arm") has no such enforcement point and stays triplicated across `CLAUDE.md`, `BACKLOG.md`
+   * and `docs/ROUTINE-PROMPT.md`, checked by the "code-health freeze is over" describe block above.
+   *
+   * Prove it red: drop the governance.md bullet, or restore either file's old "no issue carries `frozen`"
+   * sentence.
+   */
+  it('the frozen-label rule is enforced in code and pointed to from governance.md', () => {
+    const gov = read('.claude/rules/governance.md');
+    expect(gov, 'governance.md must state the rule itself').toContain('No issue ever carries the retired `frozen` label again');
+    expect(gov, 'and name the enforcing hook, or this is prose again').toContain('PreToolUse');
+    expect(gov, 'and the field it gates').toContain('`labels` include `frozen`');
+    const flat = (s: string) => s.replace(/\s+/g, ' ');
+    for (const name of ['BACKLOG.md', 'docs/ROUTINE-PROMPT.md']) {
+      const text = flat(read(name));
+      expect(text, `${name} must point at governance.md for the frozen-label rule`)
+        .toContain('enforced in code, not just this prose (`.claude/rules/governance.md`, #101)');
+    }
+    // The rationale prose this collapse actually removed — a future re-add would just be re-triplicating it.
+    expect(flat(read('BACKLOG.md')), 'the old "nothing reads it" aside must not come back')
+      .not.toContain('no issue carries it and nothing reads it');
+    expect(flat(read('docs/ROUTINE-PROMPT.md')), 'the old inline "no issue carries frozen" clause must not come back')
+      .not.toContain('Nothing is parked by a freeze any more and no issue carries');
+  });
+
+  /**
    * #199/#200 — the session-URL and content-floor rules stop being special-cased to the two REVIEW: markers.
    *
    * #189 made a REVIEW: CHANGES REQUESTED block, and #191 made a #161-adopting REVIEW: CLEARED comment,
@@ -3756,7 +3785,7 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
   // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
   const CLAUDE_MD_BUDGET = 10_750;
-  const ROUTINE_PROMPT_BUDGET = 41_008;
+  const ROUTINE_PROMPT_BUDGET = 40_949;
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -3902,6 +3931,23 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
     expect(secondItemHook.command, 'the hook must scope to the routine heartbeat issue, #62').toContain('issue_number == 62');
     expect(secondItemHook.command, 'the hook must only gate an update, not a create').toContain('method == "update"');
     expect(secondItemHook.command, 'the hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+
+  // #101 Layer 4 / #216 §1: the freeze-history rule's only mechanically actionable piece — "no issue carries
+  // `frozen`" (BACKLOG.md, docs/ROUTINE-PROMPT.md) — had no check beyond three files agreeing in prose;
+  // nothing stopped a run from actually applying the label. Unlike the freeze's broader one-time-lift
+  // narrative (which has no code-level violation to catch), "a tool call added the `frozen` label" is a
+  // concrete, checkable event, so this is the one piece of the rule real enough to collapse under #216 §1's
+  // bar — the same shape as #97's recording obligation and #191's session-URL requirement.
+  it('a hook denies applying the `frozen` label to any issue, on create or update', () => {
+    const mcpEntry = (readSettings().hooks.PreToolUse as any[])
+      .find((e) => typeof e.matcher === 'string' && e.matcher.includes('mcp__github__'));
+    expect(mcpEntry, 'no PreToolUse entry matches an mcp__github__ tool name').toBeDefined();
+    const frozenHook = (mcpEntry.hooks ?? []).find((h: any) => typeof h.command === 'string' && h.command.includes('frozen'));
+    expect(frozenHook, 'no mcp__github__ hook checks for the frozen label').toBeDefined();
+    expect(frozenHook.command, 'the hook must read .tool_input.labels, not grep prose text').toContain('.tool_input.labels');
+    expect(frozenHook.command, 'the hook must not be scoped only to update — create can carry labels too').not.toContain('method ==');
+    expect(frozenHook.command, 'the hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
   });
 
   it('.claude/settings.json declares an InstructionsLoaded hook scoped to path_glob_match (#101 verification)', () => {
@@ -4231,6 +4277,36 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
 
   it('#97 second-item hook: a mention of "second item" in prose, not as its own `- second item:` line, still denies', () => {
     expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'we discussed the second item rule casually but never wrote the line' }))).toBe(true);
+  });
+
+  // #101 Layer 4 / #216 §1: the freeze-history rule's one enforceable piece — see the structural test above
+  // ("a hook denies applying the `frozen` label") for why this, and not the broader lift narrative, is what
+  // collapses. `.tool_input.labels` is a real array on `issue_write` (create and update alike), so this reads
+  // it directly rather than grepping a command string, which is also what keeps a body merely discussing the
+  // retired label (this file included) from tripping it.
+  const frozenHookCmd = mcpEntry.hooks[2].command;
+  const runLabelsHook = (input: Record<string, unknown>): unknown => {
+    const stdin = JSON.stringify({ tool_input: input });
+    const out = execFileSync('bash', ['-c', frozenHookCmd], { input: stdin, encoding: 'utf8' });
+    return out.trim() === '' ? null : JSON.parse(out);
+  };
+
+  it('frozen-label hook: denies an issue_write update whose labels include `frozen`', () => {
+    expect(isDeny(runLabelsHook({ method: 'update', issue_number: 5, labels: ['frozen', 'priority:P1'] }))).toBe(true);
+  });
+
+  it('frozen-label hook: denies an issue_write create whose labels include `frozen`', () => {
+    expect(isDeny(runLabelsHook({ method: 'create', labels: ['frozen'] }))).toBe(true);
+  });
+
+  it('frozen-label hook: allows ordinary labels, and a body that only discusses the retired label in prose', () => {
+    expect(isDeny(runLabelsHook({ method: 'update', issue_number: 5, labels: ['priority:P1', 'routine-ok'] }))).toBe(false);
+    expect(isDeny(runLabelsHook({ body: 'Label `frozen` is retired — see BACKLOG.md.' }))).toBe(false);
+  });
+
+  it('frozen-label hook: allows a call with no labels field at all', () => {
+    const out = execFileSync('bash', ['-c', frozenHookCmd], { input: JSON.stringify({ tool_input: {} }), encoding: 'utf8' });
+    expect(out.trim()).toBe('');
   });
 });
 
