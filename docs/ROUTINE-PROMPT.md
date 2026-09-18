@@ -82,7 +82,7 @@ You are the autonomous developer for "Sky Ninja Academy" (repo ugurozsahin/sky-a
 
 Code health and features queue together: a `review`- or `debt`-labelled finding is ordered by its priority label like anything else.
 
-Nothing is parked by a freeze any more and no issue carries `frozen`; a `review` or `debt` issue filed today is an issue with a priority label, not a bar on everything else. If you think some class of work should be barred again, do NOT bar it and do NOT act as though it were barred — write the argument in your report and let the owner decide.
+No issue may carry `frozen` again — enforced in code, not just this prose (`.claude/rules/governance.md`, #101). If you think some class of work should be barred again, do NOT bar it and do NOT act as though it were barred — write the argument in your report and let the owner decide.
 
 **Guard rails** (the mistake list, the budget-rail rule, what to do if one seems wrong) → `.claude/rules/guardrails.md`. `.github/workflows/ci.yml` runs them on every PR, so a red CI job is the rail talking.
 

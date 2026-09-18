@@ -44,6 +44,10 @@
           {
             "type": "command",
             "command": "d=$(jq -r 'if (.tool_input.method == \"update\") and (.tool_input.issue_number == 62) and (((.tool_input.body // \"\") | test(\"(^|\\n)- second item: \")) | not) then \"1\" else \"0\" end'); if [ \"$d\" = \"1\" ]; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"The routine heartbeat (issue #62) must carry a - second item: line naming whether a second item was taken and, if not, which of the four #97 conditions failed. This update body is missing it.\"}}'; fi"
+          },
+          {
+            "type": "command",
+            "command": "d=$(jq -r 'if (.tool_input.labels // []) | index(\"frozen\") then \"1\" else \"0\" end'); if [ \"$d\" = \"1\" ]; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"The frozen label is retired (CLAUDE.md / .claude/rules/governance.md, #101 layer 0): the code-health freeze the owner lifted on 2026-09-10 (issue #36) is a one-time event that does not re-arm, and no run may apply the frozen label to any issue to reinstate it. Only the owner decides to freeze work again, and that decision does not go through this label.\"}}'; fi"
           }
         ]
       }
