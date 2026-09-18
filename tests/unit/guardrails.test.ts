@@ -2010,6 +2010,28 @@ describe('a stale review block may be adopted, and only under the four condition
   });
 
   /**
+   * #98/#101 — records-have-readers' "overwritten every run, never appended" piece now has real enforcement
+   * (see the structural and execution tests for the `.claude/settings.json` hook itself), documented in
+   * governance.md. Unlike the #191/#97/frozen-label bullets above, this one is explicitly NOT a collapse: the
+   * instruction stays inline, verbatim, in all three process files (the `it.each(FILES)` rail earlier in this
+   * describe block, "carries the record-routing rule", already pins that) because a run still needs to read it
+   * while executing STEP 5, the same reasoning the #97 bullet gives for keeping `- second item:` inline. This
+   * test only checks that the new enforcement is documented and named, not that anything was trimmed.
+   *
+   * Prove it red: drop this governance.md bullet.
+   */
+  it('the heartbeat replace-not-append rule is enforced in code and documented in governance.md', () => {
+    const gov = read('.claude/rules/governance.md');
+    const flat = (s: string) => s.replace(/\s+/g, ' ');
+    expect(flat(gov), 'governance.md must state the rule itself')
+      .toContain('must be overwritten each run, never appended to');
+    expect(gov, 'and name the enforcing hook, or this is prose again').toContain('PreToolUse');
+    expect(gov, 'and the issue it gates').toContain('issue #62');
+    expect(flat(gov), 'and say plainly this is not a collapse like the neighbouring bullets')
+      .toContain('not a collapse');
+  });
+
+  /**
    * #199/#200 — the session-URL and content-floor rules stop being special-cased to the two REVIEW: markers.
    *
    * #189 made a REVIEW: CHANGES REQUESTED block, and #191 made a #161-adopting REVIEW: CLEARED comment,
@@ -3950,6 +3972,32 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
     expect(frozenHook.command, 'the hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
   });
 
+  /**
+   * #98/#101 Layer 4 / #216 §1 — records-have-readers' one mechanically actionable piece: "the `routine:
+   * heartbeat` issue body [is] overwritten every run, never appended" (CLAUDE.md, BACKLOG.md). Unlike the
+   * rule's broader "who opens this, and when?" test for every other record — which has no single tool call
+   * that violates it — an update to issue #62 whose body carries two or more of the heartbeat's own
+   * UTC-timestamp summary lines is a concrete, checkable signature of a new summary tacked onto the old one
+   * instead of replacing it, the same shape as the frozen-label and #97 collapses.
+   *
+   * This is a narrower claim than "detects every possible append": it reads the structural signature of THIS
+   * repo's heartbeat format (one leading `YYYY-MM-DDTHH:MMZ — ` line per run), not a diff against the
+   * previous body — the hook never sees the old body, only the new one. An append that drops or reformats the
+   * old summary's leading timestamp before concatenating would not be caught; nor would appending a second
+   * paragraph that never starts with a bare timestamp. Both are real gaps and belong to a future, stronger
+   * rail, not this one.
+   */
+  it('a hook denies updating the routine heartbeat (#62) with two or more heartbeat-shaped timestamp lines', () => {
+    const mcpEntry = (readSettings().hooks.PreToolUse as any[])
+      .find((e) => typeof e.matcher === 'string' && e.matcher.includes('mcp__github__'));
+    expect(mcpEntry, 'no PreToolUse entry matches an mcp__github__ tool name').toBeDefined();
+    const appendHook = (mcpEntry.hooks ?? []).find((h: any) => typeof h.command === 'string' && h.command.includes('never appended'));
+    expect(appendHook, 'no mcp__github__ hook checks for an appended heartbeat body').toBeDefined();
+    expect(appendHook.command, 'the hook must scope to the routine heartbeat issue, #62').toContain('issue_number == 62');
+    expect(appendHook.command, 'the hook must only gate an update, not a create (create+fill is a legitimate one-shot POST)').toContain('method == "update"');
+    expect(appendHook.command, 'the hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+
   it('.claude/settings.json declares an InstructionsLoaded hook scoped to path_glob_match (#101 verification)', () => {
     const settings = readSettings();
     const entries = (settings.hooks?.InstructionsLoaded ?? []) as any[];
@@ -4307,6 +4355,43 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
   it('frozen-label hook: allows a call with no labels field at all', () => {
     const out = execFileSync('bash', ['-c', frozenHookCmd], { input: JSON.stringify({ tool_input: {} }), encoding: 'utf8' });
     expect(out.trim()).toBe('');
+  });
+
+  // #98/#101 Layer 4 / #216 §1: records-have-readers' "overwritten every run, never appended" piece — see the
+  // structural test above for why this, and not the rule's other records, is what collapses. The hook reads
+  // the new body only (it never sees the old one), so it denies on the structural signature of an append — two
+  // or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — rather than diffing against history.
+  const appendHookCmd = mcpEntry.hooks[3].command;
+  const runAppendHook = (input: Record<string, unknown>): unknown => {
+    const stdin = JSON.stringify({ tool_input: input });
+    const out = execFileSync('bash', ['-c', appendHookCmd], { input: stdin, encoding: 'utf8' });
+    return out.trim() === '' ? null : JSON.parse(out);
+  };
+
+  it('heartbeat-append hook: denies an update to #62 whose body carries two heartbeat-shaped timestamp lines', () => {
+    expect(isDeny(runAppendHook({
+      method: 'update',
+      issue_number: 62,
+      body: '2026-09-16T22:41Z — merged #101\n\n- nightly: ok\n\n2026-09-18T13:36Z — reviewed and merged PR #242\n- second item: no',
+    }))).toBe(true);
+  });
+
+  it('heartbeat-append hook: allows an ordinary single-summary replace, including one that mentions other timestamps mid-line', () => {
+    expect(isDeny(runAppendHook({
+      method: 'update',
+      issue_number: 62,
+      body: '2026-09-18T13:36Z — reviewed and merged PR #242\n- watchdog pulse: ok — issue #61 body timestamped 2026-09-18T11:09:35Z (~2h27m old)\n- second item: no',
+    }))).toBe(false);
+  });
+
+  it('heartbeat-append hook: allows a body with no heartbeat-shaped timestamp line at all (a different failure mode, not this rule\'s business)', () => {
+    expect(isDeny(runAppendHook({ method: 'update', issue_number: 62, body: 'no timestamp here, just prose' }))).toBe(false);
+  });
+
+  it('heartbeat-append hook: only scopes to issue #62 and to `update`', () => {
+    const twoTimestamps = '2026-09-18T11:00Z — a\n2026-09-18T13:36Z — b';
+    expect(isDeny(runAppendHook({ method: 'update', issue_number: 61, body: twoTimestamps }))).toBe(false);
+    expect(isDeny(runAppendHook({ method: 'create', issue_number: 62, body: twoTimestamps }))).toBe(false);
   });
 });
 

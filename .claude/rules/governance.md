@@ -36,6 +36,18 @@ paths:
   `docs/ROUTINE-PROMPT.md` until each individually earns the same bar. `BACKLOG.md` and
   `docs/ROUTINE-PROMPT.md` (the two of the three that stated this recording obligation) each carry a pointer
   here instead of restating it.
+- **The routine heartbeat (issue #62) must be overwritten each run, never appended to (records have readers,
+  #98).** Enforced in code: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to
+  issue #62 whose body carries two or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — the
+  structural signature of a new summary tacked onto the old one instead of replacing it. **This is not a
+  collapse like the two bullets above**, and does not belong in the "Three exceptions" count: records-have-readers
+  spans several kinds of record (the PR body, an issue or `docs/decisions/`, `git log`), of which this hook
+  covers only the one instruction a run still needs to see inline while it is running STEP 5 — the same reason
+  the `- second item:` line above stays inline rather than collapsing to a bare pointer. `CLAUDE.md`,
+  `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` keep "overwritten every run, never appended" verbatim; only this
+  bullet is new. What the hook cannot catch: an append that drops or reformats the previous summary's leading
+  timestamp before concatenating, or one that appends a second paragraph with no bare timestamp of its own —
+  both need a diff-aware check against the previous body, which this PR does not attempt.
 - **The code-health freeze (2026-09-06 → 2026-09-10).** The owner held it while any issue labelled `review` or
   `debt` was open, so the 6 September code review's refactors could land *before* feature work resumed —
   refactors move code around, and features written first would have conflicted with them. He lifted it once
