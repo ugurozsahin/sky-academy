@@ -180,7 +180,7 @@ export function rewardsScreen(nav: Nav) {
     </div>
     <div class="next-sticker">${banner}</div>
     <div class="album">${cards}</div>
-    <div class="isl-head"><div><b>My certificates</b><small>${certs.length} earned</small></div></div>
+    <div class="isl-head"><span class="icon-btn" aria-hidden="true">🎓</span><div><b>My certificates</b><small>${certs.length ? `${certs.length} earned` : 'Win a mission to earn one'}</small></div></div>
     ${certAlbumHTML(certs)}
   </section>`, 'bg-sky');
   tb.bind();
