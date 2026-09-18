@@ -59,7 +59,9 @@ import { closingRefs } from './review-gate.mjs';
 
 export const OWNER = 'ugurozsahin';
 export const REPO = 'sky-academy';
-export const PROJECT_NUMBER = 1;
+// The board was recreated as project 2 when the repo moved from the archived
+// private repo to this one; project 1 no longer resolves (#240).
+export const PROJECT_NUMBER = 2;
 
 export const STATUS = Object.freeze({
   DONE: 'Done',
