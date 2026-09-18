@@ -5,7 +5,7 @@
 // launches nothing.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AVATARS } from '../../src/avatars';
-import { YEARS, type Question } from '../../src/curriculum';
+import { topicById, YEARS, type Question, type Rng } from '../../src/curriculum';
 import { say, resetVoiceProbe } from '../../src/audio';
 import type { WaveOpts } from '../../src/game/arena';
 import { reset, save } from '../../src/storage';
@@ -194,12 +194,6 @@ describe('the no-voice sentence peek (#65)', () => {
     expect(spoken).toEqual([`Build the sentence: ${SENTENCE}`]);
   });
 
-  it('the peek is long enough to read a sentence, and short enough to be a memory task', () => {
-    // Every case above advances the clock by the constant, so 300 ms and 30 s would both pass them.
-    expect(NO_VOICE_PEEK_MS).toBeGreaterThanOrEqual(2500);
-    expect(NO_VOICE_PEEK_MS).toBeLessThanOrEqual(5000);
-  });
-
   it('teardown during a peek launches nothing and leaves nothing paused', async () => {
     save({ voice: 'no' });
     const { arena, ps, unmount } = build(sentenceQ);
@@ -208,5 +202,46 @@ describe('the no-voice sentence peek (#65)', () => {
     await vi.advanceTimersByTimeAsync(NO_VOICE_PEEK_MS * 2);
     expect(arena.spawned).toEqual([]);
     expect(arena.paused).toBe(false);
+  });
+});
+
+describe('NO_VOICE_PEEK_MS: bounded against what a child actually has to read (#128)', () => {
+  // Every case above advances the clock by the constant itself, so any value of NO_VOICE_PEEK_MS passes them —
+  // the property worth holding is its relationship to the longest sentence a Story Sentences generator can
+  // actually hand a child, not a pair of numbers picked to match today's constant.
+  const SENTENCE_TOPICS = ['r-sentence', 'y1-sentence', 'y2-sentence'];
+  // pick(rng, arr) reads arr[floor(rng() * arr.length)]; 20 evenly spaced fractions in [0, 1) hit every index
+  // of a bank up to length 20 twice over, whatever that bank's real length turns out to be.
+  const FRACTIONS = Array.from({ length: 20 }, (_, i) => i / 20);
+
+  /** A one-shot rng: its first call picks the bank entry, every call after (shuffling options) is inert. */
+  function pickAt(fraction: number): Rng {
+    let n = 0;
+    return () => (n++ === 0 ? fraction : 0.5);
+  }
+
+  function longestSentenceWords(): number {
+    let longest = 0;
+    for (const id of SENTENCE_TOPICS) {
+      const topic = topicById(id)!;
+      for (const d of [1, 2, 3] as const) for (const f of FRACTIONS) {
+        const q = topic.gen(d, pickAt(f));
+        longest = Math.max(longest, q.sequence?.length ?? 0);
+      }
+    }
+    return longest;
+  }
+
+  it('allows enough time to read the longest sentence any Story Sentences generator produces', () => {
+    // A generously slow beginning-reader's pace, so this only goes red on a sentence genuinely too long for
+    // the peek — not on the ordinary spread of NC-length sentences the banks already hold.
+    const MIN_MS_PER_WORD = 400;
+    const words = longestSentenceWords();
+    expect(words, 'sanity: the walk above must actually find sentence questions').toBeGreaterThan(0);
+    expect(NO_VOICE_PEEK_MS, `the longest sentence found is ${words} words; the peek must allow at least ${words * MIN_MS_PER_WORD} ms to read it`).toBeGreaterThanOrEqual(words * MIN_MS_PER_WORD);
+  });
+
+  it('is not so long that it stops being a memory task', () => {
+    expect(NO_VOICE_PEEK_MS).toBeLessThanOrEqual(5000);
   });
 });
