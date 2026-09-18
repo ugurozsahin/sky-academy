@@ -106,6 +106,25 @@ describe('canAdoptNow — #161 CANON evaluated against live comment data', () =>
     expect(v.reasons.join(' ')).toMatch(/only 1\.0h old/);
   });
 
+  it('fails closed when any comment on the pull request has a missing or malformed created_at, rather than letting NaN comparisons read as satisfied', () => {
+    // Found in review of the PR that introduced this file: new Date(bad) is Invalid Date, and both
+    // `NaN < 4` and `NaN < 2` evaluate to false — an indeterminate age/silence would otherwise pass silently,
+    // the opposite of this function's stated fail-closed design.
+    const v1 = canAdoptNow({
+      comments: [{ body: `REVIEW: CHANGES REQUESTED — see above. ${SESSION_A}`, created_at: 'not-a-date' }],
+      now: NOW,
+    });
+    expect(v1.ok).toBe(false);
+    expect(v1.reasons.join(' ')).toMatch(/missing or malformed created_at/);
+
+    const v2 = canAdoptNow({
+      comments: [{ body: `REVIEW: CHANGES REQUESTED — see above. ${SESSION_A}`, created_at: undefined as unknown as string }],
+      now: NOW,
+    });
+    expect(v2.ok).toBe(false);
+    expect(v2.reasons.join(' ')).toMatch(/missing or malformed created_at/);
+  });
+
   it('a comment mid-sentence mentioning the session URL does not count as the setter speaking again — it does, deliberately (any mention is a live signal)', () => {
     // Documents the actual behaviour rather than asserting an aspiration: the check is textual, like the rest
     // of this repository's marker detection, and a session ID appearing anywhere in a later comment counts.

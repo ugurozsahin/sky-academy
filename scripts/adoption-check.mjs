@@ -24,6 +24,15 @@ export function canAdoptNow({ comments, now }) {
   const sessionIdOf = (body) => (body || '').match(SESSION_ID_RE)?.[1] ?? null;
   const HOUR = 60 * 60 * 1000;
 
+  // Every comment's created_at must parse before any age/silence maths runs. Skipping this let a malformed
+  // timestamp turn into NaN, and NaN < 4 / NaN < 2 are both false — an indeterminate age or silence read as
+  // SATISFIED, the opposite of this function's whole fail-closed intent (found in review of this PR).
+  for (const c of comments || []) {
+    if (isNaN(new Date(c.created_at).getTime())) {
+      return { ok: false, reasons: ['a comment on this pull request has a missing or malformed created_at — cannot verify CANON, failing closed'] };
+    }
+  }
+
   // The currently active block: the last REVIEW: CHANGES REQUESTED with no later REVIEW: CLEARED after it —
   // the same "openReview" ordering blockState() uses, so the two never disagree about which comment is live.
   let block = null;

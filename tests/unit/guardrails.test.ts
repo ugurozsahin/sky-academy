@@ -4490,9 +4490,20 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
     expect(runCanonHook({ issue_number: 244, body: 'REVIEW: CLEARED — fps fixed' }, env)).toBeNull();
   });
 
-  it('CANON hook: denies when there is no issue_number, without invoking curl', () => {
+  it('CANON hook: denies when there is neither issue_number nor pullNumber, without invoking curl', () => {
     const env = withFakeCurl('exit 1');
     expect(isDeny(runCanonHook({ body: ADOPTION_BODY }, env))).toBe(true);
+  });
+
+  // #245 review: of the seven MCP tools this hook's matcher group covers, only add_issue_comment/issue_write
+  // carry issue_number — pull_request_review_write, update_pull_request, add_comment_to_pending_review and
+  // add_reply_to_pull_request_comment use pullNumber (or neither), so a genuine adoption-clear posted through
+  // any of those would have hit the "no issue_number" deny branch every time. Falls back to pullNumber too.
+  it('CANON hook: reads pullNumber when issue_number is absent, and still reaches the live check', () => {
+    const env = withFakeCurl('printf \'%s\' \'[]\'');
+    const v = runCanonHook({ pullNumber: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/no open REVIEW: CHANGES REQUESTED block/);
   });
 
   it('CANON hook: denies when neither GITHUB_TOKEN nor GH_TOKEN is set, without invoking curl', () => {
