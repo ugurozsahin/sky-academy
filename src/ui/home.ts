@@ -1,6 +1,7 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
-import { ACHIEVEMENTS, coinBalance, dojoToday, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
+import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
+import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { MODES } from '../game/modes';
@@ -166,6 +167,7 @@ export function rewardsScreen(nav: Nav) {
   const banner = d.stickers.length === STICKER_IDS.length ? 'Album complete — legendary!'
     : nextCoin ? `<span>Next sticker at 🪙 ${nextCoin}</span><span class="isl-bar"><i style="width:${Math.min(100, Math.round(100 * d.coins / nextCoin))}%"></i></span>`
     : 'The rest of the album is earned by playing, not by coins — see each sticker below';
+  const certs = certificates();
   render(`
   <section class="screen home rewards">
     ${tb.html}
@@ -178,8 +180,16 @@ export function rewardsScreen(nav: Nav) {
     </div>
     <div class="next-sticker">${banner}</div>
     <div class="album">${cards}</div>
+    <div class="isl-head"><span class="icon-btn" aria-hidden="true">🎓</span><div><b>My certificates</b><small>${certs.length ? `${certs.length} earned` : 'Win a mission to earn one'}</small></div></div>
+    ${certAlbumHTML(certs)}
   </section>`, 'bg-sky');
   tb.bind();
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
   $('#shop').addEventListener('click', () => { sfx.tap(); nav.shop(); });
+  $$('.cert-open').forEach(b => b.addEventListener('click', async () => {
+    sfx.tap(); const btn = b as HTMLButtonElement; const c = certs.find(x => x.id === btn.dataset.id);
+    if (!c) return;
+    btn.disabled = true;
+    try { await showStoredCertificate(c); } finally { btn.disabled = false; }
+  }));
 }

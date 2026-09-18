@@ -632,6 +632,33 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.sticker.got')).toHaveCount(3);
   });
 
+  test('"My certificates" (#110): an earned certificate lists on the rewards screen, and View opens it full-screen with tap-to-zoom', async ({ page }) => {
+    const cert = { id: 'reception:r-count', name: 'Ada', avatar: 'volt', year: 'Reception', title: 'Counting to 10', stars: 3, score: 250, correct: 20, attempts: 20, date: '2026-09-10' };
+    await seedPlayer(page, 'volt', 'Ada', { certs: [cert] });
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+    await expect(page.locator('.cert-empty')).toHaveCount(0);
+    const row = page.locator('.cert-row');
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('Counting to 10');
+    await expect(row).toContainText('★★★');
+
+    await page.click('.cert-open');
+    const view = page.locator('.cert-view');
+    await expect(view).toBeVisible();
+    const img = view.locator('.cert-view-img');
+    await expect(img).toHaveAttribute('src', /^data:image\/png/);
+    await expect(view.locator('.cert-view-hint')).toContainText('Tap to zoom');
+
+    await img.click();                                        // tap to zoom in
+    await expect(img).toHaveClass(/zoomed/);
+    await img.click();                                        // tap again to zoom back out
+    await expect(img).not.toHaveClass(/zoomed/);
+
+    await view.getByRole('button', { name: 'Done' }).click();
+    await expect(view).toHaveCount(0);
+  });
+
   test('ninja shop: buy a trail skin with the balance, stickers keep their lifetime unlocks, the skin is equipped', async ({ page }) => {
     test.slow();   // three navigations, and each one waits ~12 s for the blocked Google Fonts stylesheet in the sandbox
     const seed = async (patch: Record<string, unknown>) => {   // patch the save, then reopen the app (not reload(): the URL still carries ?reset=1)
