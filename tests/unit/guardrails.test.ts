@@ -3922,6 +3922,44 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
     expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'Looks good.\nOWNER: APPROVED - quoting style\nRest.'))).toBe(false);
   });
 
+
+  // #221 fifth review (session_017EiTZv7sPtAckGDSxSHHDU): the fourth review's fix deleted a hand-picked
+  // Cf/Cc-plus-two-stragglers set, which happened to cover every character the first four rounds had tried
+  // but was still not exhaustive — Unicode has other invisible-when-unsupported characters outside Cf/Cc
+  // entirely (the Mn — nonspacing mark — general category has combining marks and variation selectors that
+  // render as nothing when not attached to a base character they modify). Fixed by replacing the ad hoc
+  // Cf/Cc-plus-stragglers list with Unicode's own `Default_Ignorable_Code_Point` binary property — the
+  // property Unicode maintains specifically for "should be ignored by default when otherwise unsupported",
+  // which is exactly this hook's threat model — combined with `\p{Cc}` (kept separately for real control
+  // characters, since `Default_Ignorable_Code_Point` and `Cc` are largely disjoint sets and literal newlines
+  // still need folding). This covers every character found across all five review rounds as one class,
+  // rather than enumerating another one-off exception.
+  it('MCP-tool marker hook: denies invisible characters outside the Cf/Cc categories the fourth review covered (#221 fifth review)', () => {
+    const cases: [string, string][] = [
+      ['Combining Grapheme Joiner', '\u034F'], ['Mongolian Free Variation Selector-1', '\u180B'],
+      ['Variation Selector-17', '\u{E0100}'], ['Khmer Vowel Inherent AQ', '\u17B4'],
+    ];
+    for (const [name, ch] of cases) {
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must deny`).toBe(true);
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `${ch}OWNER: APPROVED`)), `${name} leading must deny`).toBe(true);
+    }
+    // every character from every prior round must still deny, at every position already pinned
+    const priorChars: [string, string][] = [
+      ['ZWSP', '\u200B'], ['LRM', '\u200E'], ['RLM', '\u200F'], ['ALM', '\u061C'],
+      ['Mongolian vowel separator', '\u180E'], ['RTL override', '\u202E'],
+      ['Hangul filler', '\u3164'], ['variation selector', '\uFE0F'], ['tag character', '\u{E0001}'],
+    ];
+    for (const [name, ch] of priorChars) {
+      expect(isDeny(runBodyHook(mcpMarkerHookCmd, `OWNER: APP${ch}ROVED`)), `${name} inside APPROVED must still deny`).toBe(true);
+    }
+    // a genuine visible gap must still correctly NOT deny — not a bypass, a human would see the break
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APP\u00A0ROVED')), 'NBSP mid-word must not deny').toBe(false);
+    // every previously-fixed case must still pass unmodified
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'OWNER: APPROVED'))).toBe(true);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, '**OWNER: APPROVED**'))).toBe(false);
+    expect(isDeny(runBodyHook(mcpMarkerHookCmd, 'This discusses OWNER: APPROVED in prose.'))).toBe(false);
+  });
+
   it('MCP-tool marker hook: allows a body with no body field at all', () => {
     const out = execFileSync('bash', ['-c', mcpMarkerHookCmd], { input: JSON.stringify({ tool_input: {} }), encoding: 'utf8' });
     expect(out.trim()).toBe('');
