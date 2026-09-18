@@ -37,6 +37,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const out = process.argv[2] ?? 'dist/sky-ninja-academy.html';
   const fragment = process.argv.includes('--artifact');
   execSync('npx vite build', { stdio: 'inherit' });
+  // `vite build` empties `dist/` first (#136): without this, the single-file build silently deletes
+  // `dist/sw.js` and does not put it back, and `dist/` is shared state — the next `playwright test` previews
+  // whatever is there, so a later e2e run fails 30 seconds into "the game still loads with the network off"
+  // for a reason that has nothing to do with whatever it was actually checking.
+  execSync('node scripts/build-sw.mjs', { stdio: 'inherit' });
   const html = readFileSync('dist/index.html', 'utf8');
   const assets = readdirSync('dist/assets');
   let js = readFileSync(join('dist/assets', assets.find(f => f.endsWith('.js'))), 'utf8');
