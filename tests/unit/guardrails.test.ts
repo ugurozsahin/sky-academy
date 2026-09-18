@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -4652,5 +4652,71 @@ describe('no workflow pins an action major GitHub has deprecated for Node 20 (#1
       expect(w, `${f} must exist under .github/workflows/, or this rail checks the wrong directory`).toBeDefined();
       expect(w!.text, `${f} must still check out the repo`).toMatch(/actions\/checkout@v\d+/);
     }
+  });
+});
+
+/**
+ * #116 item 2: `sw.test.ts` drives `renderSw`'s *output* against a hand-built file list, and the rail above
+ * proves the CLI block *runs* from any path — but nothing runs the CLI block itself as a subprocess against a
+ * real `dist/` and checks what it actually wrote. Three mutations named in #116 leave the whole 1189-test
+ * suite green: writing the worker to the wrong filename, or deleting a build-sanity guard — because every
+ * existing check reads either the exported functions directly (fed a list nobody built from a real directory)
+ * or `package.json`'s text. This drives the real `node scripts/build-sw.mjs <dist>` process, the same way
+ * `npm run build` does, against a small real directory on disk.
+ *
+ * Deliberately not covered here: the "list doesn't include index.html" guard is unreachable independently of
+ * the "index.html file is missing" guard right above it in the same block (both fire on the same missing
+ * file), and the stale-`distDir` shape of mutation is `package.json` wiring, already covered by the existing
+ * `pkg.scripts.build` regex check a few hundred lines up.
+ */
+describe('build-sw.mjs actually writes dist/sw.js, correctly, or fails loudly (#116 item 2)', () => {
+  const run = (dist: string) => {
+    try {
+      execFileSync('node', ['scripts/build-sw.mjs', dist], { encoding: 'utf8', stdio: 'pipe' });
+      return { exitCode: 0, stderr: '' };
+    } catch (e) {
+      const err = e as { status: number | null; stderr?: Buffer | string };
+      return { exitCode: err.status, stderr: err.stderr?.toString() ?? '' };
+    }
+  };
+  const withFixtureDist = (files: Record<string, string>, fn: (dist: string) => void) => {
+    const dist = mkdtempSync(join(tmpdir(), 'sna-build-sw-'));
+    try {
+      for (const [name, contents] of Object.entries(files)) writeFileSync(join(dist, name), contents);
+      fn(dist);
+    } finally {
+      rmSync(dist, { recursive: true, force: true });
+    }
+  };
+
+  it('writes a real dist/sw.js with both placeholders substituted and the actual built files in its precache list', () => {
+    withFixtureDist({ 'index.html': '<div id="app"></div>', 'app.js': 'boot();' }, (dist) => {
+      const { exitCode, stderr } = run(dist);
+      expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: '' });
+      const swPath = join(dist, 'sw.js');
+      expect(existsSync(swPath), 'must write sw.js, not some other filename, under the dist it was given').toBe(true);
+      const sw = readFileSync(swPath, 'utf8');
+      expect(sw, 'a renamed or duplicated placeholder must not ship un-substituted').not.toMatch(/__PRECACHE__|__CACHE_NAME__/);
+      expect(sw, 'the precache list must be the build this run actually produced').toContain('"index.html"');
+      expect(sw).toContain('"app.js"');
+    });
+  });
+
+  it('exits non-zero and writes nothing when the build has no JavaScript at all', () => {
+    withFixtureDist({ 'index.html': '<div id="app"></div>' }, (dist) => {
+      const { exitCode, stderr } = run(dist);
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain('no JavaScript');
+      expect(existsSync(join(dist, 'sw.js')), 'a guard that throws must not leave a worker behind to register').toBe(false);
+    });
+  });
+
+  it('exits non-zero and writes nothing when dist/index.html is missing', () => {
+    withFixtureDist({ 'app.js': 'boot();' }, (dist) => {
+      const { exitCode, stderr } = run(dist);
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain('index.html is missing');
+      expect(existsSync(join(dist, 'sw.js'))).toBe(false);
+    });
   });
 });
