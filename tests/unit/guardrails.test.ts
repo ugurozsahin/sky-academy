@@ -3610,7 +3610,19 @@ describe('.claude/rules/curriculum.md declares paths, and every path matches som
  * to the shared #161-adjacent paragraph in all three governance files (the three-file rule), which is a
  * genuine, owner-facing content addition, not padding — the same justification #198 itself used to *set*
  * these budgets to their own landing size in the first place. `docs/ROUTINE-PROMPT.md` also gained STEP 2.5
- * (#204) in the same window, landing both figures at this PR's own merged size.
+ * (#204) in the same window, landing both figures at that PR's own merged size.
+ *
+ * `docs/ROUTINE-PROMPT.md` then moved down again, 44,034 → 41,451 bytes, by replacing five spans of duplicated
+ * "how" prose with pointers into `.claude/rules/guardrails.md`, `.claude/rules/governance.md` and
+ * `.claude/skills/review-pr/SKILL.md` §4/§6 — the freeze paragraph's history, the "Guard rails" mistake-list
+ * paragraph, the "Governance PRs" section, the vendored-review-agents instruction and the review-gate/Actions
+ * API explanation, and rule 3's/rule 4's closing paragraphs in STEP 2 — none of which any rail in this
+ * describe block or elsewhere pins to ROUTINE-PROMPT.md's own wording (checked before cutting, not after).
+ * The relocated freeze history and the "say so, don't weaken a rail quietly" line landed in
+ * `.claude/rules/governance.md` and `.claude/rules/guardrails.md` respectively, since neither actually held
+ * them before despite already being the pointed-at file. The #161 CANON paragraph, the #191 sentence, the
+ * #199/#200 paragraphs and the #204/#207 CANON paragraphs are untouched — they are pinned verbatim by name a
+ * few describe blocks up from here, and deliberately so.
  *
  * Prove it red: pad either file past its budget with a comment and watch the corresponding test fail.
  */
@@ -3621,7 +3633,7 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
   // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
   const CLAUDE_MD_BUDGET = 18_999;
-  const ROUTINE_PROMPT_BUDGET = 44_034;
+  const ROUTINE_PROMPT_BUDGET = 41_451;
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');

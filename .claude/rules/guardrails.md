@@ -21,3 +21,4 @@ paths:
   specific behaviour by a rail in `tests/unit/guardrails.test.ts` itself.
 - The dependency allowlist rail fails on an unlisted `package.json` dependency — do not add one without a
   reason, and update the allowlist in the same change if the owner has agreed to it.
+- If a rail blocks you and you think it is wrong, say so in the PR — do not weaken or delete it quietly.
