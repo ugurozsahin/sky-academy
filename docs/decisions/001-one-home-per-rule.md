@@ -11,8 +11,9 @@ a copy could be removed only once that rule had runtime enforcement in code.
 Measured on 2026-09-18, after #101 ("context by layer") closed:
 
 - what a routine run loads before its first useful action went from about 42 KB to about 72 KB, not down;
-- #101 took 15 pull requests in two days, ten of them written to clear the §1 bar — 266 KB of tests and
-  9.6 KB of inline hook code, to remove three short paragraphs;
+- #101 took 15 pull requests in two days and added 83 KB to `tests/unit/guardrails.test.ts`; the six written
+  to clear the §1 bar added 31 KB of that, plus a script and 9.6 KB of inline hook code, to remove three short
+  paragraphs. The file as a whole went from 76 KB to 342 KB between 2026-09-10 and 2026-09-18;
 - the byte budgets on `CLAUDE.md` and the routine prompt sat at exactly the current size, and tests pinned
   paragraphs word for word, so neither file could get shorter.
 
@@ -34,17 +35,21 @@ than a sentence.
 3. **A rule that must hold every time becomes a check** — a hook wired in `.claude/settings.json`, a CI job,
    a test of behaviour — and its prose is then cut to the one line that says the check exists.
 4. **Removing a duplicate is ordinary work**, not owner-gated, as long as the home still carries the rule.
-   `tests/unit/instructions.test.ts` fails on a pointer to a path that does not exist.
-5. **Tests do not pin instruction wording.** A test checks behaviour or structure. A test that fails when a
-   sentence is rephrased is what stopped these files shrinking, and is removed as its paragraph is moved.
+   `tests/unit/instructions.test.ts` fails on a pointer to a file that does not exist; it cannot tell whether
+   the file still says what the pointer promises, so the reviewer checks that.
+5. **Tests do not pin the wording of a copied paragraph.** A test that holds copies identical, or fails when
+   a sentence of one of them is rephrased, is what stopped these files shrinking; it is removed in the same
+   change that reduces its paragraph to one home. New rails check behaviour or structure.
 
-Loosening a constraint on a run — removing a rule, not a copy of it — is still the owner's decision.
+Everything else is unchanged and still the owner's decision under the `open-pr` skill §6: removing a rule
+rather than a copy of it, and removing or weakening any other rail — including the rails that keep a skill
+from being gutted.
 
 ## Consequences
 
-- The copies that exist today are debt, not policy: the freeze history, records-have-readers, the #161
-  adoption conditions and the #97 second-item conditions. Until each is reduced to its home and pointers, the
-  tests that hold its copies identical stay, so a half-edited copy cannot contradict the others.
+- The copies that exist today are debt, not policy; `.claude/rules/governance.md` lists them. Until each is
+  reduced to its home and pointers, the tests that hold its copies identical stay, so a half-edited copy cannot
+  contradict the others.
 - `BACKLOG.md` retires (#218); what it still uniquely holds moves to `.claude/rules/governance.md`.
 - The byte budgets are reset downwards after each reduction, never upwards.
 - This work is done in sessions with the owner, not by the routine, until he says otherwise (2026-09-18).

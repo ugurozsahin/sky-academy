@@ -15,22 +15,22 @@ paths:
   as the home still carries the rule. Four paragraphs are still copied into `CLAUDE.md`, `BACKLOG.md` and
   `docs/ROUTINE-PROMPT.md` — the freeze history, records-have-readers, the #161 adoption conditions, the #97
   second-item conditions. That is debt: until a paragraph is reduced to its home, change its copies together,
-  which `tests/unit/guardrails.test.ts` still checks.
+  which `tests/unit/guardrails.test.ts` still checks. **While this reduction is under way it is done in
+  sessions with the owner** (issues labelled `owner-session`), not by the routine; removing a rule rather than
+  a copy, or removing any other rail, is still a loosening under the `open-pr` skill §6.
 - **A `REVIEW: CLEARED` comment that is itself a #161 adoption carries its own session URL too (#191)** — the
   same footer every comment carries (#199), so a later reader is not left guessing which session cleared a
   stale block from an unmarked comment. Enforced in code: `hasSessionUrl()` inside `scripts/review-gate.mjs`'s
-  `blockState()` flags an adoption-clear that has none (`#191`/`#195`) — that is what makes this the one
-  #161-family rule collapsible under #216 §1's bar. `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
+  `blockState()` flags an adoption-clear that has none (`#191`/`#195`). `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
   each carry a pointer here instead of restating it.
 - **The run's heartbeat snapshot (issue #62) must say whether it took a second item and, if not, which of the
   four #97 eligibility conditions failed (#239).** Enforced in code: a `PreToolUse` hook in
   `.claude/settings.json` denies an `issue_write` update to issue #62 whose body has no `- second item: `
-  line — that is what makes this one piece of the #97 rule collapsible under #216 §1's bar, the same way
-  #191's session-URL requirement was. The four eligibility conditions themselves (is a review waiting, is
+  line. The four eligibility conditions themselves (is a review waiting, is
   there time left in the run, are the second item's files disjoint from the first's, did the first item
   actually finish) have no such enforcement yet — nothing stops a run from taking an ineligible second item,
-  only from failing to say so — so they stay triplicated in `CLAUDE.md`, `BACKLOG.md` and
-  `docs/ROUTINE-PROMPT.md` until each individually earns the same bar. `BACKLOG.md` and
+  only from failing to say so — and they are still copied in `CLAUDE.md`, `BACKLOG.md` and
+  `docs/ROUTINE-PROMPT.md` (debt, first bullet). `BACKLOG.md` and
   `docs/ROUTINE-PROMPT.md` (the two of the three that stated this recording obligation) each carry a pointer
   here instead of restating it.
 - **The routine heartbeat (issue #62) must be overwritten each run, never appended to (records have readers,
@@ -54,12 +54,11 @@ paths:
 - **No issue ever carries the retired `frozen` label again (#101).** Enforced in code: a `PreToolUse` hook in
   `.claude/settings.json` denies an `issue_write` create or update whose `labels` include `frozen` — the one
   actionable rule the freeze's history leaves behind, since "no run reinstates a freeze on its own" has no
-  other concrete action to catch. That is what makes this one piece of the freeze-history rule collapsible
-  under #216 §1's bar, the same way #191's session-URL requirement and the #97 recording obligation were. The
+  other concrete action to catch. The
   freeze's broader one-time-lift narrative above (the dates, the reasoning, "does not re-arm") has no such
   enforcement point — nothing stops a run from *arguing* a class of work should be barred again, only from
-  applying this one label — so that narrative stays triplicated in `CLAUDE.md`, `BACKLOG.md` and
-  `docs/ROUTINE-PROMPT.md` until it, too, earns real enforcement. `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
+  applying this one label — and that narrative is still copied in `CLAUDE.md`, `BACKLOG.md` and
+  `docs/ROUTINE-PROMPT.md` (debt, first bullet). `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
   (the two of the three that ever mentioned the retired label) each carry a pointer here instead of restating
   it.
 - **CANON's two mechanical conditions (age of the block, silence of its setter — the figures themselves live
