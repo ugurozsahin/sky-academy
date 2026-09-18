@@ -3820,6 +3820,22 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
     expect(writeWorklogHook, 'the Write|Edit entry must itself check for WORKLOG.md').toBeDefined();
     expect(writeWorklogHook.command, 'the Write/Edit WORKLOG.md hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
   });
+
+  // #101's own "Verification" section asks for an `InstructionsLoaded` hook (matcher `path_glob_match`) that
+  // logs which file loaded, so a docs-only change and a curriculum change can be shown loading different rule
+  // files rather than assumed to. This structural check is what stops that debugging aid disappearing quietly
+  // (it costs nothing to run — `PreToolUse` denial logic is what needs a rail here, not this one) — the actual
+  // proof that scoped loading works lives in the two-run demonstration in this PR's body, not in a unit test,
+  // since a unit test cannot observe the harness's own file-loading decisions.
+  it('.claude/settings.json declares an InstructionsLoaded hook scoped to path_glob_match (#101 verification)', () => {
+    const settings = readSettings();
+    const entries = (settings.hooks?.InstructionsLoaded ?? []) as any[];
+    expect(entries.length, 'no hooks.InstructionsLoaded entry — the #101 layer-loading verification has no logger').toBeGreaterThan(0);
+    const entry = entries.find((e) => e.matcher === 'path_glob_match');
+    expect(entry, 'no InstructionsLoaded entry is scoped to the path_glob_match matcher').toBeDefined();
+    const hook = (entry.hooks ?? [])[0];
+    expect(hook?.command, 'the InstructionsLoaded hook must read .file_path to log anything useful').toContain('.file_path');
+  });
 });
 
 /**

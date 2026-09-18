@@ -10,3 +10,6 @@ _artifact_*.bundle
 # Signing keys: never commit (the debug key lives in .android/, see .android/README.md)
 *.keystore
 *.jks
+
+# InstructionsLoaded hook's debug log (#101 layer 4 verification) — per-machine, never a shared record
+.claude/instructions-loaded.log
