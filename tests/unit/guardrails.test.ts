@@ -1916,20 +1916,31 @@ describe('a stale review block may be adopted, and only under the four condition
    * even while reasoning about *other* comments' URLs to justify the adoption. Its second REVIEW: CLEARED
    * comment, also an adoption, did carry one — so this is inconsistent practice, not a rule nobody follows.
    *
-   * Deliberately NOT a gating change: blockState() never reads the clearing comment for a session URL, and
-   * this rail does not ask it to — retroactively treating an already-accepted clear as invalid would
-   * re-block pull requests that were correctly unblocked under the rule as actually written, which is a much
-   * bigger behaviour change than this documentation gap justifies. This is a documentation-only tightening:
-   * one sentence, pinned in the three process files, same pattern as every other #161 change.
+   * This started as documentation only (blockState() didn't read the clearing comment for a session URL yet).
+   * #195 (PR #210) closed that: `clearNeedsSession` now checks `isAdoptionClear(clearedBody)` for
+   * `hasSessionUrl()` and adds to `blocked`/`reasons` when it's missing — a real gate, not just a phrase in
+   * three files (an older version of this comment said otherwise; it wasn't updated when #195 landed).
    *
-   * Prove it red: drop the new sentence from any one of the three files.
+   * #216 §1: this is the one #161-family rule real enough to collapse — `CLAUDE.md`, `BACKLOG.md` and
+   * `docs/ROUTINE-PROMPT.md` now each carry a pointer to `.claude/rules/governance.md` instead of the full
+   * sentence, and governance.md carries the rule itself plus the `hasSessionUrl()`/`blockState()` citation.
+   * The other #161-family rules (the CANON paragraph above, #199, #200) stay triplicated — none of them
+   * has real code enforcement yet, per #216 §1's table.
+   *
+   * Prove it red: drop the pointer from any one of the three files, or the rule itself from governance.md.
    */
-  it.each(PROCESS)('%s requires a #161-adopting REVIEW: CLEARED comment to carry its own session URL (#191)', (name) => {
-    const text = read(name);
-    expect(text, `${name} must require the clearing session to identify itself the same way the blocking `
-      + 'session does, when the clear is itself a #161 adoption')
-      .toContain('When that REVIEW: CLEARED comment is the adoption itself, it carries the clearing '
-        + "session's own URL too");
+  it('the #191 clearing-side session-URL rule lives in governance.md, pointed to from the three process files', () => {
+    const gov = read('.claude/rules/governance.md');
+    expect(gov, 'governance.md must state the #191 rule itself, not just point elsewhere')
+      .toContain("carries its own session URL too (#191)");
+    expect(gov, 'and name the code that actually enforces it, or this is prose again').toContain('hasSessionUrl');
+    for (const name of PROCESS) {
+      const text = read(name);
+      expect(text, `${name} must point at governance.md for #191's rule`)
+        .toContain('(Its own session-URL requirement is in `.claude/rules/governance.md`, #191.)');
+      expect(text, `${name} must not also restate the #191 rule verbatim — the whole point is one copy`)
+        .not.toContain("it carries the clearing session's own URL too");
+    }
   });
 
   /**
@@ -3692,8 +3703,8 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
 
   // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 10_778;
-  const ROUTINE_PROMPT_BUDGET = 41_451;
+  const CLAUDE_MD_BUDGET = 10_750;
+  const ROUTINE_PROMPT_BUDGET = 41_295;
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');

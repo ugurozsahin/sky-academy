@@ -11,8 +11,17 @@ paths:
 # Governance files (#101)
 
 - The three-file rule: `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` carry identical wording for the
-  freeze history, records-have-readers, the stale-block adoption rule (#161) and the second-item rule (#97) —
-  change all three together. A rail in `tests/unit/guardrails.test.ts` holds them to it.
+  freeze history, records-have-readers, the stale-block adoption rule's four conditions (#161) and the
+  second-item rule (#97) — change all three together. A rail in `tests/unit/guardrails.test.ts` holds them to
+  it. **One exception (#216 §1):** #161's session-URL requirement (#191, below) has real code enforcement, so
+  its prose lives here once, as a pointer from the three files, rather than triplicated like the rest — the
+  other three rules stay triplicated until each individually earns the same bar.
+- **A `REVIEW: CLEARED` comment that is itself a #161 adoption carries its own session URL too (#191)** — the
+  same footer every comment carries (#199), so a later reader is not left guessing which session cleared a
+  stale block from an unmarked comment. Enforced in code: `hasSessionUrl()` inside `scripts/review-gate.mjs`'s
+  `blockState()` flags an adoption-clear that has none (`#191`/`#195`) — that is what makes this the one
+  #161-family rule collapsible under #216 §1's bar. `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
+  each carry a pointer here instead of restating it.
 - **The code-health freeze (2026-09-06 → 2026-09-10).** The owner held it while any issue labelled `review` or
   `debt` was open, so the 6 September code review's refactors could land *before* feature work resumed —
   refactors move code around, and features written first would have conflicted with them. He lifted it once
