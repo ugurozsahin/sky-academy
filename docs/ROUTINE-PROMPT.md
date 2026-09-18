@@ -161,10 +161,8 @@ going bad must not hold the other. Say in that pull request what the second item
 the current rate: two items mean two CI runs, #74 is open, and the spending limit is deliberately closed.
 
 **Record it either way.** Your heartbeat snapshot (STEP 5) carries a `- second item:` line saying whether you
-took one and, when you did not, **which of the four conditions failed**. Without that nobody can tell a rule
-that is never true from a rule nobody applied, which is the failure this project keeps having with its own
-process. (#97 asks for that line in the worklog, which #98 closed a day later; operational state now lives in
-the heartbeat issue body, so it goes there instead — the same record, in the place that still has a reader.)
+took one and, when you did not, which of the four conditions failed — enforced in code, not just this prose
+(`.claude/rules/governance.md`, #97/#239).
 
 ## Governance PRs: which way does it move the constraint?
 
