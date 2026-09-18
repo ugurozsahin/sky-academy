@@ -1,5 +1,7 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { basename, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 // @ts-expect-error — plain ESM bundler helper (see scripts/bundle-single.d.ts); #15's rail asserts its output
@@ -3835,5 +3837,52 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
 
   it('WORKLOG.md Bash hook: allows an append to the archived docs/worklog/*.md path', () => {
     expect(isDeny(runHook(worklogBashHookCmd, 'echo x >> docs/worklog/2026-09.md'))).toBe(false);
+  });
+});
+
+/**
+ * #116 item 1: `build-sw.mjs`, `bundle-single.mjs` and `pwa-icons.mjs` each gated their CLI block on
+ * `import.meta.url === \`file://${'$'}{process.argv[1]}\``, comparing a percent-encoded URL to a raw
+ * filesystem path. The two disagree the moment the script's own path needs escaping — a space, `#`, anything
+ * non-ASCII — and the whole block then silently no-ops: `npm run build` exits 0 with no `sw.js` and no error,
+ * from a checkout under an entirely ordinary Mac path like `~/Documents/Sky Academy/…`.
+ *
+ * This can only be reproduced by actually invoking the script from a path that needs escaping — the bug is in
+ * the RUNTIME comparison of two strings Node computes, not anything a source-text rail could see — so this
+ * copies each script into a freshly made directory whose name contains a space and runs it as a real
+ * subprocess, the same way `npm run build` would.
+ */
+describe('build scripts run their CLI block from a path that needs URL-escaping (#116)', () => {
+  const runFromSpacedPath = (scriptRelPath: string, args: string[]) => {
+    const dir = mkdtempSync(join(tmpdir(), 'sna guard rail '));   // the space is the point
+    const scriptPath = join(dir, basename(scriptRelPath));
+    writeFileSync(scriptPath, readFileSync(new URL(`../../${scriptRelPath}`, import.meta.url)));
+    try {
+      execFileSync('node', [scriptPath, ...args], { encoding: 'utf8', stdio: 'pipe' });
+      return { exitCode: 0, stderr: '' };
+    } catch (e) {
+      const err = e as { status: number | null; stderr?: Buffer | string };
+      return { exitCode: err.status, stderr: err.stderr?.toString() ?? '' };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('build-sw.mjs still errors loudly on a missing dist/index.html when run from a spaced path', () => {
+    // Mutating the guard back to the old `file://${argv[1]}` form makes this pass silently instead —
+    // exitCode 0, stderr '' — which is the exact failure this rail exists to catch.
+    const { exitCode, stderr } = runFromSpacedPath('scripts/build-sw.mjs', ['nonexistent-dist-xyz']);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain('index.html is missing');
+  });
+
+  it('bundle-single.mjs and pwa-icons.mjs no longer compare a raw path to a `file://` URL', () => {
+    for (const f of ['scripts/bundle-single.mjs', 'scripts/pwa-icons.mjs']) {
+      const src = readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8');
+      expect({ file: f, hasOldGuard: src.includes('file://${process.argv[1]}') })
+        .toEqual({ file: f, hasOldGuard: false });
+      expect({ file: f, hasNewGuard: src.includes('fileURLToPath(import.meta.url)') })
+        .toEqual({ file: f, hasNewGuard: true });
+    }
   });
 });

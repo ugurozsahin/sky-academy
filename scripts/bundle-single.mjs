@@ -2,7 +2,8 @@
 // Usage: node scripts/bundle-single.mjs [out.html] [--artifact]  (--artifact = body-only fragment, no doctype/html/head/body)
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Everything in `<head>` that must not survive into the single-file page.
@@ -27,8 +28,12 @@ export function stripHead(head) {
 }
 
 // Importing this file must not build anything: `tests/unit/guardrails.test.ts` imports `stripHead` to assert
-// on its output, and a top-level `vite build` would run on every unit test run. Same guard as build-sw.mjs.
-if (import.meta.url === `file://${process.argv[1]}`) {
+// on its output, and a top-level `vite build` would run on every unit test run. Same guard as build-sw.mjs,
+// fixed the same way for the same reason (#116): a raw filesystem path compared to a percent-encoded URL is
+// false the moment the path needs escaping (a space, `#`, anything non-ASCII), and this block then silently
+// no-ops — `node scripts/bundle-single.mjs` exits 0 from a path like `~/Documents/Sky Academy/…` with no
+// `dist/sky-ninja-academy.html` written and no error.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const out = process.argv[2] ?? 'dist/sky-ninja-academy.html';
   const fragment = process.argv.includes('--artifact');
   execSync('npx vite build', { stdio: 'inherit' });
