@@ -27,3 +27,12 @@ paths:
   starting `REVIEW: CHANGES REQUESTED`; only its setter clears it with `REVIEW: CLEARED`, except under the
   stale-block adoption rule (#161) — see the `review-pr` skill for the full protocol.
 - No agent ever writes an `OWNER: APPROVED` or `OWNER: REJECTED` marker, whatever the context.
+- **The three ordering tools (agreed with the owner, 2026-09-11).** The project board is a read-only view, not
+  a second list — `docs/ROUTINE-PROMPT.md` STEP 1 has why a cloud session cannot write to it. The owner
+  reorders work with three things, all set on the issue itself: **`priority:P0`** means now — two or three
+  cards at most, oldest first within it (`docs/ROUTINE-PROMPT.md` STEP 3 rule 5); **`Blocked by #<n>` as the
+  first line of the issue body, plus the `blocked` label**, means after that one — STEP 3 rule 2 already skips
+  an issue blocked by an open issue it references, and the label is what puts the card in the board's Blocked
+  column, coming off by hand once the blocker closes; **`later`** means not yet, the parking label. There is
+  no hand order inside a priority — oldest issue number first, full stop — which is acceptable because the
+  routine merges roughly fifteen PRs a day, so a `priority:P1` bucket drains in a day or two, not a week.

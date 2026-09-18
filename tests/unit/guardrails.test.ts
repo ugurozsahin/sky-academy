@@ -2266,6 +2266,21 @@ describe('the project board is synced from the Mac, read by pulse in the cloud, 
     expect(step5, 'the heartbeat shape must carry the board line').toMatch(/^- board: pulse /m);
   });
 
+  // #107 — the board's Priority field is a projection the sync overwrites every 15 minutes from the label; an
+  // owner who reorders from the board sees it revert and nothing else happens. The only real lever is the
+  // issue's own label. Proved red first: the old clause ("...from the board's Priority field or from the
+  // issue itself") failed the first assertion; each tool string was checked absent from governance.md too,
+  // to confirm they were not already documented somewhere the rail could accidentally credit.
+  it('STEP 3 does not claim the owner can reorder from the board, and the three ordering tools are documented', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    expect(text, "the board's Priority field is overwritten by the sync — the owner cannot reorder from it")
+      .not.toMatch(/from the board's Priority field/);
+    const gov = read('.claude/rules/governance.md');
+    expect(gov, 'the three ordering tools must be documented somewhere a session reads').toMatch(/priority:P0/);
+    expect(gov, '`Blocked by #<n>` is one of the three tools').toMatch(/Blocked by #/);
+    expect(gov, '`later` is one of the three tools').toMatch(/`later`.*means not yet/);
+  });
+
   it('the watchdog reads the same pulse and bounds its age', () => {
     const text = read('docs/WATCHDOG-PROMPT.md');
     expect(text).toContain('`board: heartbeat`');
