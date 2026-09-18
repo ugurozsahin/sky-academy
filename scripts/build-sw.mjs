@@ -8,7 +8,8 @@
 // Usage: node scripts/build-sw.mjs [distDir]
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Files that must never be precached, whatever is in `dist/`. */
 const EXCLUDE = new Set(['sw.js']);
@@ -68,7 +69,11 @@ export function renderSw(template, list, prints = list) {
     .replace('__PRECACHE__', JSON.stringify(list, null, 2));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// `resolve(argv[1]) === fileURLToPath(import.meta.url)` compares two filesystem paths, not a raw path against
+// a percent-encoded URL (#116): the old `` `file://${process.argv[1]}` `` broke on any character `file://`
+// URLs escape — a space, `#`, anything non-ASCII — so a checkout under a path like `~/Documents/Sky Academy/…`
+// made this whole block silently skip, and `npm run build` exited 0 with no `sw.js` and no error anywhere.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const dist = process.argv[2] ?? 'dist';
   if (!existsSync(join(dist, 'index.html'))) throw new Error(`${dist}/index.html is missing — run vite build first`);
   const list = precacheList(listFiles(dist));
