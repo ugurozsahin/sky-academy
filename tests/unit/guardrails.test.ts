@@ -3598,13 +3598,23 @@ describe('.claude/rules/curriculum.md declares paths, and every path matches som
  * migration to layer 2 (`.claude/rules/`) is a ratchet rather than a one-off tidy-up that regrows silently.
  *
  * Both budgets land at the latest PR's own size, not the issue's eventual target (CLAUDE.md's stated goal is
- * ≤ 4 KB — nowhere near it yet, because most of the always-loaded content this issue is about hasn't moved
- * out yet). That is deliberate: a budget rail records existing debt and only ever ratchets down as more
- * content genuinely moves to a scoped `.claude/rules/*.md` file or a skill, never up to let a PR that grew
- * either file back in. The `CLAUDE.md` budget has moved down twice this way: the `window.__sna`/Android
- * bullets moved to `.claude/rules/game.md`/`android.md` first, then the "Guard rails" paragraph's mistake
- * list moved to `.claude/rules/guardrails.md` (both already held the real content) — each a net reduction,
- * which is what lets the rail land below the pre-move size rather than merely freezing it.
+ * ≤ 4 KB — still not there, see below). That is deliberate: a budget rail records existing debt and only ever
+ * ratchets down as more content genuinely moves to a scoped `.claude/rules/*.md` file or a skill, never up to
+ * let a PR that grew either file back in. The `CLAUDE.md` budget has moved down three times this way: the
+ * `window.__sna`/Android bullets moved to `.claude/rules/game.md`/`android.md` first, then the "Guard rails"
+ * paragraph's mistake list moved to `.claude/rules/guardrails.md`, then this PR trimmed 18,999 → 10,778 bytes
+ * by cutting the non-pinned narrative around the freeze history, the skills-vendoring list, the dev-routine
+ * flow and the second-item rule down to short pointers into `.claude/rules/governance.md` and
+ * `docs/ROUTINE-PROMPT.md` — each a net reduction, which is what lets the rail land below the pre-move size
+ * rather than merely freezing it.
+ *
+ * Why ≤ 4 KB is still out of reach: the #161 stale-block paragraph, the #191 sentence and the #199/#200
+ * paragraphs (the rails a few screens up from here) must stay VERBATIM in CLAUDE.md itself, not just
+ * pointed at — they bind every comment and review a session posts regardless of which files it is touching,
+ * so a path-scoped `.claude/rules/governance.md` would never load for a session that only opens PRs and
+ * leaves comments. Those four blocks alone are >2 KB; hitting ≤ 4 KB while keeping them verbatim here would
+ * need either genuinely shorter phrasing that still satisfies every rail below, or moving the *rail*, not just
+ * the prose, to a layer that always loads — a bigger decision than one PR's trim, left for a follow-up.
  *
  * Both budgets moved back **up** once, deliberately: #199/#200 added the session-URL and content-floor rules
  * to the shared #161-adjacent paragraph in all three governance files (the three-file rule), which is a
@@ -3612,8 +3622,11 @@ describe('.claude/rules/curriculum.md declares paths, and every path matches som
  * these budgets to their own landing size in the first place. `docs/ROUTINE-PROMPT.md` also gained STEP 2.5
  * (#204) in the same window, landing both figures at that PR's own merged size.
  *
- * `docs/ROUTINE-PROMPT.md` then moved down again, 44,034 → 41,451 bytes, by replacing five spans of duplicated
- * "how" prose with pointers into `.claude/rules/guardrails.md`, `.claude/rules/governance.md` and
+ * Both budgets then moved down again independently. `CLAUDE.md` went 18,999 → 10,778 bytes by cutting the
+ * non-pinned narrative around the freeze history, the skills-vendoring list, the dev-routine flow and the
+ * second-item rule down to short pointers into `.claude/rules/governance.md` and `docs/ROUTINE-PROMPT.md`.
+ * `docs/ROUTINE-PROMPT.md` went 44,034 → 41,451 bytes by replacing five spans of duplicated "how" prose with
+ * pointers into `.claude/rules/guardrails.md`, `.claude/rules/governance.md` and
  * `.claude/skills/review-pr/SKILL.md` §4/§6 — the freeze paragraph's history, the "Guard rails" mistake-list
  * paragraph, the "Governance PRs" section, the vendored-review-agents instruction and the review-gate/Actions
  * API explanation, and rule 3's/rule 4's closing paragraphs in STEP 2 — none of which any rail in this
@@ -3621,8 +3634,8 @@ describe('.claude/rules/curriculum.md declares paths, and every path matches som
  * The relocated freeze history and the "say so, don't weaken a rail quietly" line landed in
  * `.claude/rules/governance.md` and `.claude/rules/guardrails.md` respectively, since neither actually held
  * them before despite already being the pointed-at file. The #161 CANON paragraph, the #191 sentence, the
- * #199/#200 paragraphs and the #204/#207 CANON paragraphs are untouched — they are pinned verbatim by name a
- * few describe blocks up from here, and deliberately so.
+ * #199/#200 paragraphs and the #204/#207 CANON paragraphs are untouched throughout both trims — they are
+ * pinned verbatim by name a few describe blocks up from here, and deliberately so.
  *
  * Prove it red: pad either file past its budget with a comment and watch the corresponding test fail.
  */
@@ -3632,7 +3645,7 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
 
   // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 18_999;
+  const CLAUDE_MD_BUDGET = 10_778;
   const ROUTINE_PROMPT_BUDGET = 41_451;
 
   it('CLAUDE.md stays at or under its budget', () => {
