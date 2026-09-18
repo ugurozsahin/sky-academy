@@ -44,7 +44,15 @@ on:
 concurrency:
   # Two events in quick succession (comment, then Ready for review) must not race to stamp opposite states.
   group: review-gate-${{ github.event.pull_request.number || github.event.issue.number }}
-  cancel-in-progress: true
+  # #92: this used to be `true`. Concurrency is evaluated at the WORKFLOW level, before the job's `if:` below —
+  # so an ordinary comment (no marker, its own job always skipped) still claimed the group and cancelled a
+  # `synchronize` run seconds from stamping a freshly pushed head. The cancelling run stamps nothing, so the
+  # head was left with no `review-gate` status at all — the exact gap ROUTINE-PROMPT.md rule 1 tells a reviewer
+  # to check for by hand. Queuing instead never loses a run: the job always re-lists live comments and the
+  # live draft flag right before it writes (see the script below), so whichever run in the group executes last
+  # writes the status that matches reality at that moment, and a run that skips (no marker) just finishes
+  # instantly without touching the status underneath a run that would have written one.
+  cancel-in-progress: false
 permissions:
   contents: read             # checkout, for the predicate module
   statuses: write            # writes the `review-gate` status onto the PR head
@@ -108,11 +116,11 @@ jobs:
             // comment — a `deleted` event's own payload still carries the removed comment, but it is already
             // gone from this listing, which is exactly what #77 needs: the state computed below reflects the
             // edit or delete that woke this run, whichever trigger it was. That also settles the rapid
-            // create-then-edit race `concurrency:` above raises: `cancel-in-progress: true` means only the
-            // newest triggered run for a PR survives to completion, and because every run re-lists live rather
-            // than trusting its own event, that survivor's result already accounts for everything that has
-            // happened by the time it queries GitHub — an older, cancelled run's write (if it got that far)
-            // is superseded, not raced against.
+            // create-then-edit race `concurrency:` above raises: since #92, the group queues rather than
+            // cancels, so every triggered run for a PR reaches this point and writes — and because each one
+            // re-lists live rather than trusting its own event, whichever run's write actually lands last on
+            // the API side reflects everything that had happened by the time it queried GitHub, so an earlier
+            // run's write (if it got this far) is superseded by fresher data, not raced against.
             const comments = await github.paginate(github.rest.issues.listComments,
               { owner, repo, issue_number: number, per_page: 100 });
             // The decision lives in scripts/review-gate.mjs so tests/unit/review-gate.test.ts can hold it to
