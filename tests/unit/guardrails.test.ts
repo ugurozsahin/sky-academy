@@ -273,6 +273,22 @@ describe('guard rails', () => {
       .toEqual({ wired: true });
   });
 
+  // #92: `cancel-in-progress: true` let an ordinary comment's run — one the job `if:` above will skip, since
+  // it opens with neither marker — win the single shared concurrency group and cancel a `synchronize` run
+  // that was seconds from stamping the freshly pushed head. The cancelling run stamps nothing (it is
+  // skipped), so the head was left carrying no `review-gate` status at all — exactly the gap rule 1 of
+  // docs/ROUTINE-PROMPT.md warns a reviewer to check for by hand. Queuing instead of cancelling means every
+  // triggered run that reaches the job re-reads live PR state before it writes, so a run that cannot stamp
+  // (skipped) can no longer destroy one that can.
+  it('the review gate queues instead of cancelling, so a skip-filtered run cannot cancel one that stamps (#92)', () => {
+    const yml = workflow('review-gate.yml');
+    const code = yml.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
+    const concurrency = code.slice(code.indexOf('concurrency:'), code.indexOf('permissions:'));
+    expect(concurrency.length).toBeGreaterThan(20);                        // never assert against an empty slice
+    expect(concurrency, 'cancel-in-progress must be false, or a skipped run can cancel one that stamps (#92)')
+      .toMatch(/cancel-in-progress:\s*false/);
+  });
+
   // Incident 2026-09-06: a review found `Tracer.destroy()` removing only the window listeners, so every
   // question stacked another pair on the shared canvas (#39). Anything that adds a listener must remove it.
   it('every addEventListener in src/game has a matching removeEventListener', () => {
