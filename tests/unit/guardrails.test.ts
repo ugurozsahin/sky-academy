@@ -1944,6 +1944,43 @@ describe('a stale review block may be adopted, and only under the four condition
   });
 
   /**
+   * #239/#216 §1 — the #97 second-item rule's *recording* obligation (the heartbeat must say whether a
+   * second item was taken and, if not, which condition failed) now has real enforcement: a `PreToolUse` hook
+   * denies an `issue_write` update to issue #62 whose body has no `- second item: ` line. That is the one
+   * piece of #97 real enough to collapse, the same bar #191 cleared — the four *eligibility* conditions
+   * themselves (is a review waiting, is there time left, are the files disjoint, did the first item finish)
+   * have no such enforcement, so they stay triplicated across `CLAUDE.md`, `BACKLOG.md` and
+   * `docs/ROUTINE-PROMPT.md` (checked by the `it.each(FILES)` rails above, in the #177 describe block) — this
+   * rail only covers the recording-obligation sentence, not the whole rule.
+   *
+   * Unlike #191 (a single sentence with nothing else depending on its exact words), the "carries a
+   * `- second item:` line" instruction is itself part of what STEP 5 needs while running, so it stays inline
+   * in `BACKLOG.md`/`docs/ROUTINE-PROMPT.md` rather than collapsing to a bare pointer — what moved to
+   * governance.md is the surrounding rationale (why: the code enforcement, the #98 worklog history), which
+   * was genuinely duplicated prose with no operational role.
+   *
+   * Prove it red: drop the governance.md bullet, or restore either file's old rationale sentence.
+   */
+  it('the #97 heartbeat-recording obligation is enforced in code and pointed to from governance.md', () => {
+    const gov = read('.claude/rules/governance.md');
+    expect(gov, 'governance.md must state the recording obligation itself')
+      .toContain('must say whether it took a second item and, if not, which of the');
+    expect(gov, 'and name the enforcing hook, or this is prose again').toContain('PreToolUse');
+    expect(gov, 'and the issue it gates').toContain('issue #62');
+    // Flattened, not raw: the pointer sentence sits inside prose a line-wrap can legitimately split, and a
+    // rail testing the author's line breaks rather than the rule is the exact mistake #177's tests avoid.
+    const flat = (s: string) => s.replace(/\s+/g, ' ');
+    for (const name of ['BACKLOG.md', 'docs/ROUTINE-PROMPT.md']) {
+      const text = flat(read(name));
+      expect(text, `${name} must point at governance.md for the #97 recording obligation`)
+        .toContain('enforced in code, not just this prose (`.claude/rules/governance.md`, #97/#239)');
+    }
+    // The rationale prose this collapse actually removed — a future re-add would just be re-triplicating it.
+    expect(flat(read('docs/ROUTINE-PROMPT.md')), 'the old worklog-history aside must not come back')
+      .not.toContain('#97 asks for that line in the worklog');
+  });
+
+  /**
    * #199/#200 — the session-URL and content-floor rules stop being special-cased to the two REVIEW: markers.
    *
    * #189 made a REVIEW: CHANGES REQUESTED block, and #191 made a #161-adopting REVIEW: CLEARED comment,
@@ -3719,7 +3756,7 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
   // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
   const CLAUDE_MD_BUDGET = 10_750;
-  const ROUTINE_PROMPT_BUDGET = 41_295;
+  const ROUTINE_PROMPT_BUDGET = 41_008;
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
