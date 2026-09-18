@@ -3491,6 +3491,22 @@ describe('offline support cannot go stale on its own (#15)', () => {
     expect(stripHead(head), 'the inline favicon is not a file and must stay').toMatch(/<link rel="icon" href="data:/);
   });
 
+  // `stripHead` has four replacements; only the manifest and Apple-icon links (above) had a test (#116 item
+  // 4). These two fabricate the shapes Vite's own build injects — an empty `<script src="…">` and the built
+  // stylesheet link — since the source `index.html` this file otherwise reads has neither: both appear only
+  // in `dist/index.html`, after `vite build`.
+  it("strips the built page's own module script tag, so the single-file page does not run the app twice", () => {
+    const head = '<title>t</title>\n<script type="module" crossorigin src="/assets/index-ABC123.js"></script>';
+    expect(stripHead(head)).not.toMatch(/<script/);
+    expect(stripHead(head)).toContain('<title>t</title>');
+  });
+
+  it('strips the built stylesheet link, leaving the rest of the head alone', () => {
+    const head = '<title>t</title>\n<link rel="stylesheet" crossorigin href="/assets/index-ABC123.css">';
+    expect(stripHead(head)).not.toMatch(/<link rel="stylesheet"/);
+    expect(stripHead(head)).toContain('<title>t</title>');
+  });
+
   // No `vite-plugin-pwa`, no `workbox-*`: #15's acceptance criteria rule them out and the dependency
   // allow-list rail would fail them anyway. This states the intent next to the feature that would want them.
   it('offline support added no dependency', () => {
