@@ -56,8 +56,21 @@ export function cacheName(prints) {
 }
 
 /** Substitutes both placeholders. Throws if either is missing, so a renamed placeholder cannot ship a worker
- *  that precaches the literal string `__PRECACHE__`. */
-export function renderSw(template, list, prints = list) {
+ *  that precaches the literal string `__PRECACHE__`.
+ *
+ *  `prints` is required, not defaulted to `list` (#116 item 3): both parameters are `string[]`, so a default
+ *  of `prints = list` let a caller forget the third argument entirely — or transpose it as
+ *  `renderSw(t, prints, list)` — and still type-check and run, naming every cache after filenames instead of
+ *  content. Fourteen of the sixteen precached files are not content-hashed by Vite (the twelve avatars most
+ *  of all), so that bug ships the old picture for ever: `activate` keeps the old cache, and `asset()` is
+ *  cache-first with no revalidation. The guard below only checks *shape* (a fingerprint always contains the
+ *  `\0` `fingerprints()` joins with; a bare filename never does) — it cannot tell a correct fingerprint from
+ *  a stale one, only a fingerprint from a filename. */
+export function renderSw(template, list, prints) {
+  if (!Array.isArray(prints) || prints.some(p => !p.includes('\0'))) {
+    throw new Error('renderSw: prints must be fingerprints ("name\\0size\\0hash"), not filenames — pass the ' +
+      'output of fingerprints(), not list again');
+  }
   for (const token of ['__CACHE_NAME__', '__PRECACHE__']) {
     // Exactly one, not merely present: `String.replace` with a string needle takes the first occurrence, so
     // a second copy of a placeholder would ship un-substituted inside the worker. (Raised in review.)

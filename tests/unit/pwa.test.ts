@@ -162,8 +162,12 @@ describe('the precache list is read from the build, never written down (#15)', (
     expect(cacheName(a)).toBe(cacheName([...a].reverse().sort()));
   });
 
+  // A fingerprint that only needs to satisfy renderSw's "contains \0" shape check, not describe a real file —
+  // these tests are about placeholder substitution, not fingerprint content.
+  const FAKE_PRINTS = ['a\x001\x00x'];
+
   it('renders a worker with no placeholder left in it', () => {
-    const out = renderSw(readFileSync(new URL('../../scripts/sw-template.js', import.meta.url), 'utf8'), ['index.html', 'a.js']);
+    const out = renderSw(readFileSync(new URL('../../scripts/sw-template.js', import.meta.url), 'utf8'), ['index.html', 'a.js'], ['index.html\x009\x00a', 'a.js\x003\x00b']);
     expect(out).not.toMatch(/__PRECACHE__|__CACHE_NAME__/);
     expect(JSON.parse(out.match(/const PRECACHE = (\[[\s\S]*?\]);/)![1])).toEqual(['index.html', 'a.js']);
   });
@@ -171,11 +175,19 @@ describe('the precache list is read from the build, never written down (#15)', (
   it('refuses to render if a placeholder has been renamed, or duplicated', () => {
     // Without this the worker ships precaching the literal string `__PRECACHE__` and caches nothing, while
     // every test above still passes on the template that no longer feeds it.
-    expect(() => renderSw('const PRECACHE = __PRECACHE__;', ['a'])).toThrow(/__CACHE_NAME__/);
-    expect(() => renderSw("const CACHE = '__CACHE_NAME__';", ['a'])).toThrow(/__PRECACHE__/);
+    expect(() => renderSw('const PRECACHE = __PRECACHE__;', ['a'], FAKE_PRINTS)).toThrow(/__CACHE_NAME__/);
+    expect(() => renderSw("const CACHE = '__CACHE_NAME__';", ['a'], FAKE_PRINTS)).toThrow(/__PRECACHE__/);
     // `String.replace` with a string needle substitutes the FIRST occurrence only, so a second copy would
     // ship as the literal placeholder. Presence was not enough to check. (Raised in review of #214.)
-    expect(() => renderSw("'__CACHE_NAME__' '__CACHE_NAME__' __PRECACHE__", ['a'])).toThrow(/2 times/);
+    expect(() => renderSw("'__CACHE_NAME__' '__CACHE_NAME__' __PRECACHE__", ['a'], FAKE_PRINTS)).toThrow(/2 times/);
+  });
+
+  it('refuses to render when prints look like filenames, not fingerprints (#116 item 3)', () => {
+    // The bug this guards against: `renderSw(t, list)` used to default `prints` to `list` itself, and
+    // `renderSw(t, prints, list)` — the arguments transposed — type-checked and ran too, since both
+    // parameters are `string[]`. Either shape names the cache after filenames instead of content.
+    expect(() => renderSw('__CACHE_NAME__ __PRECACHE__', ['a.js'])).toThrow(/prints must be fingerprints/);
+    expect(() => renderSw('__CACHE_NAME__ __PRECACHE__', ['a.js'], ['a.js'])).toThrow(/prints must be fingerprints/);
   });
 });
 
