@@ -76,6 +76,23 @@ export const R_LETTERS_ALL = [...new Set([...R_LETTERS_P2, ...singles(PHASE2B)])
 const rLetters = (d: 1 | 2 | 3) => (d === 1 ? R_LETTERS_P2 : R_LETTERS_ALL);
 /** The CVC words spellable with the letters that difficulty has met. Answer and decoys both obey it. */
 const rWords = (d: 1 | 2 | 3) => { const pool = rLetters(d); return CVC.filter(([w]) => [...w].every(c => pool.includes(c))); };
+/**
+ * #135: a word's middle letter is a genuine medial sound only when it is a vowel — `egg`'s middle is `g`, and
+ * the question would show `e_g` against vowel decoys with `g` marked correct.
+ */
+export const medialIsGenuine = (w: string) => VOWELS.includes(w[1]);
+/**
+ * #135: a word's last letter is a genuine final sound unless it forms a digraph with the letter before it
+ * (`cow` ends in `ow`, not `w` — `DIGRAPHS` already lists `ow` as one unit), or `LETTER_SOUNDS` itself
+ * documents that letter's end-position sound as a blend distinct from the letter (`x`, in `PHASE2B`, is `ks`
+ * at the end of `fox`/`box` — the only such entry). Mechanical, not a word list, so a future `CVC` addition
+ * with the same shape is caught without touching this function.
+ */
+export const finalIsGenuine = (w: string) => {
+  if (DIGRAPHS.includes(w.slice(-2))) return false;
+  const entry = LETTER_SOUNDS.find(([g]) => g === w[w.length - 1]);
+  return !entry || entry[2] !== 'end' || entry[1] === entry[0];
+};
 
 /** Sound Hunt: three keyword words are spoken (never shown); slice the grapheme for the sound they share. */
 function soundQ(rng: Rng, pool: Sound[], distractPool: Sound[], decoys: number): Question {
@@ -156,9 +173,11 @@ function gapQ(rng: Rng, word: string, idx: number, distractPool: string[], emoji
 // The word and the decoys both come from the difficulty's phase pool (#14). The middle-sound question keeps
 // VOWELS as its decoys, which needs no filtering: all five vowels are phase 2 set 1–4 letters already.
 const rLetterSound: Generator = (d, rng) => {
-  const [w, e] = pick(rng, rWords(d));
-  if (d === 1) return gapQ(rng, w, 0, rLetters(d), e, `${w}. Which sound does ${w} start with?`);
-  if (d === 2) return gapQ(rng, w, 2, rLetters(d), e, `${w}. Which sound does ${w} end with?`);
+  // #135: filtering by role, not deleting from CVC — `egg` keeps its (correct) place at d1, it is only kept
+  // out of the d3 draw whose gap it would answer wrong.
+  if (d === 1) { const [w, e] = pick(rng, rWords(d)); return gapQ(rng, w, 0, rLetters(d), e, `${w}. Which sound does ${w} start with?`); }
+  if (d === 2) { const [w, e] = pick(rng, rWords(d).filter(([w]) => finalIsGenuine(w))); return gapQ(rng, w, 2, rLetters(d), e, `${w}. Which sound does ${w} end with?`); }
+  const [w, e] = pick(rng, rWords(d).filter(([w]) => medialIsGenuine(w)));
   return gapQ(rng, w, 1, VOWELS, e, `${w}. Which sound is in the middle of ${w}?`);
 };
 const rCapitals: Generator = (d, rng) => {

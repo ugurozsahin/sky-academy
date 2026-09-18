@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd } from '../../src/curriculum/maths';
 import type { Difficulty, Question } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
 // Deterministic RNG (mulberry32)
@@ -494,5 +494,49 @@ describe('Reception phonics follows the phase order (#14)', () => {
     for (let i = 0; i < 400; i++) words.add(t.gen(1, r).answer);
     // A phase-2-only bank that shrank to a handful would make stage 1 repeat itself long before the stage ends.
     expect(words.size, 'phase-2-spellable CVC words available at stage 1').toBeGreaterThanOrEqual(12);
+  });
+});
+
+/**
+ * `rLetterSound` reads a fixed gap index and assumes the letter there is the sound being taught. Two words in
+ * the bank break that: `egg`'s middle letter is `g`, not a vowel, so the medial question showed `e_g` against
+ * vowel decoys with `g` marked correct; `cow` ends in the digraph `ow`, and `fox`/`box` end in the blend `/ks/`
+ * (`PHASE2B`'s own `x` → `ks` entry), so the final question answered `w`/`x` for a sound that letter alone does
+ * not make. Filtered by role, not deleted from `CVC` — `egg` keeps its correct place at d1 (#135).
+ *
+ * `medialIsGenuine`/`finalIsGenuine` are asserted over the *whole* bank, not sampled generator draws, so a
+ * future `CVC` word with the same shape (another digraph ending, another `PHASE2B` end-position blend, another
+ * non-vowel middle) is caught without anyone updating a word list by hand.
+ */
+describe('r-sounds: the letter at the gap is the sound it teaches (#135)', () => {
+  it('the medial pool excludes exactly the words whose middle letter is not a vowel', () => {
+    expect(CVC.filter(([w]) => !medialIsGenuine(w)).map(([w]) => w)).toEqual(['egg']);
+  });
+
+  it('the final pool excludes exactly the words whose last letter is not their last sound', () => {
+    expect(CVC.filter(([w]) => !finalIsGenuine(w)).map(([w]) => w).sort()).toEqual(['box', 'cow', 'fox']);
+  });
+
+  it('the medial-sound question (d3) never draws egg', () => {
+    const t = TOPICS.find(x => x.id === 'r-sounds')!;
+    const r = rng(1409);
+    for (let i = 0; i < 800; i++) expect(t.gen(3, r).say, 'd3 asked about egg').not.toMatch(/\begg\b/);
+  });
+
+  it('the final-sound question (d2) never draws cow, fox or box', () => {
+    const t = TOPICS.find(x => x.id === 'r-sounds')!;
+    const r = rng(1410);
+    for (let i = 0; i < 800; i++) {
+      const say = t.gen(2, r).say ?? '';
+      for (const w of ['cow', 'fox', 'box']) expect(say, `d2 asked about ${w}`).not.toMatch(new RegExp(`\\b${w}\\b`));
+    }
+  });
+
+  it('egg still teaches its correct initial sound at difficulty 1', () => {
+    const t = TOPICS.find(x => x.id === 'r-sounds')!;
+    const r = rng(1411);
+    let sawEgg = false;
+    for (let i = 0; i < 800; i++) if ((t.gen(1, r).say ?? '').includes('egg')) sawEgg = true;
+    expect(sawEgg, 'egg must still be drawable at d1 — only its medial role is filtered').toBe(true);
   });
 });
