@@ -1,8 +1,43 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { certificateText, certRoute, deliverCertificate, isNativeShell } from '../../src/ui/certificate';
+import { certAlbumHTML, certificateText, certRoute, deliverCertificate, isNativeShell } from '../../src/ui/certificate';
 import { AVATARS } from '../../src/avatars';
+import type { StoredCert } from '../../src/storage';
 
 const base = { name: 'Ada', avatar: AVATARS[0], year: 'Year 1', title: 'Number Bonds', stars: 3, score: 340, correct: 30, attempts: 30, date: new Date('2026-09-06T10:00:00Z') };
+
+const storedCert = (o: Partial<StoredCert> = {}): StoredCert =>
+  ({ id: 'year1:number-bonds', name: 'Ada', avatar: AVATARS[0].id, year: 'Year 1', title: 'Number Bonds', stars: 3, score: 340, correct: 30, attempts: 30, date: '2026-09-06', ...o });
+
+describe('certAlbumHTML ("My certificates", #110)', () => {
+  it('shows an empty-state hint, with no cert-list, when nothing has been earned', () => {
+    const h = certAlbumHTML([]);
+    expect(h).toContain('cert-empty');
+    expect(h).not.toContain('cert-list');
+  });
+  it('renders one row per certificate, carrying its id for the View button', () => {
+    const h = certAlbumHTML([storedCert(), storedCert({ id: 'year1:writing', title: 'Rhyming Words', stars: 1 })]);
+    expect((h.match(/class="cert-row"/g) ?? []).length).toBe(2);
+    expect(h).toContain('data-id="year1:number-bonds"');
+    expect(h).toContain('data-id="year1:writing"');
+    expect(h).toContain('Number Bonds');
+    expect(h).toContain('Rhyming Words');
+  });
+  it('clamps the star rating into a 3-glyph row and formats a British long-ish date', () => {
+    const h = certAlbumHTML([storedCert({ stars: 5 })]);
+    expect(h).toContain('★★★');
+    expect(h).not.toContain('★★★★');
+    expect(h).toContain('6 Sept 2026');
+  });
+  it('escapes a hand-edited title/year rather than injecting markup', () => {
+    const h = certAlbumHTML([storedCert({ title: '<img onerror=alert(1)>', year: '"><script>' })]);
+    expect(h).not.toContain('<img onerror');
+    expect(h).not.toContain('<script>');
+  });
+  it('tolerates an unparsable date instead of printing "Invalid Date"', () => {
+    const h = certAlbumHTML([storedCert({ date: 'not-a-date' })]);
+    expect(h).not.toContain('Invalid Date');
+  });
+});
 
 describe('mission certificate text', () => {
   it('names the child, the mission, the island, the stars and a British long date', () => {

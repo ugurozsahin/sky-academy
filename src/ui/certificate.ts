@@ -1,6 +1,7 @@
 // Mission certificate: a printable PNG (landscape, 1200×850) drawn on an offscreen canvas, then shared
 // (Web Share with files, e.g. iOS/Android) or downloaded. No DOM beyond the canvas; text is built by a pure helper.
 import { avatarById, type Avatar } from '../avatars';
+import { esc } from './dom';
 import type { StoredCert } from '../storage';
 
 export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date?: Date; training?: boolean }
@@ -22,6 +23,25 @@ export function certFromStored(c: StoredCert): CertInfo {
     date: new Date(`${c.date}T12:00:00`), training: c.training,
   };
 }
+/**
+ * "My certificates" (#110): a row per earned certificate, most recently filed first, or an empty-state hint.
+ * Pure and unit-tested without a DOM — mirrors `stickersHTML`'s shape in `ui/screen.ts`. Each row carries the
+ * cert's `id` in `data-id` so the caller can look it up in `certificates()` and redraw it full-screen; nothing
+ * here draws a canvas; that stays lazy (only when a certificate is actually opened) because the album can
+ * hold up to `CERT_CAP` (60) entries.
+ */
+export function certAlbumHTML(certs: StoredCert[]): string {
+  if (!certs.length) return '<p class="cert-empty">Win a mission (or finish Sensei training) to earn your first certificate — it will show up here.</p>';
+  const rows = certs.map(c => {
+    const a = avatarById(c.avatar);
+    const stars = '★'.repeat(Math.max(0, Math.min(3, c.stars))) + '☆'.repeat(3 - Math.max(0, Math.min(3, c.stars)));
+    const d = new Date(`${c.date}T12:00:00`);
+    const date = Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `<div class="cert-row"><span class="cert-ava" style="--glow:${a.glow}"><img src="${a.img}" alt=""></span><div class="cert-info"><b>${esc(c.title)}</b><small>${esc(c.year)}${date ? ` · ${date}` : ''}</small></div><span class="cert-stars" aria-hidden="true">${stars}</span><button class="btn cert-open" data-id="${esc(c.id)}">View</button></div>`;
+  }).join('');
+  return `<div class="cert-list">${rows}</div>`;
+}
+
 export interface CertText { heading: string; awarded: string; child: string; reason: string; detail: string; stars: string; date: string; signed: string }
 
 /** The words on the certificate (pure, unit-tested). */
@@ -159,18 +179,29 @@ async function claudeDownloads(): Promise<DownloadsApi | null> {
   } catch { return null; }
 }
 
-/** Full-screen view of the certificate with a press-and-hold hint — the fallback where no save API works. */
+/**
+ * Full-screen view of the certificate with a press-and-hold hint — the fallback where no save API works, and
+ * (#110) the "View" route from the "My certificates" album. Tap the picture to zoom in for a closer look at
+ * the detail; tap again to zoom back out. A zoomed tap must not also close the view through the backdrop
+ * handler below, so it stops the click reaching `wrap`.
+ */
 export function showCertificateFullscreen(c: HTMLCanvasElement): void {
   document.querySelector('.cert-view')?.remove();
   const wrap = document.createElement('div'); wrap.className = 'cert-view'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Your certificate');
-  const img = new Image(); img.className = 'cert-view-img'; img.alt = 'Your Sky Ninja Academy certificate'; img.src = c.toDataURL('image/png');
-  const hint = document.createElement('p'); hint.className = 'cert-view-hint'; hint.textContent = 'Press and hold the picture to save it 📥';
+  const img = new Image(); img.className = 'cert-view-img'; img.alt = 'Your Sky Ninja Academy certificate — tap to zoom'; img.src = c.toDataURL('image/png');
+  img.addEventListener('click', e => { e.stopPropagation(); img.classList.toggle('zoomed'); wrap.classList.toggle('zoomed', img.classList.contains('zoomed')); });
+  const hint = document.createElement('p'); hint.className = 'cert-view-hint'; hint.textContent = 'Tap to zoom · Press and hold to save 📥';
   const done = document.createElement('button'); done.className = 'btn big'; done.textContent = 'Done';
   const close = () => wrap.remove();
   done.addEventListener('click', close);
   wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
   wrap.append(img, hint, done);
   document.body.appendChild(wrap);
+}
+
+/** Redraw and open a previously earned certificate from the album (#110). */
+export async function showStoredCertificate(c: StoredCert): Promise<void> {
+  showCertificateFullscreen(await drawCertificate(certFromStored(c)));
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
