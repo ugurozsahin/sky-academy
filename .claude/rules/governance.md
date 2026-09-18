@@ -53,6 +53,22 @@ paths:
   `docs/ROUTINE-PROMPT.md` until it, too, earns real enforcement. `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
   (the two of the three that ever mentioned the retired label) each carry a pointer here instead of restating
   it.
+- **CANON's two mechanical conditions (age of the block, silence of its setter — the figures themselves live
+  only in `docs/ROUTINE-PROMPT.md` STEP 2, never restated here or anywhere under `.claude/`, per the rail two
+  bullets below) now have real enforcement.** `canAdoptNow()` in `scripts/adoption-check.mjs` — deliberately
+  NOT in `scripts/review-gate.mjs`, which must never read a clock (see the guard rail two bullets below: a
+  block that ages itself out on every CI re-run is #74 again) — is wired to a `PreToolUse` hook in
+  `.claude/settings.json`: before an agent's comment matching `isAdoptionClear()` (the same litmus test
+  `blockState()` already uses for "claims to adopt another reviewer's block", not a new heuristic) is allowed
+  to post, the hook fetches the pull request's live comments from the GitHub API and denies the write unless
+  both conditions hold right now. Conditions 3 and 4 — re-deriving the original objection, and the clearing
+  comment's own wording — are a judgment call no function can make, so they stay the reviewing agent's
+  responsibility exactly as `docs/ROUTINE-PROMPT.md` STEP 2 already asks. If the GitHub API call fails for any
+  reason the hook denies rather than allows — a deliberate departure from this file's other `mcp__github__`
+  hooks' fail-open `jq` pattern, because failing open here would let a stale block clear with nobody able to
+  verify it should have. Not a triplication collapse: the CANON paragraph still needs reading by an agent
+  doing the judgment-call half, so `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` are untouched by
+  this.
 - A PR touching a governance file states in one line whether it **tightens** the constraints on a run (a check,
   a rail, a rule, or describing behaviour that already exists — ordinary work) or **loosens** them (a
   constraint removed, a budget raised, a gate that no longer gates — owner-gated, never routine-merged). See

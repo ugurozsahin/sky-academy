@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync, mkdtempSync, rmSync, writeFileSync
 import { execFileSync } from 'node:child_process';
 import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 // @ts-expect-error — plain ESM bundler helper (see scripts/bundle-single.d.ts); #15's rail asserts its output
 import { stripHead } from '../../scripts/bundle-single.mjs';
@@ -2010,6 +2010,47 @@ describe('a stale review block may be adopted, and only under the four condition
   });
 
   /**
+   * #101/#216 §1 — CANON's two MECHANICAL conditions (age, silence — see #161's two mechanical checks in
+   * docs/ROUTINE-PROMPT.md STEP 2 for the figures themselves) now have real enforcement: a `PreToolUse` hook
+   * denies an `issue_write`/`add_issue_comment` write whose body is a #161 adoption clear (`isAdoptionClear()`
+   * from scripts/review-gate.mjs — the same litmus test already used elsewhere in this codebase, not a new
+   * heuristic) unless `canAdoptNow()` (scripts/adoption-check.mjs) says both conditions hold against the pull
+   * request's LIVE comments, fetched from the GitHub API at write time. Conditions 3 (re-deriving the original
+   * objection) and 4 (the clearing comment's own wording) stay a judgment call no function can make — the same
+   * bar every other Layer 4 piece has cleared: enforce what is mechanical, leave what is not.
+   *
+   * `canAdoptNow` deliberately does NOT live in `scripts/review-gate.mjs` — that file must never read a clock
+   * (the "review-gate.mjs orders the markers and never reads a clock" rail just above), because it is
+   * re-evaluated on every CI run and a clock inside it would let a block age itself out with nobody having
+   * adopted anything, which is #74 again. This hook runs once, at write time, and its answer becomes fixed
+   * history the instant the write does or does not happen — structurally different from a repeatedly-polled
+   * CI check, so it is the one place in this codebase allowed to read a clock for this rule.
+   *
+   * This governance.md bullet deliberately states NEITHER figure (the fourth hours nor the two hours): the
+   * rail below ("no .claude/ document carries a second copy of the adoption conditions") already forbids any
+   * Markdown file under .claude/ from stating a time window beside the block protocol, governance.md included,
+   * and a pointer at STEP 2 is what that rail asks for instead.
+   *
+   * Prove it red: drop the governance.md bullet, or remove the hook from `.claude/settings.json`.
+   */
+  it('CANON is enforced in code for its two mechanical conditions, documented in governance.md without restating a window', () => {
+    const gov = read('.claude/rules/governance.md');
+    expect(gov, 'governance.md must state the rule itself').toContain('CANON');
+    expect(gov, 'and name the enforcing hook, or this is prose again').toContain('PreToolUse');
+    expect(gov, 'and the pure function that makes the call').toContain('canAdoptNow');
+    expect(gov, 'and say it never touches review-gate.mjs, or the no-clock rail is not actually cited')
+      .toContain('review-gate.mjs');
+    expect(gov, 'and point at STEP 2 for the figures, per the rail that forbids restating them here')
+      .toContain('ROUTINE-PROMPT.md');
+    // The window rail below applies to every .claude/ .md file, this one included — self-check here too so a
+    // future edit that adds "4 hours" or "2 hours" to this bullet fails immediately, in the same describe
+    // block, rather than only in the repo-wide walk many lines away.
+    const WINDOW = /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty|sixty)[\s-]*(?:minute|hour|day|week)s?\b/i;
+    expect(WINDOW.exec(gov)?.[0], 'governance.md states a time window beside the block protocol — CANON’s figures live only in docs/ROUTINE-PROMPT.md STEP 2')
+      .toBeUndefined();
+  });
+
+  /**
    * #199/#200 — the session-URL and content-floor rules stop being special-cased to the two REVIEW: markers.
    *
    * #189 made a REVIEW: CHANGES REQUESTED block, and #191 made a #161-adopting REVIEW: CLEARED comment,
@@ -3950,6 +3991,31 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
     expect(frozenHook.command, 'the hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
   });
 
+  // #101 Layer 4 / #216 §1: CANON's two mechanical conditions (age, silence) now gate an actual write, not
+  // just a reviewer's own diligence. See the governance.md documentation test above for why this lives outside
+  // review-gate.mjs, and tests/unit/adoption-check.test.ts for the pure decision logic's own coverage — this
+  // only pins the hook's presence, shape and fail-closed structure so it cannot be quietly deleted or loosened.
+  it('a hook checks #161 CANON before an adoption-clear write, denies rather than warns, and fails closed on every network error path', () => {
+    const mcpEntry = (readSettings().hooks.PreToolUse as any[])
+      .find((e) => typeof e.matcher === 'string' && e.matcher.includes('mcp__github__'));
+    expect(mcpEntry, 'no PreToolUse entry matches an mcp__github__ tool name').toBeDefined();
+    const canonHook = (mcpEntry.hooks ?? []).find((h: any) => typeof h.command === 'string' && h.command.includes('canAdoptNow'));
+    expect(canonHook, 'no mcp__github__ hook calls canAdoptNow').toBeDefined();
+    const cmd = canonHook.command as string;
+    expect(cmd, 'the hook must reuse isAdoptionClear, not a new heuristic for "is this an adoption"').toContain('isAdoptionClear');
+    expect(cmd, 'the hook must reuse the tested pure function, not reimplement its logic inline').toContain('adoption-check.mjs');
+    expect(cmd, 'the hook must be able to deny, not merely warn').toContain('permissionDecision: "deny"');
+    // Every branch that gives up before reaching canAdoptNow must deny, not silently allow — the opposite of
+    // this file's other mcp__github__ hooks, which fail open on a jq/parse error (documented, deliberate: a
+    // structured-field check on this repo's own tool_input has no comparable external-failure surface). This
+    // hook DOES have one (the network call), so each escape hatch is counted here rather than trusted by name.
+    const denyCallSites = (cmd.match(/deny\(/g) ?? []).length;
+    expect(denyCallSites, 'no issue_number, no token, curl failure, non-array response, canAdoptNow saying no, and the catch-all must each call deny — fewer call sites than escape hatches means one fails open')
+      .toBeGreaterThanOrEqual(6);
+    expect(cmd, 'a curl failure must be caught, not left to crash the hook into silence').toContain('catch (e) { deny(');
+    expect(cmd, 'and the outermost catch-all must exist too, or an unexpected exception anywhere allows through').toMatch(/catch \(e\) \{ deny\("could not verify/);
+  });
+
   it('.claude/settings.json declares an InstructionsLoaded hook scoped to path_glob_match (#101 verification)', () => {
     const settings = readSettings();
     const entries = (settings.hooks?.InstructionsLoaded ?? []) as any[];
@@ -4307,6 +4373,85 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
   it('frozen-label hook: allows a call with no labels field at all', () => {
     const out = execFileSync('bash', ['-c', frozenHookCmd], { input: JSON.stringify({ tool_input: {} }), encoding: 'utf8' });
     expect(out.trim()).toBe('');
+  });
+
+  // #101 Layer 4 / #216 §1 — CANON's two mechanical conditions, exercised against the REAL hook command
+  // extracted from .claude/settings.json (not a reimplementation), with a fake `curl` on PATH standing in for
+  // the GitHub API. This is deliberate, not a shortcut: a real network call inside `npm test` would make every
+  // PR's CI depend on api.github.com being reachable, for a hook that fires on a rare event (a #161 adoption
+  // clear) — one flaky network blip would fail CI on unrelated changes. A fake curl gives full, deterministic
+  // coverage of every branch (including the success path) without that dependency. tests/unit/adoption-check
+  // .test.ts covers the pure decision logic on its own; this covers the wiring around it — the classification
+  // (isAdoptionClear), the escape hatches, and that a real curl exit code / real curl stdout drive the result.
+  const canonHookCmd = mcpEntry.hooks[3].command;
+  const fakeCurlDir = mkdtempSync(join(tmpdir(), 'canon-hook-fake-curl-'));
+  const withFakeCurl = (script: string): NodeJS.ProcessEnv => {
+    writeFileSync(join(fakeCurlDir, 'curl'), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+    return { ...process.env, PATH: `${fakeCurlDir}:${process.env.PATH}`, GITHUB_TOKEN: 'test-token' };
+  };
+  const runCanonHook = (input: Record<string, unknown>, env: NodeJS.ProcessEnv = process.env): unknown => {
+    const stdin = JSON.stringify({ tool_input: input });
+    const out = execFileSync('bash', ['-c', canonHookCmd], { input: stdin, encoding: 'utf8', env });
+    return out.trim() === '' ? null : JSON.parse(out);
+  };
+  afterAll(() => rmSync(fakeCurlDir, { recursive: true, force: true }));
+
+  const ADOPTION_BODY = "REVIEW: CLEARED\n\nClearing another reviewer's block, adopted under #161.";
+
+  it('CANON hook: allows a comment that is not an adoption clear, without ever invoking curl', () => {
+    // The fake curl exits nonzero unconditionally — if it were invoked, the run would deny, not allow.
+    const env = withFakeCurl('exit 1');
+    expect(runCanonHook({ issue_number: 244, body: 'Looks good, merging.' }, env)).toBeNull();
+    expect(runCanonHook({ issue_number: 244, body: 'REVIEW: CLEARED — fps fixed' }, env)).toBeNull();
+  });
+
+  it('CANON hook: denies when there is no issue_number, without invoking curl', () => {
+    const env = withFakeCurl('exit 1');
+    expect(isDeny(runCanonHook({ body: ADOPTION_BODY }, env))).toBe(true);
+  });
+
+  it('CANON hook: denies when neither GITHUB_TOKEN nor GH_TOKEN is set, without invoking curl', () => {
+    const { GITHUB_TOKEN, GH_TOKEN, ...rest } = withFakeCurl('exit 1');
+    expect(isDeny(runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, rest))).toBe(true);
+  });
+
+  it('CANON hook: fails closed when curl itself fails', () => {
+    const env = withFakeCurl('exit 1');
+    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/could not read this pull request comments/);
+  });
+
+  it('CANON hook: fails closed when curl returns something that is not a JSON array', () => {
+    const env = withFakeCurl('echo "{}"');
+    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/unexpected response/);
+  });
+
+  it('CANON hook: denies on age when the live block is not old enough', () => {
+    const comments = JSON.stringify([
+      { body: `REVIEW: CHANGES REQUESTED — see above. https://claude.ai/code/session_AAAA1111`, created_at: new Date().toISOString() },
+    ]).replace(/'/g, "'\\''");
+    const env = withFakeCurl(`printf '%s' '${comments}'`);
+    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/CANON's age condition is not yet met/);
+  });
+
+  it('CANON hook: allows the write once the live block is old enough and its session has gone quiet on this pull request', () => {
+    const comments = JSON.stringify([
+      { body: `REVIEW: CHANGES REQUESTED — see above. https://claude.ai/code/session_AAAA1111`, created_at: '2020-01-01T00:00:00Z' },
+    ]).replace(/'/g, "'\\''");
+    const env = withFakeCurl(`printf '%s' '${comments}'`);
+    expect(runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env)).toBeNull();
+  });
+
+  it('CANON hook: fails closed when there is no open block to adopt on the live pull request', () => {
+    const env = withFakeCurl('printf \'%s\' \'[]\'');
+    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
+    expect(isDeny(v)).toBe(true);
+    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/no open REVIEW: CHANGES REQUESTED block/);
   });
 });
 
