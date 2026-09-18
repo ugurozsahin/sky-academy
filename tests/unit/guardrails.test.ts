@@ -4441,3 +4441,60 @@ describe('build scripts run their CLI block from a path that needs URL-escaping 
     }
   });
 });
+
+/**
+ * #111 — the "Android APK" run carried two warning annotations on every run: six actions pinned at a major
+ * that GitHub was forcing onto Node 24 despite targeting Node 20, plus `setup-java@v4` specifically flagged as
+ * no longer receiving updates. Bumped every one of those six, in all three workflow files (`ci.yml` and
+ * `review-gate.yml` share `actions/checkout` and pick up their own Node-20-only actions too), to the first
+ * major release of each that ships `runs.using: node24` (confirmed against each action's own `action.yml` on
+ * GitHub, not assumed from a changelog): `actions/checkout` v4→v5, `actions/setup-node` v4→v5,
+ * `actions/setup-java` v4→v5, `actions/upload-artifact` v4→v6 (v5 still targets Node 20 — the jump is
+ * deliberate, not a typo), `android-actions/setup-android` v3→v4, `gradle/actions/setup-gradle` v4→v5,
+ * `softprops/action-gh-release` v2→v3, `actions/github-script` v7→v8. Checked each bump's `inputs:` against
+ * what this repository actually passes (`distribution`/`java-version` for setup-java, `name`/`path`/
+ * `retention-days` for upload-artifact) before landing it — none of the inputs this repo uses changed shape.
+ *
+ * This rail is deliberately a flat pinned-version list, not a "some Node-20-only major" pattern: the next
+ * deprecation will name a *different* set of majors, and a rail that already knew today's list would need
+ * editing to catch a new one anyway. What it prevents is today's list creeping back via a copy-paste from an
+ * old workflow file or an example in an issue body.
+ *
+ * Prove it red: put any one of the OLD pins back into any workflow file.
+ */
+describe('no workflow pins an action major GitHub has deprecated for Node 20 (#111)', () => {
+  const dir = new URL('../../.github/workflows/', import.meta.url);
+  const files = readdirSync(dir).filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
+  const workflows = files.map((f) => ({ f, text: readFileSync(new URL(f, dir), 'utf8') }));
+
+  const RETIRED = [
+    'actions/checkout@v4',
+    'actions/setup-node@v4',
+    'actions/setup-java@v4',
+    'actions/upload-artifact@v4',
+    'actions/upload-artifact@v5',
+    'android-actions/setup-android@v3',
+    'gradle/actions/setup-gradle@v4',
+    'softprops/action-gh-release@v2',
+    'actions/github-script@v7',
+  ];
+
+  it('reads at least three workflow files, or this rail checks nothing', () => {
+    expect(workflows.length).toBeGreaterThanOrEqual(3);
+  });
+
+  for (const pin of RETIRED) {
+    it(`no workflow file pins the retired ${pin}`, () => {
+      const offenders = workflows.filter(({ text }) => text.includes(pin)).map(({ f }) => f);
+      expect(offenders, `${pin} is a Node-20-only major GitHub is deprecating (#111) — bump it`).toEqual([]);
+    });
+  }
+
+  it('android.yml, ci.yml and review-gate.yml each still reference actions/checkout, at a current major', () => {
+    for (const f of ['android.yml', 'ci.yml', 'review-gate.yml']) {
+      const w = workflows.find((w) => w.f === f);
+      expect(w, `${f} must exist under .github/workflows/, or this rail checks the wrong directory`).toBeDefined();
+      expect(w!.text, `${f} must still check out the repo`).toMatch(/actions\/checkout@v\d+/);
+    }
+  });
+});

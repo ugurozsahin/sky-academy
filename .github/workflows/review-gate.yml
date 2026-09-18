@@ -100,9 +100,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4          # for scripts/review-gate.mjs, the tested predicate
+      - uses: actions/checkout@v5          # for scripts/review-gate.mjs, the tested predicate
         with: { sparse-checkout: scripts/review-gate.mjs, sparse-checkout-cone-mode: false }
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v8
         with:
           script: |
             const number = context.eventName === 'issue_comment'

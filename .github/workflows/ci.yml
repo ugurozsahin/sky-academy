@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # The scope step below needs the merge base to diff against, and checkout's default depth of 1 does
           # not have it. Unconditionally, NOT `${{ … == 'pull_request' && 0 || 1 }}`: GitHub's `&&`/`||`
@@ -91,7 +91,7 @@ jobs:
           # which is the kind of defect that gets shipped and believed. 52 commits and 5 MB of history, so a
           # full clone costs a fraction of a second and none of the ambiguity.
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
       # #96: e2e is ~90% of this repo's Actions bill and much of it is paid on changes that cannot move a
@@ -198,7 +198,7 @@ jobs:
         if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
         run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile' || '--project=mobile --project=desktop --project=tablet --project=tablet-landscape' }}
       - if: failure() && github.event_name != 'push'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-traces      # `reporter: list` writes no HTML report; the traces live here
           path: test-results/
