@@ -254,11 +254,21 @@ describe('guard rails', () => {
     const issueCommentBlock = on.slice(on.indexOf('issue_comment:'), on.indexOf('concurrency:'));
     const issueCommentTypes = [...issueCommentBlock.matchAll(/types:\s*\[([^\]]*)\]/g)]
       .flatMap(m => m[1].split(',').map(t => t.trim()));
-    expect({ event: 'issue_comment', type: 'created', subscribed: issueCommentTypes.includes('created') })
-      .toEqual({ event: 'issue_comment', type: 'created', subscribed: true });
+    // #77: `created` alone means editing a marker OUT, or deleting the comment outright, never re-stamps the
+    // status — it can outlive the comment it was computed from. `edited`/`deleted` close that.
+    for (const t of ['created', 'edited', 'deleted'])
+      expect({ event: 'issue_comment', type: t, subscribed: issueCommentTypes.includes(t) })
+        .toEqual({ event: 'issue_comment', type: t, subscribed: true });
     const guard = code.slice(code.indexOf('if:'), code.indexOf('runs-on:') + 200);
     for (const marker of ["'REVIEW:'", "'OWNER:'"])                     // both verdicts must wake the job
       expect({ marker, wired: guard.includes(marker) }).toEqual({ marker, wired: true });
+    // #77: the checks above alone wake the job when a marker is typed IN by an edit, not when one is edited
+    // OUT — the current `comment.body` no longer carries it. `changes.body.from` (the pre-edit body) needs the
+    // same checks, gated to `edited` only, or a withdrawn `OWNER: APPROVED` leaves the gate green forever.
+    expect({ wired: guard.includes("github.event.action == 'edited'") })
+      .toEqual({ wired: true });
+    expect({ wired: guard.includes('github.event.changes.body.from') })
+      .toEqual({ wired: true });
   });
 
   // Incident 2026-09-06: a review found `Tracer.destroy()` removing only the window listeners, so every

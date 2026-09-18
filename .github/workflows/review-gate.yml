@@ -26,12 +26,21 @@
 # because the `owner-approval` label is what puts a PR into the owner's hands — without them the label changes
 # nothing, the status stays green, and an unapproved new look merges. Labels move rarely on a PR, so the added
 # cost is small; the alternative is a rule that silently does not exist.
+#
+# `edited`/`deleted` (#77): `created` alone means editing or deleting a marker comment never re-stamps the
+# status, so it can outlive the comment it was computed from. Withdrawing a block that way is harmless (the
+# stale state is the blocked one, and something else eventually re-stamps it), but the mirror image is not:
+# the owner writes `OWNER: APPROVED`, the gate goes green, he edits the comment to take it back — nothing
+# re-triggers, and the next merge rule reads a verdict that no longer exists. The job always re-lists the PR's
+# *current* comments before deciding (see the script below), so it does not need to know what changed — it
+# only needs to be woken. A schedule was considered and rejected: it would need code to enumerate open PRs,
+# bill minutes for doing nothing, and still leave a window, where the event is precise and immediate.
 name: Review gate
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, converted_to_draft, synchronize, labeled, unlabeled]
   issue_comment:
-    types: [created]
+    types: [created, edited, deleted]
 concurrency:
   # Two events in quick succession (comment, then Ready for review) must not race to stamp opposite states.
   group: review-gate-${{ github.event.pull_request.number || github.event.issue.number }}
@@ -58,13 +67,28 @@ jobs:
     # and the PR stays red until something else happens. He is a person writing a sentence, not an agent
     # following a format, and he must not have to know that. The cost is bounded because his verdicts are rare
     # — a few a week against dozens of REVIEW comments a day, which is what made the wide filter expensive.
+    #
+    # #77 — an `edited` payload carries the comment's *current* (post-edit) body in `comment.body`, so the
+    # checks above alone wake the job when a marker is typed IN by an edit but miss the opposite: a marker
+    # edited OUT never matches the current body, even though that is exactly the case that must re-stamp
+    # (an approval withdrawn this way must turn the gate red again). `changes.body.from` carries the body as
+    # it stood *before* the edit, so the same four checks run against it too, but only for `edited` — `from`
+    # is absent on `created`/`deleted` and `&&` short-circuits before GitHub Actions would evaluate it.
+    # `deleted` needs no extra clause: its payload still carries the deleted comment in `comment.body` (the
+    # note atop `scripts/review-gate.mjs`'s call below explains why re-listing comments after it is gone is
+    # exactly what should happen), so the plain checks already wake the job when a marker comment is removed.
     if: >-
       github.event_name == 'pull_request' ||
       (github.event.issue.pull_request != null &&
        (startsWith(github.event.comment.body, 'REVIEW:') ||
         startsWith(github.event.comment.body, '**REVIEW:') ||
         startsWith(github.event.comment.body, '> REVIEW:') ||
-        contains(github.event.comment.body, 'OWNER:')))
+        contains(github.event.comment.body, 'OWNER:') ||
+        (github.event.action == 'edited' &&
+         (startsWith(github.event.changes.body.from, 'REVIEW:') ||
+          startsWith(github.event.changes.body.from, '**REVIEW:') ||
+          startsWith(github.event.changes.body.from, '> REVIEW:') ||
+          contains(github.event.changes.body.from, 'OWNER:')))))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -80,6 +104,15 @@ jobs:
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
             if (pr.state !== 'open') { core.info(`#${number} is ${pr.state} — nothing to gate.`); return; }
 
+            // Always the PR's comments as they stand RIGHT NOW, never the webhook payload's snapshot of one
+            // comment — a `deleted` event's own payload still carries the removed comment, but it is already
+            // gone from this listing, which is exactly what #77 needs: the state computed below reflects the
+            // edit or delete that woke this run, whichever trigger it was. That also settles the rapid
+            // create-then-edit race `concurrency:` above raises: `cancel-in-progress: true` means only the
+            // newest triggered run for a PR survives to completion, and because every run re-lists live rather
+            // than trusting its own event, that survivor's result already accounts for everything that has
+            // happened by the time it queries GitHub — an older, cancelled run's write (if it got that far)
+            // is superseded, not raced against.
             const comments = await github.paginate(github.rest.issues.listComments,
               { owner, repo, issue_number: number, per_page: 100 });
             // The decision lives in scripts/review-gate.mjs so tests/unit/review-gate.test.ts can hold it to

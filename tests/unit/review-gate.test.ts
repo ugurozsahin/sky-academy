@@ -90,6 +90,38 @@ describe('review gate', () => {
 });
 
 /**
+ * #77 — editing a marker comment away, or deleting it outright, must not leave the gate on stale state.
+ * `.github/workflows/review-gate.yml` now wakes on `edited`/`deleted` too and always re-lists the PR's
+ * *current* comments before calling blockState(), so the predicate itself needs no notion of "edited" or
+ * "deleted" — it only has to keep computing correctly from whatever comment set it is handed. These pin
+ * the two directions the issue reports: a block or an approval withdrawn by editing the comment away, and
+ * one withdrawn by deleting it, each as the recomputed set would actually look once the workflow re-lists.
+ */
+describe('a comment recomputes correctly once it is edited away or deleted (#77)', () => {
+  it('a REVIEW: CHANGES REQUESTED comment edited to plain text unblocks, once recomputed', () => {
+    expect(pr(false, 'REVIEW: CHANGES REQUESTED — fps floor is wrong').blocked).toBe(true);
+    // the reviewer edits the same comment to withdraw it — the next listing carries only the new text
+    expect(pr(false, 'Never mind, this was a false alarm.').blocked).toBe(false);
+  });
+
+  it('an OWNER: APPROVED comment edited to withdraw it re-blocks an owner-approval PR, once recomputed', () => {
+    expect(gated('OWNER: APPROVED — looks right').blocked).toBe(false);
+    expect(gated('Actually, hold off — let me look again.').blocked).toBe(true);
+  });
+
+  it('deleting a REVIEW: CHANGES REQUESTED comment unblocks, once recomputed from what remains', () => {
+    expect(pr(false, 'Looks fine so far.', 'REVIEW: CHANGES REQUESTED — fps floor is wrong').blocked).toBe(true);
+    // the comment is gone outright — simply absent from the next listing, not edited in place
+    expect(pr(false, 'Looks fine so far.').blocked).toBe(false);
+  });
+
+  it('deleting an OWNER: APPROVED comment re-blocks an owner-approval PR, once recomputed', () => {
+    expect(gated('Looks fine.', 'OWNER: APPROVED').blocked).toBe(false);
+    expect(gated('Looks fine.').blocked).toBe(true);
+  });
+});
+
+/**
  * #189 — a REVIEW: CHANGES REQUESTED comment with no session URL blocks the PR exactly as before, but is
  * unadoptable under #161 (docs/ROUTINE-PROMPT.md: "if the blocking comment carries no session id at all,
  * condition 1 cannot be evaluated ... fail closed and leave it for the owner"). Confirmed live on PR #160
