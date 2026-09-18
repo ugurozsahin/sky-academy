@@ -3853,6 +3853,20 @@ describe('.claude/settings.json declares the three #101 layer-0 hooks by name', 
   // (it costs nothing to run — `PreToolUse` denial logic is what needs a rail here, not this one) — the actual
   // proof that scoped loading works lives in the two-run demonstration in this PR's body, not in a unit test,
   // since a unit test cannot observe the harness's own file-loading decisions.
+  // #101 Layer 4 / #216 §1: real behavioural enforcement for the #97 second-item rule — see the execution
+  // test below (`executed against synthesized stdin`) for proof the hook's actual shell logic denies/allows
+  // correctly; this only pins the hook's presence and shape so it cannot be quietly deleted.
+  it('a hook denies updating the routine heartbeat (#62) with no `- second item:` line', () => {
+    const mcpEntry = (readSettings().hooks.PreToolUse as any[])
+      .find((e) => typeof e.matcher === 'string' && e.matcher.includes('mcp__github__'));
+    expect(mcpEntry, 'no PreToolUse entry matches an mcp__github__ tool name').toBeDefined();
+    const secondItemHook = (mcpEntry.hooks ?? []).find((h: any) => typeof h.command === 'string' && h.command.includes('second item'));
+    expect(secondItemHook, 'no mcp__github__ hook checks for the #97 second-item line').toBeDefined();
+    expect(secondItemHook.command, 'the hook must scope to the routine heartbeat issue, #62').toContain('issue_number == 62');
+    expect(secondItemHook.command, 'the hook must only gate an update, not a create').toContain('method == "update"');
+    expect(secondItemHook.command, 'the hook must deny, not merely warn').toContain('"permissionDecision":"deny"');
+  });
+
   it('.claude/settings.json declares an InstructionsLoaded hook scoped to path_glob_match (#101 verification)', () => {
     const settings = readSettings();
     const entries = (settings.hooks?.InstructionsLoaded ?? []) as any[];
@@ -4144,6 +4158,42 @@ describe('.claude/settings.json layer-0 hooks: executed against synthesized stdi
   it('MCP-tool marker hook: allows a body with no body field at all', () => {
     const out = execFileSync('bash', ['-c', mcpMarkerHookCmd], { input: JSON.stringify({ tool_input: {} }), encoding: 'utf8' });
     expect(out.trim()).toBe('');
+  });
+
+  // #101 Layer 4 / #216 §1: the #97 second-item rule ("the run's heartbeat snapshot says whether it took one
+  // and, if not, which condition failed") had no check beyond the three files agreeing with each other in
+  // prose — nothing stopped an actual heartbeat update from landing without the line #97 asks for. This hook
+  // is the one piece of #97 with real behavioural enforcement, which is what #216 §1's bar requires before a
+  // triplicated rule's copy may collapse to a pointer (as #191's session-URL requirement already did, #235).
+  // Scoped to only the routine heartbeat's own `update` calls (issue #62) — a `create` never needs this (the
+  // issue exists already; #62 has never been recreated) and no other issue_write call is this rule's business.
+  const secondItemHookCmd = mcpEntry.hooks[1].command;
+  const runIssueWriteHook = (input: Record<string, unknown>): unknown => {
+    const stdin = JSON.stringify({ tool_input: input });
+    const out = execFileSync('bash', ['-c', secondItemHookCmd], { input: stdin, encoding: 'utf8' });
+    return out.trim() === '' ? null : JSON.parse(out);
+  };
+
+  it('#97 second-item hook: denies an update to the routine heartbeat (#62) whose body has no `- second item:` line', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: '2026-09-18T00:00Z — did stuff\n- nightly: ok\n- main: green' }))).toBe(true);
+  });
+
+  it('#97 second-item hook: allows an update to #62 whose body carries the line, wherever it sits', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'stuff\n- second item: no — condition 1 failed\n- main: green' }))).toBe(false);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: '- second item: yes, PR #77' }))).toBe(false);
+  });
+
+  it('#97 second-item hook: only scopes to issue #62 — a different issue_write is not this rule\'s business', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 61, body: 'watchdog pulse, no second-item line — never develops' }))).toBe(false);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 236, body: 'an ordinary issue body with no such line' }))).toBe(false);
+  });
+
+  it('#97 second-item hook: only scopes to `update` — a `create` call is not gated (the issue already exists)', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'create', issue_number: 62, body: 'a brand new issue body, no line' }))).toBe(false);
+  });
+
+  it('#97 second-item hook: a mention of "second item" in prose, not as its own `- second item:` line, still denies', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'we discussed the second item rule casually but never wrote the line' }))).toBe(true);
   });
 });
 
