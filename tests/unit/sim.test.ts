@@ -11,7 +11,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { SHOT_FLIGHT, type ArenaOpts } from '../../src/game/arena';
 import { Session, type SessionResult } from '../../src/game/session';
-import { BOMB } from '../../src/ui/play-session';   // #142: the real TNT label, so a scenario cannot pass against one the game never spawns
+import { BOMB, waveOptsFor } from '../../src/ui/play-session';   // #142: the real TNT label, so a scenario cannot pass against one the game never spawns; #126: the real spawn-options bridge, so a scenario cannot pass against a shape the game never sends
 import { YEARS, type Generator, type Topic, type YearInfo } from '../../src/curriculum';
 import { ARENA_LISTENERS, FRAME, advanceUntil, createSim, rngFor, type Sim } from './sim/harness';
 
@@ -613,10 +613,10 @@ describe('#142: sequence progress rushes only the next earned batch', () => {
   const options = [...sequence, 'red', 'blue', 'green', 'gold', 'black', 'white'];
 
   /**
-   * An ordered spelling question, Session ⟷ Arena, with nothing in between modelled. The bridge is written
-   * out here rather than imported — `src/ui/play-session.ts` has no bridge to import — so the two calls that
-   * matter are the same text as the screen's: `ordered: q.sequence?.slice(session.seqIndex)` on spawn and
-   * `rush(sequence[done])` on progress.
+   * An ordered spelling question, Session ⟷ Arena, with nothing in between modelled. The spawn side of the
+   * bridge is `waveOptsFor` (#126), the real one `src/ui/play-session.ts` calls — a change to the screen's
+   * spawn shape now fails to compile here instead of diverging silently. `rush(sequence[done])` on progress
+   * has no screen-side equivalent to import; that half is still written out.
    */
   function orderedSequence(seed: number) {
     const progress: string[] = [];
@@ -632,7 +632,7 @@ describe('#142: sequence progress rushes only the next earned batch', () => {
         rng: rngFor(seed), stages: 1,
       },
       {
-        onQuestion: (q, info) => { speeds.push(info.speed); s.spawn({ labels: info.labels, speed: info.speed, wide: true, ordered: q.sequence?.slice(session.seqIndex) }); },
+        onQuestion: (q, info) => { speeds.push(info.speed); s.spawn(waveOptsFor(q, info, session.seqIndex)); },
         onCorrect: () => { correct++; }, onWrong: () => {}, onMiss: () => {},
         onProgress: (label, done, total) => {
           progress.push(label);
@@ -755,9 +755,9 @@ describe('#142: the arena drives the whole mission stage machine', () => {
         topic: topicOf('mission', () => { const n = ++serial; return { prompt: `q${n}`, answer: `a${n}`, options: [`a${n}`, `x${n}`] }; }),
       },
       {
-        onQuestion: (_q, info) => {
+        onQuestion: (q, info) => {
           questions.push({ stage: info.stage, index: info.index, speed: info.speed });
-          sim!.spawn({ labels: info.labels, speed: info.speed });
+          sim!.spawn(waveOptsFor(q, info, session.seqIndex));
         },
         onCorrect: () => {}, onWrong: () => {}, onProgress: () => {},
         onMiss: q => { misses.push(q.answer); },

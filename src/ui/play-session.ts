@@ -10,7 +10,7 @@
 // `window.__sna` hooks) are read through the function-valued deps, so the order in play.ts is unchanged.
 import { cheerLine, type Avatar } from '../avatars';
 import { STAGE_NAMES, type Question } from '../curriculum';
-import type { Arena } from '../game/arena';
+import type { Arena, WaveOpts } from '../game/arena';
 import { Session, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
@@ -21,6 +21,19 @@ import { renderVisual } from './visuals';
 
 /** The TNT bubble villain modes mix into a wave: it costs a life and never counts as a wrong answer (#48). */
 export const BOMB = '💣';
+
+/**
+ * The spawn options for one question's wave, shared between this screen and `tests/unit/sim.test.ts`'s
+ * scenarios (#126). Before this, every scenario hand-wrote its own copy of this shape — matched by prose
+ * ("the same text as the screen's") rather than by the compiler — and had already drifted: the `wide`
+ * derivation below had no test coverage at all, and a hardcoded `wide: true` stayed accidentally correct only
+ * because the one scenario using it happens to ask a question where `q.wide` is also true. `labels` is
+ * `info.labels` before any villain-mode TNT bubble is mixed in — `onQuestion` below does that itself, since
+ * it is specific to the real screen and no scenario exercises it here.
+ */
+export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, seqIndex: number): WaveOpts {
+  return { labels: info.labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), ordered: q.sequence?.slice(seqIndex) };
+}
 
 /** The HUD elements the callbacks write to — play.ts owns them and passes its own `els` straight in. */
 export interface PlaySessionEls {
@@ -203,7 +216,8 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
         if (deps.tracing) { say(q.say ?? q.prompt); deps.startTrace(q); return; }
         const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
-        const labels = bomb ? [...info.labels, BOMB] : info.labels;
+        const waveOpts = waveOptsFor(q, info, session.seqIndex);
+        const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
         // #138: a spawn can be queued — behind the tutorial hold, or behind the font gate — and the session
         // can move on while it waits, so it must check that its own question is still the one on screen.
         // Without this, a wave that was superseded lands on top of the wave that replaced it: spawnWave()
@@ -220,7 +234,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
           requestAnimationFrame(() => {
             if (waveId !== myWave) return;
             arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;
-            arena.spawnWave({ labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), ordered: q.sequence?.slice(session.seqIndex) });
+            arena.spawnWave({ ...waveOpts, labels });
           });
         };
         const demo = deps.showTutorial();           // first ever play: animated hand first, bubbles a moment later

@@ -9,7 +9,7 @@ import { YEARS, type Question } from '../../src/curriculum';
 import { say, resetVoiceProbe } from '../../src/audio';
 import type { WaveOpts } from '../../src/game/arena';
 import { reset, save } from '../../src/storage';
-import { createPlaySession, NO_VOICE_PEEK_MS, type PlaySessionDeps, type PlaySessionEls } from '../../src/ui/play-session';
+import { createPlaySession, NO_VOICE_PEEK_MS, waveOptsFor, type PlaySessionDeps, type PlaySessionEls } from '../../src/ui/play-session';
 
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
@@ -64,6 +64,34 @@ function build(gen: () => Question) {
 
 /** The wave launch waits on the font gate's promise, so a launch is only visible after the microtasks drain. */
 const settle = () => vi.advanceTimersByTimeAsync(0);
+
+describe('waveOptsFor: the spawn-options bridge to tests/unit/sim.test.ts (#126)', () => {
+  const q = (extra: Partial<Question> = {}): Question => ({ prompt: 'p', answer: 'a', options: ['a', 'b'], ...extra });
+
+  it('is wide when the question itself says so, whatever the label lengths', () => {
+    expect(waveOptsFor(q({ wide: true }), { labels: ['a', 'b'], speed: 2 }, 0).wide).toBe(true);
+  });
+
+  it('is wide when any label is longer than three characters, even if the question does not say so', () => {
+    expect(waveOptsFor(q(), { labels: ['a', 'blaze'], speed: 2 }, 0).wide).toBe(true);
+  });
+
+  it('is not wide when the question says nothing and every label is short', () => {
+    expect(waveOptsFor(q(), { labels: ['a', 'bee', 'cat'], speed: 2 }, 0).wide).toBe(false);
+  });
+
+  it('carries the labels and speed straight from info, untouched', () => {
+    const opts = waveOptsFor(q(), { labels: ['x', 'y'], speed: 3 }, 0);
+    expect(opts.labels).toEqual(['x', 'y']);
+    expect(opts.speed).toBe(3);
+  });
+
+  it('slices the sequence from the given index for an ordered question, or omits it for one with none', () => {
+    const sequence = ['one', 'two', 'three'];
+    expect(waveOptsFor(q({ sequence }), { labels: sequence, speed: 1 }, 1).ordered).toEqual(['two', 'three']);
+    expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, 0).ordered).toBeUndefined();
+  });
+});
 
 describe('the no-voice sentence peek (#65)', () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); });
