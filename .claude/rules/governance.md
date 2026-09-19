@@ -72,8 +72,8 @@ paths:
   both conditions hold right now. Conditions 3 and 4 — re-deriving the original objection, and the clearing
   comment's own wording — are a judgment call no function can make, so they stay the reviewing agent's
   responsibility exactly as `docs/ROUTINE-PROMPT.md` STEP 2 already asks. If the GitHub API call fails for any
-  reason the hook denies rather than allows — a deliberate departure from this file's other `mcp__github__`
-  hooks' fail-open `jq` pattern, because failing open here would let a stale block clear with nobody able to
+  reason the hook denies rather than allows — a deliberate departure from the other checks in
+  `.claude/hooks/`, which allow on input they cannot read, because failing open here would let a stale block clear with nobody able to
   verify it should have. Not a triplication collapse: the CANON paragraph still needs reading by an agent
   doing the judgment-call half, so `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` are untouched by
   this.
