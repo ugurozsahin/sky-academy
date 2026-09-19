@@ -462,7 +462,7 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
 
   it('frozen-label hook: allows ordinary labels, and a body that only discusses the retired label in prose', () => {
     expect(isDeny(runLabelsHook({ method: 'update', issue_number: 5, labels: ['priority:P1', 'routine-ok'] }))).toBe(false);
-    expect(isDeny(runLabelsHook({ body: 'Label `frozen` is retired — see BACKLOG.md.' }))).toBe(false);
+    expect(isDeny(runLabelsHook({ body: 'Label `frozen` is retired — see governance.md.' }))).toBe(false);
   });
 
   it('frozen-label hook: allows a call with no labels field at all', () => {

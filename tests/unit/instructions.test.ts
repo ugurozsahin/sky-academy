@@ -21,9 +21,9 @@ const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven
 
 const mdIn = (dir: string) => readdirSync(join(root, dir)).filter((f) => f.endsWith('.md')).map((f) => `${dir}/${f}`);
 const INSTRUCTION_FILES = [
-  'CLAUDE.md', 'AGENTS.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+  'CLAUDE.md', 'AGENTS.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
   'docs/WATCHDOG-PROMPT.md', ...mdIn('.claude/rules'), ...mdIn('docs/decisions'), ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
-].filter((f) => f !== 'BACKLOG.md' || existsSync(join(root, f)));   // BACKLOG.md is retiring (#218)
+];
 
 // A repo path anywhere inside a code span — alone, or as an argument of a command: a path under a tracked
 // top-level directory, or one of the root files these documents point at by bare name.
@@ -41,6 +41,7 @@ const isLiteral = (p: string) => !/[*<>{}$]|(^|\/)NNN-[\w-]+\.md$|instructions-l
 // Named on purpose, to say they are gone or must not be used.
 const KNOWN_ABSENT: Record<string, string> = {
   'scripts/output/': 'named only to forbid it: qa-screenshot says never to save a screenshot there',
+  'BACKLOG.md': 'retired (#218) — the decision records name it as history; no live instruction file may',
 };
 
 /** The repo paths a document points at, from its code spans, as they would be looked up on disk. */
@@ -58,7 +59,7 @@ describe('agent instruction files', () => {
   it('finds a dangling pointer alone in a span, inside a command, at the root, with a line number or anchor', () => {
     expect(danglingIn('see `docs/gone.md`, run `node scripts/gone.mjs body.md`, read `scripts/gone2.mjs:12` and '
       + '`docs/gone3.md#why`.')).toEqual(['docs/gone.md', 'scripts/gone.mjs', 'scripts/gone2.mjs', 'docs/gone3.md']);
-    // The root files are checked by name, so the day BACKLOG.md retires every pointer still naming it goes red.
+    // The root files are checked by name — how every pointer at BACKLOG.md was found the day it retired (#218).
     expect(pointersIn('`CLAUDE.md` and `BACKLOG.md`, and `npm test` reads `package.json`.'))
       .toEqual(['CLAUDE.md', 'BACKLOG.md', 'package.json']);
   });
@@ -87,6 +88,11 @@ describe('agent instruction files', () => {
       expect(existsSync(join(root, p)), `${p} exists now — drop it from KNOWN_ABSENT`).toBe(false);
       expect(pointersIn(all), `${p} is no longer named — drop it from KNOWN_ABSENT`).toContain(p);
     }
+  });
+
+  it('only the decision records still name the retired BACKLOG.md (#218)', () => {
+    const naming = INSTRUCTION_FILES.filter((f) => pointersIn(readFileSync(join(root, f), 'utf8')).includes('BACKLOG.md'));
+    expect(naming.filter((f) => !f.startsWith('docs/decisions/')), 'a live instruction points at a file that is gone').toEqual([]);
   });
 
   it('every skill directory is classed as ours or vendored, so a new one cannot go unread', () => {

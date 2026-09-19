@@ -11,4 +11,4 @@ npm run build      # dist/
 node scripts/bundle-single.mjs   # one self-contained HTML file
 ```
 
-See `CLAUDE.md` (project context), `docs/CURRICULUM.md` (curriculum map), `BACKLOG.md` (prioritised roadmap).
+See `CLAUDE.md` (project context), `docs/CURRICULUM.md` (curriculum map); the backlog is the GitHub issue list, ordered by its `priority:*` labels.

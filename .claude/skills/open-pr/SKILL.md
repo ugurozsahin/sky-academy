@@ -149,7 +149,7 @@ The reviewer who set it lifts it, or a later reviewer run's fresh review does (`
 
 ## 6. Governance pull requests say which way they move the constraint
 
-A pull request that changes how the routines themselves work — `CLAUDE.md`, `BACKLOG.md`,
+A pull request that changes how the routines themselves work — `CLAUDE.md`,
 `docs/ROUTINE-PROMPT.md`, `docs/REVIEWER-PROMPT.md`, the workflows, the guard rails — used to be left for the
 owner as a class, on the reasoning that a run should not merge changes to its own rules. Sound instinct,
 wrong cut: it conflates *an author must not land their own work* — true, and already enforced by §5 above — with *a run must not land a
@@ -182,8 +182,8 @@ routine held to a higher standard should not have to wait a day for it.
 ## 7. One home per rule
 
 A rule lives in one file and the others point at it (`docs/decisions/001-one-home-per-rule.md`). Put a new
-rule in its home — do not copy it into a second file. A few paragraphs are still copied across `CLAUDE.md`,
-`BACKLOG.md` and `docs/ROUTINE-PROMPT.md`; `.claude/rules/governance.md` lists them, and until each is
+rule in its home — do not copy it into a second file. A few paragraphs are still copied across `CLAUDE.md`
+and `docs/ROUTINE-PROMPT.md`; `.claude/rules/governance.md` lists them, and until each is
 reduced to its home a rail fails if you change one copy and not the others.
 
 And **records have readers** (#178): a change and why belongs in this body; a decision that binds future work

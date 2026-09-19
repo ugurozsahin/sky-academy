@@ -338,15 +338,14 @@ describe('closing references in a PR body (#144)', () => {
 });
 
 /**
- * The rule is worth nothing if it lives in one file. CLAUDE.md (interactive sessions), BACKLOG.md (the
- * workflow line) and docs/ROUTINE-PROMPT.md (the routine's own prompt) all tell an agent how to write a PR
- * body, and CLAUDE.md says in as many words that the three change together. This rail is why a future edit
- * cannot quietly drop the rule from two of them.
+ * CLAUDE.md (interactive sessions), docs/ROUTINE-PROMPT.md (the routine's own prompt) and the `open-pr` skill
+ * (the rule's home, where a PR body is written) all tell an agent how to write a PR body. This rail is why a
+ * future edit cannot quietly drop the rule from any of them. (`BACKLOG.md` was the third file until #218.)
  */
-describe('the three process files carry the closing-keyword rule (#144)', () => {
+describe('the process files and the open-pr skill carry the closing-keyword rule (#144)', () => {
   const doc = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
 
-  it.each(['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'])('%s states it', (name) => {
+  it.each(['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', '.claude/skills/open-pr/SKILL.md'])('%s states it', (name) => {
     const text = doc(name);
     expect(text.length).toBeGreaterThan(500);                          // a vacuous rail is worse than none
     expect(text).toMatch(/closing keyword/i);
@@ -356,7 +355,7 @@ describe('the three process files carry the closing-keyword rule (#144)', () => 
   // The docs quote the trap in order to warn about it. If one of them ever spells it out with a live issue
   // number, the paragraph teaching the rule becomes a body that breaks it the moment anyone copies it.
   it('and none of them spells the bad example out with a live issue number', () => {
-    for (const name of ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md']) {
+    for (const name of ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md']) {
       expect(closingRefs(doc(name).replace(/`/g, ''))).toEqual([]);    // backticks stripped: the text itself
     }
   });

@@ -39,7 +39,7 @@ describe('board sync: the Status rule, first match wins (#158)', () => {
     expect(desiredStatus(iss, repo)).toBe(want);
   });
 
-  // The retired `frozen` label is not a rule any more (BACKLOG.md) — it must not resurrect Blocked.
+  // The retired `frozen` label is not a rule any more (`.claude/rules/governance.md`) — it must not resurrect Blocked.
   it('frozen means nothing', () => {
     expect(desiredStatus(issue(12, ['frozen', 'priority:P1']), quiet)).toBe(STATUS.READY);
   });

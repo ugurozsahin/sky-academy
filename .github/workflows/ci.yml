@@ -45,7 +45,7 @@ on:
     # a docs-only pull request produced NO `CI` check at all — and the merge rules then need a carve-out
     # saying that particular absence is fine, sitting next to a rule saying an absent check is a red light.
     # Two readings of the same missing tick is how ugurozsahin/sky-academy-private-archive#150 was merged. Worse, the guard rails ARE documentation
-    # checks: tests/unit/guardrails.test.ts asserts that CLAUDE.md, BACKLOG.md and docs/ROUTINE-PROMPT.md
+    # checks: tests/unit/guardrails.test.ts asserts that CLAUDE.md and docs/ROUTINE-PROMPT.md
     # agree and that the freeze lift still reads as one-time, so a pull request touching only those files is
     # exactly the change those rails exist to catch, and it was the one shape they never ran on.
     # The e2e step below is what gets filtered instead, so the saving is kept and the check is not.

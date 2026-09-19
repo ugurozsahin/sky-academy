@@ -1066,7 +1066,7 @@ describe('guard rails', () => {
       // `docs/worklog/2026-09.md` replaces `WORKLOG.md` here (#178 archived it): the shape being asserted is
       // "a markdown file that cannot reach the game", and pointing at a path that no longer exists would
       // have made this line read as a leftover rather than a check.
-      for (const path of ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/worklog/2026-09.md',
+      for (const path of ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/worklog/2026-09.md',
                           'tests/unit/guardrails.test.ts', 'scripts/seed-issues.py',
                           '.claude/skills/add-topic/SKILL.md', '.github/workflows/review-gate.yml'])
         expect({ path, e2e: re.test(path) }, `${path} cannot reach the game, so it must not pay for e2e (#176)`)
@@ -1125,7 +1125,7 @@ describe('guard rails', () => {
     // #176's other half, and the reason it is a tightening rather than only a saving: a pull request used to
     // be able to produce NO `CI` check at all, which the merge rules then had to carve out as an acceptable
     // absence sitting next to "a missing check is a red light". The guard rails in this very file read
-    // CLAUDE.md, BACKLOG.md and docs/ROUTINE-PROMPT.md, so a documentation-only pull request is exactly the
+    // CLAUDE.md and docs/ROUTINE-PROMPT.md, so a documentation-only pull request is exactly the
     // change they exist to catch and was the one shape they never ran on. `push` keeps its filter: that tree
     // already passed on its own pull request minutes earlier.
     it('a pull request always gets a CI check — no paths-ignore on the pull_request trigger', () => {
@@ -1360,15 +1360,15 @@ describe('the e2e server proves it is serving the build on disk, not a leftover 
  * itself, so the wording that replaces it has to say in as many words that the lift is one-time. That
  * sentence is the load-bearing one: without it the next `review` issue re-freezes the repo by reading.
  *
- * The three files each speak to a different reader — CLAUDE.md to an interactive session, BACKLOG.md to
- * whoever looks up the labels, docs/ROUTINE-PROMPT.md to the routine itself — and CLAUDE.md says they change
- * together. A rail is why a future edit cannot drop the lift from two of them and leave one run in 2026-09-06.
- * (Reinstating a freeze is the owner's to declare, and would rewrite all three of these files at once — this
+ * The two files each speak to a different reader — CLAUDE.md to an interactive session,
+ * docs/ROUTINE-PROMPT.md to the routine itself (`BACKLOG.md` was the third until it retired, #218) — and
+ * CLAUDE.md says they change together. A rail is why a future edit cannot drop the lift from two of them and leave one run in 2026-09-06.
+ * (Reinstating a freeze is the owner's to declare, and would rewrite both of these files at once — this
  * rail going red on such a change is it working, not it objecting.)
  */
-describe('the code-health freeze is over, in all three process files (2026-09-10)', () => {
+describe('the code-health freeze is over, in both process files (2026-09-10)', () => {
   const doc = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
-  const FILES = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'];
+  const FILES = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md'];
 
   it.each(FILES)('%s records the lift, and that it cannot re-arm', (name) => {
     const text = doc(name);
@@ -1383,7 +1383,7 @@ describe('the code-health freeze is over, in all three process files (2026-09-10
   });
 
   // The old rule, verbatim in the present tense, is what a run would act on if an edit put it back in one
-  // file only. Quoting it in the past tense ("was open") is how all three describe the history.
+  // file only. Quoting it in the past tense ("was open") is how both describe the history.
   it.each(FILES)('%s does not still state the freeze as a live rule', (name) => {
     expect(doc(name)).not.toMatch(/feature work while any issue labelled `review` or `debt` is open/i);
   });
@@ -1414,7 +1414,7 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
   // Live instructions — the files a run or a session actually acts on. `docs/worklog/` is deliberately NOT
   // here: it is the archive, it describes itself in the past tense, and a rail that policed it would be
   // policing history. `tests/` is not here either, for the reason in the block comment above.
-  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+  const LIVE = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
                 'docs/WATCHDOG-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
   const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
 
@@ -1455,9 +1455,9 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
       .toMatch(/last, not first/i);
   });
 
-  // The three-file rule: the routing table is the thing that stops the habit coming back as a new file
-  // somewhere else, so all three have to carry it.
-  it.each(['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'])('%s carries the record-routing rule', (name) => {
+  // The routing table is the thing that stops the habit coming back as a new file somewhere else, so both
+  // process files carry it (a copied paragraph still — docs/decisions/001 has the debt).
+  it.each(['CLAUDE.md', 'docs/ROUTINE-PROMPT.md'])('%s carries the record-routing rule', (name) => {
     const text = live(name);
     expect(text, 'the file must ask who reads a record before one is written')
       .toMatch(/who opens this, and when/i);
@@ -1711,7 +1711,7 @@ describe('the first-run wizard shows its progress rail on every step (#67)', () 
  */
 describe('no live rule points at the retired priority-order issue (#171)', () => {
   const root = new URL('../../', import.meta.url);
-  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+  const LIVE = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
                 'docs/WATCHDOG-PROMPT.md', 'README.md'];
   // Built from parts so this rail's own source does not contain the string it bans — otherwise the file
   // could never be checked by a sibling rail, and a reader grepping the repo gets a false hit here.
@@ -1837,7 +1837,7 @@ describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
  */
 describe('branches are named for the change, and nothing matches on the old prefix (#160)', () => {
   const root = new URL('../../', import.meta.url);
-  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+  const LIVE = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
                 'docs/WATCHDOG-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
   const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
   // Built from parts so this rail's own source does not contain the instruction form it bans.
@@ -1851,12 +1851,12 @@ describe('branches are named for the change, and nothing matches on the old pref
       .not.toContain(RETIRED);
   });
 
-  // The three process files carry this convention word for word, the same way they carry the freeze wording
+  // The two process files carry this convention word for word, the same way they carry the freeze wording
   // and the records rule. A mapping that drifts between them is a run guessing which file to believe.
-  const PROCESS = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'];
+  const PROCESS = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md'];
   it.each(PROCESS)('%s states the prefix mapping in the one canonical form', (name) => {
     const text = live(name);
-    expect(text, `${name} must map the three prefixes onto the labels, identically in all three files`)
+    expect(text, `${name} must map the three prefixes onto the labels, identically in both files`)
       .toContain('`fix/` for `bug`/`playtest`, `feature/` for `enhancement`, `chore/` for everything else');
     expect(text, `${name} must give the branch shape, or the mapping has nothing to attach to`)
       .toMatch(/<n>-<slug>/);
@@ -1949,7 +1949,7 @@ describe('branches are named for the change, and nothing matches on the old pref
 describe('a block its reviewer leaves unanswered is superseded by a fresh review (#161)', () => {
   const root = new URL('../../', import.meta.url);
   const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
-  const PROCESS = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'];
+  const PROCESS = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md'];
   const flat = (s: string) => s.replace(/\s+/g, ' ');
   // The retired rule's two figures. Built from parts so a repository-wide grep for them finds only a real copy.
   const WINDOW = new RegExp(['at least 4 ', 'hours|in the last 2 ', 'hours'].join(''));
@@ -1958,7 +1958,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   // no window — a figure beside the block protocol is the retired adoption rule coming back.
   // Since docs/decisions/003-two-routines.md the run that reads rule 3 is a reviewer run, so the sentence
   // lives in `docs/REVIEWER-PROMPT.md`; the developer prompt only has to stay clear of the retired rule.
-  it('CLAUDE.md and the reviewer prompt point at the review-pr skill for the rule, state no time window, and BACKLOG.md has dropped it', () => {
+  it('CLAUDE.md and the reviewer prompt point at the review-pr skill for the rule and state no time window', () => {
     for (const name of ['CLAUDE.md', 'docs/REVIEWER-PROMPT.md']) {
       const text = flat(read(name));
       expect(text, `${name} must say what happens to a block its reviewer leaves unanswered`)
@@ -1969,8 +1969,6 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
         .not.toMatch(WINDOW);
       expect(text, `${name} still carries the retired adoption rule`).not.toContain('may be adopted');
     }
-    expect(read('BACKLOG.md'), 'BACKLOG.md is retiring (#218) and no longer carries this rule at all')
-      .not.toContain('may be adopted');
     const dev = flat(read('docs/ROUTINE-PROMPT.md'));
     expect(dev, 'the developer prompt must not bring the retired adoption rule back').not.toContain('may be adopted');
     expect(dev, 'nor its time windows — STEP 2.5 has a 30-minute debounce and nothing else').not.toMatch(WINDOW);
@@ -2038,13 +2036,13 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * denies an `issue_write` update to issue #62 whose body has no `- second item: ` line. That is the one
    * piece of #97 real enough to collapse, the same bar #191 cleared — the four *eligibility* conditions
    * themselves (is a review waiting, is there time left, are the files disjoint, did the first item finish)
-   * have no such enforcement, so they stay triplicated across `CLAUDE.md`, `BACKLOG.md` and
+   * have no such enforcement, so they stay copied in `CLAUDE.md` and
    * `docs/ROUTINE-PROMPT.md` (checked by the `it.each(FILES)` rails above, in the #177 describe block) — this
    * rail only covers the recording-obligation sentence, not the whole rule.
    *
    * Unlike #191 (a single sentence with nothing else depending on its exact words), the "carries a
    * `- second item:` line" instruction is itself part of what STEP 5 needs while running, so it stays inline
-   * in `BACKLOG.md`/`docs/ROUTINE-PROMPT.md` rather than collapsing to a bare pointer — what moved to
+   * in `docs/ROUTINE-PROMPT.md` rather than collapsing to a bare pointer — what moved to
    * governance.md is the surrounding rationale (why: the code enforcement, the #98 worklog history), which
    * was genuinely duplicated prose with no operational role.
    *
@@ -2059,7 +2057,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     // Flattened, not raw: the pointer sentence sits inside prose a line-wrap can legitimately split, and a
     // rail testing the author's line breaks rather than the rule is the exact mistake #177's tests avoid.
     const flat = (s: string) => s.replace(/\s+/g, ' ');
-    for (const name of ['BACKLOG.md', 'docs/ROUTINE-PROMPT.md']) {
+    for (const name of ['docs/ROUTINE-PROMPT.md']) {
       const text = flat(read(name));
       expect(text, `${name} must point at governance.md for the #97 recording obligation`)
         .toContain('enforced in code, not just this prose (`.claude/rules/governance.md`, #97/#239)');
@@ -2074,7 +2072,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * again", now has real enforcement: a `PreToolUse` hook denies an `issue_write` create/update whose
    * `labels` include `frozen`. That is the piece real enough to collapse, the same bar #191 and #97's
    * recording obligation cleared — the freeze's broader one-time-lift narrative (the dates, the reasoning,
-   * "does not re-arm") has no such enforcement point and stays triplicated across `CLAUDE.md`, `BACKLOG.md`
+   * "does not re-arm") has no such enforcement point and stays copied in `CLAUDE.md`
    * and `docs/ROUTINE-PROMPT.md`, checked by the "code-health freeze is over" describe block above.
    *
    * Prove it red: drop the governance.md bullet, or restore either file's old "no issue carries `frozen`"
@@ -2086,14 +2084,12 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     expect(gov, 'and name the enforcing hook, or this is prose again').toContain('PreToolUse');
     expect(gov, 'and the field it gates').toContain('`labels` include `frozen`');
     const flat = (s: string) => s.replace(/\s+/g, ' ');
-    for (const name of ['BACKLOG.md', 'docs/ROUTINE-PROMPT.md']) {
+    for (const name of ['docs/ROUTINE-PROMPT.md']) {
       const text = flat(read(name));
       expect(text, `${name} must point at governance.md for the frozen-label rule`)
         .toContain('enforced in code, not just this prose (`.claude/rules/governance.md`, #101)');
     }
     // The rationale prose this collapse actually removed — a future re-add would just be re-triplicating it.
-    expect(flat(read('BACKLOG.md')), 'the old "nothing reads it" aside must not come back')
-      .not.toContain('no issue carries it and nothing reads it');
     expect(flat(read('docs/ROUTINE-PROMPT.md')), 'the old inline "no issue carries frozen" clause must not come back')
       .not.toContain('Nothing is parked by a freeze any more and no issue carries');
   });
@@ -2102,7 +2098,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * #98/#101 — records-have-readers' "overwritten every run, never appended" piece now has real enforcement
    * (see the structural and execution tests for the `.claude/settings.json` hook itself), documented in
    * governance.md. Unlike the #191/#97/frozen-label bullets above, this one is explicitly NOT a collapse: the
-   * instruction stays inline, verbatim, in all three process files (the `it.each(FILES)` rail earlier in this
+   * instruction stays inline, verbatim, in both process files (the `it.each(FILES)` rail earlier in this
    * describe block, "carries the record-routing rule", already pins that) because a run still needs to read it
    * while executing STEP 5, the same reasoning the #97 bullet gives for keeping `- second item:` inline. This
    * test only checks that the new enforcement is documented and named, not that anything was trimmed.
@@ -2132,10 +2128,10 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * fix), the structure they already tended to have in practice.
    *
    * Deliberately NOT a gating change, same as #191: review-gate.mjs is untouched, nothing here scans live
-   * GitHub comment bodies, and none of it is retroactive. Documentation only, pinned in the three process
+   * GitHub comment bodies, and none of it is retroactive. Documentation only, pinned in the two process
    * files the same way every other #161-family rule is.
    *
-   * Prove it red: drop either new sentence from any one of the three files.
+   * Prove it red: drop either new sentence from either file.
    */
   it.each(PROCESS)('%s requires every comment and issue, not just the two REVIEW: markers, to carry a session URL (#199)', (name) => {
     const text = read(name);
@@ -2170,7 +2166,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
  * #204/#207 — two process rules decided in session on 2026-09-17.
  *
  * Both land in \`docs/ROUTINE-PROMPT.md\` only — the one file every run demonstrably reads in full every
- * time (STEP 1) — not the usual three-file pattern and not \`BACKLOG.md\`, which the owner is retiring.
+ * time (STEP 1) — not the then-usual three-file pattern and not \`BACKLOG.md\`, which has since retired (#218).
  * \`CLAUDE.md\` and \`docs/ROUTINE-PROMPT.md\` were both pinned at zero headroom by #101's byte-budget rail
  * (PR #198); landing these here meant trimming narrative asides elsewhere in the same file by a matching or
  * greater amount — historical incident detail, not rule content — so the budget rail stays exactly as
@@ -2316,13 +2312,13 @@ describe('the project board is synced from the Mac, read by pulse in the cloud, 
     expect(text, 'an open issue is not a pulse').toMatch(/an open issue is not a pulse/);
   });
 
-  it('CLAUDE.md and BACKLOG.md tell a session where the sync runs, where the token lives, and what feeds Blocked', () => {
+  it('CLAUDE.md and governance.md tell a session where the sync runs, where the token lives, and what feeds Blocked', () => {
     const claude = read('CLAUDE.md');
     expect(claude, 'the launchd definition is how it runs').toContain('scripts/board-sync.plist');
     expect(claude).toContain('.git/github-project-token');
     expect(claude, 'the token file sits beside the credentials file, never inside it').toMatch(/beside — never inside/);
     expect(claude, 'and a session must not be sent to the cloud for it').toMatch(/No cloud session can reach the board/);
-    expect(read('BACKLOG.md'), 'the label list must carry `blocked`, or the Blocked column has no input').toMatch(/`blocked` \(/);
+    expect(read('.claude/rules/governance.md'), 'the label list must carry `blocked`, or the Blocked column has no input').toMatch(/`blocked` \(/);
   });
 
   it('the launchd agent runs the script every 15 minutes from the clone', () => {
@@ -2377,7 +2373,7 @@ describe('the project board is synced from the Mac, read by pulse in the cloud, 
  * Prove it red: join any bullet in any of the four files to the line above it.
  */
 describe('a bullet is never swallowed onto the line above it (#195)', () => {
-  const PROCESS = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+  const PROCESS = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
                    'docs/WATCHDOG-PROMPT.md'];
 
   // A sentence end, then a list marker, mid-line: `.- ` or `. 1. `. Deliberately narrow — the marker must be a
@@ -3104,9 +3100,9 @@ describe('the add-guard-rail skill keeps the rules that were paid for (#180)', (
  * issues: they must be reviewable, mergeable and blockable independently, and #139 is what a single body
  * carrying two issue references does on its own.
  *
- * The three files each speak to a different reader — CLAUDE.md to an interactive session, BACKLOG.md to
- * whoever looks up the labels, docs/ROUTINE-PROMPT.md to the routine itself — and all three say they change
- * together, the same way they do for the freeze lift and the record-routing rule.
+ * The two files each speak to a different reader — CLAUDE.md to an interactive session,
+ * docs/ROUTINE-PROMPT.md to the routine itself (`BACKLOG.md` was the third until it retired, #218) — and
+ * they change together, the same way they do for the freeze lift and the record-routing rule.
  *
  * Prove it red: drop the rule from one file, reword condition 1 as "no open pull requests", or turn it into a
  * quota.
@@ -3116,7 +3112,7 @@ describe('the add-guard-rail skill keeps the rules that were paid for (#180)', (
  * for review" — the count STEP 1's review-queue check has already made. The purpose is unchanged — do not add
  * to a review queue that is not draining — and so is everything else these rails hold.
  */
-describe('a developer run may take a second item, in all three process files (#177)', () => {
+describe('a developer run may take a second item, in both process files (#177)', () => {
   // Match against prose with its markdown taken off, not against the raw bytes. Three of these rails failed
   // on their own subject first time round — `**start of the run**`, `*not* "no open…"`, and a sentence the
   // line wrap split — which is a rail testing the author's formatting rather than the rule. Emphasis markers
@@ -3125,7 +3121,7 @@ describe('a developer run may take a second item, in all three process files (#1
   const flat = (s: string) =>
     s.replace(/[*_`]/g, '').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ');
   const doc = (name: string) => flat(readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8'));
-  const FILES = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'];
+  const FILES = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md'];
 
   it.each(FILES)('%s carries the rule, and its four conditions', (name) => {
     const text = doc(name);
@@ -3759,8 +3755,8 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
 
   // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 9_890;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003)
-  const ROUTINE_PROMPT_BUDGET = 23_155;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003)
+  const CLAUDE_MD_BUDGET = 9_870;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218)
+  const ROUTINE_PROMPT_BUDGET = 23_087;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218)
   const REVIEWER_PROMPT_BUDGET = 10_072;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both
 
   it('CLAUDE.md stays at or under its budget', () => {
@@ -3888,7 +3884,7 @@ describe('one routine develops, another reviews (docs/decisions/003)', () => {
   // schedule it is a step nobody needs and a label nobody removes. `docs/decisions/` is deliberately not
   // scanned: the record says what was considered and dropped. The pattern is the backticked label, so the
   // fix-push comment's closing words, `Ready for re-review` (#200), are not a hit.
-  it.each([DEV, REV, 'CLAUDE.md', 'BACKLOG.md', 'docs/WATCHDOG-PROMPT.md', '.claude/skills/open-pr/SKILL.md',
+  it.each([DEV, REV, 'CLAUDE.md', 'docs/WATCHDOG-PROMPT.md', '.claude/skills/open-pr/SKILL.md',
            '.claude/skills/review-pr/SKILL.md'])('%s does not mention the dropped `re-review` label, or an event-triggered reviewer', (name) => {
     const text = flat(read(name));
     expect(text.length, `${name} must be read from disk as text, or this rail checks nothing`).toBeGreaterThan(300);
