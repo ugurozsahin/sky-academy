@@ -99,11 +99,11 @@ your first finding and the only one you can report.
    work again — or a run declining eligible work because it believes a freeze still holds. Only the owner
    declares a freeze, and it would appear in CLAUDE.md and `docs/ROUTINE-PROMPT.md` together, so a
    bar in one place alone is a finding. **(b) Has the order been skipped?** Since 2026-09-11 the order is
-   **the labels, not a list** (#94), which is the version of this check you can actually evaluate: run the
-   same query `docs/ROUTINE-PROMPT.md` STEP 3 gives a run —
-   `/issues?state=open&labels=routine-ok`, drop `owner-input`/`owner-approval`, anything with an open PR
-   solving it, anything blocked by an open issue it references, and the two heartbeat issues; then highest
-   `priority:*`, oldest issue number first — and compare the issue it names with the issue each PR opened
+   **the labels, not a list** (#94), which is the version of this check you can actually evaluate: run STEP 3's
+   query as `docs/ROUTINE-PROMPT.md` writes it, and apply its drops in its order — never a copy of either
+   here: a copy drifted the day the query gained `creator=` (#284), and a run would then have been accused of
+   skipping an issue it was right to skip — then highest `priority:*`, oldest issue number first — and
+   compare the issue it names with the issue each PR opened
    since your last check actually develops. A PR developing a lower-priority issue while that one sat
    unstarted is the finding, and the query is reproducible, so it is evidence rather than an impression.
    (A `review` or `debt` finding no longer blocks everything, but it is no longer last either — it sorts by
