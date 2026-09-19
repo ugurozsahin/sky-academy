@@ -2531,31 +2531,38 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   ];
   /**
    * The frontmatter block and the `description:` value, or `null` for each that is not there. The value is read
-   * the way a YAML loader reads it, as far as a regex can: a plain scalar continues onto every following line
-   * that starts with whitespace, blank lines in between included, so those lines are folded in (PR #292's two
-   * reviews: a negation on a continuation line — then one behind a blank line — was invisible to a helper that
-   * captured the first physical line only; the loader saw `… — never when …`, the rail did not). Lines are
-   * split on `\n` alone, since JS `.` and multiline `$` also stop at U+2028/U+2029 and `\r`, which a loader
-   * reads as printable characters. The one-line test below then rejects the continuation itself, a ` #`
-   * (a comment to the loader: the trigger clause behind it never reaches a turn's context), a second
-   * `description:` key (the rail would read the first, a loader the last — or refuse the file) and those three
-   * characters; this fold is what every other check reads, so the two cannot disagree about which text is
-   * the description.
+   * the way the loader reads it, as far as a regex can. The loader is lenient and line-based rather than a
+   * strict YAML parser (`review-pr` and `silent-failure-hunter` carry `: ` inside a plain scalar and load), but
+   * on these shapes it agrees with one, each confirmed on the live skill listing during PR #292's reviews: a
+   * scalar continues onto every following line that starts with whitespace, blank lines in between included,
+   * so those lines are folded in (a negation on a continuation line — then one behind a blank line — was
+   * invisible to a helper that captured the first physical line only; the loader saw `… — never when …`, the
+   * rail did not); ` #` starts a comment, so the trigger clause behind one never reaches a turn's context;
+   * `description:Open …` with no whitespace after the colon loses the trigger clause; and a second key spelt
+   * `description :` or `"description":` wins over the first. So the capture demands whitespace after the
+   * colon, lines are split on `\n` alone (JS `.` and multiline `$` also stop at U+2028/U+2029 and `\r`, which
+   * the loader reads as printable characters), and the one-line test below rejects the continuation itself,
+   * the ` #`, every second spelling of the key, and those three characters. This fold is what every other
+   * check reads, so the two cannot disagree about which text is the description.
    */
   const frontmatter = (file: string) => {
     const front = /^---\n([\s\S]*?)\n---\n/.exec(read(file));
-    const description = front && /^description:[ \t]*(\S[^\n]*(?:\n(?:[ \t]*\n)*[ \t]+\S[^\n]*)*)$/m.exec(front[1]);
+    const description = front && /^description:[ \t]+(\S[^\n]*(?:\n(?:[ \t]*\n)*[ \t]+\S[^\n]*)*)$/m.exec(front[1]);
     return {
       front: front ? front[1] : null,
       description: description ? description[1].replace(/\s*\n\s*/g, ' ') : null,
     };
   };
+  /** Every spelling a loader treats as the `description` key: bare or quoted, with or without space before the colon. */
+  const DESCRIPTION_KEY = /^["']?description["']?[ \t]*:/gm;
   /**
    * Vendored upstream text that carries ` #` inside a plain scalar (`Please review PR #1234`): the live loader
-   * reads it in full, a strict YAML loader would cut it there — an upstream matter, not this repository's, so
-   * the comment check skips this one file and every other description is held to it.
+   * reads it in full, a strict YAML loader would cut it there — an upstream matter, not this repository's. The
+   * exemption is that one token, not the file: the token is asserted present (so the entry fails loudly when
+   * upstream drops it) and stripped, and the rest of the description is held to the same ` #` check as every
+   * other.
    */
-  const HASH_IN_UPSTREAM_TEXT = ['silent-failure-hunter'];
+  const HASH_IN_UPSTREAM_TEXT: Record<string, string> = { 'silent-failure-hunter': 'PR #1234' };
   /** CR, U+2028, U+2029 — built from code points so no editor or tool can turn the escape into the character. */
   const LINE_SEPARATORS = new RegExp(`[${String.fromCharCode(13, 0x2028, 0x2029)}]`);
 
@@ -2564,17 +2571,19 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     expect(front, `${file} must open with YAML frontmatter, or nothing loads it`).not.toBeNull();
     expect(front!, `${file}: a carriage return or U+2028/U+2029 inside the frontmatter — a line ending to a regex, a printable character to the loader (#150)`)
       .not.toMatch(LINE_SEPARATORS);
-    expect(front!.match(/^description:/gm)?.length, `${file}: exactly one description: key — the rail reads the first, a loader reads the last or refuses the file (#150)`)
+    expect(front!.match(DESCRIPTION_KEY)?.length, `${file}: exactly one description key, in any spelling a loader accepts — the rail reads the first, a loader reads the last or refuses the file (#150)`)
       .toBe(1);
+    expect(front!, `${file}: the one description key is the literal "description:" followed by whitespace — "description:Open …" loses its trigger clause in the loader (#150)`)
+      .toMatch(/^description:[ \t]+\S/m);
     expect(description, `${file} needs a description — it is the only line that reaches every turn's context`)
       .not.toBeNull();
     expect(description!, 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
     expect(front!, `${file}: the description continues onto an indented line, blank lines or not — one physical line, so the line a reader sees is the whole trigger (#150)`)
       .not.toMatch(/^description:[^\n]*\n(?:[ \t]*\n)*[ \t]+\S/m);
-    if (!HASH_IN_UPSTREAM_TEXT.includes(name)) {
-      expect(description!, `${file}: " #" ends the description for a YAML loader — everything after it never reaches a turn's context (#150)`)
-        .not.toMatch(/\s#/);
-    }
+    const upstreamToken = HASH_IN_UPSTREAM_TEXT[name];
+    if (upstreamToken) expect(description!, `${file} no longer carries "${upstreamToken}" — drop its HASH_IN_UPSTREAM_TEXT entry`).toContain(upstreamToken);
+    expect(upstreamToken ? description!.replace(upstreamToken, '') : description!, `${file}: " #" ends the description for a YAML loader — everything after it never reaches a turn's context (#150)`)
+      .not.toMatch(/\s#/);
     expect(/^name:[ \t]*\S/m.test(front!), `${file} needs a name`).toBe(true);
   });
 
@@ -2642,6 +2651,9 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
       .toEqual(FRONTMATTER_FILES.map(([n]) => n).sort());
     expect(PROJECT_SKILLS, 'the project-written set the negation check reads — it must include the two body-railed skills')
       .toEqual(expect.arrayContaining(['open-pr', 'add-guard-rail']));
+    // The one negation exemption is for a phrase; if upstream drops it, the exemption fails loudly rather than going stale.
+    expect(frontmatter('.claude/skills/frontend-design/SKILL.md').description, 'frontend-design is exempt from the negation check for its "don\'t" — put it back under NEGATION_CHECKED when that text is gone')
+      .toMatch(/don't/);
   });
 
   it.each(FRONTMATTER_FILES)('%s\'s description still names the job it triggers on (#150)', (name, file) => {
