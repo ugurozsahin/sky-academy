@@ -2008,6 +2008,47 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   });
 
   /**
+   * #305 — §6 says a block never expires and who may supersede it; nothing said what a block is *for*, or that
+   * the rounds have a floor. PR #292 blocked six times over five hours for a ten-line pin, each round inventing
+   * a further YAML shape, and ended only because #161 let a second reviewer supersede the sixth block.
+   *
+   * §7 is the answer and this pins its two halves, because either alone decays into the other's failure: a bar
+   * with no round cap is the loop again one finding at a time, and a cap with no bar is "merge on the fourth
+   * round" — which is how #74 went in over five open items. The closing paragraph is pinned with them: the cap
+   * is about rounds, never about reviewing less carefully, and a reviewer reading one without the other gets
+   * the wrong rule.
+   *
+   * Prove it red: delete §7; drop either rule from it; reword the round to a fourth or a second; or take the
+   * no-time-box sentence out of the closing paragraph.
+   */
+  it('the review-pr skill says what a block is for and caps the rounds that block (#305)', () => {
+    const skill = read('.claude/skills/review-pr/SKILL.md');
+    const start = skill.indexOf('\n## 7. '), end = skill.indexOf('\n## ', start + 1);
+    expect(start, 'the review-pr skill has lost its §7').toBeGreaterThan(-1);
+    const s7 = flat(skill.slice(start, end === -1 ? undefined : end));
+    // The bar. Without it a reviewer holds a pull request for work it would merely prefer.
+    expect(s7, "the bar a block is measured against").toContain("the issue's acceptance criteria");
+    expect(s7, 'and the test a reviewer puts to their own finding before blocking on it')
+      .toMatch(/name what breaks for a run, for a reader, or for a child/);
+    expect(s7, 'a preference is a note or an issue, never a block').toMatch(/is not a block/);
+    // …and the two findings the bar never lets through, so "not a block" cannot be read as "merge anything".
+    expect(s7, 'a body that does not match its diff blocks at any round').toContain('does not do what its body says');
+    expect(s7, 'and so does a rail that does not hold').toContain('a rail does not hold what it claims');
+    // The cap. `whoever wrote them` is the load-bearing half: six rounds by two reviewers is still six rounds.
+    expect(s7, 'the third round is the floor, and it counts every reviewer\'s blocks')
+      .toMatch(/third round is the last one that blocks/);
+    expect(s7, 'counted across reviewers, not per reviewer').toContain('whoever wrote them');
+    expect(s7, 'past the cap a real defect may still block, and says so in its opening line')
+      .toMatch(/past the third round/);
+    expect(s7, 'what is dropped is queued, not lost — otherwise the cap loses findings')
+      .toMatch(/goes into an issue linked from your comment/);
+    // The cap and the depth rule sit next to each other on purpose; neither may be read as the other.
+    const closing = flat(skill.slice(skill.indexOf('\n## Reviewing is the work')));
+    expect(closing, 'the round cap must never read as "review less carefully"').toContain('There is no time box on this');
+    expect(closing, 'and the closing paragraph must say which of the two it is').toMatch(/§7 is about \*\*rounds\*\*/);
+  });
+
+  /**
    * #191 — the clearing side of #161 had the same gap as the blocking side, one level down.
    *
    * #189 made scripts/review-gate.mjs flag a REVIEW: CHANGES REQUESTED comment with no session URL, because
