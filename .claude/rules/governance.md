@@ -12,8 +12,8 @@ paths:
 
 - **Each rule has one home; every other file points at it** (`docs/decisions/001-one-home-per-rule.md`, which
   replaces the three-file rule and #216 §1's enforcement bar). Removing a duplicate is ordinary work as long
-  as the home still carries the rule. Three paragraphs are still copied into `CLAUDE.md` and
-  `docs/ROUTINE-PROMPT.md` — the freeze history, records-have-readers, the #97 second-item conditions. That is debt: until a paragraph is reduced to its home, change its copies together,
+  as the home still carries the rule. Two paragraphs are still copied into `CLAUDE.md` and
+  `docs/ROUTINE-PROMPT.md` — the freeze history and records-have-readers (the #97 second-item conditions went to their home, the developer prompt, with #145). That is debt: until a paragraph is reduced to its home, change its copies together,
   which `tests/unit/guardrails.test.ts` still checks. **While this reduction is under way it is done in
   sessions with the owner** (issues labelled `owner-session`), not by the routine; removing a rule rather than
   a copy, or removing any other rail, is still a loosening under the `open-pr` skill §6.
@@ -28,8 +28,7 @@ paths:
   line. The four eligibility conditions themselves (are more than three reviews waiting, is
   there time left in the run, are the second item's files disjoint from the first's, did the first item
   actually finish) have no such enforcement yet — nothing stops a run from taking an ineligible second item,
-  only from failing to say so — and they are still copied in `CLAUDE.md` and
-  `docs/ROUTINE-PROMPT.md` (debt, first bullet). `docs/ROUTINE-PROMPT.md` carries a pointer here for the
+  only from failing to say so. Their home is `docs/ROUTINE-PROMPT.md` STEP 3; `CLAUDE.md` points there. `docs/ROUTINE-PROMPT.md` carries a pointer here for the
   recording obligation instead of restating it.
 - **The routine heartbeat (issue #62) must be overwritten each run, never appended to (records have readers,
   #98).** Enforced in code: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to

@@ -3180,7 +3180,7 @@ describe('the add-guard-rail skill keeps the rules that were paid for (#180)', (
  * for review" — the count STEP 1's review-queue check has already made. The purpose is unchanged — do not add
  * to a review queue that is not draining — and so is everything else these rails hold.
  */
-describe('a developer run may take a second item, in both process files (#177)', () => {
+describe('a developer run may take a second item — the rule, in its home (#177)', () => {
   // Match against prose with its markdown taken off, not against the raw bytes. Three of these rails failed
   // on their own subject first time round — `**start of the run**`, `*not* "no open…"`, and a sentence the
   // line wrap split — which is a rail testing the author's formatting rather than the rule. Emphasis markers
@@ -3189,7 +3189,8 @@ describe('a developer run may take a second item, in both process files (#177)',
   const flat = (s: string) =>
     s.replace(/[*_`]/g, '').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ');
   const doc = (name: string) => flat(readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8'));
-  const FILES = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md'];
+  // One home (docs/decisions/001, #145): the developer prompt carries the rule, `CLAUDE.md` points at it.
+  const FILES = ['docs/ROUTINE-PROMPT.md'];
 
   it.each(FILES)('%s carries the rule, and its four conditions', (name) => {
     const text = doc(name);
@@ -3210,6 +3211,11 @@ describe('a developer run may take a second item, in both process files (#177)',
       .toMatch(/disjoint/i);
     expect(text, 'condition 4 — a WIP `Part of #<n>` push is not a finished first item')
       .toMatch(/Part of #<n>/);
+    // #145: two consecutive runs read condition 4 two ways. The owner chose: the bar is unfinished work, so a
+    // complete part of a larger issue passes even though its pull request says `Part of`.
+    expect(text, 'condition 4 is about unfinished work, not about the words Part of (#145)')
+      .toMatch(/The bar is unfinished work, not the words Part of #<n> \(#145\)/);
+    expect(text).toMatch(/a complete, reviewable part of a larger issue passes/);
   });
 
   it.each(FILES)('%s keeps it a condition rather than a quota', (name) => {
@@ -3229,6 +3235,13 @@ describe('a developer run may take a second item, in both process files (#177)',
   it.each(FILES)('%s forbids one pull request closing two issues', (name) => {
     expect(doc(name), 'two items are two pull requests, or one going bad holds the other')
       .toMatch(/never one pull request closing two issues/i);
+  });
+
+  it('CLAUDE.md points at the rule\'s home instead of copying it (#145)', () => {
+    const text = doc('CLAUDE.md');
+    expect(text).toMatch(/A developer run may take a second item \(#97\)/);
+    expect(text, 'the pointer').toMatch(/docs\/ROUTINE-PROMPT\.md STEP 3 is the rule's home/);
+    expect(text, 'the four conditions live in one place').not.toMatch(/disjoint/i);
   });
 
   // Without this line nobody can tell a rule that is never true from a rule nobody applied — and #178 moved
@@ -3823,8 +3836,13 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
 
   // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 9_868;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them
-  const ROUTINE_PROMPT_BUDGET = 21_532;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it
+  const CLAUDE_MD_BUDGET = 9_518;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them; → 9,518: #97 reduced to a pointer at its home (#145)
+  // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
+  // git treats edits to adjacent lines as one hunk.)
+
+  const ROUTINE_PROMPT_BUDGET = 21_529;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2
+  // —
+
   const REVIEWER_PROMPT_BUDGET = 10_044;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112)
 
   it('CLAUDE.md stays at or under its budget', () => {

@@ -91,14 +91,15 @@ Check all four after STEP 3, in order, and stop at the first that fails:
 
 1. **At most three pull requests are waiting for review** — the same "waiting" as STEP 1's review-queue check,
    which this run has already counted. Read it exactly as written: it is **not** "no open pull requests at all" —
-   a draft, a blocked pull request nobody has fixed, and the one this run just opened are not waiting. The purpose
-   is not to add to a review queue that is not draining. This condition is the entire self-limiting property.
+   a draft, a blocked pull request nobody has fixed, and the one this run just opened are not waiting. The purpose:
+   do not add to a review queue that is not draining.
 2. **Time is left in the run.** The ~45-minute clock above runs from the **start of the run**, not from the
-   second item. Past it, stop — the second item is subject to the same clock as the first.
+   second item. Past it, stop.
 3. **The second item's file scope is disjoint from the first's.** The real test is the first pull request's
    changed-file list (`GET /repos/ugurozsahin/sky-academy/pulls/<n>/files`); a different area label
    (`curriculum` against `platform`, say) is the cheap heuristic that gets you to a candidate worth checking.
-4. **The first item actually finished.** If you pushed it as WIP with `Part of #<n>`, you do not start another.
+4. **The first item actually finished.** The bar is unfinished work, not the words `Part of #<n>` (#145): a
+   complete, reviewable part of a larger issue passes; a push you left as WIP does not, and you do not start another.
 
 Then choose the second item with the same STEP 3 query and open a **second, separate pull request** — never one
 pull request closing two issues. They have to be reviewable, mergeable and blockable independently, and one
