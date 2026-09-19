@@ -3304,16 +3304,27 @@ describe('a developer run may take a second item — the rule, in its home (#177
   });
 
   it('CLAUDE.md points at the rule\'s home instead of copying it (#145)', () => {
-    const text = doc('CLAUDE.md');
+    const raw = readFileSync(new URL('../../CLAUDE.md', import.meta.url), 'utf8');
+    const text = flat(raw);
     expect(text).toMatch(/A developer run may take a second item \(#97\)/);
-    expect(text, 'the pointer').toMatch(/docs\/ROUTINE-PROMPT\.md STEP 3 is the rule's home/);
-    // The bullet itself, not the file (#291): one synonym for "disjoint", or three of the four conditions copied
-    // back, walked past a file-wide check on one word.
-    const bullet = text.match(/A developer run may take a second item \(#97\).*?STEP 3 is the rule's home\./)?.[0] ?? '';
-    expect(bullet.length, 'the bullet must be found').toBeGreaterThan(60);
-    expect(bullet.length, 'a pointer is short — the conditions live in the developer prompt').toBeLessThan(260);
+    // The whole bullet, not the file and not a slice of the bullet (#291, review of PR #294): one synonym for
+    // "disjoint", or three of the four conditions copied back, walked past a file-wide check on one word; and a
+    // slice that stopped at the pointer sentence let the same copy sit *after* it. Cut in the raw text, where
+    // a bullet ends at the next `- ` line, a blank line or a heading, and only then flatten.
+    const start = raw.search(/A developer run may take a second item \(#97\)/);
+    expect(start, 'the bullet must be found').toBeGreaterThanOrEqual(0);
+    const rest = raw.slice(start);
+    const end = rest.search(/\n(?=- |\n|#)/);
+    const bullet = flat(end === -1 ? rest : rest.slice(0, end));
+    expect(bullet, 'the pointer sentence sits in this bullet, not another')
+      .toMatch(/docs\/ROUTINE-PROMPT\.md STEP 3 is the rule's home/);
+    expect(bullet.length, `the bullet is ${bullet.length} characters; a pointer stays under 260`).toBeLessThan(260);
     for (const copied of [/at most three/i, /from the start of the run/i, /disjoint|overlap/i, /Part of #<n>/, /two items per run/i])
       expect(bullet, `CLAUDE.md copies a condition back: ${copied}`).not.toMatch(copied);
+    // The belt to that brace: the two phrases no other CLAUDE.md line has a use for stay out of the whole file,
+    // so a copy that lands outside any bullet boundary is still red.
+    expect(text, 'the four conditions live in one place').not.toMatch(/disjoint/i);
+    expect(text, 'the four conditions live in one place').not.toMatch(/from the start of the run/i);
   });
 
   // Without this line nobody can tell a rule that is never true from a rule nobody applied — and #178 moved
