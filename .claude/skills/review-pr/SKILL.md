@@ -130,9 +130,9 @@ What that means in practice:
   stands, or find a new one, the verdict is your own `REVIEW: CHANGES REQUESTED`.
 - **There is no waiting period and nothing to measure.** Whether the first reviewer has "gone quiet" is not a
   question you have to answer; the only test is that you neither opened the pull request nor pushed to it.
-- **A `re-review` label is removed by the reviewer who picks the pull request up.** Whoever pushed the fix
-  added it, because a push to a draft starts no reviewer run; taking it off as you begin keeps the label
-  meaning "nobody has picked this up yet".
+- **A fix pushed since the block is what brings the pull request back to you.** The reviewer routine counts a
+  blocked pull request with a commit newer than its block as waiting (`docs/REVIEWER-PROMPT.md` STEP 1);
+  nobody labels it or undrafts it to ask.
 - **Say "another reviewer's block" in the opening lines of the clearing comment**, in those words.
   `scripts/review-gate.mjs` recognises a superseding clear by that phrase and then requires the comment to
   carry a session URL (#191) — which every comment carries anyway (#199).

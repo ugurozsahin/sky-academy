@@ -88,9 +88,9 @@ your first finding and the only one you can report.
    scratch against the current head and give its own verdict. The issue you file names that rule and points at
    the `review-pr` skill (`.claude/skills/review-pr/SKILL.md` §6) — a run reading "stalled, 9 hours" does not
    know it is allowed to act, which is how ugurozsahin/sky-academy-private-archive#150 sat drafted and red
-   through an owner approval until a session broke it by hand. Reviews now come from the event-triggered
-   reviewer routine (`docs/REVIEWER-PROMPT.md`), not from the development routine, so a pile of ready,
-   unreviewed pull requests means that routine is not firing — say that in the finding.
+   through an owner approval until a session broke it by hand. Reviews now come from the hourly reviewer
+   routine (`docs/REVIEWER-PROMPT.md`), not from the development routine, so a pile of ready, unreviewed
+   pull requests means that routine is not running — say that in the finding.
 5. **Is the priority order being followed?** The 2026-09-06 code-health freeze **ended on 2026-09-10**, and its end
    is a one-time event, not a condition that can re-arm: a `review` or `debt` issue filed after that date does
    not re-freeze anything, the `frozen` label is retired, and code health now queues with features by priority

@@ -126,8 +126,7 @@ Open as **draft**. Undraft only once the **newest** CI run on the current head i
 `main` moved is evidence about a tree that no longer exists, and it sits on the same head SHA as a fresh one,
 so "green on the head" does not distinguish them. That is the #150 criterion, and both sibling documents spell
 it the same way (`docs/REVIEWER-PROMPT.md` STEP 2, `.claude/skills/review-pr/SKILL.md` §5). **Marking it "Ready
-for review" is what starts the reviewer routine** — it runs on GitHub events, not a schedule
-(`docs/decisions/003-two-routines.md`).
+for review" puts it in the reviewer routine's next hourly run** (`docs/decisions/003-two-routines.md`).
 
 **And your green is not the handover evidence.** Undrafting fires a run of its own — `ci.yml` carries
 `ready_for_review` (#159) — so by construction the run you checked is never the newest one on that head by the
@@ -143,11 +142,10 @@ If a reviewer later asks for changes, push the fix and say what changed — in a
 review it answers (#200): open `Pushed <sha>, addressing <what>`, resolve each blocking finding by the
 reviewer's own numbering so it is easy to match them up, state the tests you ran, and close `Ready for
 re-review`, never `REVIEW: CLEARED` — that mark stays the reviewer's, whatever you just fixed. End with your
-session URL (#199), the same as everything else you post here. Then **add the label `re-review`** to the pull
-request: a blocked pull request is a draft, a push to a draft starts no reviewer run, and the label is what
-does. **Pushing a fix does not clear a review, and
-you never undraft to get past one** — not even your own block on someone else's work. The reviewer who set it
-lifts it, or a later reviewer run's fresh review does (`review-pr` skill §6).
+session URL (#199), the same as everything else you post here. The reviewer routine's next run
+sees the fix: it looks at blocked pull requests with a commit newer than the block. **Pushing a fix does not
+clear a review, and you never undraft to get past one** — not even your own block on someone else's work.
+The reviewer who set it lifts it, or a later reviewer run's fresh review does (`review-pr` skill §6).
 
 ## 6. Governance pull requests say which way they move the constraint
 

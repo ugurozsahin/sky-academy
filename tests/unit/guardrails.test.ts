@@ -2112,14 +2112,14 @@ describe('a run fixes a stalled block before it starts new work, oldest first (#
     'with no new commit and no new comment on it',
     'in the last 30 minutes (a debounce, in case someone is fixing it right now). If one exists, push a',
     'fix addressing the review\'s findings and comment `Pushed <sha>, addressing <what>` (#199/#200\'s',
-    'content floor), then **add the label `re-review`** to the pull request: that is what starts a',
-    'reviewer run, because a blocked PR is a draft and a push to a draft starts nothing. Never post',
+    'content floor). The reviewer routine\'s next run sees the fix: it looks at blocked pull',
+    'requests with a commit newer than the block. Never post',
     '`REVIEW: CLEARED` yourself and never undraft it — clearing needs a reviewer run\'s fresh review',
     '(`docs/REVIEWER-PROMPT.md` rule 3).',
   ].join(' ');
   // 2026-09-19 (docs/decisions/003-two-routines.md): "one you did not set in your own review pass this run"
-  // went — a developer run has no review pass — and the `re-review` label came in, since nothing else starts
-  // the event-triggered reviewer on a drafted pull request.
+  // went — a developer run has no review pass — and the paragraph now says how the fix is seen: the hourly
+  // reviewer run counts a blocked pull request with a commit newer than its block as waiting.
 
   it('docs/ROUTINE-PROMPT.md carries the stalled-block rule in its canonical form', () => {
     const text = read('docs/ROUTINE-PROMPT.md');
@@ -3684,8 +3684,8 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
   const CLAUDE_MD_BUDGET = 9_890;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003)
-  const ROUTINE_PROMPT_BUDGET = 23_158;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,158: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003)
-  const REVIEWER_PROMPT_BUDGET = 9_575;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both
+  const ROUTINE_PROMPT_BUDGET = 23_155;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003)
+  const REVIEWER_PROMPT_BUDGET = 10_072;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -3715,19 +3715,22 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
  * Until then one scheduled run reviewed other runs' pull requests and then developed its own item, and "no
  * session reviews its own change" was a sentence each run had to remember. The split makes it structural: the
  * developer routine (`docs/ROUTINE-PROMPT.md`, hourly) never reviews or merges, and the reviewer routine
- * (`docs/REVIEWER-PROMPT.md`, started by GitHub events) never develops. Four ways that decays, a rail each:
+ * (`docs/REVIEWER-PROMPT.md`, hourly too, forty minutes later) never develops. Four ways that decays, a rail each:
  *
  *  1. a review step drifts back into the developer prompt, and a run is both author and judge again;
  *  2. a develop step drifts into the reviewer prompt — the same failure from the other side — or the
  *     reviewer loses the sentence that keeps a session off a pull request it opened or pushed to;
- *  3. the review-queue alarm goes. GitHub events are dropped beyond an hourly cap and an event-triggered
- *     routine cannot notice that it never fired, so the scheduled developer run is the only thing that can;
- *  4. the `re-review` label goes from any of its three places. A blocked pull request is a draft, a push to a
- *     draft starts no reviewer run, and nobody but a reviewer may undraft it: without the label a fixed pull
- *     request stays blocked for ever.
+ *  3. the review-queue alarm goes. A reviewer routine that has stopped running cannot report that it has, so
+ *     the developer run is the only thing that can;
+ *  4. the reviewer's schedule decays: it loses its cron, the cheap exit moves behind `npm ci` (24 empty runs a
+ *     day each pay for an install), or the definition of waiting loses the half that brings a fixed, blocked
+ *     pull request back — a draft nobody may undraft, which would then stay blocked for ever. And the
+ *     `re-review` label, the event-triggered design's answer to that, must not creep back: starting the
+ *     reviewer from GitHub events was considered and dropped (the decision record says why).
  *
  * Prove it red: paste "STEP 2 — REVIEW" into the developer prompt; add a STEP 3 to the reviewer prompt; delete
- * "push notification" from STEP 1; or drop `re-review` from the open-pr skill.
+ * "push notification" from STEP 1; move `npm ci` ahead of "nothing to review"; or write the label back into
+ * the open-pr skill.
  */
 describe('one routine develops, another reviews (docs/decisions/003)', () => {
   const root = new URL('../../', import.meta.url);
@@ -3766,8 +3769,6 @@ describe('one routine develops, another reviews (docs/decisions/003)', () => {
     expect(text, 'it must say it never develops').toMatch(/never develops/);
     expect(text, 'the one condition the owner set on #161: no session reviews its own change')
       .toContain('never reviews a pull request this session opened or pushed a commit to');
-    expect(text, 'and it is started by events, which is why the developer run carries the queue alarm')
-      .toMatch(/GitHub events, not a schedule/);
   });
 
   it('the developer run counts the review queue, and raises the alarm when nobody is reviewing', () => {
@@ -3777,7 +3778,8 @@ describe('one routine develops, another reviews (docs/decisions/003)', () => {
     expect(step1, 'the check must be named').toContain('**the review queue**');
     expect(step1, 'what "waiting" means: the 2-hour floor…').toContain('for more than 2 hours');
     expect(step1, '…a ready pull request nobody has reviewed…').toContain('not a draft and has no `REVIEW:` comment');
-    expect(step1, '…or one a fix was pushed to').toContain('labelled `re-review`');
+    expect(step1, '…or a blocked one a fix was pushed to').toContain('blocked, with a fix pushed since the block');
+    expect(step1, 'and it must say where reviews do come from').toContain('hourly reviewer routine (`docs/REVIEWER-PROMPT.md`)');
     expect(step1, 'the threshold').toContain('**more than three**');
     expect(step1, 'the alarm reaches the owner, not just the snapshot').toContain('push notification');
     expect(step1, 'a session that cannot send one must say so — a silent skip reads as "no alarm"')
@@ -3786,19 +3788,37 @@ describe('one routine develops, another reviews (docs/decisions/003)', () => {
     expect(raw, 'and the STEP 5 example snapshot must show the line, with the value observed').toMatch(/^- review queue: \d+ waiting/m);
   });
 
-  it('the `re-review` label is in all three places that make a fixed, blocked pull request reviewable again', () => {
-    const dev = read(DEV);
-    const step25 = flat(dev.slice(dev.indexOf('STEP 2.5 —'), dev.indexOf('STEP 3 — DEVELOP')));
-    expect(step25.length, 'STEP 2.5 must be found by its heading').toBeGreaterThan(200);
-    expect(step25, 'the run that pushes the fix adds the label — a push to a draft starts nothing').toContain('add the label `re-review`');
-    const rev = flat(read(REV));
-    expect(rev, 'the reviewer routine is started by the label').toContain('given the label `re-review`');
-    expect(rev, 'and takes it off on pick-up, so it always means "nobody has picked this up yet"')
-      .toMatch(/labelled `re-review`, remove that label when you begin/);
-    const openPr = flat(read('.claude/skills/open-pr/SKILL.md'));
-    expect(openPr, 'an author who fixes their own blocked pull request adds it too').toContain('add the label `re-review`');
-    expect(flat(read('.claude/skills/review-pr/SKILL.md')), 'and the review-pr skill tells the reviewer to remove it')
-      .toMatch(/`re-review` label is removed by the reviewer who picks the pull request up/);
+  it('the reviewer run is scheduled, exits cheaply when nothing is waiting, and defines waiting in both halves', () => {
+    const raw = read(REV);
+    expect(raw, 'the cadence is read from the cron — without it nobody can tell a late run from a dead routine')
+      .toContain('**Cadence: hourly** — the trigger\'s cron is `17 * * * *`');
+    const step1 = flat(raw.slice(raw.indexOf('STEP 1 —'), raw.indexOf('STEP 2 —')));
+    expect(step1.length, 'STEP 1 must be found by its heading').toBeGreaterThan(200);
+    const exit = step1.indexOf('nothing to review'), install = step1.indexOf('`npm ci`');
+    expect(exit, 'STEP 1 must carry the cheap exit').toBeGreaterThan(-1);
+    expect(install, 'and the install').toBeGreaterThan(-1);
+    expect(exit, 'the exit comes BEFORE the install — an empty run costs one API call, 24 times a day').toBeLessThan(install);
+    expect(step1, 'the listing call the exit is decided on').toMatch(/pulls\?state=open/);
+    expect(step1, 'waiting (a): ready, with no verdict on its newest commit')
+      .toContain('not a draft and has no `REVIEW:` verdict newer than its newest commit');
+    expect(step1, 'waiting (b): blocked, with a fix pushed since — the only way a draft nobody may undraft is seen again')
+      .toMatch(/a draft carrying a `REVIEW: CHANGES REQUESTED` comment — and has a commit, or a `Pushed <sha>, addressing …` comment, newer than that block/);
+    expect(step1, 'and never its own').toContain('A pull request this session opened or pushed to is never yours');
+    expect(flat(raw.slice(raw.indexOf('STEP 2 —'))), 'STEP 2 reviews what STEP 1 found waiting, all of it')
+      .toContain('Review every pull request that is waiting');
+  });
+
+  // The label was the event-triggered design's way of starting a reviewer on a drafted pull request. With a
+  // schedule it is a step nobody needs and a label nobody removes. `docs/decisions/` is deliberately not
+  // scanned: the record says what was considered and dropped. The pattern is the backticked label, so the
+  // fix-push comment's closing words, `Ready for re-review` (#200), are not a hit.
+  it.each([DEV, REV, 'CLAUDE.md', 'BACKLOG.md', 'docs/WATCHDOG-PROMPT.md', '.claude/skills/open-pr/SKILL.md',
+           '.claude/skills/review-pr/SKILL.md'])('%s does not mention the dropped `re-review` label, or an event-triggered reviewer', (name) => {
+    const text = flat(read(name));
+    expect(text.length, `${name} must be read from disk as text, or this rail checks nothing`).toBeGreaterThan(300);
+    expect(text, `${name} still hands out the dropped label`).not.toMatch(/`re-review`|re-review label|label(led)? re-review/i);
+    expect(text, `${name} still describes a reviewer started by GitHub events — it is scheduled hourly`)
+      .not.toMatch(/event-triggered|GitHub events?\b/i);
   });
 });
 
