@@ -913,3 +913,34 @@ describe('bubbles collide in the running arena, not just in the pure function (#
     }
   });
 });
+
+// #16 review (PR #295): `pointerup`/`pointercancel` are window listeners, so with two arenas on one page every
+// finger lift reached both, and `onUp` ignored `pointerId` — Player 2's tap flipped Player 1's `pointerDown`
+// off mid-swipe and the rest of that stroke hit nothing. A lift by another pointer must leave a stroke alone.
+describe('a pointer that did not go down on this canvas cannot end its stroke (#16)', () => {
+  function frozenWave(s: Sim) {
+    s.spawn({ labels: ['1', '2', '3', '4'], speed: 1 });
+    advanceUntil(s, () => s.live().length === 4, 'the wave never fully launched');
+    for (const b of s.arena.bubbles) { b.vx = 0; b.vy = 0; b.g = 0; b.y = s.arena.H * 0.5; }   // hold still so a swipe can cross a known spot
+    s.frame();
+    return s.live();
+  }
+  it('another pointer\'s lift leaves the stroke alive: the swipe still slices', () => {
+    sim = createSim({ seed: 7 });
+    const [b] = frozenWave(sim);
+    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 1 });      // Player 1 starts a swipe in an empty corner
+    sim.pointer('pointerup', { x: 300, y: 300, pointerId: 2 });     // Player 2 taps and lifts in the other arena
+    sim.pointer('pointermove', { x: b.x - b.r - 20, y: b.y, pointerId: 1 });
+    sim.pointer('pointermove', { x: b.x + b.r + 20, y: b.y, pointerId: 1 });   // the segment crosses the bubble
+    expect(sim.take('hits'), 'the swipe crossed a bubble after the foreign lift').toEqual([{ label: b.label, viaSwipe: true }]);
+  });
+  it('the same pointer\'s lift still ends it: nothing is sliced afterwards', () => {
+    sim = createSim({ seed: 7 });
+    const [b] = frozenWave(sim);
+    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 1 });
+    sim.pointer('pointerup', { x: 5, y: 5, pointerId: 1 });
+    sim.pointer('pointermove', { x: b.x - b.r - 20, y: b.y, pointerId: 1 });
+    sim.pointer('pointermove', { x: b.x + b.r + 20, y: b.y, pointerId: 1 });
+    expect(sim.take('hits')).toEqual([]);
+  });
+});

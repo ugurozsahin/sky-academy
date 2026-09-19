@@ -56,6 +56,7 @@ export class Arena {
   shots: Shot[] = []; shotsThrown = 0;                          // projectiles in flight / thrown so far (the e2e reads the count)
   private trail: { x: number; y: number; t: number }[] = [];
   private pointerDown = false; private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
+  private activeId: number | null = null;         // the pointer that is down on THIS canvas (#16: two arenas share one window)
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
@@ -215,7 +216,7 @@ export class Arena {
   private pos(e: PointerEvent) { const r = this.canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   private onDown = (e: PointerEvent) => {
     if (this.paused || this.frozen) return;
-    this.pointerDown = true; this.moved = 0; this.downPos = this.pos(e); this.lastPt = this.downPos;
+    this.pointerDown = true; this.activeId = e.pointerId; this.moved = 0; this.downPos = this.pos(e); this.lastPt = this.downPos;
     this.trail = [{ ...this.downPos, t: performance.now() }];
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     const b = this.bubbleAt(this.downPos.x, this.downPos.y);
@@ -234,7 +235,13 @@ export class Arena {
     if (++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);
     for (const b of this.bubbles) { if (this.frozen) break; if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true); }
   };
-  private onUp = () => { this.pointerDown = false; };
+  // `pointerup`/`pointercancel` arrive on the window, so every arena on the page hears every finger lift. Only
+  // the pointer that went down on this canvas may end its stroke: in Ninja Duel (#16) two arenas share the
+  // window, and Player 2's tap used to cut Player 1's swipe mid-stroke. Single player has one finger, one id.
+  private onUp = (e: PointerEvent) => {
+    if (this.activeId !== null && e.pointerId !== this.activeId) return;
+    this.pointerDown = false; this.activeId = null;
+  };
   private bubbleAt(x: number, y: number) {
     let best: Bubble | null = null, bd = Infinity;
     for (const b of this.bubbles) { if (!b.launched || b.hit || b.dead) continue; const d = Math.hypot(b.x - x, b.y - y); if (d < b.r * 1.15 && d < bd) { best = b; bd = d; } }

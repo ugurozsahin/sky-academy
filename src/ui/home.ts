@@ -115,7 +115,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => nav.memory(year) },
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
       title: 'Ninja Duel', blurb: 'Two players · first slice wins',
-      go: () => { say('Ninja Duel! Hand the top half to a friend'); nav.duel(year); } },
+      go: () => nav.duel(year) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
   ];
   render(`
   <section class="screen home island-screen">

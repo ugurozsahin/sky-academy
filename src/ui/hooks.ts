@@ -81,7 +81,7 @@ export interface DuelState {
   mode: 'duel';
   round: number; rounds: number;
   scoreA: number; scoreB: number;
-  /** This round already has a winner (later slices are ignored until the wave clears). */
+  /** This round is settled — won, or drawn once the wave ended — so later slices are ignored until it clears. */
   decided: boolean;
   ended: boolean;
   prompt: string | undefined;

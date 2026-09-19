@@ -50,16 +50,30 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
     await expect(page.locator('.duel-end .speech')).toHaveText('Player 1 wins 6–4!');
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 6, scoreB: 4 });
-    // Islands tears the duel down: the hooks go with it (#73 — no arena may leak across screens).
-    await page.click('.duel-end #home');
+    // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0.
+    await page.click('.duel-end #again');
+    await expect(page.locator('.duel-screen')).toBeVisible();
+    await expect(page.locator('#round')).toHaveText('Round 1 of 10');
+    await expect(page.locator('#score-a')).toHaveText('0');
+    await expect(page.locator('#score-b')).toHaveText('0');
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0 });
+    // Quit from the pause overlay tears the duel down: the hooks go with it (#73 — no arena may leak across screens).
+    await page.click('#pause');
+    await page.click('#quit');
     await expect(page.locator('.island-screen')).toBeVisible();
     expect(await page.evaluate(() => window.__sna === undefined)).toBe(true);
   });
 
-  test('a duel is played on a bubble topic of the island, and the pause overlay holds both arenas', async ({ page }) => {
+  test('a duel is played on a bubble topic of the island, a round nobody slices is a draw, and pause holds both arenas', async ({ page }) => {
     await startDuel(page);
-    const topic = await page.evaluate(() => window.__sna.state().topic);
-    expect(topic.startsWith('y1-')).toBe(true);
+    const topic = await page.evaluate(() => ({ id: window.__sna.state().topic, input: window.__sna.duel.o.topic.input, sequence: window.__sna.duel.current?.sequence }));
+    expect(topic.id.startsWith('y1-')).toBe(true);
+    expect(topic.input).not.toBe('tracing');
+    expect(topic.sequence).toBeUndefined();
+    // Nobody slices round 1: both waves fall, the round is a draw (no point either way) and round 2 follows —
+    // the natural wave-end path and the both-arenas gate, which winning every round never reaches.
+    await page.waitForFunction(() => window.__sna.state().round === 2, undefined, { timeout: 30_000 });
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 2, scoreA: 0, scoreB: 0, decided: false, ended: false });
     await page.click('#pause');
     await expect(page.locator('#resume')).toBeVisible();
     expect(await page.evaluate(() => window.__sna.arenas.a.paused && window.__sna.arenas.b.paused)).toBe(true);

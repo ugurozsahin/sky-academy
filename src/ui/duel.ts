@@ -6,7 +6,7 @@
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena } from '../game/arena';
-import { Duel, duelHeadline, duelPool, type DuelPlayer, type DuelResult } from '../game/duel';
+import { Duel, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
 import { load } from '../storage';
 import { haptic, say, sfx } from '../audio';
@@ -18,15 +18,17 @@ import { renderVisual } from './visuals';
 import { fontReady } from './font';
 import type { DuelHooks } from './hooks';
 
-export interface DuelOpts { year: YearInfo }
-const PLAYERS: DuelPlayer[] = ['a', 'b'];
+export interface DuelScreenOpts { year: YearInfo }
+const PLAYERS = ['a', 'b'] as const;
 const NAME: Record<DuelPlayer, string> = { a: 'Player 1', b: 'Player 2' };
 /** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. */
-const HOLD = { won: 1000, draw: 900 };
+const HOLD = { won: 1000, draw: 900 } as const;
 
-export function duelScreen(o: DuelOpts, goHome: () => void, replay: () => void) {
+export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
-  const pool = duelPool(topicsFor(o.year.id), o.year.diffs[0] ?? 1);
+  const difficulty = o.year.diffs[0] ?? 1;          // the year's gentlest stage, for the pool AND the match
+  const pool = duelPool(topicsFor(o.year.id), difficulty);
+  if (!pool.length) throw new Error(`Ninja Duel: ${o.year.id} has no bubble topic to duel on`);   // before anything is built to leak
   const topic = pool[Math.floor(Math.random() * pool.length)];
   render(`
   <section class="screen play duel-screen" style="--glow:${av.glow}">
@@ -57,7 +59,7 @@ export function duelScreen(o: DuelOpts, goHome: () => void, replay: () => void) 
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
 
-  const duel = new Duel({ topic, difficulty: o.year.diffs[0] ?? 1 }, {
+  const duel = new Duel({ topic, difficulty }, {
     onQuestion(q, info) {
       $('#round').textContent = `Round ${info.round} of ${info.total}`;
       prompt.innerHTML = esc(q.prompt); $('#vis').innerHTML = renderVisual(q.visual);
@@ -67,7 +69,7 @@ export function duelScreen(o: DuelOpts, goHome: () => void, replay: () => void) 
       // #44: the first wave waits for Fredoka (cached after that); #138: a spawn that waited must still be this wave's.
       fontReady().then(() => {
         if (waveId !== myWave || !scope.alive) return;
-        say(q.say ?? q.prompt);
+        say(spokenQuestion(q, info.round));   // round 1 carries the hand-over line in the same utterance
         for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts); }
       });
     },
