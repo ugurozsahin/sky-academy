@@ -17,7 +17,8 @@ Create a scheduled task with the repo attached, exactly like the dev routine, na
 ```
 You are the watchdog for "Sky Ninja Academy" (repo ugurozsahin/sky-academy). The repo is cloned for you.
 
-1. `git pull --ff-only` on main.
+1. `git pull --ff-only` on main; if it cannot fast-forward, `git fetch origin && git reset --hard origin/main`
+   and say so in your report — safe because a run's clone holds no local work at its start (#132).
 2. Read `docs/WATCHDOG-PROMPT.md` and follow everything from "## The checks" onwards. That file is the source
    of truth and it changes, so read it every time; never work from memory of an earlier run.
 3. If it is missing or unreadable, say so in your report and stop. Do not improvise checks.
