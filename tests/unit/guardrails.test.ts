@@ -2524,18 +2524,106 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     }
   });
 
-  it.each([
-    ...Object.keys(SKILLS).map((n) => [`.claude/skills/${n}/SKILL.md`] as const),
-    ...Object.keys(AGENTS).map((n) => [`.claude/agents/${n}.md`] as const),
-  ])('%s has frontmatter with a one-line description', (file) => {
-    const text = read(file);
-    const front = /^---\n([\s\S]*?)\n---\n/.exec(text);
+  /** `SKILL.md` for a skill, `<name>.md` for an agent — the one file whose frontmatter Claude Code reads. */
+  const FRONTMATTER_FILES = [
+    ...Object.keys(SKILLS).map((n) => [n, `.claude/skills/${n}/SKILL.md`] as const),
+    ...Object.keys(AGENTS).map((n) => [n, `.claude/agents/${n}.md`] as const),
+  ];
+  /** The frontmatter block and the `description:` line's value, or `null` for each that is not there. */
+  const frontmatter = (file: string) => {
+    const front = /^---\n([\s\S]*?)\n---\n/.exec(read(file));
+    const description = front && /^description:[ \t]*(\S.*)$/m.exec(front[1]);
+    return { front: front && front[1], description: description && description[1] };
+  };
+
+  it.each(FRONTMATTER_FILES.map(([, file]) => [file] as const))('%s has frontmatter with a one-line description', (file) => {
+    const { front, description } = frontmatter(file);
     expect(front, `${file} must open with YAML frontmatter, or nothing loads it`).not.toBeNull();
-    const description = /^description:[ \t]*(\S.*)$/m.exec(front![1]);
     expect(description, `${file} needs a description — it is the only line that reaches every turn's context`)
       .not.toBeNull();
-    expect(description![1], 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
-    expect(/^name:[ \t]*\S/m.test(front![1]), `${file} needs a name`).toBe(true);
+    expect(description!, 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
+    expect(/^name:[ \t]*\S/m.test(front!), `${file} needs a name`).toBe(true);
+  });
+
+  /**
+   * #150 — the description is the trigger, and nothing held what it said.
+   *
+   * The test above checks that a `description:` line exists. It said nothing about its text, so
+   * `description: Internal notes` on `open-pr` left 1245/1245 green with the file present, every body pin
+   * below satisfied and the skill never loading again — strictly worse than deleting it, which the allow-list
+   * catches at once. The description is the one line that reaches every turn's context, which is exactly why
+   * it is the line under pressure when someone trims context cost.
+   *
+   * Home: this block, not each skill's body rail — it already walks every skill and agent, and a skill with no
+   * body rail (`add-topic`, `design-language`, `qa-screenshot`, every vendored file) needs this just the same.
+   * Every key of `SKILLS` and `AGENTS` must have an entry here, so adding a skill means writing its pin in the
+   * same pull request, where a reviewer can read it. The vendored ones are pinned too: the `@ <sha>` header
+   * above says which upstream text a file claims to be, it does not hold the body byte-for-byte, so an edited
+   * vendored description was as invisible as a project one.
+   *
+   * Each pin is matched against the description's value alone — never the whole file, where the same words
+   * sit in the body of every skill. The project-written six also keep a `Use when` / `Use before` trigger
+   * clause, and their description may not carry a negation: `Use when you are NOT opening a pull request`
+   * keeps every pinned word and inverts the trigger, and a containment pin cannot see that. The negation
+   * detector is self-tested below against that very wording and against every real description.
+   *
+   * What it cannot catch: a containment pin checks that some words are present, not that the sentence still
+   * says when to use the skill. A description rewritten around the pinned words without `not`/`never`/
+   * `unless` — "Use when a pull request is being closed rather than opened" — passes. The body rails below
+   * hold what the skill says once loaded; this holds only that its trigger still names the job.
+   */
+  const DESCRIPTIONS: Record<string, RegExp> = {
+    'add-guard-rail': /Add a guard rail .*Use when .*needs a check that fails the build/,
+    'add-topic': /Add or change a curriculum topic .*Use when asked to add a maths\/writing topic/,
+    'design-language': /visual tokens and UI constraints\. Use before touching CSS or building a new screen/,
+    'frontend-design': /visual design when building new UI or reshaping an existing one/,
+    'open-pr': /Open a pull request .*Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR/,
+    'qa-screenshot': /Bounded visual QA for a Sky Ninja Academy pull request\. Use when reviewing or verifying a player-visible change/,
+    'review-pr': /Review and QA another agent's pull request .*Use when acting as the reviewer for an open PR .*block it with REVIEW: CHANGES REQUESTED/,
+    'verification-before-completion': /Use when about to claim work is complete, fixed, or passing, before committing or creating PRs/,
+    'using-git-worktrees': /Use when starting feature work that needs isolation/,
+    'systematic-debugging': /Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes/,
+    'test-driven-development': /Use when implementing any feature or bugfix, before writing implementation code/,
+    'pr-test-analyzer': /Use this agent when you need to review a pull request for test coverage quality and completeness/,
+    'silent-failure-hunter': /Use this agent when reviewing code changes in a pull request to identify silent failures/,
+    'type-design-analyzer': /Use this agent when you need expert analysis of type design/,
+  };
+  const PROJECT_SKILLS = Object.entries(SKILLS).filter(([, v]) => !v).map(([n]) => n);
+  const TRIGGER_CLAUSE = /\bUse (when|before)\b/;
+  const NEGATED = /\b(not|never|unless|except|don't|doesn't|isn't|aren't)\b/i;
+
+  it('every skill and agent in the allow-list has a description pin, and nothing else does (#150)', () => {
+    expect(Object.keys(DESCRIPTIONS).sort(), 'add the pin in the same pull request as the skill')
+      .toEqual(FRONTMATTER_FILES.map(([n]) => n).sort());
+    expect(PROJECT_SKILLS, 'the project-written set the negation check reads — it must include the two body-railed skills')
+      .toEqual(expect.arrayContaining(['open-pr', 'add-guard-rail']));
+  });
+
+  it.each(FRONTMATTER_FILES)('%s\'s description still names the job it triggers on (#150)', (name, file) => {
+    const { description } = frontmatter(file);
+    expect(description, `${file} has no description line to pin`).not.toBeNull();
+    expect(description!, `${file}: the description no longer says what the skill is for — rewritten, the skill stops loading for the run that needs it (#150)`)
+      .toMatch(DESCRIPTIONS[name]);
+  });
+
+  it.each(PROJECT_SKILLS.map((n) => [n, `.claude/skills/${n}/SKILL.md`] as const))(
+    '%s\'s description keeps its trigger clause and does not negate it (#150)', (_name, file) => {
+      const { description } = frontmatter(file);
+      expect(description!, `${file}: a project skill's description says when to use it — "Use when …" or "Use before …"`)
+        .toMatch(TRIGGER_CLAUSE);
+      expect(description!, `${file}: a negation in the description inverts the trigger while keeping every pinned word (#150)`)
+        .not.toMatch(NEGATED);
+    });
+
+  it('the negation detector fires on the inverted trigger and stays quiet on every real description (#150)', () => {
+    expect(NEGATED.test('Open a pull request in Sky Ninja Academy. Use when you are NOT opening a pull request.')).toBe(true);
+    expect(NEGATED.test('Use this skill unless a pull request is open.')).toBe(true);
+    expect(NEGATED.test("Use when a review doesn't need a block.")).toBe(true);
+    for (const [, file] of FRONTMATTER_FILES.filter(([n]) => PROJECT_SKILLS.includes(n))) {
+      expect(NEGATED.test(frontmatter(file).description!), `${file}'s real description trips the negation detector — refine the pattern, not the prose`).toBe(false);
+    }
+    // "without" is a preposition, not an inverted trigger: `design-language` says "without opening every file".
+    expect(NEGATED.test('Use before touching CSS, to keep the look consistent without opening every existing file.')).toBe(false);
   });
 
   it.each([
