@@ -2,6 +2,7 @@
 import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type DojoState } from './game/dojo';
 import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
 import { TOPICS, YEARS, type YearId } from './curriculum';
+import { AVATARS, VILLAIN } from './avatars';
 export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }   // hits/tries = lifetime slices (missions + Sensei training)
 /**
  * One earned certificate, kept as **data rather than a PNG** (#205): `certFromStored()` in `ui/certificate.ts`
@@ -268,7 +269,11 @@ export function recordMemory(year: string): number {
  * a four- or five-year-old needs a visible result in the first session or two. The other eight unlock from
  * achievements instead of more coins, because coins are a pure volume metric: a child could replay one easy
  * topic and empty the album without ever touching a second topic, a boss, or a harder year. */
-export const STICKER_IDS = ['volt', 'blaze', 'splash', 'terra', 'gust', 'frost', 'sol', 'shadow', 'kai', 'bolt', 'hammer'];
+// Derived from the roster (#113), not a hand-maintained parallel list: a roster rename or reorder used to
+// need editing this array too, and nothing caught it if you forgot — the villain always resolves as the
+// fallback for any id that has drifted out of step, so a forgotten edit here rendered a child's earned
+// sticker as Hammer Man under "New sticker!" instead of failing loudly.
+export const STICKER_IDS = [...AVATARS.map(a => a.id), VILLAIN.id];
 export const STICKER_COST = [30, 70, 120];
 export function stickersFor(coins: number): string[] {
   return STICKER_IDS.slice(0, STICKER_COST.length).filter((_, i) => coins >= STICKER_COST[i]);

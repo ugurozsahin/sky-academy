@@ -62,6 +62,19 @@ export const ALL_AVATARS: Avatar[] = [...AVATARS, MASTER];
 export function avatarById(id: string | null | undefined): Avatar {
   return ALL_AVATARS.find(a => a.id === id) ?? AVATARS[0];
 }
+
+/**
+ * True when `name` and `element` would read as saying the same word twice on a card (#112/#113) — compared
+ * word by word, with prefix matching (so `Sol` still catches `Solar Ninja`) in *either* direction (so
+ * `Bolt the Robot` next to `Robot` also collides). Word-by-word rather than a whole-string substring check,
+ * so a short given name embedded mid-word — `Rin` inside `Spring Ninja`, `Ai` inside `Rain Ninja` — does not
+ * falsely collide: neither is a whole word of the other side.
+ */
+export function nameElementCollide(name: string, element: string): boolean {
+  const nameWords = name.toLowerCase().split(/\s+/);
+  const elementWords = element.toLowerCase().split(/\s+/);
+  return nameWords.some(nw => elementWords.some(ew => ew.startsWith(nw) || nw.startsWith(ew)));
+}
 export function senseiLine(won: boolean, childName: string, rnd = Math.random): string {
   const pool = won ? SENSEI_LINES.trained : SENSEI_LINES.tryAgain;
   return pool[Math.floor(rnd() * pool.length)].replace('{name}', childName || 'Ninja');
