@@ -82,15 +82,12 @@ your first finding and the only one you can report.
    any whose head carries **no** `review-gate` status — that head has not been judged, and a missing status
    must never be read as a pass. Note separately any PR that is a draft or carries an unanswered
    `REVIEW: CHANGES REQUESTED`, and how long it has sat: a block nobody returns to is a stalled review, not a
-   safe state. **Since #161 such a block is adoptable, so say so rather than only reporting that it is stuck:**
-   another agent may clear it once the block is at least 4 hours old, the session that set it has posted no
-   comment on that same pull request in the last 2 hours (a comment elsewhere in the repository does not
-   protect the block), and that agent has re-derived the objection against the current head. The
-   issue you file names that rule, points at `docs/ROUTINE-PROMPT.md` STEP 2 for the two mechanical checks, and
-   says which of them already hold — a run reading "stalled, 9 hours" does not know it is allowed to act, which
-   is how ugurozsahin/sky-academy-private-archive#150 sat drafted and red through an owner approval until a session broke it by hand. One exception
-   worth stating in the issue when it applies: a blocking comment carrying **no** session URL cannot be adopted
-   at all, because the setter's silence cannot be checked, so that one needs the owner rather than the next run.
+   safe state. **Since #161 such a block can be superseded, so say so rather than only reporting that it is
+   stuck:** a later run that neither opened the pull request nor pushed a commit to it may review it from
+   scratch against the current head and give its own verdict. The issue you file names that rule and points at
+   the `review-pr` skill (`.claude/skills/review-pr/SKILL.md` §6) — a run reading "stalled, 9 hours" does not
+   know it is allowed to act, which is how ugurozsahin/sky-academy-private-archive#150 sat drafted and red
+   through an owner approval until a session broke it by hand.
 5. **Is the priority order being followed?** The 2026-09-06 code-health freeze **ended on 2026-09-10**, and its end
    is a one-time event, not a condition that can re-arm: a `review` or `debt` issue filed after that date does
    not re-freeze anything, the `frozen` label is retired, and code health now queues with features by priority

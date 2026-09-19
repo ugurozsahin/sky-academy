@@ -1,7 +1,4 @@
-import { execFileSync } from 'node:child_process';
 import { deny, isMain, readInput } from './io.mjs';
-import { isAdoptionClear } from '../../scripts/review-gate.mjs';
-import { canAdoptNow } from '../../scripts/adoption-check.mjs';
 
 /**
  * Layer-0 guard for the MCP GitHub tools that post an authored body or labels (#101). Each check returns a
@@ -9,7 +6,6 @@ import { canAdoptNow } from '../../scripts/adoption-check.mjs';
  */
 
 const ROUTINE_HEARTBEAT = 62;
-const REPO = 'ugurozsahin/sky-academy';
 
 // A body that OPENS with an owner marker, the same shape `scripts/review-gate.mjs` reads as a verdict:
 // APPROVED strictly, REJECTED with emphasis and case forgiven. Characters GitHub renders as nothing are
@@ -42,38 +38,8 @@ export const frozenLabel = ({ labels }) => Array.isArray(labels) && labels.inclu
   ? 'The frozen label is retired (.claude/rules/governance.md, #101 layer 0): the freeze the owner lifted on 2026-09-10 does not re-arm, and no run applies this label to reinstate it.'
   : null;
 
-/**
- * #161 CANON's two mechanical conditions, checked against the pull request's live comments before an
- * adoption clear is posted. Unlike every check above this one fails CLOSED: if the block's age and its
- * setter's silence cannot be verified, a stale block must not clear on nobody's say-so.
- */
-export const canon = (input, env = process.env) => {
-  const prefix = "REVIEW: CLEARED claims to adopt another reviewer's block (CANON, .claude/rules/governance.md, #101 layer 0): ";
-  try {
-    if (!isAdoptionClear(input.body ?? '')) return null;
-    const issue = input.issue_number || input.pullNumber;
-    if (!issue) return prefix + 'no issue_number or pullNumber on this tool call, cannot tell which pull request is being adopted';
-    const token = env.GITHUB_TOKEN || env.GH_TOKEN;
-    if (!token) return prefix + 'no GITHUB_TOKEN/GH_TOKEN available to verify live pull-request state, failing closed';
-    let out;
-    try {
-      out = execFileSync('curl', ['-sf', '--max-time', '10', '-H', `Authorization: Bearer ${token}`,
-        '-H', 'Accept: application/vnd.github+json',
-        `https://api.github.com/repos/${REPO}/issues/${issue}/comments?per_page=100`], { encoding: 'utf8', env });
-    } catch {
-      return prefix + 'could not read this pull request comments, failing closed';
-    }
-    const comments = JSON.parse(out);
-    if (!Array.isArray(comments)) return prefix + 'unexpected response reading this pull request comments, failing closed';
-    const verdict = canAdoptNow({ comments: comments.map((c) => ({ body: c.body, created_at: c.created_at })), now: new Date() });
-    return verdict.ok ? null : prefix + verdict.reasons.join('; ');
-  } catch (e) {
-    return prefix + `could not verify this before allowing the write (${e?.message ?? e}), failing closed`;
-  }
-};
-
-export const check = (input, env = process.env) =>
-  ownerMarker(input) ?? secondItem(input) ?? frozenLabel(input) ?? heartbeatAppend(input) ?? canon(input, env);
+export const check = (input) =>
+  ownerMarker(input) ?? secondItem(input) ?? frozenLabel(input) ?? heartbeatAppend(input);
 
 if (isMain(import.meta.url)) {
   const reason = check(await readInput());
