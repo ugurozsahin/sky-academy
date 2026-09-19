@@ -84,3 +84,6 @@ paths:
   the board's Blocked column, #87); `new-ui` (gates the `frontend-design` skill, #99); `watchdog` (opened by
   the watchdog); and the area labels `mode`, `curriculum`, `art`, `reward`, `platform`, `playtest`, `review`,
   `perf`, `debt`, `tests`, `guard-rail`, `accessibility`.
+  **Default priority when filing (owner, 2026-09-19):** work a player would notice is `priority:P2`; a finding
+  about a rail, a test or a prompt is `priority:P3`. Hardening findings arrive daily, and at the same priority
+  as the game they queue ahead of whatever game issue is filed after them.

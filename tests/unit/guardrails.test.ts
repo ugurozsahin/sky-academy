@@ -2053,7 +2053,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * piece of #97 real enough to collapse, the same bar #191 cleared — the four *eligibility* conditions
    * themselves (is a review waiting, is there time left, are the files disjoint, did the first item finish)
    * have no such enforcement, so they stay copied in `CLAUDE.md` and
-   * `docs/ROUTINE-PROMPT.md` (checked by the `it.each(FILES)` rails above, in the #177 describe block) — this
+   * `docs/ROUTINE-PROMPT.md` (checked by the rails in the #177 describe block) — this
    * rail only covers the recording-obligation sentence, not the whole rule.
    *
    * Unlike #191 (a single sentence with nothing else depending on its exact words), the "carries a
@@ -3231,12 +3231,12 @@ describe('the add-guard-rail skill keeps the rules that were paid for (#180)', (
  * issues: they must be reviewable, mergeable and blockable independently, and #139 is what a single body
  * carrying two issue references does on its own.
  *
- * The two files each speak to a different reader — CLAUDE.md to an interactive session,
- * docs/ROUTINE-PROMPT.md to the routine itself (`BACKLOG.md` was the third until it retired, #218) — and
- * they change together, the same way they do for the freeze lift and the record-routing rule.
+ * One home since #145 (docs/decisions/001): `docs/ROUTINE-PROMPT.md` STEP 3 carries the rule, because only a
+ * developer run applies it, and `CLAUDE.md` carries one sentence that points there. Until then both files held
+ * the four conditions, and `BACKLOG.md` a third copy until it retired (#218).
  *
- * Prove it red: drop the rule from one file, reword condition 1 as "no open pull requests", or turn it into a
- * quota.
+ * Prove it red: drop a condition from the prompt, reword condition 1 as "no open pull requests", turn it into a
+ * quota, drop either half of condition 4, or copy the conditions back into `CLAUDE.md`.
  *
  * 2026-09-19 (docs/decisions/003-two-routines.md): a developer run no longer reviews, so "nothing to review
  * this run could do" stopped meaning anything. Condition 1 is now "at most three pull requests are waiting
@@ -3252,11 +3252,12 @@ describe('a developer run may take a second item — the rule, in its home (#177
   const flat = (s: string) =>
     s.replace(/[*_`]/g, '').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ');
   const doc = (name: string) => flat(readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8'));
-  // One home (docs/decisions/001, #145): the developer prompt carries the rule, `CLAUDE.md` points at it.
-  const FILES = ['docs/ROUTINE-PROMPT.md'];
+  // One home (docs/decisions/001, #145): the developer prompt carries the rule, `CLAUDE.md` points at it. Plain
+  // `it`s on purpose (#291): `it.each([])` runs nothing and stays green, so a list here is one edit from no rail.
+  const HOME = 'docs/ROUTINE-PROMPT.md';
 
-  it.each(FILES)('%s carries the rule, and its four conditions', (name) => {
-    const text = doc(name);
+  it('the developer prompt carries the rule, and its four conditions', () => {
+    const text = doc(HOME);
     expect(text.length, 'a vacuous rail is worse than none').toBeGreaterThan(500);
     expect(text, 'the file must state the permission itself')
       .toMatch(/a developer run may take a second item/i);
@@ -3272,17 +3273,19 @@ describe('a developer run may take a second item — the rule, in its home (#177
       .toMatch(/from the start of the run/i);
     expect(text, 'condition 3 — the second item cannot touch the first item’s files')
       .toMatch(/disjoint/i);
-    expect(text, 'condition 4 — a WIP `Part of #<n>` push is not a finished first item')
+    expect(text, 'condition 4 — it must still name the words a run is tempted to read as the test')
       .toMatch(/Part of #<n>/);
     // #145: two consecutive runs read condition 4 two ways. The owner chose: the bar is unfinished work, so a
     // complete part of a larger issue passes even though its pull request says `Part of`.
     expect(text, 'condition 4 is about unfinished work, not about the words Part of (#145)')
       .toMatch(/The bar is unfinished work, not the words Part of #<n> \(#145\)/);
-    expect(text).toMatch(/a complete, reviewable part of a larger issue passes/);
+    expect(text, 'the permissive half: a finished part passes').toMatch(/a complete, reviewable part of a larger issue passes/);
+    expect(text, 'the restrictive half: without it the condition lets anything through (#291)')
+      .toMatch(/a push you left as WIP does not, and you do not start another/);
   });
 
-  it.each(FILES)('%s keeps it a condition rather than a quota', (name) => {
-    const text = doc(name);
+  it('the developer prompt keeps it a condition rather than a quota', () => {
+    const text = doc(HOME);
     expect(text, 'the self-limiting property is the point, and it has to be stated')
       .toMatch(/condition, not a quota/i);
     // The rewrite that keeps the words and loses the property. #177 rules it out by name.
@@ -3290,21 +3293,38 @@ describe('a developer run may take a second item — the rule, in its home (#177
       .not.toMatch(/two items per run(?!["”])/i);
   });
 
-  it.each(FILES)('%s says condition 1 is not "no open pull requests at all"', (name) => {
-    expect(doc(name), 'the misreading that makes the rule never fire has to be closed off in the text')
+  it('the developer prompt says condition 1 is not "no open pull requests at all"', () => {
+    expect(doc(HOME), 'the misreading that makes the rule never fire has to be closed off in the text')
       .toMatch(/not "no open pull requests at all"/i);
   });
 
-  it.each(FILES)('%s forbids one pull request closing two issues', (name) => {
-    expect(doc(name), 'two items are two pull requests, or one going bad holds the other')
+  it('the developer prompt forbids one pull request closing two issues', () => {
+    expect(doc(HOME), 'two items are two pull requests, or one going bad holds the other')
       .toMatch(/never one pull request closing two issues/i);
   });
 
   it('CLAUDE.md points at the rule\'s home instead of copying it (#145)', () => {
-    const text = doc('CLAUDE.md');
+    const raw = readFileSync(new URL('../../CLAUDE.md', import.meta.url), 'utf8');
+    const text = flat(raw);
     expect(text).toMatch(/A developer run may take a second item \(#97\)/);
-    expect(text, 'the pointer').toMatch(/docs\/ROUTINE-PROMPT\.md STEP 3 is the rule's home/);
+    // The whole bullet, not the file and not a slice of the bullet (#291, review of PR #294): one synonym for
+    // "disjoint", or three of the four conditions copied back, walked past a file-wide check on one word; and a
+    // slice that stopped at the pointer sentence let the same copy sit *after* it. Cut in the raw text, where
+    // a bullet ends at the next `- ` line, a blank line or a heading, and only then flatten.
+    const start = raw.search(/A developer run may take a second item \(#97\)/);
+    expect(start, 'the bullet must be found').toBeGreaterThanOrEqual(0);
+    const rest = raw.slice(start);
+    const end = rest.search(/\n(?=- |\n|#)/);
+    const bullet = flat(end === -1 ? rest : rest.slice(0, end));
+    expect(bullet, 'the pointer sentence sits in this bullet, not another')
+      .toMatch(/docs\/ROUTINE-PROMPT\.md STEP 3 is the rule's home/);
+    expect(bullet.length, `the bullet is ${bullet.length} characters; a pointer stays under 260`).toBeLessThan(260);
+    for (const copied of [/at most three/i, /from the start of the run/i, /disjoint|overlap/i, /Part of #<n>/, /two items per run/i])
+      expect(bullet, `CLAUDE.md copies a condition back: ${copied}`).not.toMatch(copied);
+    // The belt to that brace: the two phrases no other CLAUDE.md line has a use for stay out of the whole file,
+    // so a copy that lands outside any bullet boundary is still red.
     expect(text, 'the four conditions live in one place').not.toMatch(/disjoint/i);
+    expect(text, 'the four conditions live in one place').not.toMatch(/from the start of the run/i);
   });
 
   // Without this line nobody can tell a rule that is never true from a rule nobody applied — and #178 moved
