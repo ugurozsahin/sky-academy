@@ -2598,6 +2598,58 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
 });
 
 /**
+ * A skill file sliced on its `## N.` headings, for the two skill rails below (#180, #148).
+ *
+ * One slicer, not two. The `add-guard-rail` rail copied `open-pr`'s deliberately (its docstring says so) and
+ * the copies then diverged: #258 closed the duplicate-heading hole, captured the heading text and grew the
+ * unnumbered-heading guard in the copy, and `open-pr`'s stayed as it was — the rail this issue found reporting
+ * green about a file whose §6 said the opposite. Two skills' rails now sit behind one piece of code, and that
+ * was weighed: a slicer bug hits both, but each block keeps its own vacuity guard (`keys` must be exactly
+ * `[1..7]`) against its own file, so a slicer that matched nothing fails both loudly rather than passing both
+ * quietly. Divergence, by contrast, fails neither. A third skill rail uses this too, or says why not.
+ *
+ * What it returns, and why each is there:
+ *  - `SECTIONS` — number → `{ flat, raw, heading }`. `flat` is whitespace-normalised (wrapping is prose, not a
+ *    rule); `raw` keeps newlines for a table; `heading` is the title tail, because a rule is reversible in
+ *    title form if the slicer throws the title away.
+ *  - `DUPLICATE_HEADINGS` — every `N` seen twice. `Map.set` is last-write-wins and the keys are a set, so a
+ *    gutted section followed by a verbatim decoy `## N.` at the end of the file is invisible to the keys
+ *    guard: the reader meets the gutted one, the rail reads the decoy, and the file is *longer*.
+ *  - `ALL_HEADINGS` — every `## ` heading, numbered or not: an `## Appendix` after §7 lands inside §7's slice.
+ *  - `PREAMBLE` — everything above `## 1.`, sliced into no section and so covered by no pin unless one is put
+ *    there. A missing `## 1.` makes `search` answer -1 and `slice(0, -1)` would hand back the whole document,
+ *    turning a scoped pin into whole-file containment; the index is checked rather than trusted.
+ *  - `S(n)` — one section's flat text, or a throw. Throws on a duplicated heading **first**, so a decoy fails
+ *    every pin rather than only the one `it` that checks for it (an `it.only` elsewhere would skip that one);
+ *    then on an absent section; then, separately, on an empty one — `if (!text)` conflated the two, and "no
+ *    section 5" sends the next editor looking for a heading that is there.
+ */
+function sliceSkill(path: string) {
+  const raw = readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+  /** `open-pr/SKILL.md` in a message, not the whole repo path — the same spelling the two rails always used. */
+  const file = path.replace(/^\.claude\/skills\//, '');
+  const flat = (t: string) => t.replace(/\s+/g, ' ').trim();
+  const SECTIONS = new Map<number, { flat: string; raw: string; heading: string }>();
+  const DUPLICATE_HEADINGS: number[] = [];
+  for (const m of raw.matchAll(/^## (\d+)\.([^\n]*)\n([\s\S]*?)(?=^## \d+\.|$(?![\s\S]))/gm)) {
+    const n = Number(m[1]);
+    if (SECTIONS.has(n)) DUPLICATE_HEADINGS.push(n);
+    SECTIONS.set(n, { flat: flat(m[3]), raw: m[3], heading: flat(m[2]) });
+  }
+  const ALL_HEADINGS = [...raw.matchAll(/^## ([^\n]*)/gm)].map((m) => flat(m[1]));
+  const PREAMBLE_END = raw.search(/^## 1\./m);
+  const PREAMBLE = PREAMBLE_END < 0 ? '' : flat(raw.slice(0, PREAMBLE_END));
+  const S = (n: number): string => {
+    if (DUPLICATE_HEADINGS.length) throw new Error(`${file} repeats heading(s) ${DUPLICATE_HEADINGS.join(', ')} — the pinned section may be a decoy`);
+    const s = SECTIONS.get(n);
+    if (!s) throw new Error(`${file} has no section ${n} — the rail cannot hold a section that is not there`);
+    if (!s.flat) throw new Error(`${file} section ${n} is empty — an empty section satisfies every pin that is not a \`toContain\``);
+    return s.flat;
+  };
+  return { raw, flat, SECTIONS, DUPLICATE_HEADINGS, ALL_HEADINGS, PREAMBLE, S };
+}
+
+/**
  * The `open-pr` skill's load-bearing lines (#180).
  *
  * The allow-list above holds that the directory may exist and that a project-written skill declares a
@@ -2637,6 +2689,12 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
  *    own failure message claimed it stopped stubs; it cannot, since a stub can be padded. The per-section
  *    pins are the substance. **Never lower this number to make a build pass** — the same rule CLAUDE.md sets
  *    for budget rails. If prose trimming trips it, the rail is telling you the file lost a section.
+ *  - **A duplicate heading silently replaces a section (#148).** Found and closed on the `add-guard-rail`
+ *    copy of this slicer in #258, and left open here (#147 named it): `Map.set` is last-write-wins and the
+ *    keys guard reads a set, so §6 gutted to a licence with the genuine §6 pasted at the end under a second
+ *    `## 6.` was green on every pin — the bullet-swap one included — with the reader meeting the licence. The
+ *    two rails now share `sliceSkill`, which collects duplicates and makes `S()` throw on them, so a decoy
+ *    fails every pin, not one `it`.
  *
  * What is pinned, per section, and what each cost before it was written down:
  *
@@ -2661,34 +2719,42 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
  * by nature — it forbids one phrasing of one inversion, not the idea. A rewrite that keeps a rule and changes
  * its words will fail; the right answer then is to update the rail in the same commit, never to drop the rule.
  *
- * Prove it red: delete any of the seven sections; invert the rule a section carries; swap the Tightening and
- * Loosening bullets; append the author-field inversion to §5; or replace the body with a stub, padded or not.
- * All of those are red. An honest reflow is green.
+ * Prove it red: delete any of the seven sections; give one a duplicate heading (#148); add an unnumbered one;
+ * invert the rule a section carries; swap the Tightening and Loosening bullets; append the author-field
+ * inversion to §5; or replace the body with a stub, padded or not. All of those are red. An honest reflow is
+ * green.
  */
 describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
-  const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
-  const raw = read('.claude/skills/open-pr/SKILL.md');
-  /** Wrapping is prose, not a rule — see the docstring. Normalise it away before every comparison. */
-  const flat = (t: string) => t.replace(/\s+/g, ' ').trim();
-  /** The body sliced on its `## N.` headings, so a pin cannot be satisfied by text in a different section. */
-  const SECTIONS = new Map<number, string>();
-  for (const m of raw.matchAll(/^## (\d+)\.[^\n]*\n([\s\S]*?)(?=^## \d+\.|$(?![\s\S]))/gm)) {
-    SECTIONS.set(Number(m[1]), flat(m[2]));
-  }
-  /** One numbered section's text. Throws rather than returning '' — an absent section must not read as a pass. */
-  const S = (n: number): string => {
-    const text = SECTIONS.get(n);
-    if (!text) throw new Error(`open-pr/SKILL.md has no section ${n} — the rail cannot hold a section that is not there`);
-    return text;
+  const { raw, SECTIONS, DUPLICATE_HEADINGS, ALL_HEADINGS, S } = sliceSkill('.claude/skills/open-pr/SKILL.md');
+  /**
+   * One `- **Label** …` bullet out of a section, up to the next bullet: which bullet carries a rule is the rule.
+   * Exactly one match or a throw (#148): the first cut returned `''` on a miss, which every call site survived
+   * only because it happened to assert a positive — the next pin written as `.not.toContain` would have been
+   * green against a bullet that is not there. And a *second* bullet under the same label is the decoy pattern
+   * of the duplicate-heading hole one level down, so more than one is not "the first wins" either.
+   */
+  const bullet = (text: string, label: string): string => {
+    const hits = [...text.matchAll(new RegExp(`- \\*\\*${label}\\*\\*(.*?)(?=- \\*\\*|$)`, 'g'))].map((m) => m[1]);
+    if (hits.length !== 1) {
+      throw new Error(`open-pr/SKILL.md must carry exactly one \`- **${label}**\` bullet here, found ${hits.length} — a missing bullet is not '' and a second one is a decoy`);
+    }
+    return hits[0];
   };
-  /** One `- **Label** …` bullet out of a section, up to the next bullet: which bullet carries a rule is the rule. */
-  const bullet = (text: string, label: string): string =>
-    new RegExp(`- \\*\\*${label}\\*\\*(.*?)(?=- \\*\\*|$)`).exec(text)?.[1] ?? '';
 
-  it('slices into the seven sections the pins below address', () => {
+  it('slices into the seven sections the pins below address, each heading exactly once', () => {
     // The slicer's own vacuity guard: a regex that matched nothing would make every assertion below throw for
     // the wrong reason, and a file reorganised into different headings must be a visible failure, not a quiet one.
     expect([...SECTIONS.keys()].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    // And the half the keys cannot show (#148). `set` is last-write-wins, so §6 gutted to "Loosening — reviewed
+    // and merged like any other pull request" with the genuine §6 pasted at the end of the file under a second
+    // `## 6.` satisfied every pin below, the bullet-swap pin included, while the reader met the licence — and
+    // made the file longer, so the floor cleared more comfortably than before. Reproduced on `main` at 76cd44e.
+    expect(DUPLICATE_HEADINGS, 'a second `## N.` heading makes the pinned section a decoy the reader never sees')
+      .toEqual([]);
+    // And no unnumbered heading: an `## Appendix` after §7 is invisible to the keys guard and its text lands
+    // inside §7's slice, so a rule rewritten there is covered by nothing.
+    expect(ALL_HEADINGS.filter((h) => !/^\d+\./.test(h)), 'the file has exactly seven numbered sections and no others')
+      .toEqual([]);
   });
 
   it('is long enough to be the skill rather than a stub', () => {
@@ -2761,9 +2827,8 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
   });
 
   it('§6 keeps the loosening gate on the Loosening bullet, not merely somewhere in the section', () => {
+    // `bullet` throws on a missing or a doubled bullet (#148), so neither needs an assertion of its own here.
     const loosening = bullet(S(6), 'Loosening'), tightening = bullet(S(6), 'Tightening');
-    expect(loosening, '§6 has no Loosening bullet').not.toBe('');
-    expect(tightening, '§6 has no Tightening bullet').not.toBe('');
     // A free-floating regex cannot see which bullet it matched: swapping the two bullets' text left the
     // second cut green while the skill said a loosening may be routine-merged (#249 review).
     expect(loosening, 'a skill that let a run merge its own loosening is a licence nothing checks')
@@ -2786,10 +2851,11 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
  *
  * This is the skill a run loads when it is about to write a rail, so a rule dropped from it is a rule that
  * stops being read at the exact moment it applies — with nothing going red, which is the failure `open-pr`'s
- * rail above was built (twice) to answer. The method is the one that round arrived at, and it is copied
- * deliberately rather than reinvented: **slice the body on its `## N.` headings and assert inside the section
- * that owns the rule**, because every escape found so far was a bare substring satisfied by text somewhere
- * else in the file.
+ * rail above was built (twice) to answer. The method is the one that round arrived at: **slice the body on
+ * its `## N.` headings and assert inside the section that owns the rule**, because every escape found so far
+ * was a bare substring satisfied by text somewhere else in the file. The slicer was copied from `open-pr`'s
+ * rail at first; the two copies diverged (finding 2 below was fixed here and not there), which is #148, and
+ * they now share `sliceSkill` above.
  *
  * What is pinned, per section, and why each is load-bearing rather than merely true:
  *
@@ -2874,40 +2940,9 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
  * body with a stub, padded or not.
  */
 describe('the add-guard-rail skill keeps the rules that were paid for (#180)', () => {
-  const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
-  const raw = read('.claude/skills/add-guard-rail/SKILL.md');
-  /** Wrapping is prose, not a rule (the lesson of #249's second cut). Normalise it away before comparing. */
-  const flat = (t: string) => t.replace(/\s+/g, ' ').trim();
-  /** The body sliced on its `## N.` headings, both flattened and raw — the table in §2 needs its newlines. */
-  const SECTIONS = new Map<number, { flat: string; raw: string; heading: string }>();
-  /** Headings seen twice. `set` is last-write-wins and the keys are a set, so a decoy copy is invisible here. */
-  const DUPLICATE_HEADINGS: number[] = [];
-  for (const m of raw.matchAll(/^## (\d+)\.([^\n]*)\n([\s\S]*?)(?=^## \d+\.|$(?![\s\S]))/gm)) {
-    const n = Number(m[1]);
-    if (SECTIONS.has(n)) DUPLICATE_HEADINGS.push(n);
-    SECTIONS.set(n, { flat: flat(m[3]), raw: m[3], heading: flat(m[2]) });
-  }
-  /** Every `## ` heading in the file, numbered or not: an `## Appendix` after §7 is invisible to the keys guard. */
-  const ALL_HEADINGS = [...raw.matchAll(/^## ([^\n]*)/gm)].map((m) => flat(m[1]));
-  /**
-   * Everything above `## 1.` — sliced into no section, so covered by no pin unless one is put here. A missing
-   * `## 1.` makes `search` answer -1, and `slice(0, -1)` would quietly hand back the whole document, turning a
-   * scoped pin into whole-file containment; the index is checked rather than trusted.
-   */
-  const PREAMBLE_END = raw.search(/^## 1\./m);
-  const PREAMBLE = PREAMBLE_END < 0 ? '' : flat(raw.slice(0, PREAMBLE_END));
-  /**
-   * One section's text. Throws on absent *and* on empty — an empty body satisfies every `toContain`-free pass
-   * — and on a duplicated heading, so a decoy copy fails **every** pin rather than only the one `it` that
-   * checks for it. That separation was the gap: an `it.only` or a `.skip` elsewhere in this block would
-   * otherwise leave all the pins green against a file whose real section had been gutted.
-   */
-  const S = (n: number): string => {
-    if (DUPLICATE_HEADINGS.length) throw new Error(`add-guard-rail/SKILL.md repeats heading(s) ${DUPLICATE_HEADINGS.join(', ')} — the pinned section may be a decoy`);
-    const s = SECTIONS.get(n);
-    if (!s?.flat) throw new Error(`add-guard-rail/SKILL.md has no section ${n} — the rail cannot hold a section that is not there`);
-    return s.flat;
-  };
+  // The slicer, `S()` and the three guards it feeds are `sliceSkill` above (#148) — shared with `open-pr`'s
+  // rail, and the docstring there says why one copy rather than two.
+  const { raw, flat, SECTIONS, DUPLICATE_HEADINGS, ALL_HEADINGS, PREAMBLE, S } = sliceSkill('.claude/skills/add-guard-rail/SKILL.md');
   /**
    * A section's markdown table as trimmed cells per row, the `| --- |` separator dropped — **the header row is
    * kept**, so a pin over the first column carries its label. Dropping it instead would mean deleting the real
