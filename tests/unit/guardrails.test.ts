@@ -225,6 +225,13 @@ describe('guard rails', () => {
     expect(opens.length).toBe(1);
   });
 
+  // #113 (reviewing #112): tests/unit/avatars.test.ts asserts the roster *data* (name vs. element), but
+  // nothing observed the *render* — `${av.element} · ${av.element}` or dropping `· ${av.element}` entirely
+  // both left the full suite green. This is the exact line #112 was originally filed about (the topbar card).
+  it('the topbar card renders the ninja\'s name next to its element, not the element twice (#112/#113)', () => {
+    expect(code(SOURCES['/src/ui/home.ts'])).toContain('${av.name} · ${av.element}');
+  });
+
   // Incident 2026-09-06 (#45): `Topic.mode` ('bubbles'|'tracing') collided with `Session.Mode` (the play
   // mode), and every island menu button carried the class `.storm` — so a screen rule written on a bare
   // modifier like `.memory` could clobber a button (#63). A topic's answer style is now `Topic.input` and the
