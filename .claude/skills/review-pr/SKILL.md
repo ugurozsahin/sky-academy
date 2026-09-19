@@ -4,7 +4,7 @@ description: Review and QA another agent's pull request in Sky Ninja Academy. Us
 ---
 # Review a pull request
 
-`docs/ROUTINE-PROMPT.md` STEP 2 says *when* you review and in what order. This is *how*. The prompt stays the
+`docs/REVIEWER-PROMPT.md` STEP 2 says *when* you review and in what order. This is *how*. The prompt stays the
 authority on the flow; where the two ever disagree, the prompt wins and this file is the bug.
 
 ## Before anything: are you allowed to review this one?
@@ -80,7 +80,7 @@ child, not by the label it arrived with.
 
 ## 5. Four things make a pull request unmergeable
 
-Check all four, every time. `docs/ROUTINE-PROMPT.md` STEP 2 has the full reasoning and the incidents behind
+Check all four, every time. `docs/REVIEWER-PROMPT.md` STEP 2 has the full reasoning and the incidents behind
 each; this is the checklist.
 
 1. **CI is not green on the tree you are about to merge.** Read the **newest** run for the full head SHA; a
@@ -115,7 +115,7 @@ Do **not** fix it yourself in the same run: a session that pushes to a pull requ
 **A block its reviewer leaves unanswered is superseded by a fresh review (#161).** The reviewer who set a
 `REVIEW: CHANGES REQUESTED` block clears it with `REVIEW: CLEARED` and "Ready for review". If they do not, a
 later run that neither opened the pull request nor pushed a commit to it reviews it from scratch against the
-current head, exactly as STEP 2 reviews any pull request, and gives its own verdict: its own
+current head, exactly as `docs/REVIEWER-PROMPT.md` STEP 2 reviews any pull request, and gives its own verdict: its own
 `REVIEW: CHANGES REQUESTED`, or a `REVIEW: CLEARED` comment that opens by saying it is superseding
 another reviewer's block, followed by the merge. No session reviews its own change: you never clear a block
 on a pull request you opened or pushed to, and pushing a fix does not clear one. A block never expires by
@@ -128,6 +128,9 @@ What that means in practice:
   stands, or find a new one, the verdict is your own `REVIEW: CHANGES REQUESTED`.
 - **There is no waiting period and nothing to measure.** Whether the first reviewer has "gone quiet" is not a
   question you have to answer; the only test is that you neither opened the pull request nor pushed to it.
+- **A `re-review` label is removed by the reviewer who picks the pull request up.** Whoever pushed the fix
+  added it, because a push to a draft starts no reviewer run; taking it off as you begin keeps the label
+  meaning "nobody has picked this up yet".
 - **Say "another reviewer's block" in the opening lines of the clearing comment**, in those words.
   `scripts/review-gate.mjs` recognises a superseding clear by that phrase and then requires the comment to
   carry a session URL (#191) — which every comment carries anyway (#199).
@@ -136,6 +139,5 @@ What that means in practice:
 
 ## Reviewing is the work
 
-There is no time box on this. A run that reviews well and develops nothing has done its job; other runs' work
-in flight comes before work of your own not yet started, and a review that missed something costs far more
-than an item not started.
+There is no time box on this. A reviewer run develops nothing and has done its job when it reviews well: a
+review that missed something costs far more than an item not started.

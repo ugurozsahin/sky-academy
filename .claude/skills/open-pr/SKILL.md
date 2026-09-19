@@ -125,7 +125,9 @@ the marker as a formality.
 Open as **draft**. Undraft only once the **newest** CI run on the current head is green — a tick from before
 `main` moved is evidence about a tree that no longer exists, and it sits on the same head SHA as a fresh one,
 so "green on the head" does not distinguish them. That is the #150 criterion, and both sibling documents spell
-it the same way (`docs/ROUTINE-PROMPT.md` STEP 2, `.claude/skills/review-pr/SKILL.md` §5).
+it the same way (`docs/REVIEWER-PROMPT.md` STEP 2, `.claude/skills/review-pr/SKILL.md` §5). **Marking it "Ready
+for review" is what starts the reviewer routine** — it runs on GitHub events, not a schedule
+(`docs/decisions/003-two-routines.md`).
 
 **And your green is not the handover evidence.** Undrafting fires a run of its own — `ci.yml` carries
 `ready_for_review` (#159) — so by construction the run you checked is never the newest one on that head by the
@@ -141,16 +143,18 @@ If a reviewer later asks for changes, push the fix and say what changed — in a
 review it answers (#200): open `Pushed <sha>, addressing <what>`, resolve each blocking finding by the
 reviewer's own numbering so it is easy to match them up, state the tests you ran, and close `Ready for
 re-review`, never `REVIEW: CLEARED` — that mark stays the reviewer's, whatever you just fixed. End with your
-session URL (#199), the same as everything else you post here. **Pushing a fix does not clear a review, and
+session URL (#199), the same as everything else you post here. Then **add the label `re-review`** to the pull
+request: a blocked pull request is a draft, a push to a draft starts no reviewer run, and the label is what
+does. **Pushing a fix does not clear a review, and
 you never undraft to get past one** — not even your own block on someone else's work. The reviewer who set it
-is the one who lifts it.
+lifts it, or a later reviewer run's fresh review does (`review-pr` skill §6).
 
 ## 6. Governance pull requests say which way they move the constraint
 
-A pull request that changes how the routine itself works — `CLAUDE.md`, `BACKLOG.md`,
-`docs/ROUTINE-PROMPT.md`, the workflows, the guard rails — used to be left for the owner as a class, on the
-reasoning that a run should not merge changes to its own rules. Sound instinct, wrong cut: it conflates *an
-author must not land their own work* — true, and already enforced by §5 above — with *a run must not land a
+A pull request that changes how the routines themselves work — `CLAUDE.md`, `BACKLOG.md`,
+`docs/ROUTINE-PROMPT.md`, `docs/REVIEWER-PROMPT.md`, the workflows, the guard rails — used to be left for the
+owner as a class, on the reasoning that a run should not merge changes to its own rules. Sound instinct,
+wrong cut: it conflates *an author must not land their own work* — true, and already enforced by §5 above — with *a run must not land a
 rule change*, which is so broad that PR #96 sat open all day while the thing it fixed was live and unfixed.
 
 So every governance pull request states, in one line near the top, which way it moves the constraint:

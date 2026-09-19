@@ -1404,8 +1404,8 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
   // Live instructions — the files a run or a session actually acts on. `docs/worklog/` is deliberately NOT
   // here: it is the archive, it describes itself in the past tense, and a rail that policed it would be
   // policing history. `tests/` is not here either, for the reason in the block comment above.
-  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md',
-                'README.md', 'scripts/seed-issues.py'];
+  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+                'docs/WATCHDOG-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
   const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
 
   it('WORKLOG.md is gone from the repository root, and the archive is still there', () => {
@@ -1635,7 +1635,8 @@ describe('the first-run wizard shows its progress rail on every step (#67)', () 
  */
 describe('no live rule points at the retired priority-order issue (#171)', () => {
   const root = new URL('../../', import.meta.url);
-  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md', 'README.md'];
+  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+                'docs/WATCHDOG-PROMPT.md', 'README.md'];
   // Built from parts so this rail's own source does not contain the string it bans — otherwise the file
   // could never be checked by a sibling rail, and a reader grepping the repo gets a false hit here.
   const RETIRED = '#' + '46';
@@ -1709,17 +1710,21 @@ describe('STEP 3 states where priority:P0 sorts (#157)', () => {
  *
  * Prove it red by reverting STEP 2 to "For each, oldest first: check out the branch" with nothing about
  * priority in between.
+ *
+ * 2026-09-19 (docs/decisions/003-two-routines.md): reviewing moved to its own routine, so STEP 2 — and this
+ * rail's slice — now live in `docs/REVIEWER-PROMPT.md`. The slice ends where the four unmergeable rules
+ * begin; the developer prompt's STEP 3 still carries its own copy of the order, pinned by the #157 rail above.
  */
 describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
   const root = new URL('../../', import.meta.url);
 
   it('STEP 2 states a priority order for the PR list, not just STEP 3', () => {
-    const text = readFileSync(new URL('docs/ROUTINE-PROMPT.md', root), 'utf8');
+    const text = readFileSync(new URL('docs/REVIEWER-PROMPT.md', root), 'utf8');
     const step2Start = text.indexOf('STEP 2 — REVIEW');
-    const step3Start = text.indexOf('STEP 3 — DEVELOP');
-    expect(step2Start, 'STEP 2 must exist in the live routine prompt').toBeGreaterThan(-1);
-    expect(step3Start, 'STEP 3 must exist in the live routine prompt').toBeGreaterThan(step2Start);
-    const step2 = text.slice(step2Start, step3Start);
+    const rulesStart = text.indexOf('Four things make a PR unmergeable');
+    expect(step2Start, 'STEP 2 must exist in the live reviewer prompt').toBeGreaterThan(-1);
+    expect(rulesStart, 'the four unmergeable rules must still follow STEP 2 in the reviewer prompt').toBeGreaterThan(step2Start);
+    const step2 = text.slice(step2Start, rulesStart);
     expect(step2.length, 'STEP 2 must be read from disk as text, or this rail checks nothing').toBeGreaterThan(500);
     expect(step2, 'STEP 2 must order the PR list by the priority label of the issue each PR closes (#194)')
       .toMatch(/priority:P0`? before `?priority:P1/);
@@ -1756,8 +1761,8 @@ describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
  */
 describe('branches are named for the change, and nothing matches on the old prefix (#160)', () => {
   const root = new URL('../../', import.meta.url);
-  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md',
-                'README.md', 'scripts/seed-issues.py'];
+  const LIVE = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+                'docs/WATCHDOG-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
   const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
   // Built from parts so this rail's own source does not contain the instruction form it bans.
   const RETIRED = 'claude/' + 'issue-';
@@ -1783,10 +1788,12 @@ describe('branches are named for the change, and nothing matches on the old pref
 
   // The half that is a behaviour change. Losing this is not a typo: the reviewer's own listing goes empty
   // and the run reports "nothing to review" while PRs sit open, with nothing red to say otherwise.
-  it('STEP 2 lists every open PR instead of matching a branch prefix', () => {
-    const text = live('docs/ROUTINE-PROMPT.md');
-    expect(text, 'STEP 2 must name the unfiltered listing call').toMatch(/pulls\?state=open/);
-    expect(text, 'and say plainly that branch name is not a filter').toMatch(/never filter by branch name/i);
+  // Since the two-routine split (docs/decisions/003) both prompts list pull requests — the reviewer to find
+  // its work, the developer to count the review queue — so both must hold this.
+  it.each(['docs/REVIEWER-PROMPT.md', 'docs/ROUTINE-PROMPT.md'])('%s lists every open PR instead of matching a branch prefix', (name) => {
+    const text = live(name);
+    expect(text, `${name} must name the unfiltered listing call`).toMatch(/pulls\?state=open/);
+    expect(text, `${name} must say plainly that branch name is not a filter`).toMatch(/never filter by branch name/i);
   });
 
   // The clause that actually produced the old names, and the reason this half is a rail rather than prose.
@@ -1860,7 +1867,7 @@ describe('branches are named for the change, and nothing matches on the old pref
  *  - **The skill keeps the phrase the gate keys on.** `isAdoptionClear()` recognises a superseding clear by
  *    the words "another reviewer's block" and `blockState()` then demands a session URL of it (#191/#195).
  *
- * Prove it red: drop the sentence from `CLAUDE.md` or the routine prompt; put a time window back beside it;
+ * Prove it red: drop the sentence from `CLAUDE.md` or the reviewer prompt; put a time window back beside it;
  * reword "another reviewer's block" in the skill; or add `Date.now()` to the gate.
  */
 describe('a block its reviewer leaves unanswered is superseded by a fresh review (#161)', () => {
@@ -1873,8 +1880,10 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
 
   // One home per rule (docs/decisions/001): the two files a run reads carry one sentence and a pointer, and
   // no window — a figure beside the block protocol is the retired adoption rule coming back.
-  it('CLAUDE.md and the routine prompt point at the review-pr skill for the rule, state no time window, and BACKLOG.md has dropped it', () => {
-    for (const name of ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md']) {
+  // Since docs/decisions/003-two-routines.md the run that reads rule 3 is a reviewer run, so the sentence
+  // lives in `docs/REVIEWER-PROMPT.md`; the developer prompt only has to stay clear of the retired rule.
+  it('CLAUDE.md and the reviewer prompt point at the review-pr skill for the rule, state no time window, and BACKLOG.md has dropped it', () => {
+    for (const name of ['CLAUDE.md', 'docs/REVIEWER-PROMPT.md']) {
       const text = flat(read(name));
       expect(text, `${name} must say what happens to a block its reviewer leaves unanswered`)
         .toContain('superseded by a fresh review (#161)');
@@ -1886,6 +1895,9 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     }
     expect(read('BACKLOG.md'), 'BACKLOG.md is retiring (#218) and no longer carries this rule at all')
       .not.toContain('may be adopted');
+    const dev = flat(read('docs/ROUTINE-PROMPT.md'));
+    expect(dev, 'the developer prompt must not bring the retired adoption rule back').not.toContain('may be adopted');
+    expect(dev, 'nor its time windows — STEP 2.5 has a 30-minute debounce and nothing else').not.toMatch(WINDOW);
   });
 
   // The home itself. Scoped to §6, the section that owns the rule, so a copy elsewhere cannot satisfy it.
@@ -2096,13 +2108,18 @@ describe('a run fixes a stalled block before it starts new work, oldest first (#
 
   const CANON = [
     '**A run fixes a stalled block before it starts new work (#204).** Before STEP 3, look for the',
-    'single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`',
-    '— one you did not set in your own review pass this run, with no new commit and no new comment on it',
+    'single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`,',
+    'with no new commit and no new comment on it',
     'in the last 30 minutes (a debounce, in case someone is fixing it right now). If one exists, push a',
     'fix addressing the review\'s findings and comment `Pushed <sha>, addressing <what>` (#199/#200\'s',
-    'content floor); never post `REVIEW: CLEARED` yourself — clearing still needs the original reviewer,',
-    'or a later run\'s fresh review (rule 3 above).',
+    'content floor), then **add the label `re-review`** to the pull request: that is what starts a',
+    'reviewer run, because a blocked PR is a draft and a push to a draft starts nothing. Never post',
+    '`REVIEW: CLEARED` yourself and never undraft it — clearing needs a reviewer run\'s fresh review',
+    '(`docs/REVIEWER-PROMPT.md` rule 3).',
   ].join(' ');
+  // 2026-09-19 (docs/decisions/003-two-routines.md): "one you did not set in your own review pass this run"
+  // went — a developer run has no review pass — and the `re-review` label came in, since nothing else starts
+  // the event-triggered reviewer on a drafted pull request.
 
   it('docs/ROUTINE-PROMPT.md carries the stalled-block rule in its canonical form', () => {
     const text = read('docs/ROUTINE-PROMPT.md');
@@ -2110,14 +2127,16 @@ describe('a run fixes a stalled block before it starts new work, oldest first (#
       .toContain(CANON);
   });
 
-  it('the rule sits between STEP 2 and STEP 3, and does not let a run clear its own fix', () => {
+  it('the rule sits between STEP 1 and STEP 3, and does not let a run clear its own fix', () => {
     const text = read('docs/ROUTINE-PROMPT.md');
-    const step2 = text.indexOf('STEP 2 — REVIEW & QA FIRST');
+    const step1 = text.indexOf('STEP 1 — SETUP');
     const step25 = text.indexOf('STEP 2.5 — FIX A STALLED BLOCK');
     const step3 = text.indexOf('STEP 3 — DEVELOP ONE ITEM');
-    expect(step25, 'STEP 2.5 must exist, after STEP 2').toBeGreaterThan(step2);
+    expect(step1, 'STEP 1 must exist').toBeGreaterThan(-1);
+    expect(step25, 'STEP 2.5 must exist, after STEP 1 — a blocked PR is fixed before new work starts').toBeGreaterThan(step1);
     expect(step3, 'STEP 3 must still follow STEP 2.5, never be skipped').toBeGreaterThan(step25);
-    expect(text).toContain('never post `REVIEW: CLEARED` yourself');
+    expect(text, 'a fixer that clears its own fix is a session reviewing its own change')
+      .toContain('Never post `REVIEW: CLEARED` yourself');
   });
 });
 
@@ -2189,7 +2208,8 @@ describe('the project board is synced from the Mac, read by pulse in the cloud, 
 
   it('the routine reads the pulse in STEP 1 and carries it in the STEP 5 snapshot', () => {
     const text = read('docs/ROUTINE-PROMPT.md');
-    const step1 = text.slice(text.indexOf('STEP 1 —'), text.indexOf('STEP 2 —'));
+    // STEP 2 moved to docs/REVIEWER-PROMPT.md (docs/decisions/003), so STEP 1 now ends where STEP 2.5 begins.
+    const step1 = text.slice(text.indexOf('STEP 1 —'), text.indexOf('STEP 2.5 —'));
     const step5 = text.slice(text.indexOf('STEP 5 —'));
     expect(step1.length, 'STEP 1 must be found by its heading').toBeGreaterThan(200);
     expect(step5.length, 'STEP 5 must be found by its heading').toBeGreaterThan(200);
@@ -2281,7 +2301,8 @@ describe('the project board is synced from the Mac, read by pulse in the cloud, 
  * Prove it red: join any bullet in any of the four files to the line above it.
  */
 describe('a bullet is never swallowed onto the line above it (#195)', () => {
-  const PROCESS = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md'];
+  const PROCESS = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+                   'docs/WATCHDOG-PROMPT.md'];
 
   // A sentence end, then a list marker, mid-line: `.- ` or `. 1. `. Deliberately narrow — the marker must be a
   // hyphen or a number, and what precedes it a full stop, question or exclamation mark. Widening it to `*` or
@@ -3013,8 +3034,13 @@ describe('the add-guard-rail skill keeps the rules that were paid for (#180)', (
  *
  * Prove it red: drop the rule from one file, reword condition 1 as "no open pull requests", or turn it into a
  * quota.
+ *
+ * 2026-09-19 (docs/decisions/003-two-routines.md): a developer run no longer reviews, so "nothing to review
+ * this run could do" stopped meaning anything. Condition 1 is now "at most three pull requests are waiting
+ * for review" — the count STEP 1's review-queue check has already made. The purpose is unchanged — do not add
+ * to a review queue that is not draining — and so is everything else these rails hold.
  */
-describe('a run with nothing to review may take a second item, in all three process files (#177)', () => {
+describe('a developer run may take a second item, in all three process files (#177)', () => {
   // Match against prose with its markdown taken off, not against the raw bytes. Three of these rails failed
   // on their own subject first time round — `**start of the run**`, `*not* "no open…"`, and a sentence the
   // line wrap split — which is a rail testing the author's formatting rather than the rule. Emphasis markers
@@ -3029,13 +3055,15 @@ describe('a run with nothing to review may take a second item, in all three proc
     const text = doc(name);
     expect(text.length, 'a vacuous rail is worse than none').toBeGreaterThan(500);
     expect(text, 'the file must state the permission itself')
-      .toMatch(/a run with nothing to review may take a second item/i);
+      .toMatch(/a developer run may take a second item/i);
     expect(text, 'and that it is one more item, as its own pull request')
       .toMatch(/second, separate pull request/i);
     // Each of the four conditions, by the thing that makes it checkable rather than by its number: a
     // renumbering must not be able to drop one.
-    expect(text, 'condition 1 — nothing is waiting for a review this run could do')
-      .toMatch(/waiting for a review (that|this) run could do/i);
+    expect(text, 'condition 1 — the review queue is draining: at most three pull requests are waiting')
+      .toMatch(/at most three pull requests are waiting for review/i);
+    expect(text, 'the retired condition 1 must not survive beside the new one — a developer run reviews nothing')
+      .not.toMatch(/waiting for a review (that|this) run could do/i);
     expect(text, 'condition 2 — the ~45-minute clock runs from the start of the run, not the second item')
       .toMatch(/from the start of the run/i);
     expect(text, 'condition 3 — the second item cannot touch the first item’s files')
@@ -3649,14 +3677,15 @@ describe('.claude/rules/curriculum.md declares paths, and every path matches som
  *
  * Prove it red: pad either file past its budget with a comment and watch the corresponding test fail.
  */
-describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#101)', () => {
+describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte budgets only ever go down (#101)', () => {
   const root = new URL('../../', import.meta.url);
   const bytes = (name: string) => statSync(new URL(name, root)).size;
 
-  // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
+  // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 9_897;    // 10,750 → 9,897: #161 reduced to one sentence, its home is the review-pr skill
-  const ROUTINE_PROMPT_BUDGET = 28_479;   // 40,949 → 31,022: docs/decisions/002-routine-prompt-is-flow-only.md; → 28,479: #161 reduced to one sentence
+  const CLAUDE_MD_BUDGET = 9_890;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003)
+  const ROUTINE_PROMPT_BUDGET = 23_158;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,158: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003)
+  const REVIEWER_PROMPT_BUDGET = 9_577;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -3670,6 +3699,106 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
     expect(size, 'docs/ROUTINE-PROMPT.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
     expect(size, `docs/ROUTINE-PROMPT.md grew to ${size} bytes — a "how" line belongs in a layer 2/3 pointer, `
       + 'not back in the routine\'s own flow, rather than raising this budget').toBeLessThanOrEqual(ROUTINE_PROMPT_BUDGET);
+  });
+
+  it('docs/REVIEWER-PROMPT.md stays at or under its budget', () => {
+    const size = bytes('docs/REVIEWER-PROMPT.md');
+    expect(size, 'docs/REVIEWER-PROMPT.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
+    expect(size, `docs/REVIEWER-PROMPT.md grew to ${size} bytes — how to review belongs in the review-pr skill, `
+      + 'not in the order of a reviewer run, rather than raising this budget').toBeLessThanOrEqual(REVIEWER_PROMPT_BUDGET);
+  });
+});
+
+/**
+ * docs/decisions/003-two-routines.md — one routine develops, another reviews (owner, in session, 2026-09-19).
+ *
+ * Until then one scheduled run reviewed other runs' pull requests and then developed its own item, and "no
+ * session reviews its own change" was a sentence each run had to remember. The split makes it structural: the
+ * developer routine (`docs/ROUTINE-PROMPT.md`, hourly) never reviews or merges, and the reviewer routine
+ * (`docs/REVIEWER-PROMPT.md`, started by GitHub events) never develops. Four ways that decays, a rail each:
+ *
+ *  1. a review step drifts back into the developer prompt, and a run is both author and judge again;
+ *  2. a develop step drifts into the reviewer prompt — the same failure from the other side — or the
+ *     reviewer loses the sentence that keeps a session off a pull request it opened or pushed to;
+ *  3. the review-queue alarm goes. GitHub events are dropped beyond an hourly cap and an event-triggered
+ *     routine cannot notice that it never fired, so the scheduled developer run is the only thing that can;
+ *  4. the `re-review` label goes from any of its three places. A blocked pull request is a draft, a push to a
+ *     draft starts no reviewer run, and nobody but a reviewer may undraft it: without the label a fixed pull
+ *     request stays blocked for ever.
+ *
+ * Prove it red: paste "STEP 2 — REVIEW" into the developer prompt; add a STEP 3 to the reviewer prompt; delete
+ * "push notification" from STEP 1; or drop `re-review` from the open-pr skill.
+ */
+describe('one routine develops, another reviews (docs/decisions/003)', () => {
+  const root = new URL('../../', import.meta.url);
+  const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  const flat = (s: string) => s.replace(/\s+/g, ' ');
+  const DEV = 'docs/ROUTINE-PROMPT.md', REV = 'docs/REVIEWER-PROMPT.md';
+  const steps = (text: string) => [...text.matchAll(/^STEP ([\d.]+) — /gm)].map((m) => m[1]);
+
+  it('each prompt has exactly its own steps, under the heading the stored bootstrap reads from', () => {
+    for (const name of [DEV, REV])
+      expect(read(name), `${name}: the bootstrap stored in the routine follows the file from this heading — rename it and every run stops`)
+        .toMatch(/^## The routine$/m);
+    expect(steps(read(DEV)), 'the developer run: limit check, set-up and health checks, fix a stalled block, develop, nothing eligible, record')
+      .toEqual(['0', '1', '2.5', '3', '4', '5']);
+    expect(steps(read(REV)), 'the reviewer run: limit check, set-up, review — and nothing else')
+      .toEqual(['0', '1', '2']);
+  });
+
+  it('the developer prompt has no review step and never tells a run to review or merge', () => {
+    const text = flat(read(DEV));
+    expect(text.length, 'the developer prompt must be read from disk, or this rail checks nothing').toBeGreaterThan(5_000);
+    expect(text, 'STEP 2 moved to the reviewer prompt — back here, a run is author and judge again').not.toMatch(/STEP 2 — REVIEW/);
+    expect(text, 'the merge instruction belongs to the reviewer run only').not.toMatch(/squash-merge/i);
+    expect(text, 'nor may a developer run be told to block a pull request').not.toMatch(/post a comment beginning `REVIEW: CHANGES REQUESTED`/);
+    expect(text, 'it must say so in as many words').toContain('a developer run never reviews or merges a pull request');
+    expect(text, 'and again in the closing list, where a run looks last').toMatch(/Do NOT: review or merge any pull request/);
+    expect(text, 'and point at where reviews do happen').toContain('docs/REVIEWER-PROMPT.md');
+  });
+
+  it('the reviewer prompt has no develop step, never tells a run to develop, and keeps a session off its own pull request', () => {
+    const text = flat(read(REV));
+    expect(text.length, 'the reviewer prompt must be read from disk, or this rail checks nothing').toBeGreaterThan(3_000);
+    expect(text, 'a STEP 3 here is a reviewer that develops').not.toMatch(/STEP 3/);
+    expect(text, 'the issue query is how a run picks work to develop — it has no place here').not.toMatch(/labels=routine-ok/);
+    expect(text, 'nor has opening a pull request').not.toMatch(/open-pr/);
+    expect(text, 'it must say it never develops').toMatch(/never develops/);
+    expect(text, 'the one condition the owner set on #161: no session reviews its own change')
+      .toContain('never reviews a pull request this session opened or pushed a commit to');
+    expect(text, 'and it is started by events, which is why the developer run carries the queue alarm')
+      .toMatch(/GitHub events, not a schedule/);
+  });
+
+  it('the developer run counts the review queue, and raises the alarm when nobody is reviewing', () => {
+    const raw = read(DEV);
+    const step1 = flat(raw.slice(raw.indexOf('STEP 1 —'), raw.indexOf('STEP 2.5 —')));
+    expect(step1.length, 'STEP 1 must be found by its heading').toBeGreaterThan(200);
+    expect(step1, 'the check must be named').toContain('**the review queue**');
+    expect(step1, 'what "waiting" means: the 2-hour floor…').toContain('for more than 2 hours');
+    expect(step1, '…a ready pull request nobody has reviewed…').toContain('not a draft and has no `REVIEW:` comment');
+    expect(step1, '…or one a fix was pushed to').toContain('labelled `re-review`');
+    expect(step1, 'the threshold').toContain('**more than three**');
+    expect(step1, 'the alarm reaches the owner, not just the snapshot').toContain('push notification');
+    expect(step1, 'a session that cannot send one must say so — a silent skip reads as "no alarm"')
+      .toMatch(/no way to send one, say exactly that/);
+    // Read raw on purpose: a line of the example snapshot, which `flat()` would join to its neighbours.
+    expect(raw, 'and the STEP 5 example snapshot must show the line, with the value observed').toMatch(/^- review queue: \d+ waiting/m);
+  });
+
+  it('the `re-review` label is in all three places that make a fixed, blocked pull request reviewable again', () => {
+    const dev = read(DEV);
+    const step25 = flat(dev.slice(dev.indexOf('STEP 2.5 —'), dev.indexOf('STEP 3 — DEVELOP')));
+    expect(step25.length, 'STEP 2.5 must be found by its heading').toBeGreaterThan(200);
+    expect(step25, 'the run that pushes the fix adds the label — a push to a draft starts nothing').toContain('add the label `re-review`');
+    const rev = flat(read(REV));
+    expect(rev, 'the reviewer routine is started by the label').toContain('given the label `re-review`');
+    expect(rev, 'and takes it off on pick-up, so it always means "nobody has picked this up yet"')
+      .toMatch(/labelled `re-review`, remove that label when you begin/);
+    const openPr = flat(read('.claude/skills/open-pr/SKILL.md'));
+    expect(openPr, 'an author who fixes their own blocked pull request adds it too').toContain('add the label `re-review`');
+    expect(flat(read('.claude/skills/review-pr/SKILL.md')), 'and the review-pr skill tells the reviewer to remove it')
+      .toMatch(/`re-review` label is removed by the reviewer who picks the pull request up/);
   });
 });
 
