@@ -11,6 +11,7 @@ export interface ModeCtx {
   stage: number;            // 1-based mission stage (1 for continuous modes)
   questionsAsked: number;
   sequence: boolean;        // the current question is a spelling/sentence sequence (a touch slower)
+  slow: boolean;            // the current question is flagged `slow` by its generator — several mental steps (#297)
   enraged: boolean;         // boss on its last 3 HP
 }
 /** What a finished run scored — used to award end-stars and coins. */
@@ -41,6 +42,13 @@ export interface ModeSpec {
   coins(c: EndCtx): number;         // ninja coins earned
 }
 
+// A question that is worked out in steps rather than recalled gets one speed step, floored at 1: a spelling
+// sequence (slice several letters in order) or one a generator flagged `slow` — Year 2's two-digit arithmetic
+// that crosses a ten (#297). One helper so the two flags always ease by the same amount, in every mode that
+// eases at all. Sky Storm is not one of them: its speed ramps on questions answered rather than on the year,
+// and it clamps for `gentle` years instead — `sequence` has never eased there either.
+const eased = (c: ModeCtx, s: number) => c.sequence || c.slow ? Math.max(1, s - 1) : s;
+
 // Endless and Boss share the same "ramp on questions answered" points curve.
 const rampPoints = (c: ModeCtx) => 10 + Math.min(20, Math.floor(c.questionsAsked / 5) * 5);
 // Base coins earned every mode: 1 per correct answer + 5 per mission stage star.
@@ -51,7 +59,7 @@ export const MODES: Record<Mode, ModeSpec> = {
     id: 'mission', title: 'Mission', overHeadingWon: 'Mission complete!', overHeadingLost: 'Out of lives',
     hasLives: true, staged: true, timed: false, boss: false, villain: false,
     difficulty: c => c.year.diffs[Math.min(c.stage, c.year.diffs.length) - 1] ?? 3,
-    speed: c => { const s = c.year.speeds[Math.min(c.stage, c.year.speeds.length) - 1] ?? 3; return c.sequence ? Math.max(1, s - 1) : s; },
+    speed: c => eased(c, c.year.speeds[Math.min(c.stage, c.year.speeds.length) - 1] ?? 3),
     basePoints: c => 10 * c.stage,
     stars: c => c.won ? Math.max(1, Math.round(c.stageStarsTotal / c.stages)) : 0,
     coins: c => baseCoins(c) + (c.won ? 20 : 0),
@@ -69,7 +77,7 @@ export const MODES: Record<Mode, ModeSpec> = {
     id: 'sprint', title: 'Ninja Sprint', overHeadingWon: "Time's up!", overHeadingLost: "Time's up!",
     hasLives: false, staged: false, timed: true, boss: false, villain: false,
     difficulty: c => c.questionsAsked < 5 ? 1 : c.questionsAsked < 12 ? 2 : 3,
-    speed: c => { const s = c.year.speeds[1] ?? 2; return c.sequence ? Math.max(1, s - 1) : s; },   // steady pace: the clock is the pressure
+    speed: c => eased(c, c.year.speeds[1] ?? 2),   // steady pace: the clock is the pressure
     basePoints: () => 10,
     stars: c => c.correct >= 12 ? 3 : c.correct >= 6 ? 2 : c.correct >= 1 ? 1 : 0,
     coins: c => baseCoins(c) + c.stars * 5,
@@ -78,7 +86,7 @@ export const MODES: Record<Mode, ModeSpec> = {
     id: 'boss', title: 'Boss Battle', overHeadingWon: 'Knock-out!', overHeadingLost: 'Hammer Man wins this round',
     hasLives: true, staged: false, timed: false, boss: true, villain: true,
     difficulty: c => c.questionsAsked < 4 ? 1 : c.questionsAsked < 9 ? 2 : 3,
-    speed: c => { const s = c.year.speeds[c.enraged ? 2 : 1] ?? 2; return c.sequence ? Math.max(1, s - 1) : s; },
+    speed: c => eased(c, c.year.speeds[c.enraged ? 2 : 1] ?? 2),
     basePoints: rampPoints,
     stars: c => c.won ? (c.accuracy >= 0.9 ? 3 : c.accuracy >= 0.7 ? 2 : 1) : 0,
     coins: c => baseCoins(c) + (c.won ? 20 : 0) + c.stars * 5,

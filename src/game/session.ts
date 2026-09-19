@@ -38,7 +38,7 @@ export class Session {
   }
   /** The behaviour table entry for this run's mode (#26). */
   get spec(): ModeSpec { return MODES[this.o.mode]; }
-  private get ctx(): ModeCtx { return { year: this.o.year, stage: this.stage, questionsAsked: this.questionsAsked, sequence: !!this.current?.sequence, enraged: this.enraged }; }
+  private get ctx(): ModeCtx { return { year: this.o.year, stage: this.stage, questionsAsked: this.questionsAsked, sequence: !!this.current?.sequence, slow: !!this.current?.slow, enraged: this.enraged }; }
   get perStage() { return this.o.year.perStage; }
   get secondsLeft() { return Math.ceil(this.timeLeft / 1000); }
   get difficulty(): Difficulty { return this.spec.difficulty(this.ctx); }
