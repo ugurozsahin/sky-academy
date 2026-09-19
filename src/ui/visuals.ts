@@ -78,12 +78,16 @@ export function renderVisual(v: Visual | undefined): string {
         if (safe !== r.n) console.warn(`chart visual: row "${r.label}" had an invalid count (${r.n}) — rendered as 0`);
         return safe === r.n ? r : { ...r, n: safe };
       });
-      const wanted = v.each ?? 1;
+      // Only a pictogram has a key or a symbol (#133): the type says so now, so a tally or a block diagram is
+      // drawn with neither rather than with a placeholder value nothing reads. The defence below stays —
+      // `each` is still an unconstrained `number` on the pictogram variant, and a corrupted blob can miss it.
+      const pict = v.kind === 'pictogram' ? v : undefined;
+      const wanted = pict?.each ?? 1;
       const usable = Number.isInteger(wanted) && wanted > 0 && rows.every(r => r.n % wanted === 0);
       // #137 item 5: the demotion below (key silently becomes 1, so a d2 pictogram draws one symbol per
       // child) is the right call — refusing loudly mid-mission would be worse than a coarser-but-honest
       // picture — but it used to leave no trace anywhere. Name the rows that forced it.
-      if (v.kind === 'pictogram' && wanted !== 1 && !usable) {
+      if (pict && wanted !== 1 && !usable) {
         console.warn(`chart visual: key ${wanted} does not divide every row's count — demoted to 1, no key shown`);
       }
       const each = usable ? wanted : 1;
@@ -92,11 +96,11 @@ export function renderVisual(v: Visual | undefined): string {
       // attribute) were not. `PICTO_SYMBOL` is the only `icon` any producer supplies today, so this was never
       // a live injection, but the review that found it called it the trap: a test naming the one field that
       // is escaped reads as proof the row is safe, when its neighbour is not.
-      const icon = esc(v.icon ?? '⭐');
+      const icon = esc(pict?.icon ?? '⭐');
       const kind = esc(v.kind);
       const body = rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
       // The key is the whole point of a pictogram — without it the picture is a different number from the data.
-      const key = v.kind === 'pictogram' && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
+      const key = pict && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
       return `<div class="vis"><div class="chart ${kind}">${body}${key}</div></div>`;
     }
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
