@@ -2552,18 +2552,284 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     }
   });
 
-  it.each([
-    ...Object.keys(SKILLS).map((n) => [`.claude/skills/${n}/SKILL.md`] as const),
-    ...Object.keys(AGENTS).map((n) => [`.claude/agents/${n}.md`] as const),
-  ])('%s has frontmatter with a one-line description', (file) => {
-    const text = read(file);
-    const front = /^---\n([\s\S]*?)\n---\n/.exec(text);
-    expect(front, `${file} must open with YAML frontmatter, or nothing loads it`).not.toBeNull();
-    const description = /^description:[ \t]*(\S.*)$/m.exec(front![1]);
+  /** `SKILL.md` for a skill, `<name>.md` for an agent — the one file whose frontmatter Claude Code reads. */
+  const FRONTMATTER_FILES = [
+    ...Object.keys(SKILLS).map((n) => [n, `.claude/skills/${n}/SKILL.md`] as const),
+    ...Object.keys(AGENTS).map((n) => [n, `.claude/agents/${n}.md`] as const),
+  ];
+  /**
+   * The frontmatter block and the `description:` value, or `null` for each that is not there. The value is read
+   * the way the loader reads it, as far as a regex can.
+   *
+   * **What follows about the loader's internals is an observation, not a contract** (round 7): read out of the
+   * Claude Code CLI installed on 2026-09-19, confirmed against the live skill listing. Nothing here tests it
+   * and the CLI changes without us — treat a disagreement as this comment gone stale, re-read the loader and
+   * correct it; do not add shapes to match it from memory. As observed that day, the loader is a permissive
+   * `---` splitter — `^---\s*\n([\s\S]*?)---\s*\n?`, so the block ends at the
+   * first `---` wherever it sits, mid-line included — in front of a YAML parse; when that throws, a repair pass
+   * double-quotes any `key: value` line carrying `: ` or one of `{}[]*&#!|>%@` and parses again (which is how
+   * `review-pr`'s `REVIEW: CHANGES REQUESTED` and the agent's `PR #1234` load: repaired, not tolerated); when
+   * that throws too, the frontmatter is `{}`, the description falls back to the body's first heading, and an
+   * agent file with no `name` is not registered at all. On these shapes the rail and the loader agree, each
+   * confirmed on the live skill listing during the reviews: a scalar continues onto every following line that
+   * starts with whitespace, blank lines in between included, so those lines are folded in (a negation on a
+   * continuation line — then one behind a blank line — was invisible to a helper that captured the first
+   * physical line only; the loader saw `… — never when …`, the rail did not); ` #` starts a comment, so the
+   * trigger clause behind one never reaches a turn's context; `description:Open …` with no whitespace after
+   * the colon loses the trigger clause; a second key spelt `description :` or `"description":` wins over the
+   * first; `Academy. --- Use when …` ends the frontmatter at the `---`, trigger clause gone; and a line that is
+   * neither a key nor an indented continuation — `garbage`, a merge-conflict marker, the description wrapped
+   * onto a second line at column 0 — is the parse failure above: the listing showed `open-pr: Open a pull
+   * request`, the H1. So the capture demands whitespace after the colon, lines are split on `\n` alone (JS `.`
+   * and multiline `$` also stop at `\r`, where a YAML parser does not), and the one-line
+   * test below rejects the continuation itself, the ` #`, every second spelling of the key, any `---` inside
+   * the block, a NUL or `\r` in the block, any frontmatter key outside the file's allow-list —
+   * `disable-model-invocation: true` or a `paths:` glob that never matches switches the skill off with the
+   * description untouched, on a line no description check reads — and **any line it cannot read as a key**:
+   * a line the rail does not understand is red, never ignored. This fold is what every other check reads, so
+   * the two cannot disagree about which text is the description.
+   */
+  /** Where a plain scalar continues: a newline, any blank lines, then an indented non-blank line. One spelling, used by the capture and the rejection alike. */
+  const CONTINUATION = '\\n(?:[ \\t]*\\n)*[ \\t]+\\S';
+  const frontmatter = (file: string) => {
+    const raw = read(file);
+    const front = /^---\n([\s\S]*?)\n---\n/.exec(raw);
+    const description = front && new RegExp(`^description:[ \\t]+(\\S[^\\n]*(?:${CONTINUATION}[^\\n]*)*)$`, 'm').exec(front[1]);
+    return {
+      raw,
+      front: front ? front[1] : null,
+      description: description ? description[1].replace(/\s*\n\s*/g, ' ') : null,
+    };
+  };
+  /** Every spelling a loader treats as the `description` key: bare or quoted, with or without space before the colon. No `g`: it is used with `.test()`. */
+  const DESCRIPTION_KEY = /^["']?description["']?[ \t]*:/;
+  /**
+   * A top-level frontmatter key, in the same spellings, with whitespace after the colon or nothing at all — the
+   * shape the loader's repair pass reads (`^([a-zA-Z_-]+):\s+(.+)$`). `model:inherit` is a parse failure the
+   * repair pass skips, the round-3 `description:Open` incident for every other key.
+   */
+  const TOP_LEVEL_KEY = /^["']?([A-Za-z0-9_-]+)["']?[ \t]*:(?:[ \t]+\S|[ \t]*$)/;
+  /** A blank line as YAML sees it: spaces and tabs only — one regex, and narrower than `trim()` on purpose. */
+  const BLANK = /^[ \t]*$/;
+  /**
+   * The frontmatter keys each file carries beyond `name` and `description` — what the fourteen files carry
+   * today, nothing more; the per-file test demands exactly this set. A key outside it is red with its name: the
+   * loader honours keys the description checks never read (`disable-model-invocation`, `paths`,
+   * `user-invocable`), and any of them can switch the skill off. Every entry must name a file in the allow-list.
+   */
+  const EXTRA_KEYS: Record<string, string[]> = {
+    'frontend-design': ['license'],
+    'pr-test-analyzer': ['model', 'color'],
+    'silent-failure-hunter': ['model', 'color'],
+    'type-design-analyzer': ['model', 'color'],
+  };
+  const EXPECTED_KEYS = (name: string) => ['name', 'description', ...(EXTRA_KEYS[name] ?? [])].sort();
+  /**
+   * Vendored upstream text that carries ` #` inside a plain scalar (`Please review PR #1234`): the loader's
+   * repair pass double-quotes that line — because the same value also carries `: `, which is asserted beside
+   * the token — so it loads in full; without the repair a YAML parser would cut it there — an upstream matter,
+   * not this repository's. The exemption is that one token, not the file: the token is asserted present (so
+   * the entry fails loudly when upstream drops it) and stripped, and the rest of the description is held to
+   * the same ` #` check as every other.
+   */
+  const HASH_IN_UPSTREAM_TEXT: Record<string, string> = { 'silent-failure-hunter': 'PR #1234' };
+  /**
+   * NUL and CR, from code points so no editor can turn the escape into the character. Asserted on the
+   * frontmatter block, never the whole file (round 7): a body line ending `\r\n`, which Windows editors and
+   * several paste paths produce, cannot change which description the loader reads. U+2028/U+2029 went with
+   * that move — inside a frontmatter block they are characters nobody types, and the key-line check already
+   * refuses any line the rail cannot read.
+   */
+  const LINE_SEPARATORS = new RegExp(`[${String.fromCharCode(0, 13)}]`);
+
+  it.each(FRONTMATTER_FILES)('%s has frontmatter with a one-line description', (name, file) => {
+    const { front, description } = frontmatter(file);
+    expect(front, `${file} must open with the frontmatter shape this rail reads — "---", a newline, the block, a newline, "---", a newline: no BOM, no trailing whitespace on either fence. The loader's splitter is looser; the rail is not, so that the two never read different blocks (#150)`).not.toBeNull();
+    expect(front!, `${file}: a NUL or carriage return in the frontmatter — a line ending to a JS regex, not to a YAML parser (or, for NUL, fatal to it), so the two would read different lines (#150)`)
+      .not.toMatch(LINE_SEPARATORS);
+    expect(front!, `${file}: "---" inside the frontmatter — the loader's splitter ends the block at the first one wherever it sits, and everything after it is gone (#150)`)
+      .not.toMatch(/---/);
+    const lines = front!.split('\n');
+    expect(lines.filter((l) => TOP_LEVEL_KEY.test(l)).map((l) => TOP_LEVEL_KEY.exec(l)![1]).sort(), `${file}: a frontmatter key outside the expected set — the loader acts on keys no description check reads, and "disable-model-invocation" or a never-matching "paths" switches the skill off (#150)`)
+      .toEqual(EXPECTED_KEYS(name));
+    expect(front!, `${file}: "name:" must be the file's own name — an agent is registered under it, and a skill under its directory (#150)`)
+      .toMatch(new RegExp(`^name:[ \\t]+${name}[ \\t]*$`, 'm'));
+    const descriptionKeys = lines.filter((l) => DESCRIPTION_KEY.test(l)).length;
+    expect(descriptionKeys, descriptionKeys === 0
+      ? `${file} needs a description — it is the only line that reaches every turn's context`
+      : `${file}: exactly one description key, in any spelling a loader accepts — the rail reads the first, a loader reads the last or refuses the file (#150)`)
+      .toBe(1);
+    expect(front!, `${file}: the one description key is the literal "description:" followed by whitespace on the same line — "description:Open …" loses its trigger clause in the loader (#150)`)
+      .toMatch(/^description:[ \t]+\S/m);
     expect(description, `${file} needs a description — it is the only line that reaches every turn's context`)
       .not.toBeNull();
-    expect(description![1], 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
-    expect(/^name:[ \t]*\S/m.test(front![1]), `${file} needs a name`).toBe(true);
+    expect(description!, 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
+    expect(front!, `${file}: the description continues onto an indented line, blank lines or not — one physical line, so the line a reader sees is the whole trigger (#150)`)
+      .not.toMatch(new RegExp(`^description:[^\\n]*${CONTINUATION}`, 'm'));
+    // Strict: no allowance for leading whitespace, and blank means spaces and tabs only. A continuation is
+    // already red one assertion up, so what is left here is a line the loader parses as something (a
+    // tab-indented key, a list item, a conflict marker, the description wrapped at column 0, a line of NBSP)
+    // and the rail would otherwise silently skip.
+    expect(lines.filter((l) => !BLANK.test(l) && !TOP_LEVEL_KEY.test(l)), `${file}: a frontmatter line that is not a "key:" line — to the loader it is a parse failure, and the whole block is dropped: the description becomes the body's first heading and an agent leaves the roster (#150)`)
+      .toEqual([]);
+    const upstreamToken = HASH_IN_UPSTREAM_TEXT[name];
+    if (upstreamToken) {
+      expect(description!, `${file} no longer carries "${upstreamToken}" — drop its HASH_IN_UPSTREAM_TEXT entry`).toContain(upstreamToken);
+      expect(description!, `${file}: "${upstreamToken}" loads only because the same value carries ": ", which makes the loader's repair pass quote the line — that precondition is gone`).toMatch(/: /);
+    }
+    expect(upstreamToken ? description!.replace(upstreamToken, '') : description!, `${file}: " #" ends the description for a YAML loader — everything after it never reaches a turn's context (#150)`)
+      .not.toMatch(/(^|\s)#/);
+  });
+
+  /**
+   * #150 — the description is the trigger, and nothing held what it said.
+   *
+   * The test above checks that a `description:` line exists. It said nothing about its text, so
+   * `description: Internal notes` on `open-pr` left 1245/1245 green with the file present, every body pin
+   * below satisfied and the skill never loading again — strictly worse than deleting it, which the allow-list
+   * catches at once. The description is the one line that reaches every turn's context, which is exactly why
+   * it is the line under pressure when someone trims context cost.
+   *
+   * Home: this block, not each skill's body rail — it already walks every skill and agent, and a skill with no
+   * body rail (`add-topic`, `design-language`, `qa-screenshot`, every vendored file) needs this just the same.
+   * Every key of `SKILLS` and `AGENTS` must have an entry here, so adding a skill means writing its pin in the
+   * same pull request, where a reviewer can read it. The vendored ones are pinned too: the `@ <sha>` header
+   * above says which upstream text a file claims to be, it does not hold the body byte-for-byte, so an edited
+   * vendored description was as invisible as a project one.
+   *
+   * Each pin is matched against the description's value alone — never the whole file, where the same words
+   * sit in the body of every skill — and anchored at `^`, so a sentence put in front of the trigger (`Never use
+   * this skill. Use when …`) fails the pin rather than sitting outside it. The project-written six carry their
+   * `Use when` / `Use before` trigger clause inside the pin. And no description may carry a negation — one of
+   * the five inverting words, or any `…n't` contraction, straight or curly apostrophe: `Use when you are NOT
+   * opening a pull request` keeps every pinned word and inverts the trigger, and a containment pin cannot see
+   * that. A negation spelt with `only`, `except`, `instead` or `nothing` is outside the rail on purpose — see
+   * `NEGATION_WORDS` for why those ten words left the list in round 7. The
+   * negation detector is self-tested below against that wording; the per-file test is what proves it quiet on
+   * every real description. Two files carry upstream text that negates — `frontend-design` ("don't read as
+   * templated defaults") and `silent-failure-hunter` ("don't introduce silent failures") — and each is exempt
+   * for that phrase alone: the phrase is asserted present (so the exemption fails loudly when upstream drops
+   * it) and stripped, and the rest of the description is held like every other.
+   *
+   * What it cannot catch: a containment pin checks that some words are present, not that the sentence still
+   * says when to use the skill. A description rewritten around the pinned words with no negation word —
+   * "Use when a pull request is being closed rather than opened" — passes, and so does one spelt with a
+   * zero-width character or a homoglyph (the U+2028 class: characters nobody types). `frontmatter()` is a
+   * regex, not a YAML parser: it reads the plain-scalar shapes named on it and rejects the rest, so a quoted
+   * or block-scalar description fails the anchored pin loudly rather than being read. The body rails below
+   * hold what the skill says once loaded; this holds only that its trigger still names the job.
+   */
+  const DESCRIPTIONS: Record<string, RegExp> = {
+    'add-guard-rail': /^Add a guard rail .*Use when .*needs a check that fails the build/,
+    'add-topic': /^Add or change a curriculum topic .*Use when asked to add a maths\/writing topic/,
+    'design-language': /^Sky Ninja Academy's visual tokens and UI constraints\. Use before touching CSS or building a new screen/,
+    'frontend-design': /^Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one/,
+    'open-pr': /^Open a pull request .*Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR/,
+    'qa-screenshot': /^Bounded visual QA for a Sky Ninja Academy pull request\. Use when reviewing or verifying a player-visible change/,
+    'review-pr': /^Review and QA another agent's pull request .*Use when acting as the reviewer for an open PR .*block it with REVIEW: CHANGES REQUESTED/,
+    'verification-before-completion': /^Use when about to claim work is complete, fixed, or passing, before committing or creating PRs/,
+    'using-git-worktrees': /^Use when starting feature work that needs isolation/,
+    'systematic-debugging': /^Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes/,
+    'test-driven-development': /^Use when implementing any feature or bugfix, before writing implementation code/,
+    'pr-test-analyzer': /^Use this agent when you need to review a pull request for test coverage quality and completeness/,
+    'silent-failure-hunter': /^Use this agent when reviewing code changes in a pull request to identify silent failures/,
+    'type-design-analyzer': /^Use this agent when you need expert analysis of type design/,
+  };
+  const PROJECT_SKILLS = Object.entries(SKILLS).filter(([, v]) => !v).map(([n]) => n);
+  /** The one upstream clause each of two files is exempt from the negation check for — the whole clause, so it cannot be re-purposed, and not the file. */
+  const NEGATION_EXEMPT: Record<string, RegExp> = { 'frontend-design': /don't read as templated defaults/, 'silent-failure-hunter': /don't introduce silent failures/ };
+  /**
+   * The words that invert a trigger outright. Round 7 dropped ten more — `no`, `nor`, `except`, `only`,
+   * `skip`, `avoid`, `instead`, `nothing`, `none`, `nobody` — because those are the words a good trigger
+   * sentence uses (`Use only when the work is finished`, `skip your own PRs`) and the rail was failing the
+   * correct edit as hard as the harmful one, with no way forward but to word around it.
+   *
+   * The limit that leaves, per `add-guard-rail` §7: a negation spelt with `only`, `except`, `instead` or
+   * `nothing` is not caught. The pin still holds the words the trigger must contain; a reviewer reads the rest.
+   */
+  const NEGATION_WORDS = ['not', 'never', 'neither', 'unless', 'cannot'];
+  /** `'` or the curly `’` (U+2019, what macOS and Word substitute on typing) — from a code point, like LINE_SEPARATORS. */
+  const APOSTROPHE = `['${String.fromCharCode(0x2019)}]`;
+  /** A listed word, or any `…n't` contraction (`can't`, `don't`, `shouldn't`, `won’t`, …), either apostrophe. */
+  const NEGATED = new RegExp(`\\b(${NEGATION_WORDS.join('|')})\\b|\\w+n${APOSTROPHE}t\\b`, 'i');
+  /** The description with its exempt upstream phrase stripped, or as it is. */
+  const negationChecked = (name: string, description: string) => {
+    const phrase = NEGATION_EXEMPT[name];
+    return phrase ? description.replace(phrase, '') : description;
+  };
+
+  it('every skill and agent in the allow-list has a description pin, and nothing else does (#150)', () => {
+    const names = FRONTMATTER_FILES.map(([n]) => n).sort();
+    expect(Object.keys(DESCRIPTIONS).sort(), 'add the pin in the same pull request as the skill').toEqual(names);
+    expect(PROJECT_SKILLS, 'the project-written set — it must include the two body-railed skills')
+      .toEqual(expect.arrayContaining(['open-pr', 'add-guard-rail']));
+    // No per-file map may hold a dead key: a file that is no longer in the allow-list.
+    expect(names, 'HASH_IN_UPSTREAM_TEXT names a file the allow-list does not').toEqual(expect.arrayContaining(Object.keys(HASH_IN_UPSTREAM_TEXT)));
+    expect(names, 'NEGATION_EXEMPT names a file the allow-list does not').toEqual(expect.arrayContaining(Object.keys(NEGATION_EXEMPT)));
+    expect(names, 'EXTRA_KEYS names a file the allow-list does not').toEqual(expect.arrayContaining(Object.keys(EXTRA_KEYS)));
+    // Each negation exemption is for a phrase; if upstream drops it, the exemption fails loudly rather than going stale.
+    for (const [name, phrase] of Object.entries(NEGATION_EXEMPT)) {
+      const [, file] = FRONTMATTER_FILES.find(([n]) => n === name)!;
+      expect(frontmatter(file).description, `${name} is exempt from the negation check for its ${phrase} — drop its NEGATION_EXEMPT entry when that text is gone`)
+        .toMatch(phrase);
+    }
+  });
+
+  it.each(FRONTMATTER_FILES)('%s\'s description still names the job it triggers on (#150)', (name, file) => {
+    const { description } = frontmatter(file);
+    expect(description, `${file} has no description line to pin`).not.toBeNull();
+    // `toMatch(undefined)` passes vacuously, so a missing pin is checked here too, not only by the key-set guard.
+    expect(DESCRIPTIONS[name], `${file} has no pin in DESCRIPTIONS`).toBeInstanceOf(RegExp);
+    expect(description!, `${file}: the description no longer says what the skill is for — rewritten, the skill stops loading for the run that needs it (#150)`)
+      .toMatch(DESCRIPTIONS[name]);
+  });
+
+  it.each(FRONTMATTER_FILES)('%s\'s description does not negate its trigger (#150)', (name, file) => {
+    const { description } = frontmatter(file);
+    expect(description, `${file} has no description line to read`).not.toBeNull();
+    expect(negationChecked(name, description!), `${file}: a negation in the description inverts the trigger while keeping every pinned word (#150)`)
+      .not.toMatch(NEGATED);
+  });
+
+  it('the negation detector fires on every word it lists and on the inverted triggers it exists for, and stays quiet on a preposition (#150)', () => {
+    // One witness per word, written out in the list's own order rather than derived from it: a loop over the
+    // list would stay green when a word is dropped or swapped, which is the one change this self-test exists to
+    // catch. Each witness carries exactly its word, so it fires because of that word and stops firing without
+    // it — a witness that fires for another word (`neither … nor`) proves nothing about its own.
+    const WITNESSES: [string, string][] = [
+      ['not', 'Use when the work is not finished.'], ['never', 'Never use this on a routine run.'],
+      ['neither', 'Use when neither test is red.'], ['unless', 'Use unless the owner objects.'],
+      ['cannot', 'Use when a fix cannot wait.'],
+    ];
+    expect(WITNESSES.map(([w]) => w), 'one witness per word, in the order of NEGATION_WORDS').toEqual(NEGATION_WORDS);
+    for (const [word, sentence] of WITNESSES) {
+      const without = sentence.replace(new RegExp(`\\b${word}\\b`, 'i'), 'x');
+      expect(without, `the witness for "${word}" does not carry it`).not.toBe(sentence);
+      expect(NEGATED.test(sentence), `must fire on: ${sentence}`).toBe(true);
+      expect(NEGATED.test(sentence.toUpperCase()), `and on its upper case: ${sentence}`).toBe(true);
+      expect(NEGATED.test(without), `must fire only because of "${word}": ${without}`).toBe(false);
+    }
+    for (const inverted of [
+      'Open a pull request in Sky Ninja Academy. Use when you are NOT opening a pull request.',
+      'Use this skill unless a pull request is open.',
+      "Use when a review doesn't need a block.",
+      'Use when you have finished a piece of work on an issue. — never when the work is finished.',
+      'Use when a fix cannot wait for review.',
+      "Use when you can't open one.", "Use when the tests shouldn't run.", "Use when the owner won't be asked.",
+      `Use when you don${String.fromCharCode(0x2019)}t need a review.`, `Use when the tests aren${String.fromCharCode(0x2019)}t red.`,
+    ]) expect(NEGATED.test(inverted), `must fire on: ${inverted}`).toBe(true);
+    // "without" is a preposition, not an inverted trigger: `design-language` says "without opening every file".
+    expect(NEGATED.test('Use before touching CSS, to keep the look consistent without opening every existing file.')).toBe(false);
+    // Round 7: ordinary trigger sentences, every one red before the list was narrowed. Here so the rail is
+    // not broadened back onto the correct edit — the defect, not a shape the frontmatter may take.
+    for (const ordinary of [
+      'Use only when the work on an issue is finished.', 'Use when adding a topic instead of editing it by hand.',
+      'Use when acting as reviewer; skip your own PRs.', 'Use when a change is player-visible, except on a draft.',
+      'Use when there is no open review block.', 'Use when a rule needs a check and nothing else holds it.',
+    ]) expect(NEGATED.test(ordinary), `must stay quiet on: ${ordinary}`).toBe(false);
+    // The exemption strips the phrase and nothing else: the rest of an exempt description is still read.
+    expect(negationChecked('frontend-design', "Guidance. Never use it here. Choices that don't read as templated defaults.")).toMatch(NEGATED);
+    expect(negationChecked('frontend-design', "Guidance. Choices that don't read as templated defaults.")).not.toMatch(NEGATED);
   });
 
   it.each([
