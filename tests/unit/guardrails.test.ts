@@ -1544,6 +1544,72 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
 });
 
 /**
+ * #137 item 1: the tally chart's "gate stroke" — the diagonal line across a group of four uprights that turns
+ * `||||` into a five — is drawn entirely in `::after`, which a unit test cannot see rendered, only read as
+ * text. The existing generator test pins the *class* `tal five` and the four uprights; none of it can tell
+ * whether the pseudo-element that actually draws the fifth mark still exists, still has a visible stroke, or
+ * is still positioned inside its own `.tal`. Six mutations proved this gap (the issue's own table): deleting
+ * the rule, retargeting it to a class nothing emits, collapsing the stroke to zero width, dropping
+ * `position: relative` from `.tal` (the anchor the `::after` is positioned against), deleting
+ * `display: contents` from `.chart-row` (which is what lets `.cat`/`.data` sit directly in the `.chart` grid),
+ * and deleting the base `.chart` grid rule, `.chart .blk` or `.chart .key` outright — every one of them left
+ * the whole suite, e2e included (it only asserts `.tal` is visible, not what it draws), green.
+ *
+ * The stylesheet is read with readFileSync, not the `?raw` glob elsewhere in this file: Vite's CSS plugin
+ * returns an empty string outside a browser, which would make this rail pass on nothing. The length assertion
+ * is what proves it read real content, the same idiom as the #107/#109 rails above.
+ */
+describe('the chart visual\'s CSS structure cannot go missing without a red test (#137)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  it('the base grid, the row, the block and the key rules all exist', () => {
+    expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    const chart = bare.match(/(?:^|[}\s])\.chart\s*\{([^}]*)\}/)?.[1];
+    expect(chart, 'the base .chart rule must exist (#137)').toBeTruthy();
+    expect(chart, 'the chart lays its rows out on a grid, or .chart-row: display: contents below has nothing to plug into')
+      .toMatch(/display:\s*grid/);
+
+    const row = bare.match(/\.chart\s+\.chart-row\s*\{([^}]*)\}/)?.[1];
+    expect(row, 'a .chart .chart-row rule must exist (#137)').toBeTruthy();
+    expect(row, '.chart-row must stay display: contents, or .cat/.data stop sitting directly in the grid')
+      .toMatch(/display:\s*contents/);
+
+    expect(bare, 'a .chart .blk rule must exist — one per child in a block diagram').toMatch(/\.chart\s+\.blk\s*\{[^}]*\}/);
+    expect(bare, 'a .chart .key rule must exist — the pictogram key line').toMatch(/\.chart\s+\.key\s*\{[^}]*\}/);
+  });
+
+  it('the tally gate stroke exists, is anchored to its upright group, and is actually visible', () => {
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    const tal = bare.match(/\.chart\s+\.tal\s*\{([^}]*)\}/)?.[1];
+    expect(tal, 'a .chart .tal rule must exist').toBeTruthy();
+    expect(tal, '.tal must stay position: relative, or its ::after gate stroke positions against the wrong box')
+      .toMatch(/position:\s*relative/);
+
+    const gate = bare.match(/\.chart\s+\.tal\.five::after\s*\{([^}]*)\}/)?.[1];
+    expect(gate, 'a .chart .tal.five::after rule must exist — a tally of five renders identically to four without it')
+      .toBeTruthy();
+
+    const width = gate!.match(/border-top:\s*([\d.]+)px/)?.[1];
+    expect(width, 'the gate stroke must be drawn with a border-top width').toBeTruthy();
+    expect(Number(width), 'a zero-width border-top draws no visible stroke at all').toBeGreaterThan(0);
+
+    // `inset: top right bottom left`. Width is `containingBlockWidth - right - left`: a fixed px offset on
+    // each side (as shipped, -2px/-2px) always leaves a real width, but a *percentage* offset is relative to
+    // the row's own width and can be made to collapse it to nothing — `50% 50%` gives width 0, and "the
+    // offsets differ" cannot catch that (`50%`/`50%` are equal, but so are the legitimate `-2px`/`-2px`).
+    // Requiring px on both sides is what actually rules the collapse out.
+    const inset = gate!.match(/inset:\s*([^;}]+)/)?.[1].trim().split(/\s+/);
+    expect(inset?.length, 'inset must give all four offsets').toBe(4);
+    expect(inset![1], 'the right offset must be a fixed px value — a % of the row width can collapse the stroke to zero')
+      .toMatch(/^-?[\d.]+px$/);
+    expect(inset![3], 'same for the left offset')
+      .toMatch(/^-?[\d.]+px$/);
+  });
+});
+
+/**
  * #110: the opening screen's "Your name" field was the last thing on a long page — brand header, the full
  * eleven-card grid, *then* the field — and `.avatar-grid` is `repeat(auto-fill, minmax(104px, 1fr))`, so the
  * wider and taller the screen the further down it went. On a tablet it was below the fold behind every card.

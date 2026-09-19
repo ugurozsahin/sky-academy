@@ -66,11 +66,29 @@ export function renderVisual(v: Visual | undefined): string {
       // than rounding to a count the data does not have. A picture that lies is worse here than a plain one,
       // and `each: 0` used to throw `RangeError` out of `renderVisual` — uncaught in `play-session.ts`'s
       // `show()`, which would abort before `spawnWave` and leave a question card with no bubbles (#8 review).
+      //
+      // #137 item 2: `n` is just as unconstrained on the same public type, reached the same way, and used to
+      // throw (`n: -3`, invalid array/repeat length), hang forever (`n: Infinity`, `Math.floor(Infinity/5)`
+      // never terminates the tally loop) or exhaust the heap (`n: 1e9`). A row outside a sane range renders as
+      // an empty one instead — real generator output never exceeds 30 (a d2 pictogram, 6 icons * each 5), so
+      // the cap below leaves a wide margin without allowing unbounded allocation from a malformed `Visual`.
+      const CHART_ROW_CAP = 200;
+      const rows = v.rows.map(r => {
+        const safe = Number.isInteger(r.n) && r.n >= 0 && r.n <= CHART_ROW_CAP ? r.n : 0;
+        if (safe !== r.n) console.warn(`chart visual: row "${r.label}" had an invalid count (${r.n}) — rendered as 0`);
+        return safe === r.n ? r : { ...r, n: safe };
+      });
       const wanted = v.each ?? 1;
-      const usable = Number.isInteger(wanted) && wanted > 0 && v.rows.every(r => r.n % wanted === 0);
+      const usable = Number.isInteger(wanted) && wanted > 0 && rows.every(r => r.n % wanted === 0);
+      // #137 item 5: the demotion below (key silently becomes 1, so a d2 pictogram draws one symbol per
+      // child) is the right call — refusing loudly mid-mission would be worse than a coarser-but-honest
+      // picture — but it used to leave no trace anywhere. Name the rows that forced it.
+      if (v.kind === 'pictogram' && wanted !== 1 && !usable) {
+        console.warn(`chart visual: key ${wanted} does not divide every row's count — demoted to 1, no key shown`);
+      }
       const each = usable ? wanted : 1;
       const icon = v.icon ?? '⭐';
-      const body = v.rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
+      const body = rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
       // The key is the whole point of a pictogram — without it the picture is a different number from the data.
       const key = v.kind === 'pictogram' && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
       return `<div class="vis"><div class="chart ${v.kind}">${body}${key}</div></div>`;

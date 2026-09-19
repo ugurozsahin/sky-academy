@@ -318,8 +318,16 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
       for (const row of v.rows) {
         expect(row.n, `${q.prompt} — a count must be a positive whole number`).toBeGreaterThan(0);
         // A block diagram draws one block per child, so the row length is a layout budget, not just a number:
-        // raising the roll to 30 would run a row off a phone and nothing else would notice.
+        // raising the roll to 30 would run a row off a phone and nothing else would notice. #137 item 6: the
+        // same is true of a tally (drawn as groups of upright marks) and a pictogram (drawn as `n / each`
+        // symbols, the visible row length, not the raw count) — neither had a budget, so raising either roll
+        // stayed green while running a row off a phone.
         if (v.kind === 'block') expect(row.n, 'a block row must stay short enough to fit a phone').toBeLessThanOrEqual(10);
+        if (v.kind === 'tally') expect(row.n, 'a tally row must stay short enough to fit a phone').toBeLessThanOrEqual(10);
+        if (v.kind === 'pictogram') {
+          expect(row.n / (v.each ?? 1), 'a pictogram row (n / each symbols drawn) must stay short enough to fit a phone')
+            .toBeLessThanOrEqual(10);
+        }
       }
       // The pictogram symbol must not be one of the categories it is counting.
       if (v.kind === 'pictogram') for (const row of v.rows) expect(row.label).not.toContain(v.icon);
