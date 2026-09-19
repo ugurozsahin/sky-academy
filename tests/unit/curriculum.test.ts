@@ -304,6 +304,7 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
   it.each([1, 2, 3] as Difficulty[])('difficulty %s: every answer is re-derivable from the rows drawn', (d) => {
     const r = rng(500 + d);
     const shapesSeen = new Set<string>();
+    const eachSeen = new Set<number>();
     for (let i = 0; i < 300; i++) {
       const q = t.gen(d, r);
       expect(q.visual?.type, q.prompt).toBe('chart');
@@ -334,6 +335,10 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
       // A pictogram draws n / each symbols: a count that is not a whole multiple of the key draws a lie.
       if (v.kind === 'pictogram') for (const row of v.rows) expect(row.n % (v.each ?? 1), `${q.prompt} key=${v.each}`).toBe(0);
       else expect(v.each ?? 1, 'only a pictogram has a key').toBe(1);
+      // #137 item 6: the generator's key set (`pick(rng, [2, 5])`) was never pinned in the unit suite — only
+      // the e2e rail (mobile-only, skipped when a diff cannot reach the game) touched it. Widening it, or
+      // collapsing it to a single value, stayed green here.
+      if (v.kind === 'pictogram') eachSeen.add(v.each!);
 
       const rowFor = (icon: string) => v.rows.find(x => x.label.startsWith(icon))!;
       let expected: string;
@@ -350,6 +355,12 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
         const top = Math.max(...v.rows.map(x => x.n));
         expect(v.rows.filter(x => x.n === top).length, 'a tie would make two options correct').toBe(1);
         expected = v.rows.find(x => x.n === top)!.label.split(' ').slice(1).join(' ');
+        // #137 item 6: `most` offering one distractor instead of two, or the emojis instead of the category
+        // names, both left the generic "options.length >= 2" check green — a d1 tally never asks `most` at
+        // all (WANT_ASKS[1]), so nothing elsewhere in the suite reaches this shape.
+        const names = v.rows.map(x => x.label.split(' ').slice(1).join(' '));
+        expect(q.options.length, q.prompt).toBe(3);
+        expect([...q.options].sort(), q.prompt).toEqual([...names].sort());
       } else {
         m = q.prompt.match(/^How many chose (\S+)\?$/);
         expect(m, `unrecognised prompt shape: ${q.prompt}`).not.toBeNull();
@@ -362,6 +373,7 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
     // Coverage is what pins the progression rather than merely permitting it (#8 review).
     expect([...shapesSeen].sort(), `d${d} must actually ask all of ${WANT_ASKS[d].join(', ')} in 300 draws`)
       .toEqual([...WANT_ASKS[d]].sort());
+    if (WANT_KIND[d] === 'pictogram') expect([...eachSeen].sort(), 'the pictogram key set is exactly {2, 5}').toEqual([2, 5]);
   });
 });
 

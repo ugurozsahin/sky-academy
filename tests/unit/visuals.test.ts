@@ -171,6 +171,40 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
     }
   });
 
+  // #137 item 3: the guard is `Number.isInteger(wanted) && wanted > 0 && rows.every(r => r.n % wanted === 0)`.
+  // The test above already exercises `wanted > 0` (via 0 and -2) and the case where `every` matters least
+  // (all three rows divide by 2 anyway). It never reaches a fixture where dropping `Number.isInteger` or
+  // swapping `every` for `some` would actually change the output — both mutations stayed green under #137's
+  // own review. These two do change under each mutation.
+  it('a fractional key is refused even when it happens to divide every row evenly', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});   // the demotion trace is expected here
+    try {
+      // 3 % 1.5 === 0 and 6 % 1.5 === 0 in JS, so `rows.every(r => r.n % wanted === 0)` alone would call this
+      // usable — only `Number.isInteger(wanted)` stops "1 ⭐ = 1.5 children" from being drawn.
+      const rows = [{ label: 'a', n: 3 }, { label: 'b', n: 6 }];
+      const h = renderVisual({ type: 'chart', kind: 'pictogram', rows, icon: '⭐', each: 1.5 });
+      expect(perRow(h, /class="pic"/g), 'demoted to one symbol per child, not 2/4').toEqual([3, 6]);
+      expect(h).not.toContain('class="key"');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('one row failing to divide the key demotes every row, not just the one that fails', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});   // the demotion trace is expected here
+    try {
+      // rows.every(...): 6 % 2 === 0 but 7 % 2 !== 0, so the whole chart falls back to each=1 — a demotion
+      // that is all-or-nothing across rows (the same rule item 4 in the issue names for the pictogram key
+      // line). Swapping `every` for `some` would instead keep each=2 and draw 3 for the n:7 row — half a child.
+      const rows = [{ label: 'a', n: 6 }, { label: 'b', n: 7 }];
+      const h = renderVisual({ type: 'chart', kind: 'pictogram', rows, icon: '⭐', each: 2 });
+      expect(perRow(h, /class="pic"/g), 'neither row is drawn at the requested key').toEqual([6, 7]);
+      expect(h).not.toContain('class="key"');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('a tally groups in fives, and the fifth mark is the gate stroke rather than a fifth upright', () => {
     const h = renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: '🐶 dogs', n: 7 }] });
     expect(count(h, /class="tal five"/g)).toBe(1);             // one complete gate
@@ -194,6 +228,27 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
 
   it('escapes the category label rather than trusting it as markup', () => {
     expect(renderVisual({ type: 'chart', kind: 'block', rows: [{ label: '<b>x</b>', n: 1 }] })).toContain('&lt;b&gt;');
+  });
+
+  // #137 item 4: `label` was escaped, `icon` was not, though both reach this template as unconstrained
+  // strings on the same public `Visual`. `PICTO_SYMBOL` is the only `icon` any producer supplies today, so
+  // this was never a live injection — the point is the asymmetry itself, which a test naming only the safe
+  // field would certify rather than catch.
+  it('escapes the pictogram icon too, in both the row and the key', () => {
+    const rows = [{ label: 'a', n: 4 }, { label: 'b', n: 4 }];
+    const h = renderVisual({ type: 'chart', kind: 'pictogram', rows, icon: '<i>x</i>', each: 2 });
+    expect(h).not.toContain('<i>x</i>');
+    expect(h).toContain('&lt;i&gt;x&lt;/i&gt;');
+  });
+
+  // `kind` is a three-way literal on `Visual` — no generator can produce anything else — but it is
+  // interpolated raw into a class attribute the same way `icon` was, so a hand-edited or migrated blob that
+  // slips past the type checker (the way #95's corrupted-save fixtures already do elsewhere in this file)
+  // gets the same treatment rather than a silent hole. `as unknown as` here stands in for that corruption.
+  it('escapes `kind` too, defensively, since it interpolates into a class attribute the same way `icon` does', () => {
+    const rows = [{ label: 'a', n: 1 }];
+    const bad = { type: 'chart', kind: '"><script>', rows } as unknown as Parameters<typeof renderVisual>[0];
+    expect(renderVisual(bad)).not.toContain('<script>');
   });
 
   // #137 item 2: `n` is just as unconstrained on the public `Visual` type as `each` (above), and reached the

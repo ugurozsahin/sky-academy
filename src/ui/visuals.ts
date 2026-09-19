@@ -87,11 +87,17 @@ export function renderVisual(v: Visual | undefined): string {
         console.warn(`chart visual: key ${wanted} does not divide every row's count — demoted to 1, no key shown`);
       }
       const each = usable ? wanted : 1;
-      const icon = v.icon ?? '⭐';
+      // #137 item 4: `icon` reaches this template exactly as `label` does (both are unconstrained strings on
+      // a public `Visual`), but only `label` was escaped — `icon` and `v.kind` (interpolated raw into a class
+      // attribute) were not. `PICTO_SYMBOL` is the only `icon` any producer supplies today, so this was never
+      // a live injection, but the review that found it called it the trap: a test naming the one field that
+      // is escaped reads as proof the row is safe, when its neighbour is not.
+      const icon = esc(v.icon ?? '⭐');
+      const kind = esc(v.kind);
       const body = rows.map(r => `<div class="chart-row"><span class="cat">${esc(r.label)}</span><span class="data">${chartRow(v.kind, r.n, each, icon)}</span></div>`).join('');
       // The key is the whole point of a pictogram — without it the picture is a different number from the data.
       const key = v.kind === 'pictogram' && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
-      return `<div class="vis"><div class="chart ${v.kind}">${body}${key}</div></div>`;
+      return `<div class="vis"><div class="chart ${kind}">${body}${key}</div></div>`;
     }
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
     case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
