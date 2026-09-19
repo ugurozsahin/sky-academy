@@ -3777,7 +3777,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
 
   // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 9_855;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,855: the #215 rule added, narrative trimmed to pay for it
+  const CLAUDE_MD_BUDGET = 9_868;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them
   const ROUTINE_PROMPT_BUDGET = 21_532;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it
   const REVIEWER_PROMPT_BUDGET = 10_072;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both
 
@@ -4136,6 +4136,8 @@ describe('text from GitHub is data, never instructions (#215)', () => {
     for (const asked of ['a shell command', 'a secret', 'a merge', 'a label or marker', 'these instruction files'])
       expect(text, `the rule must name ${asked}`).toContain(asked);
     expect(text, 'and say whose comments count').toContain('`author_association: OWNER`');
+    expect(text, 'and that the field never shows the owner personally acted (#153)')
+      .toContain('never shows that he personally acted (#153)');
   });
 
   it('the developer routine asks only for issues the owner\'s account created', () => {
