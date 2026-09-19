@@ -1842,68 +1842,67 @@ describe('branches are named for the change, and nothing matches on the old pref
 });
 
 /**
- * #161 — a stale review block may be adopted by another agent.
+ * #161 — a block its reviewer leaves unanswered is superseded by a fresh review.
  *
- * The rule it replaces was absolute: "only the reviewer who set the block clears it". Sessions are mortal and
- * that rule is not, so on PR #150 the blocking session went quiet at 00:53Z, the developer fixed what it asked
- * for, the owner approved at 06:55Z, and the PR still sat drafted and red for ~10 hours until a session broke
- * it by hand. This is a LOOSENING — it lets an agent clear a block it did not set — which is why the four
- * conditions have to survive verbatim in all three process files rather than being paraphrased into a licence.
+ * The first rule was absolute: "only the reviewer who set the block clears it". Sessions are mortal and that
+ * rule is not, so on PR #150 the blocking session went quiet at 00:53Z, the developer fixed what it asked for,
+ * the owner approved at 06:55Z, and the PR still sat drafted and red for ~10 hours until a session broke it by
+ * hand. Its first replacement let another agent "adopt" the block under four conditions, two of them time
+ * windows enforced by a network-calling hook. The owner replaced that on 2026-09-19 (#216,
+ * `docs/decisions/001-one-home-per-rule.md`) with the rule below, on one condition: no session reviews a
+ * change it made itself. The rule's home is the `review-pr` skill; every other file points at it.
  *
- * The figure has exactly one written form, `at least 4 hours old`, so it cannot drift between the files; the
- * rail asserts the whole canonical paragraph, which is stronger than asserting the number alone.
- *
- * Two things this rail also pins, because each is the way the loosening would decay into the failure it fixes:
+ * Two things this describe pins, because each is a way the rule would decay:
  *
  *  - **`scripts/review-gate.mjs` has no clock.** A block must never expire by itself — that is how #74 was
  *    merged over five open review items. The gate reads marker ORDER (which `created_at` is later), never
  *    elapsed time, so `Date.now` appearing in it at all means someone taught it to age a block out.
- *  - **The absolute wording is gone from all three files.** Leaving it beside the new rule is worse than not
- *    landing the rule: a run finds "only the reviewer who set it may clear it" and obeys the stricter of two
- *    contradicting sentences, which is the stall again.
+ *  - **The skill keeps the phrase the gate keys on.** `isAdoptionClear()` recognises a superseding clear by
+ *    the words "another reviewer's block" and `blockState()` then demands a session URL of it (#191/#195).
  *
- * Prove it red: drop the paragraph from any of the three files; change `4 hours` to `four hours` in one of
- * them; put the retired absolute sentence back; or add `Date.now()` to the gate.
+ * Prove it red: drop the sentence from `CLAUDE.md` or the routine prompt; put a time window back beside it;
+ * reword "another reviewer's block" in the skill; or add `Date.now()` to the gate.
  */
-describe('a stale review block may be adopted, and only under the four conditions (#161)', () => {
+describe('a block its reviewer leaves unanswered is superseded by a fresh review (#161)', () => {
   const root = new URL('../../', import.meta.url);
   const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
   const PROCESS = ['CLAUDE.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md'];
+  const flat = (s: string) => s.replace(/\s+/g, ' ');
+  // The retired rule's two figures. Built from parts so a repository-wide grep for them finds only a real copy.
+  const WINDOW = new RegExp(['at least 4 ', 'hours|in the last 2 ', 'hours'].join(''));
 
-  // The canonical paragraph, in the one form all three files must carry. Split across lines for readability
-  // only — it is rejoined with single spaces, so the assertion is on the exact prose in the files.
-  const CANON = [
-    '**A stale review block may be adopted (#161).** A `REVIEW: CHANGES REQUESTED` block may be cleared by an',
-    'agent that did not open the pull request when all four of these hold: the block is **at least 4 hours',
-    'old**; the session that set it has posted **no comment on that same pull request in the last 2 hours**',
-    '(a comment elsewhere in the repository does not protect the block — it is the signal that the reviewer',
-    'has moved on); the adopting agent has re-derived the original objection against the current head and',
-    'found it genuinely resolved; and its `REVIEW: CLEARED` comment says in its own first lines that it is',
-    'clearing another reviewer\'s block and names the conditions that made that legitimate.',
-  ].join(' ');
-
-  it.each(PROCESS)('%s carries the adoption rule in the one canonical form', (name) => {
-    const text = read(name);
-    expect(text.length, `${name} must be read from disk as text, or this rail checks nothing`)
-      .toBeGreaterThan(300);
-    expect(text, `${name} must state the four conditions word for word — a paraphrase is how a loosening widens`)
-      .toContain(CANON);
+  // One home per rule (docs/decisions/001): the two files a run reads carry one sentence and a pointer, and
+  // no window — a figure beside the block protocol is the retired adoption rule coming back.
+  it('CLAUDE.md and the routine prompt point at the review-pr skill for the rule, state no time window, and BACKLOG.md has dropped it', () => {
+    for (const name of ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md']) {
+      const text = flat(read(name));
+      expect(text, `${name} must say what happens to a block its reviewer leaves unanswered`)
+        .toContain('superseded by a fresh review (#161)');
+      expect(text, `${name} must say a block never expires on its own`).toContain('a block never expires by itself');
+      expect(text, `${name} must point at the rule's home`).toMatch(/the `review-pr` skill §6 has the rule/);
+      expect(text, `${name} states a time window for the block protocol — the rule has none any more`)
+        .not.toMatch(WINDOW);
+      expect(text, `${name} still carries the retired adoption rule`).not.toContain('may be adopted');
+    }
+    expect(read('BACKLOG.md'), 'BACKLOG.md is retiring (#218) and no longer carries this rule at all')
+      .not.toContain('may be adopted');
   });
 
-  it.each(PROCESS)('%s keeps the limits that did not move, and drops the absolute rule', (name) => {
-    const text = read(name);
-    expect(text, `${name} must still forbid clearing your own block, and a live reviewer's`)
-      .toContain('Clearing your own block is still forbidden, and so is clearing a live reviewer\'s');
-    expect(text, `${name} must say a block never expires on its own`).toContain('A block never expires by itself');
-    // Built from parts so this rail's own source is not what trips it.
-    expect(text, `${name} still carries the retired absolute rule, which contradicts the adoption rule (#161)`)
-      .not.toContain('Only the reviewer who set ');
-    // #213: the windowless repo-wide test is the one that made the loosening a dead letter. It must not
-    // survive anywhere beside the window that replaced it, in any of the three files.
-    expect(text, `${name} still carries #213's windowless repo-wide silence test`)
-      .not.toContain('commented nowhere in the repository');
-    expect(text, `${name} must state the window, and the figure has one written form`)
-      .toContain('in the last 2 hours');
+  // The home itself. Scoped to §6, the section that owns the rule, so a copy elsewhere cannot satisfy it.
+  it('the review-pr skill carries the rule: who may supersede a block, who never may, and the phrase the gate keys on', () => {
+    const skill = read('.claude/skills/review-pr/SKILL.md');
+    const start = skill.indexOf('\n## 6. '), end = skill.indexOf('\n## ', start + 1);
+    expect(start, 'the review-pr skill has lost its §6').toBeGreaterThan(-1);
+    const s6 = flat(skill.slice(start, end === -1 ? undefined : end));
+    expect(s6, 'who may supersede: a run with no hand in the change')
+      .toContain('neither opened the pull request nor pushed a commit to it');
+    expect(s6, "the owner's one condition (2026-09-19)").toContain('No session reviews its own change');
+    expect(s6, 'and it is a review from scratch, not a countersignature').toContain('reviews it from scratch against the current head');
+    expect(s6, 'isAdoptionClear() in scripts/review-gate.mjs keys on this exact phrase, and blockState() then requires '
+      + 'a session URL of the clearing comment — reword it here and superseding clears stop being recognised')
+      .toContain("another reviewer's block");
+    expect(s6, 'a block still never expires on its own').toContain('A block never expires by itself');
+    expect(s6, 'the rule has no time window any more').not.toMatch(WINDOW);
   });
 
   /**
@@ -1921,26 +1920,28 @@ describe('a stale review block may be adopted, and only under the four condition
    * `hasSessionUrl()` and adds to `blocked`/`reasons` when it's missing — a real gate, not just a phrase in
    * three files (an older version of this comment said otherwise; it wasn't updated when #195 landed).
    *
-   * #216 §1: this is the one #161-family rule real enough to collapse — `CLAUDE.md`, `BACKLOG.md` and
-   * `docs/ROUTINE-PROMPT.md` now each carry a pointer to `.claude/rules/governance.md` instead of the full
-   * sentence, and governance.md carries the rule itself plus the `hasSessionUrl()`/`blockState()` citation.
-   * The other #161-family rules (the CANON paragraph above, #199, #200) stay triplicated — none of them
-   * has real code enforcement yet, per #216 §1's table.
+   * #216 §1 collapsed this to one copy: governance.md carries the rule itself plus the
+   * `hasSessionUrl()`/`blockState()` citation. The three process files used to point at it from inside their
+   * adoption paragraph; when #161 became "superseded by a fresh review" (2026-09-19) that paragraph went, and
+   * the mention moved to the `review-pr` skill §6, where a superseding clear is written about. (#199 and #200
+   * stay triplicated.)
    *
-   * Prove it red: drop the pointer from any one of the three files, or the rule itself from governance.md.
+   * Prove it red: drop the rule from governance.md, or the session-URL sentence from the review-pr skill.
    */
-  it('the #191 clearing-side session-URL rule lives in governance.md, pointed to from the three process files', () => {
+  it('the #191 clearing-side session-URL rule lives in governance.md, and the review-pr skill says so where a clear is written', () => {
     const gov = read('.claude/rules/governance.md');
     expect(gov, 'governance.md must state the #191 rule itself, not just point elsewhere')
       .toContain("carries its own session URL too (#191)");
     expect(gov, 'and name the code that actually enforces it, or this is prose again').toContain('hasSessionUrl');
     for (const name of PROCESS) {
-      const text = read(name);
-      expect(text, `${name} must point at governance.md for #191's rule`)
-        .toContain('(Its own session-URL requirement is in `.claude/rules/governance.md`, #191.)');
-      expect(text, `${name} must not also restate the #191 rule verbatim — the whole point is one copy`)
+      expect(read(name), `${name} must not also restate the #191 rule verbatim — the whole point is one copy`)
         .not.toContain("it carries the clearing session's own URL too");
     }
+    // The pointer used to ride inside the adoption paragraph of each process file. That paragraph is gone
+    // (#161 now has one home, the review-pr skill), so the pointer lives where the superseding clear is
+    // written about.
+    expect(flat(read('.claude/skills/review-pr/SKILL.md')), 'the review-pr skill must say a superseding clear carries a session URL')
+      .toMatch(/requires the comment to carry a session URL \(#191\)/);
   });
 
   /**
@@ -2032,47 +2033,6 @@ describe('a stale review block may be adopted, and only under the four condition
   });
 
   /**
-   * #101/#216 §1 — CANON's two MECHANICAL conditions (age, silence — see #161's two mechanical checks in
-   * docs/ROUTINE-PROMPT.md STEP 2 for the figures themselves) now have real enforcement: a `PreToolUse` hook
-   * denies an `issue_write`/`add_issue_comment` write whose body is a #161 adoption clear (`isAdoptionClear()`
-   * from scripts/review-gate.mjs — the same litmus test already used elsewhere in this codebase, not a new
-   * heuristic) unless `canAdoptNow()` (scripts/adoption-check.mjs) says both conditions hold against the pull
-   * request's LIVE comments, fetched from the GitHub API at write time. Conditions 3 (re-deriving the original
-   * objection) and 4 (the clearing comment's own wording) stay a judgment call no function can make — the same
-   * bar every other Layer 4 piece has cleared: enforce what is mechanical, leave what is not.
-   *
-   * `canAdoptNow` deliberately does NOT live in `scripts/review-gate.mjs` — that file must never read a clock
-   * (the "review-gate.mjs orders the markers and never reads a clock" rail just above), because it is
-   * re-evaluated on every CI run and a clock inside it would let a block age itself out with nobody having
-   * adopted anything, which is #74 again. This hook runs once, at write time, and its answer becomes fixed
-   * history the instant the write does or does not happen — structurally different from a repeatedly-polled
-   * CI check, so it is the one place in this codebase allowed to read a clock for this rule.
-   *
-   * This governance.md bullet deliberately states NEITHER figure (the fourth hours nor the two hours): the
-   * rail below ("no .claude/ document carries a second copy of the adoption conditions") already forbids any
-   * Markdown file under .claude/ from stating a time window beside the block protocol, governance.md included,
-   * and a pointer at STEP 2 is what that rail asks for instead.
-   *
-   * Prove it red: drop the governance.md bullet, or remove the hook from `.claude/settings.json`.
-   */
-  it('CANON is enforced in code for its two mechanical conditions, documented in governance.md without restating a window', () => {
-    const gov = read('.claude/rules/governance.md');
-    expect(gov, 'governance.md must state the rule itself').toContain('CANON');
-    expect(gov, 'and name the enforcing hook, or this is prose again').toContain('PreToolUse');
-    expect(gov, 'and the pure function that makes the call').toContain('canAdoptNow');
-    expect(gov, 'and say it never touches review-gate.mjs, or the no-clock rail is not actually cited')
-      .toContain('review-gate.mjs');
-    expect(gov, 'and point at STEP 2 for the figures, per the rail that forbids restating them here')
-      .toContain('ROUTINE-PROMPT.md');
-    // The window rail below applies to every .claude/ .md file, this one included — self-check here too so a
-    // future edit that adds "4 hours" or "2 hours" to this bullet fails immediately, in the same describe
-    // block, rather than only in the repo-wide walk many lines away.
-    const WINDOW = /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty|sixty)[\s-]*(?:minute|hour|day|week)s?\b/i;
-    expect(WINDOW.exec(gov)?.[0], 'governance.md states a time window beside the block protocol — CANON’s figures live only in docs/ROUTINE-PROMPT.md STEP 2')
-      .toBeUndefined();
-  });
-
-  /**
    * #199/#200 — the session-URL and content-floor rules stop being special-cased to the two REVIEW: markers.
    *
    * #189 made a REVIEW: CHANGES REQUESTED block, and #191 made a #161-adopting REVIEW: CLEARED comment,
@@ -2101,54 +2061,6 @@ describe('a stale review block may be adopted, and only under the four condition
       .toContain("**A comment or issue states its point up front, not only its signature (#200).** The floor for every one of them: say in the first line or two what it is and why it matters right now, then close with the `Session:` line above \u2014 nothing forces a heading onto a one-line status note, but the note has to actually say its point rather than assume the reader infers it. A fix-push comment additionally opens `Pushed <sha>, addressing <what>`, answers each blocking finding by the review's own numbering, states the tests it ran, and closes `Ready for re-review` \u2014 never `REVIEW: CLEARED`, which stays the reviewer's own mark. An issue proposing a fix additionally states the problem with real evidence, a `## Proposed fix` section, and a `## What this deliberately does not do` section \u2014 the same two-sided shape `open-pr/SKILL.md` \u00a73 already asks of a pull request body, written down for issues too rather than left to happen to match by habit.");
   });
 
-  /**
-   * #213 — the window is measured on the blocked pull request, never repo-wide.
-   *
-   * The owner's decision of 2026-09-12T08:40Z, and the whole of the fix. "Has this session written anything
-   * anywhere since" is ~always true — a reviewing run posts its block and then merges something, comments on
-   * an issue, or opens its own PR before it ends — so with no window the condition could never be satisfied
-   * and every block became permanently unadoptable. #204, #209, #214, #221 and #222 each stalled that way,
-   * with their authors' fixes pushed and CI green.
-   *
-   * A comment the setter left elsewhere is evidence it has moved ON, so it must never be read as evidence the
-   * block is live. That inversion is the way this would silently decay back: widen the window's scope from the
-   * PR to the repository and the rule is a dead letter again, with nothing red to say so.
-   *
-   * Prove it red: drop the "on this pull request only" sentence, or point the check back at the repo-wide
-   * `issues/comments` listing.
-   */
-  it('the silence window is scoped to the blocked pull request, not the repository (#213)', () => {
-    const text = read('docs/ROUTINE-PROMPT.md');
-    expect(text, 'STEP 2 must scope the window to the one pull request')
-      .toContain('**The window is measured on this pull request only, never repo-wide.**');
-    expect(text, 'and say that a comment elsewhere is the reviewer moving on, never a live block')
-      .toMatch(/moved on\*?\*?, so it does not protect the block/);
-    // The repo-wide listing is what condition 1 must no longer be checked against.
-    expect(text, 'the retired repo-wide listing must not be left standing as the check to run')
-      .not.toMatch(/issues\/comments\?sort=created/);
-  });
-
-  // The watchdog tells the owner which conditions already hold, so it must carry the same window.
-  it('the watchdog quotes the adoption conditions with the same window (#213)', () => {
-    const text = read('docs/WATCHDOG-PROMPT.md');
-    expect(text, 'the watchdog must not hand the owner the retired condition')
-      .not.toContain('commented\n   nowhere in the repository since');
-    expect(text, 'it must state the window it tells a run to check')
-      .toContain('no\n   comment on that same pull request in the last 2 hours');
-  });
-
-  // Acceptance criterion: STEP 2 tells a run how to check the two conditions it cannot eyeball.
-  it('STEP 2 gives the two mechanical checks, and fails closed without a session id', () => {
-    const text = read('docs/ROUTINE-PROMPT.md');
-    expect(text, 'age comes from the blocking comment itself').toMatch(/issues\/<pr>\/comments/);
-    expect(text, 'and the setter is identified by session URL, since one token serves every agent')
-      .toMatch(/https:\/\/claude\.ai\/code\/session_<id>/);
-    expect(text, 'with the window that makes silence checkable, read off the blocked PR itself (#213)')
-      .toMatch(/less than 2 hours old/);
-    expect(text, 'and no session id must mean NOT adoptable, never "probably gone"')
-      .toMatch(/is not adoptable/i);
-  });
-
   // The gate reports the block; it never ages one out. #74 is what an expiring block costs.
   it('review-gate.mjs orders the markers and never reads a clock', () => {
     const src = read('scripts/review-gate.mjs');
@@ -2157,132 +2069,12 @@ describe('a stale review block may be adopted, and only under the four condition
       .not.toMatch(/Date\.now|getTime\(\)|\b\d+\s*\*\s*60\s*\*\s*60\b/);
   });
 
-  it('the watchdog tells the owner a stalled block is adoptable, not merely stuck', () => {
-    const text = read('docs/WATCHDOG-PROMPT.md');
-    expect(text, 'the stale-block step must name the rule').toMatch(/Since #161 such a block is adoptable/);
-    expect(text, 'and point at where the mechanical checks live').toMatch(/ROUTINE-PROMPT\.md` STEP 2/);
-  });
-
-  /**
-   * And nothing under `.claude/` may carry a fourth copy of the conditions.
-   *
-   * The three rails above hold the three process files identical to each other. They cannot see a copy that
-   * lives somewhere else, and PR #235's first cut put one in `.claude/skills/review-pr/SKILL.md` — a
-   * paraphrase, in the reviewer's own words. The reviewing agent demonstrated what that costs: changing
-   * `at least 4 hours old` to `at least 20 minutes old` in the skill, and swapping the pull-request-scoped
-   * silence window for #213's retired repo-wide one, each left all 855 tests green. A run reading the skill
-   * and not STEP 2 would then have adopted a twenty-minute-old block — which is clearing a live reviewer's.
-   *
-   * `.claude/` is the scope because it is the context a run loads *about to do this job*: a skill's body
-   * arrives in the turn its description triggers, and an agent definition arrives with the agent. A widened
-   * condition anywhere else is a bug; a widened condition here is one the run is actively reading.
-   *
-   * **The first cut of this rail matched only the canonical phrasings, and that was the wrong half.** Its
-   * author argued a widening "has no reason to reword condition 3"; #235's second reviewer showed it has
-   * every reason, with a paraphrase that said "re-checked the objection against the current head" instead of
-   * "re-derived the original objection" and carried a twenty-minute window and #213's retired repo-wide
-   * silence test straight past the rail. A rail keyed to the words of the *correct* rule catches the
-   * harmless copy and waves the harmful one through, which is the exact failure mode #235 itself was
-   * blocked for twice.
-   *
-   * So the rule below is keyed on what a widener **cannot** drop. To grant a licence you must say when it
-   * applies, which takes a figure and a time unit; and the conditions live in three files this repository
-   * holds identical, so a `.claude/` document that discusses adoption at all has exactly one correct thing
-   * to do — point at them. Hence: talk about adoption and you must name STEP 2 and must state no window of
-   * your own. The canonical fragments are kept as well, because a verbatim copy-paste is the likeliest
-   * accident and costs nothing to catch.
-   *
-   * What this rail is NOT, said plainly rather than implied:
-   *  - It does not police `docs/`, where a decision record may legitimately quote the rule.
-   *  - It reads markdown only. A non-`.md` file under `.claude/` is invisible to it, and to the `#180`
-   *    per-file check as well (that one skips project-written entries via `if (!src) continue`), so
-   *    `.claude/skills/review-pr/adoption.txt` would carry a widened paraphrase unseen. #238's territory.
-   *  - "Discusses adoption" is itself a text match (`REVIEW: CHANGES REQUESTED` or `#161`). A document that
-   *    granted the licence while naming neither would pass — but it would also be unreadable as a rule.
-   *
-   * Prove it red four ways: restate a condition verbatim in a skill; reword one and add a window; delete
-   * review-pr's pointer at STEP 2; or narrow the walk so it no longer reaches the skills.
-   */
-  describe('no .claude/ document carries a second copy of the adoption conditions (#161)', () => {
-    // Built from parts so this rail's own source, and the CANON above, are not what trips it.
-    const FRAGMENTS = [
-      ['at least 4 ', 'hours old'],
-      ['in the last ', '2 hours'],
-      ['no comment on ', 'that same pull request'],
-      ['re-derived the ', 'original objection'],
-      // The two wordings this repository has already had to retire, and so the likeliest to be copied back.
-      ['Only the reviewer ', 'who set '],
-      ['commented nowhere ', 'in the repository'],
-    ].map((p) => p.join(''));
-    /** A figure and a time unit: what stating a window takes, in any wording a widener could choose. */
-    const WINDOW = /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty|sixty)[\s-]*(?:minute|hour|day|week)s?\b/i;
-    /** A document is talking about *this* protocol, rather than using the English word "adopt", if it names it. */
-    const ABOUT_BLOCKS = /REVIEW: CHANGES REQUESTED|#161/;
-
-    const walk = (dir: string): string[] => readdirSync(new URL(dir, root), { withFileTypes: true })
-      .flatMap((e) => (e.isDirectory() ? walk(`${dir}${e.name}/`) : e.name.endsWith('.md') ? [`${dir}${e.name}`] : []));
-    const docs = walk('.claude/');
-
-    // A count is not the files that matter: narrowing the walk to one vendored skill still cleared a
-    // `toBeGreaterThan(4)` floor while never reaching the file the rail exists for. Name them instead, and
-    // derive the list from the filesystem so a skill added later joins the scope without anyone remembering.
-    it('the walk reaches every skill and agent document', () => {
-      const shallow = (p: string) => readdirSync(new URL(p, root), { withFileTypes: true });
-      const expected = [
-        ...shallow('.claude/skills/').filter((e) => e.isDirectory()).map((e) => `.claude/skills/${e.name}/SKILL.md`),
-        ...shallow('.claude/agents/').filter((e) => e.isFile()).map((e) => `.claude/agents/${e.name}`),
-      ];
-      expect(expected.length, 'the independent listing must find something, or it cannot cross-check anything')
-        .toBeGreaterThan(4);
-      for (const file of expected) {
-        expect(docs, `the walk missed ${file} — a rail that does not read a file cannot hold it`).toContain(file);
-      }
-      expect(docs, 'and above all the reviewing skill, which is the one that auto-loads for this job')
-        .toContain('.claude/skills/review-pr/SKILL.md');
-    });
-
-    it.each(docs)('%s restates no adoption condition', (file) => {
-      const text = read(file);
-      for (const fragment of FRAGMENTS) {
-        expect(text, `${file} restates an adoption condition — point at ROUTINE-PROMPT.md STEP 2 instead, `
-          + 'because a paraphrase of a loosening is a licence nothing checks (#161)')
-          .not.toContain(fragment);
-      }
-    });
-
-    // The half the fragments cannot hold: a reworded copy. Keyed on the figure a licence needs to be usable.
-    it.each(docs)('%s states no window of its own, and points at STEP 2 if it discusses adoption', (file) => {
-      const text = read(file);
-      if (!ABOUT_BLOCKS.test(text)) return;                  // not about this protocol; vendored bodies land here
-      const window = WINDOW.exec(text);
-      expect(window?.[0], `${file} states a time window beside the block protocol. The four conditions live in `
-        + 'CLAUDE.md, BACKLOG.md and ROUTINE-PROMPT.md STEP 2 and nowhere else; a figure here is a licence (#161)')
-        .toBeUndefined();
-      expect(text, `${file} discusses block adoption without naming ROUTINE-PROMPT.md — a pointer is the only `
-        + 'correct thing a .claude/ document can do with a loosening (#161)')
-        .toContain('ROUTINE-PROMPT.md');
-    });
-
-    // And the pointer itself is pinned, not merely permitted: the rail above forbids the wrong text, this
-    // requires the right text. Deleting review-pr's whole adoption section left the suite green without it.
-    it('the reviewing skill keeps its pointer and its fail-closed rule', () => {
-      const text = read('.claude/skills/review-pr/SKILL.md');
-      expect(text, 'the skill must send the reader to STEP 2 for the conditions')
-        .toMatch(/Adopting someone else's stale block \(#161\)/);
-      expect(text, 'and keep the rule that needs no conditions to state: no session id, no adoption')
-        .toContain('not adoptable at all');
-      expect(text, 'and the two things adoption never licenses')
-        .toContain("Clearing your own block, or a live reviewer's, is forbidden");
-    });
-
-    // FRAGMENTS is a hand-written echo of CANON: retune the figures legitimately in all three process files
-    // and the numeric fragments become dead strings with nothing going red. (#235's reviewer warned the join
-    // splits `at least 4 hours old` across two entries so this could not be asserted directly — checked, and
-    // it does not: the `**` falls outside the phrase, so plain containment works.)
-    it.each(FRAGMENTS.slice(0, 4))('the canonical paragraph still contains %s', (fragment) => {
-      expect(CANON, 'a fragment absent from CANON is a dead string, and the rail above is weaker than it reads')
-        .toContain(fragment);
-    });
+  it('the watchdog tells the owner a stalled block can be superseded, not merely that it is stuck', () => {
+    const text = flat(read('docs/WATCHDOG-PROMPT.md'));
+    expect(text, 'the stalled-block step must name the rule').toMatch(/Since #161 such a block can be superseded/);
+    expect(text, 'and say who may act on it').toContain('neither opened the pull request nor pushed a commit to it');
+    expect(text, "and point at the rule's home").toContain('.claude/skills/review-pr/SKILL.md');
+    expect(text, 'the watchdog must not hand the owner a retired window').not.toMatch(WINDOW);
   });
 });
 
@@ -2308,8 +2100,8 @@ describe('a run fixes a stalled block before it starts new work, oldest first (#
     '— one you did not set in your own review pass this run, with no new commit and no new comment on it',
     'in the last 30 minutes (a debounce, in case someone is fixing it right now). If one exists, push a',
     'fix addressing the review\'s findings and comment `Pushed <sha>, addressing <what>` (#199/#200\'s',
-    'content floor); never post `REVIEW: CLEARED` yourself — clearing still needs the original reviewer',
-    'or #161\'s four conditions.',
+    'content floor); never post `REVIEW: CLEARED` yourself — clearing still needs the original reviewer,',
+    'or a later run\'s fresh review (rule 3 above).',
   ].join(' ');
 
   it('docs/ROUTINE-PROMPT.md carries the stalled-block rule in its canonical form', () => {
@@ -3863,8 +3655,8 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
 
   // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 10_750;
-  const ROUTINE_PROMPT_BUDGET = 31_022;   // 40,949 → 31,022: docs/decisions/002-routine-prompt-is-flow-only.md
+  const CLAUDE_MD_BUDGET = 9_897;    // 10,750 → 9,897: #161 reduced to one sentence, its home is the review-pr skill
+  const ROUTINE_PROMPT_BUDGET = 28_479;   // 40,949 → 31,022: docs/decisions/002-routine-prompt-is-flow-only.md; → 28,479: #161 reduced to one sentence
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');

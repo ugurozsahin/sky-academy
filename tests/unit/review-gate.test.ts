@@ -122,11 +122,9 @@ describe('a comment recomputes correctly once it is edited away or deleted (#77)
 });
 
 /**
- * #189 — a REVIEW: CHANGES REQUESTED comment with no session URL blocks the PR exactly as before, but is
- * unadoptable under #161 (docs/ROUTINE-PROMPT.md: "if the blocking comment carries no session id at all,
- * condition 1 cannot be evaluated ... fail closed and leave it for the owner"). Confirmed live on PR #160
- * (cleared only by the owner's direct intervention) and PR #179 (open, still missing it). This must be a
- * loud reason on the block, not a silent stall discovered hours later.
+ * #189 — a REVIEW: CHANGES REQUESTED comment with no session URL blocks the PR exactly as before, and the
+ * gate says the URL is missing: it is the only record of which session set the block, so it is what lets
+ * anyone check afterwards that no session reviewed its own change.
  */
 describe('the block carries a session URL (#189)', () => {
   const withUrl = 'REVIEW: CHANGES REQUESTED — the fps floor is wrong\n\nSession: https://claude.ai/code/session_01MGtjdpxyeGtFJMYeYp3t8B';
@@ -147,28 +145,28 @@ describe('the block carries a session URL (#189)', () => {
   it('adds a distinct reason when the open block has no session URL', () => {
     const blocked = pr(false, withoutUrl);
     expect(blocked.blocked).toBe(true);
-    expect(blocked.reasons).toContain('no session URL — unadoptable per #161');
+    expect(blocked.reasons).toContain('the block has no session URL (#199)');
   });
 
   it('does not add the reason when the open block carries a session URL', () => {
     const blocked = pr(false, withUrl);
     expect(blocked.blocked).toBe(true);
-    expect(blocked.reasons).not.toContain('no session URL — unadoptable per #161');
+    expect(blocked.reasons).not.toContain('the block has no session URL (#199)');
   });
 
   it('is silent when there is no open block at all', () => {
-    expect(pr(false).reasons).not.toContain('no session URL — unadoptable per #161');
+    expect(pr(false).reasons).not.toContain('the block has no session URL (#199)');
     expect(pr(false, withoutUrl, 'REVIEW: CLEARED').reasons)
-      .not.toContain('no session URL — unadoptable per #161');
+      .not.toContain('the block has no session URL (#199)');
   });
 
   it('newest marker wins: only the currently-open block is checked for a session URL', () => {
     // an old, url-less block was cleared; the new, currently-open block does carry one — no reason.
     expect(pr(false, withoutUrl, 'REVIEW: CLEARED', withUrl).reasons)
-      .not.toContain('no session URL — unadoptable per #161');
+      .not.toContain('the block has no session URL (#199)');
     // the reverse: an old block had a URL and was cleared; the new, currently-open block does not — reason fires.
     expect(pr(false, withUrl, 'REVIEW: CLEARED', withoutUrl).reasons)
-      .toContain('no session URL — unadoptable per #161');
+      .toContain('the block has no session URL (#199)');
   });
 
   it('a draft PR with a url-less block reports both reasons, under the 140-char status budget', () => {
@@ -203,27 +201,27 @@ describe("a REVIEW: CLEARED adopting another reviewer's block carries its own se
   it('adds a distinct reason when the current clear is an adoption with no session URL of its own', () => {
     const blocked = pr(false, requestWithUrl, adoptionNoUrl);
     expect(blocked.blocked).toBe(true);
-    expect(blocked.reasons).toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+    expect(blocked.reasons).toContain("REVIEW: CLEARED supersedes another reviewer's block with no session URL of its own (#191)");
   });
 
   it('does not add the reason when the adopting clear carries its own session URL', () => {
     const blocked = pr(false, requestWithUrl, adoptionWithUrl);
-    expect(blocked.reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+    expect(blocked.reasons).not.toContain("REVIEW: CLEARED supersedes another reviewer's block with no session URL of its own (#191)");
   });
 
   it('does not add the reason for an ordinary (non-adoption) clear, session URL or not', () => {
     const blocked = pr(false, requestWithUrl, ordinaryClear);
-    expect(blocked.reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+    expect(blocked.reasons).not.toContain("REVIEW: CLEARED supersedes another reviewer's block with no session URL of its own (#191)");
   });
 
   it('is silent when the adoption clear is not the PR\'s current state (superseded by a later block)', () => {
     const blocked = pr(false, requestWithUrl, adoptionNoUrl, requestWithUrl);
-    expect(blocked.reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+    expect(blocked.reasons).not.toContain("REVIEW: CLEARED supersedes another reviewer's block with no session URL of its own (#191)");
   });
 
   it('is silent when there is no clear at all', () => {
-    expect(pr(false).reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
-    expect(pr(false, requestWithUrl).reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+    expect(pr(false).reasons).not.toContain("REVIEW: CLEARED supersedes another reviewer's block with no session URL of its own (#191)");
+    expect(pr(false, requestWithUrl).reasons).not.toContain("REVIEW: CLEARED supersedes another reviewer's block with no session URL of its own (#191)");
   });
 });
 

@@ -12,17 +12,16 @@ paths:
 
 - **Each rule has one home; every other file points at it** (`docs/decisions/001-one-home-per-rule.md`, which
   replaces the three-file rule and #216 §1's enforcement bar). Removing a duplicate is ordinary work as long
-  as the home still carries the rule. Four paragraphs are still copied into `CLAUDE.md`, `BACKLOG.md` and
-  `docs/ROUTINE-PROMPT.md` — the freeze history, records-have-readers, the #161 adoption conditions, the #97
-  second-item conditions. That is debt: until a paragraph is reduced to its home, change its copies together,
+  as the home still carries the rule. Three paragraphs are still copied into `CLAUDE.md`, `BACKLOG.md` and
+  `docs/ROUTINE-PROMPT.md` — the freeze history, records-have-readers, the #97 second-item conditions. That is debt: until a paragraph is reduced to its home, change its copies together,
   which `tests/unit/guardrails.test.ts` still checks. **While this reduction is under way it is done in
   sessions with the owner** (issues labelled `owner-session`), not by the routine; removing a rule rather than
   a copy, or removing any other rail, is still a loosening under the `open-pr` skill §6.
-- **A `REVIEW: CLEARED` comment that is itself a #161 adoption carries its own session URL too (#191)** — the
-  same footer every comment carries (#199), so a later reader is not left guessing which session cleared a
-  stale block from an unmarked comment. Enforced in code: `hasSessionUrl()` inside `scripts/review-gate.mjs`'s
-  `blockState()` flags an adoption-clear that has none (`#191`/`#195`). `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
-  each carry a pointer here instead of restating it.
+- **A `REVIEW: CLEARED` comment that supersedes another reviewer's block (#161)
+  carries its own session URL too (#191)** — the same footer every comment carries (#199), so a later reader
+  is not left guessing which session cleared a stale block from an unmarked comment. Enforced in code: `hasSessionUrl()` inside `scripts/review-gate.mjs`'s
+  `blockState()` flags such a clear that has none (`#191`/`#195`). The `review-pr` skill §6, the home of the
+  #161 rule, says so where a reviewer reads it.
 - **The run's heartbeat snapshot (issue #62) must say whether it took a second item and, if not, which of the
   four #97 eligibility conditions failed (#239).** Enforced in code: a `PreToolUse` hook in
   `.claude/settings.json` denies an `issue_write` update to issue #62 whose body has no `- second item: `
@@ -61,29 +60,13 @@ paths:
   `docs/ROUTINE-PROMPT.md` (debt, first bullet). `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
   (the two of the three that ever mentioned the retired label) each carry a pointer here instead of restating
   it.
-- **CANON's two mechanical conditions (age of the block, silence of its setter — the figures themselves live
-  only in `docs/ROUTINE-PROMPT.md` STEP 2, never restated here or anywhere under `.claude/`, per the rail two
-  bullets below) now have real enforcement.** `canAdoptNow()` in `scripts/adoption-check.mjs` — deliberately
-  NOT in `scripts/review-gate.mjs`, which must never read a clock (see the guard rail two bullets below: a
-  block that ages itself out on every CI re-run is #74 again) — is wired to a `PreToolUse` hook in
-  `.claude/settings.json`: before an agent's comment matching `isAdoptionClear()` (the same litmus test
-  `blockState()` already uses for "claims to adopt another reviewer's block", not a new heuristic) is allowed
-  to post, the hook fetches the pull request's live comments from the GitHub API and denies the write unless
-  both conditions hold right now. Conditions 3 and 4 — re-deriving the original objection, and the clearing
-  comment's own wording — are a judgment call no function can make, so they stay the reviewing agent's
-  responsibility exactly as `docs/ROUTINE-PROMPT.md` STEP 2 already asks. If the GitHub API call fails for any
-  reason the hook denies rather than allows — a deliberate departure from the other checks in
-  `.claude/hooks/`, which allow on input they cannot read, because failing open here would let a stale block clear with nobody able to
-  verify it should have. Not a triplication collapse: the CANON paragraph still needs reading by an agent
-  doing the judgment-call half, so `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` are untouched by
-  this.
 - A PR touching a governance file states in one line whether it **tightens** the constraints on a run (a check,
   a rail, a rule, or describing behaviour that already exists — ordinary work) or **loosens** them (a
   constraint removed, a budget raised, a gate that no longer gates — owner-gated, never routine-merged). See
   the `open-pr` skill §6 for the full rule and worked examples.
 - The review-block mechanism, in one line: a reviewer blocks a PR by marking it draft and posting a comment
-  starting `REVIEW: CHANGES REQUESTED`; only its setter clears it with `REVIEW: CLEARED`, except under the
-  stale-block adoption rule (#161) — see the `review-pr` skill for the full protocol.
+  starting `REVIEW: CHANGES REQUESTED`; only its setter clears it with `REVIEW: CLEARED`, or a later run's
+  fresh review supersedes it (#161) — see the `review-pr` skill for the full protocol.
 - No agent ever writes an `OWNER: APPROVED` or `OWNER: REJECTED` marker, whatever the context.
 - **The three ordering tools (agreed with the owner, 2026-09-11).** The project board is a read-only view, not
   a second list — `docs/ROUTINE-PROMPT.md` STEP 1 has why a cloud session cannot write to it. The owner

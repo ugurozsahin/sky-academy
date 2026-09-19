@@ -9,9 +9,9 @@ authority on the flow; where the two ever disagree, the prompt wins and this fil
 
 ## Before anything: are you allowed to review this one?
 
-- **Never review a pull request you opened.** The API cannot tell you whose it is — one token serves every
-  agent and the owner, so every pull request here looks self-authored. You know it is yours because you opened
-  it *this run*; that is the only evidence there is.
+- **Never review a pull request you opened, or pushed a commit to.** The API cannot tell you whose it is —
+  one token serves every agent and the owner, so every pull request here looks self-authored. You know it is
+  yours because you opened it, or pushed to it, *this run*; that is the only evidence there is.
 - A pull request held only by an unanswered `owner-approval` label is not yours to unblock. Leave it.
 
 ## 1. Read the issue before the diff
@@ -106,33 +106,33 @@ projects you ran, and the commit hash — ending, like every comment you post he
 1. Mark the pull request **draft**.
 2. Comment beginning exactly `REVIEW: CHANGES REQUESTED`, then say precisely what must change. Separate
    **blocking** items from notes you are not holding the pull request for, so the author knows what is owed.
-   **Include your session URL** — a block written without one can only ever be cleared by the session that set
-   it, which is the stall #161 exists to end. (This was already the rule for this one comment before #199 made
-   it the rule for all of them; it does not change here.)
+   **Include your session URL** — one token serves every agent, so it is the only thing that tells a later
+   reader which session set the block. (This was already the rule for this one comment before #199 made it the
+   rule for all of them; it does not change here.)
 
-Do **not** fix it yourself in the same run. The reviewer who set the block is the one who clears it.
+Do **not** fix it yourself in the same run: a session that pushes to a pull request may no longer review it.
 
-**Clearing.** The reviewer who set a block clears it, with a `REVIEW: CLEARED` comment, its own session URL
-(#199 — this used to be required only when the clear was a #161 adoption; it is simpler now, and no less
-true, to say every `REVIEW: CLEARED` comment carries one) and "Ready for review". Pushing a fix does not clear
-a review, and nobody undrafts a pull request to get past one, their own included. Undrafting fires a fresh CI
-run (#159), so the merging run waits for **that** run, not the tick underneath.
+**A block its reviewer leaves unanswered is superseded by a fresh review (#161).** The reviewer who set a
+`REVIEW: CHANGES REQUESTED` block clears it with `REVIEW: CLEARED` and "Ready for review". If they do not, a
+later run that neither opened the pull request nor pushed a commit to it reviews it from scratch against the
+current head, exactly as STEP 2 reviews any pull request, and gives its own verdict: its own
+`REVIEW: CHANGES REQUESTED`, or a `REVIEW: CLEARED` comment that opens by saying it is superseding
+another reviewer's block, followed by the merge. No session reviews its own change: you never clear a block
+on a pull request you opened or pushed to, and pushing a fix does not clear one. A block never expires by
+itself — `review-gate` keeps reporting it until someone clears it deliberately.
 
-**Adopting someone else's stale block (#161): go and read the conditions, do not take them from here.**
-They are in `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` STEP 2, word for word in all three, and a
-rail holds the three copies identical. This file deliberately does **not** restate them, and that is not
-tidiness — adoption is a *loosening*, the one rule in this repository that lets an agent clear a block it did
-not set, so a paraphrase of it is a licence nothing checks. A fourth copy living in a skill would be the worst
-place for one, because a skill loads itself into the run that is about to use it.
+What that means in practice:
 
-What is safe to carry here, because none of it widens anything:
-
-- **Clearing your own block, or a live reviewer's, is forbidden.** If you disagree with an objection, you do
-  not clear it — say so and leave it standing, or replace it with your own.
-- **A blocking comment carrying no session id is not adoptable at all.** Fail closed and leave it for the
-  owner; without an id the "has the setter gone quiet" condition cannot be evaluated, and a condition you
-  cannot evaluate is never one you may assume.
-- **A block never expires by itself.** `review-gate` keeps reporting it until someone clears it deliberately.
+- **It is a review, not a countersignature.** Sections 1–5 above, in full, on the current head. The earlier
+  reviewer's findings are evidence to check, not the limit of what you look at; if you find the objection still
+  stands, or find a new one, the verdict is your own `REVIEW: CHANGES REQUESTED`.
+- **There is no waiting period and nothing to measure.** Whether the first reviewer has "gone quiet" is not a
+  question you have to answer; the only test is that you neither opened the pull request nor pushed to it.
+- **Say "another reviewer's block" in the opening lines of the clearing comment**, in those words.
+  `scripts/review-gate.mjs` recognises a superseding clear by that phrase and then requires the comment to
+  carry a session URL (#191) — which every comment carries anyway (#199).
+- **Nobody undrafts a pull request to get past a block**, their own included. Undrafting after a genuine clear
+  fires a fresh CI run (#159), so the merging run waits for **that** run, not the tick underneath.
 
 ## Reviewing is the work
 

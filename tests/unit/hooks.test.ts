@@ -1,9 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM, run by Claude Code as a PreToolUse hook (.claude/settings.json)
 import { check as bashCheck, forcePush, ownerMarker as bashOwnerMarker, worklogAppend } from '../../.claude/hooks/bash-guard.mjs';
 // @ts-expect-error — plain ESM hook helper
@@ -33,13 +32,6 @@ const runBodyHook = (check: Check<{ body: string }>, body: string) => asDeny(che
 const runIssueWriteHook = (input: Record<string, unknown>) => asDeny(secondItem(input));
 const runLabelsHook = (input: Record<string, unknown>) => asDeny(frozenLabel(input));
 const runAppendHook = (input: Record<string, unknown>) => asDeny(heartbeatAppend(input));
-
-// The CANON check shells out to `curl`, so it runs as the real script with a fake `curl` first on PATH.
-const runCanonHook = (input: Record<string, unknown>, env: NodeJS.ProcessEnv = process.env): unknown => {
-  const out = execFileSync('node', [join(root, '.claude/hooks/github-write-guard.mjs')],
-    { input: JSON.stringify({ tool_input: input }), encoding: 'utf8', env });
-  return out.trim() === '' ? null : JSON.parse(out);
-};
 
 describe('layer-0 hooks: what each rule denies and allows', () => {
   // #231: the hook's `if:` filter is best-effort (Claude Code runs the hook anyway on `$()`, backticks or
@@ -505,90 +497,6 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     const twoTimestamps = '2026-09-18T11:00Z — a\n2026-09-18T13:36Z — b';
     expect(isDeny(runAppendHook({ method: 'update', issue_number: 61, body: twoTimestamps }))).toBe(false);
     expect(isDeny(runAppendHook({ method: 'create', issue_number: 62, body: twoTimestamps }))).toBe(false);
-  });
-
-  // #101 Layer 4 / #216 §1 — CANON's two mechanical conditions, exercised against the REAL hook command
-  // extracted from .claude/settings.json (not a reimplementation), with a fake `curl` on PATH standing in for
-  // the GitHub API. This is deliberate, not a shortcut: a real network call inside `npm test` would make every
-  // PR's CI depend on api.github.com being reachable, for a hook that fires on a rare event (a #161 adoption
-  // clear) — one flaky network blip would fail CI on unrelated changes. A fake curl gives full, deterministic
-  // coverage of every branch (including the success path) without that dependency. tests/unit/adoption-check
-  // .test.ts covers the pure decision logic on its own; this covers the wiring around it — the classification
-  // (isAdoptionClear), the escape hatches, and that a real curl exit code / real curl stdout drive the result.
-  const fakeCurlDir = mkdtempSync(join(tmpdir(), 'canon-hook-fake-curl-'));
-  const withFakeCurl = (script: string): NodeJS.ProcessEnv => {
-    writeFileSync(join(fakeCurlDir, 'curl'), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
-    return { ...process.env, PATH: `${fakeCurlDir}:${process.env.PATH}`, GITHUB_TOKEN: 'test-token' };
-  };
-  afterAll(() => rmSync(fakeCurlDir, { recursive: true, force: true }));
-
-  const ADOPTION_BODY = "REVIEW: CLEARED\n\nClearing another reviewer's block, adopted under #161.";
-
-  it('CANON hook: allows a comment that is not an adoption clear, without ever invoking curl', () => {
-    // The fake curl exits nonzero unconditionally — if it were invoked, the run would deny, not allow.
-    const env = withFakeCurl('exit 1');
-    expect(runCanonHook({ issue_number: 244, body: 'Looks good, merging.' }, env)).toBeNull();
-    expect(runCanonHook({ issue_number: 244, body: 'REVIEW: CLEARED — fps fixed' }, env)).toBeNull();
-  });
-
-  it('CANON hook: denies when there is neither issue_number nor pullNumber, without invoking curl', () => {
-    const env = withFakeCurl('exit 1');
-    expect(isDeny(runCanonHook({ body: ADOPTION_BODY }, env))).toBe(true);
-  });
-
-  // #245 review: of the eight MCP tools this hook's matcher group covers, only add_issue_comment/issue_write
-  // carry issue_number — pull_request_review_write, update_pull_request, add_comment_to_pending_review and
-  // add_reply_to_pull_request_comment use pullNumber (or neither), so a genuine adoption-clear posted through
-  // any of those would have hit the "no issue_number" deny branch every time. Falls back to pullNumber too.
-  it('CANON hook: reads pullNumber when issue_number is absent, and still reaches the live check', () => {
-    const env = withFakeCurl('printf \'%s\' \'[]\'');
-    const v = runCanonHook({ pullNumber: 244, body: ADOPTION_BODY }, env);
-    expect(isDeny(v)).toBe(true);
-    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/no open REVIEW: CHANGES REQUESTED block/);
-  });
-
-  it('CANON hook: denies when neither GITHUB_TOKEN nor GH_TOKEN is set, without invoking curl', () => {
-    const { GITHUB_TOKEN, GH_TOKEN, ...rest } = withFakeCurl('exit 1');
-    expect(isDeny(runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, rest))).toBe(true);
-  });
-
-  it('CANON hook: fails closed when curl itself fails', () => {
-    const env = withFakeCurl('exit 1');
-    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
-    expect(isDeny(v)).toBe(true);
-    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/could not read this pull request comments/);
-  });
-
-  it('CANON hook: fails closed when curl returns something that is not a JSON array', () => {
-    const env = withFakeCurl('echo "{}"');
-    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
-    expect(isDeny(v)).toBe(true);
-    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/unexpected response/);
-  });
-
-  it('CANON hook: denies on age when the live block is not old enough', () => {
-    const comments = JSON.stringify([
-      { body: `REVIEW: CHANGES REQUESTED — see above. https://claude.ai/code/session_AAAA1111`, created_at: new Date().toISOString() },
-    ]).replace(/'/g, "'\\''");
-    const env = withFakeCurl(`printf '%s' '${comments}'`);
-    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
-    expect(isDeny(v)).toBe(true);
-    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/CANON's age condition is not yet met/);
-  });
-
-  it('CANON hook: allows the write once the live block is old enough and its session has gone quiet on this pull request', () => {
-    const comments = JSON.stringify([
-      { body: `REVIEW: CHANGES REQUESTED — see above. https://claude.ai/code/session_AAAA1111`, created_at: '2020-01-01T00:00:00Z' },
-    ]).replace(/'/g, "'\\''");
-    const env = withFakeCurl(`printf '%s' '${comments}'`);
-    expect(runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env)).toBeNull();
-  });
-
-  it('CANON hook: fails closed when there is no open block to adopt on the live pull request', () => {
-    const env = withFakeCurl('printf \'%s\' \'[]\'');
-    const v = runCanonHook({ issue_number: 244, body: ADOPTION_BODY }, env);
-    expect(isDeny(v)).toBe(true);
-    expect((v as any).hookSpecificOutput.permissionDecisionReason).toMatch(/no open REVIEW: CHANGES REQUESTED block/);
   });
 });
 

@@ -42,22 +42,19 @@ export const isOwnerRejected = (body) => loose(body).startsWith('OWNER: REJECTED
 export const isOwnerApproved = (body) => (body || '').replace(/^\s+/, '').startsWith('OWNER: APPROVED');
 
 /**
- * A REVIEW: CHANGES REQUESTED comment must carry its own session URL (docs/ROUTINE-PROMPT.md, #161's two
- * mechanical checks): the setter's silence is measured from the id in *this* comment, and “if the blocking
- * comment carries no session id at all, condition 1 cannot be evaluated and the block is not adoptable: fail
- * closed and leave it for the owner.” That rule was prose only — nothing read the comment for the URL, so a
- * reviewing session that forgot the footer produced a block silently nobody but the owner could ever clear,
- * discovered only by reading the PR by hand or waiting for the 8-hour watchdog check (#189; live instances:
- * PR #160, cleared only by the owner's direct intervention, and PR #179).
+ * A REVIEW: CHANGES REQUESTED comment carries its own session URL (#189, #199). One GitHub account serves
+ * every agent, so the URL is the only record of which session set a block — and "no session reviews its own
+ * change" (the `review-pr` skill §6) can only be checked afterwards if that record exists. A block without
+ * one still blocks; the gate says so, loudly, rather than leaving it to be found by hand.
  */
 export const hasSessionUrl = (body) => /https:\/\/claude\.ai\/code\/session_[A-Za-z0-9]+/.test(body || '');
 
 /**
- * Is a REVIEW: CLEARED comment itself a #161 adoption — clearing a block a *different* session set — rather
- * than an ordinary clear by the reviewer who set it? #161's own language is "clearing another reviewer's
- * block" (docs/ROUTINE-PROMPT.md, CLAUDE.md), and every adoption comment on record (PR #171, both of them)
- * opens with exactly that phrase. An ordinary clear never needs to say this, so its absence is the signal:
- * this only matches text a plain "REVIEW: CLEARED — fps fixed" clear would never contain by accident.
+ * Is a REVIEW: CLEARED comment one that supersedes a block a *different* session set (#161), rather than an
+ * ordinary clear by the reviewer who set it? The `review-pr` skill §6 tells a superseding reviewer to say
+ * "another reviewer's block" in the comment's opening lines. An ordinary clear never needs to say this, so
+ * its absence is the signal: this only matches text a plain "REVIEW: CLEARED — fps fixed" clear would never
+ * contain by accident. (The name dates from when #161 called this "adopting" a block.)
  */
 export const isAdoptionClear = (body) => isCleared(body) && /another reviewer'?s block/i.test(body || '');
 
@@ -86,9 +83,9 @@ export function blockState({ draft, labels, comments }) {
     if (isOwner(c) && isOwnerApproved(c.body)) approved = c.created_at;
   }
   const openReview = requested !== null && (cleared === null || cleared < requested);
-  // #195 — the clearing side of #189/#191's gap: a REVIEW: CLEARED comment that adopts another reviewer's
-  // block under #161 must carry its own session URL too (docs/ROUTINE-PROMPT.md, CLAUDE.md); nothing read
-  // it for one, so an adopting session that forgot the footer cleared silently and passed. Checked only
+  // #195 — the clearing side of #189/#191's gap: a REVIEW: CLEARED comment that supersedes another
+  // reviewer's block (#161) must carry its own session URL too; nothing read it for one, so a superseding
+  // session that forgot the footer cleared silently and passed. Checked only
   // when this clear is the PR's *current* state (not openReview) — an already-superseded clear from PR
   // history, such as PR #171's two pre-#191 comments, is not re-flagged.
   const clearNeedsSession = cleared !== null && !openReview && isAdoptionClear(clearedBody) && !hasSessionUrl(clearedBody);
@@ -100,8 +97,8 @@ export function blockState({ draft, labels, comments }) {
   const reasons = [];
   if (draft) reasons.push('the PR is a draft');
   if (openReview) reasons.push('a REVIEW: CHANGES REQUESTED comment has no later REVIEW: CLEARED');
-  if (openReview && !requestedHasSession) reasons.push('no session URL — unadoptable per #161');
-  if (clearNeedsSession) reasons.push("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+  if (openReview && !requestedHasSession) reasons.push('the block has no session URL (#199)');
+  if (clearNeedsSession) reasons.push("REVIEW: CLEARED supersedes another reviewer's block with no session URL of its own (#191)");
   if (ownerSaidNo) reasons.push('the owner rejected it (OWNER: REJECTED, no later OWNER: APPROVED)');
   else if (wantsOwner && approved === null) reasons.push('labelled owner-approval and the owner has not written OWNER: APPROVED');
   return { blocked: reasons.length > 0, reasons };
