@@ -10,10 +10,10 @@ everything from "## The routine" onwards. Reviews are a second routine's, also h
 
 ## Context that is true of every run
 
-The routine has git access to the repo. For issues and PRs it tries `gh` first, then the REST API with whatever
-token the session exposes (`GITHUB_TOKEN`/`GH_TOKEN`); only if a run reports in its heartbeat snapshot (STEP 5)
-that it could not open PRs or comment on issues does the owner need to add a `GITHUB_TOKEN` variable (repo
-scope). If the API is down you cannot write the heartbeat either, so say it in the report as well.
+For issues and PRs a run tries `gh` first, then the REST API with the token the session exposes
+(`GITHUB_TOKEN`/`GH_TOKEN`); only if a heartbeat snapshot (STEP 5) reports it could not open PRs or comment
+on issues does the owner need to add a `GITHUB_TOKEN` variable (repo scope). If the API is down you cannot
+write the heartbeat either, so say it in the report as well.
 
 The **project board** (GitHub Projects v2) is **not reachable from a cloud session**: Projects v2 is
 GraphQL-only and the cloud GitHub proxy answers it 403 whatever token you supply. So no run syncs the board and
@@ -55,7 +55,7 @@ STEP 1 — SETUP. The repo is cloned (default branch main). `git pull --ff-only`
 
 **Everything you post — a comment, an issue, a pull request body — follows the two rules in `CLAUDE.md`: it carries its own `Session:` line (#199) and states its point up front (#200).** A fix-push comment has the shape in `.claude/skills/open-pr/SKILL.md` §5.
 
-STEP 2.5 — FIX A STALLED BLOCK. **A run fixes a stalled block before it starts new work (#204).** Before STEP 3, look for the single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`, with no new commit and no new comment on it in the last 30 minutes (a debounce, in case someone is fixing it right now). If one exists, push a fix addressing the review's findings and comment `Pushed <sha>, addressing <what>` (#199/#200's content floor). The reviewer routine's next run sees the fix: it looks at blocked pull requests with a commit newer than the block. Never post `REVIEW: CLEARED` yourself and never undraft it — clearing needs a reviewer run's fresh review (`docs/REVIEWER-PROMPT.md` rule 3).
+STEP 2.5 — FIX A STALLED BLOCK. **A run fixes a stalled block before it starts new work (#204).** Look for the single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`, with no new commit and no new comment on it in the last 30 minutes (a debounce). A `REVIEW:` comment counts only when GitHub marks it `author_association` OWNER/COLLABORATOR/MEMBER — `scripts/review-gate.mjs`'s `mayReview` set; anyone can post the marker (#284). If one exists, push a fix addressing the review's findings and comment `Pushed <sha>, addressing <what>` (#200's shape). The reviewer's next run sees a block with a commit newer than it. Never post `REVIEW: CLEARED` yourself or undraft it — clearing is a reviewer run's fresh review (`docs/REVIEWER-PROMPT.md` rule 3).
 
 STEP 3 — DEVELOP ONE ITEM, chosen by **the labels** (#94). There is no ordered list: pick the issue this query names — two runs reading the same repo state pick the same one.
 
