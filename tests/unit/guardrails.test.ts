@@ -3842,3 +3842,29 @@ describe('build-sw.mjs actually writes dist/sw.js, correctly, or fails loudly (#
     });
   });
 });
+
+/**
+ * #136: `bundle-single.mjs` runs `npx vite build`, which empties `dist/` first, and never ran
+ * `build-sw.mjs` afterwards — so the single-file build silently deleted `dist/sw.js` and never wrote a new
+ * one. `dist/` is shared state: `playwright.config.ts` previews whatever is in it, so the next
+ * `npx playwright test` ran the whole suite against a build with no service worker, and the failure
+ * ("guard rail: the game still loads and plays with the network off") pointed at the wrong change entirely.
+ *
+ * `bundle-single.mjs` has no `distDir` argument — unlike `build-sw.mjs` above, it always builds the real
+ * project `dist/`, so this drives the actual script end-to-end (a real `vite build`, not a fixture) rather
+ * than fabricating a directory it never touches.
+ */
+describe('bundle-single.mjs regenerates dist/sw.js after vite build deletes it (#136)', () => {
+  it('leaves dist/ with a real, filled-in service worker once the single-file build finishes', () => {
+    const out = join(tmpdir(), `sna-bundle-single-${process.pid}.html`);
+    try {
+      execFileSync('node', ['scripts/bundle-single.mjs', out], { encoding: 'utf8', stdio: 'pipe' });
+      expect(existsSync('dist/sw.js'), 'vite build empties dist/ first; bundle-single.mjs must put the worker back (#136)').toBe(true);
+      const sw = readFileSync('dist/sw.js', 'utf8');
+      expect(sw, 'a renamed or unsubstituted placeholder must not ship').not.toMatch(/__PRECACHE__|__CACHE_NAME__/);
+      expect(sw, 'the precache list must reflect the build the single-file step just produced').toContain('"index.html"');
+    } finally {
+      rmSync(out, { force: true });
+    }
+  }, 30_000);
+});
