@@ -3864,7 +3864,7 @@ describe('CLAUDE.md and docs/ROUTINE-PROMPT.md byte budgets only ever go down (#
   // The two figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
   const CLAUDE_MD_BUDGET = 10_750;
-  const ROUTINE_PROMPT_BUDGET = 40_949;
+  const ROUTINE_PROMPT_BUDGET = 31_022;   // 40,949 → 31,022: docs/decisions/002-routine-prompt-is-flow-only.md
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
