@@ -115,37 +115,37 @@ const answer = (page: Page) => page.evaluate(() => window.__sna.answer());
 const waitForTarget = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s || s.waiting) return false; const c = window.__sna.session.current; const label = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; return window.__sna.bubbles().some((b: any) => b.label === label); }, null, { timeout: 20000 });
 const state = (page: Page) => page.evaluate(() => window.__sna.state());
 /**
- * Bring up a Sky Storm wave carrying a TNT. Bombs ride every third question (`play.ts`), but never a
- * sequence one, and Storm draws its topic at random — so each attempt resets the counter to 5 and a sequence
- * draw simply costs one question. Whether a wave carries a bomb is read straight off `arena.bubbles`, which
- * includes bubbles that have not launched yet: `bubbles()` shows only launched ones, and a bomb can ride the
- * second batch seconds later, so waiting on that would time out on a wave that does have one. Every predicate
- * here returns a boolean — a JSON string would be truthy on the first frame and resolve the wait immediately.
+ * Bring up a Sky Storm wave carrying a TNT. Bombs ride every third question (`play-session.ts`), but never a
+ * sequence one, and Storm draws its topic at random from the year's pool — so the helper pins the pool to a
+ * maths topic that never emits a sequence question *before* it forces "question 6". The wave that follows
+ * then carries a bomb by the spawn rule alone, with nothing left to the RNG.
+ *
+ * guard rail (#278): the earlier helper left the pool alone and retried three times, spending an attempt
+ * on every sequence draw. Three such draws in a row — a coin toss the tree under test has no say in — threw
+ * "no TNT wave after 3 attempts" and held PR #274's merge (run 35432297494) on a diff that touched no game
+ * code. A helper here never samples the RNG for a condition the game guarantees: pin the draw instead.
+ *
+ * `bubbles()` shows only launched bubbles and a bomb can ride the second batch seconds later, so the final
+ * wait reads the launched list with a deadline rather than a count, and its predicate returns a boolean — a
+ * JSON string would be truthy on the first frame and resolve the wait immediately.
  */
 async function nextWaveWithBomb(page: Page) {
-  for (let k = 0; k < 3; k++) {
-    await page.evaluate(() => { window.__sna.session.questionsAsked = 5; });
-    await solveCurrent(page);                                            // the wave this spawns is "question 6"
-    const deadline = Date.now() + 12000;
-    let carries = false, settled = false;
-    while (Date.now() < deadline && !settled) {
-      const w = await page.evaluate(() => {
-        const s = window.__sna; if (!s || s.state().ended) return 'ended';
-        if (s.state().waiting) return null;
-        const all = s.arena!.bubbles; if (!all.length) return null;
-        if (all.every((b: any) => b.dead)) return null;                  // the previous wave, cleared but not yet replaced
-        return { bomb: all.some((b: any) => b.label === '💣'), allUp: all.every((b: any) => b.launched || b.dead) };
-      });
-      if (w === 'ended') throw new Error('the Storm ended before a TNT wave came up');
-      if (w) { carries = w.bomb; settled = w.bomb || w.allUp; }
-      if (!settled) await page.waitForTimeout(150);
-    }
-    if (!carries) continue;                                              // no TNT this time: answer it and retry
-    await page.waitForFunction(() => window.__sna.bubbles()              // now let it rise into a tappable spot
-      .some((b: any) => b.label === '💣' && b.vy < 0 && b.y > 80 && b.y < window.innerHeight - 40), null, { timeout: 15000 });
-    return;
-  }
-  throw new Error('no TNT wave after 3 attempts');
+  const pinned = await page.evaluate(() => {
+    const s = window.__sna.session;
+    s.o.pool = s.o.pool!.filter(t => t.id === 'y2-tables');            // a maths topic: no generator path makes a sequence
+    s.questionsAsked = 5;
+    return s.o.pool.length;
+  });
+  expect(pinned, 'the Storm pool must still hold the pinned topic').toBe(1);
+  await solveCurrent(page);                                              // the wave this spawns is "question 6"
+  const drawn = await page.evaluate(() => {
+    const s = window.__sna.session;
+    return { ended: s.ended, asked: s.questionsAsked, sequence: !!s.current?.sequence, topic: s.currentTopic?.id };
+  });
+  if (drawn.ended) throw new Error('the Storm ended before the TNT wave came up');
+  expect(drawn, 'question 6 came from the pinned topic and is not a sequence').toEqual({ ended: false, asked: 6, sequence: false, topic: 'y2-tables' });
+  await page.waitForFunction(() => window.__sna.bubbles()                // let the TNT rise into a tappable spot
+    .some((b: any) => b.label === '💣' && b.vy < 0 && b.y > 80 && b.y < window.innerHeight - 40), null, { timeout: 15000 });
 }
 
 /** Answer the current question via the hook and wait for the next one (a sequence question needs one slice per letter). */
