@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
@@ -701,5 +701,50 @@ describe('a save from a newer build is refused, not down-stamped (#232)', () => 
     expect(importSave(JSON.stringify({ v: SAVE_VERSION + 1, name: 'Future' }))).toBe(false);
     expect(load().name, 'a refused code changes nothing').toBe('Here');
     expect(load().coins).toBe(12);
+  });
+});
+
+// #151: save() used to swallow a thrown setItem with no trace anywhere, so a shop purchase, a star or a
+// streak day could vanish on the next launch with nothing distinguishing that from an ordinary save. These
+// pin the new signal and, most importantly, that it is a *different* signal from #232's read-only latch —
+// conflating them would send a grown-up to "update this device" for a plain private-browsing tab, or make
+// them wait for a device update that a broken localStorage will never need.
+describe('save() write failures are distinguishable from the read-only latch (#151)', () => {
+  const KEY = 'sna:v1';
+  beforeEach(() => reset());
+
+  it('an ordinary save clears the flag; a thrown setItem sets it; a later success clears it again', () => {
+    expect(isWriteFailing(), 'nothing has failed yet').toBe(false);
+    save({ coins: 5 });
+    expect(isWriteFailing()).toBe(false);
+
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try { save({ coins: 6 }); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(isWriteFailing(), 'the write just threw').toBe(true);
+    expect(load().coins, 'the running session still sees its own state').toBe(6);
+    expect(JSON.parse(localStorage.getItem(KEY)!).coins, 'nothing landed on disk').toBe(5);
+
+    save({ coins: 7 });
+    expect(isWriteFailing(), 'a later write that succeeds clears it again').toBe(false);
+    expect(JSON.parse(localStorage.getItem(KEY)!).coins).toBe(7);
+  });
+
+  it('the read-only latch is a refusal to attempt a write at all, and never touches the write-failure flag', () => {
+    localStorage.setItem(KEY, JSON.stringify({ v: SAVE_VERSION + 1, name: 'Tablet', coins: 500 }));
+    load();
+    expect(isReadOnlySave(), 'a newer blob latches read-only').toBe(true);
+    expect(isWriteFailing(), 'load() never sets or clears the write-failure flag').toBe(false);
+    save({ coins: 1 });
+    expect(isWriteFailing(), 'a latched save() never attempts setItem, so nothing here can fail').toBe(false);
+  });
+
+  it('reset() clears the write-failure flag along with the latch — a fresh start gives the device the benefit of the doubt', () => {
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try { save({ coins: 1 }); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(isWriteFailing()).toBe(true);
+    reset();
+    expect(isWriteFailing(), 'reset() clears it, same as the read-only latch').toBe(false);
   });
 });

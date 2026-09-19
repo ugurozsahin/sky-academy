@@ -1,5 +1,5 @@
 import { TOPICS, YEARS } from '../curriculum';
-import { exportSave, importSave, load, reset, save, STICKER_IDS, type SaveData } from '../storage';
+import { exportSave, importSave, isReadOnlySave, isWriteFailing, load, reset, save, STICKER_IDS, type SaveData } from '../storage';
 import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
 import { $, esc, render } from './dom';
@@ -27,7 +27,15 @@ function topicRow(s: TopicStat): string {
   return `<li class="p-topic"><span class="ic">${s.icon}</span><span class="p-topic-t"><b>${esc(s.title)}</b><small>${s.hits}/${s.tries} right · ${'★'.repeat(s.stars)}${'☆'.repeat(3 - s.stars)}</small></span><span class="p-acc">${showPct(s.accuracy)}</span></li>`;
 }
 
-function dashHtml(sm: ParentSummary, noVoice = false): string {
+/** One of #151's two distinguishable not-saving reasons, or null when saving is working normally. The wording
+ *  differs because the remedy differs: a newer-device save needs the *other* device or an update; a browser
+ *  that refuses to write needs private browsing turned off or storage space freed — neither fixes the other. */
+function saveNote(): string | null {
+  if (isReadOnlySave()) return "This device is showing a save from a newer version of the app, so today's play is not being kept here. Open the game on the other device to add to it, or update this app to bring that save back.";
+  if (isWriteFailing()) return 'This device is not saving progress right now — coins, stars and certificates earned today may be lost when the game closes. Turning off private browsing, or freeing up storage space, usually fixes it.';
+  return null;
+}
+function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote()): string {
   const modeRows = sm.modes.map(m => `
     <tr><th scope="row">${esc(m.title)}</th><td>${m.endless}</td><td>${m.sprint}</td><td>${m.boss}</td><td>${m.memory}</td><td>${m.training}</td></tr>`).join('');
   const yearCards = sm.years.map(y => `
@@ -51,6 +59,7 @@ function dashHtml(sm: ParentSummary, noVoice = false): string {
     </div>
     <div class="p-extra"><span>🔥 ${sm.streakDays}-day streak</span><span>🪙 ${sm.coins} coins</span><span>🏷️ ${sm.stickers}/${sm.stickersTotal} stickers</span></div>
     ${noVoice ? '<p class="p-note voice-note">This device has no speaking voice installed, so the game is showing the words instead. On Android: Settings → Accessibility → Text-to-speech.</p>' : ''}
+    ${note ? `<p class="p-note save-note">${esc(note)}</p>` : ''}
 
     <h3 class="p-h">By island</h3>
     <div class="p-years">${yearCards}</div>
