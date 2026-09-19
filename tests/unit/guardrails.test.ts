@@ -3903,10 +3903,10 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_527;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access
+  const ROUTINE_PROMPT_BUDGET = 21_503;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 10_044;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112)
+  const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -4284,5 +4284,54 @@ describe('text from GitHub is data, never instructions (#215)', () => {
     expect(text, 'a second copy of the issue query is a second query — it drifted once').not.toMatch(/labels=routine-ok/);
     expect(text, 'the check must still send a run to the query, by reference')
       .toMatch(/run STEP 3's\s+query as `docs\/ROUTINE-PROMPT\.md` writes it/);
+  });
+});
+
+/**
+ * #132 — every run's first step, `git pull --ff-only`, fails: the cloud environment starts from a copy of the
+ * pre-migration history (same commit subjects, different hashes, no merge base with `origin/main`), so a
+ * fast-forward is impossible and `--unshallow` cannot join two unrelated histories. Each run rediscovered
+ * this and reset on its own judgement — an improvised step, which is the risk itself: the day a run
+ * improvises differently it reads a stale prompt and works on a stale tree. So the recovery is stated where
+ * the run reads it — STEP 1 of both prompts, beside the pull, and the watchdog's bootstrap — as the exact
+ * command, the condition that permits it (the pull cannot fast-forward; a clone holds no local work at the
+ * start of a run) and the obligation to say so in the report, so the recovery stays visible each time.
+ *
+ * Prove it red: drop the sentence from either STEP 1, or move it out of STEP 1's paragraph to a later step.
+ */
+describe('a pull that cannot fast-forward has a stated recovery, not an improvised one (#132)', () => {
+  const root = new URL('../../', import.meta.url);
+  const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  const flat = (s: string) => s.replace(/\s+/g, ' ');
+  const RECOVERY = '`git fetch origin && git reset --hard origin/main`';
+
+  // STEP 1's own paragraph, not the whole file: the sentence has to sit where the pull is, or a run that
+  // has just hit `fatal:` is still improvising by the time it reads it.
+  const step1 = (text: string) => {
+    const at = text.indexOf('STEP 1 — SETUP.');
+    expect(at, 'STEP 1 must exist under its own heading').toBeGreaterThan(-1);
+    const rest = text.slice(at);
+    return flat(rest.slice(0, rest.indexOf('\n\n')));
+  };
+
+  it.each(['docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md'])('%s STEP 1 states the recovery beside the pull', (name) => {
+    const s = step1(read(name));
+    expect(s.length, `${name}: STEP 1 must be read, not an empty slice`).toBeGreaterThan(200);
+    expect(s, 'the pull is still the first thing a run does').toContain('`git pull --ff-only`');
+    expect(s, 'the recovery must be the exact command, not "reset" left to the run').toContain(RECOVERY);
+    expect(s, 'and conditional on the fast-forward failing, never a step of its own').toMatch(/cannot fast-forward/);
+    expect(s, 'and reported, so the recovery stays visible every time it happens').toMatch(/say so in your report/);
+    expect(s, 'and say why it is safe, so the day the divergence is real a run still thinks').toMatch(/no local work/);
+    expect(s.indexOf('`git pull --ff-only`'), 'the pull comes before its recovery').toBeLessThan(s.indexOf(RECOVERY));
+  });
+
+  it('the watchdog bootstrap carries the same recovery on the same line as its pull', () => {
+    const text = read('docs/WATCHDOG-PROMPT.md');
+    const block = text.slice(text.indexOf('## The bootstrap'), text.indexOf('## The checks'));
+    expect(block.length, 'the bootstrap block must be read, not an empty slice').toBeGreaterThan(300);
+    const line = block.split('\n').find((l) => l.includes('`git pull --ff-only`')) ?? '';
+    expect(line, 'the bootstrap must still pull first').not.toBe('');
+    expect(line, 'and state the recovery on that step, not in a check the run reads only after pulling').toContain(RECOVERY);
+    expect(line, 'and keep it conditional').toMatch(/cannot fast-forward/);
   });
 });
