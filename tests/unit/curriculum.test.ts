@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd } from '../../src/curriculum/maths';
-import type { Difficulty, Question } from '../../src/curriculum';
+import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
@@ -367,6 +367,10 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
         expected = String(rowFor(m![1]).n);
       }
       expect(q.answer, q.prompt).toBe(expected);
+      // #137 "5. Smaller, same family": the generator's own doc comment says the spoken question must not
+      // read the counts aloud, or it answers itself for a child listening — but nothing pinned it. Every `say`
+      // template above is built from names/icons only; a digit in `say` means a count leaked into it.
+      expect(q.say, q.prompt).not.toMatch(/\d/);
     }
     // Containment alone ("the ask is allowed") is satisfied by a difficulty that quietly stops asking most of
     // what it promises — deleting `more` and `most` from d3, the whole of the stretch, left the suite green.
@@ -374,6 +378,25 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
     expect([...shapesSeen].sort(), `d${d} must actually ask all of ${WANT_ASKS[d].join(', ')} in 300 draws`)
       .toEqual([...WANT_ASKS[d]].sort());
     if (WANT_KIND[d] === 'pictogram') expect([...eachSeen].sort(), 'the pictogram key set is exactly {2, 5}').toEqual([2, 5]);
+  });
+
+  // #137 "5. Smaller, same family": the 20-try re-roll succeeds first at P ≈ 2e-17 in practice, so nothing in
+  // the 300-draw loop above ever exercises the terminator itself — deleting it, or leaving it a no-op
+  // (`Math.max(...counts)` with no `+ each`, still a tie), both leave the whole suite green. A fake rng that
+  // rolls every row to the same count on every attempt forces all 20 retries to fail and isolates the
+  // terminator's own effect: a unique winner, not a tie left standing.
+  it('the degeneracy terminator breaks a tie that 20 re-rolls could not', () => {
+    let call = 0;
+    // call 1 picks the survey (any is fine); call 2 picks `ask` from ['total','more','most'] at d3 — 0.99
+    // selects index 2, 'most'; every other call (the rolls, the i/j shuffle) rolls each row to the same count.
+    const forceTie: Rng = () => { call++; return call === 2 ? 0.99 : 0.5; };
+    const q = t.gen(3, forceTie);
+    expect(q.prompt).toBe('Which did most children choose?');
+    const v = q.visual as Extract<Question['visual'], { type: 'chart' }>;
+    const top = Math.max(...v.rows.map(r => r.n));
+    expect(v.rows.filter(r => r.n === top).length, 'the terminator must leave exactly one winner, not a bumped tie').toBe(1);
+    expect(q.answer, "the answer must be the row the terminator actually bumped, not the pre-terminator tie's first entry")
+      .toBe(v.rows.find(r => r.n === top)!.label.split(' ').slice(1).join(' '));
   });
 });
 
