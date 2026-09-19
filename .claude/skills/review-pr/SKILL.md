@@ -166,11 +166,12 @@ answer is "nothing yet, but", it is a note. Two findings block whatever the roun
 do what its body says, and a rail does not hold what it claims. Those are not preferences.
 
 **The third round is the last one that blocks.** Count the `REVIEW: CHANGES REQUESTED` comments on the pull
-request, whoever wrote them. On the third, list everything you would still change and say which of it you are
-holding for. After the third, a fresh review that finds only notes clears the block and merges; one that
-finds a genuine defect by the bar above blocks again and says in its opening line that it is past the third
-round and why the finding meets that bar. Whatever you drop goes into an issue linked from your comment — it
-is queued, not lost.
+request, whoever wrote them: the count is over the whole pull request, a push never resets it, and two
+reviewers do not get three rounds apiece. On the third, list everything you would still change and say which
+of it you are holding for. After the third, a fresh review finding only notes clears and merges; one finding
+a genuine defect by the bar above blocks again and says in its opening line that it is past the third round
+and why the finding meets that bar. Whatever you drop goes into an issue linked from the comment — it is
+queued, not lost.
 
 A reviewer who reaches the third round has usually already found the real answer: the pull request is trying
 to do too much. Say that instead. "Reduce this to X; the rest is issue #n" is a better review than a seventh
