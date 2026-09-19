@@ -98,6 +98,11 @@ incidents behind each.
 4. **It is labelled `owner-approval` with no `OWNER: APPROVED` comment.** Never write an `OWNER:` marker
    yourself, in any form. Nothing but you not doing it prevents it.
 
+A pull request that touches a governance file raises one more question before a merge: **which way does it
+move the constraint?** Check its one-line direction statement against the diff. A loosening — or a declared
+tightening that you read as a loosening — is the owner's to merge, never yours; say so in a comment and leave
+it. `.claude/skills/open-pr/SKILL.md` §6 has the rule and its worked examples.
+
 ## 6. Then decide, and make the decision visible
 
 **Merge** — squash into `main`, tick Review/QA/Done on the issue, and comment with the test results, which
