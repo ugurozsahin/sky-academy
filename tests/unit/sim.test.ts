@@ -946,6 +946,13 @@ describe('a pointer that did not go down on this canvas cannot end its stroke (#
     expect(sim.take('hits'), 'a segment neither finger drew must not slice').toEqual([]);
     sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 2 });     // the finger that owns the stroke does
     expect(sim.take('hits')).toEqual([{ label: b.label, viaSwipe: true }]);
+    // The older finger lifting changes nothing for the owner: the takeover is complete, not shared.
+    const [c] = sim.live();
+    sim.pointer('pointerup', { x: 5, y: 5, pointerId: 1 });
+    sim.pointer('pointermove', { x: c.x, y: c.y - c.r - 30, pointerId: 2 });   // along the clear lane above the row
+    sim.take('hits');
+    sim.pointer('pointermove', { x: c.x, y: c.y + c.r + 20, pointerId: 2 });   // straight down through c alone
+    expect(sim.take('hits'), 'the owning finger keeps slicing after the older one lifts').toEqual([{ label: c.label, viaSwipe: true }]);
   });
   it('pointercancel follows the same rule: a foreign one is ignored, the stroke\'s own one ends it', () => {
     sim = createSim({ seed: 7 });

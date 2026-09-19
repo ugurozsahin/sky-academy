@@ -146,3 +146,11 @@ describe('spokenQuestion (#16: the hand-over line is heard)', () => {
     expect(spokenQuestion(q, 10)).toBe(q.say ?? q.prompt);
   });
 });
+
+describe('Duel refuses a sequence question (#16: the pool is the filter, this is the floor)', () => {
+  it('throws on start rather than draining ten unwinnable rounds', () => {
+    const seqTopic = { ...topic, id: 'fake-seq', gen: () => ({ ...topic.gen(1, rng(1)), sequence: ['a', 'b'], answer: 'ab' }) };
+    const d = new Duel({ topic: seqTopic, difficulty: 1, rng: rng(1) }, events());
+    expect(() => d.start()).toThrow(/sequence question/);
+  });
+});

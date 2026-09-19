@@ -6,24 +6,29 @@ import type { DuelHooks } from '../../src/ui/hooks';
 // the round. Driven through the duel screen's own `window.__sna` hooks, which name the player every call is for.
 declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number; __said: string[]; __deadArenas: { time: number }[] } }
 
-/** A speech engine that records what it was asked to say, and when it was cancelled, in order (#16 review). */
+/**
+ * A speech engine that records what it was asked to say, and when it was cancelled, in order (#16 review). It
+ * also models the drop `src/audio.ts` documents: a `speak()` in the same task as a `cancel()` is recorded as
+ * `<dropped>`, not as the line — so a line that only *looks* spoken because the stub is synchronous is caught.
+ */
 const recordingEngine = (page: Page) => page.addInitScript(() => {
   window.__said = [];
+  let cancelling = false;
   Object.defineProperty(window, 'speechSynthesis', {
     configurable: true,
     value: {
       speaking: false, pending: false, getVoices: () => [], onvoiceschanged: null,
-      cancel: () => { window.__said.push('<cancel>'); },
-      speak: (u: SpeechSynthesisUtterance) => { window.__said.push(u.text); },
+      cancel: () => { window.__said.push('<cancel>'); cancelling = true; setTimeout(() => { cancelling = false; }, 0); },
+      speak: (u: SpeechSynthesisUtterance) => { window.__said.push(cancelling ? `<dropped> ${u.text}` : u.text); },
     },
   });
 });
-/** The hand-over line was spoken for this round 1, and nothing cancelled it afterwards. */
+/** The hand-over line was spoken for this round 1 — not dropped into a cancel — and nothing cancelled it afterwards. */
 async function expectHandoverHeard(page: Page) {
-  await page.waitForFunction(() => window.__said.some(l => l.startsWith('Ninja Duel!')));
+  await page.waitForFunction(() => window.__said.some(l => l.includes('Ninja Duel!')));
   const said = await page.evaluate(() => window.__said);
-  const at = said.findLastIndex(l => l.startsWith('Ninja Duel!'));
-  expect(said[at].startsWith(`${DUEL_HANDOVER} `), 'one utterance: the instruction, then the question').toBe(true);
+  const at = said.findLastIndex(l => l.includes('Ninja Duel!'));
+  expect(said[at].startsWith(`${DUEL_HANDOVER} `), 'one utterance, actually spoken: the instruction, then the question').toBe(true);
   expect(said.slice(at + 1), 'no cancel() after it').not.toContain('<cancel>');
 }
 
@@ -86,11 +91,12 @@ test.describe('Ninja Duel', () => {
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0 });
     await expectHandoverHeard(page);   // the rematch's line is not dropped into the old screen's cancel()
     expect(await page.evaluate(() => window.__said.indexOf('<cancel>')), 'the old screen was hushed first, then the line went out').toBeGreaterThanOrEqual(0);
-    // Quit from the pause overlay tears the duel down: the hooks go with it and BOTH render loops stop
-    // (#73 — no arena may leak across screens; the game.spec `__deadArena` pattern, once per arena).
-    await page.evaluate(() => { window.__deadArenas = [window.__sna.arenas.a, window.__sna.arenas.b]; });
-    await page.click('#pause');
-    await page.click('#quit');
+    // Leaving tears the duel down: the hooks go with it and BOTH render loops stop (#73 — no arena may leak
+    // across screens; the game.spec `__deadArena` pattern, once per arena). The exit is the hardware/browser
+    // back on an UNPAUSED screen, deliberately: `Arena.time` only advances while not paused, so leaving through
+    // the pause overlay's Quit would read a leaked loop as a stopped one (PR #295 review, round 3). It is also
+    // the `'duel'` popstate branch main.ts added.
+    await page.evaluate(() => { window.__deadArenas = [window.__sna.arenas.a, window.__sna.arenas.b]; history.back(); });
     await expect(page.locator('.island-screen')).toBeVisible();
     const leaked = await page.evaluate(() => new Promise<{ advanced: number[]; sna: string }>(res => {
       const t0 = window.__deadArenas.map(a => a.time);
@@ -109,6 +115,10 @@ test.describe('Ninja Duel', () => {
     // the natural wave-end path and the both-arenas gate, which winning every round never reaches.
     await page.waitForFunction(() => window.__sna.state().round === 2, undefined, { timeout: 30_000 });
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 2, scoreA: 0, scoreB: 0, decided: false, ended: false });
+    // The both-arenas gate: one advance per round, not one per arena. Advancing twice would show round 3 within
+    // a frame or two of round 2; round 2's wave is in the air for well over 300 ms even at 4×.
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.__sna.state().round), 'one wave end per arena, one advance per round').toBe(2);
     await page.click('#pause');
     await expect(page.locator('#resume')).toBeVisible();
     expect(await page.evaluate(() => window.__sna.arenas.a.paused && window.__sna.arenas.b.paused)).toBe(true);

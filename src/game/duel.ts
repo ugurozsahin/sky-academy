@@ -27,6 +27,9 @@ export class Duel {
     if (this.ended) return;
     this.round++; this.roundDecided = false;
     this.current = this.o.topic.gen(this.o.difficulty, this.rng);
+    // "First correct slice" has no meaning for a sequence: `answer` is the joined string, every slice would be
+    // wrong and the match would drain in draws with nothing red. duelPool() keeps these out; this is the floor.
+    if (this.current.sequence) throw new Error(`Ninja Duel: ${this.o.topic.id} produced a sequence question`);
     this.ev.onQuestion(this.current, { round: this.round, total: this.rounds });
   }
   /**
