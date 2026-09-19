@@ -63,12 +63,15 @@ describe('guard rails', () => {
   // rested on two of them agreeing (a peek releasing under a stage-clear overlay would have restarted the wave
   // behind it). Every reason to pause now flows through play-session's `syncPaused()` — the screen's overlays
   // via `hold()`, the peek, and a finished game — so outside arena.ts there is exactly one assignment. A second
-  // one is a second owner, and this rail names it.
-  it('arena.paused has one writer outside arena.ts (#65)', () => {
+  // one is a second owner, and this rail names it. #16: the Ninja Duel screen has its own two arenas and no
+  // play-session, so it carries its own single sum (`syncPaused`) — one writer per screen, listed verbatim
+  // below, so a third assignment anywhere (a new reason written outside a screen's sum) is still red.
+  it('arena.paused has one writer per screen outside arena.ts (#65, #16)', () => {
     const writers = Object.entries(SOURCES)
       .filter(([f]) => f !== '/src/game/arena.ts')
       .flatMap(([f, s]) => code(s).split('\n').filter(l => /\.paused\s*=[^=]/.test(l)).map(l => `${f}: ${l.trim()}`));
-    expect(writers, 'route a new pause reason through play-session\'s hold()/syncPaused(), never a direct write').toEqual([
+    expect(writers, 'route a new pause reason through the screen\'s hold()/syncPaused(), never a direct write').toEqual([
+      '/src/ui/duel.ts: const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };',
       '/src/ui/play-session.ts: if (arena) arena.paused = holdOpen || peekActive || session.ended;',
     ]);
   });

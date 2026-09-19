@@ -12,7 +12,7 @@ import { $, $$, render, stars } from './dom';
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
-  memory: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void; up: () => void;
+  memory: (year: YearInfo) => void; duel: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void; up: () => void;
 };
 
 function topbar(nav: Nav, rerender: () => void) {
@@ -113,6 +113,9 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     { id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,
       title: 'Memory Match', blurb: `Calm card pairs, no slicing · boards ${memory[year.id] ?? 0}`,
       go: () => nav.memory(year) },
+    { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
+      title: 'Ninja Duel', blurb: 'Two players · first slice wins',
+      go: () => { say('Ninja Duel! Hand the top half to a friend'); nav.duel(year); } },
   ];
   render(`
   <section class="screen home island-screen">

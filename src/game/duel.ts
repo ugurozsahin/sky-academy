@@ -60,3 +60,21 @@ export class Duel {
     this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds: this.rounds });
   }
 }
+
+/**
+ * The topics a duel can be played on (#16 item 4): bubble topics only — no tracing (nothing to slice) and no
+ * sequence questions (spelling, sentences, Order Up), where "first correct slice" has no meaning. A topic is
+ * sampled once with a fixed rng because a generator is a sequence topic or it is not; nothing mixes the two.
+ */
+export function duelPool(topics: Topic[], difficulty: Difficulty = 1): Topic[] {
+  return topics.filter(t => t.input !== 'tracing' && !t.gen(difficulty, seededRng(1)).sequence);
+}
+/** A tiny deterministic rng (mulberry32) for the sample above — a constant would spin a generator that draws until distinct. */
+function seededRng(seed: number) {
+  return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+/** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
+export function duelHeadline(r: DuelResult): string {
+  return r.winner === 'draw' ? `It's a draw — ${r.scoreA} all!` : `Player ${r.winner === 'a' ? 1 : 2} wins ${Math.max(r.scoreA, r.scoreB)}–${Math.min(r.scoreA, r.scoreB)}!`;
+}

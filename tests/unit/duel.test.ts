@@ -106,3 +106,29 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     expect(ev.onMatchEnd).toHaveBeenCalledTimes(1);
   });
 });
+
+// #16 items 2–4: the pure helpers the duel screen leans on — which topics a duel may use, and the match line.
+import { duelHeadline, duelPool } from '../../src/game/duel';
+import { topicsFor, YEARS } from '../../src/curriculum';
+
+describe('duelPool (#16 item 4: which topics a duel is played on)', () => {
+  it('drops tracing topics and sequence topics, keeps plain bubble topics, for every year', () => {
+    for (const y of YEARS) {
+      const all = topicsFor(y.id); const pool = duelPool(all, y.diffs[0] ?? 1);
+      expect(pool.length).toBeGreaterThan(0);
+      for (const t of pool) {
+        expect(t.input).not.toBe('tracing');
+        for (let i = 0; i < 5; i++) expect(t.gen(y.diffs[0] ?? 1, rng(i)).sequence, `${t.id} produced a sequence question`).toBeUndefined();
+      }
+      if (y.id === 'reception') expect(pool.map(t => t.id)).not.toContain('r-build');   // Build a Word slices letters in order
+    }
+  });
+});
+
+describe('duelHeadline (#16 item 3: the match-end line)', () => {
+  it('names the winner with the score, or a draw', () => {
+    expect(duelHeadline({ winner: 'a', scoreA: 6, scoreB: 3, rounds: 10 })).toBe('Player 1 wins 6–3!');
+    expect(duelHeadline({ winner: 'b', scoreA: 2, scoreB: 7, rounds: 10 })).toBe('Player 2 wins 7–2!');
+    expect(duelHeadline({ winner: 'draw', scoreA: 4, scoreB: 4, rounds: 10 })).toBe("It's a draw — 4 all!");
+  });
+});

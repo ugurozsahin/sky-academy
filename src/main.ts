@@ -3,6 +3,7 @@ import { chooseNinjaScreen, changeAvatarScreen, introScreen, nameScreen } from '
 import { mapScreen, islandScreen, rewardsScreen, type StartPlay } from './ui/home';
 import { playScreen, type PlayOpts } from './ui/play';
 import { memoryScreen } from './ui/memory';
+import { duelScreen } from './ui/duel';
 import { shopScreen } from './ui/shop';
 import { clearPendingReset, isPendingReset, parentsScreen } from './ui/parents';
 import { load, save } from './storage';
@@ -46,6 +47,7 @@ const nav = {
   island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
   play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play(o)); }) as StartPlay,
   memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
+  duel: (y: YearInfo) => { leave(); year = y; enter('duel'); dispose = duelScreen({ year: y }, up, () => nav.duel(y)); },   // #16
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },
   shop: () => { leave(); enter('shop'); shopScreen(nav); },
   parents: () => { leave(); enter('parents'); parentsScreen(nav); },
@@ -65,7 +67,7 @@ window.addEventListener('popstate', () => {
   // hardware-back press — could land back on that stale entry and silently re-show a wizard step to a
   // player who has already finished onboarding. Once `onboarded` is true, every history entry from before
   // it is inert as far as the wizard is concerned; only the map (or wherever `nav.map()` sends it next) is.
-  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro' && !load().onboarded) { fromPop = false; leave(); renderIntro(); } else if (s === 'onboard-name' && !load().onboarded) { fromPop = false; leave(); renderName(); } else if (s === 'play' || s === 'memory' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
+  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro' && !load().onboarded) { fromPop = false; leave(); renderIntro(); } else if (s === 'onboard-name' && !load().onboarded) { fromPop = false; leave(); renderName(); } else if (s === 'play' || s === 'memory' || s === 'duel' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
 });
 
 // ?reset=1 clears saved progress (used by tests).
