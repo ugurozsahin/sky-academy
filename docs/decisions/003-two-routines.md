@@ -67,12 +67,21 @@ Speak Turkish in any summary for the owner; code, comments and game text in Brit
 
 1. New routine; the same repository and the same environment as the developer routine; paste the bootstrap
    above as its prompt; **no schedule**.
-2. Add a trigger, "GitHub event" → Pull request, with the filters **Is draft = false** and **Is merged = false**
-   — without the second, merging a pull request is itself an event and starts a run with nothing to review. If the
-   form lets you pick actions, pick *opened*, *reopened*, *ready for review* and *synchronize* rather than all.
-3. Add a second trigger, "GitHub event" → Pull request, with the filter **Labels include `re-review`**.
-4. The Claude GitHub App must be installed on the repository, or no event arrives.
-5. Create the label `re-review` in the repository.
+2. Add two triggers, each a "GitHub event" on this repository. A trigger can carry several pull-request
+   actions, but its filters apply to all of them at once, which is why it takes two (names as the form showed
+   them on 2026-09-19):
+
+   | Trigger | Events to pick | Filter |
+   | --- | --- | --- |
+   | 1 — a pull request is waiting | **Ready for review**, **Opened**, **Commits pushed** | Is draft = false |
+   | 2 — a blocked pull request was fixed | **Labeled** | Labels include `re-review` |
+
+   "Ready for review" is the hand-over: the author marks the PR ready once CI is green. A blocked pull request
+   is a draft, so trigger 1 never sees a fix pushed to it; the `re-review` label is what does. Do **not** pick
+   "All pull request events" — every label, assignment and edit would start a run — and leave "Closed" out, so
+   merging a pull request starts nothing.
+3. The Claude GitHub App must be installed on the repository, or no event arrives.
+4. The label `re-review` exists in the repository (created 2026-09-19).
 
 **(c) The developer routine: nothing to paste.** Its stored bootstrap already reads `docs/ROUTINE-PROMPT.md`
 from the heading "## The routine", and neither the file name nor that heading changed. Its schedule is
