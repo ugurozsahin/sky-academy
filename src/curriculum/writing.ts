@@ -110,9 +110,13 @@ export const Y2_CEW = ['door', 'floor', 'poor', 'because', 'find', 'kind', 'mind
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 /**
- * Everyday words a KS1 child meets that are not on either exception-word list — the rhyme families the lists
- * sit in (`_old` is bold, fold and sold as well as cold, gold, hold, told) and the short words a single letter
- * turns one list word into (`p_t`, `_ull`, `h_s`). Read by `gapLetters` only (#296).
+ * The words a gap in a list word can spell, so that none of them is offered as a decoy (#296). Mostly everyday
+ * words a KS1 child meets that are not on either exception-word list — the rhyme families the lists sit in
+ * (`_old` is bold, fold and sold as well as cold, gold, hold, told) and the short words a single letter turns
+ * one list word into (`p_t`, `_ull`, `h_s`). The last batch is wider than that: a decoy is a second right
+ * answer whenever it spells *any* real word, not only one the child has been taught, so the sweep of all 489
+ * drawable gaps (review of PR #303) put its remaining hits here too, KS1 vocabulary or not. Read by
+ * `gapLetters` only.
  */
 const EVERYDAY = ['I', 'it', 'in', 'if', 'is', 'as', 'at', 'an', 'am', 'on', 'or', 'ox', 'up', 'us', 'we', 'he', 'me', 'be', 'hi', 'my', 'by', 'oh', 'ah',
   'the', 'and', 'but', 'not', 'for', 'get', 'got', 'had', 'ham', 'hat', 'hay', 'him', 'hit', 'hop', 'hot', 'how', 'hug', 'hut', 'her', 'hen', 'hid', 'sad', 'sat', 'set', 'sit', 'sun', 'sum', 'saw', 'say', 'sea', 'see', 'sew', 'six', 'sky', 'shy', 'she', 'try', 'toy', 'top', 'tap', 'ten', 'tea', 'too', 'two', 'now', 'new', 'net', 'nut', 'nod', 'nap', 'gas', 'was', 'wax', 'win', 'wet', 'web', 'wig', 'why', 'way', 'wow', 'yes', 'yet', 'you', 'yak', 'zip', 'zoo',
@@ -128,7 +132,13 @@ const EVERYDAY = ['I', 'it', 'in', 'if', 'is', 'as', 'at', 'an', 'am', 'on', 'or
   // Added for review of PR #303: the list words' own neighbours (them/then, days/ways/pays, king, good …) and a wider batch.
   'them', 'then', 'days', 'ways', 'pays', 'king', 'good', 'fine', 'mine', 'must', 'held', 'hood', 'toad', 'list', 'war', 'comb', 'dove', 'bays', 'rays', 'lays', 'wag', 'lose', 'hare', 'hero', 'herd', 'tie', 'hip', 'ark', 'mint', 'mist', 'flood', 'fist', 'bury', 'halt', 'than', 'that', 'this', 'thin', 'they', 'tray', 'stay', 'play', 'pray', 'sway', 'away', 'jays', 'kind', 'find', 'bind', 'mind', 'wind', 'dust', 'just', 'rust', 'nest', 'vest', 'pest', 'hold', 'fold', 'bold', 'cold', 'gold', 'sold', 'told', 'hole', 'food', 'mood', 'wood', 'hoof', 'roof', 'boot', 'foot', 'root', 'hoot', 'loot', 'soot', 'toot', 'road', 'load', 'last', 'lost', 'mast', 'vast', 'fast', 'past', 'east', 'west', 'was', 'wax', 'way', 'warm', 'warn', 'ward', 'come', 'cone', 'code', 'cope', 'core', 'cove', 'cake', 'love', 'live', 'move', 'loud', 'the', 'tea', 'top', 'toy', 'tub', 'two', 'try', 'are', 'arm', 'art', 'ace', 'ale', 'ape', 'axe', 'ago', 'aim', 'air', 'his', 'has', 'hit', 'hid', 'him', 'hum', 'hut', 'hug', 'had', 'hat', 'ham', 'hay', 'hen', 'hey', 'hop', 'hot', 'how', 'you', 'yes', 'yet', 'yak', 'yam', 'one', 'ode', 'ore', 'owe', 'own', 'owl', 'once', 'only', 'open', 'oven', 'over', 'ask', 'ash', 'aunt', 'ant', 'and', 'any', 'put', 'pit', 'pat', 'pet', 'pot', 'pun', 'pup', 'pub', 'pug', 'push', 'posh', 'pull', 'pill', 'poll', 'pall', 'pale', 'pole', 'pile', 'full', 'fall', 'fell', 'fill', 'fuel', 'furl', 'fool', 'foal', 'foul', 'fowl', 'house', 'mouse', 'louse', 'horse', 'home', 'hose', 'hope', 'hour', 'sour', 'four', 'pour', 'tour', 'your', 'door', 'poor', 'moor', 'doors', 'floor', 'flour', 'fire', 'five', 'ford', 'fork', 'form', 'kilt', 'mild', 'mile', 'milk', 'mill', 'miss', 'wild', 'wile', 'will', 'wine', 'wing', 'wink', 'wipe', 'wire', 'wise', 'wish', 'with', 'child', 'chill', 'chips', 'chime', 'climb', 'class', 'clash', 'most', 'moss', 'moth', 'mode', 'mole', 'more', 'oily', 'holy', 'both', 'bath', 'bosh', 'bots', 'boss', 'old', 'odd', 'colt', 'cord', 'corn', 'cost', 'cosy', 'golf', 'goat', 'goal', 'gods', 'hoop', 'tolls', 'toll', 'tool', 'tone', 'every', 'event', 'ever', 'even', 'eve', 'great', 'greet', 'grate', 'grade', 'grape', 'break', 'bread', 'breed', 'beak', 'brake', 'steak', 'stack', 'stalk', 'steal', 'steam', 'steep', 'steer', 'stem', 'step', 'pretty', 'petty', 'party', 'beautiful', 'after', 'alter', 'fact', 'post', 'part', 'path', 'pats', 'bats', 'bash', 'bass', 'baths', 'hours', 'sore', 'soar', 'prove', 'improve', 'sure', 'sugar', 'eye', 'dye', 'bye', 'could', 'would', 'should', 'cloud', 'who', 'why', 'whom', 'whole', 'whale', 'while', 'white', 'many', 'mean', 'main', 'busy', 'bush', 'people', 'water', 'again', 'half', 'calf', 'hall', 'hate', 'have', 'money', 'monkey', 'honey', 'parents', 'parent', 'present', 'pardon', 'tin', 'toe', 'tip', 'tug', 'hog', 'lot', 'tow', 'ton', 'tot', 'hub', 'arc', 'lord', 'hind', 'lots', 'asp', 'cast', 'file', 'fort', 'mice', 'hone',
   // From a sweep of every residual candidate on the review head: the real words left (sand, world, speak, plait …).
-  'skid', 'slid', 'sand', 'sags', 'ore', 'ale', 'awe', 'ware', 'herb', 'hers', 'gush', 'lush', 'mush', 'puss', 'lull', 'pulp', 'oar', 'doom', 'poop', 'fund', 'fond', 'mend', 'mink', 'weld', 'moat', 'cola', 'creak', 'sneak', 'speak', 'fact', 'lash', 'pant', 'claws', 'grams', 'grabs', 'grasp', 'pads', 'pals', 'pans', 'paws', 'pats', 'plait', 'plane', 'plank', 'plans', 'surf', 'ewe', 'world', 'wound', 'whose', 'mane', 'halo'];
+  'skid', 'slid', 'sand', 'sags', 'ore', 'ale', 'awe', 'ware', 'herb', 'hers', 'gush', 'lush', 'mush', 'puss', 'lull', 'pulp', 'oar', 'doom', 'poop', 'fund', 'fond', 'mend', 'mink', 'weld', 'moat', 'cola', 'creak', 'sneak', 'speak', 'fact', 'lash', 'pant', 'claws', 'grams', 'grabs', 'grasp', 'pads', 'pals', 'pans', 'paws', 'pats', 'plait', 'plane', 'plank', 'plans', 'surf', 'ewe', 'world', 'wound', 'whose', 'mane', 'halo',
+  // Second review of PR #303: the systematic hole was the list words' own plurals and `-er`/`-ed` forms
+  // (`cla_s` offered `p` for claps, `fin_` offered `s` for fins), so this batch is the full sweep of all 489
+  // drawable gaps rather than another guess at which families were missed.
+  'claps', 'clams', 'clans', 'clasp', 'clays', 'clothed', 'fins', 'fink', 'grans', 'gross', 'groat', 'fatter', 'bather', 'hays', 'mays', 'saws', 'sans', 'sass', 'poos', 'pooh', 'theme', 'thee', 'eves', 'aye', 'tee', 'lest', 'mosh',
+  'wafer', 'wager', 'wader', 'waver', 'wad', 'wan', 'wilt', 'wily', 'woo', 'wove', 'cater', 'eater', 'hater', 'patents', 'probe', 'prone', 'prose', 'freak', 'bream', 'bust', 'buss', 'buoy', 'bate', 'pate', 'rind', 'lobe', 'lone', 'lope', 'mini', 'mins', 'kink', 'kine', 'kins',
+  'moot', 'mope', 'mote', 'rouse', 'douse', 'souse', 'holt', 'aster', 'clime', 'dour', 'bur', 'boor', 'cole', 'cote', 'coney', 'evert'];
 /**
  * The words a spelling gap is checked against: both exception-word lists, the days, the CVC bank and the
  * everyday words above (#296). Exported for the rail that walks every word and index in both lists.
@@ -137,15 +147,21 @@ export const GAP_WORDS: ReadonlySet<string> = new Set([...Y1_CEW, ...Y2_CEW, ...
 /**
  * Decoys for a gap in `word` at `idx`: every letter that does *not* make another `GAP_WORDS` word (#296). The
  * common exception words sit in rhyme families — `_old` is cold, gold, hold and told, all four on the Year 2
- * list — so drawn from the whole alphabet a decoy was another right answer in 42 of 144 Year 1 gaps and 32 of
- * 295 Year 2 gaps, and `gapQ` sets no `listen`, so without a voice nothing on the card said which word was
- * meant. Filtered, the card is unambiguous against the checked set whatever the voice does — and the set is the
- * limit: a real word none of the lists above carry can still be spelt by a decoy, which is why the everyday
- * list was swept against every residual candidate (review of PR #303) and why the rail pins concrete gaps.
+ * list — so drawn from the whole alphabet a decoy is another right answer in 82 of the 144 Year 1 gaps and 119
+ * of the 295 Year 2 gaps (counted against the set this file ships), and `gapQ` sets no `listen`, so without a
+ * voice nothing on the card said which word was meant. Filtered, the card is unambiguous against the checked
+ * set whatever the voice does — and the set is the limit: a real word none of the lists above carry can still
+ * be spelt by a decoy, which is why the everyday list was swept against every one of the 489 drawable gaps
+ * (second review of PR #303) and why the rail pins concrete gaps. What that sweep deliberately left reachable:
+ * the US spellings `math`, `mold`, `molt` and `grays`, and words no KS1 child reads as an answer — `oath`,
+ * `sire`, `whey`, `rut`, `cur`, `hag`, `hale`, `chile`.
  *
  * `AVOID` is the other filter: spellings no card may show a child, whatever the lists know.
  */
-const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass', 'arse', 'shit', 'crap', 'cock', 'dick']);
+const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass', 'arse', 'shit', 'crap', 'cock', 'dick',
+  // Second review of PR #303: `poo_` offered `f`. A slur, a crudity or an insult is filtered here rather than
+  // added to the lists above, so that `GAP_WORDS` stays a list of words the game is happy to *show*.
+  'poof', 'gays', 'lust', 'pus', 'tush', 'coke', 'yob']);
 export function gapLetters(word: string, idx: number): string[] {
   const lower = word.toLowerCase();
   return LETTERS.filter(l => { const w = lower.slice(0, idx) + l + lower.slice(idx + 1); return l !== lower[idx] && !GAP_WORDS.has(w) && !AVOID.has(w); });

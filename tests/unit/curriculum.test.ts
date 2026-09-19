@@ -248,7 +248,11 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     for (let i = 0; i < 100; i++) { const q = t.gen(2, r); expect(q.options.map(o => o.toLowerCase()).sort()).toEqual([...new Set(q.options.map(o => o.toLowerCase()))].sort()); }
   });
 
-  it(`4. y2-temp: an estimate's decoys sit at least ${TEMP_GAP} °C from the answer and from each other`, () => {
+  it('4. y2-temp: an estimate\'s decoys sit at least 10 °C from the answer and from each other', () => {
+    // The floor is the issue's number, not the source constant (second review of PR #303): comparing the gaps
+    // to `TEMP_GAP` held for every value of it, so `TEMP_GAP = 1` stayed green with a fridge asked against
+    // 6 °C — the defect #296 names. Assert the literal, and pin the constant to it once.
+    expect(TEMP_GAP, 'the estimate floor is 10 °C').toBeGreaterThanOrEqual(10);
     const t = gen('y2-temp'); const r = rng(299);
     let estimates = 0;
     for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
@@ -258,7 +262,7 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       const degs = q.options.map(o => Number(o.replace('°C', '')));
       expect(degs.every(x => Number.isInteger(x) && x >= 0 && x <= 100), q.options.join(' ')).toBe(true);
       for (let a = 0; a < degs.length; a++) for (let b = a + 1; b < degs.length; b++)
-        expect(Math.abs(degs[a] - degs[b]), `${q.prompt} ${q.options.join(' ')}: ${degs[a]} and ${degs[b]} are both defensible`).toBeGreaterThanOrEqual(TEMP_GAP);
+        expect(Math.abs(degs[a] - degs[b]), `${q.prompt} ${q.options.join(' ')}: ${degs[a]} and ${degs[b]} are both defensible`).toBeGreaterThanOrEqual(10);
       expect(q.options.length, q.prompt).toBe(4);
     }
     expect(estimates).toBeGreaterThan(100);
@@ -279,14 +283,23 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       ['find', 0, 'bhkmw'], ['kind', 0, 'bfhmw'], ['mind', 0, 'bfhkw'], ['full', 0, 'bdghp'], ['put', 1, 'aeio'], ['both', 0, 'm'],
       ['pass', 0, 'blm'], ['cold', 0, 'bfghst'], ['be', 0, 'hmw'], ['go', 0, 'dnst'], ['his', 1, 'a'],
       ['said', 2, 'n'], ['would', 2, 'r'], ['would', 3, 'n'], ['whole', 3, 's'], ['plant', 3, 'i'], ['grass', 3, 'm'], ['mind', 1, 'e'], ['break', 0, 'c'],
+      // The second review's hole: a list word's own plural or `-er` form, which the first head offered wholesale.
+      ['father', 3, 't'], ['class', 3, 'pmn'], ['find', 3, 's'], ['poor', 3, 's'], ['says', 2, 'w'], ['grass', 2, 'o'],
+      ['there', 3, 'm'], ['water', 2, 'f'], ['water', 0, 'eh'], ['love', 2, 'nb'], ['mind', 3, 'i'], ['put', 2, 'b'],
     ];
     for (const [w, i, letters] of NEVER) for (const l of letters) {
       expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} spells a word the set must carry`).toBe(true);
       expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
     }
-    // And the spellings no card may show, whatever the lists know: the four reachable on the review head.
-    for (const [w, i, l] of [['where', 2, 'o'], ['pass', 1, 'i'], ['fast', 2, 'r'], ['ask', 0, 'a']] as [string, number, string][])
+    // And the spellings no card may show, whatever the lists know. `['ask', 0, 'a']` used to sit here and could
+    // not fail — it puts the answer letter back, which `gapLetters` drops whatever `AVOID` says; the reachable
+    // spelling is `ask@2 s` (second review of PR #303). Each row below is reachable, so dropping its word from
+    // `AVOID` turns this red.
+    for (const [w, i, l] of [['where', 2, 'o'], ['pass', 1, 'i'], ['fast', 2, 'r'], ['ask', 2, 's'], ['whole', 3, 'r'],
+      ['poor', 3, 'f'], ['says', 0, 'g'], ['last', 1, 'u'], ['put', 2, 's'], ['push', 0, 't'], ['come', 2, 'k'], ['you', 2, 'b']] as [string, number, string][]) {
+      expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} belongs in AVOID, not the word lists`).toBe(false);
       expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
+    }
     // Exhaustive over both lists and the days, every index: the pool the generators draw from is clean and still deep enough.
     for (const w of [...Y1_CEW, ...Y2_CEW, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) for (let i = 0; i < w.length; i++) {
       const pool = gapLetters(w, i);
