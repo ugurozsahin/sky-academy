@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { balance, buy, canBuy, equip, equippedItem, itemById, SHOP_ITEMS, type Wallet } from '../../src/game/shop';
-import { addCoins, buyItem, coinBalance, equipItem, load, reset, wallet } from '../../src/storage';
+import { addCoins, buyItem, coinBalance, equipItem, isWriteFailing, load, reset, wallet } from '../../src/storage';
 
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
@@ -95,5 +95,37 @@ describe('shop storage', () => {
     expect(load().spent).toBe(total);
     expect(load().stickers.length).toBe(stickersBeforeSpending);       // spending ten trails unlocked no new sticker and lost none
     expect(load().owned.sort()).toEqual(trails.map(i => i.id).sort());
+  });
+
+  // #151: buyItem() used to return true off the in-memory patch alone, so a purchase `save()` could not
+  // actually keep still played the "bought" sound and line, took the coins in this session, and vanished on
+  // the next launch with nothing telling the child or the grown-up it never happened. The shop is the one
+  // screen that must not lie, because it takes coins.
+  it('buyItem() reports failure and rolls back when the write does not land, instead of a purchase that will vanish', () => {
+    addCoins(gold.price);
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    let bought: boolean;
+    try { bought = buyItem(gold.id); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(bought, 'the write failed, so the purchase must not be reported as made').toBe(false);
+    expect(isWriteFailing()).toBe(true);
+    expect(load().owned, 'rolled back — never left half-applied in cache').toEqual([]);
+    expect(load().spent, 'the coins were not actually spent').toBe(0);
+    expect(coinBalance(), 'the child still has the coins to spend once the browser recovers').toBe(gold.price);
+
+    // …and once the browser can write again, the same purchase goes through normally.
+    expect(buyItem(gold.id), 'the underlying purchase itself was never the problem').toBe(true);
+    expect(load().owned).toEqual([gold.id]);
+  });
+
+  it('equipItem() reports failure and rolls back when the write does not land', () => {
+    addCoins(gold.price); buyItem(gold.id);           // buying equips gold; switch back to the free default first
+    equipItem('trail-element');
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    let equipped: boolean;
+    try { equipped = equipItem(gold.id); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(equipped, 'the write failed, so the switch must not be reported as kept').toBe(false);
+    expect(load().equipped.trail, 'still showing whichever trail was equipped before the failed attempt').toBe('trail-element');
   });
 });

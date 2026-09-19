@@ -192,6 +192,20 @@ let readOnly = false;
  * being saved" notice would read. That notice is #232's own related item and is not built here.
  */
 export const isReadOnlySave = () => readOnly;
+/**
+ * Set by `save()` when its own `localStorage.setItem` just threw — private browsing, a WebView with DOM
+ * storage disabled, or a full quota (#151). Distinct from `isReadOnlySave()`: that one refuses to write
+ * *deliberately*, to protect a newer save already on disk, and its remedy is "update this device"; this one
+ * is the browser refusing an ordinary write, and its remedy is "this browser will not let the game save".
+ * Conflating them would send a grown-up to update an app that already writes fine, or wait for a device
+ * update that will never fix a private-browsing tab.
+ *
+ * Reflects only the *last* attempted write, the same way `readOnly` reflects only the last `load()` — a caller
+ * that wants to know whether *this* save landed checks it immediately after calling `save()`, before anything
+ * else can write again.
+ */
+let writeFailed = false;
+export const isWriteFailing = () => writeFailed;
 export function load(): SaveData {
   if (cache) return cache;
   try {
@@ -208,9 +222,12 @@ export function load(): SaveData {
 export function save(patch: Partial<SaveData> = {}): SaveData {
   cache = { ...load(), ...patch };
   // #232: the blob on disk is newer than this build, or carries a version we cannot read. The session keeps
-  // working against `cache`; writing would relabel it as our shape and make the loss permanent.
+  // working against `cache`; writing would relabel it as our shape and make the loss permanent. Not an
+  // attempted write, so it does not touch `writeFailed` either way (#151) — that flag is only ever set by an
+  // actual `setItem` call, immediately below.
   if (readOnly) return cache;
-  try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* private mode etc. */ }
+  try { localStorage.setItem(KEY, JSON.stringify(cache)); writeFailed = false; }
+  catch { writeFailed = true; /* private mode, WebView storage disabled, full quota (#151) */ }
   return cache;
 }
 export function recordTopic(topicId: string, stars: number, score: number) {
@@ -368,17 +385,29 @@ export function recordDojo(e: DojoEvent, now = new Date()): DojoOutcome {
 /** The spendable part of the save. */
 export function wallet(): Wallet { const d = load(); return { coins: d.coins, spent: d.spent || 0, owned: Array.isArray(d.owned) ? d.owned : [], equipped: d.equipped ?? {} }; }   // tolerant of hand-edited saves
 export const coinBalance = () => balance(wallet());
-/** Buy (and equip) a shop item. Returns false when it is already owned, unknown or too dear. */
+/**
+ * Buy (and equip) a shop item. Returns false when it is already owned, unknown or too dear — and also when the
+ * purchase could not be kept (#151): the shop is the one screen that must not lie, because it takes coins.
+ * Rolled back rather than left in `cache` for the rest of the session, so a false return means what it says —
+ * nothing changed — instead of a purchase that plays back correctly until the next reload silently drops it.
+ */
 export function buyItem(id: string): boolean {
   const r = buy(wallet(), id); if (!r.ok) return false;
-  save({ spent: r.wallet.spent, owned: r.wallet.owned, equipped: r.wallet.equipped }); return true;
+  const before = load();
+  save({ spent: r.wallet.spent, owned: r.wallet.owned, equipped: r.wallet.equipped });
+  if (readOnly || writeFailed) { cache = before; return false; }
+  return true;
 }
-/** Equip an owned item. Returns false when nothing changed. */
+/** Equip an owned item. Returns false when nothing changed, or when the choice could not be kept (#151, same
+ *  reasoning as buyItem — rolled back rather than shown as equipped for a session that will forget it). */
 export function equipItem(id: string): boolean {
   const w = wallet(); const next = equip(w, id); if (next === w) return false;
-  save({ equipped: next.equipped }); return true;
+  const before = load();
+  save({ equipped: next.equipped });
+  if (readOnly || writeFailed) { cache = before; return false; }
+  return true;
 }
-export function reset() { cache = null; readOnly = false; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232)
+export function reset() { cache = null; readOnly = false; writeFailed = false; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232); writeFailed is a last-attempt signal, not a diagnosis, so a deliberate fresh start gives it the same benefit of the doubt — the very next save() call sets it again if the browser still refuses (#151)
 
 /**
  * The save as a code the grown-up can copy to another device (#64). Every APK the workflow builds is signed

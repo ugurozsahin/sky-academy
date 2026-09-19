@@ -86,6 +86,17 @@ describe('guard rails', () => {
     expect(src).not.toMatch(/\b(?:confirm|alert|prompt)\s*\(/);
   });
 
+  // #151: save() swallows a failed write by design (a device that cannot persist must not crash the game),
+  // which is exactly why the grown-ups dashboard has to say so — nothing else on the device ever will. This
+  // screen has no DOM harness this repo can run without a browser (#141), so the rail is textual: it holds
+  // the two distinguishable reasons wired into the dashboard, not merely present somewhere in the file.
+  it('the grown-ups dashboard warns when the save is not being kept (#151)', () => {
+    const src = code(SOURCES['/src/ui/parents.ts']);
+    expect(src).toMatch(/isReadOnlySave\s*\(\s*\)/);
+    expect(src).toMatch(/isWriteFailing\s*\(\s*\)/);
+    expect(src).toMatch(/class="p-note save-note"/);
+  });
+
   // #28: drawBubble built a radial gradient (+ two colour strings) and ran a `measureText` font-fit loop for
   // every bubble every frame — hundreds of measureText calls per frame with a wide word wave on a phone. The
   // body is now a cached sprite (bodySprite) and the label size is fitted once at spawn (fitLabel), so neither
