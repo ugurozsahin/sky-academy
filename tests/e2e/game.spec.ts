@@ -548,6 +548,41 @@ test.describe('Sky Ninja Academy', () => {
     for (const label of await page.locator('.vis .chart .cat').allInnerTexts()) expect(label).not.toContain(symbol);
   });
 
+  // #137 "5. Smaller, same family": the block diagram (d3) never rendered in a browser at all — the e2e rail
+  // above stops at d2, and unit tests cannot see CSS layout. Year 2's `diffs` array (`src/curriculum/types.ts`)
+  // is `[1, 2, 2, 3, 3]`, so difficulty 3 is not reached until stage 4 — three whole stages must be played
+  // first, which is why this is its own test rather than an extension of the one above.
+  test('statistics: the block diagram reaches the card without overflowing a narrow viewport (#137)', async ({ page }) => {
+    test.setTimeout(240_000);
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-stats');
+    const perStage = await page.evaluate(() => window.__sna.session.perStage as number);
+    for (let stage = 1; stage < 4; stage++) {
+      await answerAll(page, perStage);
+      await expect(page.locator('.celebrate')).toBeVisible();
+      await page.click('#next');
+    }
+    // Every question from here is difficulty 3: `y2Stats`'s `kind` is a pure function of `d`
+    // (`src/curriculum/maths.ts`), so every one of this stage's questions is a block diagram — nothing here
+    // depends on which survey or which `ask` was rolled. What *is* random is each row's count (`ri(rng, 1, 9)`
+    // per row, capped at 10 by the unit rail in `tests/unit/curriculum.test.ts`), which is exactly the input
+    // the CSS in `src/style.css` (`.chart .blk`, `clamp(14px, 4.4vw, 20px)` each) has never been checked
+    // against in a real layout engine — checking every question in the stage, not just the first, gives this a
+    // real chance of drawing the worst case (nine `.blk` boxes in one row) at least once.
+    for (let i = 0; i < perStage; i++) {
+      await expect(page.locator('.vis .chart.block')).toBeVisible();
+      await expect(page.locator('.vis .chart .blk').first()).toBeVisible();
+      // `.vis` is the row's own scroller (`src/ui/visuals.ts`'s wrapper div): scrollWidth outgrowing
+      // clientWidth means a row of blocks has pushed past the edge of the phone screen, which is unreadable
+      // rather than merely ugly — the whole point of #137 item 1's sibling check for the tally gate.
+      const overflow = await page.locator('.vis').evaluate(el => el.scrollWidth - el.clientWidth);
+      expect(overflow, `a chart row overflowed the viewport by ${overflow}px`).toBeLessThanOrEqual(1);
+      await waitForTarget(page);
+      expect(await answer(page)).toBe(true);
+      await page.waitForFunction((idx) => { const s = window.__sna?.state(); return s && (s.index > idx || s.ended || document.querySelector('.celebrate')); }, i);
+    }
+  });
+
   test('completing stage 1 shows the avatar celebrating with a praise line', async ({ page }) => {
     await seedPlayer(page, 'kai', 'Sam');
     await startTopic(page, 'year1', 'y1-bonds');
