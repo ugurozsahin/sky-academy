@@ -21,8 +21,8 @@ const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven
 
 const mdIn = (dir: string) => readdirSync(join(root, dir)).filter((f) => f.endsWith('.md')).map((f) => `${dir}/${f}`);
 const INSTRUCTION_FILES = [
-  'CLAUDE.md', 'AGENTS.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md',
-  ...mdIn('.claude/rules'), ...mdIn('docs/decisions'), ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
+  'CLAUDE.md', 'AGENTS.md', 'BACKLOG.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+  'docs/WATCHDOG-PROMPT.md', ...mdIn('.claude/rules'), ...mdIn('docs/decisions'), ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
 ].filter((f) => f !== 'BACKLOG.md' || existsSync(join(root, f)));   // BACKLOG.md is retiring (#218)
 
 // A repo path anywhere inside a code span — alone, or as an argument of a command: a path under a tracked

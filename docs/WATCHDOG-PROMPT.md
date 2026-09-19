@@ -61,8 +61,9 @@ your first finding and the only one you can report.
 3. **Is the development routine alive?** Read the body of the issue titled `routine: heartbeat`: the routine
    rewrites it with a UTC timestamp as the last thing every run does. Two missed intervals plus slack is the
    finding — take the cadence from the routine's own trigger rather than assuming. The repo has called it
-   "hourly" through more than one cadence change, and the trigger is still *named* "hourly dev run" while its
-   cron reads `37 */2 * * *` (every two hours, as of 2026-09-09), so the name is not evidence of anything. **An open issue is not evidence of a pulse; a readable, recent timestamp is** — an
+   "hourly" through more than one cadence change — the cron was two-hourly from 2026-09-09 and reads
+   `37 */1 * * *` (hourly) as of 2026-09-19 — so the trigger's name, "hourly dev run", is not evidence of anything.
+   At that cadence two missed intervals plus slack is a pulse older than ~3 hours. **An open issue is not evidence of a pulse; a readable, recent timestamp is** — an
    empty or unparseable body counts as stale, and that is the likeliest partial death, because the pulse is
    written last and last is the most exposed place to run out of time. If no such issue exists in any state,
    the routine has not run since this was introduced; if it exists but is closed, someone closed the pulse,
@@ -87,7 +88,9 @@ your first finding and the only one you can report.
    scratch against the current head and give its own verdict. The issue you file names that rule and points at
    the `review-pr` skill (`.claude/skills/review-pr/SKILL.md` §6) — a run reading "stalled, 9 hours" does not
    know it is allowed to act, which is how ugurozsahin/sky-academy-private-archive#150 sat drafted and red
-   through an owner approval until a session broke it by hand.
+   through an owner approval until a session broke it by hand. Reviews now come from the hourly reviewer
+   routine (`docs/REVIEWER-PROMPT.md`), not from the development routine, so a pile of ready, unreviewed
+   pull requests means that routine is not running — say that in the finding.
 5. **Is the priority order being followed?** The 2026-09-06 code-health freeze **ended on 2026-09-10**, and its end
    is a one-time event, not a condition that can re-arm: a `review` or `debt` issue filed after that date does
    not re-freeze anything, the `frozen` label is retired, and code health now queues with features by priority
@@ -149,7 +152,7 @@ your first finding and the only one you can report.
    **The workflow filter has to be the path, not a query parameter.** `/actions/runs?workflow=android.yml`
    looks plausible and is wrong: that endpoint takes `actor`, `branch`, `event`, `status`, `created`,
    `head_sha`, `check_suite_id` and `exclude_pull_requests`, and **silently ignores anything else**, so
-   `?workflow=` hands you the newest run in the whole repository — here, with a routine every two hours,
+   `?workflow=` hands you the newest run in the whole repository — here, with a routine every hour,
    almost always a `CI` or `Review gate` run.
    **The branch filter is what makes the answer about `main`.** This workflow's `pull_request:` trigger is its
    only frequent one, so an unfiltered list is dominated by pull-request runs on somebody's branch. Without

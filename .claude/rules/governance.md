@@ -3,6 +3,7 @@ paths:
   - "CLAUDE.md"
   - "BACKLOG.md"
   - "docs/ROUTINE-PROMPT.md"
+  - "docs/REVIEWER-PROMPT.md"
   - "docs/WATCHDOG-PROMPT.md"
   - ".github/**"
   - ".claude/**"
@@ -25,7 +26,7 @@ paths:
 - **The run's heartbeat snapshot (issue #62) must say whether it took a second item and, if not, which of the
   four #97 eligibility conditions failed (#239).** Enforced in code: a `PreToolUse` hook in
   `.claude/settings.json` denies an `issue_write` update to issue #62 whose body has no `- second item: `
-  line. The four eligibility conditions themselves (is a review waiting, is
+  line. The four eligibility conditions themselves (are more than three reviews waiting, is
   there time left in the run, are the second item's files disjoint from the first's, did the first item
   actually finish) have no such enforcement yet — nothing stops a run from taking an ineligible second item,
   only from failing to say so — and they are still copied in `CLAUDE.md`, `BACKLOG.md` and
