@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { clockSVG, coinSVG, fiveFrames, renderVisual } from '../../src/ui/visuals';
 
 const count = (html: string, re: RegExp) => (html.match(re) ?? []).length;
@@ -154,15 +154,20 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
   });
 
   it('a key it cannot honour draws one symbol per child rather than rounding to a number nobody has', () => {
-    // `Visual` is public and `each` is an unconstrained number on it. Rounding used to invent the data:
-    // n=7 with a key of 2 drew 4 symbols — 8 children — for a question whose answer is 7.
-    const odd = [{ label: 'a', n: 7 }];
-    expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, each: 2 }), /class="pic"/g)).toEqual([7]);
-    expect(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, each: 2 })).not.toContain('class="key"');
-    // And a key of zero used to throw RangeError out of renderVisual, aborting the card before its bubbles.
-    for (const each of [0, -2, 1.5]) {
-      expect(() => renderVisual({ type: 'chart', kind: 'pictogram', rows, each }), `each=${each}`).not.toThrow();
-      expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows, each }), /class="pic"/g)).toEqual([6, 4, 2]);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});   // #137 item 5's trace is expected here
+    try {
+      // `Visual` is public and `each` is an unconstrained number on it. Rounding used to invent the data:
+      // n=7 with a key of 2 drew 4 symbols — 8 children — for a question whose answer is 7.
+      const odd = [{ label: 'a', n: 7 }];
+      expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, each: 2 }), /class="pic"/g)).toEqual([7]);
+      expect(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, each: 2 })).not.toContain('class="key"');
+      // And a key of zero used to throw RangeError out of renderVisual, aborting the card before its bubbles.
+      for (const each of [0, -2, 1.5]) {
+        expect(() => renderVisual({ type: 'chart', kind: 'pictogram', rows, each }), `each=${each}`).not.toThrow();
+        expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows, each }), /class="pic"/g)).toEqual([6, 4, 2]);
+      }
+    } finally {
+      warn.mockRestore();
     }
   });
 
@@ -189,5 +194,62 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
 
   it('escapes the category label rather than trusting it as markup', () => {
     expect(renderVisual({ type: 'chart', kind: 'block', rows: [{ label: '<b>x</b>', n: 1 }] })).toContain('&lt;b&gt;');
+  });
+
+  // #137 item 2: `n` is just as unconstrained on the public `Visual` type as `each` (above), and reached the
+  // same way with no try/catch between the generator and here. Before this fix: n=-3 threw a RangeError out
+  // of Array.from/String.repeat, n=Infinity never terminated the tally loop (Math.floor(Infinity/5) is
+  // Infinity), and n=1e9 tried to allocate that many DOM strings. Every one of the six must now render an
+  // empty row instead — a wrong picture is bad, a crashed or frozen one is worse.
+  it('n is defended the same way each is — no throw, no hang, no unbounded allocation, no fractional row (#137)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});   // every bad value here is meant to warn
+    try {
+      const bad = [-3, 0, 1.5, Infinity, -Infinity, NaN, 1e9];
+      for (const kind of ['tally', 'pictogram', 'block'] as const) {
+        for (const n of bad) {
+          expect(() => renderVisual({ type: 'chart', kind, rows: [{ label: 'x', n }], each: 1 }), `${kind} n=${n}`)
+            .not.toThrow();
+        }
+      }
+      for (const n of [-3, 1.5, Infinity, -Infinity, NaN, 1e9]) {
+        expect(perRow(renderVisual({ type: 'chart', kind: 'block', rows: [{ label: 'x', n }] }), /class="blk"/g), `n=${n}`)
+          .toEqual([0]);
+      }
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('an invalid row count warns; zero — a real "nobody chose this" count — does not (#137)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      renderVisual({ type: 'chart', kind: 'block', rows: [{ label: 'x', n: 0 }] });
+      expect(warn, 'zero is a legitimate count, not something to sanitise away').not.toHaveBeenCalled();
+      renderVisual({ type: 'chart', kind: 'block', rows: [{ label: 'y', n: -3 }] });
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  // #137 item 5: the demotion itself is correct (refusing loudly mid-mission is worse than a coarser but
+  // honest picture) — it is the silence that was the bug. A trace must name what forced it, and it must not
+  // fire for the ordinary case (each divides every row, or a tally/block that never reads `each` at all).
+  it('a key demotion leaves a trace naming the key that failed; a tally/block chart never warns about one (#137)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      renderVisual({ type: 'chart', kind: 'pictogram', rows: [{ label: 'a', n: 7 }], each: 2 });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('2');
+      warn.mockClear();
+      renderVisual({ type: 'chart', kind: 'pictogram', rows: [{ label: 'a', n: 6 }, { label: 'b', n: 4 }], each: 2 });
+      expect(warn, 'every row divides by 2 — nothing to demote').not.toHaveBeenCalled();
+      renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'a', n: 7 }] });
+      expect(warn, 'tally never reads each, so it has nothing to demote or warn about').not.toHaveBeenCalled();
+      renderVisual({ type: 'chart', kind: 'block', rows: [{ label: 'a', n: 7 }] });
+      expect(warn, 'block never reads each either').not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
