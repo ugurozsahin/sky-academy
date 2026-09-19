@@ -86,4 +86,5 @@ paths:
   `perf`, `debt`, `tests`, `guard-rail`, `accessibility`.
   **Default priority when filing (owner, 2026-09-19):** work a player would notice is `priority:P2`; a finding
   about a rail, a test or a prompt is `priority:P3`. Hardening findings arrive daily, and at the same priority
-  as the game they queue ahead of whatever game issue is filed after them.
+  as the game they queue ahead of whatever game issue is filed after them. This has no such enforcement — it
+  is a convention for whoever files an issue, and the owner re-orders by label as before.

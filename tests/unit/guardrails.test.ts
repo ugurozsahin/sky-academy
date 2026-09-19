@@ -2052,8 +2052,8 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * denies an `issue_write` update to issue #62 whose body has no `- second item: ` line. That is the one
    * piece of #97 real enough to collapse, the same bar #191 cleared — the four *eligibility* conditions
    * themselves (is a review waiting, is there time left, are the files disjoint, did the first item finish)
-   * have no such enforcement, so they stay copied in `CLAUDE.md` and
-   * `docs/ROUTINE-PROMPT.md` (checked by the rails in the #177 describe block) — this
+   * have no such enforcement. #145 gave them one home, `docs/ROUTINE-PROMPT.md` STEP 3, and `CLAUDE.md` holds
+   * a pointer to it rather than a copy — both checked by the rails in the #177 describe block. This
    * rail only covers the recording-obligation sentence, not the whole rule.
    *
    * Unlike #191 (a single sentence with nothing else depending on its exact words), the "carries a
@@ -3308,23 +3308,32 @@ describe('a developer run may take a second item — the rule, in its home (#177
     const text = flat(raw);
     expect(text).toMatch(/A developer run may take a second item \(#97\)/);
     // The whole bullet, not the file and not a slice of the bullet (#291, review of PR #294): one synonym for
-    // "disjoint", or three of the four conditions copied back, walked past a file-wide check on one word; and a
-    // slice that stopped at the pointer sentence let the same copy sit *after* it. Cut in the raw text, where
-    // a bullet ends at the next `- ` line, a blank line or a heading, and only then flatten.
-    const start = raw.search(/A developer run may take a second item \(#97\)/);
-    expect(start, 'the bullet must be found').toBeGreaterThanOrEqual(0);
+    // "disjoint", or three of the four conditions copied back, walked past a file-wide check on one word; a
+    // slice that stopped at the pointer sentence let the same copy sit *after* it; and one that began at the
+    // anchor phrase let it sit *before* it. So the slice runs from the bullet's own `- ` to the next `- `
+    // line, blank line or heading — cut in the raw text, flattened only after.
+    const anchor = raw.search(/A developer run may take a second item \(#97\)/);
+    expect(anchor, 'the second-item pointer must be found in CLAUDE.md').toBeGreaterThanOrEqual(0);
+    const start = raw.lastIndexOf('\n- ', anchor) + 1;
     const rest = raw.slice(start);
     const end = rest.search(/\n(?=- |\n|#)/);
     const bullet = flat(end === -1 ? rest : rest.slice(0, end));
+    // `lastIndexOf` walks back to the nearest top-level `- `; if the pointer were moved into a paragraph or a
+    // sub-bullet, that walk lands on an earlier bullet and the slice never reaches the anchor. Say so plainly
+    // rather than failing further down as a missing pointer sentence.
+    expect(bullet, 'the pointer must sit in a top-level bullet of its own')
+      .toMatch(/A developer run may take a second item \(#97\)/);
     expect(bullet, 'the pointer sentence sits in this bullet, not another')
       .toMatch(/docs\/ROUTINE-PROMPT\.md STEP 3 is the rule's home/);
     expect(bullet.length, `the bullet is ${bullet.length} characters; a pointer stays under 260`).toBeLessThan(260);
     for (const copied of [/at most three/i, /from the start of the run/i, /disjoint|overlap/i, /Part of #<n>/, /two items per run/i])
       expect(bullet, `CLAUDE.md copies a condition back: ${copied}`).not.toMatch(copied);
-    // The belt to that brace: the two phrases no other CLAUDE.md line has a use for stay out of the whole file,
-    // so a copy that lands outside any bullet boundary is still red.
-    expect(text, 'the four conditions live in one place').not.toMatch(/disjoint/i);
-    expect(text, 'the four conditions live in one place').not.toMatch(/from the start of the run/i);
+    // The belt to that brace, and only as wide as a word list can be: these five phrases have no other use in
+    // CLAUDE.md today (`Part of #<n>` does — the branches bullet — so it stays out), which keeps a verbatim
+    // copy red wherever in the file it lands. A *paraphrase* outside this bullet is not sealed by any of it;
+    // the cap above is what holds the bullet itself, and nothing here reads the rest of the file for meaning.
+    for (const copied of [/disjoint/i, /from the start of the run/i, /at most three/i, /overlap/i, /two items per run/i])
+      expect(text, `the four conditions live in one place: ${copied}`).not.toMatch(copied);
   });
 
   // Without this line nobody can tell a rule that is never true from a rule nobody applied — and #178 moved
