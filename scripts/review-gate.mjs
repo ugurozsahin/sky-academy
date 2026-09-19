@@ -62,16 +62,28 @@ export const hasSessionUrl = (body) => /https:\/\/claude\.ai\/code\/session_[A-Z
 export const isAdoptionClear = (body) => isCleared(body) && /another reviewer'?s block/i.test(body || '');
 
 /**
- * @param {{draft: boolean, labels?: string[], comments: {body: string, created_at: string}[]}} pr
+ * Who may write a marker (#215). The repo went public on 2026-09-16 and the gate read every comment's text
+ * without asking who wrote it, so any GitHub account could post `OWNER: APPROVED` and turn the status green.
+ * `author_association` is GitHub's own stamp on each comment, relative to this repo — the commenter cannot
+ * choose it. An `OWNER:` verdict counts only from the repo's OWNER; a `REVIEW:` marker from anyone with write
+ * access. A comment with no association is a stranger's: fail closed. This does not make the owner's marker
+ * unforgeable by an *agent* — they still share his account (the note above, #78) — but when the agents get
+ * their own identity they become COLLABORATOR and this same check starts refusing them with no change here.
+ */
+const mayReview = (c) => ['OWNER', 'COLLABORATOR', 'MEMBER'].includes(c.author_association);
+const isOwner = (c) => c.author_association === 'OWNER';
+
+/**
+ * @param {{draft: boolean, labels?: string[], comments: {body: string, created_at: string, author_association?: string}[]}} pr
  * @returns {{blocked: boolean, reasons: string[]}} newest marker wins, so block → clear → block works.
  */
 export function blockState({ draft, labels, comments }) {
   let requested = null, requestedHasSession = false, cleared = null, clearedBody = null, rejected = null, approved = null;
   for (const c of comments || []) {
-    if (isChangesRequested(c.body)) { requested = c.created_at; requestedHasSession = hasSessionUrl(c.body); }
-    if (isCleared(c.body)) { cleared = c.created_at; clearedBody = c.body; }
-    if (isOwnerRejected(c.body)) rejected = c.created_at;
-    if (isOwnerApproved(c.body)) approved = c.created_at;
+    if (mayReview(c) && isChangesRequested(c.body)) { requested = c.created_at; requestedHasSession = hasSessionUrl(c.body); }
+    if (mayReview(c) && isCleared(c.body)) { cleared = c.created_at; clearedBody = c.body; }
+    if (isOwner(c) && isOwnerRejected(c.body)) rejected = c.created_at;
+    if (isOwner(c) && isOwnerApproved(c.body)) approved = c.created_at;
   }
   const openReview = requested !== null && (cleared === null || cleared < requested);
   // #195 — the clearing side of #189/#191's gap: a REVIEW: CLEARED comment that adopts another reviewer's

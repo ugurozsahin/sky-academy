@@ -177,10 +177,12 @@ Three things to get right:
 The point is asymmetry: an agent must not be able to vote itself more freedom, but an agent that wants the
 routine held to a higher standard should not have to wait a day for it.
 
-## 7. Three files that change together
+## 7. One home per rule
 
-`CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` carry several rules in identical wording, and rails in
-`tests/unit/guardrails.test.ts` hold them to it. If you change one, change all three in the same pull request.
+A rule lives in one file and the others point at it (`docs/decisions/001-one-home-per-rule.md`). Put a new
+rule in its home — do not copy it into a second file. A few paragraphs are still copied across `CLAUDE.md`,
+`BACKLOG.md` and `docs/ROUTINE-PROMPT.md`; `.claude/rules/governance.md` lists them, and until each is
+reduced to its home a rail fails if you change one copy and not the others.
 
 And **records have readers** (#178): a change and why belongs in this body; a decision that binds future work
 belongs on the issue or in `docs/decisions/`; operational state belongs in the heartbeat issue. Nothing

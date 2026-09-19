@@ -10,9 +10,9 @@ import { blockState, closingRefs, hasSessionUrl, isAdoptionClear, isChangesReque
  */
 const at = (n: number) => new Date(Date.UTC(2026, 8, 7, 12, n)).toISOString();
 const pr = (draft: boolean, ...bodies: string[]) =>
-  blockState({ draft, labels: [], comments: bodies.map((body, i) => ({ body, created_at: at(i) })) });
+  blockState({ draft, labels: [], comments: bodies.map((body, i) => ({ body, created_at: at(i), author_association: 'OWNER' })) });
 const gated = (...bodies: string[]) =>
-  blockState({ draft: false, labels: ['owner-approval'], comments: bodies.map((body, i) => ({ body, created_at: at(i) })) });
+  blockState({ draft: false, labels: ['owner-approval'], comments: bodies.map((body, i) => ({ body, created_at: at(i), author_association: 'OWNER' })) });
 
 describe('review gate', () => {
   // Loose on purpose: a reviewer who types the marker in bold, or in sentence case, still means it.
@@ -224,6 +224,52 @@ describe("a REVIEW: CLEARED adopting another reviewer's block carries its own se
   it('is silent when there is no clear at all', () => {
     expect(pr(false).reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
     expect(pr(false, requestWithUrl).reasons).not.toContain("REVIEW: CLEARED adopts another reviewer's block with no session URL of its own — unmarked per #161/#191/#195");
+  });
+});
+
+/**
+ * #215 — the repo went public on 2026-09-16, and the gate read every comment's text without asking who wrote
+ * it: any GitHub account could post `OWNER: APPROVED` on an `owner-approval` PR and turn the status green.
+ * GitHub stamps each comment with `author_association`, which the commenter cannot choose, so that is what
+ * decides whether a marker counts. An `OWNER:` verdict counts only from the repo's OWNER; a `REVIEW:` marker
+ * counts from anyone with write access. A comment with no association at all is a stranger's: fail closed.
+ */
+describe('a marker counts only from someone allowed to write it (#215)', () => {
+  const by = (author_association: string | undefined, body: string, n = 0) => ({ body, created_at: at(n), author_association });
+  const state = (labels: string[], draft: boolean, ...comments: ReturnType<typeof by>[]) => blockState({ draft, labels, comments });
+
+  it.each(['NONE', 'CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER', 'MANNEQUIN', undefined])(
+    "a stranger's (%s) OWNER: APPROVED does not approve an owner-approval PR", (who) => {
+      expect(state(['owner-approval'], false, by(who, 'OWNER: APPROVED')).blocked).toBe(true);
+    });
+
+  it('a collaborator is not the owner either: only OWNER writes an OWNER: verdict', () => {
+    expect(state(['owner-approval'], false, by('COLLABORATOR', 'OWNER: APPROVED')).blocked).toBe(true);
+    expect(state([], false, by('COLLABORATOR', 'OWNER: REJECTED — no')).blocked).toBe(false);
+  });
+
+  it("the owner's own OWNER: APPROVED still approves", () => {
+    expect(state(['owner-approval'], false, by('OWNER', 'OWNER: APPROVED')).blocked).toBe(false);
+  });
+
+  it("a stranger's OWNER: APPROVED cannot override the owner's rejection", () => {
+    expect(state([], false, by('OWNER', 'OWNER: REJECTED — too dark', 0), by('NONE', 'OWNER: APPROVED', 1)).blocked).toBe(true);
+  });
+
+  it("a stranger's REVIEW: CLEARED does not lift a real block", () => {
+    const block = by('OWNER', 'REVIEW: CHANGES REQUESTED — fps\n\nSession: https://claude.ai/code/session_abc123', 0);
+    expect(state([], false, block, by('NONE', 'REVIEW: CLEARED', 1)).blocked).toBe(true);
+  });
+
+  it('and a stranger cannot block a PR or reject it for the owner', () => {
+    expect(state([], false, by('NONE', 'REVIEW: CHANGES REQUESTED — spam')).blocked).toBe(false);
+    expect(state([], false, by('CONTRIBUTOR', 'OWNER: REJECTED — spam')).blocked).toBe(false);
+  });
+
+  it.each(['COLLABORATOR', 'MEMBER', 'OWNER'])('a REVIEW: marker from %s counts both ways', (who) => {
+    const block = by(who, 'REVIEW: CHANGES REQUESTED — fps\n\nSession: https://claude.ai/code/session_abc123', 0);
+    expect(state([], false, block).blocked).toBe(true);
+    expect(state([], false, block, by(who, 'REVIEW: CLEARED', 1)).blocked).toBe(false);
   });
 });
 

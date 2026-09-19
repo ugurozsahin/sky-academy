@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { MANIFEST_SELECTOR, registerServiceWorker, type RegisterEnv } from '../../src/pwa';
 // @ts-expect-error — plain ESM build helper, run by `npm run build` (see scripts/build-sw.d.ts)
@@ -162,6 +163,22 @@ describe('the precache list is read from the build, never written down (#15)', (
     expect(cacheName(a)).toBe(cacheName([...a].reverse().sort()));
   });
 
+  // #116 item 4: the digest length and the filename component were both unpinned — `cacheName` could have its
+  // `.slice(0, 12)` widened or narrowed, or `fingerprints` could swap its `\0`-joined field order, and the
+  // whole suite would stay green because nothing read the shape, only whether two calls agreed with each other.
+  it('the cache name is `sna-` plus a fixed 12-character hex digest', () => {
+    expect(cacheName(['a\x001\x00x'])).toMatch(/^sna-[0-9a-f]{12}$/);
+  });
+
+  it('a fingerprint line is exactly `name\\0size\\0sha256`, in that order', () => {
+    const read = () => Buffer.from('hello');
+    const [line] = fingerprints('dist', ['index.html'], read as never);
+    const [name, size, hash] = line.split('\x00');
+    expect(name).toBe('index.html');
+    expect(size).toBe('5');
+    expect(hash, 'sha256 hex is 64 characters').toMatch(/^[0-9a-f]{64}$/);
+  });
+
   // A fingerprint that only needs to satisfy renderSw's "contains \0" shape check, not describe a real file —
   // these tests are about placeholder substitution, not fingerprint content.
   const FAKE_PRINTS = ['a\x001\x00x'];
@@ -188,6 +205,158 @@ describe('the precache list is read from the build, never written down (#15)', (
     // parameters are `string[]`. Either shape names the cache after filenames instead of content.
     expect(() => renderSw('__CACHE_NAME__ __PRECACHE__', ['a.js'])).toThrow(/prints must be fingerprints/);
     expect(() => renderSw('__CACHE_NAME__ __PRECACHE__', ['a.js'], ['a.js'])).toThrow(/prints must be fingerprints/);
+  });
+});
+
+/**
+ * #15's worker itself, exercised for the first time (#116 item 4). Everything above imports `build-sw.mjs`'s
+ * pure helpers directly; nothing ran `scripts/sw-template.js`'s own handlers, because `self`/`caches` do not
+ * exist under Node and none of `shell`/`font`/`asset` is exported. Each gap below was proved by a mutation
+ * that left the rest of the suite green: deleting the `res.ok && res.type === 'basic'` gate, dropping
+ * `{ cache: 'reload' }`, or dropping `ignoreVary` all still passed before this.
+ *
+ * `runWorker` renders the real template (through the real `renderSw`) and evaluates it in a fresh V8 context
+ * carrying a minimal, in-memory Cache Storage, a fake `Request` and a scripted `fetch` — as close to the real
+ * object shape as a Node test gets without a browser. Types are kept to this file's own minimal shapes rather
+ * than DOM's `Request`/`Response`, which the fakes below only partially satisfy.
+ */
+interface FakeReq { url: string; method?: string; mode?: string; cache?: string }
+interface FakeRes { ok: boolean; type: string; clone: () => FakeRes }
+interface FakeEvent { request?: FakeReq; respondWith?: (p: Promise<unknown>) => void; waitUntil: (p: Promise<unknown>) => void }
+
+function fakeResponse(overrides: Partial<Pick<FakeRes, 'ok' | 'type'>> = {}): FakeRes {
+  const shape = { ok: true, type: 'basic', ...overrides };
+  return { ...shape, clone: () => fakeResponse(overrides) };
+}
+
+const DEFAULT_LIST = ['index.html'];
+const DEFAULT_PRINTS = ['index.html\x009\x00a'];
+const CACHE = cacheName(DEFAULT_PRINTS);
+
+function runWorker(fetchImpl: (req: FakeReq | string) => Promise<FakeRes>, list: string[] = DEFAULT_LIST, prints: string[] = DEFAULT_PRINTS) {
+  const listeners: Record<string, (e: FakeEvent) => void> = {};
+  const named = new Map<string, Map<string, FakeRes>>();
+  const matchCalls: { cache: string; url: string; opts: unknown }[] = [];
+  const caches = {
+    open: async (name: string) => {
+      if (!named.has(name)) named.set(name, new Map());
+      const store = named.get(name)!;
+      return {
+        match: async (req: FakeReq | string, opts?: unknown) => {
+          const url = typeof req === 'string' ? req : req.url;
+          matchCalls.push({ cache: name, url, opts });
+          return store.get(url);
+        },
+        put: async (req: FakeReq | string, res: FakeRes) => { store.set(typeof req === 'string' ? req : req.url, res); },
+        addAll: async (reqs: FakeReq[]) => { for (const req of reqs) store.set(req.url, await fetchImpl(req)); },
+      };
+    },
+    keys: async () => [...named.keys()],
+    delete: async (name: string) => named.delete(name),
+  };
+  const fakeSelf = {
+    addEventListener: (type: string, fn: (e: FakeEvent) => void) => { listeners[type] = fn; },
+    skipWaiting: () => {},
+    clients: { claim: () => {} },
+    location: { origin: 'https://example.com' },
+  };
+  // A real `Request` needs an absolute URL: in a browser a relative one resolves against the worker's own
+  // `self.location`, which is exactly what `install`'s `new Request(u, { cache: 'reload' })` relies on for
+  // every precached path — Node's `Request` has no such base and throws on a bare `'index.html'`.
+  class FakeRequest implements FakeReq {
+    url: string;
+    cache?: string;
+    constructor(input: string, init: { cache?: string } = {}) {
+      this.url = new URL(input, `${fakeSelf.location.origin}/`).href;
+      this.cache = init.cache;
+    }
+  }
+  const context = vm.createContext({ self: fakeSelf, caches, fetch: fetchImpl, Response, Request: FakeRequest, URL });
+  const template = readFileSync(new URL('../../scripts/sw-template.js', import.meta.url), 'utf8');
+  vm.runInContext(renderSw(template, list, prints), context);
+  return { listeners, named, matchCalls };
+}
+
+/** Fires the `fetch` listener and returns the promises it hands to `respondWith`/`waitUntil`. */
+function dispatch(listeners: Record<string, (e: FakeEvent) => void>, req: FakeReq) {
+  let respondWith!: Promise<unknown>;
+  let waitUntil: Promise<unknown> | undefined;
+  listeners.fetch({ request: req, respondWith: (p) => { respondWith = p; }, waitUntil: (p) => { waitUntil = p; } });
+  return { respondWith, waitUntil: () => waitUntil };
+}
+
+describe("the worker's runtime handlers (#116 item 4)", () => {
+  it('precaches with {cache:"reload"}, so a stale HTTP-cache entry cannot be stored under a fresh deployment\'s name', async () => {
+    const seen: FakeReq[] = [];
+    const fetchImpl = async (req: FakeReq | string) => { seen.push(req as FakeReq); return fakeResponse(); };
+    const { listeners } = runWorker(fetchImpl);
+    let waited!: Promise<unknown>;
+    listeners.install({ waitUntil: (p) => { waited = p; } });
+    await waited;
+    expect(seen).toHaveLength(1);
+    expect(seen[0].cache, "the one failure install's own comment says this whole mechanism exists to prevent").toBe('reload');
+  });
+
+  it('asset() never caches a non-ok or opaque response, so a 404 or captive-portal body is not pinned until the next deployment', async () => {
+    const req: FakeReq = { method: 'GET', mode: 'cors', url: 'https://example.com/assets/index-ABC.js' };
+    for (const overrides of [{ ok: false, type: 'basic' }, { ok: true, type: 'opaque' }]) {
+      const { listeners, named } = runWorker(async () => fakeResponse(overrides));
+      const { respondWith } = dispatch(listeners, req);
+      await respondWith;
+      expect(named.get(CACHE)?.has(req.url) ?? false, JSON.stringify(overrides)).toBe(false);
+    }
+  });
+
+  it('asset() DOES cache an ok, same-origin response, matching the existing entry ignoring Vary', async () => {
+    const req: FakeReq = { method: 'GET', mode: 'cors', url: 'https://example.com/assets/index-ABC.js' };
+    const { listeners, named, matchCalls } = runWorker(async () => fakeResponse());
+    const { respondWith } = dispatch(listeners, req);
+    await respondWith;
+    expect(named.get(CACHE)!.has(req.url)).toBe(true);
+    // Vite marks the module script and the stylesheet `crossorigin`, so the page requests them WITH an Origin
+    // header while the precache stored them without one — `ignoreVary` is what stops that being a permanent miss.
+    expect(matchCalls.some(c => c.url === req.url && (c.opts as { ignoreVary?: boolean })?.ignoreVary === true)).toBe(true);
+  });
+
+  it('shell() matches the precached document ignoring Vary, the same reason as asset()', async () => {
+    const req: FakeReq = { method: 'GET', mode: 'navigate', url: 'https://example.com/' };
+    const { listeners, matchCalls } = runWorker(async () => fakeResponse());
+    const { respondWith } = dispatch(listeners, req);
+    await respondWith;
+    expect(matchCalls.some(c => c.url === 'index.html' && (c.opts as { ignoreVary?: boolean })?.ignoreVary === true)).toBe(true);
+  });
+
+  it('shell() resolves to Response.error() rather than rejecting, before the cache has ever been populated', async () => {
+    const req: FakeReq = { method: 'GET', mode: 'navigate', url: 'https://example.com/' };
+    const { listeners } = runWorker(async () => { throw new Error('offline'); });
+    const { respondWith } = dispatch(listeners, req);
+    const res = await respondWith as Response;
+    expect(res.type, 'a network failure with no cached shell must not reject the navigation').toBe('error');
+  });
+
+  it('font() never stores a non-ok (opaque) response — today it truly caches nothing, which is the accepted behaviour (#44)', async () => {
+    const req: FakeReq = { method: 'GET', mode: 'no-cors', url: 'https://fonts.gstatic.com/s/fredoka/x.woff2' };
+    const { listeners, named } = runWorker(async () => fakeResponse({ ok: false, type: 'opaque' }));
+    const { respondWith, waitUntil } = dispatch(listeners, req);
+    await respondWith;
+    await waitUntil();
+    expect(named.get('sna-fonts-v1')?.has(req.url) ?? false).toBe(false);
+  });
+
+  it('font() serves a cache hit immediately, without waiting on a slower background refresh', async () => {
+    const req: FakeReq = { method: 'GET', mode: 'no-cors', url: 'https://fonts.gstatic.com/s/fredoka/x.woff2' };
+    let resolveFetch!: () => void;
+    const fetchImpl = () => new Promise<FakeRes>(resolve => { resolveFetch = () => resolve(fakeResponse()); });
+    const { listeners, named } = runWorker(fetchImpl);
+    named.set('sna-fonts-v1', new Map([[req.url, fakeResponse()]]));
+    const { respondWith, waitUntil } = dispatch(listeners, req);
+    // If font() awaited the refresh before checking the cache, this would hang until the timeout: the fetch
+    // above never resolves until `resolveFetch()` is called, below.
+    const res = await respondWith;
+    expect(res, 'a cache hit must not wait on the network').toBeDefined();
+    resolveFetch();
+    await waitUntil();
+    expect(named.get('sna-fonts-v1')!.has(req.url)).toBe(true);
   });
 });
 

@@ -2702,7 +2702,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
  *     a negative assertion beside it, because a positive pin can always be appended to.
  *  §6 Loosening is owner-gated, asserted **within the Loosening bullet**, with Tightening required to carry
  *     the other text and forbidden to carry the gate.
- *  §7 The three-file rule and #178's "records have readers".
+ *  §7 One home per rule (docs/decisions/001) and #178's "records have readers".
  *
  * This is still text matching: it sees these spellings and nothing else, and a negative assertion is narrow
  * by nature — it forbids one phrasing of one inversion, not the idea. A rewrite that keeps a rule and changes
@@ -2820,9 +2820,9 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
     expect(tightening, 'the gate must not migrate onto the tightening bullet').not.toContain('Owner-gated');
   });
 
-  it('§7 keeps the three-file rule and where a record goes', () => {
-    expect(S(7), 'CLAUDE.md, BACKLOG.md and ROUTINE-PROMPT.md change together, and rails hold them to it')
-      .toContain('If you change one, change all three in the same pull request');
+  it('§7 points at the one-home-per-rule decision and says where a record goes', () => {
+    expect(S(7), 'the skill must send a run to the decision, not restate it')
+      .toContain('docs/decisions/001-one-home-per-rule.md');
     expect(S(7), 'and #178: a record with no reader is not written')
       .toContain('**records have readers** (#178)');
   });
@@ -3489,6 +3489,22 @@ describe('offline support cannot go stale on its own (#15)', () => {
       .not.toMatch(/(?:href|src)="icons\//);
     // The data-URI favicon is inlined already and must survive: it is the only mark the single page has.
     expect(stripHead(head), 'the inline favicon is not a file and must stay').toMatch(/<link rel="icon" href="data:/);
+  });
+
+  // `stripHead` has four replacements; only the manifest and Apple-icon links (above) had a test (#116 item
+  // 4). These two fabricate the shapes Vite's own build injects — an empty `<script src="…">` and the built
+  // stylesheet link — since the source `index.html` this file otherwise reads has neither: both appear only
+  // in `dist/index.html`, after `vite build`.
+  it("strips the built page's own module script tag, so the single-file page does not run the app twice", () => {
+    const head = '<title>t</title>\n<script type="module" crossorigin src="/assets/index-ABC123.js"></script>';
+    expect(stripHead(head)).not.toMatch(/<script/);
+    expect(stripHead(head)).toContain('<title>t</title>');
+  });
+
+  it('strips the built stylesheet link, leaving the rest of the head alone', () => {
+    const head = '<title>t</title>\n<link rel="stylesheet" crossorigin href="/assets/index-ABC123.css">';
+    expect(stripHead(head)).not.toMatch(/<link rel="stylesheet"/);
+    expect(stripHead(head)).toContain('<title>t</title>');
   });
 
   // No `vite-plugin-pwa`, no `workbox-*`: #15's acceptance criteria rule them out and the dependency
