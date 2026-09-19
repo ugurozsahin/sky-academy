@@ -147,7 +147,39 @@ What that means in practice:
 - **Nobody undrafts a pull request to get past a block**, their own included. Undrafting after a genuine clear
   fires a fresh CI run (#159), so the merging run waits for **that** run, not the tick underneath.
 
+## 7. A block is for this pull request's own bar, and rounds are not free
+
+Pull request #292 (#150) took **six rounds of `REVIEW: CHANGES REQUESTED`** across five hours and seven
+pushes. The issue asked for four things, and all four were met on the first head. Rounds 2 to 6 added no
+acceptance item: each invented a further shape — a YAML comment, a second `description :` key,
+`model:inherit`, a line of non-breaking spaces — until a ten-line pin had become 254 lines modelling a YAML
+parser in regular expressions, with a check that failed the build on ordinary English (`only`, `instead`,
+`no`) and on a carriage return anywhere in the file. Every round was defensible on its own. The sum was not,
+and nothing here stopped it.
+
+**What a block is for.** A block says *this pull request does not meet its bar*. The bar is the issue's
+acceptance criteria, this repository's rules, and a real defect in what the diff does. Work you would like
+the author to do — a further hardening, a case nobody has hit, a design you prefer — is not a block: write it
+as a non-blocking note, or open an issue and say you have. The test to put to your own finding before it
+blocks: **name what breaks for a run, for a reader, or for a child if this merges as it stands.** If the
+answer is "nothing yet, but", it is a note. Two findings block whatever the round: the pull request does not
+do what its body says, and a rail does not hold what it claims. Those are not preferences.
+
+**The third round is the last one that blocks.** Count the `REVIEW: CHANGES REQUESTED` comments on the pull
+request, whoever wrote them: the count is over the whole pull request, a push never resets it, and two
+reviewers do not get three rounds apiece. On the third, list everything you would still change and say which
+of it you are holding for. After the third, a fresh review finding only notes clears and merges; one finding
+a genuine defect by the bar above blocks again and says in its opening line that it is past the third round
+and why the finding meets that bar. Whatever you drop goes into an issue linked from the comment — it is
+queued, not lost.
+
+A reviewer who reaches the third round has usually already found the real answer: the pull request is trying
+to do too much. Say that instead. "Reduce this to X; the rest is issue #n" is a better review than a seventh
+shape.
+
 ## Reviewing is the work
 
 There is no time box on this. A reviewer run develops nothing and has done its job when it reviews well: a
-review that missed something costs far more than an item not started.
+review that missed something costs far more than an item not started. That is about **depth** — sections 1 to
+5, in full, on the current head — and §7 is about **rounds**: reviewing well and blocking repeatedly are not
+the same thing.

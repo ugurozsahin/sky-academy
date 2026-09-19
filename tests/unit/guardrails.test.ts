@@ -2008,6 +2008,80 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   });
 
   /**
+   * #305 — §6 says a block never expires and who may supersede it; nothing said what a block is *for*, or that
+   * the rounds have a floor. PR #292 blocked six times over five hours for a ten-line pin, each round inventing
+   * a further YAML shape, and ended only because #161 let a second reviewer supersede the sixth block.
+   *
+   * §7 is the answer and this pins its two halves, because either alone decays into the other's failure: a bar
+   * with no round cap is the loop again one finding at a time, and a cap with no bar is "merge on the fourth
+   * round" — which is how #74 went in over five open items. The closing paragraph is pinned with them: the cap
+   * is about rounds, never about reviewing less carefully, and a reviewer reading one without the other gets
+   * the wrong rule.
+   *
+   * Prove it red: delete §7; drop either rule from it; reword the round to a fourth or a second; or take the
+   * no-time-box sentence out of the closing paragraph.
+   */
+  it('the review-pr skill says what a block is for and caps the rounds that block (#305)', () => {
+    const skill = read('.claude/skills/review-pr/SKILL.md');
+    const start = skill.indexOf('\n## 7. '), end = skill.indexOf('\n## ', start + 1);
+    expect(start, 'the review-pr skill has lost its §7').toBeGreaterThan(-1);
+    const s7 = flat(skill.slice(start, end === -1 ? undefined : end));
+    // Whole operative clauses, not the nouns inside them (PR #306 review round 1): seven single-sentence
+    // rewrites inverted §7 while every noun phrase an earlier draft pinned — "the issue's acceptance criteria",
+    // "past the third round", "whoever wrote them" — sat unchanged in the inverted sentence.
+
+    // The bar, all three limbs: dropping either of the last two narrows it to "the issue said so", which is
+    // how a real defect outside the acceptance criteria stops being blockable.
+    for (const limb of ["the issue's acceptance criteria", "this repository's rules", 'a real defect in what the diff does'])
+      expect(s7, `the bar has lost a limb: ${limb}`).toContain(limb);
+    expect(s7, 'and the test a reviewer puts to their own finding before blocking on it')
+      .toContain('name what breaks for a run, for a reader, or for a child');
+    expect(s7, 'a preference is a note or an issue, never a block').toContain('is not a block');
+    // The two findings the bar never lets through — as one clause, because "Two findings ARE NOTES once you
+    // are past the third round" keeps both nouns and says the opposite.
+    expect(s7, 'the always-blocking pair must stay always-blocking').toContain('Two findings block whatever the round');
+    expect(s7, 'a body that does not match its diff blocks at any round').toContain('does not do what its body says');
+    expect(s7, 'and so does a rail that does not hold').toContain('a rail does not hold what it claims');
+    // The cap, as one anchor. The counting UNIT is the load-bearing half and the easiest to "clarify" away:
+    // #292 took seven pushes to six rounds, so a cap counted `since the last push` resets on every fix and
+    // caps nothing, while reading exactly like the rule it replaced.
+    expect(s7, 'the third round is the floor').toContain('The third round is the last one that blocks');
+    expect(s7, 'counted over the pull request and across reviewers — "since the last push" would reset on every '
+      + 'fix and cap nothing (#292: seven pushes, six rounds), and two reviewers are not entitled to three rounds each')
+      .toContain('Count the `REVIEW: CHANGES REQUESTED` comments on the pull request, whoever wrote them');
+    // Both branches of what happens after the third round. Either one alone is satisfied by an inversion of
+    // the other: `blocks again for anything it still dislikes` is the loop back, with the cap still "stated".
+    expect(s7, 'past the cap, a review that finds only notes CLEARS — without this the cap has no exit')
+      .toContain('a fresh review finding only notes clears and merges');
+    expect(s7, 'and a real defect may still block past the cap, with its round disclosed')
+      .toContain('one finding a genuine defect by the bar above blocks again');
+    expect(s7, 'what is dropped is queued, not lost — otherwise the cap loses findings')
+      .toContain('goes into an issue linked from the comment');
+
+    // Negative pins. Every assertion above is positive, and a positive pin can always be appended to: one
+    // sentence — "None of this binds you", "on a governance PR the cap does not apply" — gives the rounds back
+    // with the whole section still quoted verbatim. This is a list of spellings, not a proof: it holds the
+    // escapes a run would plausibly write, and a novel wording walks past it (`add-guard-rail` §7). The #161
+    // rail three functions above carries its `WINDOW` negative for the same reason.
+    const ESCAPES = [
+      /\bsince the last push\b/i, /\bbinds you\b/i, /\bif you would rather\b/i, /\bthe cap does not apply\b/i,
+      /\bas often as you (need|like)\b/i, /\bat your discretion\b/i, /\b(only|merely) a guideline\b/i,
+      /\bnot a hard\b/i, /\bthree rounds each\b/i,
+    ];
+    for (const escape of ESCAPES)
+      expect(s7, `§7 carries an escape clause that gives the cap back: ${escape}`).not.toMatch(escape);
+
+    // The cap and the depth rule sit next to each other on purpose; neither may be read as the other.
+    const closingAt = skill.indexOf('\n## Reviewing is the work');
+    // Guarded before the slice: `slice(-1)` is the file's last character, and every assertion below would then
+    // fail blaming a deleted sentence when a heading had merely been renamed (PR #306 review, note 1).
+    expect(closingAt, 'the closing section has been renamed or removed — §7 leans on it').toBeGreaterThan(-1);
+    const closing = flat(skill.slice(closingAt));
+    expect(closing, 'the round cap must never read as "review less carefully"').toContain('There is no time box on this');
+    expect(closing, 'and the closing paragraph must say which of the two it is').toContain('§7 is about **rounds**');
+  });
+
+  /**
    * #191 — the clearing side of #161 had the same gap as the blocking side, one level down.
    *
    * #189 made scripts/review-gate.mjs flag a REVIEW: CHANGES REQUESTED comment with no session URL, because
