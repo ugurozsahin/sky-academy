@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — plain ESM helper shared with .github/workflows/review-gate.yml (see scripts/review-gate.d.ts)
 import { blockState, closingRefs, hasSessionUrl, isAdoptionClear, isChangesRequested, isCleared, isOwnerApproved, isOwnerRejected } from '../../scripts/review-gate.mjs';
+import type { AuthorAssociation } from '../../scripts/review-gate.mjs';
 
 /**
  * The review gate decides whether a pull request may be merged. It has twice reported "no block" while a
@@ -233,10 +233,10 @@ describe("a REVIEW: CLEARED adopting another reviewer's block carries its own se
  * counts from anyone with write access. A comment with no association at all is a stranger's: fail closed.
  */
 describe('a marker counts only from someone allowed to write it (#215)', () => {
-  const by = (author_association: string | undefined, body: string, n = 0) => ({ body, created_at: at(n), author_association });
+  const by = (author_association: AuthorAssociation | undefined, body: string, n = 0) => ({ body, created_at: at(n), author_association });
   const state = (labels: string[], draft: boolean, ...comments: ReturnType<typeof by>[]) => blockState({ draft, labels, comments });
 
-  it.each(['NONE', 'CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER', 'MANNEQUIN', undefined])(
+  it.each(['NONE', 'CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER', 'MANNEQUIN', undefined] as const)(
     "a stranger's (%s) OWNER: APPROVED does not approve an owner-approval PR", (who) => {
       expect(state(['owner-approval'], false, by(who, 'OWNER: APPROVED')).blocked).toBe(true);
     });
@@ -264,7 +264,7 @@ describe('a marker counts only from someone allowed to write it (#215)', () => {
     expect(state([], false, by('CONTRIBUTOR', 'OWNER: REJECTED — spam')).blocked).toBe(false);
   });
 
-  it.each(['COLLABORATOR', 'MEMBER', 'OWNER'])('a REVIEW: marker from %s counts both ways', (who) => {
+  it.each(['COLLABORATOR', 'MEMBER', 'OWNER'] as const)('a REVIEW: marker from %s counts both ways', (who) => {
     const block = by(who, 'REVIEW: CHANGES REQUESTED — fps\n\nSession: https://claude.ai/code/session_abc123', 0);
     expect(state([], false, block).blocked).toBe(true);
     expect(state([], false, block, by(who, 'REVIEW: CLEARED', 1)).blocked).toBe(false);

@@ -4,7 +4,6 @@ import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterAll, describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
-// @ts-expect-error — plain ESM bundler helper (see scripts/bundle-single.d.ts); #15's rail asserts its output
 import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
