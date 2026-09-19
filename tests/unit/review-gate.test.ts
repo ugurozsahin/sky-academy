@@ -355,7 +355,7 @@ describe('the process files and the open-pr skill carry the closing-keyword rule
   // The docs quote the trap in order to warn about it. If one of them ever spells it out with a live issue
   // number, the paragraph teaching the rule becomes a body that breaks it the moment anyone copies it.
   it('and none of them spells the bad example out with a live issue number', () => {
-    for (const name of ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md']) {
+    for (const name of ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', '.claude/skills/open-pr/SKILL.md']) {
       expect(closingRefs(doc(name).replace(/`/g, ''))).toEqual([]);    // backticks stripped: the text itself
     }
   });

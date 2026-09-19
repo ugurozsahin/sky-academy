@@ -21,7 +21,7 @@ const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven
 
 const mdIn = (dir: string) => readdirSync(join(root, dir)).filter((f) => f.endsWith('.md')).map((f) => `${dir}/${f}`);
 const INSTRUCTION_FILES = [
-  'CLAUDE.md', 'AGENTS.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
+  'CLAUDE.md', 'AGENTS.md', 'README.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
   'docs/WATCHDOG-PROMPT.md', ...mdIn('.claude/rules'), ...mdIn('docs/decisions'), ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
 ];
 
@@ -90,9 +90,13 @@ describe('agent instruction files', () => {
     }
   });
 
-  it('only the decision records still name the retired BACKLOG.md (#218)', () => {
-    const naming = INSTRUCTION_FILES.filter((f) => pointersIn(readFileSync(join(root, f), 'utf8')).includes('BACKLOG.md'));
-    expect(naming.filter((f) => !f.startsWith('docs/decisions/')), 'a live instruction points at a file that is gone').toEqual([]);
+  // Plain text, not only code spans: the instruction a run acted on was prose — STEP 1's "read CLAUDE.md,
+  // BACKLOG.md, and …" — and `README.md`, read by this rail since then, pointed at the file too (review of PR #274).
+  it('only the decision records still name the retired BACKLOG.md, in a code span or in prose (#218)', () => {
+    const live = INSTRUCTION_FILES.filter((f) => !f.startsWith('docs/decisions/'));
+    expect(live.length).toBeGreaterThan(12);
+    expect(live.filter((f) => /\bBACKLOG\.md\b/.test(readFileSync(join(root, f), 'utf8'))),
+      'a live instruction names a file that is gone').toEqual([]);
   });
 
   it('every skill directory is classed as ours or vendored, so a new one cannot go unread', () => {
