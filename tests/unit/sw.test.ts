@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { beforeEach, describe, expect, it } from 'vitest';
-// @ts-expect-error — plain ESM build helper, run by `npm run build` (see scripts/build-sw.d.ts)
 import { renderSw } from '../../scripts/build-sw.mjs';
 
 /**

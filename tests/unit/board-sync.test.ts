@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — plain ESM helper run by the routine from the shell (see scripts/board-sync.d.ts)
 import { PULSE, STATUS, branchIssue, desiredPriority, desiredStatus, isNonWork, linkedIssues, pickHeartbeat, plan, pulseLine, pulseNeeded, pulseTime, resolveProjectToken, summary } from '../../scripts/board-sync.mjs';
-import type { Change, HeartbeatIssue, Item, IssueLike, Repo } from '../../scripts/board-sync';
+import type { Change, HeartbeatIssue, Item, IssueLike, Repo } from '../../scripts/board-sync.mjs';
 
 /**
  * The board is a projection of the repository (#158): every Status is derived from state the repo already

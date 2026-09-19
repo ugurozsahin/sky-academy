@@ -2,7 +2,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { MANIFEST_SELECTOR, registerServiceWorker, type RegisterEnv } from '../../src/pwa';
-// @ts-expect-error — plain ESM build helper, run by `npm run build` (see scripts/build-sw.d.ts)
 import { cacheName, fingerprints, listFiles, precacheList, renderSw } from '../../scripts/build-sw.mjs';
 
 /**
@@ -203,6 +202,8 @@ describe('the precache list is read from the build, never written down (#15)', (
     // The bug this guards against: `renderSw(t, list)` used to default `prints` to `list` itself, and
     // `renderSw(t, prints, list)` — the arguments transposed — type-checked and ran too, since both
     // parameters are `string[]`. Either shape names the cache after filenames instead of content.
+    // @ts-expect-error — prints is required at the type level (#254); this deliberately omits it to prove
+    // the runtime guard still catches a plain-JS caller who forgets the argument entirely.
     expect(() => renderSw('__CACHE_NAME__ __PRECACHE__', ['a.js'])).toThrow(/prints must be fingerprints/);
     expect(() => renderSw('__CACHE_NAME__ __PRECACHE__', ['a.js'], ['a.js'])).toThrow(/prints must be fingerprints/);
   });
