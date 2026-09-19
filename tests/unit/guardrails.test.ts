@@ -1475,7 +1475,10 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
    * *finished-looking* pulse stamped on the way in would hide the very deaths the pulse exists to expose, and
    * that reasoning survives only while the stamp cannot be mistaken for a finish.
    *
-   * Prove it red: drop the STEP 1 stamp; drop `IN PROGRESS` from either file; let the stamp read as a pass;
+   * `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` carries the reasoning and the alternatives
+   * the owner dropped (a permissions allow-list, a no-prompt mode), so neither is re-litigated from scratch.
+   *
+   * * Prove it red: drop the STEP 1 stamp; drop `IN PROGRESS` from either file; let the stamp read as a pass;
    * or drop the watchdog's staleness bar for it.
    */
   it('a run stamps the pulse IN PROGRESS on the way in, and the watchdog treats a stale one as a finding (#314)', () => {

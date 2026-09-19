@@ -84,6 +84,7 @@ your first finding and the only one you can report.
    a scheduled run waits there until its session ends — but a usage limit and a crash look identical from
    here, so report the text and let the owner tell them apart. A **fresh** `IN PROGRESS` stamp is not a
    finding: runs here routinely take 45 minutes, and one in flight is what healthy looks like.
+   `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` has why the stamp exists and what it is not.
 
 4. **Is any PR stuck?** For each open PR: how long has it been open, and does its head carry a `review-gate`
    status (`/commits/<head sha>/status`)? Two exemptions, and only these two: a PR **parked on the owner**
