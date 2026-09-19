@@ -2451,7 +2451,9 @@ describe('a bullet is never swallowed onto the line above it (#195)', () => {
  * rail**: adding a skill or an agent means editing this list in the same pull request, which is where a reviewer
  * can see it and ask why.
  *
- * Prove it red: drop a stray directory into `.claude/skills/`, or change a SHA in a vendored header.
+ * Prove it red: drop a stray directory into `.claude/skills/`, or change a SHA in a vendored header. #130 added
+ * the other half: a fabricated header or a stray `.ts` inside a `null` skill, a symlinked skill directory, a
+ * loose file under `skills/`, and a link to a file that is not there.
  */
 describe('the vendored skills and agents are pinned, and the list is the allow-list (#180)', () => {
   const root = new URL('../../', import.meta.url);
@@ -2485,10 +2487,14 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     '.claude/skills/frontend-design/LICENSE.txt',
   ];
 
+  // #130 item 2: a symlink is reported as `isSymbolicLink()`, never `isDirectory()` or `isFile()`, so a
+  // `dirs()` that filtered on the latter alone could not see `.claude/skills/rogue -> add-topic` — a skill
+  // Claude Code loads all the same. A symlink counts as whichever kind it stands in for; the other kind of
+  // entry (a loose file under `skills/`, a directory under `agents/`) is asserted empty below.
   const dirs = (p: string) => readdirSync(new URL(p, root), { withFileTypes: true })
-    .filter((e) => e.isDirectory()).map((e) => e.name).sort();
+    .filter((e) => e.isDirectory() || e.isSymbolicLink()).map((e) => e.name).sort();
   const files = (p: string) => readdirSync(new URL(p, root), { withFileTypes: true })
-    .filter((e) => e.isFile()).map((e) => e.name).sort();
+    .filter((e) => e.isFile() || e.isSymbolicLink()).map((e) => e.name).sort();
   const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 
   it('no skill directory and no agent exists that this list does not name', () => {
@@ -2496,6 +2502,17 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
       .toEqual(Object.keys(SKILLS).sort());
     expect(files('.claude/agents'), 'same for an agent definition')
       .toEqual(Object.keys(AGENTS).map((n) => `${n}.md`).sort());
+  });
+
+  it('nothing loose sits beside the skills, nothing nested sits beside the agents (#130)', () => {
+    expect(files('.claude/skills'), 'a file directly under .claude/skills/ is not a skill, and the list above cannot see it')
+      .toEqual([]);
+    expect(dirs('.claude/agents'), 'a directory under .claude/agents/ is not an agent, and the list above cannot see it')
+      .toEqual([]);
+    for (const name of Object.keys(SKILLS)) {
+      expect(dirs(`.claude/skills/${name}`), `.claude/skills/${name}/ holds a nested directory nothing here checks`)
+        .toEqual([]);
+    }
   });
 
   it.each([
@@ -2523,12 +2540,18 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     expect(header![3], 'and the pinned commit').toBe(src.sha);
   });
 
-  it('every markdown file inside a vendored skill is pinned; the rest are kept verbatim and listed', () => {
+  // #130 item 1: the `null` half of the pin check. Flipping a vendored entry to `null` is a one-line diff that
+  // reads as bookkeeping and used to drop every content check on that skill — `if (!src) continue` — so a
+  // fabricated `<!-- vendored: … -->` header or a stray `.ts` inside `add-topic/` was green. A project-written
+  // skill is markdown only and claims no upstream; anything else is a vendored skill mislabelled `null`.
+  it('every markdown file inside a vendored skill is pinned; the rest are kept verbatim and listed; a project skill claims no upstream', () => {
     for (const [name, src] of Object.entries(SKILLS)) {
-      if (!src) continue;
       for (const f of files(`.claude/skills/${name}`)) {
         const path = `.claude/skills/${name}/${f}`;
-        if (f.endsWith('.md')) {
+        if (!src) {
+          expect(f.endsWith('.md'), `${path} is not markdown: a project-written skill is prose only — if it was copied in, list where from (#130)`).toBe(true);
+          expect(read(path), `${path} carries a vendored header but is listed as written for this project (#130)`).not.toContain('<!-- vendored:');
+        } else if (f.endsWith('.md')) {
           expect(read(path), `${path} is vendored markdown without a pin`).toContain(`@ ${src.sha}`);
         } else {
           expect(VERBATIM, `${path} is not markdown: keep it byte-for-byte and list it here`).toContain(path);
@@ -2537,17 +2560,31 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     }
   });
 
-  it('relative links inside the vendored skills resolve to a file that was copied with them', () => {
-    for (const name of Object.keys(SKILLS)) {
+  // #130 item 3: the rail used to match only `.md|.ts|.sh` targets with no `#` or `:` in them, against a set
+  // of bare sibling filenames — so `nonexistent.md#anchor` and `does-not-exist.txt` passed, and a legitimate
+  // `../../docs/ROUTINE-PROMPT.md` from a project-written skill was a hard red. Now every inline and
+  // reference-style link is resolved against the file that holds it: it must exist in the repository, and a
+  // vendored skill's must stay inside its own directory, since nothing outside was copied with it.
+  it('relative links inside the skills resolve to a file in this repository; a vendored skill links only within itself', () => {
+    const skillsUrl = new URL('.claude/skills/', root);
+    let checked = 0;
+    for (const [name, src] of Object.entries(SKILLS)) {
+      const dirUrl = new URL(`${name}/`, skillsUrl);
       for (const f of files(`.claude/skills/${name}`).filter((x) => x.endsWith('.md'))) {
         const text = read(`.claude/skills/${name}/${f}`);
-        const siblings = files(`.claude/skills/${name}`);
-        for (const [, target] of text.matchAll(/\]\(([^):#]+\.(?:md|ts|sh))\)/g)) {
-          expect(siblings, `.claude/skills/${name}/${f} links to ${target}, which was not copied with it`)
-            .toContain(target.replace(/^\.\//, ''));
+        const targets = [
+          ...[...text.matchAll(/\]\(([^)\s]+)\)/g)].map((m) => m[1]),               // [text](target)
+          ...[...text.matchAll(/^\[[^\]]+\]:[ \t]+(\S+)/gm)].map((m) => m[1]),      // [ref]: target
+        ].filter((t) => !/^[a-z][a-z0-9+.-]*:/i.test(t) && !t.startsWith('#'));   // not a URL, not an anchor
+        for (const target of targets) {
+          checked++;
+          const file = new URL(target.replace(/#.*$/, ''), dirUrl);
+          expect(existsSync(file), `.claude/skills/${name}/${f} links to ${target}, which does not exist (#130)`).toBe(true);
+          if (src) expect(file.href.startsWith(dirUrl.href), `.claude/skills/${name}/${f} links outside the vendored skill to ${target}, which was not copied with it`).toBe(true);
         }
       }
     }
+    expect(checked, 'the rail read at least the one relative link the vendored skills are known to carry').toBeGreaterThan(0);
   });
 });
 
