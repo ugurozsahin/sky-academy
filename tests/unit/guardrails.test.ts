@@ -2529,11 +2529,21 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     ...Object.keys(SKILLS).map((n) => [n, `.claude/skills/${n}/SKILL.md`] as const),
     ...Object.keys(AGENTS).map((n) => [n, `.claude/agents/${n}.md`] as const),
   ];
-  /** The frontmatter block and the `description:` line's value, or `null` for each that is not there. */
+  /**
+   * The frontmatter block and the `description:` value, or `null` for each that is not there. The value is read
+   * the way a YAML loader reads it: a plain scalar continues onto every following line that starts with
+   * whitespace, so those lines are folded in (PR #292's review: a negation on a continuation line was invisible
+   * to a helper that captured the first physical line only — the loader saw `… — never when …`, the rail did
+   * not). The one-line test below then rejects the continuation itself; this fold is what every other check
+   * reads, so the two cannot disagree about which text is the description.
+   */
   const frontmatter = (file: string) => {
     const front = /^---\n([\s\S]*?)\n---\n/.exec(read(file));
-    const description = front && /^description:[ \t]*(\S.*)$/m.exec(front[1]);
-    return { front: front && front[1], description: description && description[1] };
+    const description = front && /^description:[ \t]*(\S.*(?:\n[ \t]+\S.*)*)$/m.exec(front[1]);
+    return {
+      front: front && front[1],
+      description: description && description[1].replace(/\s*\n\s*/g, ' '),
+    };
   };
 
   it.each(FRONTMATTER_FILES.map(([, file]) => [file] as const))('%s has frontmatter with a one-line description', (file) => {
@@ -2542,6 +2552,8 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     expect(description, `${file} needs a description — it is the only line that reaches every turn's context`)
       .not.toBeNull();
     expect(description!, 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
+    expect(front!, `${file}: the description continues onto an indented line — one physical line, so the line a reader sees is the whole trigger (#150)`)
+      .not.toMatch(/^description:.*\n[ \t]+\S/m);
     expect(/^name:[ \t]*\S/m.test(front!), `${file} needs a name`).toBe(true);
   });
 
@@ -2562,35 +2574,43 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
    * vendored description was as invisible as a project one.
    *
    * Each pin is matched against the description's value alone — never the whole file, where the same words
-   * sit in the body of every skill. The project-written six also keep a `Use when` / `Use before` trigger
-   * clause, and their description may not carry a negation: `Use when you are NOT opening a pull request`
-   * keeps every pinned word and inverts the trigger, and a containment pin cannot see that. The negation
-   * detector is self-tested below against that very wording and against every real description.
+   * sit in the body of every skill — and anchored at `^`, so a sentence put in front of the trigger (`Never use
+   * this skill. Use when …`) fails the pin rather than sitting outside it. The project-written six also keep a
+   * `Use when` / `Use before` trigger clause. And every skill but `frontend-design` may carry no negation:
+   * `Use when you are NOT opening a pull request` keeps every pinned word and inverts the trigger, and a
+   * containment pin cannot see that. The negation detector is self-tested below against that wording; the
+   * per-skill test is what proves it quiet on every real description. `frontend-design` is exempt because its
+   * upstream text says "don't read as templated defaults", and the three agents because theirs are paragraphs
+   * of upstream examples ("don't introduce silent failures") — a negation appended to any of those four is not
+   * caught here, only a sentence in front of the anchored pin.
    *
    * What it cannot catch: a containment pin checks that some words are present, not that the sentence still
-   * says when to use the skill. A description rewritten around the pinned words without `not`/`never`/
-   * `unless` — "Use when a pull request is being closed rather than opened" — passes. The body rails below
-   * hold what the skill says once loaded; this holds only that its trigger still names the job.
+   * says when to use the skill. A description rewritten around the pinned words with no negation word —
+   * "Use when a pull request is being closed rather than opened" — passes. The body rails below hold what the
+   * skill says once loaded; this holds only that its trigger still names the job.
    */
   const DESCRIPTIONS: Record<string, RegExp> = {
-    'add-guard-rail': /Add a guard rail .*Use when .*needs a check that fails the build/,
-    'add-topic': /Add or change a curriculum topic .*Use when asked to add a maths\/writing topic/,
-    'design-language': /visual tokens and UI constraints\. Use before touching CSS or building a new screen/,
-    'frontend-design': /visual design when building new UI or reshaping an existing one/,
-    'open-pr': /Open a pull request .*Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR/,
-    'qa-screenshot': /Bounded visual QA for a Sky Ninja Academy pull request\. Use when reviewing or verifying a player-visible change/,
-    'review-pr': /Review and QA another agent's pull request .*Use when acting as the reviewer for an open PR .*block it with REVIEW: CHANGES REQUESTED/,
-    'verification-before-completion': /Use when about to claim work is complete, fixed, or passing, before committing or creating PRs/,
-    'using-git-worktrees': /Use when starting feature work that needs isolation/,
-    'systematic-debugging': /Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes/,
-    'test-driven-development': /Use when implementing any feature or bugfix, before writing implementation code/,
-    'pr-test-analyzer': /Use this agent when you need to review a pull request for test coverage quality and completeness/,
-    'silent-failure-hunter': /Use this agent when reviewing code changes in a pull request to identify silent failures/,
-    'type-design-analyzer': /Use this agent when you need expert analysis of type design/,
+    'add-guard-rail': /^Add a guard rail .*Use when .*needs a check that fails the build/,
+    'add-topic': /^Add or change a curriculum topic .*Use when asked to add a maths\/writing topic/,
+    'design-language': /^Sky Ninja Academy's visual tokens and UI constraints\. Use before touching CSS or building a new screen/,
+    'frontend-design': /^Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one/,
+    'open-pr': /^Open a pull request .*Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR/,
+    'qa-screenshot': /^Bounded visual QA for a Sky Ninja Academy pull request\. Use when reviewing or verifying a player-visible change/,
+    'review-pr': /^Review and QA another agent's pull request .*Use when acting as the reviewer for an open PR .*block it with REVIEW: CHANGES REQUESTED/,
+    'verification-before-completion': /^Use when about to claim work is complete, fixed, or passing, before committing or creating PRs/,
+    'using-git-worktrees': /^Use when starting feature work that needs isolation/,
+    'systematic-debugging': /^Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes/,
+    'test-driven-development': /^Use when implementing any feature or bugfix, before writing implementation code/,
+    'pr-test-analyzer': /^Use this agent when you need to review a pull request for test coverage quality and completeness/,
+    'silent-failure-hunter': /^Use this agent when reviewing code changes in a pull request to identify silent failures/,
+    'type-design-analyzer': /^Use this agent when you need expert analysis of type design/,
   };
   const PROJECT_SKILLS = Object.entries(SKILLS).filter(([, v]) => !v).map(([n]) => n);
+  const PROJECT_FILES = FRONTMATTER_FILES.filter(([n]) => PROJECT_SKILLS.includes(n));
+  /** Skills whose description is negation-checked: every skill except the one whose upstream text negates. */
+  const NEGATION_CHECKED = FRONTMATTER_FILES.filter(([n]) => n in SKILLS && n !== 'frontend-design');
   const TRIGGER_CLAUSE = /\bUse (when|before)\b/;
-  const NEGATED = /\b(not|never|unless|except|don't|doesn't|isn't|aren't)\b/i;
+  const NEGATED = /\b(not|never|no|nor|neither|unless|except|only|skip|avoid|cannot|don't|doesn't|isn't|aren't)\b/i;
 
   it('every skill and agent in the allow-list has a description pin, and nothing else does (#150)', () => {
     expect(Object.keys(DESCRIPTIONS).sort(), 'add the pin in the same pull request as the skill')
@@ -2602,28 +2622,35 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   it.each(FRONTMATTER_FILES)('%s\'s description still names the job it triggers on (#150)', (name, file) => {
     const { description } = frontmatter(file);
     expect(description, `${file} has no description line to pin`).not.toBeNull();
+    // `toMatch(undefined)` passes vacuously, so a missing pin is checked here too, not only by the key-set guard.
+    expect(DESCRIPTIONS[name], `${file} has no pin in DESCRIPTIONS`).toBeInstanceOf(RegExp);
     expect(description!, `${file}: the description no longer says what the skill is for — rewritten, the skill stops loading for the run that needs it (#150)`)
       .toMatch(DESCRIPTIONS[name]);
   });
 
-  it.each(PROJECT_SKILLS.map((n) => [n, `.claude/skills/${n}/SKILL.md`] as const))(
-    '%s\'s description keeps its trigger clause and does not negate it (#150)', (_name, file) => {
-      const { description } = frontmatter(file);
-      expect(description!, `${file}: a project skill's description says when to use it — "Use when …" or "Use before …"`)
-        .toMatch(TRIGGER_CLAUSE);
-      expect(description!, `${file}: a negation in the description inverts the trigger while keeping every pinned word (#150)`)
-        .not.toMatch(NEGATED);
-    });
+  it.each(PROJECT_FILES)('%s\'s description keeps its trigger clause (#150)', (_name, file) => {
+    expect(frontmatter(file).description ?? '', `${file}: a project skill's description says when to use it — "Use when …" or "Use before …"`)
+      .toMatch(TRIGGER_CLAUSE);
+  });
 
-  it('the negation detector fires on the inverted trigger and stays quiet on every real description (#150)', () => {
-    expect(NEGATED.test('Open a pull request in Sky Ninja Academy. Use when you are NOT opening a pull request.')).toBe(true);
-    expect(NEGATED.test('Use this skill unless a pull request is open.')).toBe(true);
-    expect(NEGATED.test("Use when a review doesn't need a block.")).toBe(true);
-    for (const [, file] of FRONTMATTER_FILES.filter(([n]) => PROJECT_SKILLS.includes(n))) {
-      expect(NEGATED.test(frontmatter(file).description!), `${file}'s real description trips the negation detector — refine the pattern, not the prose`).toBe(false);
-    }
+  it.each(NEGATION_CHECKED)('%s\'s description does not negate its trigger (#150)', (_name, file) => {
+    expect(frontmatter(file).description ?? '', `${file}: a negation in the description inverts the trigger while keeping every pinned word (#150)`)
+      .not.toMatch(NEGATED);
+  });
+
+  it('the negation detector fires on the inverted triggers it exists for and stays quiet on a preposition (#150)', () => {
+    for (const inverted of [
+      'Open a pull request in Sky Ninja Academy. Use when you are NOT opening a pull request.',
+      'Use this skill unless a pull request is open.',
+      "Use when a review doesn't need a block.",
+      'Use when you have finished a piece of work on an issue. — never when the work is finished.',
+      'Use only when the owner asks; skip it on a routine run.',
+      'Use when a fix cannot wait for review.',
+    ]) expect(NEGATED.test(inverted), `must fire on: ${inverted}`).toBe(true);
     // "without" is a preposition, not an inverted trigger: `design-language` says "without opening every file".
     expect(NEGATED.test('Use before touching CSS, to keep the look consistent without opening every existing file.')).toBe(false);
+    expect(NEGATION_CHECKED.map(([n]) => n), 'the negation check reads the project six and the vendored skills')
+      .toEqual(expect.arrayContaining([...PROJECT_SKILLS, 'using-git-worktrees']));
   });
 
   it.each([
