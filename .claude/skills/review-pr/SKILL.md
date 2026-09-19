@@ -100,8 +100,9 @@ incidents behind each.
 
 A pull request that touches a governance file raises one more question before a merge: **which way does it
 move the constraint?** Check its one-line direction statement against the diff. A loosening — or a declared
-tightening that you read as a loosening — is the owner's to merge, never yours; say so in a comment and leave
-it. `.claude/skills/open-pr/SKILL.md` §6 has the rule and its worked examples.
+tightening that you read as a loosening — is the owner's to merge, never yours: make sure it carries the
+`loosening` label (apply it yourself if the author did not — `review-gate` then stays red until the owner
+approves, #112), say why in a comment, and leave it. `.claude/skills/open-pr/SKILL.md` §6 has the rule and its worked examples.
 
 ## 6. Then decide, and make the decision visible
 

@@ -76,8 +76,8 @@ your first finding and the only one you can report.
 
 4. **Is any PR stuck?** For each open PR: how long has it been open, and does its head carry a `review-gate`
    status (`/commits/<head sha>/status`)? Two exemptions, and only these two: a PR **parked on the owner**
-   (labelled `owner-approval` and awaiting his `OWNER: APPROVED` — the routine is told to leave those open, so it
-   is a correct state, not a stall — a PR with no linked issue, such as one that only changes process docs,
+   (labelled `owner-approval`, or `loosening` since #112, and awaiting his `OWNER: APPROVED` — the routine is told to leave those open, so it
+   is a correct state, not a stall — an unlabelled PR with no linked issue, such as one that only changes process docs,
    cannot qualify this way and is judged on its age like any other), and a head pushed **before the review
    gate existed** (`a1162b7`, 2026-09-07 16:38 CET), which cannot have a status. Outside those, flag any PR open more than 8 hours, and
    any whose head carries **no** `review-gate` status — that head has not been judged, and a missing status

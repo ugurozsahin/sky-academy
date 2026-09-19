@@ -160,8 +160,10 @@ So every governance pull request states, in one line near the top, which way it 
 - **Tightening** — it adds a check, a rail or a rule, or it only describes behaviour that already exists.
   Reviewed and merged like any other pull request, by a run that did not open it.
 - **Loosening** — after this change something a run was not permitted to do, it may now do. **Owner-gated.
-  Never routine-merged, however obviously right it looks.**
-- **Mixed** — both. Owner-gated, and worth splitting instead.
+  Never routine-merged, however obviously right it looks.** Put the `loosening` label on the pull request:
+  `review-gate` reads it and stays red until the owner approves (#112), so the gate is a status a merge rule
+  reads and not only this sentence.
+- **Mixed** — both. Owner-gated — same label — and worth splitting instead.
 
 Three things to get right:
 

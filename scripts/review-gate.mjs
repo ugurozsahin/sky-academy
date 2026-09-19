@@ -92,7 +92,12 @@ export function blockState({ draft, labels, comments }) {
   // `owner-approval` says a human has to look at this before it ships — a new look, not a refactor that
   // must keep the old one. It clears only on OWNER: APPROVED; OWNER: REJECTED blocks on its own so the
   // verdict is recorded rather than the label quietly disappearing.
-  const wantsOwner = (labels || []).includes('owner-approval');
+  // `loosening` (#112) is the same gate for a different reason: a governance pull request after which a run
+  // may do something it could not before. The rule that such a change is the owner's to merge was prose
+  // only — nothing went red — so the label is the machine-readable half of the direction line the body
+  // already carries. The author applies it, or the reviewer who disagrees with a declared tightening.
+  const OWNER_GATES = ['owner-approval', 'loosening'];
+  const wantsOwner = OWNER_GATES.filter((l) => (labels || []).includes(l));
   const ownerSaidNo = rejected !== null && (approved === null || approved < rejected);
   const reasons = [];
   if (draft) reasons.push('the PR is a draft');
@@ -100,7 +105,7 @@ export function blockState({ draft, labels, comments }) {
   if (openReview && !requestedHasSession) reasons.push('the block has no session URL (#199)');
   if (clearNeedsSession) reasons.push("REVIEW: CLEARED supersedes another reviewer's block with no session URL of its own (#191)");
   if (ownerSaidNo) reasons.push('the owner rejected it (OWNER: REJECTED, no later OWNER: APPROVED)');
-  else if (wantsOwner && approved === null) reasons.push('labelled owner-approval and the owner has not written OWNER: APPROVED');
+  else if (wantsOwner.length && approved === null) reasons.push(`labelled ${wantsOwner.join(' and ')} and the owner has not written OWNER: APPROVED`);
   return { blocked: reasons.length > 0, reasons };
 }
 

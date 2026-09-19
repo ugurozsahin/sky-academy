@@ -71,6 +71,38 @@ describe('review gate', () => {
       expect(gated('OWNER: REJECTED — the halo is too soft').blocked).toBe(true);
     });
 
+    // #112 — a loosening governance change was owner-gated in prose only; the label makes it red.
+    it('a loosening label blocks until he approves, exactly like owner-approval', () => {
+      const loosening = (...bodies: string[]) => blockState({
+        draft: false, labels: ['loosening'],
+        comments: bodies.map((body, i) => ({ body, created_at: at(i), author_association: 'OWNER' as const })),
+      });
+      expect(loosening().blocked).toBe(true);
+      expect(loosening().reasons).toEqual(['labelled loosening and the owner has not written OWNER: APPROVED']);
+      expect(loosening('OWNER: APPROVED — agreed').blocked).toBe(false);
+      expect(loosening('OWNER: REJECTED — keep the constraint').blocked).toBe(true);
+      expect(loosening('REVIEW: CLEARED — looks fine to me').blocked, 'a reviewer cannot lift it').toBe(true);
+    });
+
+    it('a stranger or a collaborator cannot approve a loosening either (#215)', () => {
+      for (const who of ['NONE', 'COLLABORATOR', undefined] as const)
+        expect(blockState({ draft: false, labels: ['loosening'],
+          comments: [{ body: 'OWNER: APPROVED', created_at: at(0), author_association: who }] }).blocked).toBe(true);
+    });
+
+    it('names both labels when a pull request carries both, and one approval answers both', () => {
+      const both = (...bodies: string[]) => blockState({
+        draft: false, labels: ['owner-approval', 'loosening'],
+        comments: bodies.map((body, i) => ({ body, created_at: at(i), author_association: 'OWNER' as const })),
+      });
+      expect(both().reasons).toEqual(['labelled owner-approval and loosening and the owner has not written OWNER: APPROVED']);
+      expect(both('OWNER: APPROVED').blocked).toBe(false);
+    });
+
+    it('no other label gates anything', () => {
+      expect(blockState({ draft: false, labels: ['guard-rail', 'loosening-ish', 'owner-session'], comments: [] }).blocked).toBe(false);
+    });
+
     it('the newest verdict wins', () => {
       expect(gated('OWNER: REJECTED', 'OWNER: APPROVED').blocked).toBe(false);
       expect(gated('OWNER: APPROVED', 'OWNER: REJECTED').blocked).toBe(true);
