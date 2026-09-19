@@ -13,4 +13,4 @@ description: Add or change a curriculum topic (question generator) in Sky Ninja 
 3. Register in the `*_TOPICS` array: `{ id: 'y1-foo', title, icon, subject, year, nc, gen }`. Ids are `r-`, `y1-`, `y2-` prefixed and unique.
 4. Run `npm test` — the generic suite checks answer∈options, uniqueness, arithmetic correctness, ranges and variety for every topic × difficulty automatically. Add a targeted test in `tests/unit/curriculum.test.ts` only for a rule the generic suite can't infer.
 5. If the topic needs a new visual, add a case to `src/ui/visuals.ts` + CSS in `style.css`, then `npm run test:e2e`.
-6. Add the topic to `docs/CURRICULUM.md` and move any backlog item to Done in `BACKLOG.md`.
+6. Add the topic to `docs/CURRICULUM.md` — the issue closes with the pull request (`Closes #<n>`).

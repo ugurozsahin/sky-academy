@@ -1,7 +1,6 @@
 ---
 paths:
   - "CLAUDE.md"
-  - "BACKLOG.md"
   - "docs/ROUTINE-PROMPT.md"
   - "docs/REVIEWER-PROMPT.md"
   - "docs/WATCHDOG-PROMPT.md"
@@ -13,7 +12,7 @@ paths:
 
 - **Each rule has one home; every other file points at it** (`docs/decisions/001-one-home-per-rule.md`, which
   replaces the three-file rule and #216 §1's enforcement bar). Removing a duplicate is ordinary work as long
-  as the home still carries the rule. Three paragraphs are still copied into `CLAUDE.md`, `BACKLOG.md` and
+  as the home still carries the rule. Three paragraphs are still copied into `CLAUDE.md` and
   `docs/ROUTINE-PROMPT.md` — the freeze history, records-have-readers, the #97 second-item conditions. That is debt: until a paragraph is reduced to its home, change its copies together,
   which `tests/unit/guardrails.test.ts` still checks. **While this reduction is under way it is done in
   sessions with the owner** (issues labelled `owner-session`), not by the routine; removing a rule rather than
@@ -29,10 +28,9 @@ paths:
   line. The four eligibility conditions themselves (are more than three reviews waiting, is
   there time left in the run, are the second item's files disjoint from the first's, did the first item
   actually finish) have no such enforcement yet — nothing stops a run from taking an ineligible second item,
-  only from failing to say so — and they are still copied in `CLAUDE.md`, `BACKLOG.md` and
-  `docs/ROUTINE-PROMPT.md` (debt, first bullet). `BACKLOG.md` and
-  `docs/ROUTINE-PROMPT.md` (the two of the three that stated this recording obligation) each carry a pointer
-  here instead of restating it.
+  only from failing to say so — and they are still copied in `CLAUDE.md` and
+  `docs/ROUTINE-PROMPT.md` (debt, first bullet). `docs/ROUTINE-PROMPT.md` carries a pointer here for the
+  recording obligation instead of restating it.
 - **The routine heartbeat (issue #62) must be overwritten each run, never appended to (records have readers,
   #98).** Enforced in code: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to
   issue #62 whose body carries two or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — the
@@ -40,8 +38,8 @@ paths:
   collapse like the two bullets above**: records-have-readers
   spans several kinds of record (the PR body, an issue or `docs/decisions/`, `git log`), of which this hook
   covers only the one instruction a run still needs to see inline while it is running STEP 5 — the same reason
-  the `- second item:` line above stays inline rather than collapsing to a bare pointer. `CLAUDE.md`,
-  `BACKLOG.md` and `docs/ROUTINE-PROMPT.md` keep "overwritten every run, never appended" verbatim; only this
+  the `- second item:` line above stays inline rather than collapsing to a bare pointer. `CLAUDE.md`
+  and `docs/ROUTINE-PROMPT.md` keep "overwritten every run, never appended" verbatim; only this
   bullet is new. What the hook cannot catch: an append that drops or reformats the previous summary's leading
   timestamp before concatenating, or one that appends a second paragraph with no bare timestamp of its own —
   both need a diff-aware check against the previous body, which this PR does not attempt.
@@ -57,10 +55,9 @@ paths:
   other concrete action to catch. The
   freeze's broader one-time-lift narrative above (the dates, the reasoning, "does not re-arm") has no such
   enforcement point — nothing stops a run from *arguing* a class of work should be barred again, only from
-  applying this one label — and that narrative is still copied in `CLAUDE.md`, `BACKLOG.md` and
-  `docs/ROUTINE-PROMPT.md` (debt, first bullet). `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`
-  (the two of the three that ever mentioned the retired label) each carry a pointer here instead of restating
-  it.
+  applying this one label — and that narrative is still copied in `CLAUDE.md` and
+  `docs/ROUTINE-PROMPT.md` (debt, first bullet). `docs/ROUTINE-PROMPT.md` carries a pointer here instead of
+  restating it. **`frozen` is not a way to park work — `later` is.**
 - A PR touching a governance file states in one line whether it **tightens** the constraints on a run (a check,
   a rail, a rule, or describing behaviour that already exists — ordinary work) or **loosens** them (a
   constraint removed, a budget raised, a gate that no longer gates — owner-gated, never routine-merged). See
@@ -78,3 +75,12 @@ paths:
   column, coming off by hand once the blocker closes; **`later`** means not yet, the parking label. There is
   no hand order inside a priority — oldest issue number first, full stop — which is acceptable because the
   routine merges roughly fifteen PRs a day, so a `priority:P1` bucket drains in a day or two, not a week.
+- **The labels (#218 moved the list here).** `priority:P0`/`P1`/`P2`/`P3` — P0 outranks P1,
+  the ordering `docs/ROUTINE-PROMPT.md` STEP 3 and `scripts/board-sync.mjs`'s `PRIORITIES` array both use;
+  `routine-ok` (the developer routine may take it); `owner-session` (changed only in a session with the owner —
+  the routine never takes it); `owner-input` (needs the owner's art or decision); `owner-approval` (on a pull
+  request: holds the merge until the owner writes his marker — for a genuinely new look only); `later` (parked
+  by the owner); `blocked` (cannot move until another issue or a decision lands — it is what puts a card in
+  the board's Blocked column, #87); `new-ui` (gates the `frontend-design` skill, #99); `watchdog` (opened by
+  the watchdog); and the area labels `mode`, `curriculum`, `art`, `reward`, `platform`, `playtest`, `review`,
+  `perf`, `debt`, `tests`, `guard-rail`, `accessibility`.

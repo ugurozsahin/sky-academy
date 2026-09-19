@@ -97,7 +97,7 @@ your first finding and the only one you can report.
    instead of blocking them. So there is no freeze left to check. Two successors, and both are questions rather
    than accusations. **(a) Has a run re-imposed one?** A doc edit, an issue comment or a PR that bars a class of
    work again — or a run declining eligible work because it believes a freeze still holds. Only the owner
-   declares a freeze, and it would appear in CLAUDE.md, BACKLOG.md and `docs/ROUTINE-PROMPT.md` together, so a
+   declares a freeze, and it would appear in CLAUDE.md and `docs/ROUTINE-PROMPT.md` together, so a
    bar in one place alone is a finding. **(b) Has the order been skipped?** Since 2026-09-11 the order is
    **the labels, not a list** (#94), which is the version of this check you can actually evaluate: run the
    same query `docs/ROUTINE-PROMPT.md` STEP 3 gives a run —

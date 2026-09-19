@@ -24,7 +24,7 @@ fixed-size and overwritten every run.
 ## Where a record goes now
 
 The test for any record is **who opens this, and when?** If there is no answer, do not write it. The routing
-is in `CLAUDE.md`, `BACKLOG.md` and `docs/ROUTINE-PROMPT.md`, and the short version is:
+is in `CLAUDE.md` and `docs/ROUTINE-PROMPT.md`, and the short version is:
 
 | what | where |
 |---|---|
