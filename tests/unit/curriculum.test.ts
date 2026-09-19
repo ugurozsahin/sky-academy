@@ -587,3 +587,44 @@ describe('r-sounds: the letter at the gap is the sound it teaches (#135)', () =>
     expect(sawEgg, 'egg must still be drawable at d1 — only its medial role is filtered').toBe(true);
   });
 });
+
+// #297 — Year 2's difficulty-3 arithmetic is two-digit and crosses a ten (`83 − 47`), worked out in steps
+// rather than recalled. The sum stays as the year asks; the question carries a `slow` flag and `modes.ts`
+// drops the bubbles one speed step, exactly as it does for a spelling sequence.
+describe('slow questions (#297)', () => {
+  const SLOW_AT_D3 = ['y2-add', 'y2-sub', 'y2-inverse'];
+
+  it.each(SLOW_AT_D3)('%s flags every d3 question slow, and no d1 or d2 one', (id) => {
+    const t = TOPICS.find(x => x.id === id)!;
+    const r = rng(2970);
+    for (let i = 0; i < N; i++) {
+      expect(t.gen(3, r).slow, `${id} d3 #${i} must be slow`).toBe(true);
+      expect(t.gen(1, r).slow, `${id} d1 #${i} must not be slow`).toBeUndefined();
+      expect(t.gen(2, r).slow, `${id} d2 #${i} must not be slow`).toBeUndefined();
+    }
+  });
+
+  it('the flag is the only thing it changes — the sums are untouched', () => {
+    for (const id of SLOW_AT_D3) {
+      const t = TOPICS.find(x => x.id === id)!;
+      const r = rng(2971);
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(3, r);
+        const expected = solve(q.prompt);
+        expect(expected, `${id}: ${q.prompt} must still be solvable`).not.toBeNull();
+        expect(Number(q.answer), `${id}: ${q.prompt}`).toBe(expected);
+        expect(q.options, `${id}: answer must still be among the options`).toContain(q.answer);
+      }
+    }
+  });
+
+  it('no other topic sets slow — it is opt-in per generator, not a year-wide setting', () => {
+    for (const t of TOPICS) {
+      if (SLOW_AT_D3.includes(t.id)) continue;
+      const r = rng(2972);
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        for (let i = 0; i < 40; i++) expect(t.gen(d, r).slow, `${t.id} d${d} must not set slow`).toBeUndefined();
+      }
+    }
+  });
+});

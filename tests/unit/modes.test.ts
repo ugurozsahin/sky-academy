@@ -4,7 +4,7 @@ import { YEARS } from '../../src/curriculum';
 
 const Y1 = YEARS[1];
 const ALL: Mode[] = ['mission', 'endless', 'sprint', 'boss'];
-const ctx = (o: Partial<ModeCtx> = {}): ModeCtx => ({ year: Y1, stage: 1, questionsAsked: 0, sequence: false, enraged: false, ...o });
+const ctx = (o: Partial<ModeCtx> = {}): ModeCtx => ({ year: Y1, stage: 1, questionsAsked: 0, sequence: false, slow: false, enraged: false, ...o });
 const endCtx = (o: Partial<EndCtx> = {}): EndCtx => ({ won: false, score: 0, correct: 0, accuracy: 0, stageStarsTotal: 0, stages: 5, stars: 0, ...o });
 
 describe('mode table', () => {
@@ -33,6 +33,33 @@ describe('mode table', () => {
       const seq = MODES[m].speed(ctx({ sequence: true, questionsAsked: 20 }));
       expect(seq, m).toBeLessThanOrEqual(plain);
     }
+  });
+  // #297 — Year 2's last mission stages meet `83 − 47` at speed 3. The sum is right for the year, the clock
+  // is not: a child works two-digit regrouping out in steps. A `slow` question eases exactly like a sequence.
+  it('a slow question drops one speed step at stage 5 of a Year 2 mission, and a plain one does not', () => {
+    const Y2 = YEARS.find(y => y.id === 'year2')!;
+    expect(Y2.speeds[4], 'Y2 stage 5 is the fastest step — the premise of #297').toBe(3);
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 5, slow: false }))).toBe(3);
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 5, slow: true }))).toBe(2);
+    // and it is one step, not a reset to the bottom
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 3, slow: true }))).toBe(2);
+  });
+  it('the slow easing floors at 1 and never speeds a question up', () => {
+    const Y2 = YEARS.find(y => y.id === 'year2')!;
+    expect(Y2.speeds[0], 'Y2 stage 1 is already the slowest step').toBe(1);
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 1, slow: true })), 'floor of 1').toBe(1);
+    for (const m of ALL) {
+      const plain = MODES[m].speed(ctx({ slow: false, questionsAsked: 20 }));
+      const slow = MODES[m].speed(ctx({ slow: true, questionsAsked: 20 }));
+      expect(slow, m).toBeLessThanOrEqual(plain);
+      expect(slow, `${m} never below the floor`).toBeGreaterThanOrEqual(1);
+    }
+  });
+  it('slow and sequence ease by the same one step, and together by no more than one', () => {
+    const Y2 = YEARS.find(y => y.id === 'year2')!;
+    const at = (o: Partial<ModeCtx>) => MODES.mission.speed(ctx({ year: Y2, stage: 5, ...o }));
+    expect(at({ sequence: true })).toBe(at({ slow: true }));
+    expect(at({ sequence: true, slow: true }), 'one step in total, not two').toBe(at({ slow: true }));
   });
   it('boss fights faster only when enraged', () => {
     expect(MODES.boss.speed(ctx({ enraged: true }))).toBeGreaterThanOrEqual(MODES.boss.speed(ctx({ enraged: false })));

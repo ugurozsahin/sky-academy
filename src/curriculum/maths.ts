@@ -3,6 +3,13 @@ import type { Difficulty, Generator, Question, Rng, Topic } from './types';
 import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel, SHAPES_2D, SHAPES_3D } from './util';
 
 const q = (prompt: string) => ({ prompt, say: symSay(prompt) });
+/**
+ * Mark a question as taking several mental steps, so the bubbles fly one speed step slower (#297).
+ * Year 2's difficulty-3 arithmetic is two-digit and crosses a ten (`83 − 47`), which a child works out
+ * in steps rather than recalls; the sum stays as the year asks, only the clock eases. Set at d3 alone,
+ * which is why it is a flag on the question and not on the topic.
+ */
+const slowAtD3 = (d: Difficulty, question: Question): Question => d === 3 ? { ...question, slow: true } : question;
 
 // ---------- Reception ----------
 const rCount: Generator = (d, rng) => {
@@ -156,7 +163,7 @@ const y2Add: Generator = (d, rng) => {
   else { a = ri(rng, 10, 60); b = ri(rng, 10, 99 - a); }             // 2-digit + 2-digit
   if (a + b > 100) return y2Add(d, rng);
   const p = `${a} + ${b} = ?`;
-  return numQ(rng, p, a + b, { min: 0, max: 100, ...q(p) });
+  return slowAtD3(d, numQ(rng, p, a + b, { min: 0, max: 100, ...q(p) }));
 };
 const y2Sub: Generator = (d, rng) => {
   let a: number, b: number;
@@ -164,7 +171,7 @@ const y2Sub: Generator = (d, rng) => {
   else if (d === 2) { a = ri(rng, 30, 99); b = 10 * ri(rng, 1, 2); }
   else { a = ri(rng, 30, 99); b = ri(rng, 10, a - 1); }
   const p = `${a} − ${b} = ?`;
-  return numQ(rng, p, a - b, { min: 0, max: 100, ...q(p) });
+  return slowAtD3(d, numQ(rng, p, a - b, { min: 0, max: 100, ...q(p) }));
 };
 const y2Three: Generator = (d, rng) => {
   const max = d === 1 ? 5 : 9;
@@ -189,7 +196,7 @@ const y2Inverse: Generator = (d, rng) => {
   const kind = ri(rng, 0, 2);
   const p = kind === 0 ? `? − ${b} = ${a - b}` : kind === 1 ? `${a - b} + ? = ${a}` : `${a} − ? = ${b}`;
   const ans = kind === 0 ? a : kind === 1 ? b : a - b;
-  return numQ(rng, p, ans, { min: 0, max: 100, ...q(p) });
+  return slowAtD3(d, numQ(rng, p, ans, { min: 0, max: 100, ...q(p) }));
 };
 const y2Fractions: Generator = (d, rng) => {
   const fr = d === 1 ? pick(rng, [[1, 2], [1, 4]]) : d === 2 ? pick(rng, [[1, 2], [1, 3], [1, 4]]) : pick(rng, [[1, 3], [1, 4], [2, 4], [3, 4]]);
