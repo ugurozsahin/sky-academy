@@ -109,6 +109,39 @@ export const Y1_CEW = ['the', 'a', 'do', 'to', 'today', 'of', 'said', 'says', 'a
 export const Y2_CEW = ['door', 'floor', 'poor', 'because', 'find', 'kind', 'mind', 'behind', 'child', 'children', 'wild', 'climb', 'most', 'only', 'both', 'old', 'cold', 'gold', 'hold', 'told', 'every', 'everybody', 'even', 'great', 'break', 'steak', 'pretty', 'beautiful', 'after', 'fast', 'last', 'past', 'father', 'class', 'grass', 'pass', 'plant', 'path', 'bath', 'hour', 'move', 'prove', 'improve', 'sure', 'sugar', 'eye', 'could', 'should', 'would', 'who', 'whole', 'any', 'many', 'clothes', 'busy', 'people', 'water', 'again', 'half', 'money', 'parents'];
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+/**
+ * Everyday words a KS1 child meets that are not on either exception-word list — the rhyme families the lists
+ * sit in (`_old` is bold, fold and sold as well as cold, gold, hold, told) and the short words a single letter
+ * turns one list word into (`p_t`, `_ull`, `h_s`). Read by `gapLetters` only (#296).
+ */
+const EVERYDAY = ['I', 'it', 'in', 'if', 'is', 'as', 'at', 'an', 'am', 'on', 'or', 'ox', 'up', 'us', 'we', 'he', 'me', 'be', 'hi', 'my', 'by', 'oh', 'ok', 'ah',
+  'the', 'and', 'but', 'not', 'for', 'get', 'got', 'had', 'ham', 'hat', 'hay', 'him', 'hit', 'hop', 'hot', 'how', 'hug', 'hut', 'her', 'hen', 'hid', 'sad', 'sat', 'set', 'sit', 'sun', 'sum', 'saw', 'say', 'sea', 'see', 'sew', 'six', 'sky', 'shy', 'she', 'try', 'toy', 'top', 'tap', 'tip', 'ten', 'tin', 'tea', 'toe', 'too', 'two', 'now', 'new', 'net', 'nut', 'nod', 'nap', 'gas', 'was', 'wax', 'win', 'wet', 'web', 'wig', 'why', 'way', 'wow', 'yes', 'yet', 'you', 'yak', 'zip', 'zoo',
+  'bad', 'bag', 'bat', 'bed', 'bee', 'beg', 'bet', 'big', 'bin', 'bit', 'box', 'boy', 'bud', 'bug', 'bun', 'bus', 'bye', 'cab', 'can', 'cap', 'car', 'cat', 'cod', 'cog', 'cot', 'cow', 'cry', 'cub', 'cup', 'cut', 'dad', 'day', 'den', 'did', 'dig', 'dim', 'dip', 'dog', 'dot', 'dry', 'dug', 'ear', 'eat', 'egg', 'elf', 'end', 'eye', 'fan', 'far', 'fat', 'fed', 'fig', 'fin', 'fit', 'fix', 'fly', 'fog', 'fox', 'fun', 'fur', 'gap', 'god', 'gum', 'gun', 'gut', 'guy', 'gym',
+  'jam', 'jar', 'jet', 'jog', 'joy', 'jug', 'key', 'kid', 'kit', 'lap', 'law', 'lay', 'led', 'leg', 'let', 'lid', 'lip', 'lit', 'log', 'lot', 'low', 'mad', 'man', 'map', 'mat', 'may', 'men', 'met', 'mix', 'mop', 'mud', 'mug', 'mum', 'oil', 'old', 'one', 'our', 'out', 'owl', 'own', 'pad', 'pan', 'pat', 'paw', 'pay', 'pea', 'peg', 'pen', 'pet', 'pie', 'pig', 'pin', 'pit', 'pop', 'pot', 'pub', 'pup', 'put', 'rag', 'ran', 'rat', 'raw', 'red', 'rib', 'rid', 'rim', 'rip', 'rob', 'rod', 'rot', 'row', 'rub', 'rug', 'run', 'van', 'vet',
+  'ace', 'add', 'age', 'ago', 'aid', 'aim', 'air', 'ant', 'ape', 'arm', 'art', 'ash', 'ask', 'ate', 'axe', 'ill', 'ink', 'inn', 'its', 'ice', 'odd', 'off', 'all', 'ill',
+  'bull', 'dull', 'full', 'gull', 'hull', 'pull', 'bold', 'fold', 'sold', 'bill', 'fill', 'hill', 'mill', 'pill', 'till', 'will', 'ball', 'call', 'fall', 'hall', 'tall', 'wall', 'bell', 'fell', 'sell', 'tell', 'well', 'yell', 'doll', 'poll', 'roll', 'toll', 'bush', 'hush', 'rush', 'push', 'posh', 'dish', 'fish', 'wish', 'cash', 'dash', 'rash', 'wash', 'bash', 'mash',
+  'came', 'game', 'name', 'same', 'tame', 'home', 'dome', 'bone', 'cone', 'tone', 'zone', 'done', 'none', 'gone', 'live', 'give', 'dive', 'five', 'hive', 'hire', 'fire', 'wire', 'wore', 'more', 'sore', 'tore', 'bore', 'core', 'mere', 'here', 'sail', 'said', 'paid', 'maid', 'raid', 'laid', 'main', 'pain', 'rain', 'gain',
+  'mouse', 'louse', 'horse', 'hoard', 'board', 'ward', 'word', 'cord', 'lord', 'ford', 'bind', 'hind', 'wind', 'mild', 'mind', 'kind', 'find', 'wild', 'child', 'most', 'post', 'host', 'cost', 'lost', 'both', 'moth', 'bath', 'path', 'past', 'fast', 'last', 'cast', 'mast', 'vast', 'east', 'best', 'nest', 'rest', 'test', 'vest', 'west', 'pest', 'grass', 'glass', 'class', 'brass', 'pass', 'mass', 'bass', 'lass', 'plant', 'slant', 'grant', 'chant',
+  'seat', 'meat', 'heat', 'beat', 'neat', 'peat', 'feat', 'great', 'greet', 'treat', 'steam', 'stead', 'steal', 'break', 'bread', 'breed', 'dear', 'hear', 'near', 'fear', 'gear', 'tear', 'wear', 'year', 'bear', 'pear', 'move', 'prove', 'grove', 'drove', 'stove', 'hour', 'sour', 'tour', 'four', 'pour', 'your', 'hole', 'pole', 'mole', 'role', 'sole', 'whole', 'poor', 'door', 'moor', 'floor', 'flour', 'penny', 'funny', 'sunny', 'bunny', 'money', 'honey', 'many', 'any', 'busy', 'easy', 'even', 'ever', 'oven', 'over', 'open', 'only', 'ugly', 'holy', 'tidy', 'lady', 'baby', 'body', 'copy', 'city', 'pity', 'duty', 'tiny',
+  'talk', 'walk', 'chalk', 'stalk', 'told', 'hold', 'gold', 'golf', 'cold', 'colt', 'hurt', 'hurl', 'curl', 'girl', 'fool', 'tool', 'pool', 'cool', 'wool', 'fall', 'half', 'calf', 'hail', 'pale', 'sale', 'tale', 'male', 'gale', 'kale', 'bake', 'cake', 'lake', 'make', 'rake', 'take', 'wake', 'like', 'bike', 'hike', 'pike', 'time', 'lime', 'dime', 'mime', 'ride', 'hide', 'side', 'tide', 'wide', 'wipe', 'ripe', 'pipe', 'rope', 'hope', 'cope', 'mope', 'nope', 'note', 'vote', 'tote', 'rote', 'cute', 'mute', 'tube', 'cube',
+  'these', 'those', 'where', 'there', 'their', 'while', 'white', 'write', 'right', 'light', 'night', 'sight', 'tight', 'fight', 'might', 'could', 'would', 'should', 'mould', 'sugar', 'super', 'sure', 'pure', 'cure', 'lure', 'water', 'later', 'wafer', 'waver', 'again', 'people', 'parent', 'father', 'rather', 'gather', 'lather', 'mother', 'other', 'bother', 'brother', 'after', 'often', 'every', 'eyes', 'weeks', 'clothes', 'cloth', 'children', 'climb', 'crime', 'prime', 'improve'];
+/**
+ * The words a spelling gap is checked against: both exception-word lists, the days, the CVC bank and the
+ * everyday words above (#296). Exported for the rail that walks every word and index in both lists.
+ */
+export const GAP_WORDS: ReadonlySet<string> = new Set([...Y1_CEW, ...Y2_CEW, ...DAYS, ...CVC.map(([w]) => w), ...EVERYDAY].map(w => w.toLowerCase()));
+/**
+ * Decoys for a gap in `word` at `idx`: every letter that does *not* make another `GAP_WORDS` word (#296). The
+ * common exception words sit in rhyme families — `_old` is cold, gold, hold and told, all four on the Year 2
+ * list — so drawn from the whole alphabet a decoy was another right answer in 42 of 144 Year 1 gaps and 32 of
+ * 295 Year 2 gaps, and `gapQ` sets no `listen`, so without a voice nothing on the card said which word was
+ * meant. Filtered, the card itself is unambiguous whatever the voice does.
+ */
+export function gapLetters(word: string, idx: number): string[] {
+  const lower = word.toLowerCase();
+  return LETTERS.filter(l => l !== lower[idx] && !GAP_WORDS.has(lower.slice(0, idx) + l + lower.slice(idx + 1)));
+}
+
 /** Spelling by slicing letters in order (sequence question). */
 // `from` is the letter pool the decoys are drawn from (#14). It defaults to the whole alphabet, which is
 // right for Year 1/2 spelling; Reception passes its phase pool, because a decoy the child has not been
@@ -214,7 +247,7 @@ const y1Spelling: Generator = (d, rng) => {
   const w = pick(rng, Y1_CEW.filter(x => x.length >= (d === 1 ? 2 : 3) && x.length <= (d === 3 ? 6 : 4)));
   if (d === 3 && rng() < 0.5) return spellQ(rng, w, undefined, 3);
   const idx = ri(rng, 0, w.length - 1);
-  return gapQ(rng, w, idx, LETTERS, undefined, `Which letter is missing from the word ${w}?`);
+  return gapQ(rng, w, idx, gapLetters(w, idx), undefined, `Which letter is missing from the word ${w}?`);
 };
 const y1Plurals: Generator = (d, rng) => {
   const S: [string, string][] = [['cat', 's'], ['dog', 's'], ['book', 's'], ['hat', 's'], ['car', 's'], ['tree', 's'], ['fox', 'es'], ['box', 'es'], ['bus', 'es'], ['dish', 'es'], ['bench', 'es'], ['wish', 'es'], ['glass', 'es'], ['brush', 'es']];
@@ -243,7 +276,7 @@ const y1Days: Generator = (d, rng) => {
   const day = pick(rng, DAYS);
   if (d === 3) return spellQ(rng, day, '📅', 3);   // days keep their capital letter (Y1 grammar)
   const idx = ri(rng, 1, Math.min(4, day.length - 1));
-  return gapQ(rng, day, idx, LETTERS, '📅', `Which letter is missing from ${day}?`);
+  return gapQ(rng, day, idx, gapLetters(day, idx), '📅', `Which letter is missing from ${day}?`);
 };
 const y1Trace: Generator = (d, rng) => {
   if (d === 3) { const [w, e] = pick(rng, CVC); return { prompt: `Trace: ${w}`, say: `Trace the word ${w}`, answer: w, options: [w], visual: { type: 'word', text: w, emoji: e } }; }
@@ -257,7 +290,7 @@ const y2Spelling: Generator = (d, rng) => {
   const w = pick(rng, Y2_CEW.filter(x => x.length <= (d === 1 ? 5 : d === 2 ? 7 : 10)));
   if (d === 3 && rng() < 0.4) return spellQ(rng, w, undefined, 3);
   const idx = ri(rng, 0, w.length - 1);
-  return gapQ(rng, w, idx, LETTERS, undefined, `Which letter is missing from the word ${w}?`);
+  return gapQ(rng, w, idx, gapLetters(w, idx), undefined, `Which letter is missing from the word ${w}?`);
 };
 const CONTRACTIONS: [string, string][] = [['do not', "don't"], ['can not', "can't"], ['is not', "isn't"], ['I am', "I'm"], ['it is', "it's"], ['you are', "you're"], ['we will', "we'll"], ['did not', "didn't"], ['has not', "hasn't"], ['they are', "they're"], ['I will', "I'll"], ['could not', "couldn't"]];
 const y2Contractions: Generator = (d, rng) => {
@@ -271,7 +304,14 @@ const y2Suffix: Generator = (d, rng) => {
   const [, suf, sent] = pick(rng, SUFFIX2);
   return wordQ(rng, sent, suf, ['ful', 'less', 'ness', 'ly', 'ment'].filter(x => x !== suf).slice(0, d === 1 ? 2 : 3), { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the ending' });
 };
-const HOMOPHONES: [string, string[], string][] = [['I want ___ go home.', ['to', 'too', 'two'], 'to'], ['I have ___ cats.', ['two', 'to', 'too'], 'two'], ['Me ___!', ['too', 'to', 'two'], 'too'], ['___ house is big.', ['Their', 'There', "They're"], 'Their'], ['Look over ___!', ['there', 'their', "they're"], 'there'], ['___ going out.', ["They're", 'Their', 'There'], "They're"], ['I can ___ the sea.', ['see', 'sea'], 'see'], ['The ___ shines.', ['sun', 'son'], 'sun'], ['It is ___ o\'clock.', ['one', 'won'], 'one'], ['We ___ the race!', ['won', 'one'], 'won'], ['Turn ___ the light.', ['on', 'won'], 'on'], ['The bear has ___ fur.', ['brown', 'brawn'], 'brown'], ['___ is a bird.', ['Here', 'Hear'], 'Here'], ['I can ___ you.', ['hear', 'here'], 'hear'], ['A ___ of bread.', ['piece', 'peace'], 'piece'], ['The ___ blew hard.', ['wind', 'wined'], 'wind']];
+/**
+ * Sound-alike words: [sentence with a gap, the options (answer first), answer]. Every option set is one of
+ * `HOMOPHONE_SETS` — the Year 2 statutory pairs (NC English Appendix 1) plus `piece/peace` from Year 3–4 — and
+ * a rail holds it there: `on/won`, `brown/brawn` and `wind/wined` were not homophones at all (#296).
+ * Exported for that rail.
+ */
+export const HOMOPHONE_SETS: string[][] = [['to', 'too', 'two'], ['their', 'there', "they're"], ['see', 'sea'], ['sun', 'son'], ['one', 'won'], ['here', 'hear'], ['piece', 'peace'], ['bare', 'bear'], ['blue', 'blew'], ['night', 'knight'], ['be', 'bee'], ['quite', 'quiet']];
+export const HOMOPHONES: [string, string[], string][] = [['I want ___ go home.', ['to', 'too', 'two'], 'to'], ['I have ___ cats.', ['two', 'to', 'too'], 'two'], ['Me ___!', ['too', 'to', 'two'], 'too'], ['___ house is big.', ['Their', 'There', "They're"], 'Their'], ['Look over ___!', ['there', 'their', "they're"], 'there'], ['___ going out.', ["They're", 'Their', 'There'], "They're"], ['I can ___ the sea.', ['see', 'sea'], 'see'], ['The ___ shines.', ['sun', 'son'], 'sun'], ['It is ___ o\'clock.', ['one', 'won'], 'one'], ['We ___ the race!', ['won', 'one'], 'won'], ['The ___ ate the honey.', ['bear', 'bare'], 'bear'], ['The wind ___ my hat off.', ['blew', 'blue'], 'blew'], ['___ is a bird.', ['Here', 'Hear'], 'Here'], ['I can ___ you.', ['hear', 'here'], 'hear'], ['A ___ of bread.', ['piece', 'peace'], 'piece'], ['The ___ rode a horse.', ['knight', 'night'], 'knight'], ['A ___ makes honey.', ['bee', 'be'], 'bee'], ['Please be ___ in the library.', ['quiet', 'quite'], 'quiet']];
 const y2Homophones: Generator = (_d, rng) => {
   const [sent, opts, ans] = pick(rng, HOMOPHONES);
   return wordQ(rng, sent, ans, opts.filter(o => o !== ans), { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the right word' });
@@ -280,7 +320,8 @@ const y2Punct: Generator = (d, rng) => {
   const k = d === 1 ? 0 : ri(rng, 0, 2);
   if (k === 0) { const [s, p] = pick(rng, PUNCT_SENTS); return wordQ(rng, `${s}_`, p, ['.', '?', '!'], { visual: { type: 'sentence', text: `${s}_` }, say: `${s}. Which punctuation mark ends this sentence?` }); }
   if (k === 1) {
-    const L: [string, string][] = [['I like apples, pears_ and plums.', ','], ['We saw lions, tigers_ bears and monkeys.', ','], ['Red, blue_ green and yellow.', ','], ['Bring a hat, coat_ scarf and gloves.', ',']];
+    // #296: the gap never sits before "and" — English schools teach the list comma without one there.
+    const L: [string, string][] = [['I like apples_ pears and plums.', ','], ['We saw lions, tigers_ bears and monkeys.', ','], ['Red, blue_ green and yellow.', ','], ['Bring a hat, coat_ scarf and gloves.', ',']];
     const [s, p] = pick(rng, L);
     return wordQ(rng, s, p, ['.', '?', ';'], { visual: { type: 'sentence', text: s }, say: 'Which mark separates the items in the list?', hint: 'Commas in a list' });
   }

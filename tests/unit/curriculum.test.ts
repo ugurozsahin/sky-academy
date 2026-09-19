@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
-import { turnEnd } from '../../src/curriculum/maths';
+import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, gapLetters, Y1_CEW, Y2_CEW } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
 // Deterministic RNG (mulberry32)
@@ -181,10 +181,10 @@ describe('curriculum ranges', () => {
       const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 31);
       for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 150; i++) {
         const q = t.gen(d, r);
-        const m = q.prompt.match(/^Which (?:is|was) (?:the )?(\w+)\?$/);
+        const m = q.prompt.match(/^Which (?:is|was|holds) (?:the )?(\w+)\?$/);   // "holds more/the most" is capacity (#296)
         if (!m || !q.hint || !q.hint.includes(':')) continue;                    // skip unit/conversion/add questions
         const segs = q.hint.split(' · ').map(s => { const [label, rest] = s.split(': '); return [label, parseInt(rest, 10)] as [string, number]; });
-        const big = /^(long|tall|heav|full|warm)/.test(m[1]);                    // longer/longest/taller/heaviest/fuller/warmer …
+        const big = /^(long|tall|heav|more|most|warm)/.test(m[1]);               // longer/longest/taller/heaviest/more/most/warmer …
         const target = big ? Math.max(...segs.map(x => x[1])) : Math.min(...segs.map(x => x[1]));
         const winner = segs.find(x => x[1] === target)![0];
         expect(winner === q.answer || winner.startsWith(q.answer + ' '), `${id}: "${q.prompt}" | ${q.hint} | ans=${q.answer}`).toBe(true);
@@ -192,6 +192,124 @@ describe('curriculum ranges', () => {
       }
     }
     expect(checked).toBeGreaterThan(100);                                        // the comparison branch really did run
+  });
+});
+
+/**
+ * #296 — six KS1 questions marked a right answer wrong, taught a rule English schools do not, or had more than
+ * one right answer. Each rail below was red on the generator it names before the fix, by the issue's numbering.
+ */
+describe('KS1 questions with one right answer, and only the right one marked (#296)', () => {
+  const gen = (id: string) => TOPICS.find(x => x.id === id)!;
+  const value = (f: string) => { const [a, b] = f.split('/').map(Number); return a / b; };
+
+  it('1. y2-fractions: no decoy is worth the answer (2/4 shaded is 1/2 too)', () => {
+    const t = gen('y2-fractions'); const r = rng(296);
+    let shaded = 0, twoQuarters = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+      const q = t.gen(d, r);
+      if (!q.prompt.startsWith('What fraction')) continue;
+      shaded++; if (q.answer === '2/4') twoQuarters++;
+      for (const o of q.options) if (o !== q.answer) expect(value(o), `${q.answer}: decoy ${o} has the same value`).not.toBe(value(q.answer));
+      expect(q.options.length, q.prompt).toBe(4);
+    }
+    expect(shaded).toBeGreaterThan(100);
+    expect(twoQuarters, 'the 2/4 case must actually be drawn — it is the one that was wrong').toBeGreaterThan(10);
+  });
+
+  it('2. y2-punct: the list comma is never the one before "and"', () => {
+    const t = gen('y2-punct'); const r = rng(297);
+    let lists = 0;
+    for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
+      const q = t.gen(d, r);
+      if (!/list/.test(q.say ?? '')) continue;
+      lists++;
+      expect(q.prompt, 'a comma before "and" is not what English schools teach').not.toMatch(/_ and\b/);
+      expect(q.prompt, 'the gap sits between two list items').toMatch(/\w_ \w/);
+    }
+    expect(lists).toBeGreaterThan(30);
+  });
+
+  it('3. y2-homophones: every option set is a Year 2 statutory homophone set', () => {
+    expect(HOMOPHONES.length).toBeGreaterThan(10);
+    for (const [sent, opts, ans] of HOMOPHONES) {
+      const lower = opts.map(o => o.toLowerCase());
+      const set = HOMOPHONE_SETS.find(s => lower.every(o => s.includes(o)));
+      expect(set, `${sent}: ${opts.join('/')} is not a homophone set`).toBeDefined();
+      expect(opts, sent).toContain(ans);
+      expect(sent, 'the sentence has one gap').toMatch(/^[^_]*___[^_]*$/);
+      expect(lower, `${sent}: brown/brawn and wind/wined were not homophones`).not.toContain('brawn');
+      expect(lower, `${sent}: brown/brawn and wind/wined were not homophones`).not.toContain('wined');
+    }
+    expect(HOMOPHONES.some(([, o]) => o.includes('on')), 'on/won is not a pair').toBe(false);
+    for (const pair of [['bare', 'bear'], ['blue', 'blew'], ['night', 'knight'], ['be', 'bee'], ['quite', 'quiet']])
+      expect(HOMOPHONES.some(([, o]) => pair.every(p => o.map(x => x.toLowerCase()).includes(p))), `${pair.join('/')} from the Year 2 list is asked`).toBe(true);
+    const r = rng(298); const t = gen('y2-homophones');
+    for (let i = 0; i < 100; i++) { const q = t.gen(2, r); expect(q.options.map(o => o.toLowerCase()).sort()).toEqual([...new Set(q.options.map(o => o.toLowerCase()))].sort()); }
+  });
+
+  it(`4. y2-temp: an estimate's decoys sit at least ${TEMP_GAP} °C from the answer and from each other`, () => {
+    const t = gen('y2-temp'); const r = rng(299);
+    let estimates = 0;
+    for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+      const q = t.gen(d, r);
+      if (!q.prompt.startsWith('Temperature of')) continue;
+      estimates++;
+      const degs = q.options.map(o => Number(o.replace('°C', '')));
+      expect(degs.every(x => Number.isInteger(x) && x >= 0 && x <= 100), q.options.join(' ')).toBe(true);
+      for (let a = 0; a < degs.length; a++) for (let b = a + 1; b < degs.length; b++)
+        expect(Math.abs(degs[a] - degs[b]), `${q.prompt} ${q.options.join(' ')}: ${degs[a]} and ${degs[b]} are both defensible`).toBeGreaterThanOrEqual(TEMP_GAP);
+      expect(q.options.length, q.prompt).toBe(4);
+    }
+    expect(estimates).toBeGreaterThan(100);
+  });
+
+  it('5. y1/y2 spelling gaps: no decoy that can be drawn completes another word of the checked set', () => {
+    // The set carries both lists and the rhyme families the issue names, so `_old` cannot offer c/g/h/t.
+    for (const w of [...Y1_CEW, ...Y2_CEW, 'bold', 'fold', 'sold', 'he', 'we', 'go', 'so', 'do', 'his', 'has']) expect(GAP_WORDS.has(w), w).toBe(true);
+    for (const l of gapLetters('cold', 0)) expect('cgbfhst', `_old: ${l} makes a word`).not.toContain(l);
+    expect(gapLetters('his', 1)).not.toContain('a');
+    // Exhaustive over both lists, every index: the pool the generators draw from is clean and still deep enough.
+    for (const w of [...Y1_CEW, ...Y2_CEW]) for (let i = 0; i < w.length; i++) {
+      const pool = gapLetters(w, i);
+      expect(pool.length, `${w} index ${i} leaves too few decoys`).toBeGreaterThanOrEqual(3);
+      for (const l of pool) expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w} index ${i}: decoy ${l} makes another word`).toBe(false);
+      expect(pool, 'the answer is never a decoy').not.toContain(w[i]);
+    }
+    // And what the card actually shows, for every difficulty of the three gap topics.
+    let gaps = 0;
+    for (const id of ['y1-spelling', 'y2-spelling', 'y1-days']) for (const d of [1, 2, 3] as Difficulty[]) {
+      const t = gen(id); const r = rng(id.length * 7 + d);
+      for (let i = 0; i < 300; i++) {
+        const q = t.gen(d, r);
+        if (q.sequence || !q.prompt.includes('_')) continue;
+        gaps++;
+        const idx = q.prompt.indexOf('_');
+        for (const o of q.options) if (o !== q.answer) {
+          const filled = (q.prompt.slice(0, idx) + o + q.prompt.slice(idx + 1)).toLowerCase();
+          expect(GAP_WORDS.has(filled), `${id}: ${q.prompt} — decoy ${o} spells ${filled}`).toBe(false);
+        }
+        expect(q.options.length, q.prompt).toBe(4);
+      }
+    }
+    expect(gaps).toBeGreaterThan(500);
+  });
+
+  it('6. capacity compares what a container holds, never how full it is', () => {
+    let compared = 0;
+    for (const id of ['y1-capacity', 'y2-capacity']) for (const d of [1, 2, 3] as Difficulty[]) {
+      const t = gen(id); const r = rng(id.length + d);
+      for (let i = 0; i < 150; i++) {
+        const q = t.gen(d, r);
+        if (!q.hint?.includes(':')) continue;
+        compared++;
+        expect(q.prompt, id).toMatch(/^Which holds (more|less|the most|the least)\?$/);
+        expect(q.say, 'the spoken line says what each one holds').toMatch(/ holds \d+ millilitres/);
+        expect(q.say, id).not.toMatch(/full|empt/);
+      }
+    }
+    expect(compared).toBeGreaterThan(200);
+    for (const t of TOPICS) for (const d of [1, 2, 3] as Difficulty[]) { const r = rng(d); for (let i = 0; i < 40; i++) { const q = t.gen(d, r); expect(q.prompt + ' ' + (q.say ?? ''), t.id).not.toMatch(/\b(fuller|emptier|fullest|emptiest)\b/); } }
   });
 });
 
