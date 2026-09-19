@@ -80,13 +80,15 @@ child, not by the label it arrived with.
 
 ## 5. Four things make a pull request unmergeable
 
-Check all four, every time. `docs/REVIEWER-PROMPT.md` STEP 2 has the full reasoning and the incidents behind
-each; this is the checklist.
+Check all four, every time. This is the checklist; `docs/decisions/002-routine-prompt-is-flow-only.md` has the
+incidents behind each.
 
 1. **CI is not green on the tree you are about to merge.** Read the **newest** run for the full head SHA; a
    tick from before `main` moved is evidence about a tree that no longer exists. Queued or in progress means
    wait, not merge. A missing `CI` run on any pull request — docs-only included — is a red light (#176). A
-   green run whose *e2e step* reads "skipped" is a pass; check the summary says so and say which it was.
+   green run whose *e2e step* reads "skipped" is a pass; check the summary says so and say which it was. The
+   step is skipped when the diff touches none of the paths in `GAME_PATHS` in `.github/workflows/ci.yml` — the
+   line CI itself reads, so it cannot go stale.
    Never re-run a job to see if it passes this time.
 2. **The latest review requests changes.** An empty reviews list means nothing: GitHub refuses a formal
    CHANGES_REQUESTED review when reviewer and author share one token, which is always the case here.

@@ -30,19 +30,22 @@ const INSTRUCTION_FILES = [
 const ROOT_FILES = ['CLAUDE.md', 'AGENTS.md', 'BACKLOG.md', 'package.json', 'vite.config.ts', 'playwright.config.ts',
                     'capacitor.config.ts'];
 const DIRS = ['.claude', '.github', 'android', 'docs', 'public', 'scripts', 'src', 'tests'];
-const esc = (s: string) => s.replace(/[.]/g, '\\.');
-const PATH_IN_SPAN = new RegExp(
-  `(?<![\\w/.~-])((?:${DIRS.map(esc).join('|')})/[^\\s\`]*|(?:${ROOT_FILES.map(esc).join('|')})(?![\\w/-]))`, 'g');
-// A literal path, not a glob, a placeholder (`<n>`, `NNN`), an elided path, or a file written at run time.
-const isLiteral = (p: string) => !/[*<>{}$]|NNN|…|\.\.\.|instructions-loaded\.log$/.test(p);
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');   // every regex metacharacter, not only the dot
+const pathPattern = (dirs: string[], rootFiles: string[]) => new RegExp(
+  `(?<![\\w/.~-])((?:${dirs.map(esc).join('|')})/[^\\s\`]*|(?:${rootFiles.map(esc).join('|')})(?![\\w/-]))`, 'g');
+const PATH_IN_SPAN = pathPattern(DIRS, ROOT_FILES);
+// A literal path: not a glob or a `<n>` placeholder, not the decision-record placeholder
+// `docs/decisions/NNN-title.md`, not a file written at run time. Anchored on purpose (#261): a real path that
+// merely contains `NNN` or dots is still checked, and an elided path fails loudly rather than being skipped.
+const isLiteral = (p: string) => !/[*<>{}$]|(^|\/)NNN-[\w-]+\.md$|instructions-loaded\.log$/.test(p);
 // Named on purpose, to say they are gone or must not be used.
 const KNOWN_ABSENT: Record<string, string> = {
   'scripts/output/': 'named only to forbid it: qa-screenshot says never to save a screenshot there',
 };
 
 /** The repo paths a document points at, from its code spans, as they would be looked up on disk. */
-const pointersIn = (text: string): string[] => [...new Set(
-  [...text.matchAll(/`([^`\n]+)`/g)].flatMap((span) => [...span[1].matchAll(PATH_IN_SPAN)].map((m) => m[1]))
+const pointersIn = (text: string, pattern = PATH_IN_SPAN): string[] => [...new Set(
+  [...text.matchAll(/`([^`\n]+)`/g)].flatMap((span) => [...span[1].matchAll(pattern)].map((m) => m[1]))
     .map((p) => p.replace(/(?::\d+.*|#.*)$/, '').replace(/[.,;:)'"]+$/, ''))
     .filter(isLiteral))];
 const danglingIn = (text: string) => pointersIn(text).filter((p) => !(p in KNOWN_ABSENT) && !existsSync(join(root, p)));
@@ -64,6 +67,18 @@ describe('agent instruction files', () => {
     expect(pointersIn('`src/curriculum/**`, `docs/decisions/NNN-title.md`, `feature/<n>-<slug>`, a URL path '
       + '`GET /repos/o/r/contents/docs/x.md`, prose docs/not-in-a-span.md, `~/.claude/settings.json`')).toEqual([]);
     expect(danglingIn('`scripts/output/`')).toEqual([]);
+  });
+
+  // #261: both gaps were latent — nothing in the repo hit them — so they are pinned by construction.
+  it('takes a directory or root-file name literally, whatever regex characters it holds (#261)', () => {
+    const hostile = pathPattern(['foo+bar', 'docs(new)'], ['a.b|c.md']);
+    expect(pointersIn('`foo+bar/x.md` `foobar/y.md` `docs(new)/z.md` `a.b|c.md` `aXb` `c.md`', hostile))
+      .toEqual(['foo+bar/x.md', 'docs(new)/z.md', 'a.b|c.md']);
+  });
+
+  it('skips only the decision-record placeholder, not every path that happens to contain NNN or dots (#261)', () => {
+    expect(pointersIn('`docs/decisions/NNN-title.md`, `docs/NNNplan.md`, `scripts/run...later.mjs`'))
+      .toEqual(['docs/NNNplan.md', 'scripts/run...later.mjs']);
   });
 
   it('every KNOWN_ABSENT entry is still absent and still named somewhere', () => {
