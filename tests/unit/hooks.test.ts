@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM, run by Claude Code as a PreToolUse hook (.claude/settings.json)
 import { check as bashCheck, forcePush, ownerMarker as bashOwnerMarker, worklogAppend } from '../../.claude/hooks/bash-guard.mjs';
 // @ts-expect-error — plain ESM hook helper
-import { commands } from '../../.claude/hooks/shell.mjs';
+import { commands, parse } from '../../.claude/hooks/shell.mjs';
 // @ts-expect-error — plain ESM hook script
 import { check as writeCheck } from '../../.claude/hooks/write-guard.mjs';
 // @ts-expect-error — plain ESM hook script
@@ -105,16 +105,79 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
       expect({ cmd, denied: isDeny(runHook(worklogAppend, cmd)) }).toEqual({ cmd, denied: true });
   });
 
-  it('the shell parser splits statements, strips quotes, and keeps heredoc bodies out of the commands', () => {
-    expect(commands('A=1 env -i git -C "my dir" push origin main && echo done | tee out.txt')
-      .map((c: any) => [c.name, ...c.args])).toEqual([['git', '-C', 'my dir', 'push', 'origin', 'main'], ['echo', 'done'], ['tee', 'out.txt']]);
-    expect(commands('python3 - <<\'PY\'\nimport os; os.system("git push --force")\nPY\nls').map((c: any) => c.name)).toEqual(['python3', 'ls']);
-    expect(commands('echo a >> "x y.md" 2> err.log')[0].redirects).toEqual([{ op: '>>', target: 'x y.md' }, { op: '>', target: 'err.log' }]);
+  // PR #255 second review: process substitution was read as a plain redirect, so the command inside it was
+  // never seen; `$'…'` quoting left a `$` on the flag; and a closed list of wrapper words missed `timeout`,
+  // `nice`, `stdbuf`, `watch`. The scanner now recurses into `<(…)`/`>(…)`, reads `$'…'`, and a tool counts as
+  // run wherever its name stands in a statement — there is no wrapper list left to forget an entry of.
+  it('force-push hook: sees a push inside a process substitution, behind any wrapper, or ANSI-C quoted (PR #255 second review)', () => {
+    for (const cmd of ['diff <(git push --force) file', 'diff < <(git push --force)', 'tee >(git push -f) < log',
+                       "git push origin $'--force'", 'git push origin $"--force"',
+                       'timeout 30 git push --force', 'nice -n 10 git push --force', 'stdbuf -oL git push --force',
+                       'watch git push --force', 'xargs git push -f', 'eval git push --force',
+                       'while read x; do git push -f; done < <(ls)'])
+      expect({ cmd, denied: isDeny(runHook(forcePush, cmd)) }).toEqual({ cmd, denied: true });
+  });
+
+  it('OWNER-marker hook: sees a gh call inside a process substitution or behind any wrapper (PR #255 second review)', () => {
+    for (const cmd of ['diff <(gh pr comment 1 --body "OWNER: APPROVED")', 'timeout 30 gh pr comment 1 --body "OWNER: APPROVED"',
+                       'eval gh pr comment 1 --body "OWNER: REJECTED"'])
+      expect({ cmd, denied: isDeny(runHook(bashOwnerMarker, cmd)) }).toEqual({ cmd, denied: true });
+  });
+
+  // The guard leans towards denying: what it cannot finish reading it does not wave through. An unterminated
+  // substitution used to lose its last character silently (`--forc`), a wrong answer rather than an error.
+  it('a command the scanner cannot finish reading is denied with a reason, never read as "nothing to see"', () => {
+    for (const command of ['$(git push --force', 'echo "unclosed', "echo 'unclosed", 'echo `unclosed', '(git push --force'])
+      expect({ command, reason: bashCheck({ command }) }).toEqual({ command, reason: expect.stringMatching(/could not read this command \(unterminated/) });
+  });
+
+  it('the everyday commit pattern — a heredoc with an apostrophe inside `$(…)` — is read, not refused', () => {
+    const commit = 'git commit -m "$(cat <<\'EOF\'\nDon\'t force-push: `git push --force` (is denied\n\nCo-Authored-By: x\nEOF\n)"';
+    expect(bashCheck({ command: commit })).toBeNull();
+    expect(parse(commit).map((st: any) => st.words[0])).toEqual(['cat', 'git']);
+  });
+
+  it('WORKLOG.md Bash hook: a target built from split quotes is still the root file', () => {
+    expect(isDeny(runHook(worklogAppend, 'echo x >> "WORK"\'LOG\'.md'))).toBe(true);
+    expect(isDeny(runHook(worklogAppend, 'echo x >> docs/worklog/WORKLOG-2026.md'))).toBe(false);
+  });
+
+  it('the shell scanner splits statements, strips quotes, and keeps heredoc bodies out of the commands', () => {
+    expect(parse('A=1 env -i git -C "my dir" push origin main && echo done | tee out.txt').map((st: any) => st.words))
+      .toEqual([['A=1', 'env', '-i', 'git', '-C', 'my dir', 'push', 'origin', 'main'], ['echo', 'done'], ['tee', 'out.txt']]);
+    expect(parse('python3 - <<\'PY\'\nimport os; os.system("git push --force")\nPY\nls').map((st: any) => st.words[0])).toEqual(['python3', 'ls']);
+    expect(parse('echo a >> "x y.md" 2> err.log')[0].redirects).toEqual([{ op: '>>', target: 'x y.md' }, { op: '>', target: 'err.log' }]);
+    expect(parse('a=$(b `c` <(d)) | (e; f)').map((st: any) => st.words[0])).toEqual(['c', 'd', 'b', 'a=$()', 'e', 'f']);
+  });
+
+  it('`sh -c` and `eval` hand their script to the scanner, wherever they stand in the statement', () => {
+    expect(commands('sudo -u x bash -lc "cd r && make"').map((st: any) => st.words[0])).toEqual(['sudo', 'cd', 'make']);
+    expect(commands('time eval "ls; pwd"').map((st: any) => st.words[0])).toEqual(['time', 'ls', 'pwd']);
   });
 
   it('the Bash guard allows an ordinary command, and a call that carries no command at all', () => {
     expect(bashCheck({ command: 'echo ok' })).toBeNull();
     expect(bashCheck({})).toBeNull();
+  });
+
+  // Leaning towards denying is only tolerable if ordinary work gets through. These are the shapes a run really
+  // writes — loops, jq filters, arithmetic, `case`, heredocs feeding python, every npm script in package.json.
+  it('reads the commands a run really writes without refusing any of them', () => {
+    const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts) as string[];
+    expect(scripts.length).toBeGreaterThan(4);
+    const real = [
+      ...scripts,
+      'cd /repo && git pull --ff-only 2>&1 | tail -2; git log --oneline --grep="#101" | head -40',
+      'for n in 62 61; do gh issue view $n --json updatedAt,body -q \'"#\'$n\' updated \\(.updatedAt)"\'; done',
+      'gh pr list --state open --json number,title -q \'.[] | "#\\(.number) \\(.title[0:80])"\'',
+      'total=$(git log --oneline | wc -l); echo "n=$((total + 1)) ${total:-0} ${#total}"',
+      'case "$1" in a|b) echo ab;; *) echo other;; esac',
+      'python3 - <<\'EOF\'\nimport re\ns = "it\'s (unbalanced"\nprint(re.sub(r"[(`\']", "", s))\nEOF',
+      'git push -u origin chore/231-hooks-to-scripts 2>&1 | tail -1 && gh pr create --draft --title "x (#231)" --body-file /tmp/b.md',
+      'npx vitest run tests/unit/hooks.test.ts 2>&1 | grep -E "×|Tests |^\\s+[-+] " | head -20',
+      '[[ -f a.txt && ! -d b ]] || { echo missing >&2; exit 1; }',
+    ];
+    for (const command of real) expect({ command, reason: bashCheck({ command }) }).toEqual({ command, reason: null });
   });
 
   it('force-push hook: denies --force, -f, --force-with-lease, and a combined -uf/-fu cluster', () => {

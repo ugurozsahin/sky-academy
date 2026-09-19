@@ -4,28 +4,22 @@
  * quoted `;` or a `"$(…)"` argument was never seen, and a commit message that merely mentioned a marker was
  * denied.
  *
- * It understands quotes, backslashes and line continuations, `$(…)` and backticks (parsed as commands of
- * their own), statement separators, redirects, heredocs (kept as text, never run as commands) and
- * `sh -c '…'` / `eval`. It is a guard against mistakes, not a sandbox: a command assembled at run time
- * (`T="git push"; $T`) cannot be known from its text.
+ * One recursive scanner: quotes (`'…'`, `"…"`, `$'…'`), backslashes and line continuations; `$(…)`, backticks,
+ * `<(…)`, `>(…)` and `(…)`, each scanned as commands of their own; statement separators; redirects; heredocs,
+ * whose bodies are text and never commands. Anything left open at the end of the string THROWS, and the guard
+ * turns a throw into a deny: a construct this does not understand must not read as "nothing to see".
+ *
+ * It is a guard against mistakes, not a sandbox: a command assembled at run time (`T="git push"; $T`) cannot
+ * be known from its text. The hard guarantee against a force-push belongs on the server (branch protection).
  */
 
-/** Index just past the `)` that closes the `$(` whose body starts at `i`. */
-const closeParen = (s, i) => {
-  for (let depth = 1, quote = null; i < s.length; i++) {
-    const c = s[i];
-    if (c === '\\') i++;
-    else if (quote) { if (c === quote) quote = null; }
-    else if (c === "'" || c === '"') quote = c;
-    else if (c === '(') depth++;
-    else if (c === ')' && --depth === 0) return i + 1;
-  }
-  return s.length;
-};
+const REDIRECT = /^(&>>|&>|>>|>\||>&|<<<|<<-?|<>|<&|>|<)/;
 
-/** @returns {{words: string[], redirects: {op: string, target: string}[]}[]} */
-export function parse(cmd, out = []) {
-  const s = String(cmd ?? '');
+/**
+ * Scans `s` from `i` until `closer` (`)` or a backtick) at this nesting level, or to the end when `closer`
+ * is null. Statements found go to `out`; returns the index just past the closer.
+ */
+function scan(s, i, closer, out) {
   let words = [], redirects = [], word = null, redirectOp = null, pending = [];
   const pushWord = () => {
     if (word === null) return;
@@ -39,28 +33,39 @@ export function parse(cmd, out = []) {
     if (words.length || redirects.length) out.push({ words, redirects });
     words = []; redirects = [];
   };
-  const substitution = (body) => { parse(body, out); word = (word ?? '') + '$()'; };
+  const nested = (from, close) => { const j = scan(s, from, close, out); word = (word ?? '') + '$()'; return j - 1; };
 
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (c === '\\') { if (s[i + 1] !== '\n') word = (word ?? '') + (s[i + 1] ?? ''); i++; }
-    else if (c === "'") { const end = s.indexOf("'", i + 1); const j = end < 0 ? s.length : end; word = (word ?? '') + s.slice(i + 1, j); i = j; }
-    else if (c === '"') {
+  for (; i < s.length; i++) {
+    const c = s[i], next = s[i + 1];
+    if (c === closer) { endStatement(); return i + 1; }
+    if (c === '\\') { if (next !== '\n') word = (word ?? '') + (next ?? ''); i++; }
+    else if (c === "'" || (c === '$' && next === "'")) {
+      const ansi = c === '$';                                   // $'…' honours backslash escapes, '…' does not
       word ??= '';
-      for (i++; i < s.length && s[i] !== '"'; i++) {
+      for (i += ansi ? 2 : 1; s[i] !== "'"; i++) {
+        if (i >= s.length) throw new Error('unterminated single quote');
+        if (ansi && s[i] === '\\') i++;
+        word += s[i] ?? '';
+      }
+    }
+    else if (c === '"' || (c === '$' && next === '"')) {
+      word ??= '';
+      for (i += c === '$' ? 2 : 1; s[i] !== '"'; i++) {
+        if (i >= s.length) throw new Error('unterminated double quote');
         if (s[i] === '\\') { if (s[i + 1] !== '\n') word += s[i + 1] ?? ''; i++; }
-        else if (s[i] === '$' && s[i + 1] === '(') { const j = closeParen(s, i + 2); substitution(s.slice(i + 2, j - 1)); i = j - 1; }
-        else if (s[i] === '`') { const j = s.indexOf('`', i + 1); const k = j < 0 ? s.length : j; substitution(s.slice(i + 1, k)); i = k; }
+        else if (s[i] === '$' && s[i + 1] === '(') i = nested(i + 2, ')');
+        else if (s[i] === '`') i = nested(i + 1, '`');
         else word += s[i];
       }
     }
-    else if (c === '$' && s[i + 1] === '(') { const j = closeParen(s, i + 2); substitution(s.slice(i + 2, j - 1)); i = j - 1; }
-    else if (c === '`') { const j = s.indexOf('`', i + 1); const k = j < 0 ? s.length : j; substitution(s.slice(i + 1, k)); i = k; }
+    else if (c === '$' && next === '(') i = nested(i + 2, ')');
+    else if ((c === '<' || c === '>') && next === '(') { pushWord(); i = nested(i + 2, ')'); }   // process substitution
+    else if (c === '`') i = nested(i + 1, '`');
     else if (c === ' ' || c === '\t') pushWord();
-    else if (c === '#' && word === null) { while (i < s.length && s[i] !== '\n') i++; i--; }
+    else if (c === '#' && word === null) { while (i + 1 < s.length && s[i + 1] !== '\n') i++; }
     else if (c === '\n') {
       endStatement();
-      for (const delimiter of pending) {                     // a heredoc body is text, not commands: skip it
+      for (const delimiter of pending) {                        // a heredoc body is text, not commands: skip it
         for (i++; i < s.length; i++) {
           const end = s.indexOf('\n', i), line = s.slice(i, end < 0 ? s.length : end);
           i = end < 0 ? s.length : end;
@@ -69,48 +74,54 @@ export function parse(cmd, out = []) {
       }
       pending = [];
     }
-    else if (c === ';' || c === '(' || c === ')') endStatement();
-    else if (c === '&' && s[i + 1] !== '>') { endStatement(); if (s[i + 1] === '&') i++; }
-    else if (c === '|') { endStatement(); if (s[i + 1] === '|' || s[i + 1] === '&') i++; }
-    else if (c === '>' || c === '<' || (c === '&' && s[i + 1] === '>')) {
-      if (word !== null && /^\d+$/.test(word)) word = null;  // `2>` — the digits are a file descriptor
+    else if (c === '(') { endStatement(); i = scan(s, i + 1, ')', out) - 1; }
+    else if (c === ';' || c === ')') endStatement();            // a stray `)` is a `case` pattern's
+    else if (c === '&' && next !== '>') { endStatement(); if (next === '&') i++; }
+    else if (c === '|') { endStatement(); if (next === '|' || next === '&') i++; }
+    else if (c === '>' || c === '<' || c === '&') {
+      if (word !== null && /^\d+$/.test(word)) word = null;     // `2>` — the digits are a file descriptor
       pushWord();
-      const op = /^(&>>|&>|>>|>\||>&|<<<|<<-?|<>|<&|>|<)/.exec(s.slice(i))[0];
+      const op = REDIRECT.exec(s.slice(i))[0];
       redirectOp = op.startsWith('<<') && op !== '<<<' ? '<<' : op;
       i += op.length - 1;
     }
     else word = (word ?? '') + c;
   }
+  if (closer) throw new Error(`unterminated ${closer === ')' ? 'substitution or subshell' : 'backtick'}`);
   endStatement();
+  return i;
+}
+
+/** @returns {{words: string[], redirects: {op: string, target: string}[]}[]} every statement, nested ones included */
+export function parse(cmd) {
+  const out = [];
+  scan(String(cmd ?? ''), 0, null, out);
   return out;
 }
 
-// Words that run the command that follows them.
-const WRAPPERS = new Set(['env', 'command', 'sudo', 'time', 'nohup', 'exec', 'builtin', '{', '!', 'if', 'then', 'else', 'elif', 'do', 'while', 'until']);
+const base = (word) => word.split('/').pop();
 
 /**
- * The command each statement really runs: leading `VAR=value` and wrapper words skipped, and the script
- * inside `sh -c '…'` or `eval …` parsed as statements of its own.
- * @returns {{name: string, args: string[], redirects: {op: string, target: string}[]}[]}
+ * Every statement the command would run, plus the script handed to `sh -c '…'` or `eval …`, wherever in the
+ * statement the shell or `eval` sits — behind `env`, `timeout 30`, `xargs` or anything else.
  */
 export function commands(cmd) {
   const found = [];
   const visit = (statements) => {
     for (const st of statements) {
-      const w = st.words.slice();
-      for (let wrapped = false; w.length; ) {
-        if (/^[A-Za-z_]\w*=/.test(w[0])) w.shift();
-        else if (WRAPPERS.has(w[0])) { w.shift(); wrapped = true; }
-        else if (wrapped && w[0].startsWith('-')) w.shift();               // the wrapper's own options
-        else break;
-      }
-      const [name = '', ...args] = w;
-      const base = name.split('/').pop();
-      found.push({ name: base, args, redirects: st.redirects });
-      if (/^(sh|bash|zsh|dash)$/.test(base) && args.includes('-c')) visit(parse(args[args.indexOf('-c') + 1] ?? ''));
-      if (base === 'eval') visit(parse(args.join(' ')));
+      found.push(st);
+      st.words.forEach((w, i) => {
+        if (/^(sh|bash|zsh|dash|ksh)$/.test(base(w))) {
+          const c = st.words.findIndex((x, j) => j > i && /^-[a-zA-Z]*c[a-zA-Z]*$/.test(x));   // `-c`, `-lc`, `-ec`
+          if (c > i) visit(parse(st.words[c + 1] ?? ''));
+        }
+        if (w === 'eval') visit(parse(st.words.slice(i + 1).join(' ')));
+      });
     }
   };
   visit(parse(cmd));
   return found;
 }
+
+/** Where `tool` is run in a statement: any word whose basename is `tool`, so no list of wrappers is needed. */
+export const runsAt = (words, tool) => words.flatMap((w, i) => (base(w) === tool ? [i] : []));
