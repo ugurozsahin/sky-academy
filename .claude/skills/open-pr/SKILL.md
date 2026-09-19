@@ -66,7 +66,7 @@ deliberately did **not** do, the tests you ran, and which guard-rail budgets mov
 **A closing keyword closes its issue wherever it appears in the body** — inside a negation, a quotation, or
 the very sentence explaining why you are not closing it. GitHub scans the whole body for `close`/`fix`/
 `resolve` and their forms next to `#<n>`, the `owner/repo#<n>` form or the issue's URL, and has no notion of
-negation or context. PR #139 wrote "Left open so merging this does not close #44" and GitHub shut issue 44.
+negation or context. PR #139 wrote "Left open so merging this does not close" and then issue 44's number, and GitHub shut issue 44.
 
 So: write "the issue stays open", or "#&#8203;<n> remains open for Part B", and break the link when the
 keyword is unavoidable. **Backticks are not a fix** — the parser ignores code spans, which is why eight pull
