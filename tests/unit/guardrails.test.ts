@@ -2010,7 +2010,7 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * `hasSessionUrl()`/`blockState()` citation. The three process files used to point at it from inside their
    * adoption paragraph; when #161 became "superseded by a fresh review" (2026-09-19) that paragraph went, and
    * the mention moved to the `review-pr` skill §6, where a superseding clear is written about. (#199 and #200
-   * stay triplicated.)
+   * stay copied in `CLAUDE.md` and the developer prompt.)
    *
    * Prove it red: drop the rule from governance.md, or the session-URL sentence from the review-pr skill.
    */
