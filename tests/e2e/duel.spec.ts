@@ -1,13 +1,36 @@
 import { test, expect, type Page } from '@playwright/test';
+import { DUEL_HANDOVER } from '../../src/game/duel';
 import type { DuelHooks } from '../../src/ui/hooks';
 
 // Ninja Duel (#16 items 2–4): two arenas on one screen, the same question in both, first correct slice wins
 // the round. Driven through the duel screen's own `window.__sna` hooks, which name the player every call is for.
-declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number } }
+declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number; __said: string[]; __deadArenas: { time: number }[] } }
+
+/** A speech engine that records what it was asked to say, and when it was cancelled, in order (#16 review). */
+const recordingEngine = (page: Page) => page.addInitScript(() => {
+  window.__said = [];
+  Object.defineProperty(window, 'speechSynthesis', {
+    configurable: true,
+    value: {
+      speaking: false, pending: false, getVoices: () => [], onvoiceschanged: null,
+      cancel: () => { window.__said.push('<cancel>'); },
+      speak: (u: SpeechSynthesisUtterance) => { window.__said.push(u.text); },
+    },
+  });
+});
+/** The hand-over line was spoken for this round 1, and nothing cancelled it afterwards. */
+async function expectHandoverHeard(page: Page) {
+  await page.waitForFunction(() => window.__said.some(l => l.startsWith('Ninja Duel!')));
+  const said = await page.evaluate(() => window.__said);
+  const at = said.findLastIndex(l => l.startsWith('Ninja Duel!'));
+  expect(said[at].startsWith(`${DUEL_HANDOVER} `), 'one utterance: the instruction, then the question').toBe(true);
+  expect(said.slice(at + 1), 'no cancel() after it').not.toContain('<cancel>');
+}
 
 async function startDuel(page: Page) {
   await page.addInitScript(save => { if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save); }, JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }));
   await page.addInitScript(() => { window.__SNA_FAST = 4; });
+  await recordingEngine(page);
   await page.goto('/');
   await expect(page.locator('.home')).toBeVisible();
   await page.click('.island[data-year="year1"]');
@@ -25,6 +48,7 @@ test.describe('Ninja Duel', () => {
   test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', async ({ page }) => {
     await startDuel(page);
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
+    await expectHandoverHeard(page);   // the second child's one instruction is in round 1's own utterance
     // The same wave in both arenas: each arena launches the ONE question's options (in its own batch order —
     // a snapshot of the two in-flight sets need not match, the option set does), and the answer reaches both.
     await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
@@ -50,18 +74,29 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
     await expect(page.locator('.duel-end .speech')).toHaveText('Player 1 wins 6–4!');
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 6, scoreB: 4 });
-    // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0.
+    // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0. The recording
+    // is cleared BEFORE the click: round 1's line goes out on the task after the old screen's cancel(), and it
+    // is what the assertion after the scores must find.
+    await page.evaluate(() => { window.__said = []; });
     await page.click('.duel-end #again');
     await expect(page.locator('.duel-screen')).toBeVisible();
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
     await expect(page.locator('#score-a')).toHaveText('0');
     await expect(page.locator('#score-b')).toHaveText('0');
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0 });
-    // Quit from the pause overlay tears the duel down: the hooks go with it (#73 — no arena may leak across screens).
+    await expectHandoverHeard(page);   // the rematch's line is not dropped into the old screen's cancel()
+    expect(await page.evaluate(() => window.__said.indexOf('<cancel>')), 'the old screen was hushed first, then the line went out').toBeGreaterThanOrEqual(0);
+    // Quit from the pause overlay tears the duel down: the hooks go with it and BOTH render loops stop
+    // (#73 — no arena may leak across screens; the game.spec `__deadArena` pattern, once per arena).
+    await page.evaluate(() => { window.__deadArenas = [window.__sna.arenas.a, window.__sna.arenas.b]; });
     await page.click('#pause');
     await page.click('#quit');
     await expect(page.locator('.island-screen')).toBeVisible();
-    expect(await page.evaluate(() => window.__sna === undefined)).toBe(true);
+    const leaked = await page.evaluate(() => new Promise<{ advanced: number[]; sna: string }>(res => {
+      const t0 = window.__deadArenas.map(a => a.time);
+      setTimeout(() => res({ advanced: window.__deadArenas.map((a, i) => +(a.time - t0[i]).toFixed(2)), sna: typeof window.__sna }), 500);
+    }));
+    expect(leaked).toEqual({ advanced: [0, 0], sna: 'undefined' });
   });
 
   test('a duel is played on a bubble topic of the island, a round nobody slices is a draw, and pause holds both arenas', async ({ page }) => {

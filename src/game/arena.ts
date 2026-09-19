@@ -224,6 +224,7 @@ export class Arena {
   };
   private onMove = (e: PointerEvent) => {
     if (!this.pointerDown || this.paused || this.frozen) return;
+    if (e.pointerId !== this.activeId) return;      // a second finger's drift is not this stroke (#16: the move half of the rule below)
     // Hit-test against the last pointer position, not the visual trail: the trail fades after 280ms,
     // so a finger that pauses mid-stroke (or slow pointer events) must not lose its slice segment.
     const p = this.pos(e); const prev = this.lastPt;
@@ -236,8 +237,10 @@ export class Arena {
     for (const b of this.bubbles) { if (this.frozen) break; if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true); }
   };
   // `pointerup`/`pointercancel` arrive on the window, so every arena on the page hears every finger lift. Only
-  // the pointer that went down on this canvas may end its stroke: in Ninja Duel (#16) two arenas share the
-  // window, and Player 2's tap used to cut Player 1's swipe mid-stroke. Single player has one finger, one id.
+  // the pointer that went down on this canvas may end its stroke, and only it may extend it: in Ninja Duel
+  // (#16) two arenas share the window, and Player 2's tap used to cut Player 1's swipe mid-stroke; a second
+  // finger resting on the same canvas re-seats the trail (the newest finger owns the stroke), so the first
+  // finger's next move must not be hit-tested from that point (PR #295 review). One finger, one id, in play.
   private onUp = (e: PointerEvent) => {
     if (this.activeId !== null && e.pointerId !== this.activeId) return;
     this.pointerDown = false; this.activeId = null;

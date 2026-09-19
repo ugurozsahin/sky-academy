@@ -5,7 +5,7 @@
 // the `window.__sna` hooks the e2e drives it through. No reward economy yet (item 5, deferred on the issue).
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
-import { Arena } from '../game/arena';
+import { Arena, type Bubble } from '../game/arena';
 import { Duel, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
 import { load } from '../storage';
@@ -69,7 +69,11 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       // #44: the first wave waits for Fredoka (cached after that); #138: a spawn that waited must still be this wave's.
       fontReady().then(() => {
         if (waveId !== myWave || !scope.alive) return;
-        say(spokenQuestion(q, info.round));   // round 1 carries the hand-over line in the same utterance
+        // Round 1 carries the hand-over line in the same utterance. On a rematch it would be spoken in the very
+        // task that `hush()` cancelled the old screen's voice in — the cancel-then-speak drop audio.ts documents —
+        // so it goes out on the next task instead (PR #295 review).
+        const line = spokenQuestion(q, info.round);
+        if (info.round === 1) later(() => say(line), 0); else say(line);
         for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts); }
       });
     },
@@ -133,16 +137,18 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   // #73: a route change tears the arenas down — two rAF loops leaked across screens would be twice the incident.
   function cleanup() { for (const p of PLAYERS) arenas[p].destroy(); scope.dispose(); }
 
+  /** A bubble a player can still slice — the one predicate `bubbles()` and `wrong()` share. */
+  const inFlight = (b: Bubble) => b.launched && !b.dead && !b.hit && !b.fade;
   const target = (p: DuelPlayer, wrong: boolean): string | undefined => {
     const q: Question | null = duel.current; if (!q) return undefined;
     if (!wrong) return q.answer;
-    return arenas[p].bubbles.find(x => x.launched && !x.dead && !x.hit && x.label !== q.answer)?.label;
+    return arenas[p].bubbles.find(x => inFlight(x) && x.label !== q.answer)?.label;
   };
   const hooks: DuelHooks = {
     duel, arenas,
     answer: p => { const t = target(p, false); return t !== undefined && arenas[p].hitLabel(t); },
     wrong: p => { const t = target(p, true); return t !== undefined && arenas[p].hitLabel(t); },
-    bubbles: p => arenas[p].bubbles.filter(b => b.launched && !b.dead && !b.hit && !b.fade).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })),
+    bubbles: p => arenas[p].bubbles.filter(inFlight).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })),
     state: () => ({
       mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
