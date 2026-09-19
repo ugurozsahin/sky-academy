@@ -14,7 +14,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-counton | Numerical Patterns: count beyond 20 | what comes next |
 | r-order | Numerical Patterns: compare/order | slice 3 numbers smallest→biggest |
 | r-balance | Number: composition, equal amounts | balance scales: objects on one pan, ? on the other (d3: `a = b + ?`) |
-| r-sounds | Literacy Writing: sounds→letters | initial/final/medial sound of CVC words; the word and the decoys follow the phase order (d1 phase 2 letters, d2–3 all single-letter sounds) |
+| r-sounds | Literacy Writing: sounds→letters | initial/final/medial sound of CVC words; the word and the decoys follow the phase order (d1 phase 2 letters, d2–3 all single-letter sounds). The final (d2) and medial (d3) questions additionally require the letter at the gap to be a genuine single-letter sound (#135): `cow` ends in the digraph `ow` and `fox`/`box` end in the blend `/ks/`, so none of the three is drawn for the final question; `egg`'s middle letter is a consonant, so it is not drawn for the medial question. Each keeps its other (correct) roles — `egg` still teaches its initial sound at d1. |
 | r-soundhunt | Word Reading: say a sound for each letter | Sound Hunt: three keyword words are spoken, nothing to read; slice the grapheme (d1 phase 2 sets 1–4, d2 all single letters + qu, d3 phase 3 digraphs/trigraphs); sound-alike graphemes never appear as decoys |
 | r-capitals | Word Reading: letters | match A↔a; letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
 | r-build | Writing: spell by sounds | slice letters in order (CVC); word and decoy letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
