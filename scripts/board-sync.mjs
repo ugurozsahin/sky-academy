@@ -12,10 +12,11 @@
 // The rule, first match wins — this comment is the one place the table lives; the docs point here:
 //
 //   issue closed                                              → Done
-//   open PR linked, and `owner-approval` on the PR or issue   → Owner action
+//   open PR linked, and an owner gate on the PR or issue      → Owner action   (`owner-approval`, `loosening`:
+//                                                                                `OWNER_GATES` in review-gate.mjs, #112)
 //   open PR linked                                            → In review
 //   a branch named for the issue, and no PR yet (#160)        → In progress
-//   `owner-input` or `owner-approval` on the issue            → Owner action
+//   `owner-input` or an owner gate on the issue               → Owner action
 //   `blocked`                                                 → Blocked
 //   `later`                                                   → Backlog
 //   `priority:P0` or `priority:P1`                            → Ready
@@ -55,7 +56,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { closingRefs } from './review-gate.mjs';
+import { closingRefs, OWNER_GATES } from './review-gate.mjs';
 
 export const OWNER = 'ugurozsahin';
 export const REPO = 'sky-academy';
@@ -75,6 +76,7 @@ export const STATUS = Object.freeze({
 export const PRIORITIES = ['P0', 'P1', 'P2', 'P3'];
 
 const has = (labels, name) => (labels || []).includes(name);
+const ownerGated = (labels) => OWNER_GATES.some((gate) => has(labels, gate));
 
 /** The issue numbers a pull request is solving: `(#n)` in the title, `Closes #n` / `Part of #n` in the body. */
 export function linkedIssues(pr) {
@@ -106,9 +108,9 @@ export function desiredStatus(issue, repo) {
   if (issue.state !== 'open') return STATUS.DONE;
   const labels = issue.labels || [];
   const pr = (repo.prs || []).find((p) => linkedIssues(p).includes(issue.number));
-  if (pr) return has(pr.labels, 'owner-approval') || has(labels, 'owner-approval') ? STATUS.OWNER : STATUS.REVIEW;
+  if (pr) return ownerGated(pr.labels) || ownerGated(labels) ? STATUS.OWNER : STATUS.REVIEW;
   if ((repo.branches || []).some((b) => branchIssue(b) === issue.number)) return STATUS.PROGRESS;
-  if (has(labels, 'owner-input') || has(labels, 'owner-approval')) return STATUS.OWNER;
+  if (has(labels, 'owner-input') || ownerGated(labels)) return STATUS.OWNER;
   if (has(labels, 'blocked')) return STATUS.BLOCKED;
   if (has(labels, 'later')) return STATUS.BACKLOG;
   if (has(labels, 'priority:P0') || has(labels, 'priority:P1')) return STATUS.READY;

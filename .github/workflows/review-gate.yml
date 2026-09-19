@@ -23,7 +23,7 @@
 #
 # Cost: the job is skipped for comments that open with neither marker (a skipped job bills nothing), so this
 # is about a minute per PR event and per REVIEW:/OWNER: comment. `labeled`/`unlabeled` are in the trigger list
-# because the `owner-approval` label is what puts a PR into the owner's hands — without them the label changes
+# because a label — `owner-approval`, or `loosening` since #112 — is what puts a PR into the owner's hands — without them the label changes
 # nothing, the status stays green, and an unapproved new look merges. Labels move rarely on a PR, so the added
 # cost is small; the alternative is a rule that silently does not exist.
 #

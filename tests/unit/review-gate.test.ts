@@ -99,6 +99,18 @@ describe('review gate', () => {
       expect(both('OWNER: APPROVED').blocked).toBe(false);
     });
 
+    // Review of PR #283: the workflow cuts the status text at 140 characters, and the owner's gate is the
+    // reason that outlives every other block — pushed last, it was the one the cut removed.
+    it("puts the owner's gate first, so the 140-character status still names it under a draft and a block", () => {
+      const { reasons } = blockState({
+        draft: true, labels: ['loosening'],
+        comments: [{ body: 'REVIEW: CHANGES REQUESTED — no session line', created_at: at(0), author_association: 'OWNER' }],
+      });
+      expect(reasons.length).toBeGreaterThanOrEqual(3);
+      expect(reasons[0]).toMatch(/^labelled loosening and the owner has not written/);
+      expect(`Blocked: ${reasons.join('; ')}`.slice(0, 140)).toContain(reasons[0]);
+    });
+
     it('no other label gates anything', () => {
       expect(blockState({ draft: false, labels: ['guard-rail', 'loosening-ish', 'owner-session'], comments: [] }).blocked).toBe(false);
     });

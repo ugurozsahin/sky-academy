@@ -12,7 +12,9 @@ authority on the flow; where the two ever disagree, the prompt wins and this fil
 - **Never review a pull request you opened, or pushed a commit to.** The API cannot tell you whose it is —
   one token serves every agent and the owner, so every pull request here looks self-authored. You know it is
   yours because you opened it, or pushed to it, *this run*; that is the only evidence there is.
-- A pull request held only by an unanswered `owner-approval` label is not yours to unblock. Leave it.
+- A pull request held only by an unanswered `owner-approval` or `loosening` label is not yours to unblock.
+  Leave it. A reviewer may put `loosening` **on** a pull request (§5) and never takes it **off**: removing it
+  turns `review-gate` green at once, and that decision is the owner's.
 
 ## 1. Read the issue before the diff
 

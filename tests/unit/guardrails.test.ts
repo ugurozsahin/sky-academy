@@ -1982,6 +1982,15 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   });
 
   // The home itself. Scoped to §6, the section that owns the rule, so a copy elsewhere cannot satisfy it.
+  // #112, review of PR #283: removing the label turns `review-gate` green at once (`unlabeled` re-stamps), so
+  // this sentence is the whole difference between a gate and a suggestion.
+  it('the review-pr skill lets a reviewer put `loosening` on a pull request and never take it off (#112)', () => {
+    const skill = flat(read('.claude/skills/review-pr/SKILL.md'));
+    expect(skill).toContain('held only by an unanswered `owner-approval` or `loosening` label is not yours to unblock');
+    expect(skill, 'on, never off').toMatch(/may put `loosening` \*\*on\*\* a pull request \(§5\) and never takes it \*\*off\*\*/);
+    expect(skill, '§5 must still tell the reviewer to apply it').toContain('apply it yourself if the author did not');
+  });
+
   it('the review-pr skill carries the rule: who may supersede a block, who never may, and the phrase the gate keys on', () => {
     const skill = read('.claude/skills/review-pr/SKILL.md');
     const start = skill.indexOf('\n## 6. '), end = skill.indexOf('\n## ', start + 1);

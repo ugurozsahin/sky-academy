@@ -20,6 +20,7 @@ describe('board sync: the Status rule, first match wins (#158)', () => {
     ['closed beats every open-state row, even Owner action', issue(1, ['owner-input'], 'closed'), withPr(1, ['owner-approval']), STATUS.DONE],
     ['open PR + owner-approval on the PR → Owner action', issue(2, ['priority:P1']), withPr(2, ['owner-approval']), STATUS.OWNER],
     ['open PR + owner-approval on the issue → Owner action', issue(2, ['owner-approval']), withPr(2), STATUS.OWNER],
+    ['open PR + loosening on the PR → Owner action: the gate holds it for the owner, so the board says so (#112)', issue(2, ['priority:P1']), withPr(2, ['loosening']), STATUS.OWNER],
     ['open PR → In review', issue(3, ['priority:P1']), withPr(3), STATUS.REVIEW],
     ['open PR wins over owner-input', issue(3, ['owner-input']), withPr(3), STATUS.REVIEW],
     ['open PR saying Part of → In review', issue(3), withPr(3, [], 'Part of #3 — the rest stays open'), STATUS.REVIEW],

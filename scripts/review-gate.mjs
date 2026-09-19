@@ -70,6 +70,9 @@ export const isAdoptionClear = (body) => isCleared(body) && /another reviewer'?s
 const mayReview = (c) => ['OWNER', 'COLLABORATOR', 'MEMBER'].includes(c.author_association);
 const isOwner = (c) => c.author_association === 'OWNER';
 
+/** The labels that put a pull request in the owner's hands — one list, read here and by `scripts/board-sync.mjs`. */
+export const OWNER_GATES = ['owner-approval', 'loosening'];
+
 /**
  * @param {{draft: boolean, labels?: string[], comments: {body: string, created_at: string, author_association?: string}[]}} pr
  * @returns {{blocked: boolean, reasons: string[]}} newest marker wins, so block → clear → block works.
@@ -96,16 +99,16 @@ export function blockState({ draft, labels, comments }) {
   // may do something it could not before. The rule that such a change is the owner's to merge was prose
   // only — nothing went red — so the label is the machine-readable half of the direction line the body
   // already carries. The author applies it, or the reviewer who disagrees with a declared tightening.
-  const OWNER_GATES = ['owner-approval', 'loosening'];
-  const wantsOwner = OWNER_GATES.filter((l) => (labels || []).includes(l));
+  const ownerGates = OWNER_GATES.filter((l) => (labels || []).includes(l));
   const ownerSaidNo = rejected !== null && (approved === null || approved < rejected);
   const reasons = [];
+  // The owner's gate first: it outlives every other block, and the workflow cuts the status text at 140 characters.
+  if (ownerSaidNo) reasons.push('the owner rejected it (OWNER: REJECTED, no later OWNER: APPROVED)');
+  else if (ownerGates.length && approved === null) reasons.push(`labelled ${ownerGates.join(' and ')} and the owner has not written OWNER: APPROVED`);
   if (draft) reasons.push('the PR is a draft');
   if (openReview) reasons.push('a REVIEW: CHANGES REQUESTED comment has no later REVIEW: CLEARED');
   if (openReview && !requestedHasSession) reasons.push('the block has no session URL (#199)');
   if (clearNeedsSession) reasons.push("REVIEW: CLEARED supersedes another reviewer's block with no session URL of its own (#191)");
-  if (ownerSaidNo) reasons.push('the owner rejected it (OWNER: REJECTED, no later OWNER: APPROVED)');
-  else if (wantsOwner.length && approved === null) reasons.push(`labelled ${wantsOwner.join(' and ')} and the owner has not written OWNER: APPROVED`);
   return { blocked: reasons.length > 0, reasons };
 }
 
