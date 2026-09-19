@@ -191,12 +191,20 @@ const y2Inverse: Generator = (d, rng) => {
   const ans = kind === 0 ? a : kind === 1 ? b : a - b;
   return numQ(rng, p, ans, { min: 0, max: 100, ...q(p) });
 };
+/** `a/b` written as text has the same value as num/den (cross-multiplied, so 2/4 and 1/2 are equal). */
+const sameFraction = (text: string, num: number, den: number) => { const [a, b] = text.split('/').map(Number); return a * den === num * b; };
 const y2Fractions: Generator = (d, rng) => {
   const fr = d === 1 ? pick(rng, [[1, 2], [1, 4]]) : d === 2 ? pick(rng, [[1, 2], [1, 3], [1, 4]]) : pick(rng, [[1, 3], [1, 4], [2, 4], [3, 4]]);
   const [num, den] = fr;
   if (rng() < 0.4) {
     const shaded = num, parts = den;
-    return wordQ(rng, 'What fraction is shaded?', `${num}/${den}`, [`${den}/${num}`, `${num}/${den + 1}`, `${den - num}/${den}`, '1/2'].filter(x => x !== `${num}/${den}`), { visual: { type: 'fraction', parts, shaded }, say: 'What fraction of the shape is shaded?' });
+    // #296: a decoy is never worth the answer — 2/4 shaded is 1/2 too ("recognise the equivalence of 2/4 and
+    // 1/2", Y2 programme of study), so the child who slices 1/2 was right. Compare by value, not by spelling.
+    // `wordQ` keeps the first three, so the order is what reaches the card: `1/2` sits second so the natural
+    // misconception is offered on the 1/4, 1/3 and 3/4 cards; for 1/2 and 2/4 it is filtered and the spare
+    // decoy at the end takes its place.
+    const ds = [`${den}/${num}`, '1/2', `${num}/${den + 1}`, `${den - num}/${den}`, `${num + 1}/${den}`].filter(x => !sameFraction(x, num, den));
+    return wordQ(rng, 'What fraction is shaded?', `${num}/${den}`, ds, { visual: { type: 'fraction', parts, shaded }, say: 'What fraction of the shape is shaded?' });
   }
   const whole = den * ri(rng, 1, d === 3 ? 6 : 3);
   const ans = whole / den * num;
@@ -315,20 +323,26 @@ function uniqVals(rng: Rng, n: number, lo: number, hi: number): number[] {
   while (s.size < n && guard++ < 200) s.add(ri(rng, lo, hi));
   return [...s];
 }
-/** Slice the coloured thing that is the biggest/smallest by a measured value (d1 = 2 things comparative, d2/3 = 3 things superlative). */
-function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: string, forms: [string, string, string, string], lo: number, hi: number): Question {
+/**
+ * Slice the coloured thing that is the biggest/smallest by a measured value (d1 = 2 things comparative, d2/3 = 3
+ * things superlative). `verb` is what the thing does with its value: a pencil *is* 12 cm, a jug *holds* 300 ml
+ * (#296 — "fuller" is relative to the container, so 300 ml in a jug may be less full than 200 ml in a cup; the NC
+ * vocabulary for the container is "holds more / holds less").
+ */
+function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: string, forms: [string, string, string, string], lo: number, hi: number, verb = 'is'): Question {
   const n = d === 1 ? 2 : 3;                                   // forms = [compBig, compSmall, superBig, superSmall]
   const cols = shuffle(rng, COLOURS).slice(0, n);
   const vals = uniqVals(rng, n, lo, hi);
   const big = rng() < 0.5;
   const idx = vals.indexOf(big ? Math.max(...vals) : Math.min(...vals));
   const adj = n === 2 ? (big ? forms[0] : forms[1]) : (big ? forms[2] : forms[3]);
-  const spoken = cols.map((c, i) => `the ${c} ${noun} is ${vals[i]} ${UNIT_WORD[unit]}`).join(', ');
-  return wordQ(rng, n === 2 ? `Which is ${adj}?` : `Which is the ${adj}?`, cols[idx], cols.filter((_, i) => i !== idx), {
+  const spoken = cols.map((c, i) => `the ${c} ${noun} ${verb} ${vals[i]} ${UNIT_WORD[unit]}`).join(', ');
+  return wordQ(rng, n === 2 ? `Which ${verb} ${adj}?` : `Which ${verb} the ${adj}?`, cols[idx], cols.filter((_, i) => i !== idx), {
     hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '),
-    say: `${spoken}. Which one is ${n === 2 ? adj : 'the ' + adj}?`,
+    say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`,
   });
 }
+const HOLDS: [string, string, string, string] = ['more', 'less', 'most', 'least'];
 /** "Best unit" question: measure a familiar object in the smaller or larger standard unit. */
 function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string): Question {
   const [thing, unit] = pick(rng, things);
@@ -343,7 +357,7 @@ const y1Length: Generator = (d, rng) => rng() < 0.5
 const y1Mass: Generator = (d, rng) =>
   measureCompare(rng, d, pick(rng, ['bag', 'parcel', 'box', 'basket']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], d === 1 ? 5 : 20, d === 1 ? 30 : 100);
 const y1Capacity: Generator = (d, rng) =>
-  measureCompare(rng, d, pick(rng, ['jug', 'cup', 'bottle', 'bucket']), 'ml', ['fuller', 'emptier', 'fullest', 'emptiest'], d === 1 ? 10 : 50, d === 1 ? 90 : 500);
+  measureCompare(rng, d, pick(rng, ['jug', 'cup', 'bottle', 'bucket']), 'ml', HOLDS, d === 1 ? 10 : 50, d === 1 ? 90 : 500, 'holds');
 const y1Months: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) { const i = ri(rng, 0, 6), after = rng() < 0.5, ans = DAYS[(i + (after ? 1 : 6)) % 7]; return wordQ(rng, `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?`, ans, shuffle(rng, DAYS.filter(x => x !== ans)).slice(0, 3), { say: `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?` }); }
@@ -369,15 +383,21 @@ const y2Mass: Generator = (d, rng) => {
 };
 const y2Capacity: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
-  if (kind === 0) return measureCompare(rng, d, pick(rng, ['bottle', 'jug', 'tank', 'flask']), 'ml', ['fuller', 'emptier', 'fullest', 'emptiest'], 50, 900);
+  if (kind === 0) return measureCompare(rng, d, pick(rng, ['bottle', 'jug', 'tank', 'flask']), 'ml', HOLDS, 50, 900, 'holds');
   if (kind === 1) return unitChoice(rng, [['teaspoon', 'ml'], ['cup', 'ml'], ['mug', 'ml'], ['bath', 'l'], ['bucket', 'l'], ['paddling pool', 'l']], 'ml', 'l', 'measure');
   const [phrase, ans, ds] = pick(rng, [['1 litre', '1000 ml', ['100 ml', '10 ml', '500 ml']], ['half a litre', '500 ml', ['50 ml', '5000 ml', '250 ml']], ['2 litres', '2000 ml', ['200 ml', '20 ml', '1200 ml']]] as [string, string, string[]][]);
   return wordQ(rng, `${phrase} = ?`, ans, ds, { say: `How many millilitres is ${phrase}?` });
 };
+/** Minimum °C between an estimate's answer and each decoy, and between decoys (#296). */
+export const TEMP_GAP = 10;
+const TEMP_STEP = TEMP_GAP * 2;   // the ladder's rung: twice the floor, so a regression of the step trips the rail
 const y2Temp: Generator = (d, rng) => {
   if (d >= 2 && rng() < 0.4) {
     const [thing, t] = pick(rng, [['ice', 0], ['a cold morning', 5], ['a warm room', 20], ['a hot bath', 40], ['a summer day', 28], ['inside a fridge', 4]] as [string, number][]);
-    const ds = uniqVals(rng, 4, Math.max(0, t - 8), t + 12).filter(x => x !== t).slice(0, 3).map(x => `${x}°C`);
+    // #296: an estimate has no exact answer, so a decoy 1 °C away is as true as the answer. Decoys sit on a
+    // ladder of `TEMP_STEP` (20 °C) either side of it — none is defensible (a fridge at 24 °C, a summer day at
+    // 8 °C) and none is close to another. The ladder is derived from `TEMP_GAP`, the floor the rail holds.
+    const ds = shuffle(rng, [1, 2, 3, -1, -2, -3].map(k => t + k * TEMP_STEP).filter(x => x >= 0 && x <= 100)).slice(0, 3).map(x => `${x}°C`);
     return wordQ(rng, `Temperature of ${thing}?`, `${t}°C`, ds, { say: `About what temperature is ${thing}?` });
   }
   const warmer = rng() < 0.5;
