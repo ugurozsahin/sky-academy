@@ -1,6 +1,9 @@
 // Shared question model for every subject. Generators are pure: (difficulty, rng) => Question.
 export type Rng = () => number; // [0,1)
 
+/** One category of a chart visual: its label (emoji + name) and the count it stands for. */
+export interface ChartRow { label: string; n: number }
+
 export type Visual =
   | { type: 'objects'; emoji: string; n: number; n2?: number; emoji2?: string } // groups of objects
   | { type: 'tenframe'; n: number; n2?: number }         // ten-frame with n filled (n2 = second colour)
@@ -12,8 +15,11 @@ export type Visual =
   | { type: 'numberline'; from: number; to: number; mark?: number; step?: number }   // mark = hidden number shown as ?
   | { type: 'scales'; left: string; right: string }     // balance scales: text/emoji on each pan ("3 + 4" / "? + 2")
   // Categorical data (Y2 statistics): one row per category, `n` = the count it stands for. `kind` picks the
-  // chart; `each` is the pictogram key (one symbol = `each` of the thing), so the drawing shows n / each symbols.
-  | { type: 'chart'; kind: 'pictogram' | 'tally' | 'block'; rows: { label: string; n: number }[]; icon?: string; each?: number }
+  // chart. Two variants, not three (#133): a tally and a block diagram share their whole contract, and only
+  // the pictogram has a key — `each` (one symbol = `each` of the thing, so the drawing shows n / each symbols)
+  // and the `icon` it draws — so both are required where they mean something and absent where they do not.
+  | { type: 'chart'; kind: 'tally' | 'block'; rows: ChartRow[] }
+  | { type: 'chart'; kind: 'pictogram'; rows: ChartRow[]; each: number; icon: string }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string };                  // sentence with a blank "_"
 

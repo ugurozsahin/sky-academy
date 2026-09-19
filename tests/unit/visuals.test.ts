@@ -159,12 +159,12 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
       // `Visual` is public and `each` is an unconstrained number on it. Rounding used to invent the data:
       // n=7 with a key of 2 drew 4 symbols — 8 children — for a question whose answer is 7.
       const odd = [{ label: 'a', n: 7 }];
-      expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, each: 2 }), /class="pic"/g)).toEqual([7]);
-      expect(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, each: 2 })).not.toContain('class="key"');
+      expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, icon: '⭐', each: 2 }), /class="pic"/g)).toEqual([7]);
+      expect(renderVisual({ type: 'chart', kind: 'pictogram', rows: odd, icon: '⭐', each: 2 })).not.toContain('class="key"');
       // And a key of zero used to throw RangeError out of renderVisual, aborting the card before its bubbles.
       for (const each of [0, -2, 1.5]) {
-        expect(() => renderVisual({ type: 'chart', kind: 'pictogram', rows, each }), `each=${each}`).not.toThrow();
-        expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows, each }), /class="pic"/g)).toEqual([6, 4, 2]);
+        expect(() => renderVisual({ type: 'chart', kind: 'pictogram', rows, icon: '⭐', each }), `each=${each}`).not.toThrow();
+        expect(perRow(renderVisual({ type: 'chart', kind: 'pictogram', rows, icon: '⭐', each }), /class="pic"/g)).toEqual([6, 4, 2]);
       }
     } finally {
       warn.mockRestore();
@@ -251,6 +251,17 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
     expect(renderVisual(bad)).not.toContain('<script>');
   });
 
+  // #133 made `each` and `icon` required on the pictogram variant, so no generator can omit them — but the
+  // type is not the runtime, and a migrated or hand-edited blob can. The fallbacks that used to serve the
+  // optional fields are kept for exactly that, and this is what keeps them from being dead code.
+  it('a pictogram blob that lost its key and symbol still draws one symbol per child rather than throwing', () => {
+    const rows = [{ label: 'a', n: 3 }];
+    const bare = { type: 'chart', kind: 'pictogram', rows } as unknown as Parameters<typeof renderVisual>[0];
+    expect(() => renderVisual(bare)).not.toThrow();
+    expect(perRow(renderVisual(bare), /class="pic"/g)).toEqual([3]);
+    expect(renderVisual(bare)).not.toContain('class="key"');
+  });
+
   // #137 item 2: `n` is just as unconstrained on the public `Visual` type as `each` (above), and reached the
   // same way with no try/catch between the generator and here. Before this fix: n=-3 threw a RangeError out
   // of Array.from/String.repeat, n=Infinity never terminated the tally loop (Math.floor(Infinity/5) is
@@ -262,8 +273,12 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
       const bad = [-3, 0, 1.5, Infinity, -Infinity, NaN, 1e9];
       for (const kind of ['tally', 'pictogram', 'block'] as const) {
         for (const n of bad) {
-          expect(() => renderVisual({ type: 'chart', kind, rows: [{ label: 'x', n }], each: 1 }), `${kind} n=${n}`)
-            .not.toThrow();
+          const rows = [{ label: 'x', n }];
+          // Built per variant (#133): a key belongs to a pictogram only, and `{ kind: 'tally', each: 1 }` no
+          // longer compiles.
+          const v: Parameters<typeof renderVisual>[0] = kind === 'pictogram'
+            ? { type: 'chart', kind, rows, icon: '⭐', each: 1 } : { type: 'chart', kind, rows };
+          expect(() => renderVisual(v), `${kind} n=${n}`).not.toThrow();
         }
       }
       for (const n of [-3, 1.5, Infinity, -Infinity, NaN, 1e9]) {
@@ -293,11 +308,11 @@ describe('chart visuals: pictogram, tally and block diagram (#8)', () => {
   it('a key demotion leaves a trace naming the key that failed; a tally/block chart never warns about one (#137)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      renderVisual({ type: 'chart', kind: 'pictogram', rows: [{ label: 'a', n: 7 }], each: 2 });
+      renderVisual({ type: 'chart', kind: 'pictogram', rows: [{ label: 'a', n: 7 }], icon: '⭐', each: 2 });
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0][0]).toContain('2');
       warn.mockClear();
-      renderVisual({ type: 'chart', kind: 'pictogram', rows: [{ label: 'a', n: 6 }, { label: 'b', n: 4 }], each: 2 });
+      renderVisual({ type: 'chart', kind: 'pictogram', rows: [{ label: 'a', n: 6 }, { label: 'b', n: 4 }], icon: '⭐', each: 2 });
       expect(warn, 'every row divides by 2 — nothing to demote').not.toHaveBeenCalled();
       renderVisual({ type: 'chart', kind: 'tally', rows: [{ label: 'a', n: 7 }] });
       expect(warn, 'tally never reads each, so it has nothing to demote or warn about').not.toHaveBeenCalled();

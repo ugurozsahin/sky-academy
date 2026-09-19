@@ -417,9 +417,11 @@ const PICTO_SYMBOL = '⭐';
 const y2Stats: Generator = (d, rng) => {
   const survey = pick(rng, SURVEYS);
   const kind = d === 1 ? 'tally' : d === 2 ? 'pictogram' : 'block';
-  // The pictogram key is the whole of its difficulty: counts must be whole multiples of `each` or the drawing lies.
-  const each = kind === 'pictogram' ? pick(rng, [2, 5]) : 1;
-  const roll = () => survey.rows.map(() => ri(rng, 1, kind === 'block' ? 9 : 6) * each);
+  // The pictogram key is the whole of its difficulty: counts must be whole multiples of it or the drawing
+  // lies, so they are rolled in steps of the key. A tally or a block diagram has no key (#133) and counts in
+  // ones — `step` is the roll unit and nothing else; it never reaches the visual of a chart without a key.
+  const step = kind === 'pictogram' ? pick(rng, [2, 5]) : 1;
+  const roll = () => survey.rows.map(() => ri(rng, 1, kind === 'block' ? 9 : 6) * step);
   const ask = d === 1 ? 'one' : pick(rng, d === 2 ? ['one', 'total'] : ['total', 'more', 'most']);
 
   let counts = roll();
@@ -430,10 +432,12 @@ const y2Stats: Generator = (d, rng) => {
     : ask === 'more' && counts[i] === counts[j];
   for (let tries = 0; tries < 20 && degenerate(); tries++) counts = roll();
   // The terminator: a re-roll can be unlucky twenty times, so end it deterministically rather than loop on.
-  if (degenerate()) counts[ask === 'most' ? 0 : i] = Math.max(...counts) + each;
+  if (degenerate()) counts[ask === 'most' ? 0 : i] = Math.max(...counts) + step;
 
   const rows = survey.rows.map(([icon, name], k) => ({ label: `${icon} ${name}`, n: counts[k] }));
-  const visual: Question['visual'] = { type: 'chart', kind, rows, icon: PICTO_SYMBOL, each };
+  const visual: Question['visual'] = kind === 'pictogram'
+    ? { type: 'chart', kind, rows, each: step, icon: PICTO_SYMBOL }
+    : { type: 'chart', kind, rows };
   const chart = kind === 'tally' ? 'tally chart' : kind === 'pictogram' ? 'pictogram' : 'block diagram';
 
   if (ask === 'total') {

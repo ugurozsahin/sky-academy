@@ -326,19 +326,23 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
         if (v.kind === 'block') expect(row.n, 'a block row must stay short enough to fit a phone').toBeLessThanOrEqual(10);
         if (v.kind === 'tally') expect(row.n, 'a tally row must stay short enough to fit a phone').toBeLessThanOrEqual(10);
         if (v.kind === 'pictogram') {
-          expect(row.n / (v.each ?? 1), 'a pictogram row (n / each symbols drawn) must stay short enough to fit a phone')
+          expect(row.n / v.each, 'a pictogram row (n / each symbols drawn) must stay short enough to fit a phone')
             .toBeLessThanOrEqual(10);
         }
       }
-      // The pictogram symbol must not be one of the categories it is counting.
-      if (v.kind === 'pictogram') for (const row of v.rows) expect(row.label).not.toContain(v.icon);
-      // A pictogram draws n / each symbols: a count that is not a whole multiple of the key draws a lie.
-      if (v.kind === 'pictogram') for (const row of v.rows) expect(row.n % (v.each ?? 1), `${q.prompt} key=${v.each}`).toBe(0);
-      else expect(v.each ?? 1, 'only a pictogram has a key').toBe(1);
-      // #137 item 6: the generator's key set (`pick(rng, [2, 5])`) was never pinned in the unit suite — only
-      // the e2e rail (mobile-only, skipped when a diff cannot reach the game) touched it. Widening it, or
-      // collapsing it to a single value, stayed green here.
-      if (v.kind === 'pictogram') eachSeen.add(v.each!);
+      // Only a pictogram has a key or a symbol, and since #133 that is the type's invariant rather than this
+      // suite's: `v.each`/`v.icon` exist only under a `kind === 'pictogram'` narrow, so the old
+      // `else expect(v.each ?? 1).toBe(1)` — a test of the generator's workaround, not of the domain — is gone.
+      if (v.kind === 'pictogram') {
+        // The pictogram symbol must not be one of the categories it is counting.
+        for (const row of v.rows) expect(row.label).not.toContain(v.icon);
+        // A pictogram draws n / each symbols: a count that is not a whole multiple of the key draws a lie.
+        for (const row of v.rows) expect(row.n % v.each, `${q.prompt} key=${v.each}`).toBe(0);
+        // #137 item 6: the generator's key set (`pick(rng, [2, 5])`) was never pinned in the unit suite — only
+        // the e2e rail (mobile-only, skipped when a diff cannot reach the game) touched it. Widening it, or
+        // collapsing it to a single value, stayed green here.
+        eachSeen.add(v.each);
+      }
 
       const rowFor = (icon: string) => v.rows.find(x => x.label.startsWith(icon))!;
       let expected: string;
