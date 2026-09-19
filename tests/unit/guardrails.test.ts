@@ -3685,7 +3685,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // green.
   const CLAUDE_MD_BUDGET = 9_890;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003)
   const ROUTINE_PROMPT_BUDGET = 23_158;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,158: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003)
-  const REVIEWER_PROMPT_BUDGET = 9_577;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both
+  const REVIEWER_PROMPT_BUDGET = 9_575;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');

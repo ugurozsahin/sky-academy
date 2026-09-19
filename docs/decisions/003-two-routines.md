@@ -21,9 +21,9 @@ two), and the heartbeat. Three things followed from that:
 1. **Two routines.** The **developer routine** keeps `docs/ROUTINE-PROMPT.md`, the same stored bootstrap, the
    same schedule (hourly, cron `37 */1 * * *`), the heartbeat in issue #62 and all the STEP 1 health checks. It
    never reviews and never merges. The **reviewer routine** reads `docs/REVIEWER-PROMPT.md`. It never develops.
-2. **The reviewer is started by GitHub events, not a schedule**, with two triggers: a pull request that is
-   not a draft is opened, marked "Ready for review" or pushed to; and a pull request is given the label
-   `re-review`. A pull request is reviewed when it becomes ready, not when the next run comes round.
+2. **The reviewer is started by GitHub events, not a schedule**: a pull request is marked "Ready for review"
+   (or opened ready rather than as a draft), and a pull request is given the label `re-review`. A pull request
+   is reviewed when it becomes ready, not when the next run comes round.
 3. **The health checks and the heartbeat stay with the developer**, because they need a schedule: an
    event-triggered routine that never fires cannot notice that it never fired.
 4. **The review-queue alarm.** The developer's STEP 1 gains a fourth check. A pull request is *waiting* if it
@@ -67,19 +67,20 @@ Speak Turkish in any summary for the owner; code, comments and game text in Brit
 
 1. New routine; the same repository and the same environment as the developer routine; paste the bootstrap
    above as its prompt; **no schedule**.
-2. Add two triggers, each a "GitHub event" on this repository. A trigger can carry several pull-request
-   actions, but its filters apply to all of them at once, which is why it takes two (names as the form showed
-   them on 2026-09-19):
+2. Add the triggers below, each a "GitHub event" on this repository. The form takes **one** pull-request event
+   per trigger, and a routine can carry several triggers (event names as the form showed them on 2026-09-19):
 
-   | Trigger | Events to pick | Filter |
-   | --- | --- | --- |
-   | 1 — a pull request is waiting | **Ready for review**, **Opened**, **Commits pushed** | Is draft = false |
-   | 2 — a blocked pull request was fixed | **Labeled** | Labels include `re-review` |
+   | Trigger | Event to pick | Filter | |
+   | --- | --- | --- | --- |
+   | 1 | **Pull request: Ready for review** | none | required — the hand-over: the author marks the PR ready once CI is green |
+   | 2 | **Pull request: Labeled** | Labels include `re-review` | required — a fix was pushed to a blocked PR |
+   | 3 | **Pull request: Opened** | Is draft = false | optional — a PR opened ready rather than as a draft, which the agents never do |
 
-   "Ready for review" is the hand-over: the author marks the PR ready once CI is green. A blocked pull request
-   is a draft, so trigger 1 never sees a fix pushed to it; the `re-review` label is what does. Do **not** pick
-   "All pull request events" — every label, assignment and edit would start a run — and leave "Closed" out, so
-   merging a pull request starts nothing.
+   A blocked pull request is a draft and nobody undrafts to get past a block, so trigger 1 never sees a fix
+   pushed to it; the `re-review` label is what does. **"Commits pushed" is left out on purpose:** a reviewer
+   already reads the newest head and its CI run when it reviews, and a push to a blocked PR is trigger 2's, so
+   all it would add is a run for every push. Do **not** pick "All pull request events" — every label, assignment
+   and edit would start a run — and leave "Closed" out, so merging a pull request starts nothing.
 3. The Claude GitHub App must be installed on the repository, or no event arrives.
 4. The label `re-review` exists in the repository (created 2026-09-19).
 

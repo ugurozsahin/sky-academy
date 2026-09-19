@@ -4,8 +4,8 @@
 reads it (`docs/decisions/003-two-routines.md` has the bootstrap text and the trigger set-up). A run follows
 everything from "## The routine" onwards.
 
-**Trigger: GitHub events, not a schedule** — (a) a pull request that is not a draft is opened, marked "Ready
-for review", or pushed to; (b) a pull request is given the label `re-review`. Developing, the health checks and
+**Trigger: GitHub events, not a schedule** — (a) a pull request is marked "Ready for review", or opened
+ready rather than as a draft; (b) a pull request is given the label `re-review`. Developing, the health checks and
 the heartbeat are the developer routine's (`docs/ROUTINE-PROMPT.md`); none of them happens here.
 
 ## The routine
