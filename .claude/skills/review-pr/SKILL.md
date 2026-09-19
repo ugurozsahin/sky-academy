@@ -177,6 +177,9 @@ A reviewer who reaches the third round has usually already found the real answer
 to do too much. Say that instead. "Reduce this to X; the rest is issue #n" is a better review than a seventh
 shape.
 
+`docs/decisions/004-what-a-review-block-is-for.md` has the incident this came from and the four alternatives
+the owner dropped — automating the count, capping review size instead, the bar alone, the cap alone.
+
 ## Reviewing is the work
 
 There is no time box on this. A reviewer run develops nothing and has done its job when it reviews well: a

@@ -99,6 +99,26 @@ describe('agent instruction files', () => {
       'a live instruction names a file that is gone').toEqual([]);
   });
 
+  /**
+   * Records have readers (#98) — a decision record most of all. An ADR nobody points at is prose that ages
+   * out of agreement with the rule it explains, and the first sign is that a run re-argues a decision the
+   * owner already made. `.claude/rules/governance.md` carries the test for when a decision needs one at all;
+   * this holds the other half, that it is reachable from something a session actually reads.
+   *
+   * The pointer may sit in any live instruction file — usually the rule's own home: `docs/ROUTINE-PROMPT.md`
+   * points at 002, the `review-pr` skill at 002 and 004, `docs/WATCHDOG-PROMPT.md` at 005.
+   *
+   * Prove it red: add a file to `docs/decisions/` and point nothing at it.
+   */
+  it('every decision record is pointed at by a live instruction file (#98)', () => {
+    const adrs = readdirSync(join(root, 'docs/decisions')).filter((f) => f.endsWith('.md'));
+    expect(adrs.length, 'the decision records have gone missing').toBeGreaterThan(3);
+    const live = INSTRUCTION_FILES.filter((f) => !f.startsWith('docs/decisions/'));
+    const text = live.map((f) => readFileSync(join(root, f), 'utf8')).join('\n');
+    // By file name, wherever it is written — a code span, a sentence, a link.
+    expect(adrs.filter((f) => !text.includes(f)), 'a decision record nothing points at').toEqual([]);
+  });
+
   it('every skill directory is classed as ours or vendored, so a new one cannot go unread', () => {
     expect(readdirSync(join(root, '.claude/skills')).sort()).toEqual([...OWN_SKILLS, ...VENDORED_SKILLS].sort());
   });
