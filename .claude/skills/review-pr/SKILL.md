@@ -12,7 +12,9 @@ authority on the flow; where the two ever disagree, the prompt wins and this fil
 - **Never review a pull request you opened, or pushed a commit to.** The API cannot tell you whose it is —
   one token serves every agent and the owner, so every pull request here looks self-authored. You know it is
   yours because you opened it, or pushed to it, *this run*; that is the only evidence there is.
-- A pull request held only by an unanswered `owner-approval` label is not yours to unblock. Leave it.
+- A pull request held only by an unanswered `owner-approval` or `loosening` label is not yours to unblock.
+  Leave it. A reviewer may put `loosening` **on** a pull request (§5) and never takes it **off**: removing it
+  turns `review-gate` green at once, and that decision is the owner's.
 
 ## 1. Read the issue before the diff
 
@@ -100,8 +102,9 @@ incidents behind each.
 
 A pull request that touches a governance file raises one more question before a merge: **which way does it
 move the constraint?** Check its one-line direction statement against the diff. A loosening — or a declared
-tightening that you read as a loosening — is the owner's to merge, never yours; say so in a comment and leave
-it. `.claude/skills/open-pr/SKILL.md` §6 has the rule and its worked examples.
+tightening that you read as a loosening — is the owner's to merge, never yours: make sure it carries the
+`loosening` label (apply it yourself if the author did not — `review-gate` then stays red until the owner
+approves, #112), say why in a comment, and leave it. `.claude/skills/open-pr/SKILL.md` §6 has the rule and its worked examples.
 
 ## 6. Then decide, and make the decision visible
 

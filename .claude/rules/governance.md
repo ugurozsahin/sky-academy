@@ -79,7 +79,8 @@ paths:
   the ordering `docs/ROUTINE-PROMPT.md` STEP 3 and `scripts/board-sync.mjs`'s `PRIORITIES` array both use;
   `routine-ok` (the developer routine may take it); `owner-session` (changed only in a session with the owner —
   the routine never takes it); `owner-input` (needs the owner's art or decision); `owner-approval` (on a pull
-  request: holds the merge until the owner writes his marker — for a genuinely new look only); `later` (parked
+  request: holds the merge until the owner writes his marker — for a genuinely new look only); `loosening` (on
+  a governance pull request that loosens a constraint: the same hold, #112); `later` (parked
   by the owner); `blocked` (cannot move until another issue or a decision lands — it is what puts a card in
   the board's Blocked column, #87); `new-ui` (gates the `frontend-design` skill, #99); `watchdog` (opened by
   the watchdog); and the area labels `mode`, `curriculum`, `art`, `reward`, `platform`, `playtest`, `review`,

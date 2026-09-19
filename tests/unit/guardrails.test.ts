@@ -1982,6 +1982,15 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   });
 
   // The home itself. Scoped to §6, the section that owns the rule, so a copy elsewhere cannot satisfy it.
+  // #112, review of PR #283: removing the label turns `review-gate` green at once (`unlabeled` re-stamps), so
+  // this sentence is the whole difference between a gate and a suggestion.
+  it('the review-pr skill lets a reviewer put `loosening` on a pull request and never take it off (#112)', () => {
+    const skill = flat(read('.claude/skills/review-pr/SKILL.md'));
+    expect(skill).toContain('held only by an unanswered `owner-approval` or `loosening` label is not yours to unblock');
+    expect(skill, 'on, never off').toMatch(/may put `loosening` \*\*on\*\* a pull request \(§5\) and never takes it \*\*off\*\*/);
+    expect(skill, '§5 must still tell the reviewer to apply it').toContain('apply it yourself if the author did not');
+  });
+
   it('the review-pr skill carries the rule: who may supersede a block, who never may, and the phrase the gate keys on', () => {
     const skill = read('.claude/skills/review-pr/SKILL.md');
     const start = skill.indexOf('\n## 6. '), end = skill.indexOf('\n## ', start + 1);
@@ -3816,7 +3825,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // green.
   const CLAUDE_MD_BUDGET = 9_868;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them
   const ROUTINE_PROMPT_BUDGET = 21_532;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it
-  const REVIEWER_PROMPT_BUDGET = 10_072;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both
+  const REVIEWER_PROMPT_BUDGET = 10_044;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112)
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');

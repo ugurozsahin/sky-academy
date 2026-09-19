@@ -7,6 +7,7 @@ export declare const isOwnerRejected: (body: string) => boolean;
 export declare const isOwnerApproved: (body: string) => boolean;
 export declare const hasSessionUrl: (body: string) => boolean;
 export declare const isAdoptionClear: (body: string) => boolean;
+export declare const OWNER_GATES: string[];
 export declare function blockState(pr: { draft: boolean; labels?: string[]; comments: { body: string; created_at: string; author_association?: AuthorAssociation }[] }):
   { blocked: boolean; reasons: string[] };
 export declare const CLOSING_KEYWORDS: string[];
