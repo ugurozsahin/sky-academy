@@ -238,28 +238,35 @@ function runWorker(fetchImpl: (req: FakeReq | string) => Promise<FakeRes>, list:
   const listeners: Record<string, (e: FakeEvent) => void> = {};
   const named = new Map<string, Map<string, FakeRes>>();
   const matchCalls: { cache: string; url: string; opts: unknown }[] = [];
+  const fakeSelf = {
+    addEventListener: (type: string, fn: (e: FakeEvent) => void) => { listeners[type] = fn; },
+    skipWaiting: () => {},
+    clients: { claim: () => {} },
+    location: { origin: 'https://example.com' },
+  };
+  // Cache keys are absolute URLs, as in a browser: `cache.match('index.html')` resolves against the worker's
+  // own location, so a shell precached under `https://example.com/index.html` is a hit for the bare name.
+  const key = (req: FakeReq | string) => new URL(typeof req === 'string' ? req : req.url, `${fakeSelf.location.origin}/`).href;
   const caches = {
     open: async (name: string) => {
       if (!named.has(name)) named.set(name, new Map());
       const store = named.get(name)!;
       return {
         match: async (req: FakeReq | string, opts?: unknown) => {
-          const url = typeof req === 'string' ? req : req.url;
+          const url = key(req);
           matchCalls.push({ cache: name, url, opts });
           return store.get(url);
         },
-        put: async (req: FakeReq | string, res: FakeRes) => { store.set(typeof req === 'string' ? req : req.url, res); },
-        addAll: async (reqs: FakeReq[]) => { for (const req of reqs) store.set(req.url, await fetchImpl(req)); },
+        put: async (req: FakeReq | string, res: FakeRes) => { store.set(key(req), res); },
+        // Atomic, as the real `addAll` is: one failed fetch stores nothing at all.
+        addAll: async (reqs: FakeReq[]) => {
+          const fetched = await Promise.all(reqs.map(async req => [key(req), await fetchImpl(req)] as const));
+          for (const [url, res] of fetched) store.set(url, res);
+        },
       };
     },
     keys: async () => [...named.keys()],
     delete: async (name: string) => named.delete(name),
-  };
-  const fakeSelf = {
-    addEventListener: (type: string, fn: (e: FakeEvent) => void) => { listeners[type] = fn; },
-    skipWaiting: () => {},
-    clients: { claim: () => {} },
-    location: { origin: 'https://example.com' },
   };
   // A real `Request` needs an absolute URL: in a browser a relative one resolves against the worker's own
   // `self.location`, which is exactly what `install`'s `new Request(u, { cache: 'reload' })` relies on for
@@ -275,7 +282,7 @@ function runWorker(fetchImpl: (req: FakeReq | string) => Promise<FakeRes>, list:
   const context = vm.createContext({ self: fakeSelf, caches, fetch: fetchImpl, Response, Request: FakeRequest, URL });
   const template = readFileSync(new URL('../../scripts/sw-template.js', import.meta.url), 'utf8');
   vm.runInContext(renderSw(template, list, prints), context);
-  return { listeners, named, matchCalls };
+  return { listeners, named, matchCalls, caches };
 }
 
 /** Fires the `fetch` listener and returns the promises it hands to `respondWith`/`waitUntil`. */
@@ -324,7 +331,7 @@ describe("the worker's runtime handlers (#116 item 4)", () => {
     const { listeners, matchCalls } = runWorker(async () => fakeResponse());
     const { respondWith } = dispatch(listeners, req);
     await respondWith;
-    expect(matchCalls.some(c => c.url === 'index.html' && (c.opts as { ignoreVary?: boolean })?.ignoreVary === true)).toBe(true);
+    expect(matchCalls.some(c => c.url === 'https://example.com/index.html' && (c.opts as { ignoreVary?: boolean })?.ignoreVary === true)).toBe(true);
   });
 
   it('shell() resolves to Response.error() rather than rejecting, before the cache has ever been populated', async () => {
@@ -358,6 +365,95 @@ describe("the worker's runtime handlers (#116 item 4)", () => {
     resolveFetch();
     await waitUntil();
     expect(named.get('sna-fonts-v1')!.has(req.url)).toBe(true);
+  });
+});
+
+/**
+ * #116 item 5 — the two ways the worker could turn a game that would have loaded into one that does not.
+ *
+ *   - `caches.open()` rejecting (blocked site data, a corrupt store, a full disk) used to reject the promise
+ *     handed to `respondWith`, and a rejected `respondWith` is a browser error page — for a navigation the
+ *     network could have served. A storage failure must degrade to the network, never to an error.
+ *   - the precache was filled in `install` and never again. iOS Safari drops an origin's storage after about
+ *     seven days without a visit (the half-term shape for a school app), after which the game loaded online,
+ *     rebuilt nothing, and was dead the next time there was no signal — until the next deployment.
+ *
+ * Prove them red: make `open()` in `scripts/sw-template.js` rethrow, or drop the `rebuild()` call in `shell()`.
+ */
+describe('the worker degrades to the network and rebuilds an evicted precache (#116 item 5)', () => {
+  const NAV: FakeReq = { method: 'GET', mode: 'navigate', url: 'https://example.com/' };
+  const ASSET: FakeReq = { method: 'GET', mode: 'cors', url: 'https://example.com/assets/index-ABC.js' };
+  const FONT: FakeReq = { method: 'GET', mode: 'no-cors', url: 'https://fonts.gstatic.com/s/fredoka/x.woff2' };
+  const LIST = ['assets/index-ABC.js', 'index.html'];
+  const PRINTS = ['assets/index-ABC.js\x003\x00b', 'index.html\x009\x00a'];
+  const NAMED_CACHE = cacheName(PRINTS);
+  const precached = (named: Map<string, Map<string, FakeRes>>) => [...(named.get(NAMED_CACHE)?.keys() ?? [])].sort();
+
+  it('a storage failure serves the network for the shell, an asset and a font — never an error page', async () => {
+    for (const req of [NAV, ASSET, FONT]) {
+      const net = fakeResponse();
+      const { listeners, caches } = runWorker(async () => net);
+      caches.open = async () => { throw new Error('QuotaExceededError: storage is unavailable'); };
+      const { respondWith } = dispatch(listeners, req);
+      // The old shape rejected here, and a rejected respondWith() is a browser error page with the network up.
+      await expect(respondWith, `${req.mode} request with caches.open() rejecting`).resolves.toBe(net);
+    }
+  });
+
+  it('a shell miss under a controlling worker serves the network now and rebuilds the whole precache behind it', async () => {
+    const seen: FakeReq[] = [];
+    const net = fakeResponse();
+    const { listeners, named } = runWorker(async (req) => { seen.push(req as FakeReq); return net; }, LIST, PRINTS);
+    // No install ran: the cache is empty, which is what an eviction looks like to an active worker.
+    const { respondWith, waitUntil } = dispatch(listeners, NAV);
+    expect(await respondWith, 'the player gets the page from the network, without waiting for the rebuild').toBe(net);
+    expect(waitUntil(), 'the rebuild must be handed to waitUntil, or the browser may kill the worker mid-way').toBeDefined();
+    await waitUntil();
+    expect(precached(named), 'every precached file is back, not only the shell').toEqual(
+      ['https://example.com/assets/index-ABC.js', 'https://example.com/index.html']);
+    // Same rule as install: a stale HTTP-cache entry must not be stored under this deployment's name.
+    const rebuilt = seen.filter(r => r.cache !== undefined);
+    expect(rebuilt, 'the rebuild fetches each precached file once').toHaveLength(LIST.length);
+    expect(rebuilt.every(r => r.cache === 'reload')).toBe(true);
+  });
+
+  it('a shell hit rebuilds nothing — the cache is only ever refilled when it is actually gone', async () => {
+    const fetchImpl = vi.fn(async () => fakeResponse());
+    const { listeners, named } = runWorker(fetchImpl, LIST, PRINTS);
+    named.set(NAMED_CACHE, new Map([['https://example.com/index.html', fakeResponse()]]));
+    const { respondWith, waitUntil } = dispatch(listeners, NAV);
+    await respondWith;
+    expect(waitUntil(), 'no rebuild on a hit').toBeUndefined();
+    expect(fetchImpl, 'and no network at all').not.toHaveBeenCalled();
+  });
+
+  it('a rebuild that fails offline stores nothing and does not reject, and the next miss tries again', async () => {
+    let online = false;
+    const { listeners, named } = runWorker(async () => { if (!online) throw new Error('offline'); return fakeResponse(); }, LIST, PRINTS);
+    const first = dispatch(listeners, NAV);
+    expect(((await first.respondWith) as Response).type, 'no shell anywhere: Response.error(), as before').toBe('error');
+    // An unhandled rejection inside waitUntil is a console error on every offline launch after an eviction.
+    await expect(first.waitUntil()).resolves.toBeUndefined();
+    expect(precached(named), 'a failed rebuild leaves nothing half-filled behind').toEqual([]);
+    online = true;
+    const second = dispatch(listeners, NAV);
+    await second.respondWith;
+    await second.waitUntil();
+    expect(precached(named), 'the failure did not latch — the next online launch rebuilt it').toHaveLength(LIST.length);
+  });
+
+  it('two misses in flight share one rebuild rather than downloading the game twice', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const fetchImpl = vi.fn(async () => { await gate; return fakeResponse(); });
+    const { listeners, named } = runWorker(fetchImpl, LIST, PRINTS);
+    const a = dispatch(listeners, NAV);
+    const b = dispatch(listeners, NAV);
+    release();
+    await Promise.all([a.respondWith, b.respondWith, a.waitUntil(), b.waitUntil()]);
+    // Two navigations (the shell itself, once each) plus ONE precache of the two files — not two.
+    expect(fetchImpl).toHaveBeenCalledTimes(2 + LIST.length);
+    expect(precached(named)).toHaveLength(LIST.length);
   });
 });
 

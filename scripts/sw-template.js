@@ -17,13 +17,29 @@ const SHELL = 'index.html';
 const FONTS = 'sna-fonts-v1';
 const FONT_HOSTS = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
 
+/**
+ * Fills `cache` with every precached file. `reload` bypasses the HTTP cache: precaching a response the browser
+ * had already cached from the previous deployment would put a stale asset in a fresh cache under a new name,
+ * which is the one failure this whole mechanism exists to prevent. `addAll` is atomic — one failed fetch
+ * stores nothing — so a cache is either whole or empty, never a shell whose assets are missing.
+ */
+function precache(cache) {
+  return cache.addAll(PRECACHE.map(u => new Request(u, { cache: 'reload' })));
+}
+
+/**
+ * Cache Storage, or `null` when it cannot be opened (#116 item 5). Blocked site data, a corrupt store or a
+ * full disk make `caches.open()` reject, and a rejection handed to `respondWith` is a browser error page — for
+ * a game the network would have served. Every handler below takes `null` as "go to the network": a storage
+ * failure degrades to no worker at all, never to an error. `install` still uses `caches.open` directly: a
+ * worker that cannot store its precache must fail to install, so the previous one (or none) keeps control.
+ */
+async function open(name) {
+  try { return await caches.open(name); } catch { return null; }
+}
+
 self.addEventListener('install', (e) => {
-  // `reload` bypasses the HTTP cache: precaching a response the browser had already cached from the previous
-  // deployment would put a stale asset in a fresh cache under a new name, which is the one failure this
-  // whole mechanism exists to prevent.
-  e.waitUntil(caches.open(CACHE)
-    .then(c => c.addAll(PRECACHE.map(u => new Request(u, { cache: 'reload' }))))
-    .then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(precache).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -55,13 +71,35 @@ self.addEventListener('activate', (e) => {
  * Versioning already makes the refresh unnecessary: a new deployment brings a new worker, a new cache name
  * and a full precache, so a shell in a versioned cache is consistent with its own assets by construction.
  * (Raised in review of this PR.)
+ *
+ * A MISS means the browser evicted the cache (#116 item 5). A worker only handles fetches once it is active,
+ * and `install` cannot complete without the precache, so under a controlling worker the shell is either there
+ * or the whole origin's storage has been dropped — iOS Safari does that after about seven days without a
+ * visit, the half-term shape for a school app. Before this, `addAll` ran in `install` and never again: the
+ * game loaded online, rebuilt nothing, and was dead the next time there was no signal, until the next
+ * deployment. Now a miss serves the network at once and rebuilds the precache behind it, in `waitUntil` so
+ * the browser does not stop the worker mid-way.
  */
-async function shell() {
-  const cache = await caches.open(CACHE);
+async function shell(e) {
+  const cache = await open(CACHE);
+  if (!cache) return fetch(SHELL).catch(() => Response.error());
   const hit = await cache.match(SHELL, { ignoreVary: true });   // same reason as `asset()` below
   if (hit) return hit;
-  // Only before this worker has ever finished installing, or after the browser has evicted the cache.
+  e.waitUntil(rebuild(cache));
   return fetch(SHELL).catch(() => Response.error());
+}
+
+/** The one rebuild in flight, so two tabs missing the shell together do not download the game twice. */
+let rebuilding = null;
+function rebuild(cache) {
+  if (!rebuilding) {
+    // Offline as well as evicted there is nothing to rebuild from: `addAll` rejects, stores nothing (it is
+    // atomic), and the next online launch misses the shell again and tries again. Swallowed rather than
+    // surfaced because it is not awaited by anything that could act on it, and an unhandled rejection here
+    // would be a console error on every offline launch after an eviction. (#116 item 5)
+    rebuilding = precache(cache).catch(() => {}).then(() => { rebuilding = null; });
+  }
+  return rebuilding;
 }
 
 /**
@@ -75,7 +113,8 @@ async function shell() {
  * (Raised in review of this PR.)
  */
 async function font(e, req) {
-  const cache = await caches.open(FONTS);
+  const cache = await open(FONTS);
+  if (!cache) return fetch(req);
   const refresh = fetch(req)
     .then(res => (res && res.ok ? cache.put(req, res.clone()).then(() => res) : res))
     .catch(() => undefined);
@@ -92,7 +131,8 @@ async function font(e, req) {
  * would tell the app the asset arrived, which is the lie this project keeps writing rails against.
  */
 async function asset(req) {
-  const cache = await caches.open(CACHE);
+  const cache = await open(CACHE);
+  if (!cache) return fetch(req);
   // `ignoreVary` is load-bearing, not tidiness. The server sends `Vary: Origin` (vite preview does, and so
   // does most anything behind a CDN), and Vite marks the module script and the stylesheet `crossorigin`, so
   // the page requests them WITH an `Origin` header while the precache stored them with none. Without this,
@@ -113,7 +153,7 @@ async function asset(req) {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  if (req.mode === 'navigate') { e.respondWith(shell()); return; }
+  if (req.mode === 'navigate') { e.respondWith(shell(e)); return; }
   const url = new URL(req.url);
   if (FONT_HOSTS.includes(url.origin)) { e.respondWith(font(e, req)); return; }
   if (url.origin === self.location.origin) { e.respondWith(asset(req)); return; }
