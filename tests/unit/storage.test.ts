@@ -151,6 +151,14 @@ describe('save migration (#38)', () => {
     expect(stored.owned).toEqual([]);
   });
 
+  it('migrate() never rewrites a stored avatar id, even one the roster has since renamed (#113)', () => {
+    // #112 renamed the Shadow ninja's display name to Dusk but deliberately kept its id `'shadow'`, precisely
+    // so a save written before the rename still resolves to the same ninja. A migrate() that ever translated
+    // an old id to a new one on a future rename would silently reassign that player to AVATARS[0] instead
+    // (avatarById()'s fallback for an unknown id) — this pins migrate() as a pure carry-forward of the id.
+    expect(migrate({ v: 1, avatar: 'shadow' }).avatar).toBe('shadow');
+  });
+
   it('a save migrated from an old version keeps every sticker it already earned, achievement-based or not (#114)', () => {
     // A save from before #114: all 11 stickers unlocked purely from lifetime coins, no achievement stats at all.
     const stored = migrate({ v: 1, name: 'Old', coins: 900, stickers: [...STICKER_IDS] });
