@@ -269,8 +269,26 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     for (const w of [...Y1_CEW, ...Y2_CEW, 'bold', 'fold', 'sold', 'he', 'we', 'go', 'so', 'do', 'his', 'has']) expect(GAP_WORDS.has(w), w).toBe(true);
     for (const l of gapLetters('cold', 0)) expect('cgbfhst', `_old: ${l} makes a word`).not.toContain(l);
     expect(gapLetters('his', 1)).not.toContain('a');
-    // Exhaustive over both lists, every index: the pool the generators draw from is clean and still deep enough.
-    for (const w of [...Y1_CEW, ...Y2_CEW]) for (let i = 0; i < w.length; i++) {
+    // Load-bearing, not self-referential (review of PR #303): concrete gaps and the letters they may never
+    // offer, asserted against `gapLetters` itself, so a word dropped from the checked set goes red here even
+    // though the drawn-card check below (which reads the same set) would stay green. The first fourteen are the
+    // gaps the review found open on the first head; the rest are the issue's own families.
+    const NEVER: [string, number, string][] = [
+      ['they', 3, 'mn'], ['says', 0, 'dwp'], ['kind', 3, 'g'], ['gold', 2, 'o'], ['find', 3, 'e'], ['mind', 3, 'e'], ['most', 1, 'u'],
+      ['hold', 1, 'e'], ['hold', 2, 'o'], ['told', 2, 'a'], ['last', 1, 'i'], ['was', 2, 'r'], ['come', 3, 'b'], ['love', 0, 'd'],
+      ['find', 0, 'bhkmw'], ['kind', 0, 'bfhmw'], ['mind', 0, 'bfhkw'], ['full', 0, 'bdghp'], ['put', 1, 'aeio'], ['both', 0, 'm'],
+      ['pass', 0, 'blm'], ['cold', 0, 'bfghst'], ['be', 0, 'hmw'], ['go', 0, 'dnst'], ['his', 1, 'a'],
+      ['said', 2, 'n'], ['would', 2, 'r'], ['would', 3, 'n'], ['whole', 3, 's'], ['plant', 3, 'i'], ['grass', 3, 'm'], ['mind', 1, 'e'], ['break', 0, 'c'],
+    ];
+    for (const [w, i, letters] of NEVER) for (const l of letters) {
+      expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} spells a word the set must carry`).toBe(true);
+      expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
+    }
+    // And the spellings no card may show, whatever the lists know: the four reachable on the review head.
+    for (const [w, i, l] of [['where', 2, 'o'], ['pass', 1, 'i'], ['fast', 2, 'r'], ['ask', 0, 'a']] as [string, number, string][])
+      expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
+    // Exhaustive over both lists and the days, every index: the pool the generators draw from is clean and still deep enough.
+    for (const w of [...Y1_CEW, ...Y2_CEW, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) for (let i = 0; i < w.length; i++) {
       const pool = gapLetters(w, i);
       expect(pool.length, `${w} index ${i} leaves too few decoys`).toBeGreaterThanOrEqual(3);
       for (const l of pool) expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w} index ${i}: decoy ${l} makes another word`).toBe(false);

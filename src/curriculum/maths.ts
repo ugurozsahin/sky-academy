@@ -200,8 +200,10 @@ const y2Fractions: Generator = (d, rng) => {
     const shaded = num, parts = den;
     // #296: a decoy is never worth the answer — 2/4 shaded is 1/2 too ("recognise the equivalence of 2/4 and
     // 1/2", Y2 programme of study), so the child who slices 1/2 was right. Compare by value, not by spelling.
-    // `1/2` stays ahead of the spare decoy: `wordQ` keeps the first three, so the order is what puts it on the card.
-    const ds = [`${den}/${num}`, `${num}/${den + 1}`, `${den - num}/${den}`, '1/2', `${num + 1}/${den}`].filter(x => !sameFraction(x, num, den));
+    // `wordQ` keeps the first three, so the order is what reaches the card: `1/2` sits second so the natural
+    // misconception is offered on the 1/4, 1/3 and 3/4 cards; for 1/2 and 2/4 it is filtered and the spare
+    // decoy at the end takes its place.
+    const ds = [`${den}/${num}`, '1/2', `${num}/${den + 1}`, `${den - num}/${den}`, `${num + 1}/${den}`].filter(x => !sameFraction(x, num, den));
     return wordQ(rng, 'What fraction is shaded?', `${num}/${den}`, ds, { visual: { type: 'fraction', parts, shaded }, say: 'What fraction of the shape is shaded?' });
   }
   const whole = den * ri(rng, 1, d === 3 ? 6 : 3);
@@ -388,13 +390,14 @@ const y2Capacity: Generator = (d, rng) => {
 };
 /** Minimum °C between an estimate's answer and each decoy, and between decoys (#296). */
 export const TEMP_GAP = 10;
+const TEMP_STEP = TEMP_GAP * 2;   // the ladder's rung: twice the floor, so a regression of the step trips the rail
 const y2Temp: Generator = (d, rng) => {
   if (d >= 2 && rng() < 0.4) {
     const [thing, t] = pick(rng, [['ice', 0], ['a cold morning', 5], ['a warm room', 20], ['a hot bath', 40], ['a summer day', 28], ['inside a fridge', 4]] as [string, number][]);
-    // #296: an estimate has no exact answer, so a decoy 1 °C away is as true as the answer. Decoys sit in
-    // 20 °C steps from it — none is defensible (a fridge at 24 °C, a summer day at 8 °C) and none is close to
-    // another. `TEMP_GAP` is the floor a rail holds this to.
-    const ds = shuffle(rng, [t + 20, t + 40, t + 60, t - 20, t - 40, t - 60].filter(x => x >= 0 && x <= 100)).slice(0, 3).map(x => `${x}°C`);
+    // #296: an estimate has no exact answer, so a decoy 1 °C away is as true as the answer. Decoys sit on a
+    // ladder of `TEMP_STEP` (20 °C) either side of it — none is defensible (a fridge at 24 °C, a summer day at
+    // 8 °C) and none is close to another. The ladder is derived from `TEMP_GAP`, the floor the rail holds.
+    const ds = shuffle(rng, [1, 2, 3, -1, -2, -3].map(k => t + k * TEMP_STEP).filter(x => x >= 0 && x <= 100)).slice(0, 3).map(x => `${x}°C`);
     return wordQ(rng, `Temperature of ${thing}?`, `${t}°C`, ds, { say: `About what temperature is ${thing}?` });
   }
   const warmer = rng() < 0.5;
