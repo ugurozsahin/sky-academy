@@ -616,6 +616,74 @@ describe('Year 1 money recognises denominations and stays within 20 (#298 slice 
   });
 });
 
+describe('Year 1 ranges: capacity and doubles stay inside the year (#298 slice 5)', () => {
+  // Both red on `main`: `y1-capacity` d2–d3 rolled 50–500 ml, putting three-digit numbers on a Year 1 card
+  // when Year 1's numbers stop at 100; `y1-doubles` d3 rolled up to double 12 = 24, when Year 1 addition
+  // stops at 20 — and `max: 24` let the *decoys* out of the year's range too, which is the same overreach
+  // one bubble further away.
+  it('y1-capacity never shows a volume above 100 ml, at any difficulty', () => {
+    const t = TOPICS.find(x => x.id === 'y1-capacity')!; const r = rng(298 + 51);
+    let seen = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 400; i++) {
+      const q = t.gen(d, r);
+      // The values live in the hint ("red jug: 70 ml · blue cup: 40 ml") and are spoken in `say`; the options
+      // are the colours. Read every number off both, so neither half can drift out of range unnoticed.
+      const nums = `${q.hint ?? ''} ${q.say ?? ''}`.match(/\d+/g) ?? [];
+      expect(nums.length, `no volumes on the card: "${q.hint}"`).toBeGreaterThan(0);
+      for (const n of nums) expect(Number(n), `d${d} showed ${n} ml — outside Year 1's range`).toBeLessThanOrEqual(100);
+      seen += nums.length;
+    }
+    expect(seen, 'the sweep read no volumes — this rail would pass vacuously').toBeGreaterThan(2000);
+  });
+  it('y1-doubles answers and decoys stop at 20, and d3 is still harder than d2', () => {
+    const t = TOPICS.find(x => x.id === 'y1-doubles')!; const r = rng(298 + 52);
+    const lowest: Record<number, number> = {};
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      for (let i = 0; i < 400; i++) {
+        const q = t.gen(d, r);
+        const n = Number(q.prompt.match(/^Double (\d+) = \?$/)![1]);
+        expect(Number(q.answer), q.prompt).toBe(n * 2);
+        // The answer *and* every option: a 22 bubble beside a correct 20 is still a Year 2 number on a
+        // Year 1 card.
+        for (const o of q.options) {
+          expect(Number(o), `d${d} offered "${o}" for "${q.prompt}"`).toBeLessThanOrEqual(20);
+          expect(Number(o), `d${d} offered "${o}"`).toBeGreaterThanOrEqual(0);
+        }
+        lowest[d] = Math.min(lowest[d] ?? n, n);
+      }
+    }
+    // Capping d3 to 10 alone would have made it the same draw as d2. d3 keeps its stretch by starting higher,
+    // so this fails if a later change caps the range and silently flattens the two stages into one.
+    expect(lowest[3], 'd3 drew a number d2 could have drawn — the stretch stage is no longer a stretch')
+      .toBeGreaterThan(lowest[2]);
+  });
+});
+
+describe('Year 2 sentences subordinate the Year 2 way (#298 slice 5)', () => {
+  // Red on `main`, whose d3 bank carried "Although it was cold, we went out." Year 2 grammar names four
+  // subordinating conjunctions — when, if, that, because — and *although* is Year 3 and beyond.
+  const YEAR3_PLUS = ['although', 'though', 'unless', 'whereas', 'however', 'since', 'despite', 'while'];
+  it('no Year 3 subordinator reaches a card, and all four Year 2 ones are in the bank', () => {
+    const t = TOPICS.find(x => x.id === 'y2-sentence')!; const r = rng(298 + 53);
+    const sentences = new Set<string>();
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 400; i++) {
+      const q = t.gen(d, r);
+      sentences.add(q.answer);
+      // The words are also the bubbles, so check the options rather than only the sentence: a decoy pool
+      // offering `although` teaches it just as surely as an answer containing it.
+      for (const w of [...q.answer.split(' '), ...q.options]) {
+        const bare = w.toLowerCase().replace(/[.!?,]/g, '');
+        expect(YEAR3_PLUS, `"${bare}" is Year 3+ subordination, on a Year 2 card: "${q.answer}"`).not.toContain(bare);
+      }
+    }
+    expect(sentences.size, 'the sweep drew too few distinct sentences to have covered the banks').toBeGreaterThanOrEqual(30);
+    const all = [...sentences].join(' ').toLowerCase();
+    for (const c of ['when', 'if', 'that', 'because']) {
+      expect(all, `Year 2 subordinates with "${c}", and no sentence drawn uses it`).toMatch(new RegExp(`\\b${c}\\b`));
+    }
+  });
+});
+
 describe('shape tables (#35 — one source for maths.ts and memory.ts)', () => {
   it('2-D shapes carry correct side counts (circle = 0)', () => {
     const sides = Object.fromEntries(SHAPES_2D.map(([, name, n]) => [name, n]));

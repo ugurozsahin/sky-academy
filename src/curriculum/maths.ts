@@ -110,9 +110,16 @@ const y1Half: Generator = (d, rng) => {
   const ans = quarter ? n / 4 : n / 2;
   return numQ(rng, `${quarter ? 'A quarter' : 'Half'} of ${n} = ?`, ans, { min: 0, max: 20, visual: { type: 'objects', emoji: '🍪', n }, say: `What is ${quarter ? 'a quarter' : 'half'} of ${n}?` });
 };
+/**
+ * Year 1's addition stops at 20, so doubling stops at double 10 (#298 slice 5). d3 used to roll up to 12 and
+ * answer 24, with `max: 24` letting the decoys out of range as well.
+ *
+ * Capping alone would have made d3 the same draw as d2 (both 1–10), so d3 keeps its stretch by taking the
+ * *top half* of the same range — the doubles a child reaches for last — rather than a wider one.
+ */
 const y1Doubles: Generator = (d, rng) => {
-  const n = ri(rng, 1, d === 1 ? 5 : d === 2 ? 10 : 12);
-  return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 24, visual: d === 1 ? { type: 'tenframe', n, n2: n } : undefined });
+  const n = d === 1 ? ri(rng, 1, 5) : d === 2 ? ri(rng, 1, 10) : ri(rng, 6, 10);
+  return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 20, visual: d === 1 ? { type: 'tenframe', n, n2: n } : undefined });
 };
 const COINS = [1, 2, 5, 10, 20, 50, 100, 200];
 /**
@@ -409,8 +416,10 @@ const y1Length: Generator = (d, rng) => rng() < 0.5
   : measureCompare(rng, d, pick(rng, ['sunflower', 'tower', 'ladder', 'plant']), 'cm', ['taller', 'shorter', 'tallest', 'shortest'], d === 1 ? 5 : 10, d === 1 ? 20 : 60);
 const y1Mass: Generator = (d, rng) =>
   measureCompare(rng, d, pick(rng, ['bag', 'parcel', 'box', 'basket']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], d === 1 ? 5 : 20, d === 1 ? 30 : 100);
+// d2–d3 used to roll 50–500 ml, which put three-digit numbers on a Year 1 card; Year 1's numbers stop at 100
+// (#298 slice 5). Capped to match `y1Mass` beside it, which already stopped at 100.
 const y1Capacity: Generator = (d, rng) =>
-  measureCompare(rng, d, pick(rng, ['jug', 'cup', 'bottle', 'bucket']), 'ml', HOLDS, d === 1 ? 10 : 50, d === 1 ? 90 : 500, 'holds');
+  measureCompare(rng, d, pick(rng, ['jug', 'cup', 'bottle', 'bucket']), 'ml', HOLDS, d === 1 ? 10 : 50, d === 1 ? 90 : 100, 'holds');
 const y1Months: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) { const i = ri(rng, 0, 6), after = rng() < 0.5, ans = DAYS[(i + (after ? 1 : 6)) % 7]; return wordQ(rng, `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?`, ans, shuffle(rng, DAYS.filter(x => x !== ans)).slice(0, 3), { say: `Which day comes ${after ? 'after' : 'before'} ${DAYS[i]}?` }); }
