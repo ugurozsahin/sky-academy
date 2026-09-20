@@ -3,7 +3,10 @@ import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type 
 import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
 import { TOPICS, YEARS, type YearId } from './curriculum';
 import { AVATARS, VILLAIN } from './avatars';
-export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }   // hits/tries = lifetime slices (missions + Sensei training)
+// hits/tries = lifetime questions answered, one try per question whoever writes them: missions and Sensei
+// training (`session.ts`, latched by `waiting`) and a Ninja Duel's own seat (`duelAccuracy()`, latched per round
+// — #374's review found it counting slices, which this field cannot hold: `weakestTopics()` and parents.ts divide it).
+export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }
 /**
  * One earned certificate, kept as **data rather than a PNG** (#205): `certFromStored()` in `ui/certificate.ts`
  * turns it back into the `CertInfo` that `drawCertificate()` draws, so a stored certificate costs a few dozen

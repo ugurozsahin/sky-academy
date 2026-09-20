@@ -13,11 +13,33 @@ export interface DuelEvents {
   onRoundDraw: (q: Question) => void;                                  // nobody sliced the answer before the wave ended
   onMatchEnd: (r: DuelResult) => void;
 }
-export interface DuelResult { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number; rounds: number }
+/**
+ * One seat's answers in a match (#16 item 5, Sensei's half): `tries` counts the **rounds that seat answered**,
+ * at most one per round, and `hits` the rounds where its first answer was right.
+ *
+ * **One per round, not one per slice** (PR #374 review, B1). It has to be, because this feeds the same
+ * lifetime `progress[id].hits/tries` counter that missions write, which `weakestTopics()` and
+ * `src/ui/parents.ts` divide: a denominator in a different unit makes that ratio a number about nothing.
+ * A mission question contributes exactly one try however many bubbles the child cuts — `Session.hit()` guards
+ * on `waiting`, and `markCorrect()`/`markWrong()` set it *before* calling `tally()` (`src/game/session.ts`).
+ * A duel round cannot be latched the same way, because a wrong slice deliberately does not end it, and one
+ * arena stroke fires `onHit` for every bubble it crosses (`src/game/arena.ts`) — so swiping the whole wave,
+ * the cheap and obvious play when a wrong slice costs nothing, used to add a try per bubble. Ten rounds won
+ * that way read as 10/28 to a parent about a child who won ten out of ten.
+ */
+export interface DuelTally { hits: number; tries: number }
+export interface DuelResult { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number; rounds: number; tally: Record<DuelPlayer, DuelTally> }
 export interface DuelOpts { topic: Topic; difficulty: Difficulty; rng?: () => number; rounds?: number }
 
 export class Duel {
   round = 0; scoreA = 0; scoreB = 0; current: Question | null = null; roundDecided = false; ended = false;
+  /**
+   * Each seat's own answers, for Sensei (#16 item 5). Kept per seat rather than as a match total because the
+   * score is a race: see `duelAccuracy()` for why only one seat's is ever written to the save.
+   */
+  readonly tally: Record<DuelPlayer, DuelTally> = { a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } };
+  /** Seats that have already answered this round — the latch that keeps `tally` one try per seat per round. */
+  private answered: Record<DuelPlayer, boolean> = { a: false, b: false };
   readonly rounds: number;
   private rng: () => number;
   constructor(public o: DuelOpts, private ev: DuelEvents) {
@@ -26,7 +48,7 @@ export class Duel {
   start() { this.nextQuestion(); }
   private nextQuestion() {
     if (this.ended) return;
-    this.round++; this.roundDecided = false;
+    this.round++; this.roundDecided = false; this.answered.a = this.answered.b = false;
     this.current = this.o.topic.gen(this.o.difficulty, this.rng);
     // "First correct slice" has no meaning for a sequence: `answer` is the joined string, every slice would be
     // wrong and the match would drain in draws with nothing red. duelPool() keeps these out; this is the floor.
@@ -41,7 +63,18 @@ export class Duel {
    */
   hit(player: DuelPlayer, label: string): 'won' | 'wrong' | 'ignored' {
     const q = this.current; if (!q || this.roundDecided || this.ended) return 'ignored';
-    if (label !== q.answer) { this.ev.onRoundMiss(player, q, label); return 'wrong'; }
+    const right = label === q.answer;
+    // Sensei's tally takes this seat's FIRST answer of the round and nothing after it (`DuelTally` has why one
+    // per round is the only unit that may go into that field). Two consequences, both deliberate:
+    // wrong-then-right is 0/1 here, exactly as a mission scores it, so a seat can win a round the tally counts
+    // as a miss — `hits` is therefore not a second copy of the score; and a slice the round is already decided
+    // by never reaches this at all, because it is evidence about how fast the other child is, not about this one.
+    if (!this.answered[player]) {
+      this.answered[player] = true;
+      this.tally[player].tries++;
+      if (right) this.tally[player].hits++;
+    }
+    if (!right) { this.ev.onRoundMiss(player, q, label); return 'wrong'; }
     this.roundDecided = true;
     if (player === 'a') this.scoreA++; else this.scoreB++;
     this.ev.onRoundWon(player, q);
@@ -61,7 +94,10 @@ export class Duel {
     if (this.ended) return;
     this.ended = true;
     const winner: DuelPlayer | 'draw' = this.scoreA > this.scoreB ? 'a' : this.scoreB > this.scoreA ? 'b' : 'draw';
-    this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds: this.rounds });
+    // A snapshot, not the live counters: a `hit()` after the match ends returns 'ignored' and cannot move
+    // them, but the result outlives this screen's rematch and must not be a window onto a restarted tally.
+    const tally = { a: { ...this.tally.a }, b: { ...this.tally.b } };
+    this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds: this.rounds, tally });
   }
 }
 
@@ -144,6 +180,38 @@ export function duelDojoEvent(r: DuelResult, subject: Topic['subject']): DojoEve
     mathsCorrect: subject === 'maths' ? correct : 0,
     writingCorrect: subject === 'writing' ? correct : 0,
   };
+}
+
+/**
+ * What a finished match teaches Sensei about the one shared profile (#16 item 5) — the per-topic `hits`/`tries`
+ * tally `recordAccuracy()` adds to, which `weakestTopics()` ranks a child's practice by and the parents'
+ * report shows as a percentage.
+ *
+ * **Only Player 1's own slices, and nothing derived from the score.** A duel is a race, so the score is not an
+ * accuracy measurement and three tempting numbers are all wrong here:
+ * - `duelCorrect()` (what the coins and the dojo pay on) counts the rounds *the device* got right, two children
+ *   between them. Sensei's tally is a claim about one child, so a round the friend won would be recorded as the
+ *   profile child answering correctly.
+ * - `scoreA` alone is no better as a hit count while `rounds` is the try count: a round Player 1 never sliced,
+ *   because Player 2 got there first or nobody did, would be recorded as Player 1 answering *wrongly*. A round
+ *   lost on speed is not a wrong answer, and a child who knows the topic perfectly but is slower than a bigger
+ *   sibling would be ranked as their weakest topic.
+ * - A slice made after the round was already decided, or after this seat has already answered it, is dropped by
+ *   `hit()` before the tally, so this drops evidence rather than distorting the ratio: the rounds Player 1 did
+ *   not reach are not counted either way, and a round it answered counts once however many bubbles it cut.
+ *
+ * `hits` is **not** `scoreA`. A seat that answers wrongly and then slices the answer wins the round but tallies
+ * a miss, because the first answer is what a mission would have scored (`DuelTally`).
+ *
+ * **Which seat is the profile's child**: Player 1 is the bottom half, and `DUEL_HANDOVER` hands the *top* half
+ * (Player 2) to the friend, so the bottom seat is the one the save can claim. If the children swap halves the
+ * match teaches Sensei about the friend instead — the cost of one shared profile, and the reason this records
+ * one seat rather than both: Player 2's tally has no profile to go to and is deliberately thrown away.
+ *
+ * A match nobody sliced returns `{ hits: 0, tries: 0 }`, which `recordAccuracy()` already ignores.
+ */
+export function duelAccuracy(r: DuelResult): DuelTally {
+  return { ...r.tally.a };   // a copy: the duel screen puts this on `window.__sna`, and the result is a record
 }
 
 /** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
