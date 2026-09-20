@@ -16,7 +16,7 @@ import { scaled } from '../game/speed';   // #32: test-only time compression
 import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
 import { $, esc } from './dom';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
-import { promptMode, stageHTML, type Hud, type Outcome } from './hud';
+import { hintText, promptHTML, promptMode, stageHTML, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
 
 /** The TNT bubble villain modes mix into a wave: it costs a life and never counts as a wrong answer (#48). */
@@ -197,7 +197,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     if (!reveal) { els.speak.setAttribute('aria-label', SPEAK_LABEL[mode].aria); els.speak.setAttribute('title', SPEAK_LABEL[mode].title); }
     if (mode === 'peek' && !launched) return true;
     els.prompt.innerHTML = promptHTML(q, session.seqIndex, reveal);
-    els.hint.textContent = q.hint ?? (deps.tracing ? 'Trace over the dotted letters' : reveal ? 'Read, then slice the answer' : 'Tap or slice the answer');
+    els.hint.textContent = hintText(q, { reveal, tracing: deps.tracing });
     return false;
   }
 
@@ -331,13 +331,3 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
   };
 }
 
-/**
- * The question prompt: a plain question, or the sequence so far with the letters still to come as gaps.
- * `reveal` (#65, a device with no voice) shows the letters still to come as well — the word to copy AND the
- * place in it, which are two different things a child needs — and prints the `listen` text for a plain question.
- */
-function promptHTML(q: Question, done: number, reveal = false) {
-  if (!q.sequence) return esc(reveal && q.listen ? q.listen : q.prompt);
-  const items = q.sequence.map((l, i) => `<span class="${i < done ? 'got' : 'todo'}">${i < done || reveal ? esc(l) : '_'}</span>`);
-  return `<span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
-}

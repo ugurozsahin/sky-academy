@@ -913,3 +913,68 @@ describe('bubbles collide in the running arena, not just in the pure function (#
     }
   });
 });
+
+// #16 review (PR #295): `pointerup`/`pointercancel` are window listeners, so with two arenas on one page every
+// finger lift reached both, and `onUp` ignored `pointerId` — Player 2's tap flipped Player 1's `pointerDown`
+// off mid-swipe and the rest of that stroke hit nothing. A lift by another pointer must leave a stroke alone.
+describe('a pointer that did not go down on this canvas cannot end its stroke (#16)', () => {
+  function frozenWave(s: Sim) {
+    s.spawn({ labels: ['1', '2', '3', '4'], speed: 1 });
+    advanceUntil(s, () => s.live().length === 4, 'the wave never fully launched');
+    for (const b of s.arena.bubbles) { b.vx = 0; b.vy = 0; b.g = 0; b.y = s.arena.H * 0.5; }   // hold still so a swipe can cross a known spot
+    s.frame();
+    return s.live();
+  }
+  it('another pointer\'s lift leaves the stroke alive: the swipe still slices', () => {
+    sim = createSim({ seed: 7 });
+    const [b] = frozenWave(sim);
+    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 1 });      // Player 1 starts a swipe in an empty corner
+    sim.pointer('pointerup', { x: 300, y: 300, pointerId: 2 });     // Player 2 taps and lifts in the other arena
+    sim.pointer('pointermove', { x: b.x - b.r - 20, y: b.y, pointerId: 1 });
+    sim.pointer('pointermove', { x: b.x + b.r + 20, y: b.y, pointerId: 1 });   // the segment crosses the bubble
+    expect(sim.take('hits'), 'the swipe crossed a bubble after the foreign lift').toEqual([{ label: b.label, viaSwipe: true }]);
+  });
+  it('a second finger down on the same canvas takes the stroke over; the first finger\'s move slices nothing', () => {
+    // PR #295 review, round 2: `onDown` re-seats the trail at the second finger, and `onMove` used to accept the
+    // first finger's next move from there — a segment neither finger drew, awarded as a slice.
+    sim = createSim({ seed: 7 });
+    const live = frozenWave(sim); const b = live.reduce((r, x) => (x.x > r.x ? x : r), live[0]);   // the rightmost bubble
+    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 1 });
+    sim.pointer('pointerdown', { x: b.x, y: b.y + b.r + 30, pointerId: 2 });     // rests just below it: no tap hit
+    expect(sim.take('hits'), 'the resting finger touched nothing').toEqual([]);
+    sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 1 });     // finger 1 is now the foreign one
+    expect(sim.take('hits'), 'a segment neither finger drew must not slice').toEqual([]);
+    sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 2 });     // the finger that owns the stroke does
+    expect(sim.take('hits')).toEqual([{ label: b.label, viaSwipe: true }]);
+    // The older finger lifting changes nothing for the owner: the takeover is complete, not shared.
+    const [c] = sim.live();
+    sim.pointer('pointerup', { x: 5, y: 5, pointerId: 1 });
+    sim.pointer('pointermove', { x: c.x, y: c.y - c.r - 30, pointerId: 2 });   // along the clear lane above the row
+    sim.take('hits');
+    sim.pointer('pointermove', { x: c.x, y: c.y + c.r + 20, pointerId: 2 });   // straight down through c alone
+    expect(sim.take('hits'), 'the owning finger keeps slicing after the older one lifts').toEqual([{ label: c.label, viaSwipe: true }]);
+  });
+  it('pointercancel follows the same rule: a foreign one is ignored, the stroke\'s own one ends it', () => {
+    sim = createSim({ seed: 7 });
+    const [b] = frozenWave(sim);
+    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 1 });
+    sim.pointer('pointercancel', { x: 5, y: 5, pointerId: 2 });
+    sim.pointer('pointermove', { x: b.x - b.r - 20, y: b.y, pointerId: 1 });
+    sim.pointer('pointermove', { x: b.x + b.r + 20, y: b.y, pointerId: 1 });
+    expect(sim.take('hits'), 'still sliced after the foreign cancel').toEqual([{ label: b.label, viaSwipe: true }]);
+    sim.pointer('pointercancel', { x: 5, y: 5, pointerId: 1 });
+    const [c] = sim.live();
+    sim.pointer('pointermove', { x: c.x - c.r - 20, y: c.y, pointerId: 1 });
+    sim.pointer('pointermove', { x: c.x + c.r + 20, y: c.y, pointerId: 1 });
+    expect(sim.take('hits'), 'nothing after its own cancel').toEqual([]);
+  });
+  it('the same pointer\'s lift still ends it: nothing is sliced afterwards', () => {
+    sim = createSim({ seed: 7 });
+    const [b] = frozenWave(sim);
+    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 1 });
+    sim.pointer('pointerup', { x: 5, y: 5, pointerId: 1 });
+    sim.pointer('pointermove', { x: b.x - b.r - 20, y: b.y, pointerId: 1 });
+    sim.pointer('pointermove', { x: b.x + b.r + 20, y: b.y, pointerId: 1 });
+    expect(sim.take('hits')).toEqual([]);
+  });
+});

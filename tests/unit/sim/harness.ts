@@ -155,6 +155,11 @@ export interface Sim {
   all(): Bubble[];
   /** Listeners still attached, across the canvas and the window; 0 after `destroy()`. */
   listeners(): number;
+  /**
+   * Deliver one pointer event the way a browser would (#16 review): `pointerdown`/`pointermove` to the canvas,
+   * `pointerup`/`pointercancel` to the window — the split `Arena` registers. Coordinates are canvas CSS px.
+   */
+  pointer(type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel', e: { x: number; y: number; pointerId: number }): void;
   /** True once `destroy()` has run. `destroy()` is idempotent, so a tracked sim may also tear itself down. */
   readonly destroyed: boolean;
   destroy(): void;
@@ -268,6 +273,10 @@ export function createSim(opts: SimOpts = {}): Sim {
     all: () => arena.bubbles,
     // Both halves: Arena splits its five listeners across the canvas and the window.
     listeners: () => canvas.listenerCount() + win.listenerCount(),
+    pointer(type, e) {
+      const ev = { clientX: e.x, clientY: e.y, pointerId: e.pointerId };
+      (type === 'pointerdown' || type === 'pointermove' ? canvas : win).dispatch(type, ev);
+    },
     get destroyed() { return destroyed; },
     destroy() {
       // Idempotent: a scenario that tears its own sim down AND is tracked by `afterEach` would otherwise
