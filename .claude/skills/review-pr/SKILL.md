@@ -177,8 +177,10 @@ A reviewer who reaches the third round has usually already found the real answer
 to do too much. Say that instead. "Reduce this to X; the rest is issue #n" is a better review than a seventh
 shape.
 
-`docs/decisions/004-what-a-review-block-is-for.md` has the incident this came from and the four alternatives
-the owner dropped — automating the count, capping review size instead, the bar alone, the cap alone.
+`docs/decisions/004-what-a-review-block-is-for.md` has the incident this came from and the five alternatives
+weighed against it: automating the count, the bar with no cap, the cap with no bar and doing nothing were all
+rejected; capping the *size* of a review instead of the number of rounds was **deferred, not rejected**, and is
+the one to raise again if cost per round is still the problem.
 
 ## Reviewing is the work
 

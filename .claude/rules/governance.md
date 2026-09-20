@@ -68,7 +68,12 @@ paths:
   what is pinned; neither survives as the answer to "why this and not that". Written after 2026-09-19, when
   two decisions of exactly that kind were recorded only in pull request bodies: the review-block bar and round
   cap (#305/PR #306), now `docs/decisions/004-what-a-review-block-is-for.md`, and the run pulse (#314/PR #315),
-  whose record lands with that pull request.
+  now `docs/decisions/005-the-run-pulse-says-when-a-run-started.md`. **The number is claimed by the pull
+  request, and nothing reserves it**: those two were written concurrently and each picked its own number
+  without seeing the other. Take the next free number at the moment you write the file, and if an open pull
+  request has already claimed it, renumber yours rather than the other way round — a merged record's number is
+  the one pointers are written against. Every record is pointed at by a live instruction file, which
+  `tests/unit/instructions.test.ts` checks (#98).
 - A PR touching a governance file states in one line whether it **tightens** the constraints on a run (a check,
   a rail, a rule, or describing behaviour that already exists — ordinary work) or **loosens** them (a
   constraint removed, a budget raised, a gate that no longer gates — owner-gated, never routine-merged). See
