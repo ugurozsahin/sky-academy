@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Duel, DUEL_ROUNDS } from '../../src/game/duel';
 import { topicById } from '../../src/curriculum';
+import { hintText, promptHTML, promptMode } from '../../src/ui/hud';
+import { esc } from '../../src/ui/dom';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onRoundWon: vi.fn(), onRoundMiss: vi.fn(), onRoundDraw: vi.fn(), onMatchEnd: vi.fn() });
@@ -152,5 +154,49 @@ describe('Duel refuses a sequence question (#16: the pool is the filter, this is
     const seqTopic = { ...topic, id: 'fake-seq', gen: () => ({ ...topic.gen(1, rng(1)), sequence: ['a', 'b'], answer: 'ab' }) };
     const d = new Duel({ topic: seqTopic, difficulty: 1, rng: rng(1) }, events());
     expect(() => d.start()).toThrow(/sequence question/);
+  });
+});
+
+/**
+ * #16 review (the 18:33Z block): the duel card showed `prompt` and `visual` only. Five of the pool's topics —
+ * the `measureCompare()` comparisons — put the values being compared in `hint` and nowhere else, so those
+ * rounds read "Which is fuller?" over two coloured bubbles with nothing on screen to decide by; and the
+ * `listen` topics (Sound Hunt) had no read fallback on a silent device. These pin the two card writers the
+ * screen now goes through (`src/ui/duel.ts` `onQuestion`) over the whole pool, not one sampled round.
+ */
+describe('the duel card carries every question it can draw (#16 review, #65)', () => {
+  const DRAWS = 200;
+  /** Every question the pool can put on the card, for each year at the difficulty a duel is played at. */
+  const drawPool = () => YEARS.flatMap(y => {
+    const difficulty = y.diffs[0] ?? 1;
+    return duelPool(topicsFor(y.id), difficulty).flatMap(t =>
+      Array.from({ length: DRAWS }, (_, i) => ({ topic: t, q: t.gen(difficulty, rng(i + 1)) })));
+  });
+
+  it('a question whose deciding data lives in `hint` shows that hint, not a generic instruction', () => {
+    const hintOnly = drawPool().filter(({ q }) => q.hint && !q.visual);
+    // Not a vacuous pass: the class of question this review is about has to still exist in the pool.
+    expect(new Set(hintOnly.map(x => x.topic.id)).size).toBeGreaterThan(0);
+    for (const { topic: t, q } of hintOnly) {
+      expect(hintText(q, { reveal: false }), `${t.id}: ${q.prompt}`).toBe(q.hint);
+      expect(hintText(q, { reveal: true }), `${t.id}: ${q.prompt}`).toBe(q.hint);
+    }
+  });
+
+  it('every card shows a line under the prompt, so the strip never renders an empty hint', () => {
+    for (const { topic: t, q } of drawPool()) {
+      expect(hintText(q, { reveal: false }), `${t.id}: ${q.prompt}`).not.toBe('');
+    }
+  });
+
+  it('a `listen` question shows its words when the device cannot be heard', () => {
+    const listens = drawPool().filter(({ q }) => q.listen);
+    expect(new Set(listens.map(x => x.topic.id)).size).toBeGreaterThan(0);   // Sound Hunt is in the pool
+    for (const { topic: t, q } of listens) {
+      expect(promptMode(q, false), `${t.id}`).not.toBe('hear');
+      expect(promptHTML(q, 0, true), `${t.id}: ${q.prompt}`).toContain(esc(q.listen!));
+      expect(promptMode(q, true), `${t.id}`).toBe('hear');            // with a voice the ordinary prompt is enough
+      expect(promptHTML(q, 0, false), `${t.id}`).toBe(esc(q.prompt));
+    }
   });
 });

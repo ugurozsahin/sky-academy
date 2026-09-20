@@ -105,6 +105,36 @@ test.describe('Ninja Duel', () => {
     expect(leaked).toEqual({ advanced: [0, 0], sna: 'undefined' });
   });
 
+  test('the card carries the line the round is decided by, every round (#65, PR #295 review)', async ({ page }) => {
+    await startDuel(page);
+    // The pool's comparison topics (length, mass, capacity, temperature) put the values being compared in
+    // `q.hint` and nowhere else on the card, so a card without this line is ten rounds of "Which is fuller?"
+    // over two coloured bubbles. Read the DOM and the state in ONE evaluate: a round can end between two.
+    for (let r = 1; r <= 3; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r && !!window.__sna.state().prompt, r);
+      const seen = await page.evaluate(() => {
+        const el = document.querySelector('#hint') as HTMLElement;
+        return { hint: window.__sna.state().hint, own: window.__sna.duel.current?.hint ?? null, dom: el.textContent, shown: el.getBoundingClientRect().height };
+      });
+      expect(seen.dom, `round ${r}: the card shows the line the screen says it is showing`).toBe(seen.hint);
+      expect(seen.hint, `round ${r}: no round leaves the strip's hint line empty`).not.toBe('');
+      expect(seen.shown, `round ${r}: the line is laid out, not collapsed to nothing`).toBeGreaterThan(0);
+      if (seen.own) expect(seen.dom, `round ${r}: the question's own hint, not a generic instruction`).toBe(seen.own);
+      if (r < 3) await winRound(page, 'a');
+    }
+    // A phone turned sideways lands in the `max-height: 640px` band, where the shared `.hint` rule is
+    // `display: none` to buy the play screen room. The duel card cannot take that: the line IS the question
+    // there. Pinned in both projects, because neither project's own viewport is in the band.
+    await page.setViewportSize({ width: 844, height: 390 });
+    const landscape = await page.evaluate(() => {
+      const el = document.querySelector('#hint') as HTMLElement;
+      return { h: el.getBoundingClientRect().height, dom: el.textContent, display: getComputedStyle(el).display };
+    });
+    expect(landscape.display, 'the duel hint survives the short-screen rule').not.toBe('none');
+    expect(landscape.h, 'a landscape phone still shows the line the round is decided by').toBeGreaterThan(0);
+    expect(landscape.dom).not.toBe('');
+  });
+
   test('a duel is played on a bubble topic of the island, a round nobody slices is a draw, and pause holds both arenas', async ({ page }) => {
     await startDuel(page);
     const topic = await page.evaluate(() => ({ id: window.__sna.state().topic, input: window.__sna.duel.o.topic.input, sequence: window.__sna.duel.current?.sequence }));

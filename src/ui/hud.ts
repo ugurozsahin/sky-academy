@@ -52,6 +52,33 @@ export function promptMode(q: Pick<Question, 'listen' | 'peek'>, audible: boolea
 }
 
 /**
+ * The question prompt: a plain question, or the sequence so far with the letters still to come as gaps.
+ * `reveal` (#65, a device with no voice) shows the letters still to come as well — the word to copy AND the
+ * place in it, which are two different things a child needs — and prints the `listen` text for a plain question.
+ *
+ * It lives here beside `promptMode` (#16 review) because the duel card renders the same question the play
+ * screen does: two copies would let one screen drift into showing a question the other hides.
+ */
+export function promptHTML(q: Question, done: number, reveal = false): string {
+  if (!q.sequence) return esc(reveal && q.listen ? q.listen : q.prompt);
+  const items = q.sequence.map((l, i) => `<span class="${i < done ? 'got' : 'todo'}">${i < done || reveal ? esc(l) : '_'}</span>`);
+  return `<span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
+}
+
+/**
+ * The small line under the prompt (#16 review). It is the question's own `hint` whenever it has one — for five
+ * of the duel pool's topics (`measureCompare()`: length, mass, capacity, temperature) the values being compared
+ * live in `hint` and nowhere else on the card, so a card without this line asks "Which is fuller?" over two
+ * coloured bubbles and cannot be answered without read-aloud (#65). Only when there is no hint does it fall
+ * back to telling the child what to do.
+ */
+export function hintText(q: Pick<Question, 'hint'>, o: { reveal: boolean; tracing?: boolean }): string {
+  if (q.hint) return q.hint;
+  if (o.tracing) return 'Trace over the dotted letters';
+  return o.reveal ? 'Read, then slice the answer' : 'Tap or slice the answer';
+}
+
+/**
  * HUD writers bound to the play screen's elements. `audible()` — read-aloud on AND the device can be heard
  * (#65) — is read fresh on every reveal so the toggle and the voice verdict take effect at once (Sound Hunt
  * without a voice keeps its listen words).

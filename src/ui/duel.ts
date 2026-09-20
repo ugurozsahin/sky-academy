@@ -9,8 +9,9 @@ import { Arena, type Bubble } from '../game/arena';
 import { Duel, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
 import { load } from '../storage';
-import { haptic, say, sfx } from '../audio';
+import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
+import { hintText, promptHTML, promptMode } from './hud';
 import { screenScope } from './screen';
 import { pauseHTML } from './overlays';
 import { waveOptsFor } from './play-session';
@@ -42,6 +43,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <span class="pill" id="round"></span>
         <div class="prompt" id="prompt"></div>
         <div class="vis-wrap" id="vis"></div>
+        <div class="hint" id="hint"></div>
       </div>
       <button class="icon-btn" id="speak" aria-label="Read the question aloud">🔊</button>
     </div>
@@ -54,15 +56,24 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   </section>`, 'bg-play');
 
   const scope = screenScope(); const { later, toast } = scope;
-  const overlay = $('#overlay'); const prompt = $('#prompt');
+  const overlay = $('#overlay'); const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
   let waveId = 0; let holdOpen = false;
+  /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
+  let hintLine = '';
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
 
   const duel = new Duel({ topic, difficulty }, {
     onQuestion(q, info) {
       $('#round').textContent = `Round ${info.round} of ${info.total}`;
-      prompt.innerHTML = esc(q.prompt); $('#vis').innerHTML = renderVisual(q.visual);
+      // #65 through the play screen's own writers (#16 review): a `listen` question (Sound Hunt is in the pool)
+      // shows its words on a device that cannot be heard, and the hint line carries the data five of the pool's
+      // comparison topics keep nowhere else — without it "Which is fuller?" is two coloured bubbles and a guess.
+      // A duel has no peek timing, so a peek question reads through here rather than hiding its text.
+      const reveal = promptMode(q, canHear()) !== 'hear';
+      speak.hidden = reveal;
+      prompt.innerHTML = promptHTML(q, 0, reveal); $('#vis').innerHTML = renderVisual(q.visual);
+      hintLine = hintText(q, { reveal }); hintEl.textContent = hintLine;
       const myWave = ++waveId; waveDone.a = waveDone.b = false;
       const speed = o.year.speeds[0] ?? 2;
       const opts = waveOptsFor(q, { labels: q.options, speed }, 0);
@@ -152,6 +163,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     state: () => ({
       mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
+      hint: hintLine,
     }),
     setSpeed: k => { setGameSpeed(k); },
     timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),

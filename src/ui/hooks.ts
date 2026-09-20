@@ -86,6 +86,8 @@ export interface DuelState {
   ended: boolean;
   prompt: string | undefined;
   answer: string | undefined;
+  /** The line the card shows under the prompt — the question's own `hint` when it has one (#16 review). */
+  hint: string;
   topic: string;
 }
 
