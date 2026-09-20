@@ -49,6 +49,30 @@ paths:
   actually finish) have no such enforcement yet — nothing stops a run from taking an ineligible second item,
   only from failing to say so. Their home is `docs/ROUTINE-PROMPT.md` STEP 3; `CLAUDE.md` points there. `docs/ROUTINE-PROMPT.md` carries a pointer here for the
   recording obligation instead of restating it.
+- **A run that develops anything other than the issue its query named says so, and says which documented way
+  past the order it used (#338).** STEP 3's query is meant to be mechanical: two runs reading the same repo
+  state pick the same issue. On 2026-09-20 a run developed #20 while the query named #18, and the only bridge
+  between the query and the pick was the run's own comment reasoning that #18 was parked on the owner — which
+  `CLAUDE.md` does not accept as evidence, `owner-input` being the label that would have said it mechanically.
+  **No rule needed relaxing: STEP 3 already forbade it.** What was missing was a record — nothing obliged the
+  run to say it had departed from the query at all, which is why it took a watchdog run reconstructing the
+  query at a past moment to notice. So the obligation is symmetrical with `- second item:` above, and for the
+  same reason: the pull request body names the issue the query returned and which of the three documented ways
+  it took (a `playtest` label or an unplayable game, the owner's own words on the issue, an open `watchdog`
+  issue), and the heartbeat carries a `- query top pick: ` line saying the same. Enforced in code for the
+  heartbeat half only: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to issue
+  #62 whose body has no such line. What the hook cannot catch, the same gap `- second item:` has: it reads
+  that the line is *there*, never that the issue named is the one the query would return or that the way past
+  the order was really available — both are the reviewer's, against the query re-run on the current state. The
+  pull request half has no enforcement at all; a rail would have to re-run the query from CI, which would make
+  the build depend on live issue state. **And the hook matches `mcp__github__*` only**, while STEP 1 steers
+  authored bodies to the REST API (#207), so it is enforced on the path the prompt steers away from — the
+  same bypass `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` records for `- second item:`.
+  Two further gaps, true of both lines: **`method: 'create'` is exempt**, and STEP 5 permits a create for a
+  heartbeat that does not exist, so the one write that establishes a fresh pulse escapes every body rule;
+  and **the STEP 1 sentinel satisfies the rule forever** — nothing obliges STEP 5 to replace `pending` with
+  a real value, and the watchdog greps for `IN PROGRESS`, never for these lines. Both are the reviewer's to
+  catch until something pins them (#353). Their home is `docs/ROUTINE-PROMPT.md` STEP 3.
 - **The routine heartbeat (issue #62) must be overwritten each run, never appended to (records have readers,
   #98).** Enforced in code: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to
   issue #62 whose body carries two or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — the

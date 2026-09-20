@@ -24,8 +24,12 @@ export const ownerMarker = ({ body }) => {
 
 const updatesHeartbeat = ({ method, issue_number }) => method === 'update' && Number(issue_number) === ROUTINE_HEARTBEAT;
 
-export const secondItem = (input) => updatesHeartbeat(input) && !/(^|\n)- second item: /.test(input.body ?? '')
+export const secondItem = (input) => updatesHeartbeat(input) && !/(^|\n)- second item: *\S/.test(input.body ?? '')
   ? 'The routine heartbeat (issue #62) must carry a - second item: line naming whether a second item was taken and, if not, which of the four #97 conditions failed. This update body is missing it.'
+  : null;
+
+export const queryTopPick = (input) => updatesHeartbeat(input) && !/(^|\n)- query top pick: *\S/.test(input.body ?? '')
+  ? 'The routine heartbeat (issue #62) must carry a - query top pick: line naming the issue STEP 3\'s query returned and, when the run developed a different one, which of the three documented ways past the order it used (#338). This update body is missing it.'
   : null;
 
 const SUMMARY_LINE = /(^|\n)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?Z — /g;
@@ -39,7 +43,7 @@ export const frozenLabel = ({ labels }) => Array.isArray(labels) && labels.inclu
   : null;
 
 export const check = (input) =>
-  ownerMarker(input) ?? secondItem(input) ?? frozenLabel(input) ?? heartbeatAppend(input);
+  ownerMarker(input) ?? secondItem(input) ?? queryTopPick(input) ?? frozenLabel(input) ?? heartbeatAppend(input);
 
 if (isMain(import.meta.url)) {
   const reason = check(await readInput());

@@ -11,7 +11,7 @@ import { commands, parse } from '../../.claude/hooks/shell.mjs';
 // @ts-expect-error — plain ESM hook script
 import { check as writeCheck, claudeDir, OWNER_MARKER } from '../../.claude/hooks/write-guard.mjs';
 // @ts-expect-error — plain ESM hook script
-import { frozenLabel, heartbeatAppend, ownerMarker, secondItem } from '../../.claude/hooks/github-write-guard.mjs';
+import { check as githubCheck, frozenLabel, heartbeatAppend, ownerMarker, queryTopPick, secondItem } from '../../.claude/hooks/github-write-guard.mjs';
 
 /**
  * The layer-0 hooks (#101): `.claude/settings.json` runs one script per tool family before the tool call,
@@ -31,6 +31,7 @@ const isDeny = (result: unknown) => (result as any)?.hookSpecificOutput?.permiss
 const runHook = (check: Check<string>, command: string) => asDeny(check(command));
 const runBodyHook = (check: Check<{ body: string }>, body: string) => asDeny(check({ body }));
 const runIssueWriteHook = (input: Record<string, unknown>) => asDeny(secondItem(input));
+const runTopPickHook = (input: Record<string, unknown>) => asDeny(queryTopPick(input));
 const runLabelsHook = (input: Record<string, unknown>) => asDeny(frozenLabel(input));
 const runAppendHook = (input: Record<string, unknown>) => asDeny(heartbeatAppend(input));
 
@@ -448,6 +449,103 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'we discussed the second item rule casually but never wrote the line' }))).toBe(true);
   });
 
+  // #338: the same shape as the second-item rule above, and for the same reason. STEP 3's query is meant to
+  // be mechanical, so a run that develops a different issue has to say which one the query named and which of
+  // the three documented ways past the order it used — a run developed #20 while the query named #18, and
+  // nothing obliged it to record the departure, so only a watchdog reconstructing the query found it. What
+  // this cannot check is the same gap: that the line is there, never that the issue named is the right one.
+  it('#338 query-top-pick hook: denies an update to #62 whose body has no `- query top pick:` line', () => {
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: '2026-09-20T00:00Z — did stuff\n- second item: no\n- main: green' }))).toBe(true);
+  });
+
+  it('#338 query-top-pick hook: allows a body carrying the line, taken or departed from', () => {
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'stuff\n- query top pick: #298 (P1) — taken\n- main: green' }))).toBe(false);
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: '- query top pick: #298 — not taken; watchdog issue #338 came first' }))).toBe(false);
+  });
+
+  it('#338 query-top-pick hook: scopes to #62 and to `update`, like its sibling', () => {
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 61, body: 'the watchdog pulse never develops' }))).toBe(false);
+    expect(isDeny(runTopPickHook({ method: 'create', issue_number: 62, body: 'a brand new issue body, no line' }))).toBe(false);
+  });
+
+  it('#338 query-top-pick hook: prose about the query, not the line itself, still denies', () => {
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'the query top pick was #298 but I never wrote it as a line' }))).toBe(true);
+  });
+
+  // Round-1 review of PR #341: the deny message is the whole interface a blocked run sees, and this rule was
+  // written by copying its sibling — so the likeliest real mutation is that it inherits the sibling's text. A
+  // run obeying the wrong message would add a second `- second item:` line and be denied forever.
+  it('#338 query-top-pick hook: says which line is missing, in its own words', () => {
+    const reason = queryTopPick({ method: 'update', issue_number: 62, body: 'no lines here' }) as string;
+    expect(reason, 'it must name its own line').toContain('- query top pick: ');
+    expect(reason, 'and not send the run to add the sibling instead').not.toContain('- second item: ');
+    expect(reason, 'and say what the line is for').toMatch(/STEP 3's query|documented ways past/);
+  });
+
+  // The trailing space in the pattern is load-bearing: without it a bare heading with no value passes, and
+  // the field means nothing in exactly the run that most needs a record (PR #341 review).
+  it('#338 query-top-pick hook: the line must carry a value, not just the heading', () => {
+    // Round 2: the first version of this pin read `- query top pick: ` and stopped, so the empty-valued line
+    // — one keystroke from the shape the test is named for, and the shape a half-written stamp produces —
+    // was accepted. `: *\S` is what makes the claim true. The same hole was in `- second item:`, below.
+    for (const body of ['x\n- query top pick:', 'x\n- query top pick: ', 'x\n- query top pick:   ',
+                        'x\n- query top pick: \n- second item: no', 'x\n- query top pick:\n- second item: no'])
+      expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body })), body).toBe(true);
+    // STEP 4's defined value for a run that found nothing eligible — the case the heading-only form came from.
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'x\n- query top pick: none eligible' }))).toBe(false);
+  });
+
+  // Round 2: the line anchor was unpinned — dropping `(^|\n)` left every case green, because the only prose
+  // case had no colon in it. A record is a line a reader can find, not a phrase buried in a sentence.
+  it('#338/#97: the line must start a line, not sit mid-sentence', () => {
+    // Each rule is put alone against its own case: through the combined `check`, the *other* rule denies
+    // first and the assertion passes whatever the anchor does — which is how the first version was vacuous.
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62,
+      body: 'we recorded - query top pick: #298 inline\n- second item: no' }))).toBe(true);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62,
+      body: 'note that - second item: no applies\n- query top pick: #298 — taken' }))).toBe(true);
+  });
+
+  // The same two holes were in `- second item:` from the start (#239). Closed here rather than deferred:
+  // it is one character in the same expression, and the reviewer offered either.
+  it('#97 second-item hook: the line must carry a value and start a line', () => {
+    const withPick = '\n- query top pick: #298 — taken';
+    for (const body of ['x\n- second item:' + withPick, 'x\n- second item: ' + withPick,
+                        'x we took - second item: no' + withPick])
+      expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body })), body).toBe(true);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'x\n- second item: no' + withPick }))).toBe(false);
+  });
+
+  /**
+   * The blocking finding of PR #341's round-1 review: a second mandatory line was added to the #62 hook and
+   * STEP 1's stamp sentence was not extended, so the first heartbeat write of every run was refused and the
+   * #314 pulse never landed — leaving a stopped run and a run that was never launched indistinguishable to
+   * the watchdog, which is the one thing the stamp exists to tell apart.
+   *
+   * Fed from `docs/ROUTINE-PROMPT.md` itself rather than from a body written here, so the rail fails when
+   * either side drifts: the prompt that prescribes the stamp, or the hook that judges it.
+   */
+  it('the stamp docs/ROUTINE-PROMPT.md prescribes is one the #62 hook accepts (#341 review)', () => {
+    const prompt = readFileSync(join(root, 'docs/ROUTINE-PROMPT.md'), 'utf8');
+    const sentence = prompt.split('\n').find((l) => l.includes('stamp the pulse')) ?? '';
+    expect(sentence, 'STEP 1 must still prescribe a stamp, or this rail reads nothing').toContain('IN PROGRESS');
+    // Every `- key: value` the stamp sentence names, reassembled into the body a run would actually send.
+    const lines = [...sentence.matchAll(/`(- [a-z][a-z ]*: [^`]+)`/g)].map((m) => m[1]);
+    expect(lines.length, 'the stamp names no placeholder lines — the hook rules are then unmet').toBeGreaterThan(1);
+    const body = `2026-09-20T09:00Z — IN PROGRESS: reviewing #341\n${lines.join('\n')}`;
+    expect(githubCheck({ method: 'update', issue_number: 62, body }),
+      `STEP 1's stamp is refused by the hook, so the pulse never lands: ${body}`).toBeNull();
+  });
+
+  // Both heartbeat rules are reachable through the exported `check`, in either order of omission — a rule
+  // that is written but not wired into `check` denies nothing, and `.claude/settings.json` calls only `check`.
+  it('#338/#97: `check` denies a heartbeat body missing either line, and allows one carrying both', () => {
+    const withBoth = '2026-09-20T00:00Z — x\n- query top pick: #298 — taken\n- second item: no — condition 2 failed';
+    expect(isDeny(asDeny(githubCheck({ method: 'update', issue_number: 62, body: withBoth })))).toBe(false);
+    for (const missing of ['- query top pick: #298 — taken', '- second item: no — condition 2 failed'])
+      expect(isDeny(asDeny(githubCheck({ method: 'update', issue_number: 62, body: withBoth.replace(missing + '\n', '').replace('\n' + missing, '') })))).toBe(true);
+  });
+
   // #101 Layer 4 / #216 §1: the freeze-history rule's one enforceable piece — see the structural test above
   // ("a hook denies applying the `frozen` label") for why this, and not the broader lift narrative, is what
   // collapses. `.tool_input.labels` is a real array on `issue_write` (create and update alike), so this reads
@@ -653,6 +751,9 @@ describe('layer-0 hooks: .claude/settings.json runs them', () => {
       expect({ tool, matched: entry('mcp__github__').matcher.includes(tool) }).toEqual({ tool, matched: true });
     expect(isDeny(runWired('mcp__github__', { body: 'OWNER: APPROVED' }))).toBe(true);
     expect(isDeny(runWired('mcp__github__', { method: 'update', issue_number: 62, body: 'no line here' }))).toBe(true);
+    // …and one that satisfies `- second item:` so the wired path actually reaches `queryTopPick` (#338):
+    // `check` short-circuits, so without this the end-to-end test never exercised the new rule.
+    expect(isDeny(runWired('mcp__github__', { method: 'update', issue_number: 62, body: 'x\n- second item: no' }))).toBe(true);
     expect(isDeny(runWired('mcp__github__', { method: 'create', labels: ['frozen'] }))).toBe(true);
     expect(runWired('mcp__github__', { body: 'Pushed abc123. Ready for re-review.' })).toBeNull();
   });
