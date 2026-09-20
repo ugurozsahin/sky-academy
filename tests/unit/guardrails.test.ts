@@ -1569,13 +1569,20 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
       .toMatch(/protected path/i);
     expect(rules, 'the enforcement, named where a reader can check it')
       .toContain('`.claude/hooks/write-guard.mjs`');
+    // #346: a write can arrive through a file tool or through the shell, and until both were enforced the rule
+    // covered one of the two. Naming only one guard here is how the prose would quietly go back to that.
+    expect(rules, 'the shell half of the enforcement, or the rule covers one route and claims two')
+      .toContain('`.claude/hooks/bash-guard.mjs`');
     expect(rules, 'what a run does instead, or a denial leaves it with nowhere to go').toContain('owner-session');
     expect(rules, 'reads must stay allowed, or a run stops reading its own rules').toMatch(/reads are untouched/i);
-    // Round-1 review of PR #344: the first draft claimed a run "cannot grant itself" the permission, which is
-    // true of Write and Edit and not of the shell (#346). A rule may not claim more than it enforces.
-    expect(rules, 'the claim must be bounded by what the hook actually sees')
-      .toMatch(/closes the obvious route, not\s+every route/i);
-    expect(rules, 'and name the issue that holds the rest').toContain('#346');
+    // Round-1 review of PR #344: the first draft claimed a run "cannot grant itself" the permission, which was
+    // true of Write and Edit and not of the shell. #346 closed the shell route, so the bound moved rather than
+    // went away — a rule may still not claim more than it enforces, and what neither guard can see is stated
+    // here rather than left for the next reader to discover.
+    expect(rules, 'the claim must still be bounded by what the hooks actually see')
+      .toMatch(/no command-line rule sees/i);
+    expect(rules, 'and say concretely what falls outside it, or the bound is a disclaimer')
+      .toMatch(/opens the file itself|assembled at run time/i);
     expect(rules, 'and point at the decision record').toContain('docs/decisions/006-a-routine-never-writes-under-claude.md');
   });
 

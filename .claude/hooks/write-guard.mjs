@@ -6,7 +6,7 @@ import { deny, isMain, readInput } from './io.mjs';
  *  a checkout reached through `/var` → `/private/var` otherwise compares unequal to itself. The target of a
  *  write usually does not exist yet, so the walk stops at the deepest ancestor that does and keeps the rest
  *  verbatim — which is why a symlink at the *last* segment is still judged on its own name. */
-const canonical = (path) => {
+export const canonical = (path) => {
   let head = resolve(path);
   const tail = [];
   for (;;) {
@@ -18,7 +18,10 @@ const canonical = (path) => {
   }
 };
 
-const dir = (root) => canonical(root || process.env.CLAUDE_PROJECT_DIR || process.cwd());
+/** The checkout this call is about. Exported because `.claude/hooks/bash-guard.mjs` judges shell write targets
+ *  against the same root, by the same arithmetic — two guards that resolved paths differently would disagree
+ *  about which checkout they are protecting, which is the one thing neither may get wrong (#346). */
+export const projectDir = (root) => canonical(root || process.env.CLAUDE_PROJECT_DIR || process.cwd());
 
 /** Layer-0 guard for Write and Edit (#101): the root WORKLOG.md is retired (#98). `docs/worklog/` is not. */
 const worklog = (target, base) => target === resolve(base, 'WORKLOG.md')
@@ -32,7 +35,7 @@ export const OWNER_MARKER = '.owner-machine';
  * Resolved `target` is inside `base`. `relative()` rather than a string prefix, so `.claudex/` is not read as
  * `.claude/`, and `..` is tested as a whole path segment — `.claude/..hidden` climbs nowhere and is inside.
  * Lexical only: a symlink *under* `base` pointing out, or in, is judged on its spelling. The root itself is
- * canonicalised in `dir()`, which is the case that has actually bitten this repository.
+ * canonicalised in `projectDir()`, which is the case that has actually bitten this repository.
  */
 const under = (base, target) => {
   const rel = relative(base, target);
@@ -51,14 +54,19 @@ const under = (base, target) => {
  * Denying here ends the stall, because `PreToolUse` runs *before* the permission system: the call is refused
  * in milliseconds instead of waiting hours for a person. Reads are untouched.
  *
- * **What this covers, exactly: the `Write` and `Edit` tools.** `.claude/hooks/bash-guard.mjs` has no rule for
- * either path, so a shell write is not stopped here (#346). The marker is therefore a switch, not a seal: it
- * marks a checkout as the owner's, and refusing to *write* it through these tools keeps the obvious route
- * closed. Claiming more than that would be the rail not holding what it says.
+ * **This decides what is protected; it does not decide who asked.** The `Write` and `Edit` tools arrive
+ * through `check` below, and `claudeWrite` in `.claude/hooks/bash-guard.mjs` calls this same function on the
+ * paths a shell command would write, so the two guards cannot drift apart about which paths count (#346).
+ * Neither reaches a script that opens a file itself; the marker is a switch, not a seal, and the seal is that
+ * a routine has no reason to be writing here at all.
+ *
+ * The directory `.claude` itself counts, not only what is under it: a file tool cannot name a directory, but
+ * `rm -rf .claude` does, and that one route would otherwise be the loudest thing this rule misses.
  */
 export const claudeDir = (target, base) => {
   const marker = resolve(base, OWNER_MARKER);
-  const inClaude = under(resolve(base, '.claude'), target);
+  const claude = resolve(base, '.claude');
+  const inClaude = target === claude || under(claude, target);
   if (!inClaude && target !== marker) return null;
   if (existsSync(marker)) return null;                    // the owner is at the keyboard; both are his to edit
   const name = relative(base, target);
@@ -81,7 +89,7 @@ export const claudeDir = (target, base) => {
 // through on purpose; that is the tool's payload arriving malformed, not this rule failing to decide.
 export const check = (input, root) => {
   try {
-    const base = dir(root);
+    const base = projectDir(root);
     if (typeof input?.file_path !== 'string') return null;
     const target = canonical(resolve(base, input.file_path));
     return worklog(target, base) ?? claudeDir(target, base);

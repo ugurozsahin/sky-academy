@@ -5,13 +5,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain ESM, run by Claude Code as a PreToolUse hook (.claude/settings.json)
-import { check as bashCheck, forcePush, ownerMarker as bashOwnerMarker, worklogAppend } from '../../.claude/hooks/bash-guard.mjs';
+import { check as bashCheck, claudeWrite, forcePush, ownerMarker as bashOwnerMarker, worklogAppend } from '../../.claude/hooks/bash-guard.mjs';
 // @ts-expect-error — plain ESM hook helper
 import { commands, parse } from '../../.claude/hooks/shell.mjs';
 // @ts-expect-error — plain ESM hook script
 import { check as writeCheck, claudeDir, OWNER_MARKER } from '../../.claude/hooks/write-guard.mjs';
 // @ts-expect-error — plain ESM hook script
-import { check as githubCheck, frozenLabel, heartbeatAppend, ownerMarker, queryTopPick, secondItem } from '../../.claude/hooks/github-write-guard.mjs';
+import { check as githubCheck, frozenLabel, heartbeatAppend, ownerMarker, REQUIRED_LINES, requiredLines } from '../../.claude/hooks/github-write-guard.mjs';
 
 /**
  * The layer-0 hooks (#101): `.claude/settings.json` runs one script per tool family before the tool call,
@@ -30,8 +30,10 @@ const asDeny = (reason: string | null) =>
 const isDeny = (result: unknown) => (result as any)?.hookSpecificOutput?.permissionDecision === 'deny';
 const runHook = (check: Check<string>, command: string) => asDeny(check(command));
 const runBodyHook = (check: Check<{ body: string }>, body: string) => asDeny(check({ body }));
-const runIssueWriteHook = (input: Record<string, unknown>) => asDeny(secondItem(input));
-const runTopPickHook = (input: Record<string, unknown>) => asDeny(queryTopPick(input));
+// The two mandatory heartbeat lines are one rule over one array since #359, so both of these go to the same
+// place. They are kept as separate names because each block below still argues about one line's behaviour.
+const runIssueWriteHook = (input: Record<string, unknown>) => asDeny(requiredLines(input));
+const runTopPickHook = (input: Record<string, unknown>) => asDeny(requiredLines(input));
 const runLabelsHook = (input: Record<string, unknown>) => asDeny(frozenLabel(input));
 const runAppendHook = (input: Record<string, unknown>) => asDeny(heartbeatAppend(input));
 
@@ -425,15 +427,16 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
   // prose — nothing stopped an actual heartbeat update from landing without the line #97 asks for. This hook
   // is the one piece of #97 with real behavioural enforcement, which is what #216 §1's bar requires before a
   // triplicated rule's copy may collapse to a pointer (as #191's session-URL requirement already did, #235).
-  // Scoped to only the routine heartbeat's own `update` calls (issue #62) — a `create` never needs this (the
-  // issue exists already; #62 has never been recreated) and no other issue_write call is this rule's business.
+  // Scoped to the routine heartbeat: issue #62 by number, and any create or update carrying its title (#353).
+  // No other issue_write call is this rule's business.
   it('#97 second-item hook: denies an update to the routine heartbeat (#62) whose body has no `- second item:` line', () => {
     expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: '2026-09-18T00:00Z — did stuff\n- nightly: ok\n- main: green' }))).toBe(true);
   });
 
   it('#97 second-item hook: allows an update to #62 whose body carries the line, wherever it sits', () => {
-    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'stuff\n- second item: no — condition 1 failed\n- main: green' }))).toBe(false);
-    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: '- second item: yes, PR #77' }))).toBe(false);
+    const pick = '\n- query top pick: #298 — taken';
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'stuff\n- second item: no — condition 1 failed\n- main: green' + pick }))).toBe(false);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: '- second item: yes, PR #77' + pick }))).toBe(false);
   });
 
   it('#97 second-item hook: only scopes to issue #62 — a different issue_write is not this rule\'s business', () => {
@@ -441,12 +444,59 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 236, body: 'an ordinary issue body with no such line' }))).toBe(false);
   });
 
-  it('#97 second-item hook: only scopes to `update` — a `create` call is not gated (the issue already exists)', () => {
-    expect(isDeny(runIssueWriteHook({ method: 'create', issue_number: 62, body: 'a brand new issue body, no line' }))).toBe(false);
+  /**
+   * #353: every prompt identifies the pulse by TITLE, and `docs/ROUTINE-PROMPT.md` STEP 5 tells a run to
+   * create the issue if it is gone — so a recreated heartbeat carries a new number, and a hook that matched
+   * only `62` would guard nothing for the rest of the repository's life without a single test going red.
+   *
+   * The same expression closes the create hole: the one write that establishes a fresh pulse used to be
+   * exempt from every body rule, which is this defect seen from the other side.
+   *
+   * Prove it red: drop `title === HEARTBEAT_TITLE` from `heartbeatWrite`, and the first two go green-to-red.
+   */
+  it('#353: the heartbeat is matched by title as well as by number, so a recreated one is still guarded', () => {
+    const noLines = 'a brand new pulse body, neither line';
+    expect(isDeny(runIssueWriteHook({ method: 'create', title: 'routine: heartbeat', body: noLines })),
+      'STEP 5 creates the issue when it is missing — that write establishes the pulse and cannot be exempt').toBe(true);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 4321, title: 'routine: heartbeat', body: noLines })),
+      'a recreated heartbeat carries a new number, and the prompts never mention one').toBe(true);
+    expect(isDeny(runAppendHook({ method: 'create', title: 'routine: heartbeat', body: '2026-09-20T01:00Z — a\n2026-09-20T02:00Z — b' })),
+      'and the same is true of the never-append rule, or the create path launders an append').toBe(true);
   });
 
+  it('#353: a create that does not name the heartbeat is left alone — the title is the only thing that says so', () => {
+    expect(isDeny(runIssueWriteHook({ method: 'create', issue_number: 62, body: 'a brand new issue body, no line' })),
+      'a create carries no issue number in reality, and its title here is some other issue').toBe(false);
+    expect(isDeny(runIssueWriteHook({ method: 'create', title: 'watchdog: heartbeat', body: 'no lines' }))).toBe(false);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 61, title: 'watchdog: heartbeat', body: 'no lines' }))).toBe(false);
+  });
+
+  /**
+   * #359: `body` is optional on `issue_write`, so a labels-only, title-only or state-only update to #62 is a
+   * legitimate call carrying no body — and denying it for a "missing" line names a body that was never sent,
+   * whose obvious remedy is to ADD one, overwriting the pulse the rule exists to protect. A non-string body is
+   * the same defect from the other side: `.match` throws, a PreToolUse hook that throws exits non-zero with
+   * empty stdout, and that is a non-blocking hook error — the write proceeds.
+   *
+   * Prove it red: drop the `typeof input.body === 'string'` guard from `heartbeatBody`.
+   */
+  it('#359: a heartbeat write carrying no body text is not a missing line, and never throws', () => {
+    for (const input of [{ method: 'update', issue_number: 62, labels: ['watchdog'] },
+                         { method: 'update', issue_number: 62, state: 'open' },
+                         { method: 'update', issue_number: 62, body: null },
+                         { method: 'update', issue_number: 62, body: 42 }]) {
+      expect(() => requiredLines(input), `threw on ${JSON.stringify(input)} — the write then proceeds`).not.toThrow();
+      expect(() => heartbeatAppend(input), `threw on ${JSON.stringify(input)}`).not.toThrow();
+      expect(isDeny(runIssueWriteHook(input)), JSON.stringify(input)).toBe(false);
+      expect(isDeny(runAppendHook(input)), JSON.stringify(input)).toBe(false);
+    }
+  });
+
+  // The sibling line is supplied, or both are missing and this passes on the sibling's absence rather than on
+  // the thing it is named for — the shape of vacuity the #341 review found twice in this file.
   it('#97 second-item hook: a mention of "second item" in prose, not as its own `- second item:` line, still denies', () => {
-    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'we discussed the second item rule casually but never wrote the line' }))).toBe(true);
+    expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62,
+      body: 'we discussed the second item rule casually but never wrote the line\n- query top pick: #298 — taken' }))).toBe(true);
   });
 
   // #338: the same shape as the second-item rule above, and for the same reason. STEP 3's query is meant to
@@ -459,27 +509,54 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
   });
 
   it('#338 query-top-pick hook: allows a body carrying the line, taken or departed from', () => {
-    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'stuff\n- query top pick: #298 (P1) — taken\n- main: green' }))).toBe(false);
-    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: '- query top pick: #298 — not taken; watchdog issue #338 came first' }))).toBe(false);
+    const second = '\n- second item: no — condition 2 failed';
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'stuff\n- query top pick: #298 (P1) — taken\n- main: green' + second }))).toBe(false);
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: '- query top pick: #298 — not taken; watchdog issue #338 came first' + second }))).toBe(false);
   });
 
-  it('#338 query-top-pick hook: scopes to #62 and to `update`, like its sibling', () => {
+  it('#338 query-top-pick hook: scopes to #62 and to an untitled create, like its sibling', () => {
     expect(isDeny(runTopPickHook({ method: 'update', issue_number: 61, body: 'the watchdog pulse never develops' }))).toBe(false);
     expect(isDeny(runTopPickHook({ method: 'create', issue_number: 62, body: 'a brand new issue body, no line' }))).toBe(false);
   });
 
   it('#338 query-top-pick hook: prose about the query, not the line itself, still denies', () => {
-    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'the query top pick was #298 but I never wrote it as a line' }))).toBe(true);
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62,
+      body: 'the query top pick was #298 but I never wrote it as a line\n- second item: no' }))).toBe(true);
   });
 
   // Round-1 review of PR #341: the deny message is the whole interface a blocked run sees, and this rule was
   // written by copying its sibling — so the likeliest real mutation is that it inherits the sibling's text. A
   // run obeying the wrong message would add a second `- second item:` line and be denied forever.
   it('#338 query-top-pick hook: says which line is missing, in its own words', () => {
-    const reason = queryTopPick({ method: 'update', issue_number: 62, body: 'no lines here' }) as string;
+    const reason = requiredLines({ method: 'update', issue_number: 62,
+      body: 'no pick line here\n- second item: no' }) as string;
     expect(reason, 'it must name its own line').toContain('- query top pick: ');
     expect(reason, 'and not send the run to add the sibling instead').not.toContain('- second item: ');
     expect(reason, 'and say what the line is for').toMatch(/STEP 3's query|documented ways past/);
+  });
+
+  /**
+   * #359: `check` is a `??` chain, so it used to report one missing line per call — and since #338 made the
+   * second line mandatory, a body missing both is the ordinary case, not an edge one. The run is denied, fixes
+   * one line, and is denied again: two round trips at STEP 1, and at STEP 5 a denied write leaves the pulse
+   * still reading `IN PROGRESS`, which is exactly what the watchdog reports as a dead run.
+   *
+   * Prove it red: report only `missing[0]`, or go back to two rules chained with `??`.
+   */
+  it('#359: one deny names every missing line, so a run is not denied twice for the same body', () => {
+    const reason = requiredLines({ method: 'update', issue_number: 62, body: '2026-09-20T09:00Z — IN PROGRESS: x' }) as string;
+    for (const { key } of REQUIRED_LINES as { key: string }[])
+      expect(reason, `a body missing every line must name ${key}, or the next write is denied for it`).toContain(`${key} `);
+  });
+
+  // #359: the rules are one array now, and the deny is built from it. A line added to `REQUIRED_LINES` with no
+  // reason text, or a key that is not the line a run writes, would make a deny a run cannot act on.
+  it('#359: every required line declares the key a run writes and why it is there', () => {
+    expect((REQUIRED_LINES as unknown[]).length, 'two lines today; governance.md anticipates a third').toBeGreaterThanOrEqual(2);
+    for (const { key, why } of REQUIRED_LINES as { key: string; why: string }[]) {
+      expect(key, 'the key is the literal line prefix a run writes').toMatch(/^- [a-z][a-z ]*:$/);
+      expect(why.length, `${key} has no reason text, so its deny says nothing`).toBeGreaterThan(20);
+    }
   });
 
   // The trailing space in the pattern is load-bearing: without it a bare heading with no value passes, and
@@ -488,18 +565,20 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     // Round 2: the first version of this pin read `- query top pick: ` and stopped, so the empty-valued line
     // — one keystroke from the shape the test is named for, and the shape a half-written stamp produces —
     // was accepted. `: *\S` is what makes the claim true. The same hole was in `- second item:`, below.
-    for (const body of ['x\n- query top pick:', 'x\n- query top pick: ', 'x\n- query top pick:   ',
+    const second = '\n- second item: no';
+    for (const body of ['x\n- query top pick:' + second, 'x\n- query top pick: ' + second, 'x\n- query top pick:   ' + second,
                         'x\n- query top pick: \n- second item: no', 'x\n- query top pick:\n- second item: no'])
       expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body })), body).toBe(true);
     // STEP 4's defined value for a run that found nothing eligible — the case the heading-only form came from.
-    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'x\n- query top pick: none eligible' }))).toBe(false);
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'x\n- query top pick: none eligible' + second }))).toBe(false);
   });
 
   // Round 2: the line anchor was unpinned — dropping `(^|\n)` left every case green, because the only prose
   // case had no colon in it. A record is a line a reader can find, not a phrase buried in a sentence.
   it('#338/#97: the line must start a line, not sit mid-sentence', () => {
-    // Each rule is put alone against its own case: through the combined `check`, the *other* rule denies
-    // first and the assertion passes whatever the anchor does — which is how the first version was vacuous.
+    // Each case supplies the OTHER line in its proper form, so the deny can only be about the anchor under
+    // test — without that, the missing sibling denies and the assertion passes whatever the anchor does,
+    // which is how the first version of this rail was vacuous.
     expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62,
       body: 'we recorded - query top pick: #298 inline\n- second item: no' }))).toBe(true);
     expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62,
@@ -531,13 +610,16 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     expect(sentence, 'STEP 1 must still prescribe a stamp, or this rail reads nothing').toContain('IN PROGRESS');
     // Every `- key: value` the stamp sentence names, reassembled into the body a run would actually send.
     const lines = [...sentence.matchAll(/`(- [a-z][a-z ]*: [^`]+)`/g)].map((m) => m[1]);
-    expect(lines.length, 'the stamp names no placeholder lines — the hook rules are then unmet').toBeGreaterThan(1);
+    // Counted against the hook's own list rather than `> 1` (#359): a third required line added to
+    // `REQUIRED_LINES` and not to the stamp is the identical defect, and `> 1` would not have seen it.
+    for (const { key } of REQUIRED_LINES as { key: string }[])
+      expect(lines.join('\n'), `STEP 1's stamp does not name ${key}, which the hook requires`).toContain(key);
     const body = `2026-09-20T09:00Z — IN PROGRESS: reviewing #341\n${lines.join('\n')}`;
     expect(githubCheck({ method: 'update', issue_number: 62, body }),
       `STEP 1's stamp is refused by the hook, so the pulse never lands: ${body}`).toBeNull();
   });
 
-  // Both heartbeat rules are reachable through the exported `check`, in either order of omission — a rule
+  // Both mandatory lines are reachable through the exported `check`, in either order of omission — a rule
   // that is written but not wired into `check` denies nothing, and `.claude/settings.json` calls only `check`.
   it('#338/#97: `check` denies a heartbeat body missing either line, and allows one carrying both', () => {
     const withBoth = '2026-09-20T00:00Z — x\n- query top pick: #298 — taken\n- second item: no — condition 2 failed';
@@ -592,10 +674,37 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     expect(isDeny(runAppendHook({ method: 'update', issue_number: 62, body: 'no timestamp here, just prose' }))).toBe(false);
   });
 
-  it('heartbeat-append hook: only scopes to issue #62 and to `update`', () => {
+  it('heartbeat-append hook: only scopes to the heartbeat — by number, or by the title a create carries', () => {
     const twoTimestamps = '2026-09-18T11:00Z — a\n2026-09-18T13:36Z — b';
     expect(isDeny(runAppendHook({ method: 'update', issue_number: 61, body: twoTimestamps }))).toBe(false);
     expect(isDeny(runAppendHook({ method: 'create', issue_number: 62, body: twoTimestamps }))).toBe(false);
+    expect(isDeny(runAppendHook({ method: 'create', title: 'routine: heartbeat', body: twoTimestamps }))).toBe(true);
+  });
+
+  /**
+   * #359: five rules were exported and composed in `check()`, which is the only thing `.claude/settings.json`
+   * calls — and `heartbeatAppend` could be deleted from that chain with all 1373 unit tests green, on `main`
+   * and on PR #341's head alike. The rail that existed enumerated two rules by name, so it did not cover the
+   * third, and enumeration would not have covered the next one either.
+   *
+   * So this asserts the property rather than a list: every function a guard module exports, other than
+   * `check` itself, is named inside `check`'s own source. A helper reached through `check` satisfies it for
+   * the same reason a rule does — it is reachable. Data exports (`REQUIRED_LINES`, `OWNER_MARKER`) are not
+   * rules and are exempt by type.
+   *
+   * Prove it red: delete ` ?? heartbeatAppend(input)` from `check`, or export a new rule and forget to wire it.
+   */
+  it('every rule a guard module exports is wired into its check() (#359)', async () => {
+    const modules = ['bash-guard', 'write-guard', 'github-write-guard'];
+    for (const name of modules) {
+      const mod = await import(`../../.claude/hooks/${name}.mjs`) as Record<string, unknown>;
+      const source = String(mod.check);
+      const rules = Object.keys(mod).filter((k) => k !== 'check' && typeof mod[k] === 'function');
+      expect(rules.length, `${name}.mjs exports no rules at all — this rail then checks nothing`).toBeGreaterThan(1);
+      for (const rule of rules)
+        expect(source, `${name}.mjs exports ${rule} but check() never calls it, and settings.json calls only check`)
+          .toContain(rule);
+    }
   });
 });
 
@@ -700,6 +809,101 @@ describe('layer-0 hooks: an unattended run cannot write under .claude/ (#342)', 
   });
 });
 
+/**
+ * #346: the `Write`/`Edit` guard above closed the route both measured stalls actually took, and left the shell
+ * open beside it. `sed -i '' 's/x/y/' .claude/rules/governance.md` is the same edit by another tool, and
+ * `touch .owner-machine` is one command after which every later write in that checkout is allowed, permanently
+ * and silently. Found independently by `pr-test-analyzer` and `silent-failure-hunter` reviewing PR #344.
+ *
+ * What counts as protected is `claudeDir()`'s decision, called by both guards, so the cases below are about
+ * one thing only: does the Bash guard find the write target the command names?
+ *
+ * Roots are temporary directories, never this checkout — the owner's copy carries the marker and CI does not,
+ * so a rail anchored on the real root would say opposite things in the two places.
+ *
+ * Prove one red: drop a tool from `WRITES_EVERY_OPERAND`, or stop canonicalising the target.
+ */
+describe('layer-0 hooks: an unattended run cannot write under .claude/ from the shell either (#346)', () => {
+  const noMarker = mkdtempSync(join(tmpdir(), 'sna-sh-clone-'));
+  const owner = mkdtempSync(join(tmpdir(), 'sna-sh-owner-'));
+  writeFileSync(join(owner, OWNER_MARKER), 'owner\n');
+  const denied = (cmd: string) => claudeWrite(cmd, noMarker) as string | null;
+
+  it('denies the routes a run would really take to a file under .claude/', () => {
+    for (const cmd of [
+      "sed -i '' 's/x/y/' .claude/rules/governance.md",     // the edit the file guard refuses, by another tool
+      'sed -i.bak -e s/a/b/ .claude/settings.json',
+      'echo x > .claude/settings.json',
+      'echo x >> .claude/rules/governance.md',
+      'cat > ".claude/rules/governance.md" <<EOF\nnew rule\nEOF',
+      'echo x | tee .claude/settings.json',
+      'cp /tmp/new.md .claude/rules/governance.md',
+      'mv /tmp/new.md .claude/rules/governance.md',
+      'rm -f .claude/hooks/write-guard.mjs',
+      'rm -rf .claude',                                      // the directory itself, which no file tool can name
+      'mkdir -p .claude/rules/new',
+      'ln -sf /tmp/evil.md .claude/rules/governance.md',
+      'dd if=/tmp/x of=.claude/settings.json',
+      'git checkout -- .claude/rules/governance.md',
+      'git restore .claude/settings.json',
+      'perl -i -pe s/a/b/ .claude/settings.json',
+      'install -m 644 /tmp/x .claude/settings.json',
+      'truncate -s 0 .claude/settings.json',
+    ]) expect(denied(cmd), cmd).toMatch(/protected path/);
+  });
+
+  it('denies the one command that would switch the guard off for good', () => {
+    for (const cmd of ['touch .owner-machine', 'echo x > .owner-machine', ': > .owner-machine',
+                       'cp /tmp/x .owner-machine', 'tee .owner-machine < /dev/null'])
+      expect(denied(cmd), cmd).toMatch(/owner's-machine marker/);
+  });
+
+  it('follows the target through the quoting, wrappers and nesting the parser already handles', () => {
+    for (const cmd of ["sh -c \"touch '.claude/rules/new.md'\"", 'eval "rm -rf .claude/hooks"',
+                       'timeout 30 sed -i "" s/a/b/ .claude/settings.json',
+                       'npm test && echo done >> .claude/notes.md'])
+      expect(denied(cmd), cmd).not.toBeNull();
+  });
+
+  it('leaves reads alone — a run that stops reading .claude/ has lost its own rules', () => {
+    for (const cmd of ['cat .claude/rules/governance.md', 'grep -n owner-session .claude/settings.json',
+                       'git diff .claude/', 'git log --oneline -- .claude/hooks', 'node .claude/hooks/io.mjs',
+                       'cp .claude/settings.json /tmp/backup.json',   // .claude/ as the SOURCE of a copy is a read
+                       'ls -la .claude/skills', 'wc -c .claude/rules/*.md'])
+      expect(denied(cmd), cmd).toBeNull();
+  });
+
+  it('leaves the ordinary commands a run runs all day alone', () => {
+    for (const cmd of ['npm test', 'git checkout -b chore/346-claude-write-guards', 'git checkout main',
+                       'rm -rf dist node_modules', 'mkdir -p docs/worklog', 'echo x > /tmp/body.md',
+                       'sed -i "" s/a/b/ src/main.ts', 'mv docs/a.md docs/b.md', 'cp src/main.ts /tmp/x'])
+      expect(denied(cmd), cmd).toBeNull();
+  });
+
+  it('allows both in a checkout that carries the marker — the owner is at the keyboard', () => {
+    for (const cmd of ["sed -i '' 's/x/y/' .claude/rules/governance.md", 'touch .owner-machine'])
+      expect(claudeWrite(cmd, owner), cmd).toBeNull();
+  });
+
+  it('says what to do instead, names the path, and does not hand back the route it just refused', () => {
+    const reason = denied('sed -i "" s/x/y/ .claude/rules/governance.md') ?? '';
+    expect(reason, 'the run must be able to see which path it was').toContain('.claude/rules/governance.md');
+    expect(reason, 'and where to put the change instead').toContain('owner-session');
+    expect(reason, 'a run that retries has understood nothing').toMatch(/do not retry/i);
+    expect(reason, 'and the one message a stuck run reads must not end by naming the workaround')
+      .not.toMatch(/create .*\.owner-machine|touch \.owner-machine/i);
+    // The marker's refusal is its own: the .claude/ sentence would state a false fact about a file at the root.
+    expect(denied('touch .owner-machine'), 'the marker is not under .claude/').not.toMatch(/is under \.claude\//);
+  });
+
+  it('is wired into check(), alongside the three rules it did not displace', () => {
+    expect(bashCheck({ command: 'echo x > .claude/settings.json' }, noMarker)).toMatch(/protected path/);
+    expect(bashCheck({ command: 'git push --force origin main' }, noMarker)).toMatch(/Force-push denied/);
+    expect(bashCheck({ command: 'echo x >> WORKLOG.md' }, noMarker)).toMatch(/retired/);
+    expect(bashCheck({ command: 'npm test' }, noMarker)).toBeNull();
+  });
+});
+
 describe('layer-0 hooks: .claude/settings.json runs them', () => {
   const entry = (matcher: string) => (settings.hooks.PreToolUse as any[]).find((e) => e.matcher.startsWith(matcher));
   const runWired = (matcher: string, toolInput: Record<string, unknown>, dir = root): unknown => {
@@ -723,6 +927,17 @@ describe('layer-0 hooks: .claude/settings.json runs them', () => {
     expect(isDeny(runWired('Bash', { command: "gh pr comment 1 --body 'OWNER: APPROVED'" }))).toBe(true);
     expect(isDeny(runWired('Bash', { command: 'echo x >> WORKLOG.md' }))).toBe(true);
     expect(runWired('Bash', { command: 'npm test' })).toBeNull();
+  });
+
+  // The Bash half of #342, through the real command string (#346). Same reasoning as the Write|Edit case
+  // below it: a marker-free stand-in for a routine's clone, because the real root carries the marker here.
+  it('Bash: denies a shell write under .claude/ and the marker, in a checkout with no owner marker', () => {
+    const clone = mkdtempSync(join(tmpdir(), 'sna-sh-wired-'));
+    cpSync(join(root, '.claude/hooks'), join(clone, '.claude/hooks'), { recursive: true });
+    expect(existsSync(join(clone, OWNER_MARKER)), 'a clone never carries the marker').toBe(false);
+    expect(isDeny(runWired('Bash', { command: "sed -i '' s/x/y/ .claude/rules/governance.md" }, clone))).toBe(true);
+    expect(isDeny(runWired('Bash', { command: 'touch .owner-machine' }, clone))).toBe(true);
+    expect(runWired('Bash', { command: 'cat .claude/rules/governance.md' }, clone)).toBeNull();
   });
 
   it('Write|Edit: denies the root WORKLOG.md and allows any other file', () => {
