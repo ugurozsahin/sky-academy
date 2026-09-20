@@ -2084,11 +2084,11 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     expect(s7, 'a body that does not match its diff blocks at any round').toContain('does not do what its body says');
     expect(s7, 'and so does a rail that does not hold').toContain('a rail does not hold what it claims');
     // The cap, as one anchor. The counting UNIT is the load-bearing half and the easiest to "clarify" away:
-    // #292 took seven pushes to six rounds, so a cap counted `since the last push` resets on every fix and
+    // #292 took seven pushes to seven rounds, so a cap counted `since the last push` resets on every fix and
     // caps nothing, while reading exactly like the rule it replaced.
     expect(s7, 'the third round is the floor').toContain('The third round is the last one that blocks');
     expect(s7, 'counted over the pull request and across reviewers — "since the last push" would reset on every '
-      + 'fix and cap nothing (#292: seven pushes, six rounds), and two reviewers are not entitled to three rounds each')
+      + 'fix and cap nothing (#292: seven pushes, seven rounds), and two reviewers are not entitled to three rounds each')
       .toContain('Count the `REVIEW: CHANGES REQUESTED` comments on the pull request, whoever wrote them');
     // Both branches of what happens after the third round. Either one alone is satisfied by an inversion of
     // the other: `blocks again for anything it still dislikes` is the loop back, with the cap still "stated".

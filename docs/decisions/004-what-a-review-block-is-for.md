@@ -23,7 +23,7 @@ decide and record the home, state the limit — and **all four were met on the f
 | 7 | a negation word-list rejecting `only`/`instead`/`no`; a character check asserted against the whole file |
 
 Seven rounds is what the Decision below counts: one `REVIEW: CHANGES REQUESTED` per row, 12:25Z to 18:39Z.
-Seven pushes, five hours, 276 lines added to one test file, which ended up modelling the Claude Code skill
+Seven pushes, 6h14m, 276 lines added to one test file, which ended up modelling the Claude Code skill
 loader in regular expressions. The two findings in round 7 were real defects the growth had introduced: a
 negation word-list that rejected ordinary English (`only`, `instead`, `no`) in the one line that most needs to
 be well written, and a character check asserted against the whole file so that a carriage return anywhere in a
@@ -65,15 +65,16 @@ Both halves live in `.claude/skills/review-pr/SKILL.md` §7.
   `ugurozsahin/sky-academy-private-archive#74` already caused once.
   The limit is stated in §7's own comment instead. Revisit if a run is seen walking past the cap.
 - **Cap the size of a review rather than the number of rounds.** Not rejected — deferred. The rounds on #292
-  were 4,000–10,000 characters each, which is why answering one took a full run; cost per round is a real
+  were 4,200–10,200 characters each, which is why answering one took a full run; cost per round is a real
   problem. Round *count* was taken first because it is the multiplier, and because a size cap is easy to
   satisfy while saying just as much.
 - **The scope rule alone, with no cap.** Rejected: each of #292's rounds was individually defensible under any
   scope rule one could write, so a bar without a floor would not have stopped it.
 - **The cap alone, with no bar.** Rejected: "merge on the fourth round" with no account of what may block is
   how `ugurozsahin/sky-academy-private-archive#74` was merged over five open review items. (Both citations are
-  written in full on purpose: bare `#74` in this repository is the open Actions-budget issue
-  `docs/ROUTINE-PROMPT.md` already cites by that number, and GitHub would auto-link to it.)
+  written in full on purpose: bare `#74` in this repository is the Actions-budget issue
+  `docs/ROUTINE-PROMPT.md` already cites by that number — closed 2026-09-16, and GitHub auto-links a closed
+  issue just the same.)
 - **Do nothing and watch for a repeat.** Rejected by the owner on the evidence of the same day: the pattern had
   already appeared on four pull requests, not one.
 
