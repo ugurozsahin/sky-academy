@@ -3311,12 +3311,16 @@ describe('a developer run may take a second item — the rule, in its home (#177
     // "disjoint", or three of the four conditions copied back, walked past a file-wide check on one word; a
     // slice that stopped at the pointer sentence let the same copy sit *after* it; and one that began at the
     // anchor phrase let it sit *before* it. So the slice runs from the bullet's own `- ` to the next `- `
-    // line, blank line or heading — cut in the raw text, flattened only after.
+    // line, blank line or heading — cut in the raw text, flattened only after. A *heading* means `#{1,6} `,
+    // not any line opening `#`: this repository writes bare issue refs constantly, so a bare `\n(?=#)` would
+    // end the slice early on a wrapped continuation line beginning `#145` and leave a verbatim condition-4
+    // copy green inside the bullet — the one condition the file-wide belt below cannot carry, because
+    // `Part of #<n>` is legitimately used by the branches bullet and so stays out of it (#291, round 3).
     const anchor = raw.search(/A developer run may take a second item \(#97\)/);
     expect(anchor, 'the second-item pointer must be found in CLAUDE.md').toBeGreaterThanOrEqual(0);
     const start = raw.lastIndexOf('\n- ', anchor) + 1;
     const rest = raw.slice(start);
-    const end = rest.search(/\n(?=- |\n|#)/);
+    const end = rest.search(/\n(?=- |\n|#{1,6} )/);
     const bullet = flat(end === -1 ? rest : rest.slice(0, end));
     // `lastIndexOf` walks back to the nearest top-level `- `; if the pointer were moved into a paragraph or a
     // sub-bullet, that walk lands on an earlier bullet and the slice never reaches the anchor. Say so plainly
@@ -3330,8 +3334,12 @@ describe('a developer run may take a second item — the rule, in its home (#177
       expect(bullet, `CLAUDE.md copies a condition back: ${copied}`).not.toMatch(copied);
     // The belt to that brace, and only as wide as a word list can be: these five phrases have no other use in
     // CLAUDE.md today (`Part of #<n>` does — the branches bullet — so it stays out), which keeps a verbatim
-    // copy red wherever in the file it lands. A *paraphrase* outside this bullet is not sealed by any of it;
-    // the cap above is what holds the bullet itself, and nothing here reads the rest of the file for meaning.
+    // copy red wherever in the file it lands. What none of this seals is a *paraphrase*, inside the bullet or
+    // out: nothing here reads the file for meaning, and the cap above is not a second line of defence — the
+    // bullet flattens to ~174 characters against 260, and the review of PR #294 reworded all four conditions
+    // inside it at 187 and watched this block stay green. A word list plus a length cap cannot close a
+    // paraphrase, the cap's job is the ~520-character verbatim copy #145 removed, and 260 is set to leave the
+    // pointer room to be rewritten rather than to squeeze a rewording out.
     for (const copied of [/disjoint/i, /from the start of the run/i, /at most three/i, /overlap/i, /two items per run/i])
       expect(text, `the four conditions live in one place: ${copied}`).not.toMatch(copied);
   });
