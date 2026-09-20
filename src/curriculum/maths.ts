@@ -378,6 +378,11 @@ const y1Months: Generator = (d, rng) => {
  * between units is Year 3 non-statutory at the earliest, so the pair never crosses cm/m, g/kg or ml/l, and
  * the ranges keep the answer *and* its decoys ≤ 100: `a + b ≤ 90` and `a − b ≥ 20`, so `answer ± 10` lands
  * inside the range either way. The third decoy is the other operation — the mistake the question is about.
+ *
+ * Two invariants the bounds below carry, both pinned in `tests/unit/curriculum.test.ts` because neither is
+ * visible in the ranges at a glance: `b ≥ 10`, without which the other-operation decoy collides with
+ * `answer − 10` and `wordQ` silently dedupes the card down to three options; and `b ≤ 34`, above which
+ * `ri(rng, b + 20, 90 - b)` inverts and hands back values below its own minimum.
  */
 function measureSum(rng: Rng, unit: string, verb: [string, string]): Question {
   const b = ri(rng, 10, 30), a = ri(rng, b + 20, 90 - b), add = rng() < 0.5;
@@ -389,29 +394,31 @@ function measureSum(rng: Rng, unit: string, verb: [string, string]): Question {
 }
 // Year 2 measurement is compare and order, choose the sensible unit, and add or subtract within one unit
 // (#298). The "1 metre = ? cm" conversions these three used to ask are Year 3/4 and needed three-digit
-// numbers, so they are gone; where grams or millilitres would run past 100, the comparison is asked in the
-// larger unit instead (a 3 kg cat against a 7 kg dog) rather than by shrinking the thing being measured.
+// numbers, so they are gone. Bringing the comparisons inside 100 took both moves, not one: a larger-unit
+// draw (a 4 kg crate against a 17 kg sack) *and* smaller objects in the small unit, because a sack does not
+// weigh 60 g. Every noun below is colour-neutral — `measureCompare` renders `${colour} ${noun}` and the
+// colour is the answer, so a green orange or a purple lemon is a card this project will not show.
 const y2Length: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) return rng() < 0.5
     ? measureCompare(rng, d, pick(rng, ['rope', 'ribbon', 'plank', 'path']), 'cm', ['longer', 'shorter', 'longest', 'shortest'], 10, 99)
-    : measureCompare(rng, d, pick(rng, ['garden', 'corridor', 'fence', 'field']), 'm', ['longer', 'shorter', 'longest', 'shortest'], 2, 40);
+    : measureCompare(rng, d, pick(rng, ['fence', 'wall', 'ladder', 'pipe']), 'm', ['longer', 'shorter', 'longest', 'shortest'], 2, 40);
   if (kind === 1) return unitChoice(rng, [['pencil', 'cm'], ['finger', 'cm'], ['book', 'cm'], ['door', 'm'], ['room', 'm'], ['garden', 'm'], ['playground', 'm']], 'cm', 'm', 'measure');
   return measureSum(rng, 'cm', ['How long altogether?', 'How long is left?']);
 };
 const y2Mass: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) return rng() < 0.5
-    ? measureCompare(rng, d, pick(rng, ['apple', 'pear', 'orange', 'lemon']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], 20, 99)
-    : measureCompare(rng, d, pick(rng, ['cat', 'dog', 'sack', 'suitcase']), 'kg', ['heavier', 'lighter', 'heaviest', 'lightest'], 2, 30);
+    ? measureCompare(rng, d, pick(rng, ['spoon', 'sock', 'pebble', 'candle']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], 20, 99)
+    : measureCompare(rng, d, pick(rng, ['sack', 'crate', 'suitcase', 'barrel']), 'kg', ['heavier', 'lighter', 'heaviest', 'lightest'], 2, 20);
   if (kind === 1) return unitChoice(rng, [['feather', 'g'], ['apple', 'g'], ['coin', 'g'], ['cat', 'kg'], ['dog', 'kg'], ['bag of flour', 'kg']], 'g', 'kg', 'weigh');
   return measureSum(rng, 'g', ['How heavy altogether?', 'How much is left?']);
 };
 const y2Capacity: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) return rng() < 0.5
-    ? measureCompare(rng, d, pick(rng, ['cup', 'mug', 'glass', 'beaker']), 'ml', HOLDS, 20, 99, 'holds')
-    : measureCompare(rng, d, pick(rng, ['bucket', 'bottle', 'tank', 'watering can']), 'l', HOLDS, 2, 30, 'holds');
+    ? measureCompare(rng, d, pick(rng, ['eggcup', 'lid', 'spoon', 'pot']), 'ml', HOLDS, 20, 99, 'holds')
+    : measureCompare(rng, d, pick(rng, ['bucket', 'tank', 'barrel', 'watering can']), 'l', HOLDS, 2, 20, 'holds');
   if (kind === 1) return unitChoice(rng, [['teaspoon', 'ml'], ['cup', 'ml'], ['mug', 'ml'], ['bath', 'l'], ['bucket', 'l'], ['paddling pool', 'l']], 'ml', 'l', 'measure');
   return measureSum(rng, 'ml', ['How much altogether?', 'How much is left?']);
 };

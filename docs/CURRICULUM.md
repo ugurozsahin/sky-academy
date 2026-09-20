@@ -32,8 +32,10 @@ Writing: y2-spelling (64 CEW) · y2-contractions · y2-suffix (-ful -less -ness 
 Unit conversion (`1 m = 100 cm`, `1 kg = 1000 g`, `1 l = 1000 ml`) is **not** a KS1 topic and the three Year 2
 measures topics no longer ask for it: it is Year 3 non-statutory at the earliest, statutory in Year 4, and it
 needs three-digit numbers where Year 2 stops at 100. Year 2 compares and orders, chooses the sensible unit, and
-adds or subtracts within one unit; where grams or millilitres would run past 100 the comparison is asked in kg,
-l or m instead (owner's KS1 review, #298 slice 1; the rail is in `tests/unit/curriculum.test.ts`).
+adds or subtracts within one unit. Bringing the comparisons inside 100 took two moves: a larger-unit draw in
+kg or l, and smaller objects in g and ml. (`y2-length` needed neither — its cm comparison was already 10–99;
+the m draw is an addition, not a rescue.) Owner's KS1 review, #298 slice 1; the rails are in
+`tests/unit/curriculum.test.ts`.
 
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
