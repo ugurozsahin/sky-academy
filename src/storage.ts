@@ -50,6 +50,186 @@ export const SAVE_VERSION = 3 as const;   // bump when the stored shape changes;
 const KEY = 'sna:v1';                       // stable localStorage slot (its `v1` is historical; `raw.v` drives migration)
 const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [], onboarded: false };
 
+/* ─── Profiles: siblings on one device (#20 slice 1 — storage only, no UI) ──────────────────────────────────
+ *
+ * One save per profile, plus a tiny index saying which profiles exist and which is active. `load()` and
+ * `save()` keep their signatures and act on the **active** profile, so no caller in the game changes.
+ *
+ * **Profile 1 keeps `sna:v1` — nothing is copied and nothing is dropped.** The issue sketched a migration
+ * that writes the existing save to a new key, verifies the read-back, then removes the old one; not moving it
+ * at all reaches the same end ("the existing save becomes profile 1, losing nothing") with no crash window to
+ * order correctly and no quota failure that could strand a child between two keys. It also keeps `sna:v1`
+ * meaning what it already means everywhere outside this file — `tests/e2e/viewport.spec.ts`'s seed,
+ * `scripts/flow-*.mjs`'s screenshot flows, and four unit suites all address it by name. The cost is one
+ * asymmetric key, which `saveKeyFor` states in a line.
+ */
+/** The four fixed slots — the owner's cap (in session, 2026-09-19). Fixed rather than generated so a corrupt
+ *  index can be rebuilt by *probing* the store (four `getItem`s) instead of enumerating it — `localStorage`
+ *  enumeration is the one part of the API the Capacitor WebView and the test shim do not agree on.
+ *  `as const` rather than a `: readonly ProfileId[]` annotation, which widens the tuple and takes `length`
+ *  back to `number` (#330 review N2). */
+export const PROFILE_IDS = ['p1', 'p2', 'p3', 'p4'] as const;
+/** Derived from the list, not declared beside it: a union written separately is a second truth, and adding
+ *  `'p5'` to it alone type-checks `saveKeyFor('p5')` while `isProfileId('p5')` stays false — an addressable
+ *  slot nothing can ever reach (#330 round 2, N4). */
+export type ProfileId = typeof PROFILE_IDS[number];
+/** Derived, never declared: `addProfile` caps by running out of slots, so a hand-written number here was a
+ *  second truth that could disagree with the first — set it to 3 and the module hands out a fourth slot and
+ *  then refuses the index it just wrote (#330 review N2). */
+export const MAX_PROFILES = PROFILE_IDS.length;
+const INDEX_KEY = 'sna:profiles';
+/** Profile 1 is the save that is already on the device; the rest hang off the same slot name. */
+export const saveKeyFor = (id: ProfileId) => (id === 'p1' ? KEY : `${KEY}:${id}`);
+export interface ProfileIndex { v: 1; active: ProfileId; ids: ProfileId[] }
+
+const isProfileId = (x: unknown): x is ProfileId => typeof x === 'string' && (PROFILE_IDS as readonly string[]).includes(x);
+const readItem = (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } };
+/** The stored index, or null when there is none, it is not ours, or it is not self-consistent. Deliberately
+ *  strict: our `v`, and `ids` must be distinct known slots containing `active`. */
+function readIndex(): ProfileIndex | null {
+  const raw = readItem(INDEX_KEY);
+  if (!raw) return null;
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return null; }
+  // Two halves, and only the first is load-bearing — said plainly, since the comment below deletes a clause
+  // for being unreachable. `!parsed` is what stops `sna:profiles = 'null'` reaching the destructure and
+  // throwing out of `activeProfile()`, `profileIds()` and `load()` alike, taking the whole recovery this
+  // block exists for with it; deleting the line is red. The `typeof`/`Array.isArray` half is subsumed by
+  // `v !== 1` two lines down, because no JSON array or primitive can carry a `v` at all — removing it alone
+  // is green, and no fixture can make it otherwise. It stays as the parse-boundary front door, the shape
+  // `migrate()` uses on the same kind of blob, rather than leaving `readIndex` depending on the version rule
+  // to reject an array (#330 round 2, N1/N2).
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const { v, active, ids } = parsed as { v?: unknown; active?: unknown; ids?: unknown };
+  // `v` drives something or it is not worth storing — the #38 incident this repository still keeps a rail for
+  // ("the save had a version field and a versioned key but neither drove anything"). An index from a build
+  // that put more on it — slice 2 wants per-profile names and avatars there — must not be relabelled v1 and
+  // then stripped of those fields by the next `setActiveProfile` spread. Refusing routes it to the safe
+  // `defaultIndex` probe instead (#330 review N1).
+  if (v !== 1) return null;
+  // No explicit `ids.length > MAX_PROFILES` clause: the two checks on the next line already bound it, because
+  // distinct members of a four-member union cannot number more than four. It was here as a belt, and a belt no
+  // input can ever reach is a line no test can hold — the #330 review found it green under deletion, and it
+  // is green under deletion for the same reason a comment cannot be tested (#330 review, item 1 and N2).
+  if (!Array.isArray(ids)) return null;
+  if (!ids.every(isProfileId) || new Set(ids).size !== ids.length) return null;
+  // `isProfileId(active)` is here to *narrow* `active` for the return, not as a belt: by this line
+  // `ids.includes(active)` already refuses anything it would have caught, an empty `ids` included, since
+  // nothing is a member of an empty list. Written out because the comment above deleted a clause for being
+  // unreachable, and a reader is owed the reason this one that looks the same is not the same (#330 round 2).
+  if (!isProfileId(active) || !ids.includes(active)) return null;
+  return { v: 1, active, ids: ids as ProfileId[] };
+}
+/**
+ * What the store says when the index is missing or unreadable: **profile 1, active**, plus any other slot that
+ * actually holds a save. A corrupt index must not present a child with a blank game — their save is still
+ * under its own key — and it must not orphan a sibling's either, which is why this probes rather than
+ * returning `['p1']` flat. Nothing is written here on purpose: a blob we merely failed to parse is not
+ * overwritten until a real profile action (`setActiveProfile`, `addProfile`) asks for one.
+ */
+function defaultIndex(): ProfileIndex {
+  const ids = PROFILE_IDS.filter(id => id === 'p1' || holdsSave(id));
+  return { v: 1, active: 'p1', ids };
+}
+/** Whether a slot holds something this module could have written. A bare `!== null` counted any foreign blob
+ *  under our key — `sna:v1:p3 = 'garbage'` invented a phantom profile that loaded as `DEFAULT` and consumed
+ *  one of the four slots for good (#330 review, 02:36Z). Shape only, like `migrate()`'s own front door. */
+function holdsSave(id: ProfileId): boolean {
+  const raw = readItem(saveKeyFor(id));
+  if (!raw) return false;
+  try { const parsed: unknown = JSON.parse(raw); return !!parsed && typeof parsed === 'object' && !Array.isArray(parsed); }
+  catch { return false; }
+}
+const currentIndex = (): ProfileIndex => readIndex() ?? defaultIndex();
+/**
+ * Persist an index. False when the store did not keep it, and then nothing about the profiles has changed.
+ *
+ * It **reads the key back** rather than trusting that `setItem` returned: a store that throws is only half of
+ * "the write did not land". A store that accepts the call and keeps nothing — the shape the issue's own
+ * migration sketch guarded against with "verify it reads back" — used to return true here, so `addProfile()`
+ * reported a new profile that the next `currentIndex()` knew nothing about: the new child onboarded straight
+ * over their sibling's save, in the sibling's slot, and neither child had a game left (#330 review, 02:36Z).
+ *
+ * What `false` promises is exact: the store is **not** holding this index. It does not promise the key is
+ * untouched. For the store this was written for — one that accepts the call and keeps nothing — the two are
+ * the same. On a partially-working store the `setItem` may have landed and the read-back disagreed, or the
+ * read itself thrown, and then the caller's false return sits beside a stored `active` that did change
+ * (#330 round 2, N5). Rolling back would need a blob to roll back to and a write that can fail in its turn,
+ * so the narrower promise is stated rather than bought.
+ */
+function writeIndex(next: ProfileIndex): boolean {
+  const blob = JSON.stringify(next);
+  try { localStorage.setItem(INDEX_KEY, blob); } catch { return false; }
+  return readItem(INDEX_KEY) === blob;
+}
+/** The profiles on this device, in slot order. One profile is the normal case and costs no stored key. */
+export const profileIds = (): ProfileId[] => currentIndex().ids;
+/** Whose game the **store** says is being played — what slice 2's picker draws, and where a session starts.
+ *  Not necessarily whose game `load()` and `save()` are acting on: that is `sessionProfile()`, resolved once
+ *  per session, and the two part company in a second tab on purpose (#330 round 2, N3). */
+export const activeProfile = (): ProfileId => currentIndex().active;
+/**
+ * The profile **this session is playing as** — resolved once, from the index, when the save is first read.
+ *
+ * It is deliberately not `activeProfile()` re-asked per call. `cache`, `readOnly` and `writeFailed` are
+ * session state; the index is shared, and two tabs on one origin share `localStorage` while keeping separate
+ * module state. Re-resolving meant a switch in one tab redirected the other tab's next write: one ordinary
+ * `save()` wrote the child who was playing into their sibling's key, and `reset()` deleted the sibling's save
+ * instead of theirs — no throw, no latch, nothing for the grown-ups screen to report (#330 review, 02:36Z).
+ *
+ * A tab that keeps playing keeps writing to its own child's slot, which is what a child still holding the
+ * device means; an in-page switch goes through `setActiveProfile`/`addProfile`, which clear this so the next
+ * read resolves afresh. So `activeProfile()` (the store's answer, and what slice 2's picker draws) and this
+ * (the session's) can disagree in a second tab, and that disagreement is the point rather than a gap.
+ */
+function sessionProfile(): ProfileId { return cacheProfile ?? (cacheProfile = activeProfile()); }
+/** Forget the cached save and both write latches — they describe one blob (#232's read-only latch and #151's
+ *  failed-write flag), and it is about to be a different one. The profile stays: a fresh start is the same
+ *  child. */
+function dropSessionState() { cache = null; readOnly = false; writeFailed = false; }
+/**
+ * The above, **and** the session's profile: only a switch makes this a different child's session.
+ *
+ * `reset()` deliberately does not do this. It used to, through `dropSessionState()`, and that put back the
+ * whole class `sessionProfile()` exists to close: the next read re-resolved, `defaultIndex()` answers `p1`
+ * unconditionally, and `parents.ts`'s "Start again" then "Undo" (`snapshot = load(); reset(); save(snapshot)`)
+ * wrote the playing child's snapshot into profile 1, over a sibling, with the delete having already taken
+ * their own slot — Undo reporting success the whole way (#330 round 2, item 1).
+ */
+function leaveProfile() { dropSessionState(); cacheProfile = null; }
+/**
+ * Switch the active profile. False when `id` is not one of this device's profiles, or when the index was not
+ * kept: a switch the store refuses would put the child back on their sibling's game at the next launch, and
+ * on a store that refuses this write the new profile could not be saved either. The caller says so rather
+ * than the session pretending (the `buyItem`/`equipItem` rule, #151).
+ *
+ * **This session is unchanged on a false return; the store is not guaranteed to be.** `writeIndex` promises
+ * only that it is not holding this index, not that the key is untouched — on a partially-working store the
+ * `setItem` may have landed and the read-back disagreed. Read its paragraph before relying on the stronger
+ * reading; `false` did once say "nothing changes" outright, and that outlived the narrowing (#330 round 3, N5).
+ */
+export function setActiveProfile(id: ProfileId): boolean {
+  const idx = currentIndex();
+  if (!idx.ids.includes(id) || !writeIndex({ ...idx, active: id })) return false;
+  leaveProfile();
+  return true;
+}
+/**
+ * Add a profile and make it active, returning its id — or null when the device is at `MAX_PROFILES` or the
+ * index was not kept. The new profile starts on `DEFAULT`, so the caller runs the normal onboarding.
+ *
+ * Null carries both refusals with no way to tell them apart, and slice 2's picker has to say two different
+ * things ("four ninjas is the most" against "this browser will not let the game save") — #335. The same
+ * caveat as `setActiveProfile` applies to the store on a null return.
+ */
+export function addProfile(): ProfileId | null {
+  const idx = currentIndex();
+  const free = PROFILE_IDS.find(id => !idx.ids.includes(id));
+  if (!free || !writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) return null;
+  leaveProfile();
+  return free;
+}
+
 // A raw blob read back from storage: JSON of unknown shape (any past version, or hand-edited). Migrations walk it.
 type RawSave = Record<string, unknown>;
 // Each step upgrades a v(n) blob to v(n+1): it drops the old keys and writes the new ones, instead of leaning
@@ -173,6 +353,8 @@ export function migrate(raw: unknown): SaveData {
 }
 
 let cache: SaveData | null = null;
+/** Which profile `cache`, `readOnly` and `writeFailed` are about — see `sessionProfile()`. */
+let cacheProfile: ProfileId | null = null;
 /**
  * Set when `load()` read a blob from a **newer build** (#232). While it is set the session runs on defaults
  * and `save()` writes nothing, so the stored blob survives: a child whose tablet is on a newer build keeps
@@ -208,9 +390,10 @@ export const isReadOnlySave = () => readOnly;
 let writeFailed = false;
 export const isWriteFailing = () => writeFailed;
 export function load(): SaveData {
+  const id = sessionProfile();
   if (cache) return cache;
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(saveKeyFor(id));
     const parsed: unknown = raw ? JSON.parse(raw) : null;
     // Only a *newer* blob is protected. An unreadable `v` is still refused as data (migrate returns the
     // default) but writes resume, so the next save() replaces the corrupt blob and the device recovers.
@@ -227,7 +410,7 @@ export function save(patch: Partial<SaveData> = {}): SaveData {
   // attempted write, so it does not touch `writeFailed` either way (#151) — that flag is only ever set by an
   // actual `setItem` call, immediately below.
   if (readOnly) return cache;
-  try { localStorage.setItem(KEY, JSON.stringify(cache)); writeFailed = false; }
+  try { localStorage.setItem(saveKeyFor(sessionProfile()), JSON.stringify(cache)); writeFailed = false; }
   catch { writeFailed = true; /* private mode, WebView storage disabled, full quota (#151) */ }
   return cache;
 }
@@ -412,7 +595,7 @@ export function equipItem(id: string): boolean {
   if (readOnly || writeFailed) { cache = before; return false; }
   return true;
 }
-export function reset() { cache = null; readOnly = false; writeFailed = false; try { localStorage.removeItem(KEY); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232); writeFailed is a last-attempt signal, not a diagnosis, so a deliberate fresh start gives it the same benefit of the doubt — the very next save() call sets it again if the browser still refuses (#151)
+export function reset() { const id = sessionProfile(); dropSessionState(); try { localStorage.removeItem(saveKeyFor(id)); } catch { /* ignore */ } }   // the refused blob is gone, so the latch goes with it (#232); writeFailed is a last-attempt signal, not a diagnosis, so a deliberate fresh start gives it the same benefit of the doubt — the very next save() call sets it again if the browser still refuses (#151)
 
 /**
  * The save as a code the grown-up can copy to another device (#64). Every APK the workflow builds is signed
@@ -428,7 +611,7 @@ export function exportSave(): string {
   // mechanism added to protect it. The stored blob *is* the child's save, so move that instead: the newer
   // device reads it, and an older one refuses it in importSave() exactly as it refuses any newer code.
   if (readOnly) {
-    try { const raw = localStorage.getItem(KEY); if (raw) return raw; } catch { /* private mode etc. */ }
+    try { const raw = localStorage.getItem(saveKeyFor(sessionProfile())); if (raw) return raw; } catch { /* private mode etc. */ }
   }
   return JSON.stringify(load());
 }
@@ -449,9 +632,10 @@ export function importSave(text: string): boolean {
   const v = (raw as RawSave).v;
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > SAVE_VERSION) return false;
   const next = migrate(raw);
+  const id = sessionProfile();
   let wrote = false;
-  try { localStorage.setItem(KEY, JSON.stringify(next)); wrote = true; } catch { /* private mode etc. */ }
-  cache = next;
+  try { localStorage.setItem(saveKeyFor(id), JSON.stringify(next)); wrote = true; } catch { /* private mode etc. */ }
+  cache = next;   // `sessionProfile()` above has already latched `cacheProfile` to `id`
   // #232 review: only lift the protection if the replacement actually landed. If setItem threw, the newer
   // blob is still on disk — clearing the latch here would let the next ordinary save() relabel it, which is
   // #232 restored through this very line. (The swallowed catch and the unconditional `true` are older

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { activeProfile, addProfile, MAX_PROFILES, PROFILE_IDS, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
@@ -754,5 +754,388 @@ describe('save() write failures are distinguishable from the read-only latch (#1
     expect(isWriteFailing()).toBe(true);
     reset();
     expect(isWriteFailing(), 'reset() clears it, same as the read-only latch').toBe(false);
+  });
+});
+
+/*
+ * #20 slice 1 — siblings on one device, at the storage layer only.
+ *
+ * The behaviour these pin, in the owner's words (in session, 2026-09-19): the existing save becomes profile 1
+ * losing nothing; at most four profiles; nothing changes for a device with one profile. Everything above this
+ * block is the single-profile suite and is *also* the regression test for that last claim — it addresses
+ * `sna:v1` by name throughout and was not touched by this change.
+ */
+describe('profiles: siblings on one device (#20)', () => {
+  const INDEX = 'sna:profiles';
+  // Back to a one-profile device, for a module that keeps session state of its own. The switch is doing the
+  // work, and `reset()` cannot stand in for it: `reset()` deliberately does **not** end the session's binding
+  // — a fresh start is the same child — so a test that finished playing as p2 would otherwise have the next
+  // test's `save()` land in p2, and it must not leave a latch of its own either, or a test that seeds an index
+  // naming p2 would still be read as p1. The old helper claimed dropping the index was enough; it never was,
+  // because `sessionProfile()` returns the latched profile and never consults the index, and profile 1 leaked
+  // from one test into the next (#330 round 2, item 2).
+  const freshDevice = () => {
+    for (const id of PROFILE_IDS) localStorage.removeItem(saveKeyFor(id));
+    localStorage.removeItem(INDEX);
+    expect(setActiveProfile('p1'), 'the teardown checks its own switch').toBe(true);   // clears the cache, both write latches and the session's profile
+    localStorage.removeItem(INDEX);  // ...and a one-profile device stores no index
+  };
+  it('the teardown really does hand each test an empty device', () => {
+    save({ name: 'Ada', coins: 50 });
+    expect(addProfile()).toBe('p2');
+    save({ name: 'Bo' });
+    freshDevice();
+    expect(localStorage.getItem(INDEX)).toBeNull();
+    for (const id of PROFILE_IDS) expect(localStorage.getItem(saveKeyFor(id)), id).toBeNull();
+    expect(load().name, 'and the module is not still latched to the sibling').toBe('');
+    save({ name: 'Cass' });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).name, 'the next test writes to profile 1').toBe('Cass');
+  });
+  beforeEach(freshDevice);
+
+  it('a device with one profile stores no index at all, and profile 1 is the save that is already there', () => {
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Ada', coins: 42 }));
+    expect(saveKeyFor('p1'), 'profile 1 is not moved off the historical key').toBe('sna:v1');
+    expect(activeProfile()).toBe('p1');
+    expect(profileIds()).toEqual(['p1']);
+    expect(localStorage.getItem(INDEX), 'one profile costs no stored key').toBeNull();
+    expect(load().name, 'the v3 save is read in place, unmigrated and unmoved').toBe('Ada');
+    expect(load().coins).toBe(42);
+  });
+
+  it('an empty store reads as one profile on defaults, and writes profile 1 where it always wrote', () => {
+    expect(profileIds()).toEqual(['p1']);
+    expect(load().coins).toBe(0);
+    save({ name: 'Bo', coins: 7 });
+    expect(JSON.parse(localStorage.getItem('sna:v1')!).name).toBe('Bo');
+  });
+
+  it('two profiles keep separate coins, progress and certificates', () => {
+    save({ name: 'Ada' }); addCoins(50); recordTopic('y1-bonds', 3, 90);
+    recordCert({ id: 'year1:y1-bonds', name: 'Ada', avatar: 'volt', year: 'Year 1', title: 'Number bonds', stars: 3, score: 90, correct: 6, attempts: 6, date: '2026-09-20' });
+
+    const second = addProfile();
+    expect(second).toBe('p2');
+    expect(activeProfile()).toBe('p2');
+    expect(profileIds()).toEqual(['p1', 'p2']);
+    expect(load().name, 'a new profile starts on defaults, ready for onboarding').toBe('');
+    expect(load().coins).toBe(0);
+    expect(load().progress).toEqual({});
+    expect(certificates()).toEqual([]);
+
+    save({ name: 'Bo' }); addCoins(5); recordTopic('r-count', 1, 10);
+
+    expect(setActiveProfile('p1')).toBe(true);
+    expect(load().name).toBe('Ada');
+    expect(load().coins).toBe(50);
+    expect(load().progress['y1-bonds']).toMatchObject({ stars: 3, best: 90 });
+    expect(load().progress['r-count'], "the sibling's progress is not here").toBeUndefined();
+    expect(certificates().map(c => c.id)).toEqual(['year1:y1-bonds']);
+
+    expect(setActiveProfile('p2')).toBe(true);
+    expect(load().name).toBe('Bo');
+    expect(load().coins).toBe(5);
+    expect(certificates(), "and Ada's certificate is not in Bo's album").toEqual([]);
+    expect(localStorage.getItem('sna:v1:p2'), 'the sibling has a key of their own').not.toBeNull();
+  });
+
+  it('stops at four profiles', () => {
+    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toBe('p3');
+    expect(addProfile()).toBe('p4');
+    expect(profileIds().length).toBe(MAX_PROFILES);
+    const before = localStorage.getItem(INDEX);
+    expect(addProfile(), 'the fifth is refused').toBeNull();
+    expect(profileIds()).toEqual(['p1', 'p2', 'p3', 'p4']);
+    // Read the store, not `activeProfile()`: `addProfile` short-circuits on `!free` before it writes, so the
+    // old assertion could not fail whatever the refusal did (#330 review N8).
+    expect(localStorage.getItem(INDEX), 'and the refusal leaves the stored index exactly as it was').toBe(before);
+    expect(profileIds().length, 'four is the cap, and the cap is the length of the slot list').toBe(MAX_PROFILES);
+
+    // p3 and p4 existed only in the index: every isolation assertion in this block was p1-against-p2, so two
+    // of the owner's four slots had their key derivation held by nothing, and what that hides is the
+    // feature's headline failure — two children silently sharing one save (#330 round 3, item 2).
+    const NAMES = [['p1', 'Ada'], ['p2', 'Bo'], ['p3', 'Cass'], ['p4', 'Dee']] as const;
+    for (const [id, name] of NAMES) { expect(setActiveProfile(id), id).toBe(true); save({ name }); }
+    for (const [id, name] of NAMES) {
+      expect(JSON.parse(localStorage.getItem(saveKeyFor(id))!).name, `${id} has a key of its own`).toBe(name);
+      expect(setActiveProfile(id), id).toBe(true);
+      expect(load().name, `${id} reads back its own child`).toBe(name);
+    }
+    expect(new Set(NAMES.map(([id]) => saveKeyFor(id))).size, 'four slots, four keys').toBe(MAX_PROFILES);
+  });
+
+  it('a corrupt index falls back to profile 1 with its save intact, and keeps the siblings it can see', () => {
+    // Seeded straight into the store rather than through save(): this is a *relaunch* on a device whose
+    // index has been corrupted, and `reset()` is a fresh start for one profile, not a way to reload.
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Ada', coins: 30 }));
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION, name: 'Bo', coins: 3 }));
+    localStorage.setItem(INDEX, '{not json at all');
+
+    expect(activeProfile(), 'not a blank game — profile 1').toBe('p1');
+    expect(load().name).toBe('Ada');
+    expect(load().coins).toBe(30);
+    expect(profileIds(), "the sibling's save is still on disk, so it is not orphaned").toEqual(['p1', 'p2']);
+    expect(localStorage.getItem(INDEX), 'a blob we could not parse is not overwritten until a profile action asks').toBe('{not json at all');
+  });
+
+  it.each([
+    // `'"p2"'` would be refused a third time over by `!Array.isArray(ids)`, so it pinned nothing. These two
+    // reach the object guard itself: without it the destructure throws, and `activeProfile()`, `profileIds()`
+    // and `load()` throw with it — the whole recovery this block is about never runs (#330 round 2, N1).
+    ['null', 'null'],
+    ['an array', '[]'],
+    // These two name a second profile on purpose: with `v` unchecked, an accepted index yields
+    // `['p1','p2']` and an active p2 on defaults, so the row discriminates instead of agreeing with refusal.
+    ['no version', JSON.stringify({ active: 'p2', ids: ['p1', 'p2'] })],
+    ['a version no build here wrote', JSON.stringify({ v: 2, active: 'p2', ids: ['p1', 'p2'] })],
+    ['no ids', JSON.stringify({ v: 1, active: 'p1' })],
+    // Truthy but not an array: the falsy row above reaches only half of `!Array.isArray(ids)`, and without
+    // the other half this blob puts `ids.every is not a function` through `profileIds()` (#330 round 3, N3).
+    ['ids that are not an array', JSON.stringify({ v: 1, active: 'p1', ids: 'p1' })],
+    ['an unknown slot', JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p9'] })],
+    ['a duplicate slot', JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p1'] })],
+    ['an active profile that is not in ids', JSON.stringify({ v: 1, active: 'p3', ids: ['p1', 'p2'] })],
+
+  ])('an index with %s is refused rather than half-trusted', (_why, blob) => {
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Ada' }));
+    localStorage.setItem(INDEX, blob);
+    // The assertion that discriminates (#330 review, item 1). Every fixture but one already says
+    // `active: 'p1'`, so `activeProfile() === 'p1'` and the name below are identities under a *half-trusted*
+    // reading too, and three of these rows stayed green with their clause deleted from `readIndex`. Under
+    // refusal `defaultIndex()` probes and finds only p1's key; under half-trust the half-valid list survives.
+    expect(profileIds(), 'the half-valid list must not reach a caller').toEqual(['p1']);
+    expect(activeProfile()).toBe('p1');
+    expect(load().name).toBe('Ada');
+  });
+
+  it('switching to a profile that does not exist changes nothing', () => {
+    save({ name: 'Ada' });
+    expect(setActiveProfile('p2')).toBe(false);
+    // Nothing written, not merely nothing visible (#330 review, item 1's coda): writing the index *before*
+    // the membership check left 80/80 green, because `readIndex` then rejects the bogus index it just wrote.
+    expect(localStorage.getItem(INDEX), 'the refusal does not write an index on the way out').toBeNull();
+    expect(activeProfile()).toBe('p1');
+    expect(load().name).toBe('Ada');
+  });
+
+  it('a store that refuses the index keeps the child on the profile they are already playing (#151)', () => {
+    save({ name: 'Ada', coins: 12 });
+    addProfile();                                   // p2 exists and is active
+    save({ name: 'Bo' });
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try {
+      expect(setActiveProfile('p1'), 'an unpersisted switch is reported, not pretended').toBe(false);
+      expect(addProfile(), 'and no profile is added either').toBeNull();
+    } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(activeProfile(), 'still Bo, which is what the next launch will also read').toBe('p2');
+    expect(load().name).toBe('Bo');
+  });
+
+  it('export and restore act on the active profile, not on profile 1', () => {
+    save({ name: 'Ada', coins: 99 });
+    const adaCode = exportSave();
+    // Move profile 1 on *after* the code is taken, so the code and the slot it must not touch differ. With
+    // both at 99 coins, clobbering p1 with the code is undetectable — the identity the review caught.
+    save({ coins: 7 });
+    expect(addProfile()).toBe('p2');
+    save({ name: 'Bo', coins: 1 });
+    expect(JSON.parse(exportSave()).name, 'the code carries whoever is playing').toBe('Bo');
+
+    expect(importSave(adaCode)).toBe(true);
+    // Read the store, not `load()`: `importSave` fills `cache` whichever key its `setItem` targeted, so the
+    // cache cannot tell a restore into p2 from one that overwrote p1 (#330 review, item 2). This is the line
+    // that stops a grown-up restoring the second child's code over the first child's game.
+    const stored = (id: 'p1' | 'p2') => JSON.parse(localStorage.getItem(saveKeyFor(id))!);
+    expect(stored('p2'), "the restore lands in the active profile's slot").toMatchObject({ name: 'Ada', coins: 99 });
+    expect(stored('p1'), 'and profile 1 is left exactly as it was').toMatchObject({ name: 'Ada', coins: 7 });
+
+    // and it reads back through a real switch, not through the cache the import just filled
+    expect(setActiveProfile('p1')).toBe(true);
+    expect(load().coins).toBe(7);
+    expect(setActiveProfile('p2')).toBe(true);
+    expect(load().coins).toBe(99);
+  });
+
+  it("a sibling's own blob is what export moves when their save is read-only (#232)", () => {
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Ada', coins: 99 }));
+    // The sibling plays on a device that has seen a newer build, so `exportSave()` moves the stored blob
+    // rather than the defaults the latch runs on. The existing latch test only ever runs on p1, so the
+    // `KEY` → `activeKey()` change on that branch was unheld: it handed the grown-up the wrong child's game.
+    const newer = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', coins: 5 });
+    localStorage.setItem(saveKeyFor('p2'), newer);
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2'] }));
+
+    load();
+    expect(isReadOnlySave(), "the sibling's blob is newer than this build").toBe(true);
+    expect(exportSave(), "the code is the sibling's own blob, not profile 1's").toBe(newer);
+  });
+
+  it('a switch lifts the latches the profile we left set, and re-arms them on the way back (#232, #151)', () => {
+    const newer = JSON.stringify({ v: SAVE_VERSION + 5, name: 'Ada', coins: 500 });
+    localStorage.setItem(saveKeyFor('p1'), newer);
+    load();
+    expect(isReadOnlySave(), "profile 1's blob is from a newer build, so this session writes nothing").toBe(true);
+
+    expect(addProfile()).toBe('p2');
+    // The whole job of `dropSessionState()` beyond clearing the cache: reduced to `cache = null` it left
+    // 80/80 green, and the sibling could not save for the entire session with nothing shown (#330 review,
+    // item 3). Both latches describe one blob, and it is not this profile's.
+    expect(isReadOnlySave(), 'the read-only latch belongs to the profile we left').toBe(false);
+    save({ name: 'Bo', coins: 3 });
+    expect(isWriteFailing(), 'and the write really was attempted').toBe(false);
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "the sibling's save lands on disk").toBe('Bo');
+    expect(localStorage.getItem(saveKeyFor('p1')), "while profile 1's newer blob is byte-for-byte untouched").toBe(newer);
+
+    expect(setActiveProfile('p1')).toBe(true);
+    load();
+    expect(isReadOnlySave(), 'and switching back re-arms it against the blob it protects').toBe(true);
+  });
+
+  /*
+   * The 02:36Z review of PR #330: two findings that are design rather than assertions, both reproduced with
+   * no store fault at all, and both silent — no throw, no latch, nothing the grown-ups screen could report.
+   */
+  it('an index that moves under a playing session does not redirect its save into a sibling\'s slot', () => {
+    save({ name: 'Ada', coins: 30 });
+    expect(addProfile()).toBe('p2');
+    save({ name: 'Bo', coins: 3 });
+    load();                                    // Bo is the profile this session is playing as
+    localStorage.removeItem(INDEX);            // another tab switches, or the key is cleared
+
+    save({ coins: 4 });                        // one ordinary save, no fault anywhere
+
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!), "the coins land on the child who earned them")
+      .toMatchObject({ name: 'Bo', coins: 4 });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!), "and the sibling's game is exactly as it was")
+      .toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it('a session that reads before it writes keeps its own slot when the index moves', () => {
+    // The order a launch actually uses, and the order the two tests below do not: `load()` is the first thing
+    // that touches storage and the first `save()` comes minutes later. Both of those prime the latch with a
+    // `save()` on the way in, so `load()` re-resolving per call — the very defect `sessionProfile()` exists
+    // to close — could not make them fail (#330 round 3, item 1).
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Ada', coins: 30 }));
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION, name: 'Bo', coins: 3 }));
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2'] }));
+
+    expect(load().name, 'the session binds here, on a read, as a launch does').toBe('Bo');
+    localStorage.removeItem(INDEX);
+    save({ coins: 4 });
+
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).coins, "the write follows the read's profile").toBe(4);
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!), "and the sibling is untouched")
+      .toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it('"Start again" under the same conditions clears the child who asked, not their sibling', () => {
+    save({ name: 'Ada', coins: 30 });
+    expect(addProfile()).toBe('p2');
+    save({ name: 'Bo', coins: 3 });
+    load();
+    localStorage.removeItem(INDEX);
+
+    reset();
+
+    expect(localStorage.getItem(saveKeyFor('p2')), 'the profile that asked to start again is cleared').toBeNull();
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!), "and the sibling is untouched")
+      .toMatchObject({ name: 'Ada', coins: 30 });
+
+    // One statement further than the delete, which is where this stopped and where the defect lived: a fresh
+    // start must not end the session's binding, or the next write re-resolves and `defaultIndex()` answers
+    // `p1` unconditionally. `parents.ts`'s "Start again" then "Undo" is exactly this shape — it keeps the old
+    // save in memory and writes it straight back (#330 round 2, item 1).
+    save({ coins: 9 });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!), 'the child who started again writes to their own slot')
+      .toMatchObject({ coins: 9 });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!), "and the sibling is still untouched afterwards")
+      .toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it('a store that accepts the index and keeps nothing is a refusal, not a new profile (#151)', () => {
+    save({ name: 'Ada', coins: 30 });
+    const realSet = localStorage.setItem;
+    // Not a throw: a store that takes the call and drops this one key. The catch alone never saw this, so
+    // addProfile() reported a profile the next read knew nothing about and the new child onboarded over Ada.
+    (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => { if (k !== INDEX) realSet.call(localStorage, k, v); };
+    let added: string | null, switched: boolean;
+    try { added = addProfile(); switched = setActiveProfile('p1'); }
+    finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+
+    expect(added, 'no profile was added, and the caller is told so').toBeNull();
+    expect(switched, 'and a switch is refused on the same store').toBe(false);
+    expect(activeProfile(), 'the child on the device is still the one who was playing').toBe('p1');
+    expect(profileIds()).toEqual(['p1']);
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it('a foreign blob under a slot key does not invent a profile', () => {
+    save({ name: 'Ada' });
+    localStorage.setItem(saveKeyFor('p3'), 'garbage left by something else');
+    expect(profileIds(), 'a phantom would load as defaults and consume one of the four slots for good')
+      .toEqual(['p1']);
+    // JSON-valid but not a save: the parse alone lets these through, so the shape refinement needs its own
+    // fixture or only half the guard is held (#330 round 2, N1).
+    for (const blob of ['123', '[1,2]', '"x"', 'null']) {
+      localStorage.setItem(saveKeyFor('p3'), blob);
+      expect(profileIds(), blob).toEqual(['p1']);
+    }
+    localStorage.removeItem(saveKeyFor('p3'));
+    // and the slot is still free to be handed out
+    expect(addProfile()).toBe('p2');
+  });
+
+  it('a store whose reads throw does not take the session down with it (#151, #232)', () => {
+    const realGet = localStorage.getItem;
+    (localStorage as unknown as { getItem: unknown }).getItem = () => { throw new Error('storage disabled'); };
+    try {
+      // `sessionProfile()` is the first statement of `load()`, *outside* `load()`'s own try, so `readItem`'s
+      // catch is the only thing between a private-mode or disabled-WebView store and a throw straight out of
+      // `load()`, `activeProfile()` and `profileIds()`. Nothing shimmed `getItem` before (#330 round 3, N2).
+      expect(() => profileIds()).not.toThrow();
+      expect(profileIds()).toEqual(['p1']);
+      expect(activeProfile()).toBe('p1');
+      expect(load().name, 'the session runs on defaults rather than dying').toBe('');
+    } finally { (localStorage as unknown as { getItem: unknown }).getItem = realGet; }
+  });
+
+  it('an index the store altered on the way in is a refusal too, not only one it dropped (#151)', () => {
+    save({ name: 'Ada', coins: 30 });
+    const realSet = localStorage.setItem;
+    // Kept, but not what we wrote. The existing fault-injection drops the key entirely, which a `!== null`
+    // read-back would also catch; only a truncating or stale store separates the two (#330 round 3, N4).
+    (localStorage as unknown as { setItem: unknown }).setItem =
+      (k: string, v: string) => { realSet.call(localStorage, k, k === INDEX ? v.slice(0, 8) : v); };
+    let added: ReturnType<typeof addProfile>;
+    try { added = addProfile(); }
+    finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+
+    expect(added, 'kept-but-different is not kept').toBeNull();
+    expect(profileIds(), 'and the altered blob is not read back as an index either').toEqual(['p1']);
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it("a switch clears the failed-write flag the other profile's write set (#151)", () => {
+    expect(addProfile()).toBe('p2');
+    expect(setActiveProfile('p1')).toBe(true);
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try { save({ coins: 1 }); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(isWriteFailing()).toBe(true);
+    expect(setActiveProfile('p2')).toBe(true);
+    expect(isWriteFailing(), "the refused write was the other child's, and this session has attempted none").toBe(false);
+  });
+
+  it('reset() is a fresh start for the active profile only', () => {
+    save({ name: 'Ada', coins: 30 });
+    addProfile(); save({ name: 'Bo', coins: 3 });
+    reset();
+    expect(activeProfile(), 'still the sibling who asked to start again').toBe('p2');
+    expect(load().name).toBe('');
+    expect(setActiveProfile('p1')).toBe(true);
+    expect(load().name, "the other child's game is not part of it").toBe('Ada');
+    expect(load().coins).toBe(30);
   });
 });
