@@ -110,7 +110,7 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
 });
 
 // #16 items 2–4: the pure helpers the duel screen leans on — which topics a duel may use, and the match line.
-import { DUEL_HANDOVER, duelHeadline, duelPool, spokenQuestion } from '../../src/game/duel';
+import { DUEL_HANDOVER, duelCoins, duelHeadline, duelPool, spokenQuestion, type DuelResult } from '../../src/game/duel';
 import { topicsFor, YEARS } from '../../src/curriculum';
 
 describe('duelPool (#16 item 4: which topics a duel is played on)', () => {
@@ -135,6 +135,36 @@ describe('duelHeadline (#16 item 3: the match-end line)', () => {
     expect(duelHeadline({ winner: 'a', scoreA: 6, scoreB: 3, rounds: 10 })).toBe('Player 1 wins 6–3!');
     expect(duelHeadline({ winner: 'b', scoreA: 2, scoreB: 7, rounds: 10 })).toBe('Player 2 wins 7–2!');
     expect(duelHeadline({ winner: 'draw', scoreA: 4, scoreB: 4, rounds: 10 })).toBe("It's a draw — 4 all!");
+  });
+});
+
+// #16 item 5: what a finished match pays into the one shared save.
+describe('duelCoins (#16 item 5: a match pays the device, not the winner)', () => {
+  const res = (scoreA: number, scoreB: number): DuelResult =>
+    ({ winner: scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : 'draw', scoreA, scoreB, rounds: DUEL_ROUNDS });
+
+  it('pays one coin per decided round — the same rate baseCoins pays per correct answer', () => {
+    expect(duelCoins(res(6, 3))).toBe(9);
+    expect(duelCoins(res(3, 6))).toBe(9);
+    expect(duelCoins(res(5, 5))).toBe(10);
+  });
+
+  it('pays nothing for a drawn round: a match nobody decided pays nothing at all', () => {
+    expect(duelCoins(res(0, 0))).toBe(0);
+    expect(duelCoins(res(4, 2))).toBe(6);            // four rounds drawn out of ten
+  });
+
+  it('does not pay a match-win bonus — the payout depends on the rounds, never on who won', () => {
+    // The pair below is the whole property: same rounds decided, opposite winners, and a draw. A bonus for
+    // the winner (or for `a`, the save's owner) would separate these three.
+    expect(duelCoins(res(7, 3))).toBe(duelCoins(res(3, 7)));
+    expect(duelCoins(res(5, 5))).toBe(duelCoins(res(10, 0)));
+  });
+
+  it('cannot pay more than one coin per round of the match', () => {
+    for (let a = 0; a <= DUEL_ROUNDS; a++) for (let b = 0; a + b <= DUEL_ROUNDS; b++) {
+      expect(duelCoins(res(a, b))).toBeLessThanOrEqual(DUEL_ROUNDS);
+    }
   });
 });
 

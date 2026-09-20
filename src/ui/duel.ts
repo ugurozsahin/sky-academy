@@ -2,17 +2,18 @@
 // player, each fed the SAME question's bubbles; the shared question sits in a strip between them. The pure
 // `Duel` scorer (src/game/duel.ts) owns the rules — first correct slice wins the round, a wrong slice costs
 // nothing, best of DUEL_ROUNDS — and this file only wires two `Arena`s, the strip, the match-end overlay and
-// the `window.__sna` hooks the e2e drives it through. No reward economy yet (item 5, deferred on the issue).
+// the `window.__sna` hooks the e2e drives it through. A finished match pays coins into the one shared save
+// (item 5's coins and stickers); certificates, the Dojo and a duel history are still deferred on the issue.
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
-import { Duel, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult } from '../game/duel';
+import { Duel, duelCoins, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { load } from '../storage';
+import { addCoins, load } from '../storage';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { hintText, promptHTML, promptMode } from './hud';
-import { screenScope } from './screen';
+import { screenScope, stickersHTML } from './screen';
 import { pauseHTML } from './overlays';
 import { waveOptsFor } from './play-session';
 import { renderVisual } from './visuals';
@@ -60,6 +61,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   let waveId = 0; let holdOpen = false;
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
   let hintLine = '';
+  /** Coins the finished match paid into the save; 0 until the match ends (#16 item 5). */
+  let paid = 0;
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
 
@@ -124,6 +127,11 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
 
   function showResults(r: DuelResult) {
     hold(true);
+    // #16 item 5: the match pays into the one shared save before the overlay is built, so the coin row and
+    // any sticker it unlocked are on the screen the children are already looking at.
+    paid = duelCoins(r);
+    const fresh = addCoins(paid);
+    if (fresh.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
     overlay.hidden = false;
     overlay.innerHTML = `
@@ -131,6 +139,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <div class="hero-big sensei" style="--glow:${SENSEI.glow}"><img src="${SENSEI.img}" alt="${SENSEI.name}"><div class="speech">${esc(headline)}</div></div>
         <h2>${r.winner === 'draw' ? 'A draw!' : `${esc(NAME[r.winner])} wins!`}</h2>
         <div class="statgrid duel-final"><div><b>${r.scoreA}</b><small>${NAME.a}</small></div><div><b>${r.rounds}</b><small>rounds</small></div><div><b>${r.scoreB}</b><small>${NAME.b}</small></div></div>
+        <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
+        ${stickersHTML(fresh)}
         <div class="row"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
@@ -163,7 +173,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     state: () => ({
       mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
-      hint: hintLine,
+      hint: hintLine, coins: paid,
     }),
     setSpeed: k => { setGameSpeed(k); },
     timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),

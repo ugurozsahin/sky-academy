@@ -89,6 +89,8 @@ export interface DuelState {
   /** The line the card shows under the prompt — the question's own `hint` when it has one (#16 review). */
   hint: string;
   topic: string;
+  /** Coins the finished match paid into the shared save; 0 until the match ends (#16 item 5). */
+  coins: number;
 }
 
 /** The `window.__sna` hooks set by the Ninja Duel screen (#16): every action names the player it is for. */

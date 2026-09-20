@@ -78,7 +78,12 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
     await expect(page.locator('.duel-end .speech')).toHaveText('Player 1 wins 6–4!');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 6, scoreB: 4 });
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 6, scoreB: 4, coins: 10 });
+    // #16 item 5: the finished match pays the one shared save a coin per decided round — ten here, and not one
+    // of them for winning. Ten is under the first sticker threshold (30), so the match unlocks nothing yet.
+    await expect(page.locator('.duel-end .coin-gain')).toHaveText('+10 🪙');
+    await expect(page.locator('.duel-end .unlock')).toHaveCount(0);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).coins), 'the coins reached the save, not just the overlay').toBe(10);
     // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0. The recording
     // is cleared BEFORE the click: round 1's line goes out on the task after the old screen's cancel(), and it
     // is what the assertion after the scores must find.
@@ -88,7 +93,7 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
     await expect(page.locator('#score-a')).toHaveText('0');
     await expect(page.locator('#score-b')).toHaveText('0');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0 });
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0, coins: 0 });
     await expectHandoverHeard(page);   // the rematch's line is not dropped into the old screen's cancel()
     expect(await page.evaluate(() => window.__said.indexOf('<cancel>')), 'the old screen was hushed first, then the line went out').toBeGreaterThanOrEqual(0);
     // Leaving tears the duel down: the hooks go with it and BOTH render loops stop (#73 — no arena may leak
