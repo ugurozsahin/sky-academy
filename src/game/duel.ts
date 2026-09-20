@@ -94,6 +94,18 @@ function seededRng(seed: number) {
   return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 
+/**
+ * Coins a finished match pays into the save (#16 item 5). The two players share one profile, so the payout
+ * is for the maths the device saw, not for who won: **one coin per decided round**, which is exactly the
+ * `baseCoins` rate every other mode pays for a correct answer (`src/game/modes.ts`) — a round is decided by
+ * a correct slice, so `scoreA + scoreB` is the count of questions answered correctly in the match. A drawn
+ * round pays nothing, and there is no match-win bonus: with one shared save a bonus would pay whoever
+ * happens to hold the device rather than the child whose save it is. Maximum for a `DUEL_ROUNDS` match: 10.
+ */
+export function duelCoins(r: DuelResult): number {
+  return r.scoreA + r.scoreB;
+}
+
 /** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
 export function duelHeadline(r: DuelResult): string {
   return r.winner === 'draw' ? `It's a draw — ${r.scoreA} all!` : `Player ${r.winner === 'a' ? 1 : 2} wins ${Math.max(r.scoreA, r.scoreB)}–${Math.min(r.scoreA, r.scoreB)}!`;
