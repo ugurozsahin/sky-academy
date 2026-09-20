@@ -233,7 +233,13 @@ describe('guard rails', () => {
     // child with four siblings that their browser is broken, or the reverse.
     expect(pick).toMatch(/why === 'full'/);
     // And both are read aloud, not only printed — `.claude/rules/style.md`, "read-aloud everywhere" (B6).
+    // Two halves, because this rail can only ever hold one of them. It reads `refuse`'s *definition*, and
+    // deleting both calls left `tsc` clean and 1436/1436 green while a refused tap did nothing at all — no
+    // hint, no `sfx.wrong()`, no spoken sentence (#380 review B2). The call sites below stop that one
+    // mutation; what holds the behaviour is the e2e in `tests/e2e/game.spec.ts` that taps a card on a store
+    // whose `setItem` throws and asserts both sentences are printed *and* handed to the speech engine.
     expect(pick, 'a refusal is spoken as well as written').toMatch(/hint\.textContent = text; say\(text\);/);
+    expect(pick.match(/return refuse\(o\.hint\);/g) ?? [], 'and both handlers route their refusal through it').toHaveLength(2);
   });
 
   // #380 review B1: the picker pushes no history entry, so whatever entry was current when it opened is what

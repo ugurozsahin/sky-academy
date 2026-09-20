@@ -210,10 +210,27 @@ function dropSessionState() { cache = null; readOnly = false; writeFailed = fals
  */
 function leaveProfile() { dropSessionState(); cacheProfile = null; }
 /**
+ * Re-entering the profile the index already calls active. The cached blob and the resolved profile go, so the
+ * next read answers from the store — a second tab may have moved `active` under this session, and re-resolving
+ * is what puts the child on the card they tapped rather than on whoever this session last cached.
+ *
+ * **Both write latches stay**, which is the difference from `leaveProfile()`: they describe *this* child's
+ * blob and it is still the same blob, so a device that cannot save must go on saying so (#151's failed-write
+ * flag, #232's read-only latch, `parents.ts:35`'s sentence). Clearing them here would make the grown-ups
+ * screen forget a real fault every time a child tapped their own card.
+ */
+function rereadProfile() { cache = null; cacheProfile = null; }
+/**
  * Switch the active profile. False when `id` is not one of this device's profiles, or when the index was not
  * kept: a switch the store refuses would put the child back on their sibling's game at the next launch, and
  * on a store that refuses this write the new profile could not be saved either. The caller says so rather
  * than the session pretending (the `buyItem`/`equipItem` rule, #151).
+ *
+ * **Re-selecting the child who is already active is not a switch and writes nothing** (#380 review B1). It
+ * used to: the index was rewritten with the value it already held, so on a store that refuses writes every
+ * card on the launch picker was refused — the child's own included — and since the launch picker draws no
+ * back control, the device that used to boot to the sky map and play unsaved could no longer reach the game
+ * at all. Nothing needs persisting to hand a child back their own game, so nothing is attempted.
  *
  * **This session is unchanged on a false return; the store is not guaranteed to be.** `writeIndex` promises
  * only that it is not holding this index, not that the key is untouched — on a partially-working store the
@@ -222,7 +239,9 @@ function leaveProfile() { dropSessionState(); cacheProfile = null; }
  */
 export function setActiveProfile(id: ProfileId): boolean {
   const idx = currentIndex();
-  if (!idx.ids.includes(id) || !writeIndex({ ...idx, active: id })) return false;
+  if (!idx.ids.includes(id)) return false;
+  if (idx.active === id) { rereadProfile(); return true; }
+  if (!writeIndex({ ...idx, active: id })) return false;
   leaveProfile();
   return true;
 }

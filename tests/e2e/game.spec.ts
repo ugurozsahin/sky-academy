@@ -6,6 +6,7 @@ import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 
 declare global {
   interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
+  interface Window { __spoken?: string[] }                          // #380 review B2: every line the engine was handed, in order
 }
 
 // The live screen sets `__sna` to PlayHooks or MemoryHooks; a given test knows which, so the spec views it as
@@ -1974,6 +1975,71 @@ test.describe('profile picker (#20 slice 2)', () => {
 
     await page.click('#who');
     await expect(page.locator('.avatar-card[data-profile]'), 'and backing out created nobody').toHaveCount(1);
+  });
+
+  /**
+   * A store that takes every `setItem` and throws. Registered *after* `seedSiblings`, so the seed lands and
+   * only the running game's writes are refused — `addInitScript`s run in registration order.
+   */
+  const refuseWrites = (page: Page) => page.addInitScript(() => {
+    const proto = Object.getPrototypeOf(localStorage) as Storage;
+    proto.setItem = () => { throw new DOMException('quota', 'QuotaExceededError'); };
+  });
+  /** Record every line handed to the engine, so a test can assert a sentence was *spoken* and not only printed. */
+  const captureSpeech = (page: Page) => page.addInitScript(() => {
+    window.__spoken = [];
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        speaking: false, pending: false, getVoices: () => [], cancel: () => {}, onvoiceschanged: null,
+        speak: (u: SpeechSynthesisUtterance) => { window.__spoken!.push(u.text); },
+      },
+    });
+  });
+
+  /**
+   * guard rail (#380 review B1 and B2), and the one fixture that holds both. A device whose store reads but
+   * refuses writes is a decision this repo has already made twice — #151's `writeFailed`, #232's read-only
+   * latch, `parents.ts`'s "This device is not saving progress right now" — and the answer is always that the
+   * game degrades rather than stops. Before the picker, such a device booted to the sky map and the child
+   * played unsaved.
+   *
+   * B1: `setActiveProfile` wrote the index even when `id` was already active, so every card on the launch
+   * picker was refused — including the child's own — and the launch picker deliberately draws no back
+   * control. Three cards, three refusals, no fourth thing to tap: the game became unreachable.
+   *
+   * B2: nothing at any layer rendered this screen, so both handlers' `refuse(...)` calls were untested code.
+   * Deleting them left `tsc` clean and the whole suite green while a refused tap did nothing at all — no
+   * hint, no sound, no spoken sentence — which to a pre-reader is indistinguishable from a broken game. The
+   * unit rail can only read `refuse`'s *definition*; this is what reads the call.
+   */
+  test('a refusing store: the refusals are spoken, and the child still reaches their own game (#20 slice 2)', async ({ page }) => {
+    await seedSiblings(page);
+    await captureSpeech(page);
+    await refuseWrites(page);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.profile-screen #back'), 'no way out but a card, which is why one of them must work').toHaveCount(0);
+
+    // The sibling's card is honestly refused: that switch genuinely cannot be persisted, and the next launch
+    // would put the child back on their own game with no explanation.
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('.profile-screen'), "and the child is not dropped into their sibling's game").toBeVisible();
+    await expect(page.locator('#who-hint')).toHaveText('This browser will not let the game save, so it cannot swap ninja. 😕');
+    await expect.poll(() => page.evaluate(() => window.__spoken ?? []), { message: 'read aloud, not only printed' })
+      .toContain('This browser will not let the game save, so it cannot swap ninja. 😕');
+
+    // "New ninja" the same, and with its own sentence — the two refusals are not one message (#335 item 2).
+    await page.click('#new-ninja');
+    await expect(page.locator('#who-hint')).toHaveText('This browser will not let the game save, so a new ninja cannot be added. 😕');
+    await expect.poll(() => page.evaluate(() => window.__spoken ?? []))
+      .toContain('This browser will not let the game save, so a new ninja cannot be added. 😕');
+
+    // ...and their own card lets them through to a game that plays unsaved, as the device did before #20.
+    await page.click('.avatar-card[data-profile="p1"]');
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('#change-av'), 'their own save, read from their own slot').toContainText('Ada');
+    await expect(page.locator('#rewards')).toContainText('40');
   });
 
   test('the launch picker has no back control — it is the root screen (#20 slice 2)', async ({ page }) => {

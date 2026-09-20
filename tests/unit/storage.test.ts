@@ -1065,10 +1065,59 @@ describe('profiles: siblings on one device (#20)', () => {
     finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
 
     expect(added, 'no profile was added, and the caller is told it is the store').toEqual({ ok: false, why: 'store' });
-    expect(switched, 'and a switch is refused on the same store').toBe(false);
+    // p1 is the only profile and already the active one, so this is not a switch at all: it persists nothing,
+    // and a store that keeps nothing therefore has nothing to refuse (#380 review B1). It read `false` here
+    // until that review, which is the bug — see the three tests below for what that cost a child.
+    expect(switched, 'and re-entering the child already active is not a switch the store can refuse').toBe(true);
     expect(activeProfile(), 'the child on the device is still the one who was playing').toBe('p1');
     expect(profileIds()).toEqual(['p1']);
     expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  /*
+   * #380 review B1. `setActiveProfile` wrote the index unconditionally, including when `id` was already
+   * `active`, so on a store that refuses writes the launch picker refused *every* card — the child's own
+   * included — and the launch picker draws no back control. A device that used to boot to the sky map and
+   * play unsaved could no longer reach the game at all. The three below are the three halves of the fix that
+   * can each go wrong on their own: the refusal that must stay, the latches that must survive, and the
+   * re-read that stops a no-op returning `true` while the session sits on a sibling.
+   */
+  it('re-entering the child already playing writes nothing, so a refusing store cannot lock them out (#380 review B1)', () => {
+    save({ name: 'Ada', coins: 12 });
+    addProfile();                                   // p2 exists and is active
+    save({ name: 'Bo' });
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try {
+      expect(setActiveProfile('p1'), 'a real switch still needs the index kept, and is still refused').toBe(false);
+      expect(setActiveProfile('p2'), 'but their own card hands them back their own game').toBe(true);
+    } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(activeProfile(), 'and it is still the child the next launch will read').toBe('p2');
+    expect(load().name, "their save, not the sibling's").toBe('Bo');
+  });
+
+  it('...and it keeps the failed-write flag, which describes the blob the child is still on (#151)', () => {
+    save({ name: 'Ada' });
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try {
+      save({ coins: 3 });
+      expect(isWriteFailing(), 'the write just threw').toBe(true);
+      expect(setActiveProfile('p1')).toBe(true);
+      // `leaveProfile()` would clear it here, and the grown-ups screen would stop saying the device is not
+      // saving — a real fault forgotten every time a child tapped their own card.
+      expect(isWriteFailing(), 'the same child, the same blob, so the same fault').toBe(true);
+    } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+  });
+
+  it('...and a second tab that moved the index is honoured, not the profile this session cached (#380 review B1)', () => {
+    save({ name: 'Ada' });
+    addProfile();                                   // p2 active, and this session is latched to it
+    save({ name: 'Bo' });
+    // Another tab switches the device back to Ada. This session never saw it and is still cached on Bo.
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }));
+    expect(setActiveProfile('p1'), 'already active in the store, so there is nothing to persist').toBe(true);
+    expect(load().name, 'but the session re-resolves rather than playing on as the sibling it cached').toBe('Ada');
   });
 
   it('a foreign blob under a slot key does not invent a profile', () => {
