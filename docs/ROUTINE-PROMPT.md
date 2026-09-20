@@ -71,7 +71,7 @@ From that set, in this order:
 4. **highest priority wins**: `priority:P0` before `priority:P1` before `priority:P2` before `priority:P3` (0 is more urgent than 1 — the order `scripts/board-sync.mjs`'s `PRIORITIES` array uses); an issue with no `priority:*` label sorts after all four;
 5. **oldest first** — lowest issue number — so nothing rots at the bottom of a bucket.
 
-The three documented ways past it are in **WHAT TO WORK ON** above; take one only when you can point at the evidence for it (the `playtest` label, a red `main`, the owner's own comment, a `watchdog` issue), and say in the PR which one you took. **Nothing in this flow reads the project board** — it is the owner's view, derived from the labels by the Mac job; he reorders on the issue (`.claude/rules/governance.md`). Comment "starting" on the issue, then follow the **`open-pr` project skill** (`.claude/skills/open-pr/SKILL.md`) for *how* to branch, write the body and push it. Four things stay here too:
+The three documented ways past it are in **WHAT TO WORK ON** above; take one only when you can point at the evidence for it (the `playtest` label, a red `main`, the owner's own comment, a `watchdog` issue), and name in the PR body and in the snapshot both the issue the query returned and the way you took (#338, `.claude/rules/governance.md`). **Nothing in this flow reads the project board** — it is the owner's view, derived from the labels by the Mac job; he reorders on the issue. Comment "starting" on the issue, then follow the **`open-pr` project skill** (`.claude/skills/open-pr/SKILL.md`) for *how* to branch, write the body and push it. Four things stay here too:
 
 ```
 feature/<n>-<slug>     fix/<n>-<slug>     chore/<n>-<slug>
@@ -119,7 +119,7 @@ get right, and worked examples.
 
 STEP 4 — NOTHING ELIGIBLE? Do not invent work no open issue asks for — if it is worth doing, file it with a priority label and the next run picks it up by the same query. Instead: QA something merged without review (a merged PR whose thread carries no reviewer comment; the PR list says which), lower a guard-rail budget you can genuinely lower, thicken the thin unit coverage of `arena`/`visuals`/`tracing` (#43), or write up what you would do next and why. Fix obvious low-risk bugs (wrong ranges, typos, failing tests) via a PR.
 
-STEP 5 — RECORD. One write, and it is the whole record: **your heartbeat snapshot**. See "Where a record goes" above for where the other kinds of record belong. There is no board sync step (Context above); the snapshot's `- board:` line carries the pulse you read in STEP 1.
+STEP 5 — RECORD. One write, and it is the whole record: **your heartbeat snapshot**. See "Where a record goes" above for where the other kinds of record belong.
 
 As the very last thing you do, **replace** the body of the open issue titled `routine: heartbeat` (label `watchdog`) with a fixed-size snapshot of this run. Create it with that snapshot already in the body if it does not exist — one `POST /issues` with title, body and labels together, never create-then-fill, or a run that dies in between leaves an issue with no timestamp that reads as a pulse forever. Never close it; it is not work, it is your pulse, and the watchdog reads it to tell a dead routine from a quiet one.
 
@@ -139,6 +139,7 @@ The shape — one summary line, then the checks, then anything you decided not t
 - main: green · open PRs after this run: 2 (#99; #101, mine)
 - board: pulse 2026-09-10T22:30Z (11 min old, inside ~2 h) — in step, 59 cards
 - review queue: 1 waiting (#99, 3 h) — under the alarm
+- query top pick: #98 (P1) — taken
 - second item: no — condition 2 failed (48 min into the run)
 - not done, and why: #63 (P1) is blocked by #72, which is open — skipped per STEP 3
 ```

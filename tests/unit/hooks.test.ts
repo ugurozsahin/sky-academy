@@ -10,7 +10,7 @@ import { commands, parse } from '../../.claude/hooks/shell.mjs';
 // @ts-expect-error — plain ESM hook script
 import { check as writeCheck } from '../../.claude/hooks/write-guard.mjs';
 // @ts-expect-error — plain ESM hook script
-import { frozenLabel, heartbeatAppend, ownerMarker, secondItem } from '../../.claude/hooks/github-write-guard.mjs';
+import { check as githubCheck, frozenLabel, heartbeatAppend, ownerMarker, queryTopPick, secondItem } from '../../.claude/hooks/github-write-guard.mjs';
 
 /**
  * The layer-0 hooks (#101): `.claude/settings.json` runs one script per tool family before the tool call,
@@ -30,6 +30,7 @@ const isDeny = (result: unknown) => (result as any)?.hookSpecificOutput?.permiss
 const runHook = (check: Check<string>, command: string) => asDeny(check(command));
 const runBodyHook = (check: Check<{ body: string }>, body: string) => asDeny(check({ body }));
 const runIssueWriteHook = (input: Record<string, unknown>) => asDeny(secondItem(input));
+const runTopPickHook = (input: Record<string, unknown>) => asDeny(queryTopPick(input));
 const runLabelsHook = (input: Record<string, unknown>) => asDeny(frozenLabel(input));
 const runAppendHook = (input: Record<string, unknown>) => asDeny(heartbeatAppend(input));
 
@@ -445,6 +446,38 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
 
   it('#97 second-item hook: a mention of "second item" in prose, not as its own `- second item:` line, still denies', () => {
     expect(isDeny(runIssueWriteHook({ method: 'update', issue_number: 62, body: 'we discussed the second item rule casually but never wrote the line' }))).toBe(true);
+  });
+
+  // #338: the same shape as the second-item rule above, and for the same reason. STEP 3's query is meant to
+  // be mechanical, so a run that develops a different issue has to say which one the query named and which of
+  // the three documented ways past the order it used — a run developed #20 while the query named #18, and
+  // nothing obliged it to record the departure, so only a watchdog reconstructing the query found it. What
+  // this cannot check is the same gap: that the line is there, never that the issue named is the right one.
+  it('#338 query-top-pick hook: denies an update to #62 whose body has no `- query top pick:` line', () => {
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: '2026-09-20T00:00Z — did stuff\n- second item: no\n- main: green' }))).toBe(true);
+  });
+
+  it('#338 query-top-pick hook: allows a body carrying the line, taken or departed from', () => {
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'stuff\n- query top pick: #298 (P1) — taken\n- main: green' }))).toBe(false);
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: '- query top pick: #298 — not taken; watchdog issue #338 came first' }))).toBe(false);
+  });
+
+  it('#338 query-top-pick hook: scopes to #62 and to `update`, like its sibling', () => {
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 61, body: 'the watchdog pulse never develops' }))).toBe(false);
+    expect(isDeny(runTopPickHook({ method: 'create', issue_number: 62, body: 'a brand new issue body, no line' }))).toBe(false);
+  });
+
+  it('#338 query-top-pick hook: prose about the query, not the line itself, still denies', () => {
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'the query top pick was #298 but I never wrote it as a line' }))).toBe(true);
+  });
+
+  // Both heartbeat rules are reachable through the exported `check`, in either order of omission — a rule
+  // that is written but not wired into `check` denies nothing, and `.claude/settings.json` calls only `check`.
+  it('#338/#97: `check` denies a heartbeat body missing either line, and allows one carrying both', () => {
+    const withBoth = '2026-09-20T00:00Z — x\n- query top pick: #298 — taken\n- second item: no — condition 2 failed';
+    expect(isDeny(asDeny(githubCheck({ method: 'update', issue_number: 62, body: withBoth })))).toBe(false);
+    for (const missing of ['- query top pick: #298 — taken', '- second item: no — condition 2 failed'])
+      expect(isDeny(asDeny(githubCheck({ method: 'update', issue_number: 62, body: withBoth.replace(missing + '\n', '').replace('\n' + missing, '') })))).toBe(true);
   });
 
   // #101 Layer 4 / #216 §1: the freeze-history rule's one enforceable piece — see the structural test above
