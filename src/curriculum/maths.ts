@@ -763,6 +763,90 @@ const y2Position: Generator = (d, rng) => {
   });
 };
 
+// ---------- Symmetry & repeating patterns (#299 slice 4) ----------
+/**
+ * Half-pictures, three squares wide. A card's grid is a half beside its own reflection, so a symmetric
+ * picture is symmetric **by construction** rather than by a table someone has to keep correct by hand:
+ * there is no way to mistype a half into an asymmetric whole. `#` is a coloured square, `.` an empty one.
+ */
+const SYM_HALVES: readonly (readonly string[])[] = [
+  ['..#', '.##', '###', '..#'],   // a tree on a trunk
+  ['.##', '###', '.##', '..#'],   // a balloon on a string
+  ['#..', '##.', '###', '.##'],   // a mountain
+  ['..#', '.##', '.##', '###'],   // a fir
+  ['.#.', '###', '###', '..#'],   // a butterfly
+  ['###', '.##', '..#', '..#'],   // a funnel
+];
+/** A half row beside its own reflection: `..#` → `..##..`. */
+const mirrorRow = (row: string) => row + [...row].reverse().join('');
+const mirrored = (half: readonly string[]) => half.map(mirrorRow);
+/**
+ * Does every row read the same backwards? This is the property the card asks about, written independently of
+ * how a grid was built, so a test can check the answer against the picture rather than against the recipe.
+ */
+export const isVertSymmetric = (grid: readonly string[]) => grid.every(r => r === [...r].reverse().join(''));
+/**
+ * Break the symmetry by toggling `n` squares in the **left half only**. Every toggled square's mirror partner
+ * is in the untouched right half, so the result is always asymmetric — one flip is enough, and `n` only sets
+ * how obvious it is (three at d1, one at d3).
+ */
+function breakSymmetry(rng: Rng, half: readonly string[], n: number): string[] {
+  const grid = mirrored(half).map(r => [...r]);
+  const cols = half[0].length;
+  const spots = shuffle(rng, grid.flatMap((_, r) => Array.from({ length: cols }, (_, c) => [r, c] as [number, number]))).slice(0, n);
+  for (const [r, c] of spots) grid[r][c] = grid[r][c] === '#' ? '.' : '#';
+  return grid.map(r => r.join(''));
+}
+/** Capitals with, and without, a vertical line of symmetry — the mirror-card test itself, in letters. */
+const SYM_LETTERS = ['A', 'H', 'I', 'M', 'O', 'T', 'U', 'V', 'W', 'X', 'Y'];
+const ASYM_LETTERS = ['B', 'C', 'D', 'E', 'F', 'G', 'J', 'K', 'L', 'N', 'P', 'Q', 'R', 'S', 'Z'];
+/** Year 2: "identify line symmetry in a vertical line" — on a drawn picture, and on capital letters. */
+const y2Symmetry: Generator = (d, rng) => {
+  if (d === 1 || rng() < 0.6) {
+    const half = pick(rng, SYM_HALVES);
+    const yes = rng() < 0.5;
+    const grid = yes ? mirrored(half) : breakSymmetry(rng, half, d === 1 ? 3 : d === 2 ? 2 : 1);
+    return wordQ(rng, 'Is the dotted line a line of symmetry?', yes ? 'yes' : 'no', [yes ? 'no' : 'yes'], {
+      visual: { type: 'symmetry', grid }, wide: true,
+      say: 'Look at the dotted line. Are the two halves the same? Say yes or no.',
+      hint: 'Do both halves match?',
+    });
+  }
+  return wordQ(rng, 'Which letter has a vertical line of symmetry?', pick(rng, SYM_LETTERS), shuffle(rng, ASYM_LETTERS).slice(0, 3), {
+    say: 'Which letter looks the same folded down the middle?', hint: 'Fold it down the middle',
+  });
+};
+
+/**
+ * Repeating patterns: a unit of two or three objects repeated three times with one hidden.
+ *
+ * The gap never falls inside the first two repeats, so **two complete periods are always visible** and
+ * exactly one object fits — the acceptance bar for this issue is one defensible answer with the voice off,
+ * and a pattern showing only one period leaves "what comes next" genuinely open.
+ */
+const PATTERN_OBJECTS = ['🔴', '🔵', '🟡', '🟢', '🟣', '🟠', '⭐', '🔷'];
+/** Unit shapes as letters: which positions repeat, filled with objects at generation time. */
+const UNITS_D1 = ['AB'], UNITS_LONGER = ['ABC', 'AAB', 'ABB'];
+const y2Patterns: Generator = (d, rng) => {
+  const shape = pick(rng, d === 1 ? UNITS_D1 : UNITS_LONGER);
+  const letters = [...new Set([...shape])];
+  const chosen = shuffle(rng, PATTERN_OBJECTS).slice(0, letters.length);
+  const unit = [...shape].map(ch => chosen[letters.indexOf(ch)]);
+  const seq = [...unit, ...unit, ...unit];
+  // d1/d2 hide the last object ("what comes next?"); d3 may hide one inside the last repeat, which is harder
+  // because the child has to read the pattern from both sides of the gap.
+  const gap = d === 3 ? ri(rng, unit.length * 2, seq.length - 1) : seq.length - 1;
+  const answer = seq[gap], last = gap === seq.length - 1;
+  // The near decoys are the pattern's own other objects — the mistake worth catching — and the rest of the
+  // pool fills up to three so an AB pattern still gets a full card.
+  const decoys = [...chosen.filter(o => o !== answer), ...shuffle(rng, PATTERN_OBJECTS.filter(o => !chosen.includes(o)))];
+  return wordQ(rng, last ? 'What comes next?' : 'Which one is missing?', answer, decoys, {
+    visual: { type: 'sentence', text: seq.map((o, i) => i === gap ? '_' : o).join(' ') },
+    say: last ? 'Look at the pattern. What comes next?' : 'Look at the pattern. Which one is missing?',
+    hint: last ? 'Slice what comes next' : 'Slice the missing one',
+  });
+};
+
 export const MATHS_TOPICS: Topic[] = [
   // Reception — EYFS Early Learning Goals: Number, Numerical Patterns
   { id: 'r-count', title: 'Count It', icon: '🍎', subject: 'maths', year: 'reception', nc: 'ELG Number: count objects to 10', gen: rCount },
@@ -818,6 +902,8 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', gen: y2Order },
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
   { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes — faces, edges, vertices', gen: y2Shapes },
+  { id: 'y2-symmetry', title: 'Mirror Lines', icon: '🦋', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: line symmetry in a vertical line', gen: y2Symmetry },
+  { id: 'y2-patterns', title: 'What Comes Next?', icon: '🔁', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: order and arrange objects in patterns and sequences', gen: y2Patterns },
   { id: 'y2-position', title: 'Turns & Right Angles', icon: '🧭', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: position, direction, rotation as right angles', gen: y2Position },
   { id: 'y2-length', title: 'Length: cm & m', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: length (cm/m)', gen: y2Length },
   { id: 'y2-mass', title: 'Mass: g & kg', icon: '🏋️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: mass (g/kg)', gen: y2Mass },

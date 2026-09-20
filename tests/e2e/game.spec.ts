@@ -583,6 +583,37 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
+  // #299 slice 4: for `y2-symmetry` the drawing *is* the question — "Is the dotted line a line of symmetry?"
+  // is unanswerable without the picture and the line, and a unit test of `renderVisual` cannot see whether
+  // the SVG is laid out, sized or visible in a browser. Stage 1 is difficulty 1 (`YEARS[year2].diffs` is
+  // `[1, 2, 2, 3, 3]`), which `y2Symmetry` makes the drawn card unconditionally, so the first question is
+  // always this visual — nothing here depends on the roll.
+  test('symmetry: the mirror line and both halves of the picture reach the card (#299)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-symmetry');
+    await expect(page.locator('.vis .symgrid')).toBeVisible();
+    // `toBeVisible()` is not the check for the fold line: an SVG `<line>` is zero-wide, so Playwright reads
+    // its bounding box as empty and calls it hidden. Its geometry below is what proves it was laid out.
+    await expect(page.locator('.vis .symgrid .mirror')).toHaveCount(1);
+    // Every square is drawn, and at least one is filled: a card of empty slots is a picture of nothing, and
+    // the answer would be "yes" for the wrong reason.
+    expect(await page.locator('.vis .symgrid rect').count()).toBeGreaterThan(3);
+    expect(await page.locator('.vis .symgrid rect.on').count()).toBeGreaterThan(0);
+    // The fold line sits on the middle of the grid, which is what makes the two halves comparable at a glance.
+    const geom = await page.locator('.vis .symgrid').evaluate(el => {
+      const svg = el as unknown as SVGSVGElement, box = svg.getBoundingClientRect();
+      const line = svg.querySelector('line')!.getBoundingClientRect();
+      return { centre: box.left + box.width / 2, line: line.left + line.width / 2, span: line.height, height: box.height, width: box.width, overflow: el.parentElement!.scrollWidth - el.parentElement!.clientWidth };
+    });
+    expect(Math.abs(geom.centre - geom.line), 'the mirror line is down the middle').toBeLessThanOrEqual(1.5);
+    expect(geom.span, 'the fold line runs the height of the picture').toBeGreaterThanOrEqual(geom.height * 0.9);
+    expect(geom.width, 'the picture is drawn at a readable size').toBeGreaterThan(100);
+    expect(geom.overflow, `the picture overflowed the viewport by ${geom.overflow}px`).toBeLessThanOrEqual(1);
+    await waitForTarget(page);
+    expect(await answer(page)).toBe(true);
+    await page.waitForFunction(() => window.__sna.state().index > 0);
+  });
+
   test('completing stage 1 shows the avatar celebrating with a praise line', async ({ page }) => {
     await seedPlayer(page, 'kai', 'Sam');
     await startTopic(page, 'year1', 'y1-bonds');

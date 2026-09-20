@@ -103,6 +103,25 @@ export function renderVisual(v: Visual | undefined): string {
       const key = pict && each > 1 ? `<div class="key">1 ${icon} = ${each}</div>` : '';
       return `<div class="vis"><div class="chart ${kind}">${body}${key}</div></div>`;
     }
+    case 'symmetry': {
+      // A vertical line of symmetry drawn as squares on a grid, with a dashed mirror line down the middle
+      // (#299 slice 4). `grid` is an unconstrained `string[]` on a public `Visual`, reached exactly as the
+      // chart rows above are, so the drawing defends itself the same way (#137): at most SYM_MAX rows, every
+      // row padded or truncated to the first row's width, and any character that is not `#` drawn as an empty
+      // square. A malformed blob renders as a plain grid rather than throwing out of `renderVisual` — which
+      // `play-session.ts`'s `show()` does not catch, so a throw here would leave a card with no bubbles.
+      const SYM_MAX = 14;
+      const rows = v.grid.slice(0, SYM_MAX);
+      const cols = Math.min(SYM_MAX, rows.length ? [...rows[0]].length : 0);
+      if (!rows.length || cols < 1) { console.warn('symmetry visual: empty grid — nothing drawn'); return ''; }
+      const S = 10, w = cols * S, h = rows.length * S;
+      const cells = rows.map((row, r) => {
+        const chars = [...row];
+        return Array.from({ length: cols }, (_, c) => `<rect x="${c * S + 1}" y="${r * S + 1}" width="${S - 2}" height="${S - 2}" rx="1.5" class="${chars[c] === '#' ? 'on' : ''}"/>`).join('');
+      }).join('');
+      // The mirror line overshoots the grid top and bottom so it reads as a fold line, not as another cell edge.
+      return `<div class="vis"><svg viewBox="-1 -2 ${w + 2} ${h + 4}" class="symgrid">${cells}<line x1="${w / 2}" y1="-2" x2="${w / 2}" y2="${h + 2}" class="mirror"/></svg></div>`;
+    }
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
     case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
   }
