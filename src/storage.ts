@@ -63,12 +63,17 @@ const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'rece
  * `scripts/flow-*.mjs`'s screenshot flows, and four unit suites all address it by name. The cost is one
  * asymmetric key, which `saveKeyFor` states in a line.
  */
-export const MAX_PROFILES = 4;                                                 // the owner's cap (in session, 2026-09-19)
 export type ProfileId = 'p1' | 'p2' | 'p3' | 'p4';
-/** The four fixed slots. Fixed rather than generated so a corrupt index can be rebuilt by *probing* the store
- *  (four `getItem`s) instead of enumerating it — `localStorage` enumeration is the one part of the API the
- *  Capacitor WebView and the test shim do not agree on. */
-export const PROFILE_IDS: readonly ProfileId[] = ['p1', 'p2', 'p3', 'p4'];
+/** The four fixed slots — the owner's cap (in session, 2026-09-19). Fixed rather than generated so a corrupt
+ *  index can be rebuilt by *probing* the store (four `getItem`s) instead of enumerating it — `localStorage`
+ *  enumeration is the one part of the API the Capacitor WebView and the test shim do not agree on.
+ *  `as const satisfies` rather than a `: readonly ProfileId[]` annotation, which widens the tuple and takes
+ *  `length` back to `number` (#330 review N2). */
+export const PROFILE_IDS = ['p1', 'p2', 'p3', 'p4'] as const satisfies readonly ProfileId[];
+/** Derived, never declared: `addProfile` caps by running out of slots, so a hand-written number here was a
+ *  second truth that could disagree with the first — set it to 3 and the module hands out a fourth slot and
+ *  then refuses the index it just wrote (#330 review N2). */
+export const MAX_PROFILES = PROFILE_IDS.length;
 const INDEX_KEY = 'sna:profiles';
 /** Profile 1 is the save that is already on the device; the rest hang off the same slot name. */
 export const saveKeyFor = (id: ProfileId) => (id === 'p1' ? KEY : `${KEY}:${id}`);
@@ -84,8 +89,18 @@ function readIndex(): ProfileIndex | null {
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { return null; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-  const { active, ids } = parsed as { active?: unknown; ids?: unknown };
-  if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_PROFILES) return null;
+  const { v, active, ids } = parsed as { v?: unknown; active?: unknown; ids?: unknown };
+  // `v` drives something or it is not worth storing — the #38 incident this repository still keeps a rail for
+  // ("the save had a version field and a versioned key but neither drove anything"). An index from a build
+  // that put more on it — slice 2 wants per-profile names and avatars there — must not be relabelled v1 and
+  // then stripped of those fields by the next `setActiveProfile` spread. Refusing routes it to the safe
+  // `defaultIndex` probe instead (#330 review N1).
+  if (v !== 1) return null;
+  // No explicit `ids.length > MAX_PROFILES` clause: the two checks on the next line already bound it, because
+  // distinct members of a four-member union cannot number more than four. It was here as a belt, and a belt no
+  // input can ever reach is a line no test can hold — the #330 review found it green under deletion, and it
+  // is green under deletion for the same reason a comment cannot be tested (#330 review, item 1 and N2).
+  if (!Array.isArray(ids) || ids.length === 0) return null;
   if (!ids.every(isProfileId) || new Set(ids).size !== ids.length) return null;
   if (!isProfileId(active) || !ids.includes(active)) return null;
   return { v: 1, active, ids: ids as ProfileId[] };
