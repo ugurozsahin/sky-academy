@@ -63,12 +63,15 @@ describe('guard rails', () => {
   // rested on two of them agreeing (a peek releasing under a stage-clear overlay would have restarted the wave
   // behind it). Every reason to pause now flows through play-session's `syncPaused()` — the screen's overlays
   // via `hold()`, the peek, and a finished game — so outside arena.ts there is exactly one assignment. A second
-  // one is a second owner, and this rail names it.
-  it('arena.paused has one writer outside arena.ts (#65)', () => {
+  // one is a second owner, and this rail names it. #16: the Ninja Duel screen has its own two arenas and no
+  // play-session, so it carries its own single sum (`syncPaused`) — one writer per screen, listed verbatim
+  // below, so a third assignment anywhere (a new reason written outside a screen's sum) is still red.
+  it('arena.paused has one writer per screen outside arena.ts (#65, #16)', () => {
     const writers = Object.entries(SOURCES)
       .filter(([f]) => f !== '/src/game/arena.ts')
       .flatMap(([f, s]) => code(s).split('\n').filter(l => /\.paused\s*=[^=]/.test(l)).map(l => `${f}: ${l.trim()}`));
-    expect(writers, 'route a new pause reason through play-session\'s hold()/syncPaused(), never a direct write').toEqual([
+    expect(writers, 'route a new pause reason through the screen\'s hold()/syncPaused(), never a direct write').toEqual([
+      '/src/ui/duel.ts: const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };',
       '/src/ui/play-session.ts: if (arena) arena.paused = holdOpen || peekActive || session.ended;',
     ]);
   });
@@ -177,6 +180,7 @@ describe('guard rails', () => {
     const main = code(SOURCES['/src/main.ts']);
     expect(main).toMatch(/dispose\s*=\s*playScreen\(/);
     expect(main).toMatch(/dispose\s*=\s*memoryScreen\(/);
+    expect(main).toMatch(/dispose\s*=\s*duelScreen\(/);      // #16: the third arena-owning screen
     // Match each route's *body*, not its layout: an equivalent reformat must not turn this red (#74 review).
     // The route names are read from the source, so a screen added later is covered without editing this test.
     // Bound the slice at the router's closing brace: unbounded, the LAST route's "body" ran to end of file, so
@@ -1462,6 +1466,43 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
       .toMatch(/last, not first/i);
   });
 
+  /**
+   * #314 — a run that stops before STEP 5 used to leave nothing at all, and the commonest way to stop is a
+   * permission prompt no unattended run can answer: editing a file under `.claude/` asks for confirmation,
+   * and most of the open queue is hardening work whose home is `.claude/rules/` and `.claude/skills/`. On
+   * 2026-09-19 that cost PR #294 seven and a half hours, and the watchdog read the silence as healthy because
+   * a pulse written only at the end cannot distinguish "dead", "busy" and "waiting for a human".
+   *
+   * STEP 1 now stamps `IN PROGRESS` on the way in. The two halves are pinned together and neither is any use
+   * alone: a stamp nobody reads is noise, and a watchdog check with nothing to read is dead prose. The
+   * "not a pass" half matters most — the rule it amends ("Last, not first", pinned above) exists because a
+   * *finished-looking* pulse stamped on the way in would hide the very deaths the pulse exists to expose, and
+   * that reasoning survives only while the stamp cannot be mistaken for a finish.
+   *
+   * `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` carries the reasoning and the alternatives
+   * the owner dropped (a permissions allow-list, a no-prompt mode), so neither is re-litigated from scratch.
+   *
+   * * Prove it red: drop the STEP 1 stamp; drop `IN PROGRESS` from either file; let the stamp read as a pass;
+   * or drop the watchdog's staleness bar for it.
+   */
+  it('a run stamps the pulse IN PROGRESS on the way in, and the watchdog treats a stale one as a finding (#314)', () => {
+    const prompt = live('docs/ROUTINE-PROMPT.md');
+    // One anchor, marker included: a bare `toContain('IN PROGRESS')` on the file was satisfied by STEP 5's
+    // own mention of the stamp, so renaming the marker in STEP 1 alone stayed green.
+    expect(prompt, 'STEP 1 must stamp the pulse before the work, with the marker the watchdog greps for')
+      .toContain('replace the `routine: heartbeat` body with `<UTC> — IN PROGRESS: <what this run will do>`');
+    expect(prompt, 'it carries the `- second item:` line the #62 hook demands, or the write is denied and the stamp never lands')
+      .toMatch(/- second item: pending/);
+    expect(prompt, 'and STEP 5 must say it replaces the stamp, not sit beside it')
+      .toMatch(/IN PROGRESS` stamp, which is not a pass/);
+
+    const watchdog = live('docs/WATCHDOG-PROMPT.md');
+    expect(watchdog, 'check 3 must read the stamp').toContain('IN PROGRESS');
+    expect(watchdog, 'a stale stamp is a finding, not a pulse').toMatch(/is a finding[\s\S]{0,120}quote the stamp's line/);
+    expect(watchdog, 'and it must say a fresh stamp is NOT a finding — otherwise every run in flight is an alarm')
+      .toMatch(/fresh\*?\*? `IN PROGRESS` stamp is not a\s+finding/);
+  });
+
   // The routing table is the thing that stops the habit coming back as a new file somewhere else, so both
   // process files carry it (a copied paragraph still — docs/decisions/001 has the debt).
   it.each(['CLAUDE.md', 'docs/ROUTINE-PROMPT.md'])('%s carries the record-routing rule', (name) => {
@@ -2126,8 +2167,8 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * denies an `issue_write` update to issue #62 whose body has no `- second item: ` line. That is the one
    * piece of #97 real enough to collapse, the same bar #191 cleared — the four *eligibility* conditions
    * themselves (is a review waiting, is there time left, are the files disjoint, did the first item finish)
-   * have no such enforcement, so they stay copied in `CLAUDE.md` and
-   * `docs/ROUTINE-PROMPT.md` (checked by the `it.each(FILES)` rails above, in the #177 describe block) — this
+   * have no such enforcement. #145 gave them one home, `docs/ROUTINE-PROMPT.md` STEP 3, and `CLAUDE.md` holds
+   * a pointer to it rather than a copy — both checked by the rails in the #177 describe block. This
    * rail only covers the recording-obligation sentence, not the whole rule.
    *
    * Unlike #191 (a single sentence with nothing else depending on its exact words), the "carries a
@@ -3571,12 +3612,12 @@ describe('the add-guard-rail skill keeps the rules that were paid for (#180)', (
  * issues: they must be reviewable, mergeable and blockable independently, and #139 is what a single body
  * carrying two issue references does on its own.
  *
- * The two files each speak to a different reader — CLAUDE.md to an interactive session,
- * docs/ROUTINE-PROMPT.md to the routine itself (`BACKLOG.md` was the third until it retired, #218) — and
- * they change together, the same way they do for the freeze lift and the record-routing rule.
+ * One home since #145 (docs/decisions/001): `docs/ROUTINE-PROMPT.md` STEP 3 carries the rule, because only a
+ * developer run applies it, and `CLAUDE.md` carries one sentence that points there. Until then both files held
+ * the four conditions, and `BACKLOG.md` a third copy until it retired (#218).
  *
- * Prove it red: drop the rule from one file, reword condition 1 as "no open pull requests", or turn it into a
- * quota.
+ * Prove it red: drop a condition from the prompt, reword condition 1 as "no open pull requests", turn it into a
+ * quota, drop either half of condition 4, or copy the conditions back into `CLAUDE.md`.
  *
  * 2026-09-19 (docs/decisions/003-two-routines.md): a developer run no longer reviews, so "nothing to review
  * this run could do" stopped meaning anything. Condition 1 is now "at most three pull requests are waiting
@@ -3592,11 +3633,12 @@ describe('a developer run may take a second item — the rule, in its home (#177
   const flat = (s: string) =>
     s.replace(/[*_`]/g, '').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ');
   const doc = (name: string) => flat(readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8'));
-  // One home (docs/decisions/001, #145): the developer prompt carries the rule, `CLAUDE.md` points at it.
-  const FILES = ['docs/ROUTINE-PROMPT.md'];
+  // One home (docs/decisions/001, #145): the developer prompt carries the rule, `CLAUDE.md` points at it. Plain
+  // `it`s on purpose (#291): `it.each([])` runs nothing and stays green, so a list here is one edit from no rail.
+  const HOME = 'docs/ROUTINE-PROMPT.md';
 
-  it.each(FILES)('%s carries the rule, and its four conditions', (name) => {
-    const text = doc(name);
+  it('the developer prompt carries the rule, and its four conditions', () => {
+    const text = doc(HOME);
     expect(text.length, 'a vacuous rail is worse than none').toBeGreaterThan(500);
     expect(text, 'the file must state the permission itself')
       .toMatch(/a developer run may take a second item/i);
@@ -3612,17 +3654,19 @@ describe('a developer run may take a second item — the rule, in its home (#177
       .toMatch(/from the start of the run/i);
     expect(text, 'condition 3 — the second item cannot touch the first item’s files')
       .toMatch(/disjoint/i);
-    expect(text, 'condition 4 — a WIP `Part of #<n>` push is not a finished first item')
+    expect(text, 'condition 4 — it must still name the words a run is tempted to read as the test')
       .toMatch(/Part of #<n>/);
     // #145: two consecutive runs read condition 4 two ways. The owner chose: the bar is unfinished work, so a
     // complete part of a larger issue passes even though its pull request says `Part of`.
     expect(text, 'condition 4 is about unfinished work, not about the words Part of (#145)')
       .toMatch(/The bar is unfinished work, not the words Part of #<n> \(#145\)/);
-    expect(text).toMatch(/a complete, reviewable part of a larger issue passes/);
+    expect(text, 'the permissive half: a finished part passes').toMatch(/a complete, reviewable part of a larger issue passes/);
+    expect(text, 'the restrictive half: without it the condition lets anything through (#291)')
+      .toMatch(/a push you left as WIP does not, and you do not start another/);
   });
 
-  it.each(FILES)('%s keeps it a condition rather than a quota', (name) => {
-    const text = doc(name);
+  it('the developer prompt keeps it a condition rather than a quota', () => {
+    const text = doc(HOME);
     expect(text, 'the self-limiting property is the point, and it has to be stated')
       .toMatch(/condition, not a quota/i);
     // The rewrite that keeps the words and loses the property. #177 rules it out by name.
@@ -3630,21 +3674,55 @@ describe('a developer run may take a second item — the rule, in its home (#177
       .not.toMatch(/two items per run(?!["”])/i);
   });
 
-  it.each(FILES)('%s says condition 1 is not "no open pull requests at all"', (name) => {
-    expect(doc(name), 'the misreading that makes the rule never fire has to be closed off in the text')
+  it('the developer prompt says condition 1 is not "no open pull requests at all"', () => {
+    expect(doc(HOME), 'the misreading that makes the rule never fire has to be closed off in the text')
       .toMatch(/not "no open pull requests at all"/i);
   });
 
-  it.each(FILES)('%s forbids one pull request closing two issues', (name) => {
-    expect(doc(name), 'two items are two pull requests, or one going bad holds the other')
+  it('the developer prompt forbids one pull request closing two issues', () => {
+    expect(doc(HOME), 'two items are two pull requests, or one going bad holds the other')
       .toMatch(/never one pull request closing two issues/i);
   });
 
   it('CLAUDE.md points at the rule\'s home instead of copying it (#145)', () => {
-    const text = doc('CLAUDE.md');
+    const raw = readFileSync(new URL('../../CLAUDE.md', import.meta.url), 'utf8');
+    const text = flat(raw);
     expect(text).toMatch(/A developer run may take a second item \(#97\)/);
-    expect(text, 'the pointer').toMatch(/docs\/ROUTINE-PROMPT\.md STEP 3 is the rule's home/);
-    expect(text, 'the four conditions live in one place').not.toMatch(/disjoint/i);
+    // The whole bullet, not the file and not a slice of the bullet (#291, review of PR #294): one synonym for
+    // "disjoint", or three of the four conditions copied back, walked past a file-wide check on one word; a
+    // slice that stopped at the pointer sentence let the same copy sit *after* it; and one that began at the
+    // anchor phrase let it sit *before* it. So the slice runs from the bullet's own `- ` to the next `- `
+    // line, blank line or heading — cut in the raw text, flattened only after. A *heading* means `#{1,6} `,
+    // not any line opening `#`: this repository writes bare issue refs constantly, so a bare `\n(?=#)` would
+    // end the slice early on a wrapped continuation line beginning `#145` and leave a verbatim condition-4
+    // copy green inside the bullet — the one condition the file-wide belt below cannot carry, because
+    // `Part of #<n>` is legitimately used by the branches bullet and so stays out of it (#291, round 3).
+    const anchor = raw.search(/A developer run may take a second item \(#97\)/);
+    expect(anchor, 'the second-item pointer must be found in CLAUDE.md').toBeGreaterThanOrEqual(0);
+    const start = raw.lastIndexOf('\n- ', anchor) + 1;
+    const rest = raw.slice(start);
+    const end = rest.search(/\n(?=- |\n|#{1,6} )/);
+    const bullet = flat(end === -1 ? rest : rest.slice(0, end));
+    // `lastIndexOf` walks back to the nearest top-level `- `; if the pointer were moved into a paragraph or a
+    // sub-bullet, that walk lands on an earlier bullet and the slice never reaches the anchor. Say so plainly
+    // rather than failing further down as a missing pointer sentence.
+    expect(bullet, 'the pointer must sit in a top-level bullet of its own')
+      .toMatch(/A developer run may take a second item \(#97\)/);
+    expect(bullet, 'the pointer sentence sits in this bullet, not another')
+      .toMatch(/docs\/ROUTINE-PROMPT\.md STEP 3 is the rule's home/);
+    expect(bullet.length, `the bullet is ${bullet.length} characters; a pointer stays under 260`).toBeLessThan(260);
+    for (const copied of [/at most three/i, /from the start of the run/i, /disjoint|overlap/i, /Part of #<n>/, /two items per run/i])
+      expect(bullet, `CLAUDE.md copies a condition back: ${copied}`).not.toMatch(copied);
+    // The belt to that brace, and only as wide as a word list can be: these five phrases have no other use in
+    // CLAUDE.md today (`Part of #<n>` does — the branches bullet — so it stays out), which keeps a verbatim
+    // copy red wherever in the file it lands. What none of this seals is a *paraphrase*, inside the bullet or
+    // out: nothing here reads the file for meaning, and the cap above is not a second line of defence — the
+    // bullet flattens to ~174 characters against 260, and the review of PR #294 reworded all four conditions
+    // inside it at 187 and watched this block stay green. A word list plus a length cap cannot close a
+    // paraphrase, the cap's job is the ~520-character verbatim copy #145 removed, and 260 is set to leave the
+    // pointer room to be rewritten rather than to squeeze a rewording out.
+    for (const copied of [/disjoint/i, /from the start of the run/i, /at most three/i, /overlap/i, /two items per run/i])
+      expect(text, `the four conditions live in one place: ${copied}`).not.toMatch(copied);
   });
 
   // Without this line nobody can tell a rule that is never true from a rule nobody applied — and #178 moved
@@ -4243,7 +4321,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_503;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5
+  const ROUTINE_PROMPT_BUDGET = 21_436;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph
   // —
 
   const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3

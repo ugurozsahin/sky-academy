@@ -27,6 +27,9 @@ export class Duel {
     if (this.ended) return;
     this.round++; this.roundDecided = false;
     this.current = this.o.topic.gen(this.o.difficulty, this.rng);
+    // "First correct slice" has no meaning for a sequence: `answer` is the joined string, every slice would be
+    // wrong and the match would drain in draws with nothing red. duelPool() keeps these out; this is the floor.
+    if (this.current.sequence) throw new Error(`Ninja Duel: ${this.o.topic.id} produced a sequence question`);
     this.ev.onQuestion(this.current, { round: this.round, total: this.rounds });
   }
   /**
@@ -59,4 +62,39 @@ export class Duel {
     const winner: DuelPlayer | 'draw' = this.scoreA > this.scoreB ? 'a' : this.scoreB > this.scoreA ? 'b' : 'draw';
     this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds: this.rounds });
   }
+}
+
+/**
+ * The topics a duel can be played on (#16 item 4): bubble topics only — no tracing (nothing to slice) and no
+ * sequence questions (spelling, sentences, Order Up), where "first correct slice" has no meaning. A topic is
+ * sampled with a few seeded draws at the given difficulty: some generators mix a sequence branch in at a
+ * higher difficulty (Tricky Words at 3, say), so one draw is not a verdict — `DUEL_POOL_DRAWS` are.
+ */
+export const DUEL_POOL_DRAWS = 8;
+export function duelPool(topics: Topic[], difficulty: Difficulty = 1): Topic[] {
+  return topics.filter(t => {
+    if (t.input === 'tracing') return false;
+    for (let seed = 1; seed <= DUEL_POOL_DRAWS; seed++) if (t.gen(difficulty, seededRng(seed)).sequence) return false;
+    return true;
+  });
+}
+
+/** The hand-over instruction, spoken once at the start of a match — the second child cannot read the strip. */
+export const DUEL_HANDOVER = 'Ninja Duel! Hand the top half to a friend.';
+/**
+ * What the screen says for a question. Round 1 carries the hand-over instruction in the SAME utterance: a
+ * separate `say()` before it was cancelled by the question's own line in the same click (PR #295 review).
+ */
+export function spokenQuestion(q: Question, round: number): string {
+  const line = q.say ?? q.prompt;
+  return round === 1 ? `${DUEL_HANDOVER} ${line}` : line;
+}
+/** A tiny deterministic rng (mulberry32) for the sample above — a constant would spin a generator that draws until distinct. */
+function seededRng(seed: number) {
+  return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+/** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
+export function duelHeadline(r: DuelResult): string {
+  return r.winner === 'draw' ? `It's a draw — ${r.scoreA} all!` : `Player ${r.winner === 'a' ? 1 : 2} wins ${Math.max(r.scoreA, r.scoreB)}–${Math.min(r.scoreA, r.scoreB)}!`;
 }

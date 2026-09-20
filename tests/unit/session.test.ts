@@ -207,3 +207,37 @@ describe('rewards', () => {
     expect(s.lives).toBe(YEARS[2].lives - 1); expect(s.current).toBe(before); expect(s.waiting).toBe(false);
   });
 });
+
+/*
+ * #311 item 1 — the one line that carries `Question.slow` into the running game.
+ *
+ * `session.ts`'s `ctx` getter builds `slow: !!this.current?.slow`. Replace that with `slow: false` and the
+ * feature is dead for every child, yet the whole suite stayed green: every other test of the flag calls
+ * `MODES.*.speed()` with a hand-built `ModeCtx` and so never crosses this seam. These drive a real `Session`
+ * over a generator that flags its questions, and read the speed the arena is actually told to use.
+ */
+describe('a flagged question slows the real session (#311, #297)', () => {
+  const Y2 = YEARS.find(y => y.id === 'year2')!;
+  /** A topic whose every question carries `slow`, so the pin is about the wiring rather than about which
+   *  generator happens to flag a draw today. */
+  const flagged = (slow: boolean) => ({
+    id: 'test-slow', title: 'Slow', icon: '🐢', subject: 'maths' as const, year: 'year2' as const, nc: 'test',
+    gen: () => ({ prompt: '45 + 27 = ?', answer: '72', options: ['72', '62', '82'], slow }),
+  });
+
+  it('Session.speed and the onQuestion payload both drop a step for a flagged question', () => {
+    expect(Y2.speeds[4], 'Y2 stage 5 is the fastest step — the premise of #297').toBe(3);
+    const at = (slow: boolean) => {
+      const ev = events();
+      const s = new Session({ mode: 'mission', year: Y2, topic: flagged(slow), rng: rng(3), stages: 5 }, ev);
+      s.start();
+      // straight to the last, fastest stage
+      while (s.stage < 5) { for (let i = 0; i < Y2.perStage; i++) { s.hit(s.current!.answer); s.advance(); } s.nextStage(); }
+      ev.onQuestion.mockClear();
+      s.advance();
+      return { speed: s.speed, reported: ev.onQuestion.mock.calls[0][1].speed as number };
+    };
+    expect(at(false), 'unflagged: the stage speed as the year defines it').toEqual({ speed: 3, reported: 3 });
+    expect(at(true), 'flagged: one step slower, and the arena is told so').toEqual({ speed: 2, reported: 2 });
+  });
+});

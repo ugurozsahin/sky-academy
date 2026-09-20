@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
-import { turnEnd } from '../../src/curriculum/maths';
+import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, gapLetters, Y1_CEW, Y2_CEW } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
 // Deterministic RNG (mulberry32)
@@ -87,6 +87,80 @@ describe('curriculum ranges', () => {
       const p = t.gen(3, r).prompt;
       const nums = p.match(/\d+/g)!.map(Number);
       expect(nums.some(n => [2, 5, 10].includes(n))).toBe(true);
+    }
+  });
+  it('Year 2 measures: no unit conversion, and every number on the card within 100 (#298)', () => {
+    // Converting between units is Year 3 non-statutory at the earliest and statutory in Year 4, and Year 2's
+    // numbers stop at 100 (`.claude/rules/curriculum.md`). Red on `main` before this slice: `1 metre = ?` was
+    // answered `100 cm` (a conversion) and offered `1000 cm`, and `2 kilograms = ?` answered `2000 g`.
+    const TOKEN = /\b(cm|mm|m|kg|g|ml|l)\b|\b(centimetres?|metres?|kilograms?|grams?|millilitres?|litres?)\b/g;
+    const CANON: Record<string, string> = { centimetre: 'cm', centimetres: 'cm', metre: 'm', metres: 'm', kilogram: 'kg', kilograms: 'kg', gram: 'g', grams: 'g', millilitre: 'ml', millilitres: 'ml', litre: 'l', litres: 'l' };
+    const units = (s: string) => [...new Set((s.match(TOKEN) ?? []).map(u => CANON[u] ?? u))].sort();
+    let cards = 0, converted = 0;
+    const compared: Record<string, Set<string>> = {};
+    for (const [id, small, large] of [['y2-length', 'cm', 'm'], ['y2-mass', 'g', 'kg'], ['y2-capacity', 'ml', 'l']] as const) {
+      compared[id] = new Set();
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 29);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+        const q = t.gen(d, r); cards++;
+        // A comparison card is the one with a measured list in its hint; "best unit" names both units and is
+        // not one. Collected so the slice's *positive* half is pinned too: reverting the larger-unit draw is
+        // inside 100 and so invisible to every assertion below.
+        if (q.hint?.includes(':')) for (const u of units(q.hint)) compared[id].add(u);
+        for (const s of [q.prompt, q.answer, ...q.options, q.hint ?? '', q.say ?? ''])
+          for (const n of s.match(/\d+/g) ?? []) expect(Number(n), `${id}: ${s}`).toBeLessThanOrEqual(100);
+        // A card that names a unit in the prompt is answered in that same unit — anything else is a conversion.
+        // "Best unit for a door?" names none, and its two units are the question, so it is not caught here.
+        const pu = units(q.prompt), au = units(q.answer);
+        if (pu.length && au.length) { converted++; expect(au, `${id}: "${q.prompt}" answered "${q.answer}" — that is a unit conversion`).toEqual(pu); }
+        // And the bare-answer form the clause above cannot see: "How many centimetres in a metre?" → `100`.
+        // No legitimate Year 2 card names two units in its prompt (the "best unit" card names none).
+        expect(pu.length, `${id}: "${q.prompt}" names two units — that is a conversion`).toBeLessThanOrEqual(1);
+      }
+      expect([...compared[id]].sort(), `${id} compares in both ${small} and ${large}`).toEqual([small, large].sort());
+    }
+    // Counters, so deleting a draw cannot make this rail vacuously green (the #296 rails beside it do the same).
+    expect(cards, 'cards generated').toBeGreaterThan(2000);
+    expect(converted, 'cards where the conversion clause actually runs').toBeGreaterThan(200);
+  });
+  it('Year 2 measures: the add/subtract card is arithmetically right and every option usable (#298)', () => {
+    // Nothing verified `measureSum`'s sum: this file's `solve()` matches only bare-number prompts, so the
+    // ` cm` suffix hides the prompt from it, and the harness's non-negative / maxAnswer check is guarded by
+    // `/^-?\d+$/` on the answer, which `24 cm` fails. Swapping the operands shipped `60 cm − 22 cm = ?`
+    // answered `-38 cm` with the whole suite green (review of PR #319), and the `≤ 100` sweep above cannot
+    // see it either, because `/\d+/g` skips the minus sign.
+    const SUM = /^(\d+) (\S+) ([+−]) (\d+) \2 = \?$/;
+    for (const id of ['y2-length', 'y2-mass', 'y2-capacity']) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 53);
+      let sums = 0, added = 0, subtracted = 0;
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+        const q = t.gen(d, r);
+        const m = q.prompt.match(SUM);
+        if (!m) continue;
+        sums++;
+        const [, aStr, unit, op, bStr] = m;
+        const a = Number(aStr), b = Number(bStr);
+        if (op === '+') added++; else subtracted++;
+        expect(q.answer, q.prompt).toBe(`${op === '+' ? a + b : a - b} ${unit}`);
+        expect(q.options.length, `${q.prompt}: four bubbles`).toBe(4);
+        for (const o of q.options) {
+          expect(o, `${q.prompt}: option "${o}"`).toMatch(new RegExp(`^\\d+ ${unit}$`));   // never a minus sign
+          const v = Number(o.split(' ')[0]);
+          expect(v, `${q.prompt}: option "${o}"`).toBeGreaterThan(0);
+          expect(v, `${q.prompt}: option "${o}"`).toBeLessThanOrEqual(100);
+        }
+        // `measureSum`'s two undocumented-in-the-ranges invariants, pinned from the outside: `b ≥ 10`, below
+        // which the other-operation decoy collides with `answer − 10` and the card dedupes to three bubbles;
+        // and the pair bounds that keep `answer ± 10` inside 0…100 whichever operation is drawn.
+        expect(b, q.prompt).toBeGreaterThanOrEqual(10);
+        expect(a + b, q.prompt).toBeLessThanOrEqual(90);
+        expect(a - b, q.prompt).toBeGreaterThanOrEqual(20);
+      }
+      // Per topic, and both operations: a counter summed across the three stays green when one topic loses
+      // its draw, which is exactly the regression #298 slice 1 would be reverted by.
+      expect(sums, `${id} reaches the add/subtract draw`).toBeGreaterThan(100);
+      expect(added, `${id} draws an addition`).toBeGreaterThan(20);
+      expect(subtracted, `${id} draws a subtraction`).toBeGreaterThan(20);
     }
   });
   it('Balance the Scales: both sides are equal once ? is filled in, within the year range', () => {
@@ -181,10 +255,10 @@ describe('curriculum ranges', () => {
       const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 31);
       for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 150; i++) {
         const q = t.gen(d, r);
-        const m = q.prompt.match(/^Which (?:is|was) (?:the )?(\w+)\?$/);
+        const m = q.prompt.match(/^Which (?:is|was|holds) (?:the )?(\w+)\?$/);   // "holds more/the most" is capacity (#296)
         if (!m || !q.hint || !q.hint.includes(':')) continue;                    // skip unit/conversion/add questions
         const segs = q.hint.split(' · ').map(s => { const [label, rest] = s.split(': '); return [label, parseInt(rest, 10)] as [string, number]; });
-        const big = /^(long|tall|heav|full|warm)/.test(m[1]);                    // longer/longest/taller/heaviest/fuller/warmer …
+        const big = /^(long|tall|heav|more|most|warm)/.test(m[1]);               // longer/longest/taller/heaviest/more/most/warmer …
         const target = big ? Math.max(...segs.map(x => x[1])) : Math.min(...segs.map(x => x[1]));
         const winner = segs.find(x => x[1] === target)![0];
         expect(winner === q.answer || winner.startsWith(q.answer + ' '), `${id}: "${q.prompt}" | ${q.hint} | ans=${q.answer}`).toBe(true);
@@ -192,6 +266,157 @@ describe('curriculum ranges', () => {
       }
     }
     expect(checked).toBeGreaterThan(100);                                        // the comparison branch really did run
+  });
+});
+
+/**
+ * #296 — six KS1 questions marked a right answer wrong, taught a rule English schools do not, or had more than
+ * one right answer. Each rail below was red on the generator it names before the fix, by the issue's numbering.
+ */
+describe('KS1 questions with one right answer, and only the right one marked (#296)', () => {
+  const gen = (id: string) => TOPICS.find(x => x.id === id)!;
+  const value = (f: string) => { const [a, b] = f.split('/').map(Number); return a / b; };
+
+  it('1. y2-fractions: no decoy is worth the answer (2/4 shaded is 1/2 too)', () => {
+    const t = gen('y2-fractions'); const r = rng(296);
+    let shaded = 0, twoQuarters = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+      const q = t.gen(d, r);
+      if (!q.prompt.startsWith('What fraction')) continue;
+      shaded++; if (q.answer === '2/4') twoQuarters++;
+      for (const o of q.options) if (o !== q.answer) expect(value(o), `${q.answer}: decoy ${o} has the same value`).not.toBe(value(q.answer));
+      expect(q.options.length, q.prompt).toBe(4);
+    }
+    expect(shaded).toBeGreaterThan(100);
+    expect(twoQuarters, 'the 2/4 case must actually be drawn — it is the one that was wrong').toBeGreaterThan(10);
+  });
+
+  it('2. y2-punct: the list comma is never the one before "and"', () => {
+    const t = gen('y2-punct'); const r = rng(297);
+    let lists = 0;
+    for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
+      const q = t.gen(d, r);
+      if (!/list/.test(q.say ?? '')) continue;
+      lists++;
+      expect(q.prompt, 'a comma before "and" is not what English schools teach').not.toMatch(/_ and\b/);
+      expect(q.prompt, 'the gap sits between two list items').toMatch(/\w_ \w/);
+    }
+    expect(lists).toBeGreaterThan(30);
+  });
+
+  it('3. y2-homophones: every option set is a Year 2 statutory homophone set', () => {
+    expect(HOMOPHONES.length).toBeGreaterThan(10);
+    for (const [sent, opts, ans] of HOMOPHONES) {
+      const lower = opts.map(o => o.toLowerCase());
+      const set = HOMOPHONE_SETS.find(s => lower.every(o => s.includes(o)));
+      expect(set, `${sent}: ${opts.join('/')} is not a homophone set`).toBeDefined();
+      expect(opts, sent).toContain(ans);
+      expect(sent, 'the sentence has one gap').toMatch(/^[^_]*___[^_]*$/);
+      expect(lower, `${sent}: brown/brawn and wind/wined were not homophones`).not.toContain('brawn');
+      expect(lower, `${sent}: brown/brawn and wind/wined were not homophones`).not.toContain('wined');
+    }
+    expect(HOMOPHONES.some(([, o]) => o.includes('on')), 'on/won is not a pair').toBe(false);
+    for (const pair of [['bare', 'bear'], ['blue', 'blew'], ['night', 'knight'], ['be', 'bee'], ['quite', 'quiet']])
+      expect(HOMOPHONES.some(([, o]) => pair.every(p => o.map(x => x.toLowerCase()).includes(p))), `${pair.join('/')} from the Year 2 list is asked`).toBe(true);
+    const r = rng(298); const t = gen('y2-homophones');
+    for (let i = 0; i < 100; i++) { const q = t.gen(2, r); expect(q.options.map(o => o.toLowerCase()).sort()).toEqual([...new Set(q.options.map(o => o.toLowerCase()))].sort()); }
+  });
+
+  it('4. y2-temp: an estimate\'s decoys sit at least 10 °C from the answer and from each other', () => {
+    // The floor is the issue's number, not the source constant (second review of PR #303): comparing the gaps
+    // to `TEMP_GAP` held for every value of it, so `TEMP_GAP = 1` stayed green with a fridge asked against
+    // 6 °C — the defect #296 names. Assert the literal, and pin the constant to it once.
+    expect(TEMP_GAP, 'the estimate floor is 10 °C').toBeGreaterThanOrEqual(10);
+    const t = gen('y2-temp'); const r = rng(299);
+    let estimates = 0;
+    for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+      const q = t.gen(d, r);
+      if (!q.prompt.startsWith('Temperature of')) continue;
+      estimates++;
+      const degs = q.options.map(o => Number(o.replace('°C', '')));
+      expect(degs.every(x => Number.isInteger(x) && x >= 0 && x <= 100), q.options.join(' ')).toBe(true);
+      for (let a = 0; a < degs.length; a++) for (let b = a + 1; b < degs.length; b++)
+        expect(Math.abs(degs[a] - degs[b]), `${q.prompt} ${q.options.join(' ')}: ${degs[a]} and ${degs[b]} are both defensible`).toBeGreaterThanOrEqual(10);
+      expect(q.options.length, q.prompt).toBe(4);
+    }
+    expect(estimates).toBeGreaterThan(100);
+  });
+
+  it('5. y1/y2 spelling gaps: no decoy that can be drawn completes another word of the checked set', () => {
+    // The set carries both lists and the rhyme families the issue names, so `_old` cannot offer c/g/h/t.
+    for (const w of [...Y1_CEW, ...Y2_CEW, 'bold', 'fold', 'sold', 'he', 'we', 'go', 'so', 'do', 'his', 'has']) expect(GAP_WORDS.has(w), w).toBe(true);
+    for (const l of gapLetters('cold', 0)) expect('cgbfhst', `_old: ${l} makes a word`).not.toContain(l);
+    expect(gapLetters('his', 1)).not.toContain('a');
+    // Load-bearing, not self-referential (review of PR #303): concrete gaps and the letters they may never
+    // offer, asserted against `gapLetters` itself, so a word dropped from the checked set goes red here even
+    // though the drawn-card check below (which reads the same set) would stay green. The first fourteen are the
+    // gaps the review found open on the first head; the rest are the issue's own families.
+    const NEVER: [string, number, string][] = [
+      ['they', 3, 'mn'], ['says', 0, 'dwp'], ['kind', 3, 'g'], ['gold', 2, 'o'], ['find', 3, 'e'], ['mind', 3, 'e'], ['most', 1, 'u'],
+      ['hold', 1, 'e'], ['hold', 2, 'o'], ['told', 2, 'a'], ['last', 1, 'i'], ['was', 2, 'r'], ['come', 3, 'b'], ['love', 0, 'd'],
+      ['find', 0, 'bhkmw'], ['kind', 0, 'bfhmw'], ['mind', 0, 'bfhkw'], ['full', 0, 'bdghp'], ['put', 1, 'aeio'], ['both', 0, 'm'],
+      ['pass', 0, 'blm'], ['cold', 0, 'bfghst'], ['be', 0, 'hmw'], ['go', 0, 'dnst'], ['his', 1, 'a'],
+      ['said', 2, 'n'], ['would', 2, 'r'], ['would', 3, 'n'], ['whole', 3, 's'], ['plant', 3, 'i'], ['grass', 3, 'm'], ['mind', 1, 'e'], ['break', 0, 'c'],
+      // The second review's hole: a list word's own plural or `-er` form, which the first head offered wholesale.
+      ['father', 3, 't'], ['class', 3, 'pmn'], ['find', 3, 's'], ['poor', 3, 's'], ['says', 2, 'w'], ['grass', 2, 'o'],
+      ['there', 3, 'm'], ['water', 2, 'f'], ['water', 0, 'eh'], ['love', 2, 'nb'], ['mind', 3, 'i'], ['put', 2, 'b'],
+    ];
+    for (const [w, i, letters] of NEVER) for (const l of letters) {
+      expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} spells a word the set must carry`).toBe(true);
+      expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
+    }
+    // And the spellings no card may show, whatever the lists know. `['ask', 0, 'a']` used to sit here and could
+    // not fail — it puts the answer letter back, which `gapLetters` drops whatever `AVOID` says; the reachable
+    // spelling is `ask@2 s` (second review of PR #303). Each row below is reachable, so dropping its word from
+    // `AVOID` turns this red.
+    for (const [w, i, l] of [['where', 2, 'o'], ['pass', 1, 'i'], ['fast', 2, 'r'], ['ask', 2, 's'], ['whole', 3, 'r'],
+      ['poor', 3, 'f'], ['says', 0, 'g'], ['last', 1, 'u'], ['put', 2, 's'], ['push', 0, 't'], ['come', 2, 'k'], ['you', 2, 'b']] as [string, number, string][]) {
+      expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} belongs in AVOID, not the word lists`).toBe(false);
+      expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
+    }
+    // Exhaustive over both lists and the days, every index: the pool the generators draw from is clean and still deep enough.
+    for (const w of [...Y1_CEW, ...Y2_CEW, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) for (let i = 0; i < w.length; i++) {
+      const pool = gapLetters(w, i);
+      expect(pool.length, `${w} index ${i} leaves too few decoys`).toBeGreaterThanOrEqual(3);
+      for (const l of pool) expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w} index ${i}: decoy ${l} makes another word`).toBe(false);
+      expect(pool, 'the answer is never a decoy').not.toContain(w[i]);
+    }
+    // And what the card actually shows, for every difficulty of the three gap topics.
+    let gaps = 0;
+    for (const id of ['y1-spelling', 'y2-spelling', 'y1-days']) for (const d of [1, 2, 3] as Difficulty[]) {
+      const t = gen(id); const r = rng(id.length * 7 + d);
+      for (let i = 0; i < 300; i++) {
+        const q = t.gen(d, r);
+        if (q.sequence || !q.prompt.includes('_')) continue;
+        gaps++;
+        const idx = q.prompt.indexOf('_');
+        for (const o of q.options) if (o !== q.answer) {
+          const filled = (q.prompt.slice(0, idx) + o + q.prompt.slice(idx + 1)).toLowerCase();
+          expect(GAP_WORDS.has(filled), `${id}: ${q.prompt} — decoy ${o} spells ${filled}`).toBe(false);
+        }
+        expect(q.options.length, q.prompt).toBe(4);
+      }
+    }
+    expect(gaps).toBeGreaterThan(500);
+  });
+
+  it('6. capacity compares what a container holds, never how full it is', () => {
+    let compared = 0;
+    for (const id of ['y1-capacity', 'y2-capacity']) for (const d of [1, 2, 3] as Difficulty[]) {
+      const t = gen(id); const r = rng(id.length + d);
+      for (let i = 0; i < 150; i++) {
+        const q = t.gen(d, r);
+        if (!q.hint?.includes(':')) continue;
+        compared++;
+        expect(q.prompt, id).toMatch(/^Which holds (more|less|the most|the least)\?$/);
+        // `litres` joins `millilitres` with #298 slice 1: Year 2 compares in `l` where `ml` would need
+        // hundreds. The verb is what this rail is about and is still asserted — only the unit is widened.
+        expect(q.say, 'the spoken line says what each one holds').toMatch(/ holds \d+ (millilitres|litres)/);
+        expect(q.say, id).not.toMatch(/full|empt/);
+      }
+    }
+    expect(compared).toBeGreaterThan(200);
+    for (const t of TOPICS) for (const d of [1, 2, 3] as Difficulty[]) { const r = rng(d); for (let i = 0; i < 40; i++) { const q = t.gen(d, r); expect(q.prompt + ' ' + (q.say ?? ''), t.id).not.toMatch(/\b(fuller|emptier|fullest|emptiest)\b/); } }
   });
 });
 
