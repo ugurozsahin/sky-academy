@@ -1,4 +1,5 @@
 import { deny, isMain, readInput } from './io.mjs';
+import { projectDir, protectedKind } from './paths.mjs';
 
 /**
  * Layer-0 guard for the MCP GitHub tools that post an authored body or labels (#101). Each check returns a
@@ -16,7 +17,7 @@ const HEARTBEAT_TITLE = 'routine: heartbeat';
 // APPROVED strictly, REJECTED with emphasis and case forgiven. Characters GitHub renders as nothing are
 // deleted first, so none of them can hide inside the marker. The set is a UNION on purpose (#221): swapping
 // Cf/Cc for Default_Ignorable_Code_Point once dropped real format characters. Add to it, never replace.
-const INVISIBLE = /[\p{Cf}\p{Cc}\p{Default_Ignorable_Code_Point}ㅤ️]+/gu;
+const INVISIBLE = /[\p{Cf}\p{Cc}\p{Default_Ignorable_Code_Point}\u3164\ufe0f]+/gu;
 const norm = (s) => s.replace(INVISIBLE, '').replace(/\s+/g, ' ').trim();
 
 export const ownerMarker = ({ body }) => {
@@ -36,14 +37,28 @@ export const ownerMarker = ({ body }) => {
  * heartbeat closed and recreated — which the prompt tells a run to do — would come back with a new number and
  * escape every rule below, permanently and silently, with the whole suite green (#353).
  *
- * The number stays as the fallback for an `update` carrying no title, which is the ordinary STEP 1 and STEP 5
- * call. A `create` carries a title by construction, and matching on it closes the other half of the same hole:
- * the one write that establishes a fresh pulse used to be exempt from every body rule. A `create` with no
- * title is not identifiable as the heartbeat and is left alone — GitHub rejects it anyway.
+ * The number stays as the fallback, and matching on the title closes the other half of the same hole: the
+ * `create` that establishes a fresh pulse used to be exempt from every body rule.
+ *
+ * **The bound, stated because it is the part that is not enforced.** An `update` sends no title unless it is
+ * changing one, so after a recreate the ordinary body replacement — `{method:'update', issue_number:<new>,
+ * body:<snapshot>}` — is a write this hook cannot recognise (PR #393 review, B2). Nothing here can fix that:
+ * the hook sees one call and has no way to learn the new number. `docs/ROUTINE-PROMPT.md` STEP 5 therefore
+ * sends the title with the body, which is what makes the rule reach the pulse; a run that omits it is not
+ * guarded, and `tests/unit/hooks.test.ts` pins both the instruction and this gap rather than implying it is shut.
+ *
+ * The title is compared **normalised**: it is typed by a run out of prose, and `Routine: Heartbeat`, a
+ * trailing space invisible in the GitHub UI, or `routine: heartbeat (run log)` would each otherwise read as a
+ * different issue. `method` is required, and its absence is not the heartbeat: a call with no `method` is not
+ * an `issue_write` at all but one of the comment tools this hook also matches, and gating an ordinary comment
+ * on #62 behind the pulse's body rules would be wrong.
  */
+const isHeartbeatTitle = (title) =>
+  typeof title === 'string' && norm(title).toLowerCase().startsWith(HEARTBEAT_TITLE);
+
 const heartbeatWrite = ({ method, issue_number, title }) =>
   (method === 'create' || method === 'update')
-  && (title === HEARTBEAT_TITLE || (method === 'update' && Number(issue_number) === ROUTINE_HEARTBEAT));
+  && (isHeartbeatTitle(title) || Number(issue_number) === ROUTINE_HEARTBEAT);
 
 /**
  * The heartbeat's body text, or null when this call is not about the heartbeat or carries no body at all.
@@ -63,18 +78,20 @@ const heartbeatBody = (input) => (heartbeatWrite(input) && typeof input.body ===
  * `: *\S` hole had to be closed twice in #341 *because* they were copies, and `.claude/rules/governance.md`
  * already anticipates a third line. `tests/unit/hooks.test.ts` reads this array rather than restating it.
  */
-export const REQUIRED_LINES = [
-  { key: '- second item:',
-    why: 'whether a second item was taken and, if not, which of the four #97 conditions failed' },
-  { key: '- query top pick:',
+export const REQUIRED_LINES = Object.freeze([
+  Object.freeze({ key: '- second item:',
+    why: 'whether a second item was taken and, if not, which of the four #97 conditions failed' }),
+  Object.freeze({ key: '- query top pick:',
     why: "the issue STEP 3's query returned and, when the run developed a different one, which of the three "
-      + 'documented ways past the order it used (#338)' },
-];
+      + 'documented ways past the order it used (#338)' }),
+]);
 
 // The value is as load-bearing as the heading — a bare `- second item:` is what a half-written stamp produces
 // and would otherwise pass — and the line anchor is what makes it a record: a line a reader can find, not a
-// phrase inside a sentence.
-const carries = (body, key) => new RegExp(`(^|\\n)${key} *\\S`).test(body);
+// phrase inside a sentence. The key is escaped at the boundary that depends on it rather than trusted to stay
+// metacharacter-free, which was a rule in the test file guarding a decision made here (PR #393 review).
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const carries = (body, key) => new RegExp(`(^|\\n)${escapeRe(key)} *\\S`).test(body);
 
 export const requiredLines = (input) => {
   const body = heartbeatBody(input);
@@ -103,8 +120,37 @@ export const frozenLabel = ({ labels }) => Array.isArray(labels) && labels.inclu
   ? 'The frozen label is retired (.claude/rules/governance.md, #101 layer 0): the freeze the owner lifted on 2026-09-10 does not re-arm, and no run applies this label to reinstate it.'
   : null;
 
-export const check = (input) =>
-  ownerMarker(input) ?? requiredLines(input) ?? frozenLabel(input) ?? heartbeatAppend(input);
+/**
+ * The third route a write to `.claude/` can take, and the only one that lands on the remote (#346 covered the
+ * shell, #342 the file tools). `mcp__github__create_or_update_file`, `push_files` and `delete_file` take a
+ * repository path and commit it straight to a branch, so a run refused locally could have pushed the same
+ * edit — worse, because it is already on GitHub (PR #393 review, B5b). The path is repo-relative, which is
+ * exactly what `protectedKind()` judges, so this asks the same question the other two guards ask.
+ */
+export const filePath = (input, root) => {
+  const named = [input?.path, ...(Array.isArray(input?.files) ? input.files.map((f) => f?.path) : [])];
+  const base = projectDir(root);
+  const hit = named.find((p) => typeof p === 'string' && protectedKind(p, base) !== null);
+  return hit
+    ? `${hit} is a protected path (#342/#346), and committing it through an MCP file write is not a way round `
+      + 'the Write, Edit and Bash guards — it is the same edit, landing on the remote instead of the working '
+      + 'copy. Say on the issue what needed changing here and why, label it `owner-session`, and take the next '
+      + 'item — .claude/rules/governance.md has the rule.'
+    : null;
+};
+
+// Every entry point of every guard here turns a throw into a deny, for the reason `bash-guard.mjs` gives: a
+// PreToolUse hook that throws exits non-zero with empty stdout, which is a non-blocking error and the write
+// proceeds. `heartbeatBody` fixed one expression; this fixes the class (PR #393 review, note 7).
+export const check = (input, root) => {
+  try {
+    return ownerMarker(input ?? {}) ?? requiredLines(input ?? {}) ?? filePath(input, root)
+      ?? frozenLabel(input ?? {}) ?? heartbeatAppend(input ?? {});
+  } catch {
+    return 'github-write-guard could not decide about this call (#101), so it refused. Re-send it in the '
+      + 'shape the tool documents, or say on the issue what you were trying to record.';
+  }
+};
 
 if (isMain(import.meta.url)) {
   const reason = check(await readInput());

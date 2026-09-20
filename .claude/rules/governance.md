@@ -25,20 +25,24 @@ paths:
   approval that prompt offers is scoped to **that session**, so it never carries to the next scheduled run:
   PR #294 stalled 7h33m and PR #318 overnight, both on this very file.
   `docs/decisions/006-a-routine-never-writes-under-claude.md` has the documentation trail and the five
-  alternatives ruled out. Enforced in code, on both routes a write can take: `claudeDir()` in
-  `.claude/hooks/write-guard.mjs` denies a `Write` or `Edit` under `.claude/` — the directory itself included —
-  unless the checkout carries the gitignored `.owner-machine` marker, which a clone never has; and
-  `claudeWrite()` in `.claude/hooks/bash-guard.mjs` puts the paths a shell command would write through that
-  same decision, so `sed -i` on this file is refused as surely as an `Edit` of it (#346). The write targets it
-  reads are an output redirect and the operands of `tee`, `touch`, `rm`, `mkdir`, `truncate`, `cp`, `mv`, `ln`,
-  `install`, `sed -i`/`perl -i`, `dd of=` and `git checkout`/`git restore`. Both guards also refuse to bring
-  the marker into existence, `touch .owner-machine` included. **What no command-line rule sees**, and neither
-  guard claims to: a script that opens the file itself (`python3 - <<EOF`, `node -e`), a target assembled at
-  run time (`$DIR/settings.json`), or a tool absent from that list. The marker is a switch, not a seal — the
+  alternatives ruled out. Enforced in code, on the three routes a write can take, all asking one shared
+  question — `protectedKind()` in `.claude/hooks/paths.mjs`, so no two of them can come to disagree about
+  which paths count, the `.claude` directory itself and the marker included. The routes: `claudeDir()` in
+  `.claude/hooks/write-guard.mjs` for the `Write` and `Edit` tools; `claudeWrite()` in
+  `.claude/hooks/bash-guard.mjs` for the shell, so `sed -i` on this file is refused as surely as an `Edit` of
+  it (#346); and `filePath()` in `.claude/hooks/github-write-guard.mjs` for
+  `mcp__github__create_or_update_file`, `push_files` and `delete_file`, which commit a path straight to a
+  branch and so would land the same edit on the remote. None of them will bring the marker into existence,
+  `touch .owner-machine` included. The shell rule judges a target **by its spelling as well as by where it
+  lands**, because nothing tracks `cd`; which tools it reads as writing is the lists in `bash-guard.mjs`, not
+  restated here, since a copy of them would drift. **What no command-line rule sees**, and no guard claims to:
+  a script that opens the file itself (`python3 - <<EOF`, `node -e`), a target assembled at run time
+  (`$DIR/settings.json`), a working directory changed to a computed path, or a tool absent from those lists —
+  `git apply`, `patch`, `ed` and `rsync` among them. The marker is a switch, not a seal — the
   seal is that a routine has no reason to be writing here at
   all. `PreToolUse` runs before the permission system, so the call is refused in milliseconds rather than
-  waiting hours for a person. **Reads are untouched** — by either guard: `cat`, `grep`, `git diff` and a
-  `.claude/` path as the *source* of a copy all pass. What a run does
+  waiting hours for a person. **Reads are untouched**: a tool only counts in command position, so `cat`,
+  a `grep` whose *pattern* is `touch`, `git diff` and a `.claude/` path as the *source* of a copy all pass. What a run does
   instead: say on the issue what needed changing here and why, label it `owner-session`, take the next item.
   The owner's own checkout carries the marker; he creates it by hand, once, and nothing else does.
   That is the same answer the bullet below already gives for the one-home reduction; this makes it true of

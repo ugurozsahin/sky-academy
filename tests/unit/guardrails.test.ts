@@ -1555,9 +1555,13 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
     expect(git('ls-files', '--', MARKER).out, `${MARKER} is tracked — the hook would allow every write`).toBe('');
   });
 
+  // The constant moved to `.claude/hooks/paths.mjs` in PR #393: the shared path decision lives there so that
+  // each guard module exports nothing but its own rules, which is what lets the #359 wiring rail hold without
+  // exempting helpers by name. What this rail pins is unchanged — one spelling, in one place, matching
+  // `.gitignore` — only the file it reads.
   it('the hook and .gitignore name the same marker, so neither can drift alone', () => {
     expect(file('.gitignore'), 'the marker must be ignored by name').toContain(`\n${MARKER}\n`);
-    expect(file('.claude/hooks/write-guard.mjs'), 'the marker constant moved or was renamed')
+    expect(file('.claude/hooks/paths.mjs'), 'the marker constant moved or was renamed')
       .toContain(`export const OWNER_MARKER = '${MARKER}'`);
   });
 
@@ -1569,10 +1573,13 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
       .toMatch(/protected path/i);
     expect(rules, 'the enforcement, named where a reader can check it')
       .toContain('`.claude/hooks/write-guard.mjs`');
-    // #346: a write can arrive through a file tool or through the shell, and until both were enforced the rule
-    // covered one of the two. Naming only one guard here is how the prose would quietly go back to that.
-    expect(rules, 'the shell half of the enforcement, or the rule covers one route and claims two')
-      .toContain('`.claude/hooks/bash-guard.mjs`');
+    // #346 and the PR #393 review: a write can arrive through a file tool, through the shell, or through an
+    // MCP file write that commits straight to a branch. Naming fewer guards than the code has is how the
+    // prose goes back to covering one route and claiming all of them.
+    for (const guard of ['`.claude/hooks/bash-guard.mjs`', '`.claude/hooks/github-write-guard.mjs`'])
+      expect(rules, `${guard} is enforcement the rule does not name`).toContain(guard);
+    expect(rules, 'and the one shared decision, or three guards can drift into three answers')
+      .toContain('`.claude/hooks/paths.mjs`');
     expect(rules, 'what a run does instead, or a denial leaves it with nowhere to go').toContain('owner-session');
     expect(rules, 'reads must stay allowed, or a run stops reading its own rules').toMatch(/reads are untouched/i);
     // Round-1 review of PR #344: the first draft claimed a run "cannot grant itself" the permission, which was
