@@ -5,9 +5,19 @@ import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel,
 const q = (prompt: string) => ({ prompt, say: symSay(prompt) });
 /**
  * Mark a question as taking several mental steps, so the bubbles fly one speed step slower (#297).
- * Year 2's difficulty-3 arithmetic is two-digit and crosses a ten (`83 − 47`), which a child works out
- * in steps rather than recalls; the sum stays as the year asks, only the clock eases. Set at d3 alone,
- * which is why it is a flag on the question and not on the topic.
+ *
+ * The rule the code applies is **Year 2's difficulty-3 two-digit work**, full stop — not "crosses a ten",
+ * which is how this was first written and is narrower than what ships: over 500 draws each, 282/500
+ * `y2-add` and 326/500 `y2-sub` d3 draws need no regrouping at all (`45 + 44`, `78 − 62`, `99 − 34`). That
+ * is #297's decision, not an oversight — a bubble speed that flickered question by question inside one
+ * stage would read to a child as a glitch, so the whole of d3 eases. The sum stays as the year asks; only
+ * the clock does. Set at d3 alone, which is why it is a flag on the question and not on the topic.
+ *
+ * For one generator that makes it a *stage* split rather than a difficulty one: `y2Inverse`'s `kind` never
+ * reads `d`, and its d2 and d3 ranges coincide — 500/500 byte-identical prompts on the same seed (#311) —
+ * so `70 − ? = 26` flies at speed 3 at stage 3 of a Year 2 mission and at speed 2 at stage 4. Harmless to
+ * the child, stage 4 being the gentler one; giving `y2-inverse` a real d3 form is a curriculum change of
+ * its own and needs the owner's view.
  */
 const slowAtD3 = (d: Difficulty, question: Question): Question => d === 3 ? { ...question, slow: true } : question;
 
