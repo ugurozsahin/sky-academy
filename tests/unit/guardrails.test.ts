@@ -1462,6 +1462,43 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
       .toMatch(/last, not first/i);
   });
 
+  /**
+   * #314 — a run that stops before STEP 5 used to leave nothing at all, and the commonest way to stop is a
+   * permission prompt no unattended run can answer: editing a file under `.claude/` asks for confirmation,
+   * and most of the open queue is hardening work whose home is `.claude/rules/` and `.claude/skills/`. On
+   * 2026-09-19 that cost PR #294 seven and a half hours, and the watchdog read the silence as healthy because
+   * a pulse written only at the end cannot distinguish "dead", "busy" and "waiting for a human".
+   *
+   * STEP 1 now stamps `IN PROGRESS` on the way in. The two halves are pinned together and neither is any use
+   * alone: a stamp nobody reads is noise, and a watchdog check with nothing to read is dead prose. The
+   * "not a pass" half matters most — the rule it amends ("Last, not first", pinned above) exists because a
+   * *finished-looking* pulse stamped on the way in would hide the very deaths the pulse exists to expose, and
+   * that reasoning survives only while the stamp cannot be mistaken for a finish.
+   *
+   * `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` carries the reasoning and the alternatives
+   * the owner dropped (a permissions allow-list, a no-prompt mode), so neither is re-litigated from scratch.
+   *
+   * * Prove it red: drop the STEP 1 stamp; drop `IN PROGRESS` from either file; let the stamp read as a pass;
+   * or drop the watchdog's staleness bar for it.
+   */
+  it('a run stamps the pulse IN PROGRESS on the way in, and the watchdog treats a stale one as a finding (#314)', () => {
+    const prompt = live('docs/ROUTINE-PROMPT.md');
+    // One anchor, marker included: a bare `toContain('IN PROGRESS')` on the file was satisfied by STEP 5's
+    // own mention of the stamp, so renaming the marker in STEP 1 alone stayed green.
+    expect(prompt, 'STEP 1 must stamp the pulse before the work, with the marker the watchdog greps for')
+      .toContain('replace the `routine: heartbeat` body with `<UTC> — IN PROGRESS: <what this run will do>`');
+    expect(prompt, 'it carries the `- second item:` line the #62 hook demands, or the write is denied and the stamp never lands')
+      .toMatch(/- second item: pending/);
+    expect(prompt, 'and STEP 5 must say it replaces the stamp, not sit beside it')
+      .toMatch(/IN PROGRESS` stamp, which is not a pass/);
+
+    const watchdog = live('docs/WATCHDOG-PROMPT.md');
+    expect(watchdog, 'check 3 must read the stamp').toContain('IN PROGRESS');
+    expect(watchdog, 'a stale stamp is a finding, not a pulse').toMatch(/is a finding[\s\S]{0,120}quote the stamp's line/);
+    expect(watchdog, 'and it must say a fresh stamp is NOT a finding — otherwise every run in flight is an alarm')
+      .toMatch(/fresh\*?\*? `IN PROGRESS` stamp is not a\s+finding/);
+  });
+
   // The routing table is the thing that stops the habit coming back as a new file somewhere else, so both
   // process files carry it (a copied paragraph still — docs/decisions/001 has the debt).
   it.each(['CLAUDE.md', 'docs/ROUTINE-PROMPT.md'])('%s carries the record-routing rule', (name) => {
@@ -4243,7 +4280,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_503;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5
+  const ROUTINE_PROMPT_BUDGET = 21_436;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph
   // —
 
   const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3

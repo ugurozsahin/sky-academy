@@ -75,6 +75,16 @@ your first finding and the only one you can report.
    in it, and a snapshot whose checks are there but whose **values** are missing ("nightly ok" with no
    timestamp or head) is a run that may not have looked — worth a finding if it repeats, not on its own.
 
+   **A pulse reading `IN PROGRESS` is a run that started and never finished (#314).** STEP 1 of
+   `docs/ROUTINE-PROMPT.md` stamps it on the way in and STEP 5 replaces it with the finished snapshot, so a
+   stamp older than one interval plus slack — about 90 minutes at the hourly cadence — is a run that stopped
+   in between. That is a finding, and **quote the stamp's line in it**: it names what the run was about to do
+   and is the only evidence such a run leaves. Do not read it as a pulse, and **do not guess why it stopped**:
+   a permission prompt, a usage limit and a crash look identical from here, so report the text and let the
+   owner tell them apart. A **fresh** `IN PROGRESS` stamp is not a
+   finding: runs here routinely take 45 minutes, and one in flight is what healthy looks like.
+   `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` has why the stamp exists and what it is not.
+
 4. **Is any PR stuck?** For each open PR: how long has it been open, and does its head carry a `review-gate`
    status (`/commits/<head sha>/status`)? Two exemptions, and only these two: a PR **parked on the owner**
    (labelled `owner-approval`, or `loosening` since #112, and awaiting his `OWNER: APPROVED` — the routine is told to leave those open, so it
