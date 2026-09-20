@@ -78,3 +78,45 @@ describe('mode table', () => {
     expect(MODES.mission.coins({ ...e, stars: 3 })).toBe(30 + 15 * 5 + 20);
   });
 });
+
+/*
+ * #311 items 1 and 2 — the three seams that carry the `slow` flag (#297) into a real game, each of which a
+ * mutation killed with the whole suite green.
+ *
+ * The flag's existing tests are all `MODES.mission` with exact values, plus one cross-mode assertion shaped
+ * `expect(slow).toBeLessThanOrEqual(plain)`. That shape cannot fail: delete `eased(` from sprint or boss and
+ * the eased speed simply equals the plain one, which still satisfies `<=`. So these pin the eased speeds by
+ * value, in the years where eased and plain actually differ, and the `slow: !!this.current?.slow` line in
+ * `session.ts` by driving a real `Session` over a generator that flags its question.
+ */
+describe('the slow flag reaches every mode that eases (#311)', () => {
+  const Y2 = YEARS.find(y => y.id === 'year2')!;
+
+  it('Ninja Sprint eases a flagged question by one step', () => {
+    expect(Y2.speeds[1], "sprint reads the year's second speed step").toBe(2);
+    expect(MODES.sprint.speed(ctx({ year: Y2, slow: false })), 'plain: the steady pace').toBe(2);
+    expect(MODES.sprint.speed(ctx({ year: Y2, slow: true })), 'flagged: one step slower').toBe(1);
+  });
+
+  it('Boss Battle eases a flagged question by one step, enraged or not', () => {
+    expect([Y2.speeds[1], Y2.speeds[2]], 'boss reads step 2 normally and step 3 enraged').toEqual([2, 3]);
+    expect(MODES.boss.speed(ctx({ year: Y2, enraged: false, slow: false }))).toBe(2);
+    expect(MODES.boss.speed(ctx({ year: Y2, enraged: false, slow: true }))).toBe(1);
+    // The enraged branch was never exercised with the flag at all: `c.year.speeds[c.enraged ? 2 : 1]` has two
+    // arms and easing has to survive both, or a flagged question arrives at full speed exactly when the
+    // fight is hardest.
+    expect(MODES.boss.speed(ctx({ year: Y2, enraged: true, slow: false }))).toBe(3);
+    expect(MODES.boss.speed(ctx({ year: Y2, enraged: true, slow: true }))).toBe(2);
+  });
+
+  it('Sky Storm does not ease, and that is the decision — not an oversight to be tidied away', () => {
+    // `endless` ramps on questions answered and clamps for gentle years instead; `sequence` has never eased
+    // there either (modes.ts). Pinned so a later reader who wraps `endless` in `eased()` has to change this
+    // test, and read the comment while doing it.
+    for (const q of [0, 12, 30]) {
+      expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: q, slow: true })), `q=${q}`)
+        .toBe(MODES.endless.speed(ctx({ year: Y2, questionsAsked: q, slow: false })));
+    }
+    expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: 30, slow: true })), 'full speed at the top of the ramp').toBe(3);
+  });
+});
