@@ -777,7 +777,7 @@ describe('profiles: siblings on one device (#20)', () => {
   const freshDevice = () => {
     for (const id of PROFILE_IDS) localStorage.removeItem(saveKeyFor(id));
     localStorage.removeItem(INDEX);
-    setActiveProfile('p1');          // clears the cache, both write latches and the session's profile
+    expect(setActiveProfile('p1'), 'the teardown checks its own switch').toBe(true);   // clears the cache, both write latches and the session's profile
     localStorage.removeItem(INDEX);  // ...and a one-profile device stores no index
   };
   it('the teardown really does hand each test an empty device', () => {
@@ -851,6 +851,18 @@ describe('profiles: siblings on one device (#20)', () => {
     // old assertion could not fail whatever the refusal did (#330 review N8).
     expect(localStorage.getItem(INDEX), 'and the refusal leaves the stored index exactly as it was').toBe(before);
     expect(profileIds().length, 'four is the cap, and the cap is the length of the slot list').toBe(MAX_PROFILES);
+
+    // p3 and p4 existed only in the index: every isolation assertion in this block was p1-against-p2, so two
+    // of the owner's four slots had their key derivation held by nothing, and what that hides is the
+    // feature's headline failure — two children silently sharing one save (#330 round 3, item 2).
+    const NAMES = [['p1', 'Ada'], ['p2', 'Bo'], ['p3', 'Cass'], ['p4', 'Dee']] as const;
+    for (const [id, name] of NAMES) { expect(setActiveProfile(id), id).toBe(true); save({ name }); }
+    for (const [id, name] of NAMES) {
+      expect(JSON.parse(localStorage.getItem(saveKeyFor(id))!).name, `${id} has a key of its own`).toBe(name);
+      expect(setActiveProfile(id), id).toBe(true);
+      expect(load().name, `${id} reads back its own child`).toBe(name);
+    }
+    expect(new Set(NAMES.map(([id]) => saveKeyFor(id))).size, 'four slots, four keys').toBe(MAX_PROFILES);
   });
 
   it('a corrupt index falls back to profile 1 with its save intact, and keeps the siblings it can see', () => {
@@ -878,6 +890,9 @@ describe('profiles: siblings on one device (#20)', () => {
     ['no version', JSON.stringify({ active: 'p2', ids: ['p1', 'p2'] })],
     ['a version no build here wrote', JSON.stringify({ v: 2, active: 'p2', ids: ['p1', 'p2'] })],
     ['no ids', JSON.stringify({ v: 1, active: 'p1' })],
+    // Truthy but not an array: the falsy row above reaches only half of `!Array.isArray(ids)`, and without
+    // the other half this blob puts `ids.every is not a function` through `profileIds()` (#330 round 3, N3).
+    ['ids that are not an array', JSON.stringify({ v: 1, active: 'p1', ids: 'p1' })],
     ['an unknown slot', JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p9'] })],
     ['a duplicate slot', JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p1'] })],
     ['an active profile that is not in ids', JSON.stringify({ v: 1, active: 'p3', ids: ['p1', 'p2'] })],
@@ -997,6 +1012,24 @@ describe('profiles: siblings on one device (#20)', () => {
       .toMatchObject({ name: 'Ada', coins: 30 });
   });
 
+  it('a session that reads before it writes keeps its own slot when the index moves', () => {
+    // The order a launch actually uses, and the order the two tests below do not: `load()` is the first thing
+    // that touches storage and the first `save()` comes minutes later. Both of those prime the latch with a
+    // `save()` on the way in, so `load()` re-resolving per call — the very defect `sessionProfile()` exists
+    // to close — could not make them fail (#330 round 3, item 1).
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Ada', coins: 30 }));
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION, name: 'Bo', coins: 3 }));
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2'] }));
+
+    expect(load().name, 'the session binds here, on a read, as a launch does').toBe('Bo');
+    localStorage.removeItem(INDEX);
+    save({ coins: 4 });
+
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).coins, "the write follows the read's profile").toBe(4);
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!), "and the sibling is untouched")
+      .toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
   it('"Start again" under the same conditions clears the child who asked, not their sibling', () => {
     save({ name: 'Ada', coins: 30 });
     expect(addProfile()).toBe('p2');
@@ -1052,6 +1085,36 @@ describe('profiles: siblings on one device (#20)', () => {
     localStorage.removeItem(saveKeyFor('p3'));
     // and the slot is still free to be handed out
     expect(addProfile()).toBe('p2');
+  });
+
+  it('a store whose reads throw does not take the session down with it (#151, #232)', () => {
+    const realGet = localStorage.getItem;
+    (localStorage as unknown as { getItem: unknown }).getItem = () => { throw new Error('storage disabled'); };
+    try {
+      // `sessionProfile()` is the first statement of `load()`, *outside* `load()`'s own try, so `readItem`'s
+      // catch is the only thing between a private-mode or disabled-WebView store and a throw straight out of
+      // `load()`, `activeProfile()` and `profileIds()`. Nothing shimmed `getItem` before (#330 round 3, N2).
+      expect(() => profileIds()).not.toThrow();
+      expect(profileIds()).toEqual(['p1']);
+      expect(activeProfile()).toBe('p1');
+      expect(load().name, 'the session runs on defaults rather than dying').toBe('');
+    } finally { (localStorage as unknown as { getItem: unknown }).getItem = realGet; }
+  });
+
+  it('an index the store altered on the way in is a refusal too, not only one it dropped (#151)', () => {
+    save({ name: 'Ada', coins: 30 });
+    const realSet = localStorage.setItem;
+    // Kept, but not what we wrote. The existing fault-injection drops the key entirely, which a `!== null`
+    // read-back would also catch; only a truncating or stale store separates the two (#330 round 3, N4).
+    (localStorage as unknown as { setItem: unknown }).setItem =
+      (k: string, v: string) => { realSet.call(localStorage, k, k === INDEX ? v.slice(0, 8) : v); };
+    let added: ReturnType<typeof addProfile>;
+    try { added = addProfile(); }
+    finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+
+    expect(added, 'kept-but-different is not kept').toBeNull();
+    expect(profileIds(), 'and the altered blob is not read back as an index either').toEqual(['p1']);
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
   });
 
   it("a switch clears the failed-write flag the other profile's write set (#151)", () => {

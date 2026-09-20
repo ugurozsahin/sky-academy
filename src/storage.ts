@@ -198,10 +198,15 @@ function dropSessionState() { cache = null; readOnly = false; writeFailed = fals
  */
 function leaveProfile() { dropSessionState(); cacheProfile = null; }
 /**
- * Switch the active profile. False — and nothing changes — when `id` is not one of this device's profiles, or
- * when the index could not be written: a switch the store refuses would put the child back on their sibling's
- * game at the next launch, and on a store that refuses this write the new profile could not be saved either.
- * The caller says so rather than the session pretending (the `buyItem`/`equipItem` rule, #151).
+ * Switch the active profile. False when `id` is not one of this device's profiles, or when the index was not
+ * kept: a switch the store refuses would put the child back on their sibling's game at the next launch, and
+ * on a store that refuses this write the new profile could not be saved either. The caller says so rather
+ * than the session pretending (the `buyItem`/`equipItem` rule, #151).
+ *
+ * **This session is unchanged on a false return; the store is not guaranteed to be.** `writeIndex` promises
+ * only that it is not holding this index, not that the key is untouched — on a partially-working store the
+ * `setItem` may have landed and the read-back disagreed. Read its paragraph before relying on the stronger
+ * reading; `false` did once say "nothing changes" outright, and that outlived the narrowing (#330 round 3, N5).
  */
 export function setActiveProfile(id: ProfileId): boolean {
   const idx = currentIndex();
@@ -211,7 +216,11 @@ export function setActiveProfile(id: ProfileId): boolean {
 }
 /**
  * Add a profile and make it active, returning its id — or null when the device is at `MAX_PROFILES` or the
- * index could not be written. The new profile starts on `DEFAULT`, so the caller runs the normal onboarding.
+ * index was not kept. The new profile starts on `DEFAULT`, so the caller runs the normal onboarding.
+ *
+ * Null carries both refusals with no way to tell them apart, and slice 2's picker has to say two different
+ * things ("four ninjas is the most" against "this browser will not let the game save") — #335. The same
+ * caveat as `setActiveProfile` applies to the store on a null return.
  */
 export function addProfile(): ProfileId | null {
   const idx = currentIndex();
