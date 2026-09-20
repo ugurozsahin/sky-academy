@@ -126,6 +126,15 @@ function readIndex(): ProfileIndex | null {
  * under its own key — and it must not orphan a sibling's either, which is why this probes rather than
  * returning `['p1']` flat. Nothing is written here on purpose: a blob we merely failed to parse is not
  * overwritten until a real profile action (`setActiveProfile`, `addProfile`) asks for one.
+ *
+ * **What the probe can and cannot see** (#335 items 3 and 4, stated rather than fixed). It sees a slot only
+ * while that slot *holds a save*, so a profile added by `addProfile()` and never played — which deliberately
+ * writes no save — is invisible to it, as is a slot after `reset()`; if the index is then lost, that child is
+ * not in this list. And `readItem()` collapses "absent", "unreadable" and "the read threw" into `null`, so in
+ * an environment where `getItem` itself throws — private mode, a WebView with DOM storage off, both named in
+ * this file already — four configured children present here as one. Neither loses anything: the saves stay
+ * under their own keys, and the same environments refuse the writes that would overwrite them. The list is
+ * wrong, not the data.
  */
 function defaultIndex(): ProfileIndex {
   const ids = PROFILE_IDS.filter(id => id === 'p1' || holdsSave(id));
@@ -162,8 +171,11 @@ function writeIndex(next: ProfileIndex): boolean {
   try { localStorage.setItem(INDEX_KEY, blob); } catch { return false; }
   return readItem(INDEX_KEY) === blob;
 }
-/** The profiles on this device, in slot order. One profile is the normal case and costs no stored key. */
-export const profileIds = (): ProfileId[] => currentIndex().ids;
+/** The profiles on this device, in slot order. One profile is the normal case and costs no stored key.
+ *
+ *  `readonly` because the array is the caller's copy of parsed state and pushing to it changes nothing —
+ *  `profileIds().push('p4')` used to type-check and silently do nothing (#335 item 5). */
+export const profileIds = (): readonly ProfileId[] => currentIndex().ids;
 /** Whose game the **store** says is being played — what slice 2's picker draws, and where a session starts.
  *  Not necessarily whose game `load()` and `save()` are acting on: that is `sessionProfile()`, resolved once
  *  per session, and the two part company in a second tab on purpose (#330 round 2, N3). */
@@ -215,20 +227,66 @@ export function setActiveProfile(id: ProfileId): boolean {
   return true;
 }
 /**
- * Add a profile and make it active, returning its id — or null when the device is at `MAX_PROFILES` or the
- * index was not kept. The new profile starts on `DEFAULT`, so the caller runs the normal onboarding.
+ * The two ways adding a profile can be refused, told apart (#335 item 2). `null` carried both, and the picker
+ * has to say two different things: `'full'` is "four ninjas is the most" — a sentence about this family —
+ * while `'store'` is "this browser will not let the game save", a fault the child cannot do anything about.
+ * `writeIndex`'s catch is the only place that knows the difference and it used to discard it, and neither
+ * refusal sets `writeFailed`, so `isWriteFailing()` could not recover it afterwards either.
  *
- * Null carries both refusals with no way to tell them apart, and slice 2's picker has to say two different
- * things ("four ninjas is the most" against "this browser will not let the game save") — #335. The same
- * caveat as `setActiveProfile` applies to the store on a null return.
+ * A result object rather than a widened string union: `ProfileId` is itself a string literal union, so
+ * `'full' | ProfileId` would need `isProfileId()` at every call site to be read at all.
  */
-export function addProfile(): ProfileId | null {
+export type AddProfileResult = { ok: true; id: ProfileId } | { ok: false; why: 'full' | 'store' };
+/**
+ * Add a profile and make it active. The new profile starts on `DEFAULT`, so the caller runs the normal
+ * onboarding; `why` says which refusal it got (see `AddProfileResult`).
+ *
+ * The free slot is probed as well as counted (#335 item 1): an index that is valid but under-reports a
+ * populated slot would otherwise hand a new child a slot that already holds a sibling's save, and onboarding
+ * would merge straight over it. `defaultIndex()` makes that index hard to come by — it probes the same way —
+ * but `addProfile` is the one that does the damage, so it checks for itself rather than inheriting the care.
+ * The consequence is that "a slot is free" here is stricter than `ids.length < MAX_PROFILES`, which is why the
+ * picker asks this function instead of counting: with four slots and three profiles it can still answer
+ * `'full'`, and that is the honest answer — there is nowhere to put a fourth child.
+ *
+ * The same caveat as `setActiveProfile` applies to the store on a `'store'` refusal.
+ */
+export function addProfile(): AddProfileResult {
   const idx = currentIndex();
-  const free = PROFILE_IDS.find(id => !idx.ids.includes(id));
-  if (!free || !writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) return null;
+  const free = PROFILE_IDS.find(id => !idx.ids.includes(id) && !holdsSave(id));
+  if (!free) return { ok: false, why: 'full' };
+  if (!writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) return { ok: false, why: 'store' };
   leaveProfile();
-  return free;
+  return { ok: true, id: free };
 }
+/**
+ * Name and ninja for a profile that is **not** the one this session is playing — what the picker draws on a
+ * card. Deliberately not `load()`: that resolves the session's own profile and caches it, so reading a
+ * sibling's save through it would either answer the wrong child or latch the session onto them.
+ *
+ * Read-only, migration-free and tolerant by design. It takes the two fields a card shows and nothing else, so
+ * a save from an older version, a hand-edited one, or a blob that is not an object at all yields a card with
+ * an empty name and no ninja — which the picker renders as an un-onboarded slot — instead of throwing on the
+ * first screen a child sees. Nothing here writes, so drawing the picker cannot migrate or damage a save.
+ */
+export interface ProfileCard { id: ProfileId; name: string; avatar: string | null; onboarded: boolean }
+export function profileCard(id: ProfileId): ProfileCard {
+  const blank: ProfileCard = { id, name: '', avatar: null, onboarded: false };
+  const raw = readItem(saveKeyFor(id));
+  if (!raw) return blank;
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return blank; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return blank;
+  const s = parsed as RawSave;
+  return {
+    id,
+    name: typeof s.name === 'string' ? s.name : '',
+    avatar: typeof s.avatar === 'string' ? s.avatar : null,
+    onboarded: s.onboarded === true,
+  };
+}
+/** Every profile on this device as a card, in slot order — the picker's whole data source. */
+export const profileCards = (): ProfileCard[] => profileIds().map(profileCard);
 
 // A raw blob read back from storage: JSON of unknown shape (any past version, or hand-edited). Migrations walk it.
 type RawSave = Record<string, unknown>;

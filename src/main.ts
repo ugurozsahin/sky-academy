@@ -6,7 +6,8 @@ import { memoryScreen } from './ui/memory';
 import { duelScreen } from './ui/duel';
 import { shopScreen } from './ui/shop';
 import { clearPendingReset, isPendingReset, parentsScreen } from './ui/parents';
-import { load, save } from './storage';
+import { profilesScreen } from './ui/profiles';
+import { load, profileIds, save } from './storage';
 import { initGameSpeed } from './game/speed';
 import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
@@ -51,8 +52,15 @@ const nav = {
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },
   shop: () => { leave(); enter('shop'); shopScreen(nav); },
   parents: () => { leave(); enter('parents'); parentsScreen(nav); },
+  // #20 slice 2: the profile picker. Deliberately pushes **no** history entry, which makes it a launch screen
+  // rather than a step in the stack: the sky map is the root here (`mapScreen` pushes nothing either), and
+  // `nav.map()` pops whenever an entry exists — so an entry for the picker would send every "chosen, go to the
+  // map" straight back to the picker. Back from the picker leaves the app, exactly as back from the map does.
+  profiles: () => { leave(); fromPop = false; profilesScreen(() => afterPick(), () => nav.avatar()); },
   up,
 };
+/** Where a chosen profile lands: their sky map, or onboarding when that slot has never been played. */
+const afterPick = () => { if (load().onboarded) nav.map(); else nav.avatar(); };
 window.addEventListener('popstate', () => {
   const s = history.state?.screen as string | undefined;   // the entry we landed on
   fromPop = true;
@@ -82,9 +90,12 @@ void fontReady();
 // #15: offline play. Deliberately fire-and-forget and deliberately after the first screen is decided — a
 // worker that fails to register, or a browser that has none, must change nothing about the game starting.
 void startServiceWorker();
+// #20 slice 2: "Who is playing?" comes first once siblings share the device. With one profile — every player
+// today — it never appears and boot is unchanged, which is the owner's decision at the top of #20.
+//
 // #67: `onboarded`, not `avatar` — a profile mid-wizard already has an avatar chosen (choices save as they
 // are made) but must still see the rest of the wizard on the next launch, not jump straight to the map.
-if (load().onboarded) nav.map(); else nav.avatar();
+if (profileIds().length > 1) nav.profiles(); else if (load().onboarded) nav.map(); else nav.avatar();
 
 // Keep the layout stable on mobile browsers whose toolbars resize the viewport.
 const setVH = () => document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);

@@ -195,6 +195,59 @@ describe('guard rails', () => {
     for (const f of ['/src/ui/play.ts', '/src/ui/memory.ts']) expect(code(SOURCES[f])).toContain('return cleanup;');
   });
 
+  // #20 slice 2 — the profile picker. Four properties it is built on, none of which fails loudly.
+  //
+  // 1. The picker is a **launch screen, not a stack entry**: `mapScreen` pushes no history entry and
+  //    `nav.map()` pops whenever one exists, so an `enter('profiles')` would send every "chosen, go to the
+  //    map" straight back to the picker — a loop a child could not leave. A future hand adding `enter(...)`
+  //    to the route for symmetry with its neighbours is exactly the plausible edit.
+  // 2. Boot shows it only when siblings actually share the device. Nothing changes for today's players,
+  //    which is the owner's decision at the top of #20, and `> 1` is the whole of it.
+  // 3. The store is asked before the child is moved: a `go(...)` that did not wait for
+  //    `setActiveProfile` to return true would drop a child into a sibling's game on a store that refuses.
+  // 4. Drawing a card never goes through `load()`/`save()` — those resolve and latch *this session's*
+  //    profile, so reading a sibling's name through them would answer the wrong child or bind the session
+  //    to them. `profileCard()` reads the slot key directly for that reason.
+  it('the profile picker is a launch screen, gated on more than one profile (#20 slice 2)', () => {
+    const main = code(SOURCES['/src/main.ts']);
+    const from = main.indexOf('profiles: () =>'), to = main.indexOf('\n  up,', from);
+    expect({ route: from >= 0 && to > from }).toEqual({ route: true });
+    expect(main.slice(from, to), 'the picker pushes no history entry').not.toMatch(/\benter\(/);
+    expect(main, 'boot reaches the picker only with two or more profiles').toMatch(/profileIds\(\)\.length > 1/);
+    expect(main, 'and a one-profile device boots exactly as it did').toMatch(/else if \(load\(\)\.onboarded\) nav\.map\(\); else nav\.avatar\(\)/);
+  });
+
+  it('the picker moves a child only once the store has accepted the switch (#20 slice 2)', () => {
+    const pick = code(SOURCES['/src/ui/profiles.ts']);
+    expect(pick, 'the switch is checked, not called and hoped for').toMatch(/if \(!setActiveProfile\([^)]*\)\)/);
+    // Every `go(` in the file must sit after that guard's early return — there is one call site, and a
+    // second one added outside the guard is the mistake this pins.
+    expect(pick.match(/\bgo\(/g) ?? [], 'one call site for go(), inside the guarded handler').toHaveLength(1);
+    expect(pick.indexOf('go('), 'and it comes after the refusal check').toBeGreaterThan(pick.indexOf('!setActiveProfile'));
+    // Both refusals are told apart on screen (#335 item 2): a picker that shows one sentence for both tells a
+    // child with four siblings that their browser is broken, or the reverse.
+    expect(pick).toMatch(/why === 'full'/);
+  });
+
+  it("a sibling's card is read from the slot, never through the session's load() (#20 slice 2)", () => {
+    const store = code(SOURCES['/src/storage.ts']);
+    const from = store.indexOf('export function profileCard('), to = store.indexOf('\n}', from);
+    expect({ fn: from >= 0 && to > from }).toEqual({ fn: true });
+    const body = store.slice(from, to);
+    expect(body, 'reads the slot key itself').toMatch(/readItem\(saveKeyFor\(id\)\)/);
+    for (const banned of ['load(', 'save(', 'sessionProfile(', 'localStorage.setItem'])
+      expect({ banned, used: body.includes(banned) }).toEqual({ banned, used: false });
+    expect(code(SOURCES['/src/ui/profiles.ts']), 'and the picker uses it rather than load()').not.toMatch(/\bload\(\)/);
+  });
+
+  it('addProfile probes the slot it hands out, not just the index (#335 item 1)', () => {
+    const store = code(SOURCES['/src/storage.ts']);
+    const from = store.indexOf('export function addProfile('), to = store.indexOf('\n}', from);
+    expect({ fn: from >= 0 && to > from }).toEqual({ fn: true });
+    // Counting alone gave a new child a slot already holding a sibling's save, and onboarding merged over it.
+    expect(store.slice(from, to)).toMatch(/!idx\.ids\.includes\(id\) && !holdsSave\(id\)/);
+  });
+
   // Incident 2026-09-06 (#27): the year union `'reception' | 'year1' | 'year2'` was retyped in four files
   // and per-year assets keyed by island index, so a new year (Y3–Y6) meant editing seven places. It now
   // lives once as `YearId` in curriculum/types.ts; every other union must derive from it. This rail counts

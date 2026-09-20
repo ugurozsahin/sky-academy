@@ -1841,3 +1841,81 @@ test.describe('offline (#15)', () => {
     await context.setOffline(false);
   });
 });
+
+/**
+ * #20 slice 2 — "Who is playing?", the profile picker. Slice 1 gave siblings a save each at the storage layer
+ * and nothing in the app called it; these are the first tests where two children actually reach their own game.
+ *
+ * The index shape is `src/storage.ts`'s: `sna:profiles = { v: 1, active, ids }`, profile 1 under the historical
+ * `sna:v1` key and the rest under `sna:v1:p2`… — seeded directly rather than walked, the same trade `seedPlayer`
+ * makes above, because the walk through onboarding is the *other* tests' subject.
+ */
+async function seedSiblings(page: Page, active = 'p1') {
+  await page.addInitScript(({ index, ada, bo }) => {
+    if (!localStorage.getItem('sna:profiles')) {
+      localStorage.setItem('sna:v1', ada);
+      localStorage.setItem('sna:v1:p2', bo);
+      localStorage.setItem('sna:profiles', index);
+    }
+  }, {
+    index: JSON.stringify({ v: 1, active, ids: ['p1', 'p2'] }),
+    ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+    bo: JSON.stringify({ v: SAVE_VERSION, name: 'Bo', avatar: 'blaze', coins: 7, spent: 0, onboarded: true }),
+  });
+}
+
+test.describe('profile picker (#20 slice 2)', () => {
+  test('one profile: the launch picker never appears, and boot is unchanged', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');          // asserts `.home` is visible, i.e. boot went straight there
+    await expect(page.locator('.profile-screen')).toHaveCount(0);
+    // The route still exists for the one child on the device — it is the only way a second one is ever added.
+    await page.click('#who');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(1);
+    await expect(page.locator('#new-ninja')).toBeVisible();
+  });
+
+  test('two profiles: the picker comes first and each child keeps their own coins', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(2);
+    await expect(page.locator('.avatar-card[data-profile="p1"]')).toContainText('Ada');
+    await expect(page.locator('.avatar-card[data-profile="p2"]')).toContainText('Bo');
+
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('#change-av')).toContainText('Bo');
+    await expect(page.locator('#rewards'), "the sibling's coins, not the other child's").toContainText('7');
+
+    // The switch is persisted, not merely rendered: the next launch opens the picker again (two profiles), and
+    // the other card leads to a game that kept its own 40 coins through all of it.
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await page.click('.avatar-card[data-profile="p1"]');
+    await expect(page.locator('#change-av')).toContainText('Ada');
+    await expect(page.locator('#rewards')).toContainText('40');
+  });
+
+  test('a fourth ninja is the last: the New ninja card goes when the device is full', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await expect(page.locator('#new-ninja')).toBeVisible();
+    // Two more, each through the real onboarding the card opens — the child's own route, not the grown-ups'.
+    for (const [ninja, name] of [['blaze', 'Cass'], ['kai', 'Dee']] as const) {
+      await page.click('#new-ninja');
+      await expect(page.locator('.choose-ninja-screen'), 'a new ninja runs the normal wizard').toBeVisible();
+      await page.click(`.avatar-card[data-id="${ninja}"]`);
+      await page.click('#next');
+      await page.fill('#name', name);
+      await page.click('#go');
+      await page.click('#intro-go');
+      await expect(page.locator('.home')).toBeVisible();
+      await expect(page.locator('#change-av')).toContainText(name);
+      await page.click('#who');
+      await expect(page.locator('.profile-screen')).toBeVisible();
+    }
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(4);
+    await expect(page.locator('#new-ninja'), 'four is the most one device holds').toHaveCount(0);
+  });
+});

@@ -153,6 +153,14 @@ img { -webkit-user-drag: none; }
   box-shadow: 0 0 0 1px var(--glow), 0 12px 34px #0008, inset 0 0 40px color-mix(in srgb, var(--glow) 18%, transparent);
   transform: translateY(-4px) scale(1.03);
 }
+/* #20 slice 2: the "New ninja" card on the "Who is playing?" picker. The only thing the picker adds to the
+ * ninja-choice screen's classes: an empty slot has no portrait, so the figure holds a `+` instead of an <img>.
+ * Dashed, like `.locked`, because both mean "not a ninja yet"; sized off the figure's own box with a clamp so
+ * it tracks the card rather than needing a breakpoint of its own (`design-language` §2). */
+.avatar-card.new-ninja { border-style: dashed; }
+.avatar-card.new-ninja .figure { display: grid; place-items: center; }
+.avatar-card.new-ninja .figure::before { opacity: .18; background: radial-gradient(ellipse at center, var(--accent-2) 0%, transparent 70%); }
+.avatar-card.new-ninja .plus { position: relative; font-size: clamp(38px, 12vw, 58px); line-height: 1; color: var(--accent-2); text-shadow: 0 4px 10px #000a; }
 /*
  * #110: the name row sits *above* the avatar grid. Below it, the grid is `repeat(auto-fill, minmax(104px, 1fr))`
  * — the wider and taller the screen, the further down "Your name" went, and on a tablet it was past the fold

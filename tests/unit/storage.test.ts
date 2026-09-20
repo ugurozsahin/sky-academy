@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { activeProfile, addProfile, MAX_PROFILES, PROFILE_IDS, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { activeProfile, addProfile, MAX_PROFILES, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
@@ -782,7 +782,7 @@ describe('profiles: siblings on one device (#20)', () => {
   };
   it('the teardown really does hand each test an empty device', () => {
     save({ name: 'Ada', coins: 50 });
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo' });
     freshDevice();
     expect(localStorage.getItem(INDEX)).toBeNull();
@@ -815,7 +815,7 @@ describe('profiles: siblings on one device (#20)', () => {
     recordCert({ id: 'year1:y1-bonds', name: 'Ada', avatar: 'volt', year: 'Year 1', title: 'Number bonds', stars: 3, score: 90, correct: 6, attempts: 6, date: '2026-09-20' });
 
     const second = addProfile();
-    expect(second).toBe('p2');
+    expect(second).toEqual({ ok: true, id: 'p2' });
     expect(activeProfile()).toBe('p2');
     expect(profileIds()).toEqual(['p1', 'p2']);
     expect(load().name, 'a new profile starts on defaults, ready for onboarding').toBe('');
@@ -840,12 +840,12 @@ describe('profiles: siblings on one device (#20)', () => {
   });
 
   it('stops at four profiles', () => {
-    expect(addProfile()).toBe('p2');
-    expect(addProfile()).toBe('p3');
-    expect(addProfile()).toBe('p4');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    expect(addProfile()).toEqual({ ok: true, id: 'p3' });
+    expect(addProfile()).toEqual({ ok: true, id: 'p4' });
     expect(profileIds().length).toBe(MAX_PROFILES);
     const before = localStorage.getItem(INDEX);
-    expect(addProfile(), 'the fifth is refused').toBeNull();
+    expect(addProfile(), 'the fifth is refused, and as full rather than as a store fault').toEqual({ ok: false, why: 'full' });
     expect(profileIds()).toEqual(['p1', 'p2', 'p3', 'p4']);
     // Read the store, not `activeProfile()`: `addProfile` short-circuits on `!free` before it writes, so the
     // old assertion could not fail whatever the refusal did (#330 review N8).
@@ -927,7 +927,7 @@ describe('profiles: siblings on one device (#20)', () => {
     (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
     try {
       expect(setActiveProfile('p1'), 'an unpersisted switch is reported, not pretended').toBe(false);
-      expect(addProfile(), 'and no profile is added either').toBeNull();
+      expect(addProfile(), 'and no profile is added either').toEqual({ ok: false, why: 'store' });
     } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
     expect(activeProfile(), 'still Bo, which is what the next launch will also read').toBe('p2');
     expect(load().name).toBe('Bo');
@@ -939,7 +939,7 @@ describe('profiles: siblings on one device (#20)', () => {
     // Move profile 1 on *after* the code is taken, so the code and the slot it must not touch differ. With
     // both at 99 coins, clobbering p1 with the code is undetectable — the identity the review caught.
     save({ coins: 7 });
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', coins: 1 });
     expect(JSON.parse(exportSave()).name, 'the code carries whoever is playing').toBe('Bo');
 
@@ -978,7 +978,7 @@ describe('profiles: siblings on one device (#20)', () => {
     load();
     expect(isReadOnlySave(), "profile 1's blob is from a newer build, so this session writes nothing").toBe(true);
 
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     // The whole job of `dropSessionState()` beyond clearing the cache: reduced to `cache = null` it left
     // 80/80 green, and the sibling could not save for the entire session with nothing shown (#330 review,
     // item 3). Both latches describe one blob, and it is not this profile's.
@@ -999,7 +999,7 @@ describe('profiles: siblings on one device (#20)', () => {
    */
   it('an index that moves under a playing session does not redirect its save into a sibling\'s slot', () => {
     save({ name: 'Ada', coins: 30 });
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', coins: 3 });
     load();                                    // Bo is the profile this session is playing as
     localStorage.removeItem(INDEX);            // another tab switches, or the key is cleared
@@ -1032,7 +1032,7 @@ describe('profiles: siblings on one device (#20)', () => {
 
   it('"Start again" under the same conditions clears the child who asked, not their sibling', () => {
     save({ name: 'Ada', coins: 30 });
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', coins: 3 });
     load();
     localStorage.removeItem(INDEX);
@@ -1060,11 +1060,11 @@ describe('profiles: siblings on one device (#20)', () => {
     // Not a throw: a store that takes the call and drops this one key. The catch alone never saw this, so
     // addProfile() reported a profile the next read knew nothing about and the new child onboarded over Ada.
     (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => { if (k !== INDEX) realSet.call(localStorage, k, v); };
-    let added: string | null, switched: boolean;
+    let added: ReturnType<typeof addProfile>, switched: boolean;
     try { added = addProfile(); switched = setActiveProfile('p1'); }
     finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
 
-    expect(added, 'no profile was added, and the caller is told so').toBeNull();
+    expect(added, 'no profile was added, and the caller is told it is the store').toEqual({ ok: false, why: 'store' });
     expect(switched, 'and a switch is refused on the same store').toBe(false);
     expect(activeProfile(), 'the child on the device is still the one who was playing').toBe('p1');
     expect(profileIds()).toEqual(['p1']);
@@ -1084,7 +1084,7 @@ describe('profiles: siblings on one device (#20)', () => {
     }
     localStorage.removeItem(saveKeyFor('p3'));
     // and the slot is still free to be handed out
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
   });
 
   it('a store whose reads throw does not take the session down with it (#151, #232)', () => {
@@ -1112,13 +1112,13 @@ describe('profiles: siblings on one device (#20)', () => {
     try { added = addProfile(); }
     finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
 
-    expect(added, 'kept-but-different is not kept').toBeNull();
+    expect(added, 'kept-but-different is not kept').toEqual({ ok: false, why: 'store' });
     expect(profileIds(), 'and the altered blob is not read back as an index either').toEqual(['p1']);
     expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
   });
 
   it("a switch clears the failed-write flag the other profile's write set (#151)", () => {
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     expect(setActiveProfile('p1')).toBe(true);
     const realSet = localStorage.setItem;
     (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
@@ -1137,5 +1137,61 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(setActiveProfile('p1')).toBe(true);
     expect(load().name, "the other child's game is not part of it").toBe('Ada');
     expect(load().coins).toBe(30);
+  });
+
+  /*
+   * #20 slice 2 — what the picker needs of the store, and the two #335 findings the picker makes reachable.
+   */
+  it('addProfile refuses a slot that already holds a save the index does not list (#335 item 1)', () => {
+    save({ name: 'Ada' });
+    // An index that is valid (p1 only, active p1) beside a real save in p2 — the shape `defaultIndex()`'s own
+    // probe would never produce, but a hand-edited or half-written index can. `addProfile` used to hand p2
+    // out, and the new child's onboarding then merged over the sibling in it.
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 3, name: 'Bo', coins: 7 }));
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1'] }));
+    expect(addProfile(), 'the next free-by-count slot is not free').toEqual({ ok: true, id: 'p3' });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!), "and Bo's save is untouched").toMatchObject({ name: 'Bo', coins: 7 });
+  });
+
+  it("addProfile says 'full' when every unlisted slot holds a save, not 'store' (#335 item 2)", () => {
+    save({ name: 'Ada' });
+    for (const id of ['p2', 'p3', 'p4'] as const) localStorage.setItem(saveKeyFor(id), JSON.stringify({ v: 3, name: id }));
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1'] }));
+    // The count says one profile and three slots spare; the probe says there is nowhere to put a child. The
+    // picker shows two different sentences for these, so the refusal has to carry which one it is.
+    expect(addProfile()).toEqual({ ok: false, why: 'full' });
+  });
+
+  it("profileCard reads a sibling's name and ninja without moving this session (#20 slice 2)", () => {
+    save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 30 });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    save({ name: 'Bo', avatar: 'blaze', onboarded: true });
+
+    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true });
+    expect(activeProfile(), 'reading a card is not a switch').toBe('p2');
+    expect(load().name, 'and the session is still the child who was playing').toBe('Bo');
+    expect(profileCards()).toEqual([
+      { id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true },
+      { id: 'p2', name: 'Bo', avatar: 'blaze', onboarded: true },
+    ]);
+  });
+
+  it('profileCard is blank rather than throwing on a slot the picker cannot read (#20 slice 2)', () => {
+    save({ name: 'Ada' });
+    expect(profileCard('p2'), 'an empty slot').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
+    localStorage.setItem(saveKeyFor('p3'), 'not json at all');
+    expect(profileCard('p3'), 'a blob that is not JSON').toEqual({ id: 'p3', name: '', avatar: null, onboarded: false });
+    localStorage.setItem(saveKeyFor('p4'), JSON.stringify(['an', 'array']));
+    expect(profileCard('p4'), 'JSON that is not an object').toEqual({ id: 'p4', name: '', avatar: null, onboarded: false });
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 3, name: 42, avatar: 7, onboarded: 'yes' }));
+    expect(profileCard('p2'), 'fields of the wrong type are dropped, not shown').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
+  });
+
+  it('a profile added but never played still draws a card (#20 slice 2)', () => {
+    save({ name: 'Ada', onboarded: true });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    // `addProfile` writes no save on purpose, so the new slot is empty: the card has to come from the index.
+    expect(profileCards().map(c => c.id)).toEqual(['p1', 'p2']);
+    expect(profileCards()[1]).toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
   });
 });

@@ -12,7 +12,9 @@ import { $, $$, render, stars } from './dom';
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
-  memory: (year: YearInfo) => void; duel: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void; up: () => void;
+  memory: (year: YearInfo) => void; duel: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void;
+  profiles: () => void;   // #20 slice 2: "Who is playing?"
+  up: () => void;
 };
 
 function topbar(nav: Nav, rerender: () => void) {
@@ -24,6 +26,7 @@ function topbar(nav: Nav, rerender: () => void) {
         <button class="coin-pill" id="rewards" aria-label="Rewards: ${coinBalance()} coins">🪙 <b>${coinBalance()}</b>${d.streak.days > 1 ? ` <span class="streak">🔥${d.streak.days}</span>` : ''}</button>
         <button class="icon-btn" id="snd" aria-label="Sound ${d.sound ? 'on' : 'off'}">${d.sound ? '🔊' : '🔇'}</button>
         <button class="icon-btn" id="spk" aria-label="Read aloud ${d.speech ? 'on' : 'off'}">${d.speech ? '🗣️' : '🤐'}</button>
+        <button class="icon-btn" id="who" aria-label="Who is playing?">👥</button>
       </div>
     </header>`;
   const bind = () => {
@@ -31,6 +34,10 @@ function topbar(nav: Nav, rerender: () => void) {
     $('#rewards').addEventListener('click', () => { sfx.tap(); nav.rewards(); });
     $('#snd').addEventListener('click', () => { save({ sound: !load().sound }); rerender(); });
     $('#spk').addEventListener('click', () => { const on = !load().speech; save({ speech: on }); if (on) say('Read aloud is on', true); rerender(); });
+    // #20 slice 2: with one profile the launch picker never shows, so this is the only way a second child is
+    // ever added — it has to sit on the sky map, not behind the grown-ups gate (the owner's decision: "adding
+    // one is open to the child").
+    $('#who').addEventListener('click', () => { sfx.tap(); nav.profiles(); });
   };
   return { html, bind };
 }
