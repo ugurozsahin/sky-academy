@@ -89,6 +89,80 @@ describe('curriculum ranges', () => {
       expect(nums.some(n => [2, 5, 10].includes(n))).toBe(true);
     }
   });
+  it('Year 2 measures: no unit conversion, and every number on the card within 100 (#298)', () => {
+    // Converting between units is Year 3 non-statutory at the earliest and statutory in Year 4, and Year 2's
+    // numbers stop at 100 (`.claude/rules/curriculum.md`). Red on `main` before this slice: `1 metre = ?` was
+    // answered `100 cm` (a conversion) and offered `1000 cm`, and `2 kilograms = ?` answered `2000 g`.
+    const TOKEN = /\b(cm|mm|m|kg|g|ml|l)\b|\b(centimetres?|metres?|kilograms?|grams?|millilitres?|litres?)\b/g;
+    const CANON: Record<string, string> = { centimetre: 'cm', centimetres: 'cm', metre: 'm', metres: 'm', kilogram: 'kg', kilograms: 'kg', gram: 'g', grams: 'g', millilitre: 'ml', millilitres: 'ml', litre: 'l', litres: 'l' };
+    const units = (s: string) => [...new Set((s.match(TOKEN) ?? []).map(u => CANON[u] ?? u))].sort();
+    let cards = 0, converted = 0;
+    const compared: Record<string, Set<string>> = {};
+    for (const [id, small, large] of [['y2-length', 'cm', 'm'], ['y2-mass', 'g', 'kg'], ['y2-capacity', 'ml', 'l']] as const) {
+      compared[id] = new Set();
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 29);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+        const q = t.gen(d, r); cards++;
+        // A comparison card is the one with a measured list in its hint; "best unit" names both units and is
+        // not one. Collected so the slice's *positive* half is pinned too: reverting the larger-unit draw is
+        // inside 100 and so invisible to every assertion below.
+        if (q.hint?.includes(':')) for (const u of units(q.hint)) compared[id].add(u);
+        for (const s of [q.prompt, q.answer, ...q.options, q.hint ?? '', q.say ?? ''])
+          for (const n of s.match(/\d+/g) ?? []) expect(Number(n), `${id}: ${s}`).toBeLessThanOrEqual(100);
+        // A card that names a unit in the prompt is answered in that same unit — anything else is a conversion.
+        // "Best unit for a door?" names none, and its two units are the question, so it is not caught here.
+        const pu = units(q.prompt), au = units(q.answer);
+        if (pu.length && au.length) { converted++; expect(au, `${id}: "${q.prompt}" answered "${q.answer}" — that is a unit conversion`).toEqual(pu); }
+        // And the bare-answer form the clause above cannot see: "How many centimetres in a metre?" → `100`.
+        // No legitimate Year 2 card names two units in its prompt (the "best unit" card names none).
+        expect(pu.length, `${id}: "${q.prompt}" names two units — that is a conversion`).toBeLessThanOrEqual(1);
+      }
+      expect([...compared[id]].sort(), `${id} compares in both ${small} and ${large}`).toEqual([small, large].sort());
+    }
+    // Counters, so deleting a draw cannot make this rail vacuously green (the #296 rails beside it do the same).
+    expect(cards, 'cards generated').toBeGreaterThan(2000);
+    expect(converted, 'cards where the conversion clause actually runs').toBeGreaterThan(200);
+  });
+  it('Year 2 measures: the add/subtract card is arithmetically right and every option usable (#298)', () => {
+    // Nothing verified `measureSum`'s sum: this file's `solve()` matches only bare-number prompts, so the
+    // ` cm` suffix hides the prompt from it, and the harness's non-negative / maxAnswer check is guarded by
+    // `/^-?\d+$/` on the answer, which `24 cm` fails. Swapping the operands shipped `60 cm − 22 cm = ?`
+    // answered `-38 cm` with the whole suite green (review of PR #319), and the `≤ 100` sweep above cannot
+    // see it either, because `/\d+/g` skips the minus sign.
+    const SUM = /^(\d+) (\S+) ([+−]) (\d+) \2 = \?$/;
+    for (const id of ['y2-length', 'y2-mass', 'y2-capacity']) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 53);
+      let sums = 0, added = 0, subtracted = 0;
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+        const q = t.gen(d, r);
+        const m = q.prompt.match(SUM);
+        if (!m) continue;
+        sums++;
+        const [, aStr, unit, op, bStr] = m;
+        const a = Number(aStr), b = Number(bStr);
+        if (op === '+') added++; else subtracted++;
+        expect(q.answer, q.prompt).toBe(`${op === '+' ? a + b : a - b} ${unit}`);
+        expect(q.options.length, `${q.prompt}: four bubbles`).toBe(4);
+        for (const o of q.options) {
+          expect(o, `${q.prompt}: option "${o}"`).toMatch(new RegExp(`^\\d+ ${unit}$`));   // never a minus sign
+          const v = Number(o.split(' ')[0]);
+          expect(v, `${q.prompt}: option "${o}"`).toBeGreaterThan(0);
+          expect(v, `${q.prompt}: option "${o}"`).toBeLessThanOrEqual(100);
+        }
+        // `measureSum`'s two undocumented-in-the-ranges invariants, pinned from the outside: `b ≥ 10`, below
+        // which the other-operation decoy collides with `answer − 10` and the card dedupes to three bubbles;
+        // and the pair bounds that keep `answer ± 10` inside 0…100 whichever operation is drawn.
+        expect(b, q.prompt).toBeGreaterThanOrEqual(10);
+        expect(a + b, q.prompt).toBeLessThanOrEqual(90);
+        expect(a - b, q.prompt).toBeGreaterThanOrEqual(20);
+      }
+      // Per topic, and both operations: a counter summed across the three stays green when one topic loses
+      // its draw, which is exactly the regression #298 slice 1 would be reverted by.
+      expect(sums, `${id} reaches the add/subtract draw`).toBeGreaterThan(100);
+      expect(added, `${id} draws an addition`).toBeGreaterThan(20);
+      expect(subtracted, `${id} draws a subtraction`).toBeGreaterThan(20);
+    }
+  });
   it('Balance the Scales: both sides are equal once ? is filled in, within the year range', () => {
     const evalSide = (s: string) => { // "3 + 4", "12 − 5", "2 × 5" (left to right, no precedence needed)
       const t = s.split(' '); let acc = Number(t[0]);
@@ -335,7 +409,9 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
         if (!q.hint?.includes(':')) continue;
         compared++;
         expect(q.prompt, id).toMatch(/^Which holds (more|less|the most|the least)\?$/);
-        expect(q.say, 'the spoken line says what each one holds').toMatch(/ holds \d+ millilitres/);
+        // `litres` joins `millilitres` with #298 slice 1: Year 2 compares in `l` where `ml` would need
+        // hundreds. The verb is what this rail is about and is still asserted — only the unit is widened.
+        expect(q.say, 'the spoken line says what each one holds').toMatch(/ holds \d+ (millilitres|litres)/);
         expect(q.say, id).not.toMatch(/full|empt/);
       }
     }
