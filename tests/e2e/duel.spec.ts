@@ -32,8 +32,8 @@ async function expectHandoverHeard(page: Page) {
   expect(said.slice(at + 1), 'no cancel() after it').not.toContain('<cancel>');
 }
 
-async function startDuel(page: Page) {
-  await page.addInitScript(save => { if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save); }, JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }));
+async function startDuel(page: Page, extra: Record<string, unknown> = {}) {
+  await page.addInitScript(save => { if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save); }, JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', ...extra }));
   await page.addInitScript(() => { window.__SNA_FAST = 4; });
   await recordingEngine(page);
   await page.goto('/');
@@ -78,11 +78,13 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
     await expect(page.locator('.duel-end .speech')).toHaveText('Player 1 wins 6–4!');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 6, scoreB: 4, coins: 10 });
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 6, scoreB: 4, coins: 10, dojoCoins: 0 });
     // #16 item 5: the finished match pays the one shared save a coin per decided round — ten here, and not one
-    // of them for winning. Ten is under the first sticker threshold (30), so the match unlocks nothing yet.
+    // of them for winning. Ten is under the first sticker threshold (30), so the match unlocks nothing yet, and
+    // ten correct answers is short of every volume challenge (15/20/25) from a fresh save, so no dojo bonus.
     await expect(page.locator('.duel-end .coin-gain')).toHaveText('+10 🪙');
     await expect(page.locator('.duel-end .unlock')).toHaveCount(0);
+    await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(0);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).coins), 'the coins reached the save, not just the overlay').toBe(10);
     // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0. The recording
     // is cleared BEFORE the click: round 1's line goes out on the task after the old screen's cancel(), and it
@@ -93,7 +95,7 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
     await expect(page.locator('#score-a')).toHaveText('0');
     await expect(page.locator('#score-b')).toHaveText('0');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0, coins: 0 });
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0, coins: 0, dojoCoins: 0 });
     await expectHandoverHeard(page);   // the rematch's line is not dropped into the old screen's cancel()
     expect(await page.evaluate(() => window.__said.indexOf('<cancel>')), 'the old screen was hushed first, then the line went out').toBeGreaterThanOrEqual(0);
     // Leaving tears the duel down: the hooks go with it and BOTH render loops stop (#73 — no arena may leak
@@ -159,5 +161,28 @@ test.describe('Ninja Duel', () => {
     expect(await page.evaluate(() => window.__sna.arenas.a.paused && window.__sna.arenas.b.paused)).toBe(true);
     await page.click('#resume');
     expect(await page.evaluate(() => window.__sna.arenas.a.paused || window.__sna.arenas.b.paused)).toBe(false);
+  });
+
+  test('a finished match moves the day\'s Daily Dojo challenge and pays its bonus into the same save (#16 item 5)', async ({ page }) => {
+    // Seed today's volume challenge one answer short — all three ids, since which one the day draws is the
+    // date's business, not this test's. A single decided round then completes whichever it is, so the wiring
+    // is proven by one match instead of the four a fresh save would need.
+    const date = new Date().toISOString().slice(0, 10);
+    await startDuel(page, {
+      dojo: { date, progress: { correct15: 14, correct20: 19, correct25: 24 }, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 },
+    });
+    for (let r = 1; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, r % 2 ? 'a' : 'b');      // five rounds each: the bonus does not depend on who won
+    }
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    // One challenge row, where every other results overlay puts it: between the coin row and the stickers.
+    await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(1);
+    await expect(page.locator('.duel-end .dojo-bonus .gain')).toHaveText('+10 🪙');
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 5, scoreB: 5, coins: 10, dojoCoins: 10 });
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.coins, 'the match coins AND the dojo bonus reached the save').toBe(20);
+    expect(saved.dojo.done.length, 'the completed challenge is recorded, so it cannot be paid twice').toBe(1);
+    expect(saved.dojo.total).toBe(1);
   });
 });

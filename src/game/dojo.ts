@@ -2,9 +2,13 @@
 // streak multiplier for finishing the whole set on consecutive days. Pure logic (no DOM, no storage).
 export type DojoGroup = 'volume' | 'mode' | 'focus';
 export interface Challenge { id: string; group: DojoGroup; icon: string; title: string; goal: number; bonus: number }
-/** What one finished game tells the dojo (built by the results screens). */
+/**
+ * What one finished game tells the dojo (built by the results screens). `duel` is Ninja Duel (#16 item 5),
+ * whose event `duelDojoEvent()` in `src/game/duel.ts` builds: two players share one save, so it reports the
+ * maths the device saw and nothing it cannot honestly attribute to the save's owner.
+ */
 export interface DojoEvent {
-  mode: 'mission' | 'endless' | 'sprint' | 'boss' | 'memory';
+  mode: 'mission' | 'endless' | 'sprint' | 'boss' | 'memory' | 'duel';
   won: boolean; correct: number; attempts: number; bestCombo: number; stars: number; score: number;
   training?: boolean;              // Sensei session (a mission over a pool)
   mathsCorrect?: number; writingCorrect?: number;   // per-subject hits (from the session's per-topic tally)

@@ -91,6 +91,11 @@ export interface DuelState {
   topic: string;
   /** Coins the finished match paid into the shared save; 0 until the match ends (#16 item 5). */
   coins: number;
+  /**
+   * Daily Dojo bonus the finished match earned on top of `coins`; 0 until the match ends, and 0 whenever no
+   * challenge completed. The save gains `coins + dojoCoins` (#16 item 5).
+   */
+  dojoCoins: number;
 }
 
 /** The `window.__sna` hooks set by the Ninja Duel screen (#16): every action names the player it is for. */

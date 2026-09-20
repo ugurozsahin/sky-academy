@@ -230,3 +230,72 @@ describe('the duel card carries every question it can draw (#16 review, #65)', (
     }
   });
 });
+
+// #16 item 5: what a finished match tells the Daily Dojo. The rules the event has to respect live in
+// `applyEvent()` (src/game/dojo.ts), so these assert against the real dojo, not against the shape alone.
+import { duelCorrect, duelDojoEvent } from '../../src/game/duel';
+import { applyEvent, dailyChallenges, freshDojo, type DojoState } from '../../src/game/dojo';
+
+describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device saw)', () => {
+  const res = (scoreA: number, scoreB: number, rounds = DUEL_ROUNDS): DuelResult =>
+    ({ winner: scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : 'draw', scoreA, scoreB, rounds });
+
+  it('reports both players\' decided rounds as the questions answered correctly', () => {
+    expect(duelDojoEvent(res(6, 3), 'maths').correct).toBe(9);
+    expect(duelDojoEvent(res(0, 0), 'maths').correct).toBe(0);
+    expect(duelCorrect(res(6, 3))).toBe(duelCoins(res(6, 3)));   // one source: the payout and the dojo agree
+  });
+
+  it('never reports a combo — the duel screen tracks none, and combo5 is not gated on the mode', () => {
+    // `measure()` reads bestCombo through Math.max for every mode, so a non-zero value here would complete a
+    // challenge on evidence the duel screen does not collect. This is the rail for that.
+    for (let a = 0; a <= DUEL_ROUNDS; a++) for (let b = 0; a + b <= DUEL_ROUNDS; b++) {
+      expect(duelDojoEvent(res(a, b), 'maths').bestCombo, `${a}-${b}`).toBe(0);
+    }
+  });
+
+  it('claims no win, no stars and no score: the shared save has no winner to credit', () => {
+    const e = duelDojoEvent(res(10, 0), 'maths');
+    expect(e).toMatchObject({ mode: 'duel', won: false, stars: 0, score: 0, attempts: DUEL_ROUNDS });
+  });
+
+  it('splits by the match topic\'s subject, and counts a match only once', () => {
+    expect(duelDojoEvent(res(4, 3), 'maths')).toMatchObject({ mathsCorrect: 7, writingCorrect: 0 });
+    expect(duelDojoEvent(res(4, 3), 'writing')).toMatchObject({ mathsCorrect: 0, writingCorrect: 7 });
+  });
+
+  it('moves the volume challenge through the real dojo, and completes it across two matches', () => {
+    const date = '2026-09-20';
+    // Pick a day whose volume challenge we know, then drive it with matches rather than a hand-built event.
+    const volume = dailyChallenges(date).find(c => c.group === 'volume')!;
+    let s: DojoState = freshDojo(date);
+    let paid = 0; let completed = 0;
+    for (let i = 0; i < 4; i++) {
+      const out = applyEvent(s, duelDojoEvent(res(5, 5), 'maths'), date);
+      s = out.state; paid += out.coins; completed += out.completed.length;
+    }
+    expect(s.progress[volume.id]).toBe(volume.goal);        // 40 correct clears 15, 20 or 25
+    expect(completed).toBeGreaterThanOrEqual(1);
+    expect(paid).toBeGreaterThan(0);
+  });
+
+  it('leaves the mode and focus challenges a duel cannot honestly claim exactly where they were', () => {
+    // Sweep a month of days so most of the pool's mode and focus challenges are actually seen: one day only
+    // ever draws one of each, and a rail that happens to miss `combo5` is the one that would not have caught
+    // a non-zero bestCombo. `seen` is asserted at the end so a pool change cannot hollow this out silently.
+    const seen = new Set<string>();
+    for (let day = 1; day <= 28; day++) {
+      const date = `2026-09-${String(day).padStart(2, '0')}`;
+      const out = applyEvent(freshDojo(date), duelDojoEvent(res(5, 5), 'maths'), date);
+      for (const c of dailyChallenges(date)) {
+        if (c.group === 'volume') continue;
+        // maths10 / writing6 are the two focus challenges a duel legitimately moves (per-subject correct answers).
+        if (c.id === 'maths10' || c.id === 'writing6') continue;
+        seen.add(c.id);
+        expect(out.state.progress[c.id] ?? 0, `${c.id} moved on a duel`).toBe(0);
+      }
+    }
+    expect(seen.has('combo5'), 'the un-gated challenge was never drawn — this rail proved nothing').toBe(true);
+    expect(seen.size).toBeGreaterThanOrEqual(5);
+  });
+});

@@ -1,6 +1,7 @@
 // Ninja Duel: two players share one question, first correct slice wins the round (#16). Pure game logic (no
 // DOM/canvas), mirroring session.ts's own separation so it stays unit-testable ahead of any arena/HUD wiring.
 import type { Difficulty, Question, Topic } from '../curriculum';
+import type { DojoEvent } from './dojo';
 
 export type DuelPlayer = 'a' | 'b';
 export const DUEL_ROUNDS = 10;
@@ -95,6 +96,13 @@ function seededRng(seed: number) {
 }
 
 /**
+ * Rounds the match decided: one correct slice each, by whichever player got there first. The one source for
+ * "questions answered correctly in this match" — both the coin payout and the dojo event below read it,
+ * rather than each re-deriving `scoreA + scoreB` (#349's lesson about a second formatter).
+ */
+export const duelCorrect = (r: DuelResult): number => r.scoreA + r.scoreB;
+
+/**
  * Coins a finished match pays into the save (#16 item 5). The two players share one profile, so the payout
  * is for the maths the device saw, not for who won: **one coin per decided round**, which is exactly the
  * `baseCoins` rate every other mode pays for a correct answer (`src/game/modes.ts`) — a round is decided by
@@ -103,7 +111,31 @@ function seededRng(seed: number) {
  * happens to hold the device rather than the child whose save it is. Maximum for a `DUEL_ROUNDS` match: 10.
  */
 export function duelCoins(r: DuelResult): number {
-  return r.scoreA + r.scoreB;
+  return duelCorrect(r);
+}
+
+/**
+ * What a finished match tells the Daily Dojo (#16 item 5). Same reasoning as `duelCoins` above: the two
+ * players share one profile, so the dojo is told about the maths the *device* saw, never about who won —
+ * `duelCorrect()` decided rounds, which is the count of questions answered correctly in the match.
+ *
+ * Everything a duel cannot honestly report is reported as nothing, because `applyEvent()`'s challenges read
+ * these fields without always gating on the mode:
+ * - **`bestCombo: 0`** — `combo5` is the one challenge that is not mode-gated (`Math.max(cur, e.bestCombo)`),
+ *   and the duel screen tracks no combo at all, so any other value would pay out for something unmeasured.
+ * - **`won: false`, `stars: 0`, `score: 0`** — a duel has no winner, no stars and no score from the shared
+ *   save's point of view; the challenges that read them (`mission2`, `boss1`, `sensei1`, `stars3`,
+ *   `perfect`, `storm80`) are all gated on another mode, so this is the honest value, not a dodge.
+ *
+ * A duel plays one topic for the whole match, so the per-subject split is that topic's subject.
+ */
+export function duelDojoEvent(r: DuelResult, subject: Topic['subject']): DojoEvent {
+  const correct = duelCorrect(r);
+  return {
+    mode: 'duel', won: false, correct, attempts: r.rounds, bestCombo: 0, stars: 0, score: 0,
+    mathsCorrect: subject === 'maths' ? correct : 0,
+    writingCorrect: subject === 'writing' ? correct : 0,
+  };
 }
 
 /** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
