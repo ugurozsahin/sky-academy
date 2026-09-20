@@ -89,6 +89,26 @@ describe('curriculum ranges', () => {
       expect(nums.some(n => [2, 5, 10].includes(n))).toBe(true);
     }
   });
+  it('Year 2 measures: no unit conversion, and every number on the card within 100 (#298)', () => {
+    // Converting between units is Year 3 non-statutory at the earliest and statutory in Year 4, and Year 2's
+    // numbers stop at 100 (`.claude/rules/curriculum.md`). Red on `main` before this slice: `1 metre = ?` was
+    // answered `100 cm` (a conversion) and offered `1000 cm`, and `2 kilograms = ?` answered `2000 g`.
+    const TOKEN = /\b(cm|mm|m|kg|g|ml|l)\b|\b(centimetres?|metres?|kilograms?|grams?|millilitres?|litres?)\b/g;
+    const CANON: Record<string, string> = { centimetre: 'cm', centimetres: 'cm', metre: 'm', metres: 'm', kilogram: 'kg', kilograms: 'kg', gram: 'g', grams: 'g', millilitre: 'ml', millilitres: 'ml', litre: 'l', litres: 'l' };
+    const units = (s: string) => [...new Set((s.match(TOKEN) ?? []).map(u => CANON[u] ?? u))].sort();
+    for (const id of ['y2-length', 'y2-mass', 'y2-capacity']) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 29);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+        const q = t.gen(d, r);
+        for (const s of [q.prompt, q.answer, ...q.options, q.hint ?? '', q.say ?? ''])
+          for (const n of s.match(/\d+/g) ?? []) expect(Number(n), `${id}: ${s}`).toBeLessThanOrEqual(100);
+        // A card that names a unit in the prompt is answered in that same unit — anything else is a conversion.
+        // "Best unit for a door?" names none, and its two units are the question, so it is not caught here.
+        const pu = units(q.prompt), au = units(q.answer);
+        if (pu.length && au.length) expect(au, `${id}: "${q.prompt}" answered "${q.answer}" — that is a unit conversion`).toEqual(pu);
+      }
+    }
+  });
   it('Balance the Scales: both sides are equal once ? is filled in, within the year range', () => {
     const evalSide = (s: string) => { // "3 + 4", "12 − 5", "2 × 5" (left to right, no precedence needed)
       const t = s.split(' '); let acc = Number(t[0]);

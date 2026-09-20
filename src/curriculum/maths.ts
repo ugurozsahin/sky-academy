@@ -359,27 +359,47 @@ const y1Months: Generator = (d, rng) => {
   return wordQ(rng, `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, ans, shuffle(rng, MONTHS.filter(x => x !== ans)).slice(0, 3), { say: `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?` });
 };
 
+/**
+ * Add or subtract two measures **in one unit**, every value inside Year 2's range of 100 (#298). Converting
+ * between units is Year 3 non-statutory at the earliest, so the pair never crosses cm/m, g/kg or ml/l, and
+ * the ranges keep the answer *and* its decoys ≤ 100: `a + b ≤ 90` and `a − b ≥ 20`, so `answer ± 10` lands
+ * inside the range either way. The third decoy is the other operation — the mistake the question is about.
+ */
+function measureSum(rng: Rng, unit: string, verb: [string, string]): Question {
+  const b = ri(rng, 10, 30), a = ri(rng, b + 20, 90 - b), add = rng() < 0.5;
+  const ans = add ? a + b : a - b;
+  const word = UNIT_WORD[unit];
+  return wordQ(rng, `${a} ${unit} ${add ? '+' : '−'} ${b} ${unit} = ?`, `${ans} ${unit}`,
+    [`${ans + 10} ${unit}`, `${ans - 10} ${unit}`, `${add ? a - b : a + b} ${unit}`],
+    { say: `${a} ${word} ${add ? 'plus' : 'take away'} ${b} ${word}. ${add ? verb[0] : verb[1]}` });
+}
+// Year 2 measurement is compare and order, choose the sensible unit, and add or subtract within one unit
+// (#298). The "1 metre = ? cm" conversions these three used to ask are Year 3/4 and needed three-digit
+// numbers, so they are gone; where grams or millilitres would run past 100, the comparison is asked in the
+// larger unit instead (a 3 kg cat against a 7 kg dog) rather than by shrinking the thing being measured.
 const y2Length: Generator = (d, rng) => {
-  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 3);
-  if (kind === 0) return measureCompare(rng, d, pick(rng, ['rope', 'ribbon', 'plank', 'path']), 'cm', ['longer', 'shorter', 'longest', 'shortest'], 10, 99);
+  const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
+  if (kind === 0) return rng() < 0.5
+    ? measureCompare(rng, d, pick(rng, ['rope', 'ribbon', 'plank', 'path']), 'cm', ['longer', 'shorter', 'longest', 'shortest'], 10, 99)
+    : measureCompare(rng, d, pick(rng, ['garden', 'corridor', 'fence', 'field']), 'm', ['longer', 'shorter', 'longest', 'shortest'], 2, 40);
   if (kind === 1) return unitChoice(rng, [['pencil', 'cm'], ['finger', 'cm'], ['book', 'cm'], ['door', 'm'], ['room', 'm'], ['garden', 'm'], ['playground', 'm']], 'cm', 'm', 'measure');
-  if (kind === 2) { const [phrase, ans, ds] = pick(rng, [['1 metre', '100 cm', ['10 cm', '1000 cm', '50 cm']], ['half a metre', '50 cm', ['5 cm', '500 cm', '15 cm']], ['2 metres', '200 cm', ['20 cm', '2000 cm', '120 cm']]] as [string, string, string[]][]); return wordQ(rng, `${phrase} = ?`, ans, ds, { say: `How many centimetres is ${phrase}?` }); }
-  const a = ri(rng, 10, 50), b = ri(rng, 10, 50);
-  return wordQ(rng, `${a} cm + ${b} cm = ?`, `${a + b} cm`, [`${a + b + 10} cm`, `${a + b - 10} cm`, `${Math.abs(a - b)} cm`], { say: `${a} centimetres plus ${b} centimetres. How long altogether?` });
+  return measureSum(rng, 'cm', ['How long altogether?', 'How long is left?']);
 };
 const y2Mass: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
-  if (kind === 0) return measureCompare(rng, d, pick(rng, ['sack', 'box', 'parcel', 'melon']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], 50, 900);
+  if (kind === 0) return rng() < 0.5
+    ? measureCompare(rng, d, pick(rng, ['apple', 'pear', 'orange', 'lemon']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], 20, 99)
+    : measureCompare(rng, d, pick(rng, ['cat', 'dog', 'sack', 'suitcase']), 'kg', ['heavier', 'lighter', 'heaviest', 'lightest'], 2, 30);
   if (kind === 1) return unitChoice(rng, [['feather', 'g'], ['apple', 'g'], ['coin', 'g'], ['cat', 'kg'], ['dog', 'kg'], ['bag of flour', 'kg']], 'g', 'kg', 'weigh');
-  const [phrase, ans, ds] = pick(rng, [['1 kilogram', '1000 g', ['100 g', '10 g', '500 g']], ['half a kilogram', '500 g', ['50 g', '5000 g', '250 g']], ['2 kilograms', '2000 g', ['200 g', '20 g', '1200 g']]] as [string, string, string[]][]);
-  return wordQ(rng, `${phrase} = ?`, ans, ds, { say: `How many grams is ${phrase}?` });
+  return measureSum(rng, 'g', ['How heavy altogether?', 'How much is left?']);
 };
 const y2Capacity: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
-  if (kind === 0) return measureCompare(rng, d, pick(rng, ['bottle', 'jug', 'tank', 'flask']), 'ml', ['fuller', 'emptier', 'fullest', 'emptiest'], 50, 900);
+  if (kind === 0) return rng() < 0.5
+    ? measureCompare(rng, d, pick(rng, ['cup', 'mug', 'glass', 'beaker']), 'ml', ['fuller', 'emptier', 'fullest', 'emptiest'], 20, 99)
+    : measureCompare(rng, d, pick(rng, ['bucket', 'bottle', 'tank', 'watering can']), 'l', ['fuller', 'emptier', 'fullest', 'emptiest'], 2, 30);
   if (kind === 1) return unitChoice(rng, [['teaspoon', 'ml'], ['cup', 'ml'], ['mug', 'ml'], ['bath', 'l'], ['bucket', 'l'], ['paddling pool', 'l']], 'ml', 'l', 'measure');
-  const [phrase, ans, ds] = pick(rng, [['1 litre', '1000 ml', ['100 ml', '10 ml', '500 ml']], ['half a litre', '500 ml', ['50 ml', '5000 ml', '250 ml']], ['2 litres', '2000 ml', ['200 ml', '20 ml', '1200 ml']]] as [string, string, string[]][]);
-  return wordQ(rng, `${phrase} = ?`, ans, ds, { say: `How many millilitres is ${phrase}?` });
+  return measureSum(rng, 'ml', ['How much altogether?', 'How much is left?']);
 };
 const y2Temp: Generator = (d, rng) => {
   if (d >= 2 && rng() < 0.4) {
