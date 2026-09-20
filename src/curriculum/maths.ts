@@ -824,13 +824,30 @@ const y2Symmetry: Generator = (d, rng) => {
  * exactly one object fits — the acceptance bar for this issue is one defensible answer with the voice off,
  * and a pattern showing only one period leaves "what comes next" genuinely open.
  */
-const PATTERN_OBJECTS = ['🔴', '🔵', '🟡', '🟢', '🟣', '🟠', '⭐', '🔷'];
+/**
+ * The objects a pattern is built from: **one silhouette each** (#299 review B4).
+ *
+ * The first pool here was eight coloured circles. Six of them differed by hue alone, and because the near
+ * decoy is always another object from the same card, 54% of d1 cards put two of those six in front of the
+ * child at once — 🔴/🟢, 🔵/🟣 and the rest of the standard confusions. To a colour-blind child the sequence
+ * then reads as one repeated circle and the two bubbles are identical: not a hard card, a card with **no**
+ * answer, which fails #299's own "exactly one defensible answer with the voice off" the same way a card that
+ * answers itself does.
+ *
+ * So every object carries a different shape, and the name beside each glyph is what the rail in
+ * `tests/unit/curriculum.test.ts` holds unique — colour is decoration here, never the thing being read.
+ */
+const PATTERN_OBJECTS: readonly (readonly [string, string])[] = [
+  ['🔴', 'circle'], ['🟦', 'square'], ['🔺', 'triangle'], ['⭐', 'star'],
+  ['❤️', 'heart'], ['🌙', 'crescent'], ['🔶', 'diamond'], ['🐟', 'fish'],
+];
+const PATTERN_GLYPHS = PATTERN_OBJECTS.map(([g]) => g);
 /** Unit shapes as letters: which positions repeat, filled with objects at generation time. */
 const UNITS_D1 = ['AB'], UNITS_LONGER = ['ABC', 'AAB', 'ABB'];
 const y2Patterns: Generator = (d, rng) => {
   const shape = pick(rng, d === 1 ? UNITS_D1 : UNITS_LONGER);
   const letters = [...new Set([...shape])];
-  const chosen = shuffle(rng, PATTERN_OBJECTS).slice(0, letters.length);
+  const chosen = shuffle(rng, PATTERN_GLYPHS).slice(0, letters.length);
   const unit = [...shape].map(ch => chosen[letters.indexOf(ch)]);
   const seq = [...unit, ...unit, ...unit];
   // d1/d2 hide the last object ("what comes next?"); d3 may hide one inside the last repeat, which is harder
@@ -839,7 +856,7 @@ const y2Patterns: Generator = (d, rng) => {
   const answer = seq[gap], last = gap === seq.length - 1;
   // The near decoys are the pattern's own other objects — the mistake worth catching — and the rest of the
   // pool fills up to three so an AB pattern still gets a full card.
-  const decoys = [...chosen.filter(o => o !== answer), ...shuffle(rng, PATTERN_OBJECTS.filter(o => !chosen.includes(o)))];
+  const decoys = [...chosen.filter(o => o !== answer), ...shuffle(rng, PATTERN_GLYPHS.filter(o => !chosen.includes(o)))];
   return wordQ(rng, last ? 'What comes next?' : 'Which one is missing?', answer, decoys, {
     visual: { type: 'sentence', text: seq.map((o, i) => i === gap ? '_' : o).join(' ') },
     say: last ? 'Look at the pattern. What comes next?' : 'Look at the pattern. Which one is missing?',

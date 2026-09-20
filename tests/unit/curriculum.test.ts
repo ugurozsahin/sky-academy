@@ -1559,6 +1559,16 @@ describe('Year 2 symmetry and patterns (#299 slice 4)', () => {
     expect([...kinds].sort(), 'd2–d3 draw both kinds of card').toEqual(['letters', 'symmetry']);
   });
 
+  /**
+   * What each pattern object *looks* like, written here rather than imported: a card is readable only if no
+   * two objects on it share a silhouette, and a rail that took the generator's own table would agree with it
+   * by definition. Colour is decoration on these cards; shape is the thing being read (#299 review B4).
+   */
+  const SILHOUETTE: Record<string, string> = {
+    '🔴': 'circle', '🟦': 'square', '🔺': 'triangle', '⭐': 'star',
+    '❤️': 'heart', '🌙': 'crescent', '🔶': 'diamond', '🐟': 'fish',
+  };
+
   /** The smallest repeat the visible objects agree with — read off the card, with the gap ignored. */
   function periodOf(items: string[], gap: number): number {
     for (let p = 1; p < items.length; p++) {
@@ -1589,6 +1599,16 @@ describe('Year 2 symmetry and patterns (#299 slice 4)', () => {
         for (const o of q.options) if (o !== q.answer) expect(o, 'a decoy never also fits').not.toBe(items[gap - p]);
         expect(q.prompt).toBe(gap === items.length - 1 ? 'What comes next?' : 'Which one is missing?');
         gaps.add(gap === items.length - 1);
+        // #299 review B4: the bubbles must differ by more than hue. The pool used to be eight coloured
+        // circles, so 54% of d1 cards put two of 🔴 🔵 🟡 🟢 🟣 🟠 on the card at once — to a colour-blind
+        // child that is one repeated circle and two identical bubbles, a card with no answer rather than a
+        // hard one. The silhouettes below are the test's own list, not the generator's, so adding a glyph
+        // to the pool without a distinct shape fails here.
+        for (const o of [...items.filter(x => x !== '_'), ...q.options]) expect(SILHOUETTE, `${o} is not in the shape-distinct pool`).toHaveProperty(o);
+        const shapes = q.options.map(o => SILHOUETTE[o]);
+        expect(new Set(shapes).size, `two bubbles share a silhouette: ${q.options.join(' ')}`).toBe(q.options.length);
+        const drawn = new Set(items.filter(x => x !== '_').map(o => SILHOUETTE[o]));
+        expect(drawn.size, `the pattern itself repeats a silhouette: ${items.join(' ')}`).toBe(new Set(items.filter(x => x !== '_')).size);
       }
       expect([...gaps].sort(), d === 3 ? 'd3 hides an object inside the pattern too' : `d${d} always hides the last object`)
         .toEqual(d === 3 ? [false, true] : [true]);

@@ -107,6 +107,60 @@ describe('renderVisual — a builder for every Visual.type (#43)', () => {
     expect(h).toContain('<u class="gap">');
     expect(h).not.toContain('_');                             // every run of underscores becomes the gap
   });
+
+  /**
+   * #299 review B1: the join between the `grid` string and the squares a child actually sees is this
+   * topic's whole correctness. The card asks "Is the dotted line a line of symmetry?", so a drawing that is
+   * not the grid the generator produced makes the card contradict its own answer — a `yes` over a picture
+   * that plainly says no. Nothing pinned that step: the generator rails in `curriculum.test.ts` check the
+   * grid string, and the e2e checks that an SVG exists, is sized and has its fold line centred. Adding
+   * `|| c === 0` to the fill class in `renderVisual` draws every symmetric grid asymmetric, keeps the fold
+   * perfectly centred (the viewBox is recomputed from `cols`), and left all 1448 unit tests and the e2e
+   * green. Reading the squares back out of the markup is what closes it.
+   */
+  const gridFromSvg = (html: string, cols: number) => {
+    const squares = [...html.matchAll(/<rect\b[^>]*\bclass="(on)?"/g)].map(m => (m[1] ? '#' : '.'));
+    const rows: string[] = [];
+    for (let i = 0; i < squares.length; i += cols) rows.push(squares.slice(i, i + cols).join(''));
+    return rows;
+  };
+
+  it('symmetry draws the grid it was given, square for square, in document order', () => {
+    const grid = ['..##..', '.####.', '######', '.#..#.'];
+    const h = renderVisual({ type: 'symmetry', grid });
+    expect(gridFromSvg(h, 6), 'the drawn squares must reconstruct the grid they came from').toEqual(grid);
+    expect(count(h, /<rect\b/g), 'every cell is drawn, filled or not').toBe(24);
+    expect(count(h, /class="on"/g), 'one coloured square per # in the grid').toBe(grid.join('').split('#').length - 1);
+    expect(h, 'the viewBox is the grid, so the picture keeps its aspect at any width').toContain('viewBox="-1 -2 62 44"');
+  });
+
+  it('symmetry: a symmetric grid draws as its own mirror image, an asymmetric one does not', () => {
+    const mirrored = (rows: string[]) => rows.every(r => r === [...r].reverse().join(''));
+    const yes = ['..##..', '.####.', '######', '.#..#.'];
+    const no = yes.map((r, i) => i === 1 ? '#####.' : r);     // one square moved on the left only
+    expect(mirrored(gridFromSvg(renderVisual({ type: 'symmetry', grid: yes }), 6)), 'a symmetric grid must draw symmetric').toBe(true);
+    expect(mirrored(gridFromSvg(renderVisual({ type: 'symmetry', grid: no }), 6)), 'an asymmetric grid must draw asymmetric').toBe(false);
+  });
+
+  it('symmetry: the fold line is drawn down the middle of the grid it was given', () => {
+    const h = renderVisual({ type: 'symmetry', grid: ['..##..', '.####.'] });
+    const line = h.match(/<line x1="([\d.]+)"[^>]*x2="([\d.]+)"[^>]*class="mirror"/);
+    expect(line, 'a .mirror line must be drawn').toBeTruthy();
+    expect(line![1], 'the fold is vertical and sits on the grid centre (6 columns × 10 = 60, so 30)').toBe('30');
+    expect(line![2], 'x1 and x2 are the same, or the fold is not vertical').toBe(line![1]);
+  });
+
+  it('symmetry defends itself against a grid no generator here produces', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(renderVisual({ type: 'symmetry', grid: [] }), 'an empty grid draws nothing rather than throwing').toBe('');
+    expect(renderVisual({ type: 'symmetry', grid: [''] }), 'a zero-width grid draws nothing rather than throwing').toBe('');
+    expect(warn, 'and says so, rather than failing silently').toHaveBeenCalled();
+    warn.mockRestore();
+    // A ragged row is padded or truncated to the first row's width, so the squares never fall out of step
+    // with the columns the fold line was placed against.
+    expect(gridFromSvg(renderVisual({ type: 'symmetry', grid: ['..##..', '.#', '########'] }), 6))
+      .toEqual(['..##..', '.#....', '######']);
+  });
 });
 
 describe('coinSVG — real UK coin shapes (#43)', () => {

@@ -1745,6 +1745,56 @@ describe('the chart visual\'s CSS structure cannot go missing without a red test
 });
 
 /**
+ * #299 review B2: on a `y2-symmetry` card `.symgrid rect.on` *is* the answer. Delete that one line from
+ * `src/style.css` and every square renders at the same faint fill, so every card is a blank grid — and a
+ * blank grid is symmetric. Every `answer: 'no'` card becomes unanswerable, on a year with three lives.
+ *
+ * Nothing saw it: `curriculum`, `visuals` and `guardrails` together (709 tests) stayed green, and so did the
+ * new e2e, because both count DOM nodes rather than paint — `.symgrid rect.on` is still emitted, it just
+ * draws the same as its neighbour. That is the same failure, in the same function, that the #137 rail above
+ * was written for after deleting `.chart .blk` left the whole suite green; `renderVisual`'s symmetry case
+ * cites #137 by number for its input defence, so it carries #137's CSS rail too.
+ *
+ * Read with readFileSync for the reason the #137 rail gives: Vite's CSS plugin returns an empty string
+ * outside a browser, and the length assertion is what proves this read real content.
+ */
+describe('the symmetry visual\'s CSS structure cannot go missing without a red test (#299)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+
+  it('a coloured square and an empty one cannot render the same, and the fold line stays visible', () => {
+    expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    const box = bare.match(/\.symgrid\s*\{([^}]*)\}/)?.[1];
+    expect(box, 'a .symgrid rule must exist (#299)').toBeTruthy();
+    expect(box, '.symgrid is sized by a clamp() on the width, so a 6-wide picture still fits a phone (design-language §2)')
+      .toMatch(/width:\s*clamp\(/);
+    expect(box, 'height stays auto, or the viewBox stops carrying the grid\'s aspect and a taller picture is squashed')
+      .toMatch(/height:\s*auto/);
+
+    const off = bare.match(/\.symgrid\s+rect\s*\{([^}]*)\}/)?.[1];
+    const on = bare.match(/\.symgrid\s+rect\.on\s*\{([^}]*)\}/)?.[1];
+    expect(off, 'a .symgrid rect rule must exist — the faint empty square').toBeTruthy();
+    expect(on, 'a .symgrid rect.on rule must exist — without it every card is a blank grid, and a blank grid is symmetric')
+      .toBeTruthy();
+    const fill = (rule: string) => rule.match(/fill:\s*([^;}]+)/)?.[1].trim();
+    expect(fill(off!), 'an empty square must declare a fill').toBeTruthy();
+    expect(fill(on!), 'a coloured square must declare a fill').toBeTruthy();
+    expect(fill(on!), 'a coloured square and an empty one must not render the same, or the picture says nothing at all')
+      .not.toBe(fill(off!));
+
+    const mirror = bare.match(/\.symgrid\s+\.mirror\s*\{([^}]*)\}/)?.[1];
+    expect(mirror, 'a .symgrid .mirror rule must exist — the fold line the question is about').toBeTruthy();
+    expect(mirror, 'the fold line must be stroked, or the question has nothing to point at').toMatch(/stroke:\s*[^;}]+/);
+    const width = mirror!.match(/stroke-width:\s*([\d.]+)/)?.[1];
+    expect(width, 'the fold line must declare a stroke-width — an SVG line has no default thickness to fall back on').toBeTruthy();
+    expect(Number(width), 'a zero-width stroke draws nothing at all').toBeGreaterThan(0);
+    expect(mirror, 'the fold stays dashed: it is an instruction to compare the two halves, not part of the shape')
+      .toMatch(/stroke-dasharray:/);
+  });
+});
+
+/**
  * #110: the opening screen's "Your name" field was the last thing on a long page — brand header, the full
  * eleven-card grid, *then* the field — and `.avatar-grid` is `repeat(auto-fill, minmax(104px, 1fr))`, so the
  * wider and taller the screen the further down it went. On a tablet it was below the fold behind every card.
