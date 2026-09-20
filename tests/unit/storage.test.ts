@@ -956,6 +956,65 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(isReadOnlySave(), 'and switching back re-arms it against the blob it protects').toBe(true);
   });
 
+  /*
+   * The 02:36Z review of PR #330: two findings that are design rather than assertions, both reproduced with
+   * no store fault at all, and both silent — no throw, no latch, nothing the grown-ups screen could report.
+   */
+  it('an index that moves under a playing session does not redirect its save into a sibling\'s slot', () => {
+    save({ name: 'Ada', coins: 30 });
+    expect(addProfile()).toBe('p2');
+    save({ name: 'Bo', coins: 3 });
+    load();                                    // Bo is the profile this session is playing as
+    localStorage.removeItem(INDEX);            // another tab switches, or the key is cleared
+
+    save({ coins: 4 });                        // one ordinary save, no fault anywhere
+
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!), "the coins land on the child who earned them")
+      .toMatchObject({ name: 'Bo', coins: 4 });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!), "and the sibling's game is exactly as it was")
+      .toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it('"Start again" under the same conditions clears the child who asked, not their sibling', () => {
+    save({ name: 'Ada', coins: 30 });
+    expect(addProfile()).toBe('p2');
+    save({ name: 'Bo', coins: 3 });
+    load();
+    localStorage.removeItem(INDEX);
+
+    reset();
+
+    expect(localStorage.getItem(saveKeyFor('p2')), 'the profile that asked to start again is cleared').toBeNull();
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!), "and the sibling is untouched")
+      .toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it('a store that accepts the index and keeps nothing is a refusal, not a new profile (#151)', () => {
+    save({ name: 'Ada', coins: 30 });
+    const realSet = localStorage.setItem;
+    // Not a throw: a store that takes the call and drops this one key. The catch alone never saw this, so
+    // addProfile() reported a profile the next read knew nothing about and the new child onboarded over Ada.
+    (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => { if (k !== INDEX) realSet.call(localStorage, k, v); };
+    let added: string | null, switched: boolean;
+    try { added = addProfile(); switched = setActiveProfile('p1'); }
+    finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+
+    expect(added, 'no profile was added, and the caller is told so').toBeNull();
+    expect(switched, 'and a switch is refused on the same store').toBe(false);
+    expect(activeProfile(), 'the child on the device is still the one who was playing').toBe('p1');
+    expect(profileIds()).toEqual(['p1']);
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it('a foreign blob under a slot key does not invent a profile', () => {
+    save({ name: 'Ada' });
+    localStorage.setItem(saveKeyFor('p3'), 'garbage left by something else');
+    expect(profileIds(), 'a phantom would load as defaults and consume one of the four slots for good')
+      .toEqual(['p1']);
+    // and the slot is still free to be handed out
+    expect(addProfile()).toBe('p2');
+  });
+
   it("a switch clears the failed-write flag the other profile's write set (#151)", () => {
     expect(addProfile()).toBe('p2');
     expect(setActiveProfile('p1')).toBe(true);
