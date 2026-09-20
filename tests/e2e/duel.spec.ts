@@ -122,7 +122,13 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
     await expect(page.locator('.duel-end .speech')).toHaveText('Player 1 wins 6–4!');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 6, scoreB: 4, coins: 10, dojoCoins: 0 });
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({
+      ended: true, scoreA: 6, scoreB: 4, coins: 10, dojoCoins: 0,
+      // #16 item 5, Sensei's half: Player 1 sliced six answers and nothing else, so six of six. Player 2's
+      // round-1 wrong slice and four wins are NOT here — one shared profile, and only the bottom seat is its
+      // own child's (`duelAccuracy()`). Ten decided rounds would be the coins' number, not this one.
+      taught: { hits: 6, tries: 6 },
+    });
     // #16 item 5: the finished match pays the one shared save a coin per decided round — ten here, and not one
     // of them for winning. Ten is under the first sticker threshold (30), so the match unlocks nothing yet, and
     // ten correct answers is short of every volume challenge (15/20/25), so no dojo bonus — `dojoSave('fresh')`
@@ -131,6 +137,11 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end .unlock')).toHaveCount(0);
     await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(0);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).coins), 'the coins reached the save, not just the overlay').toBe(10);
+    // The tally reached the topic Sensei ranks by, and not as a `play`: a duel earns no stars, so `plays` stays
+    // 0 and `accuracy()` reads null for a duel-only topic. Read from the save rather than from the overlay —
+    // the state hook would be green with `recordAccuracy()` never called.
+    const learnt = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).progress[window.__sna.state().topic]);
+    expect(learnt, "Player 1's own six slices, in the save").toMatchObject({ hits: 6, tries: 6, plays: 0, stars: 0 });
     // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0. The recording
     // is cleared BEFORE the click: round 1's line goes out on the task after the old screen's cancel(), and it
     // is what the assertion after the scores must find.
@@ -140,7 +151,7 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
     await expect(page.locator('#score-a')).toHaveText('0');
     await expect(page.locator('#score-b')).toHaveText('0');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0, coins: 0, dojoCoins: 0 });
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0, coins: 0, dojoCoins: 0, taught: { hits: 0, tries: 0 } });
     await expectHandoverHeard(page);   // the rematch's line is not dropped into the old screen's cancel()
     expect(await page.evaluate(() => window.__said.indexOf('<cancel>')), 'the old screen was hushed first, then the line went out').toBeGreaterThanOrEqual(0);
     // Leaving tears the duel down: the hooks go with it and BOTH render loops stop (#73 — no arena may leak
@@ -226,7 +237,9 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end .coin-row + .dojo-bonus')).toHaveCount(1);
     await expect(page.locator('.duel-end .dojo-bonus:not(.set) .gain')).toHaveText('+10 🪙');
     await expect(page.locator('.duel-end .dojo-bonus.set .gain')).toHaveText('+25 🪙');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 5, scoreB: 5, coins: 10, dojoCoins: 35 });
+    // Five rounds each, so the dojo hears about ten correct answers while Sensei hears about five: the two
+    // numbers a duel reports are deliberately different, and this is the case where they diverge.
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 5, scoreB: 5, coins: 10, dojoCoins: 35, taught: { hits: 5, tries: 5 } });
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
     expect(saved.coins, 'the match coins AND the dojo bonus reached the save').toBe(45);
     expect(saved.dojo.done.length, 'the completed challenge is recorded, so it cannot be paid twice').toBe(3);

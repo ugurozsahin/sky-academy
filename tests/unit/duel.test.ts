@@ -7,6 +7,11 @@ import { esc } from '../../src/ui/dom';
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onRoundWon: vi.fn(), onRoundMiss: vi.fn(), onRoundDraw: vi.fn(), onMatchEnd: vi.fn() });
 const topic = topicById('y1-add')!;
+/**
+ * The tally of a match in which every decided round was won on a clean first slice and nobody sliced anything
+ * wrong — the shape a `DuelResult` literal needs, for the helpers below whose subject is not the tally.
+ */
+const matchTally = (scoreA: number, scoreB: number) => ({ a: { hits: scoreA, tries: scoreA }, b: { hits: scoreB, tries: scoreB } });
 
 describe('Duel (#16 item 1: pure scorer, no UI)', () => {
   it('starting fires the first question for round 1 of the default 10', () => {
@@ -81,7 +86,10 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     d.hit('b', d.current!.answer); d.waveEnd();  // round 3: b
     expect(d.ended).toBe(true);
     expect(ev.onMatchEnd).toHaveBeenCalledTimes(1);
-    expect(ev.onMatchEnd.mock.calls[0][0]).toEqual({ winner: 'a', scoreA: 2, scoreB: 1, rounds: 3 });
+    expect(ev.onMatchEnd.mock.calls[0][0]).toEqual({
+      winner: 'a', scoreA: 2, scoreB: 1, rounds: 3,
+      tally: { a: { hits: 2, tries: 2 }, b: { hits: 1, tries: 1 } },
+    });
   });
 
   it('a tied score at the end of the match is a draw', () => {
@@ -90,7 +98,10 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     d.start();
     d.hit('a', d.current!.answer); d.waveEnd();
     d.hit('b', d.current!.answer); d.waveEnd();
-    expect(ev.onMatchEnd.mock.calls[0][0]).toEqual({ winner: 'draw', scoreA: 1, scoreB: 1, rounds: 2 });
+    expect(ev.onMatchEnd.mock.calls[0][0]).toEqual({
+      winner: 'draw', scoreA: 1, scoreB: 1, rounds: 2,
+      tally: { a: { hits: 1, tries: 1 }, b: { hits: 1, tries: 1 } },
+    });
   });
 
   it('nothing fires once the match has ended', () => {
@@ -131,17 +142,18 @@ describe('duelPool (#16 item 4: which topics a duel is played on)', () => {
 });
 
 describe('duelHeadline (#16 item 3: the match-end line)', () => {
+  const tally = { a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } };   // the headline reads the score, never the tally
   it('names the winner with the score, or a draw', () => {
-    expect(duelHeadline({ winner: 'a', scoreA: 6, scoreB: 3, rounds: 10 })).toBe('Player 1 wins 6–3!');
-    expect(duelHeadline({ winner: 'b', scoreA: 2, scoreB: 7, rounds: 10 })).toBe('Player 2 wins 7–2!');
-    expect(duelHeadline({ winner: 'draw', scoreA: 4, scoreB: 4, rounds: 10 })).toBe("It's a draw — 4 all!");
+    expect(duelHeadline({ winner: 'a', scoreA: 6, scoreB: 3, rounds: 10, tally })).toBe('Player 1 wins 6–3!');
+    expect(duelHeadline({ winner: 'b', scoreA: 2, scoreB: 7, rounds: 10, tally })).toBe('Player 2 wins 7–2!');
+    expect(duelHeadline({ winner: 'draw', scoreA: 4, scoreB: 4, rounds: 10, tally })).toBe("It's a draw — 4 all!");
   });
 });
 
 // #16 item 5: what a finished match pays into the one shared save.
 describe('duelCoins (#16 item 5: a match pays the device, not the winner)', () => {
   const res = (scoreA: number, scoreB: number): DuelResult =>
-    ({ winner: scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : 'draw', scoreA, scoreB, rounds: DUEL_ROUNDS });
+    ({ winner: scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : 'draw', scoreA, scoreB, rounds: DUEL_ROUNDS, tally: matchTally(scoreA, scoreB) });
 
   it('pays one coin per decided round — the same rate baseCoins pays per correct answer', () => {
     expect(duelCoins(res(6, 3))).toBe(9);
@@ -248,7 +260,7 @@ function dateDrawing(id: string): string {
 
 describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device saw)', () => {
   const res = (scoreA: number, scoreB: number, rounds = DUEL_ROUNDS): DuelResult =>
-    ({ winner: scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : 'draw', scoreA, scoreB, rounds });
+    ({ winner: scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : 'draw', scoreA, scoreB, rounds, tally: matchTally(scoreA, scoreB) });
 
   it('reports both players\' decided rounds as the questions answered correctly', () => {
     expect(duelDojoEvent(res(6, 3), 'maths').correct).toBe(9);
@@ -341,5 +353,115 @@ describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device
     }
     expect(seen.has('combo5'), 'the un-gated challenge was never drawn — this rail proved nothing').toBe(true);
     expect(seen.size, 'these 28 days draw nine such challenges; fewer means some dropped out of the pool unnoticed').toBe(9);
+  });
+});
+
+// #16 item 5: what a finished match teaches Sensei. The tally is collected by the scorer as the match is
+// played, so these drive a real `Duel` rather than asserting against a hand-built result: the whole point is
+// which slices reach it and which never do.
+import { duelAccuracy } from '../../src/game/duel';
+import { recordAccuracy, reset } from '../../src/storage';
+import { accuracy, weakestTopics } from '../../src/game/sensei';
+
+// The same minimal node shim `storage.test.ts` uses, for the one case below that follows a match's tally all
+// the way into the save and back out through Sensei's ranking.
+const mem: Record<string, string> = {};
+(globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
+
+describe('the duel tallies each seat\'s own slices (#16 item 5: Sensei)', () => {
+  /** A match of `rounds` rounds on the seeded topic, so a test can say what each seat did round by round. */
+  const match = (rounds: number, seed = 11) => new Duel({ topic, difficulty: 1, rounds, rng: rng(seed) }, events());
+  const wrongOf = (d: Duel) => d.current!.options.find(o => o !== d.current!.answer)!;
+
+  it('counts a correct slice as a hit and a try, a wrong slice as a try alone, for the seat that made it', () => {
+    const d = match(2); d.start();
+    d.hit('a', wrongOf(d));
+    expect(d.tally).toEqual({ a: { hits: 0, tries: 1 }, b: { hits: 0, tries: 0 } });
+    d.hit('b', d.current!.answer);
+    expect(d.tally).toEqual({ a: { hits: 0, tries: 1 }, b: { hits: 1, tries: 1 } });
+    d.waveEnd();
+    d.hit('a', d.current!.answer);
+    expect(d.tally).toEqual({ a: { hits: 1, tries: 2 }, b: { hits: 1, tries: 1 } });
+  });
+
+  it('counts nothing for a slice the round has already been decided by, or for one after the match ended', () => {
+    const d = match(1); d.start();
+    const answer = d.current!.answer;
+    d.hit('b', answer);
+    // 'ignored' is the whole property: a seat that slices the answer a moment late has answered correctly, but
+    // crediting it would make the tally a fact about the other child's reflexes. Dropped, not counted wrong.
+    expect(d.hit('a', answer)).toBe('ignored');
+    expect(d.hit('a', 'nonsense')).toBe('ignored');
+    expect(d.tally.a).toEqual({ hits: 0, tries: 0 });
+    d.waveEnd();                                   // the match ends here (one round)
+    expect(d.hit('a', 'nonsense')).toBe('ignored');
+    expect(d.tally.a).toEqual({ hits: 0, tries: 0 });
+  });
+
+  it('counts nothing at all for a round nobody sliced', () => {
+    const d = match(2); d.start();
+    d.waveEnd();                                   // round 1 drawn
+    expect(d.tally).toEqual({ a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } });
+  });
+
+  it('hands the match result a snapshot a rematch cannot move', () => {
+    const ev = events();
+    const d = new Duel({ topic, difficulty: 1, rounds: 1, rng: rng(12) }, ev);
+    d.start(); d.hit('a', d.current!.answer); d.waveEnd();
+    const r: DuelResult = ev.onMatchEnd.mock.calls[0][0];
+    expect(r.tally).toEqual({ a: { hits: 1, tries: 1 }, b: { hits: 0, tries: 0 } });
+    d.tally.a.hits = 99; d.tally.a.tries = 99;     // the live counters are not the result's
+    expect(r.tally.a).toEqual({ hits: 1, tries: 1 });
+  });
+});
+
+describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', () => {
+  const played = (script: ('a' | 'b' | 'wrongA' | 'draw')[]): DuelResult => {
+    const ev = events();
+    const d = new Duel({ topic, difficulty: 1, rounds: script.length, rng: rng(13) }, ev);
+    d.start();
+    for (const step of script) {
+      if (step === 'wrongA') d.hit('a', d.current!.options.find(o => o !== d.current!.answer)!);
+      else if (step !== 'draw') d.hit(step, d.current!.answer);
+      d.waveEnd();
+    }
+    return ev.onMatchEnd.mock.calls[0][0];
+  };
+
+  it('is Player 1\'s own slices — never the rounds the device got right', () => {
+    const r = played(['a', 'b', 'b', 'wrongA']);
+    expect(duelAccuracy(r)).toEqual({ hits: 1, tries: 2 });
+    // The three numbers this must not be: the match total the coins and the dojo pay on (3 right of 4 rounds),
+    // and the score read as a tally (1 of 4). Each would be a claim about a child who did not answer.
+    expect(duelCorrect(r)).toBe(3);
+    expect(duelAccuracy(r).hits).not.toBe(duelCorrect(r));
+    expect(duelAccuracy(r).tries).not.toBe(r.rounds);
+  });
+
+  it('throws Player 2\'s tally away: it has no profile to go to', () => {
+    const r = played(['b', 'b', 'b']);
+    expect(r.tally.b).toEqual({ hits: 3, tries: 3 });
+    expect(duelAccuracy(r)).toEqual({ hits: 0, tries: 0 });   // and `recordAccuracy` ignores a 0-try tally
+  });
+
+  it('teaches nothing after a match Player 1 never sliced in', () => {
+    expect(duelAccuracy(played(['draw', 'draw']))).toEqual({ hits: 0, tries: 0 });
+    expect(duelAccuracy(played(['b', 'draw']))).toEqual({ hits: 0, tries: 0 });
+  });
+
+  it('is what Sensei then ranks the topic by, and a duel-only topic is not ranked as a weak one', () => {
+    // The end of the chain, through the real storage and the real ranking: a duel's tally reaches
+    // `progress[topic]`, and because a duel is no `play` of the topic (`recordTopic()` is not called) the
+    // topic still reads as never played — the same as a topic met only in Sensei training or Sky Storm.
+    reset();
+    const r = played(['wrongA', 'wrongA', 'a']);
+    const t = duelAccuracy(r);
+    expect(t).toEqual({ hits: 1, tries: 3 });
+    recordAccuracy(topic.id, t.hits, t.tries);
+    const p = JSON.parse(localStorage.getItem('sna:v1')!).progress[topic.id];
+    expect(p).toMatchObject({ hits: 1, tries: 3, plays: 0, stars: 0 });
+    expect(accuracy(p), 'no plays, so the ratio is not yet a verdict on the child').toBe(null);
+    expect(weakestTopics([topic], { [topic.id]: p }, 1)).toEqual([topic]);   // still offered, as a fresh topic
+    reset();
   });
 });

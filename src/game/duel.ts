@@ -13,11 +13,22 @@ export interface DuelEvents {
   onRoundDraw: (q: Question) => void;                                  // nobody sliced the answer before the wave ended
   onMatchEnd: (r: DuelResult) => void;
 }
-export interface DuelResult { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number; rounds: number }
+/**
+ * One seat's own slices in a match (#16 item 5, Sensei's half): `tries` counts every slice that seat made
+ * while its round was still open, `hits` the ones that were the answer. The same unit `session.ts` tallies
+ * per topic — one try per slice, not per question — so `recordAccuracy()` is fed the shape it already reads.
+ */
+export interface DuelTally { hits: number; tries: number }
+export interface DuelResult { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number; rounds: number; tally: Record<DuelPlayer, DuelTally> }
 export interface DuelOpts { topic: Topic; difficulty: Difficulty; rng?: () => number; rounds?: number }
 
 export class Duel {
   round = 0; scoreA = 0; scoreB = 0; current: Question | null = null; roundDecided = false; ended = false;
+  /**
+   * Each seat's own slices, for Sensei (#16 item 5). Kept per seat rather than as a match total because the
+   * score is a race: see `duelAccuracy()` for why only one seat's is ever written to the save.
+   */
+  readonly tally: Record<DuelPlayer, DuelTally> = { a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } };
   readonly rounds: number;
   private rng: () => number;
   constructor(public o: DuelOpts, private ev: DuelEvents) {
@@ -41,7 +52,12 @@ export class Duel {
    */
   hit(player: DuelPlayer, label: string): 'won' | 'wrong' | 'ignored' {
     const q = this.current; if (!q || this.roundDecided || this.ended) return 'ignored';
+    // Tallied here rather than at the two call sites below, so an ignored slice can never reach it: a slice
+    // after the round is decided is evidence of nothing either way, and counting it would make the seat's
+    // accuracy a fact about how fast the other child is (`duelAccuracy()` has the rest).
+    this.tally[player].tries++;
     if (label !== q.answer) { this.ev.onRoundMiss(player, q, label); return 'wrong'; }
+    this.tally[player].hits++;
     this.roundDecided = true;
     if (player === 'a') this.scoreA++; else this.scoreB++;
     this.ev.onRoundWon(player, q);
@@ -61,7 +77,10 @@ export class Duel {
     if (this.ended) return;
     this.ended = true;
     const winner: DuelPlayer | 'draw' = this.scoreA > this.scoreB ? 'a' : this.scoreB > this.scoreA ? 'b' : 'draw';
-    this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds: this.rounds });
+    // A snapshot, not the live counters: a `hit()` after the match ends returns 'ignored' and cannot move
+    // them, but the result outlives this screen's rematch and must not be a window onto a restarted tally.
+    const tally = { a: { ...this.tally.a }, b: { ...this.tally.b } };
+    this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds: this.rounds, tally });
   }
 }
 
@@ -144,6 +163,34 @@ export function duelDojoEvent(r: DuelResult, subject: Topic['subject']): DojoEve
     mathsCorrect: subject === 'maths' ? correct : 0,
     writingCorrect: subject === 'writing' ? correct : 0,
   };
+}
+
+/**
+ * What a finished match teaches Sensei about the one shared profile (#16 item 5) — the per-topic `hits`/`tries`
+ * tally `recordAccuracy()` adds to, which `weakestTopics()` ranks a child's practice by and the parents'
+ * report shows as a percentage.
+ *
+ * **Only Player 1's own slices, and nothing derived from the score.** A duel is a race, so the score is not an
+ * accuracy measurement and three tempting numbers are all wrong here:
+ * - `duelCorrect()` (what the coins and the dojo pay on) counts the rounds *the device* got right, two children
+ *   between them. Sensei's tally is a claim about one child, so a round the friend won would be recorded as the
+ *   profile child answering correctly.
+ * - `scoreA` alone is no better as a hit count while `rounds` is the try count: a round Player 1 never sliced,
+ *   because Player 2 got there first or nobody did, would be recorded as Player 1 answering *wrongly*. A round
+ *   lost on speed is not a wrong answer, and a child who knows the topic perfectly but is slower than a bigger
+ *   sibling would be ranked as their weakest topic.
+ * - A slice made after the round was already decided is dropped by `hit()` before the tally, so this drops
+ *   evidence rather than distorting the ratio: the rounds Player 1 did not reach are not counted either way.
+ *
+ * **Which seat is the profile's child**: Player 1 is the bottom half, and `DUEL_HANDOVER` hands the *top* half
+ * (Player 2) to the friend, so the bottom seat is the one the save can claim. If the children swap halves the
+ * match teaches Sensei about the friend instead — the cost of one shared profile, and the reason this records
+ * one seat rather than both: Player 2's tally has no profile to go to and is deliberately thrown away.
+ *
+ * A match nobody sliced returns `{ hits: 0, tries: 0 }`, which `recordAccuracy()` already ignores.
+ */
+export function duelAccuracy(r: DuelResult): DuelTally {
+  return r.tally.a;
 }
 
 /** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
