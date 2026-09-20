@@ -63,13 +63,16 @@ const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'rece
  * `scripts/flow-*.mjs`'s screenshot flows, and four unit suites all address it by name. The cost is one
  * asymmetric key, which `saveKeyFor` states in a line.
  */
-export type ProfileId = 'p1' | 'p2' | 'p3' | 'p4';
 /** The four fixed slots — the owner's cap (in session, 2026-09-19). Fixed rather than generated so a corrupt
  *  index can be rebuilt by *probing* the store (four `getItem`s) instead of enumerating it — `localStorage`
  *  enumeration is the one part of the API the Capacitor WebView and the test shim do not agree on.
- *  `as const satisfies` rather than a `: readonly ProfileId[]` annotation, which widens the tuple and takes
- *  `length` back to `number` (#330 review N2). */
-export const PROFILE_IDS = ['p1', 'p2', 'p3', 'p4'] as const satisfies readonly ProfileId[];
+ *  `as const` rather than a `: readonly ProfileId[]` annotation, which widens the tuple and takes `length`
+ *  back to `number` (#330 review N2). */
+export const PROFILE_IDS = ['p1', 'p2', 'p3', 'p4'] as const;
+/** Derived from the list, not declared beside it: a union written separately is a second truth, and adding
+ *  `'p5'` to it alone type-checks `saveKeyFor('p5')` while `isProfileId('p5')` stays false — an addressable
+ *  slot nothing can ever reach (#330 round 2, N4). */
+export type ProfileId = typeof PROFILE_IDS[number];
 /** Derived, never declared: `addProfile` caps by running out of slots, so a hand-written number here was a
  *  second truth that could disagree with the first — set it to 3 and the module hands out a fourth slot and
  *  then refuses the index it just wrote (#330 review N2). */
@@ -79,15 +82,23 @@ const INDEX_KEY = 'sna:profiles';
 export const saveKeyFor = (id: ProfileId) => (id === 'p1' ? KEY : `${KEY}:${id}`);
 export interface ProfileIndex { v: 1; active: ProfileId; ids: ProfileId[] }
 
-const isProfileId = (x: unknown): x is ProfileId => PROFILE_IDS.includes(x as ProfileId);
+const isProfileId = (x: unknown): x is ProfileId => typeof x === 'string' && (PROFILE_IDS as readonly string[]).includes(x);
 const readItem = (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } };
 /** The stored index, or null when there is none, it is not ours, or it is not self-consistent. Deliberately
- *  strict: `ids` must be distinct known slots, within the cap, and must contain `active`. */
+ *  strict: our `v`, and `ids` must be distinct known slots containing `active`. */
 function readIndex(): ProfileIndex | null {
   const raw = readItem(INDEX_KEY);
   if (!raw) return null;
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { return null; }
+  // Two halves, and only the first is load-bearing — said plainly, since the comment below deletes a clause
+  // for being unreachable. `!parsed` is what stops `sna:profiles = 'null'` reaching the destructure and
+  // throwing out of `activeProfile()`, `profileIds()` and `load()` alike, taking the whole recovery this
+  // block exists for with it; deleting the line is red. The `typeof`/`Array.isArray` half is subsumed by
+  // `v !== 1` two lines down, because no JSON array or primitive can carry a `v` at all — removing it alone
+  // is green, and no fixture can make it otherwise. It stays as the parse-boundary front door, the shape
+  // `migrate()` uses on the same kind of blob, rather than leaving `readIndex` depending on the version rule
+  // to reject an array (#330 round 2, N1/N2).
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
   const { v, active, ids } = parsed as { v?: unknown; active?: unknown; ids?: unknown };
   // `v` drives something or it is not worth storing — the #38 incident this repository still keeps a rail for
@@ -100,8 +111,12 @@ function readIndex(): ProfileIndex | null {
   // distinct members of a four-member union cannot number more than four. It was here as a belt, and a belt no
   // input can ever reach is a line no test can hold — the #330 review found it green under deletion, and it
   // is green under deletion for the same reason a comment cannot be tested (#330 review, item 1 and N2).
-  if (!Array.isArray(ids) || ids.length === 0) return null;
+  if (!Array.isArray(ids)) return null;
   if (!ids.every(isProfileId) || new Set(ids).size !== ids.length) return null;
+  // `isProfileId(active)` is here to *narrow* `active` for the return, not as a belt: by this line
+  // `ids.includes(active)` already refuses anything it would have caught, an empty `ids` included, since
+  // nothing is a member of an empty list. Written out because the comment above deleted a clause for being
+  // unreachable, and a reader is owed the reason this one that looks the same is not the same (#330 round 2).
   if (!isProfileId(active) || !ids.includes(active)) return null;
   return { v: 1, active, ids: ids as ProfileId[] };
 }
@@ -134,6 +149,13 @@ const currentIndex = (): ProfileIndex => readIndex() ?? defaultIndex();
  * migration sketch guarded against with "verify it reads back" — used to return true here, so `addProfile()`
  * reported a new profile that the next `currentIndex()` knew nothing about: the new child onboarded straight
  * over their sibling's save, in the sibling's slot, and neither child had a game left (#330 review, 02:36Z).
+ *
+ * What `false` promises is exact: the store is **not** holding this index. It does not promise the key is
+ * untouched. For the store this was written for — one that accepts the call and keeps nothing — the two are
+ * the same. On a partially-working store the `setItem` may have landed and the read-back disagreed, or the
+ * read itself thrown, and then the caller's false return sits beside a stored `active` that did change
+ * (#330 round 2, N5). Rolling back would need a blob to roll back to and a write that can fail in its turn,
+ * so the narrower promise is stated rather than bought.
  */
 function writeIndex(next: ProfileIndex): boolean {
   const blob = JSON.stringify(next);
@@ -142,7 +164,9 @@ function writeIndex(next: ProfileIndex): boolean {
 }
 /** The profiles on this device, in slot order. One profile is the normal case and costs no stored key. */
 export const profileIds = (): ProfileId[] => currentIndex().ids;
-/** Whose game `load()` and `save()` are reading and writing. */
+/** Whose game the **store** says is being played — what slice 2's picker draws, and where a session starts.
+ *  Not necessarily whose game `load()` and `save()` are acting on: that is `sessionProfile()`, resolved once
+ *  per session, and the two part company in a second tab on purpose (#330 round 2, N3). */
 export const activeProfile = (): ProfileId => currentIndex().active;
 /**
  * The profile **this session is playing as** — resolved once, from the index, when the save is first read.
@@ -159,10 +183,20 @@ export const activeProfile = (): ProfileId => currentIndex().active;
  * (the session's) can disagree in a second tab, and that disagreement is the point rather than a gap.
  */
 function sessionProfile(): ProfileId { return cacheProfile ?? (cacheProfile = activeProfile()); }
-/** Forget the cached save, the profile it belongs to, and both write latches — they describe the profile we
- *  are leaving, not the one we are joining (#232's read-only latch and #151's failed-write flag are each
- *  about one blob). */
-function dropSessionState() { cache = null; cacheProfile = null; readOnly = false; writeFailed = false; }
+/** Forget the cached save and both write latches — they describe one blob (#232's read-only latch and #151's
+ *  failed-write flag), and it is about to be a different one. The profile stays: a fresh start is the same
+ *  child. */
+function dropSessionState() { cache = null; readOnly = false; writeFailed = false; }
+/**
+ * The above, **and** the session's profile: only a switch makes this a different child's session.
+ *
+ * `reset()` deliberately does not do this. It used to, through `dropSessionState()`, and that put back the
+ * whole class `sessionProfile()` exists to close: the next read re-resolved, `defaultIndex()` answers `p1`
+ * unconditionally, and `parents.ts`'s "Start again" then "Undo" (`snapshot = load(); reset(); save(snapshot)`)
+ * wrote the playing child's snapshot into profile 1, over a sibling, with the delete having already taken
+ * their own slot — Undo reporting success the whole way (#330 round 2, item 1).
+ */
+function leaveProfile() { dropSessionState(); cacheProfile = null; }
 /**
  * Switch the active profile. False — and nothing changes — when `id` is not one of this device's profiles, or
  * when the index could not be written: a switch the store refuses would put the child back on their sibling's
@@ -172,7 +206,7 @@ function dropSessionState() { cache = null; cacheProfile = null; readOnly = fals
 export function setActiveProfile(id: ProfileId): boolean {
   const idx = currentIndex();
   if (!idx.ids.includes(id) || !writeIndex({ ...idx, active: id })) return false;
-  dropSessionState();
+  leaveProfile();
   return true;
 }
 /**
@@ -183,7 +217,7 @@ export function addProfile(): ProfileId | null {
   const idx = currentIndex();
   const free = PROFILE_IDS.find(id => !idx.ids.includes(id));
   if (!free || !writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) return null;
-  dropSessionState();
+  leaveProfile();
   return free;
 }
 
@@ -592,7 +626,7 @@ export function importSave(text: string): boolean {
   const id = sessionProfile();
   let wrote = false;
   try { localStorage.setItem(saveKeyFor(id), JSON.stringify(next)); wrote = true; } catch { /* private mode etc. */ }
-  cache = next; cacheProfile = id;
+  cache = next;   // `sessionProfile()` above has already latched `cacheProfile` to `id`
   // #232 review: only lift the protection if the replacement actually landed. If setItem threw, the newer
   // blob is still on disk — clearing the latch here would let the next ordinary save() relabel it, which is
   // #232 restored through this very line. (The swallowed catch and the unconditional `true` are older

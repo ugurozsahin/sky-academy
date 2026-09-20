@@ -767,12 +767,30 @@ describe('save() write failures are distinguishable from the read-only latch (#1
  */
 describe('profiles: siblings on one device (#20)', () => {
   const INDEX = 'sna:profiles';
-  // Back to a one-profile device: drop the index first so `reset()` acts on profile 1's key, not a sibling's.
+  // Back to a one-profile device, for a module that keeps session state of its own. The switch is doing the
+  // work, and `reset()` cannot stand in for it: `reset()` deliberately does **not** end the session's binding
+  // — a fresh start is the same child — so a test that finished playing as p2 would otherwise have the next
+  // test's `save()` land in p2, and it must not leave a latch of its own either, or a test that seeds an index
+  // naming p2 would still be read as p1. The old helper claimed dropping the index was enough; it never was,
+  // because `sessionProfile()` returns the latched profile and never consults the index, and profile 1 leaked
+  // from one test into the next (#330 round 2, item 2).
   const freshDevice = () => {
+    for (const id of PROFILE_IDS) localStorage.removeItem(saveKeyFor(id));
     localStorage.removeItem(INDEX);
-    for (const id of PROFILE_IDS) if (id !== 'p1') localStorage.removeItem(saveKeyFor(id));
-    reset();
+    setActiveProfile('p1');          // clears the cache, both write latches and the session's profile
+    localStorage.removeItem(INDEX);  // ...and a one-profile device stores no index
   };
+  it('the teardown really does hand each test an empty device', () => {
+    save({ name: 'Ada', coins: 50 });
+    expect(addProfile()).toBe('p2');
+    save({ name: 'Bo' });
+    freshDevice();
+    expect(localStorage.getItem(INDEX)).toBeNull();
+    for (const id of PROFILE_IDS) expect(localStorage.getItem(saveKeyFor(id)), id).toBeNull();
+    expect(load().name, 'and the module is not still latched to the sibling').toBe('');
+    save({ name: 'Cass' });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).name, 'the next test writes to profile 1').toBe('Cass');
+  });
   beforeEach(freshDevice);
 
   it('a device with one profile stores no index at all, and profile 1 is the save that is already there', () => {
@@ -832,7 +850,7 @@ describe('profiles: siblings on one device (#20)', () => {
     // Read the store, not `activeProfile()`: `addProfile` short-circuits on `!free` before it writes, so the
     // old assertion could not fail whatever the refusal did (#330 review N8).
     expect(localStorage.getItem(INDEX), 'and the refusal leaves the stored index exactly as it was').toBe(before);
-    expect(MAX_PROFILES, 'the cap is the slot list, not a second number').toBe(PROFILE_IDS.length);
+    expect(profileIds().length, 'four is the cap, and the cap is the length of the slot list').toBe(MAX_PROFILES);
   });
 
   it('a corrupt index falls back to profile 1 with its save intact, and keeps the siblings it can see', () => {
@@ -850,7 +868,11 @@ describe('profiles: siblings on one device (#20)', () => {
   });
 
   it.each([
-    ['not an object', '"p2"'],
+    // `'"p2"'` would be refused a third time over by `!Array.isArray(ids)`, so it pinned nothing. These two
+    // reach the object guard itself: without it the destructure throws, and `activeProfile()`, `profileIds()`
+    // and `load()` throw with it — the whole recovery this block is about never runs (#330 round 2, N1).
+    ['null', 'null'],
+    ['an array', '[]'],
     // These two name a second profile on purpose: with `v` unchecked, an accepted index yields
     // `['p1','p2']` and an active p2 on defaults, so the row discriminates instead of agreeing with refusal.
     ['no version', JSON.stringify({ active: 'p2', ids: ['p1', 'p2'] })],
@@ -859,7 +881,7 @@ describe('profiles: siblings on one device (#20)', () => {
     ['an unknown slot', JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p9'] })],
     ['a duplicate slot', JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p1'] })],
     ['an active profile that is not in ids', JSON.stringify({ v: 1, active: 'p3', ids: ['p1', 'p2'] })],
-    ['more entries than there are slots', JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2', 'p3', 'p4', 'p1'] })],
+
   ])('an index with %s is refused rather than half-trusted', (_why, blob) => {
     localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Ada' }));
     localStorage.setItem(INDEX, blob);
@@ -987,6 +1009,16 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(localStorage.getItem(saveKeyFor('p2')), 'the profile that asked to start again is cleared').toBeNull();
     expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!), "and the sibling is untouched")
       .toMatchObject({ name: 'Ada', coins: 30 });
+
+    // One statement further than the delete, which is where this stopped and where the defect lived: a fresh
+    // start must not end the session's binding, or the next write re-resolves and `defaultIndex()` answers
+    // `p1` unconditionally. `parents.ts`'s "Start again" then "Undo" is exactly this shape — it keeps the old
+    // save in memory and writes it straight back (#330 round 2, item 1).
+    save({ coins: 9 });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!), 'the child who started again writes to their own slot')
+      .toMatchObject({ coins: 9 });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!), "and the sibling is still untouched afterwards")
+      .toMatchObject({ name: 'Ada', coins: 30 });
   });
 
   it('a store that accepts the index and keeps nothing is a refusal, not a new profile (#151)', () => {
@@ -1011,6 +1043,13 @@ describe('profiles: siblings on one device (#20)', () => {
     localStorage.setItem(saveKeyFor('p3'), 'garbage left by something else');
     expect(profileIds(), 'a phantom would load as defaults and consume one of the four slots for good')
       .toEqual(['p1']);
+    // JSON-valid but not a save: the parse alone lets these through, so the shape refinement needs its own
+    // fixture or only half the guard is held (#330 round 2, N1).
+    for (const blob of ['123', '[1,2]', '"x"', 'null']) {
+      localStorage.setItem(saveKeyFor('p3'), blob);
+      expect(profileIds(), blob).toEqual(['p1']);
+    }
+    localStorage.removeItem(saveKeyFor('p3'));
     // and the slot is still free to be handed out
     expect(addProfile()).toBe('p2');
   });
