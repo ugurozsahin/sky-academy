@@ -219,7 +219,9 @@ const y2Fractions: Generator = (d, rng) => {
 };
 const y2Money: Generator = (d, rng) => {
   if (d === 1) { const coins = Array.from({ length: 3 }, () => pick(rng, [2, 5, 10, 20, 50])); return unitQ(rng, coins.reduce((s, c) => s + c, 0), coins); }
-  if (d === 2) { const coins = Array.from({ length: 2 }, () => pick(rng, [50, 100, 200])); const total = coins.reduce((s, c) => s + c, 0); const fmt = (p: number) => `£${(p / 100).toFixed(2)}`; return wordQ(rng, 'How much money?', fmt(total), [fmt(total + 50), fmt(total - 50), fmt(total + 100)].filter(x => !x.includes('-')), { visual: { type: 'coins', coins }, say: 'How much money altogether?' }); }
+  // £ and p recorded separately, never `£1.50` — decimal money is Year 4 (#298 slice 2). `coinLabel` is the
+  // one source for the label, so the distractors are filtered as amounts before they are ever formatted.
+  if (d === 2) { const coins = Array.from({ length: 2 }, () => pick(rng, [50, 100, 200])); const total = coins.reduce((s, c) => s + c, 0); const ds = [total + 50, total - 50, total + 100].filter(p => p > 0 && p !== total); return wordQ(rng, 'How much money?', coinLabel(total), ds.map(coinLabel), { visual: { type: 'coins', coins }, say: 'How much money altogether?' }); }
   const price = 5 * ri(rng, 1, 19);
   return wordQ(rng, `Change from £1 for ${price}p?`, `${100 - price}p`, [`${100 - price + 5}p`, `${100 - price - 5}p`, `${price}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?` });
 };

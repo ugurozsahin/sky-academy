@@ -17,6 +17,25 @@ paths:
   which `tests/unit/guardrails.test.ts` still checks. **While this reduction is under way it is done in
   sessions with the owner** (issues labelled `owner-session`), not by the routine; removing a rule rather than
   a copy, or removing any other rail, is still a loosening under the `open-pr` skill §6.
+- **An unattended run never writes under `.claude/` (#342).** Not a preference — a platform constraint.
+  `.claude/` is a Claude Code **protected path**, like `.git/`: a write there is never auto-approved, and no
+  routine setting changes it. `permissions.allow` does not reach protected paths, a cloud session cannot use
+  `bypassPermissions`, `defaultMode` is ignored there, and a routine has no permission-mode picker at all
+  (#340 has the documentation trail). What a run meets instead is a prompt nobody is there to answer, and the
+  approval that prompt offers is scoped to **that session**, so it never carries to the next scheduled run:
+  PR #294 stalled 7h33m and PR #318 overnight, both on this very file.
+  `docs/decisions/006-a-routine-never-writes-under-claude.md` has the documentation trail and the five
+  alternatives ruled out. Enforced in code: `claudeDir()` in `.claude/hooks/write-guard.mjs` denies a `Write`
+  or `Edit` under `.claude/` unless the checkout carries the gitignored `.owner-machine` marker, which a clone
+  never has, and refuses to write that marker through the same two tools. **That closes the obvious route, not
+  every route**: `.claude/hooks/bash-guard.mjs` has no rule for either path, so a shell write is not stopped
+  (#346). The marker is a switch, not a seal — the seal is that a routine has no reason to be writing here at
+  all. `PreToolUse` runs before the permission system, so the call is refused in milliseconds rather than
+  waiting hours for a person. **Reads are untouched.** What a run does
+  instead: say on the issue what needed changing here and why, label it `owner-session`, take the next item.
+  The owner's own checkout carries the marker; he creates it by hand, once, and nothing else does.
+  That is the same answer the bullet below already gives for the one-home reduction; this makes it true of
+  everything under `.claude/`, and enforces it.
 - **A `REVIEW: CLEARED` comment that supersedes another reviewer's block (#161)
   carries its own session URL too (#191)** — the same footer every comment carries (#199), so a later reader
   is not left guessing which session cleared a stale block from an unmarked comment. Enforced in code: `hasSessionUrl()` inside `scripts/review-gate.mjs`'s
@@ -49,7 +68,11 @@ paths:
   the build depend on live issue state. **And the hook matches `mcp__github__*` only**, while STEP 1 steers
   authored bodies to the REST API (#207), so it is enforced on the path the prompt steers away from — the
   same bypass `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` records for `- second item:`.
-  Their home is `docs/ROUTINE-PROMPT.md` STEP 3.
+  Two further gaps, true of both lines: **`method: 'create'` is exempt**, and STEP 5 permits a create for a
+  heartbeat that does not exist, so the one write that establishes a fresh pulse escapes every body rule;
+  and **the STEP 1 sentinel satisfies the rule forever** — nothing obliges STEP 5 to replace `pending` with
+  a real value, and the watchdog greps for `IN PROGRESS`, never for these lines. Both are the reviewer's to
+  catch until something pins them (#353). Their home is `docs/ROUTINE-PROMPT.md` STEP 3.
 - **The routine heartbeat (issue #62) must be overwritten each run, never appended to (records have readers,
   #98).** Enforced in code: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to
   issue #62 whose body carries two or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — the

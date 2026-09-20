@@ -1528,6 +1528,78 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
  * failure printed under "the worklog is archived and nothing writes it again" sends the reader to the
  * wrong rule. Raised reviewing PR #186.)
  */
+/**
+ * #342: `.claude/` is a Claude Code protected path, so a write there raises a permission prompt an unattended
+ * run cannot answer — PR #294 stalled 7h33m and PR #318 overnight, both on `.claude/rules/governance.md`, and
+ * `docs/decisions/006-a-routine-never-writes-under-claude.md` records why no routine setting permits it. The
+ * hook that denies the write is rail-covered in `tests/unit/hooks.test.ts`; what is pinned here is everything
+ * around it that could quietly make the hook a no-op or leave a run with no idea what to do instead.
+ *
+ * Prove one red: commit `.owner-machine`, or rename the marker in the hook and not in `.gitignore`.
+ */
+describe('an unattended run cannot write under .claude/, and cannot be tricked into thinking it may (#342)', () => {
+  const file = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
+  const repo = new URL('../../', import.meta.url);
+  const git = (...args: string[]) => {
+    try { return { code: 0, out: execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim() }; }
+    catch (e) { return { code: (e as { status?: number }).status ?? 1, out: '' }; }
+  };
+  const MARKER = '.owner-machine';
+
+  // The whole guard turns on this file being absent from a clone. Committed, every clone carries it, every
+  // run is allowed again, and nothing goes red — every test in hooks.test.ts would still pass.
+  it('the owner marker is ignored by git and tracked by nothing, or the guard is dead in every clone', () => {
+    // `check-ignore` asks git the question the rail is named for, rather than pattern-matching .gitignore
+    // and hoping the pattern means what it looks like (PR #344 review).
+    expect(git('check-ignore', '-q', '--', MARKER).code, `${MARKER} is not ignored — a clone would carry it`).toBe(0);
+    expect(git('ls-files', '--', MARKER).out, `${MARKER} is tracked — the hook would allow every write`).toBe('');
+  });
+
+  it('the hook and .gitignore name the same marker, so neither can drift alone', () => {
+    expect(file('.gitignore'), 'the marker must be ignored by name').toContain(`\n${MARKER}\n`);
+    expect(file('.claude/hooks/write-guard.mjs'), 'the marker constant moved or was renamed')
+      .toContain(`export const OWNER_MARKER = '${MARKER}'`);
+  });
+
+  it('.claude/rules/governance.md is the rule\'s home: why it cannot be permitted, and what a run does instead', () => {
+    const rules = file('.claude/rules/governance.md');
+    expect(rules.length, 'a vacuous rail is worse than none').toBeGreaterThan(2_000);
+    expect(rules, 'the rule itself').toContain('An unattended run never writes under `.claude/` (#342)');
+    expect(rules, 'that it is the platform, not a preference — or someone will try to configure round it')
+      .toMatch(/protected path/i);
+    expect(rules, 'the enforcement, named where a reader can check it')
+      .toContain('`.claude/hooks/write-guard.mjs`');
+    expect(rules, 'what a run does instead, or a denial leaves it with nowhere to go').toContain('owner-session');
+    expect(rules, 'reads must stay allowed, or a run stops reading its own rules').toMatch(/reads are untouched/i);
+    // Round-1 review of PR #344: the first draft claimed a run "cannot grant itself" the permission, which is
+    // true of Write and Edit and not of the shell (#346). A rule may not claim more than it enforces.
+    expect(rules, 'the claim must be bounded by what the hook actually sees')
+      .toMatch(/closes the obvious route, not\s+every route/i);
+    expect(rules, 'and name the issue that holds the rest').toContain('#346');
+    expect(rules, 'and point at the decision record').toContain('docs/decisions/006-a-routine-never-writes-under-claude.md');
+  });
+
+  it('the developer prompt forbids the write in its own flow and points at the home, without restating it', () => {
+    const doNot = file('docs/ROUTINE-PROMPT.md').split('\n').find((l) => l.startsWith('Do NOT:')) ?? '';
+    expect(doNot, 'the Do NOT line is where a run meets this').toContain('write under `.claude/`');
+    expect(doNot, 'and it must point at the rule\'s home rather than carry a copy')
+      .toContain('`.claude/rules/governance.md`');
+    expect(doNot, 'a run that stops reading .claude/ has lost its own rules').toMatch(/reads are fine/i);
+  });
+
+  // The reviewer never pushes a fix, so it has no reason to write here; a clause there would cost bytes in a
+  // second budgeted file for a case that does not arise. The first version of this rail asserted a sentence
+  // already on `main`, so it passed identically with the drift present — the reviewer proved that by adding
+  // the clause and watching it stay green (PR #344 review). Assert the absence, which is the decision.
+  it('the reviewer prompt is deliberately left alone, and stays that way', () => {
+    const reviewer = file('docs/REVIEWER-PROMPT.md');
+    expect(reviewer, 'it must still be told not to fix a pull request itself — that is why it needs no clause')
+      .toMatch(/do NOT fix it yourself in this run/i);
+    expect(reviewer, 'a `.claude/` clause here is the drift this rail exists to catch: decide it, do not drift into it')
+      .not.toMatch(/write under `?\.claude\/`?|#342/);
+  });
+});
+
 describe('the tablet layout rails (#107, #109)', () => {
 // #107: the five-frame glyph outgrew its box because the box and its contents were sized from different
 // units — `.slot` from `min(6.5vw, 4.5vh)`, `.obj` from `5.5vw` alone — so on a tablet the box collapsed
@@ -1844,9 +1916,7 @@ describe('STEP 3 states where priority:P0 sorts (#157)', () => {
  * rail's slice — now live in `docs/REVIEWER-PROMPT.md`. The slice ends where the four unmergeable rules
  * begin; the developer prompt's STEP 3 still carries its own copy of the order, pinned by the #157 rail above.
  */
-describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
-  const root = new URL('../../', import.meta.url);
-
+describe('STEP 4 gives the query line a value, so an empty run still records one (#338)', () => {
   it('STEP 4 gives the query line a value for a run that found nothing (#338, PR #341 review)', () => {
     const prompt = readFileSync(new URL('../../docs/ROUTINE-PROMPT.md', import.meta.url), 'utf8');
     const step4 = prompt.split('\n').find((l) => l.startsWith('STEP 4')) ?? '';
@@ -1854,6 +1924,10 @@ describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
     expect(step4, 'or every such run invents its own word and the field stops meaning anything')
       .toContain('- query top pick: none eligible');
   });
+});
+
+describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
+  const root = new URL('../../', import.meta.url);
 
   it('STEP 2 states a priority order for the PR list, not just STEP 3', () => {
     const text = readFileSync(new URL('docs/REVIEWER-PROMPT.md', root), 'utf8');
@@ -4334,7 +4408,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_425;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,427: STEP 3's obligation to name the query's pick and the way past it, and the snapshot's `- query top pick:` line (#338), paid for in STEP 5's two board sentences — STEP 1 and the snapshot shape below it already carry the `- board:` line, and the Context paragraph carries the no-sync rule. STEP 3's own "nothing in this flow reads the project board" stays: a rail above pins that sentence; → 21,425: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (PR #341 review), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted
+  const ROUTINE_PROMPT_BUDGET = 21_422;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
   const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3

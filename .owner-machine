@@ -1,5 +1,0 @@
-This checkout is the owner's working copy.
-
-.claude/hooks/write-guard.mjs allows writes under .claude/ only when this file is present. It is
-gitignored, so a cloned checkout never has it and an unattended run is denied instead of meeting the
-permission prompt that stalled PR #294 and PR #318 (#342, #340).
