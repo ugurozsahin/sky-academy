@@ -24,7 +24,9 @@ confirmed earlier runs had failed to finish the same way. Established at the tim
 - the prompt is not one of this repository's hooks — `.claude/hooks/io.mjs` exports exactly one decision,
   `deny`, and a hook can refuse a call but never queue it behind a person;
 - there is nothing to fall through to — `.claude/settings.json` carries `hooks` and no `permissions` block,
-  and `.claude/settings.local.json` (the owner's Mac only, never in a cloud clone) allows `Bash(gh issue *)`;
+  and the untracked settings.local.json beside it — gitignored, so it exists on the owner's Mac and in no
+  clone — allows `Bash(gh issue *)` and nothing else. Deliberately not written here as a code span: it is not
+  a path anything may follow, and `tests/unit/instructions.test.ts` resolves every one that is;
 - the run left **nothing**: no commit, no comment, no pulse;
 - the watchdog's 23:04Z pass read the 2h31m-old pulse as healthy, *"inside the ~3h stale bar, not a finding"* —
   correct by the rule as written;
