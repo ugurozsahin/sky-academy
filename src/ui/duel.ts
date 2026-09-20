@@ -67,7 +67,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   let paid = 0;
   /** Daily Dojo bonus the finished match earned on top of `paid`; 0 until the match ends (#16 item 5). */
   let dojoPaid = 0;
-  /** What the finished match taught Sensei about this topic; 0/0 until the match ends (#16 item 5). */
+  /** What the finished match taught Sensei about this topic — rounds answered, not slices; 0/0 until it ends. */
   let taught: DuelTally = { hits: 0, tries: 0 };
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
@@ -138,8 +138,9 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // about the match here too — ten questions answered correctly on this screen move the day's volume
     // challenges exactly as they would in any other mode — and its bonus rides the same single addCoins().
     paid = duelCoins(r);
-    // Sensei's half: Player 1's own slices on this topic, the seat `DUEL_HANDOVER` keeps for the profile's own
-    // child (`duelAccuracy()` has why neither the score nor the round count may be used). A separate write from
+    // Sensei's half: the rounds Player 1 answered on this topic — one try each, the unit a mission writes — for
+    // the seat `DUEL_HANDOVER` keeps for the profile's own child (`duelAccuracy()` has why neither the score nor
+    // the round count may be used, and why a swiped wave is still one try). A separate write from
     // the coins below, exactly as `play.ts` already records accuracy separately from its payout — there is no
     // coins/challenge pairing to break here, and the two-write question on a results screen is #365's, not this
     // slice's to widen into. `recordTopic()` is deliberately NOT called: a duel earns no stars and is no `play`

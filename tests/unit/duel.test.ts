@@ -359,16 +359,17 @@ describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device
 // #16 item 5: what a finished match teaches Sensei. The tally is collected by the scorer as the match is
 // played, so these drive a real `Duel` rather than asserting against a hand-built result: the whole point is
 // which slices reach it and which never do.
+import { beforeEach } from 'vitest';
 import { duelAccuracy } from '../../src/game/duel';
-import { recordAccuracy, reset } from '../../src/storage';
+import { recordAccuracy, recordTopic, reset } from '../../src/storage';
 import { accuracy, weakestTopics } from '../../src/game/sensei';
 
-// The same minimal node shim `storage.test.ts` uses, for the one case below that follows a match's tally all
-// the way into the save and back out through Sensei's ranking.
+// The same minimal node shim `storage.test.ts` uses, for the cases below that follow a match's tally all the
+// way into the save and back out through Sensei's ranking.
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
 
-describe('the duel tallies each seat\'s own slices (#16 item 5: Sensei)', () => {
+describe('the duel tallies each seat\'s answers, one per round (#16 item 5: Sensei)', () => {
   /** A match of `rounds` rounds on the seeded topic, so a test can say what each seat did round by round. */
   const match = (rounds: number, seed = 11) => new Duel({ topic, difficulty: 1, rounds, rng: rng(seed) }, events());
   const wrongOf = (d: Duel) => d.current!.options.find(o => o !== d.current!.answer)!;
@@ -382,6 +383,50 @@ describe('the duel tallies each seat\'s own slices (#16 item 5: Sensei)', () => 
     d.waveEnd();
     d.hit('a', d.current!.answer);
     expect(d.tally).toEqual({ a: { hits: 1, tries: 2 }, b: { hits: 1, tries: 1 } });
+  });
+
+  /**
+   * PR #374's review, B1 — the whole reason this tally is per round. `Arena`'s pointermove hit-tests every
+   * bubble one stroke crosses and fires `onHit` for each, and a wrong slice in a duel deliberately does not end
+   * the round, so swiping the wave is the cheap and obvious play. Counted per slice, a seat that wins every
+   * round that way reads as 10/28 to a parent; `progress[id].hits/tries` is one lifetime counter shared with
+   * missions, where `Session` latches a question to exactly one try.
+   */
+  it('counts one try however many bubbles a stroke crosses: four wrong slices in one round are one try', () => {
+    const d = match(2); d.start();
+    const q = d.current!;
+    const wrongs = q.options.filter(o => o !== q.answer);
+    expect(wrongs.length, 'a wave with only one wrong option could not show this').toBeGreaterThan(1);
+    for (const w of wrongs) expect(d.hit('a', w)).toBe('wrong');       // one stroke across the whole wave
+    expect(d.hit('a', wrongs[0])).toBe('wrong');                        // and back over a bubble already cut
+    expect(d.tally.a, 'the round is one answer, whatever the finger did').toEqual({ hits: 0, tries: 1 });
+  });
+
+  it('a seat that answers wrongly and then slices the answer wins the round and still tallies a miss', () => {
+    const d = match(2); d.start();
+    expect(d.hit('a', wrongOf(d))).toBe('wrong');
+    expect(d.hit('a', d.current!.answer)).toBe('won');
+    expect(d.scoreA, 'the round is won — the score is the race').toBe(1);
+    // ...and the tally is the mission's unit: a mission question whose first answer was wrong is 0/1, because
+    // `markWrong()` sets `waiting` before `tally()`. So `hits` is not a second copy of the score.
+    expect(d.tally.a).toEqual({ hits: 0, tries: 1 });
+  });
+
+  it('a correct first answer is not re-counted when the same seat cuts more bubbles in that round', () => {
+    const d = match(2); d.start();
+    expect(d.hit('a', d.current!.answer)).toBe('won');
+    expect(d.hit('a', wrongOf(d)), 'the round is decided, so this is dropped before the tally').toBe('ignored');
+    expect(d.tally.a).toEqual({ hits: 1, tries: 1 });
+  });
+
+  it('latches per seat and per round, never across either', () => {
+    const d = match(3); d.start();
+    d.hit('a', wrongOf(d)); d.hit('a', wrongOf(d));                    // a answers once (wrongly)
+    d.hit('b', d.current!.answer);                                     // b answers once (rightly), same round
+    expect(d.tally).toEqual({ a: { hits: 0, tries: 1 }, b: { hits: 1, tries: 1 } });
+    d.waveEnd();                                                       // round 2: the latch is off again
+    d.hit('a', d.current!.answer);
+    expect(d.tally.a).toEqual({ hits: 1, tries: 2 });
   });
 
   it('counts nothing for a slice the round has already been decided by, or for one after the match ended', () => {
@@ -438,6 +483,15 @@ describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', (
     expect(duelAccuracy(r).tries).not.toBe(r.rounds);
   });
 
+  it('hands back a copy, so the record cannot be edited through the hook it is put on', () => {
+    // `src/ui/duel.ts` puts this object on `window.__sna` as `taught`. Nothing mutates it today; the copy is
+    // what keeps that true of whatever reads the hook next (#374 N4), and `end()`'s own snapshot is the same rule.
+    const r = played(['a', 'a']);
+    const t = duelAccuracy(r);
+    t.hits = 99; t.tries = 99;
+    expect(r.tally.a).toEqual({ hits: 2, tries: 2 });
+  });
+
   it('throws Player 2\'s tally away: it has no profile to go to', () => {
     const r = played(['b', 'b', 'b']);
     expect(r.tally.b).toEqual({ hits: 3, tries: 3 });
@@ -449,19 +503,46 @@ describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', (
     expect(duelAccuracy(played(['b', 'draw']))).toEqual({ hits: 0, tries: 0 });
   });
 
+  // Every case below writes to the save, so the save is cleared before each one rather than inline: a shim
+  // shared by the whole file otherwise hands the next storage-touching test whatever the last one left (#374 N6).
+  beforeEach(() => reset());
+
   it('is what Sensei then ranks the topic by, and a duel-only topic is not ranked as a weak one', () => {
     // The end of the chain, through the real storage and the real ranking: a duel's tally reaches
     // `progress[topic]`, and because a duel is no `play` of the topic (`recordTopic()` is not called) the
     // topic still reads as never played — the same as a topic met only in Sensei training or Sky Storm.
-    reset();
-    const r = played(['wrongA', 'wrongA', 'a']);
+    const r = played(['wrongA', 'a', 'a']);
     const t = duelAccuracy(r);
-    expect(t).toEqual({ hits: 1, tries: 3 });
+    expect(t).toEqual({ hits: 2, tries: 3 });
     recordAccuracy(topic.id, t.hits, t.tries);
     const p = JSON.parse(localStorage.getItem('sna:v1')!).progress[topic.id];
-    expect(p).toMatchObject({ hits: 1, tries: 3, plays: 0, stars: 0 });
+    expect(p).toMatchObject({ hits: 2, tries: 3, plays: 0, stars: 0 });
     expect(accuracy(p), 'no plays, so the ratio is not yet a verdict on the child').toBe(null);
-    expect(weakestTopics([topic], { [topic.id]: p }, 1)).toEqual([topic]);   // still offered, as a fresh topic
-    reset();
+    // A SECOND topic, played and ranked, so the ordering can actually distinguish the two: `weakestTopics()`
+    // puts played topics first and the never-played ones after them, so the duel-only topic must come second
+    // however poor its raw ratio (#374 N1 — with one topic and n = 1 this assertion could not fail).
+    const other = topicsFor('year1').find(x => x.id !== topic.id && x.input !== 'tracing')!;
+    const strong = { stars: 3, best: 9, plays: 4, hits: 19, tries: 20 };
+    expect(weakestTopics([topic, other], { [topic.id]: p, [other.id]: strong }, 2)).toEqual([other, topic]);
+  });
+
+  it('once the topic has been played for real, a duel\'s answers move its Sensei ranking', () => {
+    // The inverse of the case above, and the one that makes the unit matter: with `plays > 0` the ratio is
+    // live, so what a duel writes decides which topic Train with Sensei drills. Per-slice counting is what
+    // #374's review blocked — a swiped wave would have dragged this topic to the bottom on merit it lost.
+    const other = topicsFor('year1').find(x => x.id !== topic.id && x.input !== 'tracing')!;
+    recordTopic(topic.id, 2, 40); recordAccuracy(topic.id, 9, 10);        // played, 90%
+    recordTopic(other.id, 2, 40); recordAccuracy(other.id, 7, 10);        // played, 70% — the weaker of the two
+    const before = JSON.parse(localStorage.getItem('sna:v1')!).progress;
+    expect(weakestTopics([topic, other], before, 1).map(t => t.id)).toEqual([other.id]);
+    // One duel of three rounds, answered wrongly twice: 10/13 ≈ 77%, still above `other`. Four wrong slices in
+    // one of those rounds would have made it 10/16 on a per-slice tally and flipped the ranking on nothing.
+    const t = duelAccuracy(played(['wrongA', 'a', 'wrongA']));
+    expect(t).toEqual({ hits: 1, tries: 3 });
+    recordAccuracy(topic.id, t.hits, t.tries);
+    const after = JSON.parse(localStorage.getItem('sna:v1')!).progress;
+    expect(after[topic.id]).toMatchObject({ hits: 10, tries: 13, plays: 1 });
+    expect(accuracy(after[topic.id])!).toBeCloseTo(10 / 13, 5);
+    expect(weakestTopics([topic, other], after, 1).map(t => t.id), 'a duel moves the ratio, without inventing tries').toEqual([other.id]);
   });
 });

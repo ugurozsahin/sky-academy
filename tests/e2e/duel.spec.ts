@@ -117,6 +117,13 @@ test.describe('Ninja Duel', () => {
     // Play out the match: Player 1 wins 6 rounds, Player 2 takes the rest.
     for (let r = 2; r <= 10; r++) {
       await page.waitForFunction(r => window.__sna.state().round === r, r);
+      // Round 2: Player 1 cuts a wrong bubble and then still takes the round. The round is won — a wrong slice
+      // costs nothing — but Sensei is told what a mission would have scored, a miss, so this is the round that
+      // makes `hits < tries` reach the save through the real arena (#374 review, B1).
+      if (r === 2) {
+        await page.waitForFunction(() => window.__sna.bubbles('a').some(b => b.label !== window.__sna.state().answer));
+        expect(await page.evaluate(() => window.__sna.wrong('a'))).toBe(true);
+      }
       await winRound(page, r <= 6 ? 'a' : 'b');
     }
     await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
@@ -124,10 +131,12 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end .speech')).toHaveText('Player 1 wins 6–4!');
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({
       ended: true, scoreA: 6, scoreB: 4, coins: 10, dojoCoins: 0,
-      // #16 item 5, Sensei's half: Player 1 sliced six answers and nothing else, so six of six. Player 2's
-      // round-1 wrong slice and four wins are NOT here — one shared profile, and only the bottom seat is its
-      // own child's (`duelAccuracy()`). Ten decided rounds would be the coins' number, not this one.
-      taught: { hits: 6, tries: 6 },
+      // #16 item 5, Sensei's half: Player 1 answered six rounds, each right first time, so six of six. Player
+      // 2's round-1 wrong slice and four wins are NOT here — one shared profile, and only the bottom seat is
+      // its own child's (`duelAccuracy()`). Ten decided rounds would be the coins' number, not this one.
+      // Six rounds answered, five right first time: round 2 was won after a wrong cut, and `scoreA` is still 6,
+      // so this also pins that `hits` is not a second copy of the score.
+      taught: { hits: 5, tries: 6 },
     });
     // #16 item 5: the finished match pays the one shared save a coin per decided round — ten here, and not one
     // of them for winning. Ten is under the first sticker threshold (30), so the match unlocks nothing yet, and
@@ -141,7 +150,7 @@ test.describe('Ninja Duel', () => {
     // 0 and `accuracy()` reads null for a duel-only topic. Read from the save rather than from the overlay —
     // the state hook would be green with `recordAccuracy()` never called.
     const learnt = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).progress[window.__sna.state().topic]);
-    expect(learnt, "Player 1's own six slices, in the save").toMatchObject({ hits: 6, tries: 6, plays: 0, stars: 0 });
+    expect(learnt, "the six rounds Player 1 answered, five of them right first time").toMatchObject({ hits: 5, tries: 6, plays: 0, stars: 0 });
     // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0. The recording
     // is cleared BEFORE the click: round 1's line goes out on the task after the old screen's cancel(), and it
     // is what the assertion after the scores must find.

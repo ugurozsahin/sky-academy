@@ -97,9 +97,9 @@ export interface DuelState {
    */
   dojoCoins: number;
   /**
-   * What the finished match added to this topic's lifetime `hits`/`tries` tally — Player 1's own slices, the
-   * only seat the shared profile can claim (`duelAccuracy()`). `{ hits: 0, tries: 0 }` until the match ends,
-   * and after a match Player 1 never sliced in (#16 item 5).
+   * What the finished match added to this topic's lifetime `hits`/`tries` tally — the rounds **Player 1**
+   * answered, one try each, that being the only seat the shared profile can claim (`duelAccuracy()`).
+   * `{ hits: 0, tries: 0 }` until the match ends, and after a match Player 1 never sliced in (#16 item 5).
    */
   taught: DuelTally;
 }
