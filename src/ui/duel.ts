@@ -7,13 +7,14 @@
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
-import { Duel, duelCoins, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult } from '../game/duel';
+import { Duel, duelCoins, duelDojoEvent, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { addCoins, load } from '../storage';
+import { addCoins, load, recordDojo } from '../storage';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { hintText, promptHTML, promptMode } from './hud';
 import { screenScope, stickersHTML } from './screen';
+import { dojoRowsHTML } from './memory';
 import { pauseHTML } from './overlays';
 import { waveOptsFor } from './play-session';
 import { renderVisual } from './visuals';
@@ -63,6 +64,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   let hintLine = '';
   /** Coins the finished match paid into the save; 0 until the match ends (#16 item 5). */
   let paid = 0;
+  /** Daily Dojo bonus the finished match earned on top of `paid`; 0 until the match ends (#16 item 5). */
+  let dojoPaid = 0;
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
 
@@ -128,10 +131,14 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   function showResults(r: DuelResult) {
     hold(true);
     // #16 item 5: the match pays into the one shared save before the overlay is built, so the coin row and
-    // any sticker it unlocked are on the screen the children are already looking at.
+    // any sticker it unlocked are on the screen the children are already looking at. The Daily Dojo hears
+    // about the match here too — ten questions answered correctly on this screen move the day's volume
+    // challenges exactly as they would in any other mode — and its bonus rides the same single addCoins().
     paid = duelCoins(r);
-    const fresh = addCoins(paid);
-    if (fresh.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
+    const dojo = recordDojo(duelDojoEvent(r, topic.subject));
+    dojoPaid = dojo.coins;
+    const fresh = addCoins(paid + dojoPaid);
+    if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
     overlay.hidden = false;
     overlay.innerHTML = `
@@ -140,6 +147,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <h2>${r.winner === 'draw' ? 'A draw!' : `${esc(NAME[r.winner])} wins!`}</h2>
         <div class="statgrid duel-final"><div><b>${r.scoreA}</b><small>${NAME.a}</small></div><div><b>${r.rounds}</b><small>rounds</small></div><div><b>${r.scoreB}</b><small>${NAME.b}</small></div></div>
         <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
+        ${dojoRowsHTML(dojo)}
         ${stickersHTML(fresh)}
         <div class="row"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
@@ -173,7 +181,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     state: () => ({
       mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
-      hint: hintLine, coins: paid,
+      hint: hintLine, coins: paid, dojoCoins: dojoPaid,
     }),
     setSpeed: k => { setGameSpeed(k); },
     timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),
