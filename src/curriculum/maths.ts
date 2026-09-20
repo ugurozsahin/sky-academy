@@ -225,14 +225,22 @@ const y2Money: Generator = (d, rng) => {
   const price = 5 * ri(rng, 1, 19);
   return wordQ(rng, `Change from £1 for ${price}p?`, `${100 - price}p`, [`${100 - price + 5}p`, `${100 - price - 5}p`, `${price}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?` });
 };
+/**
+ * The clock phrase for `h:mm` on a 12-hour dial — `3 o'clock`, `quarter past 3`, `half past 3`, `quarter to 4`,
+ * `20 past 3`, `10 to 4`. One source, because `y2-time` reads a clock face and `y2-duration` answers an end
+ * time with the same words (#298 slice 3); two copies would be free to disagree about `quarter to`, which is
+ * the only phrase that names the *next* hour.
+ */
+export const clockPhrase = (hh: number, mm: number): string =>
+  mm === 0 ? `${hh} o'clock` : mm === 15 ? `quarter past ${hh}` : mm === 30 ? `half past ${hh}` : mm === 45 ? `quarter to ${hh % 12 + 1}` : mm < 30 ? `${mm} past ${hh}` : `${60 - mm} to ${hh % 12 + 1}`;
+
 const y2Time: Generator = (d, rng) => {
   const h = ri(rng, 1, 12);
   const m = d === 1 ? pick(rng, [0, 15, 30, 45]) : d === 2 ? pick(rng, [0, 5, 10, 15, 30, 45]) : 5 * ri(rng, 0, 11);
-  const label = (hh: number, mm: number) => mm === 0 ? `${hh} o'clock` : mm === 15 ? `quarter past ${hh}` : mm === 30 ? `half past ${hh}` : mm === 45 ? `quarter to ${hh % 12 + 1}` : mm < 30 ? `${mm} past ${hh}` : `${60 - mm} to ${hh % 12 + 1}`;
-  const ans = label(h, m);
+  const ans = clockPhrase(h, m);
   const ds = new Set<string>();
   let guard = 0;
-  while (ds.size < 3 && guard++ < 30) { const mm = 5 * ri(rng, 0, 11); const hh = rng() < 0.5 ? h : ri(rng, 1, 12); const l = label(hh, mm); if (l !== ans) ds.add(l); }
+  while (ds.size < 3 && guard++ < 30) { const mm = 5 * ri(rng, 0, 11); const hh = rng() < 0.5 ? h : ri(rng, 1, 12); const l = clockPhrase(hh, mm); if (l !== ans) ds.add(l); }
   return wordQ(rng, 'What time is it?', ans, [...ds], { visual: { type: 'clock', h, m } });
 };
 const y2Words: Generator = (d, rng) => {
@@ -522,11 +530,66 @@ const y2Stats: Generator = (d, rng) => {
   });
 };
 
-const DURATIONS: [string, number][] = [['minutes in an hour', 60], ['seconds in a minute', 60], ['hours in a day', 24], ['days in a week', 7], ['days in a fortnight', 14], ['weeks in a year', 52], ['months in a year', 12], ['minutes in half an hour', 30], ['minutes in a quarter of an hour', 15], ['days in September', 30], ['days in July', 31]];
+/**
+ * Year 2 durations (#298 slice 3). Year 2 asks for two time facts — minutes in an hour, hours in a day — and
+ * for one thing this topic never did: "compare and sequence intervals of time". Seconds in a minute, days in
+ * a week, days in a fortnight, weeks in a year and the days in a named month are all Year 3 ("know the number
+ * of seconds in a minute and the number of days in each month, year and leap year"), and the month-order draw
+ * that took 35% of the cards is Year 1's, already covered by `y1-months`. All of that has left the topic.
+ *
+ * What replaces it, by stage: d1 the four facts below, d2 comparing intervals, d3 an end time.
+ */
+const DUR_FACTS: [string, number][] = [['minutes in an hour', 60], ['hours in a day', 24], ['minutes in half an hour', 30], ['minutes in a quarter of an hour', 15]];
+/**
+ * The intervals a comparison card draws from. Every phrase here is a **bubble label**, so each is kept as
+ * short as `y2-time`'s longest (`quarter past 12`) — which is why `half an hour` appears and
+ * `a quarter of an hour` does not. The values are distinct, so "the longest" of any subset is never a tie.
+ */
+const INTERVALS: [string, number][] = [['10 minutes', 10], ['15 minutes', 15], ['20 minutes', 20], ['half an hour', 30], ['40 minutes', 40], ['50 minutes', 50], ['1 hour', 60]];
+/** Durations that land the end time back on Year 2's o'clock / quarter / half grid, so it has a clock phrase. */
+const GRID_DURATIONS: [string, number][] = [['a quarter of an hour', 15], ['half an hour', 30], ['three quarters of an hour', 45], ['an hour', 60]];
+
+/** Compare `n` intervals: which takes the longest, or the shortest. `n === 2` is the comparative form. */
+function intervalCompare(rng: Rng, n: number): Question {
+  const chosen = shuffle(rng, INTERVALS).slice(0, n);
+  const big = rng() < 0.5;
+  const target = chosen.reduce((best, cur) => (big ? cur[1] > best[1] : cur[1] < best[1]) ? cur : best);
+  const ask = n === 2 ? (big ? 'Which takes longer?' : 'Which takes less time?') : (big ? 'Which takes the longest?' : 'Which takes the shortest?');
+  // No hint: the bubbles *are* the durations, so a hint listing them again would only repeat the question —
+  // and a hint is the one line a landscape phone can hide (#328).
+  return wordQ(rng, ask, target[0], chosen.filter(c => c !== target).map(c => c[0]), { say: `${chosen.map(c => c[0]).join(', ')}. ${ask}` });
+}
+
+/**
+ * "It starts at 3 o'clock and lasts half an hour. When does it end?" — a start on the quarter grid plus a
+ * duration that keeps the end on it. The decoys are the mistakes the question is about: not adding at all,
+ * adding a whole hour, and overshooting or undershooting by a quarter. They are taken in order until three
+ * distinct ones are found, because the offsets collide for some durations (`45 + 15` and `60` are one time).
+ */
+function endTime(rng: Rng): Question {
+  const h = ri(rng, 1, 12), m = pick(rng, [0, 15, 30, 45]);
+  const [phrase, mins] = pick(rng, GRID_DURATIONS);
+  const at = (t: number) => clockPhrase((Math.floor(t / 60) - 1) % 12 + 1, t % 60);
+  const start = h * 60 + m;
+  const ans = at(start + mins);
+  const ds: string[] = [];
+  for (const o of [0, mins + 15, mins - 15, 60, 30]) {
+    if (o === mins) continue;
+    const l = at(start + o);
+    if (l !== ans && !ds.includes(l)) ds.push(l);
+    if (ds.length === 3) break;
+  }
+  const said = `It starts at ${clockPhrase(h, m)} and lasts ${phrase}. When does it end?`;
+  return wordQ(rng, said, ans, ds, { say: said });
+}
+
 const y2Duration: Generator = (d, rng) => {
-  if (rng() < 0.35) { const i = ri(rng, 0, 11), after = rng() < 0.5, ans = MONTHS[(i + (after ? 1 : 11)) % 12]; return wordQ(rng, `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, ans, shuffle(rng, MONTHS.filter(x => x !== ans)).slice(0, 3), { say: `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?` }); }
-  const [phrase, n] = pick(rng, d === 1 ? DURATIONS.slice(0, 8) : DURATIONS);
-  return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 120, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n === 60 ? 30 : n * 2] });
+  if (d === 1) {
+    const [phrase, n] = pick(rng, DUR_FACTS);
+    return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 100, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n === 60 ? 30 : n * 2] });
+  }
+  if (d === 2) return intervalCompare(rng, rng() < 0.5 ? 2 : 3);
+  return endTime(rng);
 };
 
 // ---------- Position & direction (#8 Phase 2) ----------
@@ -632,7 +695,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y2-mass', title: 'Mass: g & kg', icon: '🏋️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: mass (g/kg)', gen: y2Mass },
   { id: 'y2-capacity', title: 'Capacity: ml & l', icon: '🥤', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: capacity (ml/l)', gen: y2Capacity },
   { id: 'y2-temp', title: 'Temperature', icon: '🌡️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: temperature (°C)', gen: y2Temp },
-  { id: 'y2-duration', title: 'Time & Durations', icon: '⏳', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: time, durations, months', gen: y2Duration },
+  { id: 'y2-duration', title: 'Time & Durations', icon: '⏳', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: compare and sequence intervals of time', gen: y2Duration },
   { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },
   { id: 'y2-stats', title: 'Charts & Tallies', icon: '📊', subject: 'maths', year: 'year2', nc: 'Y2 Statistics: pictograms, tally charts, block diagrams', gen: y2Stats },
 ];

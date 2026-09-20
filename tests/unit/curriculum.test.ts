@@ -123,6 +123,61 @@ describe('curriculum ranges', () => {
     expect(cards, 'cards generated').toBeGreaterThan(2000);
     expect(converted, 'cards where the conversion clause actually runs').toBeGreaterThan(200);
   });
+  it('Year 2 durations: Year 2 facts, compared intervals and end times — no Year 3 fact, no month order (#298)', () => {
+    // Red on `main` before this slice: 35% of every draw was `Which month comes after May?` (Year 1, and
+    // `y1-months`' own draw), and the fact table offered `seconds in a minute`, `days in a week`,
+    // `days in a fortnight`, `weeks in a year`, `months in a year`, `days in September` and `days in July` —
+    // all Year 3. Year 2 asks for two facts and for comparing and sequencing intervals.
+    const FACTS: Record<string, number> = { 'minutes in an hour': 60, 'hours in a day': 24, 'minutes in half an hour': 30, 'minutes in a quarter of an hour': 15 };
+    const INTERVAL: Record<string, number> = { '10 minutes': 10, '15 minutes': 15, '20 minutes': 20, 'half an hour': 30, '40 minutes': 40, '50 minutes': 50, '1 hour': 60 };
+    const LASTS: Record<string, number> = { 'a quarter of an hour': 15, 'half an hour': 30, 'three quarters of an hour': 45, 'an hour': 60 };
+    // Independent of the generator's formatter: a clock phrase back to minutes on the 12-hour dial, so the
+    // end-time check below compares an *interval* rather than re-deriving the same words a second time.
+    const onDial = (phrase: string) => {
+      let m;
+      if ((m = phrase.match(/^(\d+) o'clock$/))) return (Number(m[1]) * 60) % 720;
+      if ((m = phrase.match(/^quarter past (\d+)$/))) return (Number(m[1]) * 60 + 15) % 720;
+      if ((m = phrase.match(/^half past (\d+)$/))) return (Number(m[1]) * 60 + 30) % 720;
+      if ((m = phrase.match(/^quarter to (\d+)$/))) return ((Number(m[1]) - 1) * 60 + 45) % 720;
+      return null;
+    };
+    const t = TOPICS.find(x => x.id === 'y2-duration')!; const r = rng(298 + 3);
+    let facts = 0, pairs = 0, triples = 0, ends = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 400; i++) {
+      const q = t.gen(d, r);
+      expect(q.prompt, 'month order is Year 1 and belongs to y1-months').not.toMatch(/Which month comes/);
+      let m;
+      if ((m = q.prompt.match(/^How many (.+)\?$/))) {
+        facts++;
+        expect(FACTS[m[1]], `"${q.prompt}" is not one of Year 2's two time facts`).toBeDefined();
+        expect(Number(q.answer), q.prompt).toBe(FACTS[m[1]]);
+        expect(d, `a fact card at difficulty ${d}`).toBe(1);
+      } else if (/^Which takes /.test(q.prompt)) {
+        const big = /longer|longest/.test(q.prompt);
+        const vals = q.options.map(o => { expect(INTERVAL[o], `"${o}" is not a Year 2 interval`).toBeDefined(); return INTERVAL[o]; });
+        expect(INTERVAL[q.answer], `"${q.prompt}" answered "${q.answer}"`).toBe(big ? Math.max(...vals) : Math.min(...vals));
+        expect(q.options.length, q.prompt).toBe(q.prompt.includes(' the ') ? 3 : 2);
+        if (q.options.length === 2) pairs++; else triples++;
+        expect(d, `a comparison card at difficulty ${d}`).toBe(2);
+      } else if ((m = q.prompt.match(/^It starts at (.+) and lasts (.+)\. When does it end\?$/))) {
+        ends++;
+        const from = onDial(m[1]), lasts = LASTS[m[2]];
+        expect(from, `start "${m[1]}" is not on the quarter grid`).not.toBeNull();
+        expect(lasts, `"${m[2]}" is not a Year 2 duration`).toBeDefined();
+        const to = onDial(q.answer);
+        expect(to, `answer "${q.answer}" is not on the quarter grid`).not.toBeNull();
+        expect((to! - from! + 720) % 720, q.prompt).toBe(lasts % 720);
+        for (const o of q.options) expect(onDial(o), `option "${o}"`).not.toBeNull();
+        expect(q.options.length, q.prompt).toBe(4);
+        expect(d, `an end-time card at difficulty ${d}`).toBe(3);
+      } else throw new Error(`y2-duration drew a card this rail does not know: "${q.prompt}"`);
+    }
+    // Counters, so deleting a draw cannot make this rail vacuously green (the rails beside it do the same).
+    expect(facts, 'd1 fact cards').toBeGreaterThan(350);
+    expect(pairs, 'd2 two-interval comparisons').toBeGreaterThan(100);
+    expect(triples, 'd2 three-interval comparisons').toBeGreaterThan(100);
+    expect(ends, 'd3 end-time cards').toBeGreaterThan(350);
+  });
   it('Year 2 measures: the add/subtract card is arithmetically right and every option usable (#298)', () => {
     // Nothing verified `measureSum`'s sum: this file's `solve()` matches only bare-number prompts, so the
     // ` cm` suffix hides the prompt from it, and the harness's non-negative / maxAnswer check is guarded by
