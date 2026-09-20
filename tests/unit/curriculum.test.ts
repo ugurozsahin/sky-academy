@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, gapLetters, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, gapLetters, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
+import type { SentenceType } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
 // Deterministic RNG (mulberry32)
@@ -1354,6 +1355,138 @@ describe('Year 2 grammar and spelling (#299 slice 3)', () => {
         }
         expect([...drawn].sort(), `d${d} must reach all of its classes`).toEqual([...allowed[d]].sort());
       }
+    });
+  });
+
+  // Part B. These two banks are judged against English the test states for itself, never against their own
+  // label column (#377): a broader imperative list than the bank uses, the `What …!`/`How …!` rule, the
+  // auxiliaries and the time phrases. A row mislabelled in the bank fails here; a row that agrees with itself
+  // and with nothing else does not pass.
+  describe('y2-sentencetype', () => {
+    // Deliberately wider than the bank: a command the bank adds later must start with an imperative verb, and
+    // a statement must not. Copying the bank's six first words here would check nothing.
+    const IMPERATIVES = new Set(['close', 'wash', 'put', 'line', 'pass', 'tidy', 'stop', 'open', 'sit', 'stand',
+      'listen', 'look', 'bring', 'take', 'fetch', 'wait', 'come', 'go', 'write', 'draw', 'eat', 'turn', 'hold',
+      'give', 'help', 'clean', 'tell', 'show', 'read', 'share', 'count', 'find', 'pick', 'hang', 'feed']);
+    const END: Record<SentenceType, string> = { statement: '.', question: '?', command: '.', exclamation: '!' };
+
+    it('every sentence carries the surface marks of the type it claims, and nothing else', () => {
+      const byType = new Map<SentenceType, number>();
+      expect(new Set(SENTENCE_TYPES.map(e => e[0])).size, 'no sentence twice').toBe(SENTENCE_TYPES.length);
+      for (const [sent, type] of SENTENCE_TYPES) {
+        byType.set(type, (byType.get(type) ?? 0) + 1);
+        expect(sent.endsWith(END[type]), sent).toBe(true);
+        const first = sent.split(' ')[0].toLowerCase();
+        // Only the `What …!` / `How …!` form is an exclamation sentence; `Look out!` is a command said loudly,
+        // and `What is your name?` opens the same way but ends `?`, so both marks have to agree.
+        expect(/^(What|How) .*!$/.test(sent), `${sent} — exclamation form`).toBe(type === 'exclamation');
+        expect(IMPERATIVES.has(first), `${sent} — starts with an imperative verb`).toBe(type === 'command');
+        // A question ends with `?` and nothing else does, so `What is your name?` cannot read as an
+        // exclamation and `Close the door.` cannot read as a statement.
+        expect(sent.includes('?'), sent).toBe(type === 'question');
+        expect(sent.includes('!'), sent).toBe(type === 'exclamation');
+      }
+      for (const t of SENTENCE_TYPE_NAMES) expect(byType.get(t) ?? 0, `${t} rows`).toBeGreaterThanOrEqual(4);
+    });
+
+    it('the types unlock by difficulty, the bubbles are only the unlocked ones, and each is drawn', () => {
+      const t = topic('y2-sentencetype'), r = rng(3001);
+      const allowed: Record<number, string[]> = { 1: ['statement', 'question'], 2: ['statement', 'question', 'command'], 3: [...SENTENCE_TYPE_NAMES] };
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const drawn = new Set<string>();
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          expect(allowed[d], `d${d} drew ${q.answer}`).toContain(q.answer);
+          drawn.add(q.answer);
+          // A bubble a child has not been taught yet is not a distractor, it is noise.
+          expect([...q.options].sort(), `d${d} bubbles`).toEqual([...allowed[d]].sort());
+          const row = SENTENCE_TYPES.find(e => e[0] === (q.visual as { text: string }).text)!;
+          expect(row, q.say).toBeTruthy();
+          expect(q.answer, row[0]).toBe(row[1]);
+        }
+        expect([...drawn].sort(), `d${d} must reach all of its types`).toEqual([...allowed[d]].sort());
+      }
+    });
+  });
+
+  describe('y2-tense', () => {
+    const PAST_PHRASE = /\b(yesterday|last week|last night|ago)\b/i;
+    const PRESENT_PHRASE = /\b(every day|every morning|now)\b/i;
+    const AUX: Record<string, 'present' | 'past'> = { is: 'present', are: 'present', was: 'past', were: 'past' };
+
+    it('every verb has four distinct forms, each shaped the way its column says', () => {
+      expect(TENSE_VERBS.length).toBeGreaterThan(8);
+      let irregular = 0;
+      for (const [base, present, past, ing] of TENSE_VERBS) {
+        expect(new Set([base, present, past, ing]).size, base).toBe(4);   // four bubbles, four different words
+        for (const w of [base, present, past, ing]) expect(w, base).toMatch(/^[a-z]+$/);
+        expect(present.endsWith('s'), `${base} → ${present}`).toBe(true);
+        expect(ing.endsWith('ing'), `${base} → ${ing}`).toBe(true);
+        expect(past, base).not.toBe(base);                                // `put`/`cut` would give two right answers
+        if (!past.startsWith(base)) irregular++;
+      }
+      expect(irregular, 'the bank teaches irregular pasts too, not just -ed').toBeGreaterThanOrEqual(4);
+    });
+
+    it('every frame has one gap, and the tense it claims is the one its own words carry', () => {
+      const cols = new Set<number>();
+      for (const [frame, col, tense] of TENSE_FRAMES) {
+        expect(frame.match(/___/g)?.length, frame).toBe(1);
+        cols.add(col);
+        if (PAST_PHRASE.test(frame)) expect(tense, frame).toBe('past');
+        if (PRESENT_PHRASE.test(frame)) expect(tense, frame).toBe('present');
+        const aux = frame.split(' ').map(w => AUX[w.toLowerCase()]).find(Boolean);
+        if (col === 3) {
+          // The progressive needs an auxiliary, and that auxiliary is what says which tense it is — the two
+          // past-progressive frames carry no time phrase at all, so `was` against `is` is the whole signal.
+          expect(aux, `${frame} — a progressive frame needs is/are/was/were`).toBeTruthy();
+          expect(tense, frame).toBe(aux);
+        } else {
+          expect(aux, `${frame} — a simple frame must not carry an auxiliary`).toBeUndefined();
+          expect(tense, frame).toBe(col === 2 ? 'past' : 'present');
+        }
+      }
+      expect([...cols].sort(), 'all three forms are reachable from the frames').toEqual([1, 2, 3]);
+    });
+
+    it('d1 names the tense on simple forms, d2 adds the progressive, d3 asks for the form itself', () => {
+      const t = topic('y2-tense'), r = rng(3002);
+      const frameOf = (text: string) => TENSE_FRAMES.find(f => {
+        const [head, tail] = f[0].split('___');
+        return text.startsWith(head) && text.endsWith(tail);
+      });
+      for (const d of [1, 2] as Difficulty[]) {
+        const drawn = new Set<string>(), progressive = new Set<boolean>();
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          expect(q.prompt).toBe('Present or past?');
+          expect([...q.options].sort(), 'two bubbles: present or past').toEqual(['past', 'present']);
+          const text = (q.visual as { text: string }).text;
+          expect(text, 'the sentence on the card is finished, not gapped').not.toContain('___');
+          const f = frameOf(text)!;
+          expect(f, text).toBeTruthy();
+          expect(q.answer, text).toBe(f[2]);
+          // The gap really was filled from the column the frame asks for, so `He was walked` never ships.
+          const verb = TENSE_VERBS.find(v => text === f[0].replace('___', v[f[1]]));
+          expect(verb, `${text} — filled from column ${f[1]}`).toBeTruthy();
+          drawn.add(q.answer); progressive.add(f[1] === 3);
+        }
+        expect([...drawn].sort(), `d${d} must draw both tenses`).toEqual(['past', 'present']);
+        expect([...progressive].sort(), `d${d} progressive frames`).toEqual(d === 1 ? [false] : [false, true]);
+      }
+      const cols = new Set<number>();
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(3, r);
+        const f = TENSE_FRAMES.find(x => x[0] === q.prompt)!;
+        expect(f, q.prompt).toBeTruthy();
+        cols.add(f[1]);
+        const verb = TENSE_VERBS.find(v => v.includes(q.answer))!;
+        expect(verb, q.answer).toBeTruthy();
+        expect(q.answer, `${q.prompt} needs column ${f[1]}`).toBe(verb[f[1]]);
+        // All four forms of that one verb, so the wrong bubbles are the mistakes a child actually writes.
+        expect([...q.options].sort(), q.prompt).toEqual([...verb].sort());
+      }
+      expect([...cols].sort(), 'd3 must ask for all three forms').toEqual([1, 2, 3]);
     });
   });
 });
