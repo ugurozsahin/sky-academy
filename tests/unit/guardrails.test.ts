@@ -1493,6 +1493,11 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
       .toContain('replace the `routine: heartbeat` body with `<UTC> — IN PROGRESS: <what this run will do>`');
     expect(prompt, 'it carries the `- second item:` line the #62 hook demands, or the write is denied and the stamp never lands')
       .toMatch(/- second item: pending/);
+    // #341 review: a second mandatory line was added to the hook and this sibling was not extended, so the
+    // rail stayed green while the stamp it guards was refused. `tests/unit/hooks.test.ts` feeds the sentence
+    // to the real `check()`; this pins that the line is named at all.
+    expect(prompt, 'and the `- query top pick:` line the same hook demands (#338), or the stamp is refused')
+      .toMatch(/- query top pick: pending/);
     expect(prompt, 'and STEP 5 must say it replaces the stamp, not sit beside it')
       .toMatch(/IN PROGRESS` stamp, which is not a pass/);
 
@@ -1841,6 +1846,14 @@ describe('STEP 3 states where priority:P0 sorts (#157)', () => {
  */
 describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
   const root = new URL('../../', import.meta.url);
+
+  it('STEP 4 gives the query line a value for a run that found nothing (#338, PR #341 review)', () => {
+    const prompt = readFileSync(new URL('../../docs/ROUTINE-PROMPT.md', import.meta.url), 'utf8');
+    const step4 = prompt.split('\n').find((l) => l.startsWith('STEP 4')) ?? '';
+    expect(step4, 'STEP 4 must still exist, or this rail reads nothing').toContain('NOTHING ELIGIBLE');
+    expect(step4, 'or every such run invents its own word and the field stops meaning anything')
+      .toContain('- query top pick: none eligible');
+  });
 
   it('STEP 2 states a priority order for the PR list, not just STEP 3', () => {
     const text = readFileSync(new URL('docs/REVIEWER-PROMPT.md', root), 'utf8');
@@ -4321,7 +4334,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_427;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,427: STEP 3's obligation to name the query's pick and the way past it, and the snapshot's `- query top pick:` line (#338), paid for in STEP 5's two board sentences — STEP 1 and the snapshot shape below it already carry the `- board:` line, and the Context paragraph carries the no-sync rule. STEP 3's own "nothing in this flow reads the project board" stays: a rail above pins that sentence
+  const ROUTINE_PROMPT_BUDGET = 21_425;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,427: STEP 3's obligation to name the query's pick and the way past it, and the snapshot's `- query top pick:` line (#338), paid for in STEP 5's two board sentences — STEP 1 and the snapshot shape below it already carry the `- board:` line, and the Context paragraph carries the no-sync rule. STEP 3's own "nothing in this flow reads the project board" stays: a rail above pins that sentence; → 21,425: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (PR #341 review), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted
   // —
 
   const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3

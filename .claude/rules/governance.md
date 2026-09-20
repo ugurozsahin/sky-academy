@@ -46,7 +46,10 @@ paths:
   that the line is *there*, never that the issue named is the one the query would return or that the way past
   the order was really available — both are the reviewer's, against the query re-run on the current state. The
   pull request half has no enforcement at all; a rail would have to re-run the query from CI, which would make
-  the build depend on live issue state. Their home is `docs/ROUTINE-PROMPT.md` STEP 3.
+  the build depend on live issue state. **And the hook matches `mcp__github__*` only**, while STEP 1 steers
+  authored bodies to the REST API (#207), so it is enforced on the path the prompt steers away from — the
+  same bypass `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` records for `- second item:`.
+  Their home is `docs/ROUTINE-PROMPT.md` STEP 3.
 - **The routine heartbeat (issue #62) must be overwritten each run, never appended to (records have readers,
   #98).** Enforced in code: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to
   issue #62 whose body carries two or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — the

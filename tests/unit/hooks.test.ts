@@ -471,6 +471,46 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'the query top pick was #298 but I never wrote it as a line' }))).toBe(true);
   });
 
+  // Round-1 review of PR #341: the deny message is the whole interface a blocked run sees, and this rule was
+  // written by copying its sibling — so the likeliest real mutation is that it inherits the sibling's text. A
+  // run obeying the wrong message would add a second `- second item:` line and be denied forever.
+  it('#338 query-top-pick hook: says which line is missing, in its own words', () => {
+    const reason = queryTopPick({ method: 'update', issue_number: 62, body: 'no lines here' }) as string;
+    expect(reason, 'it must name its own line').toContain('- query top pick: ');
+    expect(reason, 'and not send the run to add the sibling instead').not.toContain('- second item: ');
+    expect(reason, 'and say what the line is for').toMatch(/STEP 3's query|documented ways past/);
+  });
+
+  // The trailing space in the pattern is load-bearing: without it a bare heading with no value passes, and
+  // the field means nothing in exactly the run that most needs a record (PR #341 review).
+  it('#338 query-top-pick hook: the line must carry a value, not just the heading', () => {
+    for (const body of ['x\n- query top pick:', 'x\n- query top pick:\n- second item: no'])
+      expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body }))).toBe(true);
+    // STEP 4's defined value for a run that found nothing eligible — the case the heading-only form came from.
+    expect(isDeny(runTopPickHook({ method: 'update', issue_number: 62, body: 'x\n- query top pick: none eligible' }))).toBe(false);
+  });
+
+  /**
+   * The blocking finding of PR #341's round-1 review: a second mandatory line was added to the #62 hook and
+   * STEP 1's stamp sentence was not extended, so the first heartbeat write of every run was refused and the
+   * #314 pulse never landed — leaving a stopped run and a run that was never launched indistinguishable to
+   * the watchdog, which is the one thing the stamp exists to tell apart.
+   *
+   * Fed from `docs/ROUTINE-PROMPT.md` itself rather than from a body written here, so the rail fails when
+   * either side drifts: the prompt that prescribes the stamp, or the hook that judges it.
+   */
+  it('the stamp docs/ROUTINE-PROMPT.md prescribes is one the #62 hook accepts (#341 review)', () => {
+    const prompt = readFileSync(join(root, 'docs/ROUTINE-PROMPT.md'), 'utf8');
+    const sentence = prompt.split('\n').find((l) => l.includes('stamp the pulse')) ?? '';
+    expect(sentence, 'STEP 1 must still prescribe a stamp, or this rail reads nothing').toContain('IN PROGRESS');
+    // Every `- key: value` the stamp sentence names, reassembled into the body a run would actually send.
+    const lines = [...sentence.matchAll(/`(- [a-z][a-z ]*: [^`]+)`/g)].map((m) => m[1]);
+    expect(lines.length, 'the stamp names no placeholder lines — the hook rules are then unmet').toBeGreaterThan(1);
+    const body = `2026-09-20T09:00Z — IN PROGRESS: reviewing #341\n${lines.join('\n')}`;
+    expect(githubCheck({ method: 'update', issue_number: 62, body }),
+      `STEP 1's stamp is refused by the hook, so the pulse never lands: ${body}`).toBeNull();
+  });
+
   // Both heartbeat rules are reachable through the exported `check`, in either order of omission — a rule
   // that is written but not wired into `check` denies nothing, and `.claude/settings.json` calls only `check`.
   it('#338/#97: `check` denies a heartbeat body missing either line, and allows one carrying both', () => {
