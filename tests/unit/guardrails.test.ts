@@ -2210,6 +2210,38 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   });
 
   /**
+   * #310 — the cap in §7 is only ever reached by a reviewer who goes looking for it.
+   *
+   * `docs/REVIEWER-PROMPT.md` is what a reviewer run actually reads first, and its rule 4 ended "while a PR
+   * is waiting, reviewing it IS this run's work, with no time box". Nothing beside that sentence separated
+   * the *depth* of a review from the number of times one may block, and the prompt's own framing pushed the
+   * wrong way: a run that reads it and reaches for the skill only at §5's merge checklist can block a fourth
+   * time having never met the cap — "a rule whose whole purpose is to stop the sixth round may never be read
+   * before the second" (`pr-test-analyzer`, PR #306 round 1). #306 left it deliberately: this file sat at its
+   * byte budget to the byte, and a budget only ever goes down, so the clause had to be paid for in the same
+   * file before it could be written at all.
+   *
+   * What this pins is the **pointer**, not the cap. The cap's home is `review-pr` §7, pinned by the #305 rail
+   * above; a second copy here would drift from §7 the moment §7 changed, which is what
+   * `docs/decisions/001-one-home-per-rule.md` exists to prevent — so the negative half below is as
+   * load-bearing as the positive one, and the #305 rail cannot catch it because it reads the skill alone.
+   *
+   * Prove it red: drop the §7 pointer from rule 4; put "with no time box" back unqualified; or restate the
+   * round cap in the prompt.
+   */
+  it('the reviewer prompt points at §7 for the rounds, and does not restate the cap (#310)', () => {
+    const text = flat(read('docs/REVIEWER-PROMPT.md'));
+    expect(text, 'rule 4 must still say a review is not hurried — the pointer hangs off that sentence')
+      .toContain("reviewing it IS this run's work");
+    expect(text, "and the no-time-box must be about a review's depth, or it reads as a licence on the rounds too")
+      .toMatch(/no time box on a review's \*\*depth\*\*/);
+    expect(text, 'and rule 4 must send a reviewer to the cap before a fourth block, not leave it at §5')
+      .toMatch(/on how many times one may block, `review-pr` §7/);
+    expect(text, 'the round cap belongs in `review-pr` §7 alone — the prompt points at it, it does not copy it')
+      .not.toMatch(/third round|rounds are not free|Count the `REVIEW: CHANGES REQUESTED` comments/i);
+  });
+
+  /**
    * #191 — the clearing side of #161 had the same gap as the blocking side, one level down.
    *
    * #189 made scripts/review-gate.mjs flag a REVIEW: CHANGES REQUESTED comment with no session URL, because
