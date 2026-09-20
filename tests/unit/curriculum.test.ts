@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, gapLetters, Y1_CEW, Y2_CEW } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, gapLetters, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
 // Deterministic RNG (mulberry32)
@@ -1263,6 +1263,96 @@ describe('Reception number patterns (#299 slice 1)', () => {
         }
         // Both verdicts are reachable — a generator stuck on evens would still pass the rail above.
         expect([...answers].sort(), `d${d} must draw both odd and even`).toEqual(d === 3 ? ['even', 'odd'] : ['no', 'yes']);
+      }
+    });
+  });
+});
+
+// #299 slice 3: Year 2 grammar and spelling. The generic suite already checks that the answer is among the
+// options, that options are unique and that each difficulty draws more than a handful of distinct cards. What
+// it cannot infer is the two things these topics ARE: that the root really changes (or the topic is `y1-suffix`
+// under another name), that the wrong spelling a child actually writes is on the card, and that the word the
+// card asks for is the only word on it that could be that class. Counts as well as values, per #361.
+describe('Year 2 grammar and spelling (#299 slice 3)', () => {
+  const topic = (id: string) => TOPICS.find(x => x.id === id)!;
+
+  describe('y2-suffix-root', () => {
+    it('every bank entry changes the root, and its two wrong spellings are distinct and wrong', () => {
+      expect(SUFFIX_ROOT.length).toBeGreaterThan(8);
+      for (const [root, suf, ans, rule, naive, misrule] of SUFFIX_ROOT) {
+        expect(ans, `${root} + ${suf}`).not.toBe(root + suf);      // the whole topic: y1-suffix is the no-change case
+        expect(naive, `${root} + ${suf}`).toBe(root + suf);        // and the no-change spelling is the trap on the card
+        expect(new Set([ans, naive, misrule]).size, `${root} + ${suf}`).toBe(3);
+        expect(ans).toMatch(/^[a-z]+$/);
+        if (rule === 'drop-e') expect(root.endsWith('e'), root).toBe(true);
+        if (rule === 'y-to-i') { expect(root.endsWith('y'), root).toBe(true); expect(ans, root).toContain('i'); }
+        if (rule === 'double') expect(ans.slice(0, root.length + 1), root).toBe(root + root[root.length - 1]);
+      }
+    });
+    it('the rules unlock by difficulty, and every unlocked rule is actually drawn', () => {
+      const t = topic('y2-suffix-root'), r = rng(2998);
+      const ruleOf = (prompt: string) => {
+        const [root, suf] = prompt.replace(' = ?', '').split(' + ');
+        const row = SUFFIX_ROOT.find(e => e[0] === root && e[1] === suf);
+        expect(row, prompt).toBeTruthy();
+        return row![3];
+      };
+      const allowed: Record<number, string[]> = { 1: ['drop-e'], 2: ['drop-e', 'double'], 3: ['drop-e', 'double', 'y-to-i'] };
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const drawn = new Set<string>();
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          const rule = ruleOf(q.prompt);
+          expect(allowed[d], `d${d} drew ${rule}`).toContain(rule);
+          drawn.add(rule);
+          // The trap is on every card, and it is never the answer: a card offering only correct-looking
+          // spellings teaches nothing about the rule.
+          const row = SUFFIX_ROOT.find(e => e[2] === q.answer)!;
+          expect(q.options).toContain(row[4]);
+          expect(q.answer).not.toBe(row[4]);
+          expect(q.options.length, 'three bubbles: the rule admits exactly two mistakes').toBe(3);
+        }
+        expect([...drawn].sort(), `d${d} must reach all of its rules`).toEqual([...allowed[d]].sort());
+      }
+    });
+  });
+
+  describe('y2-wordclass', () => {
+    it('no word in the bank belongs to two classes, and every one of them is in its own sentence', () => {
+      expect(WORD_CLASSES.length).toBeGreaterThan(8);
+      const classOf = new Map<string, string>();
+      for (const row of WORD_CLASSES) {
+        const [sent, ...words] = row;
+        expect(new Set(words).size, sent).toBe(4);
+        for (let i = 0; i < 4; i++) {
+          const w = words[i], cls = WORD_CLASS_NAMES[i];
+          expect(sent.toLowerCase(), `${w} is not in its own sentence`).toMatch(new RegExp(`\\b${w}\\b`));
+          // The card's distractors are the row's other three words, so a word that is a noun here and a verb
+          // there would put two defensible answers on one card (`play`, `run`, `smile` — kept out for this).
+          expect(classOf.get(w) ?? cls, `${w} is used as both a ${classOf.get(w)} and a ${cls}`).toBe(cls);
+          classOf.set(w, cls);
+        }
+      }
+    });
+    it('asks noun/verb at d1, adds adjective at d2, reaches adverb at d3 — and draws each one it allows', () => {
+      const t = topic('y2-wordclass'), r = rng(2999);
+      const allowed: Record<number, string[]> = { 1: ['noun', 'verb'], 2: ['noun', 'verb', 'adjective'], 3: [...WORD_CLASS_NAMES] };
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const drawn = new Set<string>();
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          const cls = q.prompt.replace('Which word is the ', '').replace('?', '');
+          expect(allowed[d], `d${d} asked for a ${cls}`).toContain(cls);
+          drawn.add(cls);
+          const row = WORD_CLASSES.find(e => e[0] === (q.visual as { text: string }).text)!;
+          expect(row, q.prompt).toBeTruthy();
+          // Every option is one of that sentence's own four words, and the answer is the one in the column
+          // asked for — not merely *a* word of that class from somewhere in the bank.
+          expect([...q.options].sort()).toEqual([...row.slice(1)].sort());
+          expect(q.answer, `${row[0]} — ${cls}`).toBe(row[WORD_CLASS_NAMES.indexOf(cls as typeof WORD_CLASS_NAMES[number]) + 1]);
+          expect(q.hint, 'the hint names the class, never the answer').toBe(`Slice the ${cls}`);
+        }
+        expect([...drawn].sort(), `d${d} must reach all of its classes`).toEqual([...allowed[d]].sort());
       }
     });
   });

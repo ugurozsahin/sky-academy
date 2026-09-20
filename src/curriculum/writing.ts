@@ -334,6 +334,84 @@ const y2Suffix: Generator = (d, rng) => {
   return wordQ(rng, sent, suf, ['ful', 'less', 'ness', 'ly', 'ment'].filter(x => x !== suf).slice(0, d === 1 ? 2 : 3), { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the ending' });
 };
 /**
+ * Endings that change the root (#299 slice 3, NC English Appendix 1 Year 2): `[root, ending, the new word,
+ * rule, the two spellings a child actually writes instead]`. `y1-suffix` and `y2-suffix` are the no-change
+ * case — `jump` + `ing`, `care` + `ful` — so **every entry here must change the root**, which is the one
+ * thing this topic teaches and a rail holds it to.
+ *
+ * The two wrong spellings are the rule left unapplied (`hopeing`) and a rule applied that does not belong to
+ * this word (`hopping` for `hope`, `happyier` for `happy`) — never a different ending: the card asks which
+ * spelling is right, not which ending fits, and `y1-suffix` already asks the other question. Two is the whole
+ * set of mistakes the rule admits, so these cards run on three bubbles rather than four.
+ */
+type SuffixRule = 'drop-e' | 'double' | 'y-to-i';
+export const SUFFIX_ROOT: ReadonlyArray<readonly [string, string, string, SuffixRule, string, string]> = [
+  // drop the e: hope → hoping
+  ['hope', 'ing', 'hoping', 'drop-e', 'hopeing', 'hopping'], ['make', 'ing', 'making', 'drop-e', 'makeing', 'makking'],
+  ['ride', 'ing', 'riding', 'drop-e', 'rideing', 'ridding'], ['smile', 'ed', 'smiled', 'drop-e', 'smileed', 'smilled'],
+  ['bake', 'ed', 'baked', 'drop-e', 'bakeed', 'bakked'], ['close', 'ing', 'closing', 'drop-e', 'closeing', 'clossing'],
+  ['wave', 'ed', 'waved', 'drop-e', 'waveed', 'wavved'], ['nice', 'er', 'nicer', 'drop-e', 'niceer', 'nicier'],
+  ['late', 'er', 'later', 'drop-e', 'lateer', 'latter'],
+  // double the last letter: hop → hopping
+  ['hop', 'ing', 'hopping', 'double', 'hoping', 'hopeing'], ['run', 'ing', 'running', 'double', 'runing', 'runeing'],
+  ['sit', 'ing', 'sitting', 'double', 'siting', 'siteing'], ['swim', 'ing', 'swimming', 'double', 'swiming', 'swimeing'],
+  ['pat', 'ed', 'patted', 'double', 'pated', 'pateed'], ['stop', 'ed', 'stopped', 'double', 'stoped', 'stopeed'],
+  ['big', 'er', 'bigger', 'double', 'biger', 'bigier'], ['sad', 'est', 'saddest', 'double', 'sadest', 'sadiest'],
+  ['hot', 'est', 'hottest', 'double', 'hotest', 'hotiest'],
+  // y becomes i: happy → happier
+  ['happy', 'er', 'happier', 'y-to-i', 'happyer', 'happyier'], ['baby', 'es', 'babies', 'y-to-i', 'babyes', 'babys'],
+  ['carry', 'ed', 'carried', 'y-to-i', 'carryed', 'carryied'], ['funny', 'est', 'funniest', 'y-to-i', 'funnyest', 'funnyiest'],
+  ['cry', 'es', 'cries', 'y-to-i', 'cryes', 'crys'], ['try', 'ed', 'tried', 'y-to-i', 'tryed', 'tryied'],
+  ['easy', 'er', 'easier', 'y-to-i', 'easyer', 'easyier'], ['silly', 'est', 'silliest', 'y-to-i', 'sillyest', 'sillyiest'],
+  ['party', 'es', 'parties', 'y-to-i', 'partyes', 'partys'],
+];
+/** d1 is the rule you can see (an `e` disappears); d2 adds doubling; d3 adds `y → i`, which changes a letter inside the word. */
+const SUFFIX_RULES: Record<number, SuffixRule[]> = { 1: ['drop-e'], 2: ['drop-e', 'double'], 3: ['drop-e', 'double', 'y-to-i'] };
+const y2SuffixRoot: Generator = (d, rng) => {
+  const rules = SUFFIX_RULES[d] ?? SUFFIX_RULES[3];
+  const [root, suf, ans, , naive, misrule] = pick(rng, SUFFIX_ROOT.filter(e => rules.includes(e[3])));
+  return wordQ(rng, `${root} + ${suf} = ?`, ans, [naive, misrule], {
+    visual: { type: 'word', text: `${root} + ${suf}` },
+    say: `Add ${suf} to ${root}. Which spelling is right?`, hint: 'The root word changes',
+  });
+};
+
+/**
+ * Word classes in a sentence (#299 slice 3, NC English Appendix 2 Year 2): `[sentence, noun, verb, adjective,
+ * adverb]`. The three words **not** asked for are the card's distractors, so every option comes from the
+ * child's own sentence and exactly one of them can be the class asked for.
+ *
+ * That only holds while no word in the bank belongs to two classes out of context — `play`, `run` and `smile`
+ * are a noun and a verb both, and `fast` is an adjective and an adverb both — so the bank avoids them and a
+ * rail holds every word to the one column it appears in. The sentences are deliberately four-content-word
+ * sentences for the same reason: a word on the card that is not one of the four could be the honest answer.
+ */
+export const WORD_CLASSES: ReadonlyArray<readonly [string, string, string, string, string]> = [
+  ['The happy kitten purred loudly.', 'kitten', 'purred', 'happy', 'loudly'],
+  ['A tiny bird sang sweetly.', 'bird', 'sang', 'tiny', 'sweetly'],
+  ['The brave ninja jumped quickly.', 'ninja', 'jumped', 'brave', 'quickly'],
+  ['My little sister giggled quietly.', 'sister', 'giggled', 'little', 'quietly'],
+  ['The old bus stopped suddenly.', 'bus', 'stopped', 'old', 'suddenly'],
+  ['A hungry rabbit nibbled greedily.', 'rabbit', 'nibbled', 'hungry', 'greedily'],
+  ['The red balloon floated slowly.', 'balloon', 'floated', 'red', 'slowly'],
+  ['Our new teacher smiled warmly.', 'teacher', 'smiled', 'new', 'warmly'],
+  ['The huge castle stood proudly.', 'castle', 'stood', 'huge', 'proudly'],
+  ['The tired baby yawned sleepily.', 'baby', 'yawned', 'tired', 'sleepily'],
+];
+/** Column order in `WORD_CLASSES`, and the order the difficulties unlock them in. Exported for the rail. */
+export const WORD_CLASS_NAMES = ['noun', 'verb', 'adjective', 'adverb'] as const;
+const y2WordClass: Generator = (d, rng) => {
+  const row = pick(rng, WORD_CLASSES);
+  // Nouns and verbs first: Year 1 already names them (Appendix 2), while adjective and adverb are Year 2's own
+  // vocabulary — and "which word is the adverb?" on a card whose adverb is the last word is the stretch.
+  const k = ri(rng, 0, d === 1 ? 1 : d === 2 ? 2 : 3);
+  const cls = WORD_CLASS_NAMES[k], answer = row[k + 1];
+  return wordQ(rng, `Which word is the ${cls}?`, answer, row.slice(1).filter(w => w !== answer), {
+    visual: { type: 'sentence', text: row[0] }, say: `${row[0]} Which word is the ${cls}?`, hint: `Slice the ${cls}`,
+  });
+};
+
+/**
  * Sound-alike words: [sentence with a gap, the options (answer first), answer]. Every option set is one of
  * `HOMOPHONE_SETS` — the Year 2 statutory pairs (NC English Appendix 1) plus `piece/peace` from Year 3–4 — and
  * a rail holds it there: `on/won`, `brown/brawn` and `wind/wined` were not homophones at all (#296).
@@ -382,7 +460,9 @@ export const WRITING_TOPICS: Topic[] = [
   { id: 'y2-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year2', nc: 'Y2 common exception words', gen: y2Spelling },
   { id: 'y2-contractions', title: "Contractions don't", icon: '✂️', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: contractions', gen: y2Contractions },
   { id: 'y2-suffix', title: 'Endings -ful -ly', icon: '🎀', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes', gen: y2Suffix },
+  { id: 'y2-suffix-root', title: 'Changing Endings', icon: '🔁', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes that change the root (drop e, double, y→i)', gen: y2SuffixRoot },
   { id: 'y2-homophones', title: 'Sound-alike Words', icon: '👂', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: homophones', gen: y2Homophones },
+  { id: 'y2-wordclass', title: 'Word Detective', icon: '🔍', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: nouns, verbs, adjectives, adverbs', gen: y2WordClass },
   { id: 'y2-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: commas, apostrophes', gen: y2Punct },
   { id: 'y2-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year2', nc: 'Y2 Writing: word order, conjunctions, noun phrases', gen: y2Sentence },
   { id: 'y2-trace', title: 'Trace Words', icon: '✍️', subject: 'writing', year: 'year2', nc: 'Y2 Handwriting', input: 'tracing', gen: y2Trace },
