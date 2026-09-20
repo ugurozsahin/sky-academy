@@ -1187,6 +1187,25 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(profileCard('p2'), 'fields of the wrong type are dropped, not shown').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
   });
 
+  it("a v2 save's card agrees with load() about whether that child has played (#20 slice 2)", () => {
+    // `onboarded` only exists from v3 and `MIGRATIONS[2]` derives it from the avatar. `load()` does not write
+    // the migrated blob back, and nothing on `boot → map → 👥` calls `save()`, so on the first launch after an
+    // upgrade the picker draws a still-v2 blob: reading the field raw told a family a fully-played game was
+    // empty (#380 review B3). The card and the migration must give the same answer about the same bytes.
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: 2, name: 'Ada', avatar: 'volt', coins: 30 }));
+    expect(migrate({ v: 2, name: 'Ada', avatar: 'volt' }).onboarded, "the migration's own answer").toBe(true);
+    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true });
+
+    // And the other half of that rule: a v2 blob with no ninja chosen never played, so the card says so.
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 2, name: 'Bo' }));
+    expect(migrate({ v: 2, name: 'Bo' }).onboarded).toBe(false);
+    expect(profileCard('p2')).toEqual({ id: 'p2', name: 'Bo', avatar: null, onboarded: false });
+
+    // A v3 blob still wins on its own field — `false` there means mid-wizard, whatever the avatar says (#67).
+    localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 3, name: 'Cass', avatar: 'kai', onboarded: false }));
+    expect(profileCard('p3')).toEqual({ id: 'p3', name: 'Cass', avatar: 'kai', onboarded: false });
+  });
+
   it('a profile added but never played still draws a card (#20 slice 2)', () => {
     save({ name: 'Ada', onboarded: true });
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });

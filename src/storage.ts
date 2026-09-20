@@ -264,10 +264,16 @@ export function addProfile(): AddProfileResult {
  * card. Deliberately not `load()`: that resolves the session's own profile and caches it, so reading a
  * sibling's save through it would either answer the wrong child or latch the session onto them.
  *
- * Read-only, migration-free and tolerant by design. It takes the two fields a card shows and nothing else, so
- * a save from an older version, a hand-edited one, or a blob that is not an object at all yields a card with
- * an empty name and no ninja — which the picker renders as an un-onboarded slot — instead of throwing on the
- * first screen a child sees. Nothing here writes, so drawing the picker cannot migrate or damage a save.
+ * Read-only and tolerant by design. It takes the two fields a card shows and nothing else, so a save from an
+ * older version, a hand-edited one, or a blob that is not an object at all yields a card with an empty name
+ * and no ninja — which the picker renders as an un-onboarded slot — instead of throwing on the first screen a
+ * child sees. Nothing here writes, so drawing the picker cannot migrate or damage a save.
+ *
+ * It does not *run* the migrations, but it applies `MIGRATIONS[2]`'s rule for `onboarded` rather than reading
+ * the field raw. A v2 blob has no such field, `load()` derives it and deliberately does not write it back,
+ * and nothing on `boot → map → 👥` calls `save()` — so on the first launch after an upgrade a fully-played
+ * child's card said "Not started yet" while `load()` answered `onboarded: true` for the very same save
+ * (#380 review B3). Keep the two rules identical: `MIGRATIONS[2]` is the home of this one.
  */
 export interface ProfileCard { id: ProfileId; name: string; avatar: string | null; onboarded: boolean }
 export function profileCard(id: ProfileId): ProfileCard {
@@ -282,7 +288,7 @@ export function profileCard(id: ProfileId): ProfileCard {
     id,
     name: typeof s.name === 'string' ? s.name : '',
     avatar: typeof s.avatar === 'string' ? s.avatar : null,
-    onboarded: s.onboarded === true,
+    onboarded: typeof s.onboarded === 'boolean' ? s.onboarded : typeof s.avatar === 'string' && !!s.avatar,   // MIGRATIONS[2]'s rule, unchanged
   };
 }
 /** Every profile on this device as a card, in slot order — the picker's whole data source. */

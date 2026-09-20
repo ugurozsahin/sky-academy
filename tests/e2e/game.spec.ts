@@ -1918,4 +1918,68 @@ test.describe('profile picker (#20 slice 2)', () => {
     await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(4);
     await expect(page.locator('#new-ninja'), 'four is the most one device holds').toHaveCount(0);
   });
+
+  /**
+   * guard rail (#380 review B1): the 👥 button is on the *shared* topbar, so the picker opens from the island
+   * and rewards screens too — and it pushes no history entry of its own, so whatever entry was current when it
+   * opened was what everything leaving it unwound onto. `renderIntro`'s `history.go(-2)` then landed a
+   * brand-new Reception profile on the previous child's Year 2 island, or on an empty rewards screen. Nothing
+   * caught it because every existing test opened the picker at launch, where history is empty.
+   */
+  for (const from of ['island', 'rewards'] as const) {
+    test(`a new ninja added from the ${from} screen starts on their own sky map (#20 slice 2)`, async ({ page }) => {
+      await seedSiblings(page);
+      await page.goto('/');
+      await page.click('.avatar-card[data-profile="p1"]');
+      await expect(page.locator('.home.map')).toBeVisible();
+
+      if (from === 'island') {
+        await page.click('.island[data-year="year2"]');
+        await expect(page.locator('.island-screen')).toBeVisible();
+      } else {
+        await page.click('#rewards');
+        await expect(page.locator('.home.rewards')).toBeVisible();
+      }
+
+      await page.click('#who');
+      await expect(page.locator('.profile-screen')).toBeVisible();
+      await page.click('#new-ninja');
+      await expect(page.locator('.choose-ninja-screen')).toBeVisible();
+      await page.click('.avatar-card[data-id="kai"]');
+      await page.click('#next');
+      await page.fill('#name', 'Cass');
+      await page.click('#go');
+      await page.click('#intro-go');
+
+      await expect(page.locator('.home.map'), "the new child's own sky map, not the screen the picker was opened from").toBeVisible();
+      await expect(page.locator('#change-av')).toContainText('Cass');
+      await expect(page.locator('#rewards'), 'and their own empty purse, not the 40 coins of the child they were added from')
+        .toHaveAttribute('aria-label', 'Rewards: 0 coins');
+    });
+  }
+
+  /**
+   * guard rail (#380 review B5): from the topbar the picker needs a way out. The ＋ card adds a profile for
+   * good — nothing deletes one until slice 3 — so without a back control a child who tapped 👥 out of
+   * curiosity could only leave by committing to a profile, and the launch picker would then greet them on
+   * every boot forever. At launch there is deliberately no back control: the picker is the root screen there.
+   */
+  test('the picker opened from the topbar has a way back that adds nobody (#20 slice 2)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await page.click('#who');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await page.click('#back');
+    await expect(page.locator('.home.map')).toBeVisible();
+    await expect(page.locator('#change-av'), 'the same child, still playing').toContainText('Ada');
+
+    await page.click('#who');
+    await expect(page.locator('.avatar-card[data-profile]'), 'and backing out created nobody').toHaveCount(1);
+  });
+
+  test('the launch picker has no back control — it is the root screen (#20 slice 2)', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.profile-screen #back'), 'back from the root leaves the app, as it does from the map').toHaveCount(0);
+  });
 });

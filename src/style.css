@@ -161,6 +161,12 @@ img { -webkit-user-drag: none; }
 .avatar-card.new-ninja .figure { display: grid; place-items: center; }
 .avatar-card.new-ninja .figure::before { opacity: .18; background: radial-gradient(ellipse at center, var(--accent-2) 0%, transparent 70%); }
 .avatar-card.new-ninja .plus { position: relative; font-size: clamp(38px, 12vw, 58px); line-height: 1; color: var(--accent-2); text-shadow: 0 4px 10px #000a; }
+/* #380 review B5: the way out of the picker when it was opened from the 👥 button. The ＋ card adds a profile
+ * for good and nothing deletes one until slice 3, so "commit to a child" must not be the only exit. The
+ * topbar's own `.icon-btn` rather than a new button; absolute so it does not push the brand off centre, and
+ * only rendered when the caller passes a way back — at launch there is none. */
+.profile-screen { position: relative; }
+.profile-screen #back { position: absolute; top: calc(16px + var(--sat)); left: 16px; z-index: 2; }
 /*
  * #110: the name row sits *above* the avatar grid. Below it, the grid is `repeat(auto-fill, minmax(104px, 1fr))`
  * — the wider and taller the screen, the further down "Your name" went, and on a tablet it was past the fold

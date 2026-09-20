@@ -56,14 +56,31 @@ const nav = {
   // rather than a step in the stack: the sky map is the root here (`mapScreen` pushes nothing either), and
   // `nav.map()` pops whenever an entry exists — so an entry for the picker would send every "chosen, go to the
   // map" straight back to the picker. Back from the picker leaves the app, exactly as back from the map does.
-  profiles: () => { leave(); fromPop = false; profilesScreen(() => afterPick(), () => nav.avatar()); },
+  //
+  // For that to be true it has to *be* at the root, and the 👥 button sits on the shared topbar — so the
+  // picker is also reached from the island and rewards screens, whose own entry was then still the current
+  // one. Everything leaving the picker unwound onto it: "New ninja" finishes Sensei's welcome with
+  // `history.go(-2)` (`renderIntro`), which landed a brand-new Reception profile on the *previous* child's
+  // Year 2 island, or on an empty rewards screen (#380 review B1). So pop back to the root first and draw
+  // the picker when that pop arrives — `toProfiles` carries the intent across the popstate, and the route
+  // re-checks on the way in, so a deeper stack unwinds one entry at a time.
+  profiles: () => {
+    leave(); year = null;
+    if (history.state?.screen) { toProfiles = true; history.back(); return; }
+    showProfiles(() => nav.map());
+  },
   up,
 };
+/** Draw the picker. `back` is the way out when it was opened from the topbar; at launch there is none, the
+ *  picker being the root screen there (#380 review B5). */
+const showProfiles = (back?: () => void) => { leave(); fromPop = false; profilesScreen(() => afterPick(), () => nav.avatar(), back); };
+let toProfiles = false;
 /** Where a chosen profile lands: their sky map, or onboarding when that slot has never been played. */
 const afterPick = () => { if (load().onboarded) nav.map(); else nav.avatar(); };
 window.addEventListener('popstate', () => {
   const s = history.state?.screen as string | undefined;   // the entry we landed on
   fromPop = true;
+  if (toProfiles) { toProfiles = false; nav.profiles(); return; }   // still unwinding towards the picker's root
   // The grown-ups screen's guarded reset (#115) must land on onboarding, never the map with an empty profile,
   // however it is left — including the hardware/browser back button landing here rather than through
   // parents.ts's own `#back` click handler.
@@ -95,7 +112,7 @@ void startServiceWorker();
 //
 // #67: `onboarded`, not `avatar` — a profile mid-wizard already has an avatar chosen (choices save as they
 // are made) but must still see the rest of the wizard on the next launch, not jump straight to the map.
-if (profileIds().length > 1) nav.profiles(); else if (load().onboarded) nav.map(); else nav.avatar();
+if (profileIds().length > 1) showProfiles(); else if (load().onboarded) nav.map(); else nav.avatar();
 
 // Keep the layout stable on mobile browsers whose toolbars resize the viewport.
 const setVH = () => document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);

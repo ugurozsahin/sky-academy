@@ -217,16 +217,47 @@ describe('guard rails', () => {
     expect(main, 'and a one-profile device boots exactly as it did').toMatch(/else if \(load\(\)\.onboarded\) nav\.map\(\); else nav\.avatar\(\)/);
   });
 
+  // Property 3 was pinned by source order alone, and source order is not control flow: deleting the one
+  // `return` from the refusal branch left this file green and the whole suite at 1427/1427 while a refused
+  // switch dropped the child into their sibling's game (#380 review B2). The decision is a pure function now
+  // and `tests/unit/profiles.test.ts` mutation-tests it for real; what a source rail can still hold is that
+  // the handler routes the store's answer through it, and that the child is moved with an id that exists
+  // only on the accepted arm — so falling out of the refusal is a type error, caught by `tsc`, not a rail.
   it('the picker moves a child only once the store has accepted the switch (#20 slice 2)', () => {
     const pick = code(SOURCES['/src/ui/profiles.ts']);
-    expect(pick, 'the switch is checked, not called and hoped for').toMatch(/if \(!setActiveProfile\([^)]*\)\)/);
-    // Every `go(` in the file must sit after that guard's early return — there is one call site, and a
-    // second one added outside the guard is the mistake this pins.
+    expect(pick, "the store is asked, and its answer is the decision's only input").toMatch(/pickOutcome\(id, setActiveProfile\(id\)\)/);
     expect(pick.match(/\bgo\(/g) ?? [], 'one call site for go(), inside the guarded handler').toHaveLength(1);
-    expect(pick.indexOf('go('), 'and it comes after the refusal check').toBeGreaterThan(pick.indexOf('!setActiveProfile'));
+    expect(pick, 'and the child is moved with the id off the accepted arm').toMatch(/go\(o\.id\)/);
+    expect(pick, 'the same shape for "New ninja": onboarding starts on the added profile').toMatch(/onNew\(o\.id\)/);
     // Both refusals are told apart on screen (#335 item 2): a picker that shows one sentence for both tells a
     // child with four siblings that their browser is broken, or the reverse.
     expect(pick).toMatch(/why === 'full'/);
+    // And both are read aloud, not only printed — `.claude/rules/style.md`, "read-aloud everywhere" (B6).
+    expect(pick, 'a refusal is spoken as well as written').toMatch(/hint\.textContent = text; say\(text\);/);
+  });
+
+  // #380 review B1: the picker pushes no history entry, so whatever entry was current when it opened is what
+  // everything leaving it unwinds onto — and the 👥 button is on the *shared* topbar, so that was the island
+  // or rewards screen. A new Reception profile finished the wizard on the previous child's Year 2 island.
+  it('the picker is reached at the root of the history stack, from wherever it was opened (#20 slice 2)', () => {
+    const main = code(SOURCES['/src/main.ts']);
+    const from = main.indexOf('profiles: () =>'), to = main.indexOf('\n  up,', from);
+    expect(main.slice(from, to), 'a stacked entry is popped before the picker is drawn')
+      .toMatch(/if \(history\.state\?\.screen\) \{ toProfiles = true; history\.back\(\); return; \}/);
+    expect(main, 'and the pop lands back in the route, so a deeper stack keeps unwinding')
+      .toMatch(/if \(toProfiles\) \{ toProfiles = false; nav\.profiles\(\); return; \}/);
+    expect(main, 'the launch picker has no way back — it is the root screen there').toMatch(/length > 1\) showProfiles\(\);/);
+  });
+
+  // #380 review B3: `profileCard` deliberately does not run the migrations, but `onboarded` only exists from
+  // v3, and nothing on `boot → map → 👥` writes a migrated blob back — so reading the field raw made a
+  // fully-played v2 save draw as "Not started yet" while `load()` said otherwise about the same bytes.
+  it("a card's onboarded flag uses the migration's own rule, not the raw field (#20 slice 2)", () => {
+    const store = code(SOURCES['/src/storage.ts']);
+    const card = store.slice(store.indexOf('export function profileCard('), store.indexOf('\n}', store.indexOf('export function profileCard(')));
+    const rule = /typeof s\.onboarded === 'boolean' \? s\.onboarded : /;
+    expect(card, 'the card derives it the way MIGRATIONS[2] does').toMatch(rule);
+    expect(store.slice(store.indexOf('MIGRATIONS: Record')), 'and MIGRATIONS[2] is still where that rule lives').toMatch(rule);
   });
 
   it("a sibling's card is read from the slot, never through the session's load() (#20 slice 2)", () => {
