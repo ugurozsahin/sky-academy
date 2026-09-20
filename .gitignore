@@ -13,3 +13,7 @@ _artifact_*.bundle
 
 # InstructionsLoaded hook's debug log (#101 layer 4 verification) — per-machine, never a shared record
 .claude/instructions-loaded.log
+
+# The owner's-machine marker (#342). Never commit it: its whole job is to be absent in a cloned checkout,
+# which is how .claude/hooks/write-guard.mjs tells an unattended run from a session with the owner.
+.owner-machine

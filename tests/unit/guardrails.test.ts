@@ -1523,6 +1523,64 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
  * failure printed under "the worklog is archived and nothing writes it again" sends the reader to the
  * wrong rule. Raised reviewing PR #186.)
  */
+/**
+ * #342: `.claude/` is a Claude Code protected path, so a write there raises a permission prompt an unattended
+ * run cannot answer — PR #294 stalled 7h33m and PR #318 overnight, both on `.claude/rules/governance.md`, and
+ * #340 records why no routine setting permits it. The hook that denies the write is rail-covered in
+ * `tests/unit/hooks.test.ts`; what is pinned here is everything around it that could quietly make the hook a
+ * no-op or leave a run with no idea what to do instead.
+ *
+ * Prove one red: commit `.owner-machine`, or rename the marker in the hook and not in `.gitignore`.
+ */
+describe('an unattended run cannot write under .claude/, and cannot be tricked into thinking it may (#342)', () => {
+  const file = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
+  const MARKER = '.owner-machine';
+
+  // The whole guard turns on this file being absent from a clone. Committed, every clone carries it, every
+  // run is allowed again, and nothing goes red — the hook's tests would still pass.
+  it('the owner marker is gitignored and untracked, or the guard is dead in every clone', () => {
+    const ignore = file('.gitignore');
+    expect(ignore, 'the marker must be ignored by name').toMatch(new RegExp(`^${MARKER}$`, 'm'));
+    const tracked = execFileSync('git', ['ls-files', '--', MARKER],
+      { cwd: new URL('../../', import.meta.url), encoding: 'utf8' }).trim();
+    expect(tracked, `${MARKER} is tracked — a clone would carry it and the hook would allow every write`).toBe('');
+  });
+
+  it('the hook and .gitignore name the same marker, so neither can drift alone', () => {
+    const hook = file('.claude/hooks/write-guard.mjs');
+    expect(hook, 'the marker constant moved or was renamed').toContain(`export const OWNER_MARKER = '${MARKER}'`);
+    expect(hook, 'the deny must turn on the marker being present, not on a flag a run can set')
+      .toContain('existsSync(resolve(base, OWNER_MARKER))');
+  });
+
+  it('.claude/rules/governance.md is the rule\'s home: why it cannot be permitted, and what a run does instead', () => {
+    const rules = file('.claude/rules/governance.md');
+    expect(rules.length, 'a vacuous rail is worse than none').toBeGreaterThan(2_000);
+    expect(rules, 'the rule itself').toContain('An unattended run never writes under `.claude/` (#342)');
+    expect(rules, 'that it is the platform, not a preference — or someone will try to configure round it')
+      .toMatch(/protected path/i);
+    expect(rules, 'the enforcement, named where a reader can check it')
+      .toContain('`.claude/hooks/write-guard.mjs`');
+    expect(rules, 'what a run does instead, or a denial leaves it with nowhere to go').toContain('owner-session');
+    expect(rules, 'reads must stay allowed, or a run stops reading its own rules').toMatch(/reads are untouched/i);
+  });
+
+  it('the developer prompt forbids the write in its own flow and points at the home, without restating it', () => {
+    const prompt = file('docs/ROUTINE-PROMPT.md');
+    const doNot = prompt.split('\n').find((l) => l.startsWith('Do NOT:')) ?? '';
+    expect(doNot, 'the Do NOT line is where a run meets this').toContain('write under `.claude/`');
+    expect(doNot, 'and it must point at the rule\'s home rather than carry a copy')
+      .toContain('`.claude/rules/governance.md`');
+    expect(doNot, 'a run that stops reading .claude/ has lost its own rules').toMatch(/reads are fine/i);
+  });
+
+  // The reviewer never pushes a fix, so it has no reason to write here; a clause there would cost bytes in a
+  // second budgeted file for a case that does not arise. Pinned so the omission reads as a decision.
+  it('the reviewer prompt is deliberately left alone — it is told not to fix a pull request itself', () => {
+    expect(file('docs/REVIEWER-PROMPT.md')).toMatch(/do NOT fix it yourself in this run|not to fix/i);
+  });
+});
+
 describe('the tablet layout rails (#107, #109)', () => {
 // #107: the five-frame glyph outgrew its box because the box and its contents were sized from different
 // units — `.slot` from `min(6.5vw, 4.5vh)`, `.obj` from `5.5vw` alone — so on a tablet the box collapsed
@@ -4321,7 +4379,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_436;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph
+  const ROUTINE_PROMPT_BUDGET = 21_433;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside
   // —
 
   const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3

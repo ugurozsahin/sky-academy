@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -8,7 +9,7 @@ import { check as bashCheck, forcePush, ownerMarker as bashOwnerMarker, worklogA
 // @ts-expect-error — plain ESM hook helper
 import { commands, parse } from '../../.claude/hooks/shell.mjs';
 // @ts-expect-error — plain ESM hook script
-import { check as writeCheck } from '../../.claude/hooks/write-guard.mjs';
+import { check as writeCheck, claudeDir, OWNER_MARKER } from '../../.claude/hooks/write-guard.mjs';
 // @ts-expect-error — plain ESM hook script
 import { frozenLabel, heartbeatAppend, ownerMarker, secondItem } from '../../.claude/hooks/github-write-guard.mjs';
 
@@ -511,14 +512,70 @@ describe('layer-0 hooks: the root WORKLOG.md write guard', () => {
 });
 
 /**
+ * #342: `.claude/` is a Claude Code protected path, so an unattended run meets a permission prompt nobody is
+ * there to answer — PR #294 stalled 7h33m and PR #318 overnight, both on `.claude/rules/governance.md`. No
+ * routine setting permits the write (#340), so the hook refuses it first: `PreToolUse` runs before the
+ * permission system, and the run gets a denial in milliseconds instead of a prompt that outlives the night.
+ *
+ * Both roots below are temporary directories, never this checkout: the owner's copy carries the marker and CI
+ * does not, so a rail anchored on the real root would say opposite things in the two places.
+ *
+ * Prove one red: drop the `existsSync` check, or compare paths with `startsWith` instead of `relative`.
+ */
+describe('layer-0 hooks: an unattended run cannot write under .claude/ (#342)', () => {
+  const noMarker = mkdtempSync(join(tmpdir(), 'sna-clone-'));
+  const owner = mkdtempSync(join(tmpdir(), 'sna-owner-'));
+  writeFileSync(join(owner, OWNER_MARKER), 'owner\n');
+
+  it('denies every write under .claude/, by relative path and by absolute', () => {
+    for (const p of ['.claude/rules/governance.md', '.claude/settings.json', '.claude/skills/open-pr/SKILL.md',
+                     '.claude/hooks/write-guard.mjs', '.claude/agents/pr-test-analyzer.md'])
+      for (const given of [p, join(noMarker, p)])
+        expect(claudeDir({ file_path: given }, noMarker), given).toMatch(/protected path/);
+  });
+
+  it('names what to do instead, not merely that the write is refused', () => {
+    const reason = claudeDir({ file_path: '.claude/rules/governance.md' }, noMarker);
+    expect(reason).toContain('owner-session');
+    expect(reason).toContain('.claude/rules/governance.md');
+    expect(reason, 'a run that retries has understood nothing').toMatch(/do not retry/i);
+  });
+
+  it('denies writing the marker itself, so a run cannot grant itself what it was just refused', () => {
+    expect(claudeDir({ file_path: OWNER_MARKER }, noMarker)).toMatch(/protected path/);
+    expect(claudeDir({ file_path: join(noMarker, OWNER_MARKER) }, noMarker)).toMatch(/protected path/);
+  });
+
+  it('allows everything under .claude/ in a checkout that carries the marker — the owner is at the keyboard', () => {
+    for (const p of ['.claude/rules/governance.md', '.claude/settings.json', OWNER_MARKER])
+      expect(claudeDir({ file_path: p }, owner), p).toBeNull();
+  });
+
+  it('judges a path by where it lands, not by how it is spelled', () => {
+    // `.claudex/` shares a prefix and is not `.claude/`; `.claude/../src` leaves the directory again.
+    for (const p of ['.claudex/notes.md', 'src/main.ts', 'docs/ROUTINE-PROMPT.md', 'claude/x.md',
+                     '.claude/../src/main.ts', 'my.claude/x.md'])
+      expect(claudeDir({ file_path: p }, noMarker), p).toBeNull();
+    expect(claudeDir({}, noMarker)).toBeNull();
+    expect(claudeDir({ file_path: 42 as unknown as string }, noMarker)).toBeNull();
+  });
+
+  it('is wired into check(), alongside the WORKLOG.md rule it did not displace', () => {
+    expect(writeCheck({ file_path: '.claude/settings.json' }, noMarker)).toMatch(/protected path/);
+    expect(writeCheck({ file_path: 'WORKLOG.md' }, noMarker)).toMatch(/retired/);
+    expect(writeCheck({ file_path: 'src/main.ts' }, noMarker)).toBeNull();
+  });
+});
+
+/**
  * The rules above are only as good as their wiring. These run the command strings exactly as
  * `.claude/settings.json` declares them, in a shell with `CLAUDE_PROJECT_DIR` set, as the harness does.
  */
 describe('layer-0 hooks: .claude/settings.json runs them', () => {
   const entry = (matcher: string) => (settings.hooks.PreToolUse as any[]).find((e) => e.matcher.startsWith(matcher));
-  const runWired = (matcher: string, toolInput: Record<string, unknown>): unknown => {
+  const runWired = (matcher: string, toolInput: Record<string, unknown>, dir = root): unknown => {
     const out = execFileSync('sh', ['-c', entry(matcher).hooks[0].command],
-      { input: JSON.stringify({ tool_input: toolInput }), encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
+      { input: JSON.stringify({ tool_input: toolInput }), encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: dir } });
     return out.trim() === '' ? null : JSON.parse(out);
   };
 
@@ -542,6 +599,20 @@ describe('layer-0 hooks: .claude/settings.json runs them', () => {
   it('Write|Edit: denies the root WORKLOG.md and allows any other file', () => {
     expect(isDeny(runWired('Write', { file_path: join(root, 'WORKLOG.md') }))).toBe(true);
     expect(runWired('Write', { file_path: join(root, 'src/main.ts') })).toBeNull();
+  });
+
+  // Run against a marker-free directory, which is what a routine's clone is: on the owner's Mac the real root
+  // carries `.owner-machine` and the same call is allowed, so anchoring here would flip between CI and his
+  // laptop. The command string is the real one out of `.claude/settings.json` (#342).
+  it('Write|Edit: denies a .claude/ write through the real command, in a checkout with no owner marker', () => {
+    // A stand-in for a routine's clone: the hooks are there, because they are committed; the marker is not,
+    // because it never is. `CLAUDE_PROJECT_DIR` locates the scripts as well as the root, so both must move.
+    const clone = mkdtempSync(join(tmpdir(), 'sna-wired-'));
+    cpSync(join(root, '.claude/hooks'), join(clone, '.claude/hooks'), { recursive: true });
+    expect(existsSync(join(clone, OWNER_MARKER)), 'a clone never carries the marker').toBe(false);
+    expect(isDeny(runWired('Write', { file_path: join(clone, '.claude/rules/governance.md') }, clone))).toBe(true);
+    expect(isDeny(runWired('Write', { file_path: join(clone, OWNER_MARKER) }, clone))).toBe(true);
+    expect(runWired('Write', { file_path: join(clone, 'src/main.ts') }, clone)).toBeNull();
   });
 
   it('MCP GitHub writes: every body-carrying tool is matched, and each rule denies through the real command', () => {
