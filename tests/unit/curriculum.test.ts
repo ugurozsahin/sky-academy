@@ -472,6 +472,35 @@ describe('coinLabel (#35 — one source for the £/p money label)', () => {
     expect(coinLabel(100)).toBe('£1');
     expect(coinLabel(200)).toBe('£2');
   });
+
+  // #298 slice 2: Year 3's guidance is that pupils "record £ and p separately. The decimal recording of money
+  // is introduced formally in year 4." `y2Money`'s d2 used to build `£1.50` with its own `.toFixed(2)`, which
+  // is why the label has one source: a second formatter is how the decimal came back.
+  it('records a mixed amount as pounds and pence, never as a decimal (#298)', () => {
+    expect(coinLabel(150)).toBe('£1 and 50p');
+    expect(coinLabel(250)).toBe('£2 and 50p');
+    expect(coinLabel(305)).toBe('£3 and 5p');
+  });
+});
+
+describe('Year 2 money is recorded the KS1 way (#298 slice 2)', () => {
+  // Over every difficulty and a wide seed sweep, because d2 is one of three branches: a per-seed spot check
+  // would pass on a run that never drew it. Red on main, where d2 answers and options read `£1.50`.
+  it('no y2-money question, answer or option carries a decimal amount', () => {
+    const topic = TOPICS.find(t => t.id === 'y2-money')!;
+    let seen = 0;
+    for (let seed = 0; seed < 400; seed++) {
+      for (const d of [1, 2, 3] as const) {
+        const q = topic.gen(d, rng(seed * 3 + d));
+        for (const text of [q.prompt, q.answer, ...q.options, q.say ?? '', q.hint ?? '']) {
+          expect(text, `y2-money d${d} seed ${seed} records money with a decimal point: ${text}`)
+            .not.toMatch(/£\d+\.\d/);
+          seen++;
+        }
+      }
+    }
+    expect(seen, 'the sweep generated nothing — this rail would pass vacuously').toBeGreaterThan(1000);
+  });
 });
 
 describe('shape tables (#35 — one source for maths.ts and memory.ts)', () => {

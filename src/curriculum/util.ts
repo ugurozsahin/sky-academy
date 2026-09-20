@@ -47,8 +47,19 @@ export function numberWord(n: number): string {
   return o ? `${TENS[t]}-${NUM_WORDS[o]}` : TENS[t];
 }
 
-/** Money label: pence under £1 stay as `50p`, whole pounds show as `£2` (one source for the shops, coins and cards). */
-export const coinLabel = (p: number) => p >= 100 ? `£${p / 100}` : `${p}p`;
+/**
+ * Money label: pence under £1 stay as `50p`, whole pounds show as `£2`, and a mixed amount records the pounds
+ * and the pence separately — `£1 and 50p` (one source for the shops, coins and cards).
+ *
+ * The separate recording is KS1's (#298 slice 2): Year 3 guidance says pupils "record £ and p separately. The
+ * decimal recording of money is introduced formally in year 4." So no label this writes carries a decimal
+ * point, which is what the rail in `tests/unit/curriculum.test.ts` holds it to.
+ */
+export const coinLabel = (p: number) => {
+  if (p < 100) return `${p}p`;
+  const pounds = Math.floor(p / 100), pence = p % 100;
+  return pence === 0 ? `£${pounds}` : `£${pounds} and ${pence}p`;
+};
 
 export const OBJECTS = ['🍎', '⭐', '🐟', '🎈', '🍪', '🦋', '🐸', '🚗', '🌼', '🧁'];
 
