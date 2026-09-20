@@ -2223,22 +2223,60 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    *
    * What this pins is the **pointer**, not the cap. The cap's home is `review-pr` §7, pinned by the #305 rail
    * above; a second copy here would drift from §7 the moment §7 changed, which is what
-   * `docs/decisions/001-one-home-per-rule.md` exists to prevent — so the negative half below is as
-   * load-bearing as the positive one, and the #305 rail cannot catch it because it reads the skill alone.
+   * `docs/decisions/001-one-home-per-rule.md` exists to prevent — and the #305 rail cannot catch that,
+   * because it reads the skill alone.
    *
-   * Prove it red: drop the §7 pointer from rule 4; put "with no time box" back unqualified; or restate the
-   * round cap in the prompt.
+   * **The positives are sliced to rule 4, not searched file-wide** (PR #386 review, B1). #310's whole content
+   * is *where the pointer sits*: it adds no rule that was not already in §7. A `toContain` over the whole file
+   * cannot tell rule 4 from any other byte, and the reviewer proved it by moving the clause verbatim into
+   * rule 2 — same words, same 10,034 bytes, rule 4 back to its pre-#310 ending — with all 327 rails green.
+   * So the slice, guarded as the #305 rail two tests above guards its own, is the assertion.
+   *
+   * The negative half stays file-wide: a restatement of the cap *anywhere* in this file is the defect. It
+   * pins operative clauses rather than the bare noun, for both reasons the review gave: `third round` alone
+   * is ordinary English on this topic, so a future pointer reading "before a third round of blocking, read
+   * `review-pr` §7" would go red while copying no cap; and three verbatim spellings let a plain paraphrase
+   * ("you may block at most three times on one pull request") past with both rails green. It is still a list
+   * of spellings, not a proof — a novel wording walks past it, exactly as the #305 rail says of its own
+   * `ESCAPES` — and the byte budget is not the backstop it looks like, since a restatement can be paid for
+   * out of other prose like any other clause.
+   *
+   * Prove it red: move the clause out of rule 4 into any other rule; drop the §7 pointer; put "with no time
+   * box" back unqualified; or restate the round cap anywhere in the file, paraphrased or verbatim.
    */
-  it('the reviewer prompt points at §7 for the rounds, and does not restate the cap (#310)', () => {
-    const text = flat(read('docs/REVIEWER-PROMPT.md'));
-    expect(text, 'rule 4 must still say a review is not hurried — the pointer hangs off that sentence')
+  it('the reviewer prompt points at §7 for the rounds, in rule 4, and does not restate the cap (#310)', () => {
+    const prompt = read('docs/REVIEWER-PROMPT.md');
+    // Rule 4 alone — from its own numbered heading to the paragraph that closes the four unmergeable rules.
+    const from = prompt.indexOf('4. **It is labelled `owner-approval`');
+    const to = prompt.indexOf('\nReport to the owner only for something noteworthy', from);
+    expect(from, 'rule 4 has been renumbered or removed — the slice below would read the wrong text')
+      .toBeGreaterThan(-1);
+    expect(to, 'the four unmergeable rules no longer end at the report paragraph').toBeGreaterThan(from);
+    const rule4 = flat(prompt.slice(from, to));
+    expect(rule4.length, 'rule 4 must be read from disk as text, or this rail checks nothing').toBeGreaterThan(500);
+
+    expect(rule4, 'rule 4 must still say a review is not hurried — the pointer hangs off that sentence')
       .toContain("reviewing it IS this run's work");
-    expect(text, "and the no-time-box must be about a review's depth, or it reads as a licence on the rounds too")
+    expect(rule4, "and the no-time-box must be about a review's depth, or it reads as a licence on the rounds too")
       .toMatch(/no time box on a review's \*\*depth\*\*/);
-    expect(text, 'and rule 4 must send a reviewer to the cap before a fourth block, not leave it at §5')
+    expect(rule4, 'and rule 4 is where it must sit: a reviewer who stops at rule 4 meets the cap, or #310 bought nothing')
       .toMatch(/on how many times one may block, `review-pr` §7/);
-    expect(text, 'the round cap belongs in `review-pr` §7 alone — the prompt points at it, it does not copy it')
-      .not.toMatch(/third round|rounds are not free|Count the `REVIEW: CHANGES REQUESTED` comments/i);
+
+    // And rule 4 must not hand the cap back in the same breath (PR #386 review, note 5). #305's own `ESCAPES`
+    // are scoped to §7's slice in the skill, so they cannot see this file — and now that a reviewer meets the
+    // cap's authority here, a licence written beside the pointer reads as the prompt's.
+    for (const escape of [/\bnot a hard\b/i, /\bas often as you (need|like)\b/i, /\bat your discretion\b/i,
+      /\b(only|merely) a guideline\b/i, /\bthe cap does not apply\b/i, /\bbinds you\b/i])
+      expect(rule4, `rule 4 carries a clause that gives the cap back: ${escape}`).not.toMatch(escape);
+
+    // File-wide, and by clause: the cap belongs in `review-pr` §7 alone.
+    const RESTATED = [
+      /third round is the last/i, /last (one|round) that blocks/i,
+      /(at most|no more than) three (rounds|blocks|times)/i, /block(?:s|ing)? (?:at most|no more than) three/i,
+      /Count the `REVIEW: CHANGES REQUESTED` comments/i,
+    ];
+    for (const copy of RESTATED)
+      expect(flat(prompt), `the prompt restates the round cap instead of pointing at it: ${copy}`).not.toMatch(copy);
   });
 
   /**
@@ -4443,7 +4481,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   const ROUTINE_PROMPT_BUDGET = 21_422;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3
+  const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3; → 10,034 again, no net change: rule 4's pointer at the round cap (#310, 28 bytes), paid for by shortening STEP 2's §4 and rule 1's §5 pointers to the `the review-pr skill` form rule 3 already used — so the prompt now spells the skill three ways and the full path survives exactly once, in rule 3. Tidying those two back to full paths would cost 28 bytes with nothing left to pay them
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
