@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Duel, DUEL_ROUNDS } from '../../src/game/duel';
 import { topicById } from '../../src/curriculum';
+import { hintText, promptHTML, promptMode } from '../../src/ui/hud';
+import { esc } from '../../src/ui/dom';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onRoundWon: vi.fn(), onRoundMiss: vi.fn(), onRoundDraw: vi.fn(), onMatchEnd: vi.fn() });
@@ -104,5 +106,97 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     expect(ev.onQuestion.mock.calls.length).toBe(callsBefore);
     expect(ev.onRoundDraw).not.toHaveBeenCalled();
     expect(ev.onMatchEnd).toHaveBeenCalledTimes(1);
+  });
+});
+
+// #16 items 2–4: the pure helpers the duel screen leans on — which topics a duel may use, and the match line.
+import { DUEL_HANDOVER, duelHeadline, duelPool, spokenQuestion } from '../../src/game/duel';
+import { topicsFor, YEARS } from '../../src/curriculum';
+
+describe('duelPool (#16 item 4: which topics a duel is played on)', () => {
+  it('drops tracing topics and sequence topics, keeps plain bubble topics, for every year and difficulty', () => {
+    for (const y of YEARS) for (const diff of [1, 2, 3] as const) {
+      const all = topicsFor(y.id); const pool = duelPool(all, diff);
+      expect(pool.length, `${y.id} d${diff}`).toBeGreaterThan(0);
+      for (const t of pool) {
+        expect(t.input).not.toBe('tracing');
+        for (let i = 100; i < 140; i++) expect(t.gen(diff, rng(i)).sequence, `${t.id} at d${diff} produced a sequence question`).toBeUndefined();
+      }
+      if (y.id === 'reception') expect(pool.map(t => t.id)).not.toContain('r-build');   // Build a Word slices letters in order
+    }
+    // Generators that mix a sequence branch in only at difficulty 3 (PR #295 review) are out at 3 and in below it.
+    expect(duelPool(topicsFor('year1'), 3).map(t => t.id)).not.toContain('y1-spelling');
+    expect(duelPool(topicsFor('year1'), 1).map(t => t.id)).toContain('y1-spelling');
+  });
+});
+
+describe('duelHeadline (#16 item 3: the match-end line)', () => {
+  it('names the winner with the score, or a draw', () => {
+    expect(duelHeadline({ winner: 'a', scoreA: 6, scoreB: 3, rounds: 10 })).toBe('Player 1 wins 6–3!');
+    expect(duelHeadline({ winner: 'b', scoreA: 2, scoreB: 7, rounds: 10 })).toBe('Player 2 wins 7–2!');
+    expect(duelHeadline({ winner: 'draw', scoreA: 4, scoreB: 4, rounds: 10 })).toBe("It's a draw — 4 all!");
+  });
+});
+
+describe('spokenQuestion (#16: the hand-over line is heard)', () => {
+  const q = topic.gen(1, rng(3));
+  it('round 1 folds the hand-over instruction into the question\'s own utterance', () => {
+    expect(spokenQuestion(q, 1)).toBe(`${DUEL_HANDOVER} ${q.say ?? q.prompt}`);
+  });
+  it('every later round speaks the question alone', () => {
+    expect(spokenQuestion(q, 2)).toBe(q.say ?? q.prompt);
+    expect(spokenQuestion(q, 10)).toBe(q.say ?? q.prompt);
+  });
+});
+
+describe('Duel refuses a sequence question (#16: the pool is the filter, this is the floor)', () => {
+  it('throws on start rather than draining ten unwinnable rounds', () => {
+    const seqTopic = { ...topic, id: 'fake-seq', gen: () => ({ ...topic.gen(1, rng(1)), sequence: ['a', 'b'], answer: 'ab' }) };
+    const d = new Duel({ topic: seqTopic, difficulty: 1, rng: rng(1) }, events());
+    expect(() => d.start()).toThrow(/sequence question/);
+  });
+});
+
+/**
+ * #16 review (the 18:33Z block): the duel card showed `prompt` and `visual` only. Five of the pool's topics —
+ * the `measureCompare()` comparisons — put the values being compared in `hint` and nowhere else, so those
+ * rounds read "Which is fuller?" over two coloured bubbles with nothing on screen to decide by; and the
+ * `listen` topics (Sound Hunt) had no read fallback on a silent device. These pin the two card writers the
+ * screen now goes through (`src/ui/duel.ts` `onQuestion`) over the whole pool, not one sampled round.
+ */
+describe('the duel card carries every question it can draw (#16 review, #65)', () => {
+  const DRAWS = 200;
+  /** Every question the pool can put on the card, for each year at the difficulty a duel is played at. */
+  const drawPool = () => YEARS.flatMap(y => {
+    const difficulty = y.diffs[0] ?? 1;
+    return duelPool(topicsFor(y.id), difficulty).flatMap(t =>
+      Array.from({ length: DRAWS }, (_, i) => ({ topic: t, q: t.gen(difficulty, rng(i + 1)) })));
+  });
+
+  it('a question whose deciding data lives in `hint` shows that hint, not a generic instruction', () => {
+    const hintOnly = drawPool().filter(({ q }) => q.hint && !q.visual);
+    // Not a vacuous pass: the class of question this review is about has to still exist in the pool.
+    expect(new Set(hintOnly.map(x => x.topic.id)).size).toBeGreaterThan(0);
+    for (const { topic: t, q } of hintOnly) {
+      expect(hintText(q, { reveal: false }), `${t.id}: ${q.prompt}`).toBe(q.hint);
+      expect(hintText(q, { reveal: true }), `${t.id}: ${q.prompt}`).toBe(q.hint);
+    }
+  });
+
+  it('every card shows a line under the prompt, so the strip never renders an empty hint', () => {
+    for (const { topic: t, q } of drawPool()) {
+      expect(hintText(q, { reveal: false }), `${t.id}: ${q.prompt}`).not.toBe('');
+    }
+  });
+
+  it('a `listen` question shows its words when the device cannot be heard', () => {
+    const listens = drawPool().filter(({ q }) => q.listen);
+    expect(new Set(listens.map(x => x.topic.id)).size).toBeGreaterThan(0);   // Sound Hunt is in the pool
+    for (const { topic: t, q } of listens) {
+      expect(promptMode(q, false), `${t.id}`).not.toBe('hear');
+      expect(promptHTML(q, 0, true), `${t.id}: ${q.prompt}`).toContain(esc(q.listen!));
+      expect(promptMode(q, true), `${t.id}`).toBe('hear');            // with a voice the ordinary prompt is enough
+      expect(promptHTML(q, 0, false), `${t.id}`).toBe(esc(q.prompt));
+    }
   });
 });
