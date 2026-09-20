@@ -234,7 +234,17 @@ describe('the duel card carries every question it can draw (#16 review, #65)', (
 // #16 item 5: what a finished match tells the Daily Dojo. The rules the event has to respect live in
 // `applyEvent()` (src/game/dojo.ts), so these assert against the real dojo, not against the shape alone.
 import { duelCorrect, duelDojoEvent } from '../../src/game/duel';
-import { applyEvent, dailyChallenges, freshDojo, type DojoState } from '../../src/game/dojo';
+import { applyEvent, CHALLENGE_BONUS, dailyChallenges, freshDojo, type DojoState } from '../../src/game/dojo';
+
+/** The first date on or after 2026-01-01 whose focus challenge is `id` — the pool's draw is date-seeded. */
+function dateDrawing(id: string): string {
+  for (let d = 0; d < 400; d++) {
+    const dt = new Date(Date.UTC(2026, 0, 1)); dt.setUTCDate(dt.getUTCDate() + d);
+    const date = dt.toISOString().slice(0, 10);
+    if (dailyChallenges(date).some(c => c.id === id)) return date;
+  }
+  throw new Error(`no date in 2026 draws ${id}`);
+}
 
 describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device saw)', () => {
   const res = (scoreA: number, scoreB: number, rounds = DUEL_ROUNDS): DuelResult =>
@@ -243,12 +253,17 @@ describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device
   it('reports both players\' decided rounds as the questions answered correctly', () => {
     expect(duelDojoEvent(res(6, 3), 'maths').correct).toBe(9);
     expect(duelDojoEvent(res(0, 0), 'maths').correct).toBe(0);
-    expect(duelCorrect(res(6, 3))).toBe(duelCoins(res(6, 3)));   // one source: the payout and the dojo agree
+    // One source: the payout and the dojo agree. `duelCoins` is `r => duelCorrect(r)`, so the two-sided
+    // comparison alone is a tautology that would hold for `scoreA - scoreB` — the literal is what pins it.
+    expect(duelCorrect(res(6, 3))).toBe(9);
+    expect(duelCoins(res(6, 3))).toBe(duelCorrect(res(6, 3)));
   });
 
   it('never reports a combo — the duel screen tracks none, and combo5 is not gated on the mode', () => {
     // `measure()` reads bestCombo through Math.max for every mode, so a non-zero value here would complete a
-    // challenge on evidence the duel screen does not collect. This is the rail for that.
+    // challenge on evidence the duel screen does not collect. This is the rail for that. `combo5` is not the
+    // only un-gated challenge (`maths10`/`writing6` are too) — it is the only un-gated one whose field a duel
+    // cannot measure, which is what makes zero the honest value rather than a convenient one.
     for (let a = 0; a <= DUEL_ROUNDS; a++) for (let b = 0; a + b <= DUEL_ROUNDS; b++) {
       expect(duelDojoEvent(res(a, b), 'maths').bestCombo, `${a}-${b}`).toBe(0);
     }
@@ -264,10 +279,13 @@ describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device
     expect(duelDojoEvent(res(4, 3), 'writing')).toMatchObject({ mathsCorrect: 0, writingCorrect: 7 });
   });
 
-  it('moves the volume challenge through the real dojo, and completes it across two matches', () => {
+  it('moves the volume challenge through the real dojo, and completes it exactly once across four matches', () => {
+    // A day whose focus challenge is neither maths10 nor writing6, so the volume challenge is the only thing
+    // a maths duel can complete and the exact figures below are knowable rather than a matter of the draw.
     const date = '2026-09-20';
-    // Pick a day whose volume challenge we know, then drive it with matches rather than a hand-built event.
-    const volume = dailyChallenges(date).find(c => c.group === 'volume')!;
+    const cs = dailyChallenges(date);
+    expect(cs.map(c => c.id)).toEqual(['correct15', 'memory1', 'perfect']);
+    const volume = cs.find(c => c.group === 'volume')!;
     let s: DojoState = freshDojo(date);
     let paid = 0; let completed = 0;
     for (let i = 0; i < 4; i++) {
@@ -275,11 +293,35 @@ describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device
       s = out.state; paid += out.coins; completed += out.completed.length;
     }
     expect(s.progress[volume.id]).toBe(volume.goal);        // 40 correct clears 15, 20 or 25
-    expect(completed).toBeGreaterThanOrEqual(1);
-    expect(paid).toBeGreaterThan(0);
+    // Exact, not `>= 1`: if the `done.includes` guard broke and matches 2–4 paid again, a lower bound holds
+    // while the child is paid four times over. That is the bug this case exists to catch.
+    expect(completed).toBe(1);
+    expect(paid).toBe(CHALLENGE_BONUS);
+    expect(s.total).toBe(1);
   });
 
-  it('leaves the mode and focus challenges a duel cannot honestly claim exactly where they were', () => {
+  it('completes maths10 on a maths duel and leaves writing6 untouched — and the mirror', () => {
+    // The other two un-gated challenges. A full match puts all ten correct answers in ONE subject, so it
+    // clears maths10 (goal 10) or writing6 (goal 6) outright. Nothing else here drives the subject fields
+    // through `applyEvent()`, so a regression setting both to `correct` would otherwise pass this whole file
+    // and double-pay the dojo on every duel.
+    const mDate = dateDrawing('maths10'); const wDate = dateDrawing('writing6');
+    const m = applyEvent(freshDojo(mDate), duelDojoEvent(res(5, 5), 'maths'), mDate);
+    expect(m.state.progress.maths10).toBe(10);
+    expect(m.completed.map(c => c.id)).toContain('maths10');
+    expect(m.state.progress.writing6).toBeUndefined();     // not today's draw, so never written
+
+    const w = applyEvent(freshDojo(wDate), duelDojoEvent(res(5, 5), 'writing'), wDate);
+    expect(w.state.progress.writing6).toBe(6);
+    expect(w.completed.map(c => c.id)).toContain('writing6');
+    expect(w.state.progress.maths10).toBeUndefined();
+
+    // The cross cases: the day's subject challenge does not move on a duel of the other subject.
+    expect(applyEvent(freshDojo(mDate), duelDojoEvent(res(5, 5), 'writing'), mDate).state.progress.maths10).toBe(0);
+    expect(applyEvent(freshDojo(wDate), duelDojoEvent(res(5, 5), 'maths'), wDate).state.progress.writing6).toBe(0);
+  });
+
+  it('leaves every mode challenge, and every focus challenge but the two subject ones, exactly where they were', () => {
     // Sweep a month of days so most of the pool's mode and focus challenges are actually seen: one day only
     // ever draws one of each, and a rail that happens to miss `combo5` is the one that would not have caught
     // a non-zero bestCombo. `seen` is asserted at the end so a pool change cannot hollow this out silently.
@@ -289,13 +331,15 @@ describe('duelDojoEvent (#16 item 5: a match tells the dojo the maths the device
       const out = applyEvent(freshDojo(date), duelDojoEvent(res(5, 5), 'maths'), date);
       for (const c of dailyChallenges(date)) {
         if (c.group === 'volume') continue;
-        // maths10 / writing6 are the two focus challenges a duel legitimately moves (per-subject correct answers).
+        // maths10 / writing6 are the two focus challenges a duel legitimately moves (per-subject correct
+        // answers); the case above pins those, both ways round.
         if (c.id === 'maths10' || c.id === 'writing6') continue;
         seen.add(c.id);
-        expect(out.state.progress[c.id] ?? 0, `${c.id} moved on a duel`).toBe(0);
+        // No `?? 0`: applyEvent always writes the key, so an absent one is a change, not "stayed at 0".
+        expect(out.state.progress[c.id], `${c.id} moved on a duel`).toBe(0);
       }
     }
     expect(seen.has('combo5'), 'the un-gated challenge was never drawn — this rail proved nothing').toBe(true);
-    expect(seen.size).toBeGreaterThanOrEqual(5);
+    expect(seen.size, 'these 28 days draw nine such challenges; fewer means some dropped out of the pool unnoticed').toBe(9);
   });
 });

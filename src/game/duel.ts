@@ -119,15 +119,23 @@ export function duelCoins(r: DuelResult): number {
  * players share one profile, so the dojo is told about the maths the *device* saw, never about who won —
  * `duelCorrect()` decided rounds, which is the count of questions answered correctly in the match.
  *
- * Everything a duel cannot honestly report is reported as nothing, because `applyEvent()`'s challenges read
- * these fields without always gating on the mode:
- * - **`bestCombo: 0`** — `combo5` is the one challenge that is not mode-gated (`Math.max(cur, e.bestCombo)`),
- *   and the duel screen tracks no combo at all, so any other value would pay out for something unmeasured.
+ * **Six of `applyEvent()`'s fourteen challenges have no mode gate**, so what is put here is paid out on its
+ * face: `correct15`/`correct20`/`correct25` (the point of this), `maths10` and `writing6` (a duel moves them
+ * legitimately — see the split below), and `combo5`. Everything a duel cannot honestly report is therefore
+ * reported as nothing:
+ * - **`bestCombo: 0`** — `combo5` is the one un-gated challenge **whose field a duel cannot measure**: the
+ *   duel screen tracks no combo at all, so any other value would pay out for something never counted.
  * - **`won: false`, `stars: 0`, `score: 0`** — a duel has no winner, no stars and no score from the shared
  *   save's point of view; the challenges that read them (`mission2`, `boss1`, `sensei1`, `stars3`,
  *   `perfect`, `storm80`) are all gated on another mode, so this is the honest value, not a dodge.
+ * - **`attempts: r.rounds`** — a unit the other producers do not use: they count questions *attempted*, and
+ *   a duel round with ten wrong slices and no correct one is one attempt here. Nothing reads it but
+ *   `perfect`, which is mission-gated, so the difference is inert; it is recorded rather than smoothed over
+ *   because the honest count of a shared question sliced by two players is not obvious.
  *
- * A duel plays one topic for the whole match, so the per-subject split is that topic's subject.
+ * A duel plays one topic for the whole match, so the per-subject split is that topic's subject — which means
+ * a full match can complete `maths10` (goal 10) or `writing6` (goal 6) outright, and a duel can move two of
+ * the day's three challenges: its volume one and, on a day that draws one of those two, its focus one.
  */
 export function duelDojoEvent(r: DuelResult, subject: Topic['subject']): DojoEvent {
   const correct = duelCorrect(r);

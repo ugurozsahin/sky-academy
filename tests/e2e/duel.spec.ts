@@ -1,10 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 import { DUEL_HANDOVER } from '../../src/game/duel';
+import { dailyChallenges } from '../../src/game/dojo';
 import type { DuelHooks } from '../../src/ui/hooks';
 
 // Ninja Duel (#16 items 2–4): two arenas on one screen, the same question in both, first correct slice wins
 // the round. Driven through the duel screen's own `window.__sna` hooks, which name the player every call is for.
-declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number; __said: string[]; __deadArenas: { time: number }[] } }
+declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number; __said: string[]; __deadArenas: { time: number }[]; __seedMiss: boolean } }
 
 /**
  * A speech engine that records what it was asked to say, and when it was cancelled, in order (#16 review). It
@@ -32,8 +33,21 @@ async function expectHandoverHeard(page: Page) {
   expect(said.slice(at + 1), 'no cancel() after it').not.toContain('<cancel>');
 }
 
-async function startDuel(page: Page, extra: Record<string, unknown> = {}) {
-  await page.addInitScript(save => { if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save); }, JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', ...extra }));
+async function startDuel(page: Page, dojoByDate?: Record<string, unknown>) {
+  // The dojo seed is chosen by the PAGE's date, not this process's: `storage.ts`'s `today()` runs in the
+  // browser, and a seed built against a different day is silently rolled over by `dojoFor()` — progress
+  // gone, the case green for the wrong reason. The two clocks straddle midnight UTC in the general case,
+  // so `dojoSeeds()` hands over every day the page could be on and the page picks.
+  await page.addInitScript(({ save, dojoByDate }) => {
+    window.__seedMiss = false;
+    if (localStorage.getItem('sna:v1')) return;
+    const d = JSON.parse(save) as Record<string, unknown>;
+    if (dojoByDate) {
+      const seed = dojoByDate[new Date().toISOString().slice(0, 10)];
+      if (seed) d.dojo = seed; else window.__seedMiss = true;
+    }
+    localStorage.setItem('sna:v1', JSON.stringify(d));
+  }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }), dojoByDate });
   await page.addInitScript(() => { window.__SNA_FAST = 4; });
   await recordingEngine(page);
   await page.goto('/');
@@ -43,6 +57,35 @@ async function startDuel(page: Page, extra: Record<string, unknown> = {}) {
   await expect(page.locator('.duel-screen')).toBeVisible();
   await page.waitForFunction(() => window.__sna?.state().prompt);
 }
+/**
+ * Dojo saves in which **only the volume challenge can move**, one per day the page could be on.
+ *
+ * Six of the fourteen challenges have no mode gate, and two of them — `maths10` (goal 10) and `writing6`
+ * (goal 6) — are completed outright by a full ten-round duel, since a match plays one topic and the whole
+ * count lands in that topic's subject. One day in five draws one of those as its focus challenge (`maths10`
+ * 21.1%, `writing6` 19.9% over 730 days), and whether the day's random duel topic is that subject is another
+ * coin toss — so a case that seeds only the volume ids is a calendar lottery that goes red on about one run
+ * in five. Seeding the day's mode and focus challenges as already done takes the date out of it: neither can
+ * complete twice, whatever the draw and whatever topic the match lands on.
+ *
+ * `volume` says where to leave the day's volume challenge: `'short'` is one answer from its goal (a single
+ * decided round finishes it, and with the other two already done that finishes the day's set), `'fresh'` is
+ * untouched (ten correct answers cannot reach 15, 20 or 25).
+ */
+function dojoSeeds(volume: 'short' | 'fresh'): Record<string, unknown> {
+  const seeds: Record<string, unknown> = {};
+  for (const offset of [0, 1]) {                       // today and tomorrow: the page's clock decides which
+    const dt = new Date(); dt.setUTCDate(dt.getUTCDate() + offset);
+    const date = dt.toISOString().slice(0, 10);
+    const others = dailyChallenges(date).filter(c => c.group !== 'volume');
+    const progress: Record<string, number> = Object.fromEntries(others.map(c => [c.id, c.goal]));
+    // All three volume ids, since which one the day draws is the date's business, not this test's.
+    if (volume === 'short') Object.assign(progress, { correct15: 14, correct20: 19, correct25: 24 });
+    seeds[date] = { date, progress, done: others.map(c => c.id), setDone: false, streak: { last: '', days: 0 }, total: others.length };
+  }
+  return seeds;
+}
+
 /** Wait until player `p`'s arena has the answer in flight, then slice it there. */
 async function winRound(page: Page, p: 'a' | 'b') {
   await page.waitForFunction(p => { const s = window.__sna.state(); return !s.decided && !s.ended && window.__sna.bubbles(p).some(b => b.label === s.answer); }, p);
@@ -51,7 +94,8 @@ async function winRound(page: Page, p: 'a' | 'b') {
 
 test.describe('Ninja Duel', () => {
   test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', async ({ page }) => {
-    await startDuel(page);
+    await startDuel(page, dojoSeeds('fresh'));
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
     await expectHandoverHeard(page);   // the second child's one instruction is in round 1's own utterance
     // The same wave in both arenas: each arena launches the ONE question's options (in its own batch order —
@@ -81,7 +125,8 @@ test.describe('Ninja Duel', () => {
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 6, scoreB: 4, coins: 10, dojoCoins: 0 });
     // #16 item 5: the finished match pays the one shared save a coin per decided round — ten here, and not one
     // of them for winning. Ten is under the first sticker threshold (30), so the match unlocks nothing yet, and
-    // ten correct answers is short of every volume challenge (15/20/25) from a fresh save, so no dojo bonus.
+    // ten correct answers is short of every volume challenge (15/20/25), so no dojo bonus — `dojoSave('fresh')`
+    // is what makes that true on every date rather than on four days in five.
     await expect(page.locator('.duel-end .coin-gain')).toHaveText('+10 🪙');
     await expect(page.locator('.duel-end .unlock')).toHaveCount(0);
     await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(0);
@@ -164,25 +209,28 @@ test.describe('Ninja Duel', () => {
   });
 
   test('a finished match moves the day\'s Daily Dojo challenge and pays its bonus into the same save (#16 item 5)', async ({ page }) => {
-    // Seed today's volume challenge one answer short — all three ids, since which one the day draws is the
-    // date's business, not this test's. A single decided round then completes whichever it is, so the wiring
-    // is proven by one match instead of the four a fresh save would need.
-    const date = new Date().toISOString().slice(0, 10);
-    await startDuel(page, {
-      dojo: { date, progress: { correct15: 14, correct20: 19, correct25: 24 }, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 },
-    });
+    // The day's volume challenge one answer short and its other two already done, so a single decided round
+    // finishes both the challenge and the day's set — on every date, not on the four days in five where the
+    // focus challenge happens to be one a duel cannot move.
+    await startDuel(page, dojoSeeds('short'));
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
     for (let r = 1; r <= 10; r++) {
       await page.waitForFunction(r => window.__sna.state().round === r, r);
       await winRound(page, r % 2 ? 'a' : 'b');      // five rounds each: the bonus does not depend on who won
     }
     await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
-    // One challenge row, where every other results overlay puts it: between the coin row and the stickers.
-    await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(1);
-    await expect(page.locator('.duel-end .dojo-bonus .gain')).toHaveText('+10 🪙');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 5, scoreB: 5, coins: 10, dojoCoins: 10 });
+    // The challenge row and the set row, in the place every other results overlay puts them: immediately
+    // after the coin row. The adjacency selector is the assertion — a count alone passes with the rows moved
+    // above the coins or below the stickers, and the position is this change's stated point.
+    await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(2);
+    await expect(page.locator('.duel-end .coin-row + .dojo-bonus')).toHaveCount(1);
+    await expect(page.locator('.duel-end .dojo-bonus:not(.set) .gain')).toHaveText('+10 🪙');
+    await expect(page.locator('.duel-end .dojo-bonus.set .gain')).toHaveText('+25 🪙');
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 5, scoreB: 5, coins: 10, dojoCoins: 35 });
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
-    expect(saved.coins, 'the match coins AND the dojo bonus reached the save').toBe(20);
-    expect(saved.dojo.done.length, 'the completed challenge is recorded, so it cannot be paid twice').toBe(1);
-    expect(saved.dojo.total).toBe(1);
+    expect(saved.coins, 'the match coins AND the dojo bonus reached the save').toBe(45);
+    expect(saved.dojo.done.length, 'the completed challenge is recorded, so it cannot be paid twice').toBe(3);
+    expect(saved.dojo.setDone, "the day's set is finished by a duel").toBe(true);
+    expect(saved.dojo.total).toBe(3);
   });
 });
