@@ -20,6 +20,11 @@ export type Visual =
   // and the `icon` it draws — so both are required where they mean something and absent where they do not.
   | { type: 'chart'; kind: 'tally' | 'block'; rows: ChartRow[] }
   | { type: 'chart'; kind: 'pictogram'; rows: ChartRow[]; each: number; icon: string }
+  // Line symmetry in a vertical line (Y2 Geometry, #299 slice 4). `grid` is one string per row, `#` for a
+  // coloured square and `.` for an empty one; the drawing puts a dashed mirror line down the middle, so the
+  // child compares the two halves rather than being told which side to look at. A picture, not a shape name:
+  // the whole question is whether the left half and the right half match.
+  | { type: 'symmetry'; grid: string[] }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
   | { type: 'sentence'; text: string };                  // sentence with a blank "_"
 
