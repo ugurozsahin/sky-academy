@@ -68,8 +68,34 @@ export const OBJECTS = ['🍎', '⭐', '🐟', '🎈', '🍪', '🦋', '🐸', '
 // Reception-easy set (circle/square/triangle/rectangle) so Memory's `SHAPES_2D.slice(0, 4)` still holds.
 /** 2-D shapes: glyph, name, number of sides (circle = 0). */
 export const SHAPES_2D: readonly [string, string, number][] = [['▲', 'triangle', 3], ['■', 'square', 4], ['▬', 'rectangle', 4], ['●', 'circle', 0], ['⬟', 'pentagon', 5], ['⬢', 'hexagon', 6]];
-/** 3-D shapes: glyph, name, faces fact. */
-export const SHAPES_3D: readonly [string, string, string][] = [['🎲', 'cube', '6 faces'], ['⚽', 'sphere', '1 curved face'], ['🥫', 'cylinder', '2 flat faces'], ['🍦', 'cone', '1 flat face'], ['🔺', 'pyramid', '5 faces'], ['🧱', 'cuboid', '6 faces']];
+/**
+ * A 3-D shape's countable properties (#299 slice 2).
+ *
+ * `as` is the name the counts hold for, which is not always the name a child slices: "pyramid" on its own
+ * has no fixed face count (a triangle-based one has 4, not 5), so a property card says "square-based
+ * pyramid" while a naming card keeps the Year 1 NC's plain "pyramid".
+ *
+ * `flat` is flat faces, which every shape here can state without argument — a sphere has none, a cone one.
+ * The old table carried a prose fact instead ("1 flat face", "1 curved face") and asked "A cone has…",
+ * where a child could defensibly slice either: a cone has one flat face *and* one curved one. Counting
+ * flat faces has exactly one answer for all six.
+ *
+ * `edges` and `vertices` are the Year 2 addition, and are carried by the polyhedra only. Whether a sphere,
+ * cylinder or cone has edges or vertices at all is a matter of KS1 convention rather than a fact a card can
+ * mark right or wrong, so the curved shapes carry neither and are never asked for them.
+ */
+export type Shape3DProps = { readonly as: string; readonly flat: number; readonly edges?: number; readonly vertices?: number };
+/** 3-D shapes: glyph, name, properties. One source for maths.ts and Memory Match (#35). */
+export const SHAPES_3D: readonly [string, string, Shape3DProps][] = [
+  ['🎲', 'cube', { as: 'cube', flat: 6, edges: 12, vertices: 8 }],
+  ['⚽', 'sphere', { as: 'sphere', flat: 0 }],
+  ['🥫', 'cylinder', { as: 'cylinder', flat: 2 }],
+  ['🍦', 'cone', { as: 'cone', flat: 1 }],
+  ['🔺', 'pyramid', { as: 'square-based pyramid', flat: 5, edges: 8, vertices: 5 }],
+  ['🧱', 'cuboid', { as: 'cuboid', flat: 6, edges: 12, vertices: 8 }],
+];
+/** A cube *is* a cuboid ("cuboids including cubes", Y1 NC), so the two never share a naming card (#299). */
+export const SAME_SOLID = new Set(['cube', 'cuboid']);
 export function symSay(s: string): string {
   return s.replace(/×/g, ' times ').replace(/÷/g, ' divided by ').replace(/\+/g, ' plus ').replace(/[−-]/g, ' minus ').replace(/=/g, ' equals ').replace(/\?/g, ' what').replace(/\s+/g, ' ').trim();
 }
