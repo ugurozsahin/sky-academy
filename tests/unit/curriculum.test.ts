@@ -693,10 +693,91 @@ describe('shape tables (#35 — one source for maths.ts and memory.ts)', () => {
   it('the first four 2-D shapes are the Reception-easy set (Memory slices these for Reception)', () => {
     expect(new Set(SHAPES_2D.slice(0, 4).map(([, name]) => name))).toEqual(new Set(['circle', 'square', 'triangle', 'rectangle']));
   });
-  it('3-D shapes carry a faces fact and a distinct glyph each', () => {
+  it('3-D shapes carry a distinct glyph and a flat-face count each', () => {
     expect(SHAPES_3D).toHaveLength(6);
-    expect(SHAPES_3D.every(([g, name, fact]) => g && name && /face/.test(fact))).toBe(true);
+    expect(SHAPES_3D.every(([g, name, p]) => g && name && p.as && Number.isInteger(p.flat))).toBe(true);
     expect(new Set(SHAPES_3D.map(([g]) => g)).size).toBe(6);
+  });
+  // #299 slice 2. The counts themselves, not just their presence: a wrong edge count ships a card that marks
+  // a right answer wrong, and no generic check can catch it.
+  it('3-D properties are the Year 2 counts, and only the polyhedra carry edges and vertices', () => {
+    const by = Object.fromEntries(SHAPES_3D.map(([, name, p]) => [name, p]));
+    expect(by.cube).toMatchObject({ as: 'cube', flat: 6, edges: 12, vertices: 8 });
+    expect(by.cuboid).toMatchObject({ as: 'cuboid', flat: 6, edges: 12, vertices: 8 });
+    expect(by.pyramid).toMatchObject({ as: 'square-based pyramid', flat: 5, edges: 8, vertices: 5 });
+    expect(by.sphere).toMatchObject({ as: 'sphere', flat: 0 });
+    expect(by.cylinder).toMatchObject({ as: 'cylinder', flat: 2 });
+    expect(by.cone).toMatchObject({ as: 'cone', flat: 1 });
+    // A curved shape's edges and vertices are a matter of KS1 convention, so no card may ask for them.
+    for (const name of ['sphere', 'cylinder', 'cone']) {
+      expect(by[name].edges, `${name} must carry no edge count`).toBeUndefined();
+      expect(by[name].vertices, `${name} must carry no vertex count`).toBeUndefined();
+    }
+    // "pyramid" alone has no fixed count — a property card must name the square-based one.
+    expect(by.pyramid.as).not.toBe('pyramid');
+  });
+});
+
+describe('3-D shape topics (#299 slice 2)', () => {
+  const by = Object.fromEntries(SHAPES_3D.map(([g, name, p]) => [name, { g, p }]));
+  const topic = (id: string) => { const t = TOPICS.find(x => x.id === id); expect(t, id).toBeTruthy(); return t!; };
+
+  // A cube IS a cuboid (Y1 NC: "cuboids including cubes"), so neither may be the other's decoy: "Which is a
+  // cuboid?" with a cube on the card, or a cube glyph named with `cuboid` offered, both have two right
+  // answers. Two of them as decoys on a third shape's card is harmless, and is not what this pins.
+  it("never offers a cube as a cuboid's decoy, or a cuboid as a cube's", () => {
+    for (const id of ['y1-shapes3d', 'y2-shapes']) {
+      const r = rng(id.length + 299);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+        const q = topic(id).gen(d, r);
+        const named = q.prompt === 'What is this shape?' ? q.answer : /^Which is a (.+)\?$/.exec(q.prompt)?.[1];
+        if (named !== 'cube' && named !== 'cuboid') continue;
+        const other = named === 'cube' ? 'cuboid' : 'cube';
+        for (const form of [other, by[other].g])
+          expect(q.options.includes(form), `${id} d${d}: ${q.prompt} → ${q.options.join(' ')}`).toBe(false);
+      }
+    }
+  });
+
+  it('y1-shapes3d names only, and stays inside the Year 1 set below d3', () => {
+    const r = rng(1299);
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
+      const q = topic('y1-shapes3d').gen(d, r);
+      expect(/^(Which is a .+\?|What is this shape\?)$/.test(q.prompt), q.prompt).toBe(true);
+      expect(/face|edge|vertice/i.test(q.prompt), `Year 1 names shapes, it does not count properties: ${q.prompt}`).toBe(false);
+      if (d < 3) {
+        const named = q.prompt === 'What is this shape?' ? q.answer : q.prompt.slice('Which is a '.length, -1);
+        expect(['cube', 'cuboid', 'pyramid', 'sphere'], `d${d} asked for ${named}`).toContain(named);
+      }
+    }
+  });
+
+  it('y2-shapes asks for edges and vertices, and only where the table carries them', () => {
+    const r = rng(2299);
+    const asked = new Set<string>();
+    for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 400; i++) {
+      const q = topic('y2-shapes').gen(d, r);
+      const m = /^How many (flat faces|edges|vertices) has a (.+)\?$/.exec(q.prompt);
+      if (!m) { expect(/^(Which is a .+\?|What is this shape\?)$/.test(q.prompt), q.prompt).toBe(true); continue; }
+      const [, label, as] = m;
+      asked.add(label);
+      const entry = SHAPES_3D.find(([, , p]) => p.as === as); expect(entry, as).toBeTruthy();
+      const p = entry![2];
+      const want = label === 'edges' ? p.edges : label === 'vertices' ? p.vertices : p.flat;
+      expect(want, `${as} has no ${label} to ask for`).toBeDefined();
+      expect(q.answer, q.prompt).toBe(String(want));
+      expect(q.options).toContain(String(want));
+    }
+    expect([...asked].sort()).toEqual(['edges', 'flat faces', 'vertices']);
+  });
+
+  // The old card asked "A cone has…" and offered "1 curved face" beside "1 flat face": both true of a cone.
+  it('no 3-D card offers a prose faces fact any more', () => {
+    for (const id of ['y1-shapes3d', 'y2-shapes']) {
+      const r = rng(id.length + 65);
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 200; i++)
+        for (const o of topic(id).gen(d, r).options) expect(/face/.test(o), `${id}: ${o}`).toBe(false);
+    }
   });
 });
 

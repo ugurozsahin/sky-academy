@@ -1,6 +1,6 @@
 // Maths topics for Reception (EYFS ELGs), Year 1 and Year 2 (National Curriculum KS1).
 import type { Difficulty, Generator, Question, Rng, Topic } from './types';
-import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel, SHAPES_2D, SHAPES_3D } from './util';
+import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel, SAME_SOLID, SHAPES_2D, SHAPES_3D } from './util';
 
 const q = (prompt: string) => ({ prompt, say: symSay(prompt) });
 /**
@@ -386,10 +386,33 @@ const y1Shapes: Generator = (d, rng) => {
   if (sides === 0) return y1Shapes(d, rng);
   return numQ(rng, `How many sides has a ${name}?`, sides, { min: 0, max: 8, visual: { type: 'word', text: g }, distractors: [sides + 1, sides - 1, sides + 2] });
 };
+/**
+ * Naming a 3-D shape, either direction: pick the glyph from the name, or the name from the glyph.
+ * Decoys come from the whole table so there are always three, but never from the cube/cuboid pair, which
+ * `SAME_SOLID` holds apart — "Which is a cuboid?" with a cube on the card has two defensible answers.
+ */
+function name3dQ(rng: Rng, from: readonly (readonly [string, string, ...unknown[]])[], glyphIsAnswer: boolean): Question {
+  const [g, name] = pick(rng, from);
+  const decoys = SHAPES_3D.filter(x => x[1] !== name && !(SAME_SOLID.has(x[1]) && SAME_SOLID.has(name)));
+  const three = shuffle(rng, decoys).slice(0, 3);
+  return glyphIsAnswer
+    ? wordQ(rng, `Which is a ${name}?`, g, three.map(x => x[0]), { hint: 'Slice the 3-D shape' })
+    : wordQ(rng, 'What is this shape?', name, three.map(x => x[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?' });
+}
+/** Year 1: "recognise and name common 3-D shapes (cuboids including cubes, pyramids and spheres)" — names only. */
+const Y1_SOLIDS = SHAPES_3D.filter(([, name]) => ['cube', 'cuboid', 'pyramid', 'sphere'].includes(name));
+const y1Shapes3d: Generator = (d, rng) => name3dQ(rng, d === 3 ? SHAPES_3D : Y1_SOLIDS, d === 1 || rng() < 0.5);
+/** Year 2: "identify and describe the properties of 3-D shapes, including the number of edges, vertices and faces". */
 const y2Shapes: Generator = (d, rng) => {
-  const [g, name, fact] = pick(rng, SHAPES_3D);
-  if (d === 1 || rng() < 0.5) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES_3D.filter(x => x[1] !== name)).slice(0, 3).map(x => x[0]), { hint: 'Slice the 3-D shape' });
-  return wordQ(rng, `A ${name} has…`, fact, shuffle(rng, SHAPES_3D.filter(x => x[2] !== fact)).slice(0, 3).map(x => x[2]), { visual: { type: 'word', text: g }, say: `A ${name} has how many faces?` });
+  if (d === 1 || rng() < 0.4) return name3dQ(rng, SHAPES_3D, d === 1 || rng() < 0.5);
+  const [g, , p] = pick(rng, SHAPES_3D);
+  // Edges and vertices are the d2–d3 stretch and only the polyhedra carry them (util.ts); everything else
+  // counts flat faces, which has one answer for all six. A number, not a phrase: "A cone has… 1 curved face"
+  // was sliceable two ways.
+  const counts: [string, number][] = [['flat faces', p.flat]];
+  if (p.edges !== undefined && p.vertices !== undefined && (d === 3 || rng() < 0.6)) counts.push(['edges', p.edges], ['vertices', p.vertices]);
+  const [label, n] = pick(rng, d === 3 && counts.length > 1 ? counts.slice(1) : counts);
+  return numQ(rng, `How many ${label} has a ${p.as}?`, n, { min: 0, max: 14, visual: { type: 'word', text: g }, say: `How many ${label} has a ${p.as}?` });
 };
 
 /** Balance the Scales: both pans must weigh the same — find the number that makes them equal (= as balance). */
@@ -771,6 +794,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y1-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year1', nc: 'Y1 NPV: order numbers to 20', gen: y1Order },
   { id: 'y1-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 NPV: number line', gen: y1Line },
   { id: 'y1-shapes', title: '2-D Shapes', icon: '🔷', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: 2-D shapes', gen: y1Shapes },
+  { id: 'y1-shapes3d', title: '3-D Shapes', icon: '🧊', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: name common 3-D shapes', gen: y1Shapes3d },
   { id: 'y1-position', title: 'Left, Right & Turns', icon: '🧭', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: position, direction, turns', gen: y1Position },
   { id: 'y1-length', title: 'Long & Tall', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: length & height', gen: y1Length },
   { id: 'y1-mass', title: 'Heavy & Light', icon: '🏋️', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: mass/weight', gen: y1Mass },
@@ -793,7 +817,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y2-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year2', nc: 'Y2 NPV: numbers to 100 in words', gen: y2Words },
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', gen: y2Order },
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
-  { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes, faces', gen: y2Shapes },
+  { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes — faces, edges, vertices', gen: y2Shapes },
   { id: 'y2-position', title: 'Turns & Right Angles', icon: '🧭', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: position, direction, rotation as right angles', gen: y2Position },
   { id: 'y2-length', title: 'Length: cm & m', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: length (cm/m)', gen: y2Length },
   { id: 'y2-mass', title: 'Mass: g & kg', icon: '🏋️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: mass (g/kg)', gen: y2Mass },
