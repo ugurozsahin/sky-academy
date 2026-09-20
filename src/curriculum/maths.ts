@@ -115,17 +115,53 @@ const y1Doubles: Generator = (d, rng) => {
   return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 24, visual: d === 1 ? { type: 'tenframe', n, n2: n } : undefined });
 };
 const COINS = [1, 2, 5, 10, 20, 50, 100, 200];
+/**
+ * The notes Year 1 recognises beside the coins — the programme of study says "coins **and notes**" (#298
+ * slice 4). Held in pence like every other denomination, so `coinLabel` writes `£5`/`£10` from the same
+ * source that writes `50p`, and `coinSVG` draws them from the same table.
+ */
+const NOTES = [500, 1000];
+const MONEY = [...COINS, ...NOTES];
+/** Year 1's addition stops at 20, so d3 adds two coins drawn from these — the largest pair is 10p + 10p. */
+const Y1_ADD_COINS = [1, 2, 5, 10];
+/**
+ * Year 1 money (#298 slice 4). The programme asks only to "recognise and know the value of different
+ * denominations of coins and notes": combining coins to a total is Year 2's "find different combinations of
+ * coins that equal the same amounts of money", and Year 1 addition stops at 20. So the topic recognises one
+ * denomination (d1), compares two coins (d2), and adds two coins to at most 20p (d3) — it no longer totals
+ * three coins to 60p.
+ */
 const y1Coins: Generator = (d, rng) => {
   if (d === 1) {
-    const c = pick(rng, COINS.slice(0, 6));
-    return wordQ(rng, 'Which coin is this?', coinLabel(c), shuffle(rng, COINS.filter(x => x !== c)).slice(0, 3).map(coinLabel), { visual: { type: 'coins', coins: [c] }, say: 'How much is this coin worth?' });
+    const c = pick(rng, MONEY);
+    const kind = c >= 500 ? 'note' : 'coin';
+    return wordQ(rng, `Which ${kind} is this?`, coinLabel(c), shuffle(rng, MONEY.filter(x => x !== c)).slice(0, 3).map(coinLabel), { visual: { type: 'coins', coins: [c] }, say: `How much is this ${kind} worth?` });
   }
-  const count = d === 2 ? 2 : 3;
-  const coins = Array.from({ length: count }, () => pick(rng, [1, 2, 5, 10, 20]));
-  return unitQ(rng, coins.reduce((s, c) => s + c, 0), coins);
+  if (d === 2) {
+    // Compare two coins by value. Notes stay at d1: the owner's decision is "which is worth more?" between
+    // two *coins*, and `£10` against `2p` compares nothing a child has to think about.
+    const [a, b] = shuffle(rng, COINS).slice(0, 2);
+    const more = rng() < 0.5;
+    const want = more ? Math.max(a, b) : Math.min(a, b);
+    return wordQ(rng, `Which is worth ${more ? 'more' : 'less'}?`, coinLabel(want), [coinLabel(want === a ? b : a)], {
+      visual: { type: 'coins', coins: [a, b] },
+      say: `${coinLabel(a)} or ${coinLabel(b)}. Which is worth ${more ? 'more' : 'less'}?`,
+    });
+  }
+  const coins = [pick(rng, Y1_ADD_COINS), pick(rng, Y1_ADD_COINS)];
+  return unitQ(rng, coins.reduce((s, c) => s + c, 0), coins, 20);
 };
-function unitQ(rng: Rng, total: number, coins: number[]) {
-  const ds = shuffle(rng, [total + 1, total - 1, total + 5, total + 10].filter(x => x > 0 && x !== total)).slice(0, 3);
+/**
+ * `max` caps the decoys at the year's range too — a `30p` bubble on a Year 1 card is the same overreach as a
+ * `30p` answer. The first four decoys are the long-standing ones and are all `y2-money` ever uses; the rest
+ * only come into play when the cap bites hard enough to leave fewer than three (a 20p total loses `+1`, `+5`
+ * and `+10` at once).
+ */
+function unitQ(rng: Rng, total: number, coins: number[], max = Infinity) {
+  const pool = [total + 1, total - 1, total + 5, total + 10, total - 5, total + 2, total - 2];
+  const ok = (x: number) => x > 0 && x !== total && x <= max;
+  const first = pool.slice(0, 4).filter(ok);
+  const ds = shuffle(rng, first.length >= 3 ? first : pool.filter(ok)).slice(0, 3);
   return wordQ(rng, 'How much money?', `${total}p`, ds.map(x => `${x}p`), { visual: { type: 'coins', coins }, say: 'How many pence altogether?' });
 }
 const y1Time: Generator = (d, rng) => {
