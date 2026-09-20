@@ -43,10 +43,11 @@ export interface ModeSpec {
 }
 
 // A question that is worked out in steps rather than recalled gets one speed step, floored at 1: a spelling
-// sequence (slice several letters in order) or one a generator flagged `slow` — Year 2's difficulty-3
-// two-digit work, all of it, not only the draws that cross a ten (#297; `slowAtD3` in `maths.ts` has the
-// measured share and why it is deliberate). One helper so the two flags always ease by the same amount, in every mode that
-// eases at all. Sky Storm is not one of them: its speed ramps on questions answered rather than on the year,
+// sequence (slice several letters in order) or one a generator flagged `slow` — the d3 draws of `y2Add`,
+// `y2Sub` and `y2Inverse`, all of them, not only the ones that cross a ten (#297; `slowAtD3` in `maths.ts`
+// has the measured share, why it is deliberate, and that it is opt-in per generator rather than a rule
+// about Year 2 d3). One helper so the two flags always ease by the same amount, in every mode that eases
+// at all. Sky Storm is not one of them: its speed ramps on questions answered rather than on the year,
 // and it clamps for `gentle` years instead — `sequence` has never eased there either.
 const eased = (c: ModeCtx, s: number) => c.sequence || c.slow ? Math.max(1, s - 1) : s;
 
