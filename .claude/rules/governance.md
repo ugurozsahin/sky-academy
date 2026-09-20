@@ -17,6 +17,25 @@ paths:
   which `tests/unit/guardrails.test.ts` still checks. **While this reduction is under way it is done in
   sessions with the owner** (issues labelled `owner-session`), not by the routine; removing a rule rather than
   a copy, or removing any other rail, is still a loosening under the `open-pr` skill §6.
+- **An unattended run never writes under `.claude/` (#342).** Not a preference — a platform constraint.
+  `.claude/` is a Claude Code **protected path**, like `.git/`: a write there is never auto-approved, and no
+  routine setting changes it. `permissions.allow` does not reach protected paths, a cloud session cannot use
+  `bypassPermissions`, `defaultMode` is ignored there, and a routine has no permission-mode picker at all
+  (#340 has the documentation trail). What a run meets instead is a prompt nobody is there to answer, and the
+  approval that prompt offers is scoped to **that session**, so it never carries to the next scheduled run:
+  PR #294 stalled 7h33m and PR #318 overnight, both on this very file.
+  `docs/decisions/006-a-routine-never-writes-under-claude.md` has the documentation trail and the five
+  alternatives ruled out. Enforced in code: `claudeDir()` in `.claude/hooks/write-guard.mjs` denies a `Write`
+  or `Edit` under `.claude/` unless the checkout carries the gitignored `.owner-machine` marker, which a clone
+  never has, and refuses to write that marker through the same two tools. **That closes the obvious route, not
+  every route**: `.claude/hooks/bash-guard.mjs` has no rule for either path, so a shell write is not stopped
+  (#346). The marker is a switch, not a seal — the seal is that a routine has no reason to be writing here at
+  all. `PreToolUse` runs before the permission system, so the call is refused in milliseconds rather than
+  waiting hours for a person. **Reads are untouched.** What a run does
+  instead: say on the issue what needed changing here and why, label it `owner-session`, take the next item.
+  The owner's own checkout carries the marker; he creates it by hand, once, and nothing else does.
+  That is the same answer the bullet below already gives for the one-home reduction; this makes it true of
+  everything under `.claude/`, and enforces it.
 - **A `REVIEW: CLEARED` comment that supersedes another reviewer's block (#161)
   carries its own session URL too (#191)** — the same footer every comment carries (#199), so a later reader
   is not left guessing which session cleared a stale block from an unmarked comment. Enforced in code: `hasSessionUrl()` inside `scripts/review-gate.mjs`'s

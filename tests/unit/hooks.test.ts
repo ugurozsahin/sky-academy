@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -8,7 +9,7 @@ import { check as bashCheck, forcePush, ownerMarker as bashOwnerMarker, worklogA
 // @ts-expect-error — plain ESM hook helper
 import { commands, parse } from '../../.claude/hooks/shell.mjs';
 // @ts-expect-error — plain ESM hook script
-import { check as writeCheck } from '../../.claude/hooks/write-guard.mjs';
+import { check as writeCheck, claudeDir, OWNER_MARKER } from '../../.claude/hooks/write-guard.mjs';
 // @ts-expect-error — plain ESM hook script
 import { frozenLabel, heartbeatAppend, ownerMarker, secondItem } from '../../.claude/hooks/github-write-guard.mjs';
 
@@ -511,14 +512,101 @@ describe('layer-0 hooks: the root WORKLOG.md write guard', () => {
 });
 
 /**
- * The rules above are only as good as their wiring. These run the command strings exactly as
- * `.claude/settings.json` declares them, in a shell with `CLAUDE_PROJECT_DIR` set, as the harness does.
+ * #342: `.claude/` is a Claude Code protected path, so an unattended run meets a permission prompt nobody is
+ * there to answer — PR #294 stalled 7h33m and PR #318 overnight, both on `.claude/rules/governance.md`. No
+ * routine setting permits the write (#340, `docs/decisions/006-a-routine-never-writes-under-claude.md`), so
+ * the hook refuses it first: `PreToolUse` runs before the permission system, and the run gets a denial in
+ * milliseconds instead of a prompt that outlives the night.
+ *
+ * Both roots below are temporary directories, never this checkout: the owner's copy carries the marker and CI
+ * does not, so a rail anchored on the real root would say opposite things in the two places.
+ *
+ * Prove one red: drop the `existsSync` check, or compare paths with `startsWith` instead of `relative`.
  */
+describe('layer-0 hooks: an unattended run cannot write under .claude/ (#342)', () => {
+  const noMarker = mkdtempSync(join(tmpdir(), 'sna-clone-'));
+  const owner = mkdtempSync(join(tmpdir(), 'sna-owner-'));
+  writeFileSync(join(owner, OWNER_MARKER), 'owner\n');
+  const deniedIn = (dir: string) => (p: string) => writeCheck({ file_path: p }, dir);
+
+  it('denies every write under .claude/, by relative path and by absolute', () => {
+    for (const p of ['.claude/rules/governance.md', '.claude/settings.json', '.claude/skills/open-pr/SKILL.md',
+                     '.claude/hooks/write-guard.mjs', '.claude/agents/pr-test-analyzer.md'])
+      for (const given of [p, join(noMarker, p)])
+        expect(deniedIn(noMarker)(given), given).toMatch(/protected path/);
+  });
+
+  // Round-1 review of PR #344: `..` was tested as a prefix, so a first segment merely *starting* with two
+  // dots read as "climbed out of the directory" and sailed through, though it lands squarely inside.
+  it('a first segment that only begins with dots is still inside .claude/ (PR #344 review)', () => {
+    for (const p of ['.claude/..x', '.claude/..hidden/notes.md', '.claude/.../x'])
+      expect(deniedIn(noMarker)(p), p).toMatch(/protected path/);
+  });
+
+  it('names the file the run actually tried to write, not a fixed example', () => {
+    // A path that shares nothing with the rule document named in the message's tail, or the assertion passes
+    // on the tail alone — which is how the first version of this rail was vacuous (PR #344 review).
+    expect(deniedIn(noMarker)('.claude/skills/review-pr/SKILL.md')).toContain('.claude/skills/review-pr/SKILL.md');
+    expect(deniedIn(noMarker)('.claude/agents/type-design-analyzer.md')).toContain('type-design-analyzer');
+  });
+
+  it('says what to do instead, and does not name a route to the write it just refused', () => {
+    const reason = deniedIn(noMarker)('.claude/rules/governance.md') ?? '';
+    expect(reason).toContain('owner-session');
+    expect(reason).toContain('.claude/rules/governance.md');
+    expect(reason, 'a run that retries has understood nothing').toMatch(/do not retry/i);
+    expect(reason, 'the one message a stuck run reads must not end by naming the workaround')
+      .not.toMatch(/create .*\.owner-machine|\.owner-machine at the repo root/i);
+  });
+
+  // The marker is at the repo root, so the .claude/ sentence would state a false fact about it; and a run
+  // just refused a .claude/ write must not read this message as a way to get it (PR #344 review).
+  it('refuses the marker for its own reason, which is true of the marker', () => {
+    const reason = deniedIn(noMarker)(OWNER_MARKER) ?? '';
+    expect(reason, 'the marker is not under .claude/').not.toMatch(/is under \.claude\//);
+    expect(reason).toMatch(/owner's-machine marker/);
+    expect(reason, 'and it must not read as permission to create it').toMatch(/nothing a run does may bring it/);
+    expect(deniedIn(noMarker)(join(noMarker, OWNER_MARKER))).toMatch(/owner's-machine marker/);
+  });
+
+  it('allows everything under .claude/ in a checkout that carries the marker — the owner is at the keyboard', () => {
+    for (const p of ['.claude/rules/governance.md', '.claude/settings.json', OWNER_MARKER])
+      expect(deniedIn(owner)(p), p).toBeNull();
+  });
+
+  it('judges a path by where it lands, not by how it is spelled', () => {
+    for (const p of ['.claudex/notes.md', 'src/main.ts', 'docs/ROUTINE-PROMPT.md', 'claude/x.md',
+                     '.claude/../src/main.ts', 'my.claude/x.md'])
+      expect(deniedIn(noMarker)(p), p).toBeNull();
+    expect(writeCheck({}, noMarker)).toBeNull();
+    expect(writeCheck({ file_path: 42 as unknown as string }, noMarker)).toBeNull();
+  });
+
+  it('is wired into check(), alongside the WORKLOG.md rule it did not displace', () => {
+    expect(deniedIn(noMarker)('.claude/settings.json')).toMatch(/protected path/);
+    expect(deniedIn(noMarker)('WORKLOG.md')).toMatch(/retired/);
+    expect(deniedIn(noMarker)('src/main.ts')).toBeNull();
+  });
+
+  // A protected-path rule that fails open on its own bug is worse than none: `check()` now does filesystem
+  // I/O where it used to compare strings, so it has throw surface the rule it replaced did not (PR #344
+  // review). `io.mjs` lets unreadable *input* through on purpose; that is the tool's payload, not this rule.
+  it('denies rather than allows when the rule itself throws', () => {
+    const boom = {} as { file_path: string };
+    Object.defineProperty(boom, 'file_path', { get() { throw new Error('unreadable'); } });
+    let reason: string | null = 'not called';
+    expect(() => { reason = writeCheck(boom, noMarker); }, 'a hook that throws exits 1 and the write proceeds')
+      .not.toThrow();
+    expect(reason, 'and swallowing the throw silently is the same failure wearing a try/catch')
+      .toMatch(/refused/);
+  });
+});
+
 describe('layer-0 hooks: .claude/settings.json runs them', () => {
   const entry = (matcher: string) => (settings.hooks.PreToolUse as any[]).find((e) => e.matcher.startsWith(matcher));
-  const runWired = (matcher: string, toolInput: Record<string, unknown>): unknown => {
+  const runWired = (matcher: string, toolInput: Record<string, unknown>, dir = root): unknown => {
     const out = execFileSync('sh', ['-c', entry(matcher).hooks[0].command],
-      { input: JSON.stringify({ tool_input: toolInput }), encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
+      { input: JSON.stringify({ tool_input: toolInput }), encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: dir } });
     return out.trim() === '' ? null : JSON.parse(out);
   };
 
@@ -542,6 +630,20 @@ describe('layer-0 hooks: .claude/settings.json runs them', () => {
   it('Write|Edit: denies the root WORKLOG.md and allows any other file', () => {
     expect(isDeny(runWired('Write', { file_path: join(root, 'WORKLOG.md') }))).toBe(true);
     expect(runWired('Write', { file_path: join(root, 'src/main.ts') })).toBeNull();
+  });
+
+  // Run against a marker-free directory, which is what a routine's clone is: on the owner's Mac the real root
+  // carries `.owner-machine` and the same call is allowed, so anchoring here would flip between CI and his
+  // laptop. The command string is the real one out of `.claude/settings.json` (#342).
+  it('Write|Edit: denies a .claude/ write through the real command, in a checkout with no owner marker', () => {
+    // A stand-in for a routine's clone: the hooks are there, because they are committed; the marker is not,
+    // because it never is. `CLAUDE_PROJECT_DIR` locates the scripts as well as the root, so both must move.
+    const clone = mkdtempSync(join(tmpdir(), 'sna-wired-'));
+    cpSync(join(root, '.claude/hooks'), join(clone, '.claude/hooks'), { recursive: true });
+    expect(existsSync(join(clone, OWNER_MARKER)), 'a clone never carries the marker').toBe(false);
+    expect(isDeny(runWired('Write', { file_path: join(clone, '.claude/rules/governance.md') }, clone))).toBe(true);
+    expect(isDeny(runWired('Write', { file_path: join(clone, OWNER_MARKER) }, clone))).toBe(true);
+    expect(runWired('Write', { file_path: join(clone, 'src/main.ts') }, clone)).toBeNull();
   });
 
   it('MCP GitHub writes: every body-carrying tool is matched, and each rule denies through the real command', () => {

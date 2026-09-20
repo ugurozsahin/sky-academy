@@ -60,10 +60,13 @@ the stamp would be refused and never land.
 
 ## Considered and dropped
 
-- **Permit the edits instead — a `permissions.allow` block in `.claude/settings.json`.** This is the actual
-  fix for the *stall*; the decision above is the fix for the *blindness*. The owner deliberately deferred it
-  (2026-09-19): measure what really stops runs, and how often, before deciding what to permit. Writing an
-  allow-list from one incident would have guessed at the list. Revisit once the stamp has produced data.
+- **Permit the edits instead — a `permissions.allow` block in `.claude/settings.json`.** ~~This is the actual
+  fix for the *stall*~~ — **struck 2026-09-20 (#340): it is not a fix at all.** Allow rules are evaluated
+  *after* the protected-path check, so the entry would have had no effect and would have looked like a
+  remedy. The decision above remains the fix for the *blindness*; the fix for the stall is
+  `docs/decisions/006-a-routine-never-writes-under-claude.md` — a run does not make the write. The owner's
+  deferral (2026-09-19) — measure what really stops runs before deciding what to permit — was right for a
+  better reason than the one recorded here at the time, and the measurement is what found this.
 - **Run the routine in a mode that never prompts.** Simplest and widest: it would end the stalls tomorrow and
   leave the layer-0 hooks as the only defence. Not taken without the measurement above, and it would still
   have left a dead run and a busy run indistinguishable.
