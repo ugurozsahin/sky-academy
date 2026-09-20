@@ -412,6 +412,115 @@ const y2WordClass: Generator = (d, rng) => {
 };
 
 /**
+ * Sentence types (#299 slice 3, NC English Appendix 2 Year 2): `[sentence, type]`.
+ *
+ * The four forms are taught as a set, so the card shows one sentence and asks which it is. What keeps exactly
+ * one answer defensible is the English KS1 convention the bank is built to: a **question** ends with `?`; an
+ * **exclamation** is the `What …!` / `How …!` form and nothing else (`Look out!` is a command, however loudly
+ * it is said); a **statement** and a **command** both end with a full stop, so those two can only be told
+ * apart by reading — which is the point of the topic.
+ *
+ * That last pair is why no command here ends with `!`: it would be correct English and would still make the
+ * card a punctuation-spotting exercise with two defensible answers.
+ */
+export const SENTENCE_TYPE_NAMES = ['statement', 'question', 'command', 'exclamation'] as const;
+export type SentenceType = typeof SENTENCE_TYPE_NAMES[number];
+export const SENTENCE_TYPES: ReadonlyArray<readonly [string, SentenceType]> = [
+  ['The cat sat on the mat.', 'statement'],
+  ['Ninjas train every day.', 'statement'],
+  ['My bike is bright red.', 'statement'],
+  ['We went to the park.', 'statement'],
+  ['The sun is shining today.', 'statement'],
+  ['Our school has a new roof.', 'statement'],
+  ['Where is my hat?', 'question'],
+  ['Can you swim?', 'question'],
+  ['What is your name?', 'question'],
+  ['Who took the last biscuit?', 'question'],
+  ['Are we there yet?', 'question'],
+  ['How old is your dog?', 'question'],
+  ['Close the door.', 'command'],
+  ['Wash your hands.', 'command'],
+  ['Put on your coat.', 'command'],
+  ['Line up quietly.', 'command'],
+  ['Pass me the ball.', 'command'],
+  ['Tidy your bedroom.', 'command'],
+  ['What a lovely day it is!', 'exclamation'],
+  ['How tall that tree is!', 'exclamation'],
+  ['What a mess we made!', 'exclamation'],
+  ['How quickly she ran!', 'exclamation'],
+  ['What big ears you have!', 'exclamation'],
+  ['How brave you are!', 'exclamation'],
+];
+/**
+ * d1 is the pair a Year 1 child already meets (a sentence that tells you something, a sentence that asks);
+ * d2 adds the command, which shares its full stop with the statement; d3 adds the exclamation.
+ *
+ * The bubbles are the types unlocked so far, not all four, so d1 is a two-way choice rather than a guess
+ * between words the child has not been taught yet.
+ */
+const y2SentenceType: Generator = (d, rng) => {
+  const allowed = SENTENCE_TYPE_NAMES.slice(0, d === 1 ? 2 : d === 2 ? 3 : 4);
+  const [sent, type] = pick(rng, SENTENCE_TYPES.filter(e => allowed.includes(e[1])));
+  return wordQ(rng, 'What kind of sentence is this?', type, allowed.filter(n => n !== type), {
+    visual: { type: 'sentence', text: sent }, say: `${sent} What kind of sentence is this?`,
+    hint: 'Does it tell, ask, order or exclaim?',
+  });
+};
+
+/**
+ * Present and past (#299 slice 3, NC English Appendix 2 Year 2): `TENSE_VERBS` is `[base, he/she present,
+ * past, -ing]` and `TENSE_FRAMES` is `[frame with one gap, the column that fills it, the tense of the
+ * finished sentence]`. Every frame takes every verb, so the two tables multiply out instead of being written
+ * card by card.
+ *
+ * A frame carries its own tense — a time phrase (`Yesterday`) or the auxiliary (`is`/`was`) — which is what
+ * makes exactly one of the four forms fit the gap at d3: `Yesterday he walking` and `Yesterday he walks` are
+ * both wrong, and a child who writes either is making the mistake this topic is for. The past-progressive
+ * frames carry no time phrase at all, so `was` against `is` is the only thing that answers them.
+ */
+export const TENSE_VERBS: ReadonlyArray<readonly [string, string, string, string]> = [
+  ['walk', 'walks', 'walked', 'walking'], ['jump', 'jumps', 'jumped', 'jumping'],
+  ['shout', 'shouts', 'shouted', 'shouting'], ['smile', 'smiles', 'smiled', 'smiling'],
+  ['clap', 'claps', 'clapped', 'clapping'], ['skip', 'skips', 'skipped', 'skipping'],
+  ['dance', 'dances', 'danced', 'dancing'], ['laugh', 'laughs', 'laughed', 'laughing'],
+  ['drum', 'drums', 'drummed', 'drumming'], ['hide', 'hides', 'hid', 'hiding'],
+  // Irregular pasts: the form a child cannot build with a rule, and the reason a bank beats a suffix.
+  ['run', 'runs', 'ran', 'running'], ['sing', 'sings', 'sang', 'singing'],
+  ['swim', 'swims', 'swam', 'swimming'], ['sit', 'sits', 'sat', 'sitting'],
+  ['sleep', 'sleeps', 'slept', 'sleeping'], ['fly', 'flies', 'flew', 'flying'],
+];
+/** 1 = he/she present, 2 = past, 3 = the `-ing` form the progressive frames need. */
+type TenseCol = 1 | 2 | 3;
+export const TENSE_FRAMES: ReadonlyArray<readonly [string, TenseCol, 'present' | 'past']> = [
+  ['Every day she ___ in the garden.', 1, 'present'],
+  ['Every morning he ___ in the park.', 1, 'present'],
+  ['Yesterday he ___ in the garden.', 2, 'past'],
+  ['Last week she ___ in the park.', 2, 'past'],
+  ['She is ___ in the garden now.', 3, 'present'],
+  ['They are ___ in the park.', 3, 'present'],
+  ['He was ___ in the garden.', 3, 'past'],
+  ['We were ___ in the park.', 3, 'past'],
+];
+/**
+ * d1 and d2 name the tense of a finished sentence — d1 on the simple forms, d2 with the progressive, where
+ * the auxiliary rather than the verb ending carries the tense. d3 turns the same sentence round and asks the
+ * child to produce the form the gap needs, with all four forms of that one verb on the bubbles.
+ */
+const y2Tense: Generator = (d, rng) => {
+  const [frame, col, tense] = pick(rng, d === 1 ? TENSE_FRAMES.filter(f => f[1] !== 3) : TENSE_FRAMES);
+  const v = pick(rng, TENSE_VERBS);
+  if (d === 3) return wordQ(rng, frame, v[col], v.filter(w => w !== v[col]), {
+    visual: { type: 'sentence', text: frame }, say: frame.replace('___', 'blank'),
+    hint: 'Which form of the word fits?',
+  });
+  const sent = frame.replace('___', v[col]);
+  return wordQ(rng, 'Present or past?', tense, [tense === 'past' ? 'present' : 'past'], {
+    visual: { type: 'sentence', text: sent }, say: `${sent} Is this sentence in the present or the past?`,
+    hint: 'Is it happening now, or has it happened already?',
+  });
+};
+
+/**
  * Sound-alike words: [sentence with a gap, the options (answer first), answer]. Every option set is one of
  * `HOMOPHONE_SETS` — the Year 2 statutory pairs (NC English Appendix 1) plus `piece/peace` from Year 3–4 — and
  * a rail holds it there: `on/won`, `brown/brawn` and `wind/wined` were not homophones at all (#296).
@@ -463,6 +572,8 @@ export const WRITING_TOPICS: Topic[] = [
   { id: 'y2-suffix-root', title: 'Changing Endings', icon: '🔁', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes that change the root (drop e, double, y→i)', gen: y2SuffixRoot },
   { id: 'y2-homophones', title: 'Sound-alike Words', icon: '👂', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: homophones', gen: y2Homophones },
   { id: 'y2-wordclass', title: 'Word Detective', icon: '🔍', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: nouns, verbs, adjectives, adverbs', gen: y2WordClass },
+  { id: 'y2-sentencetype', title: 'Sentence Types', icon: '💬', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: statements, questions, commands and exclamations', gen: y2SentenceType },
+  { id: 'y2-tense', title: 'Then & Now', icon: '⏳', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: present and past tense, including the progressive', gen: y2Tense },
   { id: 'y2-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: commas, apostrophes', gen: y2Punct },
   { id: 'y2-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year2', nc: 'Y2 Writing: word order, conjunctions, noun phrases', gen: y2Sentence },
   { id: 'y2-trace', title: 'Trace Words', icon: '✍️', subject: 'writing', year: 'year2', nc: 'Y2 Handwriting', input: 'tracing', gen: y2Trace },
