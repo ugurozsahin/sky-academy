@@ -120,6 +120,30 @@ describe('coinSVG — real UK coin shapes (#43)', () => {
   it('the £2 coin gets an inner ring (bimetallic)', () => {
     expect((coinSVG(200).match(/<circle/g) ?? []).length).toBe(2);
   });
+  // #298 slice 4: Year 1 recognises "coins **and notes**", so £5 and £10 are paper, not very large coins.
+  it('the £5 and £10 are drawn as notes — a rectangle, never a disc', () => {
+    for (const p of [500, 1000]) {
+      expect(coinSVG(p), `${p}p`).toContain('<rect');
+      expect(coinSVG(p), `${p}p`).not.toContain('<circle');
+      expect(coinSVG(p), `${p}p`).not.toContain('<polygon');
+    }
+    expect(coinSVG(500)).toContain('>£5<');
+    expect(coinSVG(1000)).toContain('>£10<');
+    // Distinguishable from each other, and both from the gold the £1/£2 use.
+    expect(coinSVG(500)).not.toBe(coinSVG(1000));
+    for (const p of [500, 1000]) expect(coinSVG(p), `${p}p reuses the coin gold`).not.toContain('#e6c250');
+  });
+  it('a note is wider than it is tall — the coin viewBox would render it as a square', () => {
+    for (const p of [500, 1000]) {
+      const box = coinSVG(p).match(/viewBox="0 0 (\d+) (\d+)"/);
+      expect(box, `${p}p has no viewBox`).not.toBeNull();
+      expect(Number(box![1]), `${p}p width`).toBeGreaterThan(Number(box![2]));
+    }
+  });
+  it('a note still carries the .coin class, so the arena keeps sizing and shadowing it', () => {
+    // `.coins .coin` in style.css owns height/drop-shadow, and the e2e visual check counts `.vis .coin`.
+    for (const p of [500, 1000]) expect(coinSVG(p), `${p}p`).toMatch(/class="coin(\s|")/);
+  });
 });
 
 describe('clockSVG — hand angles (#43)', () => {

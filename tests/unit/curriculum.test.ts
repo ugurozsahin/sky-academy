@@ -558,6 +558,64 @@ describe('Year 2 money is recorded the KS1 way (#298 slice 2)', () => {
   });
 });
 
+describe('Year 1 money recognises denominations and stays within 20 (#298 slice 4)', () => {
+  // Red on `main`, where d2 totalled two coins from [1,2,5,10,20] (up to 40p) and d3 totalled three (up to
+  // 60p) — combining coins is Year 2's "find different combinations of coins that equal the same amounts",
+  // and Year 1 addition stops at 20. Year 1 asks to "recognise and know the value of different denominations
+  // of coins **and notes**", which is why the notes join d1's pool.
+  const DENOM: Record<string, number> = { '1p': 1, '2p': 2, '5p': 5, '10p': 10, '20p': 20, '50p': 50, '£1': 100, '£2': 200, '£5': 500, '£10': 1000 };
+  it('d1 recognises one coin or note, d2 compares two coins, d3 adds two coins to at most 20p', () => {
+    const t = TOPICS.find(x => x.id === 'y1-coins')!; const r = rng(298 + 4);
+    let recognise = 0, notes = 0, compare = 0, less = 0, adds = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 400; i++) {
+      const q = t.gen(d, r);
+      let m;
+      if ((m = q.prompt.match(/^Which (coin|note) is this\?$/))) {
+        recognise++;
+        expect(d, `a recognise card at difficulty ${d}`).toBe(1);
+        const v = DENOM[q.answer];
+        expect(v, `"${q.answer}" is not a UK denomination`).toBeDefined();
+        // The word matches the thing: a note is never called a coin, which is the half of "coins and notes"
+        // a pool that simply grew would get wrong.
+        expect(m[1], `${q.answer} called a ${m[1]}`).toBe(v >= 500 ? 'note' : 'coin');
+        if (v >= 500) notes++;
+        for (const o of q.options) expect(DENOM[o], `option "${o}" is not a UK denomination`).toBeDefined();
+        expect(q.visual, q.prompt).toEqual({ type: 'coins', coins: [v] });
+      } else if ((m = q.prompt.match(/^Which is worth (more|less)\?$/))) {
+        compare++;
+        expect(d, `a comparison card at difficulty ${d}`).toBe(2);
+        const vals = q.options.map(o => { expect(DENOM[o], `option "${o}"`).toBeDefined(); return DENOM[o]; });
+        expect(q.options.length, q.prompt).toBe(2);
+        expect(DENOM[q.answer], `"${q.prompt}" over ${q.options.join(' / ')} answered "${q.answer}"`)
+          .toBe(m[1] === 'more' ? Math.max(...vals) : Math.min(...vals));
+        // Coins only at d2 — a note against a 1p compares nothing (the topic's own comment says so).
+        for (const v of vals) expect(v, `d2 offered ${v}p, which is a note`).toBeLessThan(500);
+        if (m[1] === 'less') less++;
+      } else if (q.prompt === 'How much money?') {
+        adds++;
+        expect(d, `an addition card at difficulty ${d}`).toBe(3);
+        const coins = (q.visual as { type: 'coins'; coins: number[] }).coins;
+        expect(coins.length, 'Year 1 adds two coins, not three').toBe(2);
+        expect(q.answer, q.prompt).toBe(`${coins.reduce((s, c) => s + c, 0)}p`);
+        // The answer *and* every decoy stay inside Year 1's range: a 30p bubble is the same overreach.
+        for (const o of q.options) {
+          const v = Number(o.replace(/p$/, ''));
+          expect(o, `option "${o}" is not pence`).toMatch(/^\d+p$/);
+          expect(v, `d3 offered "${o}", outside Year 1's range`).toBeLessThanOrEqual(20);
+          expect(v, `d3 offered "${o}"`).toBeGreaterThan(0);
+        }
+        expect(new Set(q.options).size, 'duplicate options').toBe(q.options.length);
+      } else throw new Error(`y1-coins drew a card this rail does not know: "${q.prompt}"`);
+    }
+    // Counters, so deleting a draw cannot make this rail vacuously green (the #298 rails above do the same).
+    expect(recognise, 'd1 recognise cards').toBeGreaterThan(350);
+    expect(notes, 'd1 cards showing a £5 or £10 note').toBeGreaterThan(30);
+    expect(compare, 'd2 comparison cards').toBeGreaterThan(350);
+    expect(less, 'd2 cards asking for the *smaller* coin').toBeGreaterThan(100);
+    expect(adds, 'd3 addition cards').toBeGreaterThan(350);
+  });
+});
+
 describe('shape tables (#35 — one source for maths.ts and memory.ts)', () => {
   it('2-D shapes carry correct side counts (circle = 0)', () => {
     const sides = Object.fromEntries(SHAPES_2D.map(([, name, n]) => [name, n]));

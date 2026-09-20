@@ -124,7 +124,21 @@ const DOT_LAYOUTS: Record<number, [number, number][]> = {
   5: [[30, 22], [90, 22], [60, 41], [30, 60], [90, 60]], 6: [[30, 20], [30, 41], [30, 62], [90, 20], [90, 41], [90, 62]],
 };
 
+/**
+ * The £5 and £10 notes Year 1 recognises beside the coins (#298 slice 4): paper, so a rounded rectangle in
+ * the note's own colour rather than another disc. The viewBox is the note's aspect (2:1) and `.coins .coin`
+ * leaves height auto, so it renders wider and shorter than the coins it sits beside instead of reading as a
+ * very large coin.
+ */
+const NOTE_INK: Record<number, [string, string]> = { 500: ['#8ed4c4', '#2c6b5e'], 1000: ['#e8a765', '#8a4e1c'] };
+export function noteSVG(p: number): string {
+  const [fill, ink] = NOTE_INK[p] ?? ['#c9b6e0', '#5b3f7a'];
+  const label = coinLabel(p);
+  return `<svg viewBox="0 0 96 48" class="coin note" style="width:76px"><rect x="3" y="3" width="90" height="42" rx="5" fill="${fill}" stroke="${ink}" stroke-width="3"/><rect x="11" y="11" width="74" height="26" rx="3" fill="none" stroke="${ink}" stroke-width="1.5" opacity="0.55"/><text x="48" y="31" text-anchor="middle" font-size="20" font-weight="700" fill="${ink}">${label}</text></svg>`;
+}
+
 export function coinSVG(p: number): string {
+  if (p >= 500) return noteSVG(p);
   const gold = p === 1 || p === 2 ? ['#c9803a', '#7a4a1c'] : p >= 100 ? ['#e6c250', '#8a6d1f'] : ['#d5d9e2', '#7d8594'];
   const label = coinLabel(p);
   const r = p === 1 ? 22 : p === 2 ? 26 : p === 5 ? 20 : p === 10 ? 25 : p === 20 ? 24 : p === 50 ? 28 : p === 100 ? 24 : 28;
