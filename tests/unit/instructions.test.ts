@@ -24,6 +24,11 @@ const INSTRUCTION_FILES = [
   'CLAUDE.md', 'AGENTS.md', 'README.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
   'docs/WATCHDOG-PROMPT.md', ...mdIn('.claude/rules'), ...mdIn('docs/decisions'), ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
 ];
+// The instruction files a session reads to be told what to do. The decision records are excluded because they
+// are the thing pointed *at*: counting them would let ADRs satisfy the rails below by citing one another, and
+// would let a retired file stay "named" by the history that records its retirement.
+const LIVE_FILES = INSTRUCTION_FILES.filter((f) => !f.startsWith('docs/decisions/'));
+const liveText = () => LIVE_FILES.map((f) => readFileSync(join(root, f), 'utf8')).join('\n');
 
 // A repo path anywhere inside a code span — alone, or as an argument of a command: a path under a tracked
 // top-level directory, or one of the root files these documents point at by bare name.
@@ -93,10 +98,39 @@ describe('agent instruction files', () => {
   // Plain text, not only code spans: the instruction a run acted on was prose — STEP 1's "read CLAUDE.md,
   // BACKLOG.md, and …" — and `README.md`, read by this rail since then, pointed at the file too (review of PR #274).
   it('only the decision records still name the retired BACKLOG.md, in a code span or in prose (#218)', () => {
-    const live = INSTRUCTION_FILES.filter((f) => !f.startsWith('docs/decisions/'));
-    expect(live.length).toBeGreaterThan(12);
-    expect(live.filter((f) => /\bBACKLOG\.md\b/.test(readFileSync(join(root, f), 'utf8'))),
+    expect(LIVE_FILES.length).toBeGreaterThan(12);
+    expect(LIVE_FILES.filter((f) => /\bBACKLOG\.md\b/.test(readFileSync(join(root, f), 'utf8'))),
       'a live instruction names a file that is gone').toEqual([]);
+  });
+
+  /**
+   * Records have readers (#98) — a decision record most of all. An ADR nobody points at is prose that ages
+   * out of agreement with the rule it explains, and the first sign is that a run re-argues a decision the
+   * owner already made. `.claude/rules/governance.md` carries the test for when a decision needs one at all;
+   * this holds the other half, that it is reachable from something a session actually reads.
+   *
+   * The pointer may sit in any live instruction file — usually the rule's own home: `docs/ROUTINE-PROMPT.md`
+   * points at 002 and 003, the `review-pr` skill at 002 and 004, `docs/WATCHDOG-PROMPT.md` at 005.
+   *
+   * What it does not check, so a reviewer does not read more into a green than is there. It matches the
+   * repo-relative path anywhere in the text, so an incidental or dead mention satisfies it: this proves the
+   * record is *reachable*, never that the pointer is one a run would follow or that it still says what the
+   * pointer promises — both are the reviewer's, exactly as for the sibling rail above. The full path is
+   * required on purpose (a bare basename, or one under the wrong directory, no longer passes), which is also
+   * what makes this compose with `%s points only at paths that exist`: that rail then proves the same path
+   * resolves. `readdirSync` is not recursive, so a record filed in a subdirectory of `docs/decisions/` is
+   * exempt and green.
+   *
+   * Prove it red: add a file to `docs/decisions/` and point nothing at it.
+   */
+  it('every decision record is pointed at by a live instruction file (#98)', () => {
+    const adrs = mdIn('docs/decisions');
+    // Vacuity only: an empty directory would pass the assertion below saying nothing. Deliberately not a
+    // floor at today's count — retiring a record is a decision a run may legitimately make.
+    expect(adrs.length, 'the decision records have gone missing').toBeGreaterThan(0);
+    const text = liveText();
+    // By repo-relative path, wherever it is written — a code span, a sentence, a link.
+    expect(adrs.filter((f) => !text.includes(f)), 'a decision record nothing points at').toEqual([]);
   });
 
   it('every skill directory is classed as ours or vendored, so a new one cannot go unread', () => {

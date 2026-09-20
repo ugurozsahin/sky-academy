@@ -76,6 +76,23 @@ paths:
   applying this one label — and that narrative is still copied in `CLAUDE.md` and
   `docs/ROUTINE-PROMPT.md` (debt, first bullet). `docs/ROUTINE-PROMPT.md` carries a pointer here instead of
   restating it. **`frozen` is not a way to park work — `later` is.**
+- **When a decision needs a `docs/decisions/` record and not just an issue.** The record-routing rule offers
+  "the issue, or `docs/decisions/NNN-title.md`" and gives no test for choosing, so everything drifted to the
+  issue — and `docs/decisions/001-one-home-per-rule.md` §1 already assigns *why a rule exists, and its history* here. The test:
+  **write the ADR when the decision binds work beyond the issue that prompted it, or when a real alternative
+  was rejected.** A decision that settles one issue's scope belongs on that issue. One that changes how every
+  future run behaves — what may block a pull request, what a run records, where a rule lives — belongs in
+  `docs/decisions/`, **with the alternatives that were dropped and why**, because the next person to propose
+  one of them will otherwise argue it from scratch. The pull request body says what changed and the rail says
+  what is pinned; neither survives as the answer to "why this and not that". Written after 2026-09-19, when
+  two decisions of exactly that kind were recorded only in pull request bodies: the review-block bar and round
+  cap (#305/PR #306), now `docs/decisions/004-what-a-review-block-is-for.md`, and the run pulse (#314/PR #315),
+  now `docs/decisions/005-the-run-pulse-says-when-a-run-started.md`. **The number is claimed by the pull
+  request, and nothing reserves it**: those two were written concurrently and each picked its own number
+  without seeing the other. Take the next free number at the moment you write the file, and if an open pull
+  request has already claimed it, renumber yours rather than the other way round — a merged record's number is
+  the one pointers are written against. Every record is pointed at by a live instruction file, which
+  `tests/unit/instructions.test.ts` checks (#98).
 - A PR touching a governance file states in one line whether it **tightens** the constraints on a run (a check,
   a rail, a rule, or describing behaviour that already exists — ordinary work) or **loosens** them (a
   constraint removed, a budget raised, a gate that no longer gates — owner-gated, never routine-merged). See

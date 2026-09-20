@@ -149,10 +149,10 @@ What that means in practice:
 
 ## 7. A block is for this pull request's own bar, and rounds are not free
 
-Pull request #292 (#150) took **six rounds of `REVIEW: CHANGES REQUESTED`** across five hours and seven
+Pull request #292 (#150) took **seven rounds of `REVIEW: CHANGES REQUESTED`** across 6h14m and seven
 pushes. The issue asked for four things, and all four were met on the first head. Rounds 2 to 6 added no
 acceptance item: each invented a further shape — a YAML comment, a second `description :` key,
-`model:inherit`, a line of non-breaking spaces — until a ten-line pin had become 254 lines modelling a YAML
+`model:inherit`, a line of non-breaking spaces — until a ten-line pin had become 276 lines modelling a YAML
 parser in regular expressions, with a check that failed the build on ordinary English (`only`, `instead`,
 `no`) and on a carriage return anywhere in the file. Every round was defensible on its own. The sum was not,
 and nothing here stopped it.
@@ -176,6 +176,11 @@ queued, not lost.
 A reviewer who reaches the third round has usually already found the real answer: the pull request is trying
 to do too much. Say that instead. "Reduce this to X; the rest is issue #n" is a better review than a seventh
 shape.
+
+`docs/decisions/004-what-a-review-block-is-for.md` has the incident this came from and the five alternatives
+weighed against it: automating the count, the bar with no cap, the cap with no bar and doing nothing were all
+rejected; capping the *size* of a review instead of the number of rounds was **deferred, not rejected**, and is
+the one to raise again if cost per round is still the problem.
 
 ## Reviewing is the work
 
