@@ -2235,80 +2235,80 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * STEP 2. Hence the uniqueness assertion, which is the load-bearing one; the slice is guarded at both ends
    * as the #305 rail two tests above guards its own.
    *
-   * The negative half stays file-wide, with emphasis stripped: a restatement of the cap *anywhere* in this
-   * file is the defect, and this file's house style bolds constantly enough that "**three**" would otherwise
-   * have walked past. It pins operative clauses and not bare nouns, in both directions. Too narrow and a
-   * paraphrase gets a second home for the cap, which decision 001 exists to prevent. Too broad and it fails
-   * the build on ordinary English: `third round`, `three times` and "count the REVIEW: CHANGES REQUESTED
-   * comments" are all things this prompt says legitimately about rules that are not the cap — STEP 1 defines
-   * a waiting pull request in terms of those comments. That is the shape `review-pr` §7's own incident is
-   * about, a check that reddened on the words `only`, `instead` and `no`.
+   * **The negative half is deliberately one pattern, and that is the settled answer rather than a gap left
+   * open** (round 3, B2). Three review rounds each found both a spelling it missed and ordinary English it
+   * reddened, which is the shape `review-pr` §7's own incident is about — a check that failed the build on
+   * the words `only`, `instead` and `no`. `third round`, `three times` and "count the REVIEW: CHANGES
+   * REQUESTED comments" are all things this prompt says legitimately about rules that are *not* the cap:
+   * STEP 1 defines a waiting pull request in terms of those comments. Widening the list a fourth time buys
+   * a longer list of spellings, not a proof — a bolded, backticked or lightly reworded copy walks past any
+   * of them, exactly as the #305 rail says of its own `ESCAPES`, and the byte budget is no backstop either,
+   * since a restatement can be paid for out of other prose like any other clause. So what remains is the one
+   * spelling that cannot occur here innocently, and **a restatement of the cap is the reviewer's to catch,
+   * not this rail's**. What #310 delivers is the pointer; the positives are what pin it.
    *
-   * It is still a list of spellings, not a proof — a novel wording walks past it, exactly as the #305 rail
-   * says of its own `ESCAPES` — and the byte budget is not the backstop it looks like, since a restatement
-   * can be paid for out of other prose like any other clause.
-   *
-   * Prove it red: move the clause out of rule 4 into any other rule, with or without a decoy opening planted
-   * earlier; drop the §7 pointer; put "with no time box" back unqualified; write a licence beside the
-   * pointer; or restate the round cap anywhere in the file, paraphrased, bolded or verbatim.
+   * Prove it red: move the clause out of rule 4 — into another rule, a new rule 5, or a paragraph of its own
+   * before the report paragraph, with or without a decoy opening planted earlier; drop the §7 pointer; put
+   * "with no time box" back unqualified; write a licence beside the pointer, either side of it; or restate
+   * the cap in the file as "the third round is the last…", bolded or backticked.
    */
   it('the reviewer prompt points at §7 for the rounds, in rule 4, and does not restate the cap (#310)', () => {
     const prompt = read('docs/REVIEWER-PROMPT.md');
     const OPENS = '4. **It is labelled `owner-approval`';
-    // Rule 4 alone — from its own numbered heading to the paragraph that closes the four unmergeable rules.
+    // Emphasis and code spans are house style in this file, never meaning, so neither may decide a match.
+    const bare = (s: string) => flat(s).replace(/\*\*|__|\*|_|`/g, '');
+
     // The anchor has to be UNIQUE: `indexOf` takes the first match, so a decoy copy of this literal planted
-    // earlier binds `from` to it while `to` stays put, the "slice" spans STEP 2 onwards, the positives are
-    // file-wide again and round 1's relocation walks straight back in (review round 2, B1). `lastIndexOf` is
-    // not the fix — it only changes which copy wins.
+    // earlier binds `from` to it, the "slice" spans STEP 2 onwards, the positives are file-wide again and
+    // round 1's relocation walks straight back in (round 2, B1). `lastIndexOf` only changes which copy wins.
     expect(prompt.split(OPENS).length - 1,
       'rule 4 must open exactly once: renumbered, removed, or a second copy of its opening would start the slice '
       + 'in the wrong place').toBe(1);
     const from = prompt.indexOf(OPENS);
-    const to = prompt.indexOf('\nReport to the owner only for something noteworthy', from);
-    expect(to, 'the four unmergeable rules no longer end at the report paragraph').toBeGreaterThan(from);
-    const rule4 = flat(prompt.slice(from, to));
-    expect(rule4.length, 'rule 4 must be read from disk as text, or this rail checks nothing').toBeGreaterThan(500);
+    // And it ends at rule 4's OWN newline. Ending it at the report paragraph made the slice "rule 4 through
+    // the end of the rules block", so the clause could leave rule 4 for a paragraph of its own or a new
+    // rule 5 and every positive below still passed, under messages saying it was in rule 4 (round 3, B1).
+    const to = prompt.indexOf('\n', from);
+    expect(to, 'rule 4 must still be one line — the slice below is that line').toBeGreaterThan(from);
+    expect(prompt.indexOf('\nReport to the owner only for something noteworthy', to),
+      'the four unmergeable rules no longer end at the report paragraph').toBeGreaterThan(to);
+    const rule4 = bare(prompt.slice(from, to));
+    expect(rule4.length, 'rule 4 has lost most of its body — the slice is meant to be the whole rule')
+      .toBeGreaterThan(800);
 
     expect(rule4, 'rule 4 must still say a review is not hurried — the pointer hangs off that sentence')
       .toContain("reviewing it IS this run's work");
     expect(rule4, "and the no-time-box must be about a review's depth, or it reads as a licence on the rounds too")
-      .toMatch(/no time box on a review's \*\*depth\*\*/);
-    // By clause, not by spelling: the file names the skill three ways and this is the least legible of them,
+      .toMatch(/no time box on a review's depth/);
+    // By clause, not by spelling: the file names the skill four ways and this is the least legible of them,
     // so pinning the literal would freeze the inconsistency and make a tidy-up double red (round 2, note 5).
     // `review-pr` and `§7` still both have to be there, which is what does the cross-file work.
     expect(rule4, 'and rule 4 is where it must sit: a reviewer who stops at rule 4 meets the cap, or #310 bought nothing')
       .toMatch(/how many times one may block[^.]*review-pr[^.]*§7/);
 
-    // And the pointer must not hand the cap back in the same breath (round 1, note 5). #305's own `ESCAPES` are
-    // scoped to §7's slice in the skill and cannot see this file. Scoped to the sentence carrying the pointer,
-    // not to all of rule 4 (round 2, note 1): rule 4's own subject is the `owner-approval` label and the
-    // `loosening` hold, whose native vocabulary is discretion and binding, and these patterns are
-    // negation-blind — "Whether the label goes on is not at your discretion" tightens the rule and would trip
-    // them. A licence that reads as the prompt's authority over the cap has to sit beside the pointer.
-    const depthAt = rule4.indexOf('**While a PR is waiting');
-    expect(depthAt, 'rule 4 has lost the sentence the §7 pointer hangs off').toBeGreaterThan(-1);
-    const capClause = rule4.slice(depthAt);
+    // And the cap must not be handed back in the same breath. Scoped to the clause, not to all of rule 4
+    // (round 2, note 1): rule 4's own subject is the `owner-approval` label and the `loosening` hold, whose
+    // native vocabulary is discretion and binding, and these patterns are negation-blind — "Whether the label
+    // goes on is not at your discretion" tightens the rule and would trip them. The clause starts at whichever
+    // of the depth sentence and the pointer comes first, so reordering the two cannot leave a licence between
+    // them unscanned (round 3, note 1).
+    const marks = [rule4.indexOf('While a PR is waiting'), rule4.search(/how many times one may block/)];
+    expect(Math.min(...marks), 'rule 4 has lost the depth sentence or the §7 pointer').toBeGreaterThan(-1);
     for (const escape of [/\bnot a hard\b/i, /\bas often as you (need|like)\b/i, /\bat your discretion\b/i,
       /\b(only|merely) a guideline\b/i, /\bthe cap does not apply\b/i, /\bbinds you\b/i])
-      expect(capClause, `the §7 pointer carries a clause that gives the cap back: ${escape}`).not.toMatch(escape);
+      expect(rule4.slice(Math.min(...marks)), `the §7 pointer carries a clause that gives the cap back: ${escape}`)
+        .not.toMatch(escape);
 
-    // File-wide, and by clause: the cap belongs in `review-pr` §7 alone. Emphasis is stripped first, because
-    // `flat()` normalises whitespace and not `**`, and this file's house style bolds constantly — so
-    // "at most **three** times" would have walked past every pattern below (round 2, note 3).
-    const bare = flat(prompt).replace(/\*\*|__|\*|_/g, '');
-    const RESTATED = [
-      /third round is the last/i, /last (one|round) that blocks/i,
-      // A blocking word is required. `three times` alone is ordinary English about anything — STEP 2's
-      // review-agent protocol could legitimately say "retry at most three times" — and the paraphrase catch
-      // is carried by the pattern after it (round 2, B3).
-      /(at most|no more than) three (rounds|blocks)/i, /block(?:s|ing)? (?:at most|no more than) three/i,
-      // §7's counting sentence, with enough of it to be that sentence: the prompt reasons about these comments
-      // constantly — STEP 1 defines a waiting pull request in terms of them — so the bare verb reddened
-      // legitimate prose about an unrelated rule (round 2, B2).
-      /Count the `REVIEW: CHANGES REQUESTED` comments on the pull request/i,
-    ];
-    for (const copy of RESTATED)
-      expect(bare, `the prompt restates the round cap instead of pointing at it: ${copy}`).not.toMatch(copy);
+    // One pattern, deliberately, and it is the weakest half of this rail (round 3, B2). Three rounds each
+    // found a spelling the list missed and ordinary English it reddened: `third round`, `three times` and
+    // "count the REVIEW: CHANGES REQUESTED comments" are all things this prompt says legitimately about rules
+    // that are NOT the cap — STEP 1 defines a waiting pull request in terms of those comments. Proving a
+    // negative over free text is what `review-pr` §7's own incident is about, so the list is reduced to the
+    // one spelling that cannot occur here innocently rather than widened again. **A restatement of the cap is
+    // the reviewer's to catch, not this rail's**; what #310 delivers is the pointer, and the positives above
+    // are what pin it.
+    expect(bare(prompt), 'the cap belongs in `review-pr` §7 alone — the prompt points at it, it does not copy it')
+      .not.toMatch(/third round is the last/i);
   });
 
   /**
