@@ -1526,31 +1526,34 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
 /**
  * #342: `.claude/` is a Claude Code protected path, so a write there raises a permission prompt an unattended
  * run cannot answer — PR #294 stalled 7h33m and PR #318 overnight, both on `.claude/rules/governance.md`, and
- * #340 records why no routine setting permits it. The hook that denies the write is rail-covered in
- * `tests/unit/hooks.test.ts`; what is pinned here is everything around it that could quietly make the hook a
- * no-op or leave a run with no idea what to do instead.
+ * `docs/decisions/006-a-routine-never-writes-under-claude.md` records why no routine setting permits it. The
+ * hook that denies the write is rail-covered in `tests/unit/hooks.test.ts`; what is pinned here is everything
+ * around it that could quietly make the hook a no-op or leave a run with no idea what to do instead.
  *
  * Prove one red: commit `.owner-machine`, or rename the marker in the hook and not in `.gitignore`.
  */
 describe('an unattended run cannot write under .claude/, and cannot be tricked into thinking it may (#342)', () => {
   const file = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
+  const repo = new URL('../../', import.meta.url);
+  const git = (...args: string[]) => {
+    try { return { code: 0, out: execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim() }; }
+    catch (e) { return { code: (e as { status?: number }).status ?? 1, out: '' }; }
+  };
   const MARKER = '.owner-machine';
 
   // The whole guard turns on this file being absent from a clone. Committed, every clone carries it, every
-  // run is allowed again, and nothing goes red — the hook's tests would still pass.
-  it('the owner marker is gitignored and untracked, or the guard is dead in every clone', () => {
-    const ignore = file('.gitignore');
-    expect(ignore, 'the marker must be ignored by name').toMatch(new RegExp(`^${MARKER}$`, 'm'));
-    const tracked = execFileSync('git', ['ls-files', '--', MARKER],
-      { cwd: new URL('../../', import.meta.url), encoding: 'utf8' }).trim();
-    expect(tracked, `${MARKER} is tracked — a clone would carry it and the hook would allow every write`).toBe('');
+  // run is allowed again, and nothing goes red — every test in hooks.test.ts would still pass.
+  it('the owner marker is ignored by git and tracked by nothing, or the guard is dead in every clone', () => {
+    // `check-ignore` asks git the question the rail is named for, rather than pattern-matching .gitignore
+    // and hoping the pattern means what it looks like (PR #344 review).
+    expect(git('check-ignore', '-q', '--', MARKER).code, `${MARKER} is not ignored — a clone would carry it`).toBe(0);
+    expect(git('ls-files', '--', MARKER).out, `${MARKER} is tracked — the hook would allow every write`).toBe('');
   });
 
   it('the hook and .gitignore name the same marker, so neither can drift alone', () => {
-    const hook = file('.claude/hooks/write-guard.mjs');
-    expect(hook, 'the marker constant moved or was renamed').toContain(`export const OWNER_MARKER = '${MARKER}'`);
-    expect(hook, 'the deny must turn on the marker being present, not on a flag a run can set')
-      .toContain('existsSync(resolve(base, OWNER_MARKER))');
+    expect(file('.gitignore'), 'the marker must be ignored by name').toContain(`\n${MARKER}\n`);
+    expect(file('.claude/hooks/write-guard.mjs'), 'the marker constant moved or was renamed')
+      .toContain(`export const OWNER_MARKER = '${MARKER}'`);
   });
 
   it('.claude/rules/governance.md is the rule\'s home: why it cannot be permitted, and what a run does instead', () => {
@@ -1563,11 +1566,16 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
       .toContain('`.claude/hooks/write-guard.mjs`');
     expect(rules, 'what a run does instead, or a denial leaves it with nowhere to go').toContain('owner-session');
     expect(rules, 'reads must stay allowed, or a run stops reading its own rules').toMatch(/reads are untouched/i);
+    // Round-1 review of PR #344: the first draft claimed a run "cannot grant itself" the permission, which is
+    // true of Write and Edit and not of the shell (#346). A rule may not claim more than it enforces.
+    expect(rules, 'the claim must be bounded by what the hook actually sees')
+      .toMatch(/closes the obvious route, not\s+every route/i);
+    expect(rules, 'and name the issue that holds the rest').toContain('#346');
+    expect(rules, 'and point at the decision record').toContain('docs/decisions/006-a-routine-never-writes-under-claude.md');
   });
 
   it('the developer prompt forbids the write in its own flow and points at the home, without restating it', () => {
-    const prompt = file('docs/ROUTINE-PROMPT.md');
-    const doNot = prompt.split('\n').find((l) => l.startsWith('Do NOT:')) ?? '';
+    const doNot = file('docs/ROUTINE-PROMPT.md').split('\n').find((l) => l.startsWith('Do NOT:')) ?? '';
     expect(doNot, 'the Do NOT line is where a run meets this').toContain('write under `.claude/`');
     expect(doNot, 'and it must point at the rule\'s home rather than carry a copy')
       .toContain('`.claude/rules/governance.md`');
@@ -1575,9 +1583,15 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
   });
 
   // The reviewer never pushes a fix, so it has no reason to write here; a clause there would cost bytes in a
-  // second budgeted file for a case that does not arise. Pinned so the omission reads as a decision.
-  it('the reviewer prompt is deliberately left alone — it is told not to fix a pull request itself', () => {
-    expect(file('docs/REVIEWER-PROMPT.md')).toMatch(/do NOT fix it yourself in this run|not to fix/i);
+  // second budgeted file for a case that does not arise. The first version of this rail asserted a sentence
+  // already on `main`, so it passed identically with the drift present — the reviewer proved that by adding
+  // the clause and watching it stay green (PR #344 review). Assert the absence, which is the decision.
+  it('the reviewer prompt is deliberately left alone, and stays that way', () => {
+    const reviewer = file('docs/REVIEWER-PROMPT.md');
+    expect(reviewer, 'it must still be told not to fix a pull request itself — that is why it needs no clause')
+      .toMatch(/do NOT fix it yourself in this run/i);
+    expect(reviewer, 'a `.claude/` clause here is the drift this rail exists to catch: decide it, do not drift into it')
+      .not.toMatch(/write under `?\.claude\/`?|#342/);
   });
 });
 
