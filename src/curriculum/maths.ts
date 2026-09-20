@@ -57,6 +57,62 @@ const rCountOn: Generator = (d, rng) => {
   const start = ri(rng, 1, d === 3 ? 25 : d === 2 ? 15 : 8);
   return numQ(rng, `${start}, ${start + 1}, ${start + 2}, ?`, start + 3, { min: 0, max: 30, say: `What comes next? ${start}, ${start + 1}, ${start + 2}…` });
 };
+/**
+ * Reception doubles (#299 slice 1). One ELG sentence covers this topic and the two below it: "explore and
+ * represent patterns within numbers up to 10, including evens and odds, double facts and how quantities can
+ * be distributed equally".
+ *
+ * "Within numbers up to 10" is the ceiling, so the largest double is 5 + 5 — this is *not* `y1-doubles`
+ * (which goes to double 10 = 20) at a smaller range but the same fact family a year earlier. **There are
+ * only five facts in the whole topic**, which is what shapes the ladder: d1 cannot be 1–3, because three
+ * cards is below the suite's variety floor, so it is 1–4 and d2 adds the fifth. d3 cannot stretch by
+ * widening either: it takes the top half of the same range, the shape #298 slice 5 settled on for
+ * `y1-doubles`, and adds the inverse form ("double what makes 8?"), the halving half of the same ELG
+ * sentence — which is also what keeps d3 varied where four doubles alone would not.
+ *
+ * The ten-frame carries both halves in two colours (`n2`), so the double is visible as a pattern rather
+ * than a sum to work out; the inverse form drops it, because a frame already split into 4 + 4 answers
+ * "double what makes 8?" before the child has thought about it.
+ */
+const rDoubles: Generator = (d, rng) => {
+  const n = d === 1 ? ri(rng, 1, 4) : d === 2 ? ri(rng, 1, 5) : ri(rng, 2, 5);
+  if (d === 3 && rng() < 0.5) return numQ(rng, `Double ? = ${n * 2}`, n, { min: 0, max: 10, say: `Double what makes ${n * 2}?` });
+  return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 10, visual: { type: 'tenframe', n, n2: n }, say: `What is double ${n}?` });
+};
+/**
+ * Reception sharing (#299 slice 1) — "how quantities can be distributed equally", between two.
+ *
+ * Between *two* throughout, which is what the ELG's own examples and the issue ask for; sharing between
+ * three or four is Year 2 division (`y2-tables`). So the difficulty ladder is the size of the quantity
+ * alone: 2–6 to introduce, the 4/6/8/10 the issue names at the expectation, and the three largest as the
+ * stretch. Totals are always even, because "equally between two" has no answer otherwise — the odd case is
+ * `r-oddeven` below, where it is the whole question rather than an unanswerable card.
+ *
+ * The five-frame `objects` visual shows the quantity to be shared, not the shared-out result: a child works
+ * the sharing out, and the total stays on the card as the most tempting wrong answer.
+ */
+const rShare: Generator = (d, rng) => {
+  const total = d === 1 ? pick(rng, [2, 4, 6]) : d === 2 ? pick(rng, [4, 6, 8, 10]) : pick(rng, [6, 8, 10]);
+  const emoji = pick(rng, OBJECTS);
+  return numQ(rng, `Share ${total} between 2 — how many each?`, total / 2, { min: 0, max: 10, distractors: [total], visual: { type: 'objects', emoji, n: total }, say: `Share ${total} equally between two. How many does each one get?` });
+};
+/**
+ * Reception odds and evens (#299 slice 1) — "evens and odds", by pairing rather than by the ×2 rule.
+ *
+ * A Reception child meets odd and even as "can everyone find a partner?", so d1–d2 ask exactly that and
+ * answer `yes`/`no`; only d3 puts the words `odd`/`even` on the bubbles, which is the vocabulary Year 2's
+ * `y2-oddeven` then assumes. Numbers stay ≤ 10 (≤ 6 at d1) per the ELG's "within numbers up to 10".
+ *
+ * No new visual, per the slice: the `objects` five-frames show the quantity and the `hint` carries the
+ * pairing ("put them in twos"). A frame that drew the pairs would answer the question in the picture.
+ */
+const rOddEven: Generator = (d, rng) => {
+  const n = ri(rng, 1, d === 1 ? 6 : 10);
+  const even = n % 2 === 0;
+  const visual = { type: 'objects', emoji: pick(rng, OBJECTS), n } as const;
+  if (d === 3) return wordQ(rng, `${n} — odd or even?`, even ? 'even' : 'odd', ['odd', 'even'], { visual, hint: 'Put them in twos', say: `Is ${n} odd or even?` });
+  return wordQ(rng, 'Can they all find a partner?', even ? 'yes' : 'no', ['yes', 'no'], { visual, hint: 'Put them in twos', say: `There are ${n}. Can they all find a partner?` });
+};
 
 // ---------- Year 1 ----------
 const y1Bonds: Generator = (d, rng) => {
@@ -696,6 +752,9 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'r-counton', title: 'What Comes Next?', icon: '🔢', subject: 'maths', year: 'reception', nc: 'ELG Patterns: count beyond 20', gen: rCountOn },
   { id: 'r-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'reception', nc: 'ELG Patterns: compare and order to 10', gen: rOrder },
   { id: 'r-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'reception', nc: 'ELG Number: composition, equal amounts', gen: rBalance },
+  { id: 'r-doubles', title: 'Doubles', icon: '👯', subject: 'maths', year: 'reception', nc: 'ELG Patterns: double facts within 10', gen: rDoubles },
+  { id: 'r-share', title: 'Share It Out', icon: '🤝', subject: 'maths', year: 'reception', nc: 'ELG Patterns: distribute equally between two', gen: rShare },
+  { id: 'r-oddeven', title: 'Partners', icon: '🐾', subject: 'maths', year: 'reception', nc: 'ELG Patterns: evens and odds', gen: rOddEven },
   // Year 1
   { id: 'y1-bonds', title: 'Number Bonds', icon: '🔗', subject: 'maths', year: 'year1', nc: 'Y1 A&S: bonds within 20', gen: y1Bonds },
   { id: 'y1-add', title: 'Adding to 20', icon: '➕', subject: 'maths', year: 'year1', nc: 'Y1 A&S: add within 20', gen: y1Add },
