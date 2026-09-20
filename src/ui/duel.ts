@@ -1,5 +1,7 @@
 // Ninja Duel screen (#16 items 2–4): two players on one device. The screen is split into two arenas, one per
-// player, each fed the SAME question's bubbles; the shared question sits in a strip between them. The pure
+// player, each fed the SAME question's bubbles. Where the split falls is `src/style.css`'s, not this file's
+// (#388): sideways it is left and right with the question in a bar across the top, and the stacked portrait
+// layout is only the fallback — so the DOM order below stays Player 2, card, Player 1 for both. The pure
 // `Duel` scorer (src/game/duel.ts) owns the rules — first correct slice wins the round, a wrong slice costs
 // nothing, best of DUEL_ROUNDS — and this file only wires two `Arena`s, the strip, the match-end overlay and
 // the `window.__sna` hooks the e2e drives it through. A finished match pays coins into the one shared save
@@ -47,6 +49,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <div class="prompt" id="prompt"></div>
         <div class="vis-wrap" id="vis"></div>
         <div class="hint" id="hint"></div>
+        <div class="duel-rotate">Turn the screen sideways — one arena each, side by side 🔄</div>
       </div>
       <button class="icon-btn" id="speak" aria-label="Read the question aloud">🔊</button>
     </div>

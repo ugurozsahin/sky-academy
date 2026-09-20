@@ -207,6 +207,65 @@ test.describe('Ninja Duel', () => {
     expect(landscape.dom).not.toBe('');
   });
 
+  /**
+   * Resize, then wait for the app to have taken the new height. `.play` is sized from `--vh`, which `src/main.ts`
+   * sets from a `resize` listener, so a `getBoundingClientRect()` straight after `setViewportSize` reports the
+   * PREVIOUS viewport's layout — which is how this rail first went green on a bar that was eating 177px.
+   */
+  async function resizeTo(page: Page, vp: { width: number; height: number }) {
+    await page.setViewportSize(vp);
+    await page.waitForFunction(h => {
+      const vh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--vh'));
+      return Math.abs(vh * 100 - h) < 2 && Math.abs(document.querySelector('.duel-screen')!.getBoundingClientRect().height - h) < 2;
+    }, vp.height);
+  }
+
+  /** Where each piece of the duel screen actually sits, in viewport pixels. */
+  const boxes = (page: Page) => page.evaluate(() => {
+    const box = (s: string) => {
+      const r = document.querySelector(s)!.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, cx: r.x + r.width / 2 };
+    };
+    return { a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: getComputedStyle(document.querySelector('.duel-rotate')!).display };
+  });
+
+  test('sideways, the duel splits left and right with the question centred over the divider (#388)', async ({ page }) => {
+    await startDuel(page);
+    // The layout the owner and child could not play was two stacked halves: each arena had half the height, and
+    // `layoutWave` spends a bubble radius twice over out of it, so the flight was ~270px on a phone. Pinned in
+    // both projects at two landscape widths — a phone on its side, and a screen wider than two capped arenas.
+    for (const vp of [{ width: 844, height: 390 }, { width: 1600, height: 900 }]) {
+      await resizeTo(page, vp);
+      const L = await boxes(page);
+      expect(L.a.right, `${vp.width}px: Player 1 ends where Player 2 begins`).toBeLessThanOrEqual(L.b.x + 1);
+      expect(Math.abs(L.a.y - L.b.y), `${vp.width}px: neither player is above the other`).toBeLessThan(2);
+      expect(Math.abs(L.a.w - L.b.w), `${vp.width}px: the two halves are the same width`).toBeLessThan(2);
+      expect(L.strip.bottom, `${vp.width}px: the question is a bar across the top, not a strip between them`).toBeLessThanOrEqual(L.a.y + 1);
+      // The reason `--arena-w` had to move off the half and onto the pair: at 1600 a capped half would leave the
+      // card floating over the gap between two arenas instead of over the line where they meet.
+      expect(Math.abs(L.strip.cx - L.a.right), `${vp.width}px: the card is centred over the divider`).toBeLessThan(2);
+      expect(L.a.w, `${vp.width}px: --arena-w still caps a half — the pair is capped and centred, not stretched`).toBeLessThanOrEqual(601);
+      expect(L.a.h, `${vp.width}px: each half keeps the height a stacked half gave away`).toBeGreaterThan(vp.height * 0.6);
+      // The regression this caught once already: a bar that stacks its pieces in a 560px card took 177px of a
+      // 390px phone, leaving each arena 213px and handing most of the fix back. A third of the height is the cap.
+      expect(L.strip.h, `${vp.width}px: the question bar does not eat the height the split just won`).toBeLessThanOrEqual(vp.height / 3);
+      expect(L.rotate, `${vp.width}px: nothing asks a player to turn a screen that is already sideways`).toBe('none');
+    }
+  });
+
+  test('portrait keeps the stacked duel as a fallback, and asks for a sideways screen (#388)', async ({ page }) => {
+    await startDuel(page);
+    // A rotate GATE was rejected: a tablet with its orientation locked would lose the mode outright. So portrait
+    // still plays, stacked as before — Player 2 on top, the card between, Player 1 on the bottom — and the only
+    // new thing on the card is the nudge.
+    await resizeTo(page, { width: 390, height: 844 });
+    const P = await boxes(page);
+    expect(P.b.bottom, 'Player 2 keeps the top half').toBeLessThanOrEqual(P.strip.y + 1);
+    expect(P.strip.bottom, 'Player 1 keeps the bottom half, the card between them').toBeLessThanOrEqual(P.a.y + 1);
+    expect(Math.abs(P.a.x - P.b.x), 'the halves are stacked, not side by side').toBeLessThan(2);
+    expect(P.rotate, 'portrait tells the players there is a better way round').not.toBe('none');
+  });
+
   test('a duel is played on a bubble topic of the island, a round nobody slices is a draw, and pause holds both arenas', async ({ page }) => {
     await startDuel(page);
     const topic = await page.evaluate(() => ({ id: window.__sna.state().topic, input: window.__sna.duel.o.topic.input, sequence: window.__sna.duel.current?.sequence }));

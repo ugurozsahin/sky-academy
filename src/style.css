@@ -342,12 +342,31 @@ img { -webkit-user-drag: none; }
 .mode-btn.memory .vport { box-shadow: 0 0 0 3px #3ec9ff; }
 .mode-btn.duel { margin-top: 10px; background: linear-gradient(90deg, #3b1a2a, #1a2a44); border-color: #ff5f6d66; box-shadow: 0 0 30px #ff5f6d33, 0 8px 24px #0008; }
 .mode-btn.duel .vport { box-shadow: 0 0 0 3px var(--bad); }
-/* Ninja Duel (#16): the play shell split into two arenas, one per player, with the shared question strip between
-   them. Each half is its own canvas (its own pointer input), stacked in a column and capped at --arena-w like
-   #arena. The screen class is `.duel-screen`, never bare `.duel` — the island's mode button carries that (#63).
-   Player 1 takes the bottom half — the child holding the phone — and Player 2 the top. */
-.duel-screen { display: flex; flex-direction: column; align-items: center; }
-.duel-half { position: relative; flex: 1 1 0; min-height: 0; width: 100%; max-width: var(--arena-w); }
+/* Ninja Duel (#16, #388): the play shell split into two arenas, one per player, with the shared question card
+   between them. Each half is its own canvas (its own pointer input). The screen class is `.duel-screen`, never
+   bare `.duel` — the island's mode button carries that (#63).
+
+   LANDSCAPE is the layout the duel is played in (#388, owner and child at play): the halves sit side by side —
+   Player 1 left, Player 2 right — each the FULL height, with the card in a bar across the top, centred over the
+   divider so it reads the same way for two children sitting at the long edge. Stacked halves gave each player
+   half the height, and `layoutWave` spends a bubble radius twice over out of whatever it is handed
+   (`usable = H - (topInset + r + 10) - r`), so on a phone the whole flight happened in about 270px.
+
+   PORTRAIT keeps the stacked layout as a fallback, Player 1 on the bottom half — the child holding the phone —
+   and Player 2 on top. It is a fallback, not a second design: the card carries a `.duel-rotate` nudge, shown in
+   portrait only, where there is height to spare for it. A rotate GATE was rejected — it makes the mode
+   unreachable on a device whose orientation is locked.
+
+   The layout is a grid rather than a flex column so the DOM order (Player 2, card, Player 1 — kept as it was)
+   and the visual order can differ per orientation without moving anything in `duel.ts`. */
+.duel-screen {
+  display: grid; justify-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: 'b' 'q' 'a';
+}
+.duel-half { position: relative; min-height: 0; min-width: 0; width: 100%; max-width: var(--arena-w); }
+.duel-half.a { grid-area: a; } .duel-half.b { grid-area: b; }
 .duel-arena { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 .duel-half.b { border-bottom: 1px solid var(--line); }
 .duel-tag {
@@ -356,7 +375,7 @@ img { -webkit-user-drag: none; }
 }
 .duel-half.b .duel-tag { top: calc(8px + var(--sat)); } .duel-half.a .duel-tag { bottom: 8px; }
 .duel-score { font-size: clamp(18px, 5vw, 24px); font-weight: 700; color: var(--text); text-shadow: 0 2px 0 #0006; }
-.duel-strip { flex: none; width: 100%; max-width: 560px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; z-index: 2; }
+.duel-strip { grid-area: q; width: 100%; max-width: 560px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; z-index: 2; }
 .duel-q {
   flex: 1; min-width: 0; text-align: center; padding: 6px 8px; border-radius: 16px;
   background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px #0006; cursor: pointer;
@@ -370,6 +389,34 @@ img { -webkit-user-drag: none; }
    coloured bubbles again. The play screen's own half of that is #328, not this pull request's. */
 .duel-q .hint { display: block; font-size: clamp(12px, 3vw, 15px); line-height: 1.25; margin-top: 2px; }
 @media (max-height: 640px) { .duel-q .hint { font-size: 12px; margin-top: 0; } }
+/* Portrait only — the landscape branch below hides it, so it costs nothing where height is scarce. */
+.duel-rotate { font-size: clamp(11px, 2.8vw, 13px); font-weight: 700; color: var(--muted); margin-top: 4px; }
+/* #388: side by side, question across the top. `--arena-w` now caps the PAIR, not each half: with the cap on
+   the half, a screen wider than two arenas leaves both of them at the outer edges and the card stranded over
+   the gap between them. Capping the grid keeps the divider under the centre of the card at every width. */
+@media (orientation: landscape) {
+  /* `.play.duel-screen`, not `.duel-screen`: `.play { max-width: none }` is a single class too and sits LATER in
+     this file, so a one-class selector here loses the tie and the cap would silently do nothing. */
+  .play.duel-screen {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: 'q q' 'a b';
+    max-width: calc(var(--arena-w) * 2); margin-inline: auto;
+  }
+  .duel-half { max-width: none; }
+  /* Height is the scarce axis now and width is not, so the bar spends width to buy height back: it takes the
+     pair's full width instead of the portrait card's 560px, and the card lays its pieces out in a ROW — round
+     pill, prompt, visual, hint on one line — rather than stacking them. Stacked in a 560px card the bar took
+     177px of a 390px-tall phone (whatever the question put in `.vis-wrap`), which handed each arena 213px and
+     gave most of the fix straight back. */
+  .duel-strip { max-width: none; padding: 4px 10px; }
+  .duel-q { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; }
+  .duel-q .prompt, .duel-q .hint { margin: 0; }
+  .duel-half.b { border-bottom: 0; border-inline-start: 1px solid var(--line); }   /* the divider runs down, not across */
+  /* Both halves are full height now, so both name tags sit at the foot of their own half, clear of the bar. */
+  .duel-half.b .duel-tag, .duel-half.a .duel-tag { top: auto; bottom: 8px; }
+  .duel-rotate { display: none; }
+}
 .duel-final { grid-template-columns: repeat(3, 1fr); }
 .foot { margin-top: 26px; text-align: center; color: #6c78a8; font-size: 12px; font-weight: 600; }
 
