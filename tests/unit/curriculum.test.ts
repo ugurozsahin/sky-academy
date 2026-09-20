@@ -1063,3 +1063,126 @@ describe('slow questions (#297)', () => {
     }
   });
 });
+
+// Reception number patterns (#299 slice 1): r-doubles, r-share, r-oddeven.
+// The generic suite already checks answer∈options, uniqueness and the year's answer ceiling (30 for
+// Reception). What it cannot infer is the ELG's own ceiling — "patterns within numbers **up to 10**" — the
+// arithmetic of each form, and the counts: #361's lesson is that a rail pinning values but not how often
+// each form is drawn ships a generator whose d3 has quietly collapsed to one form.
+describe('Reception number patterns (#299 slice 1)', () => {
+  const topic = (id: string) => TOPICS.find(x => x.id === id)!;
+
+  describe('r-doubles', () => {
+    it('every card is a true double inside the ELG ceiling of 10', () => {
+      const t = topic('r-doubles'), r = rng(2991);
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          const forward = q.prompt.match(/^Double (\d+) = \?$/);
+          const inverse = q.prompt.match(/^Double \? = (\d+)$/);
+          expect(forward || inverse, `unexpected prompt: ${q.prompt}`).toBeTruthy();
+          const n = forward ? Number(forward[1]) : Number(inverse![1]) / 2;
+          expect(Number.isInteger(n), `${q.prompt} must halve exactly`).toBe(true);
+          expect(Number(q.answer), q.prompt).toBe(forward ? n * 2 : n);
+          expect(n, `${q.prompt}: the doubled number is at most 5`).toBeLessThanOrEqual(5);
+          expect(n).toBeGreaterThanOrEqual(1);
+          expect(n * 2, `${q.prompt}: double stays within 10`).toBeLessThanOrEqual(10);
+          for (const o of q.options) expect(Number(o), `${q.prompt}: decoy ${o} out of range`).toBeLessThanOrEqual(10);
+        }
+      }
+    });
+    it('the forward card shows the double as two colours on one ten-frame; the inverse shows nothing', () => {
+      const t = topic('r-doubles'), r = rng(2992);
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          if (/^Double \? =/.test(q.prompt)) { expect(q.visual, `${q.prompt} must not hand the answer to the child`).toBeUndefined(); continue; }
+          const n = Number(q.prompt.match(/^Double (\d+)/)![1]);
+          expect(q.visual).toEqual({ type: 'tenframe', n, n2: n });
+        }
+      }
+    });
+    it('d1 introduces (1–4), d2 is the whole range (1–5), d3 is the top half (2–5) in both forms', () => {
+      const t = topic('r-doubles'), r = rng(2993);
+      const drawn = (d: Difficulty) => {
+        const ns = new Set<number>(); let forward = 0, inverse = 0;
+        for (let i = 0; i < N * 3; i++) {
+          const q = t.gen(d, r);
+          const inv = q.prompt.match(/^Double \? = (\d+)$/);
+          if (inv) { inverse++; ns.add(Number(inv[1]) / 2); } else { forward++; ns.add(Number(q.prompt.match(/^Double (\d+)/)![1])); }
+        }
+        return { ns: [...ns].sort((a, b) => a - b), forward, inverse };
+      };
+      expect(drawn(1).ns).toEqual([1, 2, 3, 4]);
+      expect(drawn(2).ns).toEqual([1, 2, 3, 4, 5]);
+      const d3 = drawn(3);
+      expect(d3.ns).toEqual([2, 3, 4, 5]);
+      // Both forms really are drawn at d3 — and only at d3.
+      expect(d3.forward).toBeGreaterThan(0);
+      expect(d3.inverse).toBeGreaterThan(0);
+      expect(drawn(1).inverse).toBe(0);
+      expect(drawn(2).inverse).toBe(0);
+    });
+  });
+
+  describe('r-share', () => {
+    it('shares an even quantity between two, and the quantity itself is on the card as the decoy', () => {
+      const t = topic('r-share'), r = rng(2994);
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          const m = q.prompt.match(/^Share (\d+) between 2 — how many each\?$/);
+          expect(m, `unexpected prompt: ${q.prompt}`).toBeTruthy();
+          const total = Number(m![1]);
+          expect(total % 2, `${q.prompt}: "equally between two" needs an even quantity`).toBe(0);
+          expect(total, 'the ELG ceiling is 10').toBeLessThanOrEqual(10);
+          expect(Number(q.answer), q.prompt).toBe(total / 2);
+          expect(q.options, `${q.prompt}: the un-shared total is the decoy to beat`).toContain(String(total));
+          expect(q.visual, `${q.prompt}: the picture shows what is to be shared, not the result`).toEqual({ type: 'objects', emoji: expect.any(String), n: total });
+        }
+      }
+    });
+    it('the ladder is the size of the quantity: 2–6, then 4–10, then 6–10', () => {
+      const t = topic('r-share'), r = rng(2995);
+      const totals = (d: Difficulty) => {
+        const s = new Set<number>();
+        for (let i = 0; i < N * 3; i++) s.add(Number(t.gen(d, r).prompt.match(/^Share (\d+)/)![1]));
+        return [...s].sort((a, b) => a - b);
+      };
+      expect(totals(1)).toEqual([2, 4, 6]);
+      expect(totals(2)).toEqual([4, 6, 8, 10]);
+      expect(totals(3)).toEqual([6, 8, 10]);
+    });
+  });
+
+  describe('r-oddeven', () => {
+    it('the answer follows the parity of the quantity shown, at every difficulty', () => {
+      const t = topic('r-oddeven'), r = rng(2996);
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          expect(q.visual?.type).toBe('objects');
+          const n = (q.visual as { n: number }).n;
+          expect(n, 'the ELG ceiling is 10').toBeLessThanOrEqual(d === 1 ? 6 : 10);
+          expect(n).toBeGreaterThanOrEqual(1);
+          const even = n % 2 === 0;
+          expect(q.answer, `${n} objects, d${d}`).toBe(d === 3 ? (even ? 'even' : 'odd') : (even ? 'yes' : 'no'));
+          expect(q.hint, 'the pairing is in the hint, never drawn — a drawn pair answers the question').toBe('Put them in twos');
+        }
+      }
+    });
+    it('d1–d2 answer yes/no; only d3 puts the words odd and even on the bubbles', () => {
+      const t = topic('r-oddeven'), r = rng(2997);
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const answers = new Set<string>();
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          expect([...q.options].sort(), `d${d} options`).toEqual(d === 3 ? ['even', 'odd'] : ['no', 'yes']);
+          answers.add(q.answer);
+        }
+        // Both verdicts are reachable — a generator stuck on evens would still pass the rail above.
+        expect([...answers].sort(), `d${d} must draw both odd and even`).toEqual(d === 3 ? ['even', 'odd'] : ['no', 'yes']);
+      }
+    });
+  });
+});
