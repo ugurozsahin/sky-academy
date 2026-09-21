@@ -5,7 +5,8 @@ import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
 import type { SentenceType } from '../../src/curriculum/writing';
-import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
+import { coinLabel, SHAPES_2D, SHAPES_3D, wordQ } from '../../src/curriculum/util';
+import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
 
 // Deterministic RNG (mulberry32)
@@ -1896,5 +1897,66 @@ describe('a hint is instruction text unless the generator says it is data (#328,
       }
     }
     expect(checked, 'no marked card was drawn — this rail would pass vacuously').toBeGreaterThan(500);
+  });
+});
+
+/**
+ * Bubble size is a property of the card, not of which option is correct (#369).
+ *
+ * `bubbleRadius` draws a wide wave 1.25x bigger (41 px against 33 px on a 390x700 arena), so as long as
+ * `wide` was read off the answer alone, every card whose options differ in length sized the correct bubble
+ * differently from its decoys — on a two-option card (`r-oddeven`'s `yes`/`no`, `y1-coins` d2's `50p`/`1p`)
+ * a child who never read the picture could slice by size. The check is the one that found it: draw many
+ * cards per topic and difficulty, group them by their option **set**, and require the width the screen
+ * derives to be the same for every card in a group. Two cards offering the same bubbles must look the same.
+ *
+ * It goes through the real `waveOptsFor` (`src/ui/play-session.ts`), the bridge `tests/unit/sim.test.ts`
+ * already uses, so a copy of the derivation cannot drift away from the screen's.
+ */
+describe('a card\'s bubble width is derived from its options, never from its answer (#369)', () => {
+  const setKey = (q: Question) => [...q.options].sort().join('\u0000');
+  const widthOf = (q: Question) => waveOptsFor(q, { labels: q.options, speed: 1 }, 0).wide;
+
+  it('two cards with the same option set spawn the same bubble width, on every topic and difficulty', () => {
+    let groups = 0, cards = 0, split = 0;
+    const offenders: string[] = [];
+    for (const topic of TOPICS) {
+      if (topic.input === 'tracing') continue;              // no wave, no bubbles
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const r = rng(topic.id.length * 7 + d);
+        const bySet = new Map<string, { wide: boolean; answer: string }[]>();
+        for (let i = 0; i < 400; i++) {
+          const q = topic.gen(d, r);
+          cards++;
+          const k = setKey(q);
+          let group = bySet.get(k);
+          if (!group) bySet.set(k, group = []);
+          group.push({ wide: !!widthOf(q), answer: q.answer });
+        }
+        for (const [k, seen] of bySet) {
+          groups++;
+          if (seen.every(s => s.wide === seen[0].wide)) continue;
+          split++;
+          const wider = seen.find(s => s.wide)!.answer, narrower = seen.find(s => !s.wide)!.answer;
+          offenders.push(`${topic.id} d${d}: {${k.split('\u0000').join(', ')}} is wide when the answer is "${wider}" and narrow when it is "${narrower}"`);
+        }
+      }
+    }
+    expect(cards, 'the sweep drew nothing — this rail would pass vacuously').toBeGreaterThan(20_000);
+    expect(groups, 'no option set repeated, so nothing was actually compared').toBeGreaterThan(500);
+    expect(split, offenders.slice(0, 8).join('\n')).toBe(0);
+  });
+
+  it('wordQ widens on a long decoy, not only on a long answer', () => {
+    const r = rng(369);
+    // `r-oddeven`'s own pair, the worst of the six: the same two bubbles, either one the answer. Only the
+    // second line discriminates — `answer.length > 2` gets the first right by accident, which is why a
+    // rail written from the passing case alone would have let the defect through.
+    expect(wordQ(r, 'Are there 4? Can they pair up?', 'yes', ['no']).wide).toBe(true);
+    expect(wordQ(r, 'Are there 3? Can they pair up?', 'no', ['yes']).wide).toBe(true);
+    // `y1-coins` d2's pair, the same shape with the long option on the other side.
+    expect(wordQ(r, 'Which is more?', '1p', ['50p']).wide).toBe(true);
+    // And a card whose options really are all short stays narrow, so nothing is widened wholesale.
+    expect(wordQ(r, 'Which letter?', 'ox', ['ax', 'ex']).wide).toBe(false);
   });
 });
