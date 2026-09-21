@@ -122,13 +122,13 @@ STEP 4 — NOTHING ELIGIBLE? (snapshot: `- query top pick: none eligible`.) Do n
 
 STEP 5 — RECORD. One write, and it is the whole record: **your heartbeat snapshot**. "Where a record goes" above has the other kinds.
 
-As the very last thing you do, **replace** the body of the open issue titled `routine: heartbeat` (label `watchdog`) with a fixed-size snapshot of this run. Create it with that snapshot already in the body if it does not exist — one `POST /issues` with title, body and labels together, never create-then-fill: a run dying in between leaves an issue with no timestamp that reads as a pulse forever. Never close it; it is not work, it is your pulse, and the watchdog reads it to tell a dead routine from a quiet one.
+As the very last thing you do, **replace** the body of the open issue titled `routine: heartbeat` (label `watchdog`) with a fixed-size snapshot of this run, **sending its title too** — the hook cannot otherwise tell a recreated pulse from any other issue (#353). Create it with that snapshot already in the body if it does not exist — one `POST /issues` with title, body and labels together, never create-then-fill: a run dying in between leaves an issue with no timestamp that reads as a pulse forever. Never close it; it is not work, it is your pulse, and the watchdog reads it to tell a dead routine from a quiet one.
 
 Three properties, each a way this fails quietly:
 
-- **Replace, never append.** Fixed size means: this run's line, and the checks below. Last run's snapshot is in the issue's edit history.
+- **Replace, never append.** Fixed size means: this run's line, and the checks below.
 - **Last, not first** — the *finished* snapshot, over STEP 1's `IN PROGRESS` stamp, which is not a pass. A finished-*looking* pulse on the way in would hide exactly the deaths the pulse exists to expose (#314).
-- **Edit the body, not a comment.** A body edit notifies nobody, which is what keeps this silent.
+- **Edit the body, not a comment.** A body edit notifies nobody, which keeps this silent.
 
 The shape — one summary line, then the checks, then anything you decided not to do and why:
 
@@ -145,6 +145,6 @@ The shape — one summary line, then the checks, then anything you decided not t
 - not done, and why: #63 (P1) is blocked by #72, which is open — skipped per STEP 3
 ```
 
-Every check STEP 1 makes gets a line with **the value observed**, not a verdict on its own: "nightly ok" with no timestamp is indistinguishable from a run that did not look, and that is the failure this project keeps having. Anything a *future run must act on* is an issue, not a line here — a snapshot that is overwritten within the hour cannot carry a to-do. Report to the owner only for something noteworthy (a merge that changes play, a regression, a decision needed — list the open "Owner action" checkboxes).
+Every check STEP 1 makes gets a line with **the value observed**, not a verdict on its own: "nightly ok" with no timestamp is indistinguishable from a run that did not look. Anything a *future run must act on* is an issue, not a line here — a snapshot that is overwritten within the hour cannot carry a to-do. Report to the owner only for something noteworthy (a merge that changes play, a regression, a decision needed — list the open "Owner action" checkboxes).
 
 Do NOT: review or merge any pull request (that is the reviewer routine's), clear a review block or undraft a blocked PR; start work no open `routine-ok` issue asks for, re-impose a freeze the owner has lifted, ship a NEW look without the owner's approval (label the PR `owner-approval`; a change that must keep the existing look is the reviewer's to verify, not his to approve), add accounts/backend, add dependencies without need (the allowlist rail will fail), publish artifacts, re-run a CI job to "see if it passes this time" (read the failure), force-push, rewrite history, weaken a guard rail, change an issue's `priority:*` label to move it up the queue (the priorities are the owner's — propose a change on the issue and leave the label alone), set a card's Status or Priority on the board by hand (change the label or the PR state instead), or **write under `.claude/`** (a protected path; the hook denies it — #342, `.claude/rules/governance.md`). Reads are fine.
