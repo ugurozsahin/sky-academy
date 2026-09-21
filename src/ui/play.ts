@@ -62,7 +62,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   };
   let arena: Arena | null = null; let tracer: Tracer | null = null; let lastResult: SessionResult | null = null;
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
-  const { later, toast } = scope;
+  const { later, toast, holdTimers } = scope;
   const hud = createHud(els, o.year.lives, canHear);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
@@ -86,7 +86,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
     arena: () => arena,
     mounted: () => window.__sna === hooks,        // the screen the callbacks were built for is still the live one
-    later, toast,
+    later, toast, holdTimers,
     startTrace, showTutorial, showTaunt, showStageClear, showResults,
   });
   const { session, waveEnd } = playSession;

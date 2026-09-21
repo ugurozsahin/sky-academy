@@ -55,6 +55,8 @@ export interface PlaySessionDeps {
   /** False once this screen has been torn down — never spawn a wave into a dead screen. */
   mounted: () => boolean;
   later: (fn: () => void, ms: number) => void;              // alive-guarded timer (#35)
+  /** Freeze/re-arm every pending `later()` beat while an overlay holds the screen (#301) — `scope.holdTimers`. */
+  holdTimers: (open: boolean) => void;
   toast: (text: string, cls?: string, ms?: number) => void;
   startTrace: (q: Question) => void;
   showTutorial: () => number;
@@ -337,6 +339,10 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     hold(open) {
       if (open === holdOpen) return;
       holdOpen = open;
+      // The screen's beats freeze with the arena (#301). The peek's own clock below already worked this way —
+      // #65 stopped it so a child pausing mid-sentence found the sentence still there — and the outcome hold,
+      // the inter-question gap and the results cue were the ones still running behind the overlay.
+      deps.holdTimers(open);
       if (peekActive && activeQuestion) {
         if (open) { peekLeft = Math.max(0, peekLeft - (performance.now() - peekSince)); peekToken++; }   // stop the clock
         else runPeek(activeQuestion);                                                                 // and restart it

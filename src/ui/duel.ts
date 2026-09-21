@@ -147,7 +147,10 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     }, { trailColor: av.glow, fx: av.fx, onSwish: () => sfx.swish(), onThrow: () => sfx.whoosh(), onLand: () => sfx.slice() });
   }
   const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };
-  const hold = (open: boolean) => { holdOpen = open; syncPaused(); };
+  // The arena's pause AND the screen's beats (#301): `syncPaused()` alone left `endWave`'s `clearWave`, the
+  // `duel.waveEnd()` that follows it and the results cue running behind the pause overlay, so a pause inside
+  // the outcome hold advanced the round and spawned the next wave out of sight.
+  const hold = (open: boolean) => { holdOpen = open; scope.holdTimers(open); syncPaused(); };
 
   function showResults(r: DuelResult) {
     hold(true);

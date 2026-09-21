@@ -862,6 +862,33 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#score')).not.toHaveText('0');
   });
 
+  test('guard rail: a pause inside the outcome hold holds the question — nothing advances behind the overlay (#301)', async ({ page }) => {
+    // #301, the play-screen half of the same defect the duel carries. `hold(true)` paused the ARENA and left
+    // the beats scheduled through `later()` running, so a pause pressed inside the ~1 s outcome hold let
+    // `endWave`'s `clearWave` fire, `session.waveEnd()` advance, and the next question render, be SPOKEN and
+    // spawn its wave with `launchAt` already in the past. The child came back to a wave flying at a question
+    // they had never been shown. #65 stopped the peek's clock under an overlay; the outcome beats were left.
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // #32: real holds — a compressed one is not a hold anybody can press pause inside
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    await waitForTarget(page);
+    expect(await answer(page)).toBe(true);
+    const before = await state(page);
+    expect(before.waiting, 'the verdict is up and the hold has begun — this is the window the bug lives in').toBe(true);
+    await page.click('#pause');
+    await expect(page.locator('#resume')).toBeVisible();
+    // Well past the correct hold AND the inter-question gap. Before the fix index had moved on by here.
+    await page.waitForTimeout(3000);
+    const held = await state(page);
+    expect(held.index, 'the question does not advance behind the overlay').toBe(before.index);
+    expect(held.prompt, 'nor is the next one written onto the card').toBe(before.prompt);
+    expect(await page.evaluate(() => window.__sna.arena.frozen), 'and the sliced wave was never cleared').toBe(true);
+    // And resuming spends the time the hold had LEFT, so the mission carries on rather than stalling.
+    await page.click('#resume');
+    await page.waitForFunction(i => window.__sna.state().index === i + 1 && !window.__sna.state().waiting,
+      before.index as number, { timeout: 5000 });
+  });
+
   test('outcome beat: a slice freezes the wave, spotlights the answer and fills in the card before moving on', async ({ page }) => {
     await page.addInitScript(() => { window.__SNA_FAST = 1; });   // #32: this test asserts the REAL outcome-beat pause (≥1200 ms) — it must run at game speed
     await seedPlayer(page);
