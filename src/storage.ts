@@ -23,6 +23,8 @@ export interface StoredCert {
   stars: number; score: number; correct: number; attempts: number;
   date: string;           // ISO day (yyyy-mm-dd), drawn as the award date
   training?: boolean;
+  duel?: boolean;         // won a Ninja Duel rather than a mission (#16 item 5) — see certKind() for why it is a
+                          // second optional flag and not a `kind` union: `training` is already on disk.
 }
 export interface SaveData {
   v: 3;

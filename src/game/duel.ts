@@ -1,6 +1,7 @@
 // Ninja Duel: two players share one question, first correct slice wins the round (#16). Pure game logic (no
 // DOM/canvas), mirroring session.ts's own separation so it stays unit-testable ahead of any arena/HUD wiring.
 import type { Difficulty, Question, Topic } from '../curriculum';
+import { starsForAccuracy } from './session';
 import type { DojoEvent } from './dojo';
 
 export type DuelPlayer = 'a' | 'b';
@@ -219,6 +220,49 @@ export function duelDojoEvent(r: DuelResult, subject: Topic['subject']): DojoEve
 export function duelAccuracy(r: DuelResult): DuelTally {
   return { ...r.tally.a };   // a copy: the duel screen puts this on `window.__sna`, and the result is a record
 }
+
+/**
+ * Stars for the certificate a won duel earns (#16 item 5) — Player 1's own accuracy, on the **identical bar a
+ * mission stage uses** (`Session`'s `acc >= 0.95 ? 3 : acc >= 0.7 ? 2 : 1`). Reusing that bar is the whole
+ * point: a star on a duel certificate has to mean what a star means anywhere else a child sees one, because
+ * the album shows duel and mission rows in the same list with the same three glyphs and no way to tell that
+ * one was rated differently.
+ *
+ * It is the **stage** bar, not a mission certificate's own `stars`, which is the rounded mean of five stage
+ * stars — close, and deliberately not called identical (#16 review, note 3). An earlier draft of this comment
+ * justified the reuse by `fileCert()` "ranking two different scales against each other"; that was wrong and is
+ * removed rather than reworded. `fileCert()` only ever compares entries sharing an `id`, and `<year>:duel` has
+ * one writer, so it never ranks a duel against a mission.
+ *
+ * It **calls** `starsForAccuracy()` rather than restating it (#397 review round 2, B2). The thresholds used to
+ * be copied here, and the copy was defended by a guard that did not exist: moving `Session`'s bar left this
+ * function and its own table test green, so the two could drift apart in silence. There is one bar now, so
+ * "a duel star means what a mission star means" is a property of the code rather than a claim in a comment.
+ *
+ * It reads `duelAccuracy()`'s tally rather than the scoreline for the reason #347 gave for paying no win
+ * bonus: `scoreA` counts rounds the friend was *slower* on, which is not a measurement of this child's maths.
+ *
+ * A tally with no tries scores 1, not 3: an empty accuracy is not a perfect one. That case cannot arise from a
+ * match Player 1 won — winning takes at least one hit, and every hit is also a try — so this is a floor for a
+ * hand-edited or replayed result, never the live path.
+ */
+export function duelStars(t: DuelTally): 1 | 2 | 3 {
+  if (t.tries <= 0) return 1;
+  return starsForAccuracy(t.hits / t.tries);
+}
+
+/**
+ * Does this finished match earn the profile's child a certificate? Only a **Player 1 win** does (#397 review
+ * round 2, note 1). Lifted out of `duelScreen`'s closure so all three `winner` values can be pinned in a unit
+ * test: inside `ui/duel.ts` it was reachable only through a full ten-round Playwright match, so the draw arm
+ * was exercised and a *loss* was not — and weakening it to `r.winner === 'draw'` left the whole suite green
+ * while a defeat filed `<year>:duel` into the child's own album, with the loser's score and stars off a tally
+ * that is not theirs.
+ *
+ * Player 2 is the friend `DUEL_HANDOVER` sends to the top half, and the save has one profile, so there is no
+ * second child to award — the same reason `duelCoins()` pays no win bonus and `duelAccuracy()` reports one seat.
+ */
+export const duelEarnsCertificate = (r: DuelResult): boolean => r.winner === 'a';
 
 /** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
 export function duelHeadline(r: DuelResult): string {

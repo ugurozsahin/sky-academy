@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Duel, DUEL_ROUNDS, seededRng } from '../../src/game/duel';
+import { Duel, DUEL_ROUNDS, duelEarnsCertificate, duelStars, seededRng } from '../../src/game/duel';
 import { layoutWave } from '../../src/game/arena';
 import { topicById } from '../../src/curriculum';
 import { hintText, promptHTML, promptMode } from '../../src/ui/hud';
@@ -548,6 +548,60 @@ describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', (
   });
 });
 
+describe('duelStars (#16 item 5: what a duel certificate may claim)', () => {
+  /** Play a scripted match and return its result — the same driver the duelAccuracy block uses. */
+  const played = (script: ('a' | 'b' | 'wrongA' | 'draw')[]): DuelResult => {
+    const ev = events();
+    const d = new Duel({ topic, difficulty: 1, rounds: script.length, rng: rng(13) }, ev);
+    d.start();
+    for (const step of script) {
+      if (step === 'wrongA') d.hit('a', d.current!.options.find(o => o !== d.current!.answer)!);
+      else if (step !== 'draw') d.hit(step, d.current!.answer);
+      d.waveEnd();
+    }
+    return ev.onMatchEnd.mock.calls[0][0];
+  };
+  // These denominators are 20, above `DUEL_ROUNDS` (10), because 95% and 70% are not expressible over ten
+  // rounds and the boundaries are the point (#397 round 2, note 8). The reachable cases are asserted
+  // separately below. `duelStars` now *calls* `starsForAccuracy`, so this table and
+  // `tests/unit/session.test.ts`'s are two views of one function rather than two copies that can drift.
+  it('uses the identical accuracy bar a mission stage uses — 95% for three, 70% for two', () => {
+    expect(duelStars({ hits: 20, tries: 20 })).toBe(3);      // 100%
+    expect(duelStars({ hits: 19, tries: 20 })).toBe(3);      // 95% exactly — the boundary is inclusive
+    expect(duelStars({ hits: 18, tries: 20 })).toBe(2);      // 90%
+    expect(duelStars({ hits: 14, tries: 20 })).toBe(2);      // 70% exactly — inclusive
+    expect(duelStars({ hits: 13, tries: 20 })).toBe(1);      // 65%
+    expect(duelStars({ hits: 0, tries: 20 })).toBe(1);       // never zero stars: one is the floor a mission has
+  });
+  it('is Player 1\'s accuracy, not the scoreline — a race won on speed is not a measurement', () => {
+    // Ten rounds, Player 1 takes six, and cut wrongly four times on the way. The scoreline says 6–4; the
+    // slices say 6 right of 10 tried, which is 60% and one star. Reading `scoreA` here would print three.
+    const r = played(['a', 'wrongA', 'a', 'wrongA', 'a', 'wrongA', 'a', 'wrongA', 'a', 'a']);
+    expect(duelAccuracy(r)).toEqual({ hits: 6, tries: 10 });
+    expect(duelStars(duelAccuracy(r))).toBe(1);
+    // The scoreline and the tally really do disagree on this match, which is what makes the line above a test
+    // of anything. An earlier version asserted `duelStars({ hits: r.scoreA, tries: r.scoreA })` is 3 — but
+    // those two fields are the same expression, so it was 3 by construction for any non-zero score and said
+    // nothing about `duelStars` or about production (#16 review, note 4). The e2e's `stars: 2` from a 6–4
+    // match is what actually guards the production path; this asserts the premise that path depends on.
+    expect(r.scoreA, 'six rounds won').toBe(6);
+    expect(duelAccuracy(r).tries, 'but ten slices taken — the two numbers a scoreline read would conflate').toBe(10);
+  });
+  it('gives a clean ten-round sweep three stars — the case a child actually reaches', () => {
+    // Every case above is over 20; a duel is ten rounds. 10/10 is the only three-star tally reachable in one,
+    // and no test reached it before (#397 round 2, note 8) — the e2e's best is two stars from a 6-4 match.
+    expect(duelStars({ hits: 10, tries: 10 })).toBe(3);
+    expect(duelStars({ hits: 9, tries: 10 })).toBe(2);     // 90% — one slip over ten rounds is not three stars
+    expect(duelStars({ hits: 7, tries: 10 })).toBe(2);     // 70% exactly, reachable and inclusive
+    expect(duelStars({ hits: 6, tries: 10 })).toBe(1);
+  });
+  it('scores an empty tally 1, not 3 — no answers is not perfect accuracy', () => {
+    expect(duelStars({ hits: 0, tries: 0 })).toBe(1);
+    // Unreachable from a won match — a win needs a hit, and a hit is a try — so this is the hand-edited floor.
+    expect(duelAccuracy(played(['b', 'b']))).toEqual({ hits: 0, tries: 0 });
+  });
+});
+
 /**
  * #389 — both halves of a duel pose the same wave. Found in play by the owner and his child: the answer rose
  * at a different moment on each side, so the match was decided by whichever shuffle dealt it early rather
@@ -605,5 +659,27 @@ describe('a duel lays both halves out from one draw (#389)', () => {
       if (a.bubbles[answer(a)].launchAt !== b.bubbles[answer(b)].launchAt) differed++;
     }
     expect(differed, 'the head start the child actually felt').toBeGreaterThan(100);
+  });
+});
+
+
+describe('duelEarnsCertificate (#397 review round 2, note 1: only Player 1 wins one)', () => {
+  const ended = (winner: 'a' | 'b' | 'draw', scoreA: number, scoreB: number): DuelResult =>
+    ({ winner, scoreA, scoreB, rounds: DUEL_ROUNDS, tally: matchTally(scoreA, scoreB) });
+
+  // All three `winner` values, which is the whole reason this predicate was lifted out of `duelScreen`'s
+  // closure: in there it took a full ten-round Playwright match to reach, so the draw arm was exercised and a
+  // LOSS was not. Weakening it to `winner === 'draw'` left the entire suite green while a defeat filed a
+  // certificate into the child's own album, carrying the loser's score and stars off a tally that is not theirs.
+  it('is a Player 1 win, and nothing else', () => {
+    expect(duelEarnsCertificate(ended('a', 6, 4))).toBe(true);
+    expect(duelEarnsCertificate(ended('b', 4, 6)), 'a loss earns the profile nothing').toBe(false);
+    expect(duelEarnsCertificate(ended('draw', 5, 5)), 'a draw earns nothing either').toBe(false);
+  });
+  it('reads the winner, not the scoreline', () => {
+    // A result whose `winner` disagrees with its scores is not constructible by `Duel`, but the predicate must
+    // not second-guess it: `winner` is the scorer's own verdict and the one field the rest of the screen uses.
+    expect(duelEarnsCertificate(ended('a', 0, 9))).toBe(true);
+    expect(duelEarnsCertificate(ended('b', 9, 0))).toBe(false);
   });
 });
