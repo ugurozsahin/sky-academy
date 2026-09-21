@@ -107,6 +107,22 @@ describe('guard rails', () => {
     expect(body).not.toMatch(/createRadialGradient|measureText/);
   });
 
+  // #348: a label that had to be wrapped reaches the screen only if drawBubble iterates every fitted line
+  // and recentres the block on the disc. Dropping either is a one-line edit that reverts the whole feature,
+  // so the shape is pinned here as well as behaviourally in `arena-spawn.test.ts` (PR #467 review, B2).
+  it('drawBubble draws every fitted line, recentred on the disc (#348)', () => {
+    const src = code(SOURCES['/src/game/arena.ts']);
+    const from = src.indexOf('private drawBubble(');
+    expect(from).toBeGreaterThan(0);
+    const body = src.slice(from, from + 1 + src.slice(from + 1).indexOf('\n  private '));
+    // Both text passes (the dark outline, then the white fill) walk the whole `lines` array…
+    expect([...body.matchAll(/for \(let i = 0; i < lines\.length; i\+\+\) c\.(stroke|fill)Text\(lines\[i\]/g)]).toHaveLength(2);
+    // …and neither draws `b.label`, which is the answer key and not what a wrapped bubble shows.
+    expect(body).not.toMatch(/(stroke|fill)Text\(\s*(b\.label|text)\b/);
+    // …and the block's first baseline is offset by half the stack, not pinned to the single-line one.
+    expect(body).toMatch(/top = 2 - \(lines\.length - 1\) \* lh \/ 2/);
+  });
+
   // #48 review: tapping a TNT threw a ninja star at it, so the bomb burst once from play.ts's BOMB branch and
   // again when the star landed — and the landing fired the avatar's *slice* sound, rewarding the child for
   // hitting the bomb, while the exploded bubble kept falling for the 150 ms flight. The arena now asks

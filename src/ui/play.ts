@@ -281,7 +281,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     },
     bubbles: () =>
       arena?.bubbles.filter(b => b.launched && !b.dead && !b.hit && !b.fade)
-        .map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })) ?? [],
+        .map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy, lines: b.lines, labelState: b.labelState })) ?? [],
     state: () => ({
       stage: session.stage, index: session.index, score: session.score, lives: session.lives,
       ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt,

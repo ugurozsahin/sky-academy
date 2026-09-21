@@ -6,15 +6,21 @@
 // checks the contract at the source, before the tests ever run. Keep these shapes in step with the objects
 // assigned in play.ts / memory.ts and the properties the spec reads.
 import type { Session } from '../game/session';
-import type { Arena } from '../game/arena';
+import type { Arena, LabelState } from '../game/arena';
 import type { Tracer } from '../game/tracing';
 import type { Memory } from '../game/memory';
 import type { Duel, DuelPlayer, DuelTally } from '../game/duel';
 import type { CertText } from './certificate';
 import type { TrailSkin } from '../game/shop';
 
-/** A live bubble as the e2e spec reads it (a subset of arena `Bubble`). */
-export interface BubbleView { label: string; x: number; y: number; r: number; vy: number }
+/**
+ * A live bubble as the e2e spec reads it (a subset of arena `Bubble`).
+ *
+ * `lines` and `labelState` are here so the wrap (#348) is observable from outside the canvas: `label` is
+ * the answer key the spec slices by, and it is unchanged by wrapping, so nothing but these two says whether
+ * the label reached the screen readable. They are what the deferred cross-topic rail will read.
+ */
+export interface BubbleView { label: string; x: number; y: number; r: number; vy: number; lines: string[]; labelState: LabelState }
 
 /** Play-screen state snapshot returned by `state()`. */
 export interface PlayState {

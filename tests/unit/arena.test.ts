@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type Collidable, compact, dealOrdered, fitLabel, fitLabelLines, labelFont, splitLabel, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
+import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type Collidable, compact, dealOrdered, LABEL_MIN_FS, LABEL_READABLE_FS, WRAP_STACK, fitLabel, fitLabelLines, labelFont, splitLabel, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
 import { ALL_AVATARS } from '../../src/avatars';
 
 describe('dealOrdered — sequence words are dealt in order across the batches (#62)', () => {
@@ -52,15 +52,23 @@ describe('fitLabel — label font sized once at spawn, not per frame (#28)', () 
   });
 });
 
-describe('splitLabel / fitLabelLines — a long label wraps instead of shrinking past readable (#348)', () => {
+const startOf = (label: string, r: number) => r * (label.length <= 2 ? 1.05 : label.length <= 4 ? 0.7 : label.length <= 7 ? 0.5 : 0.4);
+
+describe('splitLabel / fitLabelLines — a label #348 squeezed wraps; one it did not is left alone', () => {
   const sizeOf = (font: string) => parseFloat(font.match(/([\d.]+)px/)![1]);
   // Fredoka bold measured in the running game: ~0.571 * fs per character (#348's table, `a three-quarter
   // turn` at 109.6px and fs 9.6). One factor for every label, so the arithmetic below is checkable by hand.
   const measure = (font: string, text: string) => sizeOf(font) * text.length * 0.571;
+  const R = 41.4;   // #348's phone radius: a wide bubble on an iPhone 13 viewport
 
   it('breaks at the point that leaves the longer line shortest', () => {
     expect(splitLabel('£1 and 50p')).toEqual(['£1 and', '50p']);
     expect(splitLabel('quarter past 12')).toEqual(['quarter', 'past 12']);
+  });
+
+  it('takes the later break on a tie, so the first line carries more (review note 6)', () => {
+    // '£1 and 5p' ties at 6: '£1' / 'and 5p' and '£1 and' / '5p'. The direction is a choice, so pin it.
+    expect(splitLabel('£1 and 5p')).toEqual(['£1 and', '5p']);
   });
 
   it('falls back to a hyphen, kept on the first line, when a space split leaves the long word alone', () => {
@@ -78,52 +86,116 @@ describe('splitLabel / fitLabelLines — a long label wraps instead of shrinking
   it('leaves a comfortable one-line label exactly as it was', () => {
     // '£2' at r=41.4 starts at 1.05r = 43.47 and measures 43.47*2*0.571 = 49.6 < 1.75r = 72.5 — no shrink,
     // no wrap, one line. The wrap must not disturb the labels that were always fine.
-    const fit = fitLabelLines('£2', 41.4, measure);
+    const fit = fitLabelLines('£2', R, measure);
     expect(fit.lines).toEqual(['£2']);
-    expect(fit.fits).toBe(true);
+    expect(fit.state).toBe('ok');
     expect(fit.fs).toBeCloseTo(43.47);
   });
 
-  it('wraps the money label #345 pushed down to the font floor, and draws it bigger than one line did', () => {
-    // '£1 and 50p' is 10 chars, so it starts at 0.4r = 16.6 and shrinks to 12 (12*10*0.571 = 68.5 <= 72.5).
-    // Wrapped, the longer line is '£1 and' (6): 0.5r = 20.7 capped by WRAP_MAX_FS to 0.62r = 25.7, and
-    // 20.7*6*0.571 = 70.9 already fits 1.7r = 70.4 within a step — so the child reads it far larger.
-    const one = fitLabel('£1 and 50p', 41.4, measure);
-    const fit = fitLabelLines('£1 and 50p', 41.4, measure);
-    expect(fit.lines).toEqual(['£1 and', '50p']);
-    expect(fit.fs).toBeGreaterThan(one);
-    expect(fit.fits).toBe(true);
-  });
-
-  it('reports the overflow it cannot rescue instead of discarding it — the #348 silent failure', () => {
-    // 'a three-quarter turn' is the label measured overflowing the bubble on `main`: 109.6px of text in an
-    // 82.9px circle. One line cannot fit it at the floor, and neither can two at this radius, so the fit
-    // says so. Nothing in the old `fitLabel` could: it returned 10 and looked exactly like a success.
-    const fit = fitLabelLines('a three-quarter turn', 41.4, measure);
-    expect(fit.fits).toBe(false);
-    expect(fit.lines).toEqual(['a three-', 'quarter turn']);   // still the best of the bad options
-    expect(measure(labelFont(fit.fs), 'a three-quarter turn')).toBeGreaterThan(41.4 * 1.75);
-  });
-
-  it('fits that same label once the bubble is wide enough, so the rescue really is a width problem', () => {
-    // r = 57.3 is what `layoutWave`'s own three-across cap allows on a 390px phone. 1.7r = 97.4, the longer
-    // line is 'quarter turn' (12): 12*0.571*fs <= 97.4 → fs <= 14.2, comfortably above the floor.
-    const fit = fitLabelLines('a three-quarter turn', 57.3, measure);
-    expect(fit.fits).toBe(true);
-    expect(fit.lines).toHaveLength(2);
-    expect(fit.fs).toBeGreaterThan(10);
+  it('leaves a label that shrank but stayed readable on one line — PR #467 B1', () => {
+    // The gate this pins used to be "shrank at all", which caught 215 labels at this radius that were
+    // already drawn comfortably. "9 o'clock" is the cheapest of them: 9 chars, so it starts at 0.4r = 16.6
+    // and shrinks to 13.56 (13.56*9*0.571 = 69.7 <= 72.5) — above LABEL_READABLE_FS, so #348 is not about
+    // it and the wrap must not touch it. Every hyphenated number word in the bank hangs off the same gate.
+    const fit = fitLabelLines("9 o'clock", R, measure);
+    expect(fit.lines).toEqual(["9 o'clock"]);
+    expect(fit.state).toBe('ok');
+    expect(fit.fs).toBeGreaterThanOrEqual(LABEL_READABLE_FS);
+    expect(fit.fs).toBeLessThan(startOf("9 o'clock", R));   // …and it really did shrink: the old gate caught it
   });
 
   it('leaves a multi-word label that never had to shrink on one line', () => {
-    // 'yes no' (6) starts at 0.5r = 20.7 and measures 70.9 <= 1.75r = 72.5, so it was never squeezed. The
-    // wrap would be bigger (two short lines), and taking it would restack labels #348 says nothing about.
-    expect(fitLabelLines('yes no', 41.4, measure).lines).toEqual(['yes no']);
+    expect(fitLabelLines('yes no', R, measure).lines).toEqual(['yes no']);
+  });
+
+  it('wraps the money label #345 pushed below readable, and draws it far bigger', () => {
+    // '£1 and 50p' is 10 chars, so it starts at 0.4r = 16.6 and shrinks to 12.56 — inside the bubble but
+    // under the 13px floor, which is exactly what #348 measured and complained about (it puts the live
+    // figure at 10.6px). Wrapped, the longer line is '£1 and' (6) and the label is read at 19.7.
+    const one = fitLabel('£1 and 50p', R, measure);
+    const fit = fitLabelLines('£1 and 50p', R, measure);
+    expect(one).toBeLessThan(LABEL_READABLE_FS);
+    expect(fit.lines).toEqual(['£1 and', '50p']);
+    expect(fit.fs).toBeGreaterThan(one);
+    expect(fit.state).toBe('ok');
+  });
+
+  it('separates "too small to read" from "wider than the bubble" — review note 2', () => {
+    // `a three-quarter turn` is the label #348 measured spilling onto the background: on one line it is
+    // 114px of text in an 82.9px circle, so `overflow`. Two lines are 43.8 and 65.8 wide against a 70.4
+    // budget — they do NOT overflow; what is still wrong with them is the size, so `small`. The first cut
+    // of this reported one boolean for both and its headline test measured a string nothing draws.
+    const one = fitLabelLines('a three-quarter turn', R, () => 9999);
+    expect(one.state).toBe('overflow');
+    const fit = fitLabelLines('a three-quarter turn', R, measure);
+    expect(fit.lines).toEqual(['a three-', 'quarter turn']);
+    expect(fit.state).toBe('small');
+    for (const line of fit.lines) expect(measure(labelFont(fit.fs), line)).toBeLessThanOrEqual(R * 1.7);
+  });
+
+  it('fits that same label once the bubble is wide enough, so the rescue really is a width problem', () => {
+    // r = 57.3 is what `layoutWave`'s own three-across cap allows on a 390px phone.
+    const fit = fitLabelLines('a three-quarter turn', 57.3, measure);
+    expect(fit.state).toBe('ok');
+    expect(fit.lines).toHaveLength(2);
+    expect(fit.fs).toBeGreaterThanOrEqual(LABEL_READABLE_FS);
+  });
+
+  it('never steps below the size it documents as the smallest ever drawn — review note 1', () => {
+    // `fs` starts fractional, so the old `fs -= 1` walked past the bound and returned 9.56 from a loop
+    // guarded by `fs > 10`. Every radius, every label: the floor is a floor.
+    for (const r of [26, 33.1, 41.4, 57.3]) {
+      expect(fitLabel('a three-quarter turn', r, () => 9999)).toBe(LABEL_MIN_FS);
+      expect(fitLabelLines('an anti-clockwise half turn', r, () => 9999).fs).toBeGreaterThanOrEqual(LABEL_MIN_FS);
+    }
+  });
+
+  it('keeps two lines inside the disc vertically, at every radius — review note 3', () => {
+    const labels = ['£1 and 50p', 'quarter past 12', 'a three-quarter turn', 'twenty-five', 'yes no', '£2', 'an anti-clockwise turn'];
+    for (const r of [26, 33.1, 41.4, 57.3]) {
+      for (const label of labels) {
+        const fit = fitLabelLines(label, r, measure);
+        expect(fit.lines.length * fit.fs * 1.02).toBeLessThanOrEqual(WRAP_STACK * r);
+      }
+    }
+  });
+
+  it('caps the wrapped size so two short lines cannot stack past the disc — review note 3', () => {
+    // The cap only bites when both lines are short enough to want a size above 0.62r. At r = 26 (layoutWave's
+    // floor) 'abcd efgh' is that case: one line overflows, and each half would fit at 18.2 unchecked, which
+    // stacks to 37.1 against the 33.8 the disc allows. Synthetic, because no real label reaches it today —
+    // which is the point: nothing else in the suite exercises the cap at all.
+    const fit = fitLabelLines('abcd efgh', 26, measure);
+    expect(fit.lines).toEqual(['abcd', 'efgh']);
+    expect(fit.fs).toBeLessThanOrEqual(26 * 0.62);
+    expect(fit.lines.length * fit.fs * 1.02).toBeLessThanOrEqual(WRAP_STACK * 26);
+  });
+
+  it('measures each line by itself — the second argument is the text, not the label — review note 4', () => {
+    const seen: string[] = [];
+    const spy = (font: string, text: string) => { seen.push(text); return measure(font, text); };
+    expect(fitLabelLines('£1 and 50p', R, spy).lines).toEqual(['£1 and', '50p']);
+    expect(seen).toContain('£1 and');
+    expect(seen).toContain('50p');
+  });
+
+  it('sizes from the measured width, not the character count — review note 4', () => {
+    // Two labels of identical length and identical break points, one made of a glyph three times as wide.
+    // Under a length-only model these would come back the same; they must not.
+    const wide = (font: string, text: string) => sizeOf(font) * [...text].reduce((w, ch) => w + (ch === 'W' ? 1.8 : 0.3), 0);
+    const narrow = fitLabelLines('iiii iiii', R, wide);
+    const fat = fitLabelLines('WWWW WWWW', R, wide);
+    expect(fat.fs).toBeLessThan(narrow.fs);
+    expect(narrow.lines).toEqual(['iiii iiii']);   // never squeezed, so never wrapped
+    expect(fat.lines).toEqual(['WWWW', 'WWWW']);
   });
 
   it('never returns a wrap that is smaller than the single line it replaces', () => {
-    for (const label of ['£1 and 50p', 'quarter past 12', 'a three-quarter turn', 'an anti-clockwise turn', 'yes', 'seventeen']) {
-      const fit = fitLabelLines(label, 41.4, measure);
-      if (fit.lines.length === 2) expect(fit.fs).toBeGreaterThanOrEqual(fitLabel(label, 41.4, measure));
+    for (const r of [26, 33.1, 41.4, 57.3]) {
+      for (const label of ['£1 and 50p', 'quarter past 12', 'a three-quarter turn', 'an anti-clockwise turn', 'twenty-five', 'yes', 'seventeen']) {
+        const fit = fitLabelLines(label, r, measure);
+        if (fit.lines.length === 2) expect(fit.fs).toBeGreaterThanOrEqual(fitLabel(label, r, measure));
+      }
     }
   });
 });
