@@ -3445,14 +3445,29 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
    * even though the floor above stays green.
    */
   it('attack and bodyCheck end where their own last sentence ends, not wherever the section does', () => {
+    // PR #469 round 5, B1. `endsWith` alone still passes if the section keeps a filler-then-duplicate shape:
+    // delete a sentence from inside the rule, append dead-zone filler before the section's true end, then
+    // append a SECOND copy of `attackEnd`/`bodyCheckEnd` after the filler — the text still literally ends
+    // with the pinned sentence, so round 4's check alone cannot see the pad between the real rule and the
+    // duplicate. The exactly-once guard below is the same one `slice()` already applies to every `start`/`end`
+    // anchor it takes (line ~1828), extended to this open-tailed pin the same way.
+    const count = (text: string, needle: string) => text.split(needle).length - 1;
     expect(s4().trim().endsWith(attackEnd),
       'text appended after "attack it yourself"\'s own last sentence pads the floor above without tripping it — '
       + 'the PR #469 round 4 reproduction')
       .toBe(true);
+    expect(count(s4(), attackEnd),
+      'attackEnd appears more than once — a duplicate pasted after filler would satisfy the endsWith check above '
+      + 'while the filler still pads the size floor, the PR #469 round 5 reproduction')
+      .toBe(1);
     expect(s3().trim().endsWith(bodyCheckEnd),
       'text appended after the body-check bullet\'s own last sentence pads the floor above without tripping it — '
       + 'the PR #469 round 4 reproduction')
       .toBe(true);
+    expect(count(s3(), bodyCheckEnd),
+      'bodyCheckEnd appears more than once — a duplicate pasted after filler would satisfy the endsWith check '
+      + 'above while the filler still pads the size floor, the PR #469 round 5 reproduction')
+      .toBe(1);
   });
 
   /**
