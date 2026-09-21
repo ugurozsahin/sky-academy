@@ -132,11 +132,13 @@ const EVERYDAY = ['I', 'it', 'in', 'if', 'is', 'as', 'at', 'an', 'am', 'on', 'or
   // Added for review of PR #303: the list words' own neighbours (them/then, days/ways/pays, king, good …) and a wider batch.
   'them', 'then', 'days', 'ways', 'pays', 'king', 'good', 'fine', 'mine', 'must', 'held', 'hood', 'toad', 'list', 'war', 'comb', 'dove', 'bays', 'rays', 'lays', 'wag', 'lose', 'hare', 'hero', 'herd', 'tie', 'hip', 'ark', 'mint', 'mist', 'flood', 'fist', 'bury', 'halt', 'than', 'that', 'this', 'thin', 'they', 'tray', 'stay', 'play', 'pray', 'sway', 'away', 'jays', 'kind', 'find', 'bind', 'mind', 'wind', 'dust', 'just', 'rust', 'nest', 'vest', 'pest', 'hold', 'fold', 'bold', 'cold', 'gold', 'sold', 'told', 'hole', 'food', 'mood', 'wood', 'hoof', 'roof', 'boot', 'foot', 'root', 'hoot', 'loot', 'soot', 'toot', 'road', 'load', 'last', 'lost', 'mast', 'vast', 'fast', 'past', 'east', 'west', 'was', 'wax', 'way', 'warm', 'warn', 'ward', 'come', 'cone', 'code', 'cope', 'core', 'cove', 'cake', 'love', 'live', 'move', 'loud', 'the', 'tea', 'top', 'toy', 'tub', 'two', 'try', 'are', 'arm', 'art', 'ace', 'ale', 'ape', 'axe', 'ago', 'aim', 'air', 'his', 'has', 'hit', 'hid', 'him', 'hum', 'hut', 'hug', 'had', 'hat', 'ham', 'hay', 'hen', 'hey', 'hop', 'hot', 'how', 'you', 'yes', 'yet', 'yak', 'yam', 'one', 'ode', 'ore', 'owe', 'own', 'owl', 'once', 'only', 'open', 'oven', 'over', 'ask', 'ash', 'aunt', 'ant', 'and', 'any', 'put', 'pit', 'pat', 'pet', 'pot', 'pun', 'pup', 'pub', 'pug', 'push', 'posh', 'pull', 'pill', 'poll', 'pall', 'pale', 'pole', 'pile', 'full', 'fall', 'fell', 'fill', 'fuel', 'furl', 'fool', 'foal', 'foul', 'fowl', 'house', 'mouse', 'louse', 'horse', 'home', 'hose', 'hope', 'hour', 'sour', 'four', 'pour', 'tour', 'your', 'door', 'poor', 'moor', 'doors', 'floor', 'flour', 'fire', 'five', 'ford', 'fork', 'form', 'kilt', 'mild', 'mile', 'milk', 'mill', 'miss', 'wild', 'wile', 'will', 'wine', 'wing', 'wink', 'wipe', 'wire', 'wise', 'wish', 'with', 'child', 'chill', 'chips', 'chime', 'climb', 'class', 'clash', 'most', 'moss', 'moth', 'mode', 'mole', 'more', 'oily', 'holy', 'both', 'bath', 'bosh', 'bots', 'boss', 'old', 'odd', 'colt', 'cord', 'corn', 'cost', 'cosy', 'golf', 'goat', 'goal', 'gods', 'hoop', 'tolls', 'toll', 'tool', 'tone', 'every', 'event', 'ever', 'even', 'eve', 'great', 'greet', 'grate', 'grade', 'grape', 'break', 'bread', 'breed', 'beak', 'brake', 'steak', 'stack', 'stalk', 'steal', 'steam', 'steep', 'steer', 'stem', 'step', 'pretty', 'petty', 'party', 'beautiful', 'after', 'alter', 'fact', 'post', 'part', 'path', 'pats', 'bats', 'bash', 'bass', 'baths', 'hours', 'sore', 'soar', 'prove', 'improve', 'sure', 'sugar', 'eye', 'dye', 'bye', 'could', 'would', 'should', 'cloud', 'who', 'why', 'whom', 'whole', 'whale', 'while', 'white', 'many', 'mean', 'main', 'busy', 'bush', 'people', 'water', 'again', 'half', 'calf', 'hall', 'hate', 'have', 'money', 'monkey', 'honey', 'parents', 'parent', 'present', 'pardon', 'tin', 'toe', 'tip', 'tug', 'hog', 'lot', 'tow', 'ton', 'tot', 'hub', 'arc', 'lord', 'hind', 'lots', 'asp', 'cast', 'file', 'fort', 'mice', 'hone',
   // From a sweep of every residual candidate on the review head: the real words left (sand, world, speak, plait …).
-  'skid', 'slid', 'sand', 'sags', 'ore', 'ale', 'awe', 'ware', 'herb', 'hers', 'gush', 'lush', 'mush', 'puss', 'lull', 'pulp', 'oar', 'doom', 'poop', 'fund', 'fond', 'mend', 'mink', 'weld', 'moat', 'cola', 'creak', 'sneak', 'speak', 'fact', 'lash', 'pant', 'claws', 'grams', 'grabs', 'grasp', 'pads', 'pals', 'pans', 'paws', 'pats', 'plait', 'plane', 'plank', 'plans', 'surf', 'ewe', 'world', 'wound', 'whose', 'mane', 'halo',
+  // `puss` and `poop` were in this batch until the review of #324: both are crudities, so they belong in
+  // `AVOID` below, not here. They were blocking their stems already, but as words rather than as spellings.
+  'skid', 'slid', 'sand', 'sags', 'ore', 'ale', 'awe', 'ware', 'herb', 'hers', 'gush', 'lush', 'mush', 'lull', 'pulp', 'oar', 'doom', 'fund', 'fond', 'mend', 'mink', 'weld', 'moat', 'cola', 'creak', 'sneak', 'speak', 'fact', 'lash', 'pant', 'claws', 'grams', 'grabs', 'grasp', 'pads', 'pals', 'pans', 'paws', 'pats', 'plait', 'plane', 'plank', 'plans', 'surf', 'ewe', 'world', 'wound', 'whose', 'mane', 'halo',
   // Second review of PR #303: the systematic hole was the list words' own plurals and `-er`/`-ed` forms
   // (`cla_s` offered `p` for claps, `fin_` offered `s` for fins), so this batch is the full sweep of all 489
   // drawable gaps rather than another guess at which families were missed.
-  'claps', 'clams', 'clans', 'clasp', 'clays', 'clothed', 'fins', 'fink', 'grans', 'gross', 'groat', 'fatter', 'bather', 'hays', 'mays', 'saws', 'sans', 'sass', 'poos', 'pooh', 'theme', 'thee', 'eves', 'aye', 'tee', 'lest', 'mosh',
+  'claps', 'clams', 'clans', 'clasp', 'clays', 'clothed', 'fins', 'fink', 'grans', 'gross', 'groat', 'fatter', 'bather', 'hays', 'mays', 'saws', 'sans', 'sass', 'theme', 'thee', 'eves', 'aye', 'tee', 'lest', 'mosh',
   'wafer', 'wager', 'wader', 'waver', 'wad', 'wan', 'wilt', 'wily', 'woo', 'wove', 'cater', 'eater', 'hater', 'patents', 'probe', 'prone', 'prose', 'freak', 'bream', 'bust', 'buss', 'buoy', 'bate', 'pate', 'rind', 'lobe', 'lone', 'lope', 'mini', 'mins', 'kink', 'kine', 'kins',
   'moot', 'mope', 'mote', 'rouse', 'douse', 'souse', 'holt', 'aster', 'clime', 'dour', 'bur', 'boor', 'cole', 'cote', 'coney', 'evert'];
 /**
@@ -157,11 +159,31 @@ export const GAP_WORDS: ReadonlySet<string> = new Set([...Y1_CEW, ...Y2_CEW, ...
  * `sire`, `whey`, `rut`, `cur`, `hag`, `hale`, `chile`.
  *
  * `AVOID` is the other filter: spellings no card may show a child, whatever the lists know.
+ *
+ * **The rule the split follows** (#324 item 3): a spelling is blocked *here* when the reason is that a child
+ * must not see it, and in `GAP_WORDS` when the reason is that it is another right answer. `poos`, `pooh`,
+ * `poop` and `puss` sat in `EVERYDAY` until #324 for the wrong reason: the stems were closed, but by the list
+ * that exists to say "this is a word", not by the one that exists to say "not on a card" — so an unrelated
+ * curriculum prune of the word lists would have unblocked them with nothing red.
+ *
+ * **What the rail holds, and what it does not** (review of #324): `tests/unit/curriculum.test.ts` rail 5
+ * asserts the two sets are *disjoint*, which catches a spelling filed into **both** — the state a half-done
+ * move leaves behind. It is blind to the mis-filing above, because a crudity sitting in `GAP_WORDS` and absent
+ * from `AVOID` satisfies disjointness perfectly. Nothing general catches that; what catches it is a row in
+ * rail 5's reachable-`AVOID` table, one per stem, which goes red the moment the word leaves `AVOID`.
  */
-const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass', 'arse', 'shit', 'crap', 'cock', 'dick',
+export const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass', 'arse', 'shit', 'crap', 'cock', 'dick',
   // Second review of PR #303: `poo_` offered `f`. A slur, a crudity or an insult is filtered here rather than
   // added to the lists above, so that `GAP_WORDS` stays a list of words the game is happy to *show*.
-  'poof', 'gays', 'lust', 'pus', 'tush', 'coke', 'yob']);
+  'poof', 'gays', 'lust', 'pus', 'tush', 'coke', 'yob',
+  // #324 item 1: that round closed `f` on `poo_` and checked no other letter on the same stem, so `poon` — a
+  // sexual slur — was still on a Year 2 child's bubbles two rounds after a review had gone hunting for it.
+  // `poos`/`pooh` move here from `EVERYDAY` under the rule above; they were blocked, but as words rather than
+  // as spellings a card may not show.
+  'poon', 'poot', 'pood', 'poos', 'pooh', 'paps', 'pud',
+  // Review of #324: `poop` and `puss` were still in `EVERYDAY`, so the two stems the audit had just closed were
+  // each one curriculum prune away from reopening. Moved here so `poo_` is uniform and `pu__`/`p_ss` are pinned.
+  'poop', 'puss']);
 export function gapLetters(word: string, idx: number): string[] {
   const lower = word.toLowerCase();
   return LETTERS.filter(l => { const w = lower.slice(0, idx) + l + lower.slice(idx + 1); return l !== lower[idx] && !GAP_WORDS.has(w) && !AVOID.has(w); });
