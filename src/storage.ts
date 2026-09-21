@@ -292,7 +292,14 @@ export function addProfile(): AddProfileResult {
  * the field raw. A v2 blob has no such field, `load()` derives it and deliberately does not write it back,
  * and nothing on `boot → map → 👥` calls `save()` — so on the first launch after an upgrade a fully-played
  * child's card said "Not started yet" while `load()` answered `onboarded: true` for the very same save
- * (#380 review B3). Keep the two rules identical: `MIGRATIONS[2]` is the home of this one.
+ * (#380 review B3). The rule is `onboardedOf` below and both sites call it, so the two cannot drift.
+ *
+ * It also applies `load()`'s **version gate** before any of that (#380 review B2). `migrate()` answers
+ * `{ ...DEFAULT }` for anything `isMigratable` rejects — a blob from a newer build, or an unreadable `v` —
+ * so a card that read those fields raw drew "Bo — Blaze Ninja" for a save this build cannot open, and the
+ * tap that followed put Bo in the first-run wizard with `readOnly` latched and every write silently
+ * dropped. Answering `blank` is the honest version of that card: "Not started yet" is at least what tapping
+ * it gives. Saying *why* on the card is #232's `isReadOnlySave` hook, and is not this slice's.
  */
 export interface ProfileCard { id: ProfileId; name: string; avatar: string | null; onboarded: boolean }
 export function profileCard(id: ProfileId): ProfileCard {
@@ -303,13 +310,25 @@ export function profileCard(id: ProfileId): ProfileCard {
   try { parsed = JSON.parse(raw); } catch { return blank; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return blank;
   const s = parsed as RawSave;
+  if (!isMigratable(s)) return blank;                       // the card agrees with load(), which refuses this blob
   return {
     id,
     name: typeof s.name === 'string' ? s.name : '',
     avatar: typeof s.avatar === 'string' ? s.avatar : null,
-    onboarded: typeof s.onboarded === 'boolean' ? s.onboarded : typeof s.avatar === 'string' && !!s.avatar,   // MIGRATIONS[2]'s rule, unchanged
+    onboarded: onboardedOf(s),
   };
 }
+/**
+ * Whether a stored blob counts as having been through onboarding — **the one home of that rule** (#380
+ * review B3, note 1). `MIGRATIONS[2]` derives the field when a v2 blob reaches the ladder, and `profileCard`
+ * derives it for a sibling's slot the ladder never runs on; they have to answer the same thing about the
+ * same bytes, and a rail comparing two copies of the expression could only ever compare their spelling.
+ *
+ * `typeof s.avatar === 'string'` is part of the rule, not a belt: a hand-edited `{ avatar: 7 }` is truthy
+ * and is not a ninja anybody chose, and the two sites had already drifted apart on exactly that blob.
+ */
+export const onboardedOf = (s: RawSave): boolean =>
+  typeof s.onboarded === 'boolean' ? s.onboarded : typeof s.avatar === 'string' && !!s.avatar;
 /** Every profile on this device as a card, in slot order — the picker's whole data source. */
 export const profileCards = (): ProfileCard[] => profileIds().map(profileCard);
 
@@ -337,7 +356,7 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
   // the acceptance criterion is that no existing player is sent back through the wizard by this update.
   2: s => ({
     ...s,
-    onboarded: typeof s.onboarded === 'boolean' ? s.onboarded : !!s.avatar,
+    onboarded: onboardedOf(s),      // the rule itself lives by `profileCard`, which has to give the same answer
   }),
 };
 

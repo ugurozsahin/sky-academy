@@ -1,4 +1,4 @@
-import { avatarById } from '../avatars';
+import { avatarOrNull } from '../avatars';
 import { addProfile, MAX_PROFILES, profileCards, setActiveProfile, type AddProfileResult, type ProfileId } from '../storage';
 import { sfx, say } from '../audio';
 import { $, $$, esc, render } from './dom';
@@ -17,8 +17,13 @@ import { $, $$, esc, render } from './dom';
  * second child ever gets added. Renaming and deleting are slice 3's, behind the grown-ups gate.
  */
 
-/** A child with no name yet — a slot added but not onboarded — is still a card they can tap. */
-const cardName = (name: string) => (name.trim() ? name : 'New ninja');
+/**
+ * A child with no name yet — a slot added but not onboarded — is still a card they can tap, so it needs
+ * words of its own. **Not the ＋ card's words** (#380 review B1): "New ninja" labelled both, while tapping
+ * them does two different things — one opens an existing slot, the other creates a slot that nothing can
+ * delete until slice 3. The slot number is what actually distinguishes two empty cards from each other.
+ */
+const cardName = (name: string, slot: number) => (name.trim() ? name : `Ninja ${slot}`);
 
 /** What the hint line says when the store refuses. Two sentences, not one: only one of them is the family's
  *  doing (#335 item 2), and a child cannot act on the other. */
@@ -66,10 +71,16 @@ export function profilesScreen(go: (id: ProfileId) => void, onNew: (id: ProfileI
     ${onBack ? `<button class="icon-btn" id="back" aria-label="Back">←</button>` : ''}
     <header class="brand"><span class="kanji">忍</span><h1>Sky Ninja<br><span>Academy</span></h1><p class="tag" id="who-heading" tabindex="-1">Who is playing?</p></header>
     <div class="avatar-grid" role="list">
-      ${cards.map(c => { const a = avatarById(c.avatar); return `
-        <button class="avatar-card" data-profile="${c.id}" style="--glow:${a.glow}" role="listitem" aria-label="Play as ${esc(cardName(c.name))}">
-          <span class="figure"><img src="${a.img}" alt="" draggable="false"></span>
-          <b>${esc(cardName(c.name))}</b><small>${c.onboarded ? a.name : 'Not started yet'}</small>
+      ${cards.map((c, i) => {
+        // `avatarOrNull`, not `avatarById`: a slot with no ninja chosen is a state this screen must *draw*,
+        // and the Volt fallback drew it as a sibling's face — same portrait, same glow, only the text under
+        // it different, on the one screen a pre-reader picks by the picture (#380 review B1). A portrait-less
+        // card borrows the ＋ card's dashed figure, which `.new-ninja` already builds for exactly this
+        // meaning, and stays tappable: it leads to the wizard, which is where that child belongs.
+        const a = avatarOrNull(c.avatar), name = cardName(c.name, i + 1); return `
+        <button class="avatar-card${a ? '' : ' new-ninja'}" data-profile="${c.id}"${a ? ` style="--glow:${a.glow}"` : ''} role="listitem" aria-label="Play as ${esc(name)}">
+          <span class="figure">${a ? `<img src="${a.img}" alt="" draggable="false">` : `<span class="plus" aria-hidden="true">＋</span>`}</span>
+          <b>${esc(name)}</b><small>${a && c.onboarded ? a.name : 'Not started yet'}</small>
         </button>`; }).join('')}
       ${room ? `
         <button class="avatar-card new-ninja" id="new-ninja" role="listitem" aria-label="Add a new ninja">

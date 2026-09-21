@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { activeProfile, addProfile, MAX_PROFILES, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { activeProfile, addProfile, MAX_PROFILES, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
@@ -1253,6 +1253,41 @@ describe('profiles: siblings on one device (#20)', () => {
     // A v3 blob still wins on its own field — `false` there means mid-wizard, whatever the avatar says (#67).
     localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 3, name: 'Cass', avatar: 'kai', onboarded: false }));
     expect(profileCard('p3')).toEqual({ id: 'p3', name: 'Cass', avatar: 'kai', onboarded: false });
+  });
+
+  it('a card is blank for a save this build cannot open, exactly as load() is (#20 slice 2)', () => {
+    // #380 review B2. `profileCard` applied `MIGRATIONS[2]`'s rule but skipped the version gate `load()`
+    // applies before it, so a save from a **newer build** — which `migrate()` refuses outright — drew the
+    // child's real name and ninja. The tap then succeeded, `afterPick()` read `onboarded: false` off the
+    // default `load()` answers, and the child went through the first-run wizard with `readOnly` latched and
+    // every write silently dropped, their real save sitting intact under its own key.
+    const future = { v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', onboarded: true, coins: 99 };
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify(future));
+    expect(isFutureSave(future), 'the blob this is about').toBe(true);
+    expect(migrate(future), "load()'s own answer is a fresh default").toMatchObject({ name: '', avatar: null, onboarded: false });
+    expect(profileCard('p2'), 'so the card says the same thing the tap will give')
+      .toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
+
+    // The same for a `v` no build ever wrote — also refused by `isMigratable`, for a different reason (#232).
+    localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 'two', name: 'Cass', avatar: 'kai', onboarded: true }));
+    expect(profileCard('p3')).toEqual({ id: 'p3', name: '', avatar: null, onboarded: false });
+
+    // And the gate is a gate, not a blanket: the versions the ladder *can* walk are unaffected.
+    localStorage.setItem(saveKeyFor('p4'), JSON.stringify({ v: 1, name: 'Dev', avatar: 'kai' }));
+    expect(profileCard('p4')).toEqual({ id: 'p4', name: 'Dev', avatar: 'kai', onboarded: true });
+  });
+
+  it('the card and the migration derive onboarded from one rule, not two copies (#20 slice 2)', () => {
+    // #380 review note 1. The rail held two spellings of the expression against a regex that stopped at the
+    // colon, so the fallback — the whole of the rule — was never compared, and the two had already drifted:
+    // a truthy non-string avatar answered `true` on one side and `false` on the other.
+    for (const avatar of [7, true, {}, []] as const) {
+      expect(onboardedOf({ v: 2, avatar }), `avatar: ${JSON.stringify(avatar)} is not a ninja anybody chose`).toBe(false);
+      expect(MIGRATIONS[2]({ v: 2, avatar }).onboarded).toBe(false);
+    }
+    expect(onboardedOf({ v: 2, avatar: 'volt' })).toBe(true);
+    expect(onboardedOf({ v: 2, avatar: '' }), 'an empty string is no ninja either').toBe(false);
+    expect(onboardedOf({ v: 3, avatar: 'volt', onboarded: false }), 'a real field always wins').toBe(false);
   });
 
   it('a profile added but never played still draws a card (#20 slice 2)', () => {

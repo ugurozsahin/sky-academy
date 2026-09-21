@@ -200,7 +200,13 @@ describe('guard rails', () => {
   // 1. The picker is a **launch screen, not a stack entry**: `mapScreen` pushes no history entry and
   //    `nav.map()` pops whenever one exists, so an `enter('profiles')` would send every "chosen, go to the
   //    map" straight back to the picker — a loop a child could not leave. A future hand adding `enter(...)`
-  //    to the route for symmetry with its neighbours is exactly the plausible edit.
+  //    to the route for symmetry with its neighbours is exactly the plausible edit. **The route is not the
+  //    only place that edit lands** (#380 review B3): the route pops and hands off to `showProfiles`, which
+  //    is what actually draws the picker, is the only entry point on the boot path, and is where `leave()`
+  //    and `fromPop` already sit — so it looks more like every other route than the route does. It is
+  //    defined below `up,` and so was outside this rail's slice by construction: inserting `enter('profiles')`
+  //    there alone left all 332 rails and the whole 1439-test suite green.
+
   // 2. Boot shows it only when siblings actually share the device. Nothing changes for today's players,
   //    which is the owner's decision at the top of #20, and `> 1` is the whole of it.
   // 3. The store is asked before the child is moved: a `go(...)` that did not wait for
@@ -211,8 +217,11 @@ describe('guard rails', () => {
   it('the profile picker is a launch screen, gated on more than one profile (#20 slice 2)', () => {
     const main = code(SOURCES['/src/main.ts']);
     const from = main.indexOf('profiles: () =>'), to = main.indexOf('\n  up,', from);
-    expect({ route: from >= 0 && to > from }).toEqual({ route: true });
-    expect(main.slice(from, to), 'the picker pushes no history entry').not.toMatch(/\benter\(/);
+    const drawFrom = main.indexOf('const showProfiles ='), drawTo = main.indexOf('\n', drawFrom);
+    expect({ route: from >= 0 && to > from, draws: drawFrom >= 0 && drawTo > drawFrom })
+      .toEqual({ route: true, draws: true });   // a rename empties the slice below, so fail here instead
+    expect(main.slice(from, to) + main.slice(drawFrom, drawTo), 'neither the route nor the function that draws the picker pushes a history entry')
+      .not.toMatch(/\benter\(/);
     expect(main, 'boot reaches the picker only with two or more profiles').toMatch(/profileIds\(\)\.length > 1/);
     expect(main, 'and a one-profile device boots exactly as it did').toMatch(/else if \(load\(\)\.onboarded\) nav\.map\(\); else nav\.avatar\(\)/);
   });
@@ -242,6 +251,23 @@ describe('guard rails', () => {
     expect(pick.match(/return refuse\(o\.hint\);/g) ?? [], 'and both handlers route their refusal through it').toHaveLength(2);
   });
 
+  // #380 review B1 (round 3): `avatarById` falls back to `AVATARS[0]`, which is Volt — right for every
+  // caller that has already decided a portrait is going on screen, and wrong for the one screen whose job is
+  // telling children apart. A slot with no ninja chosen drew Volt's portrait and Volt's glow, pixel for
+  // pixel a sibling who plays as Volt, and the only difference was the text under it — on a screen whose
+  // audience cannot read. `avatarOrNull` is the lookup that has no opinion; the fallback stays where it is.
+  it('the picker draws a slot with no ninja as an empty slot, not as Volt (#20 slice 2)', () => {
+    const pick = code(SOURCES['/src/ui/profiles.ts']);
+    expect(pick, 'the picker asks for the ninja that exists, not one to fall back on').toMatch(/avatarOrNull\(c\.avatar\)/);
+    expect({ fallbackUsed: /\bavatarById\b/.test(pick) }).toEqual({ fallbackUsed: false });
+    expect(pick, 'and a card with none borrows the ＋ card\'s dashed figure').toMatch(/a \? '' : ' new-ninja'/);
+    // The two cards must not also share their words: "New ninja" on both is what made the empty slot and the
+    // ＋ card a coin flip in the first place. The ＋ card's `<b>` is literal; the slot's comes from `cardName`.
+    expect(code(SOURCES['/src/avatars.ts']), 'the null-answering lookup is the one home of the id → ninja walk')
+      .toMatch(/export const avatarOrNull = [\s\S]{0,200}ALL_AVATARS\.find/);
+    expect(pick, 'an unnamed slot is named by its slot, not by the ＋ card\'s words').toMatch(/name\.trim\(\) \? name : `Ninja \$\{slot\}`/);
+  });
+
   // #380 review B1: the picker pushes no history entry, so whatever entry was current when it opened is what
   // everything leaving it unwinds onto — and the 👥 button is on the *shared* topbar, so that was the island
   // or rewards screen. A new Reception profile finished the wizard on the previous child's Year 2 island.
@@ -258,12 +284,38 @@ describe('guard rails', () => {
   // #380 review B3: `profileCard` deliberately does not run the migrations, but `onboarded` only exists from
   // v3, and nothing on `boot → map → 👥` writes a migrated blob back — so reading the field raw made a
   // fully-played v2 save draw as "Not started yet" while `load()` said otherwise about the same bytes.
-  it("a card's onboarded flag uses the migration's own rule, not the raw field (#20 slice 2)", () => {
+  //
+  // This rail used to hold two *copies* of the expression against one regex, and the regex stopped at the
+  // colon — so the fallback, which is the whole of the rule, was never compared (#380 review note 1). The
+  // two had already drifted: `{ v: 2, avatar: 7 }` migrated to `onboarded: true` and drew a card saying
+  // "Not started yet". There is one rule now, so what this holds is that both sites call it rather than
+  // spelling it out again — which a copy cannot pass by looking similar.
+  it("a card's onboarded flag and the migration's are the same rule, not two copies (#20 slice 2)", () => {
+    const store = code(SOURCES['/src/storage.ts']);
+    const at = (fn: string) => store.slice(store.indexOf(fn), store.indexOf('\n}', store.indexOf(fn)));
+    const raw = /typeof s\.onboarded === 'boolean' \? s\.onboarded/;
+    expect(store, 'the rule has one home').toMatch(/export const onboardedOf = \(s: RawSave\): boolean =>/);
+    expect(at('export function profileCard('), 'the card calls it').toMatch(/onboarded: onboardedOf\(s\)/);
+    const migFrom = store.indexOf('MIGRATIONS: Record');
+    const migrations = store.slice(migFrom, store.indexOf('\n};', migFrom));
+    expect({ ladder: migFrom >= 0 && migrations.length > 0 }).toEqual({ ladder: true });
+    expect(migrations, 'and so does MIGRATIONS[2]').toMatch(/onboarded: onboardedOf\(s\)/);
+    // The copies are gone, not merely joined by a third site: a re-inlined rule at either call site is the
+    // drift this rail exists to catch, and it would otherwise read as green beside the call it replaced.
+    for (const [where, body] of [['profileCard', at('export function profileCard(')], ['MIGRATIONS[2]', migrations]] as const)
+      expect({ where, inlined: raw.test(body) }).toEqual({ where, inlined: false });
+  });
+
+  // #380 review B2: `profileCard` applied MIGRATIONS[2]'s rule but not the version gate `load()` applies
+  // first, so a save from a *newer* build — which `migrate()` refuses and answers `{ ...DEFAULT }` for —
+  // drew a card with that child's real name and ninja. Tapping it moved the session, `afterPick()` read
+  // `onboarded: false` off the default, and the child was put through the first-run wizard with `readOnly`
+  // latched and every write dropped. The card has to agree with `load()` about the same bytes.
+  it('a card is blank for a save load() would refuse, not a name the tap cannot deliver (#20 slice 2)', () => {
     const store = code(SOURCES['/src/storage.ts']);
     const card = store.slice(store.indexOf('export function profileCard('), store.indexOf('\n}', store.indexOf('export function profileCard(')));
-    const rule = /typeof s\.onboarded === 'boolean' \? s\.onboarded : /;
-    expect(card, 'the card derives it the way MIGRATIONS[2] does').toMatch(rule);
-    expect(store.slice(store.indexOf('MIGRATIONS: Record')), 'and MIGRATIONS[2] is still where that rule lives').toMatch(rule);
+    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) return blank;/);
+    expect(store.slice(store.indexOf('function migrate(')), 'and that gate is still the one load() goes through').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.DEFAULT \};/);
   });
 
   it("a sibling's card is read from the slot, never through the session's load() (#20 slice 2)", () => {

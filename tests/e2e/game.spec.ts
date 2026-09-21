@@ -1898,6 +1898,44 @@ test.describe('profile picker (#20 slice 2)', () => {
     await expect(page.locator('#rewards')).toContainText('40');
   });
 
+  /**
+   * guard rail (#380 review B1, round 3): a slot in the index with no save behind it — tap ＋ and close the
+   * app before a ninja is chosen, "Start again" in the grown-ups screen, or any sibling save the app cannot
+   * read — drew `AVATARS[0]`, Volt, because `avatarById` falls back rather than answering "none". On the one
+   * screen a pre-reader picks by the picture, an unplayed slot was pixel for pixel a sibling who plays as
+   * Volt, and it was labelled "New ninja" — the same two words as the ＋ card beside it, which does something
+   * else entirely. Every card in every other test has an avatar, which is why nothing saw it.
+   *
+   * The tap is asserted too (#380 review note 2): `afterPick()`'s un-onboarded branch was dead in the suite,
+   * and it is #67's rule at a second call site — a child who abandons the wizard must be sent back to it,
+   * never dropped on the map with an empty profile.
+   */
+  test('an unplayed slot is drawn as an empty slot, not as another child (#20 slice 2)', async ({ page }) => {
+    await page.addInitScript(({ index, ada }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);                 // p2 is in the index with no save key at all
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+
+    const played = page.locator('.avatar-card[data-profile="p1"]'), empty = page.locator('.avatar-card[data-profile="p2"]');
+    await expect(played.locator('img')).toHaveAttribute('src', /volt/);
+    await expect(empty.locator('img'), 'no portrait at all, rather than the first ninja in the list').toHaveCount(0);
+    await expect(empty, 'the dashed ＋ figure the ＋ card already means "empty" with').toHaveClass(/new-ninja/);
+    await expect(empty.locator('b'), "and words of its own, not the ＋ card's").not.toHaveText('New ninja');
+    await expect(page.locator('#new-ninja b')).toHaveText('New ninja');
+
+    // It is still a card, and tapping it goes where that child belongs: the wizard, not the map.
+    await empty.click();
+    await expect(page.locator('.choose-ninja-screen'), 'an unplayed slot opens the wizard').toBeVisible();
+    await expect(page.locator('.home'), 'never the map with an empty profile (#67)').toHaveCount(0);
+  });
+
   test('a fourth ninja is the last: the New ninja card goes when the device is full', async ({ page }) => {
     await seedSiblings(page);
     await page.goto('/');
@@ -1975,6 +2013,24 @@ test.describe('profile picker (#20 slice 2)', () => {
 
     await page.click('#who');
     await expect(page.locator('.avatar-card[data-profile]'), 'and backing out created nobody').toHaveCount(1);
+  });
+
+  /**
+   * guard rail (#380 review B3, round 3): "back from the picker leaves the app, exactly as back from the map
+   * does" is stated three times — `main.ts`'s route comment, the rail's comment, the docstring above — and
+   * was verified by nothing at any layer. It is the property the whole no-history decision rests on, and on
+   * the APK hardware back is the primary navigation control, so a stray `enter('profiles')` would send every
+   * "chosen, go to the map" straight back here with no way out. The rail can see the two source sites; only
+   * this can see what pressing back actually does.
+   */
+  test('hardware back at the launch picker leaves the app, as it does from the map (#20 slice 2)', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    // Nothing of ours to pop: the picker is the root screen here, so back is the browser's to answer.
+    expect(await page.evaluate(() => history.state?.screen ?? null), 'the picker pushed no entry').toBeNull();
+    await page.goBack();
+    await expect(page.locator('.home'), 'no sibling\'s sky map was entered by the press').toHaveCount(0);
   });
 
   /**

@@ -59,8 +59,20 @@ export const SENSEI_LINES = {
 /** Every playable ninja, the Master last. */
 export const ALL_AVATARS: Avatar[] = [...AVATARS, MASTER];
 
+/**
+ * The ninja with this id, or `null` when there is none — what a screen wants when "no portrait" is a real
+ * state it has to draw differently, rather than a missing value to paper over (#380 review B1).
+ *
+ * `avatarById` below answers the other question — "give me a ninja to draw" — and its Volt fallback is right
+ * for every caller that has already decided a portrait is going on screen. It is wrong for the profile
+ * picker, where a slot that has never been played is one of the two things the screen exists to tell apart:
+ * falling back there drew an empty slot as a sibling's face, pixel for pixel.
+ */
+export const avatarOrNull = (id: string | null | undefined): Avatar | null =>
+  ALL_AVATARS.find(a => a.id === id) ?? null;
+
 export function avatarById(id: string | null | undefined): Avatar {
-  return ALL_AVATARS.find(a => a.id === id) ?? AVATARS[0];
+  return avatarOrNull(id) ?? AVATARS[0];
 }
 
 /**
