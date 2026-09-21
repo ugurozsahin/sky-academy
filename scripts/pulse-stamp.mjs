@@ -59,59 +59,133 @@ export function readStamp(body) {
 }
 
 /**
+ * The write time, strictly. GitHub's `updated_at` is always a full ISO instant ending in `Z`, so anything
+ * else reaching here is a mangled argument rather than a fact about the pulse — and the strictness is load
+ * bearing twice over. `new Date('2026-09-21T13:00:00')` (the same string with the `Z` lost) is read in the
+ * runner's LOCAL zone, which under `TZ=America/New_York` turned a healthy pulse into a confident
+ * `240 min behind`; and `new Date(null).getTime()` is 0, not `NaN`, so a missing argument became a stamp
+ * "29833200 min ahead" of the epoch. Both are the tool being wrong about itself while sounding certain.
+ *
+ * @param {string|number|Date} writtenAt GitHub's `updated_at` for that edit — the one field the writing run
+ *   cannot author for itself, which is what makes this a check rather than a restatement.
+ * @returns {number|null} epoch ms, or `null` when the argument is not a timestamp this may rely on.
+ */
+export function readWrite(writtenAt) {
+  if (writtenAt instanceof Date) return Number.isNaN(writtenAt.getTime()) ? null : writtenAt.getTime();
+  if (typeof writtenAt === 'number') return Number.isFinite(writtenAt) ? writtenAt : null;
+  // An explicit zone required: `Z`, or `+HH:MM`/`-HH:MM`. A zoneless string is refused rather than guessed.
+  if (typeof writtenAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:?\d{2})$/.test(writtenAt.trim())) return null;
+  const ms = Date.parse(writtenAt.trim());
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
  * Minutes the stamp runs **ahead of** the write that carried it. Negative is the healthy direction: the
  * clock was read, then the write landed. Minute truncation alone puts an honest stamp up to one minute
  * behind, so a small negative number is what correct looks like, never a problem.
  *
+ * It returns one `null` for two unrelated causes, which is exactly why it is not what the CLI reports on:
+ * `check()` below asks the two questions separately, because "this pulse is unreadable" and "you passed me
+ * a bad write time" must not come out of the tool as the same sentence.
+ *
  * @param {string} body the pulse body as it was written
- * @param {string|number|Date} writtenAt GitHub's `updated_at` for that edit — the one field the writing run
- *   cannot author for itself, which is what makes this a check rather than a restatement.
- * @returns {number|null} signed minutes, or `null` when the body opens with no readable stamp.
+ * @param {string|number|Date} writtenAt GitHub's `updated_at` for that edit
+ * @returns {number|null} signed minutes, unrounded, or `null` when either side is unreadable.
  */
 export function driftMinutes(body, writtenAt) {
   const s = readStamp(body);
-  const w = new Date(writtenAt).getTime();
-  return s === null || Number.isNaN(w) ? null : (s - w) / 60_000;
+  const w = readWrite(writtenAt);
+  return s === null || w === null ? null : (s - w) / 60_000;
 }
 
 /**
  * How far ahead of its own write a stamp may sit before it is a finding. Not zero: the session host's clock
  * and GitHub's are two clocks, and a minute or two of skew between them is ordinary and says nothing about
  * how the stamp was produced. The drift this catches was 37 minutes.
+ *
+ * `tests/unit/pulse-stamp.test.ts` pins this to its exact value. It is a tolerance, not a budget that may
+ * drift upward quietly: widening it is how a real drift would be let through without a line of the check
+ * changing, so it moves only in a pull request that argues for the new number.
  */
 export const AHEAD_TOLERANCE_MIN = 2;
+
+/** The three verdicts, and the process exit codes the CLI uses for them. Nothing else exits non-zero. */
+export const OK = 0;             // the stamp and the write agree
+export const FINDING = 1;        // something is wrong with the PULSE — worth an issue
+export const CANNOT_CHECK = 2;   // something is wrong with the CALL — the check was never made
 
 /**
  * @param {string} body the pulse body
  * @param {string|number|Date} writtenAt GitHub's `updated_at` for that edit
- * @returns {{ ok: boolean, drift: number|null, reason: string }} `ok: false` means a finding — say `reason`
- *   in the issue. A body with no readable stamp is a finding here too, for the reason
- *   `docs/WATCHDOG-PROMPT.md` already gives: an unparseable pulse is a stale one, never a pass.
+ * @returns {{ code: 0|1|2, ok: boolean, drift: number|null, reason: string }}
+ *
+ * The three codes are the point. A tool that says "FINDING" when its own argument was missing manufactures
+ * an issue against a healthy routine — and `docs/ROUTINE-PROMPT.md` STEP 1 makes an open `watchdog` issue
+ * the next developer run's first work, so that false finding costs a run. `CANNOT_CHECK` therefore never
+ * reports on the pulse at all. A body with no readable stamp *is* a finding, for the reason
+ * `docs/WATCHDOG-PROMPT.md` already gives: an unparseable pulse is a stale one, never a pass.
  */
 export function check(body, writtenAt) {
-  const drift = driftMinutes(body, writtenAt);
-  if (drift === null) return { ok: false, drift: null, reason: 'the body opens with no readable stamp' };
-  const mins = Math.round(drift * 10) / 10;
-  if (drift > AHEAD_TOLERANCE_MIN) {
-    return { ok: false, drift: mins, reason: `the stamp is ${mins} min ahead of the write GitHub recorded — `
-      + 'it was not read from a clock at write time, so every staleness check reading it is short by that much' };
+  const w = readWrite(writtenAt);
+  if (w === null) {
+    return { code: CANNOT_CHECK, ok: false, drift: null, reason: 'the write time is not an ISO instant with '
+      + "an explicit zone (GitHub's `updated_at` always ends in Z) — nothing was checked about the pulse" };
   }
-  return { ok: true, drift: mins, reason: mins <= 0 ? `${Math.abs(mins)} min behind its write, as it should be`
-    : `${mins} min ahead, inside the ${AHEAD_TOLERANCE_MIN} min allowed for clock skew` };
+  const s = readStamp(body);
+  if (s === null) return { code: FINDING, ok: false, drift: null, reason: 'the body opens with no readable stamp' };
+  // Rounded once, here, and every decision below made on the rounded number: a verdict computed from more
+  // precision than the message shows produces "FINDING — 2 min ahead" beside a rule saying 2 min is allowed.
+  const drift = Math.round(((s - w) / 60_000) * 10) / 10;
+  if (drift > AHEAD_TOLERANCE_MIN) {
+    return { code: FINDING, ok: false, drift, reason: `the stamp is ${drift} min ahead of the write GitHub `
+      + 'recorded — it was not read from a clock at write time, so every staleness check reading it is short by that much' };
+  }
+  if (drift > 0) {
+    return { code: OK, ok: true, drift, reason: `${drift} min ahead, inside the ${AHEAD_TOLERANCE_MIN} min allowed for clock skew` };
+  }
+  // Behind is the benign direction and deliberately unbounded (a STEP 1 stamp says when the run STARTED, so
+  // by STEP 5 it may honestly be three quarters of an hour old). Past that it is still not a finding, but it
+  // is no longer what a run's own length explains, so the wording stops blessing it.
+  const behind = Math.abs(drift);
+  return { code: OK, ok: true, drift,
+    reason: behind > 90 ? `${behind} min behind its write — further behind than a run's own length explains`
+      : `${behind} min behind its write, as it should be` };
 }
 
-// CLI, both halves:
+// CLI:
 //   `node scripts/pulse-stamp.mjs`                       prints the stamp to paste into a pulse body
-//   `node scripts/pulse-stamp.mjs --check <file> <when>` compares a body against GitHub's `updated_at`,
-//                                                        exiting 1 on a finding so a shell can branch on it.
+//   `node scripts/pulse-stamp.mjs --check <file> <when>` compares a body against GitHub's `updated_at`
+//
+// Exit 0 ok, 1 a finding about the pulse, 2 the check could not be made. The dispatch is exhaustive on
+// purpose: it used to fall through to printing a stamp, so one character out (`-check`) printed a plausible,
+// correctly formatted timestamp and exited 0 — the drifting pulse never compared, and the output of a
+// mistake indistinguishable from the output of a success. That is the failure this whole file exists to
+// stop, inside the file itself.
+//
 // Import-safe: it runs only when this file is the entry point, so the unit rails import it untouched.
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [flag, file, when] = process.argv.slice(2);
-  if (flag === '--check') {
-    const v = check(readFileSync(file, 'utf8'), when);
-    console.log(`${v.ok ? 'ok' : 'FINDING'} — ${v.reason}`);
-    if (!v.ok) process.exitCode = 1;
-  } else {
+  const args = process.argv.slice(2);
+  const cannot = (why) => { process.stderr.write(`pulse-stamp: ${why}\n`); process.exitCode = CANNOT_CHECK; };
+  if (args.length === 0) {
     console.log(stamp());
+  } else if (args[0] !== '--check') {
+    cannot(`unknown argument ${JSON.stringify(args[0])} — usage: pulse-stamp.mjs [--check <body file> <updated_at>]`);
+  } else if (args.length !== 3) {
+    cannot(`--check takes a body file and an updated_at, got ${args.length - 1} argument(s)`);
+  } else {
+    let body;
+    try {
+      body = readFileSync(args[1], 'utf8');
+    } catch (e) {
+      cannot(`cannot read ${args[1]}: ${e.message}`);
+    }
+    if (body !== undefined) {
+      const v = check(body, args[2]);
+      if (v.code === CANNOT_CHECK) cannot(v.reason);
+      else {
+        console.log(`${v.ok ? 'ok' : 'FINDING'} — ${v.reason}`);
+        process.exitCode = v.code;
+      }
+    }
   }
 }

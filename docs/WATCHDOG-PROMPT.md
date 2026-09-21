@@ -90,7 +90,10 @@ your first finding and the only one you can report.
    wrong one is believed, and the error that matters runs *forward*: a stamp ahead of the real clock makes
    `now - stamp` artificially small, and a run that died an hour ago reads as freshly alive. GitHub's own
    `updated_at` for that issue is the one field the writing run cannot author, so compare the two:
-   `node scripts/pulse-stamp.mjs --check <body file> <updated_at>` prints the drift and exits 1 on a finding.
+   `node scripts/pulse-stamp.mjs --check <body file> <updated_at>` prints the drift. **Exit 0 is a pass, 1 is
+   a finding about the pulse, and 2 means the check was never made** — a missing or mangled argument, an
+   unreadable file — and prints to stderr, so read the code rather than the fact that it failed: a 2 is a
+   fault in your call, never evidence about the routine, and filing it as one would spend a developer run.
    Do this for all three pulses you read — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`.
    A stamp **behind** its write is healthy and says nothing: the clock was read, then the write landed. Ahead
    of it by more than a couple of minutes of clock skew is the finding, whatever the body otherwise says, and
