@@ -166,7 +166,10 @@ agents: pr-test-analyzer — nothing · silent-failure-hunter — 2, both fixed 
 That line is the whole of the evidence, and §4 says why in its own voice: *an agent that never ran and an agent
 that found nothing produce the same silence*. If one reports itself unavailable in the first minutes of a
 session, retry — the agent roster registers later than the skill list does (#180) — and **if it is still
-unavailable, name it in that line** rather than leaving it out.
+unavailable, name it in that line** rather than leaving it out. Three `unavailable`s in a row is not
+compliance: a run that cannot spawn an agent **at all** — a subagent has no agent-launching tool, which
+`review-pr` §4 already records — says *that*, in those words, so the line reads as a gap rather than a
+result.
 
 **Apply §4's reachability test before you change anything.** They reason forward from a bad input to a bad
 outcome and do not reason backwards to whether the input can occur, so a finding whose input the code cannot
