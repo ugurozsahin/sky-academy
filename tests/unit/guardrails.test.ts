@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
@@ -7,6 +7,35 @@ import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds 
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
 import { SOURCES, inDir, code, workflow } from './helpers/sources';
+
+/**
+ * The Fredoka weight axis the app actually serves, `[lo, hi]`, read from the @font-face rules in
+ * src/style.css (#479). Before #479 this was index.html's `family=Fredoka:wght@500;600;700` — a discrete
+ * list; self-hosting serves Google's own variable file, whose axis they declare as `font-weight: 300 700`.
+ *
+ * A function declaration rather than a const, because the rails that call it sit both above and below it.
+ * It throws rather than defaulting: a missing or reworded declaration must break the rails that depend on
+ * it, not quietly hand them a permissive range in which every weight is legal.
+ */
+function servedWeightRange(): [number, number] {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  if (css.length < 5000) throw new Error('style.css must be read from disk, not a blank ?raw import');
+  const faces = css.split('@font-face').slice(1);
+  if (faces.length < 2) throw new Error('src/style.css must declare Fredoka with @font-face (#479)');
+  const ranges = faces.map(f => {
+    const m = /font-weight:\s*(\d+)(?:\s+(\d+))?/.exec(f);
+    if (!m) throw new Error('every @font-face must state its font-weight (#44)');
+    return [Number(m[1]), Number(m[2] ?? m[1])] as [number, number];
+  });
+  // Every face must cover the same axis, or "the served range" is a fiction that depends on which subset a
+  // glyph fell into — a label in latin-ext would then be fitted against a different face than the one beside
+  // it. Google serves one variable file per subset with identical axes; this holds that property.
+  const [lo, hi] = ranges[0];
+  for (const [a, b] of ranges) {
+    if (a !== lo || b !== hi) throw new Error(`@font-face rules declare different weight axes (${a}-${b} vs ${lo}-${hi}) — a label's weight would depend on its subset (#479)`);
+  }
+  return [lo, hi];
+}
 
 /**
  * GUARD RAILS (#73) — checks that fail the build so a mistake we have already made cannot come back.
@@ -780,17 +809,63 @@ describe('guard rails', () => {
     expect(code(play), 'the first-ever play must not skip the gate').not.toMatch(/later\(\s*spawn\s*,/);
   });
 
-  // #44 again, the other half: the gate probes one concrete face, and it is only meaningful if index.html
-  // actually asks Google for that weight. Trim the `wght@` list and the gate would wait for a face that never
-  // arrives — every first wave then pays the full timeout AND still draws in the fallback. index.html is read
-  // from disk (Vite's glob does not reach it) and its length asserted, so an empty read cannot pass vacuously.
-  it('the font gate probes a weight index.html requests from Google (#44)', () => {
+  // #44 again, the other half: the gate probes one concrete face, and it is only meaningful if the face is
+  // one the app actually serves. Narrow what is served and the gate waits for a face that never arrives —
+  // every first wave then pays the full timeout AND still draws in the fallback.
+  //
+  // #479 moved where "served" is written down. It was index.html's `wght@` list; it is now the `font-weight`
+  // range on the @font-face rules in src/style.css, because the font is ours. Both files are read from disk
+  // (Vite's glob reaches neither) with their length asserted, so an empty read cannot pass vacuously.
+  it('the font gate probes a weight the app actually serves (#44, #479)', () => {
+    const [lo, hi] = servedWeightRange();
+    const probe = Number(/^(\d+)\s/.exec(FONT_PROBE)?.[1]);
+    expect(probe, 'FONT_PROBE must start with a numeric weight').toBeGreaterThan(0);
+    expect(probe, `the gate probes weight ${probe}, outside the served axis ${lo}-${hi}`).toBeGreaterThanOrEqual(lo);
+    expect(probe, `the gate probes weight ${probe}, outside the served axis ${lo}-${hi}`).toBeLessThanOrEqual(hi);
+  });
+
+  // #479: the whole point of self-hosting is that no face is fetched from a third party, so nothing in the
+  // shipped page may name one. A `<link>` is how it was written before; a `@import` in the stylesheet and a
+  // `src: url(https://…)` inside an @font-face are the two ways it comes back without a `<link>`, and both
+  // would fail exactly the same way — silently, in a cloud session, measuring the fallback face while every
+  // test reads green. The fallback STACK in `--font` is untouched by this: those are names, not fetches.
+  it('no face is fetched from a third party (#479)', () => {
     const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
-    expect(html.length, 'index.html must be read from disk, not a blank import').toBeGreaterThan(500);
-    const weights = /family=Fredoka:wght@([\d;]+)/.exec(html)?.[1].split(';') ?? [];
-    expect(weights.length, 'index.html should request Fredoka with an explicit wght@ list').toBeGreaterThan(0);
-    const probe = /^(\d+)\s/.exec(FONT_PROBE)?.[1];
-    expect(weights, `the gate probes weight ${probe}, which index.html must request`).toContain(probe);
+    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    expect(html.length, 'index.html must be read from disk').toBeGreaterThan(500);
+    expect(css.length, 'style.css must be read from disk').toBeGreaterThan(5000);
+    // NOT `code()`. That helper strips `//` to end of line as a JS line comment, and every URL this rail
+    // exists to catch contains `//` — `href="https://fonts.googleapis.com/…"` becomes `href="https:` and the
+    // host vanishes, so a rail built on `code()` would pass on the very file it was written against. (Found
+    // by running this rail against the pre-#479 index.html, which is the first mutation in the PR's table.)
+    // What IS stripped is the comment syntax each language really has: a host named in a comment fetches
+    // nothing, and both files carry a note about the host they stopped using. Lengths were asserted on the
+    // raw text above, so stripping cannot make an empty read pass.
+    const markup = (s: string) => s.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+    for (const host of ['fonts.googleapis.com', 'fonts.gstatic.com']) {
+      expect(markup(html).includes(host), `index.html must not reach ${host} — a routine session cannot (#479)`).toBe(false);
+      expect(markup(css).includes(host), `style.css must not reach ${host} — a routine session cannot (#479)`).toBe(false);
+    }
+    expect(markup(css), 'no @import may pull a stylesheet from anywhere but this repo (#479)').not.toMatch(/@import\s+(?:url\()?["']?https?:/i);
+    // ...and every @font-face src is a path into public/, not an absolute URL by another spelling.
+    const srcs = [...markup(css).matchAll(/src:\s*url\(\s*["']?([^"')]+)/g)].map(m => m[1]);
+    expect(srcs.length, 'the rail found no @font-face src at all — it would pass vacuously').toBeGreaterThanOrEqual(2);
+    expect(srcs.filter(u => !u.startsWith('/fonts/')), 'every font src must be a local /fonts/ path (#479)').toEqual([]);
+    // ...and the files those paths name are really in the tree, at a size only a real font reaches. A src
+    // pointing at nothing is the same defect as a src pointing at Google: the fallback face, silently.
+    // `statSync` throws ENOENT on a missing file, which aborts the test with a stack trace instead of the
+    // sentence explaining what went wrong — so existence is asserted first, and only then the size. A src
+    // naming a file that is not in the tree is the same defect as a src naming Google: the fallback face,
+    // silently, with the stylesheet reading as correct.
+    const bytes = (p: string, why: string) => {
+      const f = new URL(`../../${p}`, import.meta.url);
+      expect(existsSync(f), `${p} is not in the tree — ${why} (#479)`).toBe(true);
+      return statSync(f).size;
+    };
+    for (const u of srcs) expect(bytes(`public${u}`, 'the stylesheet names it but nothing ships it'),
+      `${u} must be a real font file, not a placeholder (#479)`).toBeGreaterThan(2000);
+    expect(bytes('public/fonts/OFL.txt', 'Fredoka is SIL OFL 1.1 and the licence ships beside the files it covers'),
+      'the licence must be the real text, not an empty file').toBeGreaterThan(1000);
   });
   // #31: `update()` runs up to six times per frame (the substep loop clamps each step to 1/60 s), and it used
   // to rebuild `shots`, `particles` and `trail` with `.filter()` on every one of them — up to 18 throwaway
@@ -915,12 +990,15 @@ describe('guard rails', () => {
   //  - `certificate.ts` passes its weight as an argument (`font(px, w = 700)`), so its call sites are
   //    outside both forms. They are 500/600/700 today.
   const FREDOKA_MAX = 700;
-  it('nothing in src/ asks Fredoka for a weight it does not have (#44)', () => {
-    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
-    expect(html.length, 'index.html must be read from disk, not a blank import').toBeGreaterThan(500);
-    const served = (/family=Fredoka:wght@([\d;]+)/.exec(html)?.[1] ?? '').split(';').filter(Boolean);
-    expect(served.length, 'index.html should request Fredoka with an explicit wght@ list').toBeGreaterThan(0);
-    expect(Math.max(...served.map(Number)), 'Fredoka has no weight above 700').toBeLessThanOrEqual(FREDOKA_MAX);
+  it('nothing in src/ asks Fredoka for a weight it does not have (#44, #479)', () => {
+    // #479: "served" moved from index.html's discrete `wght@` list to the @font-face axis in style.css, so
+    // the test moved with it — from membership of a list to containment in a range. That is a real widening
+    // (600 was never in the old list's gaps, but 450 now passes where it would once have failed) and it is
+    // the truth: the served file is variable, so 450 really is a face the browser can produce. What the rail
+    // still holds is the thing that was ever wrong — a weight OUTSIDE the axis, which the engine synthesises
+    // or rounds silently, differently on WebKit and older Android WebView than on Chromium.
+    const [lo, hi] = servedWeightRange();
+    expect(hi, 'Fredoka has no weight above 700').toBeLessThanOrEqual(FREDOKA_MAX);
 
     const asked = Object.entries(SOURCES).flatMap(([f, s]) => [
       // a canvas font string: `700 24px "Fredoka", …`
@@ -931,8 +1009,8 @@ describe('guard rails', () => {
       ...[...code(s).matchAll(/font-weight="(\d{3})"/g)].map(m => `${f}: ${m[1]}`),
     ]);
     expect(asked.length, 'the rail found no font weights at all — it would pass vacuously').toBeGreaterThan(4);
-    expect(asked.filter(a => !served.includes(a.split(': ')[1])),
-      `every Fredoka weight in src/ must be one index.html asks Google for (${served.join(';')})`).toEqual([]);
+    expect(asked.filter(a => { const w = Number(a.split(': ')[1]); return w < lo || w > hi; }),
+      `every Fredoka weight in src/ must sit on the served axis (${lo}-${hi}, src/style.css @font-face)`).toEqual([]);
   });
 
   // The same mistake in CSS. Read from disk: Vite's `?raw` returns an empty string for stylesheets outside

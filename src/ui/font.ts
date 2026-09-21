@@ -1,13 +1,20 @@
 // Canvas font readiness (#44).
 //
-// Bubble labels, tracing letters and the certificate are drawn on a canvas in Fredoka, which arrives over the
-// network from Google Fonts. Canvas text has no equivalent of CSS `font-display: swap`: whichever face is
+// Bubble labels, tracing letters and the certificate are drawn on a canvas in Fredoka, which still arrives
+// asynchronously — from `public/fonts/` on our own origin since #479, rather than from Google Fonts, which is
+// why the wait below is now about a slow connection alone and no longer about a third party being reachable
+// at all. Canvas text has no equivalent of CSS `font-display: swap`: whichever face is
 // available at the instant `fillText` runs is baked into those pixels for good. So on a slow connection the
 // first wave launches with its numbers in the fallback face and they change shape mid-flight — the one item
 // on the code-health list a child can actually see.
 //
-// Waiting for it is not simply `document.fonts.load(...)`. The @font-face rules live in the stylesheet Google
-// serves, so until that stylesheet is parsed the document's font set is EMPTY — and an empty set answers
+// Waiting for it is not simply `document.fonts.load(...)`. The @font-face rules live in a stylesheet — ours
+// since #479, Google's before it, and the argument is unchanged either way because it is about WHEN the rules
+// are parsed, not about who served them: until that stylesheet is parsed the document's font set is EMPTY,
+// and Vite delivers the app's CSS as its own request (a `<link>` in the build, an injected tag in dev) rather
+// than inline in the document. So the poll below is still load-bearing. What #479 removed is the other half
+// of the wait — a third party's reachability — which is why a routine session used to pay the full cap on
+// every navigation and still draw in the fallback face. An empty set answers
 // `check()` with **true** ("nothing matches the query, system fonts will do"), which is precisely the wrong
 // answer at the only moment the question matters. So this waits for a Fredoka face to appear in the set
 // first, then loads it, and only then reports ready.
@@ -15,8 +22,9 @@
 // A slow or dead network must never stop a child playing, so the whole wait is capped: on timeout the game
 // starts anyway in the fallback face, exactly as it does today.
 
-/** The face the gate probes. 700 is the heaviest weight Fredoka has and the heaviest `index.html` asks Google
- *  for, and every Fredoka draw in the app now names it, so this one face's arrival unblocks all of them. */
+/** The face the gate probes. 700 is the heaviest weight Fredoka has, and the top of the `font-weight: 300 700`
+ *  axis the @font-face rules in `src/style.css` declare (#479 — it was `index.html`'s `wght@` list before).
+ *  Every Fredoka draw in the app names it, so this one face's arrival unblocks all of them. */
 export const FONT_PROBE = '700 24px "Fredoka"';
 /** Longest the first wave may be held back. Beyond this the fallback face is the lesser evil. */
 export const FONT_TIMEOUT_MS = 1200;
