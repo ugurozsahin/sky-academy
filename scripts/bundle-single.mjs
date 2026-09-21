@@ -45,7 +45,18 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const html = readFileSync('dist/index.html', 'utf8');
   const assets = readdirSync('dist/assets');
   let js = readFileSync(join('dist/assets', assets.find(f => f.endsWith('.js'))), 'utf8');
-  const css = readFileSync(join('dist/assets', assets.find(f => f.endsWith('.css'))), 'utf8');
+  let css = readFileSync(join('dist/assets', assets.find(f => f.endsWith('.css'))), 'utf8');
+  // #479: Fredoka is self-hosted now, so the stylesheet's `url(/fonts/…)` points at a path that does not
+  // exist beside a single page on somebody else's origin. Inline the woff2 the same way the avatars above
+  // are inlined into the JS. Before this the page referenced fonts.googleapis.com and worked anywhere;
+  // without this it would silently render in the fallback face, which is the #479 defect with a new address.
+  // ~45 kB of base64 against a page already measured in megabytes of inlined avatars.
+  // This leaves stripHead()'s stated job — "the page references nothing it has not inlined" — true of the
+  // font for the first time: the Google <link> it used to keep was the one external reference left.
+  for (const f of readdirSync('public/fonts').filter(n => n.endsWith('.woff2'))) {
+    const b64 = readFileSync(join('public/fonts', f)).toString('base64');
+    css = css.split(`/fonts/${f}`).join(`data:font/woff2;base64,${b64}`);
+  }
   for (const f of readdirSync('public/avatars')) {
     const b64 = readFileSync(join('public/avatars', f)).toString('base64');
     js = js.split(`avatars/${f}`).join(`data:image/webp;base64,${b64}`);

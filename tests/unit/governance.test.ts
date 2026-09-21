@@ -2770,7 +2770,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
 
   // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 9_518;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them; → 9,518: #97 reduced to a pointer at its home (#145)
+  const CLAUDE_MD_BUDGET = 9_509;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them; → 9,518: #97 reduced to a pointer at its home (#145); → 9,509: the external-assets rule stopped naming its one exception and pointed at #479 instead
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
