@@ -150,7 +150,9 @@ So before you push:
 **A class you genuinely cannot enumerate** — the code cannot produce the list, or it is unbounded — gets a
 body line beginning **`SWEEP: NOT ENUMERABLE`**, naming the class and what bounds the risk instead. That exact
 spelling, for the reason `e2e not run (env)` has one: a sweep nobody did and a sweep that found nothing must
-never read the same. **It is an answer, not an exemption.** The grounds are that the code cannot produce the
+never read the same. That precedent only carries because `review-pr` §3 supplies the other half of it — for
+e2e, §2 and §5 already oblige a body to carry the evidence, and for the sweep it is §3's body check that
+makes an absent claim a finding rather than a silence. **It is an answer, not an exemption.** The grounds are that the code cannot produce the
 list — never that the run was short of time, and never that steps 1 to 4 are more than a bar — and the
 grounds are what a reviewer weighs (`review-pr` §3).
 
