@@ -25,12 +25,15 @@ import { waveOptsFor } from './play-session';
 import { renderVisual } from './visuals';
 import { fontReady } from './font';
 import type { DuelHooks } from './hooks';
+import type { DojoOutcome } from '../game/dojo';
 
 export interface DuelScreenOpts { year: YearInfo }
 const PLAYERS = ['a', 'b'] as const;
 const NAME: Record<DuelPlayer, string> = { a: 'Player 1', b: 'Player 2' };
 /** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. */
 const HOLD = { won: 1000, draw: 900 } as const;
+/** What a committed match hands its overlay to draw: the dojo outcome and the stickers `addCoins` unlocked. */
+interface MatchPayout { dojo: DojoOutcome; fresh: string[] }
 
 export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
@@ -125,7 +128,12 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     },
     onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', 900); },
     onRoundDraw() { sfx.miss(); toast('Nobody sliced it — no point', 'bad', scaled(HOLD.draw)); },
-    onMatchEnd: r => later(() => showResults(r), scaled(HOLD.won) + scaled(300)),
+    // #375/#441: the match is **committed here, synchronously**, and only the overlay waits on the timer.
+    // `later()` is scope-bound, so the ~1.3 s of pacing below is a window in which `cleanup()` — Pause →
+    // Islands, or Android's hardware back — calls `scope.dispose()` and cancels the pending callback. When
+    // every write lived inside it, a finished ten-round match paid the child nothing: no coins, no dojo move,
+    // no accuracy, no certificate and no history row, with nothing to tell it from a match never played.
+    onMatchEnd: r => { const payout = commitMatch(r); later(() => showResults(r, payout), scaled(HOLD.won) + scaled(300)); },
   });
 
   /** Freeze the wave while the winning answer is lit, then clear both arenas — each arena's onWaveEnd follows. */
@@ -149,12 +157,23 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };
   const hold = (open: boolean) => { holdOpen = open; syncPaused(); };
 
-  function showResults(r: DuelResult) {
-    hold(true);
-    // #16 item 5: the match pays into the one shared save before the overlay is built, so the coin row and
-    // any sticker it unlocked are on the screen the children are already looking at. The Daily Dojo hears
-    // about the match here too — ten questions answered correctly on this screen move the day's volume
-    // challenges exactly as they would in any other mode — and its bonus rides the same single addCoins().
+  /**
+   * Every write a finished match produces, committed the moment the match ends (#375/#441).
+   *
+   * These five used to sit at the top of `showResults()`, which runs on a scope-bound timer ~1.3 s later —
+   * so the save depended on a timer surviving, and leaving in that window lost the whole match. The overlay's
+   * job is to *show* the payout, not to be the thing that causes it. Nothing about **what** a duel pays moves
+   * here: the amounts, the dojo event, the accuracy unit and the certificate rule are all unchanged, only
+   * *when* they are committed. The pacing before the overlay (`HOLD.won` + 300 ms) is deliberate and stays.
+   *
+   * `Duel.end()` is guarded by its own `ended` flag and fires `onMatchEnd` exactly once, so this runs once per
+   * match — a rematch builds a whole new screen and a new `Duel`.
+   */
+  function commitMatch(r: DuelResult): MatchPayout {
+    // #16 item 5: the match pays into the one shared save, so the coin row and any sticker it unlocked are on
+    // the screen the children are about to look at. The Daily Dojo hears about the match here too — ten
+    // questions answered correctly on this screen move the day's volume challenges exactly as they would in
+    // any other mode — and its bonus rides the same single addCoins().
     paid = duelCoins(r);
     // Sensei's half: the rounds Player 1 answered on this topic — one try each, the unit a mission writes — for
     // the seat `DUEL_HANDOVER` keeps for the profile's own child (`duelAccuracy()` has why neither the score nor
@@ -170,8 +189,9 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     dojoPaid = dojo.coins;
     const fresh = addCoins(paid + dojoPaid);
     cert = duelCert(r);
-    // #205's rule, unchanged here: filed the moment the overlay is built, never from the 🎓 button, because the
-    // bug that issue opened with is a device where pressing the button does nothing at all.
+    // #205's rule, unchanged here: filed by the match, never from the 🎓 button, because the bug that issue
+    // opened with is a device where pressing the button does nothing at all. #375 moves the filing a further
+    // 1.3 s earlier — from the overlay being built to the match ending — which only strengthens that rule.
     //
     // Built **from** the drawn `CertInfo` rather than beside it (#16 review, B1): the field list was hand-copied,
     // so `duel: true` had two independent writers and deleting the one that reaches the printed certificate left
@@ -183,6 +203,15 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // parts company with the certificate above: that is an award, and only a Player 1 win earns one
     // (`duelEarnsCertificate`). A rematch files a second row rather than replacing this one; `fileDuel()` has why.
     recordDuel({ at: Date.now(), topic: topic.id, title: topic.title, year: o.year.title, winner: r.winner, scoreA: r.scoreA, scoreB: r.scoreB, rounds: r.rounds });
+    // Handed to the overlay rather than stored for it to find: `recordDojo` and `addCoins` ARE the writes, so
+    // a redraw that recomputed them would pay the match a second time, and a nullable field would give
+    // `showResults` a branch that draws a blank payout instead of failing loudly.
+    return { dojo, fresh };
+  }
+
+  /** Draws what `commitMatch()` already wrote — this runs on a timer the child can outrun, and writes nothing. */
+  function showResults(r: DuelResult, { dojo, fresh }: MatchPayout) {
+    hold(true);
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
     overlay.hidden = false;

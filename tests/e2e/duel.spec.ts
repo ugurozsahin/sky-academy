@@ -666,4 +666,53 @@ test.describe('Ninja Duel', () => {
     expect(await page.evaluate(() => window.__sna.certificate())).toBeNull();
     expect(await page.evaluate(() => window.__sna.certWords()), 'nothing to draw, so no words either').toBeNull();
   });
+
+  /**
+   * #375/#441: a finished match is committed at match end, so leaving before the overlay appears keeps it.
+   *
+   * Every write a duel produces used to sit inside `showResults()`, which `onMatchEnd` schedules ~1.3 s later
+   * through the screen's scope-bound `later()`. That window is live and interactive — `hold()` is only reached
+   * *inside* `showResults`, so both arenas are still running and `#pause` is still bound — and Pause → Quit
+   * runs `cleanup()` → `scope.dispose()`, which clears every pending timer. A completed ten-round match paid
+   * the child nothing: no coins, no dojo move, no accuracy, no certificate, no history row, and no toast or
+   * log to tell it from a match that was never finished. A child who wins and immediately backs out to show
+   * someone got nothing for it.
+   *
+   * The quit is driven from the match-end hook rather than raced against the timer: `state().ended` flips
+   * synchronously inside `Duel.end()`, in the same task that schedules the overlay, so a rAF poll lands inside
+   * a window that is ~325 ms wide at `__SNA_FAST = 4`. The clicks after it are synchronous — `#pause` builds
+   * the pause modal in the same task, so `#quit` is in the DOM by the time this asks for it.
+   */
+  test('a match left through Pause before the overlay appears is still paid, recorded and filed (#375, #441)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    const topic = await page.evaluate(() => window.__sna.state().topic);
+    for (let r = 1; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');                     // Player 1 takes all ten, so a certificate is earned too
+    }
+    // Quit inside the window, before the overlay is built.
+    await page.evaluate(async () => {
+      await new Promise<void>(done => {
+        const tick = () => { if (window.__sna.state().ended) done(); else requestAnimationFrame(tick); };
+        tick();
+      });
+      (document.querySelector('#pause') as HTMLButtonElement).click();
+      (document.querySelector('#quit') as HTMLButtonElement).click();
+    });
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
+    await expect(page.locator('.duel-end')).toHaveCount(0);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.coins, 'a coin per decided round reached the save').toBe(10);
+    expect(saved.progress[topic], 'and Sensei was told what Player 1 answered').toMatchObject({ hits: 10, tries: 10, plays: 0, stars: 0 });
+    // Exactly one of the three volume ids is the day's, and `dojoSeeds('fresh')` leaves it untouched, so the
+    // day's challenge carries this match's ten answers and the other two are absent.
+    const volume = (['correct15', 'correct20', 'correct25'] as const).map(id => saved.dojo.progress[id]).filter((n: number | undefined) => n !== undefined);
+    expect(volume, "the Daily Dojo heard about the match").toEqual([10]);
+    expect(saved.duels, 'the match itself outlived the overlay that never opened').toHaveLength(1);
+    expect(saved.duels[0]).toMatchObject({ winner: 'a', scoreA: 10, scoreB: 0, rounds: 10 });
+    expect(saved.certs, 'and the win filed its certificate').toHaveLength(1);
+    expect(saved.certs[0]).toMatchObject({ id: 'year1:duel', title: 'Ninja Duel', duel: true });
+  });
 });
