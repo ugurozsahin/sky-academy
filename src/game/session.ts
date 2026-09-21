@@ -82,9 +82,12 @@ const visualKey = (v: Visual): string => {
  * which is the bug — twice now. A field goes in unless it is shown to carry presentation; a visual type stays
  * out unless it is shown to carry the question.) `orderQ` speaks the numbers in their *shuffled* display order (`Slice the numbers from
  * smallest to biggest: 7, 2, 9`), which is re-shuffled per draw independently of the exercise, so folding it
- * in would put the same decoration into the card's identity that a per-draw `emoji` did. It costs nothing to
- * leave out: every topic whose question `say` carries also carries it in `listen` (`soundQ`) or `hint`
- * (`measureCompare`) or the visual (`y2-tense`, `y2-sentencetype`, `r-oddeven`).
+ * in would put the same decoration into the card's identity that a per-draw `emoji` did. On every topic whose
+ * question `say` carries, that question is also in `listen` (`soundQ`), `hint` (`measureCompare`) or the visual
+ * (`y2-tense`, `y2-sentencetype`, `r-oddeven`) — **except `intervalCompare`, where `say` and `options` are the
+ * only carriers** (round 3, #453 note 1: an earlier version of this sentence claimed no exception, which was
+ * false for the very topic the paragraph below defers). Keying `say` would not be the fix there either, for the
+ * `orderQ` reason above; #451 is.
  *
  * **But the order *within* `hint` and `listen` is presentation too** (#412 review round 1, B1), and missing
  * that was this key's own version of the same mistake: `soundQ` builds `listen` from the very
@@ -93,16 +96,27 @@ const visualKey = (v: Visual): string => {
  * 1.11% of the time — *dog, duck, dig* then *dog, dig, duck* — against 0.000% before the change. The same
  * mechanism, without the child-visible effect, is in `measureCompare`'s shuffled colour columns and
  * `y2-temp`'s two readings. So `contentList` keys a `' · '`-separated list as a **set**: the separator is this
- * repository's list separator and those three generators are the only places it appears. Normalised in the
- * key, never on the card — what the child reads is unchanged.
+ * repository's list separator, and those three generators are the only places it reaches a `Question`'s content
+ * fields — it is also in a dozen or so UI strings, which this never sees (round 3). Normalised in the key,
+ * never on the card — what the child reads is unchanged. Nothing enforces that inventory; the rails answer it
+ * from the other end by normalising over four separators, so a generator switching to one of them goes red.
  *
- * **`options` are not in the key, and that leaves one topic uncovered** (#412 review round 2, B1). The issue
- * rules them out in its own words — they are shuffled and re-drawn per draw, so keying them switches the
- * repeat-avoidance off for the forty-odd topics whose extra bubbles are decoys — but `intervalCompare`
- * (`src/curriculum/maths.ts`) sets no `hint`, no `listen` and no visual, and its own comment says the bubbles
- * *are* the durations. So `y2-duration` still reduces to `(prompt, answer)`: at d2, 22 keys for 3,000 draws
- * with 18 of them covering more than one comparison. That is `main`'s behaviour, not a regression, and keying
- * it needs a signal from the generator that its options are not a decoy pool — **#451**.
+ * **Two carriers this key does not read, and the topics that leaves uncovered** (#412 review rounds 2 and 3).
+ * Both are `main`'s behaviour rather than anything #412 introduces, and both want the same remedy — a signal
+ * from the generator that the field is the question, not decoration — so neither is keyed here:
+ *
+ * - **`options`.** #412 rules them out in its own words, because they are shuffled and re-drawn per draw, so
+ *   keying them switches repeat-avoidance off for the forty-odd topics whose extra bubbles are decoys. But
+ *   `intervalCompare` sets no `hint`, no `listen` and no visual, and its own comment says the bubbles *are* the
+ *   durations, so `y2-duration` reduces to `(prompt, answer)`: at d2, 22 keys over 3,000 draws with 18 covering
+ *   more than one comparison. **#451**.
+ * - **A `visual` type `VISUAL_QUESTION` does not list.** `visualKey` returns `''` on a lookup miss, which the
+ *   comment above calls the safe direction — and it is safe against *over*-discrimination, but it is silent
+ *   about the cost, so say it here: `coins`, `numberline` and `chart` carry their question, and the key cannot
+ *   read it. `y1-coins` at d2 gives 14 keys with 12 covering more than one spoken question, one of them holding
+ *   `£1 or 20p`, `£1 or 10p` and `£1 or 2p`; `y1-line` d3 93 of 95; `y2-line` d3 25 of 32; `y2-money` d1 30 of
+ *   33; `y2-stats` d2 194 of 194, the worst key covering 77 charts, where the chart *is* the question. A `word`
+ *   visual, by contrast, carries `orderQ`'s shuffled display, so leaving that one unread is right. **#455**.
  *
  * `sequence` is not in the key either, which is safe only because every sequence generator encodes the order
  * in `answer` (`orderQ`'s is the joined `sequence`) — an invariant pinned in `tests/unit/curriculum.test.ts`,

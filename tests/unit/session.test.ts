@@ -399,20 +399,34 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * answers to "Which is lighter?"). So the too-discriminating direction is asserted here, on the fields this
  * key actually reads, rather than delegated to a rail that cannot see them.
  *
- * **What these rails do not cover, stated rather than implied (round 2, B1): a question carried by `options`.**
- * `asked()` omits them and so does the key, so on `intervalCompare` — whose own comment reads *"No hint: the
- * bubbles **are** the durations"* — the oracle shares the key's blind spot and the two agree that fifteen
- * different comparisons are one card (`y2-duration` at d2: 22 keys, 18 covering more than one card). That is
- * not a regression, it is `main`'s behaviour, and it is **outside #412 by the issue's own words** — *"It does
- * not ask for `options` in the key. They are shuffled and re-drawn per draw; including them switches the
- * repeat-avoidance off altogether"* — which is why `the key ignores every field that carries presentation`
- * below pins the exclusion for the forty-odd topics where the extra bubbles really are decoys. Keying them
- * where they are the question needs a signal from the generator that it is not a decoy pool, and that is
- * **#451**, not this pull request.
+ * **What these rails cover, enumerated by carrier rather than summarised** — because the sentence that used to
+ * sit here has now been wider than the truth twice (rounds 2 and 3), each time on a carrier the previous
+ * wording had not thought of. So this is a table, not an adjective:
  *
- * So the claim is: no rail here names a topic, and every topic **whose question is not carried by its
- * `options`** is covered the day it ships. The unqualified version of that sentence is the mistake this file
- * corrects two paragraphs above, and it would have been this file's own.
+ * | the question is carried by | covered here |
+ * | --- | --- |
+ * | `prompt`, `answer`, `hint`, `listen`, `sequence` | **yes** — `asked()` reads all five |
+ * | a `visual` type in `VISUAL_QUESTION` (`objects`, `sentence`, `symmetry`) | rail 1 only, through the key |
+ * | a `visual` type outside it (`coins`, `numberline`, `chart`, …) | **no** |
+ * | `options` | **no** |
+ *
+ * Both noes are measured, and both are `main`'s behaviour rather than anything this change introduces.
+ * `options`: `intervalCompare`'s own comment reads *"No hint: the bubbles **are** the durations"*, and
+ * `y2-duration` at d2 gives 22 keys with 18 covering more than one comparison (#451). An unread `visual`:
+ * `visualKey` returns `''` on a lookup miss, so `y1-coins` at d2 gives 14 keys with **12 covering more than
+ * one spoken question** — one holding `£1 or 20p`, `£1 or 10p` and `£1 or 2p` — and `y1-line` d3 93 of 95,
+ * `y2-line` d3 25 of 32, `y2-money` d1 30 of 33, `y2-stats` d2 **194 of 194**, worst key covering 77 charts,
+ * where the chart *is* the question (#455).
+ *
+ * Neither is keyed here, for the same reason in both cases: doing it unconditionally switches de-duplication
+ * off wherever that field is decoration. `options` are a decoy pool on forty-odd topics, which is why `the key
+ * ignores every field that carries presentation` pins the exclusion; and a `word` visual carries `orderQ`'s
+ * *shuffled* display, so `y2-order` is correctly outside rather than missed. Both want the same thing — a
+ * signal from the generator that its field is the question — which is #451 and #455, not this pull request.
+ *
+ * So: no rail here names a topic, and within the carriers marked yes, a new topic is covered the day it ships.
+ * The adjective-shaped version of that sentence is the mistake this file diagnoses two paragraphs up, and it
+ * has twice been this file's own.
  */
 describe('the repeat key holds the whole question (#412)', () => {
   const D1 = 1 as const;
@@ -434,7 +448,9 @@ describe('the repeat key holds the whole question (#412)', () => {
    * reading either. Today there are none — `', '` appears in four sentence topics' prose and collides with
    * nothing.
    *
-   * What neither this nor the key sees: `options`. See the describe header — `y2-duration` and #451.
+   * What neither this nor the key sees: `options`, and a `visual` type outside `VISUAL_QUESTION`. The describe
+   * header enumerates it by carrier, with the measurements — `y2-duration` (#451), `y1-coins` and four more
+   * (#455).
    */
   const asked = (q: Question) => {
     const LIST_SEPARATORS = [' · ', ', ', '; ', ' | '];
