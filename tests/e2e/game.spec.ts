@@ -1779,6 +1779,48 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
     expect(saved.progress['r-count'].stars).toBeGreaterThan(0);
     expect(saved.coins).toBeGreaterThan(0);
   });
+
+  /**
+   * #363: the seeds above carry `dojo: null`, which the record check catches. A `dojo` that IS a record but
+   * broken inside was not caught, and `dojoFor()` rebuilds only a *stale* state — so a record carrying
+   * TODAY's date reached `applyEvent()` and threw as the game ended. That is the worst place for it: the
+   * throw lands after `paid` is assigned (so `window.__sna.state()` reports coins the child never got, and
+   * an e2e written against the hook alone would stay green) and before the results overlay is built (so the
+   * only way off the screen is never drawn).
+   *
+   * Sky Storm is the shortest route to a finished game; the defect is in the shared end-of-game path, not in
+   * any one mode.
+   */
+  test('guard rail: a record-shaped but broken `dojo` still ends the game, draws the results and pays out', async ({ page }) => {
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    // `today()` is `toISOString().slice(0, 10)`, so the runner's UTC date is the one the app computes.
+    const today = new Date().toISOString().slice(0, 10);
+    await seedPlayer(page, 'volt', 'Ada', { year: 'year2', dojo: { date: today } });
+    await page.click('.island[data-year="year2"]');
+    await page.click('#endless');
+    await expect(page.locator('.villain img')).toBeVisible();
+    for (let i = 0; i < 3; i++) await solveCurrent(page);
+    // slice wrong until the lives are gone (a wave missed under a slow renderer may already have cost one)
+    for (let i = 0; i < 4; i++) {
+      await waitForWrongOrEnd(page);
+      if ((await state(page)).ended) break;
+      const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+      expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+      await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before);
+    }
+    await expect(page.locator('.results h2')).toHaveText('Storm over!');
+    expect(failed, `while finishing a game on a broken dojo${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+
+    // The payout landed, and the key was rebuilt rather than half-read — read from storage, not from the
+    // `__sna` hook, which is exactly the reporter the old failure mode fooled.
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.coins).toBeGreaterThan(0);
+    expect(saved.dojo.date).toBe(today);
+    expect(Array.isArray(saved.dojo.done)).toBe(true);
+    expect(saved.dojo.streak).toEqual({ last: '', days: 0 });
+  });
 });
 
 /**

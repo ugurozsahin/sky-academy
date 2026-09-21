@@ -323,6 +323,21 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['progress', 'endless', 'sprint', 'boss', 'memory', 'training', 'equipped', 'streak', 'dojo'] as const) {
     if (k in clean && !isRecord(clean[k])) delete clean[k];
   }
+  // #363: `dojo` is the one key whose *interior* is read without a guard, and the guard above stops at the
+  // record boundary. `dojoFor()` only rebuilds a state whose `date` is stale, so a record carrying TODAY's
+  // date — exactly what a game finished today meets — reaches `carriedStreak()`'s `s.streak.last` and
+  // `applyEvent()`'s `[...s.done]` as-is and throws. That throw lands between `hold(true)` and
+  // `overlay.hidden = false` on the duel screen, so both arenas freeze with no result and no way out, and
+  // the coins the child just earned are never written. Reachable without devtools: `importSave()` accepts
+  // any version-valid JSON, so a `dojo` of `{ date: <today> }` pasted into the Restore box is enough.
+  // Deleting the key here puts it back through `DEFAULT`, the same route a missing key already takes, and
+  // covers all three `recordDojo()` call sites plus every future one — which is what this function's
+  // docstring above promises and what a `try/catch` per reader would not.
+  if (isRecord(clean.dojo)) {
+    const dj = clean.dojo as Partial<DojoState>;
+    const streakOk = isRecord(dj.streak) && typeof dj.streak!.last === 'string' && typeof dj.streak!.days === 'number';
+    if (typeof dj.date !== 'string' || !isRecord(dj.progress) || !Array.isArray(dj.done) || !streakOk || typeof dj.total !== 'number') delete clean.dojo;
+  }
   for (const k of ['stickers', 'owned'] as const) {
     if (k in clean && !Array.isArray(clean[k])) delete clean[k];
   }
