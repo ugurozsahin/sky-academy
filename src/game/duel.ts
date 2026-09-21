@@ -126,8 +126,14 @@ export function spokenQuestion(q: Question, round: number): string {
   const line = q.say ?? q.prompt;
   return round === 1 ? `${DUEL_HANDOVER} ${line}` : line;
 }
-/** A tiny deterministic rng (mulberry32) for the sample above — a constant would spin a generator that draws until distinct. */
-function seededRng(seed: number) {
+/**
+ * A tiny deterministic rng (mulberry32) for the sample above — a constant would spin a generator that draws
+ * until distinct. Exported since #389: the duel screen seeds one of these per arena from a single round seed,
+ * so both halves lay out the identical wave instead of each shuffling for itself. **One generator per call,
+ * never one shared between them** — it is stateful, and a shared instance deals the second half the first's
+ * leftovers.
+ */
+export function seededRng(seed: number) {
   return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 
