@@ -49,7 +49,11 @@ export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?:
  *
  * So this is an allowlist, and an absent type means **the old `(prompt, answer)` behaviour**: a visual this
  * table does not know about can never make two cards look different, only ever the same. That is the safe
- * direction — it can cost a re-roll that was not needed, never a repeat the re-roll existed to prevent.
+ * direction **against over-discrimination only** — and an earlier version of this sentence went on to claim it
+ * could "never cost a repeat the re-roll existed to prevent", which is false and is contradicted by the key's
+ * own docstring below (#412 review round 4, note 6). An unread carrier drives the *answer* to stop repeating,
+ * which is #390's defect: `y1-coins` at d2 keys 14 identities over 112 exercises. Safe here means a needless
+ * re-roll, not no cost. The uncovered types are #455.
  *
  * Only the three #390 names are here, because those are the ones where the visual *is* the question:
  * `objects` for `r-oddeven`, `sentence` for `y2-sentencetype` and `y2-tense`, `symmetry` for `y2-symmetry`.
@@ -66,6 +70,10 @@ const visualKey = (v: Visual): string => {
 };
 /**
  * The identity of a card, for "do not ask the same thing twice running" (#390, widened by #412).
+ *
+ * **`Session` only.** `nextQuestion` below is the one caller; `src/game/duel.ts` draws its cards with a bare
+ * `topic.gen()` and never consults this, so nothing in Ninja Duel avoids an immediate repeat. Pre-existing, and
+ * worth knowing before reading the rest of this as a property of the game (#412 review round 4, note 7).
  *
  * `prompt` and `answer` are not enough, and neither is adding the visual: on nine topics the question is
  * carried by **text that is not the prompt**, and there is no visual at all. `measureCompare` puts the values
@@ -110,6 +118,25 @@ const visualKey = (v: Visual): string => {
  *   `intervalCompare` sets no `hint`, no `listen` and no visual, and its own comment says the bubbles *are* the
  *   durations, so `y2-duration` reduces to `(prompt, answer)`: at d2, 22 keys over 3,000 draws with 18 covering
  *   more than one comparison. **#451**.
+ * **The one cost this widening carries, stated because a child pays it** (#412 review round 4). `hint` is
+ * content on a tall screen and **not on the card at all on a short one**: `src/style.css`'s
+ * `@media (max-height: 640px)` hides `.hint` until the answer is given, and a landscape phone is exactly that
+ * band (the rule says so itself, and `src/ui/hud.ts` says the measure values "live in `hint` and nowhere else
+ * on the card"). So on `y1-mass`, `y1-capacity`, `y1-length` and `y2-temp`, keying `hint` lets through a pair
+ * this loop used to refuse: driven 8,000 transitions at d1, counting only pairs byte-identical in everything a
+ * ≤640px screen renders — prompt, bubble set, visual, which bubble is correct — the rate goes from **0.00% on
+ * the old key to 1.84%–2.69%** here. Main's zero was structural rather than luck: its key was
+ * `(prompt, answer, visual)` and these generators carry no visual, so a card that looked the same and answered
+ * the same *was* the card it refused.
+ *
+ * Taken knowingly, because the trade is lopsided: `r-soundhunt` goes from a sound that could never repeat
+ * (0.000%) to the generator's own 6.1%, on every viewport, against about one card in forty on four topics in an
+ * orientation where those cards already cannot be answered without read-aloud (#65). **And the premise is being
+ * removed**: PR #430 (`Closes #328`) renders the hint inside this very media query for these five topics, after
+ * which keying it is simply correct and this paragraph should go, with the table above re-measured to 0.00%. No
+ * rail here can see any of this — `asked()` reads `hint`, and no Playwright project is shorter than 640px — so
+ * it is written down instead of pinned, which is the honest shape and not a good one.
+ *
  * - **A `visual` type `VISUAL_QUESTION` does not list.** `visualKey` returns `''` on a lookup miss, which the
  *   comment above calls the safe direction — and it is safe against *over*-discrimination, but it is silent
  *   about the cost, so say it here: `coins`, `numberline` and `chart` carry their question, and the key cannot
@@ -127,7 +154,24 @@ const visualKey = (v: Visual): string => {
  * question never takes two. Those rails normalise lists over four separators against this one, deliberately,
  * so that narrowing `contentList` goes red (round 2, B2).
  */
-const contentList = (s: string) => (s.includes(' · ') ? s.split(' · ').sort().join(' · ') : s);
+/**
+ * The separators that unambiguously delimit a **list** in a `Question`'s content field, so the order within it
+ * is presentation. `' · '` is the one the three generators use; the other three are here because a generator
+ * switching to one of them would otherwise bring round 1's defect back in silence — measured at 1.2% for
+ * `' / '` with the whole suite green (round 4, note 3). None of them appears in any `hint` or `listen` today,
+ * so widening this is a no-op now and a closed hole later.
+ *
+ * `', '` is deliberately **not** here: four sentence topics carry prose commas in `hint`/`listen`, and sorting
+ * those could merge two genuinely different cards, which is the #390 defect rather than a cure for it. The
+ * oracle in `tests/unit/session.test.ts` does normalise it, which is the asymmetry round 2's B2 asked for — a
+ * coarser oracle can only produce a red, never hide one. What neither sees is a fifth separator nobody has
+ * thought of; that residue is real and is why the oracle stays wider than this list rather than importing it.
+ */
+const LIST_SEPARATORS = [' · ', ' | ', '; ', ' / '];
+const contentList = (s: string) => {
+  for (const sep of LIST_SEPARATORS) if (s.includes(sep)) return s.split(sep).sort().join(sep);
+  return s;
+};
 export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : ''].join('\u0000');
 
 export class Session {

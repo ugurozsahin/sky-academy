@@ -406,7 +406,7 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * | the question is carried by | covered here |
  * | --- | --- |
  * | `prompt`, `answer`, `hint`, `listen`, `sequence` | **yes** — `asked()` reads all five |
- * | a `visual` type in `VISUAL_QUESTION` (`objects`, `sentence`, `symmetry`) | rail 1 only, through the key |
+ * | a `visual` type in `VISUAL_QUESTION` (`objects`, `sentence`, `symmetry`) | **no rail here** — see below |
  * | a `visual` type outside it (`coins`, `numberline`, `chart`, …) | **no** |
  * | `options` | **no** |
  *
@@ -417,6 +417,12 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * one spoken question** — one holding `£1 or 20p`, `£1 or 10p` and `£1 or 2p` — and `y1-line` d3 93 of 95,
  * `y2-line` d3 25 of 32, `y2-money` d1 30 of 33, `y2-stats` d2 **194 of 194**, worst key covering 77 charts,
  * where the chart *is* the question (#455).
+ *
+ * The allowlisted visuals get **no rail in this describe either**, which round 3's version of this table got
+ * wrong (round 4, note 1): `asked()` omits `q.visual`, so deleting any single `VISUAL_QUESTION` entry leaves
+ * both exact rails green and only the pre-existing #390 band rail above reddens. A fourth entry, or a new topic
+ * carrying its question in an `objects`/`sentence` visual with a varying prompt, would reach no rail in this
+ * file. That is the ones *inside* the allowlist and is not #455, which is the types outside it.
  *
  * Neither is keyed here, for the same reason in both cases: doing it unconditionally switches de-duplication
  * off wherever that field is decoration. `options` are a decoy pool on forty-odd topics, which is why `the key
@@ -453,7 +459,9 @@ describe('the repeat key holds the whole question (#412)', () => {
    * (#455).
    */
   const asked = (q: Question) => {
-    const LIST_SEPARATORS = [' · ', ', ', '; ', ' | '];
+    // A superset of the key's own list, which is the point: `', '` is here and deliberately not there, because
+    // prose commas must not merge two cards in the key but may safely red this rail (round 2, B2; round 4, note 3).
+    const LIST_SEPARATORS = [' · ', ' | ', '; ', ' / ', ', '];
     const set = (s: string) => {
       for (const sep of LIST_SEPARATORS) if (s.includes(sep)) return s.split(sep).sort().join(sep);
       return s;
@@ -490,13 +498,17 @@ describe('the repeat key holds the whole question (#412)', () => {
    * Cards are grouped by what they ask *with the visual held identical*, so a per-draw sticker — the `emoji`
    * that PR #407's B1 was about — can never force a false red here. That makes it full strength exactly where
    * B1 lived: neither sound-hunt topic nor any measurement topic carries a visual at all.
+   *
+   * **3,000 draws, not 700** (round 4, note 2): at 700, `y1-capacity` produced 700 distinct groups, so the `else`
+   * holding the assertion never ran and its case passed without evaluating anything. Its first duplicate is at
+   * draw 805. A rail that cannot reach its own `expect` on a topic is not covering it.
    */
   it.each(playable.map(t => t.id))('%s: two cards that ask the same thing never take two keys', (id) => {
     const topic = topicById(id)!;
     for (const d of [1, 2, 3] as const) {
       const r = rng(11);
       const byAsked = new Map<string, { key: string; q: Question }>();
-      for (let i = 0; i < 700; i++) {
+      for (let i = 0; i < 3000; i++) {
         const q = topic.gen(d, r);
         const g = `${asked(q)}\u0002${JSON.stringify(q.visual ?? null)}`;
         const k = repeatKey(q), seen = byAsked.get(g);
@@ -508,9 +520,12 @@ describe('the repeat key holds the whole question (#412)', () => {
 
   /**
    * And the fields the key must **ignore**, asserted directly rather than argued in a docstring. `say` is the
-   * one judgement `session.ts` defends at length and nothing held it: folding `q.say` in is 176/176 green and
-   * switches de-duplication off on `r-order`, whose `say` speaks the numbers in their shuffled display order
-   * (review round 1, note 1). `options` is re-shuffled every draw, and `wide`/`peek`/`slow` are how a card is
+   * one judgement `session.ts` defends at length and, when this rail was written, nothing held it: folding
+   * `q.say` in was **176/176 green** then, while switching de-duplication off on `r-order`, whose `say` speaks
+   * the numbers in their shuffled display order (round 1, note 1). That figure is kept as the reason this rail
+   * exists, not as a current measurement — **at this head the same mutation reddens 14 cases**, mostly on the
+   * converse rail this pull request added, so the judgement is better held than the sentence used to claim
+   * (round 4, note 4). `options` is re-shuffled every draw, and `wide`/`peek`/`slow` are how a card is
    * presented, not what it asks.
    */
   it('the key ignores every field that carries presentation rather than content', () => {
