@@ -41,6 +41,24 @@ export function certFromStored(c: StoredCert): CertInfo {
   };
 }
 /**
+ * The inverse of `certFromStored()`: the album entry for a certificate that has just been earned (#16 review,
+ * B1). `id`, the avatar's **id** and the award day are the caller's — they are the three things `CertInfo`
+ * cannot supply, since it carries a resolved `Avatar` and a `Date` that may be absent.
+ *
+ * It exists because the flag that says what a certificate is for was being written **twice, by hand**, on the
+ * duel path: once into the drawn `CertInfo` and once into the stored entry. Deleting it from the drawn one left
+ * every test green while the printed, kept certificate called a duel a "mission" and the album still called it
+ * a duel — the two disagreeing about what the child did. With one writer that mutation cannot survive: the same
+ * deletion now takes the stored entry with it, and the e2e's `duel: true` assertion goes red.
+ */
+export function certToStored(c: CertInfo, o: { id: string; avatar: string | null; date: string }): StoredCert {
+  return {
+    id: o.id, name: c.name, avatar: o.avatar, year: c.year, title: c.title,
+    stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
+    date: o.date, training: c.training, duel: c.duel,
+  };
+}
+/**
  * "My certificates" (#110): a row per earned certificate, most recently filed first, or an empty-state hint.
  * Pure and unit-tested without a DOM — mirrors `stickersHTML`'s shape in `ui/screen.ts`. Each row carries the
  * cert's `id` in `data-id` so the caller can look it up in `certificates()` and redraw it full-screen; nothing

@@ -119,13 +119,24 @@ export class Arena {
   /** Bubble radius scales with viewport; words get wider bubbles. */
   radius(wide: boolean) { return bubbleRadius(this.W, this.H, wide); }
 
-  spawnWave(o: WaveOpts) {
+  /**
+   * `shared` is how two arenas put up **the same wave** — the Ninja Duel's two halves (#389). Both of
+   * `layoutWave`'s impure inputs have to come from the caller for that, not just the draw: the two calls run
+   * in one loop but `performance.now()` still moves between them, and `now` is the origin every `launchAt` is
+   * measured from. Each caller passes its *own* generator off one seed rather than one shared generator —
+   * an `Rng` is stateful, so a single instance handed to both calls would deal the second arena the first's
+   * leftovers, which is the bug with extra steps.
+   *
+   * Left out, every wave outside the duel keeps `Math.random` and the live clock: a seeded arena in ordinary
+   * play would put the same wave up twice (#389's "deliberately does not do").
+   */
+  spawnWave(o: WaveOpts, shared?: { rng: Rng; now: number }) {
     this.bubbles = []; this.shots = []; this.frozen = false;
     this.orderedWave = !!o.ordered?.length;         // #108: damp collisions so a sequence bubble is never stranded
     // #43: every number below — radius, air time, batching, each bubble's arc, colour and launch moment —
     // comes from the pure layoutWave() so it can be unit-tested without a canvas. All this method still does
     // is fit each label to the measured font (#28, needs the 2D context) and push the bubbles.
-    const plan = layoutWave(o, { W: this.W, H: this.H, topInset: this.topInset }, gameSpeed(), performance.now(), Math.random);
+    const plan = layoutWave(o, { W: this.W, H: this.H, topInset: this.topInset }, gameSpeed(), shared?.now ?? performance.now(), shared?.rng ?? Math.random);
     this.waveT = plan.waveT; this.batchSpan = plan.batchSpan;
     for (const p of plan.bubbles) {
       const fontSize = fitLabel(p.label, plan.r, font => { this.ctx.font = font; return this.ctx.measureText(p.label).width; });   // #28: fit once here, not every frame

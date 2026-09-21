@@ -8,10 +8,10 @@
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
-import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelHeadline, duelPool, duelStars, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
+import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelHeadline, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
 import { addCoins, load, recordAccuracy, recordCert, recordDojo, today } from '../storage';
-import { deliverCertificate, drawCertificate, type CertInfo } from './certificate';
+import { certToStored, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { hintText, promptHTML, promptMode } from './hud';
@@ -97,7 +97,18 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         // so it goes out on the next task instead (PR #295 review).
         const line = spokenQuestion(q, info.round);
         if (info.round === 1) later(() => say(line), 0); else say(line);
-        for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts); }
+        // #389: one draw and one clock origin for the whole round, so both halves pose the identical wave.
+        // Each arena spawned from `Math.random` and its own `performance.now()`, so the answer took a
+        // different slot in the launch queue on each side — at speed 1 a batch apart is over four seconds of
+        // head start, and the match was decided by whose shuffle dealt it early rather than by who was
+        // quicker. `topInset` is set for both above the draw because the plan is only shared while the
+        // geometry is (`layoutWave` reads W, H and topInset); the rail in `guardrails.test.ts` holds that.
+        //
+        // Identical, not mirrored: both children see the answer in the same place at the same moment, which
+        // is the fair reading of "the same question" — a mirror about the divider would make the two halves
+        // look symmetrical while giving the left-handed and right-handed reach a different problem.
+        const seed = (Math.random() * 0x100000000) >>> 0, at = performance.now();
+        for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts, { rng: seededRng(seed), now: at }); }
       });
     },
     onRoundWon(player, q) {
@@ -157,10 +168,12 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     cert = duelCert(r);
     // #205's rule, unchanged here: filed the moment the overlay is built, never from the 🎓 button, because the
     // bug that issue opened with is a device where pressing the button does nothing at all.
-    if (cert) recordCert({
-      id: `${o.year.id}:duel`, name: cert.name, avatar: d.avatar, year: cert.year, title: cert.title,
-      stars: cert.stars, score: cert.score, correct: cert.correct, attempts: cert.attempts, date: today(), duel: true,
-    });
+    //
+    // Built **from** the drawn `CertInfo` rather than beside it (#16 review, B1): the field list was hand-copied,
+    // so `duel: true` had two independent writers and deleting the one that reaches the printed certificate left
+    // every test green while the album and the child's keepsake disagreed about what had been won. `certToStored`
+    // is now the only writer, so the e2e's stored assertions cover the drawn object too.
+    if (cert) recordCert(certToStored(cert, { id: `${o.year.id}:duel`, avatar: d.avatar, date: today() }));
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
     overlay.hidden = false;
@@ -177,8 +190,10 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
-    // Captured, not read back off `cert`: the handler is async and fires long after this frame, so reading the
-    // mutable binding there would need a `!` to compile and would be a lie the moment anything else assigns it.
+    // Captured, not read back off `cert`: this handler is async and fires long after this frame, and it must
+    // draw the certificate *this* match earned, so it binds the value the `if` tested. The `certificate()` hook
+    // below deliberately does the opposite and reads the live binding — it is asked "what has been earned
+    // now?" and has to answer null before the match ends (#16 review, note 7).
     const earned = cert;
     if (earned) $('#cert').addEventListener('click', async () => {
       sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;

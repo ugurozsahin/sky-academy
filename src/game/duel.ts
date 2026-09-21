@@ -126,8 +126,14 @@ export function spokenQuestion(q: Question, round: number): string {
   const line = q.say ?? q.prompt;
   return round === 1 ? `${DUEL_HANDOVER} ${line}` : line;
 }
-/** A tiny deterministic rng (mulberry32) for the sample above — a constant would spin a generator that draws until distinct. */
-function seededRng(seed: number) {
+/**
+ * A tiny deterministic rng (mulberry32) for the sample above — a constant would spin a generator that draws
+ * until distinct. Exported since #389: the duel screen seeds one of these per arena from a single round seed,
+ * so both halves lay out the identical wave instead of each shuffling for itself. **One generator per call,
+ * never one shared between them** — it is stateful, and a shared instance deals the second half the first's
+ * leftovers.
+ */
+export function seededRng(seed: number) {
   return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 
@@ -217,8 +223,15 @@ export function duelAccuracy(r: DuelResult): DuelTally {
 /**
  * Stars for the certificate a won duel earns (#16 item 5) — Player 1's own accuracy, on the **identical bar a
  * mission stage uses** (`Session`'s `acc >= 0.95 ? 3 : acc >= 0.7 ? 2 : 1`). Reusing that bar is the whole
- * point: a star on a duel certificate has to mean what a star means on every other certificate in the album,
- * or `fileCert()`'s "keep the best run" comparison is ranking two different scales against each other.
+ * point: a star on a duel certificate has to mean what a star means anywhere else a child sees one, because
+ * the album shows duel and mission rows in the same list with the same three glyphs and no way to tell that
+ * one was rated differently.
+ *
+ * It is the **stage** bar, not a mission certificate's own `stars`, which is the rounded mean of five stage
+ * stars — close, and deliberately not called identical (#16 review, note 3). An earlier draft of this comment
+ * justified the reuse by `fileCert()` "ranking two different scales against each other"; that was wrong and is
+ * removed rather than reworded. `fileCert()` only ever compares entries sharing an `id`, and `<year>:duel` has
+ * one writer, so it never ranks a duel against a mission.
  *
  * It reads `duelAccuracy()`'s tally rather than the scoreline for the reason #347 gave for paying no win
  * bonus: `scoreA` counts rounds the friend was *slower* on, which is not a measurement of this child's maths.

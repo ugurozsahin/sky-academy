@@ -751,6 +751,38 @@ describe('guard rails', () => {
   // mode worth catching: a function that reads as pure but quietly draws from the global RNG cannot be
   // seeded, so a test can only sample it. It looks covered and is not, and the disagreement shows up as a
   // wave that plays subtly differently rather than as a red build. Both take `rng: Rng`; neither may reach.
+  /*
+   * #389 — a duel's two halves pose the same wave, and three separate things have to stay true for that.
+   * Found in play: the answer rose at a different moment on each side, so the match measured the shuffle.
+   * The unit tests in `tests/unit/duel.test.ts` hold what a shared draw *does* — and stay green against the
+   * unfixed screen, because they never touch it; only a source rail can hold that the screen still wires one
+   * up. The plausible edits are all small: dropping `now` back to each arena's own clock, hoisting one
+   * generator out of the loop (stateful, so the second half gets the first's leftovers), or letting the two
+   * halves' geometry drift, which is what `layoutWave` reads.
+   */
+  it('the duel spawns both halves from one draw, one clock origin and equal geometry (#389)', () => {
+    const duel = code(SOURCES['/src/ui/duel.ts']);
+    const from = duel.indexOf('for (const p of PLAYERS) { arenas[p].topInset');
+    expect({ loop: from >= 0 }).toEqual({ loop: true });
+    const spawn = duel.slice(from, duel.indexOf('\n', from));
+    // One generator *per arena*, built inside the loop: `seededRng(seed)` is called where the spawn is, so
+    // hoisting it to a shared instance — the bug with extra steps — no longer matches.
+    expect(spawn, 'each half gets its own generator off the round seed').toMatch(/spawnWave\(opts, \{ rng: seededRng\(seed\), now: at \}\)/);
+    // ...and both halves are given the same inset in the same statement, so the geometry cannot drift apart
+    // without this line changing: `layoutWave` reads topInset, and a different one is a different wave.
+    expect(spawn, 'and the same topInset, in the same statement').toMatch(/arenas\[p\]\.topInset = 8;/);
+    // The seed and the clock origin are drawn once, above the loop. Inside it they would be per-arena again,
+    // which is exactly the defect: `performance.now()` moves between the two calls.
+    const draw = duel.slice(duel.lastIndexOf('const seed', from), from);
+    expect(draw, 'one seed and one `now` for the round, drawn before either half').toMatch(/const seed = .*performance\.now\(\)/);
+    expect(spawn, 'so neither of them is re-drawn per arena').not.toMatch(/performance\.now\(\)|Math\.random/);
+    // And the seam they ride: `spawnWave`'s shared draw is optional, so every wave outside the duel keeps
+    // `Math.random` and the live clock — a seeded arena in ordinary play would repeat itself (#389).
+    const arena = code(SOURCES['/src/game/arena.ts']);
+    expect(arena, 'the shared draw is opt-in').toMatch(/spawnWave\(o: WaveOpts, shared\?: \{ rng: Rng; now: number \}\)/);
+    expect(arena, 'and ordinary play still draws for itself').toMatch(/shared\?\.now \?\? performance\.now\(\), shared\?\.rng \?\? Math\.random/);
+  });
+
   it('the wave layout draws only from the rng it is given (#43)', () => {
     const src = code(SOURCES['/src/game/arena.ts'] ?? '');
     expect(src.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
@@ -765,7 +797,12 @@ describe('guard rails', () => {
     // the seam only pays if the game still goes through it: one definition, one call, and spawnWave
     // hands over the real clock and the real RNG rather than layoutWave reaching for them itself.
     expect(src.split('layoutWave(').length - 1, 'layoutWave has one call site: spawnWave').toBe(2);
-    expect(src, 'spawnWave passes the speed multiplier, the clock and the RNG in').toContain('gameSpeed(), performance.now(), Math.random');
+    // #389 widened the last of these rather than weakening it: spawnWave now hands over the caller's draw and
+    // clock origin when a duel gives it one (both halves must pose the same wave), and its own otherwise. The
+    // claim is unchanged — layoutWave never reaches for a clock or a global RNG itself — so this pins both
+    // arms, where it used to pin the one that existed. The `??` spelling is what keeps ordinary play impure.
+    expect(src, 'spawnWave passes the speed multiplier, the clock and the RNG in')
+      .toContain('gameSpeed(), shared?.now ?? performance.now(), shared?.rng ?? Math.random');
   });
 
   // #43: the tracing pass/fail rule is what decides whether a child gets their letter accepted, and the half
