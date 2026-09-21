@@ -3,13 +3,14 @@
 // `Duel` scorer (src/game/duel.ts) owns the rules — first correct slice wins the round, a wrong slice costs
 // nothing, best of DUEL_ROUNDS — and this file only wires two `Arena`s, the strip, the match-end overlay and
 // the `window.__sna` hooks the e2e drives it through. A finished match pays coins into the one shared save
-// (item 5's coins and stickers); certificates, the Dojo and a duel history are still deferred on the issue.
+// (item 5's coins and stickers), tells the Daily Dojo what the device answered and teaches Sensei what Player 1
+// found hard on this topic; certificates and a duel history are still deferred on the issue.
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
-import { Duel, duelCoins, duelDojoEvent, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult } from '../game/duel';
+import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelHeadline, duelPool, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { addCoins, load, recordDojo } from '../storage';
+import { addCoins, load, recordAccuracy, recordDojo } from '../storage';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { hintText, promptHTML, promptMode } from './hud';
@@ -66,6 +67,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   let paid = 0;
   /** Daily Dojo bonus the finished match earned on top of `paid`; 0 until the match ends (#16 item 5). */
   let dojoPaid = 0;
+  /** What the finished match taught Sensei about this topic — rounds answered, not slices; 0/0 until it ends. */
+  let taught: DuelTally = { hits: 0, tries: 0 };
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
 
@@ -91,7 +94,18 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         // so it goes out on the next task instead (PR #295 review).
         const line = spokenQuestion(q, info.round);
         if (info.round === 1) later(() => say(line), 0); else say(line);
-        for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts); }
+        // #389: one draw and one clock origin for the whole round, so both halves pose the identical wave.
+        // Each arena spawned from `Math.random` and its own `performance.now()`, so the answer took a
+        // different slot in the launch queue on each side — at speed 1 a batch apart is over four seconds of
+        // head start, and the match was decided by whose shuffle dealt it early rather than by who was
+        // quicker. `topInset` is set for both above the draw because the plan is only shared while the
+        // geometry is (`layoutWave` reads W, H and topInset); the rail in `guardrails.test.ts` holds that.
+        //
+        // Identical, not mirrored: both children see the answer in the same place at the same moment, which
+        // is the fair reading of "the same question" — a mirror about the divider would make the two halves
+        // look symmetrical while giving the left-handed and right-handed reach a different problem.
+        const seed = (Math.random() * 0x100000000) >>> 0, at = performance.now();
+        for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts, { rng: seededRng(seed), now: at }); }
       });
     },
     onRoundWon(player, q) {
@@ -135,6 +149,16 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // about the match here too — ten questions answered correctly on this screen move the day's volume
     // challenges exactly as they would in any other mode — and its bonus rides the same single addCoins().
     paid = duelCoins(r);
+    // Sensei's half: the rounds Player 1 answered on this topic — one try each, the unit a mission writes — for
+    // the seat `DUEL_HANDOVER` keeps for the profile's own child (`duelAccuracy()` has why neither the score nor
+    // the round count may be used, and why a swiped wave is still one try). A separate write from
+    // the coins below, exactly as `play.ts` already records accuracy separately from its payout — there is no
+    // coins/challenge pairing to break here, and the two-write question on a results screen is #365's, not this
+    // slice's to widen into. `recordTopic()` is deliberately NOT called: a duel earns no stars and is no `play`
+    // of the topic, so a duel-only topic keeps `plays: 0` and `accuracy()` reads null for it — the same way a
+    // topic met only in Sensei training or Sky Storm already behaves.
+    taught = duelAccuracy(r);
+    recordAccuracy(topic.id, taught.hits, taught.tries);
     const dojo = recordDojo(duelDojoEvent(r, topic.subject));
     dojoPaid = dojo.coins;
     const fresh = addCoins(paid + dojoPaid);
@@ -181,7 +205,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     state: () => ({
       mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
-      hint: hintLine, coins: paid, dojoCoins: dojoPaid,
+      hint: hintLine, coins: paid, dojoCoins: dojoPaid, taught,
     }),
     setSpeed: k => { setGameSpeed(k); },
     timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),

@@ -93,13 +93,47 @@ async function winRound(page: Page, p: 'a' | 'b') {
 }
 
 test.describe('Ninja Duel', () => {
+  /**
+   * guard rail (#389), found in play by the owner and his child. Each arena used to lay its own wave out from
+   * `Math.random` and its own `performance.now()`, so the answer took a different slot in each side's launch
+   * queue: at speed 1 one slot is 420 ms and a whole batch is over four seconds, and a four-option question
+   * on a half-width arena batches at three — so the answer landing in batch 0 for one player and batch 1 for
+   * the other was an ordinary draw. The match measured the shuffle rather than who was quicker.
+   *
+   * Every field compared here is fixed at spawn. `x`, `y` and `wobble` are deliberately not: all three are
+   * advanced every frame (`arena.ts` — `b.x += b.vx * dt`, `b.wobble += dt * 3`), and the two arenas run
+   * their own animation frames, so a snapshot of both mid-flight catches them a frame apart. The desktop
+   * project caught exactly that on `wobble`, drifting by 0.0024 rad between the halves while the seeded
+   * draw behind it was identical. `vx` and `g` carry the arc instead, and the *initial* wobble is held by
+   * the deep-equality check in `tests/unit/duel.test.ts`, where no clock is running.
+   */
+  test('guard rail: the two halves pose the identical wave — same order, same moments, same arcs (#389)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
+    // Read off `arenas`, already on the hooks contract, rather than `bubbles()`: that one reports only the
+    // bubbles in flight *now* and drops every field fixed at spawn, which is exactly what has to be compared.
+    const wave = await page.evaluate(() => {
+      const spawned = (p: 'a' | 'b') => window.__sna.arenas[p].bubbles.map(b =>
+        ({ label: b.label, launchAt: b.launchAt, r: b.r, vx: b.vx, g: b.g, color: b.color }));
+      return { a: spawned('a'), b: spawned('b'), answer: window.__sna.state().answer };
+    });
+    expect(wave.a.length, 'a real wave was captured, so the comparison below is not two empty lists').toBeGreaterThan(1);
+    expect(wave.b, 'both halves are dealt from one seed and one clock origin').toEqual(wave.a);
+    // Named on its own: the launch timetable is the half of it the children actually felt.
+    expect(wave.b.map(b => [b.label, b.launchAt]), 'the answer rises at the same moment on both sides')
+      .toEqual(wave.a.map(b => [b.label, b.launchAt]));
+    expect(wave.a.map(b => b.label), 'and the answer is in the wave, so the rows above are not agreeing about its absence')
+      .toContain(wave.answer);
+  });
+
   test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
     expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
     await expectHandoverHeard(page);   // the second child's one instruction is in round 1's own utterance
-    // The same wave in both arenas: each arena launches the ONE question's options (in its own batch order —
-    // a snapshot of the two in-flight sets need not match, the option set does), and the answer reaches both.
+    // The same wave in both arenas: each arena launches the ONE question's options, and the answer reaches
+    // both. Since #389 the two are laid out from one draw, so the orders match as well as the sets — the
+    // test below is the one that holds that; this one stays a check on the option set.
     await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
     const seen = await page.evaluate(() => ({
       options: window.__sna.duel.current!.options, a: window.__sna.bubbles('a').map(b => b.label), b: window.__sna.bubbles('b').map(b => b.label),
@@ -117,12 +151,27 @@ test.describe('Ninja Duel', () => {
     // Play out the match: Player 1 wins 6 rounds, Player 2 takes the rest.
     for (let r = 2; r <= 10; r++) {
       await page.waitForFunction(r => window.__sna.state().round === r, r);
+      // Round 2: Player 1 cuts a wrong bubble and then still takes the round. The round is won — a wrong slice
+      // costs nothing — but Sensei is told what a mission would have scored, a miss, so this is the round that
+      // makes `hits < tries` reach the save through the real arena (#374 review, B1).
+      if (r === 2) {
+        await page.waitForFunction(() => window.__sna.bubbles('a').some(b => b.label !== window.__sna.state().answer));
+        expect(await page.evaluate(() => window.__sna.wrong('a'))).toBe(true);
+      }
       await winRound(page, r <= 6 ? 'a' : 'b');
     }
     await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
     await expect(page.locator('.duel-end .speech')).toHaveText('Player 1 wins 6–4!');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 6, scoreB: 4, coins: 10, dojoCoins: 0 });
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({
+      ended: true, scoreA: 6, scoreB: 4, coins: 10, dojoCoins: 0,
+      // #16 item 5, Sensei's half: Player 1 answered six rounds, each right first time, so six of six. Player
+      // 2's round-1 wrong slice and four wins are NOT here — one shared profile, and only the bottom seat is
+      // its own child's (`duelAccuracy()`). Ten decided rounds would be the coins' number, not this one.
+      // Six rounds answered, five right first time: round 2 was won after a wrong cut, and `scoreA` is still 6,
+      // so this also pins that `hits` is not a second copy of the score.
+      taught: { hits: 5, tries: 6 },
+    });
     // #16 item 5: the finished match pays the one shared save a coin per decided round — ten here, and not one
     // of them for winning. Ten is under the first sticker threshold (30), so the match unlocks nothing yet, and
     // ten correct answers is short of every volume challenge (15/20/25), so no dojo bonus — `dojoSave('fresh')`
@@ -131,6 +180,11 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end .unlock')).toHaveCount(0);
     await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(0);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).coins), 'the coins reached the save, not just the overlay').toBe(10);
+    // The tally reached the topic Sensei ranks by, and not as a `play`: a duel earns no stars, so `plays` stays
+    // 0 and `accuracy()` reads null for a duel-only topic. Read from the save rather than from the overlay —
+    // the state hook would be green with `recordAccuracy()` never called.
+    const learnt = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).progress[window.__sna.state().topic]);
+    expect(learnt, "the six rounds Player 1 answered, five of them right first time").toMatchObject({ hits: 5, tries: 6, plays: 0, stars: 0 });
     // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0. The recording
     // is cleared BEFORE the click: round 1's line goes out on the task after the old screen's cancel(), and it
     // is what the assertion after the scores must find.
@@ -140,7 +194,7 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
     await expect(page.locator('#score-a')).toHaveText('0');
     await expect(page.locator('#score-b')).toHaveText('0');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0, coins: 0, dojoCoins: 0 });
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0, coins: 0, dojoCoins: 0, taught: { hits: 0, tries: 0 } });
     await expectHandoverHeard(page);   // the rematch's line is not dropped into the old screen's cancel()
     expect(await page.evaluate(() => window.__said.indexOf('<cancel>')), 'the old screen was hushed first, then the line went out').toBeGreaterThanOrEqual(0);
     // Leaving tears the duel down: the hooks go with it and BOTH render loops stop (#73 — no arena may leak
@@ -226,7 +280,9 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end .coin-row + .dojo-bonus')).toHaveCount(1);
     await expect(page.locator('.duel-end .dojo-bonus:not(.set) .gain')).toHaveText('+10 🪙');
     await expect(page.locator('.duel-end .dojo-bonus.set .gain')).toHaveText('+25 🪙');
-    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 5, scoreB: 5, coins: 10, dojoCoins: 35 });
+    // Five rounds each, so the dojo hears about ten correct answers while Sensei hears about five: the two
+    // numbers a duel reports are deliberately different, and this is the case where they diverge.
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 5, scoreB: 5, coins: 10, dojoCoins: 35, taught: { hits: 5, tries: 5 } });
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
     expect(saved.coins, 'the match coins AND the dojo bonus reached the save').toBe(45);
     expect(saved.dojo.done.length, 'the completed challenge is recorded, so it cannot be paid twice').toBe(3);

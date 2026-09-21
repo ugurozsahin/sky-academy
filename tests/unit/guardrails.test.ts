@@ -893,6 +893,38 @@ describe('guard rails', () => {
   // mode worth catching: a function that reads as pure but quietly draws from the global RNG cannot be
   // seeded, so a test can only sample it. It looks covered and is not, and the disagreement shows up as a
   // wave that plays subtly differently rather than as a red build. Both take `rng: Rng`; neither may reach.
+  /*
+   * #389 — a duel's two halves pose the same wave, and three separate things have to stay true for that.
+   * Found in play: the answer rose at a different moment on each side, so the match measured the shuffle.
+   * The unit tests in `tests/unit/duel.test.ts` hold what a shared draw *does* — and stay green against the
+   * unfixed screen, because they never touch it; only a source rail can hold that the screen still wires one
+   * up. The plausible edits are all small: dropping `now` back to each arena's own clock, hoisting one
+   * generator out of the loop (stateful, so the second half gets the first's leftovers), or letting the two
+   * halves' geometry drift, which is what `layoutWave` reads.
+   */
+  it('the duel spawns both halves from one draw, one clock origin and equal geometry (#389)', () => {
+    const duel = code(SOURCES['/src/ui/duel.ts']);
+    const from = duel.indexOf('for (const p of PLAYERS) { arenas[p].topInset');
+    expect({ loop: from >= 0 }).toEqual({ loop: true });
+    const spawn = duel.slice(from, duel.indexOf('\n', from));
+    // One generator *per arena*, built inside the loop: `seededRng(seed)` is called where the spawn is, so
+    // hoisting it to a shared instance — the bug with extra steps — no longer matches.
+    expect(spawn, 'each half gets its own generator off the round seed').toMatch(/spawnWave\(opts, \{ rng: seededRng\(seed\), now: at \}\)/);
+    // ...and both halves are given the same inset in the same statement, so the geometry cannot drift apart
+    // without this line changing: `layoutWave` reads topInset, and a different one is a different wave.
+    expect(spawn, 'and the same topInset, in the same statement').toMatch(/arenas\[p\]\.topInset = 8;/);
+    // The seed and the clock origin are drawn once, above the loop. Inside it they would be per-arena again,
+    // which is exactly the defect: `performance.now()` moves between the two calls.
+    const draw = duel.slice(duel.lastIndexOf('const seed', from), from);
+    expect(draw, 'one seed and one `now` for the round, drawn before either half').toMatch(/const seed = .*performance\.now\(\)/);
+    expect(spawn, 'so neither of them is re-drawn per arena').not.toMatch(/performance\.now\(\)|Math\.random/);
+    // And the seam they ride: `spawnWave`'s shared draw is optional, so every wave outside the duel keeps
+    // `Math.random` and the live clock — a seeded arena in ordinary play would repeat itself (#389).
+    const arena = code(SOURCES['/src/game/arena.ts']);
+    expect(arena, 'the shared draw is opt-in').toMatch(/spawnWave\(o: WaveOpts, shared\?: \{ rng: Rng; now: number \}\)/);
+    expect(arena, 'and ordinary play still draws for itself').toMatch(/shared\?\.now \?\? performance\.now\(\), shared\?\.rng \?\? Math\.random/);
+  });
+
   it('the wave layout draws only from the rng it is given (#43)', () => {
     const src = code(SOURCES['/src/game/arena.ts'] ?? '');
     expect(src.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
@@ -907,7 +939,12 @@ describe('guard rails', () => {
     // the seam only pays if the game still goes through it: one definition, one call, and spawnWave
     // hands over the real clock and the real RNG rather than layoutWave reaching for them itself.
     expect(src.split('layoutWave(').length - 1, 'layoutWave has one call site: spawnWave').toBe(2);
-    expect(src, 'spawnWave passes the speed multiplier, the clock and the RNG in').toContain('gameSpeed(), performance.now(), Math.random');
+    // #389 widened the last of these rather than weakening it: spawnWave now hands over the caller's draw and
+    // clock origin when a duel gives it one (both halves must pose the same wave), and its own otherwise. The
+    // claim is unchanged — layoutWave never reaches for a clock or a global RNG itself — so this pins both
+    // arms, where it used to pin the one that existed. The `??` spelling is what keeps ordinary play impure.
+    expect(src, 'spawnWave passes the speed multiplier, the clock and the RNG in')
+      .toContain('gameSpeed(), shared?.now ?? performance.now(), shared?.rng ?? Math.random');
   });
 
   // #43: the tracing pass/fail rule is what decides whether a child gets their letter accepted, and the half
@@ -1887,6 +1924,56 @@ describe('the chart visual\'s CSS structure cannot go missing without a red test
 });
 
 /**
+ * #299 review B2: on a `y2-symmetry` card `.symgrid rect.on` *is* the answer. Delete that one line from
+ * `src/style.css` and every square renders at the same faint fill, so every card is a blank grid — and a
+ * blank grid is symmetric. Every `answer: 'no'` card becomes unanswerable, on a year with three lives.
+ *
+ * Nothing saw it: `curriculum`, `visuals` and `guardrails` together (709 tests) stayed green, and so did the
+ * new e2e, because both count DOM nodes rather than paint — `.symgrid rect.on` is still emitted, it just
+ * draws the same as its neighbour. That is the same failure, in the same function, that the #137 rail above
+ * was written for after deleting `.chart .blk` left the whole suite green; `renderVisual`'s symmetry case
+ * cites #137 by number for its input defence, so it carries #137's CSS rail too.
+ *
+ * Read with readFileSync for the reason the #137 rail gives: Vite's CSS plugin returns an empty string
+ * outside a browser, and the length assertion is what proves this read real content.
+ */
+describe('the symmetry visual\'s CSS structure cannot go missing without a red test (#299)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+
+  it('a coloured square and an empty one cannot render the same, and the fold line stays visible', () => {
+    expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    const box = bare.match(/\.symgrid\s*\{([^}]*)\}/)?.[1];
+    expect(box, 'a .symgrid rule must exist (#299)').toBeTruthy();
+    expect(box, '.symgrid is sized by a clamp() on the width, so a 6-wide picture still fits a phone (design-language §2)')
+      .toMatch(/width:\s*clamp\(/);
+    expect(box, 'height stays auto, or the viewBox stops carrying the grid\'s aspect and a taller picture is squashed')
+      .toMatch(/height:\s*auto/);
+
+    const off = bare.match(/\.symgrid\s+rect\s*\{([^}]*)\}/)?.[1];
+    const on = bare.match(/\.symgrid\s+rect\.on\s*\{([^}]*)\}/)?.[1];
+    expect(off, 'a .symgrid rect rule must exist — the faint empty square').toBeTruthy();
+    expect(on, 'a .symgrid rect.on rule must exist — without it every card is a blank grid, and a blank grid is symmetric')
+      .toBeTruthy();
+    const fill = (rule: string) => rule.match(/fill:\s*([^;}]+)/)?.[1].trim();
+    expect(fill(off!), 'an empty square must declare a fill').toBeTruthy();
+    expect(fill(on!), 'a coloured square must declare a fill').toBeTruthy();
+    expect(fill(on!), 'a coloured square and an empty one must not render the same, or the picture says nothing at all')
+      .not.toBe(fill(off!));
+
+    const mirror = bare.match(/\.symgrid\s+\.mirror\s*\{([^}]*)\}/)?.[1];
+    expect(mirror, 'a .symgrid .mirror rule must exist — the fold line the question is about').toBeTruthy();
+    expect(mirror, 'the fold line must be stroked, or the question has nothing to point at').toMatch(/stroke:\s*[^;}]+/);
+    const width = mirror!.match(/stroke-width:\s*([\d.]+)/)?.[1];
+    expect(width, 'the fold line must declare a stroke-width — an SVG line has no default thickness to fall back on').toBeTruthy();
+    expect(Number(width), 'a zero-width stroke draws nothing at all').toBeGreaterThan(0);
+    expect(mirror, 'the fold stays dashed: it is an instruction to compare the two halves, not part of the shape')
+      .toMatch(/stroke-dasharray:/);
+  });
+});
+
+/**
  * #110: the opening screen's "Your name" field was the last thing on a long page — brand header, the full
  * eleven-card grid, *then* the field — and `.avatar-grid` is `repeat(auto-fill, minmax(104px, 1fr))`, so the
  * wider and taller the screen the further down it went. On a tablet it was below the fold behind every card.
@@ -2349,6 +2436,108 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     const closing = flat(skill.slice(closingAt));
     expect(closing, 'the round cap must never read as "review less carefully"').toContain('There is no time box on this');
     expect(closing, 'and the closing paragraph must say which of the two it is').toContain('§7 is about **rounds**');
+  });
+
+  /**
+   * #310 — the cap in §7 is only ever reached by a reviewer who goes looking for it.
+   *
+   * `docs/REVIEWER-PROMPT.md` is what a reviewer run actually reads first, and its rule 4 ended "while a PR
+   * is waiting, reviewing it IS this run's work, with no time box". Nothing beside that sentence separated
+   * the *depth* of a review from the number of times one may block, and the prompt's own framing pushed the
+   * wrong way: a run that reads it and reaches for the skill only at §5's merge checklist can block a fourth
+   * time having never met the cap — "a rule whose whole purpose is to stop the sixth round may never be read
+   * before the second" (`pr-test-analyzer`, PR #306 round 1). #306 left it deliberately: this file sat at its
+   * byte budget to the byte, and a budget only ever goes down, so the clause had to be paid for in the same
+   * file before it could be written at all.
+   *
+   * What this pins is the **pointer**, not the cap. The cap's home is `review-pr` §7, pinned by the #305 rail
+   * above; a second copy here would drift from §7 the moment §7 changed, which is what
+   * `docs/decisions/001-one-home-per-rule.md` exists to prevent — and the #305 rail cannot catch that,
+   * because it reads the skill alone.
+   *
+   * **The positives are sliced to rule 4, not searched file-wide** (PR #386 review, B1 in both rounds).
+   * #310's whole content is *where the pointer sits*: it adds no rule that was not already in §7. A
+   * `toContain` over the whole file cannot tell rule 4 from any other byte, and round 1 proved it by moving
+   * the clause verbatim into rule 2 — same words, same 10,034 bytes, rule 4 back to its pre-#310 ending —
+   * with every rail green. Round 2 then defeated the first slice the same way, because `indexOf` takes the
+   * *first* match: one planted copy of rule 4's opening, earlier in the file, widened the slice back over
+   * STEP 2. Hence the uniqueness assertion, which is the load-bearing one; the slice is guarded at both ends
+   * as the #305 rail two tests above guards its own.
+   *
+   * **The negative half is deliberately one pattern, and that is the settled answer rather than a gap left
+   * open** (round 3, B2). Three review rounds each found both a spelling it missed and ordinary English it
+   * reddened, which is the shape `review-pr` §7's own incident is about — a check that failed the build on
+   * the words `only`, `instead` and `no`. `third round`, `three times` and "count the REVIEW: CHANGES
+   * REQUESTED comments" are all things this prompt says legitimately about rules that are *not* the cap:
+   * STEP 1 defines a waiting pull request in terms of those comments. Widening the list a fourth time buys
+   * a longer list of spellings, not a proof — a bolded, backticked or lightly reworded copy walks past any
+   * of them, exactly as the #305 rail says of its own `ESCAPES`, and the byte budget is no backstop either,
+   * since a restatement can be paid for out of other prose like any other clause. So what remains is the one
+   * spelling that cannot occur here innocently, and **a restatement of the cap is the reviewer's to catch,
+   * not this rail's**. What #310 delivers is the pointer; the positives are what pin it.
+   *
+   * Prove it red: move the clause out of rule 4 — into another rule, a new rule 5, or a paragraph of its own
+   * before the report paragraph, with or without a decoy opening planted earlier; drop the §7 pointer; put
+   * "with no time box" back unqualified; write a licence beside the pointer, either side of it; or restate
+   * the cap in the file as "the third round is the last…", bolded or backticked.
+   */
+  it('the reviewer prompt points at §7 for the rounds, in rule 4, and does not restate the cap (#310)', () => {
+    const prompt = read('docs/REVIEWER-PROMPT.md');
+    const OPENS = '4. **It is labelled `owner-approval`';
+    // Emphasis and code spans are house style in this file, never meaning, so neither may decide a match.
+    const bare = (s: string) => flat(s).replace(/\*\*|__|\*|_|`/g, '');
+
+    // The anchor has to be UNIQUE: `indexOf` takes the first match, so a decoy copy of this literal planted
+    // earlier binds `from` to it, the "slice" spans STEP 2 onwards, the positives are file-wide again and
+    // round 1's relocation walks straight back in (round 2, B1). `lastIndexOf` only changes which copy wins.
+    expect(prompt.split(OPENS).length - 1,
+      'rule 4 must open exactly once: renumbered, removed, or a second copy of its opening would start the slice '
+      + 'in the wrong place').toBe(1);
+    const from = prompt.indexOf(OPENS);
+    // And it ends at rule 4's OWN newline. Ending it at the report paragraph made the slice "rule 4 through
+    // the end of the rules block", so the clause could leave rule 4 for a paragraph of its own or a new
+    // rule 5 and every positive below still passed, under messages saying it was in rule 4 (round 3, B1).
+    const to = prompt.indexOf('\n', from);
+    expect(to, 'rule 4 must still be one line — the slice below is that line').toBeGreaterThan(from);
+    expect(prompt.indexOf('\nReport to the owner only for something noteworthy', to),
+      'the four unmergeable rules no longer end at the report paragraph').toBeGreaterThan(to);
+    const rule4 = bare(prompt.slice(from, to));
+    expect(rule4.length, 'rule 4 has lost most of its body — the slice is meant to be the whole rule')
+      .toBeGreaterThan(800);
+
+    expect(rule4, 'rule 4 must still say a review is not hurried — the pointer hangs off that sentence')
+      .toContain("reviewing it IS this run's work");
+    expect(rule4, "and the no-time-box must be about a review's depth, or it reads as a licence on the rounds too")
+      .toMatch(/no time box on a review's depth/);
+    // By clause, not by spelling: the file names the skill four ways and this is the least legible of them,
+    // so pinning the literal would freeze the inconsistency and make a tidy-up double red (round 2, note 5).
+    // `review-pr` and `§7` still both have to be there, which is what does the cross-file work.
+    expect(rule4, 'and rule 4 is where it must sit: a reviewer who stops at rule 4 meets the cap, or #310 bought nothing')
+      .toMatch(/how many times one may block[^.]*review-pr[^.]*§7/);
+
+    // And the cap must not be handed back in the same breath. Scoped to the clause, not to all of rule 4
+    // (round 2, note 1): rule 4's own subject is the `owner-approval` label and the `loosening` hold, whose
+    // native vocabulary is discretion and binding, and these patterns are negation-blind — "Whether the label
+    // goes on is not at your discretion" tightens the rule and would trip them. The clause starts at whichever
+    // of the depth sentence and the pointer comes first, so reordering the two cannot leave a licence between
+    // them unscanned (round 3, note 1).
+    const marks = [rule4.indexOf('While a PR is waiting'), rule4.search(/how many times one may block/)];
+    expect(Math.min(...marks), 'rule 4 has lost the depth sentence or the §7 pointer').toBeGreaterThan(-1);
+    for (const escape of [/\bnot a hard\b/i, /\bas often as you (need|like)\b/i, /\bat your discretion\b/i,
+      /\b(only|merely) a guideline\b/i, /\bthe cap does not apply\b/i, /\bbinds you\b/i])
+      expect(rule4.slice(Math.min(...marks)), `the §7 pointer carries a clause that gives the cap back: ${escape}`)
+        .not.toMatch(escape);
+
+    // One pattern, deliberately, and it is the weakest half of this rail (round 3, B2). Three rounds each
+    // found a spelling the list missed and ordinary English it reddened: `third round`, `three times` and
+    // "count the REVIEW: CHANGES REQUESTED comments" are all things this prompt says legitimately about rules
+    // that are NOT the cap — STEP 1 defines a waiting pull request in terms of those comments. Proving a
+    // negative over free text is what `review-pr` §7's own incident is about, so the list is reduced to the
+    // one spelling that cannot occur here innocently rather than widened again. **A restatement of the cap is
+    // the reviewer's to catch, not this rail's**; what #310 delivers is the pointer, and the positives above
+    // are what pin it.
+    expect(bare(prompt), 'the cap belongs in `review-pr` §7 alone — the prompt points at it, it does not copy it')
+      .not.toMatch(/third round is the last/i);
   });
 
   /**
@@ -2970,13 +3159,32 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   const EXPECTED_KEYS = (name: string) => ['name', 'description', ...(EXTRA_KEYS[name] ?? [])].sort();
   /**
    * Vendored upstream text that carries ` #` inside a plain scalar (`Please review PR #1234`): the loader's
-   * repair pass double-quotes that line — because the same value also carries `: `, which is asserted beside
-   * the token — so it loads in full; without the repair a YAML parser would cut it there — an upstream matter,
-   * not this repository's. The exemption is that one token, not the file: the token is asserted present (so
-   * the entry fails loudly when upstream drops it) and stripped, and the rest of the description is held to
-   * the same ` #` check as every other.
+   * repair pass double-quotes that line — because the same value also carries `: ` *ahead of* the token, which
+   * is asserted beside it — so it loads in full; without the repair a YAML parser would cut it there — an
+   * upstream matter, not this repository's. The exemption is that one token, not the file: the token is
+   * asserted present (so the entry fails loudly when upstream drops it) and stripped, and the rest of the
+   * description is held to the same ` #` check as every other.
    */
   const HASH_IN_UPSTREAM_TEXT: Record<string, string> = { 'silent-failure-hunter': 'PR #1234' };
+  /**
+   * Does the loader's repair pass run for this value (#312)?
+   *
+   * It runs only when the *plain* YAML parse throws, and what makes it throw is a `: ` inside a plain scalar.
+   * A ` #` opens a comment, so a plain parse that meets the `#` first succeeds on the text up to it and never
+   * throws: the repair pass never runs, and every word after the `#` is silently dropped. Presence of `: `
+   * anywhere in the value is therefore not the precondition the exemption rests on — a `: ` *before* the
+   * comment is, and that is an ordering question.
+   *
+   * The distinction is not academic. Moving the sole `PR #1234` earlier in `silent-failure-hunter.md` — one
+   * occurrence, anchored pin prefix intact, exactly the shape an upstream re-vendor produces — truncated the
+   * real loader's description to sixteen words with this whole file green, because the old assertion asked
+   * only whether a `: ` was present somewhere.
+   */
+  const repairPassRuns = (value: string) => {
+    const comment = value.search(/(^|\s)#/);
+    const colon = value.indexOf(': ');
+    return colon >= 0 && (comment < 0 || colon < comment);
+  };
   /**
    * NUL and CR, from code points so no editor can turn the escape into the character. Asserted on the
    * frontmatter block, never the whole file (round 7): a body line ending `\r\n`, which Windows editors and
@@ -2994,19 +3202,24 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     expect(front!, `${file}: "---" inside the frontmatter — the loader's splitter ends the block at the first one wherever it sits, and everything after it is gone (#150)`)
       .not.toMatch(/---/);
     const lines = front!.split('\n');
-    expect(lines.filter((l) => TOP_LEVEL_KEY.test(l)).map((l) => TOP_LEVEL_KEY.exec(l)![1]).sort(), `${file}: a frontmatter key outside the expected set — the loader acts on keys no description check reads, and "disable-model-invocation" or a never-matching "paths" switches the skill off (#150)`)
-      .toEqual(EXPECTED_KEYS(name));
-    expect(front!, `${file}: "name:" must be the file's own name — an agent is registered under it, and a skill under its directory (#150)`)
-      .toMatch(new RegExp(`^name:[ \\t]+${name}[ \\t]*$`, 'm'));
+    // Ahead of the key-set check on purpose (#312): a file whose description has simply been deleted fails
+    // the key set first, and is then explained by the wrong message — "a frontmatter key outside the expected
+    // set … `disable-model-invocation` switches the skill off" — when what happened is that the one line
+    // reaching every turn's context is gone. Counting the description keys first lets that branch speak.
     const descriptionKeys = lines.filter((l) => DESCRIPTION_KEY.test(l)).length;
     expect(descriptionKeys, descriptionKeys === 0
       ? `${file} needs a description — it is the only line that reaches every turn's context`
       : `${file}: exactly one description key, in any spelling a loader accepts — the rail reads the first, a loader reads the last or refuses the file (#150)`)
       .toBe(1);
+    expect(lines.filter((l) => TOP_LEVEL_KEY.test(l)).map((l) => TOP_LEVEL_KEY.exec(l)![1]).sort(), `${file}: a frontmatter key outside the expected set — the loader acts on keys no description check reads, and "disable-model-invocation" or a never-matching "paths" switches the skill off (#150)`)
+      .toEqual(EXPECTED_KEYS(name));
+    expect(front!, `${file}: "name:" must be the file's own name — an agent is registered under it, and a skill under its directory (#150)`)
+      .toMatch(new RegExp(`^name:[ \\t]+${name}[ \\t]*$`, 'm'));
     expect(front!, `${file}: the one description key is the literal "description:" followed by whitespace on the same line — "description:Open …" loses its trigger clause in the loader (#150)`)
       .toMatch(/^description:[ \t]+\S/m);
-    expect(description, `${file} needs a description — it is the only line that reaches every turn's context`)
-      .not.toBeNull();
+    // No `description !== null` check here (#312): the assertion above is `frontmatter()`'s own capture in a
+    // weaker spelling, so once it passes the capture has matched and the check could never fire. The call
+    // sites that read a description WITHOUT that assertion in front of them keep theirs.
     expect(description!, 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
     expect(front!, `${file}: the description continues onto an indented line, blank lines or not — one physical line, so the line a reader sees is the whole trigger (#150)`)
       .not.toMatch(new RegExp(`^description:[^\\n]*${CONTINUATION}`, 'm'));
@@ -3019,7 +3232,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     const upstreamToken = HASH_IN_UPSTREAM_TEXT[name];
     if (upstreamToken) {
       expect(description!, `${file} no longer carries "${upstreamToken}" — drop its HASH_IN_UPSTREAM_TEXT entry`).toContain(upstreamToken);
-      expect(description!, `${file}: "${upstreamToken}" loads only because the same value carries ": ", which makes the loader's repair pass quote the line — that precondition is gone`).toMatch(/: /);
+      expect(repairPassRuns(description!), `${file}: "${upstreamToken}" loads only because a ": " appears BEFORE it, which makes the loader's repair pass quote the line — the "#" now comes first, so the plain parse succeeds on the truncated text and everything after it is silently dropped (#312)`).toBe(true);
     }
     expect(upstreamToken ? description!.replace(upstreamToken, '') : description!, `${file}: " #" ends the description for a YAML loader — everything after it never reaches a turn's context (#150)`)
       .not.toMatch(/(^|\s)#/);
@@ -3105,8 +3318,16 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   it('every skill and agent in the allow-list has a description pin, and nothing else does (#150)', () => {
     const names = FRONTMATTER_FILES.map(([n]) => n).sort();
     expect(Object.keys(DESCRIPTIONS).sort(), 'add the pin in the same pull request as the skill').toEqual(names);
-    expect(PROJECT_SKILLS, 'the project-written set — it must include the two body-railed skills')
-      .toEqual(expect.arrayContaining(['open-pr', 'add-guard-rail']));
+    // The project-written skills, held to the rule the DESCRIPTIONS docstring states in prose: their pin
+    // carries the trigger clause itself, not only the subject (#312). This used to assert that PROJECT_SKILLS
+    // contained `open-pr` and `add-guard-rail`, which is a restatement of the object literal two hundred lines
+    // above — it could not fail, and `PROJECT_SKILLS` was read nowhere else. A vendored file's description is
+    // upstream's sentence and is pinned as it stands; these six are ours, so "Use when"/"Use before" is a rule
+    // we can actually keep.
+    expect(PROJECT_SKILLS.length, 'the project-written set must not be empty — every skill reading as vendored means the allow-list lost its `null` markers').toBeGreaterThan(0);
+    for (const n of PROJECT_SKILLS)
+      expect(DESCRIPTIONS[n].source, `${n} is project-written: its pin must hold the trigger clause ("Use when …"/"Use before …"), not only the subject — the clause is what decides whether the skill loads for the run that needs it (#150)`)
+        .toMatch(/Use (when|before)/);
     // No per-file map may hold a dead key: a file that is no longer in the allow-list.
     expect(names, 'HASH_IN_UPSTREAM_TEXT names a file the allow-list does not').toEqual(expect.arrayContaining(Object.keys(HASH_IN_UPSTREAM_TEXT)));
     expect(names, 'NEGATION_EXEMPT names a file the allow-list does not').toEqual(expect.arrayContaining(Object.keys(NEGATION_EXEMPT)));
@@ -3114,9 +3335,40 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     // Each negation exemption is for a phrase; if upstream drops it, the exemption fails loudly rather than going stale.
     for (const [name, phrase] of Object.entries(NEGATION_EXEMPT)) {
       const [, file] = FRONTMATTER_FILES.find(([n]) => n === name)!;
-      expect(frontmatter(file).description, `${name} is exempt from the negation check for its ${phrase} — drop its NEGATION_EXEMPT entry when that text is gone`)
+      const { description } = frontmatter(file);
+      // Guarded first (#312): vitest's `expect(null, 'msg').toMatch(re)` throws "`.toMatch()` expects to
+      // receive a string, but got object" and DISCARDS the custom message, so a file that lost its
+      // description failed here loudly but anonymously — naming neither the file nor the reason.
+      expect(description, `${file} has no description line to read — its NEGATION_EXEMPT entry cannot be checked`).not.toBeNull();
+      expect(description!, `${name} is exempt from the negation check for its ${phrase} — drop its NEGATION_EXEMPT entry when that text is gone`)
         .toMatch(phrase);
     }
+  });
+
+  it('the ` #` exemption reads ordering, not presence: a "#" ahead of the first ": " is not exempt (#312)', () => {
+    // The live shape — a `: ` well ahead of the upstream token. The plain parse throws on the colon, the
+    // repair pass double-quotes the line, and the whole description reaches the turn's context.
+    expect(repairPassRuns('Use this agent when reviewing code changes in a pull request: see PR #1234 for the shape')).toBe(true);
+    // #312's reproduction: the same single token moved ahead of the first `: `, with the anchored pin prefix
+    // intact — the shape an upstream re-vendor produces. The plain parse succeeds on "… (see PR", the repair
+    // never runs, and every trigger clause after the `#` is gone. This is the case the old `toMatch(/: /)`
+    // assertion called exempt, with the whole file green.
+    const reproduction = 'Use this agent when reviewing a pull request (see PR #1234) to identify: silent failures';
+    expect(repairPassRuns(reproduction)).toBe(false);
+    // And the old assertion written out, so the difference is pinned rather than remembered: `toMatch(/: /)`
+    // is satisfied by that same string. This is the whole of #312 — the check was green on the one input it
+    // existed to refuse, and a run could only find out by driving the real loader.
+    expect(/: /.test(reproduction), 'the retired presence check called the reproduction exempt').toBe(true);
+    // No `: ` at all: nothing can make the plain parse throw, so the `#` is read as a comment and the rest is
+    // dropped — exempt on the old check the moment upstream reworded around its colon.
+    expect(repairPassRuns('Use this agent when reviewing changes for PR #1234')).toBe(false);
+    // A `#` that opens no comment, because no whitespace precedes it: the same reading as the ` #` check the
+    // exemption is carved out of, so the two cannot disagree about where a value ends.
+    expect(repairPassRuns('Use this agent on issue#5 when a diff: needs review')).toBe(true);
+    // The value the exemption is actually consulted for, read from the file rather than written out here, so
+    // this self-test fails with the rail if upstream reorders it rather than passing on a stand-in.
+    const [, file] = FRONTMATTER_FILES.find(([n]) => n === 'silent-failure-hunter')!;
+    expect(repairPassRuns(frontmatter(file).description!)).toBe(true);
   });
 
   it.each(FRONTMATTER_FILES)('%s\'s description still names the job it triggers on (#150)', (name, file) => {
@@ -4553,7 +4805,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   const ROUTINE_PROMPT_BUDGET = 21_422;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3
+  const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3; → 10,034 again, no net change: rule 4's pointer at the round cap (#310, 28 bytes), paid for by shortening STEP 2's §4 and rule 1's §5 pointers to the `the review-pr skill` form rule 3 already used — so the prompt now spells the skill four ways (the full path in rule 3, `the review-pr skill §N`, the same without the article, and rule 4's bare `review-pr §7`) and the full path survives exactly once, in rule 3 — which nothing pins, so it is a description of today rather than a guarantee. Tidying the short forms back to full paths would cost 28 bytes with nothing left to pay them
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');

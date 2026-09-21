@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, gapLetters, Y1_CEW, Y2_CEW } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, gapLetters, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
+import type { SentenceType } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
 // Deterministic RNG (mulberry32)
@@ -1265,5 +1266,352 @@ describe('Reception number patterns (#299 slice 1)', () => {
         expect([...answers].sort(), `d${d} must draw both odd and even`).toEqual(d === 3 ? ['even', 'odd'] : ['no', 'yes']);
       }
     });
+  });
+});
+
+// #299 slice 3: Year 2 grammar and spelling. The generic suite already checks that the answer is among the
+// options, that options are unique and that each difficulty draws more than a handful of distinct cards. What
+// it cannot infer is the two things these topics ARE: that the root really changes (or the topic is `y1-suffix`
+// under another name), that the wrong spelling a child actually writes is on the card, and that the word the
+// card asks for is the only word on it that could be that class. Counts as well as values, per #361.
+describe('Year 2 grammar and spelling (#299 slice 3)', () => {
+  const topic = (id: string) => TOPICS.find(x => x.id === id)!;
+
+  describe('y2-suffix-root', () => {
+    it('every bank entry changes the root, and its two wrong spellings are distinct and wrong', () => {
+      expect(SUFFIX_ROOT.length).toBeGreaterThan(8);
+      for (const [root, suf, ans, rule, naive, misrule] of SUFFIX_ROOT) {
+        expect(ans, `${root} + ${suf}`).not.toBe(root + suf);      // the whole topic: y1-suffix is the no-change case
+        expect(naive, `${root} + ${suf}`).toBe(root + suf);        // and the no-change spelling is the trap on the card
+        expect(new Set([ans, naive, misrule]).size, `${root} + ${suf}`).toBe(3);
+        expect(ans).toMatch(/^[a-z]+$/);
+        if (rule === 'drop-e') expect(root.endsWith('e'), root).toBe(true);
+        if (rule === 'y-to-i') { expect(root.endsWith('y'), root).toBe(true); expect(ans, root).toContain('i'); }
+        if (rule === 'double') expect(ans.slice(0, root.length + 1), root).toBe(root + root[root.length - 1]);
+      }
+    });
+    it('the rules unlock by difficulty, and every unlocked rule is actually drawn', () => {
+      const t = topic('y2-suffix-root'), r = rng(2998);
+      const ruleOf = (prompt: string) => {
+        const [root, suf] = prompt.replace(' = ?', '').split(' + ');
+        const row = SUFFIX_ROOT.find(e => e[0] === root && e[1] === suf);
+        expect(row, prompt).toBeTruthy();
+        return row![3];
+      };
+      const allowed: Record<number, string[]> = { 1: ['drop-e'], 2: ['drop-e', 'double'], 3: ['drop-e', 'double', 'y-to-i'] };
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const drawn = new Set<string>();
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          const rule = ruleOf(q.prompt);
+          expect(allowed[d], `d${d} drew ${rule}`).toContain(rule);
+          drawn.add(rule);
+          // The trap is on every card, and it is never the answer: a card offering only correct-looking
+          // spellings teaches nothing about the rule.
+          const row = SUFFIX_ROOT.find(e => e[2] === q.answer)!;
+          expect(q.options).toContain(row[4]);
+          expect(q.answer).not.toBe(row[4]);
+          expect(q.options.length, 'three bubbles: the rule admits exactly two mistakes').toBe(3);
+        }
+        expect([...drawn].sort(), `d${d} must reach all of its rules`).toEqual([...allowed[d]].sort());
+      }
+    });
+  });
+
+  describe('y2-wordclass', () => {
+    it('no word in the bank belongs to two classes, and every one of them is in its own sentence', () => {
+      expect(WORD_CLASSES.length).toBeGreaterThan(8);
+      const classOf = new Map<string, string>();
+      for (const row of WORD_CLASSES) {
+        const [sent, ...words] = row;
+        expect(new Set(words).size, sent).toBe(4);
+        for (let i = 0; i < 4; i++) {
+          const w = words[i], cls = WORD_CLASS_NAMES[i];
+          expect(sent.toLowerCase(), `${w} is not in its own sentence`).toMatch(new RegExp(`\\b${w}\\b`));
+          // The card's distractors are the row's other three words, so a word that is a noun here and a verb
+          // there would put two defensible answers on one card (`play`, `run`, `smile` — kept out for this).
+          expect(classOf.get(w) ?? cls, `${w} is used as both a ${classOf.get(w)} and a ${cls}`).toBe(cls);
+          classOf.set(w, cls);
+        }
+      }
+    });
+    it('asks noun/verb at d1, adds adjective at d2, reaches adverb at d3 — and draws each one it allows', () => {
+      const t = topic('y2-wordclass'), r = rng(2999);
+      const allowed: Record<number, string[]> = { 1: ['noun', 'verb'], 2: ['noun', 'verb', 'adjective'], 3: [...WORD_CLASS_NAMES] };
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const drawn = new Set<string>();
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          const cls = q.prompt.replace('Which word is the ', '').replace('?', '');
+          expect(allowed[d], `d${d} asked for a ${cls}`).toContain(cls);
+          drawn.add(cls);
+          const row = WORD_CLASSES.find(e => e[0] === (q.visual as { text: string }).text)!;
+          expect(row, q.prompt).toBeTruthy();
+          // Every option is one of that sentence's own four words, and the answer is the one in the column
+          // asked for — not merely *a* word of that class from somewhere in the bank.
+          expect([...q.options].sort()).toEqual([...row.slice(1)].sort());
+          expect(q.answer, `${row[0]} — ${cls}`).toBe(row[WORD_CLASS_NAMES.indexOf(cls as typeof WORD_CLASS_NAMES[number]) + 1]);
+          expect(q.hint, 'the hint names the class, never the answer').toBe(`Slice the ${cls}`);
+        }
+        expect([...drawn].sort(), `d${d} must reach all of its classes`).toEqual([...allowed[d]].sort());
+      }
+    });
+  });
+
+  // Part B. These two banks are judged against English the test states for itself, never against their own
+  // label column (#377): a broader imperative list than the bank uses, the `What …!`/`How …!` rule, the
+  // auxiliaries and the time phrases. A row mislabelled in the bank fails here; a row that agrees with itself
+  // and with nothing else does not pass.
+  describe('y2-sentencetype', () => {
+    // Deliberately wider than the bank: a command the bank adds later must start with an imperative verb, and
+    // a statement must not. Copying the bank's six first words here would check nothing.
+    const IMPERATIVES = new Set(['close', 'wash', 'put', 'line', 'pass', 'tidy', 'stop', 'open', 'sit', 'stand',
+      'listen', 'look', 'bring', 'take', 'fetch', 'wait', 'come', 'go', 'write', 'draw', 'eat', 'turn', 'hold',
+      'give', 'help', 'clean', 'tell', 'show', 'read', 'share', 'count', 'find', 'pick', 'hang', 'feed']);
+    const END: Record<SentenceType, string> = { statement: '.', question: '?', command: '.', exclamation: '!' };
+
+    it('every sentence carries the surface marks of the type it claims, and nothing else', () => {
+      const byType = new Map<SentenceType, number>();
+      expect(new Set(SENTENCE_TYPES.map(e => e[0])).size, 'no sentence twice').toBe(SENTENCE_TYPES.length);
+      for (const [sent, type] of SENTENCE_TYPES) {
+        byType.set(type, (byType.get(type) ?? 0) + 1);
+        expect(sent.endsWith(END[type]), sent).toBe(true);
+        const first = sent.split(' ')[0].toLowerCase();
+        // Only the `What …!` / `How …!` form is an exclamation sentence; `Look out!` is a command said loudly,
+        // and `What is your name?` opens the same way but ends `?`, so both marks have to agree.
+        expect(/^(What|How) .*!$/.test(sent), `${sent} — exclamation form`).toBe(type === 'exclamation');
+        expect(IMPERATIVES.has(first), `${sent} — starts with an imperative verb`).toBe(type === 'command');
+        // A question ends with `?` and nothing else does, so `What is your name?` cannot read as an
+        // exclamation and `Close the door.` cannot read as a statement.
+        expect(sent.includes('?'), sent).toBe(type === 'question');
+        expect(sent.includes('!'), sent).toBe(type === 'exclamation');
+      }
+      for (const t of SENTENCE_TYPE_NAMES) expect(byType.get(t) ?? 0, `${t} rows`).toBeGreaterThanOrEqual(4);
+    });
+
+    it('the types unlock by difficulty, the bubbles are only the unlocked ones, and each is drawn', () => {
+      const t = topic('y2-sentencetype'), r = rng(3001);
+      const allowed: Record<number, string[]> = { 1: ['statement', 'question'], 2: ['statement', 'question', 'command'], 3: [...SENTENCE_TYPE_NAMES] };
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const drawn = new Set<string>();
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          expect(allowed[d], `d${d} drew ${q.answer}`).toContain(q.answer);
+          drawn.add(q.answer);
+          // A bubble a child has not been taught yet is not a distractor, it is noise.
+          expect([...q.options].sort(), `d${d} bubbles`).toEqual([...allowed[d]].sort());
+          const row = SENTENCE_TYPES.find(e => e[0] === (q.visual as { text: string }).text)!;
+          expect(row, q.say).toBeTruthy();
+          expect(q.answer, row[0]).toBe(row[1]);
+        }
+        expect([...drawn].sort(), `d${d} must reach all of its types`).toEqual([...allowed[d]].sort());
+      }
+    });
+  });
+
+  describe('y2-tense', () => {
+    const PAST_PHRASE = /\b(yesterday|last week|last night|ago)\b/i;
+    const PRESENT_PHRASE = /\b(every day|every morning|now)\b/i;
+    const AUX: Record<string, 'present' | 'past'> = { is: 'present', are: 'present', was: 'past', were: 'past' };
+
+    it('every verb has four distinct forms, each shaped the way its column says', () => {
+      expect(TENSE_VERBS.length).toBeGreaterThan(8);
+      let irregular = 0;
+      for (const [base, present, past, ing] of TENSE_VERBS) {
+        expect(new Set([base, present, past, ing]).size, base).toBe(4);   // four bubbles, four different words
+        for (const w of [base, present, past, ing]) expect(w, base).toMatch(/^[a-z]+$/);
+        expect(present.endsWith('s'), `${base} → ${present}`).toBe(true);
+        expect(ing.endsWith('ing'), `${base} → ${ing}`).toBe(true);
+        expect(past, base).not.toBe(base);                                // `put`/`cut` would give two right answers
+        if (!past.startsWith(base)) irregular++;
+      }
+      expect(irregular, 'the bank teaches irregular pasts too, not just -ed').toBeGreaterThanOrEqual(4);
+    });
+
+    it('every frame has one gap, and the tense it claims is the one its own words carry', () => {
+      const cols = new Set<number>();
+      for (const [frame, col, tense] of TENSE_FRAMES) {
+        expect(frame.match(/___/g)?.length, frame).toBe(1);
+        cols.add(col);
+        if (PAST_PHRASE.test(frame)) expect(tense, frame).toBe('past');
+        if (PRESENT_PHRASE.test(frame)) expect(tense, frame).toBe('present');
+        const aux = frame.split(' ').map(w => AUX[w.toLowerCase()]).find(Boolean);
+        if (col === 3) {
+          // The progressive needs an auxiliary, and that auxiliary is what says which tense it is — the two
+          // past-progressive frames carry no time phrase at all, so `was` against `is` is the whole signal.
+          expect(aux, `${frame} — a progressive frame needs is/are/was/were`).toBeTruthy();
+          expect(tense, frame).toBe(aux);
+        } else {
+          expect(aux, `${frame} — a simple frame must not carry an auxiliary`).toBeUndefined();
+          expect(tense, frame).toBe(col === 2 ? 'past' : 'present');
+        }
+      }
+      expect([...cols].sort(), 'all three forms are reachable from the frames').toEqual([1, 2, 3]);
+    });
+
+    it('d1 names the tense on simple forms, d2 adds the progressive, d3 asks for the form itself', () => {
+      const t = topic('y2-tense'), r = rng(3002);
+      const frameOf = (text: string) => TENSE_FRAMES.find(f => {
+        const [head, tail] = f[0].split('___');
+        return text.startsWith(head) && text.endsWith(tail);
+      });
+      for (const d of [1, 2] as Difficulty[]) {
+        const drawn = new Set<string>(), progressive = new Set<boolean>();
+        for (let i = 0; i < N; i++) {
+          const q = t.gen(d, r);
+          expect(q.prompt).toBe('Present or past?');
+          expect([...q.options].sort(), 'two bubbles: present or past').toEqual(['past', 'present']);
+          const text = (q.visual as { text: string }).text;
+          expect(text, 'the sentence on the card is finished, not gapped').not.toContain('___');
+          const f = frameOf(text)!;
+          expect(f, text).toBeTruthy();
+          expect(q.answer, text).toBe(f[2]);
+          // The gap really was filled from the column the frame asks for, so `He was walked` never ships.
+          const verb = TENSE_VERBS.find(v => text === f[0].replace('___', v[f[1]]));
+          expect(verb, `${text} — filled from column ${f[1]}`).toBeTruthy();
+          drawn.add(q.answer); progressive.add(f[1] === 3);
+        }
+        expect([...drawn].sort(), `d${d} must draw both tenses`).toEqual(['past', 'present']);
+        expect([...progressive].sort(), `d${d} progressive frames`).toEqual(d === 1 ? [false] : [false, true]);
+      }
+      const cols = new Set<number>();
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(3, r);
+        const f = TENSE_FRAMES.find(x => x[0] === q.prompt)!;
+        expect(f, q.prompt).toBeTruthy();
+        cols.add(f[1]);
+        const verb = TENSE_VERBS.find(v => v.includes(q.answer))!;
+        expect(verb, q.answer).toBeTruthy();
+        expect(q.answer, `${q.prompt} needs column ${f[1]}`).toBe(verb[f[1]]);
+        // All four forms of that one verb, so the wrong bubbles are the mistakes a child actually writes.
+        expect([...q.options].sort(), q.prompt).toEqual([...verb].sort());
+      }
+      expect([...cols].sort(), 'd3 must ask for all three forms').toEqual([1, 2, 3]);
+    });
+  });
+});
+
+// ---------- #299 slice 4: vertical line symmetry, and repeating patterns ----------
+describe('Year 2 symmetry and patterns (#299 slice 4)', () => {
+  const topic = (id: string) => { const t = TOPICS.find(x => x.id === id); expect(t, id).toBeTruthy(); return t!; };
+
+  /**
+   * The oracle for a symmetry card, written from the picture rather than from the recipe that built it: how
+   * many mirror pairs disagree across the vertical centre line. Zero is a line of symmetry; anything else is
+   * not, and the count is also the difficulty ladder (three squares out at d1, one at d3).
+   */
+  function mirrorMismatches(grid: string[]): number {
+    const w = [...grid[0]].length;
+    let n = 0;
+    for (const row of grid) { const ch = [...row]; for (let c = 0; c < w / 2; c++) if (ch[c] !== ch[w - 1 - c]) n++; }
+    return n;
+  }
+
+  it('the yes/no answer is read off the picture, and the ladder is one, two or three squares out', () => {
+    const t = topic('y2-symmetry'), r = rng(4001);
+    const expected: Record<number, number> = { 1: 3, 2: 2, 3: 1 };
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const answers = new Set<string>();
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(d, r);
+        if (q.visual?.type !== 'symmetry') continue;
+        const grid = q.visual.grid;
+        const w = [...grid[0]].length;
+        expect(w % 2, 'a mirror line needs an even width').toBe(0);
+        expect(w, `${grid}`).toBeGreaterThanOrEqual(2);
+        for (const row of grid) {
+          expect([...row].length, `every row is ${w} wide: ${grid}`).toBe(w);
+          expect(/^[#.]+$/.test(row), `only squares and gaps: ${row}`).toBe(true);
+        }
+        expect(grid.join('').includes('#'), `a blank card is not a picture: ${grid}`).toBe(true);
+        const off = mirrorMismatches(grid);
+        expect(['yes', 'no'], q.answer).toContain(q.answer);
+        expect(q.answer === 'yes', `${grid} has ${off} squares out of place`).toBe(off === 0);
+        if (off) expect(off, `d${d} breaks the symmetry by ${expected[d]}`).toBe(expected[d]);
+        expect([...q.options].sort(), 'two bubbles: yes or no').toEqual(['no', 'yes']);
+        expect(q.wide, 'yes/no are words, so both bubbles are the wide kind whichever is the answer (#369)').toBe(true);
+        answers.add(q.answer);
+      }
+      expect([...answers].sort(), `d${d} must draw both a symmetric and an asymmetric picture`).toEqual(['no', 'yes']);
+    }
+  });
+
+  it('the letter cards are the mirror test itself: d1 never asks them, and only the answer is symmetric', () => {
+    // The test's own list, not the generator's: a capital that reads the same folded down the middle.
+    const SYMMETRIC = new Set('AHIMOTUVWXY');
+    const t = topic('y2-symmetry'), r = rng(4002);
+    for (let i = 0; i < N; i++) expect(t.gen(1, r).visual?.type, 'd1 is the drawn picture only').toBe('symmetry');
+    const kinds = new Set<string>();
+    for (const d of [2, 3] as Difficulty[]) {
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(d, r);
+        kinds.add(q.visual?.type ?? 'letters');
+        if (q.visual) continue;
+        expect(q.prompt).toBe('Which letter has a vertical line of symmetry?');
+        expect(q.options.length, 'four letters to choose from').toBe(4);
+        expect(SYMMETRIC.has(q.answer), `${q.answer} is not symmetric`).toBe(true);
+        for (const o of q.options) {
+          expect(/^[A-Z]$/.test(o), `a capital letter: ${o}`).toBe(true);
+          if (o !== q.answer) expect(SYMMETRIC.has(o), `${o} is a second defensible answer`).toBe(false);
+        }
+      }
+    }
+    expect([...kinds].sort(), 'd2–d3 draw both kinds of card').toEqual(['letters', 'symmetry']);
+  });
+
+  /**
+   * What each pattern object *looks* like, written here rather than imported: a card is readable only if no
+   * two objects on it share a silhouette, and a rail that took the generator's own table would agree with it
+   * by definition. Colour is decoration on these cards; shape is the thing being read (#299 review B4).
+   */
+  const SILHOUETTE: Record<string, string> = {
+    '🔴': 'circle', '🟦': 'square', '🔺': 'triangle', '⭐': 'star',
+    '❤️': 'heart', '🌙': 'crescent', '🔶': 'diamond', '🐟': 'fish',
+  };
+
+  /** The smallest repeat the visible objects agree with — read off the card, with the gap ignored. */
+  function periodOf(items: string[], gap: number): number {
+    for (let p = 1; p < items.length; p++) {
+      let ok = true;
+      for (let i = 0; i + p < items.length && ok; i++) if (i !== gap && i + p !== gap && items[i] !== items[i + p]) ok = false;
+      if (ok) return p;
+    }
+    return items.length;
+  }
+
+  it('the missing object is the only one the pattern allows, with two whole repeats always visible', () => {
+    const t = topic('y2-patterns'), r = rng(4003);
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const gaps = new Set<boolean>();
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(d, r);
+        expect(q.visual?.type).toBe('sentence');
+        const items = (q.visual as { text: string }).text.split(' ');
+        const gap = items.indexOf('_');
+        expect(gap, `exactly one gap: ${items.join(' ')}`).toBeGreaterThanOrEqual(0);
+        expect(items.filter(x => x === '_').length, 'exactly one gap').toBe(1);
+        const p = periodOf(items, gap);
+        expect(gap, `two whole repeats of ${p} before the gap: ${items.join(' ')}`).toBeGreaterThanOrEqual(p * 2);
+        expect(q.answer, `the pattern predicts ${items[gap - p]}: ${items.join(' ')}`).toBe(items[gap - p]);
+        expect(items.slice(0, gap).includes(q.answer), 'the answer is an object the child has already seen').toBe(true);
+        // Every other object in the pattern is on the card: the near miss is the mistake worth catching.
+        for (const o of new Set(items.filter(x => x !== '_' && x !== q.answer))) expect(q.options, `${o} is in the pattern`).toContain(o);
+        for (const o of q.options) if (o !== q.answer) expect(o, 'a decoy never also fits').not.toBe(items[gap - p]);
+        expect(q.prompt).toBe(gap === items.length - 1 ? 'What comes next?' : 'Which one is missing?');
+        gaps.add(gap === items.length - 1);
+        // #299 review B4: the bubbles must differ by more than hue. The pool used to be eight coloured
+        // circles, so 54% of d1 cards put two of 🔴 🔵 🟡 🟢 🟣 🟠 on the card at once — to a colour-blind
+        // child that is one repeated circle and two identical bubbles, a card with no answer rather than a
+        // hard one. The silhouettes below are the test's own list, not the generator's, so adding a glyph
+        // to the pool without a distinct shape fails here.
+        for (const o of [...items.filter(x => x !== '_'), ...q.options]) expect(SILHOUETTE, `${o} is not in the shape-distinct pool`).toHaveProperty(o);
+        const shapes = q.options.map(o => SILHOUETTE[o]);
+        expect(new Set(shapes).size, `two bubbles share a silhouette: ${q.options.join(' ')}`).toBe(q.options.length);
+        const drawn = new Set(items.filter(x => x !== '_').map(o => SILHOUETTE[o]));
+        expect(drawn.size, `the pattern itself repeats a silhouette: ${items.join(' ')}`).toBe(new Set(items.filter(x => x !== '_')).size);
+      }
+      expect([...gaps].sort(), d === 3 ? 'd3 hides an object inside the pattern too' : `d${d} always hides the last object`)
+        .toEqual(d === 3 ? [false, true] : [true]);
+    }
   });
 });

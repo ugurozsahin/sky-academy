@@ -9,7 +9,7 @@ import type { Session } from '../game/session';
 import type { Arena } from '../game/arena';
 import type { Tracer } from '../game/tracing';
 import type { Memory } from '../game/memory';
-import type { Duel, DuelPlayer } from '../game/duel';
+import type { Duel, DuelPlayer, DuelTally } from '../game/duel';
 import type { TrailSkin } from '../game/shop';
 
 /** A live bubble as the e2e spec reads it (a subset of arena `Bubble`). */
@@ -96,6 +96,12 @@ export interface DuelState {
    * challenge completed. The save gains `coins + dojoCoins` (#16 item 5).
    */
   dojoCoins: number;
+  /**
+   * What the finished match added to this topic's lifetime `hits`/`tries` tally — the rounds **Player 1**
+   * answered, one try each, that being the only seat the shared profile can claim (`duelAccuracy()`).
+   * `{ hits: 0, tries: 0 }` until the match ends, and after a match Player 1 never sliced in (#16 item 5).
+   */
+  taught: DuelTally;
 }
 
 /** The `window.__sna` hooks set by the Ninja Duel screen (#16): every action names the player it is for. */
