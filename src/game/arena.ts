@@ -57,6 +57,7 @@ export class Arena {
   private trail: { x: number; y: number; t: number }[] = [];
   private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
   private activeId: number | null = null;         // the pointer that is down on THIS canvas, null = no stroke (#16: two arenas share one window)
+  private strokeStale = false;                    // #331: a freeze happened since `lastPt` — the next move resumes the stroke, it does not continue it
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
@@ -228,17 +229,26 @@ export class Arena {
   private onDown = (e: PointerEvent) => {
     if (this.paused || this.frozen) return;
     this.activeId = e.pointerId; this.moved = 0; this.downPos = this.pos(e); this.lastPt = this.downPos;
+    this.strokeStale = false;                       // #331: a stroke that starts here spans no freeze — never skip its first segment
     this.trail = [{ ...this.downPos, t: performance.now() }];
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     const b = this.bubbleAt(this.downPos.x, this.downPos.y);
     if (b) this.hitBubble(b, false);
   };
   private onMove = (e: PointerEvent) => {
-    if (this.activeId === null || this.paused || this.frozen) return;
+    if (this.activeId === null || this.paused || this.frozen) { if (this.activeId === e.pointerId) this.strokeStale = true; return; }
     if (e.pointerId !== this.activeId) return;      // a second finger's drift is not this stroke (#16: the move half of the rule below)
+    const p = this.pos(e);
+    // #331: a freeze is not a pause mid-stroke, it is a gap in the game. A finger that never lifts kept
+    // `lastPt` from before the outcome hold, and a wave ending is reveal() → clearWave() → the next
+    // spawnWave(), so the first move afterwards closed a segment drawn a whole wave ago — a line straight
+    // across the new wave, the right answer among it. Re-seating `lastPt` during the freeze is not enough
+    // (the finger may have drifted, and a perfectly still one sends no move at all): the first move after a
+    // freeze RESUMES the stroke, seating a fresh start point and slicing nothing. The stroke itself lives on.
+    if (this.strokeStale) { this.strokeStale = false; this.lastPt = p; this.trail = [{ ...p, t: performance.now() }]; return; }
     // Hit-test against the last pointer position, not the visual trail: the trail fades after 280ms,
     // so a finger that pauses mid-stroke (or slow pointer events) must not lose its slice segment.
-    const p = this.pos(e); const prev = this.lastPt;
+    const prev = this.lastPt;
     const d = Math.hypot(p.x - prev.x, p.y - prev.y); this.moved += d; if (d < 2) return;
     this.lastPt = p;
     this.trail.push({ ...p, t: performance.now() });
@@ -294,6 +304,10 @@ export class Arena {
     let dt = (now - this.last) / 1000; this.last = now;
     if (dt > 0.5) dt = 0.016;                       // tab was hidden: don't jump
     dt = Math.min(dt, 0.1);
+    // #331: the home of the rule. A freeze lasting at least one frame stales the stroke whichever field caused
+    // it and whoever set it — `paused` is assigned from the play screen and has no entry point of its own — so
+    // a finger held perfectly still through the outcome hold, sending no pointermove at all, is caught here.
+    if (this.paused || this.frozen) this.strokeStale = true;
     if (!this.paused) { this.time += dt; for (let left = dt; left > 0; left -= 1 / 60) this.update(Math.min(left, 1 / 60), now); }
     this.cull(now);
     this.render(now);
