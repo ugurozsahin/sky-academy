@@ -13,7 +13,7 @@ export default async function run(p) {
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForSelector('.home');
   await p.click('#rewards');
-  await p.waitForSelector('.cert-row');
-  await p.locator('.cert-row').scrollIntoViewIfNeeded();   // the section sits below the sticker album, off the first screen
+  await p.waitForSelector('.cert-row:not(.duel-row)');
+  await p.locator('.cert-row:not(.duel-row)').scrollIntoViewIfNeeded();   // the section sits below the sticker album, off the first screen
   await p.waitForTimeout(300);
 }

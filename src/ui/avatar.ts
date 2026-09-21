@@ -1,7 +1,7 @@
 import { ALL_AVATARS, avatarById, MASTER, SENSEI_LINES, welcomeLine } from '../avatars';
 import { TOPICS } from '../curriculum';
 import { masterProgress } from '../game/sensei';
-import { load, safeRecord, save, type TopicProgress } from '../storage';
+import { load, NAME_MAX, safeRecord, save, type TopicProgress } from '../storage';
 import { sfx, say } from '../audio';
 import { $, $$, esc, render } from './dom';
 
@@ -79,7 +79,7 @@ export function nameScreen(go: () => void) {
     <header class="brand"><span class="kanji">忍</span><h1>Sky Ninja<br><span>Academy</span></h1><p class="tag" id="name-heading" tabindex="-1">What's your name?</p></header>
     ${wizardProgress(2, 3)}
     <div class="name-preview" style="--glow:${avatar.glow}"><span class="figure"><img src="${avatar.img}" alt=""></span><b>${esc(avatar.name)}</b></div>
-    <label class="name-row"><span>Your name</span><input id="name" maxlength="14" autocomplete="off" aria-describedby="name-hint" placeholder="Ninja" value="${esc(d.name)}"></label>
+    <label class="name-row"><span>Your name</span><input id="name" maxlength="${NAME_MAX}" autocomplete="off" aria-describedby="name-hint" placeholder="Ninja" value="${esc(d.name)}"></label>
     <p class="name-hint" id="name-hint" aria-live="polite">${hasName(d.name) ? '' : NAME_HINT}</p>
     <button id="go" class="btn primary big" ${canStart(d.avatar, d.name) ? '' : 'disabled'}>Let's go! ⚔️</button>
   </section>`, 'bg-sky');
