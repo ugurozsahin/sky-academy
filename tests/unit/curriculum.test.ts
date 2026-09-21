@@ -433,15 +433,21 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       // #324 item 1. PR #303 closed `f` on this stem and checked no neighbour of it, so the same card went on
       // offering three more: `poon` is a sexual slur. One row each, so dropping any single word goes red.
       ['poor', 3, 'n'], ['poor', 3, 't'], ['poor', 3, 'd'], ['poor', 3, 's'], ['poor', 3, 'h'],
-      ['put', 2, 'd'], ['pass', 2, 'p']] as [string, number, string][]) {
+      ['put', 2, 'd'], ['pass', 2, 'p'],
+      // Review of #324: `poop` and `puss` were left in `EVERYDAY`, so the stems were closed by the list that
+      // says "this is a word" — one prune from reopening, with the disjointness rail below green either way
+      // (see its comment). A row each, on every reachable gap, is what actually pins them.
+      ['poor', 3, 'p'], ['push', 3, 's'], ['pass', 1, 'u']] as [string, number, string][]) {
       expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} belongs in AVOID, not the word lists`).toBe(false);
       expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
     }
     // #324 item 3: the one general statement, rather than another row of cases. `AVOID` says "not on a card"
-    // and `GAP_WORDS` says "another right answer"; a word in both is blocked for the wrong reason, and a
-    // curriculum change that drops it from the word lists unblocks it with nothing red. `poos` and `pooh` were
-    // that case until #324 — in `EVERYDAY`, so the `poo_` stem happened to be closed by the list that exists to
-    // say a word is a word. This assertion is what stops the next crudity being filed the same way.
+    // and `GAP_WORDS` says "another right answer"; a word in *both* is blocked for the wrong reason, and a
+    // curriculum change that drops it from the word lists unblocks it with nothing red. That co-membership is
+    // the whole of what this catches — the state a half-done move out of `EVERYDAY` leaves behind.
+    // **It does not catch a crudity filed only into the word lists**, which is how `poos`, `pooh`, `poop` and
+    // `puss` were filed before #324 and its review: absent from `AVOID`, they satisfied disjointness, and this
+    // line was green on the state #324 exists to fix. The rows above are what stop that one, stem by stem.
     for (const w of AVOID) expect(GAP_WORDS.has(w), `${w} is in AVOID, so it may not also be a word the lists carry`).toBe(false);
     expect(AVOID.size, 'and the set is not empty, which would make the line above vacuous').toBeGreaterThan(20);
     // Exhaustive over both lists and the days, every index: the pool the generators draw from is clean and still deep enough.
