@@ -1,13 +1,15 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { workflowFiles } from './helpers/sources';
 
 /**
  * WORKFLOW RAILS (#321, split out of `guardrails.test.ts`) — everything that reads `.github/workflows/**`
  * and `playwright.config.*`. Unchanged by the split.
  *
- * `workflow()` reads from disk rather than through Vite's glob, which does not reach `.github/`: an empty
- * read would make every rail here pass vacuously, which is the exact failure they exist to prevent. The
- * helper asserts its own length for that reason (`tests/unit/helpers/sources.ts`).
+ * The readers come from `tests/unit/helpers/sources.ts`, which is where every rail file gets them: Vite's
+ * glob does not reach `.github/`, so these files are read from disk, and `workflowFiles()` throws rather than
+ * returning `[]` — an empty read would make every rail here pass vacuously, which is the exact failure they
+ * exist to prevent.
  *
  * A handful of workflow assertions still sit inside the `guard rails` describe in `guardrails.test.ts`,
  * interleaved with `src/` rails in the same `it`. Extracting those would mean rewriting them, and #321 is
@@ -118,9 +120,7 @@ describe('the e2e server proves it is serving the build on disk, not a leftover 
  * Prove it red: put any one of the OLD pins back into any workflow file.
  */
 describe('no workflow pins an action major GitHub has deprecated for Node 20 (#111)', () => {
-  const dir = new URL('../../.github/workflows/', import.meta.url);
-  const files = readdirSync(dir).filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
-  const workflows = files.map((f) => ({ f, text: readFileSync(new URL(f, dir), 'utf8') }));
+  const workflows = workflowFiles().map(({ name, text }) => ({ f: name, text }));
 
   const RETIRED = [
     'actions/checkout@v4',

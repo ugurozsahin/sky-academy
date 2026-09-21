@@ -85,6 +85,13 @@ your first finding and the only one you can report.
    finding: runs here routinely take 45 minutes, and one in flight is what healthy looks like.
    `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` has why the stamp exists and what it is not.
 
+   **A pulse reading `stopped: limit` is a finding, not a pass, however fresh it is.** STEP 0 of both prompts
+   tells a run that meets a usage limit to write exactly that and stop, so the body is well-formed, recent and
+   means the run did none of its work — the one shape that looks healthiest and is not. Read it as a finding
+   every time, and say which routine and what it had done; a routine hitting the limit every hour writes a
+   fresh pulse every hour, and a check that scores freshness alone would report health all day. Two in a row
+   from the same routine is worth saying plainly: that is a budget problem, not a run problem.
+
    **The reviewer routine has a pulse too, and this check is the same one (#327).** Read the body of the
    issue titled `reviewer: heartbeat` and apply everything above to it unchanged — the same bar, the same
    reading of `IN PROGRESS`, the same "an open issue is not evidence of a pulse". Its cron is `17 * * * *`,

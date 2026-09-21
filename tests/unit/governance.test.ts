@@ -2777,7 +2777,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   const ROUTINE_PROMPT_BUDGET = 21_419;   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 9_998;   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (which `review-pr` §5 carries), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted
+  const REVIEWER_PROMPT_BUDGET = 9_992;   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -3037,14 +3037,54 @@ describe('the reviewer routine keeps a pulse, and something reads it (#327, #320
     expect(p, 'the working path stamps on the way in (#314\'s shape, applied here)').toContain('IN PROGRESS');
     expect(p, 'and the cheap exit writes one too, or an idle reviewer is indistinguishable from a dead one')
       .toContain('nothing waiting');
+    // PR #417 review, note 2: a bare `nothing waiting` cannot tell zero-waiting from a listing that failed —
+    // a 403, a rate limit or an `[]` for the wrong reason all produce a fresh, healthy-looking pulse. Carrying
+    // the count makes it a value rather than a claim, and a listing that failed cannot produce an N.
+    expect(p, 'the cheap-exit pulse must carry what it counted, not just its conclusion')
+      .toMatch(/nothing waiting \(N open, 0 waiting\)/);
     expect(p, 'a stamp is not a pass: the finished snapshot must replace it as the last thing a run does')
       .toMatch(/very last thing you do/);
     expect(p, 'replace, never append — the same record discipline as the developer pulse (#98)')
       .toMatch(/replace rather than append|Replace, never append/i);
+    // PR #417 review, B2: for THIS pulse the title clause is the whole of the hook's enforcement. There is no
+    // number to fall back to — the issue does not exist until a run creates it — so an update that omits the
+    // title is invisible to `heartbeatAppend`, and the title-less update is the ordinary shape. The clause is
+    // therefore load-bearing prose, and a byte squeeze that deletes it must go red, not green. This pull
+    // request already records one such squeeze being attempted and reverted.
+    expect(p, 'STEP 1 must tell the run to send the title with every write, or the hook never sees this pulse')
+      .toMatch(/send its title with every write/);
+    // PR #417 review, B3: "one line per PR and its verdict" is a body `heartbeatAppend` refuses — SUMMARY_LINE
+    // counts every timestamped line and denies at two. A run that timestamps each one has its LAST write
+    // refused, the pulse keeps the `IN PROGRESS` stamp, and 90 minutes later the watchdog reports a dead run
+    // against a run that finished. The developer prompt has a fenced template for exactly this reason.
+    expect(p, 'STEP 1 must give the snapshot a shape the hook accepts, not just name its contents')
+      .toMatch(/\*\*one\*\* timestamped line/i);
+    expect(p, 'and say what happens if a run timestamps every line, or the shape reads as decoration')
+      .toMatch(/refused as an append/i);
     // STEP 0 used to say the opposite in as many words, and a run reading it would write nothing at all.
     expect(p, 'STEP 0 must no longer claim this routine has no heartbeat').not.toContain('This routine has no heartbeat issue');
     expect(p, 'and it must record a limit stop in the pulse, which is the run most likely to vanish')
       .toContain('stopped: limit');
+  });
+
+  /**
+   * PR #417 review, B1. STEP 0 of both prompts mandates `<UTC> — stopped: limit`, and check 3 distinguished
+   * exactly two abnormal shapes: a stale snapshot and an ageing `IN PROGRESS` stamp. A fresh `stopped: limit`
+   * body is neither, so it scored as healthy — and a routine that meets the limit every hour writes a fresh,
+   * well-formed pulse every hour. The paragraph this commit adds claims the blindness is closed, so the claim
+   * and the check have to agree.
+   *
+   * Prove it red: delete the `stopped: limit` sentence from the watchdog's check 3.
+   */
+  it('a `stopped: limit` pulse is a finding, not a pass — the shape both prompts mandate', () => {
+    const w = flat(doc('docs/WATCHDOG-PROMPT.md'));
+    expect(w, 'the watchdog must know the shape STEP 0 writes, or it scores a limit-stopped run as healthy')
+      .toContain('stopped: limit');
+    expect(w, 'and say plainly it is a finding — freshness is exactly what makes this one look fine')
+      .toMatch(/`stopped: limit`[^.]{0,80}is a finding, not a pass/i);
+    // Both STEP 0s write it, so the check covers both routines or it covers the wrong half.
+    for (const p of ['docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md'])
+      expect(doc(p), `${p} STEP 0 must still write the shape the watchdog now looks for`).toContain('stopped: limit');
   });
 
   it('the watchdog reads it, with the reviewer cadence and the two differences named', () => {

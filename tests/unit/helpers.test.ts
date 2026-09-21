@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { code, inDir, SOURCES, workflow } from './helpers/sources';
+import { code, inDir, SOURCES, workflow, workflowFiles } from './helpers/sources';
 
 /**
  * The readers four rail files share (#321). Until the split each of them was a `const` at the top of one
@@ -19,7 +19,9 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     for (const named of ['/src/game/arena.ts', '/src/ui/play.ts', '/src/curriculum/maths.ts', '/src/storage.ts'])
       expect(paths, `${named} is read by name in a rail, so the glob must reach it`).toContain(named);
     // A glob that resolves but returns empty strings is the same failure wearing a passing shape.
-    for (const [path, src] of Object.entries(SOURCES).slice(0, 5))
+    // Every entry, not a slice: blanking everything *except* the first five left this 4/4 green
+    // (PR #417 review, note 6), which is the vacuous pass this very rail is named for.
+    for (const [path, src] of Object.entries(SOURCES))
       expect(src.length, `${path} read as an empty string`).toBeGreaterThan(0);
   });
 
@@ -27,15 +29,30 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     const game = inDir('/src/game/');
     expect(game.length, '/src/game/ holds several modules').toBeGreaterThan(1);
     expect(game.length, 'and is not the whole of src/').toBeLessThan(Object.keys(SOURCES).length);
-    expect(inDir('/src/nothing-here/'), 'a directory that does not exist yields nothing, not everything').toEqual([]);
+    // It throws rather than returning `[]` (PR #417 review, note 3): a path spelled wrongly — a leading slash
+    // dropped, a folder renamed — would otherwise make every rail that reads it green for ever.
+    expect(() => inDir('/src/nothing-here/'), 'a directory that does not exist must be loud, not empty').toThrow(/leading slash/);
+    expect(() => inDir('src/game/'), 'the missing-leading-slash case this exists for').toThrow();
   });
 
   it('workflow() reads a real file from disk, since Vite\'s glob does not reach .github/', () => {
-    for (const name of ['ci.yml', 'review-gate.yml']) {
+    // `as const`, because `workflow()` takes the literal union of the files that exist (PR #417 review,
+    // note 5) — a typo is now a compile error rather than a runtime ENOENT, and this line proves it.
+    for (const name of ['ci.yml', 'review-gate.yml'] as const) {
       const text = workflow(name);
       expect(text.length, `${name} read as empty — every workflow rail would then pass vacuously`).toBeGreaterThan(200);
       expect(text, `${name} does not look like a workflow`).toMatch(/\bjobs:/);
     }
+  });
+
+  it('workflowFiles() finds every workflow, and is loud rather than empty if it finds none', () => {
+    const found = workflowFiles();
+    expect(found.length, 'the repository has several workflows; zero means the directory moved').toBeGreaterThanOrEqual(3);
+    for (const { name, text } of found) {
+      expect(name).toMatch(/\.ya?ml$/);
+      expect(text.length, `${name} read as empty`).toBeGreaterThan(100);
+    }
+    expect(found.map((w) => w.name), 'ci.yml is read by name elsewhere, so it must be in here too').toContain('ci.yml');
   });
 
   it('code() strips comments and leaves the code, so a comment naming a ban does not trip it', () => {

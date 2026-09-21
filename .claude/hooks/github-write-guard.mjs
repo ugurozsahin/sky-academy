@@ -28,31 +28,6 @@ export const ownerMarker = ({ body }) => {
     : null;
 };
 
-/**
- * Which write is a write to the run's pulse.
- *
- * Every prompt identifies it by **title**: `docs/ROUTINE-PROMPT.md` STEP 5 says to replace the body of the
- * issue titled `routine: heartbeat` and to *create it* with that snapshot if it does not exist, and
- * `docs/WATCHDOG-PROMPT.md` reads it by title too. This hook used to identify it by number alone, so a
- * heartbeat closed and recreated — which the prompt tells a run to do — would come back with a new number and
- * escape every rule below, permanently and silently, with the whole suite green (#353).
- *
- * The number stays as the fallback, and matching on the title closes the other half of the same hole: the
- * `create` that establishes a fresh pulse used to be exempt from every body rule.
- *
- * **The bound, stated because it is the part that is not enforced.** An `update` sends no title unless it is
- * changing one, so after a recreate the ordinary body replacement — `{method:'update', issue_number:<new>,
- * body:<snapshot>}` — is a write this hook cannot recognise (PR #393 review, B2). Nothing here can fix that:
- * the hook sees one call and has no way to learn the new number. `docs/ROUTINE-PROMPT.md` STEP 5 therefore
- * sends the title with the body, which is what makes the rule reach the pulse; a run that omits it is not
- * guarded, and `tests/unit/hooks.test.ts` pins both the instruction and this gap rather than implying it is shut.
- *
- * The title is compared **normalised**: it is typed by a run out of prose, and `Routine: Heartbeat`, a
- * trailing space invisible in the GitHub UI, or `routine: heartbeat (run log)` would each otherwise read as a
- * different issue. `method` is required, and its absence is not the heartbeat: a call with no `method` is not
- * an `issue_write` at all but one of the comment tools this hook also matches, and gating an ordinary comment
- * on #62 behind the pulse's body rules would be wrong.
- */
 const REVIEWER_HEARTBEAT_TITLE = 'reviewer: heartbeat';
 
 /**
@@ -60,9 +35,33 @@ const REVIEWER_HEARTBEAT_TITLE = 'reviewer: heartbeat';
  * because it was the only moving part nothing watched, and the two are deliberately not one issue — one body
  * with two writers, and the developer's `- second item:` shape does not fit a routine that has no second item.
  *
- * So the record disciplines are split: `heartbeatAppend` below applies to **both**, because replace-never-append
- * is the same rule for any pulse; `requiredLines` applies to the developer's alone, via `heartbeatWrite`.
- * Matching on title is what makes that separation free — a reviewer pulse inherits nothing by construction.
+ * So the record disciplines are split: `heartbeatAppend` applies to **both**, because replace-never-append is
+ * the same rule for any pulse; `requiredLines` applies to the developer's alone, via `heartbeatWrite` below.
+ *
+ * **Identity, and how much of it is enforced — which differs between the two pulses.** Every prompt names a
+ * pulse by **title**: STEP 5 of `docs/ROUTINE-PROMPT.md` and STEP 1 of `docs/REVIEWER-PROMPT.md` both say to
+ * replace the body of the issue titled `<name>: heartbeat`, and to create it if it does not exist;
+ * `docs/WATCHDOG-PROMPT.md` reads both by title. This hook used to match by number alone, so a pulse closed
+ * and recreated — which the prompts tell a run to do — came back with a new number and escaped every rule
+ * below, permanently and silently, with the whole suite green (#353). Matching the title fixed that, and
+ * closed the `create` exemption in the same expression.
+ *
+ * But an `update` sends no title unless it is *changing* one, so a title-less body replacement is a write
+ * this hook cannot recognise, and it cannot learn the number from one call.
+ *
+ *   - For the **developer** pulse that is a post-recreate corner: `ROUTINE_HEARTBEAT` catches every ordinary
+ *     write, and only a recreated issue's title-less updates escape.
+ *   - For the **reviewer** pulse the title is the *whole* of the enforcement. There is no number to fall back
+ *     to — the issue does not exist until a run creates it, so no constant here could name it — and the
+ *     title-less update is the ordinary shape, not an edge case (PR #417 review, B2). What holds it shut is
+ *     one clause of prose, STEP 1's "send its title with every write", and that clause is therefore pinned by
+ *     `tests/unit/governance.test.ts` as load-bearing rather than left to survive the next byte squeeze.
+ *
+ * The title is compared **normalised**: it is typed by a run out of prose, and `Routine: Heartbeat`, a
+ * trailing space invisible in the GitHub UI, or `routine: heartbeat (run log)` would each otherwise read as a
+ * different issue. `method` is required, and its absence is not a pulse: a call with no `method` is not an
+ * `issue_write` at all but one of the comment tools this hook also matches, and gating an ordinary comment on
+ * #62 behind the pulse's body rules would be wrong.
  */
 const pulseWrite = ({ method, issue_number, title }) => {
   if (method !== 'create' && method !== 'update') return null;
@@ -81,8 +80,9 @@ const heartbeatWrite = (input) => pulseWrite(input) === HEARTBEAT_TITLE;
  * overwrites the pulse these rules exist to protect. A non-string body is the same defect from the other side:
  * `.match` on it throws, and a `PreToolUse` hook that throws exits non-zero with empty stdout, which is a
  * non-blocking hook error — so the write proceeds. That was unreachable only by the accident that a sibling
- * rule denied first. One helper for all three rules, so neither failure can come back one rule at a time
- * (#359); `.claude/hooks/bash-guard.mjs` already turns a throw into a deny, and this is the same principle.
+ * rule denied first. `heartbeatAppend` reads its own body — it spans both pulses and this helper does not —
+ * so the same two guards are written out there; `check` wraps the lot in a `try` as well, which is what
+ * stops either failure coming back one rule at a time (#359).
  */
 const heartbeatBody = (input) => (heartbeatWrite(input) && typeof input.body === 'string' ? input.body : null);
 
