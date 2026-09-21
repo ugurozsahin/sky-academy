@@ -399,19 +399,49 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * answers to "Which is lighter?"). So the too-discriminating direction is asserted here, on the fields this
  * key actually reads, rather than delegated to a rail that cannot see them.
  *
- * No rail here names a topic, so the tenth one is covered the day it ships.
+ * **What these rails do not cover, stated rather than implied (round 2, B1): a question carried by `options`.**
+ * `asked()` omits them and so does the key, so on `intervalCompare` — whose own comment reads *"No hint: the
+ * bubbles **are** the durations"* — the oracle shares the key's blind spot and the two agree that fifteen
+ * different comparisons are one card (`y2-duration` at d2: 22 keys, 18 covering more than one card). That is
+ * not a regression, it is `main`'s behaviour, and it is **outside #412 by the issue's own words** — *"It does
+ * not ask for `options` in the key. They are shuffled and re-drawn per draw; including them switches the
+ * repeat-avoidance off altogether"* — which is why `the key ignores every field that carries presentation`
+ * below pins the exclusion for the forty-odd topics where the extra bubbles really are decoys. Keying them
+ * where they are the question needs a signal from the generator that it is not a decoy pool, and that is
+ * **#451**, not this pull request.
+ *
+ * So the claim is: no rail here names a topic, and every topic **whose question is not carried by its
+ * `options`** is covered the day it ships. The unqualified version of that sentence is the mistake this file
+ * corrects two paragraphs above, and it would have been this file's own.
  */
 describe('the repeat key holds the whole question (#412)', () => {
   const D1 = 1 as const;
   const yearOf = (t: { year: string }) => YEARS.find(y => y.id === t.year)!;
   /**
-   * Everything the card asks: what a child reads on it, hears from it, and must slice. No decoration — and
-   * a `' · '` list is a **set**, because three generators build one from a per-draw shuffle (B1). This is
-   * written from the `Question` contract on purpose, rather than read off `repeatKey`: it is the requirement,
-   * and the key is the thing under test.
+   * Everything the card asks: what a child reads on it, hears from it, and must slice. No decoration — and a
+   * delimited list is a **set**, because three generators build one from a per-draw shuffle (round 1, B1).
+   *
+   * The field list is written from the `Question` contract rather than read off `repeatKey`, so it is the
+   * requirement and the key is the thing under test. **The normalisation is deliberately wider than the key's**
+   * (round 2, B2): `contentList` knows only `' · '`, and round 2 showed that a copy of that one separator here
+   * asserts itself — change `soundQ`'s `listen` join to `', '` and round 1's defect returns at 1.2% with every
+   * rail green, because the oracle would fail to normalise it in exactly the same way. Four separators here
+   * against the key's one means a *narrowing* of `contentList`, including a generator switching separator, goes
+   * red on `two cards that ask the same thing never take two keys` below.
+   *
+   * Being coarser than the key can only produce a red, never hide one, and the red is informative: it needs two
+   * questions that are permutations of each other's list items, which is a card a child cannot tell apart by
+   * reading either. Today there are none — `', '` appears in four sentence topics' prose and collides with
+   * nothing.
+   *
+   * What neither this nor the key sees: `options`. See the describe header — `y2-duration` and #451.
    */
   const asked = (q: Question) => {
-    const set = (s: string) => (s.includes(' · ') ? s.split(' · ').sort().join(' · ') : s);
+    const LIST_SEPARATORS = [' · ', ', ', '; ', ' | '];
+    const set = (s: string) => {
+      for (const sep of LIST_SEPARATORS) if (s.includes(sep)) return s.split(sep).sort().join(sep);
+      return s;
+    };
     return [q.prompt, q.answer, set(q.hint ?? ''), set(q.listen ?? ''), (q.sequence ?? []).join('\u0001')].join('\u0000');
   };
   const playable = TOPICS.filter(t => t.input !== 'tracing');
@@ -487,6 +517,10 @@ describe('the repeat key holds the whole question (#412)', () => {
    * Per topic at d1: the generator's own consecutive-agreement rate, the rate a driven `Session` produces, and
    * how many distinct cards there are per distinct answer. Computed once — three of these numbers are wanted
    * by the discovery and by the assertion, and a second pass would double the cost of the file.
+   *
+   * **d1 only** (round 2, N5): these drive `nextQuestion` without answering, so the stage never advances and
+   * the difficulty never moves. The exact rails above do sweep d1/d2/d3, and round 2 checked d2/d3 here
+   * independently and found nothing, so this is a limit on the coverage rather than a hole under a claim.
    */
   const PAIRS = 1500;
   const stats = playable.map(t => {
@@ -503,14 +537,15 @@ describe('the repeat key holds the whole question (#412)', () => {
       if (asked(s.current!) === asked(prev)) sameCard++;
       prev = s.current!;
     }
-    const contents = new Set(cards.map(asked)).size;
+    const contents = new Set(cards.map(asked)).size, answers = new Set(cards.map(c => c.answer)).size;
     return {
       id: t.id,
       baseline: base / PAIRS,
       inSession: same / PAIRS,
       repeated: sameCard / PAIRS,
       contents,
-      perAnswer: contents / new Set(cards.map(c => c.answer)).size,
+      answers,
+      perAnswer: contents / answers,
     };
   });
   /**
@@ -523,15 +558,20 @@ describe('the repeat key holds the whole question (#412)', () => {
    * one prompt to one answer, so refusing the identical card refuses the answer and agreement is 0 by design.
    * It was `>= 10` in round 1 — a guess that happened to hold only while `asked()` counted `listen`'s word
    * order as content, which put the sound-hunt topics at 24 cards per answer instead of their real 4 (B1).
+   *
+   * `answers >= 2` keeps out a case that would run and pin nothing (round 2, N3): `y1-plurals` has one answer
+   * at d1, so both rates are 1.000 and the assertion reads `1.000 > 0.500` whatever `repeatKey` does.
    */
-  const measurable = stats.filter(s => s.perAnswer >= 4 && s.baseline * PAIRS >= 30);
+  const measurable = stats.filter(s => s.perAnswer >= 4 && s.answers >= 2 && s.baseline * PAIRS >= 30);
 
   it('the measurable set holds the topics this defect was found on', () => {
     const ids = measurable.map(s => s.id);
     expect(ids.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(10);
     // The two extremes of the issue's own table: the listening topics, where the key *was* the answer, and a
     // measurement topic, where the values live in `hint`. If either drops out of this set, the set is wrong.
-    for (const id of ['r-soundhunt', 'y1-soundhunt', 'y1-mass', 'y2-temp']) expect(ids).toContain(id);
+    // `y2-punct` is here because it, and the sound-hunt pair, scrape in at exactly 4.00 cards per answer
+    // (round 2, N2) — it is the one that would otherwise drop out of this rail in silence.
+    for (const id of ['r-soundhunt', 'y1-soundhunt', 'y2-punct', 'y1-mass', 'y2-temp']) expect(ids).toContain(id);
   });
 
   it.each(measurable.map(s => s.id))('%s: a driven session repeats an answer about as often as the generator does', (id) => {
@@ -539,6 +579,11 @@ describe('the repeat key holds the whole question (#412)', () => {
     // Half the generator's rate, not a fixed number: the point is that the sequence adds no signal of its own.
     // The measured gap before the fix was total — 0.000 against 0.061 on both sound-hunt topics — and after it
     // every topic in this set sits within a few percent of its baseline, so the floor is nowhere near either.
+    //
+    // Read this as a **backstop against total suppression, not a second independent net** (round 2, N1). With
+    // the pre-#412 key restored it reddens only the two sound-hunt topics: the seven measurement topics land at
+    // 0.52–0.87 against the 0.5 floor, `y2-temp` at 0.52 with 4% of margin. Rail 1 is what catches all nine,
+    // which is what the describe header says carries the load.
     expect(s.inSession, `in-session ${s.inSession.toFixed(3)} against the generator's ${s.baseline.toFixed(3)}`)
       .toBeGreaterThan(s.baseline * 0.5);
   });
@@ -551,7 +596,12 @@ describe('the repeat key holds the whole question (#412)', () => {
    * Topics with at least fifty distinct cards only, because `nextQuestion` gives up after five re-rolls and
    * serves what it has — correct behaviour, but on a three-card topic like `r-share` it makes a byte-identical
    * card about 1 transition in 700 (review round 1, note 2, pre-existing). Above fifty cards a give-up cannot
-   * account for anything at this scale, so the floor is a thousandth rather than a tolerance.
+   * account for anything at this scale.
+   *
+   * The bound is a thousandth, which over `PAIRS` transitions **is a tolerance of exactly one** (round 2, N6):
+   * 1/1500 = 0.00067 passes and two repeats do not. That is deliberate rather than tight — the broken state
+   * read 1.11%, sixteen repeats' worth — but it is a tolerance of one and not of zero, and saying otherwise
+   * was this comment's own overclaim.
    */
   const bigEnough = stats.filter(s => s.contents >= 50);
   it('the big-topic set is not empty, and holds the topics B1 was measured on', () => {

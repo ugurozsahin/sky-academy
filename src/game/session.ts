@@ -75,9 +75,12 @@ const visualKey = (v: Visual): string => {
  * driven through a real `Session` at d1, `r-soundhunt` repeated the target sound 0.000% of the time over 4000
  * pairs. A child who remembers the last answer was doing better than one who listens.
  *
- * `hint` and `listen` are therefore in the key — both are content wherever they are set. **`say` is not**, for
- * the reason `VISUAL_QUESTION` is an allowlist: it is the only one of the three that carries presentation as
- * well as content. `orderQ` speaks the numbers in their *shuffled* display order (`Slice the numbers from
+ * `hint` and `listen` are therefore in the key — both are content wherever they are set. **`say` is not**,
+ * because it is the only one of the three that carries presentation as well as content. (Not by analogy with
+ * `VISUAL_QUESTION`, which round 2's N7 rightly points out runs the other way: an omitted *visual type* costs
+ * a needless re-roll, which is safe, while an omitted *`Question` field* collapses two cards onto one key,
+ * which is the bug — twice now. A field goes in unless it is shown to carry presentation; a visual type stays
+ * out unless it is shown to carry the question.) `orderQ` speaks the numbers in their *shuffled* display order (`Slice the numbers from
  * smallest to biggest: 7, 2, 9`), which is re-shuffled per draw independently of the exercise, so folding it
  * in would put the same decoration into the card's identity that a per-draw `emoji` did. It costs nothing to
  * leave out: every topic whose question `say` carries also carries it in `listen` (`soundQ`) or `hint`
@@ -93,9 +96,22 @@ const visualKey = (v: Visual): string => {
  * repository's list separator and those three generators are the only places it appears. Normalised in the
  * key, never on the card — what the child reads is unchanged.
  *
+ * **`options` are not in the key, and that leaves one topic uncovered** (#412 review round 2, B1). The issue
+ * rules them out in its own words — they are shuffled and re-drawn per draw, so keying them switches the
+ * repeat-avoidance off for the forty-odd topics whose extra bubbles are decoys — but `intervalCompare`
+ * (`src/curriculum/maths.ts`) sets no `hint`, no `listen` and no visual, and its own comment says the bubbles
+ * *are* the durations. So `y2-duration` still reduces to `(prompt, answer)`: at d2, 22 keys for 3,000 draws
+ * with 18 of them covering more than one comparison. That is `main`'s behaviour, not a regression, and keying
+ * it needs a signal from the generator that its options are not a decoy pool — **#451**.
+ *
+ * `sequence` is not in the key either, which is safe only because every sequence generator encodes the order
+ * in `answer` (`orderQ`'s is the joined `sequence`) — an invariant pinned in `tests/unit/curriculum.test.ts`,
+ * noted here so both ends say so (round 2, N4).
+ *
  * Exported so the rails in `tests/unit/session.test.ts` can measure this key against the text a child reads
  * rather than against a copy of it, in both directions: different questions never share a key, and one
- * question never takes two.
+ * question never takes two. Those rails normalise lists over four separators against this one, deliberately,
+ * so that narrowing `contentList` goes red (round 2, B2).
  */
 const contentList = (s: string) => (s.includes(' · ') ? s.split(' · ').sort().join(' · ') : s);
 export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : ''].join('\u0000');
