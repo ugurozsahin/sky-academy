@@ -25,13 +25,24 @@ paths:
   approval that prompt offers is scoped to **that session**, so it never carries to the next scheduled run:
   PR #294 stalled 7h33m and PR #318 overnight, both on this very file.
   `docs/decisions/006-a-routine-never-writes-under-claude.md` has the documentation trail and the five
-  alternatives ruled out. Enforced in code: `claudeDir()` in `.claude/hooks/write-guard.mjs` denies a `Write`
-  or `Edit` under `.claude/` unless the checkout carries the gitignored `.owner-machine` marker, which a clone
-  never has, and refuses to write that marker through the same two tools. **That closes the obvious route, not
-  every route**: `.claude/hooks/bash-guard.mjs` has no rule for either path, so a shell write is not stopped
-  (#346). The marker is a switch, not a seal — the seal is that a routine has no reason to be writing here at
+  alternatives ruled out. Enforced in code, on the three routes a write can take, all asking one shared
+  question — `protectedKind()` in `.claude/hooks/paths.mjs`, so no two of them can come to disagree about
+  which paths count, the `.claude` directory itself and the marker included. The routes: `claudeDir()` in
+  `.claude/hooks/write-guard.mjs` for the `Write` and `Edit` tools; `claudeWrite()` in
+  `.claude/hooks/bash-guard.mjs` for the shell, so `sed -i` on this file is refused as surely as an `Edit` of
+  it (#346); and `filePath()` in `.claude/hooks/github-write-guard.mjs` for
+  `mcp__github__create_or_update_file`, `push_files` and `delete_file`, which commit a path straight to a
+  branch and so would land the same edit on the remote. None of them will bring the marker into existence,
+  `touch .owner-machine` included. The shell rule judges a target **by its spelling as well as by where it
+  lands**, because nothing tracks `cd`; which tools it reads as writing is the lists in `bash-guard.mjs`, not
+  restated here, since a copy of them would drift. **What no command-line rule sees**, and no guard claims to:
+  a script that opens the file itself (`python3 - <<EOF`, `node -e`), a target assembled at run time
+  (`$DIR/settings.json`), a working directory changed to a computed path, or a tool absent from those lists —
+  `git apply`, `patch`, `ed` and `rsync` among them. The marker is a switch, not a seal — the
+  seal is that a routine has no reason to be writing here at
   all. `PreToolUse` runs before the permission system, so the call is refused in milliseconds rather than
-  waiting hours for a person. **Reads are untouched.** What a run does
+  waiting hours for a person. **Reads are untouched**: a tool only counts in command position, so `cat`,
+  a `grep` whose *pattern* is `touch`, `git diff` and a `.claude/` path as the *source* of a copy all pass. What a run does
   instead: say on the issue what needed changing here and why, label it `owner-session`, take the next item.
   The owner's own checkout carries the marker; he creates it by hand, once, and nothing else does.
   That is the same answer the bullet below already gives for the one-home reduction; this makes it true of
@@ -43,8 +54,11 @@ paths:
   #161 rule, says so where a reviewer reads it.
 - **The run's heartbeat snapshot (issue #62) must say whether it took a second item and, if not, which of the
   four #97 eligibility conditions failed (#239).** Enforced in code: a `PreToolUse` hook in
-  `.claude/settings.json` denies an `issue_write` update to issue #62 whose body has no `- second item: `
-  line. The four eligibility conditions themselves (are more than three reviews waiting, is
+  `.claude/settings.json` denies an `issue_write` create or update to the heartbeat whose body has no
+  `- second item: ` line. It finds the heartbeat by **title** — `routine: heartbeat` — falling back to the
+  number for an update that carries none, because STEP 5 tells a run to recreate the issue if it is gone and a
+  recreated one carries a new number (#353); issue #62 is the one it has today. The four eligibility conditions
+  themselves (are more than three reviews waiting, is
   there time left in the run, are the second item's files disjoint from the first's, did the first item
   actually finish) have no such enforcement yet — nothing stops a run from taking an ineligible second item,
   only from failing to say so. Their home is `docs/ROUTINE-PROMPT.md` STEP 3; `CLAUDE.md` points there. `docs/ROUTINE-PROMPT.md` carries a pointer here for the
@@ -60,22 +74,28 @@ paths:
   same reason: the pull request body names the issue the query returned and which of the three documented ways
   it took (a `playtest` label or an unplayable game, the owner's own words on the issue, an open `watchdog`
   issue), and the heartbeat carries a `- query top pick: ` line saying the same. Enforced in code for the
-  heartbeat half only: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to issue
-  #62 whose body has no such line. What the hook cannot catch, the same gap `- second item:` has: it reads
+  heartbeat half only: the same `PreToolUse` hook denies an `issue_write` create or update to the heartbeat
+  whose body has no such line. The two mandatory lines are **one rule over one list** since #359 — a third line
+  is an entry in that list, not a third copied rule, and a body missing both is refused once, naming both,
+  rather than denied twice for the same write.
+  What the hook cannot catch, the same gap `- second item:` has: it reads
   that the line is *there*, never that the issue named is the one the query would return or that the way past
   the order was really available — both are the reviewer's, against the query re-run on the current state. The
   pull request half has no enforcement at all; a rail would have to re-run the query from CI, which would make
   the build depend on live issue state. **And the hook matches `mcp__github__*` only**, while STEP 1 steers
   authored bodies to the REST API (#207), so it is enforced on the path the prompt steers away from — the
   same bypass `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` records for `- second item:`.
-  Two further gaps, true of both lines: **`method: 'create'` is exempt**, and STEP 5 permits a create for a
-  heartbeat that does not exist, so the one write that establishes a fresh pulse escapes every body rule;
-  and **the STEP 1 sentinel satisfies the rule forever** — nothing obliges STEP 5 to replace `pending` with
-  a real value, and the watchdog greps for `IN PROGRESS`, never for these lines. Both are the reviewer's to
-  catch until something pins them (#353). Their home is `docs/ROUTINE-PROMPT.md` STEP 3.
+  The `method: 'create'` exemption these lines used to carry is closed (#353): STEP 5 permits a create for a
+  heartbeat that does not exist, so the one write that establishes a fresh pulse was the one escaping every
+  body rule, and a create carries the title the hook now matches on. **One gap is left, true of both lines:
+  the STEP 1 sentinel satisfies them forever** — nothing obliges STEP 5 to replace `pending` with a real value,
+  and the watchdog greps for `IN PROGRESS`, never for these lines. That one is still the reviewer's to catch;
+  pinning it needs a rule about what STEP 5 must replace, not about which write the hook watches, and that is
+  a decision rather than a patch. Their home is `docs/ROUTINE-PROMPT.md` STEP 3.
 - **The routine heartbeat (issue #62) must be overwritten each run, never appended to (records have readers,
-  #98).** Enforced in code: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` update to
-  issue #62 whose body carries two or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — the
+  #98).** Enforced in code: a `PreToolUse` hook in `.claude/settings.json` denies an `issue_write` create or
+  update to the heartbeat (issue #62 today, or whatever number carries its title — #353) whose body carries
+  two or more of the heartbeat's own `YYYY-MM-DDTHH:MMZ — ` summary lines — the
   structural signature of a new summary tacked onto the old one instead of replacing it. **This is not a
   collapse like the two bullets above**: records-have-readers
   spans several kinds of record (the PR body, an issue or `docs/decisions/`, `git log`), of which this hook

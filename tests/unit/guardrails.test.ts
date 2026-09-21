@@ -1763,9 +1763,13 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
     expect(git('ls-files', '--', MARKER).out, `${MARKER} is tracked — the hook would allow every write`).toBe('');
   });
 
+  // The constant moved to `.claude/hooks/paths.mjs` in PR #393: the shared path decision lives there so that
+  // each guard module exports nothing but its own rules, which is what lets the #359 wiring rail hold without
+  // exempting helpers by name. What this rail pins is unchanged — one spelling, in one place, matching
+  // `.gitignore` — only the file it reads.
   it('the hook and .gitignore name the same marker, so neither can drift alone', () => {
     expect(file('.gitignore'), 'the marker must be ignored by name').toContain(`\n${MARKER}\n`);
-    expect(file('.claude/hooks/write-guard.mjs'), 'the marker constant moved or was renamed')
+    expect(file('.claude/hooks/paths.mjs'), 'the marker constant moved or was renamed')
       .toContain(`export const OWNER_MARKER = '${MARKER}'`);
   });
 
@@ -1777,13 +1781,23 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
       .toMatch(/protected path/i);
     expect(rules, 'the enforcement, named where a reader can check it')
       .toContain('`.claude/hooks/write-guard.mjs`');
+    // #346 and the PR #393 review: a write can arrive through a file tool, through the shell, or through an
+    // MCP file write that commits straight to a branch. Naming fewer guards than the code has is how the
+    // prose goes back to covering one route and claiming all of them.
+    for (const guard of ['`.claude/hooks/bash-guard.mjs`', '`.claude/hooks/github-write-guard.mjs`'])
+      expect(rules, `${guard} is enforcement the rule does not name`).toContain(guard);
+    expect(rules, 'and the one shared decision, or three guards can drift into three answers')
+      .toContain('`.claude/hooks/paths.mjs`');
     expect(rules, 'what a run does instead, or a denial leaves it with nowhere to go').toContain('owner-session');
     expect(rules, 'reads must stay allowed, or a run stops reading its own rules').toMatch(/reads are untouched/i);
-    // Round-1 review of PR #344: the first draft claimed a run "cannot grant itself" the permission, which is
-    // true of Write and Edit and not of the shell (#346). A rule may not claim more than it enforces.
-    expect(rules, 'the claim must be bounded by what the hook actually sees')
-      .toMatch(/closes the obvious route, not\s+every route/i);
-    expect(rules, 'and name the issue that holds the rest').toContain('#346');
+    // Round-1 review of PR #344: the first draft claimed a run "cannot grant itself" the permission, which was
+    // true of Write and Edit and not of the shell. #346 closed the shell route, so the bound moved rather than
+    // went away — a rule may still not claim more than it enforces, and what neither guard can see is stated
+    // here rather than left for the next reader to discover.
+    expect(rules, 'the claim must still be bounded by what the hooks actually see')
+      .toMatch(/no command-line rule sees/i);
+    expect(rules, 'and say concretely what falls outside it, or the bound is a disclaimer')
+      .toMatch(/opens the file itself|assembled at run time/i);
     expect(rules, 'and point at the decision record').toContain('docs/decisions/006-a-routine-never-writes-under-claude.md');
   });
 

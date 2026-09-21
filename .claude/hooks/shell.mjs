@@ -99,7 +99,8 @@ export function parse(cmd) {
   return out;
 }
 
-const base = (word) => word.split('/').pop();
+/** The tool a word would run, ignoring where it was found: `/usr/bin/sed` and `sed` are the same tool. */
+export const base = (word) => word.split('/').pop();
 
 /**
  * Every statement the command would run, plus the script handed to `sh -c '…'` or `eval …`, wherever in the

@@ -1,43 +1,11 @@
-import { existsSync, realpathSync } from 'node:fs';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { deny, isMain, readInput } from './io.mjs';
-
-/** A path with its **existing** prefix canonicalised. `realpathSync` for the reason `io.mjs` gives: on macOS
- *  a checkout reached through `/var` → `/private/var` otherwise compares unequal to itself. The target of a
- *  write usually does not exist yet, so the walk stops at the deepest ancestor that does and keeps the rest
- *  verbatim — which is why a symlink at the *last* segment is still judged on its own name. */
-const canonical = (path) => {
-  let head = resolve(path);
-  const tail = [];
-  for (;;) {
-    try { return resolve(realpathSync(head), ...tail); } catch { /* keep climbing */ }
-    const up = resolve(head, '..');
-    if (up === head) return resolve(path);
-    tail.unshift(relative(up, head));
-    head = up;
-  }
-};
-
-const dir = (root) => canonical(root || process.env.CLAUDE_PROJECT_DIR || process.cwd());
+import { canonical, projectDir, protectedKind } from './paths.mjs';
 
 /** Layer-0 guard for Write and Edit (#101): the root WORKLOG.md is retired (#98). `docs/worklog/` is not. */
 const worklog = (target, base) => target === resolve(base, 'WORKLOG.md')
   ? 'WORKLOG.md at the repo root is retired (#98): nothing writes to it again. See docs/worklog/.'
   : null;
-
-/** Present only in the owner's working copy: gitignored, so it is never in a clone (#342). */
-export const OWNER_MARKER = '.owner-machine';
-
-/**
- * Resolved `target` is inside `base`. `relative()` rather than a string prefix, so `.claudex/` is not read as
- * `.claude/`, and `..` is tested as a whole path segment — `.claude/..hidden` climbs nowhere and is inside.
- * Lexical only: a symlink *under* `base` pointing out, or in, is judged on its spelling. The root itself is
- * canonicalised in `dir()`, which is the case that has actually bitten this repository.
- */
-const under = (base, target) => {
-  const rel = relative(base, target);
-  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
-};
 
 /**
  * `.claude/` is a Claude Code **protected path**, like `.git/`: a write there is never auto-approved, and no
@@ -51,18 +19,16 @@ const under = (base, target) => {
  * Denying here ends the stall, because `PreToolUse` runs *before* the permission system: the call is refused
  * in milliseconds instead of waiting hours for a person. Reads are untouched.
  *
- * **What this covers, exactly: the `Write` and `Edit` tools.** `.claude/hooks/bash-guard.mjs` has no rule for
- * either path, so a shell write is not stopped here (#346). The marker is therefore a switch, not a seal: it
- * marks a checkout as the owner's, and refusing to *write* it through these tools keeps the obvious route
- * closed. Claiming more than that would be the rail not holding what it says.
+ * **Which paths count is `protectedKind()`'s, not this function's** — `.claude/hooks/bash-guard.mjs` asks the
+ * same question of the paths a shell command would write, so the two guards cannot drift apart about it
+ * (#346). What differs is the sentence: a run refused here met a permission prompt, and a run refused in the
+ * shell did not. The marker is a switch, not a seal; the seal is that a routine has no reason to write here.
  */
 export const claudeDir = (target, base) => {
-  const marker = resolve(base, OWNER_MARKER);
-  const inClaude = under(resolve(base, '.claude'), target);
-  if (!inClaude && target !== marker) return null;
-  if (existsSync(marker)) return null;                    // the owner is at the keyboard; both are his to edit
-  const name = relative(base, target);
-  return inClaude
+  const kind = protectedKind(target, base);
+  if (kind === null || kind === 'root') return null;            // a file tool cannot name a directory
+  const name = target.startsWith(base + sep) ? target.slice(base.length + 1) : target;
+  return kind === 'claude'
     ? `${name} is under .claude/, a protected path (#342): a write there raises a permission prompt an `
       + 'unattended run cannot answer, and it stalled PR #294 for 7h33m and PR #318 overnight. Do not retry, '
       + 'and do not look for another route to the same edit. Say on the issue what needed changing here and '
@@ -81,7 +47,7 @@ export const claudeDir = (target, base) => {
 // through on purpose; that is the tool's payload arriving malformed, not this rule failing to decide.
 export const check = (input, root) => {
   try {
-    const base = dir(root);
+    const base = projectDir(root);
     if (typeof input?.file_path !== 'string') return null;
     const target = canonical(resolve(base, input.file_path));
     return worklog(target, base) ?? claudeDir(target, base);
