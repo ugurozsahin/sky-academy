@@ -775,11 +775,29 @@ describe('profiles: siblings on one device (#20)', () => {
   // because `sessionProfile()` returns the latched profile and never consults the index, and profile 1 leaked
   // from one test into the next (#330 round 2, item 2).
   const freshDevice = () => {
+    // `reset()` first, for the cache and both write latches. `setActiveProfile` used to clear those too, as a
+    // side effect of re-entering the active profile, and this helper leaned on it — but a re-entry now keeps
+    // the cached blob whenever a latch says it diverges from disk (#380 review round 4, B1), so a test that
+    // ended under a throwing `setItem` would hand the next one its coins and its fault. The switch below is
+    // still what ends the session's *binding*, which `reset()` deliberately does not touch.
+    reset();
     for (const id of PROFILE_IDS) localStorage.removeItem(saveKeyFor(id));
     localStorage.removeItem(INDEX);
-    expect(setActiveProfile('p1'), 'the teardown checks its own switch').toBe(true);   // clears the cache, both write latches and the session's profile
+    expect(setActiveProfile('p1'), 'the teardown checks its own switch').toBe(true);   // clears the session's profile
     localStorage.removeItem(INDEX);  // ...and a one-profile device stores no index
   };
+  it('the teardown leaves no cached blob and no latch, whatever the test before it did', () => {
+    // The helper's own regression: this is the state #380 review round 4's fix makes survive a re-entry, so
+    // if `freshDevice` ever drops its `reset()` the leak is a red test here rather than a puzzle two
+    // describes later.
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try { save({ name: 'Ada', coins: 99 }); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(isWriteFailing(), 'the test before us ended on a store that refused').toBe(true);
+    freshDevice();
+    expect(isWriteFailing(), 'the next test does not inherit the fault').toBe(false);
+    expect(load(), 'nor the blob it was holding').toMatchObject({ name: '', coins: 0 });
+  });
   it('the teardown really does hand each test an empty device', () => {
     save({ name: 'Ada', coins: 50 });
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
@@ -1107,7 +1125,39 @@ describe('profiles: siblings on one device (#20)', () => {
       // `leaveProfile()` would clear it here, and the grown-ups screen would stop saying the device is not
       // saving — a real fault forgotten every time a child tapped their own card.
       expect(isWriteFailing(), 'the same child, the same blob, so the same fault').toBe(true);
+      // And the blob itself, which the flag is *about*. Dropping `cache` here while keeping `writeFailed`
+      // discarded the session's only copy in precisely the state where it is the only copy: the next read
+      // answered the last value that reached disk, and every coin earned since was gone on a tap — with no
+      // refusal, no hint and no sound (#380 review round 4, B1).
+      expect(load().coins, 'the coins the child is playing on, not the last that reached disk').toBe(3);
     } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+  });
+
+  it('...and the same tap on a store that never accepted a write does not drop them into the wizard (#380 review round 4, B1)', () => {
+    // The worse arm of the same branch: nothing has reached disk this session, so re-reading answers
+    // `{...DEFAULT}` — `onboarded` false, no name, no ninja — and `afterPick()` sends a child who was playing
+    // into the first-run wizard. With one profile the launch picker never draws, so the topbar 👥 is the only
+    // way in and their own card is the obvious thing to tap.
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try {
+      save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 7 });
+      expect(isWriteFailing(), 'nothing this session reached disk').toBe(true);
+      expect(setActiveProfile('p1'), 'their own card, on a device with one profile').toBe(true);
+      expect(load(), 'their name, their ninja and their coins are still on the screen')
+        .toMatchObject({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 7 });
+    } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+  });
+
+  it('...and a read-only save is kept too, since save() never writes that one back either (#232)', () => {
+    // `readOnly` is the other latch that makes `cache` the only copy: the blob on disk is from a newer build,
+    // so `save()` returns before `setItem` and every coin earned this session lives in `cache` alone.
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: 99, name: 'Ada', coins: 4 }));
+    save({ coins: 15 });
+    expect(isReadOnlySave(), 'the blob on disk is newer than this build').toBe(true);
+    expect(setActiveProfile('p1'), 'their own card').toBe(true);
+    expect(load().coins, 'the session keeps the coins it is holding, unwritable as they are').toBe(15);
+    expect(isReadOnlySave(), 'and goes on refusing to overwrite the newer blob').toBe(true);
   });
 
   it('...and a second tab that moved the index is honoured, not the profile this session cached (#380 review B1)', () => {

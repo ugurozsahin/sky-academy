@@ -210,16 +210,33 @@ function dropSessionState() { cache = null; readOnly = false; writeFailed = fals
  */
 function leaveProfile() { dropSessionState(); cacheProfile = null; }
 /**
- * Re-entering the profile the index already calls active. The cached blob and the resolved profile go, so the
- * next read answers from the store — a second tab may have moved `active` under this session, and re-resolving
- * is what puts the child on the card they tapped rather than on whoever this session last cached.
+ * Re-entering the profile the index already calls active — the child tapping their own card on the picker.
  *
- * **Both write latches stay**, which is the difference from `leaveProfile()`: they describe *this* child's
- * blob and it is still the same blob, so a device that cannot save must go on saying so (#151's failed-write
- * flag, #232's read-only latch, `parents.ts:35`'s sentence). Clearing them here would make the grown-ups
- * screen forget a real fault every time a child tapped their own card.
+ * Two genuinely different situations wear that one shape, and they are told apart by the profile *this
+ * session* is playing as rather than by the one the index names:
+ *
+ * - **A second tab moved `active` while this session played someone else** (`cacheProfile` is a different
+ *   child, or nothing has been resolved yet). That is a switch: `leaveProfile()`, so the next read resolves
+ *   afresh and puts the child on the card they tapped rather than on whoever this session last cached. The
+ *   latches go with it, because they describe the sibling's blob and it is about to be a different one.
+ * - **The same child this session is already on.** Re-resolving would answer `id` again, so `cacheProfile`
+ *   stays; only the cached blob is a question, and **it is kept whenever a latch says it diverges from disk**
+ *   (#380 review round 4, B1). `cache` is then the session's only copy: under `writeFailed` the child is
+ *   playing on coins no `setItem` ever accepted, and under `readOnly` on a blob `save()` deliberately never
+ *   writes back (#232). Dropping it discarded that silently — the tap answered `true`, `refuse()` was never
+ *   reached, and the next `load()` handed back the last blob that reached disk, or `{...DEFAULT}` and the
+ *   first-run wizard on a store that had accepted nothing this session. With neither latch set, cache and
+ *   disk agree, so it is dropped and the store answers the next read.
+ *
+ * **Both write latches stay on that second path**, which is the other difference from `leaveProfile()`: they
+ * describe *this* child's blob and it is still the same blob, so a device that cannot save must go on saying
+ * so (#151's failed-write flag, #232's read-only latch, `parents.ts:35`'s sentence). Clearing them would make
+ * the grown-ups screen forget a real fault every time a child tapped their own card.
  */
-function rereadProfile() { cache = null; cacheProfile = null; }
+function rereadProfile(id: ProfileId) {
+  if (cacheProfile !== id) { leaveProfile(); return; }
+  if (!writeFailed && !readOnly) cache = null;
+}
 /**
  * Switch the active profile. False when `id` is not one of this device's profiles, or when the index was not
  * kept: a switch the store refuses would put the child back on their sibling's game at the next launch, and
@@ -240,7 +257,7 @@ function rereadProfile() { cache = null; cacheProfile = null; }
 export function setActiveProfile(id: ProfileId): boolean {
   const idx = currentIndex();
   if (!idx.ids.includes(id)) return false;
-  if (idx.active === id) { rereadProfile(); return true; }
+  if (idx.active === id) { rereadProfile(id); return true; }
   if (!writeIndex({ ...idx, active: id })) return false;
   leaveProfile();
   return true;
