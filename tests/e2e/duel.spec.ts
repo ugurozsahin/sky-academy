@@ -590,21 +590,30 @@ test.describe('Ninja Duel', () => {
     // the other's (sight). `onRoundMiss` is where the second bites: `duel.ts` leaves the round RUNNING on a wrong
     // slice and still toasts for 900ms, so the two halves become unequal for the child who just erred, in the one
     // mode whose whole rule is that they are identical (#389).
-    for (const vp of [{ width: 844, height: 390 }, { width: 390, height: 844 }, { width: 568, height: 320 }, { width: 320, height: 568 }]) {
+    const viewports = [{ width: 844, height: 390 }, { width: 390, height: 844 }, { width: 568, height: 320 }, { width: 320, height: 568 }];
+    for (const vp of viewports) {
       await resizeTo(page, vp);
 
       // SIGHT. A REAL wrong slice, and the toast must come up by itself: adding `.show` by hand would leave this
       // green if `onRoundMiss` stopped toasting, or toasted for 0ms, and then the whole loop would be asserting
       // about a box that is never on screen.
-      // Wait for a wrong bubble to actually be in flight on an undecided round, the way `winRound` above does:
-      // `__sna.wrong` needs one to slice, and `duel.hit` ignores a slice on a round already decided — so firing
-      // blind raises no toast and the wait below then fails for a reason that has nothing to do with the toast.
-      await page.waitForFunction(() => {
-        const st = window.__sna.state();
-        return !st.decided && !st.ended && window.__sna.bubbles('a').some(b => b.label !== st.answer);
-      });
-      expect(await page.evaluate(() => window.__sna.wrong('a')), `${vp.width}x${vp.height}: the wrong slice landed`).toBe(true);
-      await expect(page.locator('.toast')).toHaveClass(/show/);
+      // A REAL wrong slice, once. `onRoundMiss` raising the toast at all is the premise of everything below, and
+      // forcing the class by hand would leave this green if it stopped toasting — that is why it is driven for
+      // real. But it is driven for real ONCE, at the first viewport, and the arenas are frozen immediately
+      // after: repeating it at all four kept a live match running through the whole loop, and a match that
+      // reaches its tenth round mid-loop puts the results overlay over everything. The geometry of a lit toast
+      // is the same whoever lit it.
+      if (vp === viewports[0]) {
+        await page.waitForFunction(() => {
+          const st = window.__sna.state();
+          return !st.decided && !st.ended && window.__sna.bubbles('a').some(b => b.label !== st.answer);
+        });
+        expect(await page.evaluate(() => window.__sna.wrong('a')), 'a real wrong slice raises the toast').toBe(true);
+        await expect(page.locator('.toast')).toHaveClass(/show/);
+        expect(await page.evaluate(() => window.__sna.state().decided), 'and leaves the round live, which is what makes this matter').toBe(false);
+        await page.evaluate(() => { for (const p of ['a', 'b'] as const) window.__sna.arenas[p].paused = true; });
+      }
+      await page.evaluate(() => document.querySelector('.toast')!.classList.add('show'));
       // The shortest real hint in the pool: a long one wraps to more lines and is harder to swallow whole, so
       // the card most at risk is the briefest, not the wordiest.
       const card = POOL_CARDS.filter(c => c.hint).sort((a, b) => a.hint.length - b.hint.length)[0];
@@ -637,7 +646,6 @@ test.describe('Ninja Duel', () => {
         };
       }, card);
       const at = `${vp.width}x${vp.height}`;
-      expect(seen.decided, `${at}: a wrong slice leaves the round live, which is what makes this matter`).toBe(false);
       expect(seen.toastArea, `${at}: the toast is laid out, so there is something to cover an arena with`).toBeGreaterThan(0);
       expect(seen.arenaA, `${at}: the toast covers none of Player 1's arena`).toBe(0);
       expect(seen.arenaB, `${at}: the toast covers none of Player 2's arena`).toBe(0);
@@ -696,32 +704,48 @@ test.describe('Ninja Duel', () => {
     expect(taps, 'a tap where the toast is still reaches the card that reads the question aloud').toBeGreaterThan(0);
   });
 
-  test('guard rail: a drawn round\'s verdict never lands on the next round\'s question (#425)', async ({ page }) => {
+  test('guard rail: a drawn round\'s verdict is shown, on the question it is about (#425)', async ({ page }) => {
     await startDuel(page);
-    // `waveEnd()` calls `onRoundDraw` and then `advance()` in the SAME synchronous task, so the toast text is set
-    // and the card is rewritten before the browser paints. With the toast floated at the foot of the screen that
-    // did not matter; on the question bar it meant "Nobody sliced it — no point" faded in on top of the NEXT
-    // question and sat there for a full second, the two never on screen together. Measured at real speed before
-    // the fix: the pill already read `Round 2 of 10` and the prompt `6 - 2 = ?` at t+8104ms, with the verdict lit
-    // from t+8150 to t+9127. Draws are ordinary at Reception and Year 1 speeds.
+    // Two failure modes, one rail, because the first fix for this swapped one for the other.
     //
-    // Driven through `duel.waveEnd()` rather than by waiting out a real wave: the whole defect is that the two
-    // steps share a task, so it reproduces exactly and deterministically, and a timing-based version would be
-    // the sampling trap this file has already fallen into twice.
-    await page.waitForFunction(() => window.__sna.state().round === 1);
-    const drew = await page.evaluate(() => {
-      const before = window.__sna.state().round;
-      window.__sna.duel.waveEnd();                       // nobody sliced it: a draw, then straight on
+    // MISTIMED: `waveEnd()` used to call `onRoundDraw` and then `advance()` in the same synchronous task, so the
+    // toast text was set and the card rewritten before the browser painted — "Nobody sliced it — no point" faded
+    // in on top of the NEXT question and sat there a full second.
+    //
+    // INVISIBLE: clearing the toast in `onQuestion` fixed that by never painting it at all. Same task, so the
+    // class was added and removed between frames: two children got `sfx.miss()` and nothing to read, on the one
+    // outcome that needs explaining. A rail asserting only "not shown once the card is rewritten" is green for
+    // BOTH, which is exactly what the first version of this test did.
+    //
+    // So this watches the class itself, and records what the card said at the moment it was added.
+    await page.evaluate(() => {
       const t = document.querySelector('.toast') as HTMLElement;
-      return {
-        before, after: window.__sna.state().round,
-        toastText: t.textContent ?? '', lit: t.classList.contains('show'),
-        prompt: document.querySelector('#prompt')!.textContent ?? '',
-      };
+      const seen: { text: string; round: string; prompt: string }[] = [];
+      new MutationObserver(() => {
+        if (!t.classList.contains('show')) return;
+        seen.push({
+          text: t.textContent ?? '',
+          round: document.querySelector('#round')!.textContent ?? '',
+          prompt: document.querySelector('#prompt')!.textContent ?? '',
+        });
+      }).observe(t, { attributes: true, attributeFilter: ['class'] });
+      (window as unknown as { __shown: typeof seen }).__shown = seen;
     });
-    expect(drew.after, 'the draw moved the match on, so there IS a next question to land on').toBe(drew.before + 1);
-    expect(drew.toastText, 'the round really was drawn, so the verdict really was raised').toContain('Nobody sliced it');
-    expect(drew.lit, "the previous round's verdict is not lit over the new question").toBe(false);
+    const before = await page.evaluate(() => ({ round: window.__sna.state().round, prompt: document.querySelector('#prompt')!.textContent ?? '' }));
+    // Through the SCREEN's own path, not `duel.settleDraw()` directly. The defect lives in the wiring between
+    // the scorer and the screen, so a rail that calls the scorer proves nothing about it: driving `settleDraw`
+    // straight left both failure modes green under mutation. Clearing both waves is what an undecided wave
+    // running out does — `endWave` does exactly this — and each arena's `onWaveEnd` then reaches the screen.
+    await page.evaluate(() => { for (const p of ['a', 'b'] as const) window.__sna.arenas[p].clearWave('#ffffff'); });
+    // Wait for the match to move on — which happens either way — and THEN look at what was shown, so a verdict
+    // that was never painted fails on the assertion below with its reason, not as a bare timeout.
+    await page.waitForFunction(r => window.__sna.state().round > r, before.round, { timeout: 15_000 });
+    const shown = await page.evaluate(() => (window as unknown as { __shown: { text: string; round: string; prompt: string }[] }).__shown);
+    const draw = shown.filter(s => s.text.includes('Nobody sliced it'));
+    expect(draw.length, 'the drawn round is announced at all — it is the only thing telling two children why neither scored').toBeGreaterThan(0);
+    expect(draw[0].round, 'the verdict names the round that is on the screen behind it').toBe(`Round ${before.round} of 10`);
+    expect(draw[0].prompt, 'and that round\'s question, not the next one').toBe(before.prompt);
+
   });
 
   test('portrait keeps the stacked duel as a fallback, and asks for a sideways screen (#388)', async ({ page }) => {

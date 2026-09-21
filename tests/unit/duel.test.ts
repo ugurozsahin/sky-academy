@@ -25,6 +25,38 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     expect(ev.onQuestion.mock.calls[0][1]).toEqual({ round: 1, total: DUEL_ROUNDS });
   });
 
+  it('settleDraw announces a draw WITHOUT advancing, and only once (#425 review)', () => {
+    const ev = events();
+    const d = new Duel({ topic, difficulty: 1, rng: rng(7) }, ev);
+    d.start();
+    const q = d.current;
+    // The whole point of the split: the verdict goes out while the question it is about is still the current
+    // one. Joined to `advance()`, the two ran in one synchronous task, so a screen that clears its toast on a
+    // new question added and removed the class before any frame painted — the draw was never shown at all.
+    expect(d.settleDraw()).toBe(true);
+    expect(ev.onRoundDraw).toHaveBeenCalledTimes(1);
+    expect(ev.onRoundDraw.mock.calls[0][0]).toBe(q);        // announced about THIS round's question
+    expect(d.round).toBe(1);                                 // and nothing moved on
+    expect(d.current).toBe(q);
+    expect(ev.onQuestion).toHaveBeenCalledTimes(1);
+    expect(d.roundDecided).toBe(true);
+    // Settling twice draws the round twice; `waveEnd` calls it again on the way past.
+    expect(d.settleDraw()).toBe(false);
+    expect(ev.onRoundDraw).toHaveBeenCalledTimes(1);
+    d.waveEnd();
+    expect(ev.onRoundDraw).toHaveBeenCalledTimes(1);
+    expect(d.round).toBe(2);
+  });
+
+  it('waveEnd still draws and advances in one call, for every caller that has not split them (#425 review)', () => {
+    const ev = events();
+    const d = new Duel({ topic, difficulty: 1, rng: rng(8) }, ev);
+    d.start();
+    d.waveEnd();
+    expect(ev.onRoundDraw).toHaveBeenCalledTimes(1);
+    expect(d.round).toBe(2);
+  });
+
   it('the first correct slice wins the round, whichever player it is — but the round only advances on waveEnd', () => {
     const ev = events();
     const d = new Duel({ topic, difficulty: 1, rng: rng(2) }, ev);

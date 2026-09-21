@@ -86,12 +86,12 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       // shows its words on a device that cannot be heard, and the hint line carries the data five of the pool's
       // comparison topics keep nowhere else — without it "Which is fuller?" is two coloured bubbles and a guess.
       // A duel has no peek timing, so a peek question reads through here rather than hiding its text.
-      // The verdict on the last round does not belong over this one's question. `waveEnd()` calls `onRoundDraw`
-      // and then `advance()` in the SAME synchronous task, so on a drawn round the toast text is set and the card
-      // is rewritten before the browser paints: "Nobody sliced it — no point" then fades in on top of the next
-      // question and sits there for a full second, and the two are never on screen together. (The won path does
-      // not overlap — `onRoundWon` defers through `endWave` — but clearing here is right for it too.) Draws are
-      // common at Reception and Year 1 speeds, and this only became visible when the toast moved onto the card.
+      // A BACKSTOP, not the mechanism: no verdict should still be up by the time its question is replaced. What
+      // keeps the drawn round's verdict off the next question is `settleDraw()` in `waveEnd` below, which
+      // announces it and advances a hold later. Clearing here was tried as the whole fix and was worse than the
+      // bug — `onRoundDraw` and `onQuestion` share a synchronous task on the draw path, so the class was added
+      // and removed before the browser painted a frame and the verdict was never shown AT ALL: two children got
+      // `sfx.miss()` and nothing to read, on the outcome that most needs explaining (#425 review).
       toastEl.classList.remove('show');
       const reveal = promptMode(q, canHear()) !== 'hear';
       speak.hidden = reveal;
@@ -141,7 +141,12 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   const waveEnd = (p: DuelPlayer) => {
     waveDone[p] = true;
     if (!waveDone.a || !waveDone.b) return;
-    later(() => duel.waveEnd(), scaled(duel.roundDecided ? 450 : 650));
+    // Settle a draw NOW, so its verdict goes up on the question it is about, and advance after the hold. Done in
+    // one step — `duel.waveEnd()` alone — `onRoundDraw` and `onQuestion` share a task and the toast is added and
+    // removed before a frame paints, so the children get `sfx.miss()` and nothing to read. `HOLD.draw + 100` so
+    // this does not ride on two equal timers firing in the order they happened to be queued.
+    const drew = duel.settleDraw();
+    later(() => duel.waveEnd(), scaled(drew ? HOLD.draw + 100 : 450));
   };
   for (const p of PLAYERS) {
     arenas[p] = new Arena($(`#arena-${p}`) as HTMLCanvasElement, {
