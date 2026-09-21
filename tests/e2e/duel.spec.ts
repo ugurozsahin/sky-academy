@@ -408,8 +408,14 @@ test.describe('Ninja Duel', () => {
     expect(new Set(POOL_CARDS.map(c => c.topic)).size, 'drawn from many topics, not one').toBeGreaterThan(10);
     // The three cards the CSS comments are written around, by name rather than by hoping iteration order keeps
     // them. Each was absent from the first version of this catalogue.
-    expect(POOL_CARDS.some(c => c.topic === 'y2-fractions' && c.kind === 'objects'),
-      'the twelve-star counting card the 160px budget exists for').toBe(true);
+    // By its SIZE, not merely its existence. `some(kind && topic)` is satisfied by a FOUR-star card, which is
+    // exactly what the catalogue held while this line read green (PR #428 review round 4, B1a): the selection
+    // above is what fixed it, and this is what keeps it fixed. Counted on the rendered output — one
+    // `class="obj"` per star — so the claim in the message is the claim being checked.
+    const stars = POOL_CARDS.filter(c => c.topic === 'y2-fractions' && c.kind === 'objects')
+      .map(c => (c.html.match(/class="obj"/g) ?? []).length);
+    expect(Math.max(0, ...stars), 'the TWELVE-star counting card the 160px budget exists for, not a smaller one of the same kind')
+      .toBeGreaterThanOrEqual(12);
     expect(POOL_CARDS.some(c => c.what.endsWith('hidden tick rightmost')),
       "the number line whose `?` is rightmost, which `overflow-y: clip` exists for").toBe(true);
     expect(POOL_CARDS.some(c => c.kind === 'chart'), 'a chart card').toBe(true);
@@ -635,14 +641,25 @@ test.describe('Ninja Duel', () => {
       // that stopped carrying hints would have measured whatever the live draw dealt and reported green
       // (PR #428 review, B3) — the sampling trap this very file names twice.
       expect(card, 'the pool still carries a hint to dress the card with').toBeTruthy();
-      // The NO-VISUAL card, for the height probe below and that probe alone. `#vis` is 100-160px tall on every
-      // other card, so the toast's own weight is already inside slack the visual bought — `withToast` and
-      // `withoutToast` came back equal however tall the toast grew, on a card with no picture to hide that
-      // (PR #428 review round 4, B1b). A toast can only out-grow the bar on the one card that leaves it nothing
-      // else to spend.
-      const plainCard = POOL_CARDS.find(c => c.kind === 'none')!;
-      expect(plainCard, 'the pool still carries the text-only card the height probe needs').toBeTruthy();
-      const seen = await page.evaluate(([c, longest, noVisual]) => {
+      // The height probe below runs on a card of its own, and which card that is, is MEASURED at each viewport
+      // rather than reasoned about: every card in the catalogue is dressed, its bar read, and the SHORTEST bar
+      // wins — the bar a toast has the least room to grow into, which is the only thing that probe is about.
+      //
+      // Round 4's review was right that the pick was convenient rather than worst: it took the shortest-HINT
+      // card, on reasoning about hints that says nothing about bars. Its proposed replacement — the card with
+      // NO picture, on the argument that a bar carrying a 100-160px visual has slack a toast can never eat —
+      // was landed and is the wrong way round. The catalogue's text-only card is selected for the LONGEST
+      // text, so its prompt wraps the bar TALLER. Measured on that tree, room left for the toast:
+      //
+      //            844x390   390x844   568x320   320x568
+      //   no-visual    82       125        67       200
+      //   measured      8        71         8        64
+      //
+      // So the round-4 fix loosened this probe by up to a factor of ten while reading as a tightening. The
+      // measured answer is neither card that was argued for, and is not the same card at every viewport —
+      // `objects (r-count)` at three of the four — which is the reason it is chosen here by measurement and
+      // not by reasoning about which card ought to be worst.
+      const seen = await page.evaluate(([c, longest, all]) => {
         // Dressed inside the same evaluate as the measurement: the hint's share depends entirely on which card
         // is up, and sampling whatever the draw dealt is the trap this file has fallen into twice.
         document.querySelector('#vis')!.innerHTML = c.html;
@@ -693,13 +710,19 @@ test.describe('Ninja Duel', () => {
         t.classList.add('show');
         t.style.transition = wasTransition;
         // The height probe, AFTER every coverage read above, because it rewrites the toast's own text — AND
-        // the card. Dressed with the NO-VISUAL card here, not `c`: `#vis` is 100-160px on every other card, so
-        // the strip already had slack the toast's own growth was spent from, and `withToast === withoutToast`
-        // held however tall the toast grew (PR #428 review round 4, B1b). The one card that leaves the strip
-        // nothing else to spend is the one with no picture to shrink.
-        document.querySelector('#vis')!.innerHTML = noVisual.html;
-        document.querySelector('#prompt')!.textContent = noVisual.prompt;
-        document.querySelector('#hint')!.textContent = noVisual.hint;
+        // the card. Re-dressed to whichever card in the catalogue lays out the shortest bar AT THIS VIEWPORT,
+        // found by dressing all of them and reading `.duel-strip`, for the reason given where `all` is passed
+        // in: both of the cards this was argued for — shortest hint, and no visual — leave more room than the
+        // measured worst, and the no-visual one leaves ten times more (PR #428 review round 4, B1b).
+        const dress = (d: { html: string; prompt: string; hint: string }) => {
+          document.querySelector('#vis')!.innerHTML = d.html;
+          document.querySelector('#prompt')!.textContent = d.prompt;
+          document.querySelector('#hint')!.textContent = d.hint;
+        };
+        const stripH = () => document.querySelector('.duel-strip')!.getBoundingClientRect().height;
+        let shortest = all[0], shortestH = Infinity;
+        for (const d of all) { dress(d); const h = stripH(); if (h < shortestH) { shortestH = h; shortest = d; } }
+        dress(shortest);
         // Measured against `display: none` rather than against `.show`: `.toast.show` is defined once, in
         // `src/style.css`, as `opacity: 1; transform: none` — neither is a layout property, so toggling the
         // class measured the identical layout twice and the assertion held however the CSS changed
@@ -713,14 +736,16 @@ test.describe('Ninja Duel', () => {
         const wasText = t.textContent ?? '';
         t.textContent = longest;
         const withToast = arenas();
+        const strip = stripH();
+        const toastH = t.getBoundingClientRect().height;      // on `longest`, which is the line that has to fit
         t.style.display = 'none'; const withoutToast = arenas(); t.style.display = '';
-        const wrapped = Math.round(t.getBoundingClientRect().height);
         t.textContent = wasText;
         return {
           decided: window.__sna.state().decided, toastArea: Math.round(tr.width * tr.height),
-          ...covers, entry, withToast, withoutToast, wrapped,
+          ...covers, entry, withToast, withoutToast, wrapped: Math.round(toastH),
+          probed: shortest.what, margin: Math.round((strip - toastH) * 10) / 10,
         };
-      }, [card, DUEL_TOAST_LONGEST, plainCard] as const);
+      }, [card, DUEL_TOAST_LONGEST, POOL_CARDS] as const);
       const at = `${vp.width}x${vp.height}`;
       expect(seen.toastArea, `${at}: the toast is laid out, so there is something to cover an arena with`).toBeGreaterThan(0);
       // The round is still live at every viewport, which is the premise of the whole loop: a slab over an
@@ -759,6 +784,11 @@ test.describe('Ninja Duel', () => {
       // 844x390 is 8px.
       expect(seen.withToast, `${at}: the toast on the bar costs the arenas no height, even wrapped`).toEqual(seen.withoutToast);
       expect(seen.wrapped, `${at}: the longest verdict is laid out, so the height probe measured something`).toBeGreaterThan(0);
+      // The room the probe actually had, recorded rather than bounded: it is whatever the shortest bar in the
+      // pool leaves, so a number of my own here would be a budget nobody chose. It is in the message so that
+      // when the equality above goes red the next reader can see how much room there was, and on which card —
+      // and so that a selection that quietly starts picking a roomier card shows up as a margin that grew.
+      expect(seen.margin, `${at}: the shortest bar in the pool (${seen.probed}) still stands taller than the verdict on it`).toBeGreaterThan(0);
     }
 
     // INPUT — still load bearing, and now for a different target. When the toast sat over the arenas it
