@@ -8,10 +8,10 @@
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
-import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelHeadline, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
+import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { addCoins, load, recordAccuracy, recordCert, recordDojo, today } from '../storage';
-import { certToStored, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
+import { addCoins, load, recordAccuracy, recordCert, recordDojo } from '../storage';
+import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { hintText, promptHTML, promptMode } from './hud';
@@ -173,7 +173,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // so `duel: true` had two independent writers and deleting the one that reaches the printed certificate left
     // every test green while the album and the child's keepsake disagreed about what had been won. `certToStored`
     // is now the only writer, so the e2e's stored assertions cover the drawn object too.
-    if (cert) recordCert(certToStored(cert, { id: `${o.year.id}:duel`, avatar: d.avatar, date: today() }));
+    if (cert) recordCert(certToStored(cert, { id: `${o.year.id}:duel` }));
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
     overlay.hidden = false;
@@ -219,11 +219,11 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
    * rounds this child actually took, which is what `fileCert()` breaks a stars tie on.
    */
   function duelCert(r: DuelResult): CertInfo | null {
-    if (r.winner !== 'a') return null;
+    if (!duelEarnsCertificate(r)) return null;      // the predicate is in game/duel.ts so all three winners are unit-pinned
     const t = duelAccuracy(r);
     return {
       name: d.name, avatar: av, year: o.year.title, title: 'Ninja Duel',
-      stars: duelStars(t), score: r.scoreA, correct: t.hits, attempts: t.tries, duel: true,
+      stars: duelStars(t), score: r.scoreA, correct: t.hits, attempts: t.tries, duel: true, date: new Date(),
     };
   }
   function showPause() {
@@ -256,6 +256,9 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       hint: hintLine, coins: paid, dojoCoins: dojoPaid, taught,
     }),
     certificate: async () => cert ? (await drawCertificate(cert)).toDataURL('image/png') : null,
+    // The words that go on the drawn certificate. A byte count cannot tell one ninja's signature from another,
+    // which is how a wrong `avatar` survived round 1's rails (#397 round 2, B1).
+    certWords: () => cert ? certWords(cert) : null,
     setSpeed: k => { setGameSpeed(k); },
     timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),
   };

@@ -42,22 +42,37 @@ export function certFromStored(c: StoredCert): CertInfo {
 }
 /**
  * The inverse of `certFromStored()`: the album entry for a certificate that has just been earned (#16 review,
- * B1). `id`, the avatar's **id** and the award day are the caller's — they are the three things `CertInfo`
- * cannot supply, since it carries a resolved `Avatar` and a `Date` that may be absent.
+ * B1). **`id` is the only thing the caller supplies** — every other field is read off the one `CertInfo` that
+ * is also the object drawn, so the album entry and the child's keepsake cannot describe different things.
  *
- * It exists because the flag that says what a certificate is for was being written **twice, by hand**, on the
- * duel path: once into the drawn `CertInfo` and once into the stored entry. Deleting it from the drawn one left
- * every test green while the printed, kept certificate called a duel a "mission" and the album still called it
- * a duel — the two disagreeing about what the child did. With one writer that mutation cannot survive: the same
- * deletion now takes the stored entry with it, and the e2e's `duel: true` assertion goes red.
+ * It exists because fields were being written **twice, by hand**, on the duel path: once into the drawn
+ * `CertInfo` and once into the stored entry. Round 1 caught that with the `duel` flag — deleting it from the
+ * drawn one left every test green while the printed certificate called a duel a "mission" and the album still
+ * called it a duel. Round 2 caught the identical shape one field over: with `avatar` passed in separately, the
+ * drawn ninja (`av`) and the stored id (`d.avatar`) were two independent reads again, and a certificate could
+ * be **signed by the wrong ninja** with the album none the wiser.
+ *
+ * So the avatar's id comes from the resolved `Avatar` this certificate actually carries, and the award day from
+ * its own `date`. Both are narrowings of the same value rather than second readings of the source — which is
+ * what makes "the stored assertions cover the drawn object" true rather than merely claimed (#397 round 2, B1).
+ * `date` defaults to now for a `CertInfo` that omits it, exactly as `certificateText()` already does, so the
+ * two cannot disagree about the day either.
  */
-export function certToStored(c: CertInfo, o: { id: string; avatar: string | null; date: string }): StoredCert {
+export function certToStored(c: CertInfo, o: { id: string }): StoredCert {
   return {
-    id: o.id, name: c.name, avatar: o.avatar, year: c.year, title: c.title,
+    id: o.id, name: c.name, avatar: c.avatar.id, year: c.year, title: c.title,
     stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
-    date: o.date, training: c.training, duel: c.duel,
+    date: isoDay(c.date ?? new Date()), training: c.training, duel: c.duel,
   };
 }
+/** The award day as the album stores it. Mirrors `storage.ts`'s `today()`; kept here so this module's two
+ *  directions (`certToStored`/`certFromStored`) agree about the format without importing save machinery. */
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+
+/** The words on a certificate that has just been earned — what `drawCertificate()` will paint (#397 round 2,
+ *  B1). Exposed so the duel e2e can read the signature and the reason off the *drawn* object rather than
+ *  inferring them from a byte count, which cannot tell one ninja from another. */
+export const certWords = (c: CertInfo): CertText => certificateText(c);
 /**
  * "My certificates" (#110): a row per earned certificate, most recently filed first, or an empty-state hint.
  * Pure and unit-tested without a DOM — mirrors `stickersHTML`'s shape in `ui/screen.ts`. Each row carries the

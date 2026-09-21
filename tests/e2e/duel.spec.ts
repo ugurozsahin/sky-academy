@@ -211,6 +211,16 @@ test.describe('Ninja Duel', () => {
     const png = await page.evaluate(() => window.__sna.certificate());
     expect(png).toMatch(/^data:image\/png;base64,/);
     expect(png!.length, 'a blank canvas compresses far below this').toBeGreaterThan(20_000);
+    // And *what* it draws. A byte count cannot tell one ninja's signature from another, which is how a wrong
+    // `avatar` on the drawn certificate survived round 1's rails: the album said 'volt' and the keepsake was
+    // signed by Sensei (#397 round 2, B1). These are read off the object `drawCertificate()` is handed.
+    const words = await page.evaluate(() => window.__sna.certWords());
+    expect(words).toMatchObject({ child: 'Ada', reason: 'won a Ninja Duel on Year 1 Island', stars: '★★☆' });
+    expect(words!.signed, "the child's own ninja, not Sensei and not the default").toContain('Volt');
+    expect(words!.detail, "Player 1's own slices, the same five-of-six the album stored").toBe('5/6 correct (83%) · score 6');
+    // The drawn day and the stored day are one value now, not two reads of the clock a midnight apart.
+    const longDate = new Date(`${filed[0].date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    expect(words!.date, 'the album entry and the keepsake agree about the day').toBe(longDate);
     // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0. The recording
     // is cleared BEFORE the click: round 1's line goes out on the task after the old screen's cancel(), and it
     // is what the assertion after the scores must find.
@@ -288,6 +298,34 @@ test.describe('Ninja Duel', () => {
     expect(await page.evaluate(() => window.__sna.arenas.a.paused || window.__sna.arenas.b.paused)).toBe(false);
   });
 
+  /**
+   * The third `winner` arm (#397 round 2, note 1). `duelEarnsCertificate` is unit-pinned for all three values,
+   * but the *call site* in `ui/duel.ts` is reachable only from a real match — and weakening it to
+   * `r.winner === 'draw'` leaves every unit test green while a **defeat** files `year1:duel` into the child's
+   * own album, carrying the loser's score and stars off a tally that is not theirs. The draw case is covered
+   * by the Daily Dojo test below; this is the loss.
+   */
+  test('a match Player 2 wins earns the profile nothing — no button, no album entry (#16 item 5)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    for (let r = 1; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, r <= 4 ? 'a' : 'b');        // 4-6: Player 1 loses, and is not merely held to a draw
+    }
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.duel-end h2')).toHaveText('Player 2 wins!');
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 4, scoreB: 6 });
+    await expect(page.locator('.duel-end #cert'), 'a loss offers no certificate').toHaveCount(0);
+    expect(await page.evaluate(() => window.__sna.certificate()), 'and there is nothing to draw').toBeNull();
+    expect(await page.evaluate(() => window.__sna.certWords())).toBeNull();
+    // Read from the save, not the overlay: filing happens when the overlay is built, so a missing button is
+    // not by itself evidence that nothing was written.
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs), 'the album is untouched').toEqual([]);
+    // The coins still pay — a duel pays the device per decided round whoever won (#347) — so this test is
+    // about the certificate alone and not about a results screen that did nothing.
+    await expect(page.locator('.duel-end .coin-gain')).toHaveText('+10 🪙');
+  });
+
   test('a finished match moves the day\'s Daily Dojo challenge and pays its bonus into the same save (#16 item 5)', async ({ page }) => {
     // The day's volume challenge one answer short and its other two already done, so a single decided round
     // finishes both the challenge and the day's set — on every date, not on the four days in five where the
@@ -320,5 +358,6 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end #cert')).toHaveCount(0);
     expect(saved.certs, 'a drawn match files nothing').toEqual([]);
     expect(await page.evaluate(() => window.__sna.certificate())).toBeNull();
+    expect(await page.evaluate(() => window.__sna.certWords()), 'nothing to draw, so no words either').toBeNull();
   });
 });
