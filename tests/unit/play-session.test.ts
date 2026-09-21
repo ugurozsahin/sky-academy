@@ -52,7 +52,7 @@ const sentenceQ = (): Question => ({
 });
 const soundHuntQ = (): Question => ({ prompt: '🔊 Listen!', say: 'Listen: sun, sock, sad', answer: 's', options: ['s', 'a', 't', 'p'], listen: 'sun · sock · sad' });
 
-function build(gen: () => Question) {
+function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
   const els = { score: fakeEl(), stage: fakeEl(), prompt: fakeEl(), vis: fakeEl(), hint: fakeEl(), qcard: fakeEl(), speak: fakeEl() };
   const arena = {
     paused: false, W: 390, topInset: 0, spawned: [] as WaveOpts[],
@@ -67,6 +67,7 @@ function build(gen: () => Question) {
     arena: () => arena as never, mounted: () => mounted,
     later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },
     toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {}, showResults() {},
+    ...over,
   };
   const ps = createPlaySession({ mode: 'mission', year: YEARS[1], stages: 1, topic: { id: 't', title: 't', icon: 't', subject: 'writing', year: 'year1', nc: '', gen } }, deps);
   return { els: els as Record<keyof typeof els, FakeEl>, arena, ps, unmount: () => { mounted = false; ps.dispose(); } };
@@ -361,6 +362,17 @@ describe('the line under the prompt says whose it is (#328)', () => {
     await vi.advanceTimersByTimeAsync(3000);
     expect(els.hint.textContent, 'the second question is the instruction one').toBe('Slice the shape');
     expect(els.hint.classes.has('own'), 'a stale mark would keep an instruction on screen in landscape').toBe(false);
+  });
+
+  it('does not mark the tracing instruction, on the path the harness never used to reach', async () => {
+    // `build()` hardcoded `tracing: false` and nothing in the suite overrode it, so `hintText`'s tracing
+    // branch had no coverage in either direction (#430 review, addendum to note 5). No live bug — the three
+    // trace topics emit no `hint` — but the line is this screen's words, so it must not be marked.
+    save({ voice: 'yes' });
+    const { els, ps } = build(plainQ, { tracing: true });
+    ps.session.start(); await settle();
+    expect(els.hint.textContent).toBe('Trace over the dotted letters');
+    expect(els.hint.classes.has('own')).toBe(false);
   });
 
   it("does not mark the peek's own instructions, which are this screen's words and not the card's", async () => {
