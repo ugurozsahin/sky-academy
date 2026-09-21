@@ -45,7 +45,7 @@ You are not flying blind in the meantime. That head's e2e result is already know
 condition makes you read that run anyway, and CI tests `refs/pull/N/merge` — the head merged with `main` —
 which is a better tree to have evidence about than the bare branch you checked out.
 
-**Before you clear or merge, run it:**
+**No finding? Then run it, as the guarantor before you clear or merge:**
 
 ```
 npx playwright test --project=mobile
@@ -59,10 +59,16 @@ it is a merge on nothing: CI's e2e step was **skipped** by the path filter (#176
 viewport-sensitive and needs desktop, which a pull request never runs (#141); it is player-visible and wants
 pictures.
 
-**Before you block, do not** — with one exception that matters: **if the finding you are about to block on is
-a claim about runtime behaviour, you have to have run it.** "This breaks when a child taps twice" is not a
-reading of a diff. Everything static — a rail that does not hold, a type, a silent catch, a missing test — is
-decided without a browser, and the two blocking rounds on PR #487 were both of that kind.
+**If you have a finding, the suite does not run at all. Report the finding and stop (owner, 2026-09-22).**
+No exception, and in particular not "but the finding is about runtime behaviour". That case is real — "this
+breaks when a child taps twice" is a claim, not a reading of a diff, and §7's bar still wants it evidenced —
+but **the suite is the wrong instrument for it.** 110 tests that exercise something else prove nothing about
+one claim; what evidences it is a targeted reproduction: the smallest thing that makes the defect visible,
+quoted in the comment. Build that. Do not reach for the whole suite because it is the runnable thing nearest
+to hand.
+
+So the suite has exactly one job on a review: **guarantor for a tree you are about to let through.** Findings
+are decided before it and without it.
 
 Record what you actually ran, and when you skipped the browser say that you skipped it and why — a block whose
 report is silent about the suite reads like a block that ran it. Never write "mobile + desktop" over a
@@ -109,9 +115,10 @@ They are input to your review, never its verdict. The marks stay yours, and so d
 Equally, a finding no agent flagged as critical may still be the one that matters. Rank by what it costs the
 child, not by the label it arrived with.
 
-**Now go back to §2's browser step, knowing which way this review goes.** Clearing or merging: run it. Blocking
-on something static: do not, and say in the comment that you did not and why. Blocking on runtime behaviour:
-run it, because that finding is a claim you have not tested yet.
+**Now go back to §2's browser step, knowing which way this review goes.** No finding: run the suite, as the
+guarantor for the tree you are about to let through. **Any finding: do not run it** — report the finding, say
+in the comment that the suite did not run and why, and if the finding needs runtime evidence produce the
+targeted reproduction §2 asks for rather than the suite.
 
 ### Reviewing more than one: one review, one context
 
