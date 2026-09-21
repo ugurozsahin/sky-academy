@@ -158,7 +158,15 @@ export const GAP_WORDS: ReadonlySet<string> = new Set([...Y1_CEW, ...Y2_CEW, ...
  * the US spellings `math`, `mold`, `molt` and `grays`, and words no KS1 child reads as an answer — `oath`,
  * `sire`, `whey`, `rut`, `cur`, `hag`, `hale`, `chile`.
  *
- * `AVOID` is the other filter: spellings no card may show a child, whatever the lists know.
+ * `AVOID` is the other filter: spellings no card may show a child, whatever the lists know. It is applied in
+ * **two** places, and the second is the one that makes this sentence true of the game rather than of this
+ * function: here, for the generators that draw decoys through `gapLetters`, and in `gapDecoys` below,
+ * which every `gapQ` card passes through. Until #418 only this one existed, and the three `r-sounds`
+ * call sites — Reception's — consulted neither set. **One gap card is still outside both**: `y1Digraphs`
+ * builds its own two-letter gap and calls `wordQ` directly, and a multi-character pool entry would pass
+ * `gapDecoys` unfiltered anyway. Nothing in `AVOID` is reachable through it today — driven over all
+ * three difficulties, 63 frames and 315 spellings, in the review of #418 — and that is a fact about
+ * today's `DIGRAPHS`, not a property of the code.
  *
  * **The rule the split follows** (#324 item 3): a spelling is blocked *here* when the reason is that a child
  * must not see it, and in `GAP_WORDS` when the reason is that it is another right answer. `poos`, `pooh`,
@@ -183,7 +191,37 @@ export const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass
   'poon', 'poot', 'pood', 'poos', 'pooh', 'paps', 'pud',
   // Review of #324: `poop` and `puss` were still in `EVERYDAY`, so the two stems the audit had just closed were
   // each one curriculum prune away from reopening. Moved here so `poo_` is uniform and `pu__`/`p_ss` are pinned.
-  'poop', 'puss']);
+  'poop', 'puss',
+  // #418: `r-sounds` passed its letter pool to `gapQ` raw, so Reception — ages 4 and 5 — was the one island
+  // no `AVOID` entry reached. `cu_` offered `m`, `ja_` offered `p`. Filtering moved into `gapQ` in the same
+  // change; these are the spellings that sweep found and that a card must not show whichever generator built
+  // it. `poo` and `pap` are the `poo_`/`paps` standards one letter shorter — #324 closed those and this stem
+  // was reachable the whole time.
+  'cum', 'jap', 'vag', 'poo', 'bum', 'pap',
+  // #419: `p_ove` offered `o` on a Year 2 card two reviews after a sweep reported the family clean, and
+  // `h_re` offered `o` on a Year 1 one. `hore` is not a dictionary word and is here anyway, which is the
+  // rule `pud` and `paps` already follow: what is blocked is the spelling a card can **show**, not an entry
+  // in a dictionary — and it is an exact homophone of this set's first member.
+  'poove', 'hore',
+  // Review of #418: four more, found by driving the registry rather than by re-reading the list — which is
+  // the whole lesson. `cun` is on `cu_`, the same three letters as the `cum` above it: the stem was audited
+  // and the audit stopped one letter short, exactly as #324 did on `poo_`. `cok`/`coc` follow the `hore`
+  // rule — an exact homophone of a member of this set (`cock`), blocked for what a card would show.
+  'nig', 'pak', 'hun', 'cun', 'cok', 'coc']);
+/**
+ * **Reachable and deliberately left** (#418 asks for this stated rather than assumed, the way the comment
+ * above `gapLetters` records `hag`, `cur` and `rut`). These are spellings a gap card can show and that two
+ * sweeps have now considered and kept:
+ *
+ *   `pee`, `wee` — ordinary Reception vocabulary; blocking them is the filter reaching past its subject.
+ *   `bog`, `nog`, `sus` — ordinary words a KS1 child reads as the marsh, the drink and the adjective.
+ *   `pis`, `hoor`, `ho`, `hos`, `pish`, `ars` — non-words, and none an exact homophone of an `AVOID` member,
+ *   which is the line `hore` and `cok` are on the other side of. `ho` in particular cannot be closed without
+ *   a rule that reads oddly for Reception (`do`, `to`, `no`, `go`, `so`, `he` all reach it).
+ *
+ * The point of writing them down is that the next sweep reads which were decided instead of re-finding them
+ * by eye — the fourth sweep of this kind found four spellings the third had not listed.
+ */
 export function gapLetters(word: string, idx: number): string[] {
   const lower = word.toLowerCase();
   return LETTERS.filter(l => { const w = lower.slice(0, idx) + l + lower.slice(idx + 1); return l !== lower[idx] && !GAP_WORDS.has(w) && !AVOID.has(w); });
@@ -246,10 +284,40 @@ const y1Sentence = sentGen(Y1_SENTS, Y1_DECOYS, [2, 2, 2], 1);       // Y1/Y2: s
 const y2Sentence = sentGen(Y2_SENTS, Y2_DECOYS, [2, 3, 3], 1);
 
 /** Missing-letter question: show word with a gap, options are letters. */
+/**
+ * The letters a gap card may really offer: the pool, less the answer, less any letter that would spell an
+ * `AVOID` word in this gap (#418).
+ *
+ * **Here rather than at the call sites.** `gapLetters` filters `AVOID` too, but only three of the six `gapQ`
+ * call sites go through it: `rLetterSound` passes `rLetters(d)` and `VOWELS` raw, so every rail #296, #303 and
+ * #324 built was blind to Reception's cards and `cu_` offered `m`. Filtering where the card is built covers
+ * all six and every future one, and makes the unscoped sentence above `AVOID` true instead of narrowing it.
+ * **Pool depth is a constraint on exactly one frame.** `gapQ` needs 3. The start- and end-sound cards pass 13
+ * to 23 letters and the `gapLetters` sites 15, but the middle-sound card passes `VOWELS` — **5** — so it has
+ * 4 after the answer is removed and 3 once one is blocked. `hen` is there now: `h_n` loses `u` to `hun`, and
+ * has no spare. An earlier version of this comment said the thinnest pool was 15, which was false of the one
+ * card it mattered for (review of #418). `gapQ` throws below 3 rather than quietly shipping a 3-option card,
+ * and `tests/unit/curriculum.test.ts` measures the floor at index 1 as well as 0 and 2.
+ *
+ * `idx` outside the word is a caller bug, not a card: the filter would test a spelling no card can show, so
+ * it throws rather than silently passing the pool through.
+ */
+export const gapDecoys = (word: string, idx: number, pool: string[]): string[] => {
+  const lower = word.toLowerCase();
+  if (idx < 0 || idx >= lower.length) throw new RangeError(`gap index ${idx} is outside "${word}"`);
+  const ans = lower[idx];
+  return pool.filter(l => l.toLowerCase() !== ans
+    && !AVOID.has(lower.slice(0, idx) + l.toLowerCase() + lower.slice(idx + 1)));
+};
+
 function gapQ(rng: Rng, word: string, idx: number, distractPool: string[], emoji?: string, say?: string) {
   const ans = word[idx];
   const shown = word.slice(0, idx) + '_' + word.slice(idx + 1);
-  const ds = shuffle(rng, distractPool.filter(l => l !== ans)).slice(0, 3);
+  const decoys = gapDecoys(word, idx, distractPool);
+  // A card with two decoys takes the child's guess from 1-in-4 to 1-in-3 and says nothing. The middle-sound
+  // frame has no spare (see `gapDecoys`), so this is one blocked letter away rather than hypothetical.
+  if (decoys.length < 3) throw new RangeError(`"${word}" gap ${idx} leaves only ${decoys.length} decoys`);
+  const ds = shuffle(rng, decoys).slice(0, 3);
   return wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown, emoji }, say: say ?? `Which letter is missing from ${word}?`, hint: 'Slice the missing letter' });
 }
 
