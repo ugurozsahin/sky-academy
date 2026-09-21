@@ -13,7 +13,7 @@ import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
 import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { addCoins, load, recordAccuracy, recordCert, recordDojo, recordDuel, type StoredDuel } from '../storage';
+import { load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
@@ -160,11 +160,14 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   /**
    * Every write a finished match produces, committed the moment the match ends (#375/#441).
    *
-   * These five used to sit at the top of `showResults()`, which runs on a scope-bound timer ~1.3 s later —
-   * so the save depended on a timer surviving, and leaving in that window lost the whole match. The overlay's
-   * job is to *show* the payout, not to be the thing that causes it. Nothing about **what** a duel pays moves
-   * here: the amounts, the dojo event, the accuracy unit and the certificate rule are all unchanged, only
-   * *when* they are committed. The pacing before the overlay (`HOLD.won` + 300 ms) is deliberate and stays.
+   * These used to sit at the top of `showResults()`, which runs on a scope-bound timer ~1.3 s later — so the
+   * save depended on a timer surviving, and leaving in that window lost the whole match. The overlay's job is
+   * to *show* the payout, not to be the thing that causes it. Nothing about **what** a duel pays moves here:
+   * the amounts, the dojo event, the accuracy unit and the certificate rule are all unchanged, only *when*
+   * they are committed. The pacing before the overlay (`HOLD.won` + 300 ms) is deliberate and stays.
+   *
+   * This sits **under** #365's rule rather than beside it: `recordGameEnd()` is still the one write that pays
+   * the coins and moves the dojo together, and this only decides the moment it is called.
    *
    * `Duel.end()` is guarded by its own `ended` flag and fires `onMatchEnd` exactly once, so this runs once per
    * match — a rematch builds a whole new screen and a new `Duel`.
@@ -173,7 +176,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // #16 item 5: the match pays into the one shared save, so the coin row and any sticker it unlocked are on
     // the screen the children are about to look at. The Daily Dojo hears about the match here too — ten
     // questions answered correctly on this screen move the day's volume challenges exactly as they would in
-    // any other mode — and its bonus rides the same single addCoins().
+    // any other mode — and its bonus rides the same single write (#365).
     paid = duelCoins(r);
     // Sensei's half: the rounds Player 1 answered on this topic — one try each, the unit a mission writes — for
     // the seat `DUEL_HANDOVER` keeps for the profile's own child (`duelAccuracy()` has why neither the score nor
@@ -185,9 +188,9 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // topic met only in Sensei training or Sky Storm already behaves.
     taught = duelAccuracy(r);
     recordAccuracy(topic.id, taught.hits, taught.tries);
-    const dojo = recordDojo(duelDojoEvent(r, topic.subject));
+    // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
+    const { dojo, fresh } = recordGameEnd(duelDojoEvent(r, topic.subject), paid);
     dojoPaid = dojo.coins;
-    const fresh = addCoins(paid + dojoPaid);
     cert = duelCert(r);
     // #205's rule, unchanged here: filed by the match, never from the 🎓 button, because the bug that issue
     // opened with is a device where pressing the button does nothing at all. #375 moves the filing a further
@@ -203,9 +206,9 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // parts company with the certificate above: that is an award, and only a Player 1 win earns one
     // (`duelEarnsCertificate`). A rematch files a second row rather than replacing this one; `fileDuel()` has why.
     recordDuel({ at: Date.now(), topic: topic.id, title: topic.title, year: o.year.title, winner: r.winner, scoreA: r.scoreA, scoreB: r.scoreB, rounds: r.rounds });
-    // Handed to the overlay rather than stored for it to find: `recordDojo` and `addCoins` ARE the writes, so
-    // a redraw that recomputed them would pay the match a second time, and a nullable field would give
-    // `showResults` a branch that draws a blank payout instead of failing loudly.
+    // Handed to the overlay rather than stored for it to find: `recordGameEnd` IS the write, so a redraw that
+    // recomputed it would pay the match a second time, and a nullable field would give `showResults` a branch
+    // that draws a blank payout instead of failing loudly.
     return { dojo, fresh };
   }
 
