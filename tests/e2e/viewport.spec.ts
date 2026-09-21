@@ -195,4 +195,81 @@ test.describe('tablet viewports (#116)', () => {
     expect(await outsideItsBox(page, '.objs .slot', '.obj'),
       'an object painted outside its five-frame slot on a short screen (#107)').toEqual([]);
   });
+
+  /**
+   * #18 slice 2, group A — the DOM-screen width cap, and the third of group A that carries no look decision.
+   *
+   * The slice-1 audit measured `.screen` capped at 820 px on a 1280 px landscape window: 460 px empty, 36 %
+   * of the screen, on the map, the island, both onboarding steps, rewards, shop and the grown-ups dashboard.
+   * Nothing overflowed — every #107/#109/#116 fit check passed at both sizes — so an overflow check could
+   * never have caught this. What it costs is space, which is why the assertion below is a ratio.
+   *
+   * Both numbers are asserted on purpose. `> 820` is the defect itself, and would still pass if a later
+   * change capped the column at 830; the ratio is the acceptance the owner wrote ("uses the width available
+   * rather than a fixed column"). 0.9 is under both real readings — 1180/1280 = 0.92, 984/1024 = 0.96 —
+   * so it leaves room for the gutter to be retuned without this file having to be edited to stay true.
+   *
+   * The arena (`--arena-w`, 600 px) and the tracing pad (`.trace-wrap`, 560 px) are group A's other two caps
+   * and are NOT measured here: widening them changes the look, so they carry `owner-approval` and wait for
+   * him. `.play` and `.memory` are excluded from the CSS rule for the same reason.
+   */
+  const OLD_CAP = 820;
+
+  async function expectUsesTheWindow(page: Page, selector: string, what: string) {
+    const seen = await page.evaluate(sel => {
+      const els = Array.from(document.querySelectorAll<HTMLElement>(sel));
+      if (els.length !== 1) return { count: els.length, screen: 0, win: window.innerWidth };
+      return { count: 1, screen: Math.round(els[0].getBoundingClientRect().width), win: window.innerWidth };
+    }, selector);
+    expect(seen.count, `${what}: expected exactly one ${selector} on screen, or this measures nothing`).toBe(1);
+    expect(seen.screen, `${what}: still the ${OLD_CAP} px phone column (#18 group A)`).toBeGreaterThan(OLD_CAP);
+    expect(seen.screen / seen.win,
+      `${what}: ${seen.win - seen.screen} px of a ${seen.win} px window left empty (#18 group A)`)
+      .toBeGreaterThanOrEqual(0.9);
+  }
+
+  for (const [w, h] of [[1280, 800], [1024, 768]] as const) {
+    test(`onboarding uses a ${w}x${h} landscape window, not an 820 px column (#18)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto('/?reset=1');
+      await expect(page.locator('.choose-ninja-screen')).toBeVisible();
+      await expectUsesTheWindow(page, '.choose-ninja-screen', 'choose-ninja step');
+      await page.click('.avatar-card[data-id="volt"]');
+      await page.click('#next');
+      await expect(page.locator('#name')).toBeVisible();
+      await expectUsesTheWindow(page, '.name-screen', 'name step');
+    });
+
+    test(`the map, island, rewards, shop and dashboard use a ${w}x${h} landscape window (#18)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedProgress(page);                        // seeded: the widest strings these screens can draw
+      await expectUsesTheWindow(page, '.map', 'sky map');
+
+      await page.click('.island[data-year="reception"]');
+      await expect(page.locator('.island-screen')).toBeVisible();
+      await expectUsesTheWindow(page, '.island-screen', 'island screen');
+      await expectFitsViewport(page, `island screen at ${w}x${h}`);   // widening must not start an overflow
+
+      // Back through the app's own router rather than `goto('/')`: a reload keeps `history.state`, and the
+      // screen it restores is not reliably the map (this landed on rewards, seen once in this file's own run).
+      await page.click('#back');
+      await expect(page.locator('.map')).toBeVisible();
+      await page.click('#rewards');
+      await expect(page.locator('.rewards')).toBeVisible();
+      await expectUsesTheWindow(page, '.rewards', 'rewards screen');
+
+      await page.click('#shop');
+      await expect(page.locator('.shop')).toBeVisible();
+      await expectUsesTheWindow(page, '.shop', 'shop screen');
+      await expectFitsViewport(page, `shop screen at ${w}x${h}`);
+
+      await page.click('#back');                       // shop → rewards
+      await expect(page.locator('.rewards')).toBeVisible();
+      await page.click('#back');                       // rewards → map
+      await expect(page.locator('.map')).toBeVisible();
+      await openDashboard(page);
+      await expectUsesTheWindow(page, '.parents.dash', 'grown-ups dashboard');
+      await expectFitsViewport(page, `grown-ups dashboard at ${w}x${h}`);
+    });
+  }
 });

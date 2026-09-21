@@ -1922,3 +1922,39 @@ describe('`<a download>` stays reachable from one guarded place in the certifica
       .toMatch(/if\s*\(\s*caps\.nativeShell\s*\)\s*return\s*'show'\s*;[\s\S]{0,40}return\s*'download'/);
   });
 });
+
+/*
+ * #18 slice 2, group A. The DOM-screen width cap moved off the 820 px phone column on wide viewports, and
+ * the only behavioural check on it lives in `tests/e2e/viewport.spec.ts` — which the `mobile` and `desktop`
+ * projects skip, so it runs on the nightly and never on a pull request (`.claude/rules/e2e.md`). A revert
+ * or a stray `max-width` on `.screen` would therefore ship green and be found a day later, on a screen the
+ * audit spent a whole slice measuring.
+ *
+ * This rail is the pull-request-time half: it reads the stylesheet as text and holds the three decisions
+ * that make the fix what it is, not the pixel values the e2e file owns. Widening `.play` or `.memory` is
+ * `owner-approval` work (the arena cap and the card grid change the look and how far a thumb travels), so
+ * the exclusion is part of the rule, not a detail — dropping it is how an unapproved look change would
+ * arrive without anyone deciding to make one.
+ */
+describe('the landscape screen width cannot silently return to the phone column (#18)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  it('a wide-viewport media query widens .screen, and excludes .play and .memory', () => {
+    expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
+
+    const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*\.screen:not\(\.play\):not\(\.memory\)\s*\{([^}]*)\}/);
+    expect(block, 'the #18 rule must stay a min-width: 900px block over .screen:not(.play):not(.memory)').toBeTruthy();
+    expect(block![1], 'the widened cap must still be a max-width, and must not be the 820 px phone column')
+      .toMatch(/max-width:\s*min\(\s*\d{3,4}px\s*,/);
+    expect(block![1], 'the widened cap must be bigger than the 820 px column it replaces')
+      .not.toMatch(/max-width:\s*min\(\s*(?:[0-7]?\d{1,2}|8[01]\d|820)px/);
+  });
+
+  it('the base .screen rule still carries the phone column for narrow viewports', () => {
+    const base = bare.match(/(?:^|[}\s])\.screen\s*\{([^}]*)\}/)?.[1];
+    expect(base, 'the base .screen rule must exist').toBeTruthy();
+    expect(base, 'a phone and a portrait tablet keep the 820 px column — the audit found both clean')
+      .toMatch(/max-width:\s*820px/);
+  });
+});
