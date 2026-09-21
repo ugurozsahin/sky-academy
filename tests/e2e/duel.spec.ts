@@ -678,12 +678,18 @@ test.describe('Ninja Duel', () => {
    * log to tell it from a match that was never finished. A child who wins and immediately backs out to show
    * someone got nothing for it.
    *
-   * The quit is driven from the match-end hook rather than raced against the timer: `state().ended` flips
-   * synchronously inside `Duel.end()`, in the same task that schedules the overlay, so a rAF poll lands inside
-   * a window that is ~325 ms wide at `__SNA_FAST = 4`. The clicks after it are synchronous — `#pause` builds
-   * the pause modal in the same task, so `#quit` is in the DOM by the time this asks for it.
+   * **The quit here is at the EARLIEST point the window opens, not the latest** (#375 round 1, B1). Waiting
+   * for `state().ended` would only prove the ~1.3 s the overlay's own timer holds, and miss the larger
+   * ~1.45 s before it: winning the last round schedules `endWave` (~1 s) and then `waveEnd` (~450 ms), both
+   * scope-bound, and only that second callback runs `duel.waveEnd()` → `end()` → `onMatchEnd`. Throughout it
+   * `duel.ended` is false, so `syncPaused()` leaves both arenas running and `#pause` bound. So this polls for
+   * `round === rounds && decided && !ended` — the instant the last round is won, before either timer — and
+   * quits there. A commit that happened any later than that would fail this.
+   *
+   * The clicks after the poll are synchronous: `#pause` builds the pause modal in the same task, so `#quit`
+   * is in the DOM by the time this asks for it.
    */
-  test('a match left through Pause before the overlay appears is still paid, recorded and filed (#375, #441)', async ({ page }) => {
+  test('a match left through Pause the instant the last round is won is still paid, recorded and filed (#375, #441)', async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
     expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
     const topic = await page.evaluate(() => window.__sna.state().topic);
@@ -691,15 +697,23 @@ test.describe('Ninja Duel', () => {
       await page.waitForFunction(r => window.__sna.state().round === r, r);
       await winRound(page, 'a');                     // Player 1 takes all ten, so a certificate is earned too
     }
-    // Quit inside the window, before the overlay is built.
-    await page.evaluate(async () => {
+    // Quit the instant the last round is won — ahead of `endWave`, `waveEnd` and the overlay's own timer.
+    const quitState = await page.evaluate(async () => {
       await new Promise<void>(done => {
-        const tick = () => { if (window.__sna.state().ended) done(); else requestAnimationFrame(tick); };
+        const tick = () => {
+          const s = window.__sna.state();
+          if (s.round === s.rounds && s.decided && !s.ended) done(); else requestAnimationFrame(tick);
+        };
         tick();
       });
+      const at = window.__sna.state();
       (document.querySelector('#pause') as HTMLButtonElement).click();
       (document.querySelector('#quit') as HTMLButtonElement).click();
+      return at;
     });
+    // The window this quit in is the one B1 names: the match is decided but has NOT ended, so `onMatchEnd`
+    // has not run and both scope-bound timers ahead of it were still pending when `dispose()` fired.
+    expect(quitState, 'quit before the match ended, not after').toMatchObject({ round: 10, decided: true, ended: false });
     await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
     // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
     await expect(page.locator('.duel-end')).toHaveCount(0);
