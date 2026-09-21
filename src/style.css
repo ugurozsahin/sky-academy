@@ -381,23 +381,22 @@ img { -webkit-user-drag: none; }
 }
 .duel-half { position: relative; min-height: 0; min-width: 0; width: 100%; max-width: var(--arena-w); }
 .duel-half.a { grid-area: a; } .duel-half.b { grid-area: b; }
-/* The toast fades, it is never removed from the DOM, so as a grid item it opened a THIRD implicit row and took
-   32px off both arenas on every single duel, in either orientation — 16px each, for a message that is invisible
-   most of the time. Floated instead: bottom-centre, where the flex column used to put it, and in the sideways
-   layout that is on the divider, where both children can read it. */
-.duel-screen { position: relative; }
-/* `pointer-events: none` is load bearing, not tidiness. The toast fades with `opacity: 0` and is never
-   `display: none` (`screenScope().toast` only drops `.show`), so once a round has been announced it stays in the
-   DOM at full size for the rest of the match. Floating it put it OVER both canvases, and `Arena` binds input to
-   its own canvas — so an invisible 296x43 box across the bottom of the arenas swallowed a slice outright: no
-   miss, no swish, no feedback, and it straddles the divider so it took a bite out of both players at once.
-   Measured before the fix: a gesture starting inside the faded toast reached neither canvas (0 pointerdowns),
-   the same gesture 25px higher reached Player 1's. Same reason `.duel-tag`, `.hud` and `.duel-half.b::after`
-   carry it. */
+/* The toast is laid into the question bar's own grid area, over the card and never over an arena.
+   It fades with `opacity: 0` and is never removed, so as a grid item of its own it opened a THIRD implicit row
+   and took 32px off both arenas on every duel — hence the overlay. But overlaying it at the foot of the screen
+   put a 90%-opaque slab (`#0d1226e6`) over ONE player's live bubbles and not the other's: `onRoundMiss` leaves
+   the round running (`duel.ts`'s "a wrong slice; the round continues") and still toasts for 900ms, so in
+   portrait it covered 13,650px² of Player 1's arena and 0 of Player 2's — the two halves made unequal for the
+   child who just erred, in the one mode whose whole rule is that they are identical (#389). Sideways it blotted
+   out Player 2's name and score instead, including as that score changed.
+   The bar is the one place that belongs to both players equally and holds nothing time-critical: it is static
+   for the whole round, where a bubble is in flight. `q` is sized by the strip, which is taller than the toast at
+   every viewport, so this still costs no layout — the 32px stays won. `pointer-events: none` remains load
+   bearing for the same reason it was: a slice must reach the canvas. */
 .duel-screen > .toast {
-  position: absolute; bottom: calc(8px + var(--sab)); left: 50%; translate: -50% 0;
-  margin-top: 0; z-index: 3; pointer-events: none;
+  grid-area: q; place-self: center; margin-top: 0; z-index: 3; pointer-events: none;
 }
+
 .duel-arena { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 /* The divider is drawn, never a BORDER (#388/#389). With `box-sizing: border-box` a 1px border on half B took
    1px off Player 2's canvas and not Player 1's, so the two arenas had different geometry — and `layoutWave`
@@ -432,10 +431,12 @@ img { -webkit-user-drag: none; }
 .duel-rotate { font-size: clamp(11px, 2.8vw, 13px); font-weight: 700; color: var(--muted); margin-top: 4px; }
 /* The card's visual gets a HEIGHT BUDGET, in both orientations (#388). The visuals are sized in CSS and the
    `max-height: 640px` band does not shrink them — `.clock` is a fixed 120px square, `.frac` 110px, `.dots` 100px
-   — and nothing bounded the card, so what the two arenas got depended on which question the draw dealt. 132px
-   clears everything in the pool untouched; `overflow: hidden` is the backstop for anything taller, clipping being
-   far better than what it replaces: an unbounded visual took the whole screen and left the arenas 11px tall.
-   `tests/e2e/duel.spec.ts` pins this against every fixed-size visual AND a deliberately absurd one. */
+   — and nothing bounded the card, so what the two arenas got depended on which question the draw dealt.
+   160px clears everything the pool can build: 132px was tried first and CUT the bottom row off a twelve-star
+   counting card (`y2-fractions`, "count the stars") on every tablet in portrait, where `--slot` reaches its 40px
+   maximum. `overflow-y: clip`, never `overflow: hidden`, is the backstop — see the rule itself for why the axis
+   matters. `tests/e2e/duel.spec.ts` pins this against every card the three duel pools can actually deal,
+   rendered through the app's own `renderVisual()`, AND against one deliberately taller than any of them. */
 .duel-q { --duel-vis: 160px; }
 /* `overflow-y: clip`, never `overflow: hidden` — it bounds the axis that needs bounding and leaves the other
    alone. `hidden` clips BOTH axes, and each loss landed on the answer: sideways-on it cut the `?` clean off a
@@ -474,7 +475,7 @@ img { -webkit-user-drag: none; }
      the 213px that made the stacked layout unplayable. `zoom`, not `transform: scale()`, because only `zoom`
      shrinks the LAYOUT box, which is the whole point; a transform would shrink the picture and leave the bar
      just as tall. The factor is what makes the pool's tallest visual, the 120px clock, fit the budget.
-     A tall landscape screen keeps the base 132px and no scaling — see below. */
+     A tall landscape screen restores the base budget and scales nothing — see below. */
   .duel-q { --duel-vis: 100px; }
   .duel-q .vis-wrap { display: flex; justify-content: center; }
   /* KNOWN TRADE, measured rather than assumed (raised as a note on PR #394's round-2 review). `zoom` scales the
@@ -501,10 +502,9 @@ img { -webkit-user-drag: none; }
    IS the question — so a landscape tablet pays nothing for the rule above: above 700px tall the visuals keep
    their full size. The 390px-tall phone band is the one that has to shrink them. */
 @media (orientation: landscape) and (min-height: 700px) {
-  /* 160px, not the base 132px: at this width `--slot` reaches its 40px maximum, so twelve objects to count are
-     three rows of 49px — 155px — and 132px would CROP the bottom row. A cropped row of objects is a wrong count,
-     which is worse than a small one, so the budget fits the tallest visual the pool can build instead of cutting
-     it. There is height to spare here; that is the whole reason this band exists. */
+  /* The base budget again, restated only to override the short band's 100px above — the cascade reaches both
+     rules on a tall landscape screen and the later one wins. Nothing is scaled here: a clock question is one
+     where reading the face IS the question, and a tablet has the height to show it whole. */
   .duel-q { --duel-vis: 160px; }
   .duel-q .vis { zoom: 1; }
   .duel-q .prompt { font-size: clamp(22px, 5.5vw, 34px); }

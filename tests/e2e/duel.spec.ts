@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
-import { DUEL_HANDOVER } from '../../src/game/duel';
+import { DUEL_HANDOVER, duelPool } from '../../src/game/duel';
+import { topicsFor, YEARS } from '../../src/curriculum';
+import { renderVisual } from '../../src/ui/visuals';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { DuelHooks } from '../../src/ui/hooks';
 
@@ -310,48 +312,91 @@ test.describe('Ninja Duel', () => {
   });
 
   /**
-   * What a question can put in the card, keyed by the class that SIZES it in `style.css` — plus one deliberately
-   * taller than anything the pool holds. The duel draws its topic with `Math.random()`, so measuring whatever
-   * round 1 happens to deal is a sample of one: the first version of this rail quoted a 62–106px bar from six
-   * such samples and missed `y1-time`, whose fixed 120px `.clock` made it 165px. Overwriting `#vis` makes the
-   * worst case reachable on demand, and the absurd row is what makes the bound structural rather than
-   * "big enough for a clock" — an unbounded visual once left the arenas at ZERO height.
+   * Every visual a duel can actually put on the card, rendered by the app's OWN `renderVisual()` over the real
+   * `duelPool(topicsFor(year), year.diffs[0])` for all three years — not hand-written markup.
+   *
+   * Hand-written fixtures are how this rail kept missing things. They covered six of the thirteen reachable
+   * visual kinds, and the seventh — `chart`, the tally and block and pictogram cards — is the POOL'S TALLEST,
+   * taller than the clock every figure in the body was built on. Two of the fixtures were not even the shape
+   * `renderVisual` emits. Deriving them means the catalogue cannot drift from the app again: a new visual type
+   * appears here the moment a generator can draw it.
+   *
+   * `diffs[0]` is deliberate and is the whole reachable set: `duelScreen` fixes a match at the year's gentlest
+   * stage and `Duel` passes that one value to every round, so cards needing difficulty 2 or 3 — a 16- or
+   * 20-object counting frame among them — cannot appear in a duel however the match runs.
+   *
+   * Seeded, so the catalogue is identical on every run and in both projects.
    */
-  const VISUALS: Record<string, string> = {
-    'no visual': '',
-    'clock (120px, the pool\'s tallest)': '<div class="vis"><svg viewBox="0 0 100 100" class="clock"><circle cx="50" cy="50" r="47" class="face"/></svg></div>',
-    'frac (110px)': '<div class="vis"><svg viewBox="0 0 100 100" class="frac"><path d="M0 0H100V100H0Z"/></svg></div>',
-    'dots (100px)': '<div class="vis"><svg viewBox="0 0 120 80" class="dots"><circle cx="20" cy="20" r="9"/></svg></div>',
-    'two ten-frames': `<div class="vis">${'<div class="tenframe">' + '<i></i>'.repeat(10) + '</div>'}</div>`,
-    // The tallest thing in the pool that REFLOWS rather than being a fixed box: twelve objects to count, three
-    // rows of five. It is the case the `--slot` floor exists for, so it is deliberately not scaled — see the
-    // `.vis.objs` rule. Three rows is what `fiveFrames(12)` produces.
-    'twelve objects to count (three rows)': `<div class="vis objs"><div class="grp">${[5, 5, 2].map(n => `<span class="five">${Array.from({ length: 5 }, (_, i) => `<span class="slot">${i < n ? '<span class="obj">⭐</span>' : ''}</span>`).join('')}</span>`).join('')}</div></div>`,
-    // A number line with two-digit labels and the hidden tick rightmost: `lineQ` picks the last tick about one
-    // round in five, and this is the card that `overflow: hidden` cut the `?` off at 320px wide (24px of it; 4px
-    // at 360px). It is here for its WIDTH, where every other fixture is here for its height.
-    'number line, hidden tick rightmost': `<div class="vis"><div class="nline">${[10, 12, 14, 16, 18, 20].map((n, i) => `<span class="${i === 5 ? 'mark' : ''}">${i === 5 ? '?' : n}</span>`).join('')}</div></div>`,
+  /**
+   * Every card a duel can actually deal: the app's own `renderVisual()` output paired with the SAME question's
+   * own prompt and hint, over the real `duelPool(topicsFor(year), year.diffs[0])` for all three years.
+   *
+   * Real triples, not a cross product. Pairing the pool's longest prompt with another topic's longest hint and a
+   * third's tallest picture builds a card no child can be dealt, and a bound measured against it is a bound
+   * about nothing — it read 180px here for a `scales` card whose real text is short. What a rail should hold is
+   * what the generators can actually produce together.
+   *
+   * Derived rather than hand-written because hand-written is how this kept missing things: the previous
+   * catalogue covered six of the thirteen reachable kinds and omitted `chart` — the tally, block and pictogram
+   * cards — which is the pool's tallest, taller than the clock every figure in the pull request body was built
+   * on. Two of its fixtures were not even the shape `renderVisual` emits. Derived, the catalogue cannot drift
+   * from the app: a new visual kind appears the moment a generator can draw it.
+   *
+   * `diffs[0]` is the whole reachable set, not a sample: `duelScreen` fixes a match at the year's gentlest stage
+   * and `Duel` passes that one value to every round, so a card needing difficulty 2 or 3 — a 16- or 20-object
+   * counting frame among them — cannot appear in a duel however the match runs.
+   *
+   * Seeded, so the catalogue is byte-identical on every run and in both projects.
+   */
+  interface Card { what: string; html: string; prompt: string; hint: string }
+  const POOL_CARDS: Card[] = (() => {
+    const out: Card[] = [];
+    const seen = new Map<string, number>();
+    let plain: Card | null = null;
+    for (const year of YEARS) {
+      for (const topic of duelPool(topicsFor(year.id), year.diffs[0])) {
+        for (let seed = 1; seed <= 40; seed++) {
+          let n = seed * 2654435761 % 4294967296;
+          const rng = () => ((n = n * 1103515245 % 4294967296) / 4294967296);
+          const q = topic.gen(year.diffs[0], rng);
+          const card = { what: '', html: q.visual ? renderVisual(q.visual) : '', prompt: q.prompt, hint: q.hint ?? '' };
+          if (!q.visual) {
+            // One text-only card, the wordiest, since those are bounded by the text alone.
+            if (!plain || q.prompt.length + (q.hint ?? '').length > plain.prompt.length + plain.hint.length) {
+              plain = { ...card, what: `no visual (${topic.id})` };
+            }
+            continue;
+          }
+          const count = seen.get(q.visual.type) ?? 0;
+          if (count >= 2) continue;                     // two representatives per kind keeps the sweep bounded
+          seen.set(q.visual.type, count + 1);
+          out.push({ ...card, what: `${q.visual.type} (${topic.id})` });
+        }
+      }
+    }
+    return plain ? [plain, ...out] : out;
+  })();
+
+  /**
+   * Deliberately taller than anything the pool can build. Its claim is the OPPOSITE of the cards above: here the
+   * budget is SUPPOSED to clip, because the alternative is what it replaced — an unbounded visual taking the
+   * whole screen and leaving the arenas 11px tall. So it is checked for the bound and never for clipping, and it
+   * is kept out of the derived catalogue so neither claim can quietly be applied to the other.
+   */
+  const ABSURD: Card = {
+    what: 'taller than anything in the pool',
+    html: '<div class="vis"><div style="width:120px;height:600px"></div></div>',
+    prompt: 'Which day comes before Wednesday?', hint: 'yellow sunflower: 14 cm',
   };
   /**
-   * Deliberately taller than anything the pool can build. Its claim is the OPPOSITE of the fixtures above: here
-   * the budget is supposed to clip, because the alternative is what it replaced — an unbounded visual taking the
-   * whole screen and leaving the arenas 11px tall. So it is checked for the bound and never for clipping, and it
-   * is kept separate rather than special-cased inside the loop, so neither claim can quietly be applied to the
-   * other.
-   */
-  const ABSURD = '<div class="vis"><div style="width:120px;height:600px"></div></div>';
-  /**
-   * Dress the card with `html` and the longest prompt and hint the year-1 duel pool can actually produce, then
-   * measure it — **in one `evaluate`**. One round trip is the point: a round can end between two of them,
+   * Put a real card — its own visual, prompt and hint — on the screen and measure it, **in one `evaluate`**. One round trip is the point: a round can end between two of them,
    * `onQuestion` rewrites `#prompt`, `#vis` and `#hint`, and the measurement is then of the real question rather
    * than the dressed worst case — which reports GREEN, because a real question is smaller. That cost a red CI on
    * the full mobile suite while passing eight repeats in isolation, and this file already names the same hazard at
    * the `#hint` rail above: read the DOM and the state in ONE evaluate.
    *
-   * The strings are 33 and 49 characters, from `y1-months` and `y1-length`, found by generating 200 questions for
-   * each of the pool's 28 topics. Real strings, not invented ones: a hint half again as long as anything the pool
-   * holds would cap the layout against a case no child ever sees. The text matters as much as the visual — in a
-   * ROW the card wraps, and a long prompt with a long hint is another 20px of bar.
+   * The text matters as much as the picture: in a ROW the card wraps, and a long prompt beside a long hint is
+   * another 20px of bar. Both come from the same question as the visual — see `POOL_CARDS`.
    */
   /**
    * The budget must BOUND the bar without cutting the answer off, on either axis — asserted in both orientations,
@@ -368,16 +413,23 @@ test.describe('Ninja Duel', () => {
     expect(m.markPainted, `${where}: the '?' the question asks about is painted, not clipped away`).toBe(true);
   }
 
-  const dressAndMeasure = (page: Page, html: string) => page.evaluate(h => {
-    document.querySelector('#vis')!.innerHTML = h;
-    document.querySelector('#prompt')!.textContent = 'Which day comes before Wednesday?';
-    document.querySelector('#hint')!.textContent = 'yellow sunflower: 14 cm · purple sunflower: 10 cm';
+  const dressAndMeasure = (page: Page, card: { html: string; prompt: string; hint: string }) => page.evaluate(h => {
+    document.querySelector('#vis')!.innerHTML = h.html;
+    document.querySelector('#prompt')!.textContent = h.prompt;
+    document.querySelector('#hint')!.textContent = h.hint;
     const box = (sel: string) => {
       const r = document.querySelector(sel)!.getBoundingClientRect();
       return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, cx: r.x + r.width / 2 };
     };
     const wrap = document.querySelector('#vis') as HTMLElement;
     const cs = getComputedStyle(wrap);
+    // Real descendant boxes, NOT `scrollHeight - clientHeight`. `scrollHeight` is an integer, so a 0.5px
+    // threshold is finer than the metric — and worse, it counts the LAYOUT OVERFLOW of `.tal.five::after`, the
+    // rotated tally stroke, which is decoration and not something a child counts. A real tally chart reads 2-21
+    // that way while every countable mark is painted and no element's box passes the wrap's edge.
+    const wrapBox = wrap.getBoundingClientRect();
+    const kidsOverflow = Array.from(wrap.querySelectorAll('*'))
+      .reduce((worst, k) => Math.max(worst, k.getBoundingClientRect().bottom - wrapBox.bottom), 0);
     // Whether the budget CLIPS, measured off the box's own content rather than a list of class names. The first
     // version counted `.five, .tenframe` overflowing — two of the thirteen visual types a duel can draw — so it
     // scored 0 while three elements hung over the edge, and `--duel-vis: 1px`, which crops every visual in the
@@ -401,11 +453,11 @@ test.describe('Ninja Duel', () => {
       a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'),
       prompt: box('#prompt'), vis: box('#vis'), canvasA: box('#arena-a'), canvasB: box('#arena-b'),
       // All measured here, in the same tick, for the same reason the boxes are.
-      clipY: wrap.scrollHeight - wrap.clientHeight,
+      clipY: kidsOverflow,
       overflowX: cs.overflowX,
       markPainted,
     };
-  }, html);
+  }, card);
 
   test('sideways, the duel splits left and right with the question centred over the divider (#388)', async ({ page }) => {
     await startDuel(page);
@@ -434,20 +486,22 @@ test.describe('Ninja Duel', () => {
     // The bar has to be BOUNDED, not merely short on the question that came up. Before the cap: a clock question
     // took 165px of a 390px screen (42%) and handed each child 193px — worse than the 213px that made the stacked
     // layout unplayable — and a visual taller than the pool holds took the whole screen, leaving the arenas at 0.
-    for (const vp of [{ width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {
+    for (const vp of [{ width: 568, height: 320 }, { width: 640, height: 360 }, { width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {
       await resizeTo(page, vp);
-      for (const [what, html] of [...Object.entries(VISUALS), ['taller than anything in the pool', ABSURD] as const]) {
-        const L = await dressAndMeasure(page, html);
-        const where = `${vp.width}x${vp.height}, ${what}`;
-        // The measured worst case is a clock question carrying the pool's longest prompt AND hint at 844x390:
-        // 141px of bar, 249px of arena — 36% and 64%. The thresholds sit clear of that rather than hugging it,
-        // deliberately: text metrics differ between here and CI (no Fredoka there), so a bound 7px off the
-        // measurement is a rail that goes red on the runner and not on the desk. Loose enough to survive that,
-        // tight enough to still catch both regressions it exists for — deleting the visual budget takes the bar
-        // to 439px, deleting the row rules to 190px, and each fails here with room to spare.
-        // The two are deliberate complements — the bar may take at most 45%, each arena keeps at least 55%.
-        expect(L.strip.h, `${where}: the question bar stays inside the share of the height budgeted for it`).toBeLessThanOrEqual(vp.height * 0.45);
-        expect(L.a.h, `${where}: each half keeps the height a stacked half gave away`).toBeGreaterThan(vp.height * 0.55);
+      for (const card of [...POOL_CARDS, ABSURD]) {
+        const L = await dressAndMeasure(page, card);
+        const where = `${vp.width}x${vp.height}, ${card.what}`;
+        // Banded, because one number was a lie. Measured over every card the pool can deal, the worst bar is
+        // `y2-symmetry` at 25.1% on a tablet, 42.5% at 844x390, 44.6% at 640x360 and **56.7%** at 568x320 — so
+        // the single 45% cap the previous round asserted was false on a 320px phone turned over, which this
+        // diff's own nudge invites, and cleared 640x360 by four tenths of a point, which is not a margin at all.
+        // Each band sits clear of its own measured worst rather than hugging it: text metrics differ between
+        // here and CI, and a bound 0.4 points from the measurement is a rail that reddens on the runner.
+        // A small landscape screen genuinely cannot give a duel much arena. It is still far better than the
+        // stacked layout at every one of these sizes — the claim is narrowed to what holds, not the layout.
+        const cap = vp.height >= 700 ? 0.35 : vp.height >= 360 ? 0.5 : 0.65;
+        expect(L.strip.h, `${where}: the question bar stays inside the share of the height budgeted for it`).toBeLessThanOrEqual(vp.height * cap);
+        expect(L.a.h, `${where}: each half keeps the height a stacked half gave away`).toBeGreaterThan(vp.height * (1 - cap));
         expect(Math.abs(L.a.h - L.b.h), `${where}: both children get the same height`).toBeLessThan(2);
         // The two CANVASES, to the subpixel — the guard #389's issue asked for, because `layoutWave` derives `r`,
         // `g` and `vx` from geometry, so unequal boxes make the halves produce different arcs from one shared
@@ -456,7 +510,7 @@ test.describe('Ninja Duel', () => {
         // a pseudo-element now. The 2px tolerance above is far too loose to have caught it.
         expect(Math.abs(L.canvasA.h - L.canvasB.h), `${where}: both arenas are the same height, to the subpixel`).toBeLessThan(0.5);
         expect(Math.abs(L.canvasA.w - L.canvasB.w), `${where}: both arenas are the same width, to the subpixel`).toBeLessThan(0.5);
-        if (!html) continue;
+        if (!card.html) continue;   // the text-only card has no picture to check
         // The visual is scaled to fit the budget rather than the bar growing to fit the visual, so it is still on
         // screen — a bound that worked by hiding the picture would fail the question instead of the layout.
         // `L.vis.h`, not `L.strip.h`: the strip clears 40px on the prompt's own line box alone, so the old form
@@ -465,7 +519,7 @@ test.describe('Ninja Duel', () => {
         // tall ones would fail it. What this catches is the visual being gone altogether.
         expect(L.vis.h, `${where}: the visual is scaled into the bar, not dropped out of it`).toBeGreaterThan(5);
         // The bound applies to everything; "nothing is cut off" applies to what the pool can actually draw.
-        if (html !== ABSURD) expectNothingClipped(L, where);
+        if (card !== ABSURD) expectNothingClipped(L, where);
         // No assertion here that the prompt and the visual share a LINE. One was written and removed: whether the
         // row fits on one line depends on text metrics, Fredoka is fetched from Google Fonts, and CI has no
         // network — so `dots` wrapped there and not locally, 46px against 42px. That is the same
@@ -476,47 +530,70 @@ test.describe('Ninja Duel', () => {
     }
   });
 
-  test('guard rail: nothing the screen floats over the arenas swallows a slice (#388)', async ({ page }) => {
+  test('guard rail: nothing the screen floats over the arenas swallows a slice, or hides one (#388)', async ({ page }) => {
     await startDuel(page);
-    // The one rail here that uses REAL pointer input. Every other slice in this file goes through `window.__sna`,
-    // which calls into the Arena directly and so cannot see anything sitting on top of the canvas. Floating the
-    // toast to buy back 32px of arena put it OVER both halves at `z-index: 3`, and because it fades with
-    // `opacity: 0` rather than `display: none` it stays there, full size, for the rest of the match: an invisible
-    // 296x43 box across the bottom of both arenas in which a slice did nothing at all — no miss, no swish, no
-    // feedback. Sideways it straddles the divider, so it took the same bite out of each player.
+    // Two halves of one hazard, and this pull request fixed them one round apart. Floating the toast to buy back
+    // 32px of arena put it OVER both canvases: first it swallowed a slice outright (input), then — once
+    // `pointer-events: none` fixed that — it was still a 90%-opaque slab across one player's live bubbles and not
+    // the other's (sight). `onRoundMiss` is where the second bites: `duel.ts` leaves the round RUNNING on a wrong
+    // slice and still toasts for 900ms, so the two halves become unequal for the child who just erred, in the one
+    // mode whose whole rule is that they are identical (#389).
+    for (const vp of [{ width: 844, height: 390 }, { width: 390, height: 844 }]) {
+      await resizeTo(page, vp);
+
+      // SIGHT. A real wrong slice, so the round is genuinely live rather than posed.
+      const seen = await page.evaluate(() => {
+        window.__sna.wrong('a');
+        const t = document.querySelector('.toast') as HTMLElement;
+        t.classList.add('show');                       // the round announcement leaves it up for 900ms
+        const tr = t.getBoundingClientRect();
+        const over = (sel: string) => {
+          const r = document.querySelector(sel)!.getBoundingClientRect();
+          return Math.round(Math.max(0, Math.min(tr.right, r.right) - Math.max(tr.x, r.x))
+            * Math.max(0, Math.min(tr.bottom, r.bottom) - Math.max(tr.y, r.y)));
+        };
+        return {
+          decided: window.__sna.state().decided, toastArea: Math.round(tr.width * tr.height),
+          overA: over('#arena-a'), overB: over('#arena-b'),
+          tagA: over('.duel-half.a .duel-tag'), tagB: over('.duel-half.b .duel-tag'),
+        };
+      });
+      expect(seen.decided, `${vp.width}px: a wrong slice leaves the round live, which is what makes this matter`).toBe(false);
+      expect(seen.toastArea, `${vp.width}px: the toast is laid out, so there is something to cover an arena with`).toBeGreaterThan(0);
+      expect(seen.overA, `${vp.width}px: the toast covers none of Player 1's arena`).toBe(0);
+      expect(seen.overB, `${vp.width}px: the toast covers none of Player 2's arena`).toBe(0);
+      expect(seen.tagA + seen.tagB, `${vp.width}px: nor either player's name and score`).toBe(0);
+    }
+
+    // INPUT — still load bearing, and now for a different target. When the toast sat over the arenas it
+    // swallowed a slice; on the bar it covers `#qcard`, whose tap handler reads the question aloud again. A
+    // child who taps the card during a round announcement would get nothing, which is the same defect one step
+    // quieter. Asserted by what is actually under the point, and by driving a real pointer there: every other
+    // slice in this file goes through `window.__sna`, which calls the `Arena` directly and so cannot see
+    // anything sitting on top of anything.
     await resizeTo(page, { width: 844, height: 390 });
-    const dead = await page.evaluate(() => {
-      // Make the toast carry text and stay up, exactly as a round announcement leaves it.
+    const reach = await page.evaluate(() => {
       const t = document.querySelector('.toast') as HTMLElement;
       t.textContent = 'Player 1 takes the round!';
       t.classList.add('show', 'good');
       const r = t.getBoundingClientRect();
-      const hits: Record<string, number> = { a: 0, b: 0 };
-      for (const p of ['a', 'b']) {
-        document.querySelector(`#arena-${p}`)!.addEventListener('pointerdown', () => { hits[p]++; }, true);
-      }
-      (window as unknown as { __hits: Record<string, number> }).__hits = hits;
+      let taps = 0;
+      document.querySelector('#qcard')!.addEventListener('pointerdown', () => { taps++; }, true);
+      (window as unknown as { __taps: () => number }).__taps = () => taps;
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
       return {
-        w: r.width, h: r.height, cx: r.x + r.width / 2, cy: r.y + r.height / 2,
-        // The toast really is over an arena, so this case is not vacuous.
-        overA: r.bottom > document.querySelector('#arena-a')!.getBoundingClientRect().top,
+        cx: r.x + r.width / 2, cy: r.y + r.height / 2,
+        onToast: hit === t || !!hit?.closest('.toast'),
+        inCard: !!hit?.closest('#qcard'),
       };
     });
-    expect(dead.w, 'the toast is laid out, so there is something to swallow a slice').toBeGreaterThan(0);
-    expect(dead.overA, 'the toast overlaps an arena, so this case is not vacuous').toBe(true);
-    // What a child's hand does: an upward swipe begun in the arena's bottom inner corner.
-    await page.mouse.move(dead.cx - 60, dead.cy);
+    expect(reach.onToast, 'the toast does not take the point for itself').toBe(false);
+    expect(reach.inCard, 'the question card is what is under the toast, and is reachable').toBe(true);
+    await page.mouse.move(reach.cx, reach.cy);
     await page.mouse.down();
-    await page.mouse.move(dead.cx - 40, dead.cy - 30, { steps: 4 });
     await page.mouse.up();
-    const hits = await page.evaluate(() => (window as unknown as { __hits: Record<string, number> }).__hits);
-    expect(hits.a + hits.b, 'a slice begun under the faded toast still reaches an arena').toBeGreaterThan(0);
-    // And the element actually under that point is the canvas, not the thing floating over it.
-    const at = await page.evaluate(([x, y]) => {
-      const el = document.elementFromPoint(x, y);
-      return el ? el.tagName : 'null';
-    }, [dead.cx, dead.cy]);
-    expect(at, 'the arena is what is under the toast, not the toast').toBe('CANVAS');
+    const taps = await page.evaluate(() => (window as unknown as { __taps: () => number }).__taps());
+    expect(taps, 'a tap where the toast is still reaches the card that reads the question aloud').toBeGreaterThan(0);
   });
 
   test('portrait keeps the stacked duel as a fallback, and asks for a sideways screen (#388)', async ({ page }) => {
@@ -533,9 +610,9 @@ test.describe('Ninja Duel', () => {
     // construction and the rail could not have failed however wrong the CSS was.
     for (const vp of [{ width: 390, height: 844 }, { width: 800, height: 1280 }, { width: 320, height: 568 }]) {
       await resizeTo(page, vp);
-      for (const [what, html] of [...Object.entries(VISUALS), ['taller than anything in the pool', ABSURD] as const]) {
-        const P = await dressAndMeasure(page, html);
-        const where = `${vp.width}x${vp.height}, ${what}`;
+      for (const card of [...POOL_CARDS, ABSURD]) {
+        const P = await dressAndMeasure(page, card);
+        const where = `${vp.width}x${vp.height}, ${card.what}`;
         expect(P.b.bottom, `${where}: Player 2 keeps the top half`).toBeLessThanOrEqual(P.strip.y + 1);
         expect(P.strip.bottom, `${where}: Player 1 keeps the bottom half, the card between them`).toBeLessThanOrEqual(P.a.y + 1);
         expect(Math.abs(P.a.x - P.b.x), `${where}: the halves are stacked, not side by side`).toBeLessThan(2);
@@ -544,7 +621,7 @@ test.describe('Ninja Duel', () => {
         expect(Math.abs(P.canvasA.w - P.canvasB.w), `${where}: both arenas are the same width, to the subpixel`).toBeLessThan(0.5);
         // Asserted here, not merely measured. The previous version computed a crop count in portrait and then
         // never looked at it, which is how a budget that cut every tablet's counting card shipped green.
-        if (html !== ABSURD) expectNothingClipped(P, where);
+        if (card !== ABSURD) expectNothingClipped(P, where);
       }
       // The fallback's floor, once per viewport on the tallest card the pool can draw.
       //
@@ -555,7 +632,8 @@ test.describe('Ninja Duel', () => {
       // which is exactly why #388 calls this layout the fallback and not the design. So the floor is set to catch
       // the card GROWING — the failure this pull request could plausibly cause — not to assert that a 320px phone
       // in portrait is a good place to duel, which it is not.
-      const P = await dressAndMeasure(page, VISUALS['twelve objects to count (three rows)']);
+      const tallest = POOL_CARDS.find(c => c.what.startsWith('objects')) ?? POOL_CARDS[0];
+      const P = await dressAndMeasure(page, tallest);
       expect(P.a.h, `${vp.width}x${vp.height}: the portrait fallback keeps a floor under each arena`).toBeGreaterThan(vp.height * 0.24);
     }
   });
