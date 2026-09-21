@@ -1,5 +1,5 @@
 // Mission / endless session controller. Pure game logic (no DOM) so it can be unit-tested.
-import type { Difficulty, Question, Topic, YearInfo } from '../curriculum';
+import type { Difficulty, Question, Topic, Visual, YearInfo } from '../curriculum';
 import { shuffle } from '../curriculum/util';
 import { MODES, type Mode, type ModeCtx, type ModeSpec } from './modes';
 
@@ -36,6 +36,35 @@ export interface SessionResult { mode: Mode; won: boolean; score: number; stars:
  */
 export const starsForAccuracy = (acc: number): 1 | 2 | 3 => acc >= 0.95 ? 3 : acc >= 0.7 ? 2 : 1;
 export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number }
+
+/**
+ * Which `Visual` types carry their question in a form this key can read, and which part of them does it
+ * (PR #407 review, B1).
+ *
+ * The first cut stringified the **whole** visual, and decoration went into the card's identity: five
+ * Reception generators re-roll `emoji` per draw independent of the sum, so `1 + 4 = ?` came round twice
+ * running 11.75% of the time on `r-add` against 0.00% before, wearing a different sticker each time. A
+ * blocklist of cosmetic field names is not enough either — `r-balance` hides its re-rolled emoji *inside* a
+ * pan string (`emoji.repeat(n)`), and `y2-stats` inside a chart row's label.
+ *
+ * So this is an allowlist, and an absent type means **the old `(prompt, answer)` behaviour**: a visual this
+ * table does not know about can never make two cards look different, only ever the same. That is the safe
+ * direction — it can cost a re-roll that was not needed, never a repeat the re-roll existed to prevent.
+ *
+ * Only the three #390 names are here, because those are the ones where the visual *is* the question:
+ * `objects` for `r-oddeven`, `sentence` for `y2-sentencetype` and `y2-tense`, `symmetry` for `y2-symmetry`.
+ * Adding a type is a deliberate act, and the rails in `tests/unit/session.test.ts` measure both directions.
+ */
+const VISUAL_QUESTION = {
+  objects: (v: Extract<Visual, { type: 'objects' }>) => `${v.n}/${v.n2 ?? ''}`,
+  sentence: (v: Extract<Visual, { type: 'sentence' }>) => v.text,
+  symmetry: (v: Extract<Visual, { type: 'symmetry' }>) => v.grid.join('/'),
+} satisfies Partial<{ [T in Visual['type']]: (v: Extract<Visual, { type: T }>) => string }>;
+const visualKey = (v: Visual): string => {
+  const f = (VISUAL_QUESTION as Record<string, ((x: Visual) => string) | undefined>)[v.type];
+  return f ? f(v) : '';
+};
+const repeatKey = (q: Question) => `${q.prompt}\u0000${q.answer}\u0000${q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : ''}`;
 
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
@@ -93,8 +122,9 @@ export class Session {
     if (this.ended) return;
     const topic = this.pickTopic(); this.currentTopic = topic;
     let q = topic.gen(this.difficulty, this.rng);
-    // avoid immediate repeats
-    for (let i = 0; i < 5 && this.current && q.prompt === this.current.prompt && q.answer === this.current.answer; i++) q = topic.gen(this.difficulty, this.rng);
+    // avoid immediate repeats — of the whole card, not merely of its answer (#390)
+    const prev = this.current && repeatKey(this.current);
+    for (let i = 0; i < 5 && prev && repeatKey(q) === prev; i++) q = topic.gen(this.difficulty, this.rng);
     this.current = q; this.seqIndex = 0; this.waiting = false; this.questionsAsked++;
     this.ev.onQuestion(q, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(q) });
   }
