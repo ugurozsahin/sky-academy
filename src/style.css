@@ -1300,6 +1300,10 @@ img { -webkit-user-drag: none; }
   animation: pop .35s cubic-bezier(.2, 1.4, .4, 1);
 }
 @keyframes pop { from { transform: scale(.7); opacity: 0; } }
+/* #436: the certificate outcome, reported inside the results modal next to the 🎓 button rather than through
+   the shared `#toast` (which the overlay this modal lives in sits above and so covers). */
+.cert-msg { margin: 4px 0 0; text-align: center; font-size: 14px; font-weight: 700; color: var(--good); }
+.cert-msg.bad { color: var(--bad); }
 /* certificate full-screen fallback (artifact viewer with no downloads grant) */
 .cert-view {
   position: fixed;

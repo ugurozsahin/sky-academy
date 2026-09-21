@@ -40,8 +40,14 @@ const HOLD = { won: 1000, draw: 900, miss: 900 } as const;
  * can still take height off both children, and the rail must probe the real worst case rather than a copy of it
  * that drifts the moment a longer line is added here (PR #428 review, B2). `tests/unit/guardrails.test.ts`
  * holds it to being the genuine longest across every `toast(` in this file.
+ *
+ * The certificate outcome ('Certificate saved!' etc.) used to be the longest candidate and raised this same
+ * constant, but it never belonged to this class: it fires while the results overlay is up, and `#toast` sits
+ * BEHIND that overlay (`#436`) — the child never saw it. It now reports through `#cert-msg`, inside the overlay
+ * itself, so `#toast`'s only remaining raisers are the three round verdicts below, and this constant is the
+ * longest of THOSE — the draw line, which now raises it directly rather than repeating its text.
  */
-export const DUEL_TOAST_LONGEST = 'No problem — you can save it next time!';
+export const DUEL_TOAST_LONGEST = 'Nobody sliced it — no point';
 
 export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
@@ -149,7 +155,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       endWave(scaled(HOLD.won));
     },
     onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', scaled(HOLD.miss)); },
-    onRoundDraw() { sfx.miss(); toast('Nobody sliced it — no point', 'bad', scaled(HOLD.draw)); },
+    onRoundDraw() { sfx.miss(); toast(DUEL_TOAST_LONGEST, 'bad', scaled(HOLD.draw)); },
     onMatchEnd: r => later(() => showResults(r), scaled(HOLD.won) + scaled(300)),
   });
 
@@ -236,7 +242,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
         ${dojoRowsHTML(dojo)}
         ${stickersHTML(fresh)}
-        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div>' : ''}
+        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div><p class="cert-msg" id="cert-msg" role="status" hidden></p>' : ''}
         <div class="row"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
@@ -246,16 +252,22 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // below deliberately does the opposite and reads the live binding — it is asked "what has been earned
     // now?" and has to answer null before the match ends (#16 review, note 7).
     const earned = cert;
+    // #436: this outcome fires while `#overlay` is up, and the shared `#toast` sits BEHIND it (`grid-area: q`,
+    // z-index 3, under the overlay's z-index 5) — a child who taps 🎓 never saw whether it worked. `certMsg`
+    // reports inside the modal itself instead, next to the button that earned it, where nothing can cover it.
+    const certMsg = (text: string, bad = false) => {
+      const el = $('#cert-msg'); el.textContent = text; el.classList.toggle('bad', bad); el.hidden = false;
+    };
     if (earned) $('#cert').addEventListener('click', async () => {
       sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
       try {
         const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
-        if (how === 'shared') toast('Certificate shared!', 'good');
-        else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
-        else if (how === 'declined') toast(DUEL_TOAST_LONGEST, 'good');
-        // 'shown' opens the full-screen view with its own save hint, so no toast
+        if (how === 'shared') certMsg('Certificate shared!');
+        else if (how === 'saved' || how === 'downloaded') certMsg('Certificate saved!');
+        else if (how === 'declined') certMsg('No problem — you can save it next time!');
+        // 'shown' opens the full-screen view with its own save hint, so no message here
       }
-      catch { toast('Could not make the certificate', 'bad'); }
+      catch { certMsg('Could not make the certificate', true); }
       b.disabled = false;
     });
   }

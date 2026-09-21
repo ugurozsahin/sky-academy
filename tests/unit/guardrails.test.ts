@@ -1116,13 +1116,25 @@ describe('guard rails', () => {
     const raised = [...body.matchAll(/\btoast\(\s*(?:'([^']*)'|"([^"]*)"|`([^`]*)`)/g)]
       .map(m => (m[1] ?? m[2] ?? m[3]).replace(/\$\{NAME\[[^\]]+\]\}/g, seat))
       .filter(s => s.length > 0);
-    expect(raised.length, 'the toast call sites must be found, or this rail passes vacuously').toBeGreaterThanOrEqual(5);
+    // 2, not 5: #436 moved the certificate outcome ('Certificate saved!' etc.) off `#toast` entirely — it now
+    // reports through `#cert-msg`, inside the results overlay `#toast` sits BEHIND — so the family this rail
+    // guards has shrunk to the round verdicts that still share the query-bar slot. `onRoundWon`/`onRoundMiss`
+    // are the two left as string literals; the draw verdict raises the constant directly (checked below) rather
+    // than repeating its text, so it is deliberately not double-counted here.
+    expect(raised.length, 'the toast call sites must be found, or this rail passes vacuously').toBeGreaterThanOrEqual(2);
     // The constant is raised by a real call site, not merely declared beside them.
     expect(body, 'DUEL_TOAST_LONGEST is what one of those calls passes').toMatch(/toast\(DUEL_TOAST_LONGEST/);
     for (const s of raised) {
       expect(s.length, `"${s}" is longer than DUEL_TOAST_LONGEST, so the e2e layout rail no longer measures the worst case`)
         .toBeLessThanOrEqual(longest.length);
     }
+    // #436: the certificate outcome must stay off `#toast` — the whole reason it moved — so a regression that
+    // routes it back through `toast(` (where the overlay hides it again) is caught here rather than by a child
+    // never seeing whether their certificate saved.
+    expect(body, 'the certificate outcome is reported through #cert-msg, not the toast the overlay covers')
+      .toMatch(/certMsg\(/);
+    expect(body, 'and never back through toast() — that is the bug #436 fixed')
+      .not.toMatch(/toast\(['"`](?:Certificate|Could not make the certificate)/);
     // And the e2e really uses it, rather than a copy that drifts the moment this constant changes.
     const spec = readFileSync(new URL('../e2e/duel.spec.ts', import.meta.url), 'utf8');
     expect(spec, 'the duel spec imports the constant').toContain("import { DUEL_TOAST_LONGEST } from '../../src/ui/duel'");

@@ -192,6 +192,18 @@ test.describe('Ninja Duel', () => {
     // overlay is built, BEFORE the 🎓 button is pressed (#205's rule, the bug being a device where pressing it
     // does nothing). Read from the save, not the overlay: the button would be on screen with nothing recorded.
     await expect(page.locator('.duel-end #cert')).toBeVisible();
+    // #436: the certificate outcome used to report through the shared `#toast`, which sits BEHIND this results
+    // overlay (`#toast` is `grid-area: q`, z-index 3; `.overlay` is z-index 5) — a child pressing 🎓 never saw
+    // whether it worked. It now reports through `#cert-msg`, inside the modal itself, so nothing can cover it.
+    // Forcing the 'save' route the same way `game.spec.ts`'s certificate test does, for a deterministic outcome
+    // headless Chromium's real Web Share cannot give.
+    await page.evaluate(() => {
+      (navigator as any).canShare = () => false;
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async () => ({ status: 'saved' }) } : null };
+    });
+    await page.click('.duel-end #cert');
+    await expect(page.locator('.duel-end #cert-msg'), 'reported where the child is already looking, not behind the overlay').toHaveText('Certificate saved!');
+    await page.evaluate(() => { delete (window as any).claude; });   // leave the runtime clean for the rest of the test
     // ...and the history takes the same match (#415 review, note 3). The loss test below proved a row is
     // filed with no certificate; this proves the win path files exactly one of each, not two rows or none.
     const won = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).duels);
