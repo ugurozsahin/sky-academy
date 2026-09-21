@@ -1561,7 +1561,10 @@ test.describe('Sky Ninja Academy', () => {
       if (theme !== 'shapes') await page.click('#back');
     }
     expect(theme, 'a 3-D shapes board came up inside 60 draws').toBe('shapes');
-    await expect(page.locator('.card')).toHaveCount(10);
+    // The count comes from the DECK, not a literal 10 (#372 review round 2, note 2): this is a rail about
+    // GEOMETRY, and a literal would turn it red for a curriculum reason the moment a shape table grew.
+    const cards = await page.evaluate(() => window.__sna.memory.pairs.length * 2);
+    await expect(page.locator('.card')).toHaveCount(cards);
     const rows = await page.evaluate(() => {
       const grid = document.querySelector('#cards')!.getBoundingClientRect();
       const byRow = new Map<number, DOMRect[]>();
@@ -1575,13 +1578,14 @@ test.describe('Sky Ninja Academy', () => {
         right: Math.round(grid.right - Math.max(...cards.map(c => c.right))),
       }));
     });
-    expect(rows.length, 'ten cards in four columns is three rows').toBe(3);
+    expect(rows.length, 'the deck fills whole rows of four plus a short one').toBe(Math.ceil(cards / 4));
     for (const r of rows) {
       // The gap each side of a row is equal: a full row has none, and a short one is centred rather than
       // pushed against the left edge with the whole remainder showing on the right.
       expect(Math.abs(r.left - r.right), `a row of ${r.n} sits centred (left ${r.left}px, right ${r.right}px)`).toBeLessThanOrEqual(2);
     }
-    expect(rows.map(r => r.n), 'and the short row is the last one').toEqual([4, 4, 2]);
+    expect(rows.map(r => r.n).slice(0, -1).every(n => n === 4), 'every row but the last is full').toBe(true);
+    expect(rows[rows.length - 1].n, 'and the short row is the last one').toBe(cards % 4 || 4);
   });
 
   // #138: the one test that still walks the whole cold start — avatar screen → intro (#67) → sky map → island

@@ -121,8 +121,13 @@ export function pickTheme(year: YearId, rng: Rng = Math.random, id?: string): Th
  * the size it has always been and every word whole. So `cols` is the constant the screen already had, and
  * `offset` is the only new thing: how far in the last row starts when it does not fill.
  */
-export function gridFor(cards: number): { cols: number; offset: number } {
+export function gridFor(cards: number): { cols: number; offset: number; lastRowStart: number } {
   const cols = 4;
   const short = cards % cols;
-  return { cols, offset: short ? Math.floor((cols - short) / 2) : 0 };
+  // `lastRowStart` is the INDEX of the card the offset applies to, or -1 when the grid comes out square, so
+  // the caller has nothing left to derive (#372 review round 2, note 6). It was `cards % cols` again in
+  // `src/ui/memory.ts`, gated on `offset` being non-zero — which disagree for a row of three, where the row
+  // is short and `Math.floor((4 - 3) / 2)` is 0. Unreachable on a deck of pairs, and not the caller's to
+  // know: this function owns the arithmetic or it owns nothing.
+  return { cols, offset: short ? Math.floor((cols - short) / 2) : 0, lastRowStart: short ? cards - short : -1 };
 }

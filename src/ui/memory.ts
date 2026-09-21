@@ -27,8 +27,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
   // the deck instead, because a five-pair board is ten cards and four columns lay it out ragged (#372 review
   // B1). `offset` moves the first card of a short last row inwards so the row is centred rather than hanging
   // off the left edge; it is 0 for every board the game deals today.
-  const { cols, offset } = gridFor(game.cards.length);
-  const firstOfLastRow = offset ? game.cards.length - (game.cards.length % cols) : -1;
+  const { cols, offset, lastRowStart } = gridFor(game.cards.length);
   render(`
   <section class="screen memory" style="--glow:${av.glow}">
     <div class="hud-top">
@@ -43,7 +42,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     </div>
     <div class="toast" id="toast" aria-live="polite"></div>
     <div class="cards" id="cards" style="--cols:${cols}" role="grid" aria-label="Memory cards">
-      ${game.cards.map((c, i) => `<button class="card" data-i="${i}"${i === firstOfLastRow ? ` style="grid-column-start:${offset + 1}"` : ''} aria-label="Card ${i + 1}"><span class="inner"><span class="back">?</span><span class="front">${faceHTML(c.face)}</span></span></button>`).join('')}
+      ${game.cards.map((c, i) => `<button class="card" data-i="${i}"${i === lastRowStart ? ` style="grid-column-start:${offset + 1}"` : ''} aria-label="Card ${i + 1}"><span class="inner"><span class="back">?</span><span class="front">${faceHTML(c.face)}</span></span></button>`).join('')}
     </div>
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');

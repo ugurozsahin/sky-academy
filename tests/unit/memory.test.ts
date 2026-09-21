@@ -18,12 +18,14 @@ describe('memory decks', () => {
         // from `SAME_SOLID` (#372), so one row is always dropped. A smaller board, not a wrong one —
         // Reception plays four — and the rail below is what says which of the two it is.
         //
-        // DERIVED from the table, not the literal 5 that was here first (#372 review, note 6): a legitimate
-        // seventh solid would otherwise fail this unrelated assertion with `expected 6 to be 5`. The pin is
-        // not lost — `asked` is still the deck's own request, and `solidsLost` is still exactly 1 today.
+        // DERIVED from the table, not the literal 5 that was here first — and derived the way `shapes()`
+        // actually behaves, which the first attempt did not (#372 review round 2, note 1): it returns
+        // `min(max asked, rows - solidsLost)`, so subtracting `solidsLost` from the request alone still failed
+        // on a seventh NON-solid row with `expected 6 to be 5`, buying nothing over the literal while reading
+        // as if it did. Both growths are right now: a seventh solid, and a seventh row that is not one.
         const solidsLost = Math.max(0, SHAPES_3D.filter(r => SAME_SOLID.has(r[1])).length - 1);
         const asked = y.id === 'reception' ? 4 : 6;
-        const want = y.id === 'year2' && theme.id === 'shapes' ? asked - solidsLost
+        const want = y.id === 'year2' && theme.id === 'shapes' ? Math.min(asked, SHAPES_3D.length - solidsLost)
           : y.id === 'reception' ? 4 : y.id === 'year1' ? 6 : theme.id === 'words' ? 6 : 8;
         expect(pairs.length, `${y.id}/${theme.id}`).toBe(want);
         expect(new Set(pairs.map(p => faceKey(p.a))).size, `${y.id}/${theme.id} left faces`).toBe(pairs.length);
@@ -36,8 +38,17 @@ describe('memory decks', () => {
   // "cuboid" sat on the same board, and a cube IS a cuboid — the Year 1 NC's own "cuboids including cubes".
   // `shapes()` pairs one glyph with one name, so the child who pairs the die with "cuboid" was scored a MISS
   // for doing what the curriculum teaches. `SAME_SOLID` is the shared rule (`src/curriculum/util.ts`) and
-  // `maths.ts` has honoured it in its decoys since #371; this is the deck honouring it too. Every theme of
-  // every year, not just the 3-D one, so a future table that names two of a class cannot slip in beside it.
+  // `maths.ts` has honoured it in its decoys since #371; this is the deck honouring it too.
+  //
+  // **What this holds is exactly "no board carries two names from `SAME_SOLID`" — the one two-name set — and
+  // NOT "no board names two shapes of a kind"** (#372 review round 2, B1). The wider claim was written here
+  // first and it is false today, not in some future table: `SHAPES_2D` holds `■ square` and `▬ rectangle`,
+  // Reception deals `slice(0, 4)` and Year 1 deals all six, so EVERY 2-D board carries both — and the Year 1
+  // NC says "rectangles (including squares)", word for word the construction this fix is built on. That
+  // instance is **#476**, not this rail's to catch: `SAME_SOLID` cannot express a second group at all (see
+  // `src/game/memory.ts`), and adding one needs a `Map<name, groupId>` with `maths.ts`'s pairwise reader
+  // changed in step. Running over every theme of every year is coverage, so a later table adding a `SAME_SOLID`
+  // name is caught wherever it lands — it is not a claim about shapes the set does not name.
   it('no board carries two names from SAME_SOLID — a cube is a cuboid', () => {
     const solids = new Set<string>();
     for (const y of YEARS) for (const theme of THEMES[y.id] ?? []) for (let seed = 1; seed <= 120; seed++) {
@@ -48,9 +59,11 @@ describe('memory decks', () => {
       const names = pairs.flatMap(p => [p.a.text, p.b.text]).filter(t => SAME_SOLID.has(t));
       expect(names.length, `${y.id}/${theme.id} seed ${seed} offered ${names.join(' and ')}`).toBeLessThanOrEqual(1);
       if (y.id === 'year2' && theme.id === 'shapes') for (const n of names) solids.add(n);
-      // The convention itself, on the decks `shapes()` builds, so note 2's swap is a failure with a message
-      // rather than a silent pass: `shapes()` puts the GLYPH on `a` and the NAME on `b`, and a name is the
-      // one face whose spoken form is its own text. (`count` pairs '🐸🐸' with 'two', so this is not general.)
+      // The glyph-on-`a`, name-on-`b` convention, on the decks `shapes()` builds. Stated plainly (#372 review
+      // round 2, note 5): `b: txt(name, name, …)` makes this `name === name`, so it catches a swap only when
+      // the swap moves the glyph onto `b` while `say` keeps the name — which is the swap round 1 found. It is
+      // a statement of the convention, NOT what holds the line; the `names` union above is that, and it reads
+      // both faces for exactly this reason. (`count` pairs '🐸🐸' with 'two', so this is not general.)
       if (theme.id === 'shapes') for (const p of pairs) expect(p.b.text, `${y.id}/${theme.id}: the NAME is the right-hand face`).toBe(p.b.say);
     }
     // Which solid survives is alternation, not a fixed winner: `if (name === 'cuboid') continue;` satisfies
@@ -69,15 +82,18 @@ describe('memory decks', () => {
       const short = cards % cols;
       const gapLeft = offset, gapRight = short ? cols - short - offset : 0;
       expect(Math.abs(gapLeft - gapRight), `${y.id}/${theme.id} (${cards} cards): a short row sits centred`).toBeLessThanOrEqual(1);
-      expect(offset + short, `${y.id}/${theme.id}: the last row fits the grid`).toBeLessThanOrEqual(cols);
     }
     // Four columns for every board, which is what keeps the cards the size a five-year-old taps: five columns
     // were built and rendered first and broke the names mid-syllable at 390px (`spher/e`, `cylin/der`).
-    expect(gridFor(8)).toEqual({ cols: 4, offset: 0 });
-    expect(gridFor(10), 'ten cards: 4 + 4 + 2, the two centred').toEqual({ cols: 4, offset: 1 });
-    expect(gridFor(12)).toEqual({ cols: 4, offset: 0 });
-    expect(gridFor(14), 'a three-short row is centred as near as an even grid allows').toEqual({ cols: 4, offset: 1 });
-    expect(gridFor(16)).toEqual({ cols: 4, offset: 0 });
+    expect(gridFor(8)).toEqual({ cols: 4, offset: 0, lastRowStart: -1 });
+    expect(gridFor(10), 'ten cards: 4 + 4 + 2, the two centred').toEqual({ cols: 4, offset: 1, lastRowStart: 8 });
+    expect(gridFor(12)).toEqual({ cols: 4, offset: 0, lastRowStart: -1 });
+    expect(gridFor(16)).toEqual({ cols: 4, offset: 0, lastRowStart: -1 });
+    // A board is pairs x 2, so `cards` is always even and `short` is always 0 or 2 — 14 is the same case as
+    // 10 and was labelled as a third one (#372 review round 2, note 3). The odd counts are asked directly so
+    // the asymmetric branch is not dead code: a row of 3 cannot sit dead centre in 4 columns, and 1 can.
+    expect(gridFor(9), 'nine: a row of 1, centred as near as four columns allow').toEqual({ cols: 4, offset: 1, lastRowStart: 8 });
+    expect(gridFor(15), 'fifteen: a row of 3, which four columns cannot centre exactly').toEqual({ cols: 4, offset: 0, lastRowStart: 12 });
   });
 
   it('year ranges: Reception counts to 6 and words to five, Y1 words within 20, Y2 words 21–99 and tables 2/5/10', () => {
