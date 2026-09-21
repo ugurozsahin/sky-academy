@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { activeProfile, addProfile, MAX_PROFILES, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
-import { duelHeadline, duelHistoryLine } from '../../src/game/duel';
+import { duelHeadline, duelHistoryLine, type DuelResult } from '../../src/game/duel';
 import { carriedStreak } from '../../src/game/dojo';
 import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
@@ -392,6 +392,7 @@ describe('duel history (#16)', () => {
   it('caps the history, dropping the oldest', () => {
     let list: StoredDuel[] = [];
     for (let i = 0; i < DUEL_CAP + 5; i++) list = fileDuel(list, duel({ at: i }));
+    expect(DUEL_CAP, 'the value the docstring argues for — "the last few sessions", not an award').toBe(20);
     expect(list.length).toBe(DUEL_CAP);
     expect(list[0].at).toBe(DUEL_CAP + 4);                              // newest kept
     expect(list.some(m => m.at === 0)).toBe(false);                     // oldest dropped
@@ -448,16 +449,23 @@ describe('duel history (#16)', () => {
   // Read down a column of twenty rows, a scoreline sorted by winner puts Player 1's score on the left in some
   // rows and the right in others, so "am I getting better?" cannot be answered by looking.
   it('reads a row in seat order, naming the winner in words', () => {
-    expect(duelHistoryLine({ winner: 'a', scoreA: 6, scoreB: 4 })).toBe('Player 1 won · 6–4');
-    expect(duelHistoryLine({ winner: 'b', scoreA: 3, scoreB: 7 })).toBe('Player 2 won · 3–7');
-    expect(duelHistoryLine({ winner: 'draw', scoreA: 5, scoreB: 5 })).toBe('A draw · 5–5');
+    expect(duelHistoryLine(duel({ winner: 'a', scoreA: 6, scoreB: 4 }))).toBe('Player 1 won · 6–4');
+    expect(duelHistoryLine(duel({ winner: 'b', scoreA: 3, scoreB: 7 }))).toBe('Player 2 won · 3–7');
+    expect(duelHistoryLine(duel({ winner: 'draw', scoreA: 5, scoreB: 5 }))).toBe('A draw · 5–5');
     // The losing seat's score stays on its own side. This compares the SCORELINE half only: the two rows have
     // different winners, so comparing the whole string is green whatever the scoreline does — it was a vacuous
     // assertion until PR #415's review caught it. Under a sorting mutant both halves read "7–3" and this fails.
     const scoreline = (l: string) => l.split(' · ')[1];
-    expect(scoreline(duelHistoryLine({ winner: 'b', scoreA: 3, scoreB: 7 }))).toBe('3–7');
-    expect(scoreline(duelHistoryLine({ winner: 'b', scoreA: 3, scoreB: 7 })))
-      .not.toBe(scoreline(duelHistoryLine({ winner: 'a', scoreA: 7, scoreB: 3 })));
+    expect(scoreline(duelHistoryLine(duel({ winner: 'b', scoreA: 3, scoreB: 7 })))).toBe('3–7');
+    expect(scoreline(duelHistoryLine(duel({ winner: 'b', scoreA: 3, scoreB: 7 }))))
+      .not.toBe(scoreline(duelHistoryLine(duel({ winner: 'a', scoreA: 7, scoreB: 3 }))));
+    // **The type claim, pinned.** `duelHistoryLine`'s docstring says a live `DuelResult` is rejected, and
+    // that sentence shipped false twice (#415 rounds 1 and 2) because nothing held it. If the parameter is
+    // ever widened back to a structural shape or a `Pick` that `DuelResult` satisfies, this stops being an
+    // error and `@ts-expect-error` fails the build — which is the only way this claim stays true.
+    const live: DuelResult = { winner: 'b', scoreA: 3, scoreB: 7, rounds: 10, tally: { a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } } };
+    // @ts-expect-error a DuelResult is not a StoredDuel: no `at`, `topic`, `title` or `year`.
+    duelHistoryLine(live);
     // And the headline it is deliberately not: that one sorts, because it is read out once about one match.
     expect(duelHeadline({ winner: 'b', scoreA: 3, scoreB: 7, rounds: 10, tally: { a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } } })).toBe('Player 2 wins 7–3!');
   });

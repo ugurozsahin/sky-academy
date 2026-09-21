@@ -284,12 +284,16 @@ export function duelHeadline(r: DuelResult): string {
  * getting better?" cannot be answered by looking. Seat order costs nothing here, because the row already
  * names the winner in words.
  *
- * Typed against `StoredDuel` rather than a structural shape, because a row in the history is exactly what
- * the save holds. The structural version did not buy what this sentence used to claim (#415 review, note 8):
- * `DuelResult` satisfies it, so `duelHistoryLine(r)` on the live result compiled in silence. It no longer
- * does — `DuelResult` has no `topic`, so it is not assignable to the `Pick` below.
+ * Takes a whole `StoredDuel`, because a row in the history is exactly what the save holds — and because
+ * the narrower shapes do not buy what this paragraph is here to claim. It has now been wrong twice, so the
+ * claim is pinned by a compiler probe rather than by this sentence (#415 review rounds 1 and 2): the
+ * structural `{ winner; scoreA; scoreB }` admitted `DuelResult`, and so did
+ * `Pick<StoredDuel, 'winner' | 'scoreA' | 'scoreB'>` — naming `topic` as the discriminator while leaving it
+ * out of the `Pick`. `StoredDuel` requires `at`, `topic`, `title` and `year`, none of which a
+ * `DuelResult` has, so passing the live result is now a type error; `tests/unit/storage.test.ts` holds that
+ * with a `@ts-expect-error` that fails the build if it ever stops being one.
  */
-export function duelHistoryLine(d: Pick<StoredDuel, 'winner' | 'scoreA' | 'scoreB'>): string {
+export function duelHistoryLine(d: StoredDuel): string {
   const who = d.winner === 'draw' ? 'A draw' : `Player ${d.winner === 'a' ? 1 : 2} won`;
   return `${who} · ${d.scoreA}–${d.scoreB}`;
 }

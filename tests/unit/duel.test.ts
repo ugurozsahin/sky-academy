@@ -719,12 +719,23 @@ describe('duelHistoryHTML ("Recent duels", #16)', () => {
     expect(h).not.toContain('cert-open');
   });
 
-  it('dates a row the British way and without a year, unlike a certificate row', () => {
+  it('subtitles a row with the year group and a British, year-less date', () => {
     const h = duelHistoryHTML([storedDuel()]);
-    expect(h).toContain('6 Sept');
+    // The WHOLE subtitle, not a substring of it (#415 round 2, B2 and note 4). `toContain('6 Sept')` passed
+    // under `month: 'long'` ("6 September") and said nothing at all about `year`, so dropping the year group
+    // from the row was green — and `StoredDuel.year`'s own comment promises the title, never the id.
+    expect(h).toContain('<small>Year 1 · 6 Sept</small>');
     // The deliberate difference from `certAlbumHTML`, which renders "6 Sept 2026": twenty rows from the last
     // fortnight all carry the same year, and the row needs the width for its scoreline.
     expect(h).not.toContain('6 Sept 2026');
+  });
+
+  it('names the topic the match was played on, not the id', () => {
+    // `topic` is the durable key and `title` is what a child reads; the row shows the title. Swapping them at
+    // the `recordDuel` call site used to pass, because nothing asserted which one reached the row.
+    const h = duelHistoryHTML([storedDuel({ topic: 'y1-bonds', title: 'Number Bonds' })]);
+    expect(h).toContain('<b>Number Bonds</b>');
+    expect(h).not.toContain('y1-bonds');
   });
 
   it('escapes a hand-edited title/year rather than injecting markup', () => {

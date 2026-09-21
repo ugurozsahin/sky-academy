@@ -618,9 +618,14 @@ test.describe('Ninja Duel', () => {
     // read as a run of victories.
     const duels = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).duels);
     expect(duels.length, 'a loss is still a match the history keeps').toBe(1);
-    expect(duels[0]).toMatchObject({ winner: 'b', scoreA: 4, scoreB: 6, rounds: 10 });
+    // The FULL stored shape (#415 round 2, B2): `year` is the title the row prints and `topic` the durable
+    // id it does not, and neither was read back here — so `o.year.title` → `o.year.id` would have shipped
+    // "year1" to a child with the suite green, and swapping `topic` and `title` would have passed too.
+    expect(duels[0]).toMatchObject({ winner: 'b', scoreA: 4, scoreB: 6, rounds: 10, year: 'Year 1' });
     expect(typeof duels[0].at, 'stamped, so the list can order itself').toBe('number');
-    expect(duels[0].title, 'the topic the match was played on').toBeTruthy();
+    expect(duels[0].topic, 'the topic id, which survives a rename').toMatch(/^y1-/);
+    expect(duels[0].title, 'and the title a child reads, which does not').toBeTruthy();
+    expect(duels[0].title).not.toBe(duels[0].topic);
   });
 
   test('a finished match moves the day\'s Daily Dojo challenge and pays its bonus into the same save (#16 item 5)', async ({ page }) => {
