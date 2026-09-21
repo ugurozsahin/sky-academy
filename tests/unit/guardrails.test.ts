@@ -1164,8 +1164,6 @@ describe('guard rails', () => {
   // the rest idle: CI run 35640634022 paid 416 s of a 488 s job while worker 2 sat done after 57 s.
   // This is worth a rail because turning it back off breaks NOTHING that goes red. The suite still passes,
   // just three times slower, and a regression whose only symptom is a bill is one nobody files.
-  // This is worth a rail because turning it back off breaks NOTHING that goes red. The suite still passes,
-  // just three times slower, and a regression whose only symptom is a bill is one nobody files.
   //
   // **The first version of this rail matched TEXT, and review of PR #487 found three ways round it in one
   // round** — a spread defined above `defineConfig(` and mixed into a project; a spec in a subdirectory the
@@ -1177,6 +1175,17 @@ describe('guard rails', () => {
   // fourth exists. So the fix is not a fourth regex. It is to **stop reading the text and read the value**:
   // import the config and ask what Playwright will actually resolve. A spread resolves. An indirection
   // resolves. A computed value resolves. A comment cannot lie to it because no comment is read.
+  //
+  // Round 2 found the SECOND lever still failing the first way, and named the shape better than round 1 did:
+  // a check that **substitutes a placeholder for a value it does not recognise** cannot fail on the values it
+  // does not recognise. `workers` is typed `number | string` and a percentage is resolved against the
+  // runner's cores at run time, so `'50%'` is one worker on a two-core box — and this rail used to default
+  // any non-number to a passing `2`. One rule now covers both levers: **what this rail cannot judge, it
+  // refuses.** Not a number above 1, or a worker flag on the command line in any spelling — red, and say so.
+  //
+  // The ceiling of "read the resolved value", stated because the next rail to use the technique should know
+  // it: a config that reads its own importer (`process.env.VITEST ? … : …`) resolves one way here and
+  // another under Playwright. Nothing in this file can close that, and nothing pretends to.
   //
   // What is left textual is the spec half, and deliberately: Playwright's reporters do not expose a file's
   // parallel mode, so there is nothing to ask. That half reads RAW text rather than `code()` — the opposite
@@ -1195,18 +1204,35 @@ describe('guard rails', () => {
       // fine — which is exactly what the text version could not see through a spread.
       expect(p.fullyParallel ?? cfg.fullyParallel, `project '${p.name}' resolves fullyParallel to false — however it is spelt, that project is back to one file at a time (#483)`).toBe(true);
     }
-    // Same class, other lever: one worker makes the flag moot without touching it. Unset is the default
-    // (half the logical cores) and is what every measurement in #483 was taken at.
-    expect(typeof cfg.workers === 'number' ? cfg.workers : 2,
-      'workers: 1 runs the suite one test at a time with fullyParallel still reading true — if a run genuinely needs it, say why here (#483)').toBeGreaterThan(1);
-    // ...and the same lever on the command line, where no config rail can see it.
+    // Same class, other lever: one worker makes the flag moot without touching it. `workers` is typed
+    // `number | string` and a percentage is resolved against the runner at RUN time (`resolveWorkers`,
+    // playwright/lib/common/config.js), so no value this rail can see tells it how many workers a runner
+    // will get. Unset is the default — half the logical cores — and is what every #483 measurement was
+    // taken at. So the rule is not "is it 1?" but "can this rail judge it at all?", and an unjudgeable
+    // value fails. `? cfg.workers : 2` here used to hand a passing number to every value it did not
+    // understand, which is the defect the config half above was rewritten to remove, in the same rail.
+    expect(cfg.workers === undefined || (typeof cfg.workers === 'number' && cfg.workers > 1),
+      `workers is ${JSON.stringify(cfg.workers)} — leave it unset, or give a plain number above 1. One worker runs the suite a test at a time with fullyParallel still resolving true, and a percentage takes its meaning from the runner, so this rail cannot approve it on sight (#483)`).toBe(true);
+    // ...and the same lever on the command line, where no config rail can see it. "No worker flag at all"
+    // rather than "not --workers=1": the flag has a short form (`-j`), takes `=` or a space, and a
+    // percentage means whatever the runner makes it — so there is no value this rail could approve by
+    // reading. ci.yml passes none today, and every #483 measurement was taken with none.
     const e2eStep = workflow('ci.yml').split('\n').filter(l => l.includes('playwright test')).join('\n');
     expect(e2eStep, 'the rail must have found the e2e command in ci.yml').toContain('playwright test');
-    expect(e2eStep, 'ci.yml must not pin the e2e run to one worker — that is #483 undone from the command line').not.toMatch(/--workers[= ]1\b/);
+    expect(e2eStep, "ci.yml's e2e command must pass no worker flag at all — `--workers` or `-j`, in any spelling, is #483 undone from the command line where no config rail can see it (#483)")
+      .not.toMatch(/--workers|(?<![\w-])-j/);
 
     // The spec half. RECURSIVE, because Playwright's own discovery is: a spec under tests/e2e/sub/ runs, and
     // the first version of this rail never opened it. Raw text, quote-agnostic: `mode: "serial"` type-checks
-    // just as well as `mode: 'serial'`, and `describe.serial` is a third spelling of the same thing.
+    // just as well as `mode: 'serial'`, `describe.serial` is a third spelling and `describe['serial']` a
+    // fourth (round 2 — semantically identical, and the dot form is what the regex used to want).
+    //
+    // `isDirectory()` deliberately, WITHOUT `isSymbolicLink()`. That looks like the same non-recursive gap
+    // one level down, and it was raised as one — but measured, Playwright does not follow a symlinked
+    // directory either: `--list` reports the same 106 tests with `tests/e2e/link -> /tmp/outside` present as
+    // without it, that directory's spec included. This walk is meant to mean "everything Playwright would
+    // discover", so following the link would make the rail STRICTER than the thing it models and turn red
+    // on a file that never runs. If Playwright's discovery ever changes, this changes with it.
     const dir = new URL('../../tests/e2e/', import.meta.url);
     const specs: string[] = [];
     const walk = (rel: string) => {
@@ -1218,7 +1244,8 @@ describe('guard rails', () => {
     walk('');
     expect(specs.length, 'the e2e specs must be read from disk — an empty walk would pass vacuously').toBeGreaterThanOrEqual(3);
     const serial = specs.filter(f =>
-      /mode:\s*['"`]serial['"`]|describe\.serial\b/.test(readFileSync(new URL(f, dir), 'utf8')));
+      /mode:\s*['"`]serial['"`]|describe\s*(?:\.\s*serial\b|\[\s*['"`]serial['"`]\s*\])/
+        .test(readFileSync(new URL(f, dir), 'utf8')));
     expect(serial, 'no e2e spec may re-serialise itself — that undoes #483 for that file with the config still resolving true. If a flow genuinely needs ordering, scope it to its own describe and name it here with the reason')
       .toEqual([]);
   });
