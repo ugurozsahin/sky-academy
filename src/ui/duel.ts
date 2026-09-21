@@ -284,7 +284,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
  * settled; this is the same row with the scoreline where the stars sit, and no View button, because a duel has
  * nothing to redraw.
  *
- * **The empty state has its own class**, `duel-empty`, sharing `cert-empty`'s rule rather than its name.
+ * **Every borrowed class carries a `duel-` twin**: `cert-list duel-list`, `cert-row duel-row`, and the
+ * empty state is `duel-empty` alone. The rules come from the album; the *names* have to stay tellable apart.
  * Reusing the name looked right — same box, same shape of words — and it silently broke the certificate
  * album's own e2e, which asserts `.cert-empty` has count 0 to mean "a certificate is listed". One class
  * cannot mean both "no certificates" and "no duels" on a screen that shows both lists at once.
@@ -300,7 +301,7 @@ export function duelHistoryHTML(duels: StoredDuel[]): string {
     const sub = `${esc(m.year)}${date ? ` · ${date}` : ''}`;
     const ava = '<span class="cert-ava duel-ava" aria-hidden="true">⚔️</span>';
     const info = `<div class="cert-info"><b>${esc(m.title)}</b><small>${sub}</small></div>`;
-    return `<div class="cert-row">${ava}${info}<span class="duel-line">${esc(duelHistoryLine(m))}</span></div>`;
+    return `<div class="cert-row duel-row">${ava}${info}<span class="duel-line">${esc(duelHistoryLine(m))}</span></div>`;
   }).join('');
-  return `<div class="cert-list">${rows}</div>`;
+  return `<div class="cert-list duel-list">${rows}</div>`;
 }

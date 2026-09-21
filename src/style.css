@@ -597,8 +597,11 @@ img { -webkit-user-drag: none; }
 .cert-stars { flex: none; color: var(--accent); font-size: 15px; }
 .cert-open { flex: none; min-height: 44px; padding: 0 14px; font-size: 14px; }
 /* "Recent duels" (#16): the certificate row reused, with the scoreline where the stars sit and no View button
-   (a duel has nothing to redraw). `--glow` is set here because `.cert-ava` reads it and no avatar supplies one
-   on this row — without it both of that rule's color-mix declarations are invalid and the disc loses its ring. */
+   (a duel has nothing to redraw). `--glow` is set here because `.cert-ava` reads it for the disc's tint and
+   ring, and no avatar supplies one on this row. It does not prevent a breakage — `:root` declares `--glow`
+   and custom properties inherit, so without this line the ring still renders, in `:root`'s blue (#415 review,
+   note 2, which corrected an earlier claim here that it would vanish). It buys the amber that matches the
+   row's ⚔️ instead of a blue that matches nothing on it. */
 .duel-ava { --glow: var(--accent); font-size: 22px; line-height: 1; }
 .duel-line { flex: none; font-weight: 700; font-size: 14px; color: var(--muted); white-space: nowrap; }
 .coin-row { display: flex; justify-content: center; gap: 10px; margin: -6px 0 12px; flex-wrap: wrap; }

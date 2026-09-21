@@ -189,6 +189,11 @@ test.describe('Ninja Duel', () => {
     // overlay is built, BEFORE the 🎓 button is pressed (#205's rule, the bug being a device where pressing it
     // does nothing). Read from the save, not the overlay: the button would be on screen with nothing recorded.
     await expect(page.locator('.duel-end #cert')).toBeVisible();
+    // ...and the history takes the same match (#415 review, note 3). The loss test below proved a row is
+    // filed with no certificate; this proves the win path files exactly one of each, not two rows or none.
+    const won = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).duels);
+    expect(won, 'a win files one history row, like every other outcome').toHaveLength(1);
+    expect(won[0]).toMatchObject({ winner: 'a', scoreA: 6, scoreB: 4, rounds: 10 });
     const filed = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs);
     expect(filed, 'one entry per year, so a rematch upgrades rather than fills the album').toHaveLength(1);
     expect(filed[0]).toMatchObject({
@@ -648,7 +653,11 @@ test.describe('Ninja Duel', () => {
     // profile, so there is no second child to award. The negative case for the 6–4 test above: no button, no
     // album entry, and nothing for the hook to draw.
     await expect(page.locator('.duel-end #cert')).toHaveCount(0);
-    expect(saved.certs, 'a drawn match files nothing').toEqual([]);
+    expect(saved.certs, 'a drawn match files no certificate').toEqual([]);
+    // But the history still takes it, and this is the only place `winner: 'draw'` is written by the real
+    // screen rather than by a fixture (#415 review, note 3) — the value `duelHistoryLine` renders as "A draw".
+    expect(saved.duels, 'a draw is still a match that happened').toHaveLength(1);
+    expect(saved.duels[0]).toMatchObject({ winner: 'draw', scoreA: 5, scoreB: 5, rounds: 10 });
     expect(await page.evaluate(() => window.__sna.certificate())).toBeNull();
     expect(await page.evaluate(() => window.__sna.certWords()), 'nothing to draw, so no words either').toBeNull();
   });

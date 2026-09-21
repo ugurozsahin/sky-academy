@@ -706,7 +706,9 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#rewards');
     await expect(page.locator('.rewards')).toBeVisible();
     await expect(page.locator('.cert-empty')).toHaveCount(0);
-    const row = page.locator('.cert-row');
+    // Scoped to the album, not the page: "Recent duels" borrows `cert-row`'s rule, so an unscoped locator
+    // counts duel rows too and this test would fail pointing at the album (#415 review, note 1).
+    const row = page.locator('.cert-row:not(.duel-row)');
     await expect(row).toHaveCount(1);
     await expect(row).toContainText('Counting to 10');
     await expect(row).toContainText('★★★');
@@ -728,8 +730,10 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('"Recent duels" (#16): finished matches list on the rewards screen, newest first, in seat order', async ({ page }) => {
-    // Seeded at `v: 1`, like every other save here, so this also drives the v3 → v4 migration step that puts
-    // `duels` on an older save — the junk entry below has to be dropped by it rather than reaching the list.
+    // Seeded at `v: 1`, like every other save here, so this also climbs the ladder through the v3 → v4 step.
+    // What kills a mutant in `MIGRATIONS[3]` is the unit test in `storage.test.ts`, not this: empty that
+    // step's body and `duelHistory()`'s own filter drops the junk row anyway and this stays green (#415
+    // review, note 4). What this proves is the whole path — a real save, migrated, read and rendered.
     const match = (at: number, extra: Record<string, unknown> = {}) =>
       ({ at, topic: 'y1-bonds', title: 'Number bonds', year: 'Year 1', winner: 'a', scoreA: 6, scoreB: 4, rounds: 10, ...extra });
     await seedPlayer(page, 'volt', 'Ada', {

@@ -410,10 +410,25 @@ describe('duel history (#16)', () => {
   // `winner` is checked against the three the screen knows, because a fourth value renders as a match nobody
   // won, and the numbers must be finite — `Infinity` formats as "Infinity–0" in a row a child reads.
   it('a hand-edited history cannot take the list down with it', () => {
+    // B2 of PR #415's review: the fixture used to hold only `partial`, which is missing `winner`, `at` AND
+    // both scores — so the checks that ran first rejected it and the string checks never decided anything.
+    // Three of `isDuel`'s clauses could be deleted with the suite green. **Every entry below is a
+    // well-formed duel with exactly one bad field**, so each clause is the only thing standing between it and
+    // the list: dropping the string checks, the finite checks or the `winner` union each turns this red.
+    //
+    // `Array.isArray(d)` is the one clause this cannot pin, and saying so beats implying cover it does not
+    // have. A save arrives as JSON, and a JSON array cannot carry named members, so an array always fails the
+    // string checks a line later — the guard is belt-and-braces against a caller that is not a parsed save,
+    // not a load-bearing check. `isCert` has the identical shape and the identical property.
     const partial = { topic: 'y1-bonds', title: 'Number bonds' };
-    const badWinner = { ...duel(), winner: 'c' };
-    const infinite = { ...duel(), scoreA: Infinity };
-    save({ duels: ['nonsense', null, 42, {}, partial, badWinner, infinite, { ...duel(), at: NaN }, duel()] as unknown as StoredDuel[] });
+    save({ duels: [
+      'nonsense', null, 42, {}, [duel()], partial,                     // shape: not an object, or not this one
+      { ...duel(), topic: 42 }, { ...duel(), title: null }, { ...duel(), year: { t: 'Year 1' } },   // one bad string each
+      { ...duel(), winner: 'c' }, { ...duel(), winner: null },         // outside the three the screen knows
+      { ...duel(), at: NaN }, { ...duel(), scoreA: Infinity },         // and one non-finite number each — the
+      { ...duel(), scoreB: Infinity }, { ...duel(), rounds: NaN },     // `6–Infinity` row the comment warns of
+      duel(),
+    ] as unknown as StoredDuel[] });
     expect(duelHistory()).toEqual([duel()]);
     save({ duels: 'not a history' as unknown as StoredDuel[] });
     expect(duelHistory()).toEqual([]);
@@ -436,8 +451,13 @@ describe('duel history (#16)', () => {
     expect(duelHistoryLine({ winner: 'a', scoreA: 6, scoreB: 4 })).toBe('Player 1 won · 6–4');
     expect(duelHistoryLine({ winner: 'b', scoreA: 3, scoreB: 7 })).toBe('Player 2 won · 3–7');
     expect(duelHistoryLine({ winner: 'draw', scoreA: 5, scoreB: 5 })).toBe('A draw · 5–5');
-    // The losing seat's score stays on its own side. Sorted, this row would read "7–3" and match the one above.
-    expect(duelHistoryLine({ winner: 'b', scoreA: 3, scoreB: 7 })).not.toBe(duelHistoryLine({ winner: 'a', scoreA: 7, scoreB: 3 }));
+    // The losing seat's score stays on its own side. This compares the SCORELINE half only: the two rows have
+    // different winners, so comparing the whole string is green whatever the scoreline does — it was a vacuous
+    // assertion until PR #415's review caught it. Under a sorting mutant both halves read "7–3" and this fails.
+    const scoreline = (l: string) => l.split(' · ')[1];
+    expect(scoreline(duelHistoryLine({ winner: 'b', scoreA: 3, scoreB: 7 }))).toBe('3–7');
+    expect(scoreline(duelHistoryLine({ winner: 'b', scoreA: 3, scoreB: 7 })))
+      .not.toBe(scoreline(duelHistoryLine({ winner: 'a', scoreA: 7, scoreB: 3 })));
     // And the headline it is deliberately not: that one sorts, because it is read out once about one match.
     expect(duelHeadline({ winner: 'b', scoreA: 3, scoreB: 7, rounds: 10, tally: { a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } } })).toBe('Player 2 wins 7–3!');
   });

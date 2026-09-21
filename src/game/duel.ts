@@ -3,6 +3,9 @@
 import type { Difficulty, Question, Topic } from '../curriculum';
 import { starsForAccuracy } from './session';
 import type { DojoEvent } from './dojo';
+// Type-only, so it erases at compile time and adds no runtime edge — the same shape `game/parents.ts` and
+// `game/sensei.ts` already use to name a stored type without depending on the store.
+import type { StoredDuel } from '../storage';
 
 export type DuelPlayer = 'a' | 'b';
 export const DUEL_ROUNDS = 10;
@@ -281,10 +284,12 @@ export function duelHeadline(r: DuelResult): string {
  * getting better?" cannot be answered by looking. Seat order costs nothing here, because the row already
  * names the winner in words.
  *
- * Takes the stored fields rather than a `DuelResult`, because a row in the history is exactly what the save
- * holds — passing the live result would let the screen and the list drift on a match the save rejected.
+ * Typed against `StoredDuel` rather than a structural shape, because a row in the history is exactly what
+ * the save holds. The structural version did not buy what this sentence used to claim (#415 review, note 8):
+ * `DuelResult` satisfies it, so `duelHistoryLine(r)` on the live result compiled in silence. It no longer
+ * does — `DuelResult` has no `topic`, so it is not assignable to the `Pick` below.
  */
-export function duelHistoryLine(d: { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number }): string {
+export function duelHistoryLine(d: Pick<StoredDuel, 'winner' | 'scoreA' | 'scoreB'>): string {
   const who = d.winner === 'draw' ? 'A draw' : `Player ${d.winner === 'a' ? 1 : 2} won`;
   return `${who} · ${d.scoreA}–${d.scoreB}`;
 }

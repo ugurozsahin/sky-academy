@@ -35,7 +35,11 @@ export interface StoredCert {
  * **A duel has no owner, so this record has no `name` or `avatar`.** Two children share one profile
  * (`duelAccuracy()` in `game/duel.ts` has the whole of why), and the seats are `Player 1`/`Player 2` on the
  * screen itself — attaching the profile's child to a row would claim the save knows which seat they sat in,
- * which is exactly the claim the duel code refuses to make everywhere else.
+ * which the save cannot support. The certificate a Player 1 win files *does* carry the profile's name and
+ * avatar (`certToStored`, three lines above `recordDuel` in `ui/duel.ts`) — that is not an inconsistency:
+ * `duelEarnsCertificate` awards it only to seat A, the seat `DUEL_HANDOVER` keeps for the profile's child,
+ * so there the owner is known. A history row is filed for every outcome, including the ones seat B won, so
+ * here it is not.
  */
 export interface StoredDuel {
   at: number;             // epoch ms the match finished; the list's order and its only identity (see `fileDuel`)
@@ -760,7 +764,7 @@ export const DUEL_CAP = 20;
  * Every field a duel row is read through, checked — the same bar `isCert` is held to, and for the reason its
  * comment gives: a half-checked entry is worse than an unchecked one, because the junk it lets through then
  * gets compared, formatted and drawn as if it were real. `winner` is checked against the three values the
- * screen knows, because `duelResultLine()` branches on it and an unknown fourth would render as a match
+ * screen knows, because `duelHistoryLine()` branches on it and an unknown fourth would render as a match
  * nobody won. The two scores and `rounds` must be finite — `Infinity` from a hand-edited save formats as
  * "Infinity–0" in a row a child reads.
  */
