@@ -83,10 +83,15 @@ const nav = {
  * disagreeing again: the way out is the sky map, and there is one to go back to exactly when a screen is
  * already on the page.
  */
-const goProfiles = () => {
+const goProfiles = (root = false) => {
   leave(); year = null;
-  if (history.state?.screen) { pendingProfiles = true; history.back(); return; }
-  const back = screenDrawn() ? () => nav.map() : undefined;   // read before rendering, which is what replaces it
+  if (history.state?.screen) { pendingProfiles = { root }; history.back(); return; }
+  // `root` is the caller saying "there is nothing behind this" even though a screen is still on the page —
+  // `relaunch()` after a delete is drawn on top of the grown-ups screen, whose save has just gone (#420 review
+  // B1). Without it `screenDrawn()` answered true, the launch picker got a `←`, and one tap put the remaining
+  // sibling in whoever the index called active — the exact defect #380 round 5 B3 spent a round fixing, by a
+  // new door. `screenDrawn()` still decides for the 👥 button, whose sky map genuinely is behind it.
+  const back = root || !screenDrawn() ? undefined : () => nav.map();   // read before rendering, which is what replaces it
   fromPop = false;
   profilesScreen(() => afterPick(), () => nav.avatar(), back);
 };
@@ -97,7 +102,10 @@ const goProfiles = () => {
  *  popstate the unwinding above waits for, where a flag set at boot would have gone stale by the time the pop
  *  arrived. */
 const screenDrawn = () => !!document.querySelector('#app > *');
-let pendingProfiles = false;
+/** The picker this router is unwinding towards, or null — and **which kind**, because the intent has to survive
+ *  the popstate the unwinding waits for. A bare boolean lost `root` on the way through and the picker drew a
+ *  `←` again on the far side (#420 review B1). */
+let pendingProfiles: { root: boolean } | null = null;
 /** Where a chosen profile lands: their sky map, or onboarding when that slot has never been played. */
 const afterPick = () => { if (load().onboarded) nav.map(); else nav.avatar(); };
 /**
@@ -114,12 +122,15 @@ const relaunch = () => {
   // route's hand-off exactly one level and fails on a chain it cannot read, which is the right answer — a
   // relaunch that tore nothing down would leak whatever arena the grown-ups screen was opened from.
   leave();
-  if (profileIds().length > 1) goProfiles(); else if (load().onboarded) nav.map(); else nav.avatar();
+  // `goProfiles(true)`: this is the *launch* picker, with no way back past the question of who is playing —
+  // true of boot, where nothing is drawn yet, and true of a removal, where what is drawn is a dashboard whose
+  // save no longer exists (#420 review B1).
+  if (profileIds().length > 1) goProfiles(true); else if (load().onboarded) nav.map(); else nav.avatar();
 };
 window.addEventListener('popstate', () => {
   const s = history.state?.screen as string | undefined;   // the entry we landed on
   fromPop = true;
-  if (pendingProfiles) { pendingProfiles = false; goProfiles(); return; }   // still unwinding towards the picker's root
+  if (pendingProfiles) { const { root } = pendingProfiles; pendingProfiles = null; goProfiles(root); return; }   // still unwinding towards the picker's root
   // The grown-ups screen's guarded reset (#115) must land on onboarding, never the map with an empty profile,
   // however it is left — including the hardware/browser back button landing here rather than through
   // parents.ts's own `#back` click handler.

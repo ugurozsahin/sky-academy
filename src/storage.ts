@@ -341,10 +341,37 @@ export const NAME_MAX = 14;
  * - `'no-save'` — the slot exists but holds nothing this build can read, so there is no name to change.
  *   Distinct from `'unknown'` on purpose: the family can act on it (that child plays first), and the
  *   grown-ups list therefore offers no rename on an unplayed row rather than showing a refusal.
+ * - `'future'` — the slot holds a save a **newer build** wrote, on either side of the two paths below. Split
+ *   out of `'store'` (#420 review note 4): conflating them is what `readOnly`'s own paragraph forbids, because
+ *   the remedies are opposites — this one needs the other device or an update, and `'store'` needs private
+ *   browsing off or space freed. Neither ever fixes the other.
  * - `'blank'` — a name of only spaces. `hasName` is the wizard's identical rule (`avatar.ts`).
  * - `'store'` — the browser would not keep it, the same fault `STORE_HINT` describes on the picker.
  */
-export type RenameProfileResult = { ok: true; name: string } | { ok: false; why: 'unknown' | 'no-save' | 'blank' | 'store' };
+export type RenameProfileResult = { ok: true; name: string } | { ok: false; why: 'unknown' | 'no-save' | 'future' | 'blank' | 'store' };
+/** The refusal reasons, derived from the result type rather than restated (#420 review note 3). A `Record` over
+ *  a hand-written copy of the union only errors at its *index* site and catches a **removed** arm nowhere at
+ *  all, because the union was then written out three times and one copy was checked. */
+export type RenameRefusal = Extract<RenameProfileResult, { ok: false }>['why'];
+/**
+ * The name the store is actually holding for a slot, or null when it holds nothing readable — the read-back
+ * both rename paths end on (#420 review B3, B4).
+ *
+ * `writeIndex` has read back since #330 and the sibling rename did from the start; the session's own path did
+ * not, and `save()` sets `writeFailed` only when `setItem` **throws**. A store that accepts the call and keeps
+ * nothing is the other half of "the write did not land": the rename reported `ok`, the heading and the map
+ * pill both changed because they read `cache`, `saveNote()` stayed quiet because `writeFailed` was false, and
+ * at the next launch the old name was back with nothing to explain it.
+ */
+function storedName(id: ProfileId): string | null {
+  const raw = readItem(saveKeyFor(id));
+  if (!raw) return null;
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const n = (parsed as RawSave).name;
+  return typeof n === 'string' ? n : null;
+}
 /**
  * Rename a profile — the first of slice 3's two grown-ups controls (#20).
  *
@@ -365,17 +392,25 @@ export type RenameProfileResult = { ok: true; name: string } | { ok: false; why:
  * one this build cannot open, and stamping a name onto it is a small corruption of a save the other device
  * still reads. It answers `'no-save'` — honest about the outcome, and the list never offers the control.
  *
- * The write is **read back** like `writeIndex`'s, because a store that accepts `setItem` and keeps nothing is
- * the failure that cost #330 a review round; `true` here has to mean the store is holding the new name.
+ * **Both paths end on the same read-back** — `storedName(id) === next` — because a store that accepts
+ * `setItem` and keeps nothing is the failure that cost #330 a review round, and `ok` here has to mean the store
+ * is holding the new name. The session path read back nothing at all until #420 review B3; when it now fails,
+ * `cache`'s name is put back, so the screen never shows a name the store refused.
  */
 export function renameProfile(id: ProfileId, name: string): RenameProfileResult {
   if (!currentIndex().ids.includes(id)) return { ok: false, why: 'unknown' };
   const next = name.trim().slice(0, NAME_MAX).trim();   // trimmed again: the cut can land on a space
   if (!next) return { ok: false, why: 'blank' };
   if (id === sessionProfile()) {
-    if (readOnly) return { ok: false, why: 'store' };
+    if (readOnly) return { ok: false, why: 'future' };
+    const before = load().name;
     save({ name: next });
-    return writeFailed ? { ok: false, why: 'store' } : { ok: true, name: next };
+    if (!writeFailed && storedName(id) === next) return { ok: true, name: next };
+    // Nothing landed, so nothing may look as though it had: `cache` is what the heading and the map pill
+    // read, and `save()` has already put the new name in it (#420 review B3). Assigned rather than saved —
+    // a second write on a store that just refused one buys nothing and could refuse in its turn.
+    cache = { ...load(), name: before };
+    return { ok: false, why: 'store' };
   }
   const key = saveKeyFor(id);
   const raw = readItem(key);
@@ -383,10 +418,11 @@ export function renameProfile(id: ProfileId, name: string): RenameProfileResult 
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { return { ok: false, why: 'no-save' }; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, why: 'no-save' };
+  if (isFutureSave(parsed as RawSave)) return { ok: false, why: 'future' };
   if (!isMigratable(parsed as RawSave)) return { ok: false, why: 'no-save' };
   const blob = JSON.stringify({ ...(parsed as RawSave), name: next });
   try { localStorage.setItem(key, blob); } catch { return { ok: false, why: 'store' }; }
-  return readItem(key) === blob ? { ok: true, name: next } : { ok: false, why: 'store' };
+  return storedName(id) === next ? { ok: true, name: next } : { ok: false, why: 'store' };
 }
 /**
  * Why a delete was refused, and what the caller must do when it was not (#20 slice 3).
@@ -394,15 +430,27 @@ export function renameProfile(id: ProfileId, name: string): RenameProfileResult 
  * - `'unknown'` — not a profile on this device, as for a rename.
  * - `'last'` — it is the only profile left. See `deleteProfile` for why that is refused here rather than
  *   handled.
- * - `'store'` — the index write was not kept, and then **nothing has been deleted**: the ordering below is
- *   what buys that promise.
+ * - `'future'` — the slot holds a save a **newer build** wrote (#420 review B2). `renameProfile` has refused
+ *   that since it was written, on the grounds that a rename must not stamp this build's shape onto a save the
+ *   other device still reads; a delete destroys it outright, which is the same argument with more at stake,
+ *   and this function inherited none of the guard. Worse, `profileCard` blanks such a save, so the row drew
+ *   ＋ / "Ninja 2" / "Not started yet" beside a Remove button and invited the tap: reachable by an APK
+ *   rollback, a sideloaded older build (`docs/ANDROID.md`) or a stale service worker — #232's whole scenario.
+ * - `'store'` — the store did not keep the change, and then **nothing has been deleted**: the ordering below
+ *   is what buys that promise.
  *
  * `self` on the accepted arm is "this session was playing the child who has just gone", and it is the storage
  * layer's answer because `cacheProfile` is the only thing that knows: the index's `active` is a different
  * question, and a second tab makes the two disagree on purpose (`sessionProfile`). A caller that got `self`
  * must leave the screen it is on — the save behind it no longer exists.
+ *
+ * There is deliberately **no `active`** on that arm (#420 review note 2). It had no consumer: `parents.ts`
+ * reads `self` and `main.ts`'s `relaunch()` re-derives where to go from the index, which is the one place that
+ * rule lives. A second copy of the destination is a second rule to keep in step.
  */
-export type DeleteProfileResult = { ok: true; self: boolean; active: ProfileId } | { ok: false; why: 'unknown' | 'last' | 'store' };
+export type DeleteProfileResult = { ok: true; self: boolean } | { ok: false; why: 'unknown' | 'last' | 'future' | 'store' };
+/** As `RenameRefusal`, derived rather than restated (#420 review note 3). */
+export type DeleteRefusal = Extract<DeleteProfileResult, { ok: false }>['why'];
 /**
  * Remove a profile and its save — the second of slice 3's grown-ups controls (#20).
  *
@@ -425,10 +473,19 @@ export type DeleteProfileResult = { ok: true; self: boolean; active: ProfileId }
  *   write that did not leaves a listed profile whose save is gone, reported as a failure. Losing a sibling's
  *   progress is the worse of the two outcomes, so it is the one the ordering rules out.
  *
- * The residue if `removeItem` *does* throw after the index write: the slot's bytes linger, `holdsSave` still
- * sees them and `addProfile` therefore refuses that slot, so the family is capped below four until the store
- * recovers. Said rather than bought: rolling the index back needs a write that can fail in its turn, and
- * `removeItem` frees space so a full quota — the reason the other writes here fail — cannot be why it did.
+ * **And the bytes are read back, not assumed gone** (#420 review B2/B4). The producible fault needs no throw
+ * at all — a store that accepts `removeItem` and keeps the bytes — and this is the function making the
+ * strongest promise to a family: the modal says "It cannot be undone". Without the read-back the row vanished,
+ * the message said the child was removed, and every byte was still there, with two silent consequences.
+ * `addProfile` probes `holdsSave`, so the slot was never reusable and the ＋ card eventually answered "four
+ * ninjas is the most" to a family that could see two; and `defaultIndex()` probes it too, so a later lost index
+ * brought the removed child back with their full save, after they had been told it could not be undone.
+ *
+ * When the bytes survive, the index is **put back** and the answer is `'store'`, so the tap changed nothing
+ * the family can see and nothing they were promised. The residue if that restoring write is itself refused:
+ * the child is delisted with their bytes intact, capping the family a slot until the store recovers. That is
+ * the one outcome left, and it is the recoverable direction — the save still exists, which is why the index is
+ * written first and not the bytes removed first.
  *
  * **No `writeFailed` pre-check, unlike `addProfile`.** That one refuses under the latch because adding
  * switches away from the child holding the device, whose unsaved coins live only in `cache` (#380 round 5,
@@ -441,16 +498,20 @@ export function deleteProfile(id: ProfileId): DeleteProfileResult {
   if (!idx.ids.includes(id)) return { ok: false, why: 'unknown' };
   const rest = idx.ids.filter(x => x !== id);
   if (!rest.length) return { ok: false, why: 'last' };
+  // Before the index write, so a refusal changes nothing at all — the same reason `addProfile` checks the
+  // store before writing (#380 round 5, B2).
+  if (futureSaveIn(id)) return { ok: false, why: 'future' };
   const self = id === sessionProfile();
   const next: ProfileIndex = { v: 1, active: idx.active === id ? rest[0] : idx.active, ids: rest };
   if (!writeIndex(next)) return { ok: false, why: 'store' };
-  try { localStorage.removeItem(saveKeyFor(id)); } catch { /* see the residue paragraph above */ }
+  try { localStorage.removeItem(saveKeyFor(id)); } catch { /* the read-back below is what decides, not the throw */ }
+  if (readItem(saveKeyFor(id)) !== null) { writeIndex(idx); return { ok: false, why: 'store' }; }
   // Only the *session's* profile going takes the session with it. A second tab that is playing someone else
   // keeps its cache and both latches even though `active` moved here — `sessionProfile()` is latched to that
   // child, so their writes still land in their own slot. This is `rereadProfile`'s rule (#380 round 5, B2)
   // asked of `cacheProfile` rather than of the index, for the same reason.
   if (self) leaveProfile();
-  return { ok: true, self, active: next.active };
+  return { ok: true, self };
 }
 /**
  * Name and ninja for a profile that is **not** the one this session is playing — what the picker draws on a
@@ -475,17 +536,40 @@ export function deleteProfile(id: ProfileId): DeleteProfileResult {
  * dropped. Answering `blank` is the honest version of that card: "Not started yet" is at least what tapping
  * it gives. Saying *why* on the card is #232's `isReadOnlySave` hook, and is not this slice's.
  */
-export interface ProfileCard { id: ProfileId; name: string; avatar: string | null; onboarded: boolean }
+/**
+ * Whether a slot holds a save a **newer build** wrote — the one home of that question about a profile that is
+ * not this session's (#420 review B2). `isFutureSave`'s own rule, applied to a slot instead of to the blob
+ * `load()` just read, so `deleteProfile` and `profileCard` cannot come to different answers about the same
+ * bytes. Deliberately narrower than `!isMigratable`: an unreadable `v` is *not* protected — `load()` resets
+ * over it and writes resume on purpose — so only a genuinely newer save refuses a delete.
+ */
+function futureSaveIn(id: ProfileId): boolean {
+  const raw = readItem(saveKeyFor(id));
+  if (!raw) return false;
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return false; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+  return isFutureSave(parsed as RawSave);
+}
+/**
+ * `future` tells "this slot is empty" apart from "this slot holds bytes this build must not touch" (#420
+ * review B2). Both used to draw as the same blank card, so the grown-ups row said *"No name yet — this ninja
+ * has not played"* about a sibling's newer save and offered to remove it. A card cannot show the name or the
+ * ninja either way — they are fields this build cannot read — so the flag is what a screen needs in order to
+ * stop asserting the wrong reason.
+ */
+export interface ProfileCard { id: ProfileId; name: string; avatar: string | null; onboarded: boolean; future: boolean }
 export function profileCard(id: ProfileId): ProfileCard {
-  const blank: ProfileCard = { id, name: '', avatar: null, onboarded: false };
+  const blank: ProfileCard = { id, name: '', avatar: null, onboarded: false, future: false };
   const raw = readItem(saveKeyFor(id));
   if (!raw) return blank;
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { return blank; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return blank;
   const s = parsed as RawSave;
-  if (!isMigratable(s)) return blank;                       // the card agrees with load(), which refuses this blob
+  if (!isMigratable(s)) return { ...blank, future: isFutureSave(s) };   // the card agrees with load(), which refuses this blob
   return {
+    future: false,
     id,
     name: typeof s.name === 'string' ? s.name : '',
     avatar: typeof s.avatar === 'string' ? s.avatar : null,

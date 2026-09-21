@@ -1,6 +1,6 @@
 import { avatarOrNull } from '../avatars';
 import { TOPICS, YEARS } from '../curriculum';
-import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData } from '../storage';
+import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData } from '../storage';
 import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
 import { $, $$, esc, render } from './dom';
@@ -50,25 +50,49 @@ function saveNote(): string | null {
  * Built from the dashboard's own `.p-*` classes and the `.btn`/`.btn.bad` pair the reset block already uses,
  * so nothing here is a new look (`design-language` §5): the rows are the shape `.p-topic` already is.
  */
-/** Whether a row offers a rename — there is a save behind it to write a name into. A slot in the index that
- *  nothing has ever played (＋ tapped and the app closed, or "Start again") has no name to change, and
- *  `renameProfile` answers `'no-save'` for it; the row says so instead of offering a control that refuses. */
-export const canRenameCard = (c: ProfileCard) => c.onboarded || !!c.avatar || !!c.name.trim();
+/** Whether a row offers a rename — there is a save behind it to write a name into, and it is one this build
+ *  can read. A slot in the index that nothing has ever played (＋ tapped and the app closed, or "Start again")
+ *  has no name to change and `renameProfile` answers `'no-save'`; a slot holding a **newer build's** save has a
+ *  name this build must not touch and it answers `'future'` (#420 review B2). The row says which, instead of
+ *  offering a control that refuses. */
+export const canRenameCard = (c: ProfileCard) => !c.future && (c.onboarded || !!c.avatar || !!c.name.trim());
+/**
+ * Whether a row offers "Remove" — every profile except the last one on the device, and except a slot holding a
+ * save a newer build wrote (#420 review B2).
+ *
+ * Both exclusions are `deleteProfile`'s own refusals, mirrored here so a grown-up is never invited to tap a
+ * button that answers no. The **guard** is in the store, not in this predicate: a rail on a withheld button
+ * only pins the current screen, and "there is exactly one way to wipe this device" and "this build does not
+ * destroy a newer build's save" are properties of the store.
+ */
+export const canRemoveCard = (c: ProfileCard, only: boolean) => !only && !c.future;
 /** What the card is called when the child has not typed a name yet. The slot number is what tells two unnamed
  *  rows apart — the picker's `cardName` rule (#380 review B1), the same words for the same reason. */
 const rowName = (c: ProfileCard, slot: number) => (c.name.trim() ? c.name : `Ninja ${slot}`);
-/** Every refusal `renameProfile` and `deleteProfile` can return, as the sentence a grown-up reads. Exported
- *  because a missing case is otherwise a blank status line: the `Record` over the union is what makes a new
- *  refusal a type error here rather than silence on the screen. */
-export const RENAME_HINTS: Record<'unknown' | 'no-save' | 'blank' | 'store', string> = {
+/** The sentence for `'future'`, shared by both tables and by the row itself, because all three are saying the
+ *  same thing about the same bytes — and it is `saveNote()`'s remedy, not `'store'`'s: the other device, or an
+ *  update to this one (#420 review note 4). */
+const FUTURE_SAY = 'That ninja’s game was saved by a newer version of the app, so this one cannot change it or clear it. Open the game on the other device, or update this app.';
+/**
+ * Every refusal `renameProfile` and `deleteProfile` can return, as the sentence a grown-up reads — a missing
+ * case is otherwise a blank `role="status"` line.
+ *
+ * Keyed on `RenameRefusal`/`DeleteRefusal`, which are `Extract`ed from the result types rather than written out
+ * again (#420 review note 3). A hand-copied key union made the comment above false: adding an arm errored only
+ * at the `RENAME_HINTS[r.why]` *index* site, where a cast would have silenced it, and **removing** one was
+ * caught nowhere at all, because the union was written out three times and one copy was checked.
+ */
+export const RENAME_HINTS: Record<RenameRefusal, string> = {
   unknown: 'That ninja is no longer on this device.',
   'no-save': 'That ninja has not played yet, so there is no name to change.',
+  future: FUTURE_SAY,
   blank: 'A ninja needs a name — type one in first.',
   store: 'This browser will not let the game save, so the new name was not kept.',
 };
-export const DELETE_HINTS: Record<'unknown' | 'last' | 'store', string> = {
+export const DELETE_HINTS: Record<DeleteRefusal, string> = {
   unknown: 'That ninja is no longer on this device.',
   last: 'This is the only ninja on the device, so removing it is the same as starting again — use “Start again” below, which asks you to type RESET first.',
+  future: FUTURE_SAY,
   store: 'This browser will not let the game save, so nothing was removed.',
 };
 function profileRow(c: ProfileCard, slot: number, only: boolean): string {
@@ -77,12 +101,15 @@ function profileRow(c: ProfileCard, slot: number, only: boolean): string {
   return `
     <li class="p-prof" data-prof="${c.id}">
       <span class="p-prof-face"${a ? ` style="--glow:${a.glow}"` : ''}>${a ? `<img src="${a.img}" alt="" draggable="false">` : `<span class="plus" aria-hidden="true">＋</span>`}</span>
-      <span class="p-prof-who"><b>${esc(label)}</b><small>${a && c.onboarded ? esc(a.name) : 'Not started yet'}</small></span>
+      <span class="p-prof-who"><b>${esc(label)}</b><small>${c.future ? 'Saved by a newer version' : a && c.onboarded ? esc(a.name) : 'Not started yet'}</small></span>
       ${canRenameCard(c)
         ? `<input class="p-prof-in" data-name="${c.id}" type="text" maxlength="${NAME_MAX}" autocomplete="off" value="${esc(c.name)}" aria-label="Name for ${esc(label)}">
            <button class="btn" data-rename="${c.id}">Save name</button>`
-        : `<span class="p-prof-wait">No name yet — this ninja has not played.</span>`}
-      ${only ? '' : `<button class="btn bad" data-del="${c.id}">Remove</button>`}
+        // Two different reasons, never the same sentence (#420 review B2): the row used to say "has not
+        // played" about a sibling's newer save — bytes it could not read and had no business claiming
+        // anything about — and offered to destroy it.
+        : `<span class="p-prof-wait">${c.future ? esc(FUTURE_SAY) : 'No name yet — this ninja has not played.'}</span>`}
+      ${canRemoveCard(c, only) ? `<button class="btn bad" data-del="${c.id}">Remove</button>` : ''}
     </li>`;
 }
 function profilesHtml(cards: ProfileCard[]): string {
