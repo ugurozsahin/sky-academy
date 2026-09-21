@@ -190,8 +190,23 @@ describe('guard rails', () => {
     const routes = main.slice(from, to).split(/\n\s*(?=\w+:)/).slice(1);
     const named = routes.map(r => [r.slice(0, r.indexOf(':')), r] as const).filter(([n]) => n !== 'up');
     expect(named.length).toBeGreaterThanOrEqual(7);                     // every screen the router can show
+    // A route may hand off rather than dispose in its own body — `profiles` calls `goProfiles`, the picker's
+    // one way in, which the boot path takes too (#380 review round 5, B3). So the rail follows the hand-off
+    // one level instead of being satisfied by the call: whatever the route names must itself tear the old
+    // screen down. One level and no further, deliberately — a chain this rail cannot read is a route it
+    // cannot vouch for, and it should say so by failing.
+    const disposes = (body: string): boolean => {
+      if (/\bleave\(\)/.test(body)) return true;
+      const handoff = body.match(/=>\s*(\w+)\(\)/);
+      if (!handoff) return false;
+      const at = main.indexOf(`const ${handoff[1]} = `);
+      if (at < 0) return false;
+      const brace = main.indexOf('{', at), nl = main.indexOf('\n', at);
+      const end = brace >= 0 && brace < nl ? main.indexOf('\n};', at) : nl;   // a block body, or a one-line arrow
+      return end > at && /\bleave\(\)/.test(main.slice(at, end));
+    };
     for (const [screen, body] of named)
-      expect({ screen, disposes: /\bleave\(\)/.test(body) }).toEqual({ screen, disposes: true });
+      expect({ screen, disposes: disposes(body) }).toEqual({ screen, disposes: true });
     for (const f of ['/src/ui/play.ts', '/src/ui/memory.ts']) expect(code(SOURCES[f])).toContain('return cleanup;');
   });
 
@@ -201,10 +216,10 @@ describe('guard rails', () => {
   //    `nav.map()` pops whenever one exists, so an `enter('profiles')` would send every "chosen, go to the
   //    map" straight back to the picker — a loop a child could not leave. A future hand adding `enter(...)`
   //    to the route for symmetry with its neighbours is exactly the plausible edit. **The route is not the
-  //    only place that edit lands** (#380 review B3): the route pops and hands off to `showProfiles`, which
-  //    is what actually draws the picker, is the only entry point on the boot path, and is where `leave()`
-  //    and `fromPop` already sit — so it looks more like every other route than the route does. It is
-  //    defined below `up,` and so was outside this rail's slice by construction: inserting `enter('profiles')`
+  //    only place that edit lands** (#380 review B3): the route hands off to `goProfiles`, which is what
+  //    actually pops, draws the picker and is the boot path's way in too, and is where `leave()` and
+  //    `fromPop` already sit — so it looks more like every other route than the route does. It is defined
+  //    below `up,` and so was outside this rail's slice by construction: inserting `enter('profiles')`
   //    there alone left all 332 rails and the whole 1439-test suite green.
 
   // 2. Boot shows it only when siblings actually share the device. Nothing changes for today's players,
@@ -217,7 +232,7 @@ describe('guard rails', () => {
   it('the profile picker is a launch screen, gated on more than one profile (#20 slice 2)', () => {
     const main = code(SOURCES['/src/main.ts']);
     const from = main.indexOf('profiles: () =>'), to = main.indexOf('\n  up,', from);
-    const drawFrom = main.indexOf('const showProfiles ='), drawTo = main.indexOf('\n', drawFrom);
+    const drawFrom = main.indexOf('const goProfiles = () => {'), drawTo = main.indexOf('\n};', drawFrom);
     expect({ route: from >= 0 && to > from, draws: drawFrom >= 0 && drawTo > drawFrom })
       .toEqual({ route: true, draws: true });   // a rename empties the slice below, so fail here instead
     expect(main.slice(from, to) + main.slice(drawFrom, drawTo), 'neither the route nor the function that draws the picker pushes a history entry')
@@ -269,16 +284,30 @@ describe('guard rails', () => {
   });
 
   // #380 review B1: the picker pushes no history entry, so whatever entry was current when it opened is what
-  // everything leaving it unwinds onto — and the 👥 button is on the *shared* topbar, so that was the island
-  // or rewards screen. A new Reception profile finished the wizard on the previous child's Year 2 island.
+  // everything leaving it unwinds onto — and the 👥 button was then a fourth control on the *shared* topbar, so
+  // that was the island or rewards screen. A new Reception profile finished the wizard on the previous child's
+  // Year 2 island.
+  //
+  // **Round 5's B3 is the same bug by the other door, and it is why this rail now reads one function rather
+  // than two sites.** The route popped to the root; the boot path drew the picker wherever the stack happened
+  // to be, and `history.state` survives a reload — so a refresh from an island put the *launch* picker, the
+  // one that deliberately draws no `←` because "back leaves the app", on top of that island's entry, and one
+  // back press dismissed it into whoever the index last called active. Two callers of one drawing function,
+  // each with its own idea of where the stack was and which mode to ask for, is the shape that produced it; a
+  // single way in whose mode is *derived* is what this holds now.
   it('the picker is reached at the root of the history stack, from wherever it was opened (#20 slice 2)', () => {
     const main = code(SOURCES['/src/main.ts']);
-    const from = main.indexOf('profiles: () =>'), to = main.indexOf('\n  up,', from);
-    expect(main.slice(from, to), 'a stacked entry is popped before the picker is drawn')
-      .toMatch(/if \(history\.state\?\.screen\) \{ toProfiles = true; history\.back\(\); return; \}/);
-    expect(main, 'and the pop lands back in the route, so a deeper stack keeps unwinding')
-      .toMatch(/if \(toProfiles\) \{ toProfiles = false; nav\.profiles\(\); return; \}/);
-    expect(main, 'the launch picker has no way back — it is the root screen there').toMatch(/length > 1\) showProfiles\(\);/);
+    const drawFrom = main.indexOf('const goProfiles = () => {'), drawTo = main.indexOf('\n};', drawFrom);
+    const go = main.slice(drawFrom, drawTo);
+    expect(go, 'a stacked entry is popped before the picker is drawn')
+      .toMatch(/if \(history\.state\?\.screen\) \{ pendingProfiles = true; history\.back\(\); return; \}/);
+    expect(main, 'and the pop lands back in the one way in, so a deeper stack keeps unwinding')
+      .toMatch(/if \(pendingProfiles\) \{ pendingProfiles = false; goProfiles\(\); return; \}/);
+    expect(main, 'boot takes that same way in, so a reload cannot draw the launch picker on a stacked entry')
+      .toMatch(/length > 1\) goProfiles\(\);/);
+    expect(main.match(/profilesScreen\(/g) ?? [], 'which is the one place the picker is drawn').toHaveLength(1);
+    expect(go, 'and launch-or-back is read off what is on the page, never passed in by the caller')
+      .toMatch(/screenDrawn\(\) \? \(\) => nav\.map\(\) : undefined/);
   });
 
   // #380 review B3: `profileCard` deliberately does not run the migrations, but `onboarded` only exists from

@@ -256,13 +256,21 @@ function rereadProfile(id: ProfileId) {
  * only that it is not holding this index, not that the key is untouched — on a partially-working store the
  * `setItem` may have landed and the read-back disagreed. Read its paragraph before relying on the stronger
  * reading; `false` did once say "nothing changes" outright, and that outlived the narrowing (#330 round 3, N5).
+ *
+ * **Both arms end in `rereadProfile`, and that is the fix for a whole shape of bug rather than one path**
+ * (#380 review round 5, B2). Round 4 taught the `idx.active === id` arm to keep a cached save the store has
+ * refused, and left `leaveProfile()` on the arm below it — where the index *did* change. But the index naming
+ * a different child does not mean *this session* is playing one: a second tab moving `active` to Bo is exactly
+ * the case round 4 was about, and Ada tapping her own card then took the write path and had her unsaved coins
+ * dropped with `true` returned and `isWriteFailing()` cleared. Which arm ran decides what is *written*;
+ * whether the session changes child is `rereadProfile`'s question either way, asked of `cacheProfile` rather
+ * than of the index.
  */
 export function setActiveProfile(id: ProfileId): boolean {
   const idx = currentIndex();
   if (!idx.ids.includes(id)) return false;
-  if (idx.active === id) { rereadProfile(id); return true; }
-  if (!writeIndex({ ...idx, active: id })) return false;
-  leaveProfile();
+  if (idx.active !== id && !writeIndex({ ...idx, active: id })) return false;
+  rereadProfile(id);
   return true;
 }
 /**
@@ -289,11 +297,27 @@ export type AddProfileResult = { ok: true; id: ProfileId } | { ok: false; why: '
  * `'full'`, and that is the honest answer — there is nowhere to put a fourth child.
  *
  * The same caveat as `setActiveProfile` applies to the store on a `'store'` refusal.
+ *
+ * **A refused save is a refusal here too** (#380 review round 5, B2). Adding a profile switches away from the
+ * child holding the device, so their session state goes — and under `writeFailed` that state is the only copy
+ * of the game they have been playing, coins the store never accepted (#151). The index blob is ~39 bytes and
+ * the save blob ~413, so a filling quota necessarily passes through a band where this write is kept and that
+ * one is not: `writeIndex` returned true, `ok: true` came back, `refuse()` was never reached, and one tap on
+ * "New ninja" took the playing child's name, ninja and coins with no hint, no sound and nothing spoken. It
+ * also cleared the latch, so `parents.ts`'s "this device is not saving progress" — the one place a grown-up
+ * could have learnt why — went quiet. A profile the store cannot save is one it cannot hand a child, so the
+ * honest answer is `'store'`, checked **before** the index write so the refusal changes nothing at all.
+ *
+ * `readOnly` (#232) deliberately does not refuse: the store there is writable and the new child's save will
+ * land: it is *this* child's blob that comes from a future version, and `save()` never writes it back, so the
+ * session cache holds nothing disk is missing. `'full'` still comes first — there being nowhere to put a
+ * fourth child is true whatever the store is doing, and the count is what the family can act on.
  */
 export function addProfile(): AddProfileResult {
   const idx = currentIndex();
   const free = PROFILE_IDS.find(id => !idx.ids.includes(id) && !holdsSave(id));
   if (!free) return { ok: false, why: 'full' };
+  if (writeFailed) return { ok: false, why: 'store' };
   if (!writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) return { ok: false, why: 'store' };
   leaveProfile();
   return { ok: true, id: free };

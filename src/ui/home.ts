@@ -26,7 +26,6 @@ function topbar(nav: Nav, rerender: () => void) {
         <button class="coin-pill" id="rewards" aria-label="Rewards: ${coinBalance()} coins">🪙 <b>${coinBalance()}</b>${d.streak.days > 1 ? ` <span class="streak">🔥${d.streak.days}</span>` : ''}</button>
         <button class="icon-btn" id="snd" aria-label="Sound ${d.sound ? 'on' : 'off'}">${d.sound ? '🔊' : '🔇'}</button>
         <button class="icon-btn" id="spk" aria-label="Read aloud ${d.speech ? 'on' : 'off'}">${d.speech ? '🗣️' : '🤐'}</button>
-        <button class="icon-btn" id="who" aria-label="Who is playing?">👥</button>
       </div>
     </header>`;
   const bind = () => {
@@ -34,10 +33,6 @@ function topbar(nav: Nav, rerender: () => void) {
     $('#rewards').addEventListener('click', () => { sfx.tap(); nav.rewards(); });
     $('#snd').addEventListener('click', () => { save({ sound: !load().sound }); rerender(); });
     $('#spk').addEventListener('click', () => { const on = !load().speech; save({ speech: on }); if (on) say('Read aloud is on', true); rerender(); });
-    // #20 slice 2: with one profile the launch picker never shows, so this is the only way a second child is
-    // ever added — it has to sit on the sky map, not behind the grown-ups gate (the owner's decision: "adding
-    // one is open to the child").
-    $('#who').addEventListener('click', () => { sfx.tap(); nav.profiles(); });
   };
   return { html, bind };
 }
@@ -79,7 +74,11 @@ export function mapScreen(nav: Nav) {
         </button>`; }).join('')}
     </div>
     ${dojoCard()}
-    <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS & KS1 National Curriculum</span><button class="foot-link" id="grownups" aria-label="For grown-ups">👤 For grown-ups</button></footer>
+    <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS & KS1 National Curriculum</span>
+      <div class="foot-links">
+        <button class="foot-link" id="grownups" aria-label="For grown-ups">👤 For grown-ups</button>
+        <button class="foot-link" id="who" aria-label="Who is playing?">👥 Who is playing?</button>
+      </div></footer>
   </section>`, 'bg-sky');
   tb.bind();
   $$('.island').forEach(b => b.addEventListener('click', () => {
@@ -87,6 +86,13 @@ export function mapScreen(nav: Nav) {
     save({ year: y.id }); sfx.tap(); say(`${y.title} island`); nav.island(y);
   }));
   $('#grownups').addEventListener('click', () => { sfx.tap(); nav.parents(); });
+  // #20 slice 2: with one profile the launch picker never shows, so this is the only way a second child is ever
+  // added — it has to be on the sky map and not behind the grown-ups gate (the owner's decision: "adding one is
+  // open to the child"). It sat on the topbar until #380 review round 5, B1: that row was full to the pixel, a
+  // fourth `.icon-btn` hung 8px off a 390px iPhone and gave every topbar screen horizontal scroll, and the
+  // 44px touch floor (`design-language` §4) says the space cannot come out of the buttons. Here it is beside
+  // the other whole-device control instead, on the one screen every other screen comes back to.
+  $('#who').addEventListener('click', () => { sfx.tap(); nav.profiles(); });
 }
 
 /** Island: topics for one year group + its Sky Storm. */

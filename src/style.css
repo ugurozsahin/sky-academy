@@ -1233,7 +1233,18 @@ img { -webkit-user-drag: none; }
 
 /* Grown-ups gate + parent dashboard (#9) */
 .foot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.foot-link { color: var(--muted); font-size: 12px; font-weight: 700; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
+/* #20 slice 2 (#380 review round 5, B1): the sky map's two whole-device controls — "For grown-ups" and "Who is
+ * playing?" — side by side, wrapping to two lines rather than overflowing on a narrow phone. 👥 was a fourth
+ * `.icon-btn` on the topbar, and that row was already full to the pixel: the new button hung 7.6px off a
+ * 390×844 iPhone and every screen the shared topbar appears on gained horizontal scroll. The space could not
+ * come out of the buttons — `design-language` §4 puts the floor for a tappable control at 44px — so the control
+ * moved to the row that already holds the other one, and both of them meet that floor now. */
+.foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.foot-link {
+  color: var(--muted); font-size: 12px; font-weight: 700; padding: 6px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+  min-height: 44px; display: inline-flex; align-items: center;
+}
 .foot-link:active { transform: scale(.96); }
 
 .gate {

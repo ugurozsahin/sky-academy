@@ -3,6 +3,7 @@ import { TOPICS } from '../../src/curriculum';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
+import { expectFitsViewport } from './viewport';   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
 
 declare global {
   interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
@@ -1990,14 +1991,17 @@ test.describe('profile picker (#20 slice 2)', () => {
   });
 
   /**
-   * guard rail (#380 review B1): the 👥 button is on the *shared* topbar, so the picker opens from the island
-   * and rewards screens too — and it pushes no history entry of its own, so whatever entry was current when it
-   * opened was what everything leaving it unwound onto. `renderIntro`'s `history.go(-2)` then landed a
-   * brand-new Reception profile on the previous child's Year 2 island, or on an empty rewards screen. Nothing
-   * caught it because every existing test opened the picker at launch, where history is empty.
+   * guard rail (#380 review B1, and round 5's B3): the picker pushes no history entry of its own, so whatever
+   * entry is current when it opens is what everything leaving it unwinds onto. `renderIntro`'s `history.go(-2)`
+   * landed a brand-new Reception profile on the previous child's Year 2 island, or on an empty rewards screen.
+   *
+   * The 👥 control is on the sky map, which is the root, so the way to reach the picker over a stacked entry is
+   * the **boot** path: `history.state` survives a reload, a PWA relaunch or a restored tab, and boot drew the
+   * picker wherever the stack happened to be. Round 5's B3 is that door, and one function is now both doors —
+   * so this reloads from a stacked screen rather than clicking a button that no longer sits on one.
    */
   for (const from of ['island', 'rewards'] as const) {
-    test(`a new ninja added from the ${from} screen starts on their own sky map (#20 slice 2)`, async ({ page }) => {
+    test(`a new ninja added after a reload from the ${from} screen starts on their own sky map (#20 slice 2)`, async ({ page }) => {
       await seedSiblings(page);
       await page.goto('/');
       await page.click('.avatar-card[data-profile="p1"]');
@@ -2010,9 +2014,11 @@ test.describe('profile picker (#20 slice 2)', () => {
         await page.click('#rewards');
         await expect(page.locator('.home.rewards')).toBeVisible();
       }
+      expect(await page.evaluate(() => history.state?.screen ?? null), 'the screen we reload from pushed an entry').toBe(from);
 
-      await page.click('#who');
+      await page.reload();
       await expect(page.locator('.profile-screen')).toBeVisible();
+      expect(await page.evaluate(() => history.state?.screen ?? null), 'and the picker is drawn at the root, not on it').toBeNull();
       await page.click('#new-ninja');
       await expect(page.locator('.choose-ninja-screen')).toBeVisible();
       await page.click('.avatar-card[data-id="kai"]');
@@ -2029,12 +2035,14 @@ test.describe('profile picker (#20 slice 2)', () => {
   }
 
   /**
-   * guard rail (#380 review B5): from the topbar the picker needs a way out. The ＋ card adds a profile for
-   * good — nothing deletes one until slice 3 — so without a back control a child who tapped 👥 out of
+   * guard rail (#380 review B5): opened from the sky map the picker needs a way out. The ＋ card adds a profile
+   * for good — nothing deletes one until slice 3 — so without a back control a child who tapped 👥 out of
    * curiosity could only leave by committing to a profile, and the launch picker would then greet them on
-   * every boot forever. At launch there is deliberately no back control: the picker is the root screen there.
+   * every boot forever. At launch there is deliberately no back control: the picker is the root screen there,
+   * and since round 5's B3 that is *derived* from a screen being on the page rather than passed in by whichever
+   * route called — so this test and the two below it are the pair that hold the two halves apart.
    */
-  test('the picker opened from the topbar has a way back that adds nobody (#20 slice 2)', async ({ page }) => {
+  test('the picker opened from the sky map has a way back that adds nobody (#20 slice 2)', async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada');
     await page.click('#who');
     await expect(page.locator('.profile-screen')).toBeVisible();
@@ -2062,6 +2070,73 @@ test.describe('profile picker (#20 slice 2)', () => {
     expect(await page.evaluate(() => history.state?.screen ?? null), 'the picker pushed no entry').toBeNull();
     await page.goBack();
     await expect(page.locator('.home'), 'no sibling\'s sky map was entered by the press').toHaveCount(0);
+  });
+
+  /**
+   * ...**with a history entry behind it**, which is the half the test above cannot see and round 5's B3 lived in
+   * (#380 review round 5, B3). After a single `page.goto('/')` the history length is 1, so `page.goBack()` is a
+   * no-op and the assertion above cannot fail however the picker is drawn. `history.state` survives a reload,
+   * so a pull-to-refresh, PWA relaunch or restored tab from any screen below the map used to draw the *launch*
+   * picker — the one that deliberately has no `←` because "back leaves the app" — on top of that screen's
+   * entry. One press then dismissed the screen whose whole question is which child is playing, straight into
+   * whoever the index last called active: a sibling playing in the other child's game, earning their coins.
+   */
+  test('...and with a reloaded entry behind it, which is the one that broke (#20 slice 2)', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p2"]');          // Bo is the child the index now calls active
+    await expect(page.locator('.home.map')).toBeVisible();
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+
+    await page.reload();
+    await expect(page.locator('.profile-screen'), 'the reload asks who is playing, as a launch does').toBeVisible();
+    expect(await page.evaluate(() => history.state?.screen ?? null), "the restored entry is unwound, not drawn on").toBeNull();
+    await expect(page.locator('.profile-screen #back'), 'so there is no back control, and none is owed').toHaveCount(0);
+
+    await page.goBack();
+    await expect(page.locator('.home'), 'the press leaves the app rather than walking past the question').toHaveCount(0);
+    await expect(page.locator('.island-screen'), 'and does not restore the screen the reload came from').toHaveCount(0);
+  });
+
+  /**
+   * guard rail (#380 review round 5, B1): 👥 was a fourth `.icon-btn` on the shared topbar, and that row was
+   * already full to the pixel — on a 390×844 iPhone, this project's own device, the new button's right edge sat
+   * at 397.6 with the screen ending at 390, and `document.documentElement.scrollWidth` went from 390 to 398, so
+   * the sky map, the island screen and the rewards screen all gained horizontal scroll. The control this checks
+   * is not decorative: with one profile the launch picker never appears, so it is the only way a second child
+   * is ever added, and a parent hunting for it found two-thirds of a button against the bezel.
+   *
+   * Nothing pointed `expectFitsViewport` — the rail shape this repo already built for this class of bug (#107,
+   * #109, #110) — at the topbar, and the picker's own e2e clicked the button successfully because Playwright
+   * clicks an element's centre, which at 374.6 was still on screen.
+   */
+  test('the sky map, island and rewards screens fit across, control and all (#20 slice 2)', async ({ page }) => {
+    // The purse is seeded on purpose, and it is the whole difference between a rail and a decoration: with an
+    // empty purse the coin pill reads "🪙 0" and the row has ~10px of slack, so the four-button topbar fitted
+    // and this test passed while the bug was in front of it. The review's own fixture — Ada, 40 coins, no
+    // streak — is what the measurement was taken against, so it is what this seeds.
+    await page.addInitScript(save => {
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }));
+    await page.goto('/');
+    await expect(page.locator('.home.map')).toBeVisible();
+    const vw = page.viewportSize()!.width;
+    const who = page.locator('#who');
+    await expect(who, 'the way to the picker is on the map, where every screen comes back to').toBeVisible();
+    const box = (await who.boundingBox())!;
+    expect(Math.round(box.x + box.width), 'the whole control is on screen, not two-thirds of it').toBeLessThanOrEqual(vw);
+    expect(box.height, 'and it clears the 44px touch floor (`design-language` §4)').toBeGreaterThanOrEqual(44);
+    await expectFitsViewport(page, 'sky map');
+
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expectFitsViewport(page, 'island screen');
+
+    await page.goBack();
+    await page.click('#rewards');
+    await expect(page.locator('.home.rewards')).toBeVisible();
+    await expectFitsViewport(page, 'rewards screen');
   });
 
   /**

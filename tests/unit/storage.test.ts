@@ -1170,6 +1170,73 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(load().name, 'but the session re-resolves rather than playing on as the sibling it cached').toBe('Ada');
   });
 
+  /**
+   * A store in the band a filling quota necessarily passes through: it keeps the ~39-byte index blob and
+   * refuses the ~413-byte save. Round 4's fix was written and tested against a store that refuses *everything*,
+   * where `writeIndex` fails and the refusal is honest — so the two paths below, which need a kept index write
+   * beside a refused save, were unreachable from any test (#380 review round 5, B2).
+   */
+  const capWrites = (cap: number) => {
+    const realSet = localStorage.setItem.bind(localStorage);
+    (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => {
+      if (v.length > cap) throw new Error('quota');
+      realSet(k, v);
+    };
+    return () => { (localStorage as unknown as { setItem: unknown }).setItem = realSet; };
+  };
+
+  it('...and a kept index write is still not a new child, so their coins survive that tap too (#380 review round 5, B2)', () => {
+    save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 10 });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    save({ name: 'Bo' });
+    expect(setActiveProfile('p1'), 'Ada is the child holding the device').toBe(true);
+    expect(load().coins).toBe(10);
+    // Another tab moves the device to Bo, so Ada's own card now *does* have an index to write back — the arm
+    // round 4 left alone. The index is the session's business only through `cacheProfile`, and that still says
+    // Ada: dropping her session here discarded the only copy of her afternoon while answering `true`.
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2'] }));
+    const uncap = capWrites(120);
+    try {
+      save({ coins: 42 });
+      expect(isWriteFailing(), 'the save blob is over the cap and was refused').toBe(true);
+      expect(setActiveProfile('p1'), 'her own card, and this time the index is written and kept').toBe(true);
+      expect(activeProfile(), 'the switch really did persist, so the next launch opens on her').toBe('p1');
+      expect(load().coins, 'the coins the child is playing on, not the last that reached disk').toBe(42);
+      expect(isWriteFailing(), 'and the device goes on saying it is not saving').toBe(true);
+    } finally { uncap(); }
+  });
+
+  it('...and "New ninja" refuses on that store rather than taking the playing child with it (#380 review round 5, B2)', () => {
+    save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 10 });
+    const uncap = capWrites(120);
+    try {
+      save({ coins: 42 });
+      expect(isWriteFailing()).toBe(true);
+      expect(addProfile(), 'a profile the store cannot save is one it cannot hand a child')
+        .toEqual({ ok: false, why: 'store' });
+      // `ok: true` here never reached the picker's `refuse()`: no hint, no sound, nothing spoken, and Ada's
+      // name, ninja and 42 coins gone on one tap — into a wizard for a new child that nothing can delete.
+      expect(load(), 'her game is still the one on screen').toMatchObject({ name: 'Ada', avatar: 'volt', coins: 42 });
+      expect(isWriteFailing(), "and the latch stays, so parents.ts still says why").toBe(true);
+      expect(profileIds(), 'nobody was added').toEqual(['p1']);
+      expect(activeProfile()).toBe('p1');
+    } finally { uncap(); }
+  });
+
+  it('...while a read-only save does not refuse it: that store writes, it is the blob that is newer (#232)', () => {
+    // The other latch, and deliberately not a refusal: `save()` never writes this blob back, so the session
+    // cache holds nothing disk is missing, and the new child's own save will land normally.
+    const newer = JSON.stringify({ v: 99, name: 'Ada', coins: 4 });
+    localStorage.setItem(saveKeyFor('p1'), newer);
+    save({ coins: 15 });
+    expect(isReadOnlySave(), 'the blob on disk is from a newer build').toBe(true);
+    expect(addProfile(), 'the store is writable; it is this one blob that must not be written')
+      .toEqual({ ok: true, id: 'p2' });
+    save({ name: 'Bo', coins: 1 });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "the new child's save lands on disk").toBe('Bo');
+    expect(localStorage.getItem(saveKeyFor('p1')), 'and the newer blob is byte-for-byte untouched').toBe(newer);
+  });
+
   it('a foreign blob under a slot key does not invent a profile', () => {
     save({ name: 'Ada' });
     localStorage.setItem(saveKeyFor('p3'), 'garbage left by something else');

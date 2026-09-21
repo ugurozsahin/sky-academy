@@ -52,35 +52,57 @@ const nav = {
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },
   shop: () => { leave(); enter('shop'); shopScreen(nav); },
   parents: () => { leave(); enter('parents'); parentsScreen(nav); },
-  // #20 slice 2: the profile picker. Deliberately pushes **no** history entry, which makes it a launch screen
-  // rather than a step in the stack: the sky map is the root here (`mapScreen` pushes nothing either), and
-  // `nav.map()` pops whenever an entry exists — so an entry for the picker would send every "chosen, go to the
-  // map" straight back to the picker. Back from the picker leaves the app, exactly as back from the map does.
-  //
-  // For that to be true it has to *be* at the root, and the 👥 button sits on the shared topbar — so the
-  // picker is also reached from the island and rewards screens, whose own entry was then still the current
-  // one. Everything leaving the picker unwound onto it: "New ninja" finishes Sensei's welcome with
-  // `history.go(-2)` (`renderIntro`), which landed a brand-new Reception profile on the *previous* child's
-  // Year 2 island, or on an empty rewards screen (#380 review B1). So pop back to the root first and draw
-  // the picker when that pop arrives — `toProfiles` carries the intent across the popstate, and the route
-  // re-checks on the way in, so a deeper stack unwinds one entry at a time.
-  profiles: () => {
-    leave(); year = null;
-    if (history.state?.screen) { toProfiles = true; history.back(); return; }
-    showProfiles(() => nav.map());
-  },
+  profiles: () => goProfiles(),   // #20 slice 2: the profile picker — `goProfiles` is the only way in
   up,
 };
-/** Draw the picker. `back` is the way out when it was opened from the topbar; at launch there is none, the
- *  picker being the root screen there (#380 review B5). */
-const showProfiles = (back?: () => void) => { leave(); fromPop = false; profilesScreen(() => afterPick(), () => nav.avatar(), back); };
-let toProfiles = false;
+/**
+ * The picker's one way in, taken by the boot path and the 👥 button alike (#380 review round 5, B3).
+ *
+ * It pushes **no** history entry, which makes it a launch screen rather than a step in the stack: the sky map
+ * is the root here (`mapScreen` pushes nothing either), and `nav.map()` pops whenever an entry exists — so an
+ * entry for the picker would send every "chosen, go to the map" straight back to the picker. Back from the
+ * picker leaves the app, exactly as back from the map does.
+ *
+ * **For that to be true it has to *be* at the root, and two separate routes used to draw it elsewhere.** The
+ * 👥 control was a fourth button on the *shared* topbar until round 5's B1 moved it to the sky map's footer, so
+ * the picker was reached from the island and rewards screens too, whose own entry was then still the current
+ * one: everything leaving the picker unwound onto it, and "New ninja" finishing Sensei's welcome with
+ * `history.go(-2)` (`renderIntro`) landed a brand-new Reception profile on the *previous* child's Year 2
+ * island (#380 review B1). The boot path was the same bug by the other door
+ * — `history.state` survives a reload, so refreshing from an island, a PWA relaunch or a restored tab drew the
+ * **launch** picker, the one that deliberately has no `←`, on top of that island's entry: one press of
+ * hardware back dismissed the screen whose whole question is which child is playing, straight into whoever
+ * the index last called active, and a sibling was playing in the other child's game (#380 round 5, B3).
+ *
+ * So there is one way in, and it draws nothing until the stack is at the root: `pendingProfiles` carries the
+ * intent across the popstate and this function re-checks on the way in, so a deeper stack unwinds one entry at
+ * a time.
+ *
+ * The launch/back distinction is then **derived rather than passed in**, which is what stops the two routes
+ * disagreeing again: the way out is the sky map, and there is one to go back to exactly when a screen is
+ * already on the page.
+ */
+const goProfiles = () => {
+  leave(); year = null;
+  if (history.state?.screen) { pendingProfiles = true; history.back(); return; }
+  const back = screenDrawn() ? () => nav.map() : undefined;   // read before rendering, which is what replaces it
+  fromPop = false;
+  profilesScreen(() => afterPick(), () => nav.avatar(), back);
+};
+/** Whether a screen is already on the page. At launch `#app` is still the empty div `index.html` ships, so
+ *  there is nowhere to go back *to* and the picker draws no `←`; opened from the map's 👥 pill the sky map is
+ *  behind it and needs one, because the ＋ card adds a profile for good and nothing deletes one until slice 3
+ *  (#380 review B5). The DOM is the honest answer to "is there a screen behind this one": it survives the
+ *  popstate the unwinding above waits for, where a flag set at boot would have gone stale by the time the pop
+ *  arrived. */
+const screenDrawn = () => !!document.querySelector('#app > *');
+let pendingProfiles = false;
 /** Where a chosen profile lands: their sky map, or onboarding when that slot has never been played. */
 const afterPick = () => { if (load().onboarded) nav.map(); else nav.avatar(); };
 window.addEventListener('popstate', () => {
   const s = history.state?.screen as string | undefined;   // the entry we landed on
   fromPop = true;
-  if (toProfiles) { toProfiles = false; nav.profiles(); return; }   // still unwinding towards the picker's root
+  if (pendingProfiles) { pendingProfiles = false; goProfiles(); return; }   // still unwinding towards the picker's root
   // The grown-ups screen's guarded reset (#115) must land on onboarding, never the map with an empty profile,
   // however it is left — including the hardware/browser back button landing here rather than through
   // parents.ts's own `#back` click handler.
@@ -112,7 +134,7 @@ void startServiceWorker();
 //
 // #67: `onboarded`, not `avatar` — a profile mid-wizard already has an avatar chosen (choices save as they
 // are made) but must still see the rest of the wizard on the next launch, not jump straight to the map.
-if (profileIds().length > 1) showProfiles(); else if (load().onboarded) nav.map(); else nav.avatar();
+if (profileIds().length > 1) goProfiles(); else if (load().onboarded) nav.map(); else nav.avatar();
 
 // Keep the layout stable on mobile browsers whose toolbars resize the viewport.
 const setVH = () => document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
