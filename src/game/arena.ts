@@ -768,6 +768,14 @@ export const LABEL_MIN_FS = 10;
  * `£1 and 50p` at **10.6px** and called that too small — "one step above `fitLabel`'s hard `fs > 10`
  * floor" — while `9 o'clock` at 13.6px has never been complained about and is not what the issue is for.
  * 13 separates them, and it is the only thing that decides which labels a wrap may touch.
+ *
+ * **The structure is settled; this exact number is not** (PR #467 review addendum). What is
+ * metric-independent, and what B1 was about, is that the gate asks "is this label too small to read?"
+ * rather than "did it lose a pixel?" — the latter caught every label that shrank at all. Where between
+ * the floor and comfortable the line sits can only be chosen against real `measureText` widths, which is
+ * #348's own deferred piece 1; the unit measure here is a stand-in that puts `£1 and 50p` two pixels
+ * above where the running game does. Until that lands, moving this constant moves which labels wrap, and
+ * the sweep in the pull request body is the evidence for where it is now.
  */
 export const LABEL_READABLE_FS = 13;
 /** How much of `r` one line may spend across the middle of the bubble. */
