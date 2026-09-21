@@ -1333,7 +1333,12 @@ img { -webkit-user-drag: none; }
   background: linear-gradient(0deg, #10163a 60%, transparent);
 }
 .modal h2 { margin: 12px 0 6px; font-size: 28px; } .modal p { margin: 4px 0 14px; color: var(--muted); font-weight: 600; }
-.hero-big { position: relative; display: inline-block; margin-top: 4px; }
+/* #398 round 1, B2: a flex column's default `align-items: stretch` widened this from its ~200px image to the
+   modal's full content width, which pushed `.speech` — positioned at `left: 68%` of ITS OWN box — off the
+   right edge of the phone on anything but the shortest headline. `align-self` opts this one item back out;
+   everything else in `.modal.results` is already full-width by design (a grid, a flex row, or plain text
+   centred by `.modal`'s own `text-align`), so nothing else needs it. */
+.hero-big { position: relative; display: inline-block; align-self: center; margin-top: 4px; }
 .hero-big img {
   width: 200px;
   height: 200px;

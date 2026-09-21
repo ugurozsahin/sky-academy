@@ -651,6 +651,28 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.unlock')).toHaveCount(3);              // 120 coins → the three coin stickers at 30, 70, 120 (#114: the rest is achievement-based, not more coins)
     const dojoBonus = (await results.locator('.dojo-bonus .gain').allTextContents()).reduce((n, t) => n + Number(t.replace(/\D/g, '')), 0);   // today's Daily Dojo may pay for the mission / 3 stars / no slips / combo
     await expect(results.locator('#cert')).toBeVisible();                   // printable certificate for a completed mission
+    // guard rail (#398 round 1, B1/B2), on the exact scenario the review found both in: a mission this tall
+    // (a medal, three unlocks and a dojo bonus) overflows the overlay, which is what exposes them.
+    // B1 — the sticky `.row.nav` used to sit before `#cert` in DOM order, so its stuck box painted over the
+    // top of a visually normal-looking certificate button once it scrolled into view: a tap there landed on
+    // empty space rather than the button. Read near the button's own top edge, not its centre — a click
+    // there already worked and would not catch this.
+    await results.locator('#cert').scrollIntoViewIfNeeded();
+    const certBox = (await results.locator('#cert').boundingBox())!;
+    const atCertTop = await page.evaluate(({ x, y }) => {
+      const el = document.elementFromPoint(x, y);
+      return el ? `${el.id} ${el.className}` : '';
+    }, { x: certBox.x + certBox.width / 2, y: certBox.y + 2 });
+    expect(atCertTop, 'the sticky nav row must not paint over the certificate button').not.toContain('nav');
+    expect(atCertTop, 'and the point must land on the certificate button itself').toContain('cert');
+    // B2 — `.modal.results` switching to a flex column stretched `.hero-big` (normally ~200px, shrink-wrapping
+    // its avatar art) to the column's full width, which pushed `.speech` — positioned at 68% of ITS OWN box —
+    // off the right edge of a phone screen on any headline longer than the shortest one.
+    const heroBox = (await results.locator('.hero-big').boundingBox())!;
+    expect(heroBox.width, 'hero-big must keep shrink-wrapping its ~200px avatar art').toBeLessThan(260);
+    const speechBox = (await results.locator('.speech').boundingBox())!;
+    expect(speechBox.x + speechBox.width, 'the speech bubble must stay on screen')
+      .toBeLessThanOrEqual(page.viewportSize()!.width);
     const png = await page.evaluate(() => window.__sna.certificate());
     expect(png).toMatch(/^data:image\/png;base64,/); expect(png.length).toBeGreaterThan(20_000);
 
