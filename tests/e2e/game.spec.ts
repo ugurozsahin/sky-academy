@@ -1234,6 +1234,117 @@ test.describe('Sky Ninja Academy', () => {
     expect(inBox, 'a bubble was left outside the resized arena').toMatchObject({ risingOutside: 0, offSide: 0 });
   });
 
+  /**
+   * #328: `@media (max-height: 640px)` in `src/style.css` hid `.hint` outright to buy the play card vertical
+   * space, and a phone held sideways is ~390px tall — squarely in that band. For the seven measure topics
+   * (`y1-length`, `y1-mass`, `y1-capacity`, `y2-length`, `y2-mass`, `y2-capacity`, `y2-temp`) the values being
+   * compared live in `q.hint` and nowhere else on the card: no `visual`, nothing in the prompt. Hidden,
+   * "Which is longer?" sits over two coloured bubbles with nothing on screen to decide by — #65's rule that
+   * every card stays usable without read-aloud, broken by a layout rule rather than by a generator. The duel
+   * screen's half of the same bug is pinned in `duel.spec.ts` (PR #295); this is the play screen's.
+   *
+   * **The control is `y1-shapes`, and that is the point of it.** This test first used `y1-bonds`, which
+   * writes no `hint` at all — so it passed whether the mark was `hintIsData` or the `!!q.hint` the first
+   * version of the fix used, and could not see that the latter gives a line back to ~40 instruction-writing
+   * topics and pushes the arena down with it (PR #430 review, round 1). `y1-shapes` writes "Slice the shape"
+   * and must stay hidden, so the control now fails against the wrong predicate.
+   *
+   * Run at a landscape phone rather than in `viewport.spec.ts`, which only the two tablet projects run.
+   */
+  test('guard rail: a phone in landscape keeps the values a measure question is asking about (#328)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-length');
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.waitForFunction(() => window.__sna.arena!.W > window.__sna.arena!.H);   // the resize is laid out, not still portrait
+    const seen = await page.evaluate(() => {
+      const el = document.querySelector('#hint') as HTMLElement, r = el.getBoundingClientRect();
+      return {
+        text: el.textContent ?? '', display: getComputedStyle(el).display, own: el.classList.contains('own'),
+        height: r.height, bottom: r.bottom,
+        cardBottom: (document.querySelector('.qcard') as HTMLElement).getBoundingClientRect().bottom,
+      };
+    });
+    console.log(`[guard rail #328] landscape hint: display=${seen.display} h=${seen.height} cardBottom=${seen.cardBottom} "${seen.text}"`);
+    expect(seen.own, "the writer did not mark the question's own line, so the CSS cannot let it through").toBe(true);
+    expect(seen.display, 'the short-screen rule hid the only values on the card').not.toBe('none');
+    expect(seen.height, 'the line is laid out, not collapsed to nothing').toBeGreaterThan(0);
+    // The measure hint is `colour noun: value unit`, joined by ` · ` — the one shape no generic line has.
+    expect(seen.text, 'the line on screen is not the values being compared').toMatch(/: ?\d+ ?(cm|m|g|kg|ml|°C)\b/);
+    expect(seen.bottom, 'the values are on the card but off the bottom of a 390px screen').toBeLessThanOrEqual(390);
+
+    // The control: `y1-shapes`, which WRITES a hint ("Slice the shape") that the card does not need. Same
+    // year, same landscape phone. This is the case the first version of the fix got wrong.
+    // Through `startTopic()`, which picks the subject tab from the registry (#27). The bare
+    // `.topic[data-id=...]` click this used before passed only because `y1-bonds` is maths and maths is the
+    // default tab — and the useful controls here are hint-writing topics, several of which are writing
+    // (#430 review). `y1-shapes` is maths too, so this is insurance against the next swap, not a fix.
+    await page.evaluate(() => history.back());
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await startTopic(page, 'year1', 'y1-shapes');
+    // `y1-shapes` writes its hint on ~half its draws, so take the first drawn question that has one: a draw
+    // without it would make the control vacuous rather than red.
+    await page.waitForFunction(() => (document.querySelector('#hint') as HTMLElement).textContent !== '');
+    const plain = await page.evaluate(() => {
+      const el = document.querySelector('#hint') as HTMLElement;
+      return {
+        text: el.textContent ?? '', display: getComputedStyle(el).display,
+        own: el.classList.contains('own'), height: el.getBoundingClientRect().height,
+        cardBottom: (document.querySelector('.qcard') as HTMLElement).getBoundingClientRect().bottom,
+      };
+    });
+    console.log(`[guard rail #328] landscape control: display=${plain.display} h=${plain.height} cardBottom=${plain.cardBottom} "${plain.text}"`);
+    expect(plain.text, 'the control drew a card with no hint, so it proves nothing').not.toBe('');
+    expect(plain.own, "a generator's instruction hint must not be marked as data").toBe(false);
+    expect(plain.display, 'the ordinary landscape card gave up a line it used to keep').toBe('none');
+    expect(plain.height, 'the hidden line still took layout space').toBe(0);
+    // …and the cost is measured where it actually lands (#430 review, note 4). The card's bottom edge is
+    // what the wave is laid out under — `arena.topInset = els.qcard.getBoundingClientRect().bottom + 6` in
+    // `play-session.ts` — so a line shown here is a line of flight taken away. Read the edge rather than
+    // `topInset` itself, which is only written inside the launch rAF and reads its default until a wave goes
+    // up; and rather than `arena.H`, which is the viewport's and never moves whatever the card does.
+    // Hidden, the control's card ends no lower than the measure card's; with the #430 regression back it
+    // ends ~16px lower, which is the whole of what that regression costs a child in landscape.
+    // Strictly shorter, by at least the line's own height: `<=` would be satisfied by the two cards being
+    // identical, which is exactly what the regression looks like.
+    expect(seen.cardBottom - plain.cardBottom, 'the control card did not get the line of arena back')
+      .toBeGreaterThanOrEqual(seen.height - 1);
+  });
+
+  /**
+   * #328 / PR #430 review: a landscape card-height budget, which the play screen had none of while
+   * `duel.spec.ts` has had one for the duel strip at this very viewport since #388. The media query exists
+   * to keep the card off the arena on a short screen, and nothing bounded how much of the 390px the card
+   * may take — so the round-1 regression (an instruction hint shown on ~40 topics) cost `y2-symmetry` 16 of
+   * the 69px of flight `main` left it, a 23% cut, with every test green.
+   *
+   * The sample is the reviewer's own, the tallest cards they measured, and the budget is a BUDGET: it only
+   * ever goes down (`.claude/rules/guardrails.md`). Do not raise it to make a build pass — a card that
+   * needs more room in landscape is the bug this rail is for.
+   */
+  test('guard rail: no play card eats the landscape arena, on any of the tallest topics (#328)', async ({ page }) => {
+    const CARD_BUDGET = 330;   // measured worst on this tree: y2-symmetry at 321 of 390. The regression: 337.
+    await seedPlayer(page);
+    await page.setViewportSize({ width: 844, height: 390 });
+    const worst: { id: string; bottom: number; hint: string }[] = [];
+    for (const [year, id] of [['year2', 'y2-symmetry'], ['year1', 'y1-punct'], ['year1', 'y1-spelling'], ['reception', 'r-oddeven'], ['year1', 'y1-position'], ['year1', 'y1-length']] as const) {
+      await startTopic(page, year, id);
+      await page.waitForFunction(() => window.__sna.arena!.W > window.__sna.arena!.H);
+      const m = await page.evaluate(() => ({
+        bottom: (document.querySelector('.qcard') as HTMLElement).getBoundingClientRect().bottom,
+        hint: (document.querySelector('#hint') as HTMLElement).textContent ?? '',
+      }));
+      worst.push({ id, ...m });
+      await page.evaluate(() => history.back());
+      await expect(page.locator('.island-screen')).toBeVisible();
+      await page.evaluate(() => history.back());
+      await expect(page.locator('.home')).toBeVisible();
+    }
+    console.log(`[guard rail #328 budget] ${worst.map(w => `${w.id}=${w.bottom}`).join(' ')}`);
+    for (const w of worst)
+      expect(w.bottom, `${w.id}: the card reaches ${w.bottom}px of a 390px screen, leaving ${390 - w.bottom}px of arena — hint "${w.hint}"`)
+        .toBeLessThanOrEqual(CARD_BUDGET);
+  });
+
   test('guard rail: leaving the play screen stops it', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
@@ -2349,5 +2460,229 @@ test.describe('profile picker (#20 slice 2)', () => {
     await page.goto('/');
     await expect(page.locator('.profile-screen')).toBeVisible();
     await expect(page.locator('.profile-screen #back'), 'back from the root leaves the app, as it does from the map').toHaveCount(0);
+  });
+});
+
+/**
+ * #20 slice 3 — rename and remove, from behind the grown-ups gate. Slice 1 gave each sibling a save and slice 2
+ * a way to reach it; this is the first time a family can take a slot back, or fix a name typed by a five-year
+ * old. Reuses `seedSiblings` above, so the index shape is stated in exactly one place.
+ */
+test.describe('ninjas on this device (#20 slice 3)', () => {
+  test('a grown-up renames a sibling without leaving the dashboard, and the picker agrees', async ({ page }) => {
+    await seedSiblings(page);                      // Ada in p1 (active, 40 coins), Bo in p2
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    await expect(page.locator('.p-prof')).toHaveCount(2);
+    await expect(page.locator('.p-prof[data-prof="p2"]')).toContainText('Bo');
+
+    await page.fill('.p-prof-in[data-name="p2"]', 'Bobby');
+    await page.click('button[data-rename="p2"]');
+    await expect(page.locator('#prof-msg')).toHaveText('Renamed to Bobby.');
+    await expect(page.locator('.p-prof[data-prof="p2"] b'), 'the row redraws from the store').toHaveText('Bobby');
+    await expect(page.locator('.parents-dash'), 'and the child playing is untouched — the heading is still theirs').toContainText('Ada');
+
+    // The rename is persisted, not merely rendered: it is on the launch picker at the next boot, and Bo's own
+    // coins came through with it.
+    await page.goto('/');
+    await expect(page.locator('.avatar-card[data-profile="p2"]')).toContainText('Bobby');
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('#change-av')).toContainText('Bobby');
+    await expect(page.locator('#rewards'), 'a rename is one field, not a reset').toContainText('7');
+  });
+
+  test("renaming the child holding the device changes the screens they are looking at", async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await expect(page.locator('.p-prof'), 'one profile is still a row — a name is worth fixing on any device').toHaveCount(1);
+    await expect(page.locator('button[data-del="p1"]'), 'but the only ninja has no Remove: that is "Start again"').toHaveCount(0);
+    await page.fill('.p-prof-in[data-name="p1"]', 'Ada Two');
+    await page.click('button[data-rename="p1"]');
+    await expect(page.locator('#prof-msg')).toHaveText('Renamed to Ada Two.');
+    await expect(page.locator('.parents-dash'), 'the dashboard heading is drawn from the same save').toContainText('Ada Two');
+    await page.click('.parents #back');
+    await expect(page.locator('#change-av'), 'and so is the map, without a reload').toContainText('Ada Two');
+  });
+
+  test('a blank name is refused, and the refusal says so rather than clearing the row', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await page.fill('.p-prof-in[data-name="p1"]', '   ');
+    await page.click('button[data-rename="p1"]');
+    await expect(page.locator('#prof-msg')).toHaveText('A ninja needs a name — type one in first.');
+    await expect(page.locator('#prof-msg')).toHaveClass(/bad/);
+    await expect(page.locator('.p-prof[data-prof="p1"] b')).toHaveText('Ada');
+  });
+
+  test('removing a sibling asks first, and cancelling changes nothing', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    await page.click('button[data-del="p2"]');
+    await expect(page.locator('.prof-modal h2'), 'named, so a grown-up can see which child this is').toHaveText('Remove Bo?');
+    await page.click('#prof-cancel');
+    await expect(page.locator('.prof-modal')).toHaveCount(0);
+    await expect(page.locator('.p-prof')).toHaveCount(2);
+
+    // Confirming removes the row, stays on the dashboard — this is not the child who is playing — and frees
+    // the slot for a new ninja.
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.prof-modal')).toHaveCount(0);
+    await expect(page.locator('.parents-dash'), 'the grown-up is still where they were').toBeVisible();
+    await expect(page.locator('#prof-msg')).toHaveText('Bo was removed from this device.');
+    await expect(page.locator('.p-prof')).toHaveCount(1);
+    await expect(page.locator('button[data-del="p1"]'), 'and the last one left cannot be removed either').toHaveCount(0);
+
+    // Gone from the store, not only from the list: one profile boots straight to the map, and the slot is reusable.
+    await page.goto('/');
+    await expect(page.locator('.profile-screen'), 'one profile, so no launch picker').toHaveCount(0);
+    await expect(page.locator('#change-av')).toContainText('Ada');
+    await page.click('#who');
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(1);
+    await expect(page.locator('#new-ninja'), 'the freed slot is genuinely free').toBeVisible();
+  });
+
+  /**
+   * The one navigation rule slice 3 adds: a grown-up who removes the ninja this session is playing cannot be
+   * left on a dashboard drawn from a save that no longer exists. Where they land is the boot decision re-run
+   * (`main.ts`'s `relaunch`) — the picker while two or more profiles remain.
+   */
+  test('removing the child this session is playing lands on the picker, not on their empty dashboard', async ({ page }) => {
+    await page.addInitScript(({ index, ada, bo, cass }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', bo);
+        localStorage.setItem('sna:v1:p3', cass);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2', 'p3'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      bo: JSON.stringify({ v: SAVE_VERSION, name: 'Bo', avatar: 'blaze', coins: 7, spent: 0, onboarded: true }),
+      cass: JSON.stringify({ v: SAVE_VERSION, name: 'Cass', avatar: 'terra', coins: 3, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('#change-av')).toContainText('Bo');
+    await openGrownUps(page);
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.profile-screen'), 'two children left, so the launch picker is the honest answer').toBeVisible();
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(2);
+    await expect(page.locator('.avatar-card[data-profile="p2"]')).toHaveCount(0);
+    // **And it is the LAUNCH picker, with no way past the question** (#420 review B1). `relaunch()` draws on
+    // top of the grown-ups screen, so `screenDrawn()` answered true and the picker got a `←`: one tap put the
+    // remaining sibling into whoever the index called active — nobody chose them — earning that child's coins
+    // and stars. The same defect #380 round 5 B3 spent a round fixing, by a new door. Slice 2 asserts this
+    // three times for the boot picker; the post-delete one is the same screen and needs the same assertion.
+    await expect(page.locator('.profile-screen #back'), 'no way out but choosing a child (#420 B1)').toHaveCount(0);
+    // And the siblings' saves are theirs, not Bo's written over one of them on the way out.
+    await page.click('.avatar-card[data-profile="p1"]');
+    await expect(page.locator('#change-av')).toContainText('Ada');
+    await expect(page.locator('#rewards')).toContainText('40');
+  });
+
+  /**
+   * `relaunch()`'s other two branches, which nothing reached (#420 review note 5): with **two** profiles a
+   * self-delete leaves one, so there is no picker to draw and the remaining child's own screen is the answer.
+   * That is the shape most family tablets take, and replacing `nav.launch()` with `drawDash()` left every unit
+   * test green.
+   */
+  test('with two profiles, removing the one playing lands on the sibling’s own map (#20 slice 3)', async ({ page }) => {
+    await seedSiblings(page, 'p2');                 // Ada in p1 (40 coins), Bo in p2 and active
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('#change-av')).toContainText('Bo');
+    await openGrownUps(page);
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.profile-screen'), 'one child left, so no picker to choose from').toHaveCount(0);
+    await expect(page.locator('.home'), "and not the dashboard of a save that no longer exists").toBeVisible();
+    await expect(page.locator('#change-av')).toContainText('Ada');
+    await expect(page.locator('#rewards'), "Ada's own coins, not Bo's written over them").toContainText('40');
+  });
+
+  test('...and onto onboarding when the profile left has never been played (#20 slice 3)', async ({ page }) => {
+    // p1 is a slot the ＋ card made and nothing ever played; p2 is Bo, active and playing.
+    await page.addInitScript(({ index, bo }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1:p2', bo);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2'] }),
+      bo: JSON.stringify({ v: SAVE_VERSION, name: 'Bo', avatar: 'blaze', coins: 7, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p2"]');
+    await openGrownUps(page);
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.avatar-screen'), 'the wizard, because the slot left has no game yet').toBeVisible();
+    await expect(page.locator('.home'), 'never the map with an empty profile (#67, #115)').toHaveCount(0);
+  });
+
+  /**
+   * #420 review B2. `profileCard` blanks a save a newer build wrote, so the row drew ＋ / "Ninja 2" /
+   * "Not started yet" / "No name yet — this ninja has not played" beside a Remove button — and the tap
+   * destroyed 99 coins and all of that child's progress. Reachable by an APK rollback, a sideloaded older
+   * build or a stale service worker: #232's whole scenario. The row must stop claiming the wrong reason, and
+   * must not offer the tap.
+   */
+  test('a sibling’s newer-build save is not offered for renaming or removal, and says why (#20 slice 3)', async ({ page }) => {
+    await page.addInitScript(({ index, ada, future }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', future);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      future: JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    const newer = page.locator('.p-prof[data-prof="p2"]');
+    await expect(newer).toContainText('Saved by a newer version');
+    await expect(newer, 'and never "this ninja has not played" about bytes it cannot read').not.toContainText('has not played');
+    await expect(newer.locator('.p-prof-in'), 'no rename').toHaveCount(0);
+    await expect(page.locator('button[data-del="p2"]'), 'and no Remove — 99 coins are behind it').toHaveCount(0);
+    await expect(newer).toContainText('Open the game on the other device');
+    // The bytes are still there, which is the whole point: the other device still reads them.
+    expect(await page.evaluate(() => localStorage.getItem('sna:v1:p2'))).toContain('99');
+  });
+
+  /**
+   * The grown-ups list draws a slot the picker's ＋ created and nothing ever played — the same state #380
+   * review B1 was about, one screen over. It must not offer a rename it would refuse, and it must still be
+   * removable, because that is the only way the family gets the slot back.
+   */
+  test('an unplayed slot says so instead of offering a rename, and can still be removed', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await page.click('#who');
+    await page.click('#new-ninja');
+    await expect(page.locator('.avatar-screen'), 'the ＋ card runs the wizard').toBeVisible();
+    // Leave the wizard before a ninja is chosen: the slot is in the index with no save behind it.
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    const unplayed = page.locator('.p-prof[data-prof="p2"]');
+    await expect(unplayed).toContainText('Ninja 2');
+    await expect(unplayed).toContainText('Not started yet');
+    await expect(unplayed.locator('.p-prof-in'), 'no name to change').toHaveCount(0);
+    await expect(unplayed).toContainText('No name yet');
+    await page.click('button[data-del="p2"]');
+    await expect(page.locator('.prof-modal h2')).toHaveText('Remove Ninja 2?');
+    await page.click('#prof-go');
+    await expect(page.locator('.p-prof')).toHaveCount(1);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen'), 'back to a one-profile device').toHaveCount(0);
+    await expect(page.locator('#change-av')).toContainText('Ada');
   });
 });

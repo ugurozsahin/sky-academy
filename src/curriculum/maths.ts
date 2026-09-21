@@ -159,10 +159,23 @@ const y1Missing: Generator = (d, rng) => {
 };
 const y1Skip: Generator = (d, rng) => {
   const step = d === 1 ? 2 : d === 2 ? pick(rng, [2, 5, 10]) : pick(rng, [2, 5, 10]);
-  const start = step * ri(rng, 0, d === 3 ? 8 : 4);
+  // The answer is the fourth term, so the start has to leave room for three more steps inside the `max: 100`
+  // this question declares (#366). It did not: `step * 8` in tens started at 80, so "80, 90, 100, ?" answered
+  // 110 — past Year 1's ceiling of 100 (`docs/CURRICULUM.md`: "count in 2s/5s/10s" to 100) and past the
+  // declared `max`, which is the worse half: `numQ` filters the decoys against that range, so 111, 109 and 120
+  // were all dropped and the card offered 0, 1, 100 and 110. The three-digit bubble was the only one it could
+  // be, which teaches slicing the odd-looking one. `100 / step - 3` is the highest start that keeps the fourth
+  // term at or under 100; it only binds on the tens, where d3 now stops at 70 instead of 80.
+  const top = Math.min(d === 3 ? 8 : 4, Math.floor(100 / step) - 3);
+  const start = step * ri(rng, 0, top);
   const seq = [start, start + step, start + step * 2];
   const p = `${seq.join(', ')}, ?`;
-  return numQ(rng, p, start + step * 3, { min: 0, max: 100, say: `Counting in ${step}s: ${seq.join(', ')}, what comes next?`, distractors: [start + step * 3 + 1, start + step * 3 - 1, start + step * 4] });
+  const ans = start + step * 3;
+  // The last two are tail spares, and only ever reached when the first three cannot all be used: at the top
+  // of the range (`ans` = 100 in tens) `ans + 1` and `ans + step` are both filtered out, and `numQ`'s top-up
+  // can then collide with `ans - 1` and hand the child a three-bubble card. Named decoys keep them near
+  // misses rather than whatever `nearby()` scrapes together (#366).
+  return numQ(rng, p, ans, { min: 0, max: 100, say: `Counting in ${step}s: ${seq.join(', ')}, what comes next?`, distractors: [ans + 1, ans - 1, ans + step, ans - step + 1, ans - 2] });
 };
 const y1MoreLess: Generator = (d, rng) => {
   const n = ri(rng, 1, d === 1 ? 30 : d === 2 ? 60 : 99);
@@ -492,7 +505,10 @@ function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: string, for
   const adj = n === 2 ? (big ? forms[0] : forms[1]) : (big ? forms[2] : forms[3]);
   const spoken = cols.map((c, i) => `the ${c} ${noun} ${verb} ${vals[i]} ${UNIT_WORD[unit]}`).join(', ');
   return wordQ(rng, n === 2 ? `Which ${verb} ${adj}?` : `Which ${verb} the ${adj}?`, cols[idx], cols.filter((_, i) => i !== idx), {
-    hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '),
+    // The options are the colours, so this hint is the only place the sizes being compared appear — it is
+    // data, not the instruction line `hint` usually carries, and the play screen must keep it on a short
+    // screen (#328). `unitChoice` below deliberately does NOT set it: there the units are the bubbles.
+    hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,
     say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`,
   });
 }
@@ -587,7 +603,9 @@ const y2Temp: Generator = (d, rng) => {
   const [ca, cb] = shuffle(rng, ['the town', 'the hill', 'the beach', 'the park', 'the wood', 'the lake']).slice(0, 2);
   let a = ri(rng, 0, 35), b = a; while (b === a) b = ri(rng, 0, 35);
   const first = warmer ? a > b : a < b;
-  return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });
+  // `hintIsData`, for the same reason as `measureCompare()`: the options are the two places, so the
+  // temperatures live in this line and nowhere else on the card (#328).
+  return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, hintIsData: true, say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });
 };
 // Y2 statistics (#8). Each survey is three categories the child picks out by emoji, so the chart can be read
 // without reading the words — the labels carry the emoji and so does the prompt.

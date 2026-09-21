@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Session, starsForAccuracy, type SessionEvents } from '../../src/game/session';
-import { TOPICS, YEARS, topicById, topicsFor } from '../../src/curriculum';
+import { Session, repeatKey, starsForAccuracy, type SessionEvents } from '../../src/game/session';
+import { TOPICS, YEARS, topicById, topicsFor, type Question } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
@@ -254,8 +254,13 @@ describe('a flagged question slows the real session (#311, #297)', () => {
  * `tests/unit/curriculum.test.ts` calls `topic.gen()` directly and so cannot see this: the defect lives in
  * the *sequence* a child plays, which only a real `Session` produces. This rail drives one.
  *
- * The topics are **discovered, not listed**, so a fifth constant-prompt binary topic is covered the day it
- * ships rather than the day somebody remembers this rail exists.
+ * The topics are **discovered, not listed** — but read the filter for what it is, not for what it sounds
+ * like (#412): it selects a *literally* constant prompt, which is a narrower thing than the class this
+ * defect belongs to. `y1-mass` has two prompts ("Which is heavier?" / "Which is lighter?"), binary bubbles
+ * and a ten-value key space — the target profile in every respect except the one the filter tests — and it
+ * was missed here for exactly that reason. So this describe measures **these topics**, statistically; the
+ * class-wide property is the exact one in `the repeat key holds the whole question (#412)` below, which
+ * covers every topic with no guess at which ones degenerate.
  */
 describe('the previous answer carries no signal about the next (#390)', () => {
   const yearOf = (t: { year: string }) => YEARS.find(y => y.id === t.year)!;
@@ -355,6 +360,291 @@ describe('the previous answer carries no signal about the next (#390)', () => {
     // order of magnitude above that and an order below B1's 7.75%–30.8%, so neither the seed nor a small
     // pool decides the verdict.
     expect(repeats / pairs, 'the same question asked twice running').toBeLessThan(0.02);
+  });
+});
+
+/**
+ * #412 — the key must hold the question **wherever the question lives**.
+ *
+ * #390 widened the identity from `(prompt, answer)` to include the visual, which fixed the four topics whose
+ * question is carried by a picture. On nine others the question is text that is not the prompt, and there is
+ * no visual at all: `measureCompare` puts the values only in `hint` and `say`, and `soundQ`'s prompt is the
+ * constant `🔊 Listen!` with its three keyword words in `listen` and `say`. So the key still reduced to the
+ * answer, and the re-roll loop refused every card whose answer matched the previous one — `r-soundhunt`
+ * repeated the target sound **0.000%** of the time over 4000 in-session pairs, against a generator rate of
+ * 6.1%. A child who remembered the last answer was doing better than one who listened.
+ *
+ * Two rails, one exact and one behavioural, and the first is the important one because it needs no statistics
+ * and no list of suspect topics:
+ *
+ * 1. **No two cards that ask different things share a key.** `asked()` below is written here, from the
+ *    `Question` fields a child reads or hears, and is deliberately *not* read off `repeatKey` — it is the
+ *    requirement, and the key is the thing under test. Every playable topic, every difficulty. Before this
+ *    fix it failed on all nine: `y1-mass` collapsed 1,976 different cards onto 10 keys.
+ * 2. **The previous answer carries no signal**, measured against the generator's own rate rather than against
+ *    a guess at what a fair rate would be. That comparison is what makes it apply to topics whose answer is a
+ *    colour or a grapheme, where "about half the time" is simply wrong: `y1-mass` draws two of eight colours
+ *    per card, so ~0.2 is its natural rate, and 0.11 is not evidence of anything. Restricted to topics with
+ *    at least ten distinct cards per answer, because only there is refusing an *identical* card too small an
+ *    effect to explain a gap — that refusal is correct behaviour, and on a three-card topic like `r-share` it
+ *    legitimately drives agreement to zero.
+ *
+ * Rails 1 and 3 are the two halves of one claim — **the key's partition of the cards is exactly the
+ * question's** — and the second half exists because the first half alone let a real regression through
+ * (review round 1, B1/B2). Keying `listen` raw made the same sound-hunt card look like a different one, six
+ * ways per question, and every rail on this file stayed green: `the same exercise is never asked twice
+ * running` above runs 47 cases, and none of the twelve topics whose key these content fields changed is among
+ * them — it selects for a literally constant prompt with one answer per prompt, which rejects the order
+ * topics (they carry a `sequence`), the sound-hunt topics (one prompt) and the measurement topics (five
+ * answers to "Which is lighter?"). So the too-discriminating direction is asserted here, on the fields this
+ * key actually reads, rather than delegated to a rail that cannot see them.
+ *
+ * **What these rails cover, enumerated by carrier rather than summarised** — because the sentence that used to
+ * sit here has now been wider than the truth twice (rounds 2 and 3), each time on a carrier the previous
+ * wording had not thought of. So this is a table, not an adjective:
+ *
+ * | the question is carried by | covered here |
+ * | --- | --- |
+ * | `prompt`, `answer`, `hint`, `listen`, `sequence` | **yes** — `asked()` reads all five |
+ * | a `visual` type in `VISUAL_QUESTION` (`objects`, `sentence`, `symmetry`) | **no rail here** — see below |
+ * | a `visual` type outside it (`coins`, `numberline`, `chart`, …) | **no** |
+ * | `options` | **no** |
+ *
+ * Both noes are measured, and both are `main`'s behaviour rather than anything this change introduces.
+ * `options`: `intervalCompare`'s own comment reads *"No hint: the bubbles **are** the durations"*, and
+ * `y2-duration` at d2 gives 22 keys with 18 covering more than one comparison (#451). An unread `visual`:
+ * `visualKey` returns `''` on a lookup miss, so `y1-coins` at d2 gives 14 keys with **12 covering more than
+ * one spoken question** — one holding `£1 or 20p`, `£1 or 10p` and `£1 or 2p` — and `y1-line` d3 93 of 95,
+ * `y2-line` d3 25 of 32, `y2-money` d1 30 of 33, `y2-stats` d2 **194 of 194**, worst key covering 77 charts,
+ * where the chart *is* the question (#455).
+ *
+ * The allowlisted visuals get **no rail in this describe either**, which round 3's version of this table got
+ * wrong (round 4, note 1): `asked()` omits `q.visual`, so deleting any single `VISUAL_QUESTION` entry leaves
+ * both exact rails green and only the pre-existing #390 band rail above reddens. A fourth entry, or a new topic
+ * carrying its question in an `objects`/`sentence` visual with a varying prompt, would reach no rail in this
+ * file. That is the ones *inside* the allowlist and is not #455, which is the types outside it.
+ *
+ * Neither is keyed here, for the same reason in both cases: doing it unconditionally switches de-duplication
+ * off wherever that field is decoration. `options` are a decoy pool on forty-odd topics, which is why `the key
+ * ignores every field that carries presentation` pins the exclusion; and a `word` visual carries `orderQ`'s
+ * *shuffled* display, so `y2-order` is correctly outside rather than missed. Both want the same thing — a
+ * signal from the generator that its field is the question — which is #451 and #455, not this pull request.
+ *
+ * So: no rail here names a topic, and within the carriers marked yes, a new topic is covered the day it ships.
+ * The adjective-shaped version of that sentence is the mistake this file diagnoses two paragraphs up, and it
+ * has twice been this file's own.
+ */
+describe('the repeat key holds the whole question (#412)', () => {
+  const D1 = 1 as const;
+  const yearOf = (t: { year: string }) => YEARS.find(y => y.id === t.year)!;
+  /**
+   * Everything the card asks: what a child reads on it, hears from it, and must slice. No decoration — and a
+   * delimited list is a **set**, because three generators build one from a per-draw shuffle (round 1, B1).
+   *
+   * The field list is written from the `Question` contract rather than read off `repeatKey`, so it is the
+   * requirement and the key is the thing under test. **The normalisation is deliberately wider than the key's**
+   * (round 2, B2): `contentList` knows only `' · '`, and round 2 showed that a copy of that one separator here
+   * asserts itself — change `soundQ`'s `listen` join to `', '` and round 1's defect returns at 1.2% with every
+   * rail green, because the oracle would fail to normalise it in exactly the same way. Four separators here
+   * against the key's one means a *narrowing* of `contentList`, including a generator switching separator, goes
+   * red on `two cards that ask the same thing never take two keys` below.
+   *
+   * Being coarser than the key can only produce a red, never hide one, and the red is informative: it needs two
+   * questions that are permutations of each other's list items, which is a card a child cannot tell apart by
+   * reading either. Today there are none — `', '` appears in four sentence topics' prose and collides with
+   * nothing.
+   *
+   * What neither this nor the key sees: `options`, and a `visual` type outside `VISUAL_QUESTION`. The describe
+   * header enumerates it by carrier, with the measurements — `y2-duration` (#451), `y1-coins` and four more
+   * (#455).
+   */
+  const asked = (q: Question) => {
+    // A superset of the key's own list, which is the point: `', '` is here and deliberately not there, because
+    // prose commas must not merge two cards in the key but may safely red this rail (round 2, B2; round 4, note 3).
+    const LIST_SEPARATORS = [' · ', ' | ', '; ', ' / ', ', '];
+    const set = (s: string) => {
+      for (const sep of LIST_SEPARATORS) if (s.includes(sep)) return s.split(sep).sort().join(sep);
+      return s;
+    };
+    return [q.prompt, q.answer, set(q.hint ?? ''), set(q.listen ?? ''), (q.sequence ?? []).join('\u0001')].join('\u0000');
+  };
+  const playable = TOPICS.filter(t => t.input !== 'tracing');
+
+  it('there are topics to measure at all', () => {
+    expect(playable.length, 'nothing discovered — every case below would run on an empty set').toBeGreaterThan(50);
+  });
+
+  it.each(playable.map(t => t.id))('%s: two cards that ask different things never share one key', (id) => {
+    const topic = topicById(id)!;
+    for (const d of [1, 2, 3] as const) {
+      const r = rng(11);
+      const byKey = new Map<string, string>();
+      for (let i = 0; i < 700; i++) {
+        const q = topic.gen(d, r);
+        const k = repeatKey(q), a = asked(q);
+        const seen = byKey.get(k);
+        if (seen === undefined) byKey.set(k, a);
+        // The message carries the two cards, because "10 keys for 1,976 cards" says nothing about which field
+        // went missing from the key and the two prompts side by side say it at a glance.
+        else expect(seen, `d${d}: one key for two different questions — ${JSON.stringify(seen)} and ${JSON.stringify(a)}`).toBe(a);
+      }
+    }
+  });
+
+  /**
+   * The converse, and the half whose absence let B1 ship: **one question must never take two keys.** Without
+   * it a key can pass the rail above by being ever finer, which is how `listen`'s per-draw word order got in.
+   *
+   * Cards are grouped by what they ask *with the visual held identical*, so a per-draw sticker — the `emoji`
+   * that PR #407's B1 was about — can never force a false red here. That makes it full strength exactly where
+   * B1 lived: neither sound-hunt topic nor any measurement topic carries a visual at all.
+   *
+   * **3,000 draws, not 700** (round 4, note 2): at 700, `y1-capacity` produced 700 distinct groups, so the `else`
+   * holding the assertion never ran and its case passed without evaluating anything. Its first duplicate is at
+   * draw 805. A rail that cannot reach its own `expect` on a topic is not covering it.
+   */
+  it.each(playable.map(t => t.id))('%s: two cards that ask the same thing never take two keys', (id) => {
+    const topic = topicById(id)!;
+    for (const d of [1, 2, 3] as const) {
+      const r = rng(11);
+      const byAsked = new Map<string, { key: string; q: Question }>();
+      for (let i = 0; i < 3000; i++) {
+        const q = topic.gen(d, r);
+        const g = `${asked(q)}\u0002${JSON.stringify(q.visual ?? null)}`;
+        const k = repeatKey(q), seen = byAsked.get(g);
+        if (seen === undefined) byAsked.set(g, { key: k, q });
+        else expect(seen.key, `d${d}: two keys for one question — ${JSON.stringify(seen.q)} and ${JSON.stringify(q)}`).toBe(k);
+      }
+    }
+  });
+
+  /**
+   * And the fields the key must **ignore**, asserted directly rather than argued in a docstring. `say` is the
+   * one judgement `session.ts` defends at length and, when this rail was written, nothing held it: folding
+   * `q.say` in was **176/176 green** then, while switching de-duplication off on `r-order`, whose `say` speaks
+   * the numbers in their shuffled display order (round 1, note 1). That figure is kept as the reason this rail
+   * exists, not as a current measurement — **at this head the same mutation reddens 14 cases**, mostly on the
+   * converse rail this pull request added, so the judgement is better held than the sentence used to claim
+   * (round 4, note 4). `options` is re-shuffled every draw, and `wide`/`peek`/`slow` are how a card is
+   * presented, not what it asks.
+   */
+  it('the key ignores every field that carries presentation rather than content', () => {
+    for (const t of playable) {
+      const q = t.gen(D1, rng(3));
+      const base = repeatKey(q);
+      const presentation: Partial<Question>[] = [
+        { say: 'spoken some other way entirely' },
+        { options: [...q.options].reverse() },
+        { wide: !q.wide }, { peek: !q.peek }, { slow: !q.slow },
+      ];
+      for (const field of presentation) {
+        const name = Object.keys(field)[0];
+        expect(repeatKey({ ...q, ...field }), `${t.id}: \`${name}\` reached the card's identity`).toBe(base);
+      }
+    }
+  });
+
+  /**
+   * Per topic at d1: the generator's own consecutive-agreement rate, the rate a driven `Session` produces, and
+   * how many distinct cards there are per distinct answer. Computed once — three of these numbers are wanted
+   * by the discovery and by the assertion, and a second pass would double the cost of the file.
+   *
+   * **d1 only** (round 2, N5): these drive `nextQuestion` without answering, so the stage never advances and
+   * the difficulty never moves. The exact rails above do sweep d1/d2/d3, and round 2 checked d2/d3 here
+   * independently and found nothing, so this is a limit on the coverage rather than a hole under a claim.
+   */
+  const PAIRS = 1500;
+  const stats = playable.map(t => {
+    const r = rng(11);
+    const cards = Array.from({ length: PAIRS + 1 }, () => t.gen(D1, r));
+    let base = 0;
+    for (let i = 1; i < cards.length; i++) if (cards[i].answer === cards[i - 1].answer) base++;
+    const s = new Session({ mode: 'mission', year: yearOf(t), topic: t, rng: rng(7) }, events());
+    s.start();
+    let prev = s.current!, same = 0, sameCard = 0;
+    for (let i = 0; i < PAIRS; i++) {
+      s.nextQuestion();
+      if (s.current!.answer === prev.answer) same++;
+      if (asked(s.current!) === asked(prev)) sameCard++;
+      prev = s.current!;
+    }
+    const contents = new Set(cards.map(asked)).size, answers = new Set(cards.map(c => c.answer)).size;
+    return {
+      id: t.id,
+      baseline: base / PAIRS,
+      inSession: same / PAIRS,
+      repeated: sameCard / PAIRS,
+      contents,
+      answers,
+      perAnswer: contents / answers,
+    };
+  });
+  /**
+   * Where a suppressed answer cannot be explained by the refusal of an identical card, and is measurable.
+   *
+   * The floor is arithmetic, not a round number. Refusing an identical card removes one of a topic's
+   * `perAnswer` cards from the agreement mass, so a correct implementation still measures about
+   * `(1 − 1/perAnswer) × baseline`; for the 0.5 floor below to be safe, `perAnswer` must be over 2, and four
+   * leaves a factor of 0.75 against it. Beneath that the suppression is legitimate and total: `r-share` maps
+   * one prompt to one answer, so refusing the identical card refuses the answer and agreement is 0 by design.
+   * It was `>= 10` in round 1 — a guess that happened to hold only while `asked()` counted `listen`'s word
+   * order as content, which put the sound-hunt topics at 24 cards per answer instead of their real 4 (B1).
+   *
+   * `answers >= 2` keeps out a case that would run and pin nothing (round 2, N3): `y1-plurals` has one answer
+   * at d1, so both rates are 1.000 and the assertion reads `1.000 > 0.500` whatever `repeatKey` does.
+   */
+  const measurable = stats.filter(s => s.perAnswer >= 4 && s.answers >= 2 && s.baseline * PAIRS >= 30);
+
+  it('the measurable set holds the topics this defect was found on', () => {
+    const ids = measurable.map(s => s.id);
+    expect(ids.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(10);
+    // The two extremes of the issue's own table: the listening topics, where the key *was* the answer, and a
+    // measurement topic, where the values live in `hint`. If either drops out of this set, the set is wrong.
+    // `y2-punct` is here because it, and the sound-hunt pair, scrape in at exactly 4.00 cards per answer
+    // (round 2, N2) — it is the one that would otherwise drop out of this rail in silence.
+    for (const id of ['r-soundhunt', 'y1-soundhunt', 'y2-punct', 'y1-mass', 'y2-temp']) expect(ids).toContain(id);
+  });
+
+  it.each(measurable.map(s => s.id))('%s: a driven session repeats an answer about as often as the generator does', (id) => {
+    const s = measurable.find(x => x.id === id)!;
+    // Half the generator's rate, not a fixed number: the point is that the sequence adds no signal of its own.
+    // The measured gap before the fix was total — 0.000 against 0.061 on both sound-hunt topics — and after it
+    // every topic in this set sits within a few percent of its baseline, so the floor is nowhere near either.
+    //
+    // Read this as a **backstop against total suppression, not a second independent net** (round 2, N1). With
+    // the pre-#412 key restored it reddens only the two sound-hunt topics: the seven measurement topics land at
+    // 0.52–0.87 against the 0.5 floor, `y2-temp` at 0.52 with 4% of margin. Rail 1 is what catches all nine,
+    // which is what the describe header says carries the load.
+    expect(s.inSession, `in-session ${s.inSession.toFixed(3)} against the generator's ${s.baseline.toFixed(3)}`)
+      .toBeGreaterThan(s.baseline * 0.5);
+  });
+
+  /**
+   * And the symptom B1 actually produced, end to end through a `Session` rather than over the key: the same
+   * question served back to back. It read 1.11% on `r-soundhunt` with `listen` keyed raw and 0.000% both before
+   * the change and after the fix.
+   *
+   * Topics with at least fifty distinct cards only, because `nextQuestion` gives up after five re-rolls and
+   * serves what it has — correct behaviour, but on a three-card topic like `r-share` it makes a byte-identical
+   * card about 1 transition in 700 (review round 1, note 2, pre-existing). Above fifty cards a give-up cannot
+   * account for anything at this scale.
+   *
+   * The bound is a thousandth, which over `PAIRS` transitions **is a tolerance of exactly one** (round 2, N6):
+   * 1/1500 = 0.00067 passes and two repeats do not. That is deliberate rather than tight — the broken state
+   * read 1.11%, sixteen repeats' worth — but it is a tolerance of one and not of zero, and saying otherwise
+   * was this comment's own overclaim.
+   */
+  const bigEnough = stats.filter(s => s.contents >= 50);
+  it('the big-topic set is not empty, and holds the topics B1 was measured on', () => {
+    const ids = bigEnough.map(s => s.id);
+    expect(ids.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(20);
+    for (const id of ['r-soundhunt', 'y1-soundhunt']) expect(ids).toContain(id);
+  });
+
+  it.each(bigEnough.map(s => s.id))('%s: a driven session never serves the same question twice running', (id) => {
+    const s = bigEnough.find(x => x.id === id)!;
+    expect(s.repeated, `served the same question back to back ${(100 * s.repeated).toFixed(3)}% of the time over ${s.contents} distinct cards`)
+      .toBeLessThan(0.001);
   });
 });
 

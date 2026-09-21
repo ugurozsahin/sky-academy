@@ -821,6 +821,62 @@ describe('Year 1 ranges: capacity and doubles stay inside the year (#298 slice 5
   });
 });
 
+describe('y1-skip counts to 100 and no further, answer and decoys alike (#366)', () => {
+  /**
+   * Red on `main` at `d0f0a99`: `step * 8` in tens started the run at 80, so d3 drew "80, 90, 100, ?" with
+   * the answer 110. Two faults from one root — 110 is past Year 1's ceiling (`docs/CURRICULUM.md` lists this
+   * topic as "count in 2s/5s/10s", and `.claude/rules/curriculum.md` caps the year), and it is past the
+   * `max: 100` the question itself declares, which is what `numQ` filters the decoys against: 111, 109 and
+   * 120 were all dropped and the fallback fill scraped 0 and 1 off the bottom of the range. The card read
+   * `["0", "110", "1", "100"]` — the right answer was the only bubble that could be it.
+   *
+   * So the rail reads the answer AND every option, like the `y1-doubles` one above: a card whose answer is
+   * in range but whose decoys are 0 and 1 is still not a question.
+   */
+  it('never puts a number above 100 on the card, at any difficulty', () => {
+    const t = TOPICS.find(x => x.id === 'y1-skip')!; const r = rng(366);
+    let seen = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 800; i++) {
+      const q = t.gen(d, r);
+      const terms = q.prompt.match(/^(\d+), (\d+), (\d+), \?$/);
+      expect(terms, `d${d}: unexpected prompt shape "${q.prompt}"`).not.toBeNull();
+      const [a, b, c] = terms!.slice(1, 4).map(Number);
+      const step = b - a;
+      expect(c - b, `d${d}: "${q.prompt}" is not a constant count`).toBe(step);
+      expect(Number(q.answer), `d${d}: "${q.prompt}" answered ${q.answer}`).toBe(c + step);
+      for (const o of q.options) {
+        expect(Number(o), `d${d}: "${q.prompt}" offered "${o}" — outside Year 1's range`).toBeLessThanOrEqual(100);
+        expect(Number(o), `d${d}: "${q.prompt}" offered "${o}"`).toBeGreaterThanOrEqual(0);
+      }
+      seen++;
+    }
+    expect(seen, 'the sweep drew no cards — this rail would pass vacuously').toBe(2400);
+  });
+
+  it('keeps every decoy a near miss, so the answer is never the only plausible bubble', () => {
+    const t = TOPICS.find(x => x.id === 'y1-skip')!; const r = rng(366 + 1);
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 800; i++) {
+      const q = t.gen(d, r); const ans = Number(q.answer);
+      expect(q.options, `d${d}: "${q.prompt}" lost a bubble to the range filter`).toHaveLength(4);
+      // `nearby()` never strays further than ±10, and the widest declared decoy is one more step (≤ 10). A
+      // bubble outside that band is the fallback fill scraping the bottom of the range — the #366 card.
+      for (const o of q.options)
+        expect(Math.abs(Number(o) - ans), `d${d}: "${q.prompt}" offered "${o}" beside an answer of ${ans}`).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('d3 still stretches further than d2, so the cap did not flatten the stages', () => {
+    const t = TOPICS.find(x => x.id === 'y1-skip')!; const r = rng(366 + 2);
+    const highest: Record<number, number> = {};
+    for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 800; i++) {
+      const q = t.gen(d, r);
+      highest[d] = Math.max(highest[d] ?? 0, Number(q.answer));
+    }
+    expect(highest[3], 'd3 reaches no further than d2 — the stretch stage is no longer a stretch')
+      .toBeGreaterThan(highest[2]);
+  });
+});
+
 describe('Year 2 sentences subordinate the Year 2 way (#298 slice 5)', () => {
   // Red on `main`, whose d3 bank carried "Although it was cold, we went out." Year 2 grammar names four
   // subordinating conjunctions — when, if, that, because — and *although* is Year 3 and beyond.
@@ -1774,5 +1830,71 @@ describe('Year 2 symmetry and patterns (#299 slice 4)', () => {
       expect([...gaps].sort(), d === 3 ? 'd3 hides an object inside the pattern too' : `d${d} always hides the last object`)
         .toEqual(d === 3 ? [false, true] : [true]);
     }
+  });
+});
+
+
+describe('a hint is instruction text unless the generator says it is data (#328, PR #430 review)', () => {
+  /**
+   * `Question.hint` is documented as "small instruction text under the prompt", and that is what 40 of the
+   * 47 hint-writing topics put there. Seven do not: `measureCompare()` and `y2Temp`'s comparison branch put
+   * the values being compared in the hint and nowhere else on the card — the options are the *things*
+   * compared, not their sizes — so those cards are unanswerable without it, and `hintIsData` is how they say
+   * so. The play screen keeps only the marked ones on a short screen (`src/ui/play-session.ts`).
+   *
+   * This rail exists because the first version of that fix marked on `!!q.hint` and no test could tell:
+   * every control in the suite happened to be a topic writing no hint at all. It pins the split by sweeping
+   * the real registry, so a future generator cannot join either side silently.
+   */
+  const DRAWS = 300;
+  /** The shape both data-carrying generators write: `<thing>: <number><unit>`, joined by ` · `. */
+  const DATA_SHAPE = /^[^:·]+: ?-?\d+ ?(cm|m|g|kg|ml|l|°C) · /;
+  const EXPECTED = ['y1-capacity', 'y1-length', 'y1-mass', 'y2-capacity', 'y2-length', 'y2-mass', 'y2-temp'];
+
+  function sweep() {
+    const r = rng(328);
+    const marked = new Set<string>(), hinted = new Set<string>();
+    let cards = 0, flagged = 0;
+    for (const t of TOPICS) for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < DRAWS; i++) {
+      const q = t.gen(d, r); cards++;
+      if (q.hint) hinted.add(t.id);
+      if (q.hintIsData) { marked.add(t.id); flagged++; expect(q.hint, `${t.id} d${d}: hintIsData with no hint — "${q.prompt}"`).toBeTruthy(); }
+      if (q.hint && DATA_SHAPE.test(q.hint))
+        expect(q.hintIsData, `${t.id} d${d}: "${q.hint}" carries the values but is not marked — landscape would hide it (#328)`).toBe(true);
+    }
+    return { marked, hinted, cards, flagged };
+  }
+
+  it('marks exactly the seven measure topics, and no others', () => {
+    const { marked, hinted, cards, flagged } = sweep();
+    expect(cards, 'the sweep drew nothing — this rail would pass vacuously').toBeGreaterThan(70_000);
+    expect(flagged, 'no card was marked at all').toBeGreaterThan(1000);
+    expect([...marked].sort()).toEqual(EXPECTED);
+    // The other half of the claim, and the one the review caught: marking is the exception, not the rule.
+    // `y2-length`/`y2-mass` reach `measureCompare()` on one difficulty branch only, which is why the pull
+    // request's first count of "five" was wrong and a hand-written list is no substitute for this sweep.
+    expect(hinted.size, 'the registry stopped writing instruction hints — re-read this rail before changing it').toBeGreaterThan(40);
+    const instructionOnly = [...hinted].filter(id => !marked.has(id));
+    expect(instructionOnly.length, 'every hint-writing topic is now marked, which is the #430 regression')
+      .toBeGreaterThanOrEqual(38);
+  });
+
+  it('a marked card really does hide its values from the rest of the card', () => {
+    const r = rng(329);
+    let checked = 0;
+    for (const id of EXPECTED) {
+      const t = TOPICS.find(x => x.id === id)!;
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 120; i++) {
+        const q = t.gen(d, r);
+        if (!q.hintIsData) continue;
+        checked++;
+        expect(q.visual, `${id}: a marked card drew a visual, so the hint is no longer the only source`).toBeUndefined();
+        // Every number in the hint is absent from the prompt and the options: hide the line and there is
+        // nothing left to decide by. That is the whole reason the flag exists.
+        for (const n of q.hint!.match(/\d+/g) ?? [])
+          expect(`${q.prompt} ${q.options.join(' ')}`, `${id}: ${n} also appears outside the hint`).not.toContain(n);
+      }
+    }
+    expect(checked, 'no marked card was drawn — this rail would pass vacuously').toBeGreaterThan(500);
   });
 });

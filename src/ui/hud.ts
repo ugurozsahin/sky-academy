@@ -91,6 +91,12 @@ export function createHud(els: HudEls, lives: number, audible: () => boolean) {
     showOutcome(kind: Outcome, q: Question) {
       els.qcard.classList.remove('good', 'bad'); els.qcard.classList.add(kind === 'correct' ? 'good' : 'bad');
       if (!q.sequence && promptMode(q, audible()) === 'hear') els.prompt.innerHTML = fillAnswer(q.prompt, q.answer);   // a `read` card keeps its listen words
+      // The outcome line is this screen's words, so it drops the `own` mark `play-session.ts`'s `setHint`
+      // put there for a data-carrying hint (#328 review, note 1). Today the media query un-hides it anyway
+      // through `.qcard.good .hint`, so nothing renders differently — but without this the element claims to
+      // be the question's own values while showing "✓ red — that's right!", and anything that later keys off
+      // `.own` (a colour, a size) would silently reach the outcome text of every measure card.
+      els.hint.classList.remove('own');
       els.hint.innerHTML = outcomeHintHTML(kind, q.answer);
     },
   };

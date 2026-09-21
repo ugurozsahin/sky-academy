@@ -2,7 +2,7 @@
 import { avatarById, cheerLine, praiseLine } from '../avatars';
 import type { YearInfo } from '../curriculum';
 import { gridFor, Memory, pickTheme, type Face } from '../game/memory';
-import { addCoins, load, recordDojo, recordMemory, touchStreak } from '../storage';
+import { load, recordGameEnd, recordMemory, touchStreak } from '../storage';
 import { say, sfx } from '../audio';
 import { $, $$, esc, render } from './dom';
 import { resultsModal, screenScope, stickersHTML } from './screen';
@@ -69,8 +69,9 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
 
   function finish() {
     const boards = recordMemory(o.year.id);
-    const dojo = recordDojo({ mode: 'memory', won: true, correct: game.pairs.length, attempts: game.moves, bestCombo: 0, stars: game.stars, score: game.score });
-    const fresh = addCoins(game.coins + dojo.coins); const streak = touchStreak();
+    // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
+    const { dojo, fresh } = recordGameEnd({ mode: 'memory', won: true, correct: game.pairs.length, attempts: game.moves, bestCombo: 0, stars: game.stars, score: game.score }, game.coins);
+    const streak = touchStreak();
     const stickerHTML = stickersHTML(fresh);
     if (fresh.length) later(() => sfx.stage(), 600);
     sfx.stage();

@@ -13,7 +13,7 @@ import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
 import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { addCoins, load, recordAccuracy, recordCert, recordDojo, recordDuel, type StoredDuel } from '../storage';
+import { load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
@@ -154,7 +154,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // #16 item 5: the match pays into the one shared save before the overlay is built, so the coin row and
     // any sticker it unlocked are on the screen the children are already looking at. The Daily Dojo hears
     // about the match here too — ten questions answered correctly on this screen move the day's volume
-    // challenges exactly as they would in any other mode — and its bonus rides the same single addCoins().
+    // challenges exactly as they would in any other mode — and its bonus rides the same single write (#365).
     paid = duelCoins(r);
     // Sensei's half: the rounds Player 1 answered on this topic — one try each, the unit a mission writes — for
     // the seat `DUEL_HANDOVER` keeps for the profile's own child (`duelAccuracy()` has why neither the score nor
@@ -166,9 +166,9 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // topic met only in Sensei training or Sky Storm already behaves.
     taught = duelAccuracy(r);
     recordAccuracy(topic.id, taught.hits, taught.tries);
-    const dojo = recordDojo(duelDojoEvent(r, topic.subject));
+    // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
+    const { dojo, fresh } = recordGameEnd(duelDojoEvent(r, topic.subject), paid);
     dojoPaid = dojo.coins;
-    const fresh = addCoins(paid + dojoPaid);
     cert = duelCert(r);
     // #205's rule, unchanged here: filed the moment the overlay is built, never from the 🎓 button, because the
     // bug that issue opened with is a device where pressing the button does nothing at all.

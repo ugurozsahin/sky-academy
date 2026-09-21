@@ -2774,10 +2774,10 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_419;   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
+  const ROUTINE_PROMPT_BUDGET = 21_418;   // → 21,418: the pulse-stamp sentence in STEP 1 (#439), paid for in the cadence note, both bootstrap asides, the game description in the intro, the `watchdog` bullet and STEP 4's QA aside   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 9_992;   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted
+  const REVIEWER_PROMPT_BUDGET = 9_988;   // → 9,988: the pulse-stamp sentence after STEP 1 (#439), paid for in the bootstrap aside, the cadence note, the game description in the intro, STEP 2's fork sentence and rule 1's re-run clause (which the `Do NOT:` line already carries verbatim)   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -3107,5 +3107,178 @@ describe('the reviewer routine keeps a pulse, and something reads it (#327, #320
       .toMatch(/never merges one|owner's to merge/i);
     expect(flat(rule4), 'and "held the same way" alone is the wording that misled twice')
       .not.toMatch(/labelled `loosening` is held the same way \(#112; `review-pr` skill §5\)\./);
+  });
+});
+
+/**
+ * #326: a reviewer run holds every diff, test run and agent output it reviews in one context, and nothing
+ * caps how many pull requests that is. Past a point auto-compaction fires — not a decision the run makes —
+ * and a summary keeps conclusions while dropping the evidence they were built on. For this work that is close
+ * to fatal: §7's bar needs a `file:line` and a head SHA, a marker on the wrong pull request has no undo, and
+ * §5 judges the current head.
+ *
+ * The rule's home is `.claude/skills/review-pr/SKILL.md`, where the review protocol lives; the prompt carries
+ * only the flow, which is the split `docs/decisions/002-routine-prompt-is-flow-only.md` asks for.
+ *
+ * **What is scoped, exactly** — the claim here has been wrong twice, so it is written as an inventory rather
+ * than a summary. Every *positive* assertion below reads a slice: §4 or §6 from the skill, then the layer or
+ * the contract rule inside it, then nothing wider. Two assertions are deliberately whole-document: the ADR-002
+ * negative over the prompt, because a reasoning copy pasted into STEP 0 is the same violation as one in STEP 2
+ * (`add-guard-rail` §6), and its self-test beside it.
+ *
+ * Two rounds of this pull request were blocked on that claim outrunning the code:
+ * - round 1, B5: `slice(0, 460)` is 460 characters long whenever the heading exists, so the non-vacuity guard
+ *   over it could not fail and certified a layer whose body had been deleted;
+ * - round 2, B1–B4: the fix was applied to layers 1 and 2 only. Layer 3 — the rule this pull request adds —
+ *   had no slice at all, so its whole justification (the compaction paragraph, all three reasoning bullets and
+ *   the 30 KB carve-out) deleted green as long as the two-word token `auto-compaction fires` survived
+ *   somewhere in the file; contract rules 1 and 3 were pinned by their bold heading only, with a shared
+ *   800-character floor that could not feel either body going; and the prompt clause was pinned over the whole
+ *   prompt, so moving it from STEP 2 into STEP 1 — where it is read before a run knows how many pull requests
+ *   are waiting — was green.
+ *
+ * So the floor lives **inside** `slice()` rather than beside each call: a guard a caller may forget is a guard
+ * callers forget, which is how both rounds happened. Both anchors are required to appear exactly once, `end`
+ * included, because a second `**Merge**` inside layer 2 would truncate that window silently while still
+ * clearing its floor.
+ *
+ * What these still cannot catch: whether a run obeys any of it. They are text over an instruction file, and a
+ * rule is pinned by the clauses a byte squeeze reaches for first — its reason and its operative half — not by
+ * its whole prose.
+ *
+ * Prove one red: delete a layer's or a contract rule's body while leaving its heading; move the prompt clause
+ * out of STEP 2; renumber `## 4.` or move the subsection below `## 5.`; paste any anchor a second time.
+ */
+describe('a reviewer run does not hold two diffs at once (#326)', () => {
+  const skill = () => readFileSync(new URL('../../.claude/skills/review-pr/SKILL.md', import.meta.url), 'utf8');
+  const prompt = () => readFileSync(new URL('../../docs/REVIEWER-PROMPT.md', import.meta.url), 'utf8');
+  const flat = (t: string) => t.replace(/\s+/g, ' ');
+
+  /**
+   * The text between one rule's own heading and the next one's, with the non-vacuity floor applied here
+   * rather than by the caller. Throws — never returns a short or empty window — and names which anchor and
+   * which rule, because the slicer aborting the whole `it` is only readable if it says what moved.
+   * `end: null` means "to the end of the text given", which is what a rule at the end of its section needs.
+   */
+  const slice = (text: string, label: string, start: string, end: string | null, min: number) => {
+    const count = (needle: string) => text.split(needle).length - 1;
+    if (count(start) !== 1)
+      throw new Error(`${label}: the start anchor "${start}" appears ${count(start)} times, expected exactly once`);
+    let body = text.split(start)[1];
+    if (end !== null) {
+      if (count(end) !== 1)
+        throw new Error(`${label}: the end anchor "${end}" appears ${count(end)} times, expected exactly once`);
+      const cut = body.split(end)[0];
+      if (cut === body) throw new Error(`${label}: "${end}" does not follow "${start}" — the section was reorganised`);
+      body = cut;
+    }
+    if (body.trim().length < min)
+      throw new Error(`${label}: ${body.trim().length} characters of body, under the floor of ${min} — the rule was gutted, so every assertion on it would be vacuous`);
+    return body;
+  };
+
+  // The two homes. Taking the layer and contract slices out of these, rather than out of the file, is also
+  // what pins the subsection's *location*: renumbering `## 4.`, or moving the block below `## 5.`, makes
+  // §4's own slice throw — and the prompt sends a run to `§4` by name (round 2, N5).
+  const s4 = () => slice(flat(skill()), '§4', '## 4. Run the three review agents, then check their reachability',
+    '## 5. Four things make a pull request unmergeable', 2500);
+  const s6 = () => slice(flat(skill()), '§6 above the Merge rule', '## 6. Then decide, and make the decision visible',
+    '**Merge** — squash into `main`', 600);   // 1,156 today: a backstop under the two layer floors, not a byte budget
+
+  it('layer 1: a finding goes somewhere that outlives the context that found it', () => {
+    const layer1 = slice(s6(), 'layer 1', '**Write each finding when you confirm it, not at the end.**',
+      '**Re-read before you mark.**', 150);
+    expect(layer1, 'the destination is the rule — "write it" with nowhere to put it is a preference')
+      .toMatch(/outlives the context/);
+    expect(layer1, "and the reason it exists: a run's own context is not a record").toMatch(/not a record/);
+  });
+
+  it('layer 2: re-read, and compare — reading and posting anyway catches nothing', () => {
+    const layer2 = slice(s6(), 'layer 2', '**Re-read before you mark.**', null, 200);
+    for (const evidence of ['pull request number', 'head SHA', 'file:line'])
+      expect(layer2, `layer 2 must name ${evidence}, or "re-read" is a gesture`).toContain(evidence);
+    // Round 1, N2: the reason names detection, so the instruction has to name the comparison, both halves.
+    expect(layer2, 'a stale head has to send the run back to §2, not just be noticed')
+      .toMatch(/re-run §2 on the new head/);
+    expect(layer2, 'and a finding whose evidence moved has to go').toMatch(/drop the finding/);
+    expect(layer2, 'the reason: the three ways a summarised context gets a mark wrong')
+      .toMatch(/the wrong pull request, a stale head, and a finding whose evidence has evaporated/);
+  });
+
+  it('layer 3: the rule, the mechanism, all three reasons and the carve-out — inside §4', () => {
+    const layer3 = slice(s4(), 'layer 3', '### Reviewing more than one: one review, one context',
+      '**The delegation contract.**', 900);
+    expect(layer3, 'the rule itself, and that the first one stays here')
+      .toMatch(/first waiting pull request here, and each one after it in its own subagent/);
+    // Round 2, B2: each of these deleted green while the token `auto-compaction fires` survived whole-file.
+    // The budget comments a few hundred lines up record byte squeezes on these files happening repeatedly;
+    // a reason with no rail is what the next one takes first.
+    expect(layer3, 'the mechanism: compaction is not a decision a run makes').toMatch(/auto-compaction fires/);
+    expect(layer3, "reason 1 — a finding you cannot evidence meets neither §7's bar nor §2's head")
+      .toMatch(/no longer evidence is not reportable/);
+    expect(layer3, 'reason 2 — a marker on the wrong pull request has no undo').toMatch(/Cross-contamination/);
+    expect(layer3, 'reason 3 — §5 judges the current head').toMatch(/Head staleness/);
+    expect(layer3, 'and the carve-out, or a single waiting pull request pays 30 KB for nothing')
+      .toMatch(/first stays in the parent on purpose.{0,140}30 KB/);
+  });
+
+  /**
+   * Round 1, B1–B4: layer 3 handed reviews 2..N to a subagent and specified none of the delegation, and each
+   * thing left unsaid failed the same way — output indistinguishable from a correct review. Round 2, B3: two
+   * of the four rules that answer it were then pinned by their bold heading alone, and a floor over the whole
+   * contract could not feel one body go. So each rule is sliced from the next rule's number, and each is
+   * asserted on its operative half, not on its title.
+   */
+  it('the delegation contract, rule by rule', () => {
+    const contract = slice(s4(), 'the delegation contract', '**The delegation contract.**', 'This caps nothing', 1500);  // 2,604 today
+    const rule = (n: number, start: string, end: string | null, min: number) =>
+      slice(contract, `contract rule ${n}`, start, end, min);
+
+    const r1 = rule(1, '1. **The parent alone marks, merges and comments; a subagent posts nothing to GitHub**',
+      "2. **§4's three agents are the parent's", 300);
+    expect(r1, 'both unassigned outcomes, because each of them looks like a review happened').toMatch(/nobody\s+marks/);
+    expect(r1, "and what the other one costs — §7 counts rounds over the pull request, whoever wrote them")
+      .toMatch(/burns two of §7's three rounds/);
+
+    const r2 = rule(2, "2. **§4's three agents are the parent's, for every pull request.**",
+      '3. **One at a time, in one checkout.**', 300);
+    expect(r2, 'the observed reason, or §4\'s "retry, the roster registers late" still reads as the answer')
+      .toMatch(/no agent-launching tool/);
+    expect(r2, 'and what the parent does instead, which is the half that keeps §4\'s coverage')
+      .toMatch(/passes their quoted findings into the subagent's prompt/);
+
+    const r3 = rule(3, '3. **One at a time, in one checkout.**', '4. **What comes back**', 300);
+    expect(r3, 'the heading alone is ambiguous between "one at a time" and "one checkout each"')
+      .toMatch(/Concurrency needs a worktree each/);
+    expect(r3, 'and why the filesystem kind is worse than the context kind').toMatch(/confident, specific, wrong greens/);
+
+    const r4 = rule(4, '4. **What comes back**', null, 300);
+    for (const item of ['file:line', 'head SHA it judged', 'e2e not run (env)', 'one line per review agent'])
+      expect(r4, `the payload must carry ${item}, or §6's comment is written from assumption`).toContain(item);
+    expect(r4, "and the parent must not fill the rest in — that is §2's falsification one level up")
+      .toMatch(/posts nothing it did not receive/);
+    expect(r4, "§1's gate needs what a fresh context cannot know, so it is passed down").toMatch(/opened or pushed to/);
+
+    expect(s4(), 'and the section must still say plainly that none of this caps throughput')
+      .toMatch(/This caps nothing\. Reviewing many pull requests is the point of the routine/);
+  });
+
+  it('the reviewer prompt routes a run to it from STEP 2, and does not restate it', () => {
+    const p = flat(prompt());
+    const step2 = slice(p, 'STEP 2', 'STEP 2 — REVIEW & QA', 'Four things make a PR unmergeable', 1500);
+    // Round 2, B4: whole-prompt, moving the clause into STEP 1 was green — and there it is read during the
+    // cheap exit, before the run knows how many pull requests are waiting, while the step that loops says
+    // nothing about delegation.
+    expect(step2, 'STEP 2 is the step that loops, so the clause has to be in it')
+      .toMatch(/the first here, the rest each in its own subagent/i);
+    expect(step2, 'and it must point at the section that carries the rule').toMatch(/§4, #326/);
+    // Whole-document on purpose (`add-guard-rail` §6): ADR 002 is a property of the file, and a copy of the
+    // reasoning in STEP 0 or STEP 5 is the same violation as one in STEP 2. This file sits at its budget.
+    expect(p, 'the reasoning belongs in the skill, not in a second copy here')
+      .not.toMatch(/auto-compaction|cross-contamination/i);
+    // Self-test the negative: a `.not.toMatch` whose pattern matches nothing passes for ever.
+    expect(p.replace('(§4, #326)', '(auto-compaction fires past a point, §4, #326)'),
+      'the ADR-002 detector must fire on a real restatement, or it is a green tick over an unchecked property')
+      .toMatch(/auto-compaction/i);
   });
 });

@@ -71,6 +71,21 @@ describe('guard rails', () => {
     ]);
   });
 
+  // #365: a finished game reaches the save in ONE write. `recordDojo()` then `addCoins()` was two saves with
+  // no rollback, and `save()` swallows a refused `setItem` (#151), so a store that took the first and refused
+  // the second recorded the Daily Dojo challenge as done while its coins never landed — and `applyEvent()`
+  // only pays `!done.includes(c.id)`, so that bonus was gone for the day. `recordGameEnd()` replaced the pair
+  // on all three results screens, but nothing stopped them going back: reverting play.ts, memory.ts and
+  // duel.ts to the pre-fix pair left the suite 1696/1696 green and `tsc` clean (PR #438 review, round 2).
+  // Both halves of the pair stay exported with unchanged signatures and zero `src/` callers, which is exactly
+  // the adjacency a fourth results screen meets. A screen settles a finished game through `recordGameEnd()`.
+  it('no screen settles a finished game with the recordDojo/addCoins pair (#365)', () => {
+    const hits = inDir('/src/ui/').flatMap(([f, s]) =>
+      [...code(s).matchAll(/\b(recordDojo|addCoins)\s*\(/g)].map(m => `${f}: ${m[1]}(`));
+    expect(hits, 'a results screen uses recordGameEnd() — the pair is two writes with no rollback (#365)')
+      .toEqual([]);
+  });
+
   it('shadowBlur stays out of the per-frame draw paths', () => {
     const hits = inDir('/src/game/').flatMap(([f, s]) => [...code(s).matchAll(/shadowBlur/g)].map(() => f));
     expect(hits.length).toBeLessThanOrEqual(0);                         // #29 removed them; never raise this
@@ -227,7 +242,7 @@ describe('guard rails', () => {
   it('the profile picker is a launch screen, gated on more than one profile (#20 slice 2)', () => {
     const main = code(SOURCES['/src/main.ts']);
     const from = main.indexOf('profiles: () =>'), to = main.indexOf('\n  up,', from);
-    const drawFrom = main.indexOf('const goProfiles = () => {'), drawTo = main.indexOf('\n};', drawFrom);
+    const drawFrom = main.indexOf('const goProfiles = ('), drawTo = main.indexOf('\n};', drawFrom);
     expect({ route: from >= 0 && to > from, draws: drawFrom >= 0 && drawTo > drawFrom })
       .toEqual({ route: true, draws: true });   // a rename empties the slice below, so fail here instead
     expect(main.slice(from, to) + main.slice(drawFrom, drawTo), 'neither the route nor the function that draws the picker pushes a history entry')
@@ -292,17 +307,30 @@ describe('guard rails', () => {
   // single way in whose mode is *derived* is what this holds now.
   it('the picker is reached at the root of the history stack, from wherever it was opened (#20 slice 2)', () => {
     const main = code(SOURCES['/src/main.ts']);
-    const drawFrom = main.indexOf('const goProfiles = () => {'), drawTo = main.indexOf('\n};', drawFrom);
+    const drawFrom = main.indexOf('const goProfiles = ('), drawTo = main.indexOf('\n};', drawFrom);
     const go = main.slice(drawFrom, drawTo);
     expect(go, 'a stacked entry is popped before the picker is drawn')
-      .toMatch(/if \(history\.state\?\.screen\) \{ pendingProfiles = true; history\.back\(\); return; \}/);
-    expect(main, 'and the pop lands back in the one way in, so a deeper stack keeps unwinding')
-      .toMatch(/if \(pendingProfiles\) \{ pendingProfiles = false; goProfiles\(\); return; \}/);
+      .toMatch(/if \(history\.state\?\.screen\) \{ pendingProfiles = \{ root \}; history\.back\(\); return; \}/);
+    // **And the kind of picker survives the pop** (#420 review B1). `pendingProfiles` was a bare boolean, so a
+    // launch that had to unwind a stacked entry came back through this line having forgotten it was a launch,
+    // and the far side re-derived `back` from `screenDrawn()` — which is `true` on every route that unwinds.
+    // The intent has to travel with the flag, and the pop has to hand it back.
+    expect(main, 'and the pop lands back in the one way in, carrying which kind of picker it was')
+      .toMatch(/if \(pendingProfiles\) \{ const \{ root \} = pendingProfiles; pendingProfiles = null; goProfiles\(root\); return; \}/);
     expect(main, 'boot takes that same way in, so a reload cannot draw the launch picker on a stacked entry')
-      .toMatch(/length > 1\) goProfiles\(\);/);
+      .toMatch(/length > 1\) goProfiles\(true\);/);
     expect(main.match(/profilesScreen\(/g) ?? [], 'which is the one place the picker is drawn').toHaveLength(1);
-    expect(go, 'and launch-or-back is read off what is on the page, never passed in by the caller')
-      .toMatch(/screenDrawn\(\) \? \(\) => nav\.map\(\) : undefined/);
+    // Launch-or-back is still derived from the page, with one explicit override: a caller that *knows* the
+    // screen behind it is drawn from a save that no longer exists. `root ||` is that override and nothing else
+    // may add another, which is why the whole expression is pinned rather than just `screenDrawn()`.
+    expect(go, 'and launch-or-back is the page, plus an explicit root the caller can assert')
+      .toMatch(/const back = root \|\| !screenDrawn\(\) \? undefined : \(\) => nav\.map\(\);/);
+    // The two callers that must assert it, and the one that must not: a removal and boot are launches, the 👥
+    // button has the sky map genuinely behind it. Mutating either `true` to `false` puts a `←` on the launch
+    // picker, which is #380 round 5 B3 and #420 B1 in one line.
+    expect(main, 'a removal relaunches into the launch picker, not one with a way past the question')
+      .toMatch(/const relaunch = \(\) => \{[\s\S]{0,600}goProfiles\(true\);/);
+    expect(main, 'and the 👥 button asks for the one with a way back').toMatch(/profiles: \(\) => goProfiles\(\),/);
   });
 
   // #380 review B3: `profileCard` deliberately does not run the migrations, but `onboarded` only exists from
@@ -338,8 +366,16 @@ describe('guard rails', () => {
   it('a card is blank for a save load() would refuse, not a name the tap cannot deliver (#20 slice 2)', () => {
     const store = code(SOURCES['/src/storage.ts']);
     const card = store.slice(store.indexOf('export function profileCard('), store.indexOf('\n}', store.indexOf('export function profileCard(')));
-    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) return blank;/);
+    // The card still answers blank for every blob `migrate()` refuses — it now also says *which* refusal, so a
+    // screen can stop claiming "this ninja has not played" about bytes it could not read (#420 review B2). The
+    // gate is unchanged; only the shape of the blank card grew.
+    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.blank, future: isFutureSave\(s\) \};/);
     expect(store.slice(store.indexOf('function migrate(')), 'and that gate is still the one load() goes through').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.DEFAULT \};/);
+    // `future` is the *narrower* question, not `!isMigratable` renamed: an unreadable `v` is deliberately not
+    // protected — `load()` resets over it and writes resume — so only a genuinely newer save refuses a delete.
+    expect(store, 'and the delete refuses on that narrower question, at one home').toMatch(/function futureSaveIn\(id: ProfileId\): boolean \{[\s\S]{0,400}isFutureSave\(parsed as RawSave\)/);
+    const del = store.slice(store.indexOf('export function deleteProfile('), store.indexOf('\n}', store.indexOf('export function deleteProfile(')));
+    expect(del, 'before the index write, so a refusal changes nothing').toMatch(/if \(futureSaveIn\(id\)\) return \{ ok: false, why: 'future' \};[\s\S]*writeIndex\(next\)/);
   });
 
   it("a sibling's card is read from the slot, never through the session's load() (#20 slice 2)", () => {
@@ -1899,5 +1935,41 @@ describe('`<a download>` stays reachable from one guarded place in the certifica
   it('and certRoute itself never sends a native shell to a download', () => {
     expect(code(cert), 'certRoute must answer `show` for a native shell before it answers `download`')
       .toMatch(/if\s*\(\s*caps\.nativeShell\s*\)\s*return\s*'show'\s*;[\s\S]{0,40}return\s*'download'/);
+  });
+});
+
+/*
+ * #18 slice 2, group A. The DOM-screen width cap moved off the 820 px phone column on wide viewports, and
+ * the only behavioural check on it lives in `tests/e2e/viewport.spec.ts` — which the `mobile` and `desktop`
+ * projects skip, so it runs on the nightly and never on a pull request (`.claude/rules/e2e.md`). A revert
+ * or a stray `max-width` on `.screen` would therefore ship green and be found a day later, on a screen the
+ * audit spent a whole slice measuring.
+ *
+ * This rail is the pull-request-time half: it reads the stylesheet as text and holds the three decisions
+ * that make the fix what it is, not the pixel values the e2e file owns. Widening `.play` or `.memory` is
+ * `owner-approval` work (the arena cap and the card grid change the look and how far a thumb travels), so
+ * the exclusion is part of the rule, not a detail — dropping it is how an unapproved look change would
+ * arrive without anyone deciding to make one.
+ */
+describe('the landscape screen width cannot silently return to the phone column (#18)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  it('a wide-viewport media query widens .screen, and excludes .play and .memory', () => {
+    expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
+
+    const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*\.screen:not\(\.play\):not\(\.memory\)\s*\{([^}]*)\}/);
+    expect(block, 'the #18 rule must stay a min-width: 900px block over .screen:not(.play):not(.memory)').toBeTruthy();
+    expect(block![1], 'the widened cap must still be a max-width, and must not be the 820 px phone column')
+      .toMatch(/max-width:\s*min\(\s*\d{3,4}px\s*,/);
+    expect(block![1], 'the widened cap must be bigger than the 820 px column it replaces')
+      .not.toMatch(/max-width:\s*min\(\s*(?:[0-7]?\d{1,2}|8[01]\d|820)px/);
+  });
+
+  it('the base .screen rule still carries the phone column for narrow viewports', () => {
+    const base = bare.match(/(?:^|[}\s])\.screen\s*\{([^}]*)\}/)?.[1];
+    expect(base, 'the base .screen rule must exist').toBeTruthy();
+    expect(base, 'a phone and a portrait tablet keep the 820 px column — the audit found both clean')
+      .toMatch(/max-width:\s*820px/);
   });
 });
