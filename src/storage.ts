@@ -744,7 +744,8 @@ function sanitizeTypes(s: RawSave): RawSave {
   // `{ date: <today> }` pasted into the Restore box is enough.
   //
   // Deleting the key here puts it back through `DEFAULT`, the same route a missing key already takes, and
-  // covers `dojoCard()`, all three `recordDojo()` call sites and every future one — which is what this
+  // covers `dojoCard()`, every `applyEvent()` reader — `recordGameEnd()` on all three results screens since
+  // #365, `recordDojo()` wherever it is next used — and every future one, which is what this
   // function's docstring above promises and what a `try/catch` per reader would not.
   if (isRecord(clean.dojo)) {
     const dj = clean.dojo as Partial<DojoState>;
@@ -1038,8 +1039,8 @@ export function dojoToday(now = new Date()): DojoState { return dojoFor(load().d
 /** Feed a finished game to the Daily Dojo. Persists the state; the caller pays out `coins` (so sticker unlocks show).
  *
  *  **A results screen wants `recordGameEnd()` instead** (#365): this and `addCoins()` back to back are two
- *  writes, and the pair has no rollback. Kept for a caller that genuinely records a dojo event and pays
- *  nothing for it. */
+ *  writes, and the pair has no rollback. Since #365 no caller in `src/` uses it: it is kept for one that
+ *  genuinely records a dojo event and pays nothing for it, and `tests/unit/storage.test.ts` exercises it. */
 export function recordDojo(e: DojoEvent, now = new Date()): DojoOutcome {
   const out = applyEvent(load().dojo, e, today(now));
   save({ dojo: out.state }); return out;
