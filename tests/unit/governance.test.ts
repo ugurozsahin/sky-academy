@@ -2777,7 +2777,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   const ROUTINE_PROMPT_BUDGET = 21_419;   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 9_992;   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted
+  const REVIEWER_PROMPT_BUDGET = 9_990;   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -3026,6 +3026,57 @@ describe('a pull that cannot fast-forward has a stated recovery, not an improvis
  * Prove one red: drop the pulse sentence from STEP 1; drop the reviewer paragraph from the watchdog's check
  * 3; or put the `loosening` clause back to "held the same way".
  */
+/**
+ * #326: a reviewer run holds every diff, test run and agent output it reviews in one context, and nothing
+ * caps how many pull requests that is. Past a point auto-compaction fires — not a decision the run makes —
+ * and a summary keeps conclusions while dropping the evidence they were built on. For this work that is close
+ * to fatal: §7's bar needs a `file:line` and a head SHA, a marker on the wrong pull request has no undo, and
+ * §5 judges the current head.
+ *
+ * The rule's home is `.claude/skills/review-pr/SKILL.md`, where the review protocol lives; the prompt carries
+ * only the flow, which is the split `docs/decisions/002-routine-prompt-is-flow-only.md` asks for. So there are
+ * two rails: one that the skill still states each layer, and one that the prompt still routes a run to it.
+ *
+ * Prove one red: drop the subagent clause from STEP 2, or any of the three headings from §4/§6.
+ */
+describe('a reviewer run does not hold two diffs at once (#326)', () => {
+  const skill = () => readFileSync(new URL('../../.claude/skills/review-pr/SKILL.md', import.meta.url), 'utf8');
+  const prompt = () => readFileSync(new URL('../../docs/REVIEWER-PROMPT.md', import.meta.url), 'utf8');
+  const flat = (t: string) => t.replace(/\s+/g, ' ');
+
+  it('the skill carries all three layers, with the reason each exists', () => {
+    const t = flat(skill());
+    expect(t, 'layer 3: one review, one context — the structural half').toMatch(/one review, one context/i);
+    expect(t, 'and that the first stays in the parent, or a single waiting PR pays 30 KB for nothing')
+      .toMatch(/first waiting pull request here, and each one after it in its own subagent/i);
+    expect(t, 'layer 1: a finding written when it is confirmed outlives the context that found it')
+      .toMatch(/Write each finding when you confirm it, not at the end/i);
+    expect(t, 'layer 2: the three reads that close the three ways a summarised context gets a mark wrong')
+      .toMatch(/Re-read before you mark/i);
+    // Scoped to layer 2's own paragraph: `file:line` appears elsewhere in this skill, so a whole-file
+    // `toContain` stayed green when the words were taken out of the rule that needs them.
+    const layer2 = flat(skill()).split('Re-read before you mark')[1]?.slice(0, 460) ?? '';
+    expect(layer2.length, 'layer 2 has no body, so the reads below are asserted against nothing').toBeGreaterThan(200);
+    for (const evidence of ['pull request number', 'head SHA', 'file:line'])
+      expect(layer2, `layer 2 must name ${evidence}, or "re-read" is a gesture`).toContain(evidence);
+    // The reason, not just the instruction: a rule whose why is gone is the next byte squeeze's first target.
+    expect(t, 'auto-compaction is the mechanism and must be named').toMatch(/auto-compaction fires/i);
+    expect(t, 'and it must say plainly that this caps nothing — throughput is the point of the routine')
+      .toMatch(/caps nothing|does not cap/i);
+  });
+
+  it('the reviewer prompt routes a run to it, and does not restate it', () => {
+    const p = flat(prompt());
+    expect(p, 'STEP 2 is where a run decides how to take the second pull request')
+      .toMatch(/the first here, the rest each in its own subagent/i);
+    expect(p, 'and it must point at the section that carries the rule').toMatch(/\u00a74, #326/);
+    // ADR 002: the prompt is flow. A copy of the reasoning here is what that decision exists to prevent, and
+    // this file has no bytes for one — it sits at its budget.
+    expect(p, 'the reasoning belongs in the skill, not in a second copy here')
+      .not.toMatch(/auto-compaction|cross-contamination/i);
+  });
+});
+
 describe('the reviewer routine keeps a pulse, and something reads it (#327, #320)', () => {
   const doc = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
   const flat = (s: string) => s.replace(/\s+/g, ' ');

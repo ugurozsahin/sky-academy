@@ -80,6 +80,31 @@ They are input to your review, never its verdict. The marks stay yours, and so d
 Equally, a finding no agent flagged as critical may still be the one that matters. Rank by what it costs the
 child, not by the label it arrived with.
 
+### Reviewing more than one: one review, one context
+
+The three agents above already are the pattern — the parent keeps their quoted findings, not their working
+context. **Apply it one level up: review the first waiting pull request here, and each one after it in its own
+subagent**, which returns the verdict and the findings and nothing else.
+
+Past the first, this is not a preference. A run holds every diff, every test run and every agent's output in
+one context, and nothing caps how many pull requests that is; past a point the window fills and
+**auto-compaction fires** — not a decision the run makes, and not one it can decline. A summary keeps
+conclusions and drops the evidence they were built on, which is close to fatal for this work specifically:
+
+- **A finding without its evidence is what §7 forbids.** The bar there needs the file, the line and the head.
+  After a compaction a run can retain *"there is a problem in `arena.ts`"* and have lost the line it came
+  from — #292's failure mode returning structurally, months after §7 was written to stop it.
+- **Cross-contamination.** Once one pull request's findings and another's diff share a summary, the worst
+  outcome is a marker on the wrong pull request, and a misplaced `REVIEW: CLEARED` lets something unreviewed
+  merge. The marker protocol has no undo.
+- **Head staleness.** §5 judges the current head; a summary can carry the SHA the run started with.
+
+The first stays in the parent on purpose: a subagent re-reads `CLAUDE.md` and this skill, roughly 30 KB, which
+is pure overhead for a single waiting pull request — and one diff is where the risk starts, not where it bites.
+
+This caps nothing. Reviewing many pull requests is the point of the routine, and a review queue backing up is
+what produced #292; the fix is to make many reviews *safe* (#326).
+
 ## 5. Four things make a pull request unmergeable
 
 Check all four, every time. This is the checklist; `docs/decisions/002-routine-prompt-is-flow-only.md` has the
@@ -107,6 +132,17 @@ tightening that you read as a loosening — is the owner's to merge, never yours
 approves, #112), say why in a comment, and leave it. `.claude/skills/open-pr/SKILL.md` §6 has the rule and its worked examples.
 
 ## 6. Then decide, and make the decision visible
+
+**Write each finding when you confirm it, not at the end.** Records have readers, and a run's own context is
+not a record: hold a finding through three more diffs and a compaction can take the `file:line` with it. Put
+it somewhere that outlives the context — a comment as you go, or a file you re-read — before you move to the
+next pull request.
+
+**Re-read before you mark.** Immediately before `REVIEW: CHANGES REQUESTED`, `REVIEW: CLEARED` or a merge,
+re-read three things: the pull request number, its current head SHA, and the `file:line` of every finding you
+are about to report. They are cheap, and they close the three ways a summarised context gets a mark wrong —
+the wrong pull request, a stale head, and a finding whose evidence has evaporated. `docs/REVIEWER-PROMPT.md`
+STEP 2 already asks the first half of this ("still waiting?"); this is the other half (#326).
 
 **Merge** — squash into `main`, tick Review/QA/Done on the issue, and comment with the test results, which
 projects you ran, and the commit hash — ending, like every comment you post here, with your session URL (#199).
