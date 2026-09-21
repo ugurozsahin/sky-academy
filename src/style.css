@@ -374,7 +374,15 @@ img { -webkit-user-drag: none; }
 .duel-screen { position: relative; }
 .duel-screen > .toast { position: absolute; bottom: calc(8px + var(--sab)); left: 50%; translate: -50% 0; margin-top: 0; z-index: 3; }
 .duel-arena { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
-.duel-half.b { border-bottom: 1px solid var(--line); }
+/* The divider is drawn, never a BORDER (#388/#389). With `box-sizing: border-box` a 1px border on half B took
+   1px off Player 2's canvas and not Player 1's, so the two arenas had different geometry — and `layoutWave`
+   derives `r`, `g` and `vx` from geometry, so the halves produced different arcs from the same seed. That is
+   exactly the silent failure #389's issue predicted for its shared-seed fix, and it broke that rail here. A
+   pseudo-element costs no layout, so both halves stay identical to the pixel. */
+.duel-half.b::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: var(--line); pointer-events: none; z-index: 1;
+}
 .duel-tag {
   position: absolute; left: 10px; display: flex; align-items: center; gap: 8px; padding: 4px 10px;
   border-radius: 999px; background: var(--panel); border: 1px solid var(--line); pointer-events: none; font-size: 13px; color: var(--muted);
@@ -440,7 +448,8 @@ img { -webkit-user-drag: none; }
      landscape screen the prompt gives up a few points — the same trade the `max-height: 640px` rule above already
      makes for the hint. Restored at full size on a tall landscape screen below. */
   .duel-q .prompt { font-size: clamp(18px, 3.4vw, 26px); }
-  .duel-half.b { border-bottom: 0; border-inline-start: 1px solid var(--line); }   /* the divider runs down, not across */
+  /* Sideways the divider runs down the middle instead of across it — still drawn, still no layout cost. */
+  .duel-half.b::after { inset: 0 auto 0 0; width: 1px; height: auto; }
   /* Both halves are full height now, so both name tags sit at the foot of their own half, clear of the bar. */
   .duel-half.b .duel-tag, .duel-half.a .duel-tag { top: auto; bottom: 8px; }
   .duel-rotate { display: none; }

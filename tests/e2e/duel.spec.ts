@@ -267,7 +267,10 @@ test.describe('Ninja Duel', () => {
     };
     // A measured box for the nudge too, not `getComputedStyle().display`: `visibility: hidden`, `display:
     // contents` or a typo all pass a `.not.toBe('none')`, and an unmeasured element is not on screen.
-    return { a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'), prompt: box('#prompt'), vis: box('#vis') };
+    return {
+      a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'),
+      prompt: box('#prompt'), vis: box('#vis'), canvasA: box('#arena-a'), canvasB: box('#arena-b'),
+    };
   });
 
   /**
@@ -342,6 +345,13 @@ test.describe('Ninja Duel', () => {
         expect(L.strip.h, `${where}: the question bar stays inside the share of the height budgeted for it`).toBeLessThanOrEqual(vp.height * 0.45);
         expect(L.a.h, `${where}: each half keeps the height a stacked half gave away`).toBeGreaterThan(vp.height * 0.55);
         expect(Math.abs(L.a.h - L.b.h), `${where}: both children get the same height`).toBeLessThan(2);
+        // The two CANVASES, to the subpixel — the guard #389's issue asked for, because `layoutWave` derives `r`,
+        // `g` and `vx` from geometry, so unequal boxes make the halves produce different arcs from one shared
+        // seed and the fairness fix fails silently. A 1px divider BORDER on half B did exactly that (border-box
+        // takes it out of Player 2's canvas and not Player 1's) and broke #389's rail; the divider is drawn with
+        // a pseudo-element now. The 2px tolerance above is far too loose to have caught it.
+        expect(Math.abs(L.canvasA.h - L.canvasB.h), `${where}: both arenas are the same height, to the subpixel`).toBeLessThan(0.5);
+        expect(Math.abs(L.canvasA.w - L.canvasB.w), `${where}: both arenas are the same width, to the subpixel`).toBeLessThan(0.5);
         if (!html) continue;
         // The visual is scaled to fit the budget rather than the bar growing to fit the visual, so it is still on
         // screen — a bound that worked by hiding the picture would fail the question instead of the layout.
@@ -368,6 +378,8 @@ test.describe('Ninja Duel', () => {
       expect(P.b.bottom, `${what}: Player 2 keeps the top half`).toBeLessThanOrEqual(P.strip.y + 1);
       expect(P.strip.bottom, `${what}: Player 1 keeps the bottom half, the card between them`).toBeLessThanOrEqual(P.a.y + 1);
       expect(Math.abs(P.a.x - P.b.x), `${what}: the halves are stacked, not side by side`).toBeLessThan(2);
+      expect(Math.abs(P.canvasA.h - P.canvasB.h), `${what}: both arenas are the same height, to the subpixel`).toBeLessThan(0.5);
+      expect(Math.abs(P.canvasA.w - P.canvasB.w), `${what}: both arenas are the same width, to the subpixel`).toBeLessThan(0.5);
       expect(P.rotate.h, `${what}: portrait tells the players there is a better way round`).toBeGreaterThan(0);
       // The fallback has a floor of its own. It was never measured before, so the nudge's own line came out of the
       // arenas unnoticed (361px per half before this pull request, ~346px after) and nothing watched any further
