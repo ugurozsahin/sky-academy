@@ -64,7 +64,29 @@ const visualKey = (v: Visual): string => {
   const f = (VISUAL_QUESTION as Record<string, ((x: Visual) => string) | undefined>)[v.type];
   return f ? f(v) : '';
 };
-const repeatKey = (q: Question) => `${q.prompt}\u0000${q.answer}\u0000${q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : ''}`;
+/**
+ * The identity of a card, for "do not ask the same thing twice running" (#390, widened by #412).
+ *
+ * `prompt` and `answer` are not enough, and neither is adding the visual: on nine topics the question is
+ * carried by **text that is not the prompt**, and there is no visual at all. `measureCompare` puts the values
+ * only in `hint` ("red pencil: 12 cm · blue pencil: 7 cm") and `say`; `soundQ`'s prompt is the constant
+ * `🔊 Listen!` and its three keyword words — the whole question — go into `listen` and `say`. So the key
+ * reduced to the answer, and the re-roll loop then refused every card whose answer matched the previous one:
+ * driven through a real `Session` at d1, `r-soundhunt` repeated the target sound 0.000% of the time over 4000
+ * pairs. A child who remembers the last answer was doing better than one who listens.
+ *
+ * `hint` and `listen` are therefore in the key — both are content wherever they are set. **`say` is not**, for
+ * the reason `VISUAL_QUESTION` is an allowlist: it is the only one of the three that carries presentation as
+ * well as content. `orderQ` speaks the numbers in their *shuffled* display order (`Slice the numbers from
+ * smallest to biggest: 7, 2, 9`), which is re-shuffled per draw independently of the exercise, so folding it
+ * in would put the same decoration into the card's identity that a per-draw `emoji` did. It costs nothing to
+ * leave out: every topic whose question `say` carries also carries it in `listen` (`soundQ`) or `hint`
+ * (`measureCompare`) or the visual (`y2-tense`, `y2-sentencetype`, `r-oddeven`).
+ *
+ * Exported so the rail in `tests/unit/session.test.ts` can measure this key against the text a child reads
+ * rather than against a copy of it.
+ */
+export const repeatKey = (q: Question) => [q.prompt, q.answer, q.hint ?? '', q.listen ?? '', q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : ''].join('\u0000');
 
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;

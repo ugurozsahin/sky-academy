@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Session, starsForAccuracy, type SessionEvents } from '../../src/game/session';
-import { TOPICS, YEARS, topicById, topicsFor } from '../../src/curriculum';
+import { Session, repeatKey, starsForAccuracy, type SessionEvents } from '../../src/game/session';
+import { TOPICS, YEARS, topicById, topicsFor, type Question } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
@@ -254,8 +254,13 @@ describe('a flagged question slows the real session (#311, #297)', () => {
  * `tests/unit/curriculum.test.ts` calls `topic.gen()` directly and so cannot see this: the defect lives in
  * the *sequence* a child plays, which only a real `Session` produces. This rail drives one.
  *
- * The topics are **discovered, not listed**, so a fifth constant-prompt binary topic is covered the day it
- * ships rather than the day somebody remembers this rail exists.
+ * The topics are **discovered, not listed** — but read the filter for what it is, not for what it sounds
+ * like (#412): it selects a *literally* constant prompt, which is a narrower thing than the class this
+ * defect belongs to. `y1-mass` has two prompts ("Which is heavier?" / "Which is lighter?"), binary bubbles
+ * and a ten-value key space — the target profile in every respect except the one the filter tests — and it
+ * was missed here for exactly that reason. So this describe measures **these topics**, statistically; the
+ * class-wide property is the exact one in `the repeat key holds the whole question (#412)` below, which
+ * covers every topic with no guess at which ones degenerate.
  */
 describe('the previous answer carries no signal about the next (#390)', () => {
   const yearOf = (t: { year: string }) => YEARS.find(y => y.id === t.year)!;
@@ -355,6 +360,107 @@ describe('the previous answer carries no signal about the next (#390)', () => {
     // order of magnitude above that and an order below B1's 7.75%–30.8%, so neither the seed nor a small
     // pool decides the verdict.
     expect(repeats / pairs, 'the same question asked twice running').toBeLessThan(0.02);
+  });
+});
+
+/**
+ * #412 — the key must hold the question **wherever the question lives**.
+ *
+ * #390 widened the identity from `(prompt, answer)` to include the visual, which fixed the four topics whose
+ * question is carried by a picture. On nine others the question is text that is not the prompt, and there is
+ * no visual at all: `measureCompare` puts the values only in `hint` and `say`, and `soundQ`'s prompt is the
+ * constant `🔊 Listen!` with its three keyword words in `listen` and `say`. So the key still reduced to the
+ * answer, and the re-roll loop refused every card whose answer matched the previous one — `r-soundhunt`
+ * repeated the target sound **0.000%** of the time over 4000 in-session pairs, against a generator rate of
+ * 6.1%. A child who remembered the last answer was doing better than one who listened.
+ *
+ * Two rails, one exact and one behavioural, and the first is the important one because it needs no statistics
+ * and no list of suspect topics:
+ *
+ * 1. **No two cards that ask different things share a key.** `asked()` below is written here, from the
+ *    `Question` fields a child reads or hears, and is deliberately *not* read off `repeatKey` — it is the
+ *    requirement, and the key is the thing under test. Every playable topic, every difficulty. Before this
+ *    fix it failed on all nine: `y1-mass` collapsed 1,976 different cards onto 10 keys.
+ * 2. **The previous answer carries no signal**, measured against the generator's own rate rather than against
+ *    a guess at what a fair rate would be. That comparison is what makes it apply to topics whose answer is a
+ *    colour or a grapheme, where "about half the time" is simply wrong: `y1-mass` draws two of eight colours
+ *    per card, so ~0.2 is its natural rate, and 0.11 is not evidence of anything. Restricted to topics with
+ *    at least ten distinct cards per answer, because only there is refusing an *identical* card too small an
+ *    effect to explain a gap — that refusal is correct behaviour, and on a three-card topic like `r-share` it
+ *    legitimately drives agreement to zero.
+ *
+ * Neither rail names a topic, so the tenth one is covered the day it ships. What they do not cover: a key
+ * that is too discriminating, which is the opposite failure (PR #407's B1) and is pinned by
+ * `the same exercise is never asked twice running` above.
+ */
+describe('the repeat key holds the whole question (#412)', () => {
+  const D1 = 1 as const;
+  const yearOf = (t: { year: string }) => YEARS.find(y => y.id === t.year)!;
+  /** Everything the card asks: what a child reads on it, hears from it, and must slice. No decoration. */
+  const asked = (q: Question) => [q.prompt, q.answer, q.hint ?? '', q.listen ?? '', (q.sequence ?? []).join('\u0001')].join('\u0000');
+  const playable = TOPICS.filter(t => t.input !== 'tracing');
+
+  it('there are topics to measure at all', () => {
+    expect(playable.length, 'nothing discovered — every case below would run on an empty set').toBeGreaterThan(50);
+  });
+
+  it.each(playable.map(t => t.id))('%s: two cards that ask different things never share one key', (id) => {
+    const topic = topicById(id)!;
+    for (const d of [1, 2, 3] as const) {
+      const r = rng(11);
+      const byKey = new Map<string, string>();
+      for (let i = 0; i < 700; i++) {
+        const q = topic.gen(d, r);
+        const k = repeatKey(q), a = asked(q);
+        const seen = byKey.get(k);
+        if (seen === undefined) byKey.set(k, a);
+        // The message carries the two cards, because "10 keys for 1,976 cards" says nothing about which field
+        // went missing from the key and the two prompts side by side say it at a glance.
+        else expect(seen, `d${d}: one key for two different questions — ${JSON.stringify(seen)} and ${JSON.stringify(a)}`).toBe(a);
+      }
+    }
+  });
+
+  /**
+   * Per topic at d1: the generator's own consecutive-agreement rate, the rate a driven `Session` produces, and
+   * how many distinct cards there are per distinct answer. Computed once — three of these numbers are wanted
+   * by the discovery and by the assertion, and a second pass would double the cost of the file.
+   */
+  const PAIRS = 1500;
+  const stats = playable.map(t => {
+    const r = rng(11);
+    const cards = Array.from({ length: PAIRS + 1 }, () => t.gen(D1, r));
+    let base = 0;
+    for (let i = 1; i < cards.length; i++) if (cards[i].answer === cards[i - 1].answer) base++;
+    const s = new Session({ mode: 'mission', year: yearOf(t), topic: t, rng: rng(7) }, events());
+    s.start();
+    let prev = s.current!, same = 0;
+    for (let i = 0; i < PAIRS; i++) { s.nextQuestion(); if (s.current!.answer === prev.answer) same++; prev = s.current!; }
+    return {
+      id: t.id,
+      baseline: base / PAIRS,
+      inSession: same / PAIRS,
+      perAnswer: new Set(cards.map(asked)).size / new Set(cards.map(c => c.answer)).size,
+    };
+  });
+  /** Where a suppressed answer cannot be explained by the refusal of an identical card, and is measurable. */
+  const measurable = stats.filter(s => s.perAnswer >= 10 && s.baseline * PAIRS >= 30);
+
+  it('the measurable set holds the topics this defect was found on', () => {
+    const ids = measurable.map(s => s.id);
+    expect(ids.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(10);
+    // The two extremes of the issue's own table: the listening topics, where the key *was* the answer, and a
+    // measurement topic, where the values live in `hint`. If either drops out of this set, the set is wrong.
+    for (const id of ['r-soundhunt', 'y1-soundhunt', 'y1-mass', 'y2-temp']) expect(ids).toContain(id);
+  });
+
+  it.each(measurable.map(s => s.id))('%s: a driven session repeats an answer about as often as the generator does', (id) => {
+    const s = measurable.find(x => x.id === id)!;
+    // Half the generator's rate, not a fixed number: the point is that the sequence adds no signal of its own.
+    // The measured gap before the fix was total — 0.000 against 0.061 on both sound-hunt topics — and after it
+    // every topic in this set sits within a few percent of its baseline, so the floor is nowhere near either.
+    expect(s.inSession, `in-session ${s.inSession.toFixed(3)} against the generator's ${s.baseline.toFixed(3)}`)
+      .toBeGreaterThan(s.baseline * 0.5);
   });
 });
 
