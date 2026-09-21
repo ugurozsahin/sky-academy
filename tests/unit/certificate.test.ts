@@ -77,6 +77,11 @@ describe('duel certificate text (#16 item 5)', () => {
     // Not constructible by any caller — play.ts never sets `duel`, ui/duel.ts never sets `training` — but a
     // save is a file on a device, and one resolution is better than whichever branch happens to be first.
     expect(certKind({ training: true, duel: true })).toBe('duel');
+    // A junk flag falls back to 'mission' rather than being trusted for truthiness. `isCert()` does not type-check
+    // either flag, and rejecting the entry there would drop a certificate a child earned — a wrong reason line
+    // on a hand-edited save is the cheaper failure.
+    expect(certKind({ duel: 'yes' as unknown as boolean })).toBe('mission');
+    expect(certKind({ training: 1 as unknown as boolean })).toBe('mission');
     expect(certificateText({ ...base, training: true, duel: true }).reason).toContain('Ninja Duel');
   });
   it('carries the duel flag back out of the album, so a stored duel cert redraws as one', () => {

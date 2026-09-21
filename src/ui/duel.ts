@@ -177,10 +177,13 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
-    if (cert) $('#cert').addEventListener('click', async () => {
+    // Captured, not read back off `cert`: the handler is async and fires long after this frame, so reading the
+    // mutable binding there would need a `!` to compile and would be a lie the moment anything else assigns it.
+    const earned = cert;
+    if (earned) $('#cert').addEventListener('click', async () => {
       sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
       try {
-        const how = await deliverCertificate(await drawCertificate(cert!), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
+        const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
         if (how === 'shared') toast('Certificate shared!', 'good');
         else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
         else if (how === 'declined') toast('No problem — you can save it next time!', 'good');

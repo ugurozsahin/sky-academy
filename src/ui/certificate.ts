@@ -13,9 +13,15 @@ export interface CertInfo { name: string; avatar: Avatar; year: string; title: s
  * earn nothing a reader can see. The cost is that `{ training: true, duel: true }` is expressible; no caller
  * constructs it (`play.ts` never sets `duel`, `ui/duel.ts` never sets `training`), and this function is the one
  * place the precedence is decided, so a hand-edited save reads as a duel rather than as undefined behaviour.
+ *
+ * Both flags are compared against `true` rather than read for truthiness, and that is the deliberate half:
+ * `isCert()` does not type-check either one (it never did for `training`), so a hand-edited `"duel": "yes"`
+ * reaches here. Falling back to `'mission'` prints a slightly wrong reason on a junk entry; **rejecting** the
+ * entry in `isCert()` instead would drop a certificate a child genuinely earned, which is the worse of the two
+ * and the opposite of what that guard exists for.
  */
 export const certKind = (i: { training?: boolean; duel?: boolean }): 'duel' | 'sensei' | 'mission' =>
-  i.duel ? 'duel' : i.training ? 'sensei' : 'mission';
+  i.duel === true ? 'duel' : i.training === true ? 'sensei' : 'mission';
 
 /**
  * Rebuild a drawable certificate from what the save keeps (#205). Certificates are stored as data, not as a
