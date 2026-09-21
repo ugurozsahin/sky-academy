@@ -1,6 +1,6 @@
 // Memory Match: flip two cards, keep the pairs. Pure logic + pair decks (no DOM) so it is unit-testable.
 import type { Rng, YearId } from '../curriculum';
-import { coinLabel, numberWord, OBJECTS, pick, ri, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
+import { coinLabel, numberWord, OBJECTS, pick, ri, SAME_SOLID, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
 
 export interface Face { text: string; say: string; coin?: number; small?: boolean }  // coin = pence, drawn as a coin
 export interface Pair { a: Face; b: Face }
@@ -14,7 +14,22 @@ const objs = (n: number, emoji: string): Face => ({ text: emoji.repeat(n), say: 
 const words = (rng: Rng, from: number, to: number, n: number): Pair[] => shuffle(rng, Array.from({ length: to - from + 1 }, (_, i) => from + i)).slice(0, n).map(v => ({ a: txt(String(v), numberWord(v)), b: txt(numberWord(v), numberWord(v), v > 20) }));
 // Shape tables come from curriculum/util.ts (SHAPES_2D/SHAPES_3D); Memory only needs the glyph + name, so
 // `shapes()` reads the first two members and ignores the extra fact field (sides / faces).
-const shapes = (rng: Rng, list: readonly (readonly [string, string, ...unknown[]])[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(([g, name]) => ({ a: txt(g, name), b: txt(name, name, name.length > 6) }));
+// At most ONE name from a `SAME_SOLID` class per board (#372). A cube IS a cuboid — the Year 1 NC's own
+// "cuboids including cubes" — so a deck carrying both 🎲/cube and 🧱/cuboid scores a child who pairs 🎲 with
+// "cuboid" a MISS for doing exactly what the curriculum teaches, and `shapes()` pairs one glyph with one name,
+// so only 🎲↔cube counts. `maths.ts` has held the two apart in its decoys since #371; the deck is the other
+// place they can meet. `SHAPES_3D` has exactly six rows, so the Year 2 board is five pairs rather than six —
+// a smaller board, not a wrong one, and Reception already plays four.
+const shapes = (rng: Rng, list: readonly (readonly [string, string, ...unknown[]])[], n: number): Pair[] => {
+  const out: Pair[] = [];
+  let solid = false;
+  for (const [g, name] of shuffle(rng, list)) {
+    if (out.length >= n) break;
+    if (SAME_SOLID.has(name)) { if (solid) continue; solid = true; }
+    out.push({ a: txt(g, name), b: txt(name, name, name.length > 6) });
+  }
+  return out;
+};
 const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
 
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */

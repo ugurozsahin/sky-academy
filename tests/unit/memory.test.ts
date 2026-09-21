@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Memory, THEMES, pickTheme } from '../../src/game/memory';
 import { YEARS } from '../../src/curriculum';
+import { SAME_SOLID } from '../../src/curriculum/util';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const faceKey = (f: { text: string; coin?: number }) => `${f.coin ? 'coin:' : ''}${f.text}`;
@@ -13,7 +14,10 @@ describe('memory decks', () => {
       expect(themes!.length).toBeGreaterThanOrEqual(3);
       for (const theme of themes!) for (let seed = 1; seed <= 40; seed++) {
         const pairs = theme.pairs(rng(seed));
-        const want = y.id === 'reception' ? 4 : y.id === 'year1' ? 6 : theme.id === 'shapes' || theme.id === 'words' ? 6 : 8;
+        // Year 2's 3-D board is FIVE, not six: `SHAPES_3D` has exactly six rows and no board may carry both
+        // members of a `SAME_SOLID` class (#372), so one row is always dropped. A smaller board, not a wrong
+        // one — Reception plays four — and the rail below is what says which of the two it is.
+        const want = y.id === 'reception' ? 4 : y.id === 'year1' ? 6 : theme.id === 'words' ? 6 : theme.id === 'shapes' ? 5 : 8;
         expect(pairs.length, `${y.id}/${theme.id}`).toBe(want);
         expect(new Set(pairs.map(p => faceKey(p.a))).size, `${y.id}/${theme.id} left faces`).toBe(pairs.length);
         expect(new Set(pairs.map(p => faceKey(p.b))).size, `${y.id}/${theme.id} right faces`).toBe(pairs.length);
@@ -21,6 +25,19 @@ describe('memory decks', () => {
       }
     }
   });
+  // guard rail (#372): Memory Match's Year 2 3-D board asked a child to pair the die with "cube" while
+  // "cuboid" sat on the same board, and a cube IS a cuboid — the Year 1 NC's own "cuboids including cubes".
+  // `shapes()` pairs one glyph with one name, so the child who pairs the die with "cuboid" was scored a MISS
+  // for doing what the curriculum teaches. `SAME_SOLID` is the shared rule (`src/curriculum/util.ts`) and
+  // `maths.ts` has honoured it in its decoys since #371; this is the deck honouring it too. Every theme of
+  // every year, not just the 3-D one, so a future table that names two of a class cannot slip in beside it.
+  it('no board carries two names from one SAME_SOLID class — a cube is a cuboid', () => {
+    for (const y of YEARS) for (const theme of THEMES[y.id] ?? []) for (let seed = 1; seed <= 120; seed++) {
+      const names = theme.pairs(rng(seed)).map(p => p.b.text).filter(t => SAME_SOLID.has(t));
+      expect(names.length, `${y.id}/${theme.id} seed ${seed} offered ${names.join(' and ')}`).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('year ranges: Reception counts to 6 and words to five, Y1 words within 20, Y2 words 21–99 and tables 2/5/10', () => {
     for (let seed = 1; seed <= 30; seed++) {
       for (const p of pickTheme('reception', rng(seed), 'count').pairs(rng(seed))) expect(Number(p.a.text)).toBeLessThanOrEqual(6);
