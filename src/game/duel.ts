@@ -91,7 +91,7 @@ export class Duel {
     this.advance();
   }
   private advance() {
-    if (this.round >= this.rounds) { this.end(); return; }
+    if (this.onLastRound) { this.end(); return; }   // the getter, not a second copy of the comparison (#375 round 2, note 5)
     this.nextQuestion();
   }
   /** True once the match is on its last round — the round after which `waveEnd()` ends it rather than advancing. */

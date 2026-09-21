@@ -107,6 +107,34 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     });
   });
 
+  /**
+   * The invariant the #375 fix rests on, pinned where no clock runs (#375 round 2, `type-design-analyzer`).
+   *
+   * `duelScreen` commits a finished match from `result()` **before** `end()` has run — at the last slice, or
+   * when the last wave runs out — so a result taken then must equal the one `onMatchEnd` would deliver. Note
+   * that `onLastRound` alone is not the licence: it reports *position*, not settledness. What makes the early
+   * read safe is that the round is also settled, and these two cases are the two ways that happens.
+   */
+  it('result() on a settled last round is already the result end() delivers — won, and undecided (#375)', () => {
+    for (const settle of ['won', 'undecided'] as const) {
+      const ev = events();
+      const d = new Duel({ topic, difficulty: 1, rounds: 3, rng: rng(11) }, ev);
+      d.start();
+      d.hit('a', d.current!.answer); d.waveEnd();          // round 1: a
+      d.hit('a', d.current!.answer); d.waveEnd();          // round 2: a
+      expect(d.onLastRound, 'round 3 of 3 is the last round').toBe(true);
+      if (settle === 'won') d.hit('b', d.current!.answer);  // decided, but the wave has not ended
+      const early = d.result();
+      expect(d.ended, 'the match has NOT ended yet — this is the window the screen commits in').toBe(false);
+      // A slice after the round is decided changes nothing; on the undecided path there is nothing left to
+      // slice, which is `Arena`'s `live === 0` in the real screen and is asserted there.
+      if (settle === 'won') expect(d.hit('a', d.current!.answer)).toBe('ignored');
+      d.waveEnd();                                          // now the match really ends
+      expect(d.ended).toBe(true);
+      expect(early, `the early ${settle} read is the final result, field for field`).toEqual(ev.onMatchEnd.mock.calls[0][0]);
+    }
+  });
+
   it('nothing fires once the match has ended', () => {
     const ev = events();
     const d = new Duel({ topic, difficulty: 1, rounds: 1, rng: rng(9) }, ev);

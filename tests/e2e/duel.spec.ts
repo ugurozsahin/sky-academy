@@ -693,27 +693,38 @@ test.describe('Ninja Duel', () => {
     await startDuel(page, dojoSeeds('fresh'));
     expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
     const topic = await page.evaluate(() => window.__sna.state().topic);
-    for (let r = 1; r <= 10; r++) {
+    for (let r = 1; r <= 9; r++) {
       await page.waitForFunction(r => window.__sna.state().round === r, r);
-      await winRound(page, 'a');                     // Player 1 takes all ten, so a certificate is earned too
+      await winRound(page, 'a');                     // rounds 1-9; round 10 is driven by hand below
     }
-    // Quit the instant the last round is won — ahead of `endWave`, `waveEnd` and the overlay's own timer.
-    const quitState = await page.evaluate(async () => {
-      await new Promise<void>(done => {
-        const tick = () => {
-          const s = window.__sna.state();
-          if (s.round === s.rounds && s.decided && !s.ended) done(); else requestAnimationFrame(tick);
-        };
-        tick();
-      });
-      const at = window.__sna.state();
+    // Round 10 is sliced, read and quit inside ONE page.evaluate, so no timer of any kind can run in between
+    // (#375 round 2, B2). Polling for `decided && !ended` and quitting afterwards could not tell the winning
+    // slice's commit from the `waveEnd` one 250 ms later: `{round: 10, decided: true, ended: false}` is true
+    // of both, so the test passed either way and its pass depended on beating `endWave` on the runner. Here
+    // `answer('a')` and the `state()` read are in the same synchronous task, so `coins: 10` can only have
+    // been written by the commit inside `duel.hit()` itself.
+    await page.waitForFunction(() => window.__sna.state().round === 10);
+    await page.waitForFunction(p => { const s = window.__sna.state(); return !s.decided && !s.ended && window.__sna.bubbles(p).some(b => b.label === s.answer); }, 'a');
+    const afterHit = await page.evaluate(() => {
+      const t0 = performance.now();
+      const ok = window.__sna.answer('a');
+      const ms = performance.now() - t0;            // the slice's whole task, commit included (#375 round 2, B3)
+      const s = window.__sna.state();
       (document.querySelector('#pause') as HTMLButtonElement).click();
       (document.querySelector('#quit') as HTMLButtonElement).click();
-      return at;
+      return { ok, ms, ...s };
     });
-    // The window this quit in is the one B1 names: the match is decided but has NOT ended, so `onMatchEnd`
-    // has not run and both scope-bound timers ahead of it were still pending when `dispose()` fired.
-    expect(quitState, 'quit before the match ended, not after').toMatchObject({ round: 10, decided: true, ended: false });
+    expect(afterHit, 'the winning slice commits in its own task, not on a timer')
+      .toMatchObject({ ok: true, round: 10, decided: true, ended: false, coins: 10, taught: { hits: 10, tries: 10 } });
+    // #375 round 2, B3: `commitMatch` now runs inside the slice handler, which `Arena.onHit` calls from the
+    // render loop's own task. This is the measurement the game rules ask for before a change on that path is
+    // pushed. The budget is a ceiling on the WHOLE handler — hit detection, the burst, `floatText`, the
+    // toast and the four load/save round trips — and it only ever goes down (`.claude/rules/guardrails.md`).
+    // Observed headless over four runs: 1.5, 2.2, 2.7, 4.4 ms. One frame at 60 fps is 16.7 ms, and this task
+    // runs once per match. The render loop itself is held separately by `game.spec.ts`'s "still renders at
+    // speed" rail, which reads fps=60.3 ratio=1.00 on this head — unchanged, since no arena code moved.
+    console.log(`[guard rail] last-slice task = ${afterHit.ms.toFixed(1)} ms (commit included)`);
+    expect(afterHit.ms, 'the commit must not cost the slice its frame').toBeLessThan(16);
     await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
     // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
     await expect(page.locator('.duel-end')).toHaveCount(0);
@@ -728,5 +739,62 @@ test.describe('Ninja Duel', () => {
     expect(saved.duels[0]).toMatchObject({ winner: 'a', scoreA: 10, scoreB: 0, rounds: 10 });
     expect(saved.certs, 'and the win filed its certificate').toHaveLength(1);
     expect(saved.certs[0]).toMatchObject({ id: 'year1:duel', title: 'Ninja Duel', duel: true });
+  });
+
+  /**
+   * The draw half of the same window (#375 round 2, B1): a last round **nobody slices**.
+   *
+   * The test above only ever exercises a last round that is WON, so the commit in `waveEnd` — the one that
+   * covers an undecided last round — was dead code under the whole suite: deleting it left 1932 unit tests
+   * and all eleven duel e2e tests green. Two children failing to slice the answer in time on the last round
+   * is an ordinary way for a match to end, and quitting right then is exactly what #375/#441 are about.
+   *
+   * The quit is driven off `Arena`'s own `waveActive`, not off a timeout and not off anything the commit
+   * writes. `waveActive` flips false in the same statement that calls `onWaveEnd` (`arena.ts`), which is what
+   * sets `waveDone[p]`, so "both false" is precisely "both waves have reported, `duel.waveEnd()` is pending
+   * on its ~650 ms timer, and nothing has ended the match yet". Reading `bubbles()` instead would be wrong:
+   * a bubble that is fading is already out of `bubbles()` while the arena still counts it live, so the poll
+   * could fire before the commit and fail for a reason that is not the bug. It needs a cast because
+   * `waveActive` is private to `Arena` — deliberately, since only this rail has any business reading it.
+   */
+  test('a last round nobody slices is still paid and recorded if the child quits before the overlay (#375, #441)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    const topic = await page.evaluate(() => window.__sna.state().topic);
+    for (let r = 1; r <= 9; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');
+    }
+    // Round 10 arrives and both waves launch; then nobody slices, and they run out.
+    await page.waitForFunction(() => window.__sna.state().round === 10);
+    const waveActive = (p: 'a' | 'b') => (window.__sna.arenas[p] as unknown as { waveActive: boolean }).waveActive;
+    await page.waitForFunction(`(${waveActive})('a') && (${waveActive})('b')`);
+    const quitState = await page.evaluate(async fn => {
+      const active = eval(`(${fn})`) as (p: 'a' | 'b') => boolean;
+      await new Promise<void>(done => {
+        const tick = () => { if (!active('a') && !active('b')) done(); else requestAnimationFrame(tick); };
+        tick();
+      });
+      const s = window.__sna.state();
+      (document.querySelector('#pause') as HTMLButtonElement).click();
+      (document.querySelector('#quit') as HTMLButtonElement).click();
+      return s;
+    }, waveActive.toString());
+    // Undecided and unended: `duel.waveEnd()` — which would register the draw and end the match — was still
+    // sitting on its timer when `dispose()` cleared it. Only the `waveEnd` commit can have paid this match.
+    expect(quitState, 'quit with the last round undecided and the match not ended')
+      .toMatchObject({ round: 10, decided: false, ended: false, coins: 9 });
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    await expect(page.locator('.duel-end')).toHaveCount(0);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    // Nine decided rounds, not ten: the last one paid nobody, which is what makes this the draw path.
+    expect(saved.coins, 'a coin per DECIDED round — round 10 decided nothing').toBe(9);
+    expect(saved.progress[topic], 'Player 1 answered nine rounds; round 10 he never answered at all')
+      .toMatchObject({ hits: 9, tries: 9, plays: 0, stars: 0 });
+    const volume = (['correct15', 'correct20', 'correct25'] as const).map(id => saved.dojo.progress[id]).filter((n: number | undefined) => n !== undefined);
+    expect(volume, 'the Daily Dojo heard about the nine').toEqual([9]);
+    expect(saved.duels, 'the match still happened, and a 9-0 is still a Player 1 win').toHaveLength(1);
+    expect(saved.duels[0]).toMatchObject({ winner: 'a', scoreA: 9, scoreB: 0, rounds: 10 });
+    expect(saved.certs, 'and a Player 1 win earns its certificate however the last round went').toHaveLength(1);
   });
 });

@@ -68,11 +68,16 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   let waveId = 0; let holdOpen = false;
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
   let hintLine = '';
-  /** Coins the finished match paid into the save; 0 until the match ends (#16 item 5). */
+  // The four below are written by `commitMatch`, so they carry their values from the moment the match is
+  // SETTLED — which on a last round is up to ~1.45 s before `duel.ended` flips (#375 round 2, note 1). They
+  // used to say "0 until the match ends"; that was true when the only writer ran inside the overlay, and it
+  // is not true now. `window.__sna`'s `state()`, `certificate()` and `certWords()` read all four live, so an
+  // e2e asking "what has been earned now?" between the last slice and `ended` gets the real answer, not null.
+  /** Coins the finished match paid into the save; 0 until it is settled (#16 item 5). */
   let paid = 0;
-  /** Daily Dojo bonus the finished match earned on top of `paid`; 0 until the match ends (#16 item 5). */
+  /** Daily Dojo bonus the finished match earned on top of `paid`; 0 until it is settled (#16 item 5). */
   let dojoPaid = 0;
-  /** What the finished match taught Sensei about this topic — rounds answered, not slices; 0/0 until it ends. */
+  /** What the finished match taught Sensei about this topic — rounds answered, not slices; 0/0 until settled. */
   let taught: DuelTally = { hits: 0, tries: 0 };
   /** The certificate a Player 1 win earned, or null — the other two outcomes earn none (#16 item 5). */
   let cert: CertInfo | null = null;
@@ -146,6 +151,11 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // The draw half of B1: a last round nobody sliced is settled the moment both waves run out, and a draw
     // scores nothing, so the result is already final — but `duel.waveEnd()` below, which is what would
     // register the draw and end the match, is a scope-bound timer a quit can still cancel. Commit first.
+    //
+    // **What makes it final here is `Arena`'s own contract** (#375 round 2, note 6): `onWaveEnd` fires only at
+    // `live === 0` (`arena.ts`), and every hit path requires `!b.dead`, so once BOTH arenas have reported
+    // there is no bubble either child could still slice and no route left to `duel.hit()`. If that ever
+    // changes — a wave that ends with bubbles still catchable — this commit stops being safe, silently.
     if (duel.onLastRound) commitOnce(duel.result());
     later(() => duel.waveEnd(), scaled(duel.roundDecided ? 450 : 650));
   };
@@ -173,6 +183,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
    * `certWords()` hooks read them live, at whatever moment they are asked, not once at draw time.
    */
   let payout: GameEndOutcome | null = null;
+  /** Whether `commitMatch` has been entered — see `commitOnce`, which sets it before the call, not after. */
+  let committed = false;
   /**
    * Commit the finished match exactly once, from whichever point reaches it first (#375/#441, round 1 B1).
    *
@@ -180,14 +192,27 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
    * **running out** undecided (`waveEnd`), and the match formally **ending** (`onMatchEnd`). The first two
    * are the fix for B1 — between them and `onMatchEnd` sit two scope-bound timers (`endWave`'s ~1 s and
    * `waveEnd`'s ~450 ms) totalling ~1.45 s in which `duel.ended` is still false, so both arenas run, `#pause`
-   * is live, and `cleanup()` → `scope.dispose()` cancels whichever timer has not fired yet. `onMatchEnd` stays
-   * a caller because it is the only one reached when the last round is a draw registered by `duel.waveEnd()`
-   * after a wave this screen never saw run out, and because it is the honest place for the normal path.
+   * is live, and `cleanup()` → `scope.dispose()` cancels whichever timer has not fired yet.
+   *
+   * **`onMatchEnd` is kept as the third caller knowing it never commits today** (#375 round 2, note 2). Every
+   * route to `Duel.end()` runs through `duel.waveEnd()`, whose only caller in `src/` is the `later()` directly
+   * below the `waveEnd` commit — so on a last round `payout` is always already set by the time it fires. It
+   * stays because the two early points are each guarded by `duel.onLastRound`, and a mutation to either guard
+   * would otherwise lose the payout entirely rather than merely commit it late. Do not read it as a live path.
    *
    * Calling it early is safe because `Duel.result()` is final once the last round is settled — its own doc
    * has why nothing afterwards can move a field it reads.
    */
-  const commitOnce = (r: DuelResult): GameEndOutcome => payout ??= commitMatch(r);
+  const commitOnce = (r: DuelResult): GameEndOutcome => {
+    // The flag is set BEFORE the call, not latched on its return (#375 round 2, note 3). `payout ??= …` would
+    // leave `payout` null if `commitMatch` threw partway through its load/save cycles, and the next commit
+    // point would then run the whole sequence again — double coins and a duplicate history row on top of the
+    // original failure. Committed-and-failed must read the same as committed.
+    if (!committed) { committed = true; payout = commitMatch(r); }
+    // Only reachable if a previous call threw: loud here beats a TypeError inside the overlay's destructure.
+    if (!payout) throw new Error('Ninja Duel: the match was committed but its payout did not survive');
+    return payout;
+  };
 
   /**
    * Every write a finished match produces, committed the moment the match is settled (#375/#441).
@@ -265,7 +290,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // Captured, not read back off `cert`: this handler is async and fires long after this frame, and it must
     // draw the certificate *this* match earned, so it binds the value the `if` tested. The `certificate()` hook
     // below deliberately does the opposite and reads the live binding — it is asked "what has been earned
-    // now?" and has to answer null before the match ends (#16 review, note 7).
+    // now?" and answers null until the match is settled (#16 review, note 7; narrowed by #375 round 2, note 1:
+    // "before the match ends" was the old boundary, and `cert` is now set at the last slice, not the overlay).
     const earned = cert;
     if (earned) $('#cert').addEventListener('click', async () => {
       sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
