@@ -367,6 +367,12 @@ img { -webkit-user-drag: none; }
 }
 .duel-half { position: relative; min-height: 0; min-width: 0; width: 100%; max-width: var(--arena-w); }
 .duel-half.a { grid-area: a; } .duel-half.b { grid-area: b; }
+/* The toast fades, it is never removed from the DOM, so as a grid item it opened a THIRD implicit row and took
+   32px off both arenas on every single duel, in either orientation — 16px each, for a message that is invisible
+   most of the time. Floated instead: bottom-centre, where the flex column used to put it, and in the sideways
+   layout that is on the divider, where both children can read it. */
+.duel-screen { position: relative; }
+.duel-screen > .toast { position: absolute; bottom: calc(8px + var(--sab)); left: 50%; translate: -50% 0; margin-top: 0; z-index: 3; }
 .duel-arena { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 .duel-half.b { border-bottom: 1px solid var(--line); }
 .duel-tag {
@@ -391,6 +397,14 @@ img { -webkit-user-drag: none; }
 @media (max-height: 640px) { .duel-q .hint { font-size: 12px; margin-top: 0; } }
 /* Portrait only — the landscape branch below hides it, so it costs nothing where height is scarce. */
 .duel-rotate { font-size: clamp(11px, 2.8vw, 13px); font-weight: 700; color: var(--muted); margin-top: 4px; }
+/* The card's visual gets a HEIGHT BUDGET, in both orientations (#388). The visuals are sized in CSS and the
+   `max-height: 640px` band does not shrink them — `.clock` is a fixed 120px square, `.frac` 110px, `.dots` 100px
+   — and nothing bounded the card, so what the two arenas got depended on which question the draw dealt. 132px
+   clears everything in the pool untouched; `overflow: hidden` is the backstop for anything taller, clipping being
+   far better than what it replaces: an unbounded visual took the whole screen and left the arenas 11px tall.
+   `tests/e2e/duel.spec.ts` pins this against every fixed-size visual AND a deliberately absurd one. */
+.duel-q { --duel-vis: 132px; }
+.duel-q .vis-wrap { max-height: var(--duel-vis); overflow: hidden; }
 /* #388: side by side, question across the top. `--arena-w` now caps the PAIR, not each half: with the cap on
    the half, a screen wider than two arenas leaves both of them at the outer edges and the card stranded over
    the gap between them. Capping the grid keeps the divider under the centre of the card at every width. */
@@ -412,10 +426,32 @@ img { -webkit-user-drag: none; }
   .duel-strip { max-width: none; padding: 4px 10px; }
   .duel-q { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; }
   .duel-q .prompt, .duel-q .hint { margin: 0; }
+  /* A SHORT landscape screen is the one band with no height to spare, so the budget tightens and the visual is
+     scaled into it: a clock question took 165px of a 390px screen (42%) and left each child 193px — WORSE than
+     the 213px that made the stacked layout unplayable. `zoom`, not `transform: scale()`, because only `zoom`
+     shrinks the LAYOUT box, which is the whole point; a transform would shrink the picture and leave the bar
+     just as tall. The factor is what makes the pool's tallest visual, the 120px clock, fit the budget.
+     A tall landscape screen keeps the base 132px and no scaling — see below. */
+  .duel-q { --duel-vis: 76px; }
+  .duel-q .vis-wrap { display: flex; justify-content: center; }
+  .duel-q .vis { margin: 0; zoom: 0.62; }
+  /* The bar is a row, so anything that does not fit across it WRAPS, and every wrapped line is height taken off
+     both arenas. At 844px a 34px prompt will not sit beside the pool's longest hint and a visual, so on a short
+     landscape screen the prompt gives up a few points — the same trade the `max-height: 640px` rule above already
+     makes for the hint. Restored at full size on a tall landscape screen below. */
+  .duel-q .prompt { font-size: clamp(18px, 3.4vw, 26px); }
   .duel-half.b { border-bottom: 0; border-inline-start: 1px solid var(--line); }   /* the divider runs down, not across */
   /* Both halves are full height now, so both name tags sit at the foot of their own half, clear of the bar. */
   .duel-half.b .duel-tag, .duel-half.a .duel-tag { top: auto; bottom: 8px; }
   .duel-rotate { display: none; }
+}
+/* Only a SHORT landscape screen is actually short of height, and a clock question is one where reading the face
+   IS the question — so a landscape tablet pays nothing for the rule above: above 700px tall the visuals keep
+   their full size. The 390px-tall phone band is the one that has to shrink them. */
+@media (orientation: landscape) and (min-height: 700px) {
+  .duel-q { --duel-vis: 132px; }                          /* back to the base budget: the clock is untouched */
+  .duel-q .vis { zoom: 1; }
+  .duel-q .prompt { font-size: clamp(22px, 5.5vw, 34px); }
 }
 .duel-final { grid-template-columns: repeat(3, 1fr); }
 .foot { margin-top: 26px; text-align: center; color: #6c78a8; font-size: 12px; font-weight: 600; }

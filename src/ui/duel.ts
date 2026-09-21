@@ -49,7 +49,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <div class="prompt" id="prompt"></div>
         <div class="vis-wrap" id="vis"></div>
         <div class="hint" id="hint"></div>
-        <div class="duel-rotate">Turn the screen sideways — one arena each, side by side 🔄</div>
+        <div class="duel-rotate">Sideways is better: one arena each, side by side 🔄</div>
       </div>
       <button class="icon-btn" id="speak" aria-label="Read the question aloud">🔊</button>
     </div>

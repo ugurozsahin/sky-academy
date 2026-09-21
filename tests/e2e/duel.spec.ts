@@ -197,7 +197,7 @@ test.describe('Ninja Duel', () => {
     // A phone turned sideways lands in the `max-height: 640px` band, where the shared `.hint` rule is
     // `display: none` to buy the play screen room. The duel card cannot take that: the line IS the question
     // there. Pinned in both projects, because neither project's own viewport is in the band.
-    await page.setViewportSize({ width: 844, height: 390 });
+    await resizeTo(page, { width: 844, height: 390 });   // through the helper: a bare resize reads the old layout
     const landscape = await page.evaluate(() => {
       const el = document.querySelector('#hint') as HTMLElement;
       return { h: el.getBoundingClientRect().height, dom: el.textContent, display: getComputedStyle(el).display };
@@ -211,13 +211,18 @@ test.describe('Ninja Duel', () => {
    * Resize, then wait for the app to have taken the new height. `.play` is sized from `--vh`, which `src/main.ts`
    * sets from a `resize` listener, so a `getBoundingClientRect()` straight after `setViewportSize` reports the
    * PREVIOUS viewport's layout — which is how this rail first went green on a bar that was eating 177px.
+   * The width is waited on as well: the interesting pair here is 844 against 1600 at the same height, and a
+   * height-only predicate is satisfied instantly by the stale layout that the helper exists to rule out.
    */
   async function resizeTo(page: Page, vp: { width: number; height: number }) {
     await page.setViewportSize(vp);
-    await page.waitForFunction(h => {
+    // `want` is the serialised argument, deliberately not the closed-over `vp`: a predicate that reads the outer
+    // variable resolves it in Node, never in the page, and waits on nothing. tsc accepts both.
+    await page.waitForFunction(want => {
       const vh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--vh'));
-      return Math.abs(vh * 100 - h) < 2 && Math.abs(document.querySelector('.duel-screen')!.getBoundingClientRect().height - h) < 2;
-    }, vp.height);
+      const box = document.querySelector('.duel-screen')!.getBoundingClientRect();
+      return window.innerWidth === want.width && Math.abs(vh * 100 - want.height) < 2 && Math.abs(box.height - want.height) < 2;
+    }, vp);
   }
 
   /** Where each piece of the duel screen actually sits, in viewport pixels. */
@@ -226,30 +231,90 @@ test.describe('Ninja Duel', () => {
       const r = document.querySelector(s)!.getBoundingClientRect();
       return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, cx: r.x + r.width / 2 };
     };
-    return { a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: getComputedStyle(document.querySelector('.duel-rotate')!).display };
+    // A measured box for the nudge too, not `getComputedStyle().display`: `visibility: hidden`, `display:
+    // contents` or a typo all pass a `.not.toBe('none')`, and an unmeasured element is not on screen.
+    return { a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'), prompt: box('#prompt'), vis: box('#vis') };
   });
+
+  /**
+   * What a question can put in the card, keyed by the class that SIZES it in `style.css` — plus one deliberately
+   * taller than anything the pool holds. The duel draws its topic with `Math.random()`, so measuring whatever
+   * round 1 happens to deal is a sample of one: the first version of this rail quoted a 62–106px bar from six
+   * such samples and missed `y1-time`, whose fixed 120px `.clock` made it 165px. Overwriting `#vis` makes the
+   * worst case reachable on demand, and the absurd row is what makes the bound structural rather than
+   * "big enough for a clock" — an unbounded visual once left the arenas at ZERO height.
+   */
+  const VISUALS: Record<string, string> = {
+    'no visual': '',
+    'clock (120px, the pool\'s tallest)': '<div class="vis"><svg viewBox="0 0 100 100" class="clock"><circle cx="50" cy="50" r="47" class="face"/></svg></div>',
+    'frac (110px)': '<div class="vis"><svg viewBox="0 0 100 100" class="frac"><path d="M0 0H100V100H0Z"/></svg></div>',
+    'dots (100px)': '<div class="vis"><svg viewBox="0 0 120 80" class="dots"><circle cx="20" cy="20" r="9"/></svg></div>',
+    'two ten-frames': `<div class="vis">${'<div class="tenframe">' + '<i></i>'.repeat(10) + '</div>'}</div>`,
+    'taller than anything in the pool': '<div class="vis"><div style="width:120px;height:600px"></div></div>',
+  };
+  /**
+   * Put `html` in the card's visual slot, along with the longest prompt and hint the year-1 duel pool can
+   * actually produce — 33 and 49 characters, from `y1-months` and `y1-length`, found by generating 200 questions
+   * for each of the pool's 28 topics. Real strings, not invented ones: a hint half again as long as anything the
+   * pool holds would cap the layout against a case no child ever sees. The text matters as much as the visual —
+   * in a ROW the card wraps, and a long prompt with a long hint is another 20px of bar.
+   */
+  const dressCard = (page: Page, html: string) => page.evaluate(h => {
+    document.querySelector('#vis')!.innerHTML = h;
+    document.querySelector('#prompt')!.textContent = 'Which day comes before Wednesday?';
+    document.querySelector('#hint')!.textContent = 'yellow sunflower: 14 cm · purple sunflower: 10 cm';
+  }, html);
 
   test('sideways, the duel splits left and right with the question centred over the divider (#388)', async ({ page }) => {
     await startDuel(page);
     // The layout the owner and child could not play was two stacked halves: each arena had half the height, and
     // `layoutWave` spends a bubble radius twice over out of it, so the flight was ~270px on a phone. Pinned in
-    // both projects at two landscape widths — a phone on its side, and a screen wider than two capped arenas.
-    for (const vp of [{ width: 844, height: 390 }, { width: 1600, height: 900 }]) {
+    // both projects at a phone on its side, a tablet, and a screen wider than two capped arenas.
+    for (const vp of [{ width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {
       await resizeTo(page, vp);
       const L = await boxes(page);
       expect(L.a.right, `${vp.width}px: Player 1 ends where Player 2 begins`).toBeLessThanOrEqual(L.b.x + 1);
       expect(Math.abs(L.a.y - L.b.y), `${vp.width}px: neither player is above the other`).toBeLessThan(2);
       expect(Math.abs(L.a.w - L.b.w), `${vp.width}px: the two halves are the same width`).toBeLessThan(2);
       expect(L.strip.bottom, `${vp.width}px: the question is a bar across the top, not a strip between them`).toBeLessThanOrEqual(L.a.y + 1);
-      // The reason `--arena-w` had to move off the half and onto the pair: at 1600 a capped half would leave the
-      // card floating over the gap between two arenas instead of over the line where they meet.
+      // The reason `--arena-w` had to move off the half and onto the pair: past two capped arenas a capped HALF
+      // would leave the card floating over the gap between them instead of over the line where they meet.
       expect(Math.abs(L.strip.cx - L.a.right), `${vp.width}px: the card is centred over the divider`).toBeLessThan(2);
-      expect(L.a.w, `${vp.width}px: --arena-w still caps a half — the pair is capped and centred, not stretched`).toBeLessThanOrEqual(601);
-      expect(L.a.h, `${vp.width}px: each half keeps the height a stacked half gave away`).toBeGreaterThan(vp.height * 0.6);
-      // The regression this caught once already: a bar that stacks its pieces in a 560px card took 177px of a
-      // 390px phone, leaving each arena 213px and handing most of the fix back. A third of the height is the cap.
-      expect(L.strip.h, `${vp.width}px: the question bar does not eat the height the split just won`).toBeLessThanOrEqual(vp.height / 3);
-      expect(L.rotate, `${vp.width}px: nothing asks a player to turn a screen that is already sideways`).toBe('none');
+      // An exact width, not `<= 601`: at 844 the cap does not bind, so an upper bound there is met whether or not
+      // the cap exists and its message would be a lie. Half the screen, or `--arena-w`, whichever is smaller.
+      expect(Math.round(L.a.w), `${vp.width}px: a half is half the screen, capped at --arena-w`).toBe(Math.min(vp.width / 2, 600));
+      expect(L.rotate.h, `${vp.width}px: nothing asks a player to turn a screen that is already sideways`).toBe(0);
+    }
+  });
+
+  test('sideways, no question can take the height the split just won, whatever it puts on the card (#388)', async ({ page }) => {
+    await startDuel(page);
+    // The bar has to be BOUNDED, not merely short on the question that came up. Before the cap: a clock question
+    // took 165px of a 390px screen (42%) and handed each child 193px — worse than the 213px that made the stacked
+    // layout unplayable — and a visual taller than the pool holds took the whole screen, leaving the arenas at 0.
+    for (const vp of [{ width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {
+      await resizeTo(page, vp);
+      for (const [what, html] of Object.entries(VISUALS)) {
+        await dressCard(page, html);
+        const L = await boxes(page);
+        const where = `${vp.width}x${vp.height}, ${what}`;
+        // 38%: the measured worst case is a clock question carrying the pool's longest prompt AND hint at
+        // 844x390 — 141px of bar, 249px of arena. Not an aspiration, the guarantee the stylesheet actually makes.
+        expect(L.strip.h, `${where}: the question bar stays inside the share of the height budgeted for it`).toBeLessThanOrEqual(vp.height * 0.38);
+        expect(L.a.h, `${where}: each half keeps the height a stacked half gave away`).toBeGreaterThan(vp.height * 0.6);
+        expect(Math.abs(L.a.h - L.b.h), `${where}: both children get the same height`).toBeLessThan(2);
+        if (!html) continue;
+        // The visual is scaled to fit the budget rather than the bar growing to fit the visual, so it is still on
+        // screen — a bound that worked by hiding the picture would fail the question instead of the layout.
+        expect(L.strip.h, `${where}: the visual is scaled into the bar, not dropped out of it`).toBeGreaterThan(40);
+        // And the bar is a ROW: the prompt sits BESIDE the visual, not above it. This needs its own assertion,
+        // because the height cap does NOT catch losing the row — with the budget doing the heavy lifting a
+        // stacked card is only ~4px taller and clears the cap. Deleting the two rules that make the row passed
+        // every other assertion here, which is exactly the review finding this answers. Boxes overlap vertically
+        // when they share a line and cannot when they are stacked.
+        expect(L.prompt.y, `${where}: the prompt sits beside the visual, not stacked above it`).toBeLessThan(L.vis.bottom);
+        expect(L.vis.y, `${where}: the visual sits beside the prompt, not stacked below it`).toBeLessThan(L.prompt.bottom);
+      }
     }
   });
 
@@ -259,11 +324,21 @@ test.describe('Ninja Duel', () => {
     // still plays, stacked as before — Player 2 on top, the card between, Player 1 on the bottom — and the only
     // new thing on the card is the nudge.
     await resizeTo(page, { width: 390, height: 844 });
-    const P = await boxes(page);
-    expect(P.b.bottom, 'Player 2 keeps the top half').toBeLessThanOrEqual(P.strip.y + 1);
-    expect(P.strip.bottom, 'Player 1 keeps the bottom half, the card between them').toBeLessThanOrEqual(P.a.y + 1);
-    expect(Math.abs(P.a.x - P.b.x), 'the halves are stacked, not side by side').toBeLessThan(2);
-    expect(P.rotate, 'portrait tells the players there is a better way round').not.toBe('none');
+    for (const [what, html] of Object.entries(VISUALS)) {
+      await dressCard(page, html);
+      const P = await boxes(page);
+      expect(P.b.bottom, `${what}: Player 2 keeps the top half`).toBeLessThanOrEqual(P.strip.y + 1);
+      expect(P.strip.bottom, `${what}: Player 1 keeps the bottom half, the card between them`).toBeLessThanOrEqual(P.a.y + 1);
+      expect(Math.abs(P.a.x - P.b.x), `${what}: the halves are stacked, not side by side`).toBeLessThan(2);
+      expect(P.rotate.h, `${what}: portrait tells the players there is a better way round`).toBeGreaterThan(0);
+      // The fallback has a floor of its own. It was never measured before, so the nudge's own line came out of the
+      // arenas unnoticed (361px per half before this pull request, ~346px after) and nothing watched any further
+      // growth of the card. Portrait is the layout #388 calls too cramped already; it may not quietly get worse.
+      // 240px: the measured worst case is a portrait clock question, 251px. The floor exists because nothing
+      // measured this before, so the nudge's own line came off both arenas unnoticed (~10px each) and any further
+      // growth of the card would have gone the same way. Portrait is the fallback #388 already calls cramped.
+      expect(P.a.h, `${what}: the portrait fallback keeps a floor under each arena`).toBeGreaterThan(240);
+    }
   });
 
   test('a duel is played on a bubble topic of the island, a round nobody slices is a draw, and pause holds both arenas', async ({ page }) => {
