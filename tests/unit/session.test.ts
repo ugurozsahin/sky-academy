@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Session, type SessionEvents } from '../../src/game/session';
-import { YEARS, topicById, topicsFor } from '../../src/curriculum';
+import { TOPICS, YEARS, topicById, topicsFor } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
@@ -239,5 +239,79 @@ describe('a flagged question slows the real session (#311, #297)', () => {
     };
     expect(at(false), 'unflagged: the stage speed as the year defines it').toEqual({ speed: 3, reported: 3 });
     expect(at(true), 'flagged: one step slower, and the arena is told so').toEqual({ speed: 2, reported: 2 });
+  });
+});
+
+/**
+ * #390 — the sequence of cards must not answer itself.
+ *
+ * `nextQuestion()` re-rolls while the new card matches the previous one, to avoid an immediate repeat. On a
+ * topic whose prompt is a **constant** and whose answer space is **binary**, the `(prompt, answer)` identity
+ * it used took exactly two values, so a freshly generated, genuinely different picture was rejected purely
+ * for repeating the previous answer — up to five times. With a fair coin and five re-rolls consecutive cards
+ * then share an answer 1.56% of the time, so "slice the other bubble" beats reading the card.
+ *
+ * `tests/unit/curriculum.test.ts` calls `topic.gen()` directly and so cannot see this: the defect lives in
+ * the *sequence* a child plays, which only a real `Session` produces. This rail drives one.
+ *
+ * The topics are **discovered, not listed**, so a fifth constant-prompt binary topic is covered the day it
+ * ships rather than the day somebody remembers this rail exists.
+ */
+describe('the previous answer carries no signal about the next (#390)', () => {
+  const yearOf = (t: { year: string }) => YEARS.find(y => y.id === t.year)!;
+  /** Mission stage 1 is difficulty 1 for every year (`YEARS[*].diffs[0]`), which is what the rail samples. */
+  const D1 = 1 as const;
+
+  /** Topics whose d1 cards all share one prompt and offer exactly two bubbles — where the identity degenerates. */
+  const constantPromptBinary = () => TOPICS.filter(t => {
+    if (t.input === 'tracing') return false;
+    const r = rng(11);
+    const cards = Array.from({ length: 200 }, () => t.gen(D1, r));
+    return cards.every(c => c.prompt === cards[0].prompt && c.options.length === 2 && !c.sequence);
+  });
+
+  it('YEARS stage 1 is difficulty 1, which is what this rail samples', () => {
+    for (const y of YEARS) expect(y.diffs[0], `${y.id} stage 1`).toBe(D1);
+  });
+
+  it('finds the four topics #390 measured, so the discovery itself cannot go blind', () => {
+    const found = constantPromptBinary().map(t => t.id).sort();
+    for (const id of ['r-oddeven', 'y2-sentencetype', 'y2-symmetry', 'y2-tense']) expect(found).toContain(id);
+  });
+
+  it.each(constantPromptBinary().map(t => t.id))('%s: consecutive answers agree about half the time', (id) => {
+    const topic = topicById(id)!;
+    const s = new Session({ mode: 'mission', year: yearOf(topic), topic, rng: rng(7) }, events());
+    s.start();
+    let prev = s.current!, same = 0;
+    const pairs = 600;
+    for (let i = 0; i < pairs; i++) {
+      s.nextQuestion();
+      const q = s.current!;
+      expect(q.prompt, 'the premise: one constant prompt').toBe(prev.prompt);
+      expect(q.options.length, 'the premise: a binary answer space').toBe(2);
+      if (q.answer === prev.answer) same++;
+      prev = q;
+    }
+    // A fair coin gives 0.5; the broken dedupe gave ~0.016. The band is wide enough that the seed does not
+    // decide the verdict and narrow enough that any re-roll on the answer alone fails it.
+    expect(same / pairs).toBeGreaterThan(0.35);
+    expect(same / pairs).toBeLessThan(0.65);
+  });
+
+  /** The other half of the same key: widening it must not switch the repeat-avoidance off. */
+  it('still refuses to ask the identical card twice in a row (y2-oddeven, whose prompt carries its data)', () => {
+    const topic = topicById('y2-oddeven')!;
+    const s = new Session({ mode: 'mission', year: yearOf(topic), topic, rng: rng(7) }, events());
+    s.start();
+    let prev = s.current!, repeats = 0;
+    for (let i = 0; i < 600; i++) {
+      s.nextQuestion();
+      const q = s.current!;
+      if (q.prompt === prev.prompt && q.answer === prev.answer) repeats++;
+      prev = q;
+    }
+    // Five re-rolls over ~15 d1 numbers: an immediate repeat should be all but unreachable.
+    expect(repeats, 'the same question asked twice running').toBeLessThan(3);
   });
 });

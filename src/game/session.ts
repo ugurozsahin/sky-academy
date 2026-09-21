@@ -23,6 +23,21 @@ export interface SessionEvents {
 export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number }
 export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number }
 
+/**
+ * What makes two cards "the same card" for the repeat-avoidance in `nextQuestion()` (#390).
+ *
+ * `(prompt, answer)` alone is the right identity only for a topic whose prompt carries its data
+ * ("17 — odd or even?"). For a constant prompt with a binary answer — `r-oddeven`, `y2-sentencetype`,
+ * `y2-tense`, `y2-symmetry` — that pair takes exactly two values, so the re-roll rejected a genuinely new
+ * picture purely for repeating the previous answer, and the answer sequence became the tell: with five
+ * re-rolls, consecutive cards shared an answer 1.56% of the time, so "slice the other bubble" beat reading
+ * the card. The visual is what carries the question on those topics, so it belongs in the key.
+ *
+ * The bubble labels deliberately stay out: they are shuffled per draw, so including them would call every
+ * card new and switch the repeat-avoidance off altogether.
+ */
+const repeatKey = (q: Question) => `${q.prompt}\u0000${q.answer}\u0000${q.visual ? JSON.stringify(q.visual) : ''}`;
+
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
   correct = 0; attempts = 0; stageCorrect = 0; stageAttempts = 0; stageStars: number[] = [];
@@ -79,8 +94,9 @@ export class Session {
     if (this.ended) return;
     const topic = this.pickTopic(); this.currentTopic = topic;
     let q = topic.gen(this.difficulty, this.rng);
-    // avoid immediate repeats
-    for (let i = 0; i < 5 && this.current && q.prompt === this.current.prompt && q.answer === this.current.answer; i++) q = topic.gen(this.difficulty, this.rng);
+    // avoid immediate repeats — of the whole card, not merely of its answer (#390)
+    const prev = this.current && repeatKey(this.current);
+    for (let i = 0; i < 5 && prev && repeatKey(q) === prev; i++) q = topic.gen(this.difficulty, this.rng);
     this.current = q; this.seqIndex = 0; this.waiting = false; this.questionsAsked++;
     this.ev.onQuestion(q, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(q) });
   }
