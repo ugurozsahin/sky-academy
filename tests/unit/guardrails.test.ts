@@ -2260,6 +2260,108 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   });
 
   /**
+   * #310 — the cap in §7 is only ever reached by a reviewer who goes looking for it.
+   *
+   * `docs/REVIEWER-PROMPT.md` is what a reviewer run actually reads first, and its rule 4 ended "while a PR
+   * is waiting, reviewing it IS this run's work, with no time box". Nothing beside that sentence separated
+   * the *depth* of a review from the number of times one may block, and the prompt's own framing pushed the
+   * wrong way: a run that reads it and reaches for the skill only at §5's merge checklist can block a fourth
+   * time having never met the cap — "a rule whose whole purpose is to stop the sixth round may never be read
+   * before the second" (`pr-test-analyzer`, PR #306 round 1). #306 left it deliberately: this file sat at its
+   * byte budget to the byte, and a budget only ever goes down, so the clause had to be paid for in the same
+   * file before it could be written at all.
+   *
+   * What this pins is the **pointer**, not the cap. The cap's home is `review-pr` §7, pinned by the #305 rail
+   * above; a second copy here would drift from §7 the moment §7 changed, which is what
+   * `docs/decisions/001-one-home-per-rule.md` exists to prevent — and the #305 rail cannot catch that,
+   * because it reads the skill alone.
+   *
+   * **The positives are sliced to rule 4, not searched file-wide** (PR #386 review, B1 in both rounds).
+   * #310's whole content is *where the pointer sits*: it adds no rule that was not already in §7. A
+   * `toContain` over the whole file cannot tell rule 4 from any other byte, and round 1 proved it by moving
+   * the clause verbatim into rule 2 — same words, same 10,034 bytes, rule 4 back to its pre-#310 ending —
+   * with every rail green. Round 2 then defeated the first slice the same way, because `indexOf` takes the
+   * *first* match: one planted copy of rule 4's opening, earlier in the file, widened the slice back over
+   * STEP 2. Hence the uniqueness assertion, which is the load-bearing one; the slice is guarded at both ends
+   * as the #305 rail two tests above guards its own.
+   *
+   * **The negative half is deliberately one pattern, and that is the settled answer rather than a gap left
+   * open** (round 3, B2). Three review rounds each found both a spelling it missed and ordinary English it
+   * reddened, which is the shape `review-pr` §7's own incident is about — a check that failed the build on
+   * the words `only`, `instead` and `no`. `third round`, `three times` and "count the REVIEW: CHANGES
+   * REQUESTED comments" are all things this prompt says legitimately about rules that are *not* the cap:
+   * STEP 1 defines a waiting pull request in terms of those comments. Widening the list a fourth time buys
+   * a longer list of spellings, not a proof — a bolded, backticked or lightly reworded copy walks past any
+   * of them, exactly as the #305 rail says of its own `ESCAPES`, and the byte budget is no backstop either,
+   * since a restatement can be paid for out of other prose like any other clause. So what remains is the one
+   * spelling that cannot occur here innocently, and **a restatement of the cap is the reviewer's to catch,
+   * not this rail's**. What #310 delivers is the pointer; the positives are what pin it.
+   *
+   * Prove it red: move the clause out of rule 4 — into another rule, a new rule 5, or a paragraph of its own
+   * before the report paragraph, with or without a decoy opening planted earlier; drop the §7 pointer; put
+   * "with no time box" back unqualified; write a licence beside the pointer, either side of it; or restate
+   * the cap in the file as "the third round is the last…", bolded or backticked.
+   */
+  it('the reviewer prompt points at §7 for the rounds, in rule 4, and does not restate the cap (#310)', () => {
+    const prompt = read('docs/REVIEWER-PROMPT.md');
+    const OPENS = '4. **It is labelled `owner-approval`';
+    // Emphasis and code spans are house style in this file, never meaning, so neither may decide a match.
+    const bare = (s: string) => flat(s).replace(/\*\*|__|\*|_|`/g, '');
+
+    // The anchor has to be UNIQUE: `indexOf` takes the first match, so a decoy copy of this literal planted
+    // earlier binds `from` to it, the "slice" spans STEP 2 onwards, the positives are file-wide again and
+    // round 1's relocation walks straight back in (round 2, B1). `lastIndexOf` only changes which copy wins.
+    expect(prompt.split(OPENS).length - 1,
+      'rule 4 must open exactly once: renumbered, removed, or a second copy of its opening would start the slice '
+      + 'in the wrong place').toBe(1);
+    const from = prompt.indexOf(OPENS);
+    // And it ends at rule 4's OWN newline. Ending it at the report paragraph made the slice "rule 4 through
+    // the end of the rules block", so the clause could leave rule 4 for a paragraph of its own or a new
+    // rule 5 and every positive below still passed, under messages saying it was in rule 4 (round 3, B1).
+    const to = prompt.indexOf('\n', from);
+    expect(to, 'rule 4 must still be one line — the slice below is that line').toBeGreaterThan(from);
+    expect(prompt.indexOf('\nReport to the owner only for something noteworthy', to),
+      'the four unmergeable rules no longer end at the report paragraph').toBeGreaterThan(to);
+    const rule4 = bare(prompt.slice(from, to));
+    expect(rule4.length, 'rule 4 has lost most of its body — the slice is meant to be the whole rule')
+      .toBeGreaterThan(800);
+
+    expect(rule4, 'rule 4 must still say a review is not hurried — the pointer hangs off that sentence')
+      .toContain("reviewing it IS this run's work");
+    expect(rule4, "and the no-time-box must be about a review's depth, or it reads as a licence on the rounds too")
+      .toMatch(/no time box on a review's depth/);
+    // By clause, not by spelling: the file names the skill four ways and this is the least legible of them,
+    // so pinning the literal would freeze the inconsistency and make a tidy-up double red (round 2, note 5).
+    // `review-pr` and `§7` still both have to be there, which is what does the cross-file work.
+    expect(rule4, 'and rule 4 is where it must sit: a reviewer who stops at rule 4 meets the cap, or #310 bought nothing')
+      .toMatch(/how many times one may block[^.]*review-pr[^.]*§7/);
+
+    // And the cap must not be handed back in the same breath. Scoped to the clause, not to all of rule 4
+    // (round 2, note 1): rule 4's own subject is the `owner-approval` label and the `loosening` hold, whose
+    // native vocabulary is discretion and binding, and these patterns are negation-blind — "Whether the label
+    // goes on is not at your discretion" tightens the rule and would trip them. The clause starts at whichever
+    // of the depth sentence and the pointer comes first, so reordering the two cannot leave a licence between
+    // them unscanned (round 3, note 1).
+    const marks = [rule4.indexOf('While a PR is waiting'), rule4.search(/how many times one may block/)];
+    expect(Math.min(...marks), 'rule 4 has lost the depth sentence or the §7 pointer').toBeGreaterThan(-1);
+    for (const escape of [/\bnot a hard\b/i, /\bas often as you (need|like)\b/i, /\bat your discretion\b/i,
+      /\b(only|merely) a guideline\b/i, /\bthe cap does not apply\b/i, /\bbinds you\b/i])
+      expect(rule4.slice(Math.min(...marks)), `the §7 pointer carries a clause that gives the cap back: ${escape}`)
+        .not.toMatch(escape);
+
+    // One pattern, deliberately, and it is the weakest half of this rail (round 3, B2). Three rounds each
+    // found a spelling the list missed and ordinary English it reddened: `third round`, `three times` and
+    // "count the REVIEW: CHANGES REQUESTED comments" are all things this prompt says legitimately about rules
+    // that are NOT the cap — STEP 1 defines a waiting pull request in terms of those comments. Proving a
+    // negative over free text is what `review-pr` §7's own incident is about, so the list is reduced to the
+    // one spelling that cannot occur here innocently rather than widened again. **A restatement of the cap is
+    // the reviewer's to catch, not this rail's**; what #310 delivers is the pointer, and the positives above
+    // are what pin it.
+    expect(bare(prompt), 'the cap belongs in `review-pr` §7 alone — the prompt points at it, it does not copy it')
+      .not.toMatch(/third round is the last/i);
+  });
+
+  /**
    * #191 — the clearing side of #161 had the same gap as the blocking side, one level down.
    *
    * #189 made scripts/review-gate.mjs flag a REVIEW: CHANGES REQUESTED comment with no session URL, because
@@ -4461,7 +4563,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   const ROUTINE_PROMPT_BUDGET = 21_422;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3
+  const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3; → 10,034 again, no net change: rule 4's pointer at the round cap (#310, 28 bytes), paid for by shortening STEP 2's §4 and rule 1's §5 pointers to the `the review-pr skill` form rule 3 already used — so the prompt now spells the skill four ways (the full path in rule 3, `the review-pr skill §N`, the same without the article, and rule 4's bare `review-pr §7`) and the full path survives exactly once, in rule 3 — which nothing pins, so it is a description of today rather than a guarantee. Tidying the short forms back to full paths would cost 28 bytes with nothing left to pay them
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
