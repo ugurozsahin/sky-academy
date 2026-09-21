@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, gapLetters, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
 import type { SentenceType } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
@@ -414,7 +414,10 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       ['pass', 0, 'blm'], ['cold', 0, 'bfghst'], ['be', 0, 'hmw'], ['go', 0, 'dnst'], ['his', 1, 'a'],
       ['said', 2, 'n'], ['would', 2, 'r'], ['would', 3, 'n'], ['whole', 3, 's'], ['plant', 3, 'i'], ['grass', 3, 'm'], ['mind', 1, 'e'], ['break', 0, 'c'],
       // The second review's hole: a list word's own plural or `-er` form, which the first head offered wholesale.
-      ['father', 3, 't'], ['class', 3, 'pmn'], ['find', 3, 's'], ['poor', 3, 's'], ['says', 2, 'w'], ['grass', 2, 'o'],
+      // `['poor', 3, 's']` used to sit here, asserting `poos` was carried by the word lists. #324 moved it to
+      // `AVOID` with the rest of the stem, so its row is in the reachable-`AVOID` table below instead — the
+      // letter is still blocked, and now for the stated reason.
+      ['father', 3, 't'], ['class', 3, 'pmn'], ['find', 3, 's'], ['says', 2, 'w'], ['grass', 2, 'o'],
       ['there', 3, 'm'], ['water', 2, 'f'], ['water', 0, 'eh'], ['love', 2, 'nb'], ['mind', 3, 'i'], ['put', 2, 'b'],
     ];
     for (const [w, i, letters] of NEVER) for (const l of letters) {
@@ -426,10 +429,21 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // spelling is `ask@2 s` (second review of PR #303). Each row below is reachable, so dropping its word from
     // `AVOID` turns this red.
     for (const [w, i, l] of [['where', 2, 'o'], ['pass', 1, 'i'], ['fast', 2, 'r'], ['ask', 2, 's'], ['whole', 3, 'r'],
-      ['poor', 3, 'f'], ['says', 0, 'g'], ['last', 1, 'u'], ['put', 2, 's'], ['push', 0, 't'], ['come', 2, 'k'], ['you', 2, 'b']] as [string, number, string][]) {
+      ['poor', 3, 'f'], ['says', 0, 'g'], ['last', 1, 'u'], ['put', 2, 's'], ['push', 0, 't'], ['come', 2, 'k'], ['you', 2, 'b'],
+      // #324 item 1. PR #303 closed `f` on this stem and checked no neighbour of it, so the same card went on
+      // offering three more: `poon` is a sexual slur. One row each, so dropping any single word goes red.
+      ['poor', 3, 'n'], ['poor', 3, 't'], ['poor', 3, 'd'], ['poor', 3, 's'], ['poor', 3, 'h'],
+      ['put', 2, 'd'], ['pass', 2, 'p']] as [string, number, string][]) {
       expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} belongs in AVOID, not the word lists`).toBe(false);
       expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
     }
+    // #324 item 3: the one general statement, rather than another row of cases. `AVOID` says "not on a card"
+    // and `GAP_WORDS` says "another right answer"; a word in both is blocked for the wrong reason, and a
+    // curriculum change that drops it from the word lists unblocks it with nothing red. `poos` and `pooh` were
+    // that case until #324 — in `EVERYDAY`, so the `poo_` stem happened to be closed by the list that exists to
+    // say a word is a word. This assertion is what stops the next crudity being filed the same way.
+    for (const w of AVOID) expect(GAP_WORDS.has(w), `${w} is in AVOID, so it may not also be a word the lists carry`).toBe(false);
+    expect(AVOID.size, 'and the set is not empty, which would make the line above vacuous').toBeGreaterThan(20);
     // Exhaustive over both lists and the days, every index: the pool the generators draw from is clean and still deep enough.
     for (const w of [...Y1_CEW, ...Y2_CEW, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) for (let i = 0; i < w.length; i++) {
       const pool = gapLetters(w, i);

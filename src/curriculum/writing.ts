@@ -136,7 +136,7 @@ const EVERYDAY = ['I', 'it', 'in', 'if', 'is', 'as', 'at', 'an', 'am', 'on', 'or
   // Second review of PR #303: the systematic hole was the list words' own plurals and `-er`/`-ed` forms
   // (`cla_s` offered `p` for claps, `fin_` offered `s` for fins), so this batch is the full sweep of all 489
   // drawable gaps rather than another guess at which families were missed.
-  'claps', 'clams', 'clans', 'clasp', 'clays', 'clothed', 'fins', 'fink', 'grans', 'gross', 'groat', 'fatter', 'bather', 'hays', 'mays', 'saws', 'sans', 'sass', 'poos', 'pooh', 'theme', 'thee', 'eves', 'aye', 'tee', 'lest', 'mosh',
+  'claps', 'clams', 'clans', 'clasp', 'clays', 'clothed', 'fins', 'fink', 'grans', 'gross', 'groat', 'fatter', 'bather', 'hays', 'mays', 'saws', 'sans', 'sass', 'theme', 'thee', 'eves', 'aye', 'tee', 'lest', 'mosh',
   'wafer', 'wager', 'wader', 'waver', 'wad', 'wan', 'wilt', 'wily', 'woo', 'wove', 'cater', 'eater', 'hater', 'patents', 'probe', 'prone', 'prose', 'freak', 'bream', 'bust', 'buss', 'buoy', 'bate', 'pate', 'rind', 'lobe', 'lone', 'lope', 'mini', 'mins', 'kink', 'kine', 'kins',
   'moot', 'mope', 'mote', 'rouse', 'douse', 'souse', 'holt', 'aster', 'clime', 'dour', 'bur', 'boor', 'cole', 'cote', 'coney', 'evert'];
 /**
@@ -157,11 +157,24 @@ export const GAP_WORDS: ReadonlySet<string> = new Set([...Y1_CEW, ...Y2_CEW, ...
  * `sire`, `whey`, `rut`, `cur`, `hag`, `hale`, `chile`.
  *
  * `AVOID` is the other filter: spellings no card may show a child, whatever the lists know.
+ *
+ * **The rule the split follows, and the one a rail now holds** (#324 item 3): a spelling is blocked *here* when
+ * the reason is that a child must not see it, and in `GAP_WORDS` when the reason is that it is another right
+ * answer. The two sets are therefore disjoint — `tests/unit/curriculum.test.ts` rail 5 asserts it — because a
+ * word in both would be blocked for the wrong reason, and removing it from the word lists for an unrelated
+ * curriculum change would quietly unblock it. `poos` and `pooh` sat in `EVERYDAY` until #324 for exactly that
+ * reason: the `poo_` stem was closed, but by the list that exists to say "this is a word", not by the one that
+ * exists to say "not on a card".
  */
-const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass', 'arse', 'shit', 'crap', 'cock', 'dick',
+export const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass', 'arse', 'shit', 'crap', 'cock', 'dick',
   // Second review of PR #303: `poo_` offered `f`. A slur, a crudity or an insult is filtered here rather than
   // added to the lists above, so that `GAP_WORDS` stays a list of words the game is happy to *show*.
-  'poof', 'gays', 'lust', 'pus', 'tush', 'coke', 'yob']);
+  'poof', 'gays', 'lust', 'pus', 'tush', 'coke', 'yob',
+  // #324 item 1: that round closed `f` on `poo_` and checked no other letter on the same stem, so `poon` — a
+  // sexual slur — was still on a Year 2 child's bubbles two rounds after a review had gone hunting for it.
+  // `poos`/`pooh` move here from `EVERYDAY` under the rule above; they were blocked, but as words rather than
+  // as spellings a card may not show.
+  'poon', 'poot', 'pood', 'poos', 'pooh', 'paps', 'pud']);
 export function gapLetters(word: string, idx: number): string[] {
   const lower = word.toLowerCase();
   return LETTERS.filter(l => { const w = lower.slice(0, idx) + l + lower.slice(idx + 1); return l !== lower[idx] && !GAP_WORDS.has(w) && !AVOID.has(w); });
