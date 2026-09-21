@@ -291,8 +291,19 @@ test.describe('Ninja Duel', () => {
     // rows of five. It is the case the `--slot` floor exists for, so it is deliberately not scaled — see the
     // `.vis.objs` rule. Three rows is what `fiveFrames(12)` produces.
     'twelve objects to count (three rows)': `<div class="vis objs"><div class="grp">${[5, 5, 2].map(n => `<span class="five">${Array.from({ length: 5 }, (_, i) => `<span class="slot">${i < n ? '<span class="obj">⭐</span>' : ''}</span>`).join('')}</span>`).join('')}</div></div>`,
-    'taller than anything in the pool': '<div class="vis"><div style="width:120px;height:600px"></div></div>',
+    // A number line with two-digit labels and the hidden tick rightmost: `lineQ` picks the last tick about one
+    // round in five, and this is the card that `overflow: hidden` cut the `?` off at 320px wide (24px of it; 4px
+    // at 360px). It is here for its WIDTH, where every other fixture is here for its height.
+    'number line, hidden tick rightmost': `<div class="vis"><div class="nline">${[10, 12, 14, 16, 18, 20].map((n, i) => `<span class="${i === 5 ? 'mark' : ''}">${i === 5 ? '?' : n}</span>`).join('')}</div></div>`,
   };
+  /**
+   * Deliberately taller than anything the pool can build. Its claim is the OPPOSITE of the fixtures above: here
+   * the budget is supposed to clip, because the alternative is what it replaced — an unbounded visual taking the
+   * whole screen and leaving the arenas 11px tall. So it is checked for the bound and never for clipping, and it
+   * is kept separate rather than special-cased inside the loop, so neither claim can quietly be applied to the
+   * other.
+   */
+  const ABSURD = '<div class="vis"><div style="width:120px;height:600px"></div></div>';
   /**
    * Dress the card with `html` and the longest prompt and hint the year-1 duel pool can actually produce, then
    * measure it — **in one `evaluate`**. One round trip is the point: a round can end between two of them,
@@ -306,6 +317,21 @@ test.describe('Ninja Duel', () => {
    * holds would cap the layout against a case no child ever sees. The text matters as much as the visual — in a
    * ROW the card wraps, and a long prompt with a long hint is another 20px of bar.
    */
+  /**
+   * The budget must BOUND the bar without cutting the answer off, on either axis — asserted in both orientations,
+   * because the first version of this only ran in landscape and only at viewports where nothing clipped.
+   */
+  function expectNothingClipped(m: { clipY: number; overflowX: string; markPainted: boolean }, where: string) {
+    // Vertical: a cropped row of objects is a WRONG COUNT, not merely a small one — `y2-fractions` draws twelve
+    // stars, and half a bottom row turns "1/4 of 12" into a card that reads as ten.
+    expect(m.clipY, `${where}: the budget bounds the visual without cutting it off`).toBeLessThanOrEqual(0.5);
+    // Horizontal: `overflow: hidden` clips x too, and it cut the `?` clean off a number line at 320px wide —
+    // where the prompt is "Which number is hidden?". `overflow-y: clip` bounds y and leaves x alone; beside
+    // `hidden`, `overflow-x: visible` would compute to `auto` and make a scroll container instead.
+    expect(m.overflowX, `${where}: the budget does not clip the horizontal axis`).toBe('visible');
+    expect(m.markPainted, `${where}: the '?' the question asks about is painted, not clipped away`).toBe(true);
+  }
+
   const dressAndMeasure = (page: Page, html: string) => page.evaluate(h => {
     document.querySelector('#vis')!.innerHTML = h;
     document.querySelector('#prompt')!.textContent = 'Which day comes before Wednesday?';
@@ -314,13 +340,34 @@ test.describe('Ninja Duel', () => {
       const r = document.querySelector(sel)!.getBoundingClientRect();
       return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, cx: r.x + r.width / 2 };
     };
-    const wrap = document.querySelector('#vis')!.getBoundingClientRect();
+    const wrap = document.querySelector('#vis') as HTMLElement;
+    const cs = getComputedStyle(wrap);
+    // Whether the budget CLIPS, measured off the box's own content rather than a list of class names. The first
+    // version counted `.five, .tenframe` overflowing — two of the thirteen visual types a duel can draw — so it
+    // scored 0 while three elements hung over the edge, and `--duel-vis: 1px`, which crops every visual in the
+    // pool, passed every rail in this file. `scrollHeight` against `clientHeight` is type-agnostic and cannot
+    // drift from what the app renders.
+    // Is the `?` tick — the thing the question asks about — actually painted where it sits? `overflow: hidden`
+    // clips x as well as y, and it cut this clean off at 320px wide. Sampling the MARK rather than the widest
+    // descendant on purpose: at 320px a two-digit number line is simply wider than the phone, so the container's
+    // own outer edge runs past the viewport whatever the budget does, and asserting on that would fail for a
+    // reason this stylesheet did not cause and cannot fix.
+    const mark = wrap.querySelector('.mark');
+    const mr = mark?.getBoundingClientRect();
+    // Its CENTRE, not two pixels inside its right edge: the edge sample reads whatever overlaps the card there,
+    // which is the same on `main` as here and so is not this diff's business. The centre discriminates exactly
+    // the regression — `overflow: hidden` left it unpainted at 320px, `overflow-y: clip` paints it.
+    const markPainted = !mr || (() => {
+      const hit = document.elementFromPoint(mr.x + mr.width / 2, mr.y + mr.height / 2);
+      return !!hit && (hit === mark || hit.closest('.mark') === mark);
+    })();
     return {
       a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'),
       prompt: box('#prompt'), vis: box('#vis'), canvasA: box('#arena-a'), canvasB: box('#arena-b'),
-      // Counted here too, in the same tick, for the same reason.
-      cropped: Array.from(document.querySelectorAll('#vis .five, #vis .tenframe'))
-        .filter(r => r.getBoundingClientRect().bottom > wrap.bottom + 0.5).length,
+      // All measured here, in the same tick, for the same reason the boxes are.
+      clipY: wrap.scrollHeight - wrap.clientHeight,
+      overflowX: cs.overflowX,
+      markPainted,
     };
   }, html);
 
@@ -353,7 +400,7 @@ test.describe('Ninja Duel', () => {
     // layout unplayable — and a visual taller than the pool holds took the whole screen, leaving the arenas at 0.
     for (const vp of [{ width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {
       await resizeTo(page, vp);
-      for (const [what, html] of Object.entries(VISUALS)) {
+      for (const [what, html] of [...Object.entries(VISUALS), ['taller than anything in the pool', ABSURD] as const]) {
         const L = await dressAndMeasure(page, html);
         const where = `${vp.width}x${vp.height}, ${what}`;
         // The measured worst case is a clock question carrying the pool's longest prompt AND hint at 844x390:
@@ -378,10 +425,11 @@ test.describe('Ninja Duel', () => {
         // screen — a bound that worked by hiding the picture would fail the question instead of the layout.
         // `L.vis.h`, not `L.strip.h`: the strip clears 40px on the prompt's own line box alone, so the old form
         // would have passed with `#vis` removed from the DOM entirely and its label would have been a lie.
-        expect(L.vis.h, `${where}: the visual is scaled into the bar, not dropped out of it`).toBeGreaterThan(20);
-        // `overflow: hidden` bounds the bar, so the thing to check is that it never actually CROPS: a cropped row
-        // of objects is a wrong count, which is worse than a small one. Counted in the same tick as the boxes.
-        expect(L.cropped, `${where}: no row of the visual is cropped by the budget`).toBe(0);
+        // > 5, not > 20: a number line is a short, wide visual (14.5px sideways) and a threshold tuned to the
+        // tall ones would fail it. What this catches is the visual being gone altogether.
+        expect(L.vis.h, `${where}: the visual is scaled into the bar, not dropped out of it`).toBeGreaterThan(5);
+        // The bound applies to everything; "nothing is cut off" applies to what the pool can actually draw.
+        if (html !== ABSURD) expectNothingClipped(L, where);
         // No assertion here that the prompt and the visual share a LINE. One was written and removed: whether the
         // row fits on one line depends on text metrics, Fredoka is fetched from Google Fonts, and CI has no
         // network — so `dots` wrapped there and not locally, 46px against 42px. That is the same
@@ -438,24 +486,41 @@ test.describe('Ninja Duel', () => {
   test('portrait keeps the stacked duel as a fallback, and asks for a sideways screen (#388)', async ({ page }) => {
     await startDuel(page);
     // A rotate GATE was rejected: a tablet with its orientation locked would lose the mode outright. So portrait
-    // still plays, stacked as before — Player 2 on top, the card between, Player 1 on the bottom — and the only
-    // new thing on the card is the nudge.
-    await resizeTo(page, { width: 390, height: 844 });
-    for (const [what, html] of Object.entries(VISUALS)) {
-      const P = await dressAndMeasure(page, html);
-      expect(P.b.bottom, `${what}: Player 2 keeps the top half`).toBeLessThanOrEqual(P.strip.y + 1);
-      expect(P.strip.bottom, `${what}: Player 1 keeps the bottom half, the card between them`).toBeLessThanOrEqual(P.a.y + 1);
-      expect(Math.abs(P.a.x - P.b.x), `${what}: the halves are stacked, not side by side`).toBeLessThan(2);
-      expect(Math.abs(P.canvasA.h - P.canvasB.h), `${what}: both arenas are the same height, to the subpixel`).toBeLessThan(0.5);
-      expect(Math.abs(P.canvasA.w - P.canvasB.w), `${what}: both arenas are the same width, to the subpixel`).toBeLessThan(0.5);
-      expect(P.rotate.h, `${what}: portrait tells the players there is a better way round`).toBeGreaterThan(0);
-      // The fallback has a floor of its own. It was never measured before, so the nudge's own line came out of the
-      // arenas unnoticed (361px per half before this pull request, ~346px after) and nothing watched any further
-      // growth of the card. Portrait is the layout #388 calls too cramped already; it may not quietly get worse.
-      // 240px: the measured worst case is a portrait clock question, 251px. The floor exists because nothing
-      // measured this before, so the nudge's own line came off both arenas unnoticed (~10px each) and any further
-      // growth of the card would have gone the same way. Portrait is the fallback #388 already calls cramped.
-      expect(P.a.h, `${what}: the portrait fallback keeps a floor under each arena`).toBeGreaterThan(240);
+    // still plays, stacked as before — Player 2 on top, the card between, Player 1 on the bottom.
+    //
+    // Three portrait sizes, not one. The first version of this test ran at 390x844 alone, which is the ONE
+    // portrait width where `--slot` is 28px and nothing clips: `clamp(22px, min(7.2vw, 5vh), 40px)` reaches its
+    // 40px maximum past ~556px wide, so twelve stars are 152px on every tablet in portrait and the old 132px
+    // budget cut the bottom row in half there. 320px is the other end — narrow enough that a number line
+    // overflows the card, which is the horizontal clip. No project in `playwright.config.ts` runs this file at
+    // either size (`tablet` is `testMatch: /viewport\.spec\.ts/`), so the fixtures were unreachable by
+    // construction and the rail could not have failed however wrong the CSS was.
+    for (const vp of [{ width: 390, height: 844 }, { width: 800, height: 1280 }, { width: 320, height: 568 }]) {
+      await resizeTo(page, vp);
+      for (const [what, html] of [...Object.entries(VISUALS), ['taller than anything in the pool', ABSURD] as const]) {
+        const P = await dressAndMeasure(page, html);
+        const where = `${vp.width}x${vp.height}, ${what}`;
+        expect(P.b.bottom, `${where}: Player 2 keeps the top half`).toBeLessThanOrEqual(P.strip.y + 1);
+        expect(P.strip.bottom, `${where}: Player 1 keeps the bottom half, the card between them`).toBeLessThanOrEqual(P.a.y + 1);
+        expect(Math.abs(P.a.x - P.b.x), `${where}: the halves are stacked, not side by side`).toBeLessThan(2);
+        expect(P.rotate.h, `${where}: portrait tells the players there is a better way round`).toBeGreaterThan(0);
+        expect(Math.abs(P.canvasA.h - P.canvasB.h), `${where}: both arenas are the same height, to the subpixel`).toBeLessThan(0.5);
+        expect(Math.abs(P.canvasA.w - P.canvasB.w), `${where}: both arenas are the same width, to the subpixel`).toBeLessThan(0.5);
+        // Asserted here, not merely measured. The previous version computed a crop count in portrait and then
+        // never looked at it, which is how a budget that cut every tablet's counting card shipped green.
+        if (html !== ABSURD) expectNothingClipped(P, where);
+      }
+      // The fallback's floor, once per viewport on the tallest card the pool can draw.
+      //
+      // 24%, measured rather than chosen, and it is a LOW bar on purpose. On the twelve-star card each arena is
+      // 144px at 320x568, 180px at 360x640, 268.9px at 390x844 and 467.8px at 800x1280 — and on `main` the same
+      // card gives 142.5 / 178.5 / 267.4 / 461.3, so this branch is ahead at every one of them: floating the
+      // toast gives back more than the nudge line costs. Portrait on a small phone is cramped on `main` too,
+      // which is exactly why #388 calls this layout the fallback and not the design. So the floor is set to catch
+      // the card GROWING — the failure this pull request could plausibly cause — not to assert that a 320px phone
+      // in portrait is a good place to duel, which it is not.
+      const P = await dressAndMeasure(page, VISUALS['twelve objects to count (three rows)']);
+      expect(P.a.h, `${vp.width}x${vp.height}: the portrait fallback keeps a floor under each arena`).toBeGreaterThan(vp.height * 0.24);
     }
   });
 

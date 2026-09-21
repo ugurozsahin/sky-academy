@@ -422,8 +422,18 @@ img { -webkit-user-drag: none; }
    clears everything in the pool untouched; `overflow: hidden` is the backstop for anything taller, clipping being
    far better than what it replaces: an unbounded visual took the whole screen and left the arenas 11px tall.
    `tests/e2e/duel.spec.ts` pins this against every fixed-size visual AND a deliberately absurd one. */
-.duel-q { --duel-vis: 132px; }
-.duel-q .vis-wrap { max-height: var(--duel-vis); overflow: hidden; }
+.duel-q { --duel-vis: 160px; }
+/* `overflow-y: clip`, never `overflow: hidden` — it bounds the axis that needs bounding and leaves the other
+   alone. `hidden` clips BOTH axes, and each loss landed on the answer: sideways-on it cut the `?` clean off a
+   number line at 320px wide (24px of it, 4px at 360px) where the prompt is "Which number is hidden?", and it is
+   `hidden` on x that did it — on `main` the line simply spilled past the card and stayed readable. With `clip`,
+   `overflow-x: visible` survives beside it; beside `hidden` it would compute to `auto` and make a scroll
+   container, which is worse again. 160px, not 132px: `--slot` reaches its 40px maximum on any portrait screen
+   past ~556px wide, so twelve stars are 152px there and 132px cut the bottom row in half — on every tablet in
+   portrait, for `y2-fractions`, whose prompt is `1/4 of 12 = ?` and whose hint is "count the stars". Count what
+   was drawn and you get 10. That is the wrong-count failure this budget exists to prevent, introduced by the
+   budget itself. */
+.duel-q .vis-wrap { max-height: var(--duel-vis); overflow-y: clip; }
 /* #388: side by side, question across the top. `--arena-w` now caps the PAIR, not each half: with the cap on
    the half, a screen wider than two arenas leaves both of them at the outer edges and the card stranded over
    the gap between them. Capping the grid keeps the divider under the centre of the card at every width. */
