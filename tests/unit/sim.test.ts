@@ -978,3 +978,111 @@ describe('a pointer that did not go down on this canvas cannot end its stroke (#
     expect(sim.take('hits')).toEqual([]);
   });
 });
+
+// #331: `onMove` returned early while `paused || frozen` WITHOUT updating `lastPt`, so the point a finger was
+// at when the freeze began survived the freeze. A wave ending is `reveal()` → `clearWave()` → `spawnWave()`,
+// and the first move after it hit-tested the segment from that stale point to the current one — a line drawn
+// across the whole of the NEXT wave, the correct answer among it. Pre-existing on `main`; Ninja Duel is where
+// it decides the round, because the player who has just lost is the one still holding the glass.
+describe('a stroke held through a freeze does not draw a line through time (#331)', () => {
+  /** A wave of four, launched and pinned in a row at mid-height so a swipe crosses a known lane. */
+  function pinnedRow(s: Sim) {
+    s.spawn({ labels: ['1', '2', '3', '4'], speed: 1 });
+    advanceUntil(s, () => s.live().length === 4, 'the wave never fully launched');
+    for (const b of s.arena.bubbles) { b.vx = 0; b.vy = 0; b.g = 0; b.y = s.arena.H * 0.5; }
+    s.frame();
+    return s.live();
+  }
+
+  it('a finger that never lifts across a wave end slices nothing of the next wave', () => {
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: 2, y: lane, pointerId: 1 });     // down in the empty left margin, on the row's lane
+    expect(sim.take('hits'), 'the finger went down on nothing').toEqual([]);
+
+    sim.arena.reveal({ good: row[0].label });                        // the question is answered: the wave freezes
+    sim.pointer('pointermove', { x: 40, y: lane, pointerId: 1 });    // the finger drifts while everything is held
+    sim.take('hits');
+    sim.arena.clearWave();                                           // wave over, arena unfreezes
+    const next = pinnedRow(sim);
+
+    sim.pointer('pointermove', { x: sim.arena.W - 2, y: lane, pointerId: 1 });   // one twitch, right across the arena
+    expect(sim.take('hits'), 'the twitch sliced the next wave from a point the finger left a wave ago')
+      .toEqual([]);
+    expect(sim.live().length, 'the next wave is still up, unsliced').toBe(next.length);
+  });
+
+  it('a finger perfectly still through the hold, sending no move at all, is caught too', () => {
+    // The case the early return in `onMove` cannot see: no pointermove arrives during the freeze, so the only
+    // thing that observes it is the frame loop. Real holds last over a second, so frames are what actually
+    // happen; a finger resting on the glass is the commonest way this bug is met.
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: 2, y: lane, pointerId: 1 });
+    sim.take('hits');
+    sim.arena.reveal({ good: row[0].label });
+    sim.advance(1300);                                               // the outcome hold, and not one pointer event in it
+    sim.arena.clearWave();
+    pinnedRow(sim);
+    sim.pointer('pointermove', { x: sim.arena.W - 2, y: lane, pointerId: 1 });
+    expect(sim.take('hits'), 'the still finger\'s first twitch sliced the next wave').toEqual([]);
+  });
+
+  it('the same is true of a pause: the finger keeps its stroke, not its old position', () => {
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: 2, y: lane, pointerId: 1 });
+    sim.take('hits');
+    sim.arena.paused = true;
+    sim.pointer('pointermove', { x: 40, y: lane, pointerId: 1 });    // drifts behind the pause overlay
+    sim.arena.paused = false;
+    sim.pointer('pointermove', { x: sim.arena.W - 2, y: lane, pointerId: 1 });
+    expect(sim.take('hits'), 'a pause is not a licence to slice the row').toEqual([]);
+  });
+
+  it('a stroke that starts after the freeze keeps its first segment', () => {
+    // The other way the fix could be wrong: staleness belongs to the stroke that spanned the freeze, not to
+    // the arena. A child who lifts during the outcome hold and swipes afresh at the new wave has drawn no
+    // line through time, and must not be charged one — without the reset in `onDown` their opening segment
+    // is swallowed, which is the fix quietly eating a real slice.
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: 2, y: lane, pointerId: 1 });
+    sim.take('hits');
+    sim.arena.reveal({ good: row[0].label });
+    sim.advance(1300);
+    sim.pointer('pointerup', { x: 2, y: lane, pointerId: 1 });       // the finger lifts during the hold
+    sim.arena.clearWave();
+    const next = pinnedRow(sim);
+    const b = next.reduce((r, x) => (x.x < r.x ? x : r), next[0]);   // the leftmost bubble of the new row
+
+    sim.pointer('pointerdown', { x: b.x, y: b.y - b.r - 30, pointerId: 2 });   // a fresh stroke, starting clear of the row
+    expect(sim.take('hits'), 'the new stroke went down on nothing').toEqual([]);
+    sim.pointer('pointermove', { x: b.x, y: b.y + b.r + 20, pointerId: 2 });   // straight down through b alone
+    expect(sim.take('hits'), 'a fresh stroke\'s first segment still slices').toEqual([{ label: b.label, viaSwipe: true }]);
+  });
+
+  it('the stroke itself survives: the next real swipe still slices', () => {
+    // The fix must not end the stroke — a child who holds the glass through the outcome hold and then swipes
+    // properly is still playing. Only the segment spanning the freeze is dropped.
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: 2, y: lane, pointerId: 1 });
+    sim.arena.reveal({ good: row[0].label });
+    sim.pointer('pointermove', { x: 40, y: lane, pointerId: 1 });
+    sim.arena.clearWave();
+    const next = pinnedRow(sim);
+    const b = next.reduce((r, x) => (x.x < r.x ? x : r), next[0]);   // the leftmost bubble of the new row
+    sim.take('hits');
+
+    sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 1 });   // move up into the clear lane: no hit
+    expect(sim.take('hits'), 'the lane above the row is empty').toEqual([]);
+    sim.pointer('pointermove', { x: b.x, y: b.y + b.r + 20, pointerId: 1 });   // then straight down through b alone
+    expect(sim.take('hits'), 'a swipe drawn after the freeze still counts').toEqual([{ label: b.label, viaSwipe: true }]);
+  });
+});
