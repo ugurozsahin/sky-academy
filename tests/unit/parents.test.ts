@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '../../src/game/parents';
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
-import { SAVE_VERSION, STICKER_IDS, type SaveData, type TopicProgress } from '../../src/storage';
+import { SAVE_VERSION, STICKER_IDS, type ProfileCard, type SaveData, type TopicProgress } from '../../src/storage';
+import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS } from '../../src/ui/parents';
 import { freshDojo } from '../../src/game/dojo';
 
 const base: SaveData = {
   v: SAVE_VERSION, name: 'Test', avatar: 'kai', year: 'year1', sound: true, speech: true, voice: 'unknown',
   progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, certs: [],
-  coins: 0, spent: 0, owned: [], equipped: {}, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), onboarded: true,
+  coins: 0, spent: 0, owned: [], equipped: {}, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), onboarded: true, duels: [],
 };
 const p = (stars: number, plays: number, hits?: number, tries?: number): TopicProgress => ({ stars, best: 0, plays, hits, tries });
 // small deterministic rng
@@ -127,5 +128,51 @@ describe('parent dashboard summary', () => {
     expect(pct(0.725)).toBe(73);
     expect(pct(1)).toBe(100);
     expect(pct(0)).toBe(0);
+  });
+});
+
+/**
+ * #20 slice 3 — the two rules the grown-ups list is built on that a screenshot could not tell you: which rows
+ * offer a rename, and that every refusal the store can return has a sentence to show for it.
+ */
+describe('ninjas on this device (#20 slice 3)', () => {
+  const card = (over: Partial<ProfileCard> = {}): ProfileCard => ({ id: 'p1', name: '', avatar: null, onboarded: false, future: false, ...over });
+
+  it('offers a rename exactly when there is a save behind the row', () => {
+    expect(canRenameCard(card()), 'a slot ＋ created and nothing ever played').toBe(false);
+    expect(canRenameCard(card({ onboarded: true })), 'played').toBe(true);
+    expect(canRenameCard(card({ avatar: 'volt' })), 'mid-wizard: a ninja chosen, no name yet').toBe(true);
+    expect(canRenameCard(card({ name: 'Ada' })), 'a name and no ninja is still a save').toBe(true);
+    expect(canRenameCard(card({ name: '   ' })), 'spaces are not a name').toBe(false);
+    // The arm the rail's "exactly when" was claiming and never feeding (#420 review round 2, note 2): a save
+    // this build cannot read has a name, and it is not one a rename may touch.
+    expect(canRenameCard(card({ onboarded: true, future: true })), 'a newer build wrote it, so there is nothing to change here').toBe(false);
+    expect(canRenameCard(card({ name: 'Bo', avatar: 'blaze', future: true })), 'name and ninja notwithstanding').toBe(false);
+  });
+
+  /**
+   * `canRemoveCard`'s two exclusions, which had no unit test while `canRenameCard`'s did (#420 review round 2,
+   * note 1) — both were held only by the mobile e2e, and inverting either was green on the unit suite.
+   */
+  it('offers Remove for every ninja except the last one, and except a save a newer build wrote', () => {
+    expect(canRemoveCard(card({ onboarded: true }), false), 'one of several').toBe(true);
+    expect(canRemoveCard(card({ onboarded: true }), true), 'the only one — that is "Start again"').toBe(false);
+    expect(canRemoveCard(card({ future: true }), false), '99 coins this build cannot read are behind it').toBe(false);
+    expect(canRemoveCard(card(), false), 'an unplayed slot is removable: it is the only way the family gets it back').toBe(true);
+  });
+
+  /**
+   * The maps are `Record`s over the refusal unions, so a new refusal is a type error rather than a blank
+   * status line — but nothing stops an entry being added as `''`, and an empty `role="status"` is exactly the
+   * silence the values exist to prevent. These are `renameProfile`'s and `deleteProfile`'s own unions,
+   * re-stated here so a refusal that loses its sentence fails a test instead of a review.
+   */
+  it('has a sentence for every refusal the store can return, and names the safer route out of the last one', () => {
+    for (const [why, text] of [...Object.entries(RENAME_HINTS), ...Object.entries(DELETE_HINTS)])
+      expect(text.trim().length, why).toBeGreaterThan(10);
+    // The refusal that has to teach a grown-up what to do instead: `deleteProfile` sends the only profile to
+    // "Start again", which is the control that asks for the typed word.
+    expect(DELETE_HINTS.last).toContain('Start again');
+    expect(DELETE_HINTS.last).toContain('RESET');
   });
 });

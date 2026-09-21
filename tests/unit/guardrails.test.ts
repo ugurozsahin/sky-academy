@@ -227,7 +227,7 @@ describe('guard rails', () => {
   it('the profile picker is a launch screen, gated on more than one profile (#20 slice 2)', () => {
     const main = code(SOURCES['/src/main.ts']);
     const from = main.indexOf('profiles: () =>'), to = main.indexOf('\n  up,', from);
-    const drawFrom = main.indexOf('const goProfiles = () => {'), drawTo = main.indexOf('\n};', drawFrom);
+    const drawFrom = main.indexOf('const goProfiles = ('), drawTo = main.indexOf('\n};', drawFrom);
     expect({ route: from >= 0 && to > from, draws: drawFrom >= 0 && drawTo > drawFrom })
       .toEqual({ route: true, draws: true });   // a rename empties the slice below, so fail here instead
     expect(main.slice(from, to) + main.slice(drawFrom, drawTo), 'neither the route nor the function that draws the picker pushes a history entry')
@@ -292,17 +292,30 @@ describe('guard rails', () => {
   // single way in whose mode is *derived* is what this holds now.
   it('the picker is reached at the root of the history stack, from wherever it was opened (#20 slice 2)', () => {
     const main = code(SOURCES['/src/main.ts']);
-    const drawFrom = main.indexOf('const goProfiles = () => {'), drawTo = main.indexOf('\n};', drawFrom);
+    const drawFrom = main.indexOf('const goProfiles = ('), drawTo = main.indexOf('\n};', drawFrom);
     const go = main.slice(drawFrom, drawTo);
     expect(go, 'a stacked entry is popped before the picker is drawn')
-      .toMatch(/if \(history\.state\?\.screen\) \{ pendingProfiles = true; history\.back\(\); return; \}/);
-    expect(main, 'and the pop lands back in the one way in, so a deeper stack keeps unwinding')
-      .toMatch(/if \(pendingProfiles\) \{ pendingProfiles = false; goProfiles\(\); return; \}/);
+      .toMatch(/if \(history\.state\?\.screen\) \{ pendingProfiles = \{ root \}; history\.back\(\); return; \}/);
+    // **And the kind of picker survives the pop** (#420 review B1). `pendingProfiles` was a bare boolean, so a
+    // launch that had to unwind a stacked entry came back through this line having forgotten it was a launch,
+    // and the far side re-derived `back` from `screenDrawn()` — which is `true` on every route that unwinds.
+    // The intent has to travel with the flag, and the pop has to hand it back.
+    expect(main, 'and the pop lands back in the one way in, carrying which kind of picker it was')
+      .toMatch(/if \(pendingProfiles\) \{ const \{ root \} = pendingProfiles; pendingProfiles = null; goProfiles\(root\); return; \}/);
     expect(main, 'boot takes that same way in, so a reload cannot draw the launch picker on a stacked entry')
-      .toMatch(/length > 1\) goProfiles\(\);/);
+      .toMatch(/length > 1\) goProfiles\(true\);/);
     expect(main.match(/profilesScreen\(/g) ?? [], 'which is the one place the picker is drawn').toHaveLength(1);
-    expect(go, 'and launch-or-back is read off what is on the page, never passed in by the caller')
-      .toMatch(/screenDrawn\(\) \? \(\) => nav\.map\(\) : undefined/);
+    // Launch-or-back is still derived from the page, with one explicit override: a caller that *knows* the
+    // screen behind it is drawn from a save that no longer exists. `root ||` is that override and nothing else
+    // may add another, which is why the whole expression is pinned rather than just `screenDrawn()`.
+    expect(go, 'and launch-or-back is the page, plus an explicit root the caller can assert')
+      .toMatch(/const back = root \|\| !screenDrawn\(\) \? undefined : \(\) => nav\.map\(\);/);
+    // The two callers that must assert it, and the one that must not: a removal and boot are launches, the 👥
+    // button has the sky map genuinely behind it. Mutating either `true` to `false` puts a `←` on the launch
+    // picker, which is #380 round 5 B3 and #420 B1 in one line.
+    expect(main, 'a removal relaunches into the launch picker, not one with a way past the question')
+      .toMatch(/const relaunch = \(\) => \{[\s\S]{0,600}goProfiles\(true\);/);
+    expect(main, 'and the 👥 button asks for the one with a way back').toMatch(/profiles: \(\) => goProfiles\(\),/);
   });
 
   // #380 review B3: `profileCard` deliberately does not run the migrations, but `onboarded` only exists from
@@ -338,8 +351,16 @@ describe('guard rails', () => {
   it('a card is blank for a save load() would refuse, not a name the tap cannot deliver (#20 slice 2)', () => {
     const store = code(SOURCES['/src/storage.ts']);
     const card = store.slice(store.indexOf('export function profileCard('), store.indexOf('\n}', store.indexOf('export function profileCard(')));
-    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) return blank;/);
+    // The card still answers blank for every blob `migrate()` refuses — it now also says *which* refusal, so a
+    // screen can stop claiming "this ninja has not played" about bytes it could not read (#420 review B2). The
+    // gate is unchanged; only the shape of the blank card grew.
+    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.blank, future: isFutureSave\(s\) \};/);
     expect(store.slice(store.indexOf('function migrate(')), 'and that gate is still the one load() goes through').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.DEFAULT \};/);
+    // `future` is the *narrower* question, not `!isMigratable` renamed: an unreadable `v` is deliberately not
+    // protected — `load()` resets over it and writes resume — so only a genuinely newer save refuses a delete.
+    expect(store, 'and the delete refuses on that narrower question, at one home').toMatch(/function futureSaveIn\(id: ProfileId\): boolean \{[\s\S]{0,400}isFutureSave\(parsed as RawSave\)/);
+    const del = store.slice(store.indexOf('export function deleteProfile('), store.indexOf('\n}', store.indexOf('export function deleteProfile(')));
+    expect(del, 'before the index write, so a refusal changes nothing').toMatch(/if \(futureSaveIn\(id\)\) return \{ ok: false, why: 'future' \};[\s\S]*writeIndex\(next\)/);
   });
 
   it("a sibling's card is read from the slot, never through the session's load() (#20 slice 2)", () => {
