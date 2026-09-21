@@ -733,10 +733,44 @@ export function touchStreak(now = new Date()): number {
 }
 /** Today's dojo state (rolled over to a fresh day when needed — not persisted until something is recorded). */
 export function dojoToday(now = new Date()): DojoState { return dojoFor(load().dojo, today(now)); }
-/** Feed a finished game to the Daily Dojo. Persists the state; the caller pays out `coins` (so sticker unlocks show). */
+/** Feed a finished game to the Daily Dojo. Persists the state; the caller pays out `coins` (so sticker unlocks show).
+ *
+ *  **A results screen wants `recordGameEnd()` instead** (#365): this and `addCoins()` back to back are two
+ *  writes, and the pair has no rollback. Kept for a caller that genuinely records a dojo event and pays
+ *  nothing for it. */
 export function recordDojo(e: DojoEvent, now = new Date()): DojoOutcome {
   const out = applyEvent(load().dojo, e, today(now));
   save({ dojo: out.state }); return out;
+}
+/** What a finished game settled: the dojo's own outcome, and the stickers the payout unlocked. */
+export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[] }
+/**
+ * Settle a finished game in **one** write: the Daily Dojo state, the coins it pays (the game's plus the
+ * dojo's bonus) and the stickers that unlocks (#365).
+ *
+ * Every results screen used to call `recordDojo()` and then `addCoins()`, which is two `save()`s with nothing
+ * tying them together. `save()` deliberately swallows a refused `setItem` rather than throwing (#151: a device
+ * that cannot write must not brick the game), so neither caller could tell the second write had been dropped —
+ * and the half-state it leaves is the bad one. **Coins are re-earnable; a completed challenge is not.** Write 1
+ * had already put the challenge id into `dojo.done`, and `applyEvent()` only pays `!done.includes(c.id)`, so
+ * on a day a child finished the set that is up to `CHALLENGE_BONUS * 3 + SET_BONUS` gone with no way back
+ * before the day rolls over — while the overlay, built from the in-memory numbers, cheerfully showed the coins.
+ *
+ * One `load()`, one `save()`: the store either takes the whole finished game or none of it, so the half-state
+ * is unreachable rather than merely unlikely. A refusal still leaves `writeFailed` for the grown-ups screen to
+ * report, exactly as before — this closes the *inconsistency*, not the refusal (#151 stands).
+ */
+export function recordGameEnd(e: DojoEvent, coins: number, now = new Date()): GameEndOutcome {
+  const d = load();
+  const dojo = applyEvent(d.dojo, e, today(now));
+  const total = d.coins + Math.max(0, coins + dojo.coins);
+  // The dojo's new state goes into the sticker evaluation too: an achievement that reads dojo progress must
+  // see the day this game just moved, which is what the old order gave it (`addCoins`'s `load()` ran after
+  // `recordDojo`'s `save()`) and what a single `load()` would otherwise quietly lose.
+  const unlocked = evaluateStickers({ ...d, coins: total, dojo: dojo.state });
+  const fresh = unlocked.filter(id => !d.stickers.includes(id));
+  save({ dojo: dojo.state, coins: total, stickers: unlocked });
+  return { dojo, fresh };
 }
 /** The spendable part of the save. */
 export function wallet(): Wallet { const d = load(); return { coins: d.coins, spent: d.spent || 0, owned: Array.isArray(d.owned) ? d.owned : [], equipped: d.equipped ?? {} }; }   // tolerant of hand-edited saves
