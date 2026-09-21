@@ -10,6 +10,7 @@ import type { Arena } from '../game/arena';
 import type { Tracer } from '../game/tracing';
 import type { Memory } from '../game/memory';
 import type { Duel, DuelPlayer, DuelTally } from '../game/duel';
+import type { CertText } from './certificate';
 import type { TrailSkin } from '../game/shop';
 
 /** A live bubble as the e2e spec reads it (a subset of arena `Bubble`). */
@@ -114,6 +115,10 @@ export interface DuelHooks {
   wrong(p: DuelPlayer): boolean;
   bubbles(p: DuelPlayer): BubbleView[];
   state(): DuelState;
+  /** PNG data URL of the certificate a Player 1 win earned, or null for a draw or a Player 2 win (#16 item 5). */
+  certificate(): Promise<string | null>;
+  /** The words on that certificate, read off the object actually drawn (#397 round 2, B1), or null. */
+  certWords(): CertText | null;
   setSpeed(k: number): void;
   timing(): { speed: number; hold: { won: number; draw: number } };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Session, type SessionEvents } from '../../src/game/session';
+import { Session, starsForAccuracy, type SessionEvents } from '../../src/game/session';
 import { TOPICS, YEARS, topicById, topicsFor } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -313,5 +313,39 @@ describe('the previous answer carries no signal about the next (#390)', () => {
     }
     // Five re-rolls over ~15 d1 numbers: an immediate repeat should be all but unreachable.
     expect(repeats, 'the same question asked twice running').toBeLessThan(3);
+  });
+});
+
+describe('starsForAccuracy — the one three-star bar (#397 review round 2, B2)', () => {
+  // The thresholds used to be written out here AND copied into `duelStars`, with a comment claiming that moving
+  // one would go red. It would not: the duel test asserted the copy, so both stayed green and the two scales
+  // could drift apart in silence. There is one function now, and this table is the only thing pinning it — the
+  // duel test asserts the same numbers *through* `duelStars`, which now calls this.
+  it('is inclusive at both boundaries', () => {
+    expect(starsForAccuracy(1)).toBe(3);
+    expect(starsForAccuracy(0.95)).toBe(3);      // exactly 95% — inclusive
+    expect(starsForAccuracy(0.9499)).toBe(2);
+    expect(starsForAccuracy(0.7)).toBe(2);       // exactly 70% — inclusive
+    expect(starsForAccuracy(0.6999)).toBe(1);
+    expect(starsForAccuracy(0)).toBe(1);         // never zero stars: one is the floor
+  });
+  it('is what a mission stage actually awards, not a second copy of it', () => {
+    // Drives a real stage and checks the stage star is this function applied to the stage accuracy. If
+    // `Session` ever stops calling it, this goes red — the guarantee the old comment claimed and did not have.
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(7) }, ev);
+    s.start();
+    for (let i = 0; i < Y1.perStage; i++) {
+      const q = s.current!;
+      // One wrong answer in the stage, the rest right: accuracy lands under 95%, so the star is not 3 and the
+      // assertion below is about the bar rather than about a constant.
+      if (i === 0) s.hit(q.options.find(o => o !== q.answer)!); else s.hit(q.answer);
+      s.advance();
+    }
+    expect(ev.onStageClear).toHaveBeenCalledTimes(1);
+    const [, stars, acc] = ev.onStageClear.mock.calls[0];
+    expect(stars, 'the stage star is the shared bar applied to the stage accuracy').toBe(starsForAccuracy(acc));
+    expect(acc).toBeLessThan(0.95);
+    expect(stars).toBeLessThan(3);
   });
 });

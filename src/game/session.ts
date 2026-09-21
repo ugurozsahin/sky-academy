@@ -21,6 +21,20 @@ export interface SessionEvents {
   onEnd: (r: SessionResult) => void;
 }
 export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number }
+
+/**
+ * The three-star bar, from an accuracy in 0..1 — the **one** definition (#397 review round 2, B2).
+ *
+ * It was written out here and copied into `duelStars()`, and the copy was justified by a guard that did not
+ * exist: moving these thresholds left both the copy and its test green, so the two scales could drift apart
+ * silently. That is the one outcome that must not happen, because the certificate album lists duel and mission
+ * rows together with the same three glyphs and nothing tells a child that one was rated on a different scale.
+ * One exported function is what makes the claim true — a rail could only have noticed the drift afterwards.
+ *
+ * Both boundaries are inclusive; `tests/unit/session.test.ts` pins them as a table, which is the only thing
+ * standing between these numbers and an accidental edit.
+ */
+export const starsForAccuracy = (acc: number): 1 | 2 | 3 => acc >= 0.95 ? 3 : acc >= 0.7 ? 2 : 1;
 export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number }
 
 /**
@@ -167,7 +181,7 @@ export class Session {
     this.index++;
     if (this.index >= this.perStage) {
       const acc = this.stageAttempts ? this.stageCorrect / this.stageAttempts : 0;
-      const stars = acc >= 0.95 ? 3 : acc >= 0.7 ? 2 : 1;
+      const stars = starsForAccuracy(acc);
       this.stageStars.push(stars);
       this.ev.onStageClear(this.stage, stars, acc);
       return; // UI calls nextStage()
