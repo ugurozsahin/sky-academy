@@ -53,12 +53,25 @@ export const ownerMarker = ({ body }) => {
  * an `issue_write` at all but one of the comment tools this hook also matches, and gating an ordinary comment
  * on #62 behind the pulse's body rules would be wrong.
  */
-const isHeartbeatTitle = (title) =>
-  typeof title === 'string' && norm(title).toLowerCase().startsWith(HEARTBEAT_TITLE);
+const REVIEWER_HEARTBEAT_TITLE = 'reviewer: heartbeat';
 
-const heartbeatWrite = ({ method, issue_number, title }) =>
-  (method === 'create' || method === 'update')
-  && (isHeartbeatTitle(title) || Number(issue_number) === ROUTINE_HEARTBEAT);
+/**
+ * Which pulse a write is about, or null. **Two routines, two pulses** (#327): the reviewer got one of its own
+ * because it was the only moving part nothing watched, and the two are deliberately not one issue — one body
+ * with two writers, and the developer's `- second item:` shape does not fit a routine that has no second item.
+ *
+ * So the record disciplines are split: `heartbeatAppend` below applies to **both**, because replace-never-append
+ * is the same rule for any pulse; `requiredLines` applies to the developer's alone, via `heartbeatWrite`.
+ * Matching on title is what makes that separation free — a reviewer pulse inherits nothing by construction.
+ */
+const pulseWrite = ({ method, issue_number, title }) => {
+  if (method !== 'create' && method !== 'update') return null;
+  const named = typeof title === 'string' ? norm(title).toLowerCase() : '';
+  for (const pulse of [HEARTBEAT_TITLE, REVIEWER_HEARTBEAT_TITLE]) if (named.startsWith(pulse)) return pulse;
+  return Number(issue_number) === ROUTINE_HEARTBEAT ? HEARTBEAT_TITLE : null;
+};
+
+const heartbeatWrite = (input) => pulseWrite(input) === HEARTBEAT_TITLE;
 
 /**
  * The heartbeat's body text, or null when this call is not about the heartbeat or carries no body at all.
@@ -110,9 +123,10 @@ export const requiredLines = (input) => {
 const SUMMARY_LINE = /(^|\n)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?Z — /g;
 
 export const heartbeatAppend = (input) => {
-  const body = heartbeatBody(input);
+  const pulse = pulseWrite(input);
+  const body = pulse !== null && typeof input?.body === 'string' ? input.body : null;
   return body !== null && (body.match(SUMMARY_LINE) ?? []).length > 1
-    ? `The routine heartbeat (the issue titled "${HEARTBEAT_TITLE}", #${ROUTINE_HEARTBEAT}) is overwritten each run, never appended to (#98): this body carries two or more UTC-timestamp summary lines, the signature of a new summary tacked onto the old one.`
+    ? `A run pulse (the issue titled "${pulse}") is overwritten each run, never appended to (#98): this body carries two or more UTC-timestamp summary lines, the signature of a new summary tacked onto the old one.`
     : null;
 };
 

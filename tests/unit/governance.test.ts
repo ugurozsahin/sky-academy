@@ -2774,10 +2774,10 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_422;   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
+  const ROUTINE_PROMPT_BUDGET = 21_419;   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 10_034;   // its landing size (docs/decisions/003-two-routines.md) — what moved out of the developer prompt, less what only made sense when one run did both; → 10,044: a stale sentence about edited comments (#77 re-reads them) replaced by the `loosening` hold (#112); → 10,034: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, STEP 1's empty-run clause and STEP 2's two restatements of rule 3; → 10,034 again, no net change: rule 4's pointer at the round cap (#310, 28 bytes), paid for by shortening STEP 2's §4 and rule 1's §5 pointers to the `the review-pr skill` form rule 3 already used — so the prompt now spells the skill four ways (the full path in rule 3, `the review-pr skill §N`, the same without the article, and rule 4's bare `review-pr §7`) and the full path survives exactly once, in rule 3 — which nothing pins, so it is a description of today rather than a guarantee. Tidying the short forms back to full paths would cost 28 bytes with nothing left to pay them
+  const REVIEWER_PROMPT_BUDGET = 9_998;   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (which `review-pr` §5 carries), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -3011,5 +3011,61 @@ describe('a pull that cannot fast-forward has a stated recovery, not an improvis
     expect(line, 'the bootstrap must still pull first').not.toBe('');
     expect(line, 'and state the recovery on that step, not in a check the run reads only after pulling').toContain(RECOVERY);
     expect(line, 'and keep it conditional').toMatch(/cannot fast-forward/);
+  });
+});
+
+/**
+ * #327: the reviewer routine was the only moving part nothing watched. It had no pulse at all — STEP 0 said
+ * so in as many words — so a reviewer run that died at the token limit, stalled on a prompt, or was killed
+ * mid-review left nothing behind: no commit, no comment, no trace. The developer routine's #314 stamp is its
+ * own; the watchdog had nothing to read for this one.
+ *
+ * The fix is three files agreeing, and the rails below are one per file, because any one of them alone leaves
+ * the pulse either unwritten or unread. #320 rides along in the same rule 4 the reviewer prompt already had.
+ *
+ * Prove one red: drop the pulse sentence from STEP 1; drop the reviewer paragraph from the watchdog's check
+ * 3; or put the `loosening` clause back to "held the same way".
+ */
+describe('the reviewer routine keeps a pulse, and something reads it (#327, #320)', () => {
+  const doc = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
+  const flat = (s: string) => s.replace(/\s+/g, ' ');
+  const PULSE = 'reviewer: heartbeat';
+
+  it('the reviewer prompt tells a run to write the pulse, on both paths', () => {
+    const p = flat(doc('docs/REVIEWER-PROMPT.md'));
+    expect(p, 'the pulse must be named by title, which is how the hook and the watchdog find it').toContain(PULSE);
+    expect(p, 'the working path stamps on the way in (#314\'s shape, applied here)').toContain('IN PROGRESS');
+    expect(p, 'and the cheap exit writes one too, or an idle reviewer is indistinguishable from a dead one')
+      .toContain('nothing waiting');
+    expect(p, 'a stamp is not a pass: the finished snapshot must replace it as the last thing a run does')
+      .toMatch(/very last thing you do/);
+    expect(p, 'replace, never append — the same record discipline as the developer pulse (#98)')
+      .toMatch(/replace rather than append|Replace, never append/i);
+    // STEP 0 used to say the opposite in as many words, and a run reading it would write nothing at all.
+    expect(p, 'STEP 0 must no longer claim this routine has no heartbeat').not.toContain('This routine has no heartbeat issue');
+    expect(p, 'and it must record a limit stop in the pulse, which is the run most likely to vanish')
+      .toContain('stopped: limit');
+  });
+
+  it('the watchdog reads it, with the reviewer cadence and the two differences named', () => {
+    const w = flat(doc('docs/WATCHDOG-PROMPT.md'));
+    expect(w, 'the watchdog must read the reviewer pulse by title, or the write has no reader').toContain(PULSE);
+    expect(w, 'and take the cadence from the reviewer trigger, not the developer one').toContain('17 * * * *');
+    expect(w, '`nothing waiting` is healthy — read as a dead run it would produce a finding every idle hour')
+      .toMatch(/nothing waiting.{0,120}(healthy|cheap exit)/i);
+    expect(w, 'and the developer-only lines must not be demanded of a reviewer pulse')
+      .toMatch(/- second item:.{0,200}not a finding/i);
+  });
+
+  // #320: rule 4 said a `loosening` PR is "held the same way" as `owner-approval` — true up to approval and
+  // false at the merge, which is the one step rule 4 governs. In session on 2026-09-19 that wording produced
+  // two wrong statements about PR #306 and PR #315; nothing broke only because the owner merged #306 himself.
+  it('rule 4 says a `loosening` PR stays the owner\'s to merge even after he approves', () => {
+    const rule4 = doc('docs/REVIEWER-PROMPT.md').split('\n').find((l) => l.startsWith('4. **It is labelled `owner-approval`')) ?? '';
+    expect(rule4, 'rule 4 must still be the merge-blocking rule this clause belongs to').toContain('loosening');
+    expect(rule4, 'the part that differs from `owner-approval` is what a run gets wrong')
+      .toMatch(/never merges one|owner's to merge/i);
+    expect(flat(rule4), 'and "held the same way" alone is the wording that misled twice')
+      .not.toMatch(/labelled `loosening` is held the same way \(#112; `review-pr` skill §5\)\./);
   });
 });
