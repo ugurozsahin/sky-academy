@@ -3017,13 +3017,32 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   const EXPECTED_KEYS = (name: string) => ['name', 'description', ...(EXTRA_KEYS[name] ?? [])].sort();
   /**
    * Vendored upstream text that carries ` #` inside a plain scalar (`Please review PR #1234`): the loader's
-   * repair pass double-quotes that line — because the same value also carries `: `, which is asserted beside
-   * the token — so it loads in full; without the repair a YAML parser would cut it there — an upstream matter,
-   * not this repository's. The exemption is that one token, not the file: the token is asserted present (so
-   * the entry fails loudly when upstream drops it) and stripped, and the rest of the description is held to
-   * the same ` #` check as every other.
+   * repair pass double-quotes that line — because the same value also carries `: ` *ahead of* the token, which
+   * is asserted beside it — so it loads in full; without the repair a YAML parser would cut it there — an
+   * upstream matter, not this repository's. The exemption is that one token, not the file: the token is
+   * asserted present (so the entry fails loudly when upstream drops it) and stripped, and the rest of the
+   * description is held to the same ` #` check as every other.
    */
   const HASH_IN_UPSTREAM_TEXT: Record<string, string> = { 'silent-failure-hunter': 'PR #1234' };
+  /**
+   * Does the loader's repair pass run for this value (#312)?
+   *
+   * It runs only when the *plain* YAML parse throws, and what makes it throw is a `: ` inside a plain scalar.
+   * A ` #` opens a comment, so a plain parse that meets the `#` first succeeds on the text up to it and never
+   * throws: the repair pass never runs, and every word after the `#` is silently dropped. Presence of `: `
+   * anywhere in the value is therefore not the precondition the exemption rests on — a `: ` *before* the
+   * comment is, and that is an ordering question.
+   *
+   * The distinction is not academic. Moving the sole `PR #1234` earlier in `silent-failure-hunter.md` — one
+   * occurrence, anchored pin prefix intact, exactly the shape an upstream re-vendor produces — truncated the
+   * real loader's description to sixteen words with this whole file green, because the old assertion asked
+   * only whether a `: ` was present somewhere.
+   */
+  const repairPassRuns = (value: string) => {
+    const comment = value.search(/(^|\s)#/);
+    const colon = value.indexOf(': ');
+    return colon >= 0 && (comment < 0 || colon < comment);
+  };
   /**
    * NUL and CR, from code points so no editor can turn the escape into the character. Asserted on the
    * frontmatter block, never the whole file (round 7): a body line ending `\r\n`, which Windows editors and
@@ -3041,19 +3060,24 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     expect(front!, `${file}: "---" inside the frontmatter — the loader's splitter ends the block at the first one wherever it sits, and everything after it is gone (#150)`)
       .not.toMatch(/---/);
     const lines = front!.split('\n');
-    expect(lines.filter((l) => TOP_LEVEL_KEY.test(l)).map((l) => TOP_LEVEL_KEY.exec(l)![1]).sort(), `${file}: a frontmatter key outside the expected set — the loader acts on keys no description check reads, and "disable-model-invocation" or a never-matching "paths" switches the skill off (#150)`)
-      .toEqual(EXPECTED_KEYS(name));
-    expect(front!, `${file}: "name:" must be the file's own name — an agent is registered under it, and a skill under its directory (#150)`)
-      .toMatch(new RegExp(`^name:[ \\t]+${name}[ \\t]*$`, 'm'));
+    // Ahead of the key-set check on purpose (#312): a file whose description has simply been deleted fails
+    // the key set first, and is then explained by the wrong message — "a frontmatter key outside the expected
+    // set … `disable-model-invocation` switches the skill off" — when what happened is that the one line
+    // reaching every turn's context is gone. Counting the description keys first lets that branch speak.
     const descriptionKeys = lines.filter((l) => DESCRIPTION_KEY.test(l)).length;
     expect(descriptionKeys, descriptionKeys === 0
       ? `${file} needs a description — it is the only line that reaches every turn's context`
       : `${file}: exactly one description key, in any spelling a loader accepts — the rail reads the first, a loader reads the last or refuses the file (#150)`)
       .toBe(1);
+    expect(lines.filter((l) => TOP_LEVEL_KEY.test(l)).map((l) => TOP_LEVEL_KEY.exec(l)![1]).sort(), `${file}: a frontmatter key outside the expected set — the loader acts on keys no description check reads, and "disable-model-invocation" or a never-matching "paths" switches the skill off (#150)`)
+      .toEqual(EXPECTED_KEYS(name));
+    expect(front!, `${file}: "name:" must be the file's own name — an agent is registered under it, and a skill under its directory (#150)`)
+      .toMatch(new RegExp(`^name:[ \\t]+${name}[ \\t]*$`, 'm'));
     expect(front!, `${file}: the one description key is the literal "description:" followed by whitespace on the same line — "description:Open …" loses its trigger clause in the loader (#150)`)
       .toMatch(/^description:[ \t]+\S/m);
-    expect(description, `${file} needs a description — it is the only line that reaches every turn's context`)
-      .not.toBeNull();
+    // No `description !== null` check here (#312): the assertion above is `frontmatter()`'s own capture in a
+    // weaker spelling, so once it passes the capture has matched and the check could never fire. The call
+    // sites that read a description WITHOUT that assertion in front of them keep theirs.
     expect(description!, 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
     expect(front!, `${file}: the description continues onto an indented line, blank lines or not — one physical line, so the line a reader sees is the whole trigger (#150)`)
       .not.toMatch(new RegExp(`^description:[^\\n]*${CONTINUATION}`, 'm'));
@@ -3066,7 +3090,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     const upstreamToken = HASH_IN_UPSTREAM_TEXT[name];
     if (upstreamToken) {
       expect(description!, `${file} no longer carries "${upstreamToken}" — drop its HASH_IN_UPSTREAM_TEXT entry`).toContain(upstreamToken);
-      expect(description!, `${file}: "${upstreamToken}" loads only because the same value carries ": ", which makes the loader's repair pass quote the line — that precondition is gone`).toMatch(/: /);
+      expect(repairPassRuns(description!), `${file}: "${upstreamToken}" loads only because a ": " appears BEFORE it, which makes the loader's repair pass quote the line — the "#" now comes first, so the plain parse succeeds on the truncated text and everything after it is silently dropped (#312)`).toBe(true);
     }
     expect(upstreamToken ? description!.replace(upstreamToken, '') : description!, `${file}: " #" ends the description for a YAML loader — everything after it never reaches a turn's context (#150)`)
       .not.toMatch(/(^|\s)#/);
@@ -3152,8 +3176,16 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   it('every skill and agent in the allow-list has a description pin, and nothing else does (#150)', () => {
     const names = FRONTMATTER_FILES.map(([n]) => n).sort();
     expect(Object.keys(DESCRIPTIONS).sort(), 'add the pin in the same pull request as the skill').toEqual(names);
-    expect(PROJECT_SKILLS, 'the project-written set — it must include the two body-railed skills')
-      .toEqual(expect.arrayContaining(['open-pr', 'add-guard-rail']));
+    // The project-written skills, held to the rule the DESCRIPTIONS docstring states in prose: their pin
+    // carries the trigger clause itself, not only the subject (#312). This used to assert that PROJECT_SKILLS
+    // contained `open-pr` and `add-guard-rail`, which is a restatement of the object literal two hundred lines
+    // above — it could not fail, and `PROJECT_SKILLS` was read nowhere else. A vendored file's description is
+    // upstream's sentence and is pinned as it stands; these six are ours, so "Use when"/"Use before" is a rule
+    // we can actually keep.
+    expect(PROJECT_SKILLS.length, 'the project-written set must not be empty — every skill reading as vendored means the allow-list lost its `null` markers').toBeGreaterThan(0);
+    for (const n of PROJECT_SKILLS)
+      expect(DESCRIPTIONS[n].source, `${n} is project-written: its pin must hold the trigger clause ("Use when …"/"Use before …"), not only the subject — the clause is what decides whether the skill loads for the run that needs it (#150)`)
+        .toMatch(/Use (when|before)/);
     // No per-file map may hold a dead key: a file that is no longer in the allow-list.
     expect(names, 'HASH_IN_UPSTREAM_TEXT names a file the allow-list does not').toEqual(expect.arrayContaining(Object.keys(HASH_IN_UPSTREAM_TEXT)));
     expect(names, 'NEGATION_EXEMPT names a file the allow-list does not').toEqual(expect.arrayContaining(Object.keys(NEGATION_EXEMPT)));
@@ -3161,9 +3193,40 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     // Each negation exemption is for a phrase; if upstream drops it, the exemption fails loudly rather than going stale.
     for (const [name, phrase] of Object.entries(NEGATION_EXEMPT)) {
       const [, file] = FRONTMATTER_FILES.find(([n]) => n === name)!;
-      expect(frontmatter(file).description, `${name} is exempt from the negation check for its ${phrase} — drop its NEGATION_EXEMPT entry when that text is gone`)
+      const { description } = frontmatter(file);
+      // Guarded first (#312): vitest's `expect(null, 'msg').toMatch(re)` throws "`.toMatch()` expects to
+      // receive a string, but got object" and DISCARDS the custom message, so a file that lost its
+      // description failed here loudly but anonymously — naming neither the file nor the reason.
+      expect(description, `${file} has no description line to read — its NEGATION_EXEMPT entry cannot be checked`).not.toBeNull();
+      expect(description!, `${name} is exempt from the negation check for its ${phrase} — drop its NEGATION_EXEMPT entry when that text is gone`)
         .toMatch(phrase);
     }
+  });
+
+  it('the ` #` exemption reads ordering, not presence: a "#" ahead of the first ": " is not exempt (#312)', () => {
+    // The live shape — a `: ` well ahead of the upstream token. The plain parse throws on the colon, the
+    // repair pass double-quotes the line, and the whole description reaches the turn's context.
+    expect(repairPassRuns('Use this agent when reviewing code changes in a pull request: see PR #1234 for the shape')).toBe(true);
+    // #312's reproduction: the same single token moved ahead of the first `: `, with the anchored pin prefix
+    // intact — the shape an upstream re-vendor produces. The plain parse succeeds on "… (see PR", the repair
+    // never runs, and every trigger clause after the `#` is gone. This is the case the old `toMatch(/: /)`
+    // assertion called exempt, with the whole file green.
+    const reproduction = 'Use this agent when reviewing a pull request (see PR #1234) to identify: silent failures';
+    expect(repairPassRuns(reproduction)).toBe(false);
+    // And the old assertion written out, so the difference is pinned rather than remembered: `toMatch(/: /)`
+    // is satisfied by that same string. This is the whole of #312 — the check was green on the one input it
+    // existed to refuse, and a run could only find out by driving the real loader.
+    expect(/: /.test(reproduction), 'the retired presence check called the reproduction exempt').toBe(true);
+    // No `: ` at all: nothing can make the plain parse throw, so the `#` is read as a comment and the rest is
+    // dropped — exempt on the old check the moment upstream reworded around its colon.
+    expect(repairPassRuns('Use this agent when reviewing changes for PR #1234')).toBe(false);
+    // A `#` that opens no comment, because no whitespace precedes it: the same reading as the ` #` check the
+    // exemption is carved out of, so the two cannot disagree about where a value ends.
+    expect(repairPassRuns('Use this agent on issue#5 when a diff: needs review')).toBe(true);
+    // The value the exemption is actually consulted for, read from the file rather than written out here, so
+    // this self-test fails with the rail if upstream reorders it rather than passing on a stand-in.
+    const [, file] = FRONTMATTER_FILES.find(([n]) => n === 'silent-failure-hunter')!;
+    expect(repairPassRuns(frontmatter(file).description!)).toBe(true);
   });
 
   it.each(FRONTMATTER_FILES)('%s\'s description still names the job it triggers on (#150)', (name, file) => {
