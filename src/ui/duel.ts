@@ -6,13 +6,14 @@
 // nothing, best of DUEL_ROUNDS — and this file only wires two `Arena`s, the strip, the match-end overlay and
 // the `window.__sna` hooks the e2e drives it through. A finished match pays coins into the one shared save
 // (item 5's coins and stickers), tells the Daily Dojo what the device answered and teaches Sensei what Player 1
-// found hard on this topic; certificates and a duel history are still deferred on the issue.
+// found hard on this topic and files a certificate when Player 1 wins; a duel history is still deferred.
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
-import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelHeadline, duelPool, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
+import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { addCoins, load, recordAccuracy, recordDojo } from '../storage';
+import { addCoins, load, recordAccuracy, recordCert, recordDojo } from '../storage';
+import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { hintText, promptHTML, promptMode } from './hud';
@@ -72,6 +73,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   let dojoPaid = 0;
   /** What the finished match taught Sensei about this topic — rounds answered, not slices; 0/0 until it ends. */
   let taught: DuelTally = { hits: 0, tries: 0 };
+  /** The certificate a Player 1 win earned, or null — the other two outcomes earn none (#16 item 5). */
+  let cert: CertInfo | null = null;
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
 
@@ -165,6 +168,15 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     const dojo = recordDojo(duelDojoEvent(r, topic.subject));
     dojoPaid = dojo.coins;
     const fresh = addCoins(paid + dojoPaid);
+    cert = duelCert(r);
+    // #205's rule, unchanged here: filed the moment the overlay is built, never from the 🎓 button, because the
+    // bug that issue opened with is a device where pressing the button does nothing at all.
+    //
+    // Built **from** the drawn `CertInfo` rather than beside it (#16 review, B1): the field list was hand-copied,
+    // so `duel: true` had two independent writers and deleting the one that reaches the printed certificate left
+    // every test green while the album and the child's keepsake disagreed about what had been won. `certToStored`
+    // is now the only writer, so the e2e's stored assertions cover the drawn object too.
+    if (cert) recordCert(certToStored(cert, { id: `${o.year.id}:duel` }));
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
     overlay.hidden = false;
@@ -176,10 +188,46 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
         ${dojoRowsHTML(dojo)}
         ${stickersHTML(fresh)}
+        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div>' : ''}
         <div class="row"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
+    // Captured, not read back off `cert`: this handler is async and fires long after this frame, and it must
+    // draw the certificate *this* match earned, so it binds the value the `if` tested. The `certificate()` hook
+    // below deliberately does the opposite and reads the live binding — it is asked "what has been earned
+    // now?" and has to answer null before the match ends (#16 review, note 7).
+    const earned = cert;
+    if (earned) $('#cert').addEventListener('click', async () => {
+      sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
+      try {
+        const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
+        if (how === 'shared') toast('Certificate shared!', 'good');
+        else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
+        else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
+        // 'shown' opens the full-screen view with its own save hint, so no toast
+      }
+      catch { toast('Could not make the certificate', 'bad'); }
+      b.disabled = false;
+    });
+  }
+  /**
+   * The certificate a finished match earned, or null (#16 item 5). **Only a Player 1 win earns one**: the two
+   * children share one profile, Player 2 is the friend `DUEL_HANDOVER` sends to the top half, and a certificate
+   * filed in this save saying a duel was won has to be about the child whose save it is. A draw and a Player 2
+   * win earn nothing for the same reason #347 pays no win bonus — there is no second profile to award.
+   *
+   * `correct`/`attempts` are Player 1's own slices (`duelAccuracy()`), not the scoreline: the printed
+   * "5/6 correct (83%)" then means the same thing it means on a mission certificate. `score` is `scoreA`, the
+   * rounds this child actually took, which is what `fileCert()` breaks a stars tie on.
+   */
+  function duelCert(r: DuelResult): CertInfo | null {
+    if (!duelEarnsCertificate(r)) return null;      // the predicate is in game/duel.ts so all three winners are unit-pinned
+    const t = duelAccuracy(r);
+    return {
+      name: d.name, avatar: av, year: o.year.title, title: 'Ninja Duel',
+      stars: duelStars(t), score: r.scoreA, correct: t.hits, attempts: t.tries, duel: true, date: new Date(),
+    };
   }
   function showPause() {
     hold(true); overlay.hidden = false; overlay.innerHTML = pauseHTML();
@@ -210,6 +258,10 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
       hint: hintLine, coins: paid, dojoCoins: dojoPaid, taught,
     }),
+    certificate: async () => cert ? (await drawCertificate(cert)).toDataURL('image/png') : null,
+    // The words that go on the drawn certificate. A byte count cannot tell one ninja's signature from another,
+    // which is how a wrong `avatar` survived round 1's rails (#397 round 2, B1).
+    certWords: () => cert ? certWords(cert) : null,
     setSpeed: k => { setGameSpeed(k); },
     timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),
   };

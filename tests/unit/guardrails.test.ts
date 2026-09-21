@@ -190,9 +190,180 @@ describe('guard rails', () => {
     const routes = main.slice(from, to).split(/\n\s*(?=\w+:)/).slice(1);
     const named = routes.map(r => [r.slice(0, r.indexOf(':')), r] as const).filter(([n]) => n !== 'up');
     expect(named.length).toBeGreaterThanOrEqual(7);                     // every screen the router can show
+    // A route may hand off rather than dispose in its own body — `profiles` calls `goProfiles`, the picker's
+    // one way in, which the boot path takes too (#380 review round 5, B3). So the rail follows the hand-off
+    // one level instead of being satisfied by the call: whatever the route names must itself tear the old
+    // screen down. One level and no further, deliberately — a chain this rail cannot read is a route it
+    // cannot vouch for, and it should say so by failing.
+    const disposes = (body: string): boolean => {
+      if (/\bleave\(\)/.test(body)) return true;
+      const handoff = body.match(/=>\s*(\w+)\(\)/);
+      if (!handoff) return false;
+      const at = main.indexOf(`const ${handoff[1]} = `);
+      if (at < 0) return false;
+      const brace = main.indexOf('{', at), nl = main.indexOf('\n', at);
+      const end = brace >= 0 && brace < nl ? main.indexOf('\n};', at) : nl;   // a block body, or a one-line arrow
+      return end > at && /\bleave\(\)/.test(main.slice(at, end));
+    };
     for (const [screen, body] of named)
-      expect({ screen, disposes: /\bleave\(\)/.test(body) }).toEqual({ screen, disposes: true });
+      expect({ screen, disposes: disposes(body) }).toEqual({ screen, disposes: true });
     for (const f of ['/src/ui/play.ts', '/src/ui/memory.ts']) expect(code(SOURCES[f])).toContain('return cleanup;');
+  });
+
+  // #20 slice 2 — the profile picker. Four properties it is built on, none of which fails loudly.
+  //
+  // 1. The picker is a **launch screen, not a stack entry**: `mapScreen` pushes no history entry and
+  //    `nav.map()` pops whenever one exists, so an `enter('profiles')` would send every "chosen, go to the
+  //    map" straight back to the picker — a loop a child could not leave. A future hand adding `enter(...)`
+  //    to the route for symmetry with its neighbours is exactly the plausible edit. **The route is not the
+  //    only place that edit lands** (#380 review B3): the route hands off to `goProfiles`, which is what
+  //    actually pops, draws the picker and is the boot path's way in too, and is where `leave()` and
+  //    `fromPop` already sit — so it looks more like every other route than the route does. It is defined
+  //    below `up,` and so was outside this rail's slice by construction: inserting `enter('profiles')`
+  //    there alone left all 332 rails and the whole 1439-test suite green.
+
+  // 2. Boot shows it only when siblings actually share the device. Nothing changes for today's players,
+  //    which is the owner's decision at the top of #20, and `> 1` is the whole of it.
+  // 3. The store is asked before the child is moved: a `go(...)` that did not wait for
+  //    `setActiveProfile` to return true would drop a child into a sibling's game on a store that refuses.
+  // 4. Drawing a card never goes through `load()`/`save()` — those resolve and latch *this session's*
+  //    profile, so reading a sibling's name through them would answer the wrong child or bind the session
+  //    to them. `profileCard()` reads the slot key directly for that reason.
+  it('the profile picker is a launch screen, gated on more than one profile (#20 slice 2)', () => {
+    const main = code(SOURCES['/src/main.ts']);
+    const from = main.indexOf('profiles: () =>'), to = main.indexOf('\n  up,', from);
+    const drawFrom = main.indexOf('const goProfiles = () => {'), drawTo = main.indexOf('\n};', drawFrom);
+    expect({ route: from >= 0 && to > from, draws: drawFrom >= 0 && drawTo > drawFrom })
+      .toEqual({ route: true, draws: true });   // a rename empties the slice below, so fail here instead
+    expect(main.slice(from, to) + main.slice(drawFrom, drawTo), 'neither the route nor the function that draws the picker pushes a history entry')
+      .not.toMatch(/\benter\(/);
+    expect(main, 'boot reaches the picker only with two or more profiles').toMatch(/profileIds\(\)\.length > 1/);
+    expect(main, 'and a one-profile device boots exactly as it did').toMatch(/else if \(load\(\)\.onboarded\) nav\.map\(\); else nav\.avatar\(\)/);
+  });
+
+  // Property 3 was pinned by source order alone, and source order is not control flow: deleting the one
+  // `return` from the refusal branch left this file green and the whole suite at 1427/1427 while a refused
+  // switch dropped the child into their sibling's game (#380 review B2). The decision is a pure function now
+  // and `tests/unit/profiles.test.ts` mutation-tests it for real; what a source rail can still hold is that
+  // the handler routes the store's answer through it, and that the child is moved with an id that exists
+  // only on the accepted arm — so falling out of the refusal is a type error, caught by `tsc`, not a rail.
+  it('the picker moves a child only once the store has accepted the switch (#20 slice 2)', () => {
+    const pick = code(SOURCES['/src/ui/profiles.ts']);
+    expect(pick, "the store is asked, and its answer is the decision's only input").toMatch(/pickOutcome\(id, setActiveProfile\(id\)\)/);
+    expect(pick.match(/\bgo\(/g) ?? [], 'one call site for go(), inside the guarded handler').toHaveLength(1);
+    expect(pick, 'and the child is moved with the id off the accepted arm').toMatch(/go\(o\.id\)/);
+    expect(pick, 'the same shape for "New ninja": onboarding starts on the added profile').toMatch(/onNew\(o\.id\)/);
+    // Both refusals are told apart on screen (#335 item 2): a picker that shows one sentence for both tells a
+    // child with four siblings that their browser is broken, or the reverse.
+    expect(pick).toMatch(/why === 'full'/);
+    // And both are read aloud, not only printed — `.claude/rules/style.md`, "read-aloud everywhere" (B6).
+    // Two halves, because this rail can only ever hold one of them. It reads `refuse`'s *definition*, and
+    // deleting both calls left `tsc` clean and 1436/1436 green while a refused tap did nothing at all — no
+    // hint, no `sfx.wrong()`, no spoken sentence (#380 review B2). The call sites below stop that one
+    // mutation; what holds the behaviour is the e2e in `tests/e2e/game.spec.ts` that taps a card on a store
+    // whose `setItem` throws and asserts both sentences are printed *and* handed to the speech engine.
+    expect(pick, 'a refusal is spoken as well as written').toMatch(/hint\.textContent = text; say\(text\);/);
+    expect(pick.match(/return refuse\(o\.hint\);/g) ?? [], 'and both handlers route their refusal through it').toHaveLength(2);
+  });
+
+  // #380 review B1 (round 3): `avatarById` falls back to `AVATARS[0]`, which is Volt — right for every
+  // caller that has already decided a portrait is going on screen, and wrong for the one screen whose job is
+  // telling children apart. A slot with no ninja chosen drew Volt's portrait and Volt's glow, pixel for
+  // pixel a sibling who plays as Volt, and the only difference was the text under it — on a screen whose
+  // audience cannot read. `avatarOrNull` is the lookup that has no opinion; the fallback stays where it is.
+  it('the picker draws a slot with no ninja as an empty slot, not as Volt (#20 slice 2)', () => {
+    const pick = code(SOURCES['/src/ui/profiles.ts']);
+    expect(pick, 'the picker asks for the ninja that exists, not one to fall back on').toMatch(/avatarOrNull\(c\.avatar\)/);
+    expect({ fallbackUsed: /\bavatarById\b/.test(pick) }).toEqual({ fallbackUsed: false });
+    expect(pick, 'and a card with none borrows the ＋ card\'s dashed figure').toMatch(/a \? '' : ' new-ninja'/);
+    // The two cards must not also share their words: "New ninja" on both is what made the empty slot and the
+    // ＋ card a coin flip in the first place. The ＋ card's `<b>` is literal; the slot's comes from `cardName`.
+    expect(code(SOURCES['/src/avatars.ts']), 'the null-answering lookup is the one home of the id → ninja walk')
+      .toMatch(/export const avatarOrNull = [\s\S]{0,200}ALL_AVATARS\.find/);
+    expect(pick, 'an unnamed slot is named by its slot, not by the ＋ card\'s words').toMatch(/name\.trim\(\) \? name : `Ninja \$\{slot\}`/);
+  });
+
+  // #380 review B1: the picker pushes no history entry, so whatever entry was current when it opened is what
+  // everything leaving it unwinds onto — and the 👥 button was then a fourth control on the *shared* topbar, so
+  // that was the island or rewards screen. A new Reception profile finished the wizard on the previous child's
+  // Year 2 island.
+  //
+  // **Round 5's B3 is the same bug by the other door, and it is why this rail now reads one function rather
+  // than two sites.** The route popped to the root; the boot path drew the picker wherever the stack happened
+  // to be, and `history.state` survives a reload — so a refresh from an island put the *launch* picker, the
+  // one that deliberately draws no `←` because "back leaves the app", on top of that island's entry, and one
+  // back press dismissed it into whoever the index last called active. Two callers of one drawing function,
+  // each with its own idea of where the stack was and which mode to ask for, is the shape that produced it; a
+  // single way in whose mode is *derived* is what this holds now.
+  it('the picker is reached at the root of the history stack, from wherever it was opened (#20 slice 2)', () => {
+    const main = code(SOURCES['/src/main.ts']);
+    const drawFrom = main.indexOf('const goProfiles = () => {'), drawTo = main.indexOf('\n};', drawFrom);
+    const go = main.slice(drawFrom, drawTo);
+    expect(go, 'a stacked entry is popped before the picker is drawn')
+      .toMatch(/if \(history\.state\?\.screen\) \{ pendingProfiles = true; history\.back\(\); return; \}/);
+    expect(main, 'and the pop lands back in the one way in, so a deeper stack keeps unwinding')
+      .toMatch(/if \(pendingProfiles\) \{ pendingProfiles = false; goProfiles\(\); return; \}/);
+    expect(main, 'boot takes that same way in, so a reload cannot draw the launch picker on a stacked entry')
+      .toMatch(/length > 1\) goProfiles\(\);/);
+    expect(main.match(/profilesScreen\(/g) ?? [], 'which is the one place the picker is drawn').toHaveLength(1);
+    expect(go, 'and launch-or-back is read off what is on the page, never passed in by the caller')
+      .toMatch(/screenDrawn\(\) \? \(\) => nav\.map\(\) : undefined/);
+  });
+
+  // #380 review B3: `profileCard` deliberately does not run the migrations, but `onboarded` only exists from
+  // v3, and nothing on `boot → map → 👥` writes a migrated blob back — so reading the field raw made a
+  // fully-played v2 save draw as "Not started yet" while `load()` said otherwise about the same bytes.
+  //
+  // This rail used to hold two *copies* of the expression against one regex, and the regex stopped at the
+  // colon — so the fallback, which is the whole of the rule, was never compared (#380 review note 1). The
+  // two had already drifted: `{ v: 2, avatar: 7 }` migrated to `onboarded: true` and drew a card saying
+  // "Not started yet". There is one rule now, so what this holds is that both sites call it rather than
+  // spelling it out again — which a copy cannot pass by looking similar.
+  it("a card's onboarded flag and the migration's are the same rule, not two copies (#20 slice 2)", () => {
+    const store = code(SOURCES['/src/storage.ts']);
+    const at = (fn: string) => store.slice(store.indexOf(fn), store.indexOf('\n}', store.indexOf(fn)));
+    const raw = /typeof s\.onboarded === 'boolean' \? s\.onboarded/;
+    expect(store, 'the rule has one home').toMatch(/export const onboardedOf = \(s: RawSave\): boolean =>/);
+    expect(at('export function profileCard('), 'the card calls it').toMatch(/onboarded: onboardedOf\(s\)/);
+    const migFrom = store.indexOf('MIGRATIONS: Record');
+    const migrations = store.slice(migFrom, store.indexOf('\n};', migFrom));
+    expect({ ladder: migFrom >= 0 && migrations.length > 0 }).toEqual({ ladder: true });
+    expect(migrations, 'and so does MIGRATIONS[2]').toMatch(/onboarded: onboardedOf\(s\)/);
+    // The copies are gone, not merely joined by a third site: a re-inlined rule at either call site is the
+    // drift this rail exists to catch, and it would otherwise read as green beside the call it replaced.
+    for (const [where, body] of [['profileCard', at('export function profileCard(')], ['MIGRATIONS[2]', migrations]] as const)
+      expect({ where, inlined: raw.test(body) }).toEqual({ where, inlined: false });
+  });
+
+  // #380 review B2: `profileCard` applied MIGRATIONS[2]'s rule but not the version gate `load()` applies
+  // first, so a save from a *newer* build — which `migrate()` refuses and answers `{ ...DEFAULT }` for —
+  // drew a card with that child's real name and ninja. Tapping it moved the session, `afterPick()` read
+  // `onboarded: false` off the default, and the child was put through the first-run wizard with `readOnly`
+  // latched and every write dropped. The card has to agree with `load()` about the same bytes.
+  it('a card is blank for a save load() would refuse, not a name the tap cannot deliver (#20 slice 2)', () => {
+    const store = code(SOURCES['/src/storage.ts']);
+    const card = store.slice(store.indexOf('export function profileCard('), store.indexOf('\n}', store.indexOf('export function profileCard(')));
+    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) return blank;/);
+    expect(store.slice(store.indexOf('function migrate(')), 'and that gate is still the one load() goes through').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.DEFAULT \};/);
+  });
+
+  it("a sibling's card is read from the slot, never through the session's load() (#20 slice 2)", () => {
+    const store = code(SOURCES['/src/storage.ts']);
+    const from = store.indexOf('export function profileCard('), to = store.indexOf('\n}', from);
+    expect({ fn: from >= 0 && to > from }).toEqual({ fn: true });
+    const body = store.slice(from, to);
+    expect(body, 'reads the slot key itself').toMatch(/readItem\(saveKeyFor\(id\)\)/);
+    for (const banned of ['load(', 'save(', 'sessionProfile(', 'localStorage.setItem'])
+      expect({ banned, used: body.includes(banned) }).toEqual({ banned, used: false });
+    expect(code(SOURCES['/src/ui/profiles.ts']), 'and the picker uses it rather than load()').not.toMatch(/\bload\(\)/);
+  });
+
+  it('addProfile probes the slot it hands out, not just the index (#335 item 1)', () => {
+    const store = code(SOURCES['/src/storage.ts']);
+    const from = store.indexOf('export function addProfile('), to = store.indexOf('\n}', from);
+    expect({ fn: from >= 0 && to > from }).toEqual({ fn: true });
+    // Counting alone gave a new child a slot already holding a sibling's save, and onboarding merged over it.
+    expect(store.slice(from, to)).toMatch(/!idx\.ids\.includes\(id\) && !holdsSave\(id\)/);
   });
 
   // Incident 2026-09-06 (#27): the year union `'reception' | 'year1' | 'year2'` was retyped in four files
@@ -1592,9 +1763,13 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
     expect(git('ls-files', '--', MARKER).out, `${MARKER} is tracked — the hook would allow every write`).toBe('');
   });
 
+  // The constant moved to `.claude/hooks/paths.mjs` in PR #393: the shared path decision lives there so that
+  // each guard module exports nothing but its own rules, which is what lets the #359 wiring rail hold without
+  // exempting helpers by name. What this rail pins is unchanged — one spelling, in one place, matching
+  // `.gitignore` — only the file it reads.
   it('the hook and .gitignore name the same marker, so neither can drift alone', () => {
     expect(file('.gitignore'), 'the marker must be ignored by name').toContain(`\n${MARKER}\n`);
-    expect(file('.claude/hooks/write-guard.mjs'), 'the marker constant moved or was renamed')
+    expect(file('.claude/hooks/paths.mjs'), 'the marker constant moved or was renamed')
       .toContain(`export const OWNER_MARKER = '${MARKER}'`);
   });
 
@@ -1606,13 +1781,23 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
       .toMatch(/protected path/i);
     expect(rules, 'the enforcement, named where a reader can check it')
       .toContain('`.claude/hooks/write-guard.mjs`');
+    // #346 and the PR #393 review: a write can arrive through a file tool, through the shell, or through an
+    // MCP file write that commits straight to a branch. Naming fewer guards than the code has is how the
+    // prose goes back to covering one route and claiming all of them.
+    for (const guard of ['`.claude/hooks/bash-guard.mjs`', '`.claude/hooks/github-write-guard.mjs`'])
+      expect(rules, `${guard} is enforcement the rule does not name`).toContain(guard);
+    expect(rules, 'and the one shared decision, or three guards can drift into three answers')
+      .toContain('`.claude/hooks/paths.mjs`');
     expect(rules, 'what a run does instead, or a denial leaves it with nowhere to go').toContain('owner-session');
     expect(rules, 'reads must stay allowed, or a run stops reading its own rules').toMatch(/reads are untouched/i);
-    // Round-1 review of PR #344: the first draft claimed a run "cannot grant itself" the permission, which is
-    // true of Write and Edit and not of the shell (#346). A rule may not claim more than it enforces.
-    expect(rules, 'the claim must be bounded by what the hook actually sees')
-      .toMatch(/closes the obvious route, not\s+every route/i);
-    expect(rules, 'and name the issue that holds the rest').toContain('#346');
+    // Round-1 review of PR #344: the first draft claimed a run "cannot grant itself" the permission, which was
+    // true of Write and Edit and not of the shell. #346 closed the shell route, so the bound moved rather than
+    // went away — a rule may still not claim more than it enforces, and what neither guard can see is stated
+    // here rather than left for the next reader to discover.
+    expect(rules, 'the claim must still be bounded by what the hooks actually see')
+      .toMatch(/no command-line rule sees/i);
+    expect(rules, 'and say concretely what falls outside it, or the bound is a disclaimer')
+      .toMatch(/opens the file itself|assembled at run time/i);
     expect(rules, 'and point at the decision record').toContain('docs/decisions/006-a-routine-never-writes-under-claude.md');
   });
 
@@ -3017,13 +3202,32 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   const EXPECTED_KEYS = (name: string) => ['name', 'description', ...(EXTRA_KEYS[name] ?? [])].sort();
   /**
    * Vendored upstream text that carries ` #` inside a plain scalar (`Please review PR #1234`): the loader's
-   * repair pass double-quotes that line — because the same value also carries `: `, which is asserted beside
-   * the token — so it loads in full; without the repair a YAML parser would cut it there — an upstream matter,
-   * not this repository's. The exemption is that one token, not the file: the token is asserted present (so
-   * the entry fails loudly when upstream drops it) and stripped, and the rest of the description is held to
-   * the same ` #` check as every other.
+   * repair pass double-quotes that line — because the same value also carries `: ` *ahead of* the token, which
+   * is asserted beside it — so it loads in full; without the repair a YAML parser would cut it there — an
+   * upstream matter, not this repository's. The exemption is that one token, not the file: the token is
+   * asserted present (so the entry fails loudly when upstream drops it) and stripped, and the rest of the
+   * description is held to the same ` #` check as every other.
    */
   const HASH_IN_UPSTREAM_TEXT: Record<string, string> = { 'silent-failure-hunter': 'PR #1234' };
+  /**
+   * Does the loader's repair pass run for this value (#312)?
+   *
+   * It runs only when the *plain* YAML parse throws, and what makes it throw is a `: ` inside a plain scalar.
+   * A ` #` opens a comment, so a plain parse that meets the `#` first succeeds on the text up to it and never
+   * throws: the repair pass never runs, and every word after the `#` is silently dropped. Presence of `: `
+   * anywhere in the value is therefore not the precondition the exemption rests on — a `: ` *before* the
+   * comment is, and that is an ordering question.
+   *
+   * The distinction is not academic. Moving the sole `PR #1234` earlier in `silent-failure-hunter.md` — one
+   * occurrence, anchored pin prefix intact, exactly the shape an upstream re-vendor produces — truncated the
+   * real loader's description to sixteen words with this whole file green, because the old assertion asked
+   * only whether a `: ` was present somewhere.
+   */
+  const repairPassRuns = (value: string) => {
+    const comment = value.search(/(^|\s)#/);
+    const colon = value.indexOf(': ');
+    return colon >= 0 && (comment < 0 || colon < comment);
+  };
   /**
    * NUL and CR, from code points so no editor can turn the escape into the character. Asserted on the
    * frontmatter block, never the whole file (round 7): a body line ending `\r\n`, which Windows editors and
@@ -3041,19 +3245,24 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     expect(front!, `${file}: "---" inside the frontmatter — the loader's splitter ends the block at the first one wherever it sits, and everything after it is gone (#150)`)
       .not.toMatch(/---/);
     const lines = front!.split('\n');
-    expect(lines.filter((l) => TOP_LEVEL_KEY.test(l)).map((l) => TOP_LEVEL_KEY.exec(l)![1]).sort(), `${file}: a frontmatter key outside the expected set — the loader acts on keys no description check reads, and "disable-model-invocation" or a never-matching "paths" switches the skill off (#150)`)
-      .toEqual(EXPECTED_KEYS(name));
-    expect(front!, `${file}: "name:" must be the file's own name — an agent is registered under it, and a skill under its directory (#150)`)
-      .toMatch(new RegExp(`^name:[ \\t]+${name}[ \\t]*$`, 'm'));
+    // Ahead of the key-set check on purpose (#312): a file whose description has simply been deleted fails
+    // the key set first, and is then explained by the wrong message — "a frontmatter key outside the expected
+    // set … `disable-model-invocation` switches the skill off" — when what happened is that the one line
+    // reaching every turn's context is gone. Counting the description keys first lets that branch speak.
     const descriptionKeys = lines.filter((l) => DESCRIPTION_KEY.test(l)).length;
     expect(descriptionKeys, descriptionKeys === 0
       ? `${file} needs a description — it is the only line that reaches every turn's context`
       : `${file}: exactly one description key, in any spelling a loader accepts — the rail reads the first, a loader reads the last or refuses the file (#150)`)
       .toBe(1);
+    expect(lines.filter((l) => TOP_LEVEL_KEY.test(l)).map((l) => TOP_LEVEL_KEY.exec(l)![1]).sort(), `${file}: a frontmatter key outside the expected set — the loader acts on keys no description check reads, and "disable-model-invocation" or a never-matching "paths" switches the skill off (#150)`)
+      .toEqual(EXPECTED_KEYS(name));
+    expect(front!, `${file}: "name:" must be the file's own name — an agent is registered under it, and a skill under its directory (#150)`)
+      .toMatch(new RegExp(`^name:[ \\t]+${name}[ \\t]*$`, 'm'));
     expect(front!, `${file}: the one description key is the literal "description:" followed by whitespace on the same line — "description:Open …" loses its trigger clause in the loader (#150)`)
       .toMatch(/^description:[ \t]+\S/m);
-    expect(description, `${file} needs a description — it is the only line that reaches every turn's context`)
-      .not.toBeNull();
+    // No `description !== null` check here (#312): the assertion above is `frontmatter()`'s own capture in a
+    // weaker spelling, so once it passes the capture has matched and the check could never fire. The call
+    // sites that read a description WITHOUT that assertion in front of them keep theirs.
     expect(description!, 'and it must be one line, not a folded block').not.toMatch(/^[|>]/);
     expect(front!, `${file}: the description continues onto an indented line, blank lines or not — one physical line, so the line a reader sees is the whole trigger (#150)`)
       .not.toMatch(new RegExp(`^description:[^\\n]*${CONTINUATION}`, 'm'));
@@ -3066,7 +3275,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     const upstreamToken = HASH_IN_UPSTREAM_TEXT[name];
     if (upstreamToken) {
       expect(description!, `${file} no longer carries "${upstreamToken}" — drop its HASH_IN_UPSTREAM_TEXT entry`).toContain(upstreamToken);
-      expect(description!, `${file}: "${upstreamToken}" loads only because the same value carries ": ", which makes the loader's repair pass quote the line — that precondition is gone`).toMatch(/: /);
+      expect(repairPassRuns(description!), `${file}: "${upstreamToken}" loads only because a ": " appears BEFORE it, which makes the loader's repair pass quote the line — the "#" now comes first, so the plain parse succeeds on the truncated text and everything after it is silently dropped (#312)`).toBe(true);
     }
     expect(upstreamToken ? description!.replace(upstreamToken, '') : description!, `${file}: " #" ends the description for a YAML loader — everything after it never reaches a turn's context (#150)`)
       .not.toMatch(/(^|\s)#/);
@@ -3152,8 +3361,16 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
   it('every skill and agent in the allow-list has a description pin, and nothing else does (#150)', () => {
     const names = FRONTMATTER_FILES.map(([n]) => n).sort();
     expect(Object.keys(DESCRIPTIONS).sort(), 'add the pin in the same pull request as the skill').toEqual(names);
-    expect(PROJECT_SKILLS, 'the project-written set — it must include the two body-railed skills')
-      .toEqual(expect.arrayContaining(['open-pr', 'add-guard-rail']));
+    // The project-written skills, held to the rule the DESCRIPTIONS docstring states in prose: their pin
+    // carries the trigger clause itself, not only the subject (#312). This used to assert that PROJECT_SKILLS
+    // contained `open-pr` and `add-guard-rail`, which is a restatement of the object literal two hundred lines
+    // above — it could not fail, and `PROJECT_SKILLS` was read nowhere else. A vendored file's description is
+    // upstream's sentence and is pinned as it stands; these six are ours, so "Use when"/"Use before" is a rule
+    // we can actually keep.
+    expect(PROJECT_SKILLS.length, 'the project-written set must not be empty — every skill reading as vendored means the allow-list lost its `null` markers').toBeGreaterThan(0);
+    for (const n of PROJECT_SKILLS)
+      expect(DESCRIPTIONS[n].source, `${n} is project-written: its pin must hold the trigger clause ("Use when …"/"Use before …"), not only the subject — the clause is what decides whether the skill loads for the run that needs it (#150)`)
+        .toMatch(/Use (when|before)/);
     // No per-file map may hold a dead key: a file that is no longer in the allow-list.
     expect(names, 'HASH_IN_UPSTREAM_TEXT names a file the allow-list does not').toEqual(expect.arrayContaining(Object.keys(HASH_IN_UPSTREAM_TEXT)));
     expect(names, 'NEGATION_EXEMPT names a file the allow-list does not').toEqual(expect.arrayContaining(Object.keys(NEGATION_EXEMPT)));
@@ -3161,9 +3378,40 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     // Each negation exemption is for a phrase; if upstream drops it, the exemption fails loudly rather than going stale.
     for (const [name, phrase] of Object.entries(NEGATION_EXEMPT)) {
       const [, file] = FRONTMATTER_FILES.find(([n]) => n === name)!;
-      expect(frontmatter(file).description, `${name} is exempt from the negation check for its ${phrase} — drop its NEGATION_EXEMPT entry when that text is gone`)
+      const { description } = frontmatter(file);
+      // Guarded first (#312): vitest's `expect(null, 'msg').toMatch(re)` throws "`.toMatch()` expects to
+      // receive a string, but got object" and DISCARDS the custom message, so a file that lost its
+      // description failed here loudly but anonymously — naming neither the file nor the reason.
+      expect(description, `${file} has no description line to read — its NEGATION_EXEMPT entry cannot be checked`).not.toBeNull();
+      expect(description!, `${name} is exempt from the negation check for its ${phrase} — drop its NEGATION_EXEMPT entry when that text is gone`)
         .toMatch(phrase);
     }
+  });
+
+  it('the ` #` exemption reads ordering, not presence: a "#" ahead of the first ": " is not exempt (#312)', () => {
+    // The live shape — a `: ` well ahead of the upstream token. The plain parse throws on the colon, the
+    // repair pass double-quotes the line, and the whole description reaches the turn's context.
+    expect(repairPassRuns('Use this agent when reviewing code changes in a pull request: see PR #1234 for the shape')).toBe(true);
+    // #312's reproduction: the same single token moved ahead of the first `: `, with the anchored pin prefix
+    // intact — the shape an upstream re-vendor produces. The plain parse succeeds on "… (see PR", the repair
+    // never runs, and every trigger clause after the `#` is gone. This is the case the old `toMatch(/: /)`
+    // assertion called exempt, with the whole file green.
+    const reproduction = 'Use this agent when reviewing a pull request (see PR #1234) to identify: silent failures';
+    expect(repairPassRuns(reproduction)).toBe(false);
+    // And the old assertion written out, so the difference is pinned rather than remembered: `toMatch(/: /)`
+    // is satisfied by that same string. This is the whole of #312 — the check was green on the one input it
+    // existed to refuse, and a run could only find out by driving the real loader.
+    expect(/: /.test(reproduction), 'the retired presence check called the reproduction exempt').toBe(true);
+    // No `: ` at all: nothing can make the plain parse throw, so the `#` is read as a comment and the rest is
+    // dropped — exempt on the old check the moment upstream reworded around its colon.
+    expect(repairPassRuns('Use this agent when reviewing changes for PR #1234')).toBe(false);
+    // A `#` that opens no comment, because no whitespace precedes it: the same reading as the ` #` check the
+    // exemption is carved out of, so the two cannot disagree about where a value ends.
+    expect(repairPassRuns('Use this agent on issue#5 when a diff: needs review')).toBe(true);
+    // The value the exemption is actually consulted for, read from the file rather than written out here, so
+    // this self-test fails with the rail if upstream reorders it rather than passing on a stand-in.
+    const [, file] = FRONTMATTER_FILES.find(([n]) => n === 'silent-failure-hunter')!;
+    expect(repairPassRuns(frontmatter(file).description!)).toBe(true);
   });
 
   it.each(FRONTMATTER_FILES)('%s\'s description still names the job it triggers on (#150)', (name, file) => {

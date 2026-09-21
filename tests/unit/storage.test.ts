@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { activeProfile, addProfile, MAX_PROFILES, PROFILE_IDS, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { activeProfile, addProfile, MAX_PROFILES, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
+import { carriedStreak } from '../../src/game/dojo';
 import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
 
@@ -508,6 +509,65 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     expect(load().progress['y1-add']).toMatchObject({ stars: 2 });
     expect(load().endless.year1).toBe(50);
   });
+
+  /**
+   * #363: the loop above stops at `isRecord(clean.dojo)`, and `dojo` is the one key whose interior is read
+   * without a guard. `dojoFor()` rebuilds only a *stale* state, so a record carrying TODAY's date — what a
+   * game finished today meets — went straight into `carriedStreak()` and `applyEvent()` and threw. Every
+   * case below is reachable through the Restore box, which only checks that `v` is an integer in range.
+   */
+  describe('a record-shaped but broken `dojo` (#363)', () => {
+    const today = new Date('2026-09-20T10:00:00Z');
+    const iso = '2026-09-20';
+    const finish = () => recordDojo({ mode: 'mission', won: true, correct: 20, attempts: 20, bestCombo: 6, stars: 3, score: 90 }, today);
+    const broken: Record<string, unknown> = {
+      'only a date — the shape a truncated blob leaves': { date: iso },
+      'no streak': { date: iso, progress: {}, done: [], total: 0 },
+      'a streak that is not a record': { date: iso, progress: {}, done: [], streak: 'nope', total: 0 },
+      'a streak missing its fields': { date: iso, progress: {}, done: [], streak: {}, total: 0 },
+      // PR #408 review B2: without this row the `typeof dj.streak.last === 'string'` clause could be
+      // deleted with all 104 tests still passing — `streak: {}` fails on `last` *and* `days`, and a
+      // wrong-typed `days` fails only on `days`, so nothing isolated `last`.
+      'streak.last not a string': { date: iso, progress: {}, done: [], streak: { last: 5, days: 0 }, total: 0 },
+      'streak.days not a number': { date: iso, progress: {}, done: [], streak: { last: '', days: 'four' }, total: 0 },
+      '`done` not an array': { date: iso, progress: {}, done: 1, streak: { last: '', days: 0 }, total: 0 },
+      '`progress` not a record': { date: iso, progress: [], done: [], streak: { last: '', days: 0 }, total: 0 },
+      'a date that is not a string': { date: 20260920, progress: {}, done: [], streak: { last: '', days: 0 }, total: 0 },
+      'no total': { date: iso, progress: {}, done: [], streak: { last: '', days: 0 } },
+    };
+
+    it.each(Object.keys(broken))('%s: the day ends normally and the coins are paid', (name) => {
+      expect(importSave(JSON.stringify({ v: 3, name: 'Ada', avatar: 'volt', dojo: broken[name] })), name).toBe(true);
+      // The key is gone and `DEFAULT` has filled it back in — which is the fix, rather than each of the
+      // three `recordDojo()` readers coping. Three of these shapes throw without it and the rest load a
+      // half-built state, so this line is what every case here pins.
+      expect(load().dojo, name).toEqual({ date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 });
+      // `carriedStreak`, not `dojoToday`: the map screen's `dojoCard()` is the FIRST reader of the interior
+      // and it reads a superset of what `applyEvent()` does, so this is the call that actually threw (PR
+      // #408 review, note 7 — `dojoFor()` reads only `.date` and was never at risk).
+      expect(() => carriedStreak(load().dojo, iso), name).not.toThrow();
+      let out: ReturnType<typeof recordDojo> | undefined;
+      expect(() => { out = finish(); }, name).not.toThrow();
+      // Not merely "did not throw": the bad key is replaced by the default, so the day's challenges are
+      // scored and their bonus is actually earned and written.
+      expect(out!.completed.length, name).toBeGreaterThan(0);
+      expect(out!.coins, name).toBeGreaterThan(0);
+      expect(load().dojo.date, name).toBe(iso);
+    });
+
+    it('a well-formed `dojo` is left exactly as given — the streak and lifetime total survive', () => {
+      const good = { date: iso, progress: { correct15: 3 }, done: [], setDone: false, streak: { last: '2026-09-19', days: 4 }, total: 11 };
+      expect(importSave(JSON.stringify({ v: 3, name: 'Ada', avatar: 'volt', dojo: good }))).toBe(true);
+      expect(load().dojo).toEqual(good);
+      // and a stale-dated one still rolls over rather than being deleted: streak and total carry into today
+      const stale = { ...good, date: '2026-09-18' };
+      expect(importSave(JSON.stringify({ v: 3, name: 'Ada', avatar: 'volt', dojo: stale }))).toBe(true);
+      const rolled = dojoToday(today);
+      expect(rolled.date).toBe(iso);
+      expect(rolled.streak).toEqual({ last: '2026-09-19', days: 4 });
+      expect(rolled.total).toBe(11);
+    });
+  });
 });
 
 // #115: the grown-ups "Start again" action clears the save through this function rather than a raw
@@ -775,14 +835,32 @@ describe('profiles: siblings on one device (#20)', () => {
   // because `sessionProfile()` returns the latched profile and never consults the index, and profile 1 leaked
   // from one test into the next (#330 round 2, item 2).
   const freshDevice = () => {
+    // `reset()` first, for the cache and both write latches. `setActiveProfile` used to clear those too, as a
+    // side effect of re-entering the active profile, and this helper leaned on it — but a re-entry now keeps
+    // the cached blob whenever a latch says it diverges from disk (#380 review round 4, B1), so a test that
+    // ended under a throwing `setItem` would hand the next one its coins and its fault. The switch below is
+    // still what ends the session's *binding*, which `reset()` deliberately does not touch.
+    reset();
     for (const id of PROFILE_IDS) localStorage.removeItem(saveKeyFor(id));
     localStorage.removeItem(INDEX);
-    expect(setActiveProfile('p1'), 'the teardown checks its own switch').toBe(true);   // clears the cache, both write latches and the session's profile
+    expect(setActiveProfile('p1'), 'the teardown checks its own switch').toBe(true);   // clears the session's profile
     localStorage.removeItem(INDEX);  // ...and a one-profile device stores no index
   };
+  it('the teardown leaves no cached blob and no latch, whatever the test before it did', () => {
+    // The helper's own regression: this is the state #380 review round 4's fix makes survive a re-entry, so
+    // if `freshDevice` ever drops its `reset()` the leak is a red test here rather than a puzzle two
+    // describes later.
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try { save({ name: 'Ada', coins: 99 }); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(isWriteFailing(), 'the test before us ended on a store that refused').toBe(true);
+    freshDevice();
+    expect(isWriteFailing(), 'the next test does not inherit the fault').toBe(false);
+    expect(load(), 'nor the blob it was holding').toMatchObject({ name: '', coins: 0 });
+  });
   it('the teardown really does hand each test an empty device', () => {
     save({ name: 'Ada', coins: 50 });
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo' });
     freshDevice();
     expect(localStorage.getItem(INDEX)).toBeNull();
@@ -815,7 +893,7 @@ describe('profiles: siblings on one device (#20)', () => {
     recordCert({ id: 'year1:y1-bonds', name: 'Ada', avatar: 'volt', year: 'Year 1', title: 'Number bonds', stars: 3, score: 90, correct: 6, attempts: 6, date: '2026-09-20' });
 
     const second = addProfile();
-    expect(second).toBe('p2');
+    expect(second).toEqual({ ok: true, id: 'p2' });
     expect(activeProfile()).toBe('p2');
     expect(profileIds()).toEqual(['p1', 'p2']);
     expect(load().name, 'a new profile starts on defaults, ready for onboarding').toBe('');
@@ -840,12 +918,12 @@ describe('profiles: siblings on one device (#20)', () => {
   });
 
   it('stops at four profiles', () => {
-    expect(addProfile()).toBe('p2');
-    expect(addProfile()).toBe('p3');
-    expect(addProfile()).toBe('p4');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    expect(addProfile()).toEqual({ ok: true, id: 'p3' });
+    expect(addProfile()).toEqual({ ok: true, id: 'p4' });
     expect(profileIds().length).toBe(MAX_PROFILES);
     const before = localStorage.getItem(INDEX);
-    expect(addProfile(), 'the fifth is refused').toBeNull();
+    expect(addProfile(), 'the fifth is refused, and as full rather than as a store fault').toEqual({ ok: false, why: 'full' });
     expect(profileIds()).toEqual(['p1', 'p2', 'p3', 'p4']);
     // Read the store, not `activeProfile()`: `addProfile` short-circuits on `!free` before it writes, so the
     // old assertion could not fail whatever the refusal did (#330 review N8).
@@ -927,7 +1005,7 @@ describe('profiles: siblings on one device (#20)', () => {
     (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
     try {
       expect(setActiveProfile('p1'), 'an unpersisted switch is reported, not pretended').toBe(false);
-      expect(addProfile(), 'and no profile is added either').toBeNull();
+      expect(addProfile(), 'and no profile is added either').toEqual({ ok: false, why: 'store' });
     } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
     expect(activeProfile(), 'still Bo, which is what the next launch will also read').toBe('p2');
     expect(load().name).toBe('Bo');
@@ -939,7 +1017,7 @@ describe('profiles: siblings on one device (#20)', () => {
     // Move profile 1 on *after* the code is taken, so the code and the slot it must not touch differ. With
     // both at 99 coins, clobbering p1 with the code is undetectable — the identity the review caught.
     save({ coins: 7 });
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', coins: 1 });
     expect(JSON.parse(exportSave()).name, 'the code carries whoever is playing').toBe('Bo');
 
@@ -978,7 +1056,7 @@ describe('profiles: siblings on one device (#20)', () => {
     load();
     expect(isReadOnlySave(), "profile 1's blob is from a newer build, so this session writes nothing").toBe(true);
 
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     // The whole job of `dropSessionState()` beyond clearing the cache: reduced to `cache = null` it left
     // 80/80 green, and the sibling could not save for the entire session with nothing shown (#330 review,
     // item 3). Both latches describe one blob, and it is not this profile's.
@@ -999,7 +1077,7 @@ describe('profiles: siblings on one device (#20)', () => {
    */
   it('an index that moves under a playing session does not redirect its save into a sibling\'s slot', () => {
     save({ name: 'Ada', coins: 30 });
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', coins: 3 });
     load();                                    // Bo is the profile this session is playing as
     localStorage.removeItem(INDEX);            // another tab switches, or the key is cleared
@@ -1032,7 +1110,7 @@ describe('profiles: siblings on one device (#20)', () => {
 
   it('"Start again" under the same conditions clears the child who asked, not their sibling', () => {
     save({ name: 'Ada', coins: 30 });
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', coins: 3 });
     load();
     localStorage.removeItem(INDEX);
@@ -1060,15 +1138,163 @@ describe('profiles: siblings on one device (#20)', () => {
     // Not a throw: a store that takes the call and drops this one key. The catch alone never saw this, so
     // addProfile() reported a profile the next read knew nothing about and the new child onboarded over Ada.
     (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => { if (k !== INDEX) realSet.call(localStorage, k, v); };
-    let added: string | null, switched: boolean;
+    let added: ReturnType<typeof addProfile>, switched: boolean;
     try { added = addProfile(); switched = setActiveProfile('p1'); }
     finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
 
-    expect(added, 'no profile was added, and the caller is told so').toBeNull();
-    expect(switched, 'and a switch is refused on the same store').toBe(false);
+    expect(added, 'no profile was added, and the caller is told it is the store').toEqual({ ok: false, why: 'store' });
+    // p1 is the only profile and already the active one, so this is not a switch at all: it persists nothing,
+    // and a store that keeps nothing therefore has nothing to refuse (#380 review B1). It read `false` here
+    // until that review, which is the bug — see the three tests below for what that cost a child.
+    expect(switched, 'and re-entering the child already active is not a switch the store can refuse').toBe(true);
     expect(activeProfile(), 'the child on the device is still the one who was playing').toBe('p1');
     expect(profileIds()).toEqual(['p1']);
     expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  /*
+   * #380 review B1. `setActiveProfile` wrote the index unconditionally, including when `id` was already
+   * `active`, so on a store that refuses writes the launch picker refused *every* card — the child's own
+   * included — and the launch picker draws no back control. A device that used to boot to the sky map and
+   * play unsaved could no longer reach the game at all. The three below are the three halves of the fix that
+   * can each go wrong on their own: the refusal that must stay, the latches that must survive, and the
+   * re-read that stops a no-op returning `true` while the session sits on a sibling.
+   */
+  it('re-entering the child already playing writes nothing, so a refusing store cannot lock them out (#380 review B1)', () => {
+    save({ name: 'Ada', coins: 12 });
+    addProfile();                                   // p2 exists and is active
+    save({ name: 'Bo' });
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try {
+      expect(setActiveProfile('p1'), 'a real switch still needs the index kept, and is still refused').toBe(false);
+      expect(setActiveProfile('p2'), 'but their own card hands them back their own game').toBe(true);
+    } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(activeProfile(), 'and it is still the child the next launch will read').toBe('p2');
+    expect(load().name, "their save, not the sibling's").toBe('Bo');
+  });
+
+  it('...and it keeps the failed-write flag, which describes the blob the child is still on (#151)', () => {
+    save({ name: 'Ada' });
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try {
+      save({ coins: 3 });
+      expect(isWriteFailing(), 'the write just threw').toBe(true);
+      expect(setActiveProfile('p1')).toBe(true);
+      // `leaveProfile()` would clear it here, and the grown-ups screen would stop saying the device is not
+      // saving — a real fault forgotten every time a child tapped their own card.
+      expect(isWriteFailing(), 'the same child, the same blob, so the same fault').toBe(true);
+      // And the blob itself, which the flag is *about*. Dropping `cache` here while keeping `writeFailed`
+      // discarded the session's only copy in precisely the state where it is the only copy: the next read
+      // answered the last value that reached disk, and every coin earned since was gone on a tap — with no
+      // refusal, no hint and no sound (#380 review round 4, B1).
+      expect(load().coins, 'the coins the child is playing on, not the last that reached disk').toBe(3);
+    } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+  });
+
+  it('...and the same tap on a store that never accepted a write does not drop them into the wizard (#380 review round 4, B1)', () => {
+    // The worse arm of the same branch: nothing has reached disk this session, so re-reading answers
+    // `{...DEFAULT}` — `onboarded` false, no name, no ninja — and `afterPick()` sends a child who was playing
+    // into the first-run wizard. With one profile the launch picker never draws, so the topbar 👥 is the only
+    // way in and their own card is the obvious thing to tap.
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try {
+      save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 7 });
+      expect(isWriteFailing(), 'nothing this session reached disk').toBe(true);
+      expect(setActiveProfile('p1'), 'their own card, on a device with one profile').toBe(true);
+      expect(load(), 'their name, their ninja and their coins are still on the screen')
+        .toMatchObject({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 7 });
+    } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+  });
+
+  it('...and a read-only save is kept too, since save() never writes that one back either (#232)', () => {
+    // `readOnly` is the other latch that makes `cache` the only copy: the blob on disk is from a newer build,
+    // so `save()` returns before `setItem` and every coin earned this session lives in `cache` alone.
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: 99, name: 'Ada', coins: 4 }));
+    save({ coins: 15 });
+    expect(isReadOnlySave(), 'the blob on disk is newer than this build').toBe(true);
+    expect(setActiveProfile('p1'), 'their own card').toBe(true);
+    expect(load().coins, 'the session keeps the coins it is holding, unwritable as they are').toBe(15);
+    expect(isReadOnlySave(), 'and goes on refusing to overwrite the newer blob').toBe(true);
+  });
+
+  it('...and a second tab that moved the index is honoured, not the profile this session cached (#380 review B1)', () => {
+    save({ name: 'Ada' });
+    addProfile();                                   // p2 active, and this session is latched to it
+    save({ name: 'Bo' });
+    // Another tab switches the device back to Ada. This session never saw it and is still cached on Bo.
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }));
+    expect(setActiveProfile('p1'), 'already active in the store, so there is nothing to persist').toBe(true);
+    expect(load().name, 'but the session re-resolves rather than playing on as the sibling it cached').toBe('Ada');
+  });
+
+  /**
+   * A store in the band a filling quota necessarily passes through: it keeps the ~39-byte index blob and
+   * refuses the ~413-byte save. Round 4's fix was written and tested against a store that refuses *everything*,
+   * where `writeIndex` fails and the refusal is honest — so the two paths below, which need a kept index write
+   * beside a refused save, were unreachable from any test (#380 review round 5, B2).
+   */
+  const capWrites = (cap: number) => {
+    const realSet = localStorage.setItem.bind(localStorage);
+    (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => {
+      if (v.length > cap) throw new Error('quota');
+      realSet(k, v);
+    };
+    return () => { (localStorage as unknown as { setItem: unknown }).setItem = realSet; };
+  };
+
+  it('...and a kept index write is still not a new child, so their coins survive that tap too (#380 review round 5, B2)', () => {
+    save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 10 });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    save({ name: 'Bo' });
+    expect(setActiveProfile('p1'), 'Ada is the child holding the device').toBe(true);
+    expect(load().coins).toBe(10);
+    // Another tab moves the device to Bo, so Ada's own card now *does* have an index to write back — the arm
+    // round 4 left alone. The index is the session's business only through `cacheProfile`, and that still says
+    // Ada: dropping her session here discarded the only copy of her afternoon while answering `true`.
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2'] }));
+    const uncap = capWrites(120);
+    try {
+      save({ coins: 42 });
+      expect(isWriteFailing(), 'the save blob is over the cap and was refused').toBe(true);
+      expect(setActiveProfile('p1'), 'her own card, and this time the index is written and kept').toBe(true);
+      expect(activeProfile(), 'the switch really did persist, so the next launch opens on her').toBe('p1');
+      expect(load().coins, 'the coins the child is playing on, not the last that reached disk').toBe(42);
+      expect(isWriteFailing(), 'and the device goes on saying it is not saving').toBe(true);
+    } finally { uncap(); }
+  });
+
+  it('...and "New ninja" refuses on that store rather than taking the playing child with it (#380 review round 5, B2)', () => {
+    save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 10 });
+    const uncap = capWrites(120);
+    try {
+      save({ coins: 42 });
+      expect(isWriteFailing()).toBe(true);
+      expect(addProfile(), 'a profile the store cannot save is one it cannot hand a child')
+        .toEqual({ ok: false, why: 'store' });
+      // `ok: true` here never reached the picker's `refuse()`: no hint, no sound, nothing spoken, and Ada's
+      // name, ninja and 42 coins gone on one tap — into a wizard for a new child that nothing can delete.
+      expect(load(), 'her game is still the one on screen').toMatchObject({ name: 'Ada', avatar: 'volt', coins: 42 });
+      expect(isWriteFailing(), "and the latch stays, so parents.ts still says why").toBe(true);
+      expect(profileIds(), 'nobody was added').toEqual(['p1']);
+      expect(activeProfile()).toBe('p1');
+    } finally { uncap(); }
+  });
+
+  it('...while a read-only save does not refuse it: that store writes, it is the blob that is newer (#232)', () => {
+    // The other latch, and deliberately not a refusal: `save()` never writes this blob back, so the session
+    // cache holds nothing disk is missing, and the new child's own save will land normally.
+    const newer = JSON.stringify({ v: 99, name: 'Ada', coins: 4 });
+    localStorage.setItem(saveKeyFor('p1'), newer);
+    save({ coins: 15 });
+    expect(isReadOnlySave(), 'the blob on disk is from a newer build').toBe(true);
+    expect(addProfile(), 'the store is writable; it is this one blob that must not be written')
+      .toEqual({ ok: true, id: 'p2' });
+    save({ name: 'Bo', coins: 1 });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "the new child's save lands on disk").toBe('Bo');
+    expect(localStorage.getItem(saveKeyFor('p1')), 'and the newer blob is byte-for-byte untouched').toBe(newer);
   });
 
   it('a foreign blob under a slot key does not invent a profile', () => {
@@ -1084,7 +1310,7 @@ describe('profiles: siblings on one device (#20)', () => {
     }
     localStorage.removeItem(saveKeyFor('p3'));
     // and the slot is still free to be handed out
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
   });
 
   it('a store whose reads throw does not take the session down with it (#151, #232)', () => {
@@ -1112,13 +1338,13 @@ describe('profiles: siblings on one device (#20)', () => {
     try { added = addProfile(); }
     finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
 
-    expect(added, 'kept-but-different is not kept').toBeNull();
+    expect(added, 'kept-but-different is not kept').toEqual({ ok: false, why: 'store' });
     expect(profileIds(), 'and the altered blob is not read back as an index either').toEqual(['p1']);
     expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
   });
 
   it("a switch clears the failed-write flag the other profile's write set (#151)", () => {
-    expect(addProfile()).toBe('p2');
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     expect(setActiveProfile('p1')).toBe(true);
     const realSet = localStorage.setItem;
     (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
@@ -1137,5 +1363,115 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(setActiveProfile('p1')).toBe(true);
     expect(load().name, "the other child's game is not part of it").toBe('Ada');
     expect(load().coins).toBe(30);
+  });
+
+  /*
+   * #20 slice 2 — what the picker needs of the store, and the two #335 findings the picker makes reachable.
+   */
+  it('addProfile refuses a slot that already holds a save the index does not list (#335 item 1)', () => {
+    save({ name: 'Ada' });
+    // An index that is valid (p1 only, active p1) beside a real save in p2 — the shape `defaultIndex()`'s own
+    // probe would never produce, but a hand-edited or half-written index can. `addProfile` used to hand p2
+    // out, and the new child's onboarding then merged over the sibling in it.
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 3, name: 'Bo', coins: 7 }));
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1'] }));
+    expect(addProfile(), 'the next free-by-count slot is not free').toEqual({ ok: true, id: 'p3' });
+    expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!), "and Bo's save is untouched").toMatchObject({ name: 'Bo', coins: 7 });
+  });
+
+  it("addProfile says 'full' when every unlisted slot holds a save, not 'store' (#335 item 2)", () => {
+    save({ name: 'Ada' });
+    for (const id of ['p2', 'p3', 'p4'] as const) localStorage.setItem(saveKeyFor(id), JSON.stringify({ v: 3, name: id }));
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1'] }));
+    // The count says one profile and three slots spare; the probe says there is nowhere to put a child. The
+    // picker shows two different sentences for these, so the refusal has to carry which one it is.
+    expect(addProfile()).toEqual({ ok: false, why: 'full' });
+  });
+
+  it("profileCard reads a sibling's name and ninja without moving this session (#20 slice 2)", () => {
+    save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 30 });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    save({ name: 'Bo', avatar: 'blaze', onboarded: true });
+
+    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true });
+    expect(activeProfile(), 'reading a card is not a switch').toBe('p2');
+    expect(load().name, 'and the session is still the child who was playing').toBe('Bo');
+    expect(profileCards()).toEqual([
+      { id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true },
+      { id: 'p2', name: 'Bo', avatar: 'blaze', onboarded: true },
+    ]);
+  });
+
+  it('profileCard is blank rather than throwing on a slot the picker cannot read (#20 slice 2)', () => {
+    save({ name: 'Ada' });
+    expect(profileCard('p2'), 'an empty slot').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
+    localStorage.setItem(saveKeyFor('p3'), 'not json at all');
+    expect(profileCard('p3'), 'a blob that is not JSON').toEqual({ id: 'p3', name: '', avatar: null, onboarded: false });
+    localStorage.setItem(saveKeyFor('p4'), JSON.stringify(['an', 'array']));
+    expect(profileCard('p4'), 'JSON that is not an object').toEqual({ id: 'p4', name: '', avatar: null, onboarded: false });
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 3, name: 42, avatar: 7, onboarded: 'yes' }));
+    expect(profileCard('p2'), 'fields of the wrong type are dropped, not shown').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
+  });
+
+  it("a v2 save's card agrees with load() about whether that child has played (#20 slice 2)", () => {
+    // `onboarded` only exists from v3 and `MIGRATIONS[2]` derives it from the avatar. `load()` does not write
+    // the migrated blob back, and nothing on `boot → map → 👥` calls `save()`, so on the first launch after an
+    // upgrade the picker draws a still-v2 blob: reading the field raw told a family a fully-played game was
+    // empty (#380 review B3). The card and the migration must give the same answer about the same bytes.
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: 2, name: 'Ada', avatar: 'volt', coins: 30 }));
+    expect(migrate({ v: 2, name: 'Ada', avatar: 'volt' }).onboarded, "the migration's own answer").toBe(true);
+    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true });
+
+    // And the other half of that rule: a v2 blob with no ninja chosen never played, so the card says so.
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 2, name: 'Bo' }));
+    expect(migrate({ v: 2, name: 'Bo' }).onboarded).toBe(false);
+    expect(profileCard('p2')).toEqual({ id: 'p2', name: 'Bo', avatar: null, onboarded: false });
+
+    // A v3 blob still wins on its own field — `false` there means mid-wizard, whatever the avatar says (#67).
+    localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 3, name: 'Cass', avatar: 'kai', onboarded: false }));
+    expect(profileCard('p3')).toEqual({ id: 'p3', name: 'Cass', avatar: 'kai', onboarded: false });
+  });
+
+  it('a card is blank for a save this build cannot open, exactly as load() is (#20 slice 2)', () => {
+    // #380 review B2. `profileCard` applied `MIGRATIONS[2]`'s rule but skipped the version gate `load()`
+    // applies before it, so a save from a **newer build** — which `migrate()` refuses outright — drew the
+    // child's real name and ninja. The tap then succeeded, `afterPick()` read `onboarded: false` off the
+    // default `load()` answers, and the child went through the first-run wizard with `readOnly` latched and
+    // every write silently dropped, their real save sitting intact under its own key.
+    const future = { v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', onboarded: true, coins: 99 };
+    localStorage.setItem(saveKeyFor('p2'), JSON.stringify(future));
+    expect(isFutureSave(future), 'the blob this is about').toBe(true);
+    expect(migrate(future), "load()'s own answer is a fresh default").toMatchObject({ name: '', avatar: null, onboarded: false });
+    expect(profileCard('p2'), 'so the card says the same thing the tap will give')
+      .toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
+
+    // The same for a `v` no build ever wrote — also refused by `isMigratable`, for a different reason (#232).
+    localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 'two', name: 'Cass', avatar: 'kai', onboarded: true }));
+    expect(profileCard('p3')).toEqual({ id: 'p3', name: '', avatar: null, onboarded: false });
+
+    // And the gate is a gate, not a blanket: the versions the ladder *can* walk are unaffected.
+    localStorage.setItem(saveKeyFor('p4'), JSON.stringify({ v: 1, name: 'Dev', avatar: 'kai' }));
+    expect(profileCard('p4')).toEqual({ id: 'p4', name: 'Dev', avatar: 'kai', onboarded: true });
+  });
+
+  it('the card and the migration derive onboarded from one rule, not two copies (#20 slice 2)', () => {
+    // #380 review note 1. The rail held two spellings of the expression against a regex that stopped at the
+    // colon, so the fallback — the whole of the rule — was never compared, and the two had already drifted:
+    // a truthy non-string avatar answered `true` on one side and `false` on the other.
+    for (const avatar of [7, true, {}, []] as const) {
+      expect(onboardedOf({ v: 2, avatar }), `avatar: ${JSON.stringify(avatar)} is not a ninja anybody chose`).toBe(false);
+      expect(MIGRATIONS[2]({ v: 2, avatar }).onboarded).toBe(false);
+    }
+    expect(onboardedOf({ v: 2, avatar: 'volt' })).toBe(true);
+    expect(onboardedOf({ v: 2, avatar: '' }), 'an empty string is no ninja either').toBe(false);
+    expect(onboardedOf({ v: 3, avatar: 'volt', onboarded: false }), 'a real field always wins').toBe(false);
+  });
+
+  it('a profile added but never played still draws a card (#20 slice 2)', () => {
+    save({ name: 'Ada', onboarded: true });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    // `addProfile` writes no save on purpose, so the new slot is empty: the card has to come from the index.
+    expect(profileCards().map(c => c.id)).toEqual(['p1', 'p2']);
+    expect(profileCards()[1]).toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
   });
 });

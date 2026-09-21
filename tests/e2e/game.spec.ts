@@ -3,9 +3,11 @@ import { TOPICS } from '../../src/curriculum';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
+import { expectFitsViewport } from './viewport';   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
 
 declare global {
   interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
+  interface Window { __spoken?: string[] }                          // #380 review B2: every line the engine was handed, in order
 }
 
 // The live screen sets `__sna` to PlayHooks or MemoryHooks; a given test knows which, so the spec views it as
@@ -1779,6 +1781,47 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
     expect(saved.progress['r-count'].stars).toBeGreaterThan(0);
     expect(saved.coins).toBeGreaterThan(0);
   });
+
+  /**
+   * #363: the seeds above carry `dojo: null`, which the record check catches. A `dojo` that IS a record but
+   * broken inside was not — and what it takes down first is the **map screen**, before any game starts.
+   *
+   * `dojoCard()` (`src/ui/home.ts`) runs at boot and reads `carriedStreak(s, s.date)` → `s.streak.last`,
+   * `s.done.includes()` and `s.progress[…]`: a strict **superset** of what `applyEvent()` reads at the end
+   * of a game. `dojoFor()` rebuilds only a *stale* state, so a record carrying TODAY's date reaches both
+   * readers untouched, and the child meets the boot one first — a blank screen with nothing to start.
+   *
+   * The end-of-game path is real too and lands worse (inside `duel.ts`'s `showResults()`, between
+   * `hold(true)` and `overlay.hidden = false`, freezing both arenas) — but no fixture can reach it to be
+   * tested: anything that crashes `applyEvent()` has already crashed the map. So this rail asserts the boot,
+   * which is both the first symptom and the stronger guard (PR #408 review, B1).
+   */
+  test('guard rail: a record-shaped but broken `dojo` still renders the map and its Daily Dojo card', async ({ page }) => {
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    // The date is computed IN THE PAGE. `today()` is `toISOString().slice(0, 10)`, so a run crossing UTC
+    // midnight between a Node-side seed and the assertion would leave a *stale* `dojo` — which `dojoFor()`
+    // rolls over, quietly evaporating the reproduction (PR #408 review, note 8). `v: 1` matches
+    // `seedPlayer`: the v2→v3 step is what marks a save with an avatar as already onboarded.
+    await page.addInitScript(() => {
+      if (localStorage.getItem('sna:v1')) return;
+      const date = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('sna:v1', JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', year: 'year2', dojo: { date } }));
+    });
+    await page.goto('/');
+
+    // The map and the card itself — this is the assertion that goes red without the guard, and it names the
+    // reader that actually throws.
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('#dojo')).toBeVisible();
+    await expect(page.locator('#dojo .dojo-item')).toHaveCount(3);
+    // …drawn from a *default* state, not a half-read one: a fresh day has no streak multiplier and the foot
+    // offers the set bonus rather than "come back tomorrow".
+    await expect(page.locator('#dojo .mult')).toHaveCount(0);
+    await expect(page.locator('#dojo .dojo-foot')).toContainText('Finish all three');
+    expect(failed, `while landing on the map with a broken dojo${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+  });
 });
 
 /**
@@ -1870,5 +1913,342 @@ test.describe('offline (#15)', () => {
     expect(fromNetwork, 'every same-origin response while offline must come from the service worker').toEqual([]);
 
     await context.setOffline(false);
+  });
+});
+
+/**
+ * #20 slice 2 — "Who is playing?", the profile picker. Slice 1 gave siblings a save each at the storage layer
+ * and nothing in the app called it; these are the first tests where two children actually reach their own game.
+ *
+ * The index shape is `src/storage.ts`'s: `sna:profiles = { v: 1, active, ids }`, profile 1 under the historical
+ * `sna:v1` key and the rest under `sna:v1:p2`… — seeded directly rather than walked, the same trade `seedPlayer`
+ * makes above, because the walk through onboarding is the *other* tests' subject.
+ */
+async function seedSiblings(page: Page, active = 'p1') {
+  await page.addInitScript(({ index, ada, bo }) => {
+    if (!localStorage.getItem('sna:profiles')) {
+      localStorage.setItem('sna:v1', ada);
+      localStorage.setItem('sna:v1:p2', bo);
+      localStorage.setItem('sna:profiles', index);
+    }
+  }, {
+    index: JSON.stringify({ v: 1, active, ids: ['p1', 'p2'] }),
+    ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+    bo: JSON.stringify({ v: SAVE_VERSION, name: 'Bo', avatar: 'blaze', coins: 7, spent: 0, onboarded: true }),
+  });
+}
+
+test.describe('profile picker (#20 slice 2)', () => {
+  test('one profile: the launch picker never appears, and boot is unchanged', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');          // asserts `.home` is visible, i.e. boot went straight there
+    await expect(page.locator('.profile-screen')).toHaveCount(0);
+    // The route still exists for the one child on the device — it is the only way a second one is ever added.
+    await page.click('#who');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(1);
+    await expect(page.locator('#new-ninja')).toBeVisible();
+  });
+
+  test('two profiles: the picker comes first and each child keeps their own coins', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(2);
+    await expect(page.locator('.avatar-card[data-profile="p1"]')).toContainText('Ada');
+    await expect(page.locator('.avatar-card[data-profile="p2"]')).toContainText('Bo');
+
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('#change-av')).toContainText('Bo');
+    await expect(page.locator('#rewards'), "the sibling's coins, not the other child's").toContainText('7');
+
+    // The switch is persisted, not merely rendered: the next launch opens the picker again (two profiles), and
+    // the other card leads to a game that kept its own 40 coins through all of it.
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await page.click('.avatar-card[data-profile="p1"]');
+    await expect(page.locator('#change-av')).toContainText('Ada');
+    await expect(page.locator('#rewards')).toContainText('40');
+  });
+
+  /**
+   * guard rail (#380 review B1, round 3): a slot in the index with no save behind it — tap ＋ and close the
+   * app before a ninja is chosen, "Start again" in the grown-ups screen, or any sibling save the app cannot
+   * read — drew `AVATARS[0]`, Volt, because `avatarById` falls back rather than answering "none". On the one
+   * screen a pre-reader picks by the picture, an unplayed slot was pixel for pixel a sibling who plays as
+   * Volt, and it was labelled "New ninja" — the same two words as the ＋ card beside it, which does something
+   * else entirely. Every card in every other test has an avatar, which is why nothing saw it.
+   *
+   * The tap is asserted too (#380 review note 2): `afterPick()`'s un-onboarded branch was dead in the suite,
+   * and it is #67's rule at a second call site — a child who abandons the wizard must be sent back to it,
+   * never dropped on the map with an empty profile.
+   */
+  test('an unplayed slot is drawn as an empty slot, not as another child (#20 slice 2)', async ({ page }) => {
+    await page.addInitScript(({ index, ada }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);                 // p2 is in the index with no save key at all
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+
+    const played = page.locator('.avatar-card[data-profile="p1"]'), empty = page.locator('.avatar-card[data-profile="p2"]');
+    await expect(played.locator('img')).toHaveAttribute('src', /volt/);
+    await expect(empty.locator('img'), 'no portrait at all, rather than the first ninja in the list').toHaveCount(0);
+    await expect(empty, 'the dashed ＋ figure the ＋ card already means "empty" with').toHaveClass(/new-ninja/);
+    await expect(empty.locator('b'), "and words of its own, not the ＋ card's").not.toHaveText('New ninja');
+    await expect(page.locator('#new-ninja b')).toHaveText('New ninja');
+
+    // It is still a card, and tapping it goes where that child belongs: the wizard, not the map.
+    await empty.click();
+    await expect(page.locator('.choose-ninja-screen'), 'an unplayed slot opens the wizard').toBeVisible();
+    await expect(page.locator('.home'), 'never the map with an empty profile (#67)').toHaveCount(0);
+  });
+
+  test('a fourth ninja is the last: the New ninja card goes when the device is full', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await expect(page.locator('#new-ninja')).toBeVisible();
+    // Two more, each through the real onboarding the card opens — the child's own route, not the grown-ups'.
+    for (const [ninja, name] of [['blaze', 'Cass'], ['kai', 'Dee']] as const) {
+      await page.click('#new-ninja');
+      await expect(page.locator('.choose-ninja-screen'), 'a new ninja runs the normal wizard').toBeVisible();
+      await page.click(`.avatar-card[data-id="${ninja}"]`);
+      await page.click('#next');
+      await page.fill('#name', name);
+      await page.click('#go');
+      await page.click('#intro-go');
+      await expect(page.locator('.home')).toBeVisible();
+      await expect(page.locator('#change-av')).toContainText(name);
+      await page.click('#who');
+      await expect(page.locator('.profile-screen')).toBeVisible();
+    }
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(4);
+    await expect(page.locator('#new-ninja'), 'four is the most one device holds').toHaveCount(0);
+  });
+
+  /**
+   * guard rail (#380 review B1, and round 5's B3): the picker pushes no history entry of its own, so whatever
+   * entry is current when it opens is what everything leaving it unwinds onto. `renderIntro`'s `history.go(-2)`
+   * landed a brand-new Reception profile on the previous child's Year 2 island, or on an empty rewards screen.
+   *
+   * The 👥 control is on the sky map, which is the root, so the way to reach the picker over a stacked entry is
+   * the **boot** path: `history.state` survives a reload, a PWA relaunch or a restored tab, and boot drew the
+   * picker wherever the stack happened to be. Round 5's B3 is that door, and one function is now both doors —
+   * so this reloads from a stacked screen rather than clicking a button that no longer sits on one.
+   */
+  for (const from of ['island', 'rewards'] as const) {
+    test(`a new ninja added after a reload from the ${from} screen starts on their own sky map (#20 slice 2)`, async ({ page }) => {
+      await seedSiblings(page);
+      await page.goto('/');
+      await page.click('.avatar-card[data-profile="p1"]');
+      await expect(page.locator('.home.map')).toBeVisible();
+
+      if (from === 'island') {
+        await page.click('.island[data-year="year2"]');
+        await expect(page.locator('.island-screen')).toBeVisible();
+      } else {
+        await page.click('#rewards');
+        await expect(page.locator('.home.rewards')).toBeVisible();
+      }
+      expect(await page.evaluate(() => history.state?.screen ?? null), 'the screen we reload from pushed an entry').toBe(from);
+
+      await page.reload();
+      await expect(page.locator('.profile-screen')).toBeVisible();
+      expect(await page.evaluate(() => history.state?.screen ?? null), 'and the picker is drawn at the root, not on it').toBeNull();
+      await page.click('#new-ninja');
+      await expect(page.locator('.choose-ninja-screen')).toBeVisible();
+      await page.click('.avatar-card[data-id="kai"]');
+      await page.click('#next');
+      await page.fill('#name', 'Cass');
+      await page.click('#go');
+      await page.click('#intro-go');
+
+      await expect(page.locator('.home.map'), "the new child's own sky map, not the screen the picker was opened from").toBeVisible();
+      await expect(page.locator('#change-av')).toContainText('Cass');
+      await expect(page.locator('#rewards'), 'and their own empty purse, not the 40 coins of the child they were added from')
+        .toHaveAttribute('aria-label', 'Rewards: 0 coins');
+    });
+  }
+
+  /**
+   * guard rail (#380 review B5): opened from the sky map the picker needs a way out. The ＋ card adds a profile
+   * for good — nothing deletes one until slice 3 — so without a back control a child who tapped 👥 out of
+   * curiosity could only leave by committing to a profile, and the launch picker would then greet them on
+   * every boot forever. At launch there is deliberately no back control: the picker is the root screen there,
+   * and since round 5's B3 that is *derived* from a screen being on the page rather than passed in by whichever
+   * route called — so this test and the two below it are the pair that hold the two halves apart.
+   */
+  test('the picker opened from the sky map has a way back that adds nobody (#20 slice 2)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await page.click('#who');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await page.click('#back');
+    await expect(page.locator('.home.map')).toBeVisible();
+    await expect(page.locator('#change-av'), 'the same child, still playing').toContainText('Ada');
+
+    await page.click('#who');
+    await expect(page.locator('.avatar-card[data-profile]'), 'and backing out created nobody').toHaveCount(1);
+  });
+
+  /**
+   * guard rail (#380 review B3, round 3): "back from the picker leaves the app, exactly as back from the map
+   * does" is stated three times — `main.ts`'s route comment, the rail's comment, the docstring above — and
+   * was verified by nothing at any layer. It is the property the whole no-history decision rests on, and on
+   * the APK hardware back is the primary navigation control, so a stray `enter('profiles')` would send every
+   * "chosen, go to the map" straight back here with no way out. The rail can see the two source sites; only
+   * this can see what pressing back actually does.
+   */
+  test('hardware back at the launch picker leaves the app, as it does from the map (#20 slice 2)', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    // Nothing of ours to pop: the picker is the root screen here, so back is the browser's to answer.
+    expect(await page.evaluate(() => history.state?.screen ?? null), 'the picker pushed no entry').toBeNull();
+    await page.goBack();
+    await expect(page.locator('.home'), 'no sibling\'s sky map was entered by the press').toHaveCount(0);
+  });
+
+  /**
+   * ...**with a history entry behind it**, which is the half the test above cannot see and round 5's B3 lived in
+   * (#380 review round 5, B3). After a single `page.goto('/')` the history length is 1, so `page.goBack()` is a
+   * no-op and the assertion above cannot fail however the picker is drawn. `history.state` survives a reload,
+   * so a pull-to-refresh, PWA relaunch or restored tab from any screen below the map used to draw the *launch*
+   * picker — the one that deliberately has no `←` because "back leaves the app" — on top of that screen's
+   * entry. One press then dismissed the screen whose whole question is which child is playing, straight into
+   * whoever the index last called active: a sibling playing in the other child's game, earning their coins.
+   */
+  test('...and with a reloaded entry behind it, which is the one that broke (#20 slice 2)', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p2"]');          // Bo is the child the index now calls active
+    await expect(page.locator('.home.map')).toBeVisible();
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+
+    await page.reload();
+    await expect(page.locator('.profile-screen'), 'the reload asks who is playing, as a launch does').toBeVisible();
+    expect(await page.evaluate(() => history.state?.screen ?? null), "the restored entry is unwound, not drawn on").toBeNull();
+    await expect(page.locator('.profile-screen #back'), 'so there is no back control, and none is owed').toHaveCount(0);
+
+    await page.goBack();
+    await expect(page.locator('.home'), 'the press leaves the app rather than walking past the question').toHaveCount(0);
+    await expect(page.locator('.island-screen'), 'and does not restore the screen the reload came from').toHaveCount(0);
+  });
+
+  /**
+   * guard rail (#380 review round 5, B1): 👥 was a fourth `.icon-btn` on the shared topbar, and that row was
+   * already full to the pixel — on a 390×844 iPhone, this project's own device, the new button's right edge sat
+   * at 397.6 with the screen ending at 390, and `document.documentElement.scrollWidth` went from 390 to 398, so
+   * the sky map, the island screen and the rewards screen all gained horizontal scroll. The control this checks
+   * is not decorative: with one profile the launch picker never appears, so it is the only way a second child
+   * is ever added, and a parent hunting for it found two-thirds of a button against the bezel.
+   *
+   * Nothing pointed `expectFitsViewport` — the rail shape this repo already built for this class of bug (#107,
+   * #109, #110) — at the topbar, and the picker's own e2e clicked the button successfully because Playwright
+   * clicks an element's centre, which at 374.6 was still on screen.
+   */
+  test('the sky map, island and rewards screens fit across, control and all (#20 slice 2)', async ({ page }) => {
+    // The purse is seeded on purpose, and it is the whole difference between a rail and a decoration: with an
+    // empty purse the coin pill reads "🪙 0" and the row has ~10px of slack, so the four-button topbar fitted
+    // and this test passed while the bug was in front of it. The review's own fixture — Ada, 40 coins, no
+    // streak — is what the measurement was taken against, so it is what this seeds.
+    await page.addInitScript(save => {
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }));
+    await page.goto('/');
+    await expect(page.locator('.home.map')).toBeVisible();
+    const vw = page.viewportSize()!.width;
+    const who = page.locator('#who');
+    await expect(who, 'the way to the picker is on the map, where every screen comes back to').toBeVisible();
+    const box = (await who.boundingBox())!;
+    expect(Math.round(box.x + box.width), 'the whole control is on screen, not two-thirds of it').toBeLessThanOrEqual(vw);
+    expect(box.height, 'and it clears the 44px touch floor (`design-language` §4)').toBeGreaterThanOrEqual(44);
+    await expectFitsViewport(page, 'sky map');
+
+    await page.click('.island[data-year="year2"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expectFitsViewport(page, 'island screen');
+
+    await page.goBack();
+    await page.click('#rewards');
+    await expect(page.locator('.home.rewards')).toBeVisible();
+    await expectFitsViewport(page, 'rewards screen');
+  });
+
+  /**
+   * A store that takes every `setItem` and throws. Registered *after* `seedSiblings`, so the seed lands and
+   * only the running game's writes are refused — `addInitScript`s run in registration order.
+   */
+  const refuseWrites = (page: Page) => page.addInitScript(() => {
+    const proto = Object.getPrototypeOf(localStorage) as Storage;
+    proto.setItem = () => { throw new DOMException('quota', 'QuotaExceededError'); };
+  });
+  /** Record every line handed to the engine, so a test can assert a sentence was *spoken* and not only printed. */
+  const captureSpeech = (page: Page) => page.addInitScript(() => {
+    window.__spoken = [];
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        speaking: false, pending: false, getVoices: () => [], cancel: () => {}, onvoiceschanged: null,
+        speak: (u: SpeechSynthesisUtterance) => { window.__spoken!.push(u.text); },
+      },
+    });
+  });
+
+  /**
+   * guard rail (#380 review B1 and B2), and the one fixture that holds both. A device whose store reads but
+   * refuses writes is a decision this repo has already made twice — #151's `writeFailed`, #232's read-only
+   * latch, `parents.ts`'s "This device is not saving progress right now" — and the answer is always that the
+   * game degrades rather than stops. Before the picker, such a device booted to the sky map and the child
+   * played unsaved.
+   *
+   * B1: `setActiveProfile` wrote the index even when `id` was already active, so every card on the launch
+   * picker was refused — including the child's own — and the launch picker deliberately draws no back
+   * control. Three cards, three refusals, no fourth thing to tap: the game became unreachable.
+   *
+   * B2: nothing at any layer rendered this screen, so both handlers' `refuse(...)` calls were untested code.
+   * Deleting them left `tsc` clean and the whole suite green while a refused tap did nothing at all — no
+   * hint, no sound, no spoken sentence — which to a pre-reader is indistinguishable from a broken game. The
+   * unit rail can only read `refuse`'s *definition*; this is what reads the call.
+   */
+  test('a refusing store: the refusals are spoken, and the child still reaches their own game (#20 slice 2)', async ({ page }) => {
+    await seedSiblings(page);
+    await captureSpeech(page);
+    await refuseWrites(page);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.profile-screen #back'), 'no way out but a card, which is why one of them must work').toHaveCount(0);
+
+    // The sibling's card is honestly refused: that switch genuinely cannot be persisted, and the next launch
+    // would put the child back on their own game with no explanation.
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('.profile-screen'), "and the child is not dropped into their sibling's game").toBeVisible();
+    await expect(page.locator('#who-hint')).toHaveText('This browser will not let the game save, so it cannot swap ninja. 😕');
+    await expect.poll(() => page.evaluate(() => window.__spoken ?? []), { message: 'read aloud, not only printed' })
+      .toContain('This browser will not let the game save, so it cannot swap ninja. 😕');
+
+    // "New ninja" the same, and with its own sentence — the two refusals are not one message (#335 item 2).
+    await page.click('#new-ninja');
+    await expect(page.locator('#who-hint')).toHaveText('This browser will not let the game save, so a new ninja cannot be added. 😕');
+    await expect.poll(() => page.evaluate(() => window.__spoken ?? []))
+      .toContain('This browser will not let the game save, so a new ninja cannot be added. 😕');
+
+    // ...and their own card lets them through to a game that plays unsaved, as the device did before #20.
+    await page.click('.avatar-card[data-profile="p1"]');
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('#change-av'), 'their own save, read from their own slot').toContainText('Ada');
+    await expect(page.locator('#rewards')).toContainText('40');
+  });
+
+  test('the launch picker has no back control — it is the root screen (#20 slice 2)', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.profile-screen #back'), 'back from the root leaves the app, as it does from the map').toHaveCount(0);
   });
 });

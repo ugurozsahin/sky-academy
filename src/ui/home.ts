@@ -12,7 +12,9 @@ import { $, $$, render, stars } from './dom';
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
-  memory: (year: YearInfo) => void; duel: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void; up: () => void;
+  memory: (year: YearInfo) => void; duel: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void;
+  profiles: () => void;   // #20 slice 2: "Who is playing?"
+  up: () => void;
 };
 
 function topbar(nav: Nav, rerender: () => void) {
@@ -72,7 +74,11 @@ export function mapScreen(nav: Nav) {
         </button>`; }).join('')}
     </div>
     ${dojoCard()}
-    <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS & KS1 National Curriculum</span><button class="foot-link" id="grownups" aria-label="For grown-ups">👤 For grown-ups</button></footer>
+    <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS & KS1 National Curriculum</span>
+      <div class="foot-links">
+        <button class="foot-link" id="grownups" aria-label="For grown-ups">👤 For grown-ups</button>
+        <button class="foot-link" id="who" aria-label="Who is playing?">👥 Who is playing?</button>
+      </div></footer>
   </section>`, 'bg-sky');
   tb.bind();
   $$('.island').forEach(b => b.addEventListener('click', () => {
@@ -80,6 +86,13 @@ export function mapScreen(nav: Nav) {
     save({ year: y.id }); sfx.tap(); say(`${y.title} island`); nav.island(y);
   }));
   $('#grownups').addEventListener('click', () => { sfx.tap(); nav.parents(); });
+  // #20 slice 2: with one profile the launch picker never shows, so this is the only way a second child is ever
+  // added — it has to be on the sky map and not behind the grown-ups gate (the owner's decision: "adding one is
+  // open to the child"). It sat on the topbar until #380 review round 5, B1: that row was full to the pixel, a
+  // fourth `.icon-btn` hung 8px off a 390px iPhone and gave every topbar screen horizontal scroll, and the
+  // 44px touch floor (`design-language` §4) says the space cannot come out of the buttons. Here it is beside
+  // the other whole-device control instead, on the one screen every other screen comes back to.
+  $('#who').addEventListener('click', () => { sfx.tap(); nav.profiles(); });
 }
 
 /** Island: topics for one year group + its Sky Storm. */
