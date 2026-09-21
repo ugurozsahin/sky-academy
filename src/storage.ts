@@ -131,6 +131,15 @@ function readIndex(): ProfileIndex | null {
  * under its own key — and it must not orphan a sibling's either, which is why this probes rather than
  * returning `['p1']` flat. Nothing is written here on purpose: a blob we merely failed to parse is not
  * overwritten until a real profile action (`setActiveProfile`, `addProfile`) asks for one.
+ *
+ * **What the probe can and cannot see** (#335 items 3 and 4, stated rather than fixed). It sees a slot only
+ * while that slot *holds a save*, so a profile added by `addProfile()` and never played — which deliberately
+ * writes no save — is invisible to it, as is a slot after `reset()`; if the index is then lost, that child is
+ * not in this list. And `readItem()` collapses "absent", "unreadable" and "the read threw" into `null`, so in
+ * an environment where `getItem` itself throws — private mode, a WebView with DOM storage off, both named in
+ * this file already — four configured children present here as one. Neither loses anything: the saves stay
+ * under their own keys, and the same environments refuse the writes that would overwrite them. The list is
+ * wrong, not the data.
  */
 function defaultIndex(): ProfileIndex {
   const ids = PROFILE_IDS.filter(id => id === 'p1' || holdsSave(id));
@@ -167,8 +176,11 @@ function writeIndex(next: ProfileIndex): boolean {
   try { localStorage.setItem(INDEX_KEY, blob); } catch { return false; }
   return readItem(INDEX_KEY) === blob;
 }
-/** The profiles on this device, in slot order. One profile is the normal case and costs no stored key. */
-export const profileIds = (): ProfileId[] => currentIndex().ids;
+/** The profiles on this device, in slot order. One profile is the normal case and costs no stored key.
+ *
+ *  `readonly` because the array is the caller's copy of parsed state and pushing to it changes nothing —
+ *  `profileIds().push('p4')` used to type-check and silently do nothing (#335 item 5). */
+export const profileIds = (): readonly ProfileId[] => currentIndex().ids;
 /** Whose game the **store** says is being played — what slice 2's picker draws, and where a session starts.
  *  Not necessarily whose game `load()` and `save()` are acting on: that is `sessionProfile()`, resolved once
  *  per session, and the two part company in a second tab on purpose (#330 round 2, N3). */
@@ -203,37 +215,168 @@ function dropSessionState() { cache = null; readOnly = false; writeFailed = fals
  */
 function leaveProfile() { dropSessionState(); cacheProfile = null; }
 /**
+ * Re-entering the profile the index already calls active — the child tapping their own card on the picker.
+ *
+ * Two genuinely different situations wear that one shape, and they are told apart by the profile *this
+ * session* is playing as rather than by the one the index names:
+ *
+ * - **A second tab moved `active` while this session played someone else** (`cacheProfile` is a different
+ *   child, or nothing has been resolved yet). That is a switch: `leaveProfile()`, so the next read resolves
+ *   afresh and puts the child on the card they tapped rather than on whoever this session last cached. The
+ *   latches go with it, because they describe the sibling's blob and it is about to be a different one.
+ * - **The same child this session is already on.** Re-resolving would answer `id` again, so `cacheProfile`
+ *   stays; only the cached blob is a question, and **it is kept whenever a latch says it diverges from disk**
+ *   (#380 review round 4, B1). `cache` is then the session's only copy: under `writeFailed` the child is
+ *   playing on coins no `setItem` ever accepted, and under `readOnly` on a blob `save()` deliberately never
+ *   writes back (#232). Dropping it discarded that silently — the tap answered `true`, `refuse()` was never
+ *   reached, and the next `load()` handed back the last blob that reached disk, or `{...DEFAULT}` and the
+ *   first-run wizard on a store that had accepted nothing this session. With neither latch set, cache and
+ *   disk agree, so it is dropped and the store answers the next read.
+ *
+ * **Both write latches stay on that second path**, which is the other difference from `leaveProfile()`: they
+ * describe *this* child's blob and it is still the same blob, so a device that cannot save must go on saying
+ * so (#151's failed-write flag, #232's read-only latch, `parents.ts:35`'s sentence). Clearing them would make
+ * the grown-ups screen forget a real fault every time a child tapped their own card.
+ */
+function rereadProfile(id: ProfileId) {
+  if (cacheProfile !== id) { leaveProfile(); return; }
+  if (!writeFailed && !readOnly) cache = null;
+}
+/**
  * Switch the active profile. False when `id` is not one of this device's profiles, or when the index was not
  * kept: a switch the store refuses would put the child back on their sibling's game at the next launch, and
  * on a store that refuses this write the new profile could not be saved either. The caller says so rather
  * than the session pretending (the `buyItem`/`equipItem` rule, #151).
  *
+ * **Re-selecting the child who is already active is not a switch and writes nothing** (#380 review B1). It
+ * used to: the index was rewritten with the value it already held, so on a store that refuses writes every
+ * card on the launch picker was refused — the child's own included — and since the launch picker draws no
+ * back control, the device that used to boot to the sky map and play unsaved could no longer reach the game
+ * at all. Nothing needs persisting to hand a child back their own game, so nothing is attempted.
+ *
  * **This session is unchanged on a false return; the store is not guaranteed to be.** `writeIndex` promises
  * only that it is not holding this index, not that the key is untouched — on a partially-working store the
  * `setItem` may have landed and the read-back disagreed. Read its paragraph before relying on the stronger
  * reading; `false` did once say "nothing changes" outright, and that outlived the narrowing (#330 round 3, N5).
+ *
+ * **Both arms end in `rereadProfile`, and that is the fix for a whole shape of bug rather than one path**
+ * (#380 review round 5, B2). Round 4 taught the `idx.active === id` arm to keep a cached save the store has
+ * refused, and left `leaveProfile()` on the arm below it — where the index *did* change. But the index naming
+ * a different child does not mean *this session* is playing one: a second tab moving `active` to Bo is exactly
+ * the case round 4 was about, and Ada tapping her own card then took the write path and had her unsaved coins
+ * dropped with `true` returned and `isWriteFailing()` cleared. Which arm ran decides what is *written*;
+ * whether the session changes child is `rereadProfile`'s question either way, asked of `cacheProfile` rather
+ * than of the index.
  */
 export function setActiveProfile(id: ProfileId): boolean {
   const idx = currentIndex();
-  if (!idx.ids.includes(id) || !writeIndex({ ...idx, active: id })) return false;
-  leaveProfile();
+  if (!idx.ids.includes(id)) return false;
+  if (idx.active !== id && !writeIndex({ ...idx, active: id })) return false;
+  rereadProfile(id);
   return true;
 }
 /**
- * Add a profile and make it active, returning its id — or null when the device is at `MAX_PROFILES` or the
- * index was not kept. The new profile starts on `DEFAULT`, so the caller runs the normal onboarding.
+ * The two ways adding a profile can be refused, told apart (#335 item 2). `null` carried both, and the picker
+ * has to say two different things: `'full'` is "four ninjas is the most" — a sentence about this family —
+ * while `'store'` is "this browser will not let the game save", a fault the child cannot do anything about.
+ * `writeIndex`'s catch is the only place that knows the difference and it used to discard it, and neither
+ * refusal sets `writeFailed`, so `isWriteFailing()` could not recover it afterwards either.
  *
- * Null carries both refusals with no way to tell them apart, and slice 2's picker has to say two different
- * things ("four ninjas is the most" against "this browser will not let the game save") — #335. The same
- * caveat as `setActiveProfile` applies to the store on a null return.
+ * A result object rather than a widened string union: `ProfileId` is itself a string literal union, so
+ * `'full' | ProfileId` would need `isProfileId()` at every call site to be read at all.
  */
-export function addProfile(): ProfileId | null {
+export type AddProfileResult = { ok: true; id: ProfileId } | { ok: false; why: 'full' | 'store' };
+/**
+ * Add a profile and make it active. The new profile starts on `DEFAULT`, so the caller runs the normal
+ * onboarding; `why` says which refusal it got (see `AddProfileResult`).
+ *
+ * The free slot is probed as well as counted (#335 item 1): an index that is valid but under-reports a
+ * populated slot would otherwise hand a new child a slot that already holds a sibling's save, and onboarding
+ * would merge straight over it. `defaultIndex()` makes that index hard to come by — it probes the same way —
+ * but `addProfile` is the one that does the damage, so it checks for itself rather than inheriting the care.
+ * The consequence is that "a slot is free" here is stricter than `ids.length < MAX_PROFILES`, which is why the
+ * picker asks this function instead of counting: with four slots and three profiles it can still answer
+ * `'full'`, and that is the honest answer — there is nowhere to put a fourth child.
+ *
+ * The same caveat as `setActiveProfile` applies to the store on a `'store'` refusal.
+ *
+ * **A refused save is a refusal here too** (#380 review round 5, B2). Adding a profile switches away from the
+ * child holding the device, so their session state goes — and under `writeFailed` that state is the only copy
+ * of the game they have been playing, coins the store never accepted (#151). The index blob is ~39 bytes and
+ * the save blob ~413, so a filling quota necessarily passes through a band where this write is kept and that
+ * one is not: `writeIndex` returned true, `ok: true` came back, `refuse()` was never reached, and one tap on
+ * "New ninja" took the playing child's name, ninja and coins with no hint, no sound and nothing spoken. It
+ * also cleared the latch, so `parents.ts`'s "this device is not saving progress" — the one place a grown-up
+ * could have learnt why — went quiet. A profile the store cannot save is one it cannot hand a child, so the
+ * honest answer is `'store'`, checked **before** the index write so the refusal changes nothing at all.
+ *
+ * `readOnly` (#232) deliberately does not refuse: the store there is writable and the new child's save will
+ * land: it is *this* child's blob that comes from a future version, and `save()` never writes it back, so the
+ * session cache holds nothing disk is missing. `'full'` still comes first — there being nowhere to put a
+ * fourth child is true whatever the store is doing, and the count is what the family can act on.
+ */
+export function addProfile(): AddProfileResult {
   const idx = currentIndex();
-  const free = PROFILE_IDS.find(id => !idx.ids.includes(id));
-  if (!free || !writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) return null;
+  const free = PROFILE_IDS.find(id => !idx.ids.includes(id) && !holdsSave(id));
+  if (!free) return { ok: false, why: 'full' };
+  if (writeFailed) return { ok: false, why: 'store' };
+  if (!writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) return { ok: false, why: 'store' };
   leaveProfile();
-  return free;
+  return { ok: true, id: free };
 }
+/**
+ * Name and ninja for a profile that is **not** the one this session is playing — what the picker draws on a
+ * card. Deliberately not `load()`: that resolves the session's own profile and caches it, so reading a
+ * sibling's save through it would either answer the wrong child or latch the session onto them.
+ *
+ * Read-only and tolerant by design. It takes the two fields a card shows and nothing else, so a save from an
+ * older version, a hand-edited one, or a blob that is not an object at all yields a card with an empty name
+ * and no ninja — which the picker renders as an un-onboarded slot — instead of throwing on the first screen a
+ * child sees. Nothing here writes, so drawing the picker cannot migrate or damage a save.
+ *
+ * It does not *run* the migrations, but it applies `MIGRATIONS[2]`'s rule for `onboarded` rather than reading
+ * the field raw. A v2 blob has no such field, `load()` derives it and deliberately does not write it back,
+ * and nothing on `boot → map → 👥` calls `save()` — so on the first launch after an upgrade a fully-played
+ * child's card said "Not started yet" while `load()` answered `onboarded: true` for the very same save
+ * (#380 review B3). The rule is `onboardedOf` below and both sites call it, so the two cannot drift.
+ *
+ * It also applies `load()`'s **version gate** before any of that (#380 review B2). `migrate()` answers
+ * `{ ...DEFAULT }` for anything `isMigratable` rejects — a blob from a newer build, or an unreadable `v` —
+ * so a card that read those fields raw drew "Bo — Blaze Ninja" for a save this build cannot open, and the
+ * tap that followed put Bo in the first-run wizard with `readOnly` latched and every write silently
+ * dropped. Answering `blank` is the honest version of that card: "Not started yet" is at least what tapping
+ * it gives. Saying *why* on the card is #232's `isReadOnlySave` hook, and is not this slice's.
+ */
+export interface ProfileCard { id: ProfileId; name: string; avatar: string | null; onboarded: boolean }
+export function profileCard(id: ProfileId): ProfileCard {
+  const blank: ProfileCard = { id, name: '', avatar: null, onboarded: false };
+  const raw = readItem(saveKeyFor(id));
+  if (!raw) return blank;
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return blank; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return blank;
+  const s = parsed as RawSave;
+  if (!isMigratable(s)) return blank;                       // the card agrees with load(), which refuses this blob
+  return {
+    id,
+    name: typeof s.name === 'string' ? s.name : '',
+    avatar: typeof s.avatar === 'string' ? s.avatar : null,
+    onboarded: onboardedOf(s),
+  };
+}
+/**
+ * Whether a stored blob counts as having been through onboarding — **the one home of that rule** (#380
+ * review B3, note 1). `MIGRATIONS[2]` derives the field when a v2 blob reaches the ladder, and `profileCard`
+ * derives it for a sibling's slot the ladder never runs on; they have to answer the same thing about the
+ * same bytes, and a rail comparing two copies of the expression could only ever compare their spelling.
+ *
+ * `typeof s.avatar === 'string'` is part of the rule, not a belt: a hand-edited `{ avatar: 7 }` is truthy
+ * and is not a ninja anybody chose, and the two sites had already drifted apart on exactly that blob.
+ */
+export const onboardedOf = (s: RawSave): boolean =>
+  typeof s.onboarded === 'boolean' ? s.onboarded : typeof s.avatar === 'string' && !!s.avatar;
+/** Every profile on this device as a card, in slot order — the picker's whole data source. */
+export const profileCards = (): ProfileCard[] => profileIds().map(profileCard);
 
 // A raw blob read back from storage: JSON of unknown shape (any past version, or hand-edited). Migrations walk it.
 type RawSave = Record<string, unknown>;
@@ -259,7 +402,7 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
   // the acceptance criterion is that no existing player is sent back through the wizard by this update.
   2: s => ({
     ...s,
-    onboarded: typeof s.onboarded === 'boolean' ? s.onboarded : !!s.avatar,
+    onboarded: onboardedOf(s),      // the rule itself lives by `profileCard`, which has to give the same answer
   }),
 };
 
