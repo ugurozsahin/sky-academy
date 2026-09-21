@@ -3026,57 +3026,6 @@ describe('a pull that cannot fast-forward has a stated recovery, not an improvis
  * Prove one red: drop the pulse sentence from STEP 1; drop the reviewer paragraph from the watchdog's check
  * 3; or put the `loosening` clause back to "held the same way".
  */
-/**
- * #326: a reviewer run holds every diff, test run and agent output it reviews in one context, and nothing
- * caps how many pull requests that is. Past a point auto-compaction fires — not a decision the run makes —
- * and a summary keeps conclusions while dropping the evidence they were built on. For this work that is close
- * to fatal: §7's bar needs a `file:line` and a head SHA, a marker on the wrong pull request has no undo, and
- * §5 judges the current head.
- *
- * The rule's home is `.claude/skills/review-pr/SKILL.md`, where the review protocol lives; the prompt carries
- * only the flow, which is the split `docs/decisions/002-routine-prompt-is-flow-only.md` asks for. So there are
- * two rails: one that the skill still states each layer, and one that the prompt still routes a run to it.
- *
- * Prove one red: drop the subagent clause from STEP 2, or any of the three headings from §4/§6.
- */
-describe('a reviewer run does not hold two diffs at once (#326)', () => {
-  const skill = () => readFileSync(new URL('../../.claude/skills/review-pr/SKILL.md', import.meta.url), 'utf8');
-  const prompt = () => readFileSync(new URL('../../docs/REVIEWER-PROMPT.md', import.meta.url), 'utf8');
-  const flat = (t: string) => t.replace(/\s+/g, ' ');
-
-  it('the skill carries all three layers, with the reason each exists', () => {
-    const t = flat(skill());
-    expect(t, 'layer 3: one review, one context — the structural half').toMatch(/one review, one context/i);
-    expect(t, 'and that the first stays in the parent, or a single waiting PR pays 30 KB for nothing')
-      .toMatch(/first waiting pull request here, and each one after it in its own subagent/i);
-    expect(t, 'layer 1: a finding written when it is confirmed outlives the context that found it')
-      .toMatch(/Write each finding when you confirm it, not at the end/i);
-    expect(t, 'layer 2: the three reads that close the three ways a summarised context gets a mark wrong')
-      .toMatch(/Re-read before you mark/i);
-    // Scoped to layer 2's own paragraph: `file:line` appears elsewhere in this skill, so a whole-file
-    // `toContain` stayed green when the words were taken out of the rule that needs them.
-    const layer2 = flat(skill()).split('Re-read before you mark')[1]?.slice(0, 460) ?? '';
-    expect(layer2.length, 'layer 2 has no body, so the reads below are asserted against nothing').toBeGreaterThan(200);
-    for (const evidence of ['pull request number', 'head SHA', 'file:line'])
-      expect(layer2, `layer 2 must name ${evidence}, or "re-read" is a gesture`).toContain(evidence);
-    // The reason, not just the instruction: a rule whose why is gone is the next byte squeeze's first target.
-    expect(t, 'auto-compaction is the mechanism and must be named').toMatch(/auto-compaction fires/i);
-    expect(t, 'and it must say plainly that this caps nothing — throughput is the point of the routine')
-      .toMatch(/caps nothing|does not cap/i);
-  });
-
-  it('the reviewer prompt routes a run to it, and does not restate it', () => {
-    const p = flat(prompt());
-    expect(p, 'STEP 2 is where a run decides how to take the second pull request')
-      .toMatch(/the first here, the rest each in its own subagent/i);
-    expect(p, 'and it must point at the section that carries the rule').toMatch(/\u00a74, #326/);
-    // ADR 002: the prompt is flow. A copy of the reasoning here is what that decision exists to prevent, and
-    // this file has no bytes for one — it sits at its budget.
-    expect(p, 'the reasoning belongs in the skill, not in a second copy here')
-      .not.toMatch(/auto-compaction|cross-contamination/i);
-  });
-});
-
 describe('the reviewer routine keeps a pulse, and something reads it (#327, #320)', () => {
   const doc = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
   const flat = (s: string) => s.replace(/\s+/g, ' ');
@@ -3158,5 +3107,119 @@ describe('the reviewer routine keeps a pulse, and something reads it (#327, #320
       .toMatch(/never merges one|owner's to merge/i);
     expect(flat(rule4), 'and "held the same way" alone is the wording that misled twice')
       .not.toMatch(/labelled `loosening` is held the same way \(#112; `review-pr` skill §5\)\./);
+  });
+});
+
+/**
+ * #326: a reviewer run holds every diff, test run and agent output it reviews in one context, and nothing
+ * caps how many pull requests that is. Past a point auto-compaction fires — not a decision the run makes —
+ * and a summary keeps conclusions while dropping the evidence they were built on. For this work that is close
+ * to fatal: §7's bar needs a `file:line` and a head SHA, a marker on the wrong pull request has no undo, and
+ * §5 judges the current head.
+ *
+ * The rule's home is `.claude/skills/review-pr/SKILL.md`, where the review protocol lives; the prompt carries
+ * only the flow, which is the split `docs/decisions/002-routine-prompt-is-flow-only.md` asks for. So the
+ * skill-side rails assert each layer is still stated, and the prompt-side one that a run is still routed to it.
+ *
+ * Every skill-side assertion is scoped to **its own rule's paragraph**, through `para()`, which throws when
+ * the heading is gone or duplicated and whose slice ends where the next rule begins. Two failures are behind
+ * that: a whole-file `toContain` went green with the words deleted from the rule that needed them, and the
+ * first fix for it used `slice(0, 460)` — a window that is 460 characters long whenever the heading exists, so
+ * the non-vacuity guard over it could not fail and certified a gutted rule (PR #440 review, B5).
+ *
+ * What these cannot catch: whether a run obeys any of it. They are text over an instruction file, and the
+ * contract's four rules are each pinned by the one clause a byte squeeze would reach for first.
+ *
+ * Prove one red: drop the subagent clause from STEP 2; drop any of the three layer headings from §4/§6; or
+ * gut a pinned paragraph's body while leaving its heading in place.
+ */
+describe('a reviewer run does not hold two diffs at once (#326)', () => {
+  const skill = () => readFileSync(new URL('../../.claude/skills/review-pr/SKILL.md', import.meta.url), 'utf8');
+  const prompt = () => readFileSync(new URL('../../docs/REVIEWER-PROMPT.md', import.meta.url), 'utf8');
+  const flat = (t: string) => t.replace(/\s+/g, ' ');
+
+  /**
+   * The text between a rule's own heading and the start of the next rule. Throws rather than returning '' —
+   * a heading that moved, was reworded or was pasted a second time makes every pin below it meaningless, and
+   * silence is how that reads from the outside. The caller asserts a floor on the length it returns, which is
+   * only worth anything because this slice ends at real text rather than a character count.
+   */
+  const para = (start: string, end: string) => {
+    const parts = flat(skill()).split(start);
+    if (parts.length !== 2) throw new Error(`"${start}" appears ${parts.length - 1} times in the skill, expected exactly once`);
+    const body = parts[1].split(end)[0];
+    if (body === parts[1]) throw new Error(`"${end}" does not follow "${start}" — the section was reorganised`);
+    return body;
+  };
+
+  it('the skill carries all three layers, with the reason each exists', () => {
+    const t = flat(skill());
+    expect(t, 'layer 3: one review, one context — the structural half').toMatch(/one review, one context/i);
+    expect(t, 'and that the first stays in the parent, or a single waiting PR pays 30 KB for nothing')
+      .toMatch(/first waiting pull request here, and each one after it in its own subagent/i);
+    expect(t, 'layer 1: a finding written when it is confirmed outlives the context that found it')
+      .toMatch(/Write each finding when you confirm it, not at the end/i);
+    expect(t, 'layer 2: the three reads that close the three ways a summarised context gets a mark wrong')
+      .toMatch(/Re-read before you mark/i);
+
+    // Layer 1's body IS its destination — "somewhere that outlives the context" — and only the trigger
+    // sentence above was pinned, so the destination could be deleted green (PR #440 review, N3).
+    const layer1 = para('Write each finding when you confirm it, not at the end', '**Re-read before you mark');
+    expect(layer1.length, 'layer 1 has no body, so the destination below is asserted against nothing').toBeGreaterThan(120);
+    expect(layer1, 'a finding has to go somewhere outside the context, or "write it" has no object')
+      .toMatch(/outlives the context/);
+
+    // `file:line` appears elsewhere in this skill, so a whole-file `toContain` stayed green when the words
+    // were taken out of this rule.
+    const layer2 = para('Re-read before you mark', '**Merge**');
+    expect(layer2.length, 'layer 2 has no body, so the reads below are asserted against nothing').toBeGreaterThan(200);
+    for (const evidence of ['pull request number', 'head SHA', 'file:line'])
+      expect(layer2, `layer 2 must name ${evidence}, or "re-read" is a gesture`).toContain(evidence);
+    // A run that re-reads the head and posts anyway has obeyed the instruction and caught nothing: the
+    // detection the reason claims lives in the comparison, not the reading (PR #440 review, N2).
+    expect(layer2, 'layer 2 must say what to do when a re-read disagrees, not just to re-read')
+      .toMatch(/re-run §2 on the new head/);
+
+    // The reason, not just the instruction: a rule whose why is gone is the next byte squeeze's first target.
+    expect(t, 'auto-compaction is the mechanism and must be named').toMatch(/auto-compaction fires/i);
+    expect(t, 'and it must say plainly that this caps nothing — throughput is the point of the routine')
+      .toMatch(/caps nothing|does not cap/i);
+  });
+
+  /**
+   * PR #440 review, B1–B4. Layer 3 handed reviews 2..N to a subagent and specified none of the delegation,
+   * and each thing left unsaid fails the same way — output indistinguishable from a correct review. Nobody
+   * was assigned the marks, so a review produces none of them or two of them; §4's three agents cannot be
+   * spawned from inside a subagent at all, which §4's retry escape reads as a timing problem; a channel
+   * restricted to "the verdict and the findings" cannot carry what §6's merge comment must state, so the
+   * parent supplies it from assumption; and "each in its own subagent" does not say *sequentially*, while
+   * §2 and §3 share one working tree.
+   */
+  it('the delegation contract assigns the marks, the agents, the order and the payload', () => {
+    const c = para('**The delegation contract.**', 'This caps nothing');
+    expect(c.length, 'the contract has no body, so the four rules below are asserted against nothing').toBeGreaterThan(800);
+    expect(c, 'B1: exactly one of parent and subagent marks, or a block exists twice or not at all')
+      .toMatch(/parent alone marks, merges and comments; a subagent posts nothing to GitHub/);
+    expect(c, 'B2: a subagent cannot spawn one, so §4 coverage is the parent\'s or it is nobody\'s')
+      .toMatch(/three agents are the parent's, for every pull request/);
+    expect(c, 'and the reason has to stay, or §4\'s "retry, the roster registers late" reads as the answer')
+      .toMatch(/no agent-launching tool/);
+    expect(c, 'B4: one working tree, so two subagents at once contaminate each other\'s checkout')
+      .toMatch(/One at a time, in one checkout/);
+    expect(c, 'B3: the payload carries what §6\'s comment and §7\'s bar are written from')
+      .toMatch(/head SHA it judged/);
+    expect(c, 'and forbids filling the rest from assumption, which is the falsification §2 already bans')
+      .toMatch(/posts nothing it did not receive/);
+  });
+
+  it('the reviewer prompt routes a run to it, and does not restate it', () => {
+    const p = flat(prompt());
+    expect(p, 'STEP 2 is where a run decides how to take the second pull request')
+      .toMatch(/the first here, the rest each in its own subagent/i);
+    expect(p, 'and it must point at the section that carries the rule').toMatch(/§4, #326/);
+    // ADR 002: the prompt is flow. A copy of the reasoning here is what that decision exists to prevent, and
+    // this file has no bytes for one — it sits at its budget.
+    expect(p, 'the reasoning belongs in the skill, not in a second copy here')
+      .not.toMatch(/auto-compaction|cross-contamination/i);
   });
 });
