@@ -3396,6 +3396,23 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     '**Check the pull request body against the code**', STRUCTURAL);
   const bodyCheck = () => slice(s3(), 'the body-check bullet', '**Check the pull request body against the code**', null, STRUCTURAL);
 
+  // PR #469 round 4, B1: `attack` and `bodyCheck` are the last subsection in their section, so `end: null`
+  // runs to the section's true end rather than to the rule's own end — the same thing today, but it means
+  // text appended anywhere later in the section, however close to that end, reads as part of the rule and
+  // pads the floor above. Deleting a sentence from inside either window and appending unrelated filler right
+  // before the next `##` heading left the floor above unmoved on both — the reviewer's own reproduction.
+  // `sweep` and `bullet` cannot be gamed this way because their end anchor is the next `###` heading, pinned
+  // exactly once; `attack` and `bodyCheck` have no such heading to anchor on, so the anchor here is each
+  // rule's own last sentence instead, and this pins it the same way — as the section's literal last content,
+  // with nothing after it. It does not narrow what the floor above measures: the window `attack`/`bodyCheck`
+  // return is unchanged, so this is a genuinely separate check, not a rename of the one it accompanies.
+  const attackEnd = 'A run that re-reads its own work runs its own rail, sees its own green, '
+    + 'and concludes what it concluded the first time.';
+  const bodyCheckEnd = "An author's `nothing` beside two findings of your own is the gap that line was added "
+    + 'to expose — and **an absent `agents:` line is the same finding as an absent sweep claim**, for the '
+    + 'same reason: `open-pr` §4 calls that line the whole of the evidence, so a body without one has no '
+    + 'evidence, not good news.';
+
   it('the windows have not shrunk — the one check a qualifier cannot walk past', () => {
     // Typed over `SIZES`, so a budget deleted from the literal is a compile error rather than a silent
     // disappearance (PR #469 round 3, N1) — the same argument `sliceSkill`'s docstring makes for its
@@ -3412,6 +3429,30 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       expect(size, `${name} has shrunk below ${SIZES[name as keyof typeof SIZES]} — if that is an honest trim, `
         + 'lower the number in this commit and say so in the body; otherwise a rule has been gutted')
         .toBeGreaterThanOrEqual(SIZES[name as keyof typeof SIZES]);
+  });
+
+  /**
+   * PR #469 round 4, B1. `sweep` and `bullet` are bounded by the next `###` heading, so nothing can be
+   * appended after them without either landing inside the next rule (visible, and covered by that rule's own
+   * floor) or introducing a third heading (caught by the subsection test below). `attack` and `bodyCheck`
+   * have no such heading — they are the last rule in their section — so the one thing that can still happen
+   * to them is exactly what the reviewer's reproduction did: delete a sentence from inside the rule, and
+   * append unrelated prose right before the section's own end, where it reads as a plausible new bullet
+   * rather than as padding. The floor above cannot see it, because the window still runs to the section's
+   * true end and simply counts the filler as if it were the rule. This is the structural half `slice`'s own
+   * docstring says an open-tailed window needs: the rule's own last sentence, pinned as the section's literal
+   * last content, so anything appended after it — however small, however close to the true end — fails here
+   * even though the floor above stays green.
+   */
+  it('attack and bodyCheck end where their own last sentence ends, not wherever the section does', () => {
+    expect(s4().trim().endsWith(attackEnd),
+      'text appended after "attack it yourself"\'s own last sentence pads the floor above without tripping it — '
+      + 'the PR #469 round 4 reproduction')
+      .toBe(true);
+    expect(s3().trim().endsWith(bodyCheckEnd),
+      'text appended after the body-check bullet\'s own last sentence pads the floor above without tripping it — '
+      + 'the PR #469 round 4 reproduction')
+      .toBe(true);
   });
 
   /**
