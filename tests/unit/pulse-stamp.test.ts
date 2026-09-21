@@ -122,4 +122,18 @@ describe('every routine that writes or reads a pulse is pointed at the one home 
     '%s names scripts/pulse-stamp.mjs', (file) => {
       expect(readFileSync(join(root, file), 'utf8')).toContain('scripts/pulse-stamp.mjs');
     });
+
+  // The two halves are no use apart, the way #314's stamp and its watchdog check are no use apart: a stamp
+  // read from the clock that nobody verifies is a convention, and a verifier nobody is told to run is dead
+  // prose. So the watchdog is held to the *invocation*, not only to the path — the three prompts above would
+  // all pass on a bare mention in a sentence.
+  it('and the watchdog is told to run the check half, on every pulse it reads', () => {
+    const w = readFileSync(join(root, 'docs/WATCHDOG-PROMPT.md'), 'utf8');
+    expect(w, 'check 3 must run the comparison, not merely know the script exists')
+      .toContain('node scripts/pulse-stamp.mjs --check');
+    expect(w, 'against the field the writing run cannot author for itself').toContain('updated_at');
+    for (const pulse of ['routine: heartbeat', 'reviewer: heartbeat', 'board: heartbeat']) {
+      expect(w, `${pulse} must be one of the pulses the check covers`).toContain(pulse);
+    }
+  });
 });
