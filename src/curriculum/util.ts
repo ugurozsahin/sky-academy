@@ -32,10 +32,18 @@ export function numQ(rng: Rng, prompt: string, answer: number, opts: { min?: num
   return { prompt, answer: String(answer), options, say: opts.say, visual: opts.visual, hint: opts.hint };
 }
 
-/** Build a word/symbol multiple-choice question. */
+/**
+ * Build a word/symbol multiple-choice question.
+ *
+ * `wide` is read off the **whole option set**, never the answer alone (#369): `bubbleRadius` draws a wide
+ * wave 1.25x bigger, so deriving it from the answer made the correct bubble systematically the larger one
+ * wherever a card's options differ in length — on a two-option card (`yes`/`no`, `50p`/`1p`) size alone gave
+ * the answer away. Width is a property of the card, which is what `Question['wide']` has always claimed
+ * ("options are words → bigger bubbles"); `waveOptsFor` in `src/ui/play-session.ts` reads the same way.
+ */
 export function wordQ(rng: Rng, prompt: string, answer: string, distractors: string[], extra: Partial<Question> = {}): Question {
   const ds = [...new Set(distractors.filter(d => d !== answer))].slice(0, 3);
-  return { prompt, answer, options: shuffle(rng, [answer, ...ds]), wide: answer.length > 2, ...extra };
+  return { prompt, answer, options: shuffle(rng, [answer, ...ds]), wide: [answer, ...ds].some(o => o.length > 2), ...extra };
 }
 
 export const NUM_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
