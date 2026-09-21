@@ -135,7 +135,15 @@ export const DUEL_POOL_DRAWS = 8;
 export function duelPool(topics: Topic[], difficulty: Difficulty = 1): Topic[] {
   return topics.filter(t => {
     if (t.input === 'tracing') return false;
-    for (let seed = 1; seed <= DUEL_POOL_DRAWS; seed++) if (t.gen(difficulty, seededRng(seed)).sequence) return false;
+    try {
+      for (let seed = 1; seed <= DUEL_POOL_DRAWS; seed++) if (t.gen(difficulty, seededRng(seed)).sequence) return false;
+    } catch (e) {
+      // #444: a generator that throws (the same floor rail #433 can trip on a future curriculum edit) must
+      // not stop Ninja Duel opening at all for the whole year — a topic that cannot be drawn safely is
+      // exactly as duel-unable as one that draws a sequence question, so it is excluded the same way.
+      console.error(`Sky Ninja Academy: "${t.id}" question generator threw while building the duel pool`, e);
+      return false;
+    }
     return true;
   });
 }

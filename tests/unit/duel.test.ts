@@ -192,6 +192,16 @@ describe('duelPool (#16 item 4: which topics a duel is played on)', () => {
     expect(duelPool(topicsFor('year1'), 3).map(t => t.id)).not.toContain('y1-spelling');
     expect(duelPool(topicsFor('year1'), 1).map(t => t.id)).toContain('y1-spelling');
   });
+  it('a topic whose generator throws is dropped, not left to freeze the whole year (#444)', () => {
+    const good = topicById('y1-add')!;
+    const boom = { ...good, id: 'y1-boom', gen: () => { throw new Error('boom'); } };
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => duelPool([good, boom], 1)).not.toThrow();
+    const pool = duelPool([good, boom], 1);
+    expect(pool.map(t => t.id)).toEqual(['y1-add']);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('y1-boom'), expect.any(Error));
+    spy.mockRestore();
+  });
 });
 
 describe('duelHeadline (#16 item 3: the match-end line)', () => {
