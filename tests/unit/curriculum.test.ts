@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
@@ -5,6 +6,7 @@ import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
 import type { SentenceType } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
+import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
 
 // Deterministic RNG (mulberry32)
 function rng(seed: number) {
@@ -450,21 +452,26 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // `gapQ` raw, so none of the rows above — all of which go through `gapLetters` — ever touched these cards,
     // and `cu_` offered `m` to a four-year-old. One row per (word, gap, letter) the sweep found, so dropping
     // any single `AVOID` entry goes red naming the spelling it lets back.
-    const R_POOL = [...R_LETTERS_ALL];
-    for (const [w, i, l] of [['cup', 2, 'm'], ['map', 0, 'p'], ['map', 0, 'j'], ['tap', 0, 'p'], ['tap', 0, 'j'],
-      ['pot', 2, 'o'], ['cap', 0, 'p'], ['cap', 0, 'j'], ['pan', 2, 'p'], ['bus', 0, 'p'], ['bus', 2, 'm'],
-      ['bag', 0, 'v'], ['jam', 2, 'p'], ['bug', 2, 'm'], ['van', 2, 'g']] as [string, number, string][]) {
+    // The pool comes from the index, because the generator's does: index 0 is drawn at d1 from the phase-2
+    // pool, index 2 at d2 from the full pool, index 1 at d3 from the vowels. The first version of these rows
+    // asserted `R_LETTERS_ALL` for all of them, so five described cards that cannot be drawn — `j` and `b`
+    // are phase 2B and never in the d1 pool — and the guard meant to catch exactly that checked the wrong
+    // pool and passed (review of #418). No spelling was left unpinned; the claim was what was wrong.
+    const R_POOL = (i: number) => (i === 0 ? R_LETTERS_P2 : i === 1 ? ['a', 'e', 'i', 'o', 'u'] : R_LETTERS_ALL);
+    for (const [w, i, l] of [['cup', 2, 'm'], ['cup', 2, 'n'], ['pot', 2, 'o'], ['pan', 2, 'p'], ['pan', 2, 'k'],
+      ['bus', 2, 'm'], ['jam', 2, 'p'], ['bug', 2, 'm'], ['van', 2, 'g'], ['put', 2, 's'],
+      ['pig', 0, 'n'], ['hen', 1, 'u'], ['cow', 2, 'k'], ['cow', 2, 'c']] as [string, number, string][]) {
       const filled = w.slice(0, i) + l + w.slice(i + 1);
-      expect(AVOID.has(filled), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} spells ${filled}, which belongs in AVOID`).toBe(true);
-      expect(gapDecoys(w, i, R_POOL), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l} — it spells ${filled}`).not.toContain(l);
-      // …and the letter really is in the pool the generator passes, or the row above proves nothing.
-      expect(R_POOL, `${l} is not in the r-sounds pool, so this row is vacuous`).toContain(l);
+      const gap = `${w.slice(0, i)}_${w.slice(i + 1)}`;
+      expect(AVOID.has(filled), `${gap}: ${l} spells ${filled}, which belongs in AVOID`).toBe(true);
+      expect(R_POOL(i), `${l} is not in the pool index ${i} draws from, so this row is vacuous`).toContain(l);
+      expect(gapDecoys(w, i, R_POOL(i)), `${gap} may never offer ${l} — it spells ${filled}`).not.toContain(l);
     }
-    // The middle-sound card passes VOWELS, which is a different pool and must be filtered too.
-    expect(gapDecoys('pot', 2, ['a', 'e', 'i', 'o', 'u']), 'po_ may never offer o — it spells poo').not.toContain('o');
-    // And the filter must still leave a card buildable: `gapQ` takes 3 decoys.
-    for (const [w] of CVC) for (const i of [0, 2])
-      expect(gapDecoys(w, i, R_POOL).length, `${w} index ${i} leaves too few decoys`).toBeGreaterThanOrEqual(3);
+    // The floor, at every index the generator gaps — including 1, whose pool is five letters and whose real
+    // margin is one blocked letter. The first version looped `[0, 2]`, so it measured every pool except the
+    // one the comment it was checking was false about (review of #418, B3).
+    for (const [w] of CVC) for (const i of [0, 1, 2])
+      expect(gapDecoys(w, i, R_POOL(i)).length, `${w} index ${i} leaves too few decoys`).toBeGreaterThanOrEqual(3);
 
     // #324 item 3: the one general statement, rather than another row of cases. `AVOID` says "not on a card"
     // and `GAP_WORDS` says "another right answer"; a word in *both* is blocked for the wrong reason, and a
@@ -484,14 +491,34 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     }
     // And what the card actually shows, for every difficulty of the three gap topics.
     let gaps = 0;
-    // `r-sounds` is here since #418: it was the one gap topic the sweep never covered, which is exactly why
-    // sixteen crude or slur spellings sat on Reception's cards with the whole suite green.
-    for (const id of ['y1-spelling', 'y2-spelling', 'y1-days', 'r-sounds']) for (const d of [1, 2, 3] as Difficulty[]) {
+    const perTopic = new Map<string, number>();
+    // Derived, not listed. `r-sounds` was missing from the hand-written version and that omission IS #418, so
+    // a list is the one thing this loop must not have: every topic that draws a gap card is swept, and a new
+    // one joins by existing (review of #418, N6). The floor below is per-topic for the same reason.
+    // Single-letter gaps, which is what "substitute this option into the gap" means. Deriving it turned up
+    // `y1-digraphs`, which the hand-written list also omitted: it gaps TWO characters (`tr__`) and builds its
+    // card without `gapQ`, so it goes through neither filter. That is recorded at `writing.ts`'s `gapDecoys`
+    // and is not this sweep's shape — but it is found here rather than forgotten.
+    const drawn = TOPICS.map(t => ({ id: t.id, q: t.gen(1, rng(t.id.length + 3)) }));
+    // A letter gap is a single `_` INSIDE a word — no space beside it — whose options are single letters.
+    // Without both halves a sentence card (`_ cat is black.`, options are words) reads as one.
+    const isLetterGap = (q: Question) => /(^|\S)_(\S|$)/.test(q.prompt) && !q.prompt.includes('__')
+      && q.options.every(o => /^[a-z]$/i.test(String(o)));
+    const GAP_TOPICS = drawn.filter(({ q }) => !q.sequence && isLetterGap(q)).map(({ id }) => id);
+    const MULTI_GAP = drawn.filter(({ q }) => !q.sequence && q.prompt.includes('__')).map(({ id }) => id);
+    expect(GAP_TOPICS, 'the gap topics must be found, not named').toEqual(
+      expect.arrayContaining(['y1-spelling', 'y2-spelling', 'y1-days', 'r-sounds']));
+    expect(MULTI_GAP, 'y1-digraphs gaps two characters and is outside both filters — see writing.ts')
+      .toContain('y1-digraphs');
+    expect(GAP_TOPICS, 'and it is not a single-letter gap, so this sweep\'s substitution does not apply to it')
+      .not.toContain('y1-digraphs');
+    for (const id of GAP_TOPICS) for (const d of [1, 2, 3] as Difficulty[]) {
       const t = gen(id); const r = rng(id.length * 7 + d);
       for (let i = 0; i < 300; i++) {
         const q = t.gen(d, r);
         if (q.sequence || !q.prompt.includes('_')) continue;
         gaps++;
+        perTopic.set(id, (perTopic.get(id) ?? 0) + 1);
         const idx = q.prompt.indexOf('_');
         for (const o of q.options) if (o !== q.answer) {
           const filled = (q.prompt.slice(0, idx) + o + q.prompt.slice(idx + 1)).toLowerCase();
@@ -510,12 +537,84 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
         expect(q.options.length, q.prompt).toBe(4);
         // The exemption above rests on this: drop the emoji from an r-sounds card and `_un` beside nothing
         // really is ambiguous, so the exemption must go red rather than quietly widen.
-        if (id === 'r-sounds')
+        if (id === 'r-sounds') {
+          const idx2 = q.prompt.indexOf('_');
+          const word = q.prompt.slice(0, idx2) + q.answer + q.prompt.slice(idx2 + 1);
+          // Presence is not pairing (review of #418, N1): `p_n` beside 🍳 offers `e` and `i`, and `pen` and
+          // `pin` are both CVC entries with pictures of their own, so a wrong picture is a genuinely
+          // ambiguous card that a truthiness check would pass.
           expect(q.visual && 'emoji' in q.visual ? q.visual.emoji : undefined,
-            `${id}: ${q.prompt} has no picture, so a decoy spelling another word IS ambiguous`).toBeTruthy();
+            `${id}: ${q.prompt} must show ${word}'s own picture, or a decoy spelling another word IS ambiguous`)
+            .toBe(CVC.find(([w]) => w === word)?.[1]);
+        }
       }
     }
     expect(gaps).toBeGreaterThan(500);
+    // Per topic, because one topic drawing 900 met the global floor on its own and the other three could
+    // have drawn nothing (review of #418, N5).
+    for (const [id, n] of perTopic) expect(n, `${id} drew ${n} gap cards — this sweep never saw it`).toBeGreaterThan(100);
+  });
+
+  /**
+   * #418 review, B1/B2. Four sweeps have now gone hunting for crude spellings on Reception's cards, each
+   * against a hand-written list, and each found spellings the one before had not: `cum` and `jap`, then
+   * `nig`, `pak`, `hun` and `cun` — the last on the same three letters as `cum`. The method is the defect.
+   * A denylist rail can only ever assert that the words *somebody already thought of* are absent, which is
+   * why the `AVOID` sweep beside it goes green on a slur nobody listed.
+   *
+   * So this pins the **whole reachable set** instead. Every spelling a Reception gap card can show is checked
+   * in, sorted, in `fixtures/reception-gap-spellings.txt`. A new `CVC` word, a phase move, a letter added to
+   * a pool or an `AVOID` entry removed changes that set, and the rail prints the difference — so the next
+   * spelling arrives **named, in a diff a person reads**, rather than waiting for a fifth sweep's eye.
+   *
+   * Updating the fixture is the point, not a chore: it is the moment somebody looks at what a four-year-old
+   * can now be shown. `#324 item 2` — a vendored word list giving `AVOID` an oracle outside itself — is
+   * still the real answer and still open; this is what makes the gap visible while that waits.
+   *
+   * Prove it red: add a word to `CVC`, or drop any entry from `AVOID`.
+   */
+  it('7. every spelling a Reception gap card can show has been looked at (#418)', () => {
+    const expected = readFileSync(new URL('./fixtures/reception-gap-spellings.txt', import.meta.url), 'utf8')
+      .split('\n').map(l => l.trim()).filter(Boolean);
+    expect(expected.length, 'the fixture is empty or unreadable, which would make this rail vacuous').toBeGreaterThan(500);
+    const actual = receptionGapSpellings();
+    const set = new Set(expected);
+    const added = actual.filter(w => !set.has(w));
+    const gone = expected.filter(w => !actual.includes(w));
+    expect(added, 'a Reception card can now show spellings nobody has looked at — read them, decide, then '
+      + 'update fixtures/reception-gap-spellings.txt in the same commit').toEqual([]);
+    expect(gone, 'spellings are no longer reachable; if that was the intent, update the fixture').toEqual([]);
+
+    // The helper rebuilds the generator's frames, so it can drift from the generator and take this green with
+    // it. Every card the real topic draws must be one of them.
+    const frames = receptionGapFrames();
+    const known = new Set(frames.map(f => `${f.word}@${f.idx}`));
+    const t = gen('r-sounds');
+    let seen = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(41 + d);
+      for (let i = 0; i < 400; i++) {
+        const q = t.gen(d, r);
+        const idx = q.prompt.indexOf('_');
+        const word = q.prompt.slice(0, idx) + q.answer + q.prompt.slice(idx + 1);
+        expect(known, `the real generator drew ${q.prompt} (${word}@${idx}), which the frames do not carry`)
+          .toContain(`${word}@${idx}`);
+        seen++;
+        // …and every option it really offers is in the reviewed set.
+        for (const o of q.options) {
+          const filled = (q.prompt.slice(0, idx) + o + q.prompt.slice(idx + 1)).toLowerCase();
+          expect(set.has(filled), `r-sounds: ${q.prompt} — option ${o} spells ${filled}, which is not in the fixture`).toBe(true);
+        }
+      }
+    }
+    expect(seen, 'no cards drawn, so the drift check above proved nothing').toBeGreaterThan(1000);
+
+    // And the filter is doing something: the set it keeps off a card is non-empty and disjoint from the set
+    // above. Without this, emptying `AVOID` would only shrink the fixture and could be "fixed" by updating it.
+    const blocked = receptionBlocked();
+    expect(blocked.length, 'AVOID reaches no Reception card, so the filter is off').toBeGreaterThan(8);
+    for (const w of blocked)
+      expect(set.has(w), `${w} is blocked and also in the reviewed set — one of the two is wrong`).toBe(false);
   });
 
   it('6. capacity compares what a container holds, never how full it is', () => {
