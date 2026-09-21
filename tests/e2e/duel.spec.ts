@@ -517,6 +517,12 @@ test.describe('Ninja Duel', () => {
 
   test('sideways, no question can take the height the split just won, whatever it puts on the card (#388)', async ({ page }) => {
     await startDuel(page);
+    // Freeze both arenas for the sweep. This test measures LAYOUT over dozens of dressed cards and takes tens of
+    // seconds; left running, the match reaches its tenth round part-way through and `showResults` puts a modal
+    // over the whole screen, after which every hit test fails for a reason that has nothing to do with the
+    // budget. Pausing the arenas is the screen's own mechanism — `syncPaused` sets exactly this — so no wave
+    // ends, no round advances, and nothing rewrites the card underneath the measurements.
+    await page.evaluate(() => { for (const p of ['a', 'b'] as const) window.__sna.arenas[p].paused = true; });
     // The bar has to be BOUNDED, not merely short on the question that came up. Before the cap: a clock question
     // took 165px of a 390px screen (42%) and handed each child 193px — worse than the 213px that made the stacked
     // layout unplayable — and a visual taller than the pool holds took the whole screen, leaving the arenas at 0.
@@ -532,7 +538,14 @@ test.describe('Ninja Duel', () => {
         // arena. The 0.5 band an earlier round used was padding: nothing real needed it at 844x390 or 640x360,
         // where the only thing breaching 0.45 was ABSURD, the deliberately-oversized synthetic card. ABSURD has
         // its own looser bound below instead, so the real cards keep the tight one.
-        const cap = vp.height >= 700 ? 0.35 : vp.height >= 360 ? 0.45 : 0.65;
+        //
+        // 390 and 360 are separate bands for one measured reason: `symmetry` is 42.5% at 844x390 but 44.6% here
+        // and **45.2% on CI**, which has no Fredoka and so wraps the card differently. A flat 0.45 went red on
+        // the runner at 162.59px against 162 — six tenths of a pixel — while passing on this machine. That is
+        // the exact failure this file's own comment warned about two rounds earlier and then walked into by
+        // taking a tightening at the one band with no room for it. The bound is set from the worst measured
+        // ACROSS environments, not from the worst measured here.
+        const cap = vp.height >= 700 ? 0.35 : vp.height >= 390 ? 0.45 : vp.height >= 360 ? 0.48 : 0.65;
         if (card === ABSURD) {
           // Its claim is only that the budget keeps the arenas usable when handed something absurd — the same
           // reason it is exempt from `expectNothingClipped`. Measured at 42.8% of the height at 844x390.
@@ -583,7 +596,14 @@ test.describe('Ninja Duel', () => {
       // SIGHT. A REAL wrong slice, and the toast must come up by itself: adding `.show` by hand would leave this
       // green if `onRoundMiss` stopped toasting, or toasted for 0ms, and then the whole loop would be asserting
       // about a box that is never on screen.
-      await page.evaluate(() => window.__sna.wrong('a'));
+      // Wait for a wrong bubble to actually be in flight on an undecided round, the way `winRound` above does:
+      // `__sna.wrong` needs one to slice, and `duel.hit` ignores a slice on a round already decided — so firing
+      // blind raises no toast and the wait below then fails for a reason that has nothing to do with the toast.
+      await page.waitForFunction(() => {
+        const st = window.__sna.state();
+        return !st.decided && !st.ended && window.__sna.bubbles('a').some(b => b.label !== st.answer);
+      });
+      expect(await page.evaluate(() => window.__sna.wrong('a')), `${vp.width}x${vp.height}: the wrong slice landed`).toBe(true);
       await expect(page.locator('.toast')).toHaveClass(/show/);
       // The shortest real hint in the pool: a long one wraps to more lines and is harder to swallow whole, so
       // the card most at risk is the briefest, not the wordiest.
@@ -706,6 +726,12 @@ test.describe('Ninja Duel', () => {
 
   test('portrait keeps the stacked duel as a fallback, and asks for a sideways screen (#388)', async ({ page }) => {
     await startDuel(page);
+    // Freeze both arenas for the sweep. This test measures LAYOUT over dozens of dressed cards and takes tens of
+    // seconds; left running, the match reaches its tenth round part-way through and `showResults` puts a modal
+    // over the whole screen, after which every hit test fails for a reason that has nothing to do with the
+    // budget. Pausing the arenas is the screen's own mechanism — `syncPaused` sets exactly this — so no wave
+    // ends, no round advances, and nothing rewrites the card underneath the measurements.
+    await page.evaluate(() => { for (const p of ['a', 'b'] as const) window.__sna.arenas[p].paused = true; });
     // A rotate GATE was rejected: a tablet with its orientation locked would lose the mode outright. So portrait
     // still plays, stacked as before — Player 2 on top, the card between, Player 1 on the bottom.
     //

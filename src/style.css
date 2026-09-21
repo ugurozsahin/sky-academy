@@ -404,6 +404,13 @@ img { -webkit-user-drag: none; }
 .duel-screen > .toast {
   grid-area: q; place-self: start center; margin-top: 4px; z-index: 3; pointer-events: none;
 }
+/* The duel's toast fades in PLACE — no slide. The shared `.toast` enters from `translateY(-6px)`, and aligned to
+   the top of the bar that start position is 6px above it, which in portrait is inside Player 2's arena: for the
+   200ms of the fade the panel really is over one child's bubbles, the very thing this placement exists to end.
+   Reversing the slide only moves the problem, because the safe direction is not the same in both orientations —
+   sideways the arenas are BELOW the bar, so a downward entry lands on them instead. Nothing keeps a 6px slide
+   inside a bar it is aligned to the edge of, so the motion goes and the fade stays. */
+.duel-screen > .toast { transform: none; }
 
 .duel-arena { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 /* The divider is drawn, never a BORDER (#388/#389). With `box-sizing: border-box` a 1px border on half B took
