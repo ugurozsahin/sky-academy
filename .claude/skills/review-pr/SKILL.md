@@ -23,23 +23,52 @@ owner reorders, re-scopes and offers stopgaps there, and a criterion he added in
 body. Then ask what the diff would have to do to satisfy them, and only then read the diff. Reading the diff
 first makes you a proof-reader of the author's plan instead of a check on it.
 
-## 2. Run it yourself, on the head you are judging
+## 2. Run it yourself, on the head you are judging — cheap first, the browser last
 
 ```
 npx tsc --noEmit
 npm test
-npm run build && npx playwright test --project=mobile
+npm run build
+```
+
+Seconds, and they gate everything after them. Run them now. Then §3 and §4 — the diff, and the agents.
+
+**The browser comes after those, because it belongs to the merge decision and not to the block decision
+(#499).** A review that is going to block ends with the author pushing a new commit, so a suite run before the
+block was evidence about a head that no longer exists by the time anyone acts on it. Measured over 45 merged
+pull requests: 51 blocking rounds against 45 merges, so **about half of all reviewer suite runs were on a tree
+replaced within the hour** — and it is the third run of the same suite on that tree, after the author's own
+pre-push run and CI's.
+
+You are not flying blind in the meantime. That head's e2e result is already known: a pull request reaches you
+"Ready for review" only once CI was green on it (`docs/ROUTINE-PROMPT.md` STEP 3), §5's first unmergeable
+condition makes you read that run anyway, and CI tests `refs/pull/N/merge` — the head merged with `main` —
+which is a better tree to have evidence about than the bare branch you checked out.
+
+**Before you clear or merge, run it:**
+
+```
+npx playwright test --project=mobile
 npx playwright test --project=desktop        # when the diff could behave differently by viewport
 ```
 
 Take screenshots too if the change is player-visible.
 
-Record what you actually ran. Never write "mobile + desktop" over a mobile-only pass. A pull request runs e2e
-on **mobile only** (#141) and only when the diff can reach the game (#176), so a viewport-sensitive change —
-CSS, layout, canvas maths — has no desktop evidence at all until the nightly unless you produce it. **If the
-browsers are unavailable, write "e2e not run (env)"** — that exact phrase, so a pass and a non-run are never
-the same mark on the page. It is the one place in this file where "did not run" has a prescribed spelling,
-and §4's argument is why it needs one.
+Three cases where your run is the **only** e2e evidence that will ever exist for this tree, so a merge without
+it is a merge on nothing: CI's e2e step was **skipped** by the path filter (#176); the change is
+viewport-sensitive and needs desktop, which a pull request never runs (#141); it is player-visible and wants
+pictures.
+
+**Before you block, do not** — with one exception that matters: **if the finding you are about to block on is
+a claim about runtime behaviour, you have to have run it.** "This breaks when a child taps twice" is not a
+reading of a diff. Everything static — a rail that does not hold, a type, a silent catch, a missing test — is
+decided without a browser, and the two blocking rounds on PR #487 were both of that kind.
+
+Record what you actually ran, and when you skipped the browser say that you skipped it and why — a block whose
+report is silent about the suite reads like a block that ran it. Never write "mobile + desktop" over a
+mobile-only pass. **If the browsers are unavailable, write "e2e not run (env)"** — that exact phrase, so a
+pass and a non-run are never the same mark on the page. It is the one place in this file where "did not run"
+has a prescribed spelling, and §4's argument is why it needs one.
 
 ## 3. Attack the change, do not confirm it
 
@@ -79,6 +108,10 @@ They are input to your review, never its verdict. The marks stay yours, and so d
 
 Equally, a finding no agent flagged as critical may still be the one that matters. Rank by what it costs the
 child, not by the label it arrived with.
+
+**Now go back to §2's browser step, knowing which way this review goes.** Clearing or merging: run it. Blocking
+on something static: do not, and say in the comment that you did not and why. Blocking on runtime behaviour:
+run it, because that finding is a claim you have not tested yet.
 
 ### Reviewing more than one: one review, one context
 
