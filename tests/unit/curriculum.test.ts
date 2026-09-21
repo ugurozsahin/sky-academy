@@ -821,6 +821,62 @@ describe('Year 1 ranges: capacity and doubles stay inside the year (#298 slice 5
   });
 });
 
+describe('y1-skip counts to 100 and no further, answer and decoys alike (#366)', () => {
+  /**
+   * Red on `main` at `d0f0a99`: `step * 8` in tens started the run at 80, so d3 drew "80, 90, 100, ?" with
+   * the answer 110. Two faults from one root — 110 is past Year 1's ceiling (`docs/CURRICULUM.md` lists this
+   * topic as "count in 2s/5s/10s", and `.claude/rules/curriculum.md` caps the year), and it is past the
+   * `max: 100` the question itself declares, which is what `numQ` filters the decoys against: 111, 109 and
+   * 120 were all dropped and the fallback fill scraped 0 and 1 off the bottom of the range. The card read
+   * `["0", "110", "1", "100"]` — the right answer was the only bubble that could be it.
+   *
+   * So the rail reads the answer AND every option, like the `y1-doubles` one above: a card whose answer is
+   * in range but whose decoys are 0 and 1 is still not a question.
+   */
+  it('never puts a number above 100 on the card, at any difficulty', () => {
+    const t = TOPICS.find(x => x.id === 'y1-skip')!; const r = rng(366);
+    let seen = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 800; i++) {
+      const q = t.gen(d, r);
+      const terms = q.prompt.match(/^(\d+), (\d+), (\d+), \?$/);
+      expect(terms, `d${d}: unexpected prompt shape "${q.prompt}"`).not.toBeNull();
+      const [a, b, c] = terms!.slice(1, 4).map(Number);
+      const step = b - a;
+      expect(c - b, `d${d}: "${q.prompt}" is not a constant count`).toBe(step);
+      expect(Number(q.answer), `d${d}: "${q.prompt}" answered ${q.answer}`).toBe(c + step);
+      for (const o of q.options) {
+        expect(Number(o), `d${d}: "${q.prompt}" offered "${o}" — outside Year 1's range`).toBeLessThanOrEqual(100);
+        expect(Number(o), `d${d}: "${q.prompt}" offered "${o}"`).toBeGreaterThanOrEqual(0);
+      }
+      seen++;
+    }
+    expect(seen, 'the sweep drew no cards — this rail would pass vacuously').toBe(2400);
+  });
+
+  it('keeps every decoy a near miss, so the answer is never the only plausible bubble', () => {
+    const t = TOPICS.find(x => x.id === 'y1-skip')!; const r = rng(366 + 1);
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 800; i++) {
+      const q = t.gen(d, r); const ans = Number(q.answer);
+      expect(q.options, `d${d}: "${q.prompt}" lost a bubble to the range filter`).toHaveLength(4);
+      // `nearby()` never strays further than ±10, and the widest declared decoy is one more step (≤ 10). A
+      // bubble outside that band is the fallback fill scraping the bottom of the range — the #366 card.
+      for (const o of q.options)
+        expect(Math.abs(Number(o) - ans), `d${d}: "${q.prompt}" offered "${o}" beside an answer of ${ans}`).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('d3 still stretches further than d2, so the cap did not flatten the stages', () => {
+    const t = TOPICS.find(x => x.id === 'y1-skip')!; const r = rng(366 + 2);
+    const highest: Record<number, number> = {};
+    for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 800; i++) {
+      const q = t.gen(d, r);
+      highest[d] = Math.max(highest[d] ?? 0, Number(q.answer));
+    }
+    expect(highest[3], 'd3 reaches no further than d2 — the stretch stage is no longer a stretch')
+      .toBeGreaterThan(highest[2]);
+  });
+});
+
 describe('Year 2 sentences subordinate the Year 2 way (#298 slice 5)', () => {
   // Red on `main`, whose d3 bank carried "Although it was cold, we went out." Year 2 grammar names four
   // subordinating conjunctions — when, if, that, because — and *although* is Year 3 and beyond.

@@ -159,10 +159,23 @@ const y1Missing: Generator = (d, rng) => {
 };
 const y1Skip: Generator = (d, rng) => {
   const step = d === 1 ? 2 : d === 2 ? pick(rng, [2, 5, 10]) : pick(rng, [2, 5, 10]);
-  const start = step * ri(rng, 0, d === 3 ? 8 : 4);
+  // The answer is the fourth term, so the start has to leave room for three more steps inside the `max: 100`
+  // this question declares (#366). It did not: `step * 8` in tens started at 80, so "80, 90, 100, ?" answered
+  // 110 — past Year 1's ceiling of 100 (`docs/CURRICULUM.md`: "count in 2s/5s/10s" to 100) and past the
+  // declared `max`, which is the worse half: `numQ` filters the decoys against that range, so 111, 109 and 120
+  // were all dropped and the card offered 0, 1, 100 and 110. The three-digit bubble was the only one it could
+  // be, which teaches slicing the odd-looking one. `100 / step - 3` is the highest start that keeps the fourth
+  // term at or under 100; it only binds on the tens, where d3 now stops at 70 instead of 80.
+  const top = Math.min(d === 3 ? 8 : 4, Math.floor(100 / step) - 3);
+  const start = step * ri(rng, 0, top);
   const seq = [start, start + step, start + step * 2];
   const p = `${seq.join(', ')}, ?`;
-  return numQ(rng, p, start + step * 3, { min: 0, max: 100, say: `Counting in ${step}s: ${seq.join(', ')}, what comes next?`, distractors: [start + step * 3 + 1, start + step * 3 - 1, start + step * 4] });
+  const ans = start + step * 3;
+  // The last two are tail spares, and only ever reached when the first three cannot all be used: at the top
+  // of the range (`ans` = 100 in tens) `ans + 1` and `ans + step` are both filtered out, and `numQ`'s top-up
+  // can then collide with `ans - 1` and hand the child a three-bubble card. Named decoys keep them near
+  // misses rather than whatever `nearby()` scrapes together (#366).
+  return numQ(rng, p, ans, { min: 0, max: 100, say: `Counting in ${step}s: ${seq.join(', ')}, what comes next?`, distractors: [ans + 1, ans - 1, ans + step, ans - step + 1, ans - 2] });
 };
 const y1MoreLess: Generator = (d, rng) => {
   const n = ri(rng, 1, d === 1 ? 30 : d === 2 ? 60 : 99);
