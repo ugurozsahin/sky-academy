@@ -1,10 +1,15 @@
+import { avatarOrNull } from '../avatars';
 import { TOPICS, YEARS } from '../curriculum';
-import { exportSave, importSave, isReadOnlySave, isWriteFailing, load, reset, save, STICKER_IDS, type SaveData } from '../storage';
+import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData } from '../storage';
 import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
-import { $, esc, render } from './dom';
+import { $, $$, esc, render } from './dom';
 
-type Nav = { map: () => void; avatar: () => void };
+/** `launch` is where a grown-up lands after removing the ninja this session was playing (#20 slice 3): the
+ *  boot decision, re-run — the picker while two or more profiles are left, otherwise that child's map, or
+ *  onboarding when the remaining slot has never been played. It is `main.ts`'s one copy of that rule, not a
+ *  second statement of it here. */
+type Nav = { map: () => void; avatar: () => void; launch: () => void };
 /** The word a grown-up must type to confirm "Start again" — deliberately not a single tap a child could land on. */
 const RESET_WORD = 'RESET';
 
@@ -35,7 +40,76 @@ function saveNote(): string | null {
   if (isWriteFailing()) return 'This device is not saving progress right now — coins, stars and certificates earned today may be lost when the game closes. Turning off private browsing, or freeing up storage space, usually fixes it.';
   return null;
 }
-function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote()): string {
+/**
+ * #20 slice 3 — the ninjas on this device, renamed and removed from behind the grown-ups gate.
+ *
+ * The owner's decision at the top of #20 is that "renaming and deleting sit behind the grown-ups gate", which
+ * is this screen and this section. Adding a ninja stays where slice 2 put it, on the picker's ＋ card, because
+ * that one is deliberately open to the child.
+ *
+ * Built from the dashboard's own `.p-*` classes and the `.btn`/`.btn.bad` pair the reset block already uses,
+ * so nothing here is a new look (`design-language` §5): the rows are the shape `.p-topic` already is.
+ */
+/** Whether a row offers a rename — there is a save behind it to write a name into. A slot in the index that
+ *  nothing has ever played (＋ tapped and the app closed, or "Start again") has no name to change, and
+ *  `renameProfile` answers `'no-save'` for it; the row says so instead of offering a control that refuses. */
+export const canRenameCard = (c: ProfileCard) => c.onboarded || !!c.avatar || !!c.name.trim();
+/** What the card is called when the child has not typed a name yet. The slot number is what tells two unnamed
+ *  rows apart — the picker's `cardName` rule (#380 review B1), the same words for the same reason. */
+const rowName = (c: ProfileCard, slot: number) => (c.name.trim() ? c.name : `Ninja ${slot}`);
+/** Every refusal `renameProfile` and `deleteProfile` can return, as the sentence a grown-up reads. Exported
+ *  because a missing case is otherwise a blank status line: the `Record` over the union is what makes a new
+ *  refusal a type error here rather than silence on the screen. */
+export const RENAME_HINTS: Record<'unknown' | 'no-save' | 'blank' | 'store', string> = {
+  unknown: 'That ninja is no longer on this device.',
+  'no-save': 'That ninja has not played yet, so there is no name to change.',
+  blank: 'A ninja needs a name — type one in first.',
+  store: 'This browser will not let the game save, so the new name was not kept.',
+};
+export const DELETE_HINTS: Record<'unknown' | 'last' | 'store', string> = {
+  unknown: 'That ninja is no longer on this device.',
+  last: 'This is the only ninja on the device, so removing it is the same as starting again — use “Start again” below, which asks you to type RESET first.',
+  store: 'This browser will not let the game save, so nothing was removed.',
+};
+function profileRow(c: ProfileCard, slot: number, only: boolean): string {
+  const a = avatarOrNull(c.avatar);      // not `avatarById`: an unplayed slot is a state this list must draw (#380 review B1)
+  const label = rowName(c, slot);
+  return `
+    <li class="p-prof" data-prof="${c.id}">
+      <span class="p-prof-face"${a ? ` style="--glow:${a.glow}"` : ''}>${a ? `<img src="${a.img}" alt="" draggable="false">` : `<span class="plus" aria-hidden="true">＋</span>`}</span>
+      <span class="p-prof-who"><b>${esc(label)}</b><small>${a && c.onboarded ? esc(a.name) : 'Not started yet'}</small></span>
+      ${canRenameCard(c)
+        ? `<input class="p-prof-in" data-name="${c.id}" type="text" maxlength="${NAME_MAX}" autocomplete="off" value="${esc(c.name)}" aria-label="Name for ${esc(label)}">
+           <button class="btn" data-rename="${c.id}">Save name</button>`
+        : `<span class="p-prof-wait">No name yet — this ninja has not played.</span>`}
+      ${only ? '' : `<button class="btn bad" data-del="${c.id}">Remove</button>`}
+    </li>`;
+}
+function profilesHtml(cards: ProfileCard[]): string {
+  const only = cards.length === 1;
+  return `
+    <h3 class="p-h">Ninjas on this device</h3>
+    <div class="p-profs">
+      <p class="p-profs-say">Each ninja has their own progress, coins and certificates. A new one is added by the child, from “Who is playing?” on the sky map.</p>
+      <ul class="p-prof-list">${cards.map((c, i) => profileRow(c, i + 1, only)).join('')}</ul>
+      <p class="p-prof-msg" id="prof-msg" role="status" hidden></p>
+    </div>`;
+}
+/** The one question a removal asks. Deliberately a single named confirmation and not `RESET_WORD`'s typed
+ *  word: that guard belongs to clearing the whole device, and `deleteProfile` refuses the last profile so this
+ *  control can never be the cheaper route to the same end. */
+function deleteConfirmHTML(name: string): string {
+  return `
+      <div class="modal reset-modal prof-modal">
+        <h2>Remove ${esc(name)}?</h2>
+        <p>This clears everything saved for ${esc(name)} on this device: progress, stars, coins, stickers, streak, name and ninja. It cannot be undone.</p>
+        <div class="reset-actions">
+          <button class="btn" id="prof-cancel">Cancel</button>
+          <button class="btn bad" id="prof-go">Remove ${esc(name)}</button>
+        </div>
+      </div>`;
+}
+function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: ProfileCard[] = profileCards()): string {
   const modeRows = sm.modes.map(m => `
     <tr><th scope="row">${esc(m.title)}</th><td>${m.endless}</td><td>${m.sprint}</td><td>${m.boss}</td><td>${m.memory}</td><td>${m.training}</td></tr>`).join('');
   const yearCards = sm.years.map(y => `
@@ -74,6 +148,8 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote()): string
       <thead><tr><th scope="col">Island</th><th scope="col" title="Sky Storm best score">Storm</th><th scope="col" title="Ninja Sprint best score">Sprint</th><th scope="col" title="Boss Battle knock-outs">Boss</th><th scope="col" title="Memory Match boards">Cards</th><th scope="col" title="Sensei training sessions">Sensei</th></tr></thead>
       <tbody>${modeRows}</tbody>
     </table></div>
+
+    ${profilesHtml(cards)}
 
     <h3 class="p-h">Move to another device</h3>
     <div class="p-move">
@@ -211,6 +287,47 @@ export function parentsScreen(nav: Nav) {
 
     const overlay = $('#reset-overlay');
     const closeOverlay = () => { overlay.hidden = true; overlay.innerHTML = ''; };
+
+    // #20 slice 3. Both controls redraw rather than patching the row: every number above came from the save
+    // that was just renamed or removed, which is the same reason `wireMove`'s restore redraws.
+    const profMsg = (text: string, bad = false) => {
+      const el = $('#prof-msg');
+      el.textContent = text; el.classList.toggle('bad', bad); el.hidden = false;
+    };
+    $$('button[data-rename]').forEach(b => b.addEventListener('click', () => {
+      sfx.tap();
+      const id = b.dataset.rename as ProfileId;
+      const input = $<HTMLInputElement>(`input[data-name="${id}"]`);
+      const r = renameProfile(id, input.value);
+      if (!r.ok) { sfx.wrong(); profMsg(RENAME_HINTS[r.why], true); return; }
+      sfx.correct();
+      // The stored name, not what was typed: `renameProfile` trims and truncates, and the row has to redraw
+      // with what the store is actually holding.
+      const done = `Renamed to ${r.name}.`;
+      drawDash();
+      profMsg(done);
+    }));
+    $$('button[data-del]').forEach(b => b.addEventListener('click', () => {
+      sfx.tap();
+      const id = b.dataset.del as ProfileId;
+      const row = profileCards().find(c => c.id === id);
+      const name = row ? rowName(row, profileCards().findIndex(c => c.id === id) + 1) : 'this ninja';
+      overlay.hidden = false;
+      overlay.innerHTML = deleteConfirmHTML(name);
+      $('#prof-cancel').addEventListener('click', () => { sfx.tap(); closeOverlay(); });
+      $('#prof-go').addEventListener('click', () => {
+        sfx.tap();
+        const r = deleteProfile(id);
+        closeOverlay();
+        if (!r.ok) { sfx.wrong(); profMsg(DELETE_HINTS[r.why], true); return; }
+        sfx.correct();
+        // The save this whole screen is drawn from has just gone, so there is nothing to redraw: `launch` puts
+        // the device back where boot would, which is the picker while siblings remain (#20 slice 3).
+        if (r.self) { nav.launch(); return; }
+        drawDash();
+        profMsg(`${name} was removed from this device.`);
+      });
+    }));
 
     $('#start-again').addEventListener('click', () => {
       sfx.tap();

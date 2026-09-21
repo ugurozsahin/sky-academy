@@ -325,6 +325,134 @@ export function addProfile(): AddProfileResult {
   return { ok: true, id: free };
 }
 /**
+ * The longest name the game keeps — **the one home of that number** (#20 slice 3). The first-run wizard's
+ * `maxlength` was the only statement of it, so renaming from the grown-ups screen had nothing to agree with:
+ * an `<input maxlength>` is a browser courtesy a paste or an automated fill walks straight past, and a
+ * 400-character name reaches the HUD, the picker card and every certificate. `renameProfile` truncates to it
+ * and `nameScreen` renders it, so the two cannot drift.
+ */
+export const NAME_MAX = 14;
+/**
+ * Why a rename was refused, as a value the grown-ups screen can turn into a sentence (#20 slice 3, the
+ * `AddProfileResult` shape). The accepted arm carries the name **as stored**, trimmed and truncated, because
+ * that — not what was typed — is what the row must redraw with.
+ *
+ * - `'unknown'` — not a profile on this device. A stale row, or a second tab that deleted the slot.
+ * - `'no-save'` — the slot exists but holds nothing this build can read, so there is no name to change.
+ *   Distinct from `'unknown'` on purpose: the family can act on it (that child plays first), and the
+ *   grown-ups list therefore offers no rename on an unplayed row rather than showing a refusal.
+ * - `'blank'` — a name of only spaces. `hasName` is the wizard's identical rule (`avatar.ts`).
+ * - `'store'` — the browser would not keep it, the same fault `STORE_HINT` describes on the picker.
+ */
+export type RenameProfileResult = { ok: true; name: string } | { ok: false; why: 'unknown' | 'no-save' | 'blank' | 'store' };
+/**
+ * Rename a profile — the first of slice 3's two grown-ups controls (#20).
+ *
+ * **Two paths, because renaming the child holding the device is not the same act as renaming a sibling.**
+ *
+ * - **This session's own profile** goes through `save()`, so the name the running game shows — the map's
+ *   `#change-av` pill, the dashboard's own heading, the next certificate — changes with the store instead of
+ *   at the next reload. Writing raw here would leave `cache` holding the old name and the screen lying.
+ *   `readOnly` (#232) is a refusal rather than a silent success: `save()` deliberately writes nothing while
+ *   it is latched, so reporting `ok` would promise a rename the store never took.
+ * - **A sibling's slot** is patched raw: read, set one field, write. Deliberately *not* through `load()`,
+ *   for the reason `profileCard` gives — that resolves and caches the session's profile, so it would either
+ *   rename the wrong child or latch this session onto them. And deliberately not through `migrate()` either:
+ *   a rename must not be the thing that rewrites a sibling's blob into this build's shape. One field changes
+ *   and every other byte survives, which is also what makes this safe to offer for a v1 or v2 save.
+ *
+ * `isMigratable` gates the raw path for the same reason `profileCard` applies it: a blob from a newer build is
+ * one this build cannot open, and stamping a name onto it is a small corruption of a save the other device
+ * still reads. It answers `'no-save'` — honest about the outcome, and the list never offers the control.
+ *
+ * The write is **read back** like `writeIndex`'s, because a store that accepts `setItem` and keeps nothing is
+ * the failure that cost #330 a review round; `true` here has to mean the store is holding the new name.
+ */
+export function renameProfile(id: ProfileId, name: string): RenameProfileResult {
+  if (!currentIndex().ids.includes(id)) return { ok: false, why: 'unknown' };
+  const next = name.trim().slice(0, NAME_MAX).trim();   // trimmed again: the cut can land on a space
+  if (!next) return { ok: false, why: 'blank' };
+  if (id === sessionProfile()) {
+    if (readOnly) return { ok: false, why: 'store' };
+    save({ name: next });
+    return writeFailed ? { ok: false, why: 'store' } : { ok: true, name: next };
+  }
+  const key = saveKeyFor(id);
+  const raw = readItem(key);
+  if (!raw) return { ok: false, why: 'no-save' };
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return { ok: false, why: 'no-save' }; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, why: 'no-save' };
+  if (!isMigratable(parsed as RawSave)) return { ok: false, why: 'no-save' };
+  const blob = JSON.stringify({ ...(parsed as RawSave), name: next });
+  try { localStorage.setItem(key, blob); } catch { return { ok: false, why: 'store' }; }
+  return readItem(key) === blob ? { ok: true, name: next } : { ok: false, why: 'store' };
+}
+/**
+ * Why a delete was refused, and what the caller must do when it was not (#20 slice 3).
+ *
+ * - `'unknown'` — not a profile on this device, as for a rename.
+ * - `'last'` — it is the only profile left. See `deleteProfile` for why that is refused here rather than
+ *   handled.
+ * - `'store'` — the index write was not kept, and then **nothing has been deleted**: the ordering below is
+ *   what buys that promise.
+ *
+ * `self` on the accepted arm is "this session was playing the child who has just gone", and it is the storage
+ * layer's answer because `cacheProfile` is the only thing that knows: the index's `active` is a different
+ * question, and a second tab makes the two disagree on purpose (`sessionProfile`). A caller that got `self`
+ * must leave the screen it is on — the save behind it no longer exists.
+ */
+export type DeleteProfileResult = { ok: true; self: boolean; active: ProfileId } | { ok: false; why: 'unknown' | 'last' | 'store' };
+/**
+ * Remove a profile and its save — the second of slice 3's grown-ups controls (#20).
+ *
+ * **The last profile is refused, and that is a deliberate narrowing of the issue's sketch.** #20's slice 3
+ * says deleting the active profile "returns to the picker (or to onboarding if it was the last one)", which
+ * reads as deleting the only profile being allowed. But that is already a control on the same screen —
+ * "Start again" — and that one asks a grown-up to type `RESET` before it clears anything, and offers an undo
+ * afterwards. A second route to the same end, two taps and no typed word, would quietly weaken the guard
+ * `RESET_WORD` exists to be (`parents.ts`). So the destination the issue asks for is reached through the
+ * control that already guards it, and this one refuses with `'last'`. Refused **here** rather than by the
+ * list not drawing the button, because "there is exactly one way to wipe this device" is a property of the
+ * store, and a rail on a disabled button only pins the current screen.
+ *
+ * **The index is written before the bytes are removed**, and the two are not interchangeable:
+ *
+ * - Index first means a refused write has changed nothing at all — the save is still there and the family
+ *   still sees the child, which is what `'store'` promises. `writeIndex`'s own paragraph narrows that to
+ *   "the store is not holding this index"; that caveat applies here too.
+ * - Bytes first would put the failure the other way round: a `removeItem` that landed followed by an index
+ *   write that did not leaves a listed profile whose save is gone, reported as a failure. Losing a sibling's
+ *   progress is the worse of the two outcomes, so it is the one the ordering rules out.
+ *
+ * The residue if `removeItem` *does* throw after the index write: the slot's bytes linger, `holdsSave` still
+ * sees them and `addProfile` therefore refuses that slot, so the family is capped below four until the store
+ * recovers. Said rather than bought: rolling the index back needs a write that can fail in its turn, and
+ * `removeItem` frees space so a full quota — the reason the other writes here fail — cannot be why it did.
+ *
+ * **No `writeFailed` pre-check, unlike `addProfile`.** That one refuses under the latch because adding
+ * switches away from the child holding the device, whose unsaved coins live only in `cache` (#380 round 5,
+ * B2). Deleting a *sibling* leaves this session untouched, and deleting the playing child is a grown-up
+ * asking for exactly that blob to go. The index write still fails on its own if the store is refusing, and
+ * then `'store'` is the answer.
+ */
+export function deleteProfile(id: ProfileId): DeleteProfileResult {
+  const idx = currentIndex();
+  if (!idx.ids.includes(id)) return { ok: false, why: 'unknown' };
+  const rest = idx.ids.filter(x => x !== id);
+  if (!rest.length) return { ok: false, why: 'last' };
+  const self = id === sessionProfile();
+  const next: ProfileIndex = { v: 1, active: idx.active === id ? rest[0] : idx.active, ids: rest };
+  if (!writeIndex(next)) return { ok: false, why: 'store' };
+  try { localStorage.removeItem(saveKeyFor(id)); } catch { /* see the residue paragraph above */ }
+  // Only the *session's* profile going takes the session with it. A second tab that is playing someone else
+  // keeps its cache and both latches even though `active` moved here — `sessionProfile()` is latched to that
+  // child, so their writes still land in their own slot. This is `rereadProfile`'s rule (#380 round 5, B2)
+  // asked of `cacheProfile` rather than of the index, for the same reason.
+  if (self) leaveProfile();
+  return { ok: true, self, active: next.active };
+}
+/**
  * Name and ninja for a profile that is **not** the one this session is playing — what the picker draws on a
  * card. Deliberately not `load()`: that resolves the session's own profile and caches it, so reading a
  * sibling's save through it would either answer the wrong child or latch the session onto them.

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { activeProfile, addProfile, MAX_PROFILES, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { activeProfile, addProfile, deleteProfile, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { carriedStreak } from '../../src/game/dojo';
 import { esc } from '../../src/ui/dom';
@@ -1473,5 +1473,191 @@ describe('profiles: siblings on one device (#20)', () => {
     // `addProfile` writes no save on purpose, so the new slot is empty: the card has to come from the index.
     expect(profileCards().map(c => c.id)).toEqual(['p1', 'p2']);
     expect(profileCards()[1]).toEqual({ id: 'p2', name: '', avatar: null, onboarded: false });
+  });
+  // ── #20 slice 3: rename and delete, the grown-ups screen's two controls ───────────────────────────────────
+  describe('renameProfile (#20 slice 3)', () => {
+    it('renames the profile this session is playing through save(), so the running screen agrees with the store', () => {
+      save({ name: 'Ada', coins: 40, onboarded: true });
+      expect(renameProfile('p1', 'Ada Two')).toEqual({ ok: true, name: 'Ada Two' });
+      expect(load().name, 'the session cache, not just disk').toBe('Ada Two');
+      expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).name).toBe('Ada Two');
+      expect(load().coins, 'and nothing else about the save moved').toBe(40);
+    });
+
+    it("renames a sibling's slot without touching this session or migrating their blob", () => {
+      save({ name: 'Ada', coins: 40, onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      expect(setActiveProfile('p1')).toBe(true);
+      // A v1 blob — older than this build — written straight into the sibling's slot.
+      localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 1, name: 'Bo', avatar: 'blaze', coins: 7 }));
+      expect(renameProfile('p2', 'Bobby')).toEqual({ ok: true, name: 'Bobby' });
+      const raw = JSON.parse(localStorage.getItem(saveKeyFor('p2'))!);
+      expect(raw.name).toBe('Bobby');
+      expect(raw.v, 'a rename is not the thing that migrates a sibling').toBe(1);
+      expect(raw.coins, 'and it carries every other byte through').toBe(7);
+      expect(load().name, 'this session is still Ada, unlatched onto nobody').toBe('Ada');
+      expect(activeProfile()).toBe('p1');
+    });
+
+    it('trims, truncates to NAME_MAX, and refuses a name of only spaces', () => {
+      save({ name: 'Ada', onboarded: true });
+      expect(renameProfile('p1', '   ')).toEqual({ ok: false, why: 'blank' });
+      expect(load().name, 'a refused rename changes nothing').toBe('Ada');
+      expect(renameProfile('p1', '  Bo  ')).toEqual({ ok: true, name: 'Bo' });
+      const long = 'Wolfeschlegelsteinhausen';
+      expect(long.length).toBeGreaterThan(NAME_MAX);
+      const r = renameProfile('p1', long);
+      expect(r).toEqual({ ok: true, name: long.slice(0, NAME_MAX) });
+      expect(load().name.length, 'the cap the wizard renders is the cap the store enforces').toBe(NAME_MAX);
+      // The cut can land on a space, and a trailing space is not part of a name.
+      expect('Ada Bo Cassie Dee'.slice(0, NAME_MAX), 'the fixture cuts on a space').toBe('Ada Bo Cassie ');
+      expect(renameProfile('p1', 'Ada Bo Cassie Dee')).toEqual({ ok: true, name: 'Ada Bo Cassie' });
+    });
+
+    it('refuses a slot that is not a profile of this device, and one with nothing to name', () => {
+      save({ name: 'Ada', onboarded: true });
+      expect(renameProfile('p3', 'Cass'), 'p3 is not in the index').toEqual({ ok: false, why: 'unknown' });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      expect(setActiveProfile('p1')).toBe(true);
+      expect(renameProfile('p2', 'Bo'), 'listed, but addProfile writes no save').toEqual({ ok: false, why: 'no-save' });
+      expect(localStorage.getItem(saveKeyFor('p2')), 'and it does not invent one').toBeNull();
+      localStorage.setItem(saveKeyFor('p2'), 'not json at all');
+      expect(renameProfile('p2', 'Bo')).toEqual({ ok: false, why: 'no-save' });
+      expect(localStorage.getItem(saveKeyFor('p2')), 'a blob we cannot read is left exactly as it is').toBe('not json at all');
+    });
+
+    it("refuses a sibling's save from a newer build rather than stamping a name onto it (#232)", () => {
+      save({ name: 'Ada', onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      expect(setActiveProfile('p1')).toBe(true);
+      const future = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', coins: 99 });
+      localStorage.setItem(saveKeyFor('p2'), future);
+      expect(renameProfile('p2', 'Bobby')).toEqual({ ok: false, why: 'no-save' });
+      expect(localStorage.getItem(saveKeyFor('p2')), 'the other device still reads it').toBe(future);
+    });
+
+    it("refuses while the session's own save is read-only, instead of reporting a rename save() never wrote (#232)", () => {
+      localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION + 1, name: 'Ada', coins: 99 }));
+      expect(load().name, 'the session runs on defaults over a newer blob').toBe('');
+      expect(isReadOnlySave()).toBe(true);
+      expect(renameProfile('p1', 'Bo')).toEqual({ ok: false, why: 'store' });
+      expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).name).toBe('Ada');
+    });
+
+    it('reports a store that will not keep the new name, on either path (#151, #330)', () => {
+      save({ name: 'Ada', onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      save({ name: 'Bo', onboarded: true });          // p2 is now the session's, with a save of its own
+      expect(setActiveProfile('p1')).toBe(true);
+      const realSet = localStorage.setItem;
+      (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+      try {
+        expect(renameProfile('p1', 'Ada Two'), "the session's own path").toEqual({ ok: false, why: 'store' });
+        expect(renameProfile('p2', 'Bobby'), "the sibling's raw path").toEqual({ ok: false, why: 'store' });
+      } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+      expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, 'and nothing was written').toBe('Bo');
+      // A store that accepts the call and keeps nothing is the other half of "the write did not land" (#330).
+      (localStorage as unknown as { setItem: unknown }).setItem = () => { /* silently drops it */ };
+      try { expect(renameProfile('p2', 'Bobby')).toEqual({ ok: false, why: 'store' }); }
+      finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    });
+  });
+
+  describe('deleteProfile (#20 slice 3)', () => {
+    /** Two siblings, Ada in p1 and Bo in p2, with `active` as asked and the session bound to it. */
+    const twoChildren = (active: 'p1' | 'p2') => {
+      save({ name: 'Ada', coins: 40, onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      save({ name: 'Bo', coins: 7, onboarded: true });
+      expect(setActiveProfile(active)).toBe(true);
+      expect(load().name).toBe(active === 'p1' ? 'Ada' : 'Bo');
+    };
+
+    it("removes a sibling's slot and save, and leaves this session alone", () => {
+      twoChildren('p1');
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: false, active: 'p1' });
+      expect(profileIds()).toEqual(['p1']);
+      expect(localStorage.getItem(saveKeyFor('p2')), 'the bytes go with the slot').toBeNull();
+      expect(load().name, 'the child holding the device never noticed').toBe('Ada');
+      expect(load().coins).toBe(40);
+      // The freed slot is genuinely reusable — `addProfile` probes `holdsSave`, so leftover bytes would cap
+      // the family below four for good (#335 item 1).
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    });
+
+    it('removing the active profile moves `active` on and ends the session bound to it', () => {
+      twoChildren('p2');
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: true, active: 'p1' });
+      expect(profileIds()).toEqual(['p1']);
+      expect(activeProfile()).toBe('p1');
+      expect(load().name, "the next read resolves afresh, onto the sibling's own save").toBe('Ada');
+      expect(load().coins, "and not the deleted child's coins written over them").toBe(40);
+      expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).coins, 'nothing wrote Bo into p1').toBe(40);
+    });
+
+    it('refuses the only profile: clearing the whole device stays "Start again" and its typed word', () => {
+      save({ name: 'Ada', coins: 40, onboarded: true });
+      expect(deleteProfile('p1')).toEqual({ ok: false, why: 'last' });
+      expect(load().name, 'a refused delete changes nothing').toBe('Ada');
+      expect(profileIds()).toEqual(['p1']);
+      // And it stays refused as the family shrinks back to one, rather than only on a device that never grew.
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      save({ name: 'Bo', onboarded: true });
+      expect(deleteProfile('p1')).toEqual({ ok: true, self: false, active: 'p2' });
+      expect(deleteProfile('p2')).toEqual({ ok: false, why: 'last' });
+      expect(load().name, "the last child's save survives the refusal").toBe('Bo');
+    });
+
+    it('refuses a slot that is not a profile of this device', () => {
+      twoChildren('p1');
+      expect(deleteProfile('p3')).toEqual({ ok: false, why: 'unknown' });
+      expect(profileIds()).toEqual(['p1', 'p2']);
+    });
+
+    it('a store that will not keep the index deletes nothing at all', () => {
+      twoChildren('p1');
+      const realSet = localStorage.setItem;
+      (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+      try { expect(deleteProfile('p2')).toEqual({ ok: false, why: 'store' }); }
+      finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+      expect(profileIds(), 'still a family of two').toEqual(['p1', 'p2']);
+      expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "and Bo's save is untouched — the index is written first for exactly this").toBe('Bo');
+      // The same for a store that accepts the call and keeps nothing.
+      (localStorage as unknown as { setItem: unknown }).setItem = () => { /* silently drops it */ };
+      try { expect(deleteProfile('p2')).toEqual({ ok: false, why: 'store' }); }
+      finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+      expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name).toBe('Bo');
+    });
+
+    it('a second tab playing someone else keeps its own session when `active` moves (#380 round 5, B2)', () => {
+      // p1 Ada, p2 Bo, p3 Cass. This session is playing Ada; the index says Bo is active, as a second tab
+      // that switched would leave it. Removing Bo moves `active`, but not this session's child.
+      save({ name: 'Ada', coins: 40, onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      save({ name: 'Bo', coins: 7, onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p3' });
+      save({ name: 'Cass', coins: 3, onboarded: true });
+      expect(setActiveProfile('p1')).toBe(true);
+      expect(load().name, 'this session is Ada').toBe('Ada');
+      localStorage.setItem('sna:profiles', JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2', 'p3'] }));
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: false, active: 'p1' });
+      expect(load().name, "Ada's session survives a delete that was never hers").toBe('Ada');
+      expect(load().coins).toBe(40);
+      save({ coins: 41 });
+      expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).coins, 'and her writes still land in her own slot').toBe(41);
+    });
+
+    it("removing the profile this session is playing drops its cache, so a refused save cannot follow it (#151)", () => {
+      twoChildren('p2');
+      const realSet = localStorage.setItem;
+      (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+      try { save({ coins: 999 }); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+      expect(isWriteFailing(), 'Bo has 999 coins that never reached disk').toBe(true);
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: true, active: 'p1' });
+      expect(isWriteFailing(), 'the latch describes a blob that is gone').toBe(false);
+      expect(load().coins, "and Ada's save is what the next read answers").toBe(40);
+      save({ coins: 41 });
+      expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).coins, "not 999 written into Ada's slot").toBe(41);
+    });
   });
 });

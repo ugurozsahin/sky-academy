@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '../../src/game/parents';
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
-import { SAVE_VERSION, STICKER_IDS, type SaveData, type TopicProgress } from '../../src/storage';
+import { SAVE_VERSION, STICKER_IDS, type ProfileCard, type SaveData, type TopicProgress } from '../../src/storage';
+import { canRenameCard, DELETE_HINTS, RENAME_HINTS } from '../../src/ui/parents';
 import { freshDojo } from '../../src/game/dojo';
 
 const base: SaveData = {
@@ -127,5 +128,38 @@ describe('parent dashboard summary', () => {
     expect(pct(0.725)).toBe(73);
     expect(pct(1)).toBe(100);
     expect(pct(0)).toBe(0);
+  });
+});
+
+/**
+ * #20 slice 3 — the two rules the grown-ups list is built on that a screenshot could not tell you: which rows
+ * offer a rename, and that every refusal the store can return has a sentence to show for it.
+ */
+describe('ninjas on this device (#20 slice 3)', () => {
+  const card = (over: Partial<ProfileCard> = {}): ProfileCard => ({ id: 'p1', name: '', avatar: null, onboarded: false, ...over });
+
+  it('offers a rename exactly when there is a save behind the row', () => {
+    expect(canRenameCard(card()), 'a slot ＋ created and nothing ever played').toBe(false);
+    expect(canRenameCard(card({ onboarded: true })), 'played').toBe(true);
+    expect(canRenameCard(card({ avatar: 'volt' })), 'mid-wizard: a ninja chosen, no name yet').toBe(true);
+    expect(canRenameCard(card({ name: 'Ada' })), 'a name and no ninja is still a save').toBe(true);
+    expect(canRenameCard(card({ name: '   ' })), 'spaces are not a name').toBe(false);
+  });
+
+  /**
+   * The maps are `Record`s over the refusal unions, so a new refusal is a type error rather than a blank
+   * status line — but nothing stops an entry being added as `''`, and an empty `role="status"` is exactly the
+   * silence the values exist to prevent. These are `renameProfile`'s and `deleteProfile`'s own unions,
+   * re-stated here so a refusal that loses its sentence fails a test instead of a review.
+   */
+  it('has a sentence for every refusal the store can return, and names the safer route out of the last one', () => {
+    expect(Object.keys(RENAME_HINTS).sort()).toEqual(['blank', 'no-save', 'store', 'unknown']);
+    expect(Object.keys(DELETE_HINTS).sort()).toEqual(['last', 'store', 'unknown']);
+    for (const [why, text] of [...Object.entries(RENAME_HINTS), ...Object.entries(DELETE_HINTS)])
+      expect(text.trim().length, why).toBeGreaterThan(10);
+    // The refusal that has to teach a grown-up what to do instead: `deleteProfile` sends the only profile to
+    // "Start again", which is the control that asks for the typed word.
+    expect(DELETE_HINTS.last).toContain('Start again');
+    expect(DELETE_HINTS.last).toContain('RESET');
   });
 });

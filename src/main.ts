@@ -53,6 +53,7 @@ const nav = {
   shop: () => { leave(); enter('shop'); shopScreen(nav); },
   parents: () => { leave(); enter('parents'); parentsScreen(nav); },
   profiles: () => goProfiles(),   // #20 slice 2: the profile picker — `goProfiles` is the only way in
+  launch: () => relaunch(),       // #20 slice 3: the boot decision, re-run — see `relaunch`
   up,
 };
 /**
@@ -99,6 +100,22 @@ const screenDrawn = () => !!document.querySelector('#app > *');
 let pendingProfiles = false;
 /** Where a chosen profile lands: their sky map, or onboarding when that slot has never been played. */
 const afterPick = () => { if (load().onboarded) nav.map(); else nav.avatar(); };
+/**
+ * **The boot decision, as a function** — where this device starts when nobody has chosen yet (#20 slice 3).
+ *
+ * It was the `if` at the bottom of this file and nothing else needed it. Slice 3's "Remove" does: a grown-up
+ * who deletes the ninja this session is playing cannot be left on a dashboard drawn from a save that no
+ * longer exists, and where they should land is exactly this question — the picker while two or more profiles
+ * remain, otherwise the one remaining child's map, or onboarding when that slot has never been played. Written
+ * twice it would be two rules that agree today; `parents.ts` calls `nav.launch()` and this stays the only copy.
+ */
+const relaunch = () => {
+  // `leave()` here and not only in the routes it hands off to: the #74 rail in `guardrails.test.ts` follows a
+  // route's hand-off exactly one level and fails on a chain it cannot read, which is the right answer — a
+  // relaunch that tore nothing down would leak whatever arena the grown-ups screen was opened from.
+  leave();
+  if (profileIds().length > 1) goProfiles(); else if (load().onboarded) nav.map(); else nav.avatar();
+};
 window.addEventListener('popstate', () => {
   const s = history.state?.screen as string | undefined;   // the entry we landed on
   fromPop = true;
@@ -134,7 +151,7 @@ void startServiceWorker();
 //
 // #67: `onboarded`, not `avatar` — a profile mid-wizard already has an avatar chosen (choices save as they
 // are made) but must still see the rest of the wizard on the next launch, not jump straight to the map.
-if (profileIds().length > 1) goProfiles(); else if (load().onboarded) nav.map(); else nav.avatar();
+relaunch();
 
 // Keep the layout stable on mobile browsers whose toolbars resize the viewport.
 const setVH = () => document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
