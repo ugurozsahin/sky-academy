@@ -114,8 +114,8 @@ img { -webkit-user-drag: none; }
 .btn.big { padding: 16px 30px; font-size: 20px; }
 .btn:disabled { opacity: .45; filter: grayscale(.6); pointer-events: none; }
 .icon-btn {
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   border-radius: 14px;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -319,6 +319,17 @@ img { -webkit-user-drag: none; }
 .hero { display: flex; align-items: center; gap: 12px; padding: 6px 12px 6px 6px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); text-align: left; }
 .hero b { display: block; font-size: 17px; } .hero small { color: var(--muted); }
 .settings { display: flex; gap: 8px; }
+/* #414: on a narrow phone (320/360px) the settled coin pill + two icon buttons leave `.hero` no room, and it
+ * cannot shrink below its text's intrinsic width by default. Below 400px `.hero` is allowed to give: its text
+ * column gets `min-width: 0` and both lines ellipsise rather than pushing the row off the right edge. The
+ * element line is the one that actually runs long ("Electric Ninja"), so in practice it is what truncates —
+ * the child's own name is short enough to survive whole at every measured width. `.settings` is untouched: the
+ * coin pill and the two `.icon-btn`s are the fixed part of the row and nothing here should make them smaller. */
+@media (max-width: 400px) {
+  .hero { min-width: 0; }
+  .hero > span:last-child { min-width: 0; overflow: hidden; }
+  .hero b, .hero small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 .section-title { margin: 22px 4px 10px; font-size: 20px; color: #dfe6ff; }
 .islands { display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: 12px; }
 .island {
