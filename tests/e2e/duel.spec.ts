@@ -363,7 +363,7 @@ test.describe('Ninja Duel', () => {
   });
   const POOL_CARDS: Card[] = (() => {
     const out: Card[] = [];
-    const seen = new Map<string, number>();
+    const biggest = new Map<string, Card>();
     let plain: Card | null = null;
     let rightmostTick: Card | null = null;
     for (const year of YEARS) {
@@ -379,16 +379,19 @@ test.describe('Ninja Duel', () => {
           // for — `overflow: hidden` cut the `?` clean off it at 320px wide — and `markPainted` is vacuous
           // without it, on the very viewports this rail added for width.
           if (card.html.includes('class="mark">?</span></div></div>')) rightmostTick ??= { ...card, what: `${card.what} — hidden tick rightmost` };
-          // Keyed by kind AND topic, never by kind alone: keyed by kind, the first topic to emit one took both
-          // slots, so `objects` was `r-count`'s two stars and the twelve-star `y2-fractions` card — the one the
-          // 160px budget exists for, and the one `src/style.css` names — never entered the catalogue at all.
+          // Keyed by kind AND topic, never by kind alone, and kept by SIZE, not by seed order: the first two
+          // cards seen used to win the slot, so `objects` kept `r-count`'s two stars and `y2-fractions`'s own
+          // FOUR-star draw, never the pool's real twelve-star maximum — the card `src/style.css`'s 160px budget
+          // and the portrait floor below are both written around, and both measured nothing (PR #428 review
+          // round 4, B1a). `html.length` stands in for element count: every kind here repeats one child markup
+          // per item (a `.slot`, an `<i>`, a `<circle>`...), so more items is a longer string.
           const key = `${card.kind}|${topic.id}`;
-          if ((seen.get(key) ?? 0) >= 2) continue;
-          seen.set(key, (seen.get(key) ?? 0) + 1);
-          out.push(card);
+          const prev = biggest.get(key);
+          if (!prev || card.html.length > prev.html.length) biggest.set(key, card);
         }
       }
     }
+    out.push(...biggest.values());
     if (plain) out.unshift(plain);
     if (rightmostTick) out.push(rightmostTick);
     return out;
@@ -632,7 +635,14 @@ test.describe('Ninja Duel', () => {
       // that stopped carrying hints would have measured whatever the live draw dealt and reported green
       // (PR #428 review, B3) — the sampling trap this very file names twice.
       expect(card, 'the pool still carries a hint to dress the card with').toBeTruthy();
-      const seen = await page.evaluate(([c, longest]) => {
+      // The NO-VISUAL card, for the height probe below and that probe alone. `#vis` is 100-160px tall on every
+      // other card, so the toast's own weight is already inside slack the visual bought — `withToast` and
+      // `withoutToast` came back equal however tall the toast grew, on a card with no picture to hide that
+      // (PR #428 review round 4, B1b). A toast can only out-grow the bar on the one card that leaves it nothing
+      // else to spend.
+      const plainCard = POOL_CARDS.find(c => c.kind === 'none')!;
+      expect(plainCard, 'the pool still carries the text-only card the height probe needs').toBeTruthy();
+      const seen = await page.evaluate(([c, longest, noVisual]) => {
         // Dressed inside the same evaluate as the measurement: the hint's share depends entirely on which card
         // is up, and sampling whatever the draw dealt is the trap this file has fallen into twice.
         document.querySelector('#vis')!.innerHTML = c.html;
@@ -682,7 +692,14 @@ test.describe('Ninja Duel', () => {
         };
         t.classList.add('show');
         t.style.transition = wasTransition;
-        // The height probe, AFTER every coverage read above, because it rewrites the toast's own text.
+        // The height probe, AFTER every coverage read above, because it rewrites the toast's own text — AND
+        // the card. Dressed with the NO-VISUAL card here, not `c`: `#vis` is 100-160px on every other card, so
+        // the strip already had slack the toast's own growth was spent from, and `withToast === withoutToast`
+        // held however tall the toast grew (PR #428 review round 4, B1b). The one card that leaves the strip
+        // nothing else to spend is the one with no picture to shrink.
+        document.querySelector('#vis')!.innerHTML = noVisual.html;
+        document.querySelector('#prompt')!.textContent = noVisual.prompt;
+        document.querySelector('#hint')!.textContent = noVisual.hint;
         // Measured against `display: none` rather than against `.show`: `.toast.show` is defined once, in
         // `src/style.css`, as `opacity: 1; transform: none` — neither is a layout property, so toggling the
         // class measured the identical layout twice and the assertion held however the CSS changed
@@ -703,7 +720,7 @@ test.describe('Ninja Duel', () => {
           decided: window.__sna.state().decided, toastArea: Math.round(tr.width * tr.height),
           ...covers, entry, withToast, withoutToast, wrapped,
         };
-      }, [card, DUEL_TOAST_LONGEST] as const);
+      }, [card, DUEL_TOAST_LONGEST, plainCard] as const);
       const at = `${vp.width}x${vp.height}`;
       expect(seen.toastArea, `${at}: the toast is laid out, so there is something to cover an arena with`).toBeGreaterThan(0);
       // The round is still live at every viewport, which is the premise of the whole loop: a slab over an
