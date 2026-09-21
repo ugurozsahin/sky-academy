@@ -390,11 +390,19 @@ img { -webkit-user-drag: none; }
    child who just erred, in the one mode whose whole rule is that they are identical (#389). Sideways it blotted
    out Player 2's name and score instead, including as that score changed.
    The bar is the one place that belongs to both players equally and holds nothing time-critical: it is static
-   for the whole round, where a bubble is in flight. `q` is sized by the strip, which is taller than the toast at
+   for the whole round, where a bubble is in flight. `start center` rather than centred, and inset 4px: the card
+   is covered and that is the accepted trade, but `.duel-q .hint` is not — five pool topics carry the values
+   being compared there and NOWHERE else, so a hint swallowed whole is a round of "Which is fuller?" over two
+   coloured bubbles. Measured across four viewports, centred hid it completely at 568x320; this hides at most a
+   quarter of it, and none of either arena or either name pill. `q` is sized by the strip, which is taller than the toast at
    every viewport, so this still costs no layout — the 32px stays won. `pointer-events: none` remains load
-   bearing for the same reason it was: a slice must reach the canvas. */
+   bearing for the same reason it was: a slice must reach the canvas.
+   `.duel-screen` no longer needs `position: relative` for this — a grid item is placed by the grid — so it is
+   gone, and `#overlay`'s `position: absolute; inset: 0` now resolves against `#app` instead. Measured as no
+   visible change (`#app` is `position: relative` and `min-height: calc(var(--vh) * 100)`, so the overlay still
+   covers the screen exactly), but it is a dependency the next person to touch `#app` would not otherwise see. */
 .duel-screen > .toast {
-  grid-area: q; place-self: center; margin-top: 0; z-index: 3; pointer-events: none;
+  grid-area: q; place-self: start center; margin-top: 4px; z-index: 3; pointer-events: none;
 }
 
 .duel-arena { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }

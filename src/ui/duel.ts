@@ -64,6 +64,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
 
   const scope = screenScope(); const { later, toast } = scope;
   const overlay = $('#overlay'); const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
+  const toastEl = $('#toast');
   let waveId = 0; let holdOpen = false;
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
   let hintLine = '';
@@ -85,6 +86,13 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       // shows its words on a device that cannot be heard, and the hint line carries the data five of the pool's
       // comparison topics keep nowhere else — without it "Which is fuller?" is two coloured bubbles and a guess.
       // A duel has no peek timing, so a peek question reads through here rather than hiding its text.
+      // The verdict on the last round does not belong over this one's question. `waveEnd()` calls `onRoundDraw`
+      // and then `advance()` in the SAME synchronous task, so on a drawn round the toast text is set and the card
+      // is rewritten before the browser paints: "Nobody sliced it — no point" then fades in on top of the next
+      // question and sits there for a full second, and the two are never on screen together. (The won path does
+      // not overlap — `onRoundWon` defers through `endWave` — but clearing here is right for it too.) Draws are
+      // common at Reception and Year 1 speeds, and this only became visible when the toast moved onto the card.
+      toastEl.classList.remove('show');
       const reveal = promptMode(q, canHear()) !== 'hear';
       speak.hidden = reveal;
       prompt.innerHTML = promptHTML(q, 0, reveal); $('#vis').innerHTML = renderVisual(q.visual);
