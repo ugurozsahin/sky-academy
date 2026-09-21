@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
 import type { SentenceType } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
 
@@ -437,10 +437,35 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       // Review of #324: `poop` and `puss` were left in `EVERYDAY`, so the stems were closed by the list that
       // says "this is a word" — one prune from reopening, with the disjointness rail below green either way
       // (see its comment). A row each, on every reachable gap, is what actually pins them.
-      ['poor', 3, 'p'], ['push', 3, 's'], ['pass', 1, 'u']] as [string, number, string][]) {
+      ['poor', 3, 'p'], ['push', 3, 's'], ['pass', 1, 'u'],
+      // #419: two reviews of PR #406 reported this family clean — one enumerated 10,919 drawable spellings
+      // against a 151-entry list — and `p_ove` was offering `o` the whole time. `hore` is settled the same
+      // way rather than left for the next sweep to re-find: not a dictionary word, an exact homophone of
+      // this set's first member, and blocked because `AVOID` is about what a card can show.
+      ['prove', 1, 'o'], ['here', 1, 'o']] as [string, number, string][]) {
       expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} belongs in AVOID, not the word lists`).toBe(false);
       expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
     }
+    // #418: the same shape for Reception, which no row above could reach. `r-sounds` passes its letter pool to
+    // `gapQ` raw, so none of the rows above — all of which go through `gapLetters` — ever touched these cards,
+    // and `cu_` offered `m` to a four-year-old. One row per (word, gap, letter) the sweep found, so dropping
+    // any single `AVOID` entry goes red naming the spelling it lets back.
+    const R_POOL = [...R_LETTERS_ALL];
+    for (const [w, i, l] of [['cup', 2, 'm'], ['map', 0, 'p'], ['map', 0, 'j'], ['tap', 0, 'p'], ['tap', 0, 'j'],
+      ['pot', 2, 'o'], ['cap', 0, 'p'], ['cap', 0, 'j'], ['pan', 2, 'p'], ['bus', 0, 'p'], ['bus', 2, 'm'],
+      ['bag', 0, 'v'], ['jam', 2, 'p'], ['bug', 2, 'm'], ['van', 2, 'g']] as [string, number, string][]) {
+      const filled = w.slice(0, i) + l + w.slice(i + 1);
+      expect(AVOID.has(filled), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} spells ${filled}, which belongs in AVOID`).toBe(true);
+      expect(gapDecoys(w, i, R_POOL), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l} — it spells ${filled}`).not.toContain(l);
+      // …and the letter really is in the pool the generator passes, or the row above proves nothing.
+      expect(R_POOL, `${l} is not in the r-sounds pool, so this row is vacuous`).toContain(l);
+    }
+    // The middle-sound card passes VOWELS, which is a different pool and must be filtered too.
+    expect(gapDecoys('pot', 2, ['a', 'e', 'i', 'o', 'u']), 'po_ may never offer o — it spells poo').not.toContain('o');
+    // And the filter must still leave a card buildable: `gapQ` takes 3 decoys.
+    for (const [w] of CVC) for (const i of [0, 2])
+      expect(gapDecoys(w, i, R_POOL).length, `${w} index ${i} leaves too few decoys`).toBeGreaterThanOrEqual(3);
+
     // #324 item 3: the one general statement, rather than another row of cases. `AVOID` says "not on a card"
     // and `GAP_WORDS` says "another right answer"; a word in *both* is blocked for the wrong reason, and a
     // curriculum change that drops it from the word lists unblocks it with nothing red. That co-membership is
@@ -459,7 +484,9 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     }
     // And what the card actually shows, for every difficulty of the three gap topics.
     let gaps = 0;
-    for (const id of ['y1-spelling', 'y2-spelling', 'y1-days']) for (const d of [1, 2, 3] as Difficulty[]) {
+    // `r-sounds` is here since #418: it was the one gap topic the sweep never covered, which is exactly why
+    // sixteen crude or slur spellings sat on Reception's cards with the whole suite green.
+    for (const id of ['y1-spelling', 'y2-spelling', 'y1-days', 'r-sounds']) for (const d of [1, 2, 3] as Difficulty[]) {
       const t = gen(id); const r = rng(id.length * 7 + d);
       for (let i = 0; i < 300; i++) {
         const q = t.gen(d, r);
@@ -468,9 +495,24 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
         const idx = q.prompt.indexOf('_');
         for (const o of q.options) if (o !== q.answer) {
           const filled = (q.prompt.slice(0, idx) + o + q.prompt.slice(idx + 1)).toLowerCase();
-          expect(GAP_WORDS.has(filled), `${id}: ${q.prompt} — decoy ${o} spells ${filled}`).toBe(false);
+          // `GAP_WORDS` — "is this another right answer" — applies to the three topics whose cards show only
+          // the gapped word. `r-sounds` passes an emoji to `gapQ` and every CVC entry has one, so its card is
+          // `_un` beside ☀️: a decoy spelling another real CVC word is not a second right answer there, the
+          // way it is on a y1-spelling card, which passes `undefined`. Verified rather than assumed — the
+          // emoji assertion below is what keeps that true.
+          if (id !== 'r-sounds')
+            expect(GAP_WORDS.has(filled), `${id}: ${q.prompt} — decoy ${o} spells ${filled}`).toBe(false);
+          // `AVOID` applies to all four, and this is the half that was missing everywhere: the sweep asserted
+          // only `GAP_WORDS` and never the set that exists to say "not on a card", so the one rail that looks
+          // at a real card could not have caught #418 even on the topics it did cover.
+          expect(AVOID.has(filled), `${id}: ${q.prompt} — decoy ${o} spells ${filled}, which no card may show`).toBe(false);
         }
         expect(q.options.length, q.prompt).toBe(4);
+        // The exemption above rests on this: drop the emoji from an r-sounds card and `_un` beside nothing
+        // really is ambiguous, so the exemption must go red rather than quietly widen.
+        if (id === 'r-sounds')
+          expect(q.visual && 'emoji' in q.visual ? q.visual.emoji : undefined,
+            `${id}: ${q.prompt} has no picture, so a decoy spelling another word IS ambiguous`).toBeTruthy();
       }
     }
     expect(gaps).toBeGreaterThan(500);

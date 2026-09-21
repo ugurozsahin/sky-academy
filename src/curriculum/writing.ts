@@ -158,7 +158,11 @@ export const GAP_WORDS: ReadonlySet<string> = new Set([...Y1_CEW, ...Y2_CEW, ...
  * the US spellings `math`, `mold`, `molt` and `grays`, and words no KS1 child reads as an answer — `oath`,
  * `sire`, `whey`, `rut`, `cur`, `hag`, `hale`, `chile`.
  *
- * `AVOID` is the other filter: spellings no card may show a child, whatever the lists know.
+ * `AVOID` is the other filter: spellings no card may show a child, whatever the lists know. It is applied in
+ * **two** places, and the second is the one that makes this sentence true of the game rather than of this
+ * function: here, for the generators that draw decoys through `gapLetters`, and in `gapDecoys` below,
+ * which every `gapQ` card passes through. Until #418 only this one existed, and the three `r-sounds`
+ * call sites — Reception's — consulted neither set.
  *
  * **The rule the split follows** (#324 item 3): a spelling is blocked *here* when the reason is that a child
  * must not see it, and in `GAP_WORDS` when the reason is that it is another right answer. `poos`, `pooh`,
@@ -183,7 +187,18 @@ export const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass
   'poon', 'poot', 'pood', 'poos', 'pooh', 'paps', 'pud',
   // Review of #324: `poop` and `puss` were still in `EVERYDAY`, so the two stems the audit had just closed were
   // each one curriculum prune away from reopening. Moved here so `poo_` is uniform and `pu__`/`p_ss` are pinned.
-  'poop', 'puss']);
+  'poop', 'puss',
+  // #418: `r-sounds` passed its letter pool to `gapQ` raw, so Reception — ages 4 and 5 — was the one island
+  // no `AVOID` entry reached. `cu_` offered `m`, `ja_` offered `p`. Filtering moved into `gapQ` in the same
+  // change; these are the spellings that sweep found and that a card must not show whichever generator built
+  // it. `poo` and `pap` are the `poo_`/`paps` standards one letter shorter — #324 closed those and this stem
+  // was reachable the whole time.
+  'cum', 'jap', 'vag', 'poo', 'bum', 'pap',
+  // #419: `p_ove` offered `o` on a Year 2 card two reviews after a sweep reported the family clean, and
+  // `h_re` offered `o` on a Year 1 one. `hore` is not a dictionary word and is here anyway, which is the
+  // rule `pud` and `paps` already follow: what is blocked is the spelling a card can **show**, not an entry
+  // in a dictionary — and it is an exact homophone of this set's first member.
+  'poove', 'hore']);
 export function gapLetters(word: string, idx: number): string[] {
   const lower = word.toLowerCase();
   return LETTERS.filter(l => { const w = lower.slice(0, idx) + l + lower.slice(idx + 1); return l !== lower[idx] && !GAP_WORDS.has(w) && !AVOID.has(w); });
@@ -246,10 +261,27 @@ const y1Sentence = sentGen(Y1_SENTS, Y1_DECOYS, [2, 2, 2], 1);       // Y1/Y2: s
 const y2Sentence = sentGen(Y2_SENTS, Y2_DECOYS, [2, 3, 3], 1);
 
 /** Missing-letter question: show word with a gap, options are letters. */
+/**
+ * The letters a gap card may really offer: the pool, less the answer, less any letter that would spell an
+ * `AVOID` word in this gap (#418).
+ *
+ * **Here rather than at the call sites.** `gapLetters` filters `AVOID` too, but only three of the six `gapQ`
+ * call sites go through it: `rLetterSound` passes `rLetters(d)` and `VOWELS` raw, so every rail #296, #303 and
+ * #324 built was blind to Reception's cards and `cu_` offered `m`. Filtering where the card is built covers
+ * all six and every future one, and makes the unscoped sentence above `AVOID` true instead of narrowing it.
+ * Pool depth is not a constraint: `gapQ` needs 3 and the thinnest pool any generator passes is 15.
+ */
+export const gapDecoys = (word: string, idx: number, pool: string[]): string[] => {
+  const lower = word.toLowerCase();
+  const ans = lower[idx];
+  return pool.filter(l => l.toLowerCase() !== ans
+    && !AVOID.has(lower.slice(0, idx) + l.toLowerCase() + lower.slice(idx + 1)));
+};
+
 function gapQ(rng: Rng, word: string, idx: number, distractPool: string[], emoji?: string, say?: string) {
   const ans = word[idx];
   const shown = word.slice(0, idx) + '_' + word.slice(idx + 1);
-  const ds = shuffle(rng, distractPool.filter(l => l !== ans)).slice(0, 3);
+  const ds = shuffle(rng, gapDecoys(word, idx, distractPool)).slice(0, 3);
   return wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown, emoji }, say: say ?? `Which letter is missing from ${word}?`, hint: 'Slice the missing letter' });
 }
 
