@@ -36,6 +36,18 @@ export interface Question {
   sequence?: string[];    // slice these in order (spelling); options = sequence letters + decoys
   visual?: Visual;
   hint?: string;          // small instruction text under the prompt
+  /**
+   * `hint` is the values the card is answered from, not the instruction line above — they appear there and
+   * nowhere else (no `visual`, nothing in the prompt, the options being the *things* compared rather than
+   * their sizes). Two generators set it, `measureCompare()` and `y2Temp`'s comparison branch, which is seven
+   * topics; the other 40 hint-writing topics are chrome ("Slice the shape") and must not set it.
+   *
+   * It exists because a short screen reclaims `.hint` (`@media (max-height: 640px)`), which is a fair trade
+   * for an instruction and takes a measure card's only readable content away — #328, and #65's rule that
+   * every card stays usable without read-aloud. `src/ui/play-session.ts` marks the element `own` from this,
+   * so only these cards keep the line on a phone held sideways.
+   */
+  hintIsData?: boolean;
   wide?: boolean;         // options are words → bigger bubbles
   listen?: string;        // spoken-only question: shown on the card instead of `prompt` when read-aloud is off
   peek?: boolean;         // no-voice sequence: show `listen` briefly, then hide it before the bubbles launch (#65)

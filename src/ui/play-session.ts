@@ -163,13 +163,18 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     syncPaused();
   }
   /**
-   * Write the line under the prompt, saying which kind it is. `own` marks a question's *own* `hint`: the
-   * short-screen rule (`@media (max-height: 640px)` in style.css) hides `.hint` to buy the card vertical
-   * space on a phone held sideways, which is a fair trade for the generic instructions this screen writes
-   * and not for the five `measureCompare()` topics, whose values being compared live in `hint` and nowhere
-   * else on the card — hidden, "Which is fuller?" sits over two coloured bubbles with nothing to decide by
-   * (#328, and #65's rule that every card stays usable without read-aloud). The CSS keeps hiding the
-   * unmarked ones, so every other landscape card renders exactly as it did.
+   * Write the line under the prompt. `own` marks the one kind that must survive a short screen: a hint the
+   * card is *answered from*, which the generator declares with `hintIsData` (`types.ts`). The short-screen
+   * rule (`@media (max-height: 640px)` in style.css) hides `.hint` to buy the card vertical space on a phone
+   * held sideways — a fair trade for an instruction line, and not for the seven measure topics whose values
+   * being compared live in `hint` and nowhere else: hidden, "Which is fuller?" sits over two coloured
+   * bubbles with nothing to decide by (#328, and #65's rule that every card stays usable without read-aloud).
+   *
+   * **Not `!!q.hint`**, which is what the first version of this fix used. 47 of the registry's 87 topics
+   * write a `hint` and only 7 of those carry data; `hint` is documented as "small instruction text", and
+   * that is what the other 40 put there ("Slice the shape", "Put them in twos"). Marking all of them would
+   * have given a 16px line back to every one of those cards in landscape and pushed the arena down with it
+   * (`arena.topInset` below) — the space the media query exists to reclaim (PR #430 review, round 1).
    */
   function setHint(text: string, own = false) {
     els.hint.textContent = text;
@@ -210,10 +215,11 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     if (!reveal) { els.speak.setAttribute('aria-label', SPEAK_LABEL[mode].aria); els.speak.setAttribute('title', SPEAK_LABEL[mode].title); }
     if (mode === 'peek' && !launched) return true;
     els.prompt.innerHTML = promptHTML(q, session.seqIndex, reveal);
-    // `line === q.hint` rather than `!!q.hint`: the mark then follows what `hintText()` actually returned, so
-    // a future change to which line wins cannot leave the two disagreeing (#328).
+    // Both halves: the generator says this hint is data, AND it is the hint that reached the card. The second
+    // conjunct is not redundant — `hintText()` falls back to a generic instruction when `q.hint` is absent,
+    // and a generator that set the flag without a hint would otherwise mark that instruction (#328).
     const line = hintText(q, { reveal, tracing: deps.tracing });
-    setHint(line, line === q.hint);
+    setHint(line, !!q.hint && !!q.hintIsData);
     return false;
   }
 
