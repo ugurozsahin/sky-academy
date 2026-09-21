@@ -1179,6 +1179,53 @@ test.describe('Sky Ninja Academy', () => {
     expect(inBox, 'a bubble was left outside the resized arena').toMatchObject({ risingOutside: 0, offSide: 0 });
   });
 
+  /**
+   * #328: `@media (max-height: 640px)` in `src/style.css` hid `.hint` outright to buy the play card vertical
+   * space, and a phone held sideways is ~390px tall — squarely in that band. For the five `measureCompare()`
+   * topics (`y1-length`, `y1-mass`, `y1-capacity`, `y2-capacity`, `y2-temp`) the values being compared live in
+   * `q.hint` and nowhere else on the card: no `visual`, nothing in the prompt. Hidden, "Which is longer?" sits
+   * over two coloured bubbles with nothing on screen to decide by — #65's rule that every card stays usable
+   * without read-aloud, broken by a layout rule rather than by a generator. The duel screen's half of the same
+   * bug is pinned in `duel.spec.ts` (PR #295); this is the play screen's.
+   *
+   * Both halves are checked, because the fix is worth nothing if it costs every other landscape card a line:
+   * the question's own hint is marked `own` and shows, the screen's generic instruction is not and still does
+   * not. Run at a landscape phone rather than in `viewport.spec.ts`, which only the two tablet projects run.
+   */
+  test('guard rail: a phone in landscape keeps the values a measure question is asking about (#328)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-length');
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.waitForFunction(() => window.__sna.arena!.W > window.__sna.arena!.H);   // the resize is laid out, not still portrait
+    const seen = await page.evaluate(() => {
+      const el = document.querySelector('#hint') as HTMLElement, r = el.getBoundingClientRect();
+      return { text: el.textContent ?? '', display: getComputedStyle(el).display, own: el.classList.contains('own'), height: r.height, bottom: r.bottom };
+    });
+    console.log(`[guard rail #328] landscape hint: display=${seen.display} h=${seen.height} "${seen.text}"`);
+    expect(seen.own, "the writer did not mark the question's own line, so the CSS cannot let it through").toBe(true);
+    expect(seen.display, 'the short-screen rule hid the only values on the card').not.toBe('none');
+    expect(seen.height, 'the line is laid out, not collapsed to nothing').toBeGreaterThan(0);
+    // The measure hint is `colour noun: value unit`, joined by ` · ` — the one shape no generic line has.
+    expect(seen.text, 'the line on screen is not the values being compared').toMatch(/: ?\d+ ?(cm|m|g|kg|ml|°C)\b/);
+    expect(seen.bottom, 'the values are on the card but off the bottom of a 390px screen').toBeLessThanOrEqual(390);
+
+    // The control: an ordinary card, same year and same landscape phone. `y1-bonds` writes no `hint`, so the
+    // line is the screen's own "Tap or slice the answer" and the short-screen rule must still hide it.
+    await page.evaluate(() => history.back());
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await page.click('.topic[data-id="y1-bonds"]');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => !!window.__sna?.state().prompt);
+    const plain = await page.evaluate(() => {
+      const el = document.querySelector('#hint') as HTMLElement;
+      return { text: el.textContent ?? '', display: getComputedStyle(el).display, own: el.classList.contains('own'), height: el.getBoundingClientRect().height };
+    });
+    console.log(`[guard rail #328] landscape control: display=${plain.display} h=${plain.height} "${plain.text}"`);
+    expect(plain.own, 'a generic instruction must not be marked as the question\'s own').toBe(false);
+    expect(plain.display, 'the ordinary landscape card gave up a line it used to keep').toBe('none');
+    expect(plain.height, 'the hidden line still took layout space').toBe(0);
+  });
+
   test('guard rail: leaving the play screen stops it', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');

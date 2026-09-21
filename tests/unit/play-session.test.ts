@@ -22,13 +22,23 @@ const spoken: string[] = [];
 const engine = { speaking: false, pending: false, cancel() {}, speak(u: { text: string }) { spoken.push(u.text); }, getVoices: () => [] };
 (globalThis as any).window = { speechSynthesis: engine };
 
-/** A DOM element as far as the callbacks touch one: HTML in, attributes, hidden, and a class list nobody reads. */
+/**
+ * A DOM element as far as the callbacks touch one: HTML in, attributes, hidden, and a class list. The class
+ * list is a real set rather than a pair of no-ops because `.hint` now carries `own` (#328) and that mark is
+ * the whole of what the landscape fix does — a stub would let the tests below pass with it never written.
+ */
 function fakeEl() {
   const attrs: Record<string, string> = {};
+  const classes = new Set<string>();
   return {
-    innerHTML: '', textContent: '', hidden: false, attrs,
+    innerHTML: '', textContent: '', hidden: false, attrs, classes,
     setAttribute(k: string, v: string) { attrs[k] = v; },
-    classList: { add() {}, remove() {} },
+    classList: {
+      add(c: string) { classes.add(c); },
+      remove(c: string) { classes.delete(c); },
+      contains: (c: string) => classes.has(c),
+      toggle(c: string, on?: boolean) { const want = on ?? !classes.has(c); classes[want ? 'add' : 'delete'](c); return want; },
+    },
     getBoundingClientRect: () => ({ bottom: 120 }),
   };
 }
@@ -271,5 +281,67 @@ describe('NO_VOICE_PEEK_MS: bounded against what a child actually has to read (#
 
   it('is not so long that it stops being a memory task', () => {
     expect(NO_VOICE_PEEK_MS).toBeLessThanOrEqual(5000);
+  });
+});
+
+/**
+ * #328: on a phone held sideways `@media (max-height: 640px)` hides `.hint` to buy the play card vertical
+ * space. That is a fair trade for the generic instructions this screen writes and not for a question's own
+ * `hint` — the five `measureCompare()` topics put the values being compared there and nowhere else, so the
+ * card becomes "Which holds more?" over two coloured bubbles (#65: usable without read-aloud). The fix is
+ * one class: the CSS keeps hiding every line the screen wrote itself, and lets the marked one through.
+ *
+ * Checked here as well as in the e2e (`game.spec.ts`, at 844×390) because the mark is the whole mechanism:
+ * this says the writer sets it on the right questions, that says the rule then renders it.
+ */
+describe('the line under the prompt says whose it is (#328)', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  /** A `measureCompare()` card, in the shape `y1-capacity` draws: the millilitres live in the hint alone. */
+  const measureQ = (): Question => ({
+    prompt: 'Which holds more?', answer: 'red', options: ['red', 'blue'],
+    hint: 'red jug: 300 ml · blue jug: 100 ml', say: 'the red jug holds 300 millilitres, the blue jug holds 100 millilitres. Which one holds more?',
+  });
+  const plainQ = (): Question => ({ prompt: '3 + 4', answer: '7', options: ['7', '8'] });
+
+  it("marks the question's own hint, so the short-screen rule cannot hide the only values on the card", async () => {
+    save({ voice: 'yes' });
+    const { els, ps } = build(measureQ);
+    ps.session.start(); await settle();
+    expect(els.hint.textContent).toBe('red jug: 300 ml · blue jug: 100 ml');
+    expect(els.hint.classes.has('own'), 'without this class the landscape rule hides the millilitres').toBe(true);
+  });
+
+  it('leaves the generic instruction unmarked, so landscape keeps the space it buys today', async () => {
+    save({ voice: 'yes' });
+    const { els, ps } = build(plainQ);
+    ps.session.start(); await settle();
+    expect(els.hint.textContent).toBe('Tap or slice the answer');
+    expect(els.hint.classes.has('own')).toBe(false);
+  });
+
+  it('clears the mark when a hint-carrying question is followed by one without, so it cannot stick', async () => {
+    save({ voice: 'yes' });
+    let first = true;
+    const { els, ps } = build(() => { const q = first ? measureQ() : plainQ(); first = false; return q; });
+    ps.session.start(); await settle();
+    expect(els.hint.classes.has('own')).toBe(true);
+    expect(ps.session.hit('red')).toBe('correct');
+    ps.waveEnd();                                   // the arena's callback, which the stub arena above cannot fire
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(els.hint.textContent, 'the second question is the plain one').toBe('Tap or slice the answer');
+    expect(els.hint.classes.has('own'), 'a stale mark would keep a generic line on screen in landscape').toBe(false);
+  });
+
+  it("does not mark the peek's own instructions, which are this screen's words and not the card's", async () => {
+    save({ voice: 'no' });
+    const { els, ps } = build(sentenceQ);
+    ps.session.start(); await settle();
+    expect(els.hint.textContent).toBe('Look, remember, then build it');
+    expect(els.hint.classes.has('own')).toBe(false);
+    await vi.advanceTimersByTimeAsync(NO_VOICE_PEEK_MS);
+    expect(els.hint.textContent).toBe('Slice the words in order');
+    expect(els.hint.classes.has('own')).toBe(false);
   });
 });

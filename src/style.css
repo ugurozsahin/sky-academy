@@ -1332,6 +1332,17 @@ img { -webkit-user-drag: none; }
   .hint {
     display: none;
   }
+  /*
+   * …except the line the question itself wrote. `play-session.ts` marks that one `own` (#328): for the five
+   * `measureCompare()` topics — `y1-length`, `y1-mass`, `y1-capacity`, `y2-capacity`, `y2-temp` — the values
+   * being compared are in `hint` and nowhere else on the card, so hiding it on a phone held sideways leaves
+   * "Which holds more?" over two coloured bubbles that cannot be told apart (#65: every card usable without
+   * read-aloud). The generic instructions this screen writes stay hidden, which is what buys the space; the
+   * duel screen's half of the same bug is `.duel-q .hint` above (#295).
+   */
+  .hint.own {
+    display: block;
+  }
   .qcard.good .hint, .qcard.bad .hint {
     display: block;
   }

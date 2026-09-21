@@ -162,10 +162,23 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     peekToken++; peekActive = false; peekDone = null;
     syncPaused();
   }
+  /**
+   * Write the line under the prompt, saying which kind it is. `own` marks a question's *own* `hint`: the
+   * short-screen rule (`@media (max-height: 640px)` in style.css) hides `.hint` to buy the card vertical
+   * space on a phone held sideways, which is a fair trade for the generic instructions this screen writes
+   * and not for the five `measureCompare()` topics, whose values being compared live in `hint` and nowhere
+   * else on the card — hidden, "Which is fuller?" sits over two coloured bubbles with nothing to decide by
+   * (#328, and #65's rule that every card stays usable without read-aloud). The CSS keeps hiding the
+   * unmarked ones, so every other landscape card renders exactly as it did.
+   */
+  function setHint(text: string, own = false) {
+    els.hint.textContent = text;
+    els.hint.classList.toggle('own', own);
+  }
   /** Show the sentence and start (or resume) its clock. `then` runs when it hides — nothing, for a repeat. */
   function showPeek(q: Question, then: (() => void) | null) {
     els.prompt.innerHTML = esc(q.listen!);
-    els.hint.textContent = 'Look, remember, then build it';
+    setHint('Look, remember, then build it');
     peekActive = true; peekLeft = scaled(NO_VOICE_PEEK_MS); peekDone = then;
     syncPaused();
     if (!holdOpen) runPeek(q);
@@ -175,7 +188,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     deps.later(() => {
       if (token !== peekToken || activeQuestion !== q || !deps.mounted()) return;
       els.prompt.innerHTML = promptHTML(q, session.seqIndex);
-      els.hint.textContent = 'Slice the words in order';
+      setHint('Slice the words in order');
       const then = peekDone; peekActive = false; peekDone = null;
       syncPaused();
       then?.();
@@ -197,7 +210,10 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     if (!reveal) { els.speak.setAttribute('aria-label', SPEAK_LABEL[mode].aria); els.speak.setAttribute('title', SPEAK_LABEL[mode].title); }
     if (mode === 'peek' && !launched) return true;
     els.prompt.innerHTML = promptHTML(q, session.seqIndex, reveal);
-    els.hint.textContent = hintText(q, { reveal, tracing: deps.tracing });
+    // `line === q.hint` rather than `!!q.hint`: the mark then follows what `hintText()` actually returned, so
+    // a future change to which line wins cannot leave the two disagreeing (#328).
+    const line = hintText(q, { reveal, tracing: deps.tracing });
+    setHint(line, line === q.hint);
     return false;
   }
 
