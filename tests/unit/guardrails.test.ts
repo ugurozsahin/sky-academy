@@ -1079,6 +1079,55 @@ describe('guard rails', () => {
     expect(arena, 'and ordinary play still draws for itself').toMatch(/shared\?\.now \?\? performance\.now\(\), shared\?\.rng \?\? Math\.random/);
   });
 
+  /*
+   * #425/PR #428 — the duel's toast sits in the question bar's own `grid-area: q`, overlapping the card and
+   * neither arena. That placement bought the arenas back the 32px a third grid row had cost them, and it holds
+   * only while the toast stays SHORTER than the strip: a line long enough to wrap grows the `q` row and takes
+   * the height off both children again. The e2e rail measures exactly that, on `DUEL_TOAST_LONGEST` — so this
+   * rail's whole job is to keep that constant the real worst case. A longer line added to `duel.ts` would
+   * otherwise leave the e2e measuring a case that no longer exists, green, which is the shape of the failure
+   * #425 was opened about: "the guard rail that should have caught it did not".
+   */
+  it('the duel e2e probes the longest verdict the screen can actually raise (#425)', () => {
+    const src = SOURCES['/src/ui/duel.ts'] ?? '';
+    expect(src.length, 'duel.ts must be read, not a blank import').toBeGreaterThan(1000);
+    // Read out of the source rather than imported: `src/ui/duel.ts` pulls the arena, the certificate canvas
+    // and the audio graph in behind it, and a rail about a string is not a reason to stand all that up here.
+    // EVERY read below is off `body`, never off `src`. `seat` used to be read raw, so the first `a: '…'`
+    // anywhere in the file — a COMMENT included — became the seat name every `${NAME[player]}` verdict was
+    // measured at, and one comment above `NAME` reading `` {  a: 'P1', b: 'P2' } `` shortened a 44-char
+    // verdict to 38 and slipped it under the bound (PR #428 review, B2). This is a file that quotes code in
+    // its comments as a matter of habit — `src/ui/duel.ts` carries a literal `` `toast(` `` in prose — which
+    // is why the call-site scan below always stripped them. One `body` now, so the three reads cannot
+    // disagree about whether comments count.
+    const body = code(src);
+    const longest = /export const DUEL_TOAST_LONGEST = '([^']*)'/.exec(body)?.[1] ?? '';
+    const seat = /a: '([^']*)'/.exec(body)?.[1] ?? '';
+    expect({ longest: longest.length > 0, seat: seat.length > 0 },
+      'both must be found in the source, or every comparison below is against an empty string').toEqual({ longest: true, seat: true });
+    // Every `toast(` argument in the file, with the two seat names substituted at their real width. Both are
+    // 'Player N', so either stands for both; a name that stopped being fixed-width would need this widened.
+    // All three quote styles, because nothing in this repository makes `toast("…")` unreachable — there is no
+    // linter forbidding double quotes, and a double-quoted 62-char verdict was invisible here (review, note 1).
+    // The substitution handles exactly ONE interpolation shape, `${NAME[…]}`: a verdict that reached a seat
+    // name any other way (a local alias, `NAME.a`, a template helper) is measured at SOURCE length, which
+    // over-states it and so cannot green a real overflow — but it does mean this rail's "every `toast(` in the
+    // file" is exact only for the shapes named here.
+    const raised = [...body.matchAll(/\btoast\(\s*(?:'([^']*)'|"([^"]*)"|`([^`]*)`)/g)]
+      .map(m => (m[1] ?? m[2] ?? m[3]).replace(/\$\{NAME\[[^\]]+\]\}/g, seat))
+      .filter(s => s.length > 0);
+    expect(raised.length, 'the toast call sites must be found, or this rail passes vacuously').toBeGreaterThanOrEqual(5);
+    // The constant is raised by a real call site, not merely declared beside them.
+    expect(body, 'DUEL_TOAST_LONGEST is what one of those calls passes').toMatch(/toast\(DUEL_TOAST_LONGEST/);
+    for (const s of raised) {
+      expect(s.length, `"${s}" is longer than DUEL_TOAST_LONGEST, so the e2e layout rail no longer measures the worst case`)
+        .toBeLessThanOrEqual(longest.length);
+    }
+    // And the e2e really uses it, rather than a copy that drifts the moment this constant changes.
+    const spec = readFileSync(new URL('../e2e/duel.spec.ts', import.meta.url), 'utf8');
+    expect(spec, 'the duel spec imports the constant').toContain("import { DUEL_TOAST_LONGEST } from '../../src/ui/duel'");
+  });
+
   it('the wave layout draws only from the rng it is given (#43)', () => {
     const src = code(SOURCES['/src/game/arena.ts'] ?? '');
     expect(src.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);

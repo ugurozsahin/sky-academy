@@ -29,8 +29,19 @@ import type { DuelHooks } from './hooks';
 export interface DuelScreenOpts { year: YearInfo }
 const PLAYERS = ['a', 'b'] as const;
 const NAME: Record<DuelPlayer, string> = { a: 'Player 1', b: 'Player 2' };
-/** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. */
-const HOLD = { won: 1000, draw: 900 } as const;
+/** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. `miss` is the
+ *  wrong-slice toast, which holds nothing back — the round keeps running — but is scaled with the other two so
+ *  `setGameSpeed` stretches every verdict on this screen rather than all but one (PR #428 review, note 3). */
+const HOLD = { won: 1000, draw: 900, miss: 900 } as const;
+/**
+ * The longest line this screen can put in the `#toast`, and the call site that raises it. Exported because the
+ * layout rail in `tests/e2e/duel.spec.ts` measures what a *wrapped* verdict costs the arenas — the toast sits
+ * in the question bar's own `grid-area: q` (`src/style.css`), so growing that row is the one way the placement
+ * can still take height off both children, and the rail must probe the real worst case rather than a copy of it
+ * that drifts the moment a longer line is added here (PR #428 review, B2). `tests/unit/guardrails.test.ts`
+ * holds it to being the genuine longest across every `toast(` in this file.
+ */
+export const DUEL_TOAST_LONGEST = 'No problem — you can save it next time!';
 
 export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
@@ -65,6 +76,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
 
   const scope = screenScope(); const { later, toast } = scope;
   const overlay = $('#overlay'); const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
+  const toastEl = $('#toast');
   let waveId = 0; let holdOpen = false;
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
   let hintLine = '';
@@ -86,6 +98,13 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       // shows its words on a device that cannot be heard, and the hint line carries the data five of the pool's
       // comparison topics keep nowhere else — without it "Which is fuller?" is two coloured bubbles and a guess.
       // A duel has no peek timing, so a peek question reads through here rather than hiding its text.
+      // A BACKSTOP, not the mechanism: no verdict should still be up by the time its question is replaced. What
+      // keeps the drawn round's verdict off the next question is `settleDraw()` in `waveEnd` below, which
+      // announces it and advances a hold later. Clearing here was tried as the whole fix and was worse than the
+      // bug — `onRoundDraw` and `onQuestion` share a synchronous task on the draw path, so the class was added
+      // and removed before the browser painted a frame and the verdict was never shown AT ALL: two children got
+      // `sfx.miss()` and nothing to read, on the outcome that most needs explaining (#425 review).
+      toastEl.classList.remove('show');
       const reveal = promptMode(q, canHear()) !== 'hear';
       speak.hidden = reveal;
       prompt.innerHTML = promptHTML(q, 0, reveal); $('#vis').innerHTML = renderVisual(q.visual);
@@ -129,7 +148,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       for (const p of PLAYERS) arenas[p].reveal({ good: q.answer });
       endWave(scaled(HOLD.won));
     },
-    onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', 900); },
+    onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', scaled(HOLD.miss)); },
     onRoundDraw() { sfx.miss(); toast('Nobody sliced it — no point', 'bad', scaled(HOLD.draw)); },
     onMatchEnd: r => later(() => showResults(r), scaled(HOLD.won) + scaled(300)),
   });
@@ -140,7 +159,12 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   const waveEnd = (p: DuelPlayer) => {
     waveDone[p] = true;
     if (!waveDone.a || !waveDone.b) return;
-    later(() => duel.waveEnd(), scaled(duel.roundDecided ? 450 : 650));
+    // Settle a draw NOW, so its verdict goes up on the question it is about, and advance after the hold. Done in
+    // one step — `duel.waveEnd()` alone — `onRoundDraw` and `onQuestion` share a task and the toast is added and
+    // removed before a frame paints, so the children get `sfx.miss()` and nothing to read. `HOLD.draw + 100` so
+    // this does not ride on two equal timers firing in the order they happened to be queued.
+    const drew = duel.settleDraw();
+    later(() => duel.waveEnd(), scaled(drew ? HOLD.draw + 100 : 450));
   };
   for (const p of PLAYERS) {
     arenas[p] = new Arena($(`#arena-${p}`) as HTMLCanvasElement, {
@@ -228,7 +252,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
         if (how === 'shared') toast('Certificate shared!', 'good');
         else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
-        else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
+        else if (how === 'declined') toast(DUEL_TOAST_LONGEST, 'good');
         // 'shown' opens the full-screen view with its own save hint, so no toast
       }
       catch { toast('Could not make the certificate', 'bad'); }
@@ -287,7 +311,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // which is how a wrong `avatar` survived round 1's rails (#397 round 2, B1).
     certWords: () => cert ? certWords(cert) : null,
     setSpeed: k => { setGameSpeed(k); },
-    timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),
+    timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw), miss: scaled(HOLD.miss) } }),
   };
   window.__sna = hooks;
   duel.start();
