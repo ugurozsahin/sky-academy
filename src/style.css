@@ -1074,6 +1074,17 @@ img { -webkit-user-drag: none; }
   border-radius: 12px;
 }
 .sentence { font-size: clamp(20px, 5vw, 28px); font-weight: 600; } .sentence .gap { border-bottom: 3px solid var(--accent); text-decoration: none; }
+/*
+ * Line symmetry (#299 slice 4). A `clamp()` on the width only, with `height: auto` — the viewBox carries the
+ * grid's aspect, so a 6x4 picture and a taller one both keep their proportions instead of each needing a box.
+ * The squares are the array/ten-frame treatment (accent fill on a faint slot) so this reads as the same
+ * family of diagram rather than a new kind of picture; the mirror line is the cool accent, dashed, because
+ * it is an instruction to compare and not part of the shape.
+ */
+.symgrid { width: clamp(120px, 34vw, 190px); height: auto; }
+.symgrid rect { fill: #ffffff1c; }
+.symgrid rect.on { fill: var(--accent); }
+.symgrid .mirror { stroke: var(--accent-2); stroke-width: 1.2; stroke-dasharray: 3 2.5; }
 .tracing .prompt { font-size: 22px; }
 .trace-wrap { width: 100%; max-width: 560px; flex: 1; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding-bottom: calc(12px + var(--sab)); min-height: 0; }
 #trace { flex: 1; width: 100%; min-height: 220px; border-radius: 20px; background: #0d122699; border: 1px dashed #ffffff33; touch-action: none; }

@@ -1490,3 +1490,128 @@ describe('Year 2 grammar and spelling (#299 slice 3)', () => {
     });
   });
 });
+
+// ---------- #299 slice 4: vertical line symmetry, and repeating patterns ----------
+describe('Year 2 symmetry and patterns (#299 slice 4)', () => {
+  const topic = (id: string) => { const t = TOPICS.find(x => x.id === id); expect(t, id).toBeTruthy(); return t!; };
+
+  /**
+   * The oracle for a symmetry card, written from the picture rather than from the recipe that built it: how
+   * many mirror pairs disagree across the vertical centre line. Zero is a line of symmetry; anything else is
+   * not, and the count is also the difficulty ladder (three squares out at d1, one at d3).
+   */
+  function mirrorMismatches(grid: string[]): number {
+    const w = [...grid[0]].length;
+    let n = 0;
+    for (const row of grid) { const ch = [...row]; for (let c = 0; c < w / 2; c++) if (ch[c] !== ch[w - 1 - c]) n++; }
+    return n;
+  }
+
+  it('the yes/no answer is read off the picture, and the ladder is one, two or three squares out', () => {
+    const t = topic('y2-symmetry'), r = rng(4001);
+    const expected: Record<number, number> = { 1: 3, 2: 2, 3: 1 };
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const answers = new Set<string>();
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(d, r);
+        if (q.visual?.type !== 'symmetry') continue;
+        const grid = q.visual.grid;
+        const w = [...grid[0]].length;
+        expect(w % 2, 'a mirror line needs an even width').toBe(0);
+        expect(w, `${grid}`).toBeGreaterThanOrEqual(2);
+        for (const row of grid) {
+          expect([...row].length, `every row is ${w} wide: ${grid}`).toBe(w);
+          expect(/^[#.]+$/.test(row), `only squares and gaps: ${row}`).toBe(true);
+        }
+        expect(grid.join('').includes('#'), `a blank card is not a picture: ${grid}`).toBe(true);
+        const off = mirrorMismatches(grid);
+        expect(['yes', 'no'], q.answer).toContain(q.answer);
+        expect(q.answer === 'yes', `${grid} has ${off} squares out of place`).toBe(off === 0);
+        if (off) expect(off, `d${d} breaks the symmetry by ${expected[d]}`).toBe(expected[d]);
+        expect([...q.options].sort(), 'two bubbles: yes or no').toEqual(['no', 'yes']);
+        expect(q.wide, 'yes/no are words, so both bubbles are the wide kind whichever is the answer (#369)').toBe(true);
+        answers.add(q.answer);
+      }
+      expect([...answers].sort(), `d${d} must draw both a symmetric and an asymmetric picture`).toEqual(['no', 'yes']);
+    }
+  });
+
+  it('the letter cards are the mirror test itself: d1 never asks them, and only the answer is symmetric', () => {
+    // The test's own list, not the generator's: a capital that reads the same folded down the middle.
+    const SYMMETRIC = new Set('AHIMOTUVWXY');
+    const t = topic('y2-symmetry'), r = rng(4002);
+    for (let i = 0; i < N; i++) expect(t.gen(1, r).visual?.type, 'd1 is the drawn picture only').toBe('symmetry');
+    const kinds = new Set<string>();
+    for (const d of [2, 3] as Difficulty[]) {
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(d, r);
+        kinds.add(q.visual?.type ?? 'letters');
+        if (q.visual) continue;
+        expect(q.prompt).toBe('Which letter has a vertical line of symmetry?');
+        expect(q.options.length, 'four letters to choose from').toBe(4);
+        expect(SYMMETRIC.has(q.answer), `${q.answer} is not symmetric`).toBe(true);
+        for (const o of q.options) {
+          expect(/^[A-Z]$/.test(o), `a capital letter: ${o}`).toBe(true);
+          if (o !== q.answer) expect(SYMMETRIC.has(o), `${o} is a second defensible answer`).toBe(false);
+        }
+      }
+    }
+    expect([...kinds].sort(), 'd2–d3 draw both kinds of card').toEqual(['letters', 'symmetry']);
+  });
+
+  /**
+   * What each pattern object *looks* like, written here rather than imported: a card is readable only if no
+   * two objects on it share a silhouette, and a rail that took the generator's own table would agree with it
+   * by definition. Colour is decoration on these cards; shape is the thing being read (#299 review B4).
+   */
+  const SILHOUETTE: Record<string, string> = {
+    '🔴': 'circle', '🟦': 'square', '🔺': 'triangle', '⭐': 'star',
+    '❤️': 'heart', '🌙': 'crescent', '🔶': 'diamond', '🐟': 'fish',
+  };
+
+  /** The smallest repeat the visible objects agree with — read off the card, with the gap ignored. */
+  function periodOf(items: string[], gap: number): number {
+    for (let p = 1; p < items.length; p++) {
+      let ok = true;
+      for (let i = 0; i + p < items.length && ok; i++) if (i !== gap && i + p !== gap && items[i] !== items[i + p]) ok = false;
+      if (ok) return p;
+    }
+    return items.length;
+  }
+
+  it('the missing object is the only one the pattern allows, with two whole repeats always visible', () => {
+    const t = topic('y2-patterns'), r = rng(4003);
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const gaps = new Set<boolean>();
+      for (let i = 0; i < N; i++) {
+        const q = t.gen(d, r);
+        expect(q.visual?.type).toBe('sentence');
+        const items = (q.visual as { text: string }).text.split(' ');
+        const gap = items.indexOf('_');
+        expect(gap, `exactly one gap: ${items.join(' ')}`).toBeGreaterThanOrEqual(0);
+        expect(items.filter(x => x === '_').length, 'exactly one gap').toBe(1);
+        const p = periodOf(items, gap);
+        expect(gap, `two whole repeats of ${p} before the gap: ${items.join(' ')}`).toBeGreaterThanOrEqual(p * 2);
+        expect(q.answer, `the pattern predicts ${items[gap - p]}: ${items.join(' ')}`).toBe(items[gap - p]);
+        expect(items.slice(0, gap).includes(q.answer), 'the answer is an object the child has already seen').toBe(true);
+        // Every other object in the pattern is on the card: the near miss is the mistake worth catching.
+        for (const o of new Set(items.filter(x => x !== '_' && x !== q.answer))) expect(q.options, `${o} is in the pattern`).toContain(o);
+        for (const o of q.options) if (o !== q.answer) expect(o, 'a decoy never also fits').not.toBe(items[gap - p]);
+        expect(q.prompt).toBe(gap === items.length - 1 ? 'What comes next?' : 'Which one is missing?');
+        gaps.add(gap === items.length - 1);
+        // #299 review B4: the bubbles must differ by more than hue. The pool used to be eight coloured
+        // circles, so 54% of d1 cards put two of 🔴 🔵 🟡 🟢 🟣 🟠 on the card at once — to a colour-blind
+        // child that is one repeated circle and two identical bubbles, a card with no answer rather than a
+        // hard one. The silhouettes below are the test's own list, not the generator's, so adding a glyph
+        // to the pool without a distinct shape fails here.
+        for (const o of [...items.filter(x => x !== '_'), ...q.options]) expect(SILHOUETTE, `${o} is not in the shape-distinct pool`).toHaveProperty(o);
+        const shapes = q.options.map(o => SILHOUETTE[o]);
+        expect(new Set(shapes).size, `two bubbles share a silhouette: ${q.options.join(' ')}`).toBe(q.options.length);
+        const drawn = new Set(items.filter(x => x !== '_').map(o => SILHOUETTE[o]));
+        expect(drawn.size, `the pattern itself repeats a silhouette: ${items.join(' ')}`).toBe(new Set(items.filter(x => x !== '_')).size);
+      }
+      expect([...gaps].sort(), d === 3 ? 'd3 hides an object inside the pattern too' : `d${d} always hides the last object`)
+        .toEqual(d === 3 ? [false, true] : [true]);
+    }
+  });
+});

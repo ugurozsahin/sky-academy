@@ -5,9 +5,24 @@ import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel,
 const q = (prompt: string) => ({ prompt, say: symSay(prompt) });
 /**
  * Mark a question as taking several mental steps, so the bubbles fly one speed step slower (#297).
- * Year 2's difficulty-3 arithmetic is two-digit and crosses a ten (`83 − 47`), which a child works out
- * in steps rather than recalls; the sum stays as the year asks, only the clock eases. Set at d3 alone,
- * which is why it is a flag on the question and not on the topic.
+ *
+ * The rule the code applies is **the d3 draws of `y2Add`, `y2Sub` and `y2Inverse` — all of them**, not only
+ * the ones that cross a ten, which is how this was first written and is narrower than what ships: about
+ * three in five d3 draws need no regrouping at all (59% `y2-add`, 58% `y2-sub` — a share fixed by the two
+ * `ri(...)` ranges, so it can be re-derived without a seed: `45 + 44`, `78 − 62`, `99 − 34`). That is
+ * #297's decision, not an oversight — a bubble speed that flickered question by question inside one stage
+ * would read to a child as a glitch, so the whole of d3 eases. The sum stays as the year asks; only the
+ * clock does.
+ *
+ * **It is opt-in per generator, not a property of Year 2 difficulty 3** — `tests/unit/curriculum.test.ts`
+ * pins that ("no other topic sets slow"). `y2-length` d3 draws `50 cm − 29 cm`, two-digit and crossing a
+ * ten, and flies at full speed. Set at d3 alone, which is why it is a flag on the question, not the topic.
+ *
+ * For one of the three it is a *stage* split rather than a difficulty one: `y2Inverse`'s `kind` never
+ * reads `d`, and its d2 and d3 ranges coincide — 500/500 byte-identical prompts on the same seed (#311) —
+ * so `70 − ? = 26` flies at speed 3 at stage 3 of a Year 2 mission and at speed 2 at stage 4. Harmless to
+ * the child, stage 4 being the gentler one; giving `y2-inverse` a real d3 form is a curriculum change and
+ * belongs in its own issue.
  */
 const slowAtD3 = (d: Difficulty, question: Question): Question => d === 3 ? { ...question, slow: true } : question;
 
@@ -763,6 +778,107 @@ const y2Position: Generator = (d, rng) => {
   });
 };
 
+// ---------- Symmetry & repeating patterns (#299 slice 4) ----------
+/**
+ * Half-pictures, three squares wide. A card's grid is a half beside its own reflection, so a symmetric
+ * picture is symmetric **by construction** rather than by a table someone has to keep correct by hand:
+ * there is no way to mistype a half into an asymmetric whole. `#` is a coloured square, `.` an empty one.
+ */
+const SYM_HALVES: readonly (readonly string[])[] = [
+  ['..#', '.##', '###', '..#'],   // a tree on a trunk
+  ['.##', '###', '.##', '..#'],   // a balloon on a string
+  ['#..', '##.', '###', '.##'],   // a mountain
+  ['..#', '.##', '.##', '###'],   // a fir
+  ['.#.', '###', '###', '..#'],   // a butterfly
+  ['###', '.##', '..#', '..#'],   // a funnel
+];
+/** A half row beside its own reflection: `..#` → `..##..`. */
+const mirrorRow = (row: string) => row + [...row].reverse().join('');
+const mirrored = (half: readonly string[]) => half.map(mirrorRow);
+/**
+ * Does every row read the same backwards? This is the property the card asks about, written independently of
+ * how a grid was built, so a test can check the answer against the picture rather than against the recipe.
+ */
+export const isVertSymmetric = (grid: readonly string[]) => grid.every(r => r === [...r].reverse().join(''));
+/**
+ * Break the symmetry by toggling `n` squares in the **left half only**. Every toggled square's mirror partner
+ * is in the untouched right half, so the result is always asymmetric — one flip is enough, and `n` only sets
+ * how obvious it is (three at d1, one at d3).
+ */
+function breakSymmetry(rng: Rng, half: readonly string[], n: number): string[] {
+  const grid = mirrored(half).map(r => [...r]);
+  const cols = half[0].length;
+  const spots = shuffle(rng, grid.flatMap((_, r) => Array.from({ length: cols }, (_, c) => [r, c] as [number, number]))).slice(0, n);
+  for (const [r, c] of spots) grid[r][c] = grid[r][c] === '#' ? '.' : '#';
+  return grid.map(r => r.join(''));
+}
+/** Capitals with, and without, a vertical line of symmetry — the mirror-card test itself, in letters. */
+const SYM_LETTERS = ['A', 'H', 'I', 'M', 'O', 'T', 'U', 'V', 'W', 'X', 'Y'];
+const ASYM_LETTERS = ['B', 'C', 'D', 'E', 'F', 'G', 'J', 'K', 'L', 'N', 'P', 'Q', 'R', 'S', 'Z'];
+/** Year 2: "identify line symmetry in a vertical line" — on a drawn picture, and on capital letters. */
+const y2Symmetry: Generator = (d, rng) => {
+  if (d === 1 || rng() < 0.6) {
+    const half = pick(rng, SYM_HALVES);
+    const yes = rng() < 0.5;
+    const grid = yes ? mirrored(half) : breakSymmetry(rng, half, d === 1 ? 3 : d === 2 ? 2 : 1);
+    return wordQ(rng, 'Is the dotted line a line of symmetry?', yes ? 'yes' : 'no', [yes ? 'no' : 'yes'], {
+      visual: { type: 'symmetry', grid }, wide: true,
+      say: 'Look at the dotted line. Are the two halves the same? Say yes or no.',
+      hint: 'Do both halves match?',
+    });
+  }
+  return wordQ(rng, 'Which letter has a vertical line of symmetry?', pick(rng, SYM_LETTERS), shuffle(rng, ASYM_LETTERS).slice(0, 3), {
+    say: 'Which letter looks the same folded down the middle?', hint: 'Fold it down the middle',
+  });
+};
+
+/**
+ * Repeating patterns: a unit of two or three objects repeated three times with one hidden.
+ *
+ * The gap never falls inside the first two repeats, so **two complete periods are always visible** and
+ * exactly one object fits — the acceptance bar for this issue is one defensible answer with the voice off,
+ * and a pattern showing only one period leaves "what comes next" genuinely open.
+ */
+/**
+ * The objects a pattern is built from: **one silhouette each** (#299 review B4).
+ *
+ * The first pool here was eight coloured circles. Six of them differed by hue alone, and because the near
+ * decoy is always another object from the same card, 54% of d1 cards put two of those six in front of the
+ * child at once — 🔴/🟢, 🔵/🟣 and the rest of the standard confusions. To a colour-blind child the sequence
+ * then reads as one repeated circle and the two bubbles are identical: not a hard card, a card with **no**
+ * answer, which fails #299's own "exactly one defensible answer with the voice off" the same way a card that
+ * answers itself does.
+ *
+ * So every object carries a different shape, and the name beside each glyph is what the rail in
+ * `tests/unit/curriculum.test.ts` holds unique — colour is decoration here, never the thing being read.
+ */
+const PATTERN_OBJECTS: readonly (readonly [string, string])[] = [
+  ['🔴', 'circle'], ['🟦', 'square'], ['🔺', 'triangle'], ['⭐', 'star'],
+  ['❤️', 'heart'], ['🌙', 'crescent'], ['🔶', 'diamond'], ['🐟', 'fish'],
+];
+const PATTERN_GLYPHS = PATTERN_OBJECTS.map(([g]) => g);
+/** Unit shapes as letters: which positions repeat, filled with objects at generation time. */
+const UNITS_D1 = ['AB'], UNITS_LONGER = ['ABC', 'AAB', 'ABB'];
+const y2Patterns: Generator = (d, rng) => {
+  const shape = pick(rng, d === 1 ? UNITS_D1 : UNITS_LONGER);
+  const letters = [...new Set([...shape])];
+  const chosen = shuffle(rng, PATTERN_GLYPHS).slice(0, letters.length);
+  const unit = [...shape].map(ch => chosen[letters.indexOf(ch)]);
+  const seq = [...unit, ...unit, ...unit];
+  // d1/d2 hide the last object ("what comes next?"); d3 may hide one inside the last repeat, which is harder
+  // because the child has to read the pattern from both sides of the gap.
+  const gap = d === 3 ? ri(rng, unit.length * 2, seq.length - 1) : seq.length - 1;
+  const answer = seq[gap], last = gap === seq.length - 1;
+  // The near decoys are the pattern's own other objects — the mistake worth catching — and the rest of the
+  // pool fills up to three so an AB pattern still gets a full card.
+  const decoys = [...chosen.filter(o => o !== answer), ...shuffle(rng, PATTERN_GLYPHS.filter(o => !chosen.includes(o)))];
+  return wordQ(rng, last ? 'What comes next?' : 'Which one is missing?', answer, decoys, {
+    visual: { type: 'sentence', text: seq.map((o, i) => i === gap ? '_' : o).join(' ') },
+    say: last ? 'Look at the pattern. What comes next?' : 'Look at the pattern. Which one is missing?',
+    hint: last ? 'Slice what comes next' : 'Slice the missing one',
+  });
+};
+
 export const MATHS_TOPICS: Topic[] = [
   // Reception — EYFS Early Learning Goals: Number, Numerical Patterns
   { id: 'r-count', title: 'Count It', icon: '🍎', subject: 'maths', year: 'reception', nc: 'ELG Number: count objects to 10', gen: rCount },
@@ -818,6 +934,8 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', gen: y2Order },
   { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
   { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes — faces, edges, vertices', gen: y2Shapes },
+  { id: 'y2-symmetry', title: 'Mirror Lines', icon: '🦋', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: line symmetry in a vertical line', gen: y2Symmetry },
+  { id: 'y2-patterns', title: 'What Comes Next?', icon: '🔁', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: order and arrange objects in patterns and sequences', gen: y2Patterns },
   { id: 'y2-position', title: 'Turns & Right Angles', icon: '🧭', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: position, direction, rotation as right angles', gen: y2Position },
   { id: 'y2-length', title: 'Length: cm & m', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: length (cm/m)', gen: y2Length },
   { id: 'y2-mass', title: 'Mass: g & kg', icon: '🏋️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: mass (g/kg)', gen: y2Mass },

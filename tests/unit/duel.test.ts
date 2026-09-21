@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Duel, DUEL_ROUNDS } from '../../src/game/duel';
+import { Duel, DUEL_ROUNDS, seededRng } from '../../src/game/duel';
+import { layoutWave } from '../../src/game/arena';
 import { topicById } from '../../src/curriculum';
 import { hintText, promptHTML, promptMode } from '../../src/ui/hud';
 import { esc } from '../../src/ui/dom';
@@ -544,5 +545,65 @@ describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', (
     expect(after[topic.id]).toMatchObject({ hits: 10, tries: 13, plays: 1 });
     expect(accuracy(after[topic.id])!).toBeCloseTo(10 / 13, 5);
     expect(weakestTopics([topic, other], after, 1).map(t => t.id), 'a duel moves the ratio, without inventing tries').toEqual([other.id]);
+  });
+});
+
+/**
+ * #389 — both halves of a duel pose the same wave. Found in play by the owner and his child: the answer rose
+ * at a different moment on each side, so the match was decided by whichever shuffle dealt it early rather
+ * than by who was quicker. `src/ui/duel.ts` spawned each arena from `Math.random` and its own
+ * `performance.now()`, and `layoutWave` draws the launch order, the arcs, the colours and the wobble from
+ * that rng — the launch order being the one that decides matches. At speed 1 a slot is 420 ms and a whole
+ * batch is over four seconds.
+ *
+ * These test the production seam, not a restatement of `layoutWave`'s purity (`arena.test.ts` has that): the
+ * real exported `seededRng`, one generator per half off one round seed, exactly as the screen builds them.
+ */
+describe('a duel lays both halves out from one draw (#389)', () => {
+  const HALF = { W: 195, H: 760, topInset: 8 };       // one side of a 390-wide phone split down the middle
+  const OPTS = { speed: 1, labels: ['12', '9', '14', '11'] } as never;
+  const answer = (p: ReturnType<typeof layoutWave>) => p.bubbles.findIndex(b => b.label === '12');
+
+  it('two generators off one seed deal the identical wave, launch order included', () => {
+    const a = layoutWave(OPTS, HALF, 1, 1000, seededRng(7));
+    const b = layoutWave(OPTS, HALF, 1, 1000, seededRng(7));
+    expect(b).toEqual(a);
+    // Named separately, because deep equality would still pass if every bubble were identical and the whole
+    // plan were empty — and because the launch timetable is the half of it the defect was actually about.
+    expect(b.bubbles.map(x => x.label)).toEqual(a.bubbles.map(x => x.label));
+    expect(b.bubbles.map(x => x.launchAt)).toEqual(a.bubbles.map(x => x.launchAt));
+    expect(answer(a), 'the answer is in the wave at all, so the row above is not comparing its absence').toBeGreaterThanOrEqual(0);
+  });
+
+  it('one shared generator is not the fix: the second half gets the first half leftovers', () => {
+    const shared = seededRng(7);
+    const a = layoutWave(OPTS, HALF, 1, 1000, shared);
+    const b = layoutWave(OPTS, HALF, 1, 1000, shared);
+    expect(b, 'an Rng is stateful — this is the bug with extra steps, and why each call gets its own').not.toEqual(a);
+  });
+
+  it('the plan is shared only while the geometry is — a half a different size is a different wave', () => {
+    const a = layoutWave(OPTS, HALF, 1, 1000, seededRng(7));
+    const b = layoutWave(OPTS, { ...HALF, H: HALF.H - 40 }, 1, 1000, seededRng(7));
+    expect(b, 'which is what the rail on both halves topInset and canvas size is for').not.toEqual(a);
+  });
+
+  it('and `now` has to be shared too: the same seed a millisecond apart is a different timetable', () => {
+    const a = layoutWave(OPTS, HALF, 1, 1000, seededRng(7));
+    const b = layoutWave(OPTS, HALF, 1, 1001, seededRng(7));
+    expect(b.bubbles.map(x => x.launchAt), 'one `performance.now()` per arena was the other half of the defect')
+      .not.toEqual(a.bubbles.map(x => x.launchAt));
+  });
+
+  it('the defect itself: independent draws put the answer up at different moments', () => {
+    // Sampled rather than asserted once — two independent shuffles do sometimes agree. What is pinned is that
+    // they disagree *often*, which is the claim the issue makes: this is an ordinary draw, not a rare one.
+    let differed = 0;
+    for (let i = 0; i < 200; i++) {
+      const a = layoutWave(OPTS, HALF, 1, 1000, seededRng(i * 2 + 1));
+      const b = layoutWave(OPTS, HALF, 1, 1000, seededRng(i * 2 + 2));
+      if (a.bubbles[answer(a)].launchAt !== b.bubbles[answer(b)].launchAt) differed++;
+    }
+    expect(differed, 'the head start the child actually felt').toBeGreaterThan(100);
   });
 });

@@ -93,13 +93,47 @@ async function winRound(page: Page, p: 'a' | 'b') {
 }
 
 test.describe('Ninja Duel', () => {
+  /**
+   * guard rail (#389), found in play by the owner and his child. Each arena used to lay its own wave out from
+   * `Math.random` and its own `performance.now()`, so the answer took a different slot in each side's launch
+   * queue: at speed 1 one slot is 420 ms and a whole batch is over four seconds, and a four-option question
+   * on a half-width arena batches at three — so the answer landing in batch 0 for one player and batch 1 for
+   * the other was an ordinary draw. The match measured the shuffle rather than who was quicker.
+   *
+   * Every field compared here is fixed at spawn. `x`, `y` and `wobble` are deliberately not: all three are
+   * advanced every frame (`arena.ts` — `b.x += b.vx * dt`, `b.wobble += dt * 3`), and the two arenas run
+   * their own animation frames, so a snapshot of both mid-flight catches them a frame apart. The desktop
+   * project caught exactly that on `wobble`, drifting by 0.0024 rad between the halves while the seeded
+   * draw behind it was identical. `vx` and `g` carry the arc instead, and the *initial* wobble is held by
+   * the deep-equality check in `tests/unit/duel.test.ts`, where no clock is running.
+   */
+  test('guard rail: the two halves pose the identical wave — same order, same moments, same arcs (#389)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
+    // Read off `arenas`, already on the hooks contract, rather than `bubbles()`: that one reports only the
+    // bubbles in flight *now* and drops every field fixed at spawn, which is exactly what has to be compared.
+    const wave = await page.evaluate(() => {
+      const spawned = (p: 'a' | 'b') => window.__sna.arenas[p].bubbles.map(b =>
+        ({ label: b.label, launchAt: b.launchAt, r: b.r, vx: b.vx, g: b.g, color: b.color }));
+      return { a: spawned('a'), b: spawned('b'), answer: window.__sna.state().answer };
+    });
+    expect(wave.a.length, 'a real wave was captured, so the comparison below is not two empty lists').toBeGreaterThan(1);
+    expect(wave.b, 'both halves are dealt from one seed and one clock origin').toEqual(wave.a);
+    // Named on its own: the launch timetable is the half of it the children actually felt.
+    expect(wave.b.map(b => [b.label, b.launchAt]), 'the answer rises at the same moment on both sides')
+      .toEqual(wave.a.map(b => [b.label, b.launchAt]));
+    expect(wave.a.map(b => b.label), 'and the answer is in the wave, so the rows above are not agreeing about its absence')
+      .toContain(wave.answer);
+  });
+
   test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
     expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
     await expectHandoverHeard(page);   // the second child's one instruction is in round 1's own utterance
-    // The same wave in both arenas: each arena launches the ONE question's options (in its own batch order —
-    // a snapshot of the two in-flight sets need not match, the option set does), and the answer reaches both.
+    // The same wave in both arenas: each arena launches the ONE question's options, and the answer reaches
+    // both. Since #389 the two are laid out from one draw, so the orders match as well as the sets — the
+    // test below is the one that holds that; this one stays a check on the option set.
     await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
     const seen = await page.evaluate(() => ({
       options: window.__sna.duel.current!.options, a: window.__sna.bubbles('a').map(b => b.label), b: window.__sna.bubbles('b').map(b => b.label),

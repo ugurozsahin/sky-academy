@@ -10,7 +10,7 @@
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
-import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
+import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelHeadline, duelPool, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
 import { addCoins, load, recordAccuracy, recordDojo } from '../storage';
 import { canHear, haptic, say, sfx } from '../audio';
@@ -97,7 +97,18 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         // so it goes out on the next task instead (PR #295 review).
         const line = spokenQuestion(q, info.round);
         if (info.round === 1) later(() => say(line), 0); else say(line);
-        for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts); }
+        // #389: one draw and one clock origin for the whole round, so both halves pose the identical wave.
+        // Each arena spawned from `Math.random` and its own `performance.now()`, so the answer took a
+        // different slot in the launch queue on each side — at speed 1 a batch apart is over four seconds of
+        // head start, and the match was decided by whose shuffle dealt it early rather than by who was
+        // quicker. `topInset` is set for both above the draw because the plan is only shared while the
+        // geometry is (`layoutWave` reads W, H and topInset); the rail in `guardrails.test.ts` holds that.
+        //
+        // Identical, not mirrored: both children see the answer in the same place at the same moment, which
+        // is the fair reading of "the same question" — a mirror about the divider would make the two halves
+        // look symmetrical while giving the left-handed and right-handed reach a different problem.
+        const seed = (Math.random() * 0x100000000) >>> 0, at = performance.now();
+        for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts, { rng: seededRng(seed), now: at }); }
       });
     },
     onRoundWon(player, q) {
