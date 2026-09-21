@@ -438,6 +438,11 @@ export function renameProfile(id: ProfileId, name: string): RenameProfileResult 
  *   rollback, a sideloaded older build (`docs/ANDROID.md`) or a stale service worker — #232's whole scenario.
  * - `'store'` — the store did not keep the change, and then **nothing has been deleted**: the ordering below
  *   is what buys that promise.
+ * - `'orphaned'` — the one outcome where the tap did change something and it is not what was asked (#420
+ *   review round 2, B2). The store kept the save's bytes *and* refused to take the index back, so the child is
+ *   no longer listed while their game is still on the device. It has its own arm because `'store'`'s sentence
+ *   is "nothing was removed", and here something was: a family told that would be told a falsehood about their
+ *   own device.
  *
  * `self` on the accepted arm is "this session was playing the child who has just gone", and it is the storage
  * layer's answer because `cacheProfile` is the only thing that knows: the index's `active` is a different
@@ -448,7 +453,7 @@ export function renameProfile(id: ProfileId, name: string): RenameProfileResult 
  * reads `self` and `main.ts`'s `relaunch()` re-derives where to go from the index, which is the one place that
  * rule lives. A second copy of the destination is a second rule to keep in step.
  */
-export type DeleteProfileResult = { ok: true; self: boolean } | { ok: false; why: 'unknown' | 'last' | 'future' | 'store' };
+export type DeleteProfileResult = { ok: true; self: boolean } | { ok: false; why: 'unknown' | 'last' | 'future' | 'store' | 'orphaned' };
 /** As `RenameRefusal`, derived rather than restated (#420 review note 3). */
 export type DeleteRefusal = Extract<DeleteProfileResult, { ok: false }>['why'];
 /**
@@ -482,10 +487,24 @@ export type DeleteRefusal = Extract<DeleteProfileResult, { ok: false }>['why'];
  * brought the removed child back with their full save, after they had been told it could not be undone.
  *
  * When the bytes survive, the index is **put back** and the answer is `'store'`, so the tap changed nothing
- * the family can see and nothing they were promised. The residue if that restoring write is itself refused:
- * the child is delisted with their bytes intact, capping the family a slot until the store recovers. That is
- * the one outcome left, and it is the recoverable direction — the save still exists, which is why the index is
- * written first and not the bytes removed first.
+ * the family can see and nothing they were promised.
+ *
+ * **That restoring write can itself be refused, and its answer is read rather than discarded** (#420 review
+ * round 2, B2). It is the likelier half of the pair, not the unlikely one: the blob it writes is strictly
+ * *longer* than the one the store just accepted, so a quota band exists that takes the shorter and refuses the
+ * longer. Then the child really is delisted with their bytes intact, and that is `'orphaned'` — not `'store'`,
+ * whose sentence is "nothing was removed".
+ *
+ * **And it does not heal, which the first version of this paragraph claimed it would.** Once the slot is out of
+ * `ids`, `deleteProfile` answers `'unknown'` for it and nothing in the UI can reach the bytes, while
+ * `addProfile`'s `holdsSave` probe skips that slot for good: the family is capped a ninja short and will
+ * eventually be told "four ninjas is the most" with three on screen. Only losing the index recovers it, because
+ * `defaultIndex()` probes the slots — the same path that makes the child reappear.
+ *
+ * It is still the recoverable direction, and that is why the index is written first rather than the bytes
+ * removed first: the save exists throughout. Removing the bytes first would put the failure the other way
+ * round — a save destroyed and the child still listed — and losing a sibling's progress is the worse of the
+ * two.
  *
  * **No `writeFailed` pre-check, unlike `addProfile`.** That one refuses under the latch because adding
  * switches away from the child holding the device, whose unsaved coins live only in `cache` (#380 round 5,
@@ -505,7 +524,7 @@ export function deleteProfile(id: ProfileId): DeleteProfileResult {
   const next: ProfileIndex = { v: 1, active: idx.active === id ? rest[0] : idx.active, ids: rest };
   if (!writeIndex(next)) return { ok: false, why: 'store' };
   try { localStorage.removeItem(saveKeyFor(id)); } catch { /* the read-back below is what decides, not the throw */ }
-  if (readItem(saveKeyFor(id)) !== null) { writeIndex(idx); return { ok: false, why: 'store' }; }
+  if (readItem(saveKeyFor(id)) !== null) return { ok: false, why: writeIndex(idx) ? 'store' : 'orphaned' };
   // Only the *session's* profile going takes the session with it. A second tab that is playing someone else
   // keeps its cache and both latches even though `active` moved here — `sessionProfile()` is latched to that
   // child, so their writes still land in their own slot. This is `rereadProfile`'s rule (#380 round 5, B2)

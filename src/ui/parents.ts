@@ -94,6 +94,11 @@ export const DELETE_HINTS: Record<DeleteRefusal, string> = {
   last: 'This is the only ninja on the device, so removing it is the same as starting again — use “Start again” below, which asks you to type RESET first.',
   future: FUTURE_SAY,
   store: 'This browser will not let the game save, so nothing was removed.',
+  // Never `store`'s sentence (#420 review round 2, B2). Something *was* changed — the ninja is off the list and
+  // their game is still on the device — so "nothing was removed" would be a falsehood about their own tablet.
+  // It says what is true, and that the slot does not come back, because it does not: only clearing this
+  // browser's storage frees it.
+  orphaned: 'That ninja is off the list, but the game saved for them is still on this device and the app can no longer reach it — the device is out of space. That slot stays used up, so only three ninjas will fit until this browser’s storage is cleared.',
 };
 function profileRow(c: ProfileCard, slot: number, only: boolean): string {
   const a = avatarOrNull(c.avatar);      // not `avatarById`: an unplayed slot is a state this list must draw (#380 review B1)
@@ -346,7 +351,10 @@ export function parentsScreen(nav: Nav) {
         sfx.tap();
         const r = deleteProfile(id);
         closeOverlay();
-        if (!r.ok) { sfx.wrong(); profMsg(DELETE_HINTS[r.why], true); return; }
+        // The refusals redraw too (#420 review round 2, B2). `'orphaned'` leaves the index genuinely changed,
+        // so the row beside the sentence would contradict it; and redrawing costs nothing on the others, where
+        // the list is simply unchanged.
+        if (!r.ok) { sfx.wrong(); drawDash(); profMsg(DELETE_HINTS[r.why], true); return; }
         sfx.correct();
         // The save this whole screen is drawn from has just gone, so there is nothing to redraw: `launch` puts
         // the device back where boot would, which is the picker while siblings remain (#20 slice 3).

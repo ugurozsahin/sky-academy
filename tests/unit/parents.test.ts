@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '../../src/game/parents';
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { SAVE_VERSION, STICKER_IDS, type ProfileCard, type SaveData, type TopicProgress } from '../../src/storage';
-import { canRenameCard, DELETE_HINTS, RENAME_HINTS } from '../../src/ui/parents';
+import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS } from '../../src/ui/parents';
 import { freshDojo } from '../../src/game/dojo';
 
 const base: SaveData = {
@@ -144,6 +144,21 @@ describe('ninjas on this device (#20 slice 3)', () => {
     expect(canRenameCard(card({ avatar: 'volt' })), 'mid-wizard: a ninja chosen, no name yet').toBe(true);
     expect(canRenameCard(card({ name: 'Ada' })), 'a name and no ninja is still a save').toBe(true);
     expect(canRenameCard(card({ name: '   ' })), 'spaces are not a name').toBe(false);
+    // The arm the rail's "exactly when" was claiming and never feeding (#420 review round 2, note 2): a save
+    // this build cannot read has a name, and it is not one a rename may touch.
+    expect(canRenameCard(card({ onboarded: true, future: true })), 'a newer build wrote it, so there is nothing to change here').toBe(false);
+    expect(canRenameCard(card({ name: 'Bo', avatar: 'blaze', future: true })), 'name and ninja notwithstanding').toBe(false);
+  });
+
+  /**
+   * `canRemoveCard`'s two exclusions, which had no unit test while `canRenameCard`'s did (#420 review round 2,
+   * note 1) — both were held only by the mobile e2e, and inverting either was green on the unit suite.
+   */
+  it('offers Remove for every ninja except the last one, and except a save a newer build wrote', () => {
+    expect(canRemoveCard(card({ onboarded: true }), false), 'one of several').toBe(true);
+    expect(canRemoveCard(card({ onboarded: true }), true), 'the only one — that is "Start again"').toBe(false);
+    expect(canRemoveCard(card({ future: true }), false), '99 coins this build cannot read are behind it').toBe(false);
+    expect(canRemoveCard(card(), false), 'an unplayed slot is removable: it is the only way the family gets it back').toBe(true);
   });
 
   /**

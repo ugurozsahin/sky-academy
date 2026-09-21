@@ -1600,6 +1600,9 @@ describe('profiles: siblings on one device (#20)', () => {
   });
 
   describe('deleteProfile (#20 slice 3)', () => {
+    /** Whether a slot really holds no save — `addProfile` writes none on purpose, and the B1 fixture below
+     *  depends on that staying true, so it is asserted rather than assumed. */
+    const holdsNoSave = (id: 'p3' | 'p4') => localStorage.getItem(saveKeyFor(id)) === null;
     /** Two siblings, Ada in p1 and Bo in p2, with `active` as asked and the session bound to it. */
     const twoChildren = (active: 'p1' | 'p2') => {
       save({ name: 'Ada', coins: 40, onboarded: true });
@@ -1621,10 +1624,36 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     });
 
-    it('removing the active profile moves `active` on and ends the session bound to it', () => {
-      twoChildren('p2');
+    /**
+     * **This reads the stored index, not `activeProfile()`, and that is the whole point of it** (#420 review
+     * round 2, B1).
+     *
+     * It used to assert `activeProfile()` and was satisfied by the wrong thing entirely: mutate `active` so it
+     * never moves off the deleted id and `readIndex()` rejects the result — `active` is no longer in `ids` —
+     * so `currentIndex()` falls through to `defaultIndex()`, which answers `'p1'` unconditionally. The
+     * assertion passed on the **corruption-recovery path** while the line it names did nothing, and the whole
+     * 1,633-test suite stayed green.
+     *
+     * That masking is not free, which is why the fixture carries **p3, a slot the ＋ card created and nobody
+     * has played**: `defaultIndex()` only lists slots that hold a save, so under the mutation p3 silently
+     * disappears from the picker — a family that tapped ＋ and put the tablet down loses that child's slot.
+     * Every other test here gives every slot a save, which is exactly why none of them could see it.
+     */
+    it('removing the active profile moves `active` on in the stored index, and ends the session bound to it', () => {
+      save({ name: 'Ada', coins: 40, onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      save({ name: 'Bo', coins: 7, onboarded: true });
+      expect(addProfile(), 'p3 is created and deliberately never played').toEqual({ ok: true, id: 'p3' });
+      expect(setActiveProfile('p2')).toBe(true);
+      expect(load().name).toBe('Bo');
+      expect(holdsNoSave('p3'), 'the fixture the recovery path cannot stand in for').toBe(true);
+
       expect(deleteProfile('p2')).toEqual({ ok: true, self: true });
-      expect(profileIds()).toEqual(['p1']);
+      // The stored bytes, read raw: this is the line under test, and nothing downstream of `readIndex()` can
+      // answer for it.
+      expect(JSON.parse(localStorage.getItem(INDEX)!), 'the index the store is actually holding')
+        .toEqual({ v: 1, active: 'p1', ids: ['p1', 'p3'] });
+      expect(profileIds(), 'and the unplayed slot survives, because the index was never left invalid').toEqual(['p1', 'p3']);
       expect(activeProfile()).toBe('p1');
       expect(load().name, "the next read resolves afresh, onto the sibling's own save").toBe('Ada');
       expect(load().coins, "and not the deleted child's coins written over them").toBe(40);
@@ -1682,6 +1711,33 @@ describe('profiles: siblings on one device (#20)', () => {
       localStorage.removeItem('sna:profiles');
       expect(profileIds(), 'a rebuilt index finds Bo exactly where they were').toContain('p2');
       expect(profileCard('p2').name).toBe('Bo');
+    });
+
+    /**
+     * The quota band #420 review round 2 B2 is about: the store takes the *shorter* index and refuses the
+     * *longer* one, so the delete's own write lands and the rollback does not. The child is then genuinely
+     * delisted with their bytes intact, and `'store'` — whose sentence is "nothing was removed" — would be a
+     * falsehood about the family's own device.
+     */
+    it("a refused rollback is 'orphaned', not 'store': something did change (#420 review round 2, B2)", () => {
+      twoChildren('p1');
+      const realRemove = localStorage.removeItem, realSet = localStorage.setItem;
+      (localStorage as unknown as { removeItem: unknown }).removeItem = () => { /* accepted, and kept */ };
+      const shorter = JSON.stringify({ v: 1, active: 'p1', ids: ['p1'] });
+      // Takes the delete's index, refuses anything longer — which is exactly the rollback.
+      (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => { if (k !== INDEX || v === shorter) mem[k] = v; };
+      try { expect(deleteProfile('p2')).toEqual({ ok: false, why: 'orphaned' }); }
+      finally {
+        (localStorage as unknown as { removeItem: unknown }).removeItem = realRemove;
+        (localStorage as unknown as { setItem: unknown }).setItem = realSet;
+      }
+      // The state the sentence has to describe, asserted rather than trusted.
+      expect(JSON.parse(localStorage.getItem(INDEX)!), 'the rollback did not land').toEqual({ v: 1, active: 'p1', ids: ['p1'] });
+      expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "and Bo's bytes are still there").toBe('Bo');
+      // And it does not heal, which is the half the docstring used to get wrong: no route back to the slot.
+      expect(deleteProfile('p2'), 'delisted, so the UI cannot reach it again').toEqual({ ok: false, why: 'unknown' });
+      expect(addProfile(), "addProfile's probe skips the occupied slot for good").toEqual({ ok: true, id: 'p3' });
+      expect(profileIds(), 'three ninjas, with the fourth slot used up').toEqual(['p1', 'p3']);
     });
 
     it('a second tab playing someone else keeps its own session when `active` moves (#380 round 5, B2)', () => {
