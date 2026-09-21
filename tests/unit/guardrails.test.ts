@@ -71,6 +71,21 @@ describe('guard rails', () => {
     ]);
   });
 
+  // #365: a finished game reaches the save in ONE write. `recordDojo()` then `addCoins()` was two saves with
+  // no rollback, and `save()` swallows a refused `setItem` (#151), so a store that took the first and refused
+  // the second recorded the Daily Dojo challenge as done while its coins never landed — and `applyEvent()`
+  // only pays `!done.includes(c.id)`, so that bonus was gone for the day. `recordGameEnd()` replaced the pair
+  // on all three results screens, but nothing stopped them going back: reverting play.ts, memory.ts and
+  // duel.ts to the pre-fix pair left the suite 1696/1696 green and `tsc` clean (PR #438 review, round 2).
+  // Both halves of the pair stay exported with unchanged signatures and zero `src/` callers, which is exactly
+  // the adjacency a fourth results screen meets. A screen settles a finished game through `recordGameEnd()`.
+  it('no screen settles a finished game with the recordDojo/addCoins pair (#365)', () => {
+    const hits = inDir('/src/ui/').flatMap(([f, s]) =>
+      [...code(s).matchAll(/\b(recordDojo|addCoins)\s*\(/g)].map(m => `${f}: ${m[1]}(`));
+    expect(hits, 'a results screen uses recordGameEnd() — the pair is two writes with no rollback (#365)')
+      .toEqual([]);
+  });
+
   it('shadowBlur stays out of the per-frame draw paths', () => {
     const hits = inDir('/src/game/').flatMap(([f, s]) => [...code(s).matchAll(/shadowBlur/g)].map(() => f));
     expect(hits.length).toBeLessThanOrEqual(0);                         // #29 removed them; never raise this

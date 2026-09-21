@@ -942,7 +942,11 @@ export function evaluateStickers(d: SaveData): string[] {
   return STICKER_IDS.filter(id => earned.has(id));
 }
 /** Add coins, return newly unlocked sticker ids (coin thresholds and any achievement the same play session
- * just satisfied — every mode records its own stats before calling this, so `d` already reflects them). */
+ * just satisfied — every mode records its own stats before calling this, so `d` already reflects them).
+ *
+ * **A results screen wants `recordGameEnd()` instead** (#365), and since it no caller in `src/` uses this: a
+ * rail in `tests/unit/guardrails.test.ts` keeps `src/ui/` off both halves of the old pair. Kept for a caller
+ * that pays coins with no finished game behind them, and used by `tests/unit/shop.test.ts` to seed a purse. */
 export function addCoins(n: number): string[] {
   const d = load(); const coins = d.coins + Math.max(0, n);
   const unlocked = evaluateStickers({ ...d, coins }); const fresh = unlocked.filter(id => !d.stickers.includes(id));
@@ -1063,13 +1067,22 @@ export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[] }
  * is unreachable rather than merely unlikely. A refusal still leaves `writeFailed` for the grown-ups screen to
  * report, exactly as before — this closes the *inconsistency*, not the refusal (#151 stands).
  */
-export function recordGameEnd(e: DojoEvent, coins: number, now = new Date()): GameEndOutcome {
+export function recordGameEnd(e: DojoEvent, gameCoins: number, now = new Date()): GameEndOutcome {
   const d = load();
   const dojo = applyEvent(d.dojo, e, today(now));
-  const total = d.coins + Math.max(0, coins + dojo.coins);
-  // The dojo's new state goes into the sticker evaluation too: an achievement that reads dojo progress must
-  // see the day this game just moved, which is what the old order gave it (`addCoins`'s `load()` ran after
-  // `recordDojo`'s `save()`) and what a single `load()` would otherwise quietly lose.
+  // `gameCoins`, not `coins`: every call site on `main` read `addCoins(paid + dojo.coins)`, so a maintainer
+  // with that muscle memory would write `recordGameEnd(e, r.coins + dojo.coins)` and be paid the bonus twice,
+  // with no type error and no test to catch it (round 2, note 4). The bonus is this function's to add.
+  //
+  // The clamp guards the game's own figure alone. Clamping the SUM would let a negative `gameCoins` cancel a
+  // bonus the child earned rather than being refused on its own (round 2, note 2) — unreachable with today's
+  // non-negative inputs, which is why it is a shape question rather than a bug.
+  const total = d.coins + Math.max(0, gameCoins) + dojo.coins;
+  // The dojo's new state goes into the sticker evaluation too, so that an achievement reading dojo progress
+  // WOULD see the day this game just moved — the old order gave it that (`addCoins`'s `load()` ran after
+  // `recordDojo`'s `save()`) and a single `load()` would otherwise quietly lose it. Nothing reads it today:
+  // no `ACHIEVEMENTS` entry touches `d.dojo` and `stickersFor` reads only coins, so withholding it is
+  // undetectable by any test. Deliberate forward-compatibility, deliberately untested (round 2, note 1).
   const unlocked = evaluateStickers({ ...d, coins: total, dojo: dojo.state });
   const fresh = unlocked.filter(id => !d.stickers.includes(id));
   save({ dojo: dojo.state, coins: total, stickers: unlocked });
