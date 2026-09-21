@@ -1243,6 +1243,69 @@ describe('guard rails', () => {
   // Neither failed anything — which is exactly what makes them worth a rail. A test written against the
   // compressed trajectory would have been asserting a path the game does not have, and the next beat added
   // in real time would be just as invisible as these were.
+  /**
+   * #301's hold, wired — and the two shapes of it no other unit test can see (PR #474 round-1 review).
+   *
+   * Reverting the user-visible half of #301 outright — `holdTimers` a no-op in `play.ts`, `scope.holdTimers`
+   * deleted from `duel.ts` — left the whole unit suite green at 1,931: only the two new e2e specs caught it,
+   * and a `testIgnore` could quietly drop those (review, note 7). The terminal-hold rule had nothing at all:
+   * `hold(true)` at the results screen froze beats no resume would ever re-arm, so the sticker jingle never
+   * played and every results toast pinned itself over the modal — and CI stayed green through both, because
+   * nothing asserted that a toast goes AWAY. Text checks, like every rail in this file: they hold the exact
+   * call sites named in their comments, and say nothing about a third screen or a new way to arm a beat.
+   */
+  it('both game screens put their beats on the hold, and take the terminal hold off it (#301, PR #474 review B1)', () => {
+    const play = code(SOURCES['/src/ui/play.ts'] ?? '');
+    const playSession = code(SOURCES['/src/ui/play-session.ts'] ?? '');
+    const duel = code(SOURCES['/src/ui/duel.ts'] ?? '');
+    expect({ play: play.length > 1000, playSession: playSession.length > 1000, duel: duel.length > 1000 },
+      'all three must be read, not blank imports').toEqual({ play: true, playSession: true, duel: true });
+    // Wired at all: the pause hold reaches the beat clock on both screens.
+    expect(playSession, "play-session's hold drives the screen's beats, not only the arena").toMatch(/\bdeps\.holdTimers\(open\)/);
+    expect(play, "and play.ts hands the scope's holdTimers to the session").toMatch(/\bholdTimers\b/);
+    expect(duel, "the duel's hold drives them too").toMatch(/\bscope\.holdTimers\(open\)/);
+    // And taken OFF it where the hold is TERMINAL. `showResults` never reopens — both screens offer only
+    // Play again and Islands, and both go straight to cleanup — so a beat armed after it has no resume.
+    expect(play, 'the play results hold does not freeze the beats it is about to arm')
+      .toMatch(/playSession\.hold\(true,\s*false\)/);
+    expect(duel, 'nor does the duel results hold').toMatch(/\bhold\(true,\s*false\)/);
+    // The beat that proved it, still inside the results path on both screens. Named so that moving it out is
+    // a deliberate act rather than something this rail silently stops covering.
+    for (const [name, src] of [['play.ts', play], ['duel.ts', duel]] as const) {
+      const at = src.indexOf('function showResults');
+      expect(at, `${name} still has a showResults for this rule to be about`).toBeGreaterThan(-1);
+      expect(src.slice(at), `${name}'s results screen still arms the unlock jingle after its hold`)
+        .toMatch(/later\(\(\) => sfx\.stage\(\)/);
+    }
+  });
+
+  /**
+   * #301's one gap, closed in PR #474's round 1 (review, B2): the first wave's font gate.
+   *
+   * `fontReady()` is a promise, and a raw `.then()` continuation is guarded by `mounted()`/`waveId` and by
+   * nothing that reads the hold — so a pause pressed inside that gate, up to the 1200 ms cap on a cold font
+   * cache, spoke the question and launched the wave behind the overlay, which is the very symptom #301's
+   * docblock says it removes. Routed through `later(..., scaled(0))` it defers instead of dropping. A text
+   * check: it holds that the two known gates go through the beat clock, not that no third way to spawn exists.
+   */
+  it('the font-gated first spawn goes through the beat clock, not straight out of the promise (#301, PR #474 review B2)', () => {
+    for (const [name, path] of [['play-session.ts', '/src/ui/play-session.ts'], ['duel.ts', '/src/ui/duel.ts']] as const) {
+      const src = code(SOURCES[path] ?? '');
+      expect(src.length, `${name} must be read, not a blank import`).toBeGreaterThan(1000);
+      // EVERY occurrence, not the first. `play-session.ts` has two — `fontReady().then(() => { fontsReady =
+      // true; })`, which sets the flag and launches nothing, and the gate itself — and slicing by first match
+      // read the wrong one, green. That is the same trap #395 files against the prose rails, met here.
+      const gates = [...src.matchAll(/fontReady\(\)\.then\(/g)].map(m => m.index ?? -1);
+      expect(gates.length, `${name} still gates on fontReady at all`).toBeGreaterThan(0);
+      const launching = gates.filter(at => /\bspawn(Wave)?\(/.test(src.slice(at, at + 900)));
+      expect(launching.length, `${name} has a fontReady gate that goes on to launch a wave`).toBe(1);
+      // The beat clock must be the FIRST thing inside that continuation, not something reached later in it.
+      expect(src.slice(launching[0], launching[0] + 80).replace(/\s+/g, ' '),
+        `${name}'s font gate hands its continuation to later(), so a pause inside the gate holds the spawn`)
+        .toMatch(/^fontReady\(\)\.then\(\(\) => (deps\.)?later\(/);
+    }
+  });
+
   it('fast mode compresses time only — the drift scales with it and no beat is left in real time (#138)', () => {
     const arena = code(SOURCES['/src/game/arena.ts'] ?? '');
     expect(arena.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
