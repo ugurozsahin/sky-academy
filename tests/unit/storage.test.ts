@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { activeProfile, addProfile, MAX_PROFILES, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
+import { carriedStreak } from '../../src/game/dojo';
 import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
 
@@ -507,6 +508,65 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     // and the writes actually landed — this is recovery, not merely surviving
     expect(load().progress['y1-add']).toMatchObject({ stars: 2 });
     expect(load().endless.year1).toBe(50);
+  });
+
+  /**
+   * #363: the loop above stops at `isRecord(clean.dojo)`, and `dojo` is the one key whose interior is read
+   * without a guard. `dojoFor()` rebuilds only a *stale* state, so a record carrying TODAY's date — what a
+   * game finished today meets — went straight into `carriedStreak()` and `applyEvent()` and threw. Every
+   * case below is reachable through the Restore box, which only checks that `v` is an integer in range.
+   */
+  describe('a record-shaped but broken `dojo` (#363)', () => {
+    const today = new Date('2026-09-20T10:00:00Z');
+    const iso = '2026-09-20';
+    const finish = () => recordDojo({ mode: 'mission', won: true, correct: 20, attempts: 20, bestCombo: 6, stars: 3, score: 90 }, today);
+    const broken: Record<string, unknown> = {
+      'only a date — the shape a truncated blob leaves': { date: iso },
+      'no streak': { date: iso, progress: {}, done: [], total: 0 },
+      'a streak that is not a record': { date: iso, progress: {}, done: [], streak: 'nope', total: 0 },
+      'a streak missing its fields': { date: iso, progress: {}, done: [], streak: {}, total: 0 },
+      // PR #408 review B2: without this row the `typeof dj.streak.last === 'string'` clause could be
+      // deleted with all 104 tests still passing — `streak: {}` fails on `last` *and* `days`, and a
+      // wrong-typed `days` fails only on `days`, so nothing isolated `last`.
+      'streak.last not a string': { date: iso, progress: {}, done: [], streak: { last: 5, days: 0 }, total: 0 },
+      'streak.days not a number': { date: iso, progress: {}, done: [], streak: { last: '', days: 'four' }, total: 0 },
+      '`done` not an array': { date: iso, progress: {}, done: 1, streak: { last: '', days: 0 }, total: 0 },
+      '`progress` not a record': { date: iso, progress: [], done: [], streak: { last: '', days: 0 }, total: 0 },
+      'a date that is not a string': { date: 20260920, progress: {}, done: [], streak: { last: '', days: 0 }, total: 0 },
+      'no total': { date: iso, progress: {}, done: [], streak: { last: '', days: 0 } },
+    };
+
+    it.each(Object.keys(broken))('%s: the day ends normally and the coins are paid', (name) => {
+      expect(importSave(JSON.stringify({ v: 3, name: 'Ada', avatar: 'volt', dojo: broken[name] })), name).toBe(true);
+      // The key is gone and `DEFAULT` has filled it back in — which is the fix, rather than each of the
+      // three `recordDojo()` readers coping. Three of these shapes throw without it and the rest load a
+      // half-built state, so this line is what every case here pins.
+      expect(load().dojo, name).toEqual({ date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 });
+      // `carriedStreak`, not `dojoToday`: the map screen's `dojoCard()` is the FIRST reader of the interior
+      // and it reads a superset of what `applyEvent()` does, so this is the call that actually threw (PR
+      // #408 review, note 7 — `dojoFor()` reads only `.date` and was never at risk).
+      expect(() => carriedStreak(load().dojo, iso), name).not.toThrow();
+      let out: ReturnType<typeof recordDojo> | undefined;
+      expect(() => { out = finish(); }, name).not.toThrow();
+      // Not merely "did not throw": the bad key is replaced by the default, so the day's challenges are
+      // scored and their bonus is actually earned and written.
+      expect(out!.completed.length, name).toBeGreaterThan(0);
+      expect(out!.coins, name).toBeGreaterThan(0);
+      expect(load().dojo.date, name).toBe(iso);
+    });
+
+    it('a well-formed `dojo` is left exactly as given — the streak and lifetime total survive', () => {
+      const good = { date: iso, progress: { correct15: 3 }, done: [], setDone: false, streak: { last: '2026-09-19', days: 4 }, total: 11 };
+      expect(importSave(JSON.stringify({ v: 3, name: 'Ada', avatar: 'volt', dojo: good }))).toBe(true);
+      expect(load().dojo).toEqual(good);
+      // and a stale-dated one still rolls over rather than being deleted: streak and total carry into today
+      const stale = { ...good, date: '2026-09-18' };
+      expect(importSave(JSON.stringify({ v: 3, name: 'Ada', avatar: 'volt', dojo: stale }))).toBe(true);
+      const rolled = dojoToday(today);
+      expect(rolled.date).toBe(iso);
+      expect(rolled.streak).toEqual({ last: '2026-09-19', days: 4 });
+      expect(rolled.total).toBe(11);
+    });
   });
 });
 

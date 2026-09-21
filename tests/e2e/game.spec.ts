@@ -1781,6 +1781,47 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
     expect(saved.progress['r-count'].stars).toBeGreaterThan(0);
     expect(saved.coins).toBeGreaterThan(0);
   });
+
+  /**
+   * #363: the seeds above carry `dojo: null`, which the record check catches. A `dojo` that IS a record but
+   * broken inside was not — and what it takes down first is the **map screen**, before any game starts.
+   *
+   * `dojoCard()` (`src/ui/home.ts`) runs at boot and reads `carriedStreak(s, s.date)` → `s.streak.last`,
+   * `s.done.includes()` and `s.progress[…]`: a strict **superset** of what `applyEvent()` reads at the end
+   * of a game. `dojoFor()` rebuilds only a *stale* state, so a record carrying TODAY's date reaches both
+   * readers untouched, and the child meets the boot one first — a blank screen with nothing to start.
+   *
+   * The end-of-game path is real too and lands worse (inside `duel.ts`'s `showResults()`, between
+   * `hold(true)` and `overlay.hidden = false`, freezing both arenas) — but no fixture can reach it to be
+   * tested: anything that crashes `applyEvent()` has already crashed the map. So this rail asserts the boot,
+   * which is both the first symptom and the stronger guard (PR #408 review, B1).
+   */
+  test('guard rail: a record-shaped but broken `dojo` still renders the map and its Daily Dojo card', async ({ page }) => {
+    const failed: string[] = [];
+    page.on('pageerror', e => failed.push(`page error: ${e.message}`));
+
+    // The date is computed IN THE PAGE. `today()` is `toISOString().slice(0, 10)`, so a run crossing UTC
+    // midnight between a Node-side seed and the assertion would leave a *stale* `dojo` — which `dojoFor()`
+    // rolls over, quietly evaporating the reproduction (PR #408 review, note 8). `v: 1` matches
+    // `seedPlayer`: the v2→v3 step is what marks a save with an avatar as already onboarded.
+    await page.addInitScript(() => {
+      if (localStorage.getItem('sna:v1')) return;
+      const date = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('sna:v1', JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', year: 'year2', dojo: { date } }));
+    });
+    await page.goto('/');
+
+    // The map and the card itself — this is the assertion that goes red without the guard, and it names the
+    // reader that actually throws.
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('#dojo')).toBeVisible();
+    await expect(page.locator('#dojo .dojo-item')).toHaveCount(3);
+    // …drawn from a *default* state, not a half-read one: a fresh day has no streak multiplier and the foot
+    // offers the set bonus rather than "come back tomorrow".
+    await expect(page.locator('#dojo .mult')).toHaveCount(0);
+    await expect(page.locator('#dojo .dojo-foot')).toContainText('Finish all three');
+    expect(failed, `while landing on the map with a broken dojo${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+  });
 });
 
 /**

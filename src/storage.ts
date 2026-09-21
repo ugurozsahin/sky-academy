@@ -468,6 +468,26 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['progress', 'endless', 'sprint', 'boss', 'memory', 'training', 'equipped', 'streak', 'dojo'] as const) {
     if (k in clean && !isRecord(clean[k])) delete clean[k];
   }
+  // #363: `dojo` is the one key whose *interior* is read without a guard, and the guard above stops at the
+  // record boundary. `dojoFor()` only rebuilds a state whose `date` is stale, so a record carrying TODAY's
+  // date is handed to every reader untouched and throws on `s.streak.last`, `s.done` or `s.progress`.
+  //
+  // The FIRST reader is the map screen, not a game: `dojoCard()` (`ui/home.ts`) runs at boot and reads a
+  // superset of what `applyEvent()` does, so the child's symptom is a blank map with nothing to start —
+  // there is no save that survives boot and fails only at the end of a game. The end-of-game readers are
+  // the worse landing when they are reached: in `duel.ts` the throw sits between `hold(true)` and
+  // `overlay.hidden = false`, freezing both arenas with no result, and the coins just earned are never
+  // written. Reachable without devtools: `importSave()` accepts any version-valid JSON, so a `dojo` of
+  // `{ date: <today> }` pasted into the Restore box is enough.
+  //
+  // Deleting the key here puts it back through `DEFAULT`, the same route a missing key already takes, and
+  // covers `dojoCard()`, all three `recordDojo()` call sites and every future one — which is what this
+  // function's docstring above promises and what a `try/catch` per reader would not.
+  if (isRecord(clean.dojo)) {
+    const dj = clean.dojo as Partial<DojoState>;
+    const streakOk = isRecord(dj.streak) && typeof dj.streak!.last === 'string' && typeof dj.streak!.days === 'number';
+    if (typeof dj.date !== 'string' || !isRecord(dj.progress) || !Array.isArray(dj.done) || !streakOk || typeof dj.total !== 'number') delete clean.dojo;
+  }
   for (const k of ['stickers', 'owned'] as const) {
     if (k in clean && !Array.isArray(clean[k])) delete clean[k];
   }
