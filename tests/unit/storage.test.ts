@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { activeProfile, addProfile, MAX_PROFILES, PROFILE_IDS, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
+import { carriedStreak } from '../../src/game/dojo';
 import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
 
@@ -524,6 +525,10 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
       'no streak': { date: iso, progress: {}, done: [], total: 0 },
       'a streak that is not a record': { date: iso, progress: {}, done: [], streak: 'nope', total: 0 },
       'a streak missing its fields': { date: iso, progress: {}, done: [], streak: {}, total: 0 },
+      // PR #408 review B2: without this row the `typeof dj.streak.last === 'string'` clause could be
+      // deleted with all 104 tests still passing — `streak: {}` fails on `last` *and* `days`, and a
+      // wrong-typed `days` fails only on `days`, so nothing isolated `last`.
+      'streak.last not a string': { date: iso, progress: {}, done: [], streak: { last: 5, days: 0 }, total: 0 },
       'streak.days not a number': { date: iso, progress: {}, done: [], streak: { last: '', days: 'four' }, total: 0 },
       '`done` not an array': { date: iso, progress: {}, done: 1, streak: { last: '', days: 0 }, total: 0 },
       '`progress` not a record': { date: iso, progress: [], done: [], streak: { last: '', days: 0 }, total: 0 },
@@ -537,7 +542,10 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
       // three `recordDojo()` readers coping. Three of these shapes throw without it and the rest load a
       // half-built state, so this line is what every case here pins.
       expect(load().dojo, name).toEqual({ date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 });
-      expect(() => dojoToday(today), name).not.toThrow();
+      // `carriedStreak`, not `dojoToday`: the map screen's `dojoCard()` is the FIRST reader of the interior
+      // and it reads a superset of what `applyEvent()` does, so this is the call that actually threw (PR
+      // #408 review, note 7 — `dojoFor()` reads only `.date` and was never at risk).
+      expect(() => carriedStreak(load().dojo, iso), name).not.toThrow();
       let out: ReturnType<typeof recordDojo> | undefined;
       expect(() => { out = finish(); }, name).not.toThrow();
       // Not merely "did not throw": the bad key is replaced by the default, so the day's challenges are

@@ -327,14 +327,19 @@ function sanitizeTypes(s: RawSave): RawSave {
   }
   // #363: `dojo` is the one key whose *interior* is read without a guard, and the guard above stops at the
   // record boundary. `dojoFor()` only rebuilds a state whose `date` is stale, so a record carrying TODAY's
-  // date — exactly what a game finished today meets — reaches `carriedStreak()`'s `s.streak.last` and
-  // `applyEvent()`'s `[...s.done]` as-is and throws. That throw lands between `hold(true)` and
-  // `overlay.hidden = false` on the duel screen, so both arenas freeze with no result and no way out, and
-  // the coins the child just earned are never written. Reachable without devtools: `importSave()` accepts
-  // any version-valid JSON, so a `dojo` of `{ date: <today> }` pasted into the Restore box is enough.
+  // date is handed to every reader untouched and throws on `s.streak.last`, `s.done` or `s.progress`.
+  //
+  // The FIRST reader is the map screen, not a game: `dojoCard()` (`ui/home.ts`) runs at boot and reads a
+  // superset of what `applyEvent()` does, so the child's symptom is a blank map with nothing to start —
+  // there is no save that survives boot and fails only at the end of a game. The end-of-game readers are
+  // the worse landing when they are reached: in `duel.ts` the throw sits between `hold(true)` and
+  // `overlay.hidden = false`, freezing both arenas with no result, and the coins just earned are never
+  // written. Reachable without devtools: `importSave()` accepts any version-valid JSON, so a `dojo` of
+  // `{ date: <today> }` pasted into the Restore box is enough.
+  //
   // Deleting the key here puts it back through `DEFAULT`, the same route a missing key already takes, and
-  // covers all three `recordDojo()` call sites plus every future one — which is what this function's
-  // docstring above promises and what a `try/catch` per reader would not.
+  // covers `dojoCard()`, all three `recordDojo()` call sites and every future one — which is what this
+  // function's docstring above promises and what a `try/catch` per reader would not.
   if (isRecord(clean.dojo)) {
     const dj = clean.dojo as Partial<DojoState>;
     const streakOk = isRecord(dj.streak) && typeof dj.streak!.last === 'string' && typeof dj.streak!.days === 'number';

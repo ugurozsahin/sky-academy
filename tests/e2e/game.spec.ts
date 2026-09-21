@@ -1782,44 +1782,43 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
 
   /**
    * #363: the seeds above carry `dojo: null`, which the record check catches. A `dojo` that IS a record but
-   * broken inside was not caught, and `dojoFor()` rebuilds only a *stale* state — so a record carrying
-   * TODAY's date reached `applyEvent()` and threw as the game ended. That is the worst place for it: the
-   * throw lands after `paid` is assigned (so `window.__sna.state()` reports coins the child never got, and
-   * an e2e written against the hook alone would stay green) and before the results overlay is built (so the
-   * only way off the screen is never drawn).
+   * broken inside was not — and what it takes down first is the **map screen**, before any game starts.
    *
-   * Sky Storm is the shortest route to a finished game; the defect is in the shared end-of-game path, not in
-   * any one mode.
+   * `dojoCard()` (`src/ui/home.ts`) runs at boot and reads `carriedStreak(s, s.date)` → `s.streak.last`,
+   * `s.done.includes()` and `s.progress[…]`: a strict **superset** of what `applyEvent()` reads at the end
+   * of a game. `dojoFor()` rebuilds only a *stale* state, so a record carrying TODAY's date reaches both
+   * readers untouched, and the child meets the boot one first — a blank screen with nothing to start.
+   *
+   * The end-of-game path is real too and lands worse (inside `duel.ts`'s `showResults()`, between
+   * `hold(true)` and `overlay.hidden = false`, freezing both arenas) — but no fixture can reach it to be
+   * tested: anything that crashes `applyEvent()` has already crashed the map. So this rail asserts the boot,
+   * which is both the first symptom and the stronger guard (PR #408 review, B1).
    */
-  test('guard rail: a record-shaped but broken `dojo` still ends the game, draws the results and pays out', async ({ page }) => {
+  test('guard rail: a record-shaped but broken `dojo` still renders the map and its Daily Dojo card', async ({ page }) => {
     const failed: string[] = [];
     page.on('pageerror', e => failed.push(`page error: ${e.message}`));
 
-    // `today()` is `toISOString().slice(0, 10)`, so the runner's UTC date is the one the app computes.
-    const today = new Date().toISOString().slice(0, 10);
-    await seedPlayer(page, 'volt', 'Ada', { year: 'year2', dojo: { date: today } });
-    await page.click('.island[data-year="year2"]');
-    await page.click('#endless');
-    await expect(page.locator('.villain img')).toBeVisible();
-    for (let i = 0; i < 3; i++) await solveCurrent(page);
-    // slice wrong until the lives are gone (a wave missed under a slow renderer may already have cost one)
-    for (let i = 0; i < 4; i++) {
-      await waitForWrongOrEnd(page);
-      if ((await state(page)).ended) break;
-      const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
-      expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
-      await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before);
-    }
-    await expect(page.locator('.results h2')).toHaveText('Storm over!');
-    expect(failed, `while finishing a game on a broken dojo${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
+    // The date is computed IN THE PAGE. `today()` is `toISOString().slice(0, 10)`, so a run crossing UTC
+    // midnight between a Node-side seed and the assertion would leave a *stale* `dojo` — which `dojoFor()`
+    // rolls over, quietly evaporating the reproduction (PR #408 review, note 8). `v: 1` matches
+    // `seedPlayer`: the v2→v3 step is what marks a save with an avatar as already onboarded.
+    await page.addInitScript(() => {
+      if (localStorage.getItem('sna:v1')) return;
+      const date = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('sna:v1', JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt', year: 'year2', dojo: { date } }));
+    });
+    await page.goto('/');
 
-    // The payout landed, and the key was rebuilt rather than half-read — read from storage, not from the
-    // `__sna` hook, which is exactly the reporter the old failure mode fooled.
-    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
-    expect(saved.coins).toBeGreaterThan(0);
-    expect(saved.dojo.date).toBe(today);
-    expect(Array.isArray(saved.dojo.done)).toBe(true);
-    expect(saved.dojo.streak).toEqual({ last: '', days: 0 });
+    // The map and the card itself — this is the assertion that goes red without the guard, and it names the
+    // reader that actually throws.
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('#dojo')).toBeVisible();
+    await expect(page.locator('#dojo .dojo-item')).toHaveCount(3);
+    // …drawn from a *default* state, not a half-read one: a fresh day has no streak multiplier and the foot
+    // offers the set bonus rather than "come back tomorrow".
+    await expect(page.locator('#dojo .mult')).toHaveCount(0);
+    await expect(page.locator('#dojo .dojo-foot')).toContainText('Finish all three');
+    expect(failed, `while landing on the map with a broken dojo${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
   });
 });
 
