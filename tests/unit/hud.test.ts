@@ -76,7 +76,18 @@ describe('outcomeHintHTML (#36 — the outcome reveal under the question card)',
 // three readers — the one with no test until the 17:41Z review pointed at it. A reveal that ignored the mode
 // would overwrite a silent device's listen-words card with the filled-in answer.
 describe('promptMode and the outcome reveal (#65)', () => {
-  const el = () => ({ innerHTML: '', textContent: '', classList: { add() {}, remove() {} } }) as unknown as HTMLElement;
+  /**
+   * The class list is a real set, not a pair of no-ops: `showOutcome` clears `.own` from the hint (#328,
+   * PR #430 review note 1) and a stub would make that unassertable — which is how the interaction got here
+   * with no coverage at all. `classes` is exposed for the test below to read.
+   */
+  const el = () => {
+    const classes = new Set<string>();
+    return {
+      innerHTML: '', textContent: '', classes,
+      classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c), contains: (c: string) => classes.has(c) },
+    } as unknown as HTMLElement & { classes: Set<string> };
+  };
   const soundHunt: Question = { prompt: '🔊 Listen!', answer: 's', options: ['s', 'a'], listen: 'sun · sock · sad' };
   const sum: Question = { prompt: '3 + 4 = ?', answer: '7', options: ['7', '9'] };
 
@@ -104,5 +115,30 @@ describe('promptMode and the outcome reveal (#65)', () => {
     hud.showOutcome('wrong', soundHunt);
     expect(els.prompt.innerHTML, 'a silent device keeps the words it was reading').toBe('sun · sock · sad');
     expect(els.hint.innerHTML).toContain('<b class="ok">s</b>');
+  });
+
+  /**
+   * #328, review note 1. The play screen marks the hint `own` when the card is answered from it, and the
+   * outcome line replaces that text with this screen's own words ("✓ red — that's right!"). Without the
+   * clear, the element goes on claiming to be the question's values while showing the verdict — harmless
+   * today only because `.qcard.good .hint` un-hides it by a second, independent mechanism, and silently
+   * wrong the moment anything keys off `.own` for a colour or a size.
+   *
+   * It is checked here rather than in `play-session.test.ts`, whose harness stubs `showOutcome` out
+   * entirely — so this path was not merely unasserted there, it was unreachable.
+   */
+  it('the outcome line drops the hint\'s `own` mark, whatever the outcome (#328)', () => {
+    const measure: Question = {
+      prompt: 'Which holds more?', answer: 'red', options: ['red', 'blue'],
+      hint: 'red jug: 300 ml · blue jug: 100 ml', hintIsData: true,
+    };
+    for (const kind of ['correct', 'wrong', 'miss'] as const) {
+      const els = { lives: el(), qcard: el(), prompt: el(), hint: el() };
+      const hud = createHud(els, 3, () => true);
+      els.hint.classList.add('own');                       // as `setHint` leaves it for a measure card
+      hud.showOutcome(kind, measure);
+      expect((els.hint as unknown as { classes: Set<string> }).classes.has('own'),
+        `${kind}: the outcome text is still marked as the question's own values`).toBe(false);
+    }
   });
 });

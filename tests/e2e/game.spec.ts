@@ -1234,6 +1234,117 @@ test.describe('Sky Ninja Academy', () => {
     expect(inBox, 'a bubble was left outside the resized arena').toMatchObject({ risingOutside: 0, offSide: 0 });
   });
 
+  /**
+   * #328: `@media (max-height: 640px)` in `src/style.css` hid `.hint` outright to buy the play card vertical
+   * space, and a phone held sideways is ~390px tall — squarely in that band. For the seven measure topics
+   * (`y1-length`, `y1-mass`, `y1-capacity`, `y2-length`, `y2-mass`, `y2-capacity`, `y2-temp`) the values being
+   * compared live in `q.hint` and nowhere else on the card: no `visual`, nothing in the prompt. Hidden,
+   * "Which is longer?" sits over two coloured bubbles with nothing on screen to decide by — #65's rule that
+   * every card stays usable without read-aloud, broken by a layout rule rather than by a generator. The duel
+   * screen's half of the same bug is pinned in `duel.spec.ts` (PR #295); this is the play screen's.
+   *
+   * **The control is `y1-shapes`, and that is the point of it.** This test first used `y1-bonds`, which
+   * writes no `hint` at all — so it passed whether the mark was `hintIsData` or the `!!q.hint` the first
+   * version of the fix used, and could not see that the latter gives a line back to ~40 instruction-writing
+   * topics and pushes the arena down with it (PR #430 review, round 1). `y1-shapes` writes "Slice the shape"
+   * and must stay hidden, so the control now fails against the wrong predicate.
+   *
+   * Run at a landscape phone rather than in `viewport.spec.ts`, which only the two tablet projects run.
+   */
+  test('guard rail: a phone in landscape keeps the values a measure question is asking about (#328)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-length');
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.waitForFunction(() => window.__sna.arena!.W > window.__sna.arena!.H);   // the resize is laid out, not still portrait
+    const seen = await page.evaluate(() => {
+      const el = document.querySelector('#hint') as HTMLElement, r = el.getBoundingClientRect();
+      return {
+        text: el.textContent ?? '', display: getComputedStyle(el).display, own: el.classList.contains('own'),
+        height: r.height, bottom: r.bottom,
+        cardBottom: (document.querySelector('.qcard') as HTMLElement).getBoundingClientRect().bottom,
+      };
+    });
+    console.log(`[guard rail #328] landscape hint: display=${seen.display} h=${seen.height} cardBottom=${seen.cardBottom} "${seen.text}"`);
+    expect(seen.own, "the writer did not mark the question's own line, so the CSS cannot let it through").toBe(true);
+    expect(seen.display, 'the short-screen rule hid the only values on the card').not.toBe('none');
+    expect(seen.height, 'the line is laid out, not collapsed to nothing').toBeGreaterThan(0);
+    // The measure hint is `colour noun: value unit`, joined by ` · ` — the one shape no generic line has.
+    expect(seen.text, 'the line on screen is not the values being compared').toMatch(/: ?\d+ ?(cm|m|g|kg|ml|°C)\b/);
+    expect(seen.bottom, 'the values are on the card but off the bottom of a 390px screen').toBeLessThanOrEqual(390);
+
+    // The control: `y1-shapes`, which WRITES a hint ("Slice the shape") that the card does not need. Same
+    // year, same landscape phone. This is the case the first version of the fix got wrong.
+    // Through `startTopic()`, which picks the subject tab from the registry (#27). The bare
+    // `.topic[data-id=...]` click this used before passed only because `y1-bonds` is maths and maths is the
+    // default tab — and the useful controls here are hint-writing topics, several of which are writing
+    // (#430 review). `y1-shapes` is maths too, so this is insurance against the next swap, not a fix.
+    await page.evaluate(() => history.back());
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await startTopic(page, 'year1', 'y1-shapes');
+    // `y1-shapes` writes its hint on ~half its draws, so take the first drawn question that has one: a draw
+    // without it would make the control vacuous rather than red.
+    await page.waitForFunction(() => (document.querySelector('#hint') as HTMLElement).textContent !== '');
+    const plain = await page.evaluate(() => {
+      const el = document.querySelector('#hint') as HTMLElement;
+      return {
+        text: el.textContent ?? '', display: getComputedStyle(el).display,
+        own: el.classList.contains('own'), height: el.getBoundingClientRect().height,
+        cardBottom: (document.querySelector('.qcard') as HTMLElement).getBoundingClientRect().bottom,
+      };
+    });
+    console.log(`[guard rail #328] landscape control: display=${plain.display} h=${plain.height} cardBottom=${plain.cardBottom} "${plain.text}"`);
+    expect(plain.text, 'the control drew a card with no hint, so it proves nothing').not.toBe('');
+    expect(plain.own, "a generator's instruction hint must not be marked as data").toBe(false);
+    expect(plain.display, 'the ordinary landscape card gave up a line it used to keep').toBe('none');
+    expect(plain.height, 'the hidden line still took layout space').toBe(0);
+    // …and the cost is measured where it actually lands (#430 review, note 4). The card's bottom edge is
+    // what the wave is laid out under — `arena.topInset = els.qcard.getBoundingClientRect().bottom + 6` in
+    // `play-session.ts` — so a line shown here is a line of flight taken away. Read the edge rather than
+    // `topInset` itself, which is only written inside the launch rAF and reads its default until a wave goes
+    // up; and rather than `arena.H`, which is the viewport's and never moves whatever the card does.
+    // Hidden, the control's card ends no lower than the measure card's; with the #430 regression back it
+    // ends ~16px lower, which is the whole of what that regression costs a child in landscape.
+    // Strictly shorter, by at least the line's own height: `<=` would be satisfied by the two cards being
+    // identical, which is exactly what the regression looks like.
+    expect(seen.cardBottom - plain.cardBottom, 'the control card did not get the line of arena back')
+      .toBeGreaterThanOrEqual(seen.height - 1);
+  });
+
+  /**
+   * #328 / PR #430 review: a landscape card-height budget, which the play screen had none of while
+   * `duel.spec.ts` has had one for the duel strip at this very viewport since #388. The media query exists
+   * to keep the card off the arena on a short screen, and nothing bounded how much of the 390px the card
+   * may take — so the round-1 regression (an instruction hint shown on ~40 topics) cost `y2-symmetry` 16 of
+   * the 69px of flight `main` left it, a 23% cut, with every test green.
+   *
+   * The sample is the reviewer's own, the tallest cards they measured, and the budget is a BUDGET: it only
+   * ever goes down (`.claude/rules/guardrails.md`). Do not raise it to make a build pass — a card that
+   * needs more room in landscape is the bug this rail is for.
+   */
+  test('guard rail: no play card eats the landscape arena, on any of the tallest topics (#328)', async ({ page }) => {
+    const CARD_BUDGET = 330;   // measured worst on this tree: y2-symmetry at 321 of 390. The regression: 337.
+    await seedPlayer(page);
+    await page.setViewportSize({ width: 844, height: 390 });
+    const worst: { id: string; bottom: number; hint: string }[] = [];
+    for (const [year, id] of [['year2', 'y2-symmetry'], ['year1', 'y1-punct'], ['year1', 'y1-spelling'], ['reception', 'r-oddeven'], ['year1', 'y1-position'], ['year1', 'y1-length']] as const) {
+      await startTopic(page, year, id);
+      await page.waitForFunction(() => window.__sna.arena!.W > window.__sna.arena!.H);
+      const m = await page.evaluate(() => ({
+        bottom: (document.querySelector('.qcard') as HTMLElement).getBoundingClientRect().bottom,
+        hint: (document.querySelector('#hint') as HTMLElement).textContent ?? '',
+      }));
+      worst.push({ id, ...m });
+      await page.evaluate(() => history.back());
+      await expect(page.locator('.island-screen')).toBeVisible();
+      await page.evaluate(() => history.back());
+      await expect(page.locator('.home')).toBeVisible();
+    }
+    console.log(`[guard rail #328 budget] ${worst.map(w => `${w.id}=${w.bottom}`).join(' ')}`);
+    for (const w of worst)
+      expect(w.bottom, `${w.id}: the card reaches ${w.bottom}px of a 390px screen, leaving ${390 - w.bottom}px of arena — hint "${w.hint}"`)
+        .toBeLessThanOrEqual(CARD_BUDGET);
+  });
+
   test('guard rail: leaving the play screen stops it', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');

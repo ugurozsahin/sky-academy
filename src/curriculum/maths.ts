@@ -505,7 +505,10 @@ function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: string, for
   const adj = n === 2 ? (big ? forms[0] : forms[1]) : (big ? forms[2] : forms[3]);
   const spoken = cols.map((c, i) => `the ${c} ${noun} ${verb} ${vals[i]} ${UNIT_WORD[unit]}`).join(', ');
   return wordQ(rng, n === 2 ? `Which ${verb} ${adj}?` : `Which ${verb} the ${adj}?`, cols[idx], cols.filter((_, i) => i !== idx), {
-    hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '),
+    // The options are the colours, so this hint is the only place the sizes being compared appear — it is
+    // data, not the instruction line `hint` usually carries, and the play screen must keep it on a short
+    // screen (#328). `unitChoice` below deliberately does NOT set it: there the units are the bubbles.
+    hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,
     say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`,
   });
 }
@@ -600,7 +603,9 @@ const y2Temp: Generator = (d, rng) => {
   const [ca, cb] = shuffle(rng, ['the town', 'the hill', 'the beach', 'the park', 'the wood', 'the lake']).slice(0, 2);
   let a = ri(rng, 0, 35), b = a; while (b === a) b = ri(rng, 0, 35);
   const first = warmer ? a > b : a < b;
-  return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });
+  // `hintIsData`, for the same reason as `measureCompare()`: the options are the two places, so the
+  // temperatures live in this line and nowhere else on the card (#328).
+  return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, hintIsData: true, say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });
 };
 // Y2 statistics (#8). Each survey is three categories the child picks out by emoji, so the chart can be read
 // without reading the words — the labels carry the emoji and so does the prompt.

@@ -1342,6 +1342,22 @@ img { -webkit-user-drag: none; }
   .hint {
     display: none;
   }
+  /*
+   * …except a line the card is *answered from*. `play-session.ts` marks that one `own` (#328), from the
+   * generator's own `hintIsData` flag: seven topics — `y1-length`, `y1-mass`, `y1-capacity`, `y2-length`,
+   * `y2-mass`, `y2-capacity`, `y2-temp` — put the values being compared in `hint` and nowhere else on the
+   * card, so hiding it on a phone held sideways leaves "Which holds more?" over two coloured bubbles that
+   * cannot be told apart (#65: every card usable without read-aloud).
+   *
+   * Every OTHER hint stays hidden here, including the ~40 generator-written instruction lines ("Slice the
+   * shape", "Add -s or -es") as well as the four this screen writes itself — that is what buys the space,
+   * and `tests/e2e/game.spec.ts`'s `y1-shapes` control is a hint-writing topic precisely so this line is a
+   * claim the suite can fail. The duel screen's half of the same bug is `.duel-q .hint` above (#295);
+   * `memory.ts` is a third user of this selector and is out of scope here — see #461.
+   */
+  .hint.own {
+    display: block;
+  }
   .qcard.good .hint, .qcard.bad .hint {
     display: block;
   }

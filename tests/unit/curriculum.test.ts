@@ -1832,3 +1832,69 @@ describe('Year 2 symmetry and patterns (#299 slice 4)', () => {
     }
   });
 });
+
+
+describe('a hint is instruction text unless the generator says it is data (#328, PR #430 review)', () => {
+  /**
+   * `Question.hint` is documented as "small instruction text under the prompt", and that is what 40 of the
+   * 47 hint-writing topics put there. Seven do not: `measureCompare()` and `y2Temp`'s comparison branch put
+   * the values being compared in the hint and nowhere else on the card — the options are the *things*
+   * compared, not their sizes — so those cards are unanswerable without it, and `hintIsData` is how they say
+   * so. The play screen keeps only the marked ones on a short screen (`src/ui/play-session.ts`).
+   *
+   * This rail exists because the first version of that fix marked on `!!q.hint` and no test could tell:
+   * every control in the suite happened to be a topic writing no hint at all. It pins the split by sweeping
+   * the real registry, so a future generator cannot join either side silently.
+   */
+  const DRAWS = 300;
+  /** The shape both data-carrying generators write: `<thing>: <number><unit>`, joined by ` · `. */
+  const DATA_SHAPE = /^[^:·]+: ?-?\d+ ?(cm|m|g|kg|ml|l|°C) · /;
+  const EXPECTED = ['y1-capacity', 'y1-length', 'y1-mass', 'y2-capacity', 'y2-length', 'y2-mass', 'y2-temp'];
+
+  function sweep() {
+    const r = rng(328);
+    const marked = new Set<string>(), hinted = new Set<string>();
+    let cards = 0, flagged = 0;
+    for (const t of TOPICS) for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < DRAWS; i++) {
+      const q = t.gen(d, r); cards++;
+      if (q.hint) hinted.add(t.id);
+      if (q.hintIsData) { marked.add(t.id); flagged++; expect(q.hint, `${t.id} d${d}: hintIsData with no hint — "${q.prompt}"`).toBeTruthy(); }
+      if (q.hint && DATA_SHAPE.test(q.hint))
+        expect(q.hintIsData, `${t.id} d${d}: "${q.hint}" carries the values but is not marked — landscape would hide it (#328)`).toBe(true);
+    }
+    return { marked, hinted, cards, flagged };
+  }
+
+  it('marks exactly the seven measure topics, and no others', () => {
+    const { marked, hinted, cards, flagged } = sweep();
+    expect(cards, 'the sweep drew nothing — this rail would pass vacuously').toBeGreaterThan(70_000);
+    expect(flagged, 'no card was marked at all').toBeGreaterThan(1000);
+    expect([...marked].sort()).toEqual(EXPECTED);
+    // The other half of the claim, and the one the review caught: marking is the exception, not the rule.
+    // `y2-length`/`y2-mass` reach `measureCompare()` on one difficulty branch only, which is why the pull
+    // request's first count of "five" was wrong and a hand-written list is no substitute for this sweep.
+    expect(hinted.size, 'the registry stopped writing instruction hints — re-read this rail before changing it').toBeGreaterThan(40);
+    const instructionOnly = [...hinted].filter(id => !marked.has(id));
+    expect(instructionOnly.length, 'every hint-writing topic is now marked, which is the #430 regression')
+      .toBeGreaterThanOrEqual(38);
+  });
+
+  it('a marked card really does hide its values from the rest of the card', () => {
+    const r = rng(329);
+    let checked = 0;
+    for (const id of EXPECTED) {
+      const t = TOPICS.find(x => x.id === id)!;
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 120; i++) {
+        const q = t.gen(d, r);
+        if (!q.hintIsData) continue;
+        checked++;
+        expect(q.visual, `${id}: a marked card drew a visual, so the hint is no longer the only source`).toBeUndefined();
+        // Every number in the hint is absent from the prompt and the options: hide the line and there is
+        // nothing left to decide by. That is the whole reason the flag exists.
+        for (const n of q.hint!.match(/\d+/g) ?? [])
+          expect(`${q.prompt} ${q.options.join(' ')}`, `${id}: ${n} also appears outside the hint`).not.toContain(n);
+      }
+    }
+    expect(checked, 'no marked card was drawn — this rail would pass vacuously').toBeGreaterThan(500);
+  });
+});
