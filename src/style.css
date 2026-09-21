@@ -571,8 +571,10 @@ img { -webkit-user-drag: none; }
 .sticker .isl-bar { align-self: stretch; margin-top: 2px; }   /* #114: achievement progress — stretches past the card's centred children */
 .sticker:not(.got) .figure img { filter: brightness(0) opacity(.35); } .sticker:not(.got) .figure::before { opacity: .15; }
 .sticker.got { border-color: var(--glow); box-shadow: inset 0 0 30px color-mix(in srgb, var(--glow) 16%, transparent); }
-/* "My certificates" (#110): a row per earned certificate, next to the sticker album. */
-.cert-empty {
+/* "My certificates" (#110): a row per earned certificate, next to the sticker album — and, since #16, the
+   "Recent duels" list below it, which reuses these rules (see `duelHistoryHTML`). The empty states share this
+   rule but not a class name: `.cert-empty` means "no certificates" to the album's own e2e. */
+.cert-empty, .duel-empty {
   margin: 12px 0 0;
   padding: 14px 16px;
   border-radius: 16px;
@@ -609,6 +611,14 @@ img { -webkit-user-drag: none; }
 .cert-info small { color: var(--muted); font-weight: 600; font-size: 12px; }
 .cert-stars { flex: none; color: var(--accent); font-size: 15px; }
 .cert-open { flex: none; min-height: 44px; padding: 0 14px; font-size: 14px; }
+/* "Recent duels" (#16): the certificate row reused, with the scoreline where the stars sit and no View button
+   (a duel has nothing to redraw). `--glow` is set here because `.cert-ava` reads it for the disc's tint and
+   ring, and no avatar supplies one on this row. It does not prevent a breakage — `:root` declares `--glow`
+   and custom properties inherit, so without this line the ring still renders, in `:root`'s blue (#415 review,
+   note 2, which corrected an earlier claim here that it would vanish). It buys the amber that matches the
+   row's ⚔️ instead of a blue that matches nothing on it. */
+.duel-ava { --glow: var(--accent); font-size: 22px; line-height: 1; }
+.duel-line { flex: none; font-weight: 700; font-size: 14px; color: var(--muted); white-space: nowrap; }
 .coin-row { display: flex; justify-content: center; gap: 10px; margin: -6px 0 12px; flex-wrap: wrap; }
 .coin-gain { font-size: 22px; font-weight: 700; color: #ffd87a; text-shadow: 0 0 14px #ffb02088; }
 .streak-pill { align-self: center; padding: 4px 10px; border-radius: 999px; background: #3b1a22; border: 1px solid #ff8a4c66; color: #ffb090; font-weight: 700; font-size: 14px; }
@@ -1479,6 +1489,40 @@ img { -webkit-user-drag: none; }
 .p-move .btn { width: 100%; }
 .p-move-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--good); }
 .p-move-msg.bad { color: var(--bad); }
+
+/* ninjas on this device: rename and remove (#20 slice 3)
+   The row is `.p-topic`'s shape — panel, hairline, 14px radius — with the face where the icon sits, so the
+   section reads as another list on a screen full of them rather than a new component (`design-language` §5).
+   It wraps rather than shrinking: the input, "Save name" and "Remove" cannot all sit beside a face and a name
+   on a 320px phone without one of them going under 44px, and a tap target is the thing that must not give
+   (#414's lesson on the topbar). `min-width` on the input is what makes the wrap happen instead of a 40px
+   box. */
+.p-profs { display: flex; flex-direction: column; gap: 10px; }
+.p-profs-say { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.p-prof-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.p-prof {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px;
+}
+.p-prof-face {
+  flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 50%; background: #0e1330; border: 1px solid var(--line);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--glow, var(--line)) 60%, transparent);
+}
+.p-prof-face img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.p-prof-face .plus { font-size: 20px; color: var(--muted); }
+.p-prof-who { flex: 1 1 8ch; min-width: 0; }
+.p-prof-who b { display: block; overflow-wrap: anywhere; }
+.p-prof-who small { color: var(--muted); font-weight: 600; }
+.p-prof-in {
+  flex: 1 1 9ch; min-width: 9ch; box-sizing: border-box; min-height: 44px; padding: 8px 10px;
+  border-radius: 12px; border: 1px solid var(--line); background: #0e1330; color: #cfd8ff;
+  font: inherit; font-size: 15px;
+}
+.p-prof-wait { flex: 1 1 100%; color: var(--muted); font-size: 12px; font-weight: 600; }
+.p-prof .btn { flex: 0 0 auto; min-height: 44px; padding: 8px 14px; font-size: 14px; }
+.p-prof-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--good); }
+.p-prof-msg.bad { color: var(--bad); }
 
 /* "Start again" — a guarded full reset (#115) */
 /* The dashboard is the one screen under `.overlay` that scrolls taller than one viewport (personal bests,

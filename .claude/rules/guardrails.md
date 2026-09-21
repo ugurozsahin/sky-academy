@@ -1,12 +1,19 @@
 ---
 paths:
   - "tests/unit/guardrails.test.ts"
+  - "tests/unit/governance.test.ts"
+  - "tests/unit/workflows.test.ts"
+  - "tests/unit/scripts.test.ts"
+  - "tests/unit/helpers/sources.ts"
+  - "tests/unit/helpers.test.ts"
   - "scripts/**"
 ---
 
 # Guard rails and scripts (#101)
 
-- `tests/unit/guardrails.test.ts` and the `guard rail:` tests in the e2e spec encode mistakes already made —
+- `tests/unit/guardrails.test.ts` — with `governance.test.ts`, `workflows.test.ts` and `scripts.test.ts`
+  beside it, split out by subject in #321, and the readers all four share in `tests/unit/helpers/sources.ts` —
+  and the `guard rail:` tests in the e2e spec encode mistakes already made:
   render frame rate, screen teardown on a route change, screen-class CSS collisions, `as any` in game logic,
   comparator shuffles, `shadowBlur`, the dependency allowlist, listener pairing; British English lives in
   `british.test.ts`. They are text/DOM checks, not proofs: they catch the exact spellings and the exact
@@ -18,7 +25,7 @@ paths:
 - Adding a rail with each bug fix is part of the fix, not a follow-up.
 - `scripts/` holds operational tooling (screenshots, the single-file bundle, art extraction, the board sync,
   the review-gate check) — read the comment at the top of a script before changing it; several are pinned to
-  specific behaviour by a rail in `tests/unit/guardrails.test.ts` itself.
+  specific behaviour by a rail in `tests/unit/scripts.test.ts` itself.
 - The dependency allowlist rail fails on an unlisted `package.json` dependency — do not add one without a
   reason, and update the allowlist in the same change if the owner has agreed to it.
 - If a rail blocks you and you think it is wrong, say so in the PR — do not weaken or delete it quietly.

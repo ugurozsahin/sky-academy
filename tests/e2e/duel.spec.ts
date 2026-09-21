@@ -192,6 +192,11 @@ test.describe('Ninja Duel', () => {
     // overlay is built, BEFORE the 🎓 button is pressed (#205's rule, the bug being a device where pressing it
     // does nothing). Read from the save, not the overlay: the button would be on screen with nothing recorded.
     await expect(page.locator('.duel-end #cert')).toBeVisible();
+    // ...and the history takes the same match (#415 review, note 3). The loss test below proved a row is
+    // filed with no certificate; this proves the win path files exactly one of each, not two rows or none.
+    const won = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).duels);
+    expect(won, 'a win files one history row, like every other outcome').toHaveLength(1);
+    expect(won[0]).toMatchObject({ winner: 'a', scoreA: 6, scoreB: 4, rounds: 10 });
     const filed = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs);
     expect(filed, 'one entry per year, so a rematch upgrades rather than fills the album').toHaveLength(1);
     expect(filed[0]).toMatchObject({
@@ -872,6 +877,20 @@ test.describe('Ninja Duel', () => {
     // The coins still pay — a duel pays the device per decided round whoever won (#347) — so this test is
     // about the certificate alone and not about a results screen that did nothing.
     await expect(page.locator('.duel-end .coin-gain')).toHaveText('+10 🪙');
+    // ...and the duel history DOES take it (#16, the last piece of item 5). This is the pair to the album
+    // assertion three lines up, and the reason both are here: a loss earns no award but is still a match that
+    // happened, so exactly one of the two writes must fire. A row filed only on a win would make the list
+    // read as a run of victories.
+    const duels = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).duels);
+    expect(duels.length, 'a loss is still a match the history keeps').toBe(1);
+    // The FULL stored shape (#415 round 2, B2): `year` is the title the row prints and `topic` the durable
+    // id it does not, and neither was read back here — so `o.year.title` → `o.year.id` would have shipped
+    // "year1" to a child with the suite green, and swapping `topic` and `title` would have passed too.
+    expect(duels[0]).toMatchObject({ winner: 'b', scoreA: 4, scoreB: 6, rounds: 10, year: 'Year 1' });
+    expect(typeof duels[0].at, 'stamped, so the list can order itself').toBe('number');
+    expect(duels[0].topic, 'the topic id, which survives a rename').toMatch(/^y1-/);
+    expect(duels[0].title, 'and the title a child reads, which does not').toBeTruthy();
+    expect(duels[0].title).not.toBe(duels[0].topic);
   });
 
   test('a finished match moves the day\'s Daily Dojo challenge and pays its bonus into the same save (#16 item 5)', async ({ page }) => {
@@ -904,7 +923,11 @@ test.describe('Ninja Duel', () => {
     // profile, so there is no second child to award. The negative case for the 6–4 test above: no button, no
     // album entry, and nothing for the hook to draw.
     await expect(page.locator('.duel-end #cert')).toHaveCount(0);
-    expect(saved.certs, 'a drawn match files nothing').toEqual([]);
+    expect(saved.certs, 'a drawn match files no certificate').toEqual([]);
+    // But the history still takes it, and this is the only place `winner: 'draw'` is written by the real
+    // screen rather than by a fixture (#415 review, note 3) — the value `duelHistoryLine` renders as "A draw".
+    expect(saved.duels, 'a draw is still a match that happened').toHaveLength(1);
+    expect(saved.duels[0]).toMatchObject({ winner: 'draw', scoreA: 5, scoreB: 5, rounds: 10 });
     expect(await page.evaluate(() => window.__sna.certificate())).toBeNull();
     expect(await page.evaluate(() => window.__sna.certWords()), 'nothing to draw, so no words either').toBeNull();
   });

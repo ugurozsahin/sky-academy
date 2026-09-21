@@ -26,11 +26,14 @@ you have is a unit test; put it in the module's own file and leave this one alon
 Give it one mistake, too. A rail asserting three unrelated things fails as one line and tells the reader
 which of the three only if they go and read it.
 
-## 2. Four homes, and the one place a rail must not go
+## 2. Seven homes, and the one place a rail must not go
 
 | Where | For |
 | --- | --- |
-| `tests/unit/guardrails.test.ts` | text and structure over `src/`, the workflows and the process documents |
+| `tests/unit/guardrails.test.ts` | text and structure over `src/` |
+| `tests/unit/governance.test.ts` | the process documents — `CLAUDE.md`, the prompts under `docs/`, the skills and agents under `.claude/`, and the records a run leaves |
+| `tests/unit/workflows.test.ts` | `.github/workflows/**` and `playwright.config.*` |
+| `tests/unit/scripts.test.ts` | anything that reads or runs `scripts/**` |
 | `tests/e2e/game.spec.ts`, named `guard rail: …` | anything needing a browser — frame rate, CSS, screen teardown |
 | `tests/unit/british.test.ts` | game wording (#47) |
 | a job in `.github/workflows/ci.yml` | what is not in the tree the tests read — the head branch name (#160) |

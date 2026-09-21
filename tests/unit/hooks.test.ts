@@ -710,6 +710,33 @@ describe('layer-0 hooks: what each rule denies and allows', () => {
     expect(() => { (REQUIRED_LINES as { key: string }[])[0].key = '- x.*:'; }).toThrow();
   });
 
+  /**
+   * #327 gave the reviewer routine a pulse of its own, and the two pulses share exactly one rule. Replace
+   * never append is the same discipline for any pulse (#98), so `heartbeatAppend` covers both. The two
+   * mandatory lines are not: `- second item:` is a developer concept (#97) and `- query top pick:` names a
+   * query a reviewer never runs, so demanding them of a reviewer pulse would refuse every write it makes.
+   *
+   * Matching on title is what makes that separation free rather than a second copy of the rule.
+   *
+   * Prove it red: drop `REVIEWER_HEARTBEAT_TITLE` from the list `pulseWrite` walks, or route the reviewer
+   * pulse through `heartbeatWrite`.
+   */
+  it('#327: the reviewer pulse inherits replace-never-append, and nothing else', () => {
+    const appended = '2026-09-21T01:00Z \u2014 reviewed #393\n2026-09-21T02:00Z \u2014 reviewed #394';
+    for (const title of ['reviewer: heartbeat', 'Reviewer: Heartbeat', 'reviewer: heartbeat '])
+      expect(isDeny(asDeny(githubCheck({ method: 'update', issue_number: 4242, title, body: appended }))), title).toBe(true);
+    expect(isDeny(asDeny(githubCheck({ method: 'create', title: 'reviewer: heartbeat', body: appended }))),
+      'the create that establishes the pulse is not exempt either').toBe(true);
+    // …and the developer-only lines are not demanded of it, or every reviewer write is refused.
+    for (const body of ['2026-09-21T01:00Z \u2014 IN PROGRESS: reviewing #393',
+                        '2026-09-21T01:00Z \u2014 nothing waiting',
+                        '2026-09-21T01:00Z \u2014 stopped: limit'])
+      expect(isDeny(asDeny(githubCheck({ method: 'update', issue_number: 4242, title: 'reviewer: heartbeat', body }))), body).toBe(false);
+    // The developer pulse keeps both obligations, so the separation is real rather than a blanket loosening.
+    expect(isDeny(asDeny(githubCheck({ method: 'update', issue_number: 62, body: '2026-09-21T01:00Z \u2014 IN PROGRESS: x' }))),
+      'the developer pulse still carries its two lines').toBe(true);
+  });
+
   it('frozen-label hook: denies an issue_write update whose labels include `frozen`', () => {
     expect(isDeny(runLabelsHook({ method: 'update', issue_number: 5, labels: ['frozen', 'priority:P1'] }))).toBe(true);
   });

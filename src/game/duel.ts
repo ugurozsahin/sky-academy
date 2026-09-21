@@ -3,6 +3,9 @@
 import type { Difficulty, Question, Topic } from '../curriculum';
 import { starsForAccuracy } from './session';
 import type { DojoEvent } from './dojo';
+// Type-only, so it erases at compile time and adds no runtime edge — the same shape `game/parents.ts` and
+// `game/sensei.ts` already use to name a stored type without depending on the store.
+import type { StoredDuel } from '../storage';
 
 export type DuelPlayer = 'a' | 'b';
 export const DUEL_ROUNDS = 10;
@@ -283,4 +286,30 @@ export const duelEarnsCertificate = (r: DuelResult): boolean => r.winner === 'a'
 /** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
 export function duelHeadline(r: DuelResult): string {
   return r.winner === 'draw' ? `It's a draw — ${r.scoreA} all!` : `Player ${r.winner === 'a' ? 1 : 2} wins ${Math.max(r.scoreA, r.scoreB)}–${Math.min(r.scoreA, r.scoreB)}!`;
+}
+
+/**
+ * How a past match reads in the duel history (#16, the last piece of item 5). One row is `Player 1 won` /
+ * `Player 2 won` / `A draw`, and the scoreline **in seat order, never sorted** — `scoreA–scoreB`, Player 1
+ * first, whoever won.
+ *
+ * That is the one thing this does not share with `duelHeadline()` above, and the difference is the point.
+ * A headline is read out at the end of one match, so `Math.max`/`Math.min` says "4–1 to the winner" and the
+ * children know which of them that was. A row in a list of twenty is read *down a column*: a scoreline sorted
+ * by winner puts Player 1's score in the left column in some rows and the right column in others, so "am I
+ * getting better?" cannot be answered by looking. Seat order costs nothing here, because the row already
+ * names the winner in words.
+ *
+ * Takes a whole `StoredDuel`, because a row in the history is exactly what the save holds — and because
+ * the narrower shapes do not buy what this paragraph is here to claim. It has now been wrong twice, so the
+ * claim is pinned by a compiler probe rather than by this sentence (#415 review rounds 1 and 2): the
+ * structural `{ winner; scoreA; scoreB }` admitted `DuelResult`, and so did
+ * `Pick<StoredDuel, 'winner' | 'scoreA' | 'scoreB'>` — naming `topic` as the discriminator while leaving it
+ * out of the `Pick`. `StoredDuel` requires `at`, `topic`, `title` and `year`, none of which a
+ * `DuelResult` has, so passing the live result is now a type error; `tests/unit/storage.test.ts` holds that
+ * with a `@ts-expect-error` that fails the build if it ever stops being one.
+ */
+export function duelHistoryLine(d: StoredDuel): string {
+  const who = d.winner === 'draw' ? 'A draw' : `Player ${d.winner === 'a' ? 1 : 2} won`;
+  return `${who} · ${d.scoreA}–${d.scoreB}`;
 }
