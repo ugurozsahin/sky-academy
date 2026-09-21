@@ -267,7 +267,7 @@ test.describe('Ninja Duel', () => {
     // A phone turned sideways lands in the `max-height: 640px` band, where the shared `.hint` rule is
     // `display: none` to buy the play screen room. The duel card cannot take that: the line IS the question
     // there. Pinned in both projects, because neither project's own viewport is in the band.
-    await page.setViewportSize({ width: 844, height: 390 });
+    await resizeTo(page, { width: 844, height: 390 });   // through the helper: a bare resize reads the old layout
     const landscape = await page.evaluate(() => {
       const el = document.querySelector('#hint') as HTMLElement;
       return { h: el.getBoundingClientRect().height, dom: el.textContent, display: getComputedStyle(el).display };
@@ -275,6 +275,289 @@ test.describe('Ninja Duel', () => {
     expect(landscape.display, 'the duel hint survives the short-screen rule').not.toBe('none');
     expect(landscape.h, 'a landscape phone still shows the line the round is decided by').toBeGreaterThan(0);
     expect(landscape.dom).not.toBe('');
+  });
+
+  /**
+   * Resize, then wait for the app to have taken the new height. `.play` is sized from `--vh`, which `src/main.ts`
+   * sets from a `resize` listener, so a `getBoundingClientRect()` straight after `setViewportSize` reports the
+   * PREVIOUS viewport's layout — which is how this rail first went green on a bar that was eating 177px.
+   * The width is waited on as well: the interesting pair here is 844 against 1600 at the same height, and a
+   * height-only predicate is satisfied instantly by the stale layout that the helper exists to rule out.
+   */
+  async function resizeTo(page: Page, vp: { width: number; height: number }) {
+    await page.setViewportSize(vp);
+    // `want` is the serialised argument, deliberately not the closed-over `vp`: a predicate that reads the outer
+    // variable resolves it in Node, never in the page, and waits on nothing. tsc accepts both.
+    await page.waitForFunction(want => {
+      const vh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--vh'));
+      const box = document.querySelector('.duel-screen')!.getBoundingClientRect();
+      return window.innerWidth === want.width && Math.abs(vh * 100 - want.height) < 2 && Math.abs(box.height - want.height) < 2;
+    }, vp);
+  }
+
+  /** Where each piece of the duel screen actually sits, in viewport pixels. */
+  const boxes = (page: Page) => page.evaluate(() => {
+    const box = (s: string) => {
+      const r = document.querySelector(s)!.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, cx: r.x + r.width / 2 };
+    };
+    // A measured box for the nudge too, not `getComputedStyle().display`: `visibility: hidden`, `display:
+    // contents` or a typo all pass a `.not.toBe('none')`, and an unmeasured element is not on screen.
+    return {
+      a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'),
+      prompt: box('#prompt'), vis: box('#vis'), canvasA: box('#arena-a'), canvasB: box('#arena-b'),
+    };
+  });
+
+  /**
+   * What a question can put in the card, keyed by the class that SIZES it in `style.css` — plus one deliberately
+   * taller than anything the pool holds. The duel draws its topic with `Math.random()`, so measuring whatever
+   * round 1 happens to deal is a sample of one: the first version of this rail quoted a 62–106px bar from six
+   * such samples and missed `y1-time`, whose fixed 120px `.clock` made it 165px. Overwriting `#vis` makes the
+   * worst case reachable on demand, and the absurd row is what makes the bound structural rather than
+   * "big enough for a clock" — an unbounded visual once left the arenas at ZERO height.
+   */
+  const VISUALS: Record<string, string> = {
+    'no visual': '',
+    'clock (120px, the pool\'s tallest)': '<div class="vis"><svg viewBox="0 0 100 100" class="clock"><circle cx="50" cy="50" r="47" class="face"/></svg></div>',
+    'frac (110px)': '<div class="vis"><svg viewBox="0 0 100 100" class="frac"><path d="M0 0H100V100H0Z"/></svg></div>',
+    'dots (100px)': '<div class="vis"><svg viewBox="0 0 120 80" class="dots"><circle cx="20" cy="20" r="9"/></svg></div>',
+    'two ten-frames': `<div class="vis">${'<div class="tenframe">' + '<i></i>'.repeat(10) + '</div>'}</div>`,
+    // The tallest thing in the pool that REFLOWS rather than being a fixed box: twelve objects to count, three
+    // rows of five. It is the case the `--slot` floor exists for, so it is deliberately not scaled — see the
+    // `.vis.objs` rule. Three rows is what `fiveFrames(12)` produces.
+    'twelve objects to count (three rows)': `<div class="vis objs"><div class="grp">${[5, 5, 2].map(n => `<span class="five">${Array.from({ length: 5 }, (_, i) => `<span class="slot">${i < n ? '<span class="obj">⭐</span>' : ''}</span>`).join('')}</span>`).join('')}</div></div>`,
+    // A number line with two-digit labels and the hidden tick rightmost: `lineQ` picks the last tick about one
+    // round in five, and this is the card that `overflow: hidden` cut the `?` off at 320px wide (24px of it; 4px
+    // at 360px). It is here for its WIDTH, where every other fixture is here for its height.
+    'number line, hidden tick rightmost': `<div class="vis"><div class="nline">${[10, 12, 14, 16, 18, 20].map((n, i) => `<span class="${i === 5 ? 'mark' : ''}">${i === 5 ? '?' : n}</span>`).join('')}</div></div>`,
+  };
+  /**
+   * Deliberately taller than anything the pool can build. Its claim is the OPPOSITE of the fixtures above: here
+   * the budget is supposed to clip, because the alternative is what it replaced — an unbounded visual taking the
+   * whole screen and leaving the arenas 11px tall. So it is checked for the bound and never for clipping, and it
+   * is kept separate rather than special-cased inside the loop, so neither claim can quietly be applied to the
+   * other.
+   */
+  const ABSURD = '<div class="vis"><div style="width:120px;height:600px"></div></div>';
+  /**
+   * Dress the card with `html` and the longest prompt and hint the year-1 duel pool can actually produce, then
+   * measure it — **in one `evaluate`**. One round trip is the point: a round can end between two of them,
+   * `onQuestion` rewrites `#prompt`, `#vis` and `#hint`, and the measurement is then of the real question rather
+   * than the dressed worst case — which reports GREEN, because a real question is smaller. That cost a red CI on
+   * the full mobile suite while passing eight repeats in isolation, and this file already names the same hazard at
+   * the `#hint` rail above: read the DOM and the state in ONE evaluate.
+   *
+   * The strings are 33 and 49 characters, from `y1-months` and `y1-length`, found by generating 200 questions for
+   * each of the pool's 28 topics. Real strings, not invented ones: a hint half again as long as anything the pool
+   * holds would cap the layout against a case no child ever sees. The text matters as much as the visual — in a
+   * ROW the card wraps, and a long prompt with a long hint is another 20px of bar.
+   */
+  /**
+   * The budget must BOUND the bar without cutting the answer off, on either axis — asserted in both orientations,
+   * because the first version of this only ran in landscape and only at viewports where nothing clipped.
+   */
+  function expectNothingClipped(m: { clipY: number; overflowX: string; markPainted: boolean }, where: string) {
+    // Vertical: a cropped row of objects is a WRONG COUNT, not merely a small one — `y2-fractions` draws twelve
+    // stars, and half a bottom row turns "1/4 of 12" into a card that reads as ten.
+    expect(m.clipY, `${where}: the budget bounds the visual without cutting it off`).toBeLessThanOrEqual(0.5);
+    // Horizontal: `overflow: hidden` clips x too, and it cut the `?` clean off a number line at 320px wide —
+    // where the prompt is "Which number is hidden?". `overflow-y: clip` bounds y and leaves x alone; beside
+    // `hidden`, `overflow-x: visible` would compute to `auto` and make a scroll container instead.
+    expect(m.overflowX, `${where}: the budget does not clip the horizontal axis`).toBe('visible');
+    expect(m.markPainted, `${where}: the '?' the question asks about is painted, not clipped away`).toBe(true);
+  }
+
+  const dressAndMeasure = (page: Page, html: string) => page.evaluate(h => {
+    document.querySelector('#vis')!.innerHTML = h;
+    document.querySelector('#prompt')!.textContent = 'Which day comes before Wednesday?';
+    document.querySelector('#hint')!.textContent = 'yellow sunflower: 14 cm · purple sunflower: 10 cm';
+    const box = (sel: string) => {
+      const r = document.querySelector(sel)!.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, cx: r.x + r.width / 2 };
+    };
+    const wrap = document.querySelector('#vis') as HTMLElement;
+    const cs = getComputedStyle(wrap);
+    // Whether the budget CLIPS, measured off the box's own content rather than a list of class names. The first
+    // version counted `.five, .tenframe` overflowing — two of the thirteen visual types a duel can draw — so it
+    // scored 0 while three elements hung over the edge, and `--duel-vis: 1px`, which crops every visual in the
+    // pool, passed every rail in this file. `scrollHeight` against `clientHeight` is type-agnostic and cannot
+    // drift from what the app renders.
+    // Is the `?` tick — the thing the question asks about — actually painted where it sits? `overflow: hidden`
+    // clips x as well as y, and it cut this clean off at 320px wide. Sampling the MARK rather than the widest
+    // descendant on purpose: at 320px a two-digit number line is simply wider than the phone, so the container's
+    // own outer edge runs past the viewport whatever the budget does, and asserting on that would fail for a
+    // reason this stylesheet did not cause and cannot fix.
+    const mark = wrap.querySelector('.mark');
+    const mr = mark?.getBoundingClientRect();
+    // Its CENTRE, not two pixels inside its right edge: the edge sample reads whatever overlaps the card there,
+    // which is the same on `main` as here and so is not this diff's business. The centre discriminates exactly
+    // the regression — `overflow: hidden` left it unpainted at 320px, `overflow-y: clip` paints it.
+    const markPainted = !mr || (() => {
+      const hit = document.elementFromPoint(mr.x + mr.width / 2, mr.y + mr.height / 2);
+      return !!hit && (hit === mark || hit.closest('.mark') === mark);
+    })();
+    return {
+      a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'),
+      prompt: box('#prompt'), vis: box('#vis'), canvasA: box('#arena-a'), canvasB: box('#arena-b'),
+      // All measured here, in the same tick, for the same reason the boxes are.
+      clipY: wrap.scrollHeight - wrap.clientHeight,
+      overflowX: cs.overflowX,
+      markPainted,
+    };
+  }, html);
+
+  test('sideways, the duel splits left and right with the question centred over the divider (#388)', async ({ page }) => {
+    await startDuel(page);
+    // The layout the owner and child could not play was two stacked halves: each arena had half the height, and
+    // `layoutWave` spends a bubble radius twice over out of it, so the flight was ~270px on a phone. Pinned in
+    // both projects at a phone on its side, a tablet, and a screen wider than two capped arenas.
+    for (const vp of [{ width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {
+      await resizeTo(page, vp);
+      const L = await boxes(page);
+      expect(L.a.right, `${vp.width}px: Player 1 ends where Player 2 begins`).toBeLessThanOrEqual(L.b.x + 1);
+      expect(Math.abs(L.a.y - L.b.y), `${vp.width}px: neither player is above the other`).toBeLessThan(2);
+      expect(Math.abs(L.a.w - L.b.w), `${vp.width}px: the two halves are the same width`).toBeLessThan(2);
+      expect(L.strip.bottom, `${vp.width}px: the question is a bar across the top, not a strip between them`).toBeLessThanOrEqual(L.a.y + 1);
+      // The reason `--arena-w` had to move off the half and onto the pair: past two capped arenas a capped HALF
+      // would leave the card floating over the gap between them instead of over the line where they meet.
+      expect(Math.abs(L.strip.cx - L.a.right), `${vp.width}px: the card is centred over the divider`).toBeLessThan(2);
+      // An exact width, not `<= 601`: at 844 the cap does not bind, so an upper bound there is met whether or not
+      // the cap exists and its message would be a lie. Half the screen, or `--arena-w`, whichever is smaller.
+      expect(Math.round(L.a.w), `${vp.width}px: a half is half the screen, capped at --arena-w`).toBe(Math.min(vp.width / 2, 600));
+      expect(L.rotate.h, `${vp.width}px: nothing asks a player to turn a screen that is already sideways`).toBe(0);
+    }
+  });
+
+  test('sideways, no question can take the height the split just won, whatever it puts on the card (#388)', async ({ page }) => {
+    await startDuel(page);
+    // The bar has to be BOUNDED, not merely short on the question that came up. Before the cap: a clock question
+    // took 165px of a 390px screen (42%) and handed each child 193px — worse than the 213px that made the stacked
+    // layout unplayable — and a visual taller than the pool holds took the whole screen, leaving the arenas at 0.
+    for (const vp of [{ width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {
+      await resizeTo(page, vp);
+      for (const [what, html] of [...Object.entries(VISUALS), ['taller than anything in the pool', ABSURD] as const]) {
+        const L = await dressAndMeasure(page, html);
+        const where = `${vp.width}x${vp.height}, ${what}`;
+        // The measured worst case is a clock question carrying the pool's longest prompt AND hint at 844x390:
+        // 141px of bar, 249px of arena — 36% and 64%. The thresholds sit clear of that rather than hugging it,
+        // deliberately: text metrics differ between here and CI (no Fredoka there), so a bound 7px off the
+        // measurement is a rail that goes red on the runner and not on the desk. Loose enough to survive that,
+        // tight enough to still catch both regressions it exists for — deleting the visual budget takes the bar
+        // to 439px, deleting the row rules to 190px, and each fails here with room to spare.
+        // The two are deliberate complements — the bar may take at most 45%, each arena keeps at least 55%.
+        expect(L.strip.h, `${where}: the question bar stays inside the share of the height budgeted for it`).toBeLessThanOrEqual(vp.height * 0.45);
+        expect(L.a.h, `${where}: each half keeps the height a stacked half gave away`).toBeGreaterThan(vp.height * 0.55);
+        expect(Math.abs(L.a.h - L.b.h), `${where}: both children get the same height`).toBeLessThan(2);
+        // The two CANVASES, to the subpixel — the guard #389's issue asked for, because `layoutWave` derives `r`,
+        // `g` and `vx` from geometry, so unequal boxes make the halves produce different arcs from one shared
+        // seed and the fairness fix fails silently. A 1px divider BORDER on half B did exactly that (border-box
+        // takes it out of Player 2's canvas and not Player 1's) and broke #389's rail; the divider is drawn with
+        // a pseudo-element now. The 2px tolerance above is far too loose to have caught it.
+        expect(Math.abs(L.canvasA.h - L.canvasB.h), `${where}: both arenas are the same height, to the subpixel`).toBeLessThan(0.5);
+        expect(Math.abs(L.canvasA.w - L.canvasB.w), `${where}: both arenas are the same width, to the subpixel`).toBeLessThan(0.5);
+        if (!html) continue;
+        // The visual is scaled to fit the budget rather than the bar growing to fit the visual, so it is still on
+        // screen — a bound that worked by hiding the picture would fail the question instead of the layout.
+        // `L.vis.h`, not `L.strip.h`: the strip clears 40px on the prompt's own line box alone, so the old form
+        // would have passed with `#vis` removed from the DOM entirely and its label would have been a lie.
+        // > 5, not > 20: a number line is a short, wide visual (14.5px sideways) and a threshold tuned to the
+        // tall ones would fail it. What this catches is the visual being gone altogether.
+        expect(L.vis.h, `${where}: the visual is scaled into the bar, not dropped out of it`).toBeGreaterThan(5);
+        // The bound applies to everything; "nothing is cut off" applies to what the pool can actually draw.
+        if (html !== ABSURD) expectNothingClipped(L, where);
+        // No assertion here that the prompt and the visual share a LINE. One was written and removed: whether the
+        // row fits on one line depends on text metrics, Fredoka is fetched from Google Fonts, and CI has no
+        // network — so `dots` wrapped there and not locally, 46px against 42px. That is the same
+        // environment-sensitive rail the review blocked round 1 for, just with a different cause. Losing the row
+        // is caught by the bar cap above instead, and caught properly: deleting the two rules that make it takes
+        // the bar to 190px against this cap.
+      }
+    }
+  });
+
+  test('guard rail: nothing the screen floats over the arenas swallows a slice (#388)', async ({ page }) => {
+    await startDuel(page);
+    // The one rail here that uses REAL pointer input. Every other slice in this file goes through `window.__sna`,
+    // which calls into the Arena directly and so cannot see anything sitting on top of the canvas. Floating the
+    // toast to buy back 32px of arena put it OVER both halves at `z-index: 3`, and because it fades with
+    // `opacity: 0` rather than `display: none` it stays there, full size, for the rest of the match: an invisible
+    // 296x43 box across the bottom of both arenas in which a slice did nothing at all — no miss, no swish, no
+    // feedback. Sideways it straddles the divider, so it took the same bite out of each player.
+    await resizeTo(page, { width: 844, height: 390 });
+    const dead = await page.evaluate(() => {
+      // Make the toast carry text and stay up, exactly as a round announcement leaves it.
+      const t = document.querySelector('.toast') as HTMLElement;
+      t.textContent = 'Player 1 takes the round!';
+      t.classList.add('show', 'good');
+      const r = t.getBoundingClientRect();
+      const hits: Record<string, number> = { a: 0, b: 0 };
+      for (const p of ['a', 'b']) {
+        document.querySelector(`#arena-${p}`)!.addEventListener('pointerdown', () => { hits[p]++; }, true);
+      }
+      (window as unknown as { __hits: Record<string, number> }).__hits = hits;
+      return {
+        w: r.width, h: r.height, cx: r.x + r.width / 2, cy: r.y + r.height / 2,
+        // The toast really is over an arena, so this case is not vacuous.
+        overA: r.bottom > document.querySelector('#arena-a')!.getBoundingClientRect().top,
+      };
+    });
+    expect(dead.w, 'the toast is laid out, so there is something to swallow a slice').toBeGreaterThan(0);
+    expect(dead.overA, 'the toast overlaps an arena, so this case is not vacuous').toBe(true);
+    // What a child's hand does: an upward swipe begun in the arena's bottom inner corner.
+    await page.mouse.move(dead.cx - 60, dead.cy);
+    await page.mouse.down();
+    await page.mouse.move(dead.cx - 40, dead.cy - 30, { steps: 4 });
+    await page.mouse.up();
+    const hits = await page.evaluate(() => (window as unknown as { __hits: Record<string, number> }).__hits);
+    expect(hits.a + hits.b, 'a slice begun under the faded toast still reaches an arena').toBeGreaterThan(0);
+    // And the element actually under that point is the canvas, not the thing floating over it.
+    const at = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      return el ? el.tagName : 'null';
+    }, [dead.cx, dead.cy]);
+    expect(at, 'the arena is what is under the toast, not the toast').toBe('CANVAS');
+  });
+
+  test('portrait keeps the stacked duel as a fallback, and asks for a sideways screen (#388)', async ({ page }) => {
+    await startDuel(page);
+    // A rotate GATE was rejected: a tablet with its orientation locked would lose the mode outright. So portrait
+    // still plays, stacked as before — Player 2 on top, the card between, Player 1 on the bottom.
+    //
+    // Three portrait sizes, not one. The first version of this test ran at 390x844 alone, which is the ONE
+    // portrait width where `--slot` is 28px and nothing clips: `clamp(22px, min(7.2vw, 5vh), 40px)` reaches its
+    // 40px maximum past ~556px wide, so twelve stars are 152px on every tablet in portrait and the old 132px
+    // budget cut the bottom row in half there. 320px is the other end — narrow enough that a number line
+    // overflows the card, which is the horizontal clip. No project in `playwright.config.ts` runs this file at
+    // either size (`tablet` is `testMatch: /viewport\.spec\.ts/`), so the fixtures were unreachable by
+    // construction and the rail could not have failed however wrong the CSS was.
+    for (const vp of [{ width: 390, height: 844 }, { width: 800, height: 1280 }, { width: 320, height: 568 }]) {
+      await resizeTo(page, vp);
+      for (const [what, html] of [...Object.entries(VISUALS), ['taller than anything in the pool', ABSURD] as const]) {
+        const P = await dressAndMeasure(page, html);
+        const where = `${vp.width}x${vp.height}, ${what}`;
+        expect(P.b.bottom, `${where}: Player 2 keeps the top half`).toBeLessThanOrEqual(P.strip.y + 1);
+        expect(P.strip.bottom, `${where}: Player 1 keeps the bottom half, the card between them`).toBeLessThanOrEqual(P.a.y + 1);
+        expect(Math.abs(P.a.x - P.b.x), `${where}: the halves are stacked, not side by side`).toBeLessThan(2);
+        expect(P.rotate.h, `${where}: portrait tells the players there is a better way round`).toBeGreaterThan(0);
+        expect(Math.abs(P.canvasA.h - P.canvasB.h), `${where}: both arenas are the same height, to the subpixel`).toBeLessThan(0.5);
+        expect(Math.abs(P.canvasA.w - P.canvasB.w), `${where}: both arenas are the same width, to the subpixel`).toBeLessThan(0.5);
+        // Asserted here, not merely measured. The previous version computed a crop count in portrait and then
+        // never looked at it, which is how a budget that cut every tablet's counting card shipped green.
+        if (html !== ABSURD) expectNothingClipped(P, where);
+      }
+      // The fallback's floor, once per viewport on the tallest card the pool can draw.
+      //
+      // 24%, measured rather than chosen, and it is a LOW bar on purpose. On the twelve-star card each arena is
+      // 144px at 320x568, 180px at 360x640, 268.9px at 390x844 and 467.8px at 800x1280 — and on `main` the same
+      // card gives 142.5 / 178.5 / 267.4 / 461.3, so this branch is ahead at every one of them: floating the
+      // toast gives back more than the nudge line costs. Portrait on a small phone is cramped on `main` too,
+      // which is exactly why #388 calls this layout the fallback and not the design. So the floor is set to catch
+      // the card GROWING — the failure this pull request could plausibly cause — not to assert that a 320px phone
+      // in portrait is a good place to duel, which it is not.
+      const P = await dressAndMeasure(page, VISUALS['twelve objects to count (three rows)']);
+      expect(P.a.h, `${vp.width}x${vp.height}: the portrait fallback keeps a floor under each arena`).toBeGreaterThan(vp.height * 0.24);
+    }
   });
 
   test('a duel is played on a bubble topic of the island, a round nobody slices is a draw, and pause holds both arenas', async ({ page }) => {
