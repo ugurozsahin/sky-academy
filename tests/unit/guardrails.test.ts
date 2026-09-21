@@ -1158,6 +1158,43 @@ describe('guard rails', () => {
       .toMatch(/await expectFitsViewport\(/);
   });
 
+  // #483: Playwright's default parallelises across FILES only — the tests inside one file are a single
+  // sequential chain on one worker. 97 of the mobile project's 104 tests live in tests/e2e/game.spec.ts, so
+  // with the flag off the e2e step is as long as that one chain however many workers the runner offers, and
+  // the rest idle: CI run 35640634022 paid 416 s of a 488 s job while worker 2 sat done after 57 s.
+  // This is worth a rail because turning it back off breaks NOTHING that goes red. The suite still passes,
+  // just three times slower, and a regression whose only symptom is a bill is one nobody files.
+  // Three ways it decays, all three covered:
+  //   - the flag is deleted, commented out, or set to false;
+  //   - the flag is moved INSIDE a project, where it governs that project alone while every other project
+  //     quietly returns to the file-serial default — so it is located in the slice ABOVE `projects:`;
+  //   - a spec file puts itself back to serial with `test.describe.configure({ mode: 'serial' })`, which
+  //     undoes the flag for that file without touching the config at all. game.spec.ts IS the file this
+  //     issue is about, so one line at its top would restore the whole defect with the config still honest.
+  // Read through `code()`: the paragraph in playwright.config.ts explaining the flag names it repeatedly,
+  // and a rail satisfied by the prose that describes the rule is the #129 failure.
+  it('the e2e suite parallelises inside a file, not only across files (#483)', () => {
+    const cfg = code(readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8'));
+    const split = cfg.indexOf('projects:');
+    expect(split, 'playwright.config.ts must be read from disk and still declare projects').toBeGreaterThan(0);
+    const top = cfg.slice(cfg.indexOf('defineConfig('), split);
+    expect(top.length, 'the slice above `projects:` must be the real top level of defineConfig').toBeGreaterThan(100);
+    expect(top, 'fullyParallel must be true at the TOP level of defineConfig — inside a project it governs that one project and the file-serial default returns for the others (#483)')
+      .toMatch(/fullyParallel:\s*true/);
+    expect(cfg.slice(split), 'no project may turn fullyParallel back off — that is the same 416 s step under a config that still reads as fixed (#483)')
+      .not.toMatch(/fullyParallel:\s*false/);
+    // The config is only half of it: `mode: 'serial'` in a spec re-serialises that file from the inside.
+    // If a future flow genuinely needs ordering, scope it to its own `describe` and name it here with the
+    // reason — what must never happen silently is game.spec.ts, the 97-test file, going serial again.
+    const specs = readdirSync(new URL('../../tests/e2e/', import.meta.url))
+      .filter(f => f.endsWith('.spec.ts'));
+    expect(specs.length, 'the e2e specs must be read from disk').toBeGreaterThanOrEqual(3);
+    const serial = specs.filter(f =>
+      /mode:\s*'serial'|describe\.serial/.test(code(readFileSync(new URL(`../../tests/e2e/${f}`, import.meta.url), 'utf8'))));
+    expect(serial, 'no e2e spec may re-serialise itself — that undoes #483 for that file with the config untouched')
+      .toEqual([]);
+  });
+
   // #138: fast mode (#32) is only sound while it is a *pure time compression* — the same game, fewer seconds.
   // It shipped with two leaks. `layoutWave` divided the flight time but left `vx` in px/second, so at 4x a
   // bubble drifted a quarter as far sideways as a child ever sees; and a handful of `later(...)` beats in

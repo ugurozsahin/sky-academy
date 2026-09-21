@@ -30,6 +30,22 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
   retries: 0,   // #32: the suite now runs at 4× (tests/e2e set window.__SNA_FAST), so a flake is a real race to fix, not to silently retry
+  // #483. Playwright's default parallelises across FILES only: the tests inside one file are a single
+  // sequential chain on one worker. 97 of this project's 104 mobile tests live in tests/e2e/game.spec.ts, so
+  // the whole e2e step was as long as that one chain no matter how many workers the runner offered — CI's
+  // second worker finished duel.spec.ts inside the first minute and then idled for about six.
+  // Measured on run 35640634022: e2e 416 s of a 488 s job, `Running 107 tests using 2 workers`, and
+  // game.spec.ts alone ~93 % of the test seconds. Measured on the owner's Mac at c48fbee, --project=mobile:
+  // today's config 200 s at 23 % worker utilisation; with this flag 124 s at 2 workers (98 %) and 107 s at 4.
+  // The sum of test durations barely moved (226 s -> 243 s at 2 workers), which is the whole point: the time
+  // was going to an IDLE worker, not to contention.
+  // `workers` is deliberately left at Playwright's default (half the logical cores) — the numbers above are
+  // what the runner already picks, and raising it is a separate decision to be measured on a runner.
+  // What this costs: two tests now share a CPU, so a test whose assertion depends on real wall-clock pacing
+  // can expose a race it used to hide (the frame counters below game.spec.ts:1184 and :1325, the 400 ms
+  // flight sampling at :890). With `retries: 0` (#32) that surfaces as a red build, which is the intent —
+  // a flake here is a race to fix, and the alternative is a green tick that means less.
+  fullyParallel: true,
   reporter: [['list']],
   use: { baseURL, trace: 'retain-on-failure', launchOptions: executablePath ? { executablePath } : {} },
   webServer: { command: `npx vite preview --port ${port} --strictPort`, url: baseURL, reuseExistingServer: true, timeout: 30_000 },
