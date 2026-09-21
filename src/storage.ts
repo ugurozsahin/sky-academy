@@ -26,8 +26,31 @@ export interface StoredCert {
   duel?: boolean;         // won a Ninja Duel rather than a mission (#16 item 5) — see certKind() for why it is a
                           // second optional flag and not a `kind` union: `training` is already on disk.
 }
+/**
+ * One finished Ninja Duel, kept so the match outlives its results overlay (#16 item 5, the last open piece).
+ * Same reasoning as `StoredCert` above — data, not a picture — and for the same reason: until now a duel
+ * existed only while the overlay was open, so "who won last time" was a thing the two children had to
+ * remember between them.
+ *
+ * **A duel has no owner, so this record has no `name` or `avatar`.** Two children share one profile
+ * (`duelAccuracy()` in `game/duel.ts` has the whole of why), and the seats are `Player 1`/`Player 2` on the
+ * screen itself — attaching the profile's child to a row would claim the save knows which seat they sat in,
+ * which the save cannot support. The certificate a Player 1 win files *does* carry the profile's name and
+ * avatar (`certToStored`, three lines above `recordDuel` in `ui/duel.ts`) — that is not an inconsistency:
+ * `duelEarnsCertificate` awards it only to seat A, the seat `DUEL_HANDOVER` keeps for the profile's child,
+ * so there the owner is known. A history row is filed for every outcome, including the ones seat B won, so
+ * here it is not.
+ */
+export interface StoredDuel {
+  at: number;             // epoch ms the match finished; the list's order and its only identity (see `fileDuel`)
+  topic: string;          // topic id the match was played on
+  title: string;          // topic title as the duel screen showed it ("Number bonds")
+  year: string;           // year *title* ("Year 1"), matching `StoredCert.year` — the id is not shown
+  winner: 'a' | 'b' | 'draw';
+  scoreA: number; scoreB: number; rounds: number;
+}
 export interface SaveData {
-  v: 3;
+  v: 4;
   name: string;
   avatar: string | null;
   year: YearId;
@@ -50,10 +73,11 @@ export interface SaveData {
   equipped: Partial<Record<ItemKind, string>>;   // equipped item per kind (missing = the free default)
   certs: StoredCert[];               // certificates earned, most recently filed first (#205)
   onboarded: boolean;                // the first-run wizard (#67) has been completed or skipped past
+  duels: StoredDuel[];               // Ninja Duels played, most recent first (#16)
 }
-export const SAVE_VERSION = 3 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
+export const SAVE_VERSION = 4 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
 const KEY = 'sna:v1';                       // stable localStorage slot (its `v1` is historical; `raw.v` drives migration)
-const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [], onboarded: false };
+const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [], onboarded: false, duels: [] };
 
 /* ─── Profiles: siblings on one device (#20 slice 1 — storage only, no UI) ──────────────────────────────────
  *
@@ -635,6 +659,14 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
     ...s,
     onboarded: onboardedOf(s),      // the rule itself lives by `profileCard`, which has to give the same answer
   }),
+  // v3 → v4: #16's duel history. `duels` is *filtered* rather than normalised, for the same reason `certs` is
+  // in the v1 → v2 step above: its job is to drop anything that is not a match record, and a save written
+  // before this step has no honest duel history to preserve — the matches those children played were never
+  // stored, so an empty list is the truthful answer rather than a loss.
+  3: s => ({
+    ...s,
+    duels: Array.isArray(s.duels) ? s.duels.filter(isDuel) : [],
+  }),
 };
 
 /**
@@ -951,6 +983,45 @@ export function certificates(): StoredCert[] { const c = load().certs; return Ar
 export function recordCert(c: StoredCert): StoredCert[] {
   const certs = fileCert(certificates(), c);
   save({ certs }); return certs;
+}
+/**
+ * Duel history cap (#16). Deliberately far smaller than `CERT_CAP`: a certificate is a *reward*, one per
+ * mission and kept for good, while a duel is an afternoon's play — two children can finish ten matches in
+ * half an hour, and a list that keeps all of them is a list nobody scrolls. Twenty is "the last few
+ * sessions", and the oldest fall off the end.
+ */
+export const DUEL_CAP = 20;
+/**
+ * Every field a duel row is read through, checked — the same bar `isCert` is held to, and for the reason its
+ * comment gives: a half-checked entry is worse than an unchecked one, because the junk it lets through then
+ * gets compared, formatted and drawn as if it were real. `winner` is checked against the three values the
+ * screen knows, because `duelHistoryLine()` branches on it and an unknown fourth would render as a match
+ * nobody won. The two scores and `rounds` must be finite — `Infinity` from a hand-edited save formats as
+ * "Infinity–0" in a row a child reads.
+ */
+const isDuel = (d: unknown): d is StoredDuel => {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
+  const x = d as Record<string, unknown>;
+  return typeof x.topic === 'string' && typeof x.title === 'string' && typeof x.year === 'string'
+    && (x.winner === 'a' || x.winner === 'b' || x.winner === 'draw')
+    && [x.at, x.scoreA, x.scoreB, x.rounds].every(n => typeof n === 'number' && Number.isFinite(n));
+};
+/**
+ * File a finished duel into the history (pure). **Every match is its own row**, which is the one way this
+ * differs from `fileCert` and is deliberate: a certificate is an award for a mission, so replaying that
+ * mission must not earn a second one, but a duel is an event — two children who play the same topic five
+ * times want to see five matches, not one that keeps being rewritten. So there is no "better run" comparison
+ * and nothing to deduplicate; the newest goes to the front and the list is capped at `cap`, oldest dropped.
+ */
+export function fileDuel(list: StoredDuel[], d: StoredDuel, cap = DUEL_CAP): StoredDuel[] {
+  return [d, ...list].slice(0, Math.max(0, cap));
+}
+/** Every duel played, most recent first. Tolerant of a hand-edited save. */
+export function duelHistory(): StoredDuel[] { const d = load().duels; return Array.isArray(d) ? d.filter(isDuel) : []; }
+/** Record a finished match. Returns the history as it now stands. */
+export function recordDuel(d: StoredDuel): StoredDuel[] {
+  const duels = fileDuel(duelHistory(), d);
+  save({ duels }); return duels;
 }
 export const today = (now = new Date()) => now.toISOString().slice(0, 10);
 /** Update the daily streak for a play today. Returns the streak length. */
