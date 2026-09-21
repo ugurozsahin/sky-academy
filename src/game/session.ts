@@ -83,10 +83,22 @@ const visualKey = (v: Visual): string => {
  * leave out: every topic whose question `say` carries also carries it in `listen` (`soundQ`) or `hint`
  * (`measureCompare`) or the visual (`y2-tense`, `y2-sentencetype`, `r-oddeven`).
  *
- * Exported so the rail in `tests/unit/session.test.ts` can measure this key against the text a child reads
- * rather than against a copy of it.
+ * **But the order *within* `hint` and `listen` is presentation too** (#412 review round 1, B1), and missing
+ * that was this key's own version of the same mistake: `soundQ` builds `listen` from the very
+ * `shuffle(rng, words).slice(0, 3)` that `say` is built from, so three keyword words have up to six spellings
+ * of one question, and a first cut that keyed the raw string served the same sound-hunt card twice running
+ * 1.11% of the time — *dog, duck, dig* then *dog, dig, duck* — against 0.000% before the change. The same
+ * mechanism, without the child-visible effect, is in `measureCompare`'s shuffled colour columns and
+ * `y2-temp`'s two readings. So `contentList` keys a `' · '`-separated list as a **set**: the separator is this
+ * repository's list separator and those three generators are the only places it appears. Normalised in the
+ * key, never on the card — what the child reads is unchanged.
+ *
+ * Exported so the rails in `tests/unit/session.test.ts` can measure this key against the text a child reads
+ * rather than against a copy of it, in both directions: different questions never share a key, and one
+ * question never takes two.
  */
-export const repeatKey = (q: Question) => [q.prompt, q.answer, q.hint ?? '', q.listen ?? '', q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : ''].join('\u0000');
+const contentList = (s: string) => (s.includes(' · ') ? s.split(' · ').sort().join(' · ') : s);
+export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : ''].join('\u0000');
 
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;

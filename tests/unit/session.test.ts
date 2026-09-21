@@ -389,15 +389,31 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  *    effect to explain a gap — that refusal is correct behaviour, and on a three-card topic like `r-share` it
  *    legitimately drives agreement to zero.
  *
- * Neither rail names a topic, so the tenth one is covered the day it ships. What they do not cover: a key
- * that is too discriminating, which is the opposite failure (PR #407's B1) and is pinned by
- * `the same exercise is never asked twice running` above.
+ * Rails 1 and 3 are the two halves of one claim — **the key's partition of the cards is exactly the
+ * question's** — and the second half exists because the first half alone let a real regression through
+ * (review round 1, B1/B2). Keying `listen` raw made the same sound-hunt card look like a different one, six
+ * ways per question, and every rail on this file stayed green: `the same exercise is never asked twice
+ * running` above runs 47 cases, and none of the twelve topics whose key these content fields changed is among
+ * them — it selects for a literally constant prompt with one answer per prompt, which rejects the order
+ * topics (they carry a `sequence`), the sound-hunt topics (one prompt) and the measurement topics (five
+ * answers to "Which is lighter?"). So the too-discriminating direction is asserted here, on the fields this
+ * key actually reads, rather than delegated to a rail that cannot see them.
+ *
+ * No rail here names a topic, so the tenth one is covered the day it ships.
  */
 describe('the repeat key holds the whole question (#412)', () => {
   const D1 = 1 as const;
   const yearOf = (t: { year: string }) => YEARS.find(y => y.id === t.year)!;
-  /** Everything the card asks: what a child reads on it, hears from it, and must slice. No decoration. */
-  const asked = (q: Question) => [q.prompt, q.answer, q.hint ?? '', q.listen ?? '', (q.sequence ?? []).join('\u0001')].join('\u0000');
+  /**
+   * Everything the card asks: what a child reads on it, hears from it, and must slice. No decoration — and
+   * a `' · '` list is a **set**, because three generators build one from a per-draw shuffle (B1). This is
+   * written from the `Question` contract on purpose, rather than read off `repeatKey`: it is the requirement,
+   * and the key is the thing under test.
+   */
+  const asked = (q: Question) => {
+    const set = (s: string) => (s.includes(' · ') ? s.split(' · ').sort().join(' · ') : s);
+    return [q.prompt, q.answer, set(q.hint ?? ''), set(q.listen ?? ''), (q.sequence ?? []).join('\u0001')].join('\u0000');
+  };
   const playable = TOPICS.filter(t => t.input !== 'tracing');
 
   it('there are topics to measure at all', () => {
@@ -422,6 +438,52 @@ describe('the repeat key holds the whole question (#412)', () => {
   });
 
   /**
+   * The converse, and the half whose absence let B1 ship: **one question must never take two keys.** Without
+   * it a key can pass the rail above by being ever finer, which is how `listen`'s per-draw word order got in.
+   *
+   * Cards are grouped by what they ask *with the visual held identical*, so a per-draw sticker — the `emoji`
+   * that PR #407's B1 was about — can never force a false red here. That makes it full strength exactly where
+   * B1 lived: neither sound-hunt topic nor any measurement topic carries a visual at all.
+   */
+  it.each(playable.map(t => t.id))('%s: two cards that ask the same thing never take two keys', (id) => {
+    const topic = topicById(id)!;
+    for (const d of [1, 2, 3] as const) {
+      const r = rng(11);
+      const byAsked = new Map<string, { key: string; q: Question }>();
+      for (let i = 0; i < 700; i++) {
+        const q = topic.gen(d, r);
+        const g = `${asked(q)}\u0002${JSON.stringify(q.visual ?? null)}`;
+        const k = repeatKey(q), seen = byAsked.get(g);
+        if (seen === undefined) byAsked.set(g, { key: k, q });
+        else expect(seen.key, `d${d}: two keys for one question — ${JSON.stringify(seen.q)} and ${JSON.stringify(q)}`).toBe(k);
+      }
+    }
+  });
+
+  /**
+   * And the fields the key must **ignore**, asserted directly rather than argued in a docstring. `say` is the
+   * one judgement `session.ts` defends at length and nothing held it: folding `q.say` in is 176/176 green and
+   * switches de-duplication off on `r-order`, whose `say` speaks the numbers in their shuffled display order
+   * (review round 1, note 1). `options` is re-shuffled every draw, and `wide`/`peek`/`slow` are how a card is
+   * presented, not what it asks.
+   */
+  it('the key ignores every field that carries presentation rather than content', () => {
+    for (const t of playable) {
+      const q = t.gen(D1, rng(3));
+      const base = repeatKey(q);
+      const presentation: Partial<Question>[] = [
+        { say: 'spoken some other way entirely' },
+        { options: [...q.options].reverse() },
+        { wide: !q.wide }, { peek: !q.peek }, { slow: !q.slow },
+      ];
+      for (const field of presentation) {
+        const name = Object.keys(field)[0];
+        expect(repeatKey({ ...q, ...field }), `${t.id}: \`${name}\` reached the card's identity`).toBe(base);
+      }
+    }
+  });
+
+  /**
    * Per topic at d1: the generator's own consecutive-agreement rate, the rate a driven `Session` produces, and
    * how many distinct cards there are per distinct answer. Computed once — three of these numbers are wanted
    * by the discovery and by the assertion, and a second pass would double the cost of the file.
@@ -434,17 +496,35 @@ describe('the repeat key holds the whole question (#412)', () => {
     for (let i = 1; i < cards.length; i++) if (cards[i].answer === cards[i - 1].answer) base++;
     const s = new Session({ mode: 'mission', year: yearOf(t), topic: t, rng: rng(7) }, events());
     s.start();
-    let prev = s.current!, same = 0;
-    for (let i = 0; i < PAIRS; i++) { s.nextQuestion(); if (s.current!.answer === prev.answer) same++; prev = s.current!; }
+    let prev = s.current!, same = 0, sameCard = 0;
+    for (let i = 0; i < PAIRS; i++) {
+      s.nextQuestion();
+      if (s.current!.answer === prev.answer) same++;
+      if (asked(s.current!) === asked(prev)) sameCard++;
+      prev = s.current!;
+    }
+    const contents = new Set(cards.map(asked)).size;
     return {
       id: t.id,
       baseline: base / PAIRS,
       inSession: same / PAIRS,
-      perAnswer: new Set(cards.map(asked)).size / new Set(cards.map(c => c.answer)).size,
+      repeated: sameCard / PAIRS,
+      contents,
+      perAnswer: contents / new Set(cards.map(c => c.answer)).size,
     };
   });
-  /** Where a suppressed answer cannot be explained by the refusal of an identical card, and is measurable. */
-  const measurable = stats.filter(s => s.perAnswer >= 10 && s.baseline * PAIRS >= 30);
+  /**
+   * Where a suppressed answer cannot be explained by the refusal of an identical card, and is measurable.
+   *
+   * The floor is arithmetic, not a round number. Refusing an identical card removes one of a topic's
+   * `perAnswer` cards from the agreement mass, so a correct implementation still measures about
+   * `(1 − 1/perAnswer) × baseline`; for the 0.5 floor below to be safe, `perAnswer` must be over 2, and four
+   * leaves a factor of 0.75 against it. Beneath that the suppression is legitimate and total: `r-share` maps
+   * one prompt to one answer, so refusing the identical card refuses the answer and agreement is 0 by design.
+   * It was `>= 10` in round 1 — a guess that happened to hold only while `asked()` counted `listen`'s word
+   * order as content, which put the sound-hunt topics at 24 cards per answer instead of their real 4 (B1).
+   */
+  const measurable = stats.filter(s => s.perAnswer >= 4 && s.baseline * PAIRS >= 30);
 
   it('the measurable set holds the topics this defect was found on', () => {
     const ids = measurable.map(s => s.id);
@@ -461,6 +541,29 @@ describe('the repeat key holds the whole question (#412)', () => {
     // every topic in this set sits within a few percent of its baseline, so the floor is nowhere near either.
     expect(s.inSession, `in-session ${s.inSession.toFixed(3)} against the generator's ${s.baseline.toFixed(3)}`)
       .toBeGreaterThan(s.baseline * 0.5);
+  });
+
+  /**
+   * And the symptom B1 actually produced, end to end through a `Session` rather than over the key: the same
+   * question served back to back. It read 1.11% on `r-soundhunt` with `listen` keyed raw and 0.000% both before
+   * the change and after the fix.
+   *
+   * Topics with at least fifty distinct cards only, because `nextQuestion` gives up after five re-rolls and
+   * serves what it has — correct behaviour, but on a three-card topic like `r-share` it makes a byte-identical
+   * card about 1 transition in 700 (review round 1, note 2, pre-existing). Above fifty cards a give-up cannot
+   * account for anything at this scale, so the floor is a thousandth rather than a tolerance.
+   */
+  const bigEnough = stats.filter(s => s.contents >= 50);
+  it('the big-topic set is not empty, and holds the topics B1 was measured on', () => {
+    const ids = bigEnough.map(s => s.id);
+    expect(ids.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(20);
+    for (const id of ['r-soundhunt', 'y1-soundhunt']) expect(ids).toContain(id);
+  });
+
+  it.each(bigEnough.map(s => s.id))('%s: a driven session never serves the same question twice running', (id) => {
+    const s = bigEnough.find(x => x.id === id)!;
+    expect(s.repeated, `served the same question back to back ${(100 * s.repeated).toFixed(3)}% of the time over ${s.contents} distinct cards`)
+      .toBeLessThan(0.001);
   });
 });
 
