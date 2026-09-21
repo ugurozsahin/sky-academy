@@ -34,11 +34,19 @@ export default defineConfig({
   // sequential chain on one worker. 97 of this project's 104 mobile tests live in tests/e2e/game.spec.ts, so
   // the whole e2e step was as long as that one chain no matter how many workers the runner offered — CI's
   // second worker finished duel.spec.ts inside the first minute and then idled for about six.
-  // Measured on run 35640634022: e2e 416 s of a 488 s job, `Running 107 tests using 2 workers`, and
-  // game.spec.ts alone ~93 % of the test seconds. Measured on the owner's Mac at c48fbee, --project=mobile:
-  // today's config 200 s at 23 % worker utilisation; with this flag 124 s at 2 workers (98 %) and 107 s at 4.
-  // The sum of test durations barely moved (226 s -> 243 s at 2 workers), which is the whole point: the time
-  // was going to an IDLE worker, not to contention.
+  // What the flag fixes is unambiguous, and it is worker UTILISATION rather than wall clock. Run
+  // 35640634022, flag off: 107 tests summing 466 s of test time against a 416 s step on 2 workers — 56 %,
+  // the idle worker. The same tree with the flag on reaches 98-99 % on every attempt.
+  // What that is WORTH is much smaller on a runner than on a laptop, and the difference is contention:
+  //   - the owner's Mac, --project=mobile at 2 workers: 204 s -> 120/123/123 s, and the test-time sum barely
+  //     moves (226 -> 243 s). A big box runs two browsers for almost the price of one.
+  //   - a 4-vCPU GitHub runner, the same commit re-run three times: 374 / 292 / 254 s, against a twelve-run
+  //     flag-off baseline of 340-437 s (median 406 s). The test-time sum goes 466 s -> 575-731 s, so most of
+  //     the reclaimed idle time is spent again on tests slowing each other down.
+  // So: a real but noisy ~25 % there, ~40 % on a developer machine, and the mechanism is sound in both.
+  // The honest reading of the runner numbers is that it is CPU-bound, not worker-bound — one Chromium plus
+  // the preview server already uses most of 4 vCPUs. More parallelism on ONE runner cannot fix that; more
+  // runners (--shard) could, and that is #81's territory and the owner's call, not this file's.
   // `workers` is deliberately left at Playwright's default (half the logical cores) — the numbers above are
   // what the runner already picks, and raising it is a separate decision to be measured on a runner.
   // What this costs: two tests now share a CPU, so a test whose assertion depends on real wall-clock pacing
