@@ -1544,6 +1544,46 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#memory small')).toContainText('boards 1');
   });
 
+  test('guard rail: a Memory board never leaves a short row hanging off one edge (#372)', async ({ page }) => {
+    // Nothing in this repository rendered a Memory board to LOOK at it, so a five-pair deck shipped as
+    // 4 + 4 + 2 with two empty cells beside the last row — the first ragged board the mode had ever had, and
+    // the only one whose card count is not a multiple of four. The existing Memory test above plays Reception
+    // (8 cards, two full rows) and `viewport.spec.ts` seeds a board count into storage without opening the
+    // screen, so both were green throughout. This measures the real boxes.
+    await seedPlayer(page, 'splash', 'Mia');
+    await page.click('.island[data-year="year2"]');
+    // The theme is drawn at random; re-enter until the 3-D board comes up, which is the deck at issue.
+    let theme = '';
+    for (let tries = 0; tries < 60 && theme !== 'shapes'; tries++) {
+      await page.click('#memory');
+      await expect(page.locator('.card').first()).toBeVisible();
+      theme = await page.evaluate(() => window.__sna.theme as string);
+      if (theme !== 'shapes') await page.click('#back');
+    }
+    expect(theme, 'a 3-D shapes board came up inside 60 draws').toBe('shapes');
+    await expect(page.locator('.card')).toHaveCount(10);
+    const rows = await page.evaluate(() => {
+      const grid = document.querySelector('#cards')!.getBoundingClientRect();
+      const byRow = new Map<number, DOMRect[]>();
+      for (const c of document.querySelectorAll('#cards .card')) {
+        const r = c.getBoundingClientRect(); const key = Math.round(r.y);
+        (byRow.get(key) ?? byRow.set(key, []).get(key)!).push(r);
+      }
+      return [...byRow.entries()].sort((a, b) => a[0] - b[0]).map(([, cards]) => ({
+        n: cards.length,
+        left: Math.round(Math.min(...cards.map(c => c.left)) - grid.left),
+        right: Math.round(grid.right - Math.max(...cards.map(c => c.right))),
+      }));
+    });
+    expect(rows.length, 'ten cards in four columns is three rows').toBe(3);
+    for (const r of rows) {
+      // The gap each side of a row is equal: a full row has none, and a short one is centred rather than
+      // pushed against the left edge with the whole remainder showing on the right.
+      expect(Math.abs(r.left - r.right), `a row of ${r.n} sits centred (left ${r.left}px, right ${r.right}px)`).toBeLessThanOrEqual(2);
+    }
+    expect(rows.map(r => r.n), 'and the short row is the last one').toEqual([4, 4, 2]);
+  });
+
   // #138: the one test that still walks the whole cold start — avatar screen → intro (#67) → sky map → island
   // → play — so
   // the path every other test now seeds past keeps a test of its own, end to end and in order.
