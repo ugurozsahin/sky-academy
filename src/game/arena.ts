@@ -6,6 +6,7 @@ export interface Bubble {
   id: number; label: string; x: number; y: number; vx: number; vy: number; g: number; r: number;   // g = per-bubble gravity (its arc is fixed at launch); the e2e freeze helper reads it
   launchAt: number; launched: boolean; hit: boolean; dead: boolean; color: string; wobble: number;
   fontSize: number;   // label font size, fitted once at spawn (#28) so the per-frame draw never runs a measureText loop
+  lines: string[];    // the label as drawn: one line, or two when a single line would be squeezed (#348)
   mark?: 'good' | 'bad'; markAt?: number; fade?: boolean;   // outcome reveal: spotlighted (✓/✗) or faded out
 }
 type PKind = 'dot' | 'ring' | 'shard' | 'text' | 'ember' | 'drop' | 'bolt' | 'rock' | 'leaf' | 'crystal' | 'star' | 'smoke' | 'pixel' | 'slash';
@@ -139,8 +140,8 @@ export class Arena {
     const plan = layoutWave(o, { W: this.W, H: this.H, topInset: this.topInset }, gameSpeed(), shared?.now ?? performance.now(), shared?.rng ?? Math.random);
     this.waveT = plan.waveT; this.batchSpan = plan.batchSpan;
     for (const p of plan.bubbles) {
-      const fontSize = fitLabel(p.label, plan.r, font => { this.ctx.font = font; return this.ctx.measureText(p.label).width; });   // #28: fit once here, not every frame
-      this.bubbles.push({ id: this.nextId++, label: p.label, x: p.x, y: this.H + plan.r, vx: p.vx, vy: p.vy, g: p.g, r: plan.r, launchAt: p.launchAt, launched: false, hit: false, dead: false, color: p.color, wobble: p.wobble, fontSize });
+      const fit = fitLabelLines(p.label, plan.r, (font, text) => { this.ctx.font = font; return this.ctx.measureText(text).width; });   // #28: fit once here, not every frame
+      this.bubbles.push({ id: this.nextId++, label: p.label, x: p.x, y: this.H + plan.r, vx: p.vx, vy: p.vy, g: p.g, r: plan.r, launchAt: p.launchAt, launched: false, hit: false, dead: false, color: p.color, wobble: p.wobble, fontSize: fit.fs, lines: fit.lines });
     }
     this.waveActive = true;
   }
@@ -175,8 +176,8 @@ export class Arena {
       let x = this.W / 2; const y = this.topInset + (this.H - this.topInset) * 0.42;
       const bad = this.bubbles.find(b => b.mark === 'bad' && !b.dead);
       if (bad && Math.hypot(bad.x - x, bad.y - y) < 2.2 * r) x = bad.x < this.W / 2 ? Math.min(this.W - r - 8, bad.x + 2.4 * r) : Math.max(r + 8, bad.x - 2.4 * r);   // don't sit on the ✗ bubble
-      const fontSize = fitLabel(o.good, r, font => { this.ctx.font = font; return this.ctx.measureText(o.good!).width; });
-      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now, fontSize });
+      const fit = fitLabelLines(o.good, r, (font, text) => { this.ctx.font = font; return this.ctx.measureText(text).width; });
+      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now, fontSize: fit.fs, lines: fit.lines });
     }
   }
   /** Remove remaining bubbles (with a gentle fade) — used when the question is over. */
@@ -427,12 +428,15 @@ export class Arena {
     // strings + a gradient object per bubble) and a shadowBlur are too slow on low-end devices (#28/#29).
     const g = glowSprite(b.color, b.r); c.drawImage(g, -g.width / 2, -g.height / 2);
     const body = bodySprite(b.color, b.r); c.drawImage(body, -body.width / 2, -body.height / 2);
-    // label — font size fitted once at spawn (#28), never in this per-frame path
-    const text = b.label; const fs = b.fontSize;
+    // label — font size and line break fitted once at spawn (#28/#348), never in this per-frame path
+    const lines = b.lines; const fs = b.fontSize;
     c.font = labelFont(fs);
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.lineJoin = 'round'; c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = 'rgba(20,20,40,.75)'; c.strokeText(text, 0, 2);
-    c.fillStyle = '#fff'; c.fillText(text, 0, 2);
+    const lh = fs * 1.02, top = 2 - (lines.length - 1) * lh / 2;   // the block of lines stays centred on the disc
+    c.lineJoin = 'round'; c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = 'rgba(20,20,40,.75)';
+    for (let i = 0; i < lines.length; i++) c.strokeText(lines[i], 0, top + i * lh);
+    c.fillStyle = '#fff';
+    for (let i = 0; i < lines.length; i++) c.fillText(lines[i], 0, top + i * lh);
     if (b.mark) {                                    // ✓ / ✗ badge
       const col = b.mark === 'good' ? GOOD : BAD, br = b.r * 0.36, bx = b.r * 0.74, by = -b.r * 0.74;
       c.fillStyle = col; c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill();
@@ -749,12 +753,72 @@ export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: num
   return { r, waveT: T * 1000, batchSpan: perBatch * stagger, perBatch, batchGap, stagger, bubbles };
 }
 
+/** The smallest a bubble label is ever drawn: below this it is not readable on a moving bubble (#348). */
+export const LABEL_MIN_FS = 10;
+/** How much of `r` one line may spend across the middle of the bubble. */
+const LINE_BUDGET = 1.75;
+/** A wrapped line sits above or below the centre, where the disc's chord is a shade narrower. */
+const WRAP_BUDGET = 1.7;
+/** Two lines of this size stack to ~1.3r, so both stay inside the disc whatever the glyph widths. */
+const WRAP_MAX_FS = 0.62;
+/** The size a label starts at, from its character count, before anything is measured. */
+const startFs = (label: string, r: number) => r * (label.length <= 2 ? 1.05 : label.length <= 4 ? 0.7 : label.length <= 7 ? 0.5 : 0.4);
+
+/** A fitted bubble label: the lines to draw, the size they share, and whether they actually fit (#348). */
+export interface LabelFit { fs: number; lines: string[]; fits: boolean }
+
 // Called once per bubble in spawnWave (#28) — `measure` sets the font and returns the text width — instead
 // of running the shrink loop in drawBubble every frame. Pure and canvas-free so it unit-tests directly.
-export function fitLabel(label: string, r: number, measure: (font: string) => number): number {
-  let fs = r * (label.length <= 2 ? 1.05 : label.length <= 4 ? 0.7 : label.length <= 7 ? 0.5 : 0.4);
-  while (measure(labelFont(fs)) > r * 1.75 && fs > 10) fs -= 1;
+export function fitLabel(label: string, r: number, measure: (font: string, text: string) => number): number {
+  let fs = startFs(label, r);
+  while (measure(labelFont(fs), label) > r * LINE_BUDGET && fs > LABEL_MIN_FS) fs -= 1;
   return fs;
+}
+
+/**
+ * Break a label into two lines at the point that leaves the longer line shortest (#348).
+ *
+ * A space is the natural break; a hyphen is the fallback, kept on the first line the way a hyphenated word
+ * is normally broken, because `a three-quarter turn` is one long *word* away from fitting and a space-only
+ * rule leaves `three-quarter` — the whole problem — on a line of its own. `null` when there is neither.
+ */
+export function splitLabel(label: string): [string, string] | null {
+  const breaks: [string, string][] = [];
+  for (let i = 0; i < label.length; i++) {
+    if (label[i] === ' ' && i > 0 && i < label.length - 1) breaks.push([label.slice(0, i), label.slice(i + 1)]);
+    else if (label[i] === '-' && i > 0 && i < label.length - 1) breaks.push([label.slice(0, i + 1), label.slice(i + 1)]);
+  }
+  if (!breaks.length) return null;
+  const longest = (b: [string, string]) => Math.max(b[0].length, b[1].length);
+  return breaks.reduce((best, b) => longest(b) < longest(best) ? b : best);
+}
+
+/**
+ * Fit a label into its bubble, wrapping onto a second line when one line would be squeezed (#348).
+ *
+ * `fitLabel` shrinks until the label fits and then gives up at `LABEL_MIN_FS` **whether or not it does** —
+ * so `£1 and 50p` was drawn at the floor and `a three-quarter turn` spilled out of the bubble onto the
+ * background, and nothing anywhere said so. Two lines buy nearly twice the width at the same size, and
+ * `fits` reports the case neither line count can rescue rather than discarding it, so a caller can see it.
+ */
+export function fitLabelLines(label: string, r: number, measure: (font: string, text: string) => number): LabelFit {
+  const oneFs = fitLabel(label, r, measure);
+  // "Fits" means fits *readably*: inside the budget AND at or above the floor. The old loop could leave a
+  // label under the floor and inside the budget, which is the half of the bug nobody could see from outside.
+  const one: LabelFit = { fs: oneFs, lines: [label], fits: measure(labelFont(oneFs), label) <= r * LINE_BUDGET && oneFs >= LABEL_MIN_FS };
+  // A label that never had to shrink is already drawn at its natural size, so wrapping it would only stack
+  // two short words for nothing. Only a squeezed label is a candidate — that is exactly #348's complaint.
+  if (oneFs >= startFs(label, r)) return one;
+  const split = splitLabel(label);
+  if (!split) return one;
+  const widest = (fs: number) => Math.max(measure(labelFont(fs), split[0]), measure(labelFont(fs), split[1]));
+  let fs = Math.min(fitLabel(split[0].length >= split[1].length ? split[0] : split[1], r, measure), r * WRAP_MAX_FS);
+  while (widest(fs) > r * WRAP_BUDGET && fs > LABEL_MIN_FS) fs -= 1;
+  const two: LabelFit = { fs, lines: split, fits: widest(fs) <= r * WRAP_BUDGET && fs >= LABEL_MIN_FS };
+  // Take the wrap when it earns something: a label that fits where one line did not, a bigger label, or —
+  // when nothing fits — the same size across narrower lines, which is less of the bubble overflowed.
+  if (one.fits !== two.fits) return two.fits ? two : one;
+  return two.fs > one.fs || (!one.fits && two.fs >= one.fs) ? two : one;
 }
 
 const glowCache = new Map<string, HTMLCanvasElement>();

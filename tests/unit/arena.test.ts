@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type Collidable, compact, dealOrdered, fitLabel, labelFont, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
+import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type Collidable, compact, dealOrdered, fitLabel, fitLabelLines, labelFont, splitLabel, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
 import { ALL_AVATARS } from '../../src/avatars';
 
 describe('dealOrdered — sequence words are dealt in order across the batches (#62)', () => {
@@ -49,6 +49,82 @@ describe('fitLabel — label font sized once at spawn, not per frame (#28)', () 
 
   it('labelFont carries the weight, size and the Fredoka fallback stack', () => {
     expect(labelFont(24)).toBe('700 24px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif');
+  });
+});
+
+describe('splitLabel / fitLabelLines — a long label wraps instead of shrinking past readable (#348)', () => {
+  const sizeOf = (font: string) => parseFloat(font.match(/([\d.]+)px/)![1]);
+  // Fredoka bold measured in the running game: ~0.571 * fs per character (#348's table, `a three-quarter
+  // turn` at 109.6px and fs 9.6). One factor for every label, so the arithmetic below is checkable by hand.
+  const measure = (font: string, text: string) => sizeOf(font) * text.length * 0.571;
+
+  it('breaks at the point that leaves the longer line shortest', () => {
+    expect(splitLabel('£1 and 50p')).toEqual(['£1 and', '50p']);
+    expect(splitLabel('quarter past 12')).toEqual(['quarter', 'past 12']);
+  });
+
+  it('falls back to a hyphen, kept on the first line, when a space split leaves the long word alone', () => {
+    // Spaces alone give 'a' / 'three-quarter turn' (18) or 'a three-quarter' (15) / 'turn'; the hyphen
+    // gives 'a three-' (8) / 'quarter turn' (12), which is the shortest longest line of the three.
+    expect(splitLabel('a three-quarter turn')).toEqual(['a three-', 'quarter turn']);
+  });
+
+  it('returns null for a label with nothing to break on, and never breaks at a leading or trailing one', () => {
+    expect(splitLabel('£2')).toBeNull();
+    expect(splitLabel('twelve')).toBeNull();
+    expect(splitLabel(' -')).toBeNull();
+  });
+
+  it('leaves a comfortable one-line label exactly as it was', () => {
+    // '£2' at r=41.4 starts at 1.05r = 43.47 and measures 43.47*2*0.571 = 49.6 < 1.75r = 72.5 — no shrink,
+    // no wrap, one line. The wrap must not disturb the labels that were always fine.
+    const fit = fitLabelLines('£2', 41.4, measure);
+    expect(fit.lines).toEqual(['£2']);
+    expect(fit.fits).toBe(true);
+    expect(fit.fs).toBeCloseTo(43.47);
+  });
+
+  it('wraps the money label #345 pushed down to the font floor, and draws it bigger than one line did', () => {
+    // '£1 and 50p' is 10 chars, so it starts at 0.4r = 16.6 and shrinks to 12 (12*10*0.571 = 68.5 <= 72.5).
+    // Wrapped, the longer line is '£1 and' (6): 0.5r = 20.7 capped by WRAP_MAX_FS to 0.62r = 25.7, and
+    // 20.7*6*0.571 = 70.9 already fits 1.7r = 70.4 within a step — so the child reads it far larger.
+    const one = fitLabel('£1 and 50p', 41.4, measure);
+    const fit = fitLabelLines('£1 and 50p', 41.4, measure);
+    expect(fit.lines).toEqual(['£1 and', '50p']);
+    expect(fit.fs).toBeGreaterThan(one);
+    expect(fit.fits).toBe(true);
+  });
+
+  it('reports the overflow it cannot rescue instead of discarding it — the #348 silent failure', () => {
+    // 'a three-quarter turn' is the label measured overflowing the bubble on `main`: 109.6px of text in an
+    // 82.9px circle. One line cannot fit it at the floor, and neither can two at this radius, so the fit
+    // says so. Nothing in the old `fitLabel` could: it returned 10 and looked exactly like a success.
+    const fit = fitLabelLines('a three-quarter turn', 41.4, measure);
+    expect(fit.fits).toBe(false);
+    expect(fit.lines).toEqual(['a three-', 'quarter turn']);   // still the best of the bad options
+    expect(measure(labelFont(fit.fs), 'a three-quarter turn')).toBeGreaterThan(41.4 * 1.75);
+  });
+
+  it('fits that same label once the bubble is wide enough, so the rescue really is a width problem', () => {
+    // r = 57.3 is what `layoutWave`'s own three-across cap allows on a 390px phone. 1.7r = 97.4, the longer
+    // line is 'quarter turn' (12): 12*0.571*fs <= 97.4 → fs <= 14.2, comfortably above the floor.
+    const fit = fitLabelLines('a three-quarter turn', 57.3, measure);
+    expect(fit.fits).toBe(true);
+    expect(fit.lines).toHaveLength(2);
+    expect(fit.fs).toBeGreaterThan(10);
+  });
+
+  it('leaves a multi-word label that never had to shrink on one line', () => {
+    // 'yes no' (6) starts at 0.5r = 20.7 and measures 70.9 <= 1.75r = 72.5, so it was never squeezed. The
+    // wrap would be bigger (two short lines), and taking it would restack labels #348 says nothing about.
+    expect(fitLabelLines('yes no', 41.4, measure).lines).toEqual(['yes no']);
+  });
+
+  it('never returns a wrap that is smaller than the single line it replaces', () => {
+    for (const label of ['£1 and 50p', 'quarter past 12', 'a three-quarter turn', 'an anti-clockwise turn', 'yes', 'seventeen']) {
+      const fit = fitLabelLines(label, 41.4, measure);
+      if (fit.lines.length === 2) expect(fit.fs).toBeGreaterThanOrEqual(fitLabel(label, 41.4, measure));
+    }
   });
 });
 
