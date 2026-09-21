@@ -5,7 +5,8 @@ import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
 import type { SentenceType } from '../../src/curriculum/writing';
-import { coinLabel, SHAPES_2D, SHAPES_3D } from '../../src/curriculum/util';
+import { coinLabel, SHAPES_2D, SHAPES_3D, wordQ } from '../../src/curriculum/util';
+import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
 
 // Deterministic RNG (mulberry32)
@@ -1830,5 +1831,191 @@ describe('Year 2 symmetry and patterns (#299 slice 4)', () => {
       expect([...gaps].sort(), d === 3 ? 'd3 hides an object inside the pattern too' : `d${d} always hides the last object`)
         .toEqual(d === 3 ? [false, true] : [true]);
     }
+  });
+});
+
+
+describe('a hint is instruction text unless the generator says it is data (#328, PR #430 review)', () => {
+  /**
+   * `Question.hint` is documented as "small instruction text under the prompt", and that is what 40 of the
+   * 47 hint-writing topics put there. Seven do not: `measureCompare()` and `y2Temp`'s comparison branch put
+   * the values being compared in the hint and nowhere else on the card — the options are the *things*
+   * compared, not their sizes — so those cards are unanswerable without it, and `hintIsData` is how they say
+   * so. The play screen keeps only the marked ones on a short screen (`src/ui/play-session.ts`).
+   *
+   * This rail exists because the first version of that fix marked on `!!q.hint` and no test could tell:
+   * every control in the suite happened to be a topic writing no hint at all. It pins the split by sweeping
+   * the real registry, so a future generator cannot join either side silently.
+   */
+  const DRAWS = 300;
+  /** The shape both data-carrying generators write: `<thing>: <number><unit>`, joined by ` · `. */
+  const DATA_SHAPE = /^[^:·]+: ?-?\d+ ?(cm|m|g|kg|ml|l|°C) · /;
+  const EXPECTED = ['y1-capacity', 'y1-length', 'y1-mass', 'y2-capacity', 'y2-length', 'y2-mass', 'y2-temp'];
+
+  function sweep() {
+    const r = rng(328);
+    const marked = new Set<string>(), hinted = new Set<string>();
+    let cards = 0, flagged = 0;
+    for (const t of TOPICS) for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < DRAWS; i++) {
+      const q = t.gen(d, r); cards++;
+      if (q.hint) hinted.add(t.id);
+      if (q.hintIsData) { marked.add(t.id); flagged++; expect(q.hint, `${t.id} d${d}: hintIsData with no hint — "${q.prompt}"`).toBeTruthy(); }
+      if (q.hint && DATA_SHAPE.test(q.hint))
+        expect(q.hintIsData, `${t.id} d${d}: "${q.hint}" carries the values but is not marked — landscape would hide it (#328)`).toBe(true);
+    }
+    return { marked, hinted, cards, flagged };
+  }
+
+  it('marks exactly the seven measure topics, and no others', () => {
+    const { marked, hinted, cards, flagged } = sweep();
+    expect(cards, 'the sweep drew nothing — this rail would pass vacuously').toBeGreaterThan(70_000);
+    expect(flagged, 'no card was marked at all').toBeGreaterThan(1000);
+    expect([...marked].sort()).toEqual(EXPECTED);
+    // The other half of the claim, and the one the review caught: marking is the exception, not the rule.
+    // `y2-length`/`y2-mass` reach `measureCompare()` on one difficulty branch only, which is why the pull
+    // request's first count of "five" was wrong and a hand-written list is no substitute for this sweep.
+    expect(hinted.size, 'the registry stopped writing instruction hints — re-read this rail before changing it').toBeGreaterThan(40);
+    const instructionOnly = [...hinted].filter(id => !marked.has(id));
+    expect(instructionOnly.length, 'every hint-writing topic is now marked, which is the #430 regression')
+      .toBeGreaterThanOrEqual(38);
+  });
+
+  it('a marked card really does hide its values from the rest of the card', () => {
+    const r = rng(329);
+    let checked = 0;
+    for (const id of EXPECTED) {
+      const t = TOPICS.find(x => x.id === id)!;
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 120; i++) {
+        const q = t.gen(d, r);
+        if (!q.hintIsData) continue;
+        checked++;
+        expect(q.visual, `${id}: a marked card drew a visual, so the hint is no longer the only source`).toBeUndefined();
+        // Every number in the hint is absent from the prompt and the options: hide the line and there is
+        // nothing left to decide by. That is the whole reason the flag exists.
+        for (const n of q.hint!.match(/\d+/g) ?? [])
+          expect(`${q.prompt} ${q.options.join(' ')}`, `${id}: ${n} also appears outside the hint`).not.toContain(n);
+      }
+    }
+    expect(checked, 'no marked card was drawn — this rail would pass vacuously').toBeGreaterThan(500);
+  });
+});
+
+/**
+ * Bubble size is a property of the card, not of which option is correct (#369).
+ *
+ * `bubbleRadius` draws a wide wave 1.25x bigger (41 px against 33 px on a 390x700 arena), so as long as
+ * `wide` was read off the answer alone, every card whose options differ in length sized the correct bubble
+ * differently from its decoys — on a two-option card (`r-oddeven`'s `yes`/`no`, `y1-coins` d2's `50p`/`1p`)
+ * a child who never read the picture could slice by size.
+ *
+ * The check is the one that found the bug: group a cell's cards by their option **set** and require the
+ * width to be the same for every card in a group. Two cards offering the same bubbles must look the same.
+ *
+ * **Grouping is the only non-tautological shape available here**, which is worth saying because the obvious
+ * stronger rail is not. Once `wide` is derived from the options it *is* a pure function of the labels, so any
+ * check that reads the labels — "can a child predict the answer from the wave's size?" included — is
+ * satisfied by the implementation restating itself. Only asking whether one option set was ever drawn at two
+ * different widths compares the card against another real card rather than against the formula. The price is
+ * that it can speak only where an option set recurs with more than one answer: 203 of the 252 cells.
+ * `NO_REPEATED_SET` names the other 49 and is asserted in both directions, so it stays honest.
+ *
+ * It goes through the real `waveOptsFor` (`src/ui/play-session.ts`), the bridge `tests/unit/sim.test.ts`
+ * already uses, so a copy of the derivation cannot drift away from the screen's.
+ */
+describe('a card\'s bubble width is derived from its options, never from its answer (#369)', () => {
+  const setKey = (q: Question) => [...q.options].sort().join('\u0000');
+  const widthOf = (q: Question) => !!waveOptsFor(q, { labels: q.options, speed: 1 }, 0).wide;
+  const BUBBLE_TOPICS = TOPICS.filter(t => t.input !== 'tracing');       // a tracing mission has no wave
+  const DRAWS = 400;
+
+  /** One cell's draw, shared by both rails below so they judge the identical cards. */
+  function draw(topic: typeof TOPICS[number], d: Difficulty) {
+    const r = rng(topic.id.length * 7 + d);
+    return Array.from({ length: DRAWS }, () => topic.gen(d, r));
+  }
+
+  /**
+   * The (topic, difficulty) cells where grouping by option set can prove nothing, because no option set
+   * is ever drawn twice with two different answers — so every group holds one answer and comparing
+   * within a group compares a card with itself.
+   *
+   * **This is structural, not a seed accident**, which is why it is a named list rather than more draws:
+   * wherever the distractors are derived from the answer (`nearby`, coin neighbours, near-miss spellings,
+   * a shuffled sentence's own words) a given option set can only ever occur with the answer it was built
+   * from. More draws move a handful of cells off the list without touching the reason — at 3,000 draws per
+   * cell 42 are still blind — so the list is tied to `DRAWS` and to the seed above, and is asserted in both
+   * directions below so it cannot quietly rot.
+   *
+   * It is the honest record of what this rail does **not** defend. `y1-coins` d3 is on it, and `y1-coins`
+   * is one of the six topics #369 was filed about: on that difficulty every card is one where `q.wide`
+   * alone decides the on-screen width, and restoring the old derivation there leaves this suite green.
+   * Closing that needs a check of a different shape, which #482 carries.
+   */
+  const NO_REPEATED_SET = new Set([
+    'r-order d1', 'r-order d2', 'r-order d3', 'r-share d2', 'r-share d3',
+    'r-build d3', 'r-sentence d1', 'r-sentence d2', 'r-sentence d3',
+    'y1-skip d1', 'y1-skip d2', 'y1-skip d3', 'y1-order d1', 'y1-order d2', 'y1-order d3',
+    'y1-coins d3', 'y1-shapes d3', 'y1-plurals d1', 'y1-punct d1', 'y1-days d3',
+    'y1-sentence d1', 'y1-sentence d2', 'y1-sentence d3',
+    'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
+    'y2-add d3', 'y2-tables d1', 'y2-balance d2', 'y2-line d2', 'y2-line d3',
+    'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
+    'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d1', 'y2-duration d3',
+    'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
+  ]);
+
+  it('every cell either compares two cards that offer the same bubbles, or is on the named blind list', () => {
+    // The guard this replaces counted every distinct option set, singletons included, and so was cleared
+    // seventy times over by groups that compared nothing (#471 review, B2). What it claimed to count is
+    // what it counts now: option sets drawn with at least two different answers.
+    let cards = 0, discriminating = 0, split = 0, swept = 0;
+    const offenders: string[] = [], unexpectedlyBlind: string[] = [], nowComparable: string[] = [];
+    for (const topic of BUBBLE_TOPICS) {
+      swept++;
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const cell = `${topic.id} d${d}`;
+        const bySet = new Map<string, { wide: boolean; answer: string }[]>();
+        for (const q of draw(topic, d)) {
+          cards++;
+          const k = setKey(q);
+          let group = bySet.get(k);
+          if (!group) bySet.set(k, group = []);
+          group.push({ wide: widthOf(q), answer: q.answer });
+        }
+        let cellDiscriminating = 0;
+        for (const [k, seen] of bySet) {
+          if (new Set(seen.map(s => s.answer)).size < 2) continue;     // one answer: nothing to compare
+          cellDiscriminating++; discriminating++;
+          if (seen.every(s => s.wide === seen[0].wide)) continue;
+          split++;
+          const wider = seen.find(s => s.wide)!.answer, narrower = seen.find(s => !s.wide)!.answer;
+          offenders.push(`${cell}: {${k.split('\u0000').join(', ')}} is wide when the answer is "${wider}" and narrow when it is "${narrower}"`);
+        }
+        if (cellDiscriminating === 0 && !NO_REPEATED_SET.has(cell)) unexpectedlyBlind.push(cell);
+        if (cellDiscriminating > 0 && NO_REPEATED_SET.has(cell)) nowComparable.push(cell);
+      }
+    }
+    // A topic dropped from the sweep — by a wrong `input: 'tracing'`, say — would otherwise vanish silently.
+    expect(swept, 'the sweep no longer covers every bubble topic').toBe(BUBBLE_TOPICS.length);
+    expect(cards, 'the sweep drew nothing — this rail would pass vacuously').toBe(BUBBLE_TOPICS.length * 3 * DRAWS);
+    expect(discriminating, 'no option set was drawn with two different answers, so nothing was compared')
+      .toBeGreaterThan(1000);
+    // Both directions, so the list cannot rot: nothing blind is unlisted, and nothing listed is secretly covered.
+    expect(unexpectedlyBlind, 'these cells compare nothing and are not on the blind list — add them, with why').toEqual([]);
+    expect(nowComparable, 'these cells now compare something — take them off the blind list').toEqual([]);
+    expect(split, offenders.slice(0, 8).join('\n')).toBe(0);
+  });
+
+  it('wordQ widens on a long decoy, not only on a long answer', () => {
+    const r = rng(369);
+    // `r-oddeven`'s own pair, the worst of the six: the same two bubbles, either one the answer. Only the
+    // second line discriminates — `answer.length > 2` gets the first right by accident, which is why a
+    // rail written from the passing case alone would have let the defect through.
+    expect(wordQ(r, 'Are there 4? Can they pair up?', 'yes', ['no']).wide).toBe(true);
+    expect(wordQ(r, 'Are there 3? Can they pair up?', 'no', ['yes']).wide).toBe(true);
+    // `y1-coins` d2's pair, the same shape with the long option on the other side.
+    expect(wordQ(r, 'Which is more?', '1p', ['50p']).wide).toBe(true);
+    // And a card whose options really are all short stays narrow, so nothing is widened wholesale.
+    expect(wordQ(r, 'Which letter?', 'ox', ['ax', 'ex']).wide).toBe(false);
   });
 });

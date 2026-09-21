@@ -36,8 +36,9 @@ export function precacheList(files) {
  * One line per precached file: `name\0size\0sha256`. The cache name is derived from THIS, not from the
  * filenames, and that distinction is the whole point.
  *
- * Only two of the sixteen precached files are content-hashed by Vite. The other fourteen — `index.html`,
- * `manifest.webmanifest` and twelve avatar `.webp`s — keep their names when their contents change, and the
+ * Only two of the twenty-three precached files are content-hashed by Vite. The other twenty-one —
+ * `index.html`, `manifest.webmanifest`, two self-hosted Fredoka `.woff2`s and their licence (#479), and
+ * twelve avatar `.webp`s — keep their names when their contents change, and the
  * avatars are the owner's art, the single most likely thing in this repository to be re-exported in place.
  * Hashing filenames would give a re-exported `blaze.webp` an identical cache name, so `activate` would keep
  * the old cache, and `asset()` is cache-first with no revalidation: every returning player would see the old
@@ -61,7 +62,7 @@ export function cacheName(prints) {
  *  `prints` is required, not defaulted to `list` (#116 item 3): both parameters are `string[]`, so a default
  *  of `prints = list` let a caller forget the third argument entirely — or transpose it as
  *  `renderSw(t, prints, list)` — and still type-check and run, naming every cache after filenames instead of
- *  content. Fourteen of the sixteen precached files are not content-hashed by Vite (the twelve avatars most
+ *  content. Twenty-one of the twenty-three precached files are not content-hashed by Vite (the twelve avatars most
  *  of all), so that bug ships the old picture for ever: `activate` keeps the old cache, and `asset()` is
  *  cache-first with no revalidation. The guard below only checks *shape* (a fingerprint always contains the
  *  `\0` `fingerprints()` joins with; a bare filename never does) — it cannot tell a correct fingerprint from

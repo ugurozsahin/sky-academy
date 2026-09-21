@@ -602,6 +602,38 @@ test.describe('Ninja Duel', () => {
     }
   });
 
+  test('guard rail: a pause inside the win hold holds the round — nothing advances behind the overlay (#301)', async ({ page }) => {
+    // #301, found by PR #295's reviewer. `hold(true)` set `arena.paused` and nothing else, so the beats the
+    // outcome schedules through `later()` kept running behind the pause overlay: `endWave`'s `clearWave` fired,
+    // both waves ended, `duel.waveEnd()` advanced the round, and `onQuestion` wrote the strip, SPOKE the next
+    // question and spawned its wave with `launchAt` already in the past. On resume two children found a wave
+    // flying at a question neither had been shown.
+    await startDuel(page);
+    // Real game speed for this one, the way its play-screen twin in `game.spec.ts` opts out with
+    // `__SNA_FAST = 1`: a compressed hold is not a hold anybody can press pause inside. `startDuel` boots at
+    // `__SNA_FAST = 4`, which leaves ~362ms between the winning slice and the round advancing for a
+    // `page.evaluate` round trip AND a real `page.click`. It measured 67-113ms of that budget and passed six
+    // times out of six — but `playwright.config.ts` sets `retries: 0`, and a two-core runner with two workers
+    // has far less headroom than this machine (PR #474 review, note 6). `setSpeed` is read by `scaled()` at
+    // the moment each beat is armed, so taking it to 1 here gives the hold below its full length.
+    await page.evaluate(() => window.__sna.setSpeed(1));
+    await winRound(page, 'a');
+    const before = await page.evaluate(() => window.__sna.state());
+    expect(before.decided, 'the round is decided and the hold has begun — this is the window the bug lives in').toBe(true);
+    await page.click('#pause');
+    await expect(page.locator('#resume')).toBeVisible();
+    // Well past the won hold AND the 450ms breath after it. Before the fix the round had advanced by here.
+    await page.waitForTimeout(3000);
+    const held = await page.evaluate(() => window.__sna.state());
+    expect(held.round, 'the round does not advance behind the overlay').toBe(before.round);
+    expect(held.prompt, 'nor is the next question written onto the card').toBe(before.prompt);
+    expect(await page.evaluate(() => window.__sna.arenas.a.frozen), "and Player 1's wave was never cleared").toBe(true);
+    expect(await page.evaluate(() => window.__sna.arenas.b.frozen), "nor Player 2's").toBe(true);
+    // And resuming spends the time the hold had LEFT, so the match carries on rather than stalling.
+    await page.click('#resume');
+    await page.waitForFunction(r => window.__sna.state().round === r + 1, before.round, { timeout: 5000 });
+  });
+
   test('guard rail: nothing the screen floats over the arenas swallows a slice, or hides one (#388)', async ({ page }) => {
     await startDuel(page);
     // Two halves of one hazard, and this pull request fixed them one round apart. Floating the toast to buy back

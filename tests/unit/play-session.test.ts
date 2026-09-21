@@ -22,13 +22,23 @@ const spoken: string[] = [];
 const engine = { speaking: false, pending: false, cancel() {}, speak(u: { text: string }) { spoken.push(u.text); }, getVoices: () => [] };
 (globalThis as any).window = { speechSynthesis: engine };
 
-/** A DOM element as far as the callbacks touch one: HTML in, attributes, hidden, and a class list nobody reads. */
+/**
+ * A DOM element as far as the callbacks touch one: HTML in, attributes, hidden, and a class list. The class
+ * list is a real set rather than a pair of no-ops because `.hint` now carries `own` (#328) and that mark is
+ * the whole of what the landscape fix does — a stub would let the tests below pass with it never written.
+ */
 function fakeEl() {
   const attrs: Record<string, string> = {};
+  const classes = new Set<string>();
   return {
-    innerHTML: '', textContent: '', hidden: false, attrs,
+    innerHTML: '', textContent: '', hidden: false, attrs, classes,
     setAttribute(k: string, v: string) { attrs[k] = v; },
-    classList: { add() {}, remove() {} },
+    classList: {
+      add(c: string) { classes.add(c); },
+      remove(c: string) { classes.delete(c); },
+      contains: (c: string) => classes.has(c),
+      toggle(c: string, on?: boolean) { const want = on ?? !classes.has(c); classes[want ? 'add' : 'delete'](c); return want; },
+    },
     getBoundingClientRect: () => ({ bottom: 120 }),
   };
 }
@@ -42,13 +52,14 @@ const sentenceQ = (): Question => ({
 });
 const soundHuntQ = (): Question => ({ prompt: '🔊 Listen!', say: 'Listen: sun, sock, sad', answer: 's', options: ['s', 'a', 't', 'p'], listen: 'sun · sock · sad' });
 
-function build(gen: () => Question) {
+function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
   const els = { score: fakeEl(), stage: fakeEl(), prompt: fakeEl(), vis: fakeEl(), hint: fakeEl(), qcard: fakeEl(), speak: fakeEl() };
   const arena = {
     paused: false, W: 390, topInset: 0, spawned: [] as WaveOpts[],
     spawnWave(o: WaveOpts) { this.spawned.push(o); }, rush() { return false; }, floatText() {}, reveal() {}, clearWave() {},
   };
   let mounted = true;
+  const holdCalls: boolean[] = [];
   const deps: PlaySessionDeps = {
     training: false, tracing: false, villain: false, av: AVATARS[0],
     els: els as unknown as PlaySessionEls,
@@ -56,10 +67,14 @@ function build(gen: () => Question) {
     hold: { correct: 900, wrong: 1200, miss: 900 },
     arena: () => arena as never, mounted: () => mounted,
     later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },
+    // The real one freezes and re-arms these (#301); this stub only records that the screen calls it, which is
+    // what `screen.test.ts` then holds the freezing itself to.
+    holdTimers: (open) => { holdCalls.push(open); },
     toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {}, showResults() {},
+    ...over,
   };
   const ps = createPlaySession({ mode: 'mission', year: YEARS[1], stages: 1, topic: { id: 't', title: 't', icon: 't', subject: 'writing', year: 'year1', nc: '', gen } }, deps);
-  return { els: els as Record<keyof typeof els, FakeEl>, arena, ps, unmount: () => { mounted = false; ps.dispose(); } };
+  return { els: els as Record<keyof typeof els, FakeEl>, arena, ps, holdCalls, unmount: () => { mounted = false; ps.dispose(); } };
 }
 
 /** The wave launch waits on the font gate's promise, so a launch is only visible after the microtasks drain. */
@@ -120,7 +135,7 @@ describe('the no-voice sentence peek (#65)', () => {
 
   it('the pause overlay stops the peek clock — the sentence is still there on resume, with its time left', async () => {
     save({ voice: 'no' });
-    const { els, arena, ps } = build(sentenceQ);
+    const { els, arena, ps, holdCalls } = build(sentenceQ);
     ps.session.start(); await settle();
     await vi.advanceTimersByTimeAsync(1000);
     ps.hold(true);
@@ -130,6 +145,10 @@ describe('the no-voice sentence peek (#65)', () => {
     expect(arena.spawned, 'and nothing launches under the overlay').toEqual([]);
     ps.hold(false);
     expect(arena.paused, 'resume: the peek still holds the arena').toBe(true);
+    // #301: the screen's own beats are handed the same open/close, so the outcome hold and the gap freeze with
+    // the arena rather than running behind the overlay. What the freezing itself must do is in `screen.test.ts`;
+    // this is the wiring, which no rail held before.
+    expect(holdCalls, 'the scope is told to freeze and re-arm its beats, in that order').toEqual([true, false]);
     await vi.advanceTimersByTimeAsync(NO_VOICE_PEEK_MS - 1000 - 1);
     expect(els.prompt.innerHTML, 'the remaining 2 s run from the resume, not from the start').toBe(SENTENCE);
     await vi.advanceTimersByTimeAsync(1);
@@ -271,5 +290,107 @@ describe('NO_VOICE_PEEK_MS: bounded against what a child actually has to read (#
 
   it('is not so long that it stops being a memory task', () => {
     expect(NO_VOICE_PEEK_MS).toBeLessThanOrEqual(5000);
+  });
+});
+
+/**
+ * #328: on a phone held sideways `@media (max-height: 640px)` hides `.hint` to buy the play card vertical
+ * space. That is a fair trade for an instruction line and not for the seven measure topics, which put the
+ * values being compared there and nowhere else, so the card becomes "Which holds more?" over two coloured
+ * bubbles (#65: usable without read-aloud). The fix is one class, written from the generator's own
+ * `hintIsData` flag: the CSS keeps hiding every other hint and lets the marked one through.
+ *
+ * **The predicate is the whole finding of this pull request's round-1 review.** It was `!!q.hint` by way of
+ * `line === q.hint`, and `hint` is documented as "small instruction text": 47 of 87 topics write one and
+ * only 7 carry data, so the first version gave a line back to ~40 landscape cards that the media query
+ * exists to reclaim. The tests could not tell, because both controls — here and in the e2e — were drawn
+ * from topics that write no hint at all. `instructionQ` below is that gap closed: it is the shape of
+ * `y1-shapes`/`y2-punct`, a hint-writing card that must stay hidden, and it fails against `!!q.hint`.
+ *
+ * Checked here as well as in the e2e (`game.spec.ts`, at 844×390) because the mark is the whole mechanism:
+ * this says the writer sets it on the right questions, that says the rule then renders it.
+ */
+describe('the line under the prompt says whose it is (#328)', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  /** A `measureCompare()` card, in the shape `y1-capacity` draws: the millilitres live in the hint alone. */
+  const measureQ = (): Question => ({
+    prompt: 'Which holds more?', answer: 'red', options: ['red', 'blue'],
+    hint: 'red jug: 300 ml · blue jug: 100 ml', hintIsData: true, say: 'the red jug holds 300 millilitres, the blue jug holds 100 millilitres. Which one holds more?',
+  });
+  /**
+   * A card that writes a `hint` and does NOT need it — the majority case, `y1-shapes`'s shape. This is the
+   * control the first version of the fix was missing: it is what separates `hintIsData` from `!!q.hint`,
+   * and it is red against the latter.
+   */
+  const instructionQ = (): Question => ({ prompt: 'Which is the circle?', answer: '⭕', options: ['⭕', '🔺'], hint: 'Slice the shape' });
+  const plainQ = (): Question => ({ prompt: '3 + 4', answer: '7', options: ['7', '8'] });
+
+  it("marks the question's own hint, so the short-screen rule cannot hide the only values on the card", async () => {
+    save({ voice: 'yes' });
+    const { els, ps } = build(measureQ);
+    ps.session.start(); await settle();
+    expect(els.hint.textContent).toBe('red jug: 300 ml · blue jug: 100 ml');
+    expect(els.hint.classes.has('own'), 'without this class the landscape rule hides the millilitres').toBe(true);
+  });
+
+  it("leaves a generator's INSTRUCTION hint unmarked, which is 40 of the 47 topics that write one", async () => {
+    save({ voice: 'yes' });
+    const { els, ps } = build(instructionQ);
+    ps.session.start(); await settle();
+    expect(els.hint.textContent, 'the card still shows its instruction on a tall screen').toBe('Slice the shape');
+    expect(els.hint.classes.has('own'), 'marking this costs every such card a line of arena in landscape').toBe(false);
+  });
+
+  it('leaves the screen\'s own generic instruction unmarked, so landscape keeps the space it buys today', async () => {
+    save({ voice: 'yes' });
+    const { els, ps } = build(plainQ);
+    ps.session.start(); await settle();
+    expect(els.hint.textContent).toBe('Tap or slice the answer');
+    expect(els.hint.classes.has('own')).toBe(false);
+  });
+
+  it('does not mark a fallback instruction when a generator sets the flag but writes no hint', async () => {
+    save({ voice: 'yes' });
+    const { els, ps } = build(() => ({ prompt: '3 + 4', answer: '7', options: ['7', '8'], hintIsData: true }));
+    ps.session.start(); await settle();
+    expect(els.hint.textContent, 'no hint, so `hintText` fell back to the screen\'s line').toBe('Tap or slice the answer');
+    expect(els.hint.classes.has('own'), 'the flag alone must not mark a line the question did not write').toBe(false);
+  });
+
+  it('clears the mark when a hint-carrying question is followed by one without, so it cannot stick', async () => {
+    save({ voice: 'yes' });
+    let first = true;
+    const { els, ps } = build(() => { const q = first ? measureQ() : instructionQ(); first = false; return q; });
+    ps.session.start(); await settle();
+    expect(els.hint.classes.has('own')).toBe(true);
+    expect(ps.session.hit('red')).toBe('correct');
+    ps.waveEnd();                                   // the arena's callback, which the stub arena above cannot fire
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(els.hint.textContent, 'the second question is the instruction one').toBe('Slice the shape');
+    expect(els.hint.classes.has('own'), 'a stale mark would keep an instruction on screen in landscape').toBe(false);
+  });
+
+  it('does not mark the tracing instruction, on the path the harness never used to reach', async () => {
+    // `build()` hardcoded `tracing: false` and nothing in the suite overrode it, so `hintText`'s tracing
+    // branch had no coverage in either direction (#430 review, addendum to note 5). No live bug — the three
+    // trace topics emit no `hint` — but the line is this screen's words, so it must not be marked.
+    save({ voice: 'yes' });
+    const { els, ps } = build(plainQ, { tracing: true });
+    ps.session.start(); await settle();
+    expect(els.hint.textContent).toBe('Trace over the dotted letters');
+    expect(els.hint.classes.has('own')).toBe(false);
+  });
+
+  it("does not mark the peek's own instructions, which are this screen's words and not the card's", async () => {
+    save({ voice: 'no' });
+    const { els, ps } = build(sentenceQ);
+    ps.session.start(); await settle();
+    expect(els.hint.textContent).toBe('Look, remember, then build it');
+    expect(els.hint.classes.has('own')).toBe(false);
+    await vi.advanceTimersByTimeAsync(NO_VOICE_PEEK_MS);
+    expect(els.hint.textContent).toBe('Slice the words in order');
+    expect(els.hint.classes.has('own')).toBe(false);
   });
 });

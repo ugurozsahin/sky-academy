@@ -16,9 +16,10 @@
        screenshots the page instead. Stripped by scripts/bundle-single.mjs along with the manifest link,
        because the single-file page is hosted on somebody else's origin with no icons/ beside it. -->
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+  <!-- #479: Fredoka used to come from fonts.googleapis.com. It is now two woff2 files under public/fonts/,
+       declared by @font-face in src/style.css, so there is no <link> here at all. A routine session's egress
+       policy refuses that host, which meant every screenshot and every e2e run measured the FALLBACK face
+       while claiming to measure the game — and label fitting is a measureText comparison. -->
 </head>
 <body>
   <div id="app"></div>

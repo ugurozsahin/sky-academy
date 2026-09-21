@@ -13,7 +13,7 @@ import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
 import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { addCoins, load, recordAccuracy, recordCert, recordDojo, recordDuel, type StoredDuel } from '../storage';
+import { load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
@@ -113,7 +113,13 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       const speed = o.year.speeds[0] ?? 2;
       const opts = waveOptsFor(q, { labels: q.options, speed }, 0);
       // #44: the first wave waits for Fredoka (cached after that); #138: a spawn that waited must still be this wave's.
-      fontReady().then(() => {
+      // Through `later(..., 0)` and not straight out of the promise (PR #474 review, B2). `waveId`/`alive`
+      // are the only guards a raw continuation has, and neither reads the hold — so a pause pressed inside
+      // this gate, up to the 1200ms cap on a cold font cache, let `say()` speak a question behind the overlay
+      // and `spawnWave` land with `launchAt` already past. That is #301 word for word, in the one place the
+      // fix did not reach. A 0ms beat defers rather than drops: frozen at 0 remaining, re-armed at 0 on
+      // resume, so the wave goes up the moment the child comes back instead of never.
+      fontReady().then(() => later(() => {
         if (waveId !== myWave || !scope.alive) return;
         // Round 1 carries the hand-over line in the same utterance. On a rematch it would be spoken in the very
         // task that `hush()` cancelled the old screen's voice in — the cancel-then-speak drop audio.ts documents —
@@ -132,7 +138,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         // look symmetrical while giving the left-handed and right-handed reach a different problem.
         const seed = (Math.random() * 0x100000000) >>> 0, at = performance.now();
         for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts, { rng: seededRng(seed), now: at }); }
-      });
+      }, scaled(0)));   // scaled(0) is 0 — a "next task", on the same clock every other beat here uses (#138)
     },
     onRoundWon(player, q) {
       sfx.correct(); haptic('slice');
@@ -171,14 +177,26 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     }, { trailColor: av.glow, fx: av.fx, onSwish: () => sfx.swish(), onThrow: () => sfx.whoosh(), onLand: () => sfx.slice() });
   }
   const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };
-  const hold = (open: boolean) => { holdOpen = open; syncPaused(); };
+  // The arena's pause AND the screen's beats (#301): `syncPaused()` alone left `endWave`'s `clearWave`, the
+  // `duel.waveEnd()` that follows it and the results cue running behind the pause overlay, so a pause inside
+  // the outcome hold advanced the round and spawned the next wave out of sight.
+  //
+  // `beats` is false for a hold that NEVER LIFTS (PR #474 review, B1). Freezing beats is right for the pause
+  // overlay, which reopens; it is exactly wrong for the results overlay, which does not — a beat armed after
+  // that hold would sit in the set unarmed until `dispose()` threw it away, in silence. That cost this screen
+  // the sticker jingle below and left every results toast pinned over the modal for the life of the screen.
+  // The results hold still pauses both arenas (`syncPaused()` reads `duel.ended` too); it just leaves the
+  // overlay's own presentation timers alone, which is what `main` did before #301 and is the only behaviour
+  // the game is over for.
+  const hold = (open: boolean, beats = true) => { holdOpen = open; if (beats) scope.holdTimers(open); syncPaused(); };
 
   function showResults(r: DuelResult) {
-    hold(true);
+    hold(true, false);   // terminal: the beats below (the jingle, the certificate toasts) must still run — see `hold`
+
     // #16 item 5: the match pays into the one shared save before the overlay is built, so the coin row and
     // any sticker it unlocked are on the screen the children are already looking at. The Daily Dojo hears
     // about the match here too — ten questions answered correctly on this screen move the day's volume
-    // challenges exactly as they would in any other mode — and its bonus rides the same single addCoins().
+    // challenges exactly as they would in any other mode — and its bonus rides the same single write (#365).
     paid = duelCoins(r);
     // Sensei's half: the rounds Player 1 answered on this topic — one try each, the unit a mission writes — for
     // the seat `DUEL_HANDOVER` keeps for the profile's own child (`duelAccuracy()` has why neither the score nor
@@ -190,9 +208,9 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // topic met only in Sensei training or Sky Storm already behaves.
     taught = duelAccuracy(r);
     recordAccuracy(topic.id, taught.hits, taught.tries);
-    const dojo = recordDojo(duelDojoEvent(r, topic.subject));
+    // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
+    const { dojo, fresh } = recordGameEnd(duelDojoEvent(r, topic.subject), paid);
     dojoPaid = dojo.coins;
-    const fresh = addCoins(paid + dojoPaid);
     cert = duelCert(r);
     // #205's rule, unchanged here: filed the moment the overlay is built, never from the 🎓 button, because the
     // bug that issue opened with is a device where pressing the button does nothing at all.
@@ -282,7 +300,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     duel, arenas,
     answer: p => { const t = target(p, false); return t !== undefined && arenas[p].hitLabel(t); },
     wrong: p => { const t = target(p, true); return t !== undefined && arenas[p].hitLabel(t); },
-    bubbles: p => arenas[p].bubbles.filter(inFlight).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })),
+    bubbles: p => arenas[p].bubbles.filter(inFlight).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy, lines: b.lines, labelState: b.labelState })),
     state: () => ({
       mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,

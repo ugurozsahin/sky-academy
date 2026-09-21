@@ -1,8 +1,8 @@
 // Memory Match screen: a calm, non-slice card-flip mode. Cards are DOM buttons (no canvas).
 import { avatarById, cheerLine, praiseLine } from '../avatars';
 import type { YearInfo } from '../curriculum';
-import { Memory, pickTheme, type Face } from '../game/memory';
-import { addCoins, load, recordDojo, recordMemory, touchStreak } from '../storage';
+import { gridFor, Memory, pickTheme, type Face } from '../game/memory';
+import { load, recordGameEnd, recordMemory, touchStreak } from '../storage';
 import { say, sfx } from '../audio';
 import { $, $$, esc, render } from './dom';
 import { resultsModal, screenScope, stickersHTML } from './screen';
@@ -23,7 +23,11 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
   const d = load(); const av = avatarById(d.avatar);
   const theme = pickTheme(o.year.id, Math.random, o.theme);
   const game = new Memory(theme.pairs(Math.random));
-  const cols = 4;                                  // 8 / 12 / 16 cards → 2 / 3 / 4 rows
+  // Was `const cols = 4` with a comment enumerating 8 / 12 / 16 cards; `gridFor` is that decision made from
+  // the deck instead, because a five-pair board is ten cards and four columns lay it out ragged (#372 review
+  // B1). `offset` moves the first card of a short last row inwards so the row is centred rather than hanging
+  // off the left edge; it is 0 for every board the game deals today.
+  const { cols, offset, lastRowStart } = gridFor(game.cards.length);
   render(`
   <section class="screen memory" style="--glow:${av.glow}">
     <div class="hud-top">
@@ -38,7 +42,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     </div>
     <div class="toast" id="toast" aria-live="polite"></div>
     <div class="cards" id="cards" style="--cols:${cols}" role="grid" aria-label="Memory cards">
-      ${game.cards.map((c, i) => `<button class="card" data-i="${i}" aria-label="Card ${i + 1}"><span class="inner"><span class="back">?</span><span class="front">${faceHTML(c.face)}</span></span></button>`).join('')}
+      ${game.cards.map((c, i) => `<button class="card" data-i="${i}"${i === lastRowStart ? ` style="grid-column-start:${offset + 1}"` : ''} aria-label="Card ${i + 1}"><span class="inner"><span class="back">?</span><span class="front">${faceHTML(c.face)}</span></span></button>`).join('')}
     </div>
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
@@ -65,8 +69,9 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
 
   function finish() {
     const boards = recordMemory(o.year.id);
-    const dojo = recordDojo({ mode: 'memory', won: true, correct: game.pairs.length, attempts: game.moves, bestCombo: 0, stars: game.stars, score: game.score });
-    const fresh = addCoins(game.coins + dojo.coins); const streak = touchStreak();
+    // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
+    const { dojo, fresh } = recordGameEnd({ mode: 'memory', won: true, correct: game.pairs.length, attempts: game.moves, bestCombo: 0, stars: game.stars, score: game.score }, game.coins);
+    const streak = touchStreak();
     const stickerHTML = stickersHTML(fresh);
     if (fresh.length) later(() => sfx.stage(), 600);
     sfx.stage();

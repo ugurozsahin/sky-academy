@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
@@ -7,6 +7,35 @@ import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds 
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
 import { SOURCES, inDir, code, workflow } from './helpers/sources';
+
+/**
+ * The Fredoka weight axis the app actually serves, `[lo, hi]`, read from the @font-face rules in
+ * src/style.css (#479). Before #479 this was index.html's `family=Fredoka:wght@500;600;700` — a discrete
+ * list; self-hosting serves Google's own variable file, whose axis they declare as `font-weight: 300 700`.
+ *
+ * A function declaration rather than a const, because the rails that call it sit both above and below it.
+ * It throws rather than defaulting: a missing or reworded declaration must break the rails that depend on
+ * it, not quietly hand them a permissive range in which every weight is legal.
+ */
+function servedWeightRange(): [number, number] {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  if (css.length < 5000) throw new Error('style.css must be read from disk, not a blank ?raw import');
+  const faces = css.split('@font-face').slice(1);
+  if (faces.length < 2) throw new Error('src/style.css must declare Fredoka with @font-face (#479)');
+  const ranges = faces.map(f => {
+    const m = /font-weight:\s*(\d+)(?:\s+(\d+))?/.exec(f);
+    if (!m) throw new Error('every @font-face must state its font-weight (#44)');
+    return [Number(m[1]), Number(m[2] ?? m[1])] as [number, number];
+  });
+  // Every face must cover the same axis, or "the served range" is a fiction that depends on which subset a
+  // glyph fell into — a label in latin-ext would then be fitted against a different face than the one beside
+  // it. Google serves one variable file per subset with identical axes; this holds that property.
+  const [lo, hi] = ranges[0];
+  for (const [a, b] of ranges) {
+    if (a !== lo || b !== hi) throw new Error(`@font-face rules declare different weight axes (${a}-${b} vs ${lo}-${hi}) — a label's weight would depend on its subset (#479)`);
+  }
+  return [lo, hi];
+}
 
 /**
  * GUARD RAILS (#73) — checks that fail the build so a mistake we have already made cannot come back.
@@ -71,6 +100,21 @@ describe('guard rails', () => {
     ]);
   });
 
+  // #365: a finished game reaches the save in ONE write. `recordDojo()` then `addCoins()` was two saves with
+  // no rollback, and `save()` swallows a refused `setItem` (#151), so a store that took the first and refused
+  // the second recorded the Daily Dojo challenge as done while its coins never landed — and `applyEvent()`
+  // only pays `!done.includes(c.id)`, so that bonus was gone for the day. `recordGameEnd()` replaced the pair
+  // on all three results screens, but nothing stopped them going back: reverting play.ts, memory.ts and
+  // duel.ts to the pre-fix pair left the suite 1696/1696 green and `tsc` clean (PR #438 review, round 2).
+  // Both halves of the pair stay exported with unchanged signatures and zero `src/` callers, which is exactly
+  // the adjacency a fourth results screen meets. A screen settles a finished game through `recordGameEnd()`.
+  it('no screen settles a finished game with the recordDojo/addCoins pair (#365)', () => {
+    const hits = inDir('/src/ui/').flatMap(([f, s]) =>
+      [...code(s).matchAll(/\b(recordDojo|addCoins)\s*\(/g)].map(m => `${f}: ${m[1]}(`));
+    expect(hits, 'a results screen uses recordGameEnd() — the pair is two writes with no rollback (#365)')
+      .toEqual([]);
+  });
+
   it('shadowBlur stays out of the per-frame draw paths', () => {
     const hits = inDir('/src/game/').flatMap(([f, s]) => [...code(s).matchAll(/shadowBlur/g)].map(() => f));
     expect(hits.length).toBeLessThanOrEqual(0);                         // #29 removed them; never raise this
@@ -105,6 +149,22 @@ describe('guard rails', () => {
     expect(from).toBeGreaterThan(0);
     const body = src.slice(from, from + 1 + src.slice(from + 1).indexOf('\n  private '));   // up to the next method
     expect(body).not.toMatch(/createRadialGradient|measureText/);
+  });
+
+  // #348: a label that had to be wrapped reaches the screen only if drawBubble iterates every fitted line
+  // and recentres the block on the disc. Dropping either is a one-line edit that reverts the whole feature,
+  // so the shape is pinned here as well as behaviourally in `arena-spawn.test.ts` (PR #467 review, B2).
+  it('drawBubble draws every fitted line, recentred on the disc (#348)', () => {
+    const src = code(SOURCES['/src/game/arena.ts']);
+    const from = src.indexOf('private drawBubble(');
+    expect(from).toBeGreaterThan(0);
+    const body = src.slice(from, from + 1 + src.slice(from + 1).indexOf('\n  private '));
+    // Both text passes (the dark outline, then the white fill) walk the whole `lines` array…
+    expect([...body.matchAll(/for \(let i = 0; i < lines\.length; i\+\+\) c\.(stroke|fill)Text\(lines\[i\]/g)]).toHaveLength(2);
+    // …and neither draws `b.label`, which is the answer key and not what a wrapped bubble shows.
+    expect(body).not.toMatch(/(stroke|fill)Text\(\s*(b\.label|text)\b/);
+    // …and the block's first baseline is offset by half the stack, not pinned to the single-line one.
+    expect(body).toMatch(/top = 2 - \(lines\.length - 1\) \* lh \/ 2/);
   });
 
   // #48 review: tapping a TNT threw a ninja star at it, so the bomb burst once from play.ts's BOMB branch and
@@ -765,17 +825,63 @@ describe('guard rails', () => {
     expect(code(play), 'the first-ever play must not skip the gate').not.toMatch(/later\(\s*spawn\s*,/);
   });
 
-  // #44 again, the other half: the gate probes one concrete face, and it is only meaningful if index.html
-  // actually asks Google for that weight. Trim the `wght@` list and the gate would wait for a face that never
-  // arrives — every first wave then pays the full timeout AND still draws in the fallback. index.html is read
-  // from disk (Vite's glob does not reach it) and its length asserted, so an empty read cannot pass vacuously.
-  it('the font gate probes a weight index.html requests from Google (#44)', () => {
+  // #44 again, the other half: the gate probes one concrete face, and it is only meaningful if the face is
+  // one the app actually serves. Narrow what is served and the gate waits for a face that never arrives —
+  // every first wave then pays the full timeout AND still draws in the fallback.
+  //
+  // #479 moved where "served" is written down. It was index.html's `wght@` list; it is now the `font-weight`
+  // range on the @font-face rules in src/style.css, because the font is ours. Both files are read from disk
+  // (Vite's glob reaches neither) with their length asserted, so an empty read cannot pass vacuously.
+  it('the font gate probes a weight the app actually serves (#44, #479)', () => {
+    const [lo, hi] = servedWeightRange();
+    const probe = Number(/^(\d+)\s/.exec(FONT_PROBE)?.[1]);
+    expect(probe, 'FONT_PROBE must start with a numeric weight').toBeGreaterThan(0);
+    expect(probe, `the gate probes weight ${probe}, outside the served axis ${lo}-${hi}`).toBeGreaterThanOrEqual(lo);
+    expect(probe, `the gate probes weight ${probe}, outside the served axis ${lo}-${hi}`).toBeLessThanOrEqual(hi);
+  });
+
+  // #479: the whole point of self-hosting is that no face is fetched from a third party, so nothing in the
+  // shipped page may name one. A `<link>` is how it was written before; a `@import` in the stylesheet and a
+  // `src: url(https://…)` inside an @font-face are the two ways it comes back without a `<link>`, and both
+  // would fail exactly the same way — silently, in a cloud session, measuring the fallback face while every
+  // test reads green. The fallback STACK in `--font` is untouched by this: those are names, not fetches.
+  it('no face is fetched from a third party (#479)', () => {
     const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
-    expect(html.length, 'index.html must be read from disk, not a blank import').toBeGreaterThan(500);
-    const weights = /family=Fredoka:wght@([\d;]+)/.exec(html)?.[1].split(';') ?? [];
-    expect(weights.length, 'index.html should request Fredoka with an explicit wght@ list').toBeGreaterThan(0);
-    const probe = /^(\d+)\s/.exec(FONT_PROBE)?.[1];
-    expect(weights, `the gate probes weight ${probe}, which index.html must request`).toContain(probe);
+    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    expect(html.length, 'index.html must be read from disk').toBeGreaterThan(500);
+    expect(css.length, 'style.css must be read from disk').toBeGreaterThan(5000);
+    // NOT `code()`. That helper strips `//` to end of line as a JS line comment, and every URL this rail
+    // exists to catch contains `//` — `href="https://fonts.googleapis.com/…"` becomes `href="https:` and the
+    // host vanishes, so a rail built on `code()` would pass on the very file it was written against. (Found
+    // by running this rail against the pre-#479 index.html, which is the first mutation in the PR's table.)
+    // What IS stripped is the comment syntax each language really has: a host named in a comment fetches
+    // nothing, and both files carry a note about the host they stopped using. Lengths were asserted on the
+    // raw text above, so stripping cannot make an empty read pass.
+    const markup = (s: string) => s.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+    for (const host of ['fonts.googleapis.com', 'fonts.gstatic.com']) {
+      expect(markup(html).includes(host), `index.html must not reach ${host} — a routine session cannot (#479)`).toBe(false);
+      expect(markup(css).includes(host), `style.css must not reach ${host} — a routine session cannot (#479)`).toBe(false);
+    }
+    expect(markup(css), 'no @import may pull a stylesheet from anywhere but this repo (#479)').not.toMatch(/@import\s+(?:url\()?["']?https?:/i);
+    // ...and every @font-face src is a path into public/, not an absolute URL by another spelling.
+    const srcs = [...markup(css).matchAll(/src:\s*url\(\s*["']?([^"')]+)/g)].map(m => m[1]);
+    expect(srcs.length, 'the rail found no @font-face src at all — it would pass vacuously').toBeGreaterThanOrEqual(2);
+    expect(srcs.filter(u => !u.startsWith('/fonts/')), 'every font src must be a local /fonts/ path (#479)').toEqual([]);
+    // ...and the files those paths name are really in the tree, at a size only a real font reaches. A src
+    // pointing at nothing is the same defect as a src pointing at Google: the fallback face, silently.
+    // `statSync` throws ENOENT on a missing file, which aborts the test with a stack trace instead of the
+    // sentence explaining what went wrong — so existence is asserted first, and only then the size. A src
+    // naming a file that is not in the tree is the same defect as a src naming Google: the fallback face,
+    // silently, with the stylesheet reading as correct.
+    const bytes = (p: string, why: string) => {
+      const f = new URL(`../../${p}`, import.meta.url);
+      expect(existsSync(f), `${p} is not in the tree — ${why} (#479)`).toBe(true);
+      return statSync(f).size;
+    };
+    for (const u of srcs) expect(bytes(`public${u}`, 'the stylesheet names it but nothing ships it'),
+      `${u} must be a real font file, not a placeholder (#479)`).toBeGreaterThan(2000);
+    expect(bytes('public/fonts/OFL.txt', 'Fredoka is SIL OFL 1.1 and the licence ships beside the files it covers'),
+      'the licence must be the real text, not an empty file').toBeGreaterThan(1000);
   });
   // #31: `update()` runs up to six times per frame (the substep loop clamps each step to 1/60 s), and it used
   // to rebuild `shots`, `particles` and `trail` with `.filter()` on every one of them — up to 18 throwaway
@@ -900,12 +1006,15 @@ describe('guard rails', () => {
   //  - `certificate.ts` passes its weight as an argument (`font(px, w = 700)`), so its call sites are
   //    outside both forms. They are 500/600/700 today.
   const FREDOKA_MAX = 700;
-  it('nothing in src/ asks Fredoka for a weight it does not have (#44)', () => {
-    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
-    expect(html.length, 'index.html must be read from disk, not a blank import').toBeGreaterThan(500);
-    const served = (/family=Fredoka:wght@([\d;]+)/.exec(html)?.[1] ?? '').split(';').filter(Boolean);
-    expect(served.length, 'index.html should request Fredoka with an explicit wght@ list').toBeGreaterThan(0);
-    expect(Math.max(...served.map(Number)), 'Fredoka has no weight above 700').toBeLessThanOrEqual(FREDOKA_MAX);
+  it('nothing in src/ asks Fredoka for a weight it does not have (#44, #479)', () => {
+    // #479: "served" moved from index.html's discrete `wght@` list to the @font-face axis in style.css, so
+    // the test moved with it — from membership of a list to containment in a range. That is a real widening
+    // (600 was never in the old list's gaps, but 450 now passes where it would once have failed) and it is
+    // the truth: the served file is variable, so 450 really is a face the browser can produce. What the rail
+    // still holds is the thing that was ever wrong — a weight OUTSIDE the axis, which the engine synthesises
+    // or rounds silently, differently on WebKit and older Android WebView than on Chromium.
+    const [lo, hi] = servedWeightRange();
+    expect(hi, 'Fredoka has no weight above 700').toBeLessThanOrEqual(FREDOKA_MAX);
 
     const asked = Object.entries(SOURCES).flatMap(([f, s]) => [
       // a canvas font string: `700 24px "Fredoka", …`
@@ -916,8 +1025,8 @@ describe('guard rails', () => {
       ...[...code(s).matchAll(/font-weight="(\d{3})"/g)].map(m => `${f}: ${m[1]}`),
     ]);
     expect(asked.length, 'the rail found no font weights at all — it would pass vacuously').toBeGreaterThan(4);
-    expect(asked.filter(a => !served.includes(a.split(': ')[1])),
-      `every Fredoka weight in src/ must be one index.html asks Google for (${served.join(';')})`).toEqual([]);
+    expect(asked.filter(a => { const w = Number(a.split(': ')[1]); return w < lo || w > hi; }),
+      `every Fredoka weight in src/ must sit on the served axis (${lo}-${hi}, src/style.css @font-face)`).toEqual([]);
   });
 
   // The same mistake in CSS. Read from disk: Vite's `?raw` returns an empty string for stylesheets outside
@@ -1199,6 +1308,69 @@ describe('guard rails', () => {
   // Neither failed anything — which is exactly what makes them worth a rail. A test written against the
   // compressed trajectory would have been asserting a path the game does not have, and the next beat added
   // in real time would be just as invisible as these were.
+  /**
+   * #301's hold, wired — and the two shapes of it no other unit test can see (PR #474 round-1 review).
+   *
+   * Reverting the user-visible half of #301 outright — `holdTimers` a no-op in `play.ts`, `scope.holdTimers`
+   * deleted from `duel.ts` — left the whole unit suite green at 1,931: only the two new e2e specs caught it,
+   * and a `testIgnore` could quietly drop those (review, note 7). The terminal-hold rule had nothing at all:
+   * `hold(true)` at the results screen froze beats no resume would ever re-arm, so the sticker jingle never
+   * played and every results toast pinned itself over the modal — and CI stayed green through both, because
+   * nothing asserted that a toast goes AWAY. Text checks, like every rail in this file: they hold the exact
+   * call sites named in their comments, and say nothing about a third screen or a new way to arm a beat.
+   */
+  it('both game screens put their beats on the hold, and take the terminal hold off it (#301, PR #474 review B1)', () => {
+    const play = code(SOURCES['/src/ui/play.ts'] ?? '');
+    const playSession = code(SOURCES['/src/ui/play-session.ts'] ?? '');
+    const duel = code(SOURCES['/src/ui/duel.ts'] ?? '');
+    expect({ play: play.length > 1000, playSession: playSession.length > 1000, duel: duel.length > 1000 },
+      'all three must be read, not blank imports').toEqual({ play: true, playSession: true, duel: true });
+    // Wired at all: the pause hold reaches the beat clock on both screens.
+    expect(playSession, "play-session's hold drives the screen's beats, not only the arena").toMatch(/\bdeps\.holdTimers\(open\)/);
+    expect(play, "and play.ts hands the scope's holdTimers to the session").toMatch(/\bholdTimers\b/);
+    expect(duel, "the duel's hold drives them too").toMatch(/\bscope\.holdTimers\(open\)/);
+    // And taken OFF it where the hold is TERMINAL. `showResults` never reopens — both screens offer only
+    // Play again and Islands, and both go straight to cleanup — so a beat armed after it has no resume.
+    expect(play, 'the play results hold does not freeze the beats it is about to arm')
+      .toMatch(/playSession\.hold\(true,\s*false\)/);
+    expect(duel, 'nor does the duel results hold').toMatch(/\bhold\(true,\s*false\)/);
+    // The beat that proved it, still inside the results path on both screens. Named so that moving it out is
+    // a deliberate act rather than something this rail silently stops covering.
+    for (const [name, src] of [['play.ts', play], ['duel.ts', duel]] as const) {
+      const at = src.indexOf('function showResults');
+      expect(at, `${name} still has a showResults for this rule to be about`).toBeGreaterThan(-1);
+      expect(src.slice(at), `${name}'s results screen still arms the unlock jingle after its hold`)
+        .toMatch(/later\(\(\) => sfx\.stage\(\)/);
+    }
+  });
+
+  /**
+   * #301's one gap, closed in PR #474's round 1 (review, B2): the first wave's font gate.
+   *
+   * `fontReady()` is a promise, and a raw `.then()` continuation is guarded by `mounted()`/`waveId` and by
+   * nothing that reads the hold — so a pause pressed inside that gate, up to the 1200 ms cap on a cold font
+   * cache, spoke the question and launched the wave behind the overlay, which is the very symptom #301's
+   * docblock says it removes. Routed through `later(..., scaled(0))` it defers instead of dropping. A text
+   * check: it holds that the two known gates go through the beat clock, not that no third way to spawn exists.
+   */
+  it('the font-gated first spawn goes through the beat clock, not straight out of the promise (#301, PR #474 review B2)', () => {
+    for (const [name, path] of [['play-session.ts', '/src/ui/play-session.ts'], ['duel.ts', '/src/ui/duel.ts']] as const) {
+      const src = code(SOURCES[path] ?? '');
+      expect(src.length, `${name} must be read, not a blank import`).toBeGreaterThan(1000);
+      // EVERY occurrence, not the first. `play-session.ts` has two — `fontReady().then(() => { fontsReady =
+      // true; })`, which sets the flag and launches nothing, and the gate itself — and slicing by first match
+      // read the wrong one, green. That is the same trap #395 files against the prose rails, met here.
+      const gates = [...src.matchAll(/fontReady\(\)\.then\(/g)].map(m => m.index ?? -1);
+      expect(gates.length, `${name} still gates on fontReady at all`).toBeGreaterThan(0);
+      const launching = gates.filter(at => /\bspawn(Wave)?\(/.test(src.slice(at, at + 900)));
+      expect(launching.length, `${name} has a fontReady gate that goes on to launch a wave`).toBe(1);
+      // The beat clock must be the FIRST thing inside that continuation, not something reached later in it.
+      expect(src.slice(launching[0], launching[0] + 80).replace(/\s+/g, ' '),
+        `${name}'s font gate hands its continuation to later(), so a pause inside the gate holds the spawn`)
+        .toMatch(/^fontReady\(\)\.then\(\(\) => (deps\.)?later\(/);
+    }
+  });
+
   it('fast mode compresses time only — the drift scales with it and no beat is left in real time (#138)', () => {
     const arena = code(SOURCES['/src/game/arena.ts'] ?? '');
     expect(arena.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
@@ -1969,5 +2141,41 @@ describe('`<a download>` stays reachable from one guarded place in the certifica
   it('and certRoute itself never sends a native shell to a download', () => {
     expect(code(cert), 'certRoute must answer `show` for a native shell before it answers `download`')
       .toMatch(/if\s*\(\s*caps\.nativeShell\s*\)\s*return\s*'show'\s*;[\s\S]{0,40}return\s*'download'/);
+  });
+});
+
+/*
+ * #18 slice 2, group A. The DOM-screen width cap moved off the 820 px phone column on wide viewports, and
+ * the only behavioural check on it lives in `tests/e2e/viewport.spec.ts` — which the `mobile` and `desktop`
+ * projects skip, so it runs on the nightly and never on a pull request (`.claude/rules/e2e.md`). A revert
+ * or a stray `max-width` on `.screen` would therefore ship green and be found a day later, on a screen the
+ * audit spent a whole slice measuring.
+ *
+ * This rail is the pull-request-time half: it reads the stylesheet as text and holds the three decisions
+ * that make the fix what it is, not the pixel values the e2e file owns. Widening `.play` or `.memory` is
+ * `owner-approval` work (the arena cap and the card grid change the look and how far a thumb travels), so
+ * the exclusion is part of the rule, not a detail — dropping it is how an unapproved look change would
+ * arrive without anyone deciding to make one.
+ */
+describe('the landscape screen width cannot silently return to the phone column (#18)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  it('a wide-viewport media query widens .screen, and excludes .play and .memory', () => {
+    expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
+
+    const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*\.screen:not\(\.play\):not\(\.memory\)\s*\{([^}]*)\}/);
+    expect(block, 'the #18 rule must stay a min-width: 900px block over .screen:not(.play):not(.memory)').toBeTruthy();
+    expect(block![1], 'the widened cap must still be a max-width, and must not be the 820 px phone column')
+      .toMatch(/max-width:\s*min\(\s*\d{3,4}px\s*,/);
+    expect(block![1], 'the widened cap must be bigger than the 820 px column it replaces')
+      .not.toMatch(/max-width:\s*min\(\s*(?:[0-7]?\d{1,2}|8[01]\d|820)px/);
+  });
+
+  it('the base .screen rule still carries the phone column for narrow viewports', () => {
+    const base = bare.match(/(?:^|[}\s])\.screen\s*\{([^}]*)\}/)?.[1];
+    expect(base, 'the base .screen rule must exist').toBeTruthy();
+    expect(base, 'a phone and a portrait tablet keep the 820 px column — the audit found both clean')
+      .toMatch(/max-width:\s*820px/);
   });
 });

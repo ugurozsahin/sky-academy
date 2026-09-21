@@ -55,6 +55,8 @@ export interface PlaySessionDeps {
   /** False once this screen has been torn down — never spawn a wave into a dead screen. */
   mounted: () => boolean;
   later: (fn: () => void, ms: number) => void;              // alive-guarded timer (#35)
+  /** Freeze/re-arm every pending `later()` beat while an overlay holds the screen (#301) — `scope.holdTimers`. */
+  holdTimers: (open: boolean) => void;
   toast: (text: string, cls?: string, ms?: number) => void;
   startTrace: (q: Question) => void;
   showTutorial: () => number;
@@ -72,8 +74,13 @@ export interface PlaySession {
    * One of the screen's overlays (pause, stage clear, results) opened (`true`) or closed. The arena is paused
    * while an overlay OR a sentence peek holds it, and a peek's clock stops while an overlay is open — so a
    * child who pauses mid-peek finds the sentence still there on resume, with the rest of its time to run (#65).
+   *
+   * `beats` is false for a hold that NEVER LIFTS — the results overlay (PR #474 review, B1). Freezing the
+   * screen's beats (#301) is right for pause and stage clear, which both reopen; after the results hold a
+   * frozen beat has no resume to be re-armed by, so it sat in the set unarmed until `dispose()` threw it
+   * away, in silence. That cost the sticker jingle and left every results toast pinned over the modal.
    */
-  hold(open: boolean): void;
+  hold(open: boolean, beats?: boolean): void;
   /**
    * The child tapped the card or 🔊. On a device that speaks the screen reads the line again; on one that
    * cannot, a hidden sentence is shown again for the peek time. Returns true when it was handled here, so
@@ -162,10 +169,28 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     peekToken++; peekActive = false; peekDone = null;
     syncPaused();
   }
+  /**
+   * Write the line under the prompt. `own` marks the one kind that must survive a short screen: a hint the
+   * card is *answered from*, which the generator declares with `hintIsData` (`types.ts`). The short-screen
+   * rule (`@media (max-height: 640px)` in style.css) hides `.hint` to buy the card vertical space on a phone
+   * held sideways — a fair trade for an instruction line, and not for the seven measure topics whose values
+   * being compared live in `hint` and nowhere else: hidden, "Which is fuller?" sits over two coloured
+   * bubbles with nothing to decide by (#328, and #65's rule that every card stays usable without read-aloud).
+   *
+   * **Not `!!q.hint`**, which is what the first version of this fix used. 47 of the registry's 87 topics
+   * write a `hint` and only 7 of those carry data; `hint` is documented as "small instruction text", and
+   * that is what the other 40 put there ("Slice the shape", "Put them in twos"). Marking all of them would
+   * have given a 16px line back to every one of those cards in landscape and pushed the arena down with it
+   * (`arena.topInset` below) — the space the media query exists to reclaim (PR #430 review, round 1).
+   */
+  function setHint(text: string, own = false) {
+    els.hint.textContent = text;
+    els.hint.classList.toggle('own', own);
+  }
   /** Show the sentence and start (or resume) its clock. `then` runs when it hides — nothing, for a repeat. */
   function showPeek(q: Question, then: (() => void) | null) {
     els.prompt.innerHTML = esc(q.listen!);
-    els.hint.textContent = 'Look, remember, then build it';
+    setHint('Look, remember, then build it');
     peekActive = true; peekLeft = scaled(NO_VOICE_PEEK_MS); peekDone = then;
     syncPaused();
     if (!holdOpen) runPeek(q);
@@ -175,7 +200,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     deps.later(() => {
       if (token !== peekToken || activeQuestion !== q || !deps.mounted()) return;
       els.prompt.innerHTML = promptHTML(q, session.seqIndex);
-      els.hint.textContent = 'Slice the words in order';
+      setHint('Slice the words in order');
       const then = peekDone; peekActive = false; peekDone = null;
       syncPaused();
       then?.();
@@ -197,7 +222,11 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     if (!reveal) { els.speak.setAttribute('aria-label', SPEAK_LABEL[mode].aria); els.speak.setAttribute('title', SPEAK_LABEL[mode].title); }
     if (mode === 'peek' && !launched) return true;
     els.prompt.innerHTML = promptHTML(q, session.seqIndex, reveal);
-    els.hint.textContent = hintText(q, { reveal, tracing: deps.tracing });
+    // Both halves: the generator says this hint is data, AND it is the hint that reached the card. The second
+    // conjunct is not redundant — `hintText()` falls back to a generic instruction when `q.hint` is absent,
+    // and a generator that set the flag without a hint would otherwise mark that instruction (#328).
+    const line = hintText(q, { reveal, tracing: deps.tracing });
+    setHint(line, !!q.hint && !!q.hintIsData);
     return false;
   }
 
@@ -247,7 +276,15 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         // but the coincidence that showTutorial()'s 1800 ms happens to exceed the 1200 ms cap.
         const gatedSpawn = () => {
           if (fontsReady) { spawn(); return; }
-          fontReady().then(() => { if (deps.mounted()) spawn(); });   // never into a torn-down screen
+          // Through `later(..., 0)` and not straight out of the promise (PR #474 review, B2). `mounted()` is
+          // the only guard a raw continuation has and it does not read the hold, so a pause pressed inside
+          // this gate — up to the 1200ms cap, on a cold font cache — let `say()` speak the question behind
+          // the overlay and `spawnWave` land with `launchAt` already past. That is #301 word for word, in the
+          // one place the fix did not reach. A 0ms beat defers rather than drops: frozen at 0 remaining and
+          // re-armed at 0 on resume, so the wave goes up when the child comes back rather than never.
+          // `scaled(0)` rather than a bare `0`: it is 0 either way, and #138's rail is right that a beat belongs
+          // on the scaled clock — this one is a "next task", not a wait, and says so by going through it.
+          fontReady().then(() => deps.later(() => { if (deps.mounted()) spawn(); }, scaled(0)));   // never into a torn-down screen
         };
         const launch = () => { if (demo) deps.later(gatedSpawn, demo); else gatedSpawn(); };
         if (peek) showPeek(q, launch); else launch();   // #65: the peek owns the launch — it runs when the sentence hides
@@ -312,9 +349,13 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       const gap = scaled(lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650);
       deps.later(() => session.waveEnd(), Math.max(0, revealUntil - performance.now()) + gap);
     },
-    hold(open) {
+    hold(open, beats = true) {
       if (open === holdOpen) return;
       holdOpen = open;
+      // The screen's beats freeze with the arena (#301). The peek's own clock below already worked this way —
+      // #65 stopped it so a child pausing mid-sentence found the sentence still there — and the outcome hold,
+      // the inter-question gap and the results cue were the ones still running behind the overlay.
+      if (beats) deps.holdTimers(open);
       if (peekActive && activeQuestion) {
         if (open) { peekLeft = Math.max(0, peekLeft - (performance.now() - peekSince)); peekToken++; }   // stop the clock
         else runPeek(activeQuestion);                                                                 // and restart it

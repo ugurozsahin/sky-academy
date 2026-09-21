@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { activeProfile, addProfile, deleteProfile, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
+import { activeProfile, addProfile, deleteProfile, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { duelHeadline, duelHistoryLine, type DuelResult } from '../../src/game/duel';
 import { carriedStreak } from '../../src/game/dojo';
@@ -643,8 +643,9 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
 
     it.each(Object.keys(broken))('%s: the day ends normally and the coins are paid', (name) => {
       expect(importSave(JSON.stringify({ v: 3, name: 'Ada', avatar: 'volt', dojo: broken[name] })), name).toBe(true);
-      // The key is gone and `DEFAULT` has filled it back in — which is the fix, rather than each of the
-      // three `recordDojo()` readers coping. Three of these shapes throw without it and the rest load a
+      // The key is gone and `DEFAULT` has filled it back in — which is the fix, rather than each reader of
+      // the interior coping (the three results screens reach `applyEvent()` through `recordGameEnd()` since
+      // #365; `dojoCard()` and `dojoToday()` read it directly). Three of these shapes throw without it and the rest load a
       // half-built state, so this line is what every case here pins.
       expect(load().dojo, name).toEqual({ date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 });
       // `carriedStreak`, not `dojoToday`: the map screen's `dojoCard()` is the FIRST reader of the interior
@@ -1875,5 +1876,130 @@ describe('profiles: siblings on one device (#20)', () => {
       save({ coins: 41 });
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).coins, "not 999 written into Ada's slot").toBe(41);
     });
+  });
+});
+
+// #365: a results screen used to persist a finished game in TWO writes — `recordDojo()` then `addCoins()` —
+// with nothing tying them together. `save()` swallows a refused `setItem` by design (#151: a device that
+// cannot write must not brick the game), so when the second write was the one dropped, the child was shown
+// coins that never reached disk while the dojo write HAD landed. Coins are re-earnable; a completed challenge
+// is not — write 1 put the challenge id into `dojo.done`, and `applyEvent()` only pays `!done.includes(c.id)`.
+// `recordGameEnd()` is the single write, so the store takes the whole finished game or none of it.
+describe('a finished game is persisted in one write, or not at all (#365)', () => {
+  // Read the blob back through the key the store is actually writing — an earlier describe in this file
+  // leaves a different profile active, and a hardcoded `sna:v1` would then assert against a sibling's save.
+  const disked = () => JSON.parse(localStorage.getItem(saveKeyFor(activeProfile()))!);
+  beforeEach(() => { setActiveProfile('p1'); reset(); });
+
+  /** A store that accepts `n` writes and then throws — the shape that made the old pair lose a challenge. */
+  function refuseFromWrite(n: number) {
+    const real = localStorage.setItem;
+    let seen = 0;
+    (localStorage as unknown as { setItem: unknown }).setItem = function (k: string, v: string) {
+      if (++seen > n) throw new Error('quota');
+      return (real as (k: string, v: string) => void).call(localStorage, k, v);
+    };
+    return () => { (localStorage as unknown as { setItem: unknown }).setItem = real; };
+  }
+
+  const memoryWin = { mode: 'memory' as const, won: true, correct: 12, attempts: 14, bestCombo: 0, stars: 3, score: 120 };
+
+  it('the whole game lands when the store accepts it: the dojo state and the coins agree on disk', () => {
+    save({ coins: 4 });
+    const out = recordGameEnd(memoryWin, 9);
+    const disk = disked();
+    expect(disk.coins, 'the game\'s coins and the dojo bonus both landed').toBe(4 + 9 + out.dojo.coins);
+    expect(disk.dojo.date, 'the dojo state landed in the same blob').toBe(out.dojo.state.date);
+    // Round 1, note 6: on most dates `memoryWin` completes nothing, so this compares [] to [] and the coin
+    // line above is what carries the test. Kept because it is free and is the assertion that would catch the
+    // two halves landing in different blobs; `bigWin` in the next test is the one that completes a challenge
+    // on all 400 dates swept.
+    expect(disk.dojo.done, 'and so did what the game completed').toEqual(out.dojo.state.done);
+  });
+
+  it('a store that refuses everything leaves neither half on disk (not discriminating — the old pair did too)', () => {
+    // Round 1, note 6: the name used to promise more than the body. A store that refuses EVERY write lands
+    // nothing under either shape, so this cannot tell the single write from the old pair — the discriminating
+    // case is the next test. What it does pin is that a total refusal is clean rather than half-applied, and
+    // that #151's report to the grown-ups screen survives it.
+    save({ coins: 4 });
+    const before = disked();
+    const restore = refuseFromWrite(0);                    // the very next write is refused
+    try { recordGameEnd(memoryWin, 9); } finally { restore(); }
+
+    const disk = disked();
+    expect(disk.coins, 'no coins landed').toBe(4);
+    expect(disk.dojo, 'and no dojo progress landed either — the two cannot disagree').toEqual(before.dojo);
+    expect(isWriteFailing(), 'the refusal is still reported to the grown-ups screen (#151)').toBe(true);
+  });
+
+  it('a store that would refuse a SECOND write never gets asked for one: the finished game is whole', () => {
+    // THE case, and the one the issue asks for: a `setItem` that throws on the second call only. Under the old
+    // pair, write 1 (the dojo state) landed and write 2 (the coins) was dropped, so the disk carried a
+    // challenge recorded as done whose coins never arrived. `applyEvent()` only pays `!done.includes(c.id)`,
+    // so no later game — this session or any after a reload — would ever pay it again: the permanent half of
+    // the loss, and the reason this is a P2 rather than a cosmetic slip.
+    const bigWin = { ...memoryWin, correct: 30 };
+    save({ coins: 4 });
+    // Round 1, note 6: under the fix the refusal is never actually thrown — there is no second `setItem` to
+    // throw on, and that IS the property. Under the old pair it fired, and the assertions below went red.
+    const restore = refuseFromWrite(1);                    // the first write lands, a second would be refused
+    let out;
+    try { out = recordGameEnd(bigWin, 9); } finally { restore(); }
+
+    expect(out.dojo.completed.length, 'the game really did complete a challenge').toBeGreaterThan(0);
+    const disk = disked();
+    expect(disk.coins, 'the coins the challenge earned are on disk').toBe(4 + 9 + out.dojo.coins);
+    for (const c of out.dojo.completed)
+      expect(disk.dojo.done, `${c.id} is recorded done, and its coins are there to match`).toContain(c.id);
+  });
+
+  it('one write, not two — counted, so the pair cannot quietly come back', () => {
+    save({ coins: 0 });
+    const real = localStorage.setItem;
+    let writes = 0;
+    (localStorage as unknown as { setItem: unknown }).setItem = function (k: string, v: string) {
+      writes++; return (real as (k: string, v: string) => void).call(localStorage, k, v);
+    };
+    try { recordGameEnd(memoryWin, 9); } finally { (localStorage as unknown as { setItem: unknown }).setItem = real; }
+    expect(writes, 'settling a finished game is exactly one setItem').toBe(1);
+  });
+
+  it('a sticker unlocked by the dojo bonus is still reported', () => {
+    // Round 1, B1: this test used to seed 29 coins and pay the game's own 1, crossing STICKER_COST[0] === 30
+    // with NO dojo bonus in it at all — `memoryWin` pays a bonus on only 68 of 400 dates (verified), and on
+    // the rest `out.dojo.coins` is 0, so the name was true of roughly a sixth of the calendar and the
+    // assertion could not tell a dropped bonus from a kept one. Pinned to a date where the bonus is real, and
+    // seeded so the game's own coins alone fall SHORT of the threshold: the crossing is the bonus's doing or
+    // it does not happen.
+    const BONUS_DAY = new Date('2026-01-13T12:00:00Z');    // `memory1` is that day's mode challenge
+    const gameCoins = 1;
+    const seed = STICKER_COST[0] - gameCoins - 4;          // 25: short of 30 without the bonus, past it with
+
+    save({ coins: seed, stickers: [] });
+    const out = recordGameEnd(memoryWin, gameCoins, BONUS_DAY);
+
+    expect(out.dojo.coins, 'the fixture must actually earn a bonus, or this test proves nothing')
+      .toBeGreaterThan(0);
+    expect(seed + gameCoins, 'and the game\'s own coins must NOT reach the threshold on their own')
+      .toBeLessThan(STICKER_COST[0]);
+    expect(seed + gameCoins + out.dojo.coins).toBeGreaterThanOrEqual(STICKER_COST[0]);
+
+    expect(out.fresh, 'the bonus carried the child over the threshold, and the unlock was reported')
+      .toContain(STICKER_IDS[0]);
+    expect(disked().stickers, 'and the unlock is on disk with the rest').toEqual(
+      expect.arrayContaining(out.fresh));
+  });
+
+  it('a sticker the child already owns is not reported as new', () => {
+    // Round 1, N1: `addCoins()` pinned this (`shop.test.ts`, `expect(fresh).toEqual([])`); `recordGameEnd()`
+    // inherited the `.filter(id => !d.stickers.includes(id))` but not the test, so mutating it to
+    // `const fresh = unlocked;` left the whole suite green. That regression puts a "New sticker!" row for
+    // every sticker the child already has on every results screen, after every game.
+    save({ coins: STICKER_COST[0] + 10, stickers: [STICKER_IDS[0]] });
+    const out = recordGameEnd(memoryWin, 1);
+    expect(out.fresh, 'already owned, so nothing is new').toEqual([]);
+    expect(disked().stickers, 'and it is still owned — nothing is ever taken away (#114)')
+      .toContain(STICKER_IDS[0]);
   });
 });
