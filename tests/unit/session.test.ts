@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Session, starsForAccuracy, type SessionEvents } from '../../src/game/session';
-import { YEARS, topicById, topicsFor } from '../../src/curriculum';
+import { TOPICS, YEARS, topicById, topicsFor } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
@@ -242,6 +242,121 @@ describe('a flagged question slows the real session (#311, #297)', () => {
   });
 });
 
+/**
+ * #390 — the sequence of cards must not answer itself.
+ *
+ * `nextQuestion()` re-rolls while the new card matches the previous one, to avoid an immediate repeat. On a
+ * topic whose prompt is a **constant** and whose answer space is **binary**, the `(prompt, answer)` identity
+ * it used took exactly two values, so a freshly generated, genuinely different picture was rejected purely
+ * for repeating the previous answer — up to five times. With a fair coin and five re-rolls consecutive cards
+ * then share an answer 1.56% of the time, so "slice the other bubble" beats reading the card.
+ *
+ * `tests/unit/curriculum.test.ts` calls `topic.gen()` directly and so cannot see this: the defect lives in
+ * the *sequence* a child plays, which only a real `Session` produces. This rail drives one.
+ *
+ * The topics are **discovered, not listed**, so a fifth constant-prompt binary topic is covered the day it
+ * ships rather than the day somebody remembers this rail exists.
+ */
+describe('the previous answer carries no signal about the next (#390)', () => {
+  const yearOf = (t: { year: string }) => YEARS.find(y => y.id === t.year)!;
+  /** Mission stage 1 is difficulty 1 for every year (`YEARS[*].diffs[0]`), which is what the rail samples. */
+  const D1 = 1 as const;
+
+  /** Topics whose d1 cards all share one prompt and offer exactly two bubbles — where the identity degenerates. */
+  const constantPromptBinary = () => TOPICS.filter(t => {
+    if (t.input === 'tracing') return false;
+    const r = rng(11);
+    const cards = Array.from({ length: 200 }, () => t.gen(D1, r));
+    return cards.every(c => c.prompt === cards[0].prompt && c.options.length === 2 && !c.sequence);
+  });
+
+  it('YEARS stage 1 is difficulty 1, which is what this rail samples', () => {
+    for (const y of YEARS) expect(y.diffs[0], `${y.id} stage 1`).toBe(D1);
+  });
+
+  it('finds the four topics #390 measured, so the discovery itself cannot go blind', () => {
+    const found = constantPromptBinary().map(t => t.id).sort();
+    // `it.each([])` registers nothing in Vitest 3 rather than erroring, so a discovery that went blind would
+    // report the band rail below as green with no cases at all. This line makes the floor deliberate
+    // (PR #407 review, note 3).
+    expect(found.length, 'the discovery found nothing — the band rail below would silently run no cases').toBeGreaterThanOrEqual(4);
+    for (const id of ['r-oddeven', 'y2-sentencetype', 'y2-symmetry', 'y2-tense']) expect(found).toContain(id);
+  });
+
+  it.each(constantPromptBinary().map(t => t.id))('%s: consecutive answers agree about half the time', (id) => {
+    const topic = topicById(id)!;
+    const s = new Session({ mode: 'mission', year: yearOf(topic), topic, rng: rng(7) }, events());
+    s.start();
+    let prev = s.current!, same = 0;
+    const pairs = 600;
+    for (let i = 0; i < pairs; i++) {
+      s.nextQuestion();
+      const q = s.current!;
+      expect(q.prompt, 'the premise: one constant prompt').toBe(prev.prompt);
+      expect(q.options.length, 'the premise: a binary answer space').toBe(2);
+      if (q.answer === prev.answer) same++;
+      prev = q;
+    }
+    // What this band bounds is "the previous answer is no help", not "exactly a fair coin" (PR #407 review,
+    // note 4): a correct implementation still refuses an *identical* card, so its expected agreement is
+    // (0.5 − P(identical)) / (1 − P(identical)), which drifts below 0.5 as a topic's d1 pool shrinks —
+    // `y2-sentencetype` already sits near 0.45. The floor is set well under that drift, and the ceiling
+    // exists only to catch a key that went the other way. The broken dedupe read ~0.016, nowhere near either.
+    expect(same / pairs).toBeGreaterThan(0.35);
+    expect(same / pairs).toBeLessThan(0.65);
+  });
+
+  /**
+   * The other half of the same key — and it must run on topics that **have a visual**, or it cannot see the
+   * term this key added at all (PR #407 review, B2). The first cut asserted this on `y2-oddeven` alone,
+   * which carries no visual, so `repeatKey` reduced there byte-for-byte to the old `prompt \0 answer` and
+   * the test behaved identically before and after the widening.
+   *
+   * What it caught nothing of: stringifying the whole visual put a per-draw emoji into the card's identity,
+   * so `1 + 4 = ?` came round twice running 11.75% of the time on `r-add`, against 0.00% on `main`.
+   *
+   * So the topics are discovered here too: every d1 topic whose prompt is **self-contained** — more than one
+   * prompt, and each prompt always has the same answer — because on those the prompt IS the exercise, and an
+   * identical prompt with an identical answer twice running is the same card however it is decorated. 47
+   * topics qualify, 33 of them with a visual.
+   */
+  const selfContainedPrompt = () => TOPICS.filter(t => {
+    if (t.input === 'tracing') return false;
+    const r = rng(11);
+    const cards = Array.from({ length: 300 }, () => t.gen(D1, r));
+    if (cards.some(c => c.sequence)) return false;
+    const byPrompt = new Map<string, Set<string>>();
+    for (const c of cards) (byPrompt.get(c.prompt) ?? byPrompt.set(c.prompt, new Set()).get(c.prompt)!).add(c.answer);
+    return byPrompt.size > 1 && [...byPrompt.values()].every(a => a.size === 1);
+  });
+
+  it('the self-contained-prompt discovery finds the topics it is meant to', () => {
+    const found = selfContainedPrompt().map(t => t.id);
+    expect(found.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(20);
+    // Four with a visual and one without, so a change that quietly narrowed this to prompt-only topics —
+    // which is exactly how B2 went blind — fails here.
+    for (const id of ['r-add', 'r-sub', 'r-share', 'r-balance', 'y2-oddeven']) expect(found).toContain(id);
+  });
+
+  it.each(selfContainedPrompt().map(t => t.id))('%s: the same exercise is never asked twice running', (id) => {
+    const topic = topicById(id)!;
+    const s = new Session({ mode: 'mission', year: yearOf(topic), topic, rng: rng(7) }, events());
+    s.start();
+    let prev = s.current!, repeats = 0;
+    const pairs = 600;
+    for (let i = 0; i < pairs; i++) {
+      s.nextQuestion();
+      const q = s.current!;
+      if (q.prompt === prev.prompt && q.answer === prev.answer) repeats++;
+      prev = q;
+    }
+    // 46 of the 47 measure 0. `r-share` measures 3: its d1 pool is three prompts, so the five re-rolls give
+    // up at (1/3)^6 ≈ 0.14% — the same 3 it measures on `main`, not a cost of this key. The bound sits an
+    // order of magnitude above that and an order below B1's 7.75%–30.8%, so neither the seed nor a small
+    // pool decides the verdict.
+    expect(repeats / pairs, 'the same question asked twice running').toBeLessThan(0.02);
+  });
+});
 
 describe('starsForAccuracy — the one three-star bar (#397 review round 2, B2)', () => {
   // The thresholds used to be written out here AND copied into `duelStars`, with a comment claiming that moving

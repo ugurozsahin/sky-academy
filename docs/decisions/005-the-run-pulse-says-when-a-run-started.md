@@ -2,6 +2,9 @@
 
 **Status:** accepted — owner, in session, 2026-09-19. Amends the "Last, not first" rule in
 `docs/ROUTINE-PROMPT.md` STEP 5 (#98). Implemented by #314 / PR #315.
+**Extended to the reviewer routine — owner, in session, 2026-09-21 (#327).** Same decision, second routine;
+the amendment is at the end of this file rather than in a record of its own, per
+`docs/decisions/001-one-home-per-rule.md`.
 
 ## Context
 
@@ -54,9 +57,10 @@ A pulse written only at the end cannot tell them apart, and the third had no nam
 4. **Nothing is permitted by this.** No `permissions` block, no hook change, no change to how a run is
    launched.
 
-The `- second item: pending` line is load-bearing, not decoration: `secondItem()` in
-`.claude/hooks/github-write-guard.mjs` denies any update to issue #62 whose body lacks that line, so without it
-the stamp would be refused and never land.
+The `- second item: pending` line is load-bearing, not decoration: `requiredLines()` in
+`.claude/hooks/github-write-guard.mjs` denies any write to the pulse whose body lacks that line, so without it
+the stamp would be refused and never land. (It was `secondItem()` until #359 collapsed the two mandatory
+lines into one rule over one list.)
 
 ## Considered and dropped
 
@@ -82,7 +86,7 @@ the stamp would be refused and never land.
 - One extra API write per run, at the cheapest point in it.
 - A stalled run becomes visible in ~90 minutes instead of never, and the finding says what it was doing.
 - "Last, not first" now means specifically *no finished-looking pulse on the way in*. The rail in
-  `tests/unit/guardrails.test.ts` pins both halves — the stamp and the "not a pass" — because either alone
+  `tests/unit/governance.test.ts` (in `guardrails.test.ts` until #321 split it out) pins both halves — the stamp and the "not a pass" — because either alone
   decays into the other's failure.
 - `ROUTINE_PROMPT_BUDGET` falls 21,503 → 21,436; the addition is paid for in prose, and three first attempts
   at paying hit text that rails pin word for word and were reverted.
@@ -90,3 +94,39 @@ the stamp would be refused and never land.
   same hook denies it on the MCP path — a run stopping on a limit still leaves nothing. And that hook matches
   `mcp__github__*` tools only, while STEP 1 tells runs to post authored bodies with the REST API, so the
   heartbeat rules are enforced on the path the prompt steers away from. Both recorded on #314.
+
+## Amendment, 2026-09-21 (#327): the reviewer routine gets a pulse of its own
+
+Everything above was written about the developer routine, and left the reviewer routine with **no trace of any
+kind**. `docs/REVIEWER-PROMPT.md` STEP 0 said so in as many words — *"This routine has no heartbeat issue, so
+post nothing half-finished"* — so a reviewer run that died at the token limit, stalled on a permission prompt,
+or was killed mid-review left no commit, no comment and no pulse. The watchdog had nothing to read. It was the
+only moving part in the project that nothing watched, and it merges pull requests.
+
+**Decision.** The same three points, applied unchanged: STEP 1 stamps `<UTC> — IN PROGRESS: reviewing #<n>`
+before the work; the finished snapshot replaces it last; the watchdog reads it as part of check 3, at the
+reviewer's own cadence (`17 * * * *`, so the same hourly numbers). Two points are new, and both come from the
+reviewer routine having a shape the developer routine does not:
+
+1. **The cheap exit writes a pulse too — `<UTC> — nothing waiting`.** STEP 1 has a deliberate one-API-call
+   exit when no pull request is waiting, and an idle reviewer is the common case. Left silent, "idle" and
+   "dead" would look identical from the watchdog, which is the whole blindness this record is about. It costs
+   a second API call on a cheap run, and that is the price of the fix.
+2. **Two pulses, not one shared issue.** Rejected: one body with two writers, and the developer's
+   `- second item:` shape (#97) does not fit a routine that has no second item. Separate issues make the
+   record disciplines separable, which is what the hook now does — `heartbeatAppend` covers both pulses,
+   because replace-never-append is the same rule for any of them, and `requiredLines` covers the developer's
+   alone. Matching on **title** rather than number (#353) is what made that separation free: a reviewer pulse
+   inherits nothing by construction, so nothing had to be untangled.
+
+**Consequences.** One extra API write per reviewer run, two on an idle one. A stalled reviewer becomes visible
+in ~90 minutes instead of never. `REVIEWER_PROMPT_BUDGET` falls 10,034 → 9,998; the additions are paid for in
+prose, and one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was
+reverted. #323 argues that paying for additions this way is what has been degrading these files, and it is
+right; this landed first because it is `priority:P0` and #323 is `priority:P1`, which is a recorded exception
+rather than a disagreement.
+
+**Still open**, inherited unchanged from the developer side: the hook matches `mcp__github__*` only while
+STEP 1 steers authored bodies to the REST API, so both pulses are enforced on the path the prompts steer away
+from. And nothing obliges a run to replace `IN PROGRESS` with a real snapshot; the watchdog greps for it, which
+is the check that catches a run that never did.

@@ -27,7 +27,7 @@ The test for any record is **who opens this, and when?** If there is no answer, 
 why, including what was deliberately *not* done → the PR body. A decision that binds future work → the issue
 it came from, or `docs/decisions/NNN-title.md`. Operational state — last run, each check and its verdict,
 anomalies not acted on → the `routine: heartbeat` issue body, **overwritten every run, never appended**.
-History → `git log` and the PR list. A run's state lives in the issue labels, the open PRs and its heartbeat issue. (Same wording in `CLAUDE.md` — change both; a rail in `tests/unit/guardrails.test.ts` holds them to it
+History → `git log` and the PR list. A run's state lives in the issue labels, the open PRs and its heartbeat issue. (Same wording in `CLAUDE.md` — change both; a rail in `tests/unit/governance.test.ts` holds them to it
 and fails if `WORKLOG.md` returns to the root.)
 
 A note for the next run is not a record — it is an issue. The live artifact is not republished (owner,
