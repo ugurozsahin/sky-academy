@@ -1301,6 +1301,98 @@ describe('guard rails', () => {
       .toMatch(/await expectFitsViewport\(/);
   });
 
+  // #483: Playwright's default parallelises across FILES only — the tests inside one file are a single
+  // sequential chain on one worker. 97 of the mobile project's 104 tests live in tests/e2e/game.spec.ts, so
+  // with the flag off the e2e step is as long as that one chain however many workers the runner offers, and
+  // the rest idle: CI run 35640634022 paid 416 s of a 488 s job while worker 2 sat done after 57 s.
+  // This is worth a rail because turning it back off breaks NOTHING that goes red. The suite still passes,
+  // just three times slower, and a regression whose only symptom is a bill is one nobody files.
+  //
+  // **The first version of this rail matched TEXT, and review of PR #487 found three ways round it in one
+  // round** — a spread defined above `defineConfig(` and mixed into a project; a spec in a subdirectory the
+  // non-recursive `readdirSync` never saw; and a `//` inside a string, which `code()` strips to end of line,
+  // hiding the very call being searched for. Each was real and each was reproduced with the rail green.
+  //
+  // They are not three bugs. They are three members of ONE class — ways to write a thing so that a regex
+  // does not see it — and in a Turing-complete language that class has no end: patch three spellings and a
+  // fourth exists. So the fix is not a fourth regex. It is to **stop reading the text and read the value**:
+  // import the config and ask what Playwright will actually resolve. A spread resolves. An indirection
+  // resolves. A computed value resolves. A comment cannot lie to it because no comment is read.
+  //
+  // Round 2 found the SECOND lever still failing the first way, and named the shape better than round 1 did:
+  // a check that **substitutes a placeholder for a value it does not recognise** cannot fail on the values it
+  // does not recognise. `workers` is typed `number | string` and a percentage is resolved against the
+  // runner's cores at run time, so `'50%'` is one worker on a two-core box — and this rail used to default
+  // any non-number to a passing `2`. One rule now covers both levers: **what this rail cannot judge, it
+  // refuses.** Not a number above 1, or a worker flag on the command line in any spelling — red, and say so.
+  //
+  // The ceiling of "read the resolved value", stated because the next rail to use the technique should know
+  // it: a config that reads its own importer (`process.env.VITEST ? … : …`) resolves one way here and
+  // another under Playwright. Nothing in this file can close that, and nothing pretends to.
+  //
+  // What is left textual is the spec half, and deliberately: Playwright's reporters do not expose a file's
+  // parallel mode, so there is nothing to ask. That half reads RAW text rather than `code()` — the opposite
+  // trade from the first version and the right way round for a guard rail. Raw text can produce a false
+  // POSITIVE (the word in a comment turns it red, and somebody rewords the comment); `code()` produced a
+  // false NEGATIVE (the defect ships green), which is the failure this whole file exists against.
+  it('the e2e suite parallelises inside a file, not only across files (#483)', async () => {
+    // The resolved config, not its source text. `defineConfig` returns the object; importing it runs the
+    // port derivation at the top of the file, which is pure.
+    const cfg = (await import('../../playwright.config')).default;
+    expect(cfg.fullyParallel, 'fullyParallel must be on at the top level — with it off, 97 of the suite\'s tests are one sequential chain on one worker (#483)').toBe(true);
+    expect(cfg.projects?.length, 'the config must still declare its projects, or this rail checks nothing').toBeGreaterThanOrEqual(4);
+    for (const p of cfg.projects ?? []) {
+      // `?? cfg.fullyParallel` is how Playwright resolves it: a project that says nothing inherits the top
+      // level. A project that says `false` governs itself alone, and every OTHER project would still look
+      // fine — which is exactly what the text version could not see through a spread.
+      expect(p.fullyParallel ?? cfg.fullyParallel, `project '${p.name}' resolves fullyParallel to false — however it is spelt, that project is back to one file at a time (#483)`).toBe(true);
+    }
+    // Same class, other lever: one worker makes the flag moot without touching it. `workers` is typed
+    // `number | string` and a percentage is resolved against the runner at RUN time (`resolveWorkers`,
+    // playwright/lib/common/config.js), so no value this rail can see tells it how many workers a runner
+    // will get. Unset is the default — half the logical cores — and is what every #483 measurement was
+    // taken at. So the rule is not "is it 1?" but "can this rail judge it at all?", and an unjudgeable
+    // value fails. `? cfg.workers : 2` here used to hand a passing number to every value it did not
+    // understand, which is the defect the config half above was rewritten to remove, in the same rail.
+    expect(cfg.workers === undefined || (typeof cfg.workers === 'number' && cfg.workers > 1),
+      `workers is ${JSON.stringify(cfg.workers)} — leave it unset, or give a plain number above 1. One worker runs the suite a test at a time with fullyParallel still resolving true, and a percentage takes its meaning from the runner, so this rail cannot approve it on sight (#483)`).toBe(true);
+    // ...and the same lever on the command line, where no config rail can see it. "No worker flag at all"
+    // rather than "not --workers=1": the flag has a short form (`-j`), takes `=` or a space, and a
+    // percentage means whatever the runner makes it — so there is no value this rail could approve by
+    // reading. ci.yml passes none today, and every #483 measurement was taken with none.
+    const e2eStep = workflow('ci.yml').split('\n').filter(l => l.includes('playwright test')).join('\n');
+    expect(e2eStep, 'the rail must have found the e2e command in ci.yml').toContain('playwright test');
+    expect(e2eStep, "ci.yml's e2e command must pass no worker flag at all — `--workers` or `-j`, in any spelling, is #483 undone from the command line where no config rail can see it (#483)")
+      .not.toMatch(/--workers|(?<![\w-])-j/);
+
+    // The spec half. RECURSIVE, because Playwright's own discovery is: a spec under tests/e2e/sub/ runs, and
+    // the first version of this rail never opened it. Raw text, quote-agnostic: `mode: "serial"` type-checks
+    // just as well as `mode: 'serial'`, `describe.serial` is a third spelling and `describe['serial']` a
+    // fourth (round 2 — semantically identical, and the dot form is what the regex used to want).
+    //
+    // `isDirectory()` deliberately, WITHOUT `isSymbolicLink()`. That looks like the same non-recursive gap
+    // one level down, and it was raised as one — but measured, Playwright does not follow a symlinked
+    // directory either: `--list` reports the same 106 tests with `tests/e2e/link -> /tmp/outside` present as
+    // without it, that directory's spec included. This walk is meant to mean "everything Playwright would
+    // discover", so following the link would make the rail STRICTER than the thing it models and turn red
+    // on a file that never runs. If Playwright's discovery ever changes, this changes with it.
+    const dir = new URL('../../tests/e2e/', import.meta.url);
+    const specs: string[] = [];
+    const walk = (rel: string) => {
+      for (const e of readdirSync(new URL(rel, dir), { withFileTypes: true })) {
+        if (e.isDirectory()) walk(`${rel}${e.name}/`);
+        else if (e.name.endsWith('.spec.ts')) specs.push(`${rel}${e.name}`);
+      }
+    };
+    walk('');
+    expect(specs.length, 'the e2e specs must be read from disk — an empty walk would pass vacuously').toBeGreaterThanOrEqual(3);
+    const serial = specs.filter(f =>
+      /mode:\s*['"`]serial['"`]|describe\s*(?:\.\s*serial\b|\[\s*['"`]serial['"`]\s*\])/
+        .test(readFileSync(new URL(f, dir), 'utf8')));
+    expect(serial, 'no e2e spec may re-serialise itself — that undoes #483 for that file with the config still resolving true. If a flow genuinely needs ordering, scope it to its own describe and name it here with the reason')
+      .toEqual([]);
+  });
+
   // #138: fast mode (#32) is only sound while it is a *pure time compression* — the same game, fewer seconds.
   // It shipped with two leaks. `layoutWave` divided the flight time but left `vx` in px/second, so at 4x a
   // bubble drifted a quarter as far sideways as a child ever sees; and a handful of `later(...)` beats in

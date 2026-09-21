@@ -168,11 +168,21 @@ jobs:
       # matrix. The game is mobile-first and the owner plays it on a phone and a tablet, so a desktop-only
       # regression landing on main and being caught by that night's run is the accepted trade.
       #
-      # Why a project costs a whole run rather than a share of one: Playwright's `workers` defaults to half
-      # the logical cores and an ubuntu-latest runner has 2, so this suite runs on ONE worker — the e2e step
-      # prints `Running 78 tests using 1 worker`. Projects therefore run end to end, one after another, and
-      # the desktop leg is the slower of the two (1280x800 against the iPhone 13 viewport). Measured on run
-      # 34461649267: mobile 09:38:24 -> 09:41:07 (2m43s), desktop 09:41:07 -> 09:45:07 (4m00s), 6.8 m total.
+      # Why a project used to cost a whole run rather than a share of one — and #483's correction, because
+      # the explanation this paragraph carried was the wrong cause and #81 was costed against it.
+      # What it said: `workers` defaults to half the logical cores, an ubuntu-latest runner has 2, so the
+      # suite runs on ONE worker and projects therefore run end to end. The observation was right and the
+      # cause was not. A project was serial because `fullyParallel` was OFF in playwright.config.ts, which
+      # parallelises across FILES only — and 97 of the mobile project's 104 tests are in one file, so extra
+      # workers had nothing to pick up and idled. Run 35640634022 says `Running 107 tests using 2 workers`
+      # (the runner is 4 cores now, not 2) and still paid 416 s, with worker 2 done after 57 s.
+      # The flag is on as of #483, and it takes worker utilisation on this step from 56 % to 98-99 %. The
+      # wall-clock win here is smaller than that sounds and noisier than a laptop suggests — 374/292/254 s
+      # over three re-runs of one commit, against a twelve-run baseline of 340-437 s — because this runner is
+      # CPU-bound: the same 107 tests cost 466 s of test time serially and 575-731 s two at a time. More
+      # workers on ONE runner cannot go further; more runners (--shard) could, and that is #81's decision.
+      # The desktop leg is still the slower of the two (1280x800 against the iPhone 13 viewport). Measured on
+      # run 34461649267, BEFORE that flag and at one worker: mobile 2m43s, desktop 4m00s, 6.8 m total.
       # Dropping desktop from the PR run therefore takes ~4.0 min off it, not the ~half a project count
       # suggests — and #72's third project will add its own full leg to the nightly for the same reason.
       #
