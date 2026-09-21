@@ -2307,3 +2307,227 @@ test.describe('profile picker (#20 slice 2)', () => {
     await expect(page.locator('.profile-screen #back'), 'back from the root leaves the app, as it does from the map').toHaveCount(0);
   });
 });
+
+/**
+ * #20 slice 3 — rename and remove, from behind the grown-ups gate. Slice 1 gave each sibling a save and slice 2
+ * a way to reach it; this is the first time a family can take a slot back, or fix a name typed by a five-year
+ * old. Reuses `seedSiblings` above, so the index shape is stated in exactly one place.
+ */
+test.describe('ninjas on this device (#20 slice 3)', () => {
+  test('a grown-up renames a sibling without leaving the dashboard, and the picker agrees', async ({ page }) => {
+    await seedSiblings(page);                      // Ada in p1 (active, 40 coins), Bo in p2
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    await expect(page.locator('.p-prof')).toHaveCount(2);
+    await expect(page.locator('.p-prof[data-prof="p2"]')).toContainText('Bo');
+
+    await page.fill('.p-prof-in[data-name="p2"]', 'Bobby');
+    await page.click('button[data-rename="p2"]');
+    await expect(page.locator('#prof-msg')).toHaveText('Renamed to Bobby.');
+    await expect(page.locator('.p-prof[data-prof="p2"] b'), 'the row redraws from the store').toHaveText('Bobby');
+    await expect(page.locator('.parents-dash'), 'and the child playing is untouched — the heading is still theirs').toContainText('Ada');
+
+    // The rename is persisted, not merely rendered: it is on the launch picker at the next boot, and Bo's own
+    // coins came through with it.
+    await page.goto('/');
+    await expect(page.locator('.avatar-card[data-profile="p2"]')).toContainText('Bobby');
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('#change-av')).toContainText('Bobby');
+    await expect(page.locator('#rewards'), 'a rename is one field, not a reset').toContainText('7');
+  });
+
+  test("renaming the child holding the device changes the screens they are looking at", async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await expect(page.locator('.p-prof'), 'one profile is still a row — a name is worth fixing on any device').toHaveCount(1);
+    await expect(page.locator('button[data-del="p1"]'), 'but the only ninja has no Remove: that is "Start again"').toHaveCount(0);
+    await page.fill('.p-prof-in[data-name="p1"]', 'Ada Two');
+    await page.click('button[data-rename="p1"]');
+    await expect(page.locator('#prof-msg')).toHaveText('Renamed to Ada Two.');
+    await expect(page.locator('.parents-dash'), 'the dashboard heading is drawn from the same save').toContainText('Ada Two');
+    await page.click('.parents #back');
+    await expect(page.locator('#change-av'), 'and so is the map, without a reload').toContainText('Ada Two');
+  });
+
+  test('a blank name is refused, and the refusal says so rather than clearing the row', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await page.fill('.p-prof-in[data-name="p1"]', '   ');
+    await page.click('button[data-rename="p1"]');
+    await expect(page.locator('#prof-msg')).toHaveText('A ninja needs a name — type one in first.');
+    await expect(page.locator('#prof-msg')).toHaveClass(/bad/);
+    await expect(page.locator('.p-prof[data-prof="p1"] b')).toHaveText('Ada');
+  });
+
+  test('removing a sibling asks first, and cancelling changes nothing', async ({ page }) => {
+    await seedSiblings(page);
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    await page.click('button[data-del="p2"]');
+    await expect(page.locator('.prof-modal h2'), 'named, so a grown-up can see which child this is').toHaveText('Remove Bo?');
+    await page.click('#prof-cancel');
+    await expect(page.locator('.prof-modal')).toHaveCount(0);
+    await expect(page.locator('.p-prof')).toHaveCount(2);
+
+    // Confirming removes the row, stays on the dashboard — this is not the child who is playing — and frees
+    // the slot for a new ninja.
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.prof-modal')).toHaveCount(0);
+    await expect(page.locator('.parents-dash'), 'the grown-up is still where they were').toBeVisible();
+    await expect(page.locator('#prof-msg')).toHaveText('Bo was removed from this device.');
+    await expect(page.locator('.p-prof')).toHaveCount(1);
+    await expect(page.locator('button[data-del="p1"]'), 'and the last one left cannot be removed either').toHaveCount(0);
+
+    // Gone from the store, not only from the list: one profile boots straight to the map, and the slot is reusable.
+    await page.goto('/');
+    await expect(page.locator('.profile-screen'), 'one profile, so no launch picker').toHaveCount(0);
+    await expect(page.locator('#change-av')).toContainText('Ada');
+    await page.click('#who');
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(1);
+    await expect(page.locator('#new-ninja'), 'the freed slot is genuinely free').toBeVisible();
+  });
+
+  /**
+   * The one navigation rule slice 3 adds: a grown-up who removes the ninja this session is playing cannot be
+   * left on a dashboard drawn from a save that no longer exists. Where they land is the boot decision re-run
+   * (`main.ts`'s `relaunch`) — the picker while two or more profiles remain.
+   */
+  test('removing the child this session is playing lands on the picker, not on their empty dashboard', async ({ page }) => {
+    await page.addInitScript(({ index, ada, bo, cass }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', bo);
+        localStorage.setItem('sna:v1:p3', cass);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2', 'p3'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      bo: JSON.stringify({ v: SAVE_VERSION, name: 'Bo', avatar: 'blaze', coins: 7, spent: 0, onboarded: true }),
+      cass: JSON.stringify({ v: SAVE_VERSION, name: 'Cass', avatar: 'terra', coins: 3, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('#change-av')).toContainText('Bo');
+    await openGrownUps(page);
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.profile-screen'), 'two children left, so the launch picker is the honest answer').toBeVisible();
+    await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(2);
+    await expect(page.locator('.avatar-card[data-profile="p2"]')).toHaveCount(0);
+    // **And it is the LAUNCH picker, with no way past the question** (#420 review B1). `relaunch()` draws on
+    // top of the grown-ups screen, so `screenDrawn()` answered true and the picker got a `←`: one tap put the
+    // remaining sibling into whoever the index called active — nobody chose them — earning that child's coins
+    // and stars. The same defect #380 round 5 B3 spent a round fixing, by a new door. Slice 2 asserts this
+    // three times for the boot picker; the post-delete one is the same screen and needs the same assertion.
+    await expect(page.locator('.profile-screen #back'), 'no way out but choosing a child (#420 B1)').toHaveCount(0);
+    // And the siblings' saves are theirs, not Bo's written over one of them on the way out.
+    await page.click('.avatar-card[data-profile="p1"]');
+    await expect(page.locator('#change-av')).toContainText('Ada');
+    await expect(page.locator('#rewards')).toContainText('40');
+  });
+
+  /**
+   * `relaunch()`'s other two branches, which nothing reached (#420 review note 5): with **two** profiles a
+   * self-delete leaves one, so there is no picker to draw and the remaining child's own screen is the answer.
+   * That is the shape most family tablets take, and replacing `nav.launch()` with `drawDash()` left every unit
+   * test green.
+   */
+  test('with two profiles, removing the one playing lands on the sibling’s own map (#20 slice 3)', async ({ page }) => {
+    await seedSiblings(page, 'p2');                 // Ada in p1 (40 coins), Bo in p2 and active
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('#change-av')).toContainText('Bo');
+    await openGrownUps(page);
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.profile-screen'), 'one child left, so no picker to choose from').toHaveCount(0);
+    await expect(page.locator('.home'), "and not the dashboard of a save that no longer exists").toBeVisible();
+    await expect(page.locator('#change-av')).toContainText('Ada');
+    await expect(page.locator('#rewards'), "Ada's own coins, not Bo's written over them").toContainText('40');
+  });
+
+  test('...and onto onboarding when the profile left has never been played (#20 slice 3)', async ({ page }) => {
+    // p1 is a slot the ＋ card made and nothing ever played; p2 is Bo, active and playing.
+    await page.addInitScript(({ index, bo }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1:p2', bo);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2'] }),
+      bo: JSON.stringify({ v: SAVE_VERSION, name: 'Bo', avatar: 'blaze', coins: 7, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p2"]');
+    await openGrownUps(page);
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.avatar-screen'), 'the wizard, because the slot left has no game yet').toBeVisible();
+    await expect(page.locator('.home'), 'never the map with an empty profile (#67, #115)').toHaveCount(0);
+  });
+
+  /**
+   * #420 review B2. `profileCard` blanks a save a newer build wrote, so the row drew ＋ / "Ninja 2" /
+   * "Not started yet" / "No name yet — this ninja has not played" beside a Remove button — and the tap
+   * destroyed 99 coins and all of that child's progress. Reachable by an APK rollback, a sideloaded older
+   * build or a stale service worker: #232's whole scenario. The row must stop claiming the wrong reason, and
+   * must not offer the tap.
+   */
+  test('a sibling’s newer-build save is not offered for renaming or removal, and says why (#20 slice 3)', async ({ page }) => {
+    await page.addInitScript(({ index, ada, future }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', future);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      future: JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    const newer = page.locator('.p-prof[data-prof="p2"]');
+    await expect(newer).toContainText('Saved by a newer version');
+    await expect(newer, 'and never "this ninja has not played" about bytes it cannot read').not.toContainText('has not played');
+    await expect(newer.locator('.p-prof-in'), 'no rename').toHaveCount(0);
+    await expect(page.locator('button[data-del="p2"]'), 'and no Remove — 99 coins are behind it').toHaveCount(0);
+    await expect(newer).toContainText('Open the game on the other device');
+    // The bytes are still there, which is the whole point: the other device still reads them.
+    expect(await page.evaluate(() => localStorage.getItem('sna:v1:p2'))).toContain('99');
+  });
+
+  /**
+   * The grown-ups list draws a slot the picker's ＋ created and nothing ever played — the same state #380
+   * review B1 was about, one screen over. It must not offer a rename it would refuse, and it must still be
+   * removable, because that is the only way the family gets the slot back.
+   */
+  test('an unplayed slot says so instead of offering a rename, and can still be removed', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await page.click('#who');
+    await page.click('#new-ninja');
+    await expect(page.locator('.avatar-screen'), 'the ＋ card runs the wizard').toBeVisible();
+    // Leave the wizard before a ninja is chosen: the slot is in the index with no save behind it.
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    const unplayed = page.locator('.p-prof[data-prof="p2"]');
+    await expect(unplayed).toContainText('Ninja 2');
+    await expect(unplayed).toContainText('Not started yet');
+    await expect(unplayed.locator('.p-prof-in'), 'no name to change').toHaveCount(0);
+    await expect(unplayed).toContainText('No name yet');
+    await page.click('button[data-del="p2"]');
+    await expect(page.locator('.prof-modal h2')).toHaveText('Remove Ninja 2?');
+    await page.click('#prof-go');
+    await expect(page.locator('.p-prof')).toHaveCount(1);
+    await page.goto('/');
+    await expect(page.locator('.profile-screen'), 'back to a one-profile device').toHaveCount(0);
+    await expect(page.locator('#change-av')).toContainText('Ada');
+  });
+});
