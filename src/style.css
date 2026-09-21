@@ -42,6 +42,25 @@ img { -webkit-user-drag: none; }
 @keyframes drift { from { background-position: 0 0; } to { background-position: 40px 10px; } }
 
 .screen { max-width: 820px; margin: 0 auto; padding: calc(16px + var(--sat)) 16px calc(24px + var(--sab)); }
+/*
+ * #18 group A, the DOM-screen cap. 820 px is a phone column, and a tablet held in landscape was given it
+ * whole: the slice-1 audit measured 460 px of a 1280 px window empty (36 %) on the map, the island, both
+ * onboarding steps, rewards, shop and the grown-ups dashboard. Nothing overflowed — what landscape cost was
+ * space.
+ *
+ * 900 px is the breakpoint the dashboard grids already turn on (`.p-stats`/`.p-years` below), so this reuses
+ * it rather than inventing a fifth width: a portrait tablet is ~800 px and stays on the phone column, which
+ * the audit found clean. `100% - 40px` keeps a gutter at 1024x768, where 1180 px is never reached, so the
+ * column never runs to the bezel.
+ *
+ * `.play` and `.memory` are excluded deliberately. They carry `.screen` too, but their widths are the arena
+ * cap and the card grid — `--arena-w` (600 px) and `.cards` (520 px) — which the owner gated behind
+ * `owner-approval` because widening them changes how the game looks and how far a thumb travels mid-wave.
+ * This rule moves only the screens made of DOM, whose criterion is "stops wasting a third of the window".
+ */
+@media (min-width: 900px) {
+  .screen:not(.play):not(.memory) { max-width: min(1180px, 100% - 40px); }
+}
 
 /* ---------- shared components ---------- */
 .btn {
