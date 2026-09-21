@@ -85,6 +85,19 @@ your first finding and the only one you can report.
    finding: runs here routinely take 45 minutes, and one in flight is what healthy looks like.
    `docs/decisions/005-the-run-pulse-says-when-a-run-started.md` has why the stamp exists and what it is not.
 
+   **Check the stamp against the write, not only against now (#439).** Everything above reads the timestamp
+   *inside* the body, which is a number the run being checked chose for itself — so a run that stamps the
+   wrong one is believed, and the error that matters runs *forward*: a stamp ahead of the real clock makes
+   `now - stamp` artificially small, and a run that died an hour ago reads as freshly alive. GitHub's own
+   `updated_at` for that issue is the one field the writing run cannot author, so compare the two:
+   `node scripts/pulse-stamp.mjs --check <body file> <updated_at>` prints the drift and exits 1 on a finding.
+   Do this for all three pulses you read — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`.
+   A stamp **behind** its write is healthy and says nothing: the clock was read, then the write landed. Ahead
+   of it by more than a couple of minutes of clock skew is the finding, whatever the body otherwise says, and
+   the age you computed above is wrong by that much — say both numbers in the issue. Found on 2026-09-21,
+   when a reviewer run stamped `11:40Z` on an edit recorded at `11:02:55Z`;
+   `docs/decisions/007-a-pulse-stamp-is-read-from-the-clock.md` has why, and the prevention half.
+
    **A pulse reading `stopped: limit` is a finding, not a pass, however fresh it is.** STEP 0 of both prompts
    tells a run that meets a usage limit to write exactly that and stop, so the body is well-formed, recent and
    means the run did none of its work — the one shape that looks healthiest and is not. Read it as a finding
@@ -255,6 +268,8 @@ Details that matter, because each of them is a way this could fail quietly:
 
 - **Last, not first.** A run that dies halfway leaves no fresh pulse, which is exactly what the pulse is for.
   Stamping it on the way in would hide the deaths it exists to expose.
+- **Read your own stamp from the clock** — `node scripts/pulse-stamp.mjs` — like the two routines you check,
+  and for the same reason (#439). Nothing watches you, so a stamp you estimated is one nobody would catch.
 - **Edit the body, never add a comment.** GitHub sends nothing for a body edit, so this stays silent. Two
   things it does do, and the owner should not be surprised by them: creating the issue notifies anyone
   watching all activity, once; and each edit bumps `updated_at`, so the issue floats to the top of
