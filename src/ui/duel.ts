@@ -6,13 +6,14 @@
 // nothing, best of DUEL_ROUNDS — and this file only wires two `Arena`s, the strip, the match-end overlay and
 // the `window.__sna` hooks the e2e drives it through. A finished match pays coins into the one shared save
 // (item 5's coins and stickers), tells the Daily Dojo what the device answered and teaches Sensei what Player 1
-// found hard on this topic and files a certificate when Player 1 wins; a duel history is still deferred.
+// found hard on this topic, files a certificate when Player 1 wins, and records the match itself in the duel
+// history the rewards screen lists.
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
-import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
+import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { addCoins, load, recordAccuracy, recordCert, recordDojo } from '../storage';
+import { addCoins, load, recordAccuracy, recordCert, recordDojo, recordDuel, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
@@ -177,6 +178,11 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // every test green while the album and the child's keepsake disagreed about what had been won. `certToStored`
     // is now the only writer, so the e2e's stored assertions cover the drawn object too.
     if (cert) recordCert(certToStored(cert, { id: `${o.year.id}:duel` }));
+    // The last piece of item 5: the match itself, so it outlives this overlay. Filed for **every** finished
+    // match — a loss and a draw are as much a thing that happened as a win — which is the one place this
+    // parts company with the certificate above: that is an award, and only a Player 1 win earns one
+    // (`duelEarnsCertificate`). A rematch files a second row rather than replacing this one; `fileDuel()` has why.
+    recordDuel({ at: Date.now(), topic: topic.id, title: topic.title, year: o.year.title, winner: r.winner, scoreA: r.scoreA, scoreB: r.scoreB, rounds: r.rounds });
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
     overlay.hidden = false;
@@ -268,4 +274,34 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   window.__sna = hooks;
   duel.start();
   return cleanup;
+}
+
+/**
+ * "Recent duels" on the rewards screen (#16, the last piece of item 5): a row per finished match, most recent
+ * first, or an empty-state hint. Pure and unit-tested without a DOM, exactly as `certAlbumHTML` is, and it
+ * deliberately **reuses that album's markup** — `cert-list`, `cert-row`, `cert-info` — rather than inventing a
+ * second list. Two lists a few pixels apart in different classes would be a new look on a screen whose look is
+ * settled; this is the same row with the scoreline where the stars sit, and no View button, because a duel has
+ * nothing to redraw.
+ *
+ * **Every borrowed class carries a `duel-` twin**: `cert-list duel-list`, `cert-row duel-row`, and the
+ * empty state is `duel-empty` alone. The rules come from the album; the *names* have to stay tellable apart.
+ * Reusing the name looked right — same box, same shape of words — and it silently broke the certificate
+ * album's own e2e, which asserts `.cert-empty` has count 0 to mean "a certificate is listed". One class
+ * cannot mean both "no certificates" and "no duels" on a screen that shows both lists at once.
+ *
+ * The date carries no year. A certificate is a keepsake, so its row says "14 Sep 2026"; twenty duels from the
+ * last fortnight all say the same year, and the row has a scoreline to fit alongside it on a 320px phone.
+ */
+export function duelHistoryHTML(duels: StoredDuel[]): string {
+  if (!duels.length) return '<p class="duel-empty">Hand the device to a friend and play a Ninja Duel — every match you finish shows up here.</p>';
+  const rows = duels.map(m => {
+    const day = new Date(m.at);
+    const date = Number.isNaN(day.getTime()) ? '' : day.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const sub = `${esc(m.year)}${date ? ` · ${date}` : ''}`;
+    const ava = '<span class="cert-ava duel-ava" aria-hidden="true">⚔️</span>';
+    const info = `<div class="cert-info"><b>${esc(m.title)}</b><small>${sub}</small></div>`;
+    return `<div class="cert-row duel-row">${ava}${info}<span class="duel-line">${esc(duelHistoryLine(m))}</span></div>`;
+  }).join('');
+  return `<div class="cert-list duel-list">${rows}</div>`;
 }

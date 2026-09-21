@@ -702,12 +702,23 @@ test.describe('Sky Ninja Academy', () => {
 
   test('"My certificates" (#110): an earned certificate lists on the rewards screen, and View opens it full-screen with tap-to-zoom', async ({ page }) => {
     const cert = { id: 'reception:r-count', name: 'Ada', avatar: 'volt', year: 'Reception', title: 'Counting to 10', stars: 3, score: 250, correct: 20, attempts: 20, date: '2026-09-10' };
-    await seedPlayer(page, 'volt', 'Ada', { certs: [cert] });
+    // Seeded with a duel as well as a certificate (#415 round 2, note 3). With no duel on the page
+    // `.cert-row:not(.duel-row)` is literally `.cert-row`, so the scoping this test depends on was green
+    // even when reverted. One of each makes the split load-bearing here and in the two QA flow scripts.
+    const duel = { at: 1_757_000_000_000, topic: 'y1-bonds', title: 'Number bonds', year: 'Year 1', winner: 'a', scoreA: 6, scoreB: 4, rounds: 10 };
+    await seedPlayer(page, 'volt', 'Ada', { certs: [cert], duels: [duel] });
     await page.click('#rewards');
     await expect(page.locator('.rewards')).toBeVisible();
     await expect(page.locator('.cert-empty')).toHaveCount(0);
-    const row = page.locator('.cert-row');
+    // Scoped to the album, not the page: "Recent duels" borrows `cert-row`'s rule, so an unscoped locator
+    // counts duel rows too and this test would fail pointing at the album (#415 review, note 1).
+    const row = page.locator('.cert-row:not(.duel-row)');
     await expect(row).toHaveCount(1);
+    // Both kinds are on the screen: unscoped, this would be 2, which is what the album's own test would have
+    // started failing on the day a seed carried a duel.
+    await expect(page.locator('.cert-row')).toHaveCount(2);
+    await expect(page.locator('.duel-row')).toHaveCount(1);
+    await expect(row, 'the scoped locator is the certificate, not the duel').toContainText('Counting to 10');
     await expect(row).toContainText('Counting to 10');
     await expect(row).toContainText('★★★');
 
@@ -725,6 +736,50 @@ test.describe('Sky Ninja Academy', () => {
 
     await view.getByRole('button', { name: 'Done' }).click();
     await expect(view).toHaveCount(0);
+  });
+
+  test('"Recent duels" (#16): finished matches list on the rewards screen, newest first, in seat order', async ({ page }) => {
+    // Seeded at `v: 1`, like every other save here, so this also climbs the ladder through the v3 → v4 step.
+    // What kills a mutant in `MIGRATIONS[3]` is the unit test in `storage.test.ts`, not this: empty that
+    // step's body and `duelHistory()`'s own filter drops the junk row anyway and this stays green (#415
+    // review, note 4). What this proves is the whole path — a real save, migrated, read and rendered.
+    const match = (at: number, extra: Record<string, unknown> = {}) =>
+      ({ at, topic: 'y1-bonds', title: 'Number bonds', year: 'Year 1', winner: 'a', scoreA: 6, scoreB: 4, rounds: 10, ...extra });
+    await seedPlayer(page, 'volt', 'Ada', {
+      duels: [
+        match(1_757_100_000_000, { topic: 'y1-days', title: 'Days of the week', winner: 'b', scoreA: 3, scoreB: 7 }),
+        match(1_757_000_000_000),
+        { topic: 'y1-bonds', title: 'junk' },                     // a hand-edited row: never reaches the list
+      ],
+    });
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+
+    const lines = page.locator('.duel-line');
+    await expect(lines).toHaveCount(2);                           // the junk row is filtered, not rendered
+    // Newest first, and the scoreline in seat order — Player 1's score stays on the left in BOTH rows, which
+    // is the whole reason this line is not `duelHeadline`. Sorted by winner, row 0 would read "7–3".
+    await expect(lines.nth(0)).toHaveText('Player 2 won · 3–7');
+    await expect(lines.nth(1)).toHaveText('Player 1 won · 6–4');
+    await expect(page.locator('.cert-row').filter({ hasText: 'Days of the week' })).toBeVisible();
+    // The section's own heading and subtitle (#415 round 2, note 2): both were untested, so collapsing
+    // `duelsSub` to a constant or deleting the heading line was green.
+    await expect(page.getByText('Recent duels')).toBeVisible();
+    await expect(page.getByText('your last 2 matches')).toBeVisible();
+    await expect(page.locator('.duel-ava').first()).toBeVisible();
+  });
+
+  test('"Recent duels" (#16): a player who has never duelled gets the hint, not an empty box', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+    await expect(page.locator('.duel-line')).toHaveCount(0);
+    // Its own class, not `.cert-empty`: that one means "no certificates" to the album test above, and a
+    // screen showing both lists cannot have one class meaning two things.
+    await expect(page.locator('.duel-empty')).toContainText('Hand the device to a friend and play a Ninja Duel');
+    await expect(page.locator('.cert-empty'), 'the album keeps its own empty state').toHaveCount(1);
+    // The other two `duelsSub` branches are the singular and the empty one; this is the empty one.
+    await expect(page.getByText('Play a Ninja Duel with a friend')).toBeVisible();
   });
 
   test('ninja shop: buy a trail skin with the balance, stickers keep their lifetime unlocks, the skin is equipped', async ({ page }) => {

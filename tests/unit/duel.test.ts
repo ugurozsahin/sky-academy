@@ -4,6 +4,8 @@ import { layoutWave } from '../../src/game/arena';
 import { topicById } from '../../src/curriculum';
 import { hintText, promptHTML, promptMode } from '../../src/ui/hud';
 import { esc } from '../../src/ui/dom';
+import { duelHistoryHTML } from '../../src/ui/duel';
+import type { StoredDuel } from '../../src/storage';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onRoundWon: vi.fn(), onRoundMiss: vi.fn(), onRoundDraw: vi.fn(), onMatchEnd: vi.fn() });
@@ -681,5 +683,70 @@ describe('duelEarnsCertificate (#397 review round 2, note 1: only Player 1 wins 
     // not second-guess it: `winner` is the scorer's own verdict and the one field the rest of the screen uses.
     expect(duelEarnsCertificate(ended('a', 0, 9))).toBe(true);
     expect(duelEarnsCertificate(ended('b', 9, 0))).toBe(false);
+  });
+});
+
+// B1 of PR #415's review: `duelHistoryHTML`'s own docstring said it was "unit-tested without a DOM, exactly as
+// `certAlbumHTML` is" while a grep over tests/ returned nothing. These mirror `certAlbumHTML`'s five tests in
+// `tests/unit/certificate.test.ts` one for one, because that is the sibling the claim named.
+describe('duelHistoryHTML ("Recent duels", #16)', () => {
+  const storedDuel = (o: Partial<StoredDuel> = {}): StoredDuel =>
+    ({ at: Date.UTC(2026, 8, 6, 10, 0, 0), topic: 'y1-bonds', title: 'Number Bonds', year: 'Year 1', winner: 'a', scoreA: 6, scoreB: 4, rounds: 10, ...o });
+
+  it('shows an empty-state hint, with no cert-list, when no duel has been played', () => {
+    const h = duelHistoryHTML([]);
+    expect(h).toContain('duel-empty');
+    expect(h).toContain('Hand the device to a friend and play a Ninja Duel');
+    expect(h).not.toContain('cert-list');
+    // Its own class, not the album's: `.cert-empty` means "no certificates" to the certificate album's e2e.
+    expect(h).not.toContain('cert-empty');
+  });
+
+  it('renders one row per match, in the album\'s own markup, with the scoreline where the stars sit', () => {
+    const h = duelHistoryHTML([storedDuel(), storedDuel({ title: 'Days of the Week', winner: 'b', scoreA: 3, scoreB: 7 })]);
+    expect((h.match(/class="cert-row duel-row"/g) ?? []).length).toBe(2);
+    // Both classes, always paired (#415 review, note 1): the album's rule is borrowed, but the album's own
+    // e2e and two QA scripts select `.cert-row`, so a duel row has to stay tellable apart from a certificate
+    // one. Dropping `duel-row` here makes `.cert-row:not(.duel-row)` count duel rows in the album's test.
+    expect(h).toContain('class="cert-list duel-list"');
+    expect(h).not.toContain('class="cert-row"');
+    expect(h).toContain('cert-info');
+    expect(h).toContain('Number Bonds');
+    expect(h).toContain('Days of the Week');
+    expect(h).toContain('Player 1 won · 6–4');
+    expect(h).toContain('Player 2 won · 3–7');
+    // No View button: a duel has nothing to redraw, which is the one thing the row does not borrow.
+    expect(h).not.toContain('cert-open');
+  });
+
+  it('subtitles a row with the year group and a British, year-less date', () => {
+    const h = duelHistoryHTML([storedDuel()]);
+    // The WHOLE subtitle, not a substring of it (#415 round 2, B2 and note 4). `toContain('6 Sept')` passed
+    // under `month: 'long'` ("6 September") and said nothing at all about `year`, so dropping the year group
+    // from the row was green — and `StoredDuel.year`'s own comment promises the title, never the id.
+    expect(h).toContain('<small>Year 1 · 6 Sept</small>');
+    // The deliberate difference from `certAlbumHTML`, which renders "6 Sept 2026": twenty rows from the last
+    // fortnight all carry the same year, and the row needs the width for its scoreline.
+    expect(h).not.toContain('6 Sept 2026');
+  });
+
+  it('names the topic the match was played on, not the id', () => {
+    // `topic` is the durable key and `title` is what a child reads; the row shows the title. Swapping them at
+    // the `recordDuel` call site used to pass, because nothing asserted which one reached the row.
+    const h = duelHistoryHTML([storedDuel({ topic: 'y1-bonds', title: 'Number Bonds' })]);
+    expect(h).toContain('<b>Number Bonds</b>');
+    expect(h).not.toContain('y1-bonds');
+  });
+
+  it('escapes a hand-edited title/year rather than injecting markup', () => {
+    const h = duelHistoryHTML([storedDuel({ title: '<img onerror=alert(1)>', year: '"><script>' })]);
+    expect(h).not.toContain('<img onerror');
+    expect(h).not.toContain('<script>');
+  });
+
+  it('tolerates an unparsable timestamp instead of printing "Invalid Date"', () => {
+    const h = duelHistoryHTML([storedDuel({ at: NaN })]);
+    expect(h).not.toContain('Invalid Date');
+    expect(h).toContain('Number Bonds');   // the row still renders, it just loses its date
   });
 });

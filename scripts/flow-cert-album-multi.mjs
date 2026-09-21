@@ -20,7 +20,7 @@ export default async function run(p) {
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForSelector('.home');
   await p.click('#rewards');
-  await p.waitForSelector('.cert-row');
+  await p.waitForSelector('.cert-row:not(.duel-row)');
   await p.locator('.isl-head:has-text("My certificates")').scrollIntoViewIfNeeded();
   await p.waitForTimeout(300);
 }
