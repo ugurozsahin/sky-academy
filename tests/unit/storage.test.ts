@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { activeProfile, addProfile, MAX_PROFILES, PROFILE_IDS, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, type StoredCert } from '../../src/storage';
+import { activeProfile, addProfile, MAX_PROFILES, PROFILE_IDS, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
+import { duelHeadline, duelHistoryLine } from '../../src/game/duel';
 import { esc } from '../../src/ui/dom';
 import { topicsFor } from '../../src/curriculum';
 
@@ -362,6 +363,82 @@ describe('certificate album (#205)', () => {
     // UTC+12, where midnight UTC *is* local noon and there is no wrong day left to catch.
     expect(c.date!.getHours(), 'read at local noon — UTC midnight renders as the previous day west of Greenwich').toBe(12);
     expect(c.date!.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })).toBe('14 September 2026');
+  });
+});
+
+describe('duel history (#16)', () => {
+  beforeEach(() => reset());
+  const duel = (p: Partial<StoredDuel> = {}): StoredDuel => ({
+    at: 1_757_000_000_000, topic: 'y1-bonds', title: 'Number bonds', year: 'Year 1',
+    winner: 'a', scoreA: 6, scoreB: 4, rounds: 10, ...p,
+  });
+
+  // The whole of what makes this different from `fileCert`: a certificate is an award for a mission and there
+  // is one per mission, but a duel is an event. Two children who play the same topic five times want five
+  // rows. Collapsing them by topic — the obvious thing to copy from the album — would make the list say the
+  // afternoon happened once.
+  it('keeps every match, newest first, and never collapses a rematch into the one before it', () => {
+    const first = duel({ at: 1, winner: 'a', scoreA: 6, scoreB: 4 });
+    const rematch = duel({ at: 2, winner: 'b', scoreA: 3, scoreB: 7 });
+    const third = duel({ at: 3, winner: 'draw', scoreA: 5, scoreB: 5 });
+    const list = fileDuel(fileDuel(fileDuel([], first), rematch), third);
+    expect(list.map(m => m.at)).toEqual([3, 2, 1]);
+    expect(list.map(m => m.winner)).toEqual(['draw', 'b', 'a']);
+    // Same topic, same scoreline, same day: still two rows. `fileCert` would have kept one.
+    expect(fileDuel([duel()], duel()).length).toBe(2);
+  });
+
+  it('caps the history, dropping the oldest', () => {
+    let list: StoredDuel[] = [];
+    for (let i = 0; i < DUEL_CAP + 5; i++) list = fileDuel(list, duel({ at: i }));
+    expect(list.length).toBe(DUEL_CAP);
+    expect(list[0].at).toBe(DUEL_CAP + 4);                              // newest kept
+    expect(list.some(m => m.at === 0)).toBe(false);                     // oldest dropped
+  });
+
+  it('records through the save, and survives a reload', () => {
+    expect(duelHistory()).toEqual([]);
+    recordDuel(duel({ at: 1 }));
+    recordDuel(duel({ at: 2, topic: 'y1-days', title: 'Days of the week' }));
+    expect(duelHistory().map(m => m.topic)).toEqual(['y1-days', 'y1-bonds']);
+    const stored = JSON.parse(mem['sna:v1']);                           // what a reload would read back
+    expect(stored.duels.length).toBe(2);
+  });
+
+  // Same fixture reasoning as the album's: the entries that actually reach a save are the plausible ones.
+  // `winner` is checked against the three the screen knows, because a fourth value renders as a match nobody
+  // won, and the numbers must be finite — `Infinity` formats as "Infinity–0" in a row a child reads.
+  it('a hand-edited history cannot take the list down with it', () => {
+    const partial = { topic: 'y1-bonds', title: 'Number bonds' };
+    const badWinner = { ...duel(), winner: 'c' };
+    const infinite = { ...duel(), scoreA: Infinity };
+    save({ duels: ['nonsense', null, 42, {}, partial, badWinner, infinite, { ...duel(), at: NaN }, duel()] as unknown as StoredDuel[] });
+    expect(duelHistory()).toEqual([duel()]);
+    save({ duels: 'not a history' as unknown as StoredDuel[] });
+    expect(duelHistory()).toEqual([]);
+  });
+
+  // A save written before v4 has no duel history to preserve: those matches were never stored. An empty list
+  // is the truthful answer, and the v3 → v4 step is what makes it one rather than `undefined` reaching a
+  // `.map()` on the rewards screen.
+  it('a save from before the history migrates to an empty one, not to a missing field', () => {
+    const v3 = migrate({ v: 3, name: 'Ada', coins: 5 });
+    expect(v3.v).toBe(SAVE_VERSION);
+    expect(v3.duels).toEqual([]);
+    expect(migrate({ v: 3, name: 'Ada', duels: [duel(), 'junk'] }).duels).toEqual([duel()]);
+  });
+
+  // Seat order, not winner order — the one thing `duelHistoryLine` does not share with `duelHeadline`.
+  // Read down a column of twenty rows, a scoreline sorted by winner puts Player 1's score on the left in some
+  // rows and the right in others, so "am I getting better?" cannot be answered by looking.
+  it('reads a row in seat order, naming the winner in words', () => {
+    expect(duelHistoryLine({ winner: 'a', scoreA: 6, scoreB: 4 })).toBe('Player 1 won · 6–4');
+    expect(duelHistoryLine({ winner: 'b', scoreA: 3, scoreB: 7 })).toBe('Player 2 won · 3–7');
+    expect(duelHistoryLine({ winner: 'draw', scoreA: 5, scoreB: 5 })).toBe('A draw · 5–5');
+    // The losing seat's score stays on its own side. Sorted, this row would read "7–3" and match the one above.
+    expect(duelHistoryLine({ winner: 'b', scoreA: 3, scoreB: 7 })).not.toBe(duelHistoryLine({ winner: 'a', scoreA: 7, scoreB: 3 }));
+    // And the headline it is deliberately not: that one sorts, because it is read out once about one match.
+    expect(duelHeadline({ winner: 'b', scoreA: 3, scoreB: 7, rounds: 10, tally: { a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } } })).toBe('Player 2 wins 7–3!');
   });
 });
 

@@ -725,6 +725,42 @@ test.describe('Sky Ninja Academy', () => {
     await expect(view).toHaveCount(0);
   });
 
+  test('"Recent duels" (#16): finished matches list on the rewards screen, newest first, in seat order', async ({ page }) => {
+    // Seeded at `v: 1`, like every other save here, so this also drives the v3 → v4 migration step that puts
+    // `duels` on an older save — the junk entry below has to be dropped by it rather than reaching the list.
+    const match = (at: number, extra: Record<string, unknown> = {}) =>
+      ({ at, topic: 'y1-bonds', title: 'Number bonds', year: 'Year 1', winner: 'a', scoreA: 6, scoreB: 4, rounds: 10, ...extra });
+    await seedPlayer(page, 'volt', 'Ada', {
+      duels: [
+        match(1_757_100_000_000, { topic: 'y1-days', title: 'Days of the week', winner: 'b', scoreA: 3, scoreB: 7 }),
+        match(1_757_000_000_000),
+        { topic: 'y1-bonds', title: 'junk' },                     // a hand-edited row: never reaches the list
+      ],
+    });
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+
+    const lines = page.locator('.duel-line');
+    await expect(lines).toHaveCount(2);                           // the junk row is filtered, not rendered
+    // Newest first, and the scoreline in seat order — Player 1's score stays on the left in BOTH rows, which
+    // is the whole reason this line is not `duelHeadline`. Sorted by winner, row 0 would read "7–3".
+    await expect(lines.nth(0)).toHaveText('Player 2 won · 3–7');
+    await expect(lines.nth(1)).toHaveText('Player 1 won · 6–4');
+    await expect(page.locator('.cert-row').filter({ hasText: 'Days of the week' })).toBeVisible();
+    await expect(page.locator('.duel-ava').first()).toBeVisible();
+  });
+
+  test('"Recent duels" (#16): a player who has never duelled gets the hint, not an empty box', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+    await expect(page.locator('.duel-line')).toHaveCount(0);
+    // Its own class, not `.cert-empty`: that one means "no certificates" to the album test above, and a
+    // screen showing both lists cannot have one class meaning two things.
+    await expect(page.locator('.duel-empty')).toContainText('Hand the device to a friend and play a Ninja Duel');
+    await expect(page.locator('.cert-empty'), 'the album keeps its own empty state').toHaveCount(1);
+  });
+
   test('ninja shop: buy a trail skin with the balance, stickers keep their lifetime unlocks, the skin is equipped', async ({ page }) => {
     test.slow();   // three navigations, and each one waits ~12 s for the blocked Google Fonts stylesheet in the sandbox
     const seed = async (patch: Record<string, unknown>) => {   // patch the save, then reopen the app (not reload(): the URL still carries ?reset=1)

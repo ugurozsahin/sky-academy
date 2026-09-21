@@ -417,8 +417,10 @@ img { -webkit-user-drag: none; }
 .sticker .isl-bar { align-self: stretch; margin-top: 2px; }   /* #114: achievement progress — stretches past the card's centred children */
 .sticker:not(.got) .figure img { filter: brightness(0) opacity(.35); } .sticker:not(.got) .figure::before { opacity: .15; }
 .sticker.got { border-color: var(--glow); box-shadow: inset 0 0 30px color-mix(in srgb, var(--glow) 16%, transparent); }
-/* "My certificates" (#110): a row per earned certificate, next to the sticker album. */
-.cert-empty {
+/* "My certificates" (#110): a row per earned certificate, next to the sticker album — and, since #16, the
+   "Recent duels" list below it, which reuses these rules (see `duelHistoryHTML`). The empty states share this
+   rule but not a class name: `.cert-empty` means "no certificates" to the album's own e2e. */
+.cert-empty, .duel-empty {
   margin: 12px 0 0;
   padding: 14px 16px;
   border-radius: 16px;
@@ -455,6 +457,11 @@ img { -webkit-user-drag: none; }
 .cert-info small { color: var(--muted); font-weight: 600; font-size: 12px; }
 .cert-stars { flex: none; color: var(--accent); font-size: 15px; }
 .cert-open { flex: none; min-height: 44px; padding: 0 14px; font-size: 14px; }
+/* "Recent duels" (#16): the certificate row reused, with the scoreline where the stars sit and no View button
+   (a duel has nothing to redraw). `--glow` is set here because `.cert-ava` reads it and no avatar supplies one
+   on this row — without it both of that rule's color-mix declarations are invalid and the disc loses its ring. */
+.duel-ava { --glow: var(--accent); font-size: 22px; line-height: 1; }
+.duel-line { flex: none; font-weight: 700; font-size: 14px; color: var(--muted); white-space: nowrap; }
 .coin-row { display: flex; justify-content: center; gap: 10px; margin: -6px 0 12px; flex-wrap: wrap; }
 .coin-gain { font-size: 22px; font-weight: 700; color: #ffd87a; text-shadow: 0 0 14px #ffb02088; }
 .streak-pill { align-self: center; padding: 4px 10px; border-radius: 999px; background: #3b1a22; border: 1px solid #ff8a4c66; color: #ffb090; font-weight: 700; font-size: 14px; }

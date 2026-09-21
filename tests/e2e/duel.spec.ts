@@ -324,6 +324,15 @@ test.describe('Ninja Duel', () => {
     // The coins still pay — a duel pays the device per decided round whoever won (#347) — so this test is
     // about the certificate alone and not about a results screen that did nothing.
     await expect(page.locator('.duel-end .coin-gain')).toHaveText('+10 🪙');
+    // ...and the duel history DOES take it (#16, the last piece of item 5). This is the pair to the album
+    // assertion three lines up, and the reason both are here: a loss earns no award but is still a match that
+    // happened, so exactly one of the two writes must fire. A row filed only on a win would make the list
+    // read as a run of victories.
+    const duels = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).duels);
+    expect(duels.length, 'a loss is still a match the history keeps').toBe(1);
+    expect(duels[0]).toMatchObject({ winner: 'b', scoreA: 4, scoreB: 6, rounds: 10 });
+    expect(typeof duels[0].at, 'stamped, so the list can order itself').toBe('number');
+    expect(duels[0].title, 'the topic the match was played on').toBeTruthy();
   });
 
   test('a finished match moves the day\'s Daily Dojo challenge and pays its bonus into the same save (#16 item 5)', async ({ page }) => {

@@ -268,3 +268,23 @@ export const duelEarnsCertificate = (r: DuelResult): boolean => r.winner === 'a'
 export function duelHeadline(r: DuelResult): string {
   return r.winner === 'draw' ? `It's a draw — ${r.scoreA} all!` : `Player ${r.winner === 'a' ? 1 : 2} wins ${Math.max(r.scoreA, r.scoreB)}–${Math.min(r.scoreA, r.scoreB)}!`;
 }
+
+/**
+ * How a past match reads in the duel history (#16, the last piece of item 5). One row is `Player 1 won` /
+ * `Player 2 won` / `A draw`, and the scoreline **in seat order, never sorted** — `scoreA–scoreB`, Player 1
+ * first, whoever won.
+ *
+ * That is the one thing this does not share with `duelHeadline()` above, and the difference is the point.
+ * A headline is read out at the end of one match, so `Math.max`/`Math.min` says "4–1 to the winner" and the
+ * children know which of them that was. A row in a list of twenty is read *down a column*: a scoreline sorted
+ * by winner puts Player 1's score in the left column in some rows and the right column in others, so "am I
+ * getting better?" cannot be answered by looking. Seat order costs nothing here, because the row already
+ * names the winner in words.
+ *
+ * Takes the stored fields rather than a `DuelResult`, because a row in the history is exactly what the save
+ * holds — passing the live result would let the screen and the list drift on a match the save rejected.
+ */
+export function duelHistoryLine(d: { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number }): string {
+  const who = d.winner === 'draw' ? 'A draw' : `Player ${d.winner === 'a' ? 1 : 2} won`;
+  return `${who} · ${d.scoreA}–${d.scoreB}`;
+}

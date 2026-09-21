@@ -1,12 +1,13 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
-import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
+import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { MODES } from '../game/modes';
 import { weakestTopics } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS } from '../game/dojo';
+import { duelHistoryHTML } from './duel';
 import { $, $$, render, stars } from './dom';
 
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
@@ -171,6 +172,12 @@ export function rewardsScreen(nav: Nav) {
     : nextCoin ? `<span>Next sticker at 🪙 ${nextCoin}</span><span class="isl-bar"><i style="width:${Math.min(100, Math.round(100 * d.coins / nextCoin))}%"></i></span>`
     : 'The rest of the album is earned by playing, not by coins — see each sticker below';
   const certs = certificates();
+  const duels = duelHistory();
+  // #16's last piece, listed under the certificates because it is the other thing on this screen a child
+  // earned by playing rather than bought. The subtitle is hoisted out of the markup below to keep the
+  // long-line budget in `guardrails.test.ts` falling (#36) — it only ever ratchets down.
+  const duelsSub = duels.length === 0 ? 'Play a Ninja Duel with a friend'
+    : duels.length === 1 ? 'your last match' : `your last ${duels.length} matches`;
   render(`
   <section class="screen home rewards">
     ${tb.html}
@@ -185,6 +192,8 @@ export function rewardsScreen(nav: Nav) {
     <div class="album">${cards}</div>
     <div class="isl-head"><span class="icon-btn" aria-hidden="true">🎓</span><div><b>My certificates</b><small>${certs.length ? `${certs.length} earned` : 'Win a mission to earn one'}</small></div></div>
     ${certAlbumHTML(certs)}
+    <div class="isl-head"><span class="icon-btn" aria-hidden="true">⚔️</span><div><b>Recent duels</b><small>${duelsSub}</small></div></div>
+    ${duelHistoryHTML(duels)}
   </section>`, 'bg-sky');
   tb.bind();
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
