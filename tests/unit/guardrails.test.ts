@@ -1164,34 +1164,62 @@ describe('guard rails', () => {
   // the rest idle: CI run 35640634022 paid 416 s of a 488 s job while worker 2 sat done after 57 s.
   // This is worth a rail because turning it back off breaks NOTHING that goes red. The suite still passes,
   // just three times slower, and a regression whose only symptom is a bill is one nobody files.
-  // Three ways it decays, all three covered:
-  //   - the flag is deleted, commented out, or set to false;
-  //   - the flag is moved INSIDE a project, where it governs that project alone while every other project
-  //     quietly returns to the file-serial default — so it is located in the slice ABOVE `projects:`;
-  //   - a spec file puts itself back to serial with `test.describe.configure({ mode: 'serial' })`, which
-  //     undoes the flag for that file without touching the config at all. game.spec.ts IS the file this
-  //     issue is about, so one line at its top would restore the whole defect with the config still honest.
-  // Read through `code()`: the paragraph in playwright.config.ts explaining the flag names it repeatedly,
-  // and a rail satisfied by the prose that describes the rule is the #129 failure.
-  it('the e2e suite parallelises inside a file, not only across files (#483)', () => {
-    const cfg = code(readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8'));
-    const split = cfg.indexOf('projects:');
-    expect(split, 'playwright.config.ts must be read from disk and still declare projects').toBeGreaterThan(0);
-    const top = cfg.slice(cfg.indexOf('defineConfig('), split);
-    expect(top.length, 'the slice above `projects:` must be the real top level of defineConfig').toBeGreaterThan(100);
-    expect(top, 'fullyParallel must be true at the TOP level of defineConfig — inside a project it governs that one project and the file-serial default returns for the others (#483)')
-      .toMatch(/fullyParallel:\s*true/);
-    expect(cfg.slice(split), 'no project may turn fullyParallel back off — that is the same 416 s step under a config that still reads as fixed (#483)')
-      .not.toMatch(/fullyParallel:\s*false/);
-    // The config is only half of it: `mode: 'serial'` in a spec re-serialises that file from the inside.
-    // If a future flow genuinely needs ordering, scope it to its own `describe` and name it here with the
-    // reason — what must never happen silently is game.spec.ts, the 97-test file, going serial again.
-    const specs = readdirSync(new URL('../../tests/e2e/', import.meta.url))
-      .filter(f => f.endsWith('.spec.ts'));
-    expect(specs.length, 'the e2e specs must be read from disk').toBeGreaterThanOrEqual(3);
+  // This is worth a rail because turning it back off breaks NOTHING that goes red. The suite still passes,
+  // just three times slower, and a regression whose only symptom is a bill is one nobody files.
+  //
+  // **The first version of this rail matched TEXT, and review of PR #487 found three ways round it in one
+  // round** — a spread defined above `defineConfig(` and mixed into a project; a spec in a subdirectory the
+  // non-recursive `readdirSync` never saw; and a `//` inside a string, which `code()` strips to end of line,
+  // hiding the very call being searched for. Each was real and each was reproduced with the rail green.
+  //
+  // They are not three bugs. They are three members of ONE class — ways to write a thing so that a regex
+  // does not see it — and in a Turing-complete language that class has no end: patch three spellings and a
+  // fourth exists. So the fix is not a fourth regex. It is to **stop reading the text and read the value**:
+  // import the config and ask what Playwright will actually resolve. A spread resolves. An indirection
+  // resolves. A computed value resolves. A comment cannot lie to it because no comment is read.
+  //
+  // What is left textual is the spec half, and deliberately: Playwright's reporters do not expose a file's
+  // parallel mode, so there is nothing to ask. That half reads RAW text rather than `code()` — the opposite
+  // trade from the first version and the right way round for a guard rail. Raw text can produce a false
+  // POSITIVE (the word in a comment turns it red, and somebody rewords the comment); `code()` produced a
+  // false NEGATIVE (the defect ships green), which is the failure this whole file exists against.
+  it('the e2e suite parallelises inside a file, not only across files (#483)', async () => {
+    // The resolved config, not its source text. `defineConfig` returns the object; importing it runs the
+    // port derivation at the top of the file, which is pure.
+    const cfg = (await import('../../playwright.config')).default;
+    expect(cfg.fullyParallel, 'fullyParallel must be on at the top level — with it off, 97 of the suite\'s tests are one sequential chain on one worker (#483)').toBe(true);
+    expect(cfg.projects?.length, 'the config must still declare its projects, or this rail checks nothing').toBeGreaterThanOrEqual(4);
+    for (const p of cfg.projects ?? []) {
+      // `?? cfg.fullyParallel` is how Playwright resolves it: a project that says nothing inherits the top
+      // level. A project that says `false` governs itself alone, and every OTHER project would still look
+      // fine — which is exactly what the text version could not see through a spread.
+      expect(p.fullyParallel ?? cfg.fullyParallel, `project '${p.name}' resolves fullyParallel to false — however it is spelt, that project is back to one file at a time (#483)`).toBe(true);
+    }
+    // Same class, other lever: one worker makes the flag moot without touching it. Unset is the default
+    // (half the logical cores) and is what every measurement in #483 was taken at.
+    expect(typeof cfg.workers === 'number' ? cfg.workers : 2,
+      'workers: 1 runs the suite one test at a time with fullyParallel still reading true — if a run genuinely needs it, say why here (#483)').toBeGreaterThan(1);
+    // ...and the same lever on the command line, where no config rail can see it.
+    const e2eStep = workflow('ci.yml').split('\n').filter(l => l.includes('playwright test')).join('\n');
+    expect(e2eStep, 'the rail must have found the e2e command in ci.yml').toContain('playwright test');
+    expect(e2eStep, 'ci.yml must not pin the e2e run to one worker — that is #483 undone from the command line').not.toMatch(/--workers[= ]1\b/);
+
+    // The spec half. RECURSIVE, because Playwright's own discovery is: a spec under tests/e2e/sub/ runs, and
+    // the first version of this rail never opened it. Raw text, quote-agnostic: `mode: "serial"` type-checks
+    // just as well as `mode: 'serial'`, and `describe.serial` is a third spelling of the same thing.
+    const dir = new URL('../../tests/e2e/', import.meta.url);
+    const specs: string[] = [];
+    const walk = (rel: string) => {
+      for (const e of readdirSync(new URL(rel, dir), { withFileTypes: true })) {
+        if (e.isDirectory()) walk(`${rel}${e.name}/`);
+        else if (e.name.endsWith('.spec.ts')) specs.push(`${rel}${e.name}`);
+      }
+    };
+    walk('');
+    expect(specs.length, 'the e2e specs must be read from disk — an empty walk would pass vacuously').toBeGreaterThanOrEqual(3);
     const serial = specs.filter(f =>
-      /mode:\s*'serial'|describe\.serial/.test(code(readFileSync(new URL(`../../tests/e2e/${f}`, import.meta.url), 'utf8'))));
-    expect(serial, 'no e2e spec may re-serialise itself — that undoes #483 for that file with the config untouched')
+      /mode:\s*['"`]serial['"`]|describe\.serial\b/.test(readFileSync(new URL(f, dir), 'utf8')));
+    expect(serial, 'no e2e spec may re-serialise itself — that undoes #483 for that file with the config still resolving true. If a flow genuinely needs ordering, scope it to its own describe and name it here with the reason')
       .toEqual([]);
   });
 
