@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { certAlbumHTML, certificateText, certRoute, deliverCertificate, hasCapacitorShare, isNativeShell } from '../../src/ui/certificate';
+import { certAlbumHTML, certFromStored, certificateText, certKind, certRoute, deliverCertificate, hasCapacitorShare, isNativeShell } from '../../src/ui/certificate';
 import { AVATARS } from '../../src/avatars';
 import type { StoredCert } from '../../src/storage';
 
@@ -60,6 +60,34 @@ describe('mission certificate text', () => {
 
 const caps = (o: Partial<Parameters<typeof certRoute>[0]> = {}) =>
   ({ canShareFiles: false, claudeSave: false, claudeRuntime: false, nativeShell: false, capacitorShare: false, ...o });
+
+describe('duel certificate text (#16 item 5)', () => {
+  it('says a duel was won, and never calls it a mission', () => {
+    const t = certificateText({ ...base, title: 'Ninja Duel', correct: 5, attempts: 6, score: 6, stars: 2, duel: true });
+    expect(t.reason).toBe('won a Ninja Duel on Year 1 Island');
+    expect(t.reason).not.toContain('mission');
+    // The detail line is Player 1\'s own slices, so it reads exactly as a mission's does.
+    expect(t.detail).toBe('5/6 correct (83%) · score 6');
+    expect(t.stars).toBe('★★☆');
+  });
+  it('keeps the three wordings apart, and a hand-edited both-flags save reads as a duel', () => {
+    expect(certKind({})).toBe('mission');
+    expect(certKind({ training: true })).toBe('sensei');
+    expect(certKind({ duel: true })).toBe('duel');
+    // Not constructible by any caller — play.ts never sets `duel`, ui/duel.ts never sets `training` — but a
+    // save is a file on a device, and one resolution is better than whichever branch happens to be first.
+    expect(certKind({ training: true, duel: true })).toBe('duel');
+    expect(certificateText({ ...base, training: true, duel: true }).reason).toContain('Ninja Duel');
+  });
+  it('carries the duel flag back out of the album, so a stored duel cert redraws as one', () => {
+    const c = certFromStored(storedCert({ id: 'year1:duel', title: 'Ninja Duel', duel: true }));
+    expect(c.duel).toBe(true);
+    expect(certificateText(c).reason).toBe('won a Ninja Duel on Year 1 Island');
+    // A stored cert with no flag still redraws as a mission: the field is optional on disk (no SAVE_VERSION bump).
+    expect(certFromStored(storedCert()).duel).toBeUndefined();
+    expect(certificateText(certFromStored(storedCert())).reason).toContain('mission');
+  });
+});
 
 describe('certificate delivery route', () => {
   it('prefers the system share sheet when files can be shared', () => {

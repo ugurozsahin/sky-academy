@@ -214,6 +214,25 @@ export function duelAccuracy(r: DuelResult): DuelTally {
   return { ...r.tally.a };   // a copy: the duel screen puts this on `window.__sna`, and the result is a record
 }
 
+/**
+ * Stars for the certificate a won duel earns (#16 item 5) — Player 1's own accuracy, on the **identical bar a
+ * mission stage uses** (`Session`'s `acc >= 0.95 ? 3 : acc >= 0.7 ? 2 : 1`). Reusing that bar is the whole
+ * point: a star on a duel certificate has to mean what a star means on every other certificate in the album,
+ * or `fileCert()`'s "keep the best run" comparison is ranking two different scales against each other.
+ *
+ * It reads `duelAccuracy()`'s tally rather than the scoreline for the reason #347 gave for paying no win
+ * bonus: `scoreA` counts rounds the friend was *slower* on, which is not a measurement of this child's maths.
+ *
+ * A tally with no tries scores 1, not 3: an empty accuracy is not a perfect one. That case cannot arise from a
+ * match Player 1 won — winning takes at least one hit, and every hit is also a try — so this is a floor for a
+ * hand-edited or replayed result, never the live path.
+ */
+export function duelStars(t: DuelTally): number {
+  if (t.tries <= 0) return 1;
+  const acc = t.hits / t.tries;
+  return acc >= 0.95 ? 3 : acc >= 0.7 ? 2 : 1;
+}
+
 /** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
 export function duelHeadline(r: DuelResult): string {
   return r.winner === 'draw' ? `It's a draw — ${r.scoreA} all!` : `Player ${r.winner === 'a' ? 1 : 2} wins ${Math.max(r.scoreA, r.scoreB)}–${Math.min(r.scoreA, r.scoreB)}!`;

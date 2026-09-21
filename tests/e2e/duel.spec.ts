@@ -151,6 +151,21 @@ test.describe('Ninja Duel', () => {
     // the state hook would be green with `recordAccuracy()` never called.
     const learnt = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).progress[window.__sna.state().topic]);
     expect(learnt, "the six rounds Player 1 answered, five of them right first time").toMatchObject({ hits: 5, tries: 6, plays: 0, stars: 0 });
+    // #16 item 5, the certificate half: Player 1 won, so the album gets one — and it is filed the moment the
+    // overlay is built, BEFORE the 🎓 button is pressed (#205's rule, the bug being a device where pressing it
+    // does nothing). Read from the save, not the overlay: the button would be on screen with nothing recorded.
+    await expect(page.locator('.duel-end #cert')).toBeVisible();
+    const filed = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs);
+    expect(filed, 'one entry per year, so a rematch upgrades rather than fills the album').toHaveLength(1);
+    expect(filed[0]).toMatchObject({
+      id: 'year1:duel', title: 'Ninja Duel', year: 'Year 1', name: 'Ada', duel: true,
+      // Player 1's own five-of-six, not the 6–4 scoreline: 83% is two stars on the mission bar, and reading
+      // `scoreA` as the tally would have filed three. `score` is the rounds this child took.
+      stars: 2, score: 6, correct: 5, attempts: 6,
+    });
+    // It really draws — the certificate path is reached with a duel's fields, not only stored.
+    const png = await page.evaluate(() => window.__sna.certificate());
+    expect(png?.startsWith('data:image/png;base64,')).toBe(true);
     // Rematch routes back into the same screen (the #73 class): a fresh match, both scores at 0. The recording
     // is cleared BEFORE the click: round 1's line goes out on the task after the old screen's cancel(), and it
     // is what the assertion after the scores must find.
@@ -254,5 +269,11 @@ test.describe('Ninja Duel', () => {
     expect(saved.dojo.done.length, 'the completed challenge is recorded, so it cannot be paid twice').toBe(3);
     expect(saved.dojo.setDone, "the day's set is finished by a duel").toBe(true);
     expect(saved.dojo.total).toBe(3);
+    // #16 item 5: five each is a DRAW, and a draw earns no certificate — nobody won, and the save has one
+    // profile, so there is no second child to award. The negative case for the 6–4 test above: no button, no
+    // album entry, and nothing for the hook to draw.
+    await expect(page.locator('.duel-end #cert')).toHaveCount(0);
+    expect(saved.certs, 'a drawn match files nothing').toEqual([]);
+    expect(await page.evaluate(() => window.__sna.certificate())).toBeNull();
   });
 });

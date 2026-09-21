@@ -4,7 +4,18 @@ import { avatarById, type Avatar } from '../avatars';
 import { esc } from './dom';
 import type { StoredCert } from '../storage';
 
-export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date?: Date; training?: boolean }
+export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date?: Date; training?: boolean; duel?: boolean }
+
+/**
+ * Which of the three things a certificate was earned for (#16 item 5). `training` and `duel` are separate
+ * optional flags rather than one `kind` field because `training` is already **on disk** in every save that has
+ * ever filed a certificate, and a discriminated union would need a `SAVE_VERSION` bump and a migration step to
+ * earn nothing a reader can see. The cost is that `{ training: true, duel: true }` is expressible; no caller
+ * constructs it (`play.ts` never sets `duel`, `ui/duel.ts` never sets `training`), and this function is the one
+ * place the precedence is decided, so a hand-edited save reads as a duel rather than as undefined behaviour.
+ */
+export const certKind = (i: { training?: boolean; duel?: boolean }): 'duel' | 'sensei' | 'mission' =>
+  i.duel ? 'duel' : i.training ? 'sensei' : 'mission';
 
 /**
  * Rebuild a drawable certificate from what the save keeps (#205). Certificates are stored as data, not as a
@@ -20,7 +31,7 @@ export function certFromStored(c: StoredCert): CertInfo {
   return {
     name: c.name, avatar: avatarById(c.avatar), year: c.year, title: c.title,
     stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
-    date: new Date(`${c.date}T12:00:00`), training: c.training,
+    date: new Date(`${c.date}T12:00:00`), training: c.training, duel: c.duel,
   };
 }
 /**
@@ -49,9 +60,16 @@ export function certificateText(i: CertInfo): CertText {
   const d = i.date ?? new Date();
   const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const acc = i.attempts ? Math.round(100 * i.correct / i.attempts) : 0;
+  // A duel is not a mission and the certificate may not call it one: the child won a race against a friend on
+  // one device, and "completed the Counting mission" would be the wrong claim on a printed, kept record.
+  const reason = {
+    duel: `won a Ninja Duel on ${i.year} Island`,
+    sensei: `completed Sensei training on ${i.year} Island`,
+    mission: `completed the ${i.title} mission on ${i.year} Island`,
+  }[certKind(i)];
   return {
     heading: 'Sky Ninja Academy', awarded: 'Certificate of Achievement', child: i.name.trim() || 'Ninja',
-    reason: i.training ? `completed Sensei training on ${i.year} Island` : `completed the ${i.title} mission on ${i.year} Island`,
+    reason,
     detail: `${i.correct}/${i.attempts} correct (${acc}%) · score ${i.score}`,
     stars: '★'.repeat(Math.max(0, Math.min(3, i.stars))) + '☆'.repeat(3 - Math.max(0, Math.min(3, i.stars))),
     date, signed: `Sensei · with ${i.avatar.name} the ${i.avatar.element}`,

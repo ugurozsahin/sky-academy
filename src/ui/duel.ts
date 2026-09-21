@@ -4,13 +4,14 @@
 // nothing, best of DUEL_ROUNDS — and this file only wires two `Arena`s, the strip, the match-end overlay and
 // the `window.__sna` hooks the e2e drives it through. A finished match pays coins into the one shared save
 // (item 5's coins and stickers), tells the Daily Dojo what the device answered and teaches Sensei what Player 1
-// found hard on this topic; certificates and a duel history are still deferred on the issue.
+// found hard on this topic and files a certificate when Player 1 wins; a duel history is still deferred.
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
-import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelHeadline, duelPool, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
+import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelHeadline, duelPool, duelStars, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { addCoins, load, recordAccuracy, recordDojo } from '../storage';
+import { addCoins, load, recordAccuracy, recordCert, recordDojo, today } from '../storage';
+import { deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { hintText, promptHTML, promptMode } from './hud';
@@ -69,6 +70,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   let dojoPaid = 0;
   /** What the finished match taught Sensei about this topic — rounds answered, not slices; 0/0 until it ends. */
   let taught: DuelTally = { hits: 0, tries: 0 };
+  /** The certificate a Player 1 win earned, or null — the other two outcomes earn none (#16 item 5). */
+  let cert: CertInfo | null = null;
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
 
@@ -151,6 +154,13 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     const dojo = recordDojo(duelDojoEvent(r, topic.subject));
     dojoPaid = dojo.coins;
     const fresh = addCoins(paid + dojoPaid);
+    cert = duelCert(r);
+    // #205's rule, unchanged here: filed the moment the overlay is built, never from the 🎓 button, because the
+    // bug that issue opened with is a device where pressing the button does nothing at all.
+    if (cert) recordCert({
+      id: `${o.year.id}:duel`, name: cert.name, avatar: d.avatar, year: cert.year, title: cert.title,
+      stars: cert.stars, score: cert.score, correct: cert.correct, attempts: cert.attempts, date: today(), duel: true,
+    });
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
     overlay.hidden = false;
@@ -162,10 +172,41 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
         ${dojoRowsHTML(dojo)}
         ${stickersHTML(fresh)}
+        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div>' : ''}
         <div class="row"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
+    if (cert) $('#cert').addEventListener('click', async () => {
+      sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
+      try {
+        const how = await deliverCertificate(await drawCertificate(cert!), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
+        if (how === 'shared') toast('Certificate shared!', 'good');
+        else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
+        else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
+        // 'shown' opens the full-screen view with its own save hint, so no toast
+      }
+      catch { toast('Could not make the certificate', 'bad'); }
+      b.disabled = false;
+    });
+  }
+  /**
+   * The certificate a finished match earned, or null (#16 item 5). **Only a Player 1 win earns one**: the two
+   * children share one profile, Player 2 is the friend `DUEL_HANDOVER` sends to the top half, and a certificate
+   * filed in this save saying a duel was won has to be about the child whose save it is. A draw and a Player 2
+   * win earn nothing for the same reason #347 pays no win bonus — there is no second profile to award.
+   *
+   * `correct`/`attempts` are Player 1's own slices (`duelAccuracy()`), not the scoreline: the printed
+   * "5/6 correct (83%)" then means the same thing it means on a mission certificate. `score` is `scoreA`, the
+   * rounds this child actually took, which is what `fileCert()` breaks a stars tie on.
+   */
+  function duelCert(r: DuelResult): CertInfo | null {
+    if (r.winner !== 'a') return null;
+    const t = duelAccuracy(r);
+    return {
+      name: d.name, avatar: av, year: o.year.title, title: 'Ninja Duel',
+      stars: duelStars(t), score: r.scoreA, correct: t.hits, attempts: t.tries, duel: true,
+    };
   }
   function showPause() {
     hold(true); overlay.hidden = false; overlay.innerHTML = pauseHTML();
@@ -196,6 +237,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
       hint: hintLine, coins: paid, dojoCoins: dojoPaid, taught,
     }),
+    certificate: async () => cert ? (await drawCertificate(cert)).toDataURL('image/png') : null,
     setSpeed: k => { setGameSpeed(k); },
     timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),
   };

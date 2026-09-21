@@ -114,6 +114,8 @@ export interface DuelHooks {
   wrong(p: DuelPlayer): boolean;
   bubbles(p: DuelPlayer): BubbleView[];
   state(): DuelState;
+  /** PNG data URL of the certificate a Player 1 win earned, or null for a draw or a Player 2 win (#16 item 5). */
+  certificate(): Promise<string | null>;
   setSpeed(k: number): void;
   timing(): { speed: number; hold: { won: number; draw: number } };
 }

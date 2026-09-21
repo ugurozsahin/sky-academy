@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Duel, DUEL_ROUNDS } from '../../src/game/duel';
+import { Duel, DUEL_ROUNDS, duelStars } from '../../src/game/duel';
 import { topicById } from '../../src/curriculum';
 import { hintText, promptHTML, promptMode } from '../../src/ui/hud';
 import { esc } from '../../src/ui/dom';
@@ -544,5 +544,44 @@ describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', (
     expect(after[topic.id]).toMatchObject({ hits: 10, tries: 13, plays: 1 });
     expect(accuracy(after[topic.id])!).toBeCloseTo(10 / 13, 5);
     expect(weakestTopics([topic, other], after, 1).map(t => t.id), 'a duel moves the ratio, without inventing tries').toEqual([other.id]);
+  });
+});
+
+describe('duelStars (#16 item 5: what a duel certificate may claim)', () => {
+  /** Play a scripted match and return its result — the same driver the duelAccuracy block uses. */
+  const played = (script: ('a' | 'b' | 'wrongA' | 'draw')[]): DuelResult => {
+    const ev = events();
+    const d = new Duel({ topic, difficulty: 1, rounds: script.length, rng: rng(13) }, ev);
+    d.start();
+    for (const step of script) {
+      if (step === 'wrongA') d.hit('a', d.current!.options.find(o => o !== d.current!.answer)!);
+      else if (step !== 'draw') d.hit(step, d.current!.answer);
+      d.waveEnd();
+    }
+    return ev.onMatchEnd.mock.calls[0][0];
+  };
+  // Deliberately the mission bar's own numbers, written out rather than imported: if `Session`'s thresholds
+  // ever move, this test goes red and somebody has to decide whether a duel star follows them. A shared
+  // constant would have let the two scales drift apart silently, which is the thing `fileCert()` cannot survive.
+  it('uses the identical accuracy bar a mission stage uses — 95% for three, 70% for two', () => {
+    expect(duelStars({ hits: 20, tries: 20 })).toBe(3);      // 100%
+    expect(duelStars({ hits: 19, tries: 20 })).toBe(3);      // 95% exactly — the boundary is inclusive
+    expect(duelStars({ hits: 18, tries: 20 })).toBe(2);      // 90%
+    expect(duelStars({ hits: 14, tries: 20 })).toBe(2);      // 70% exactly — inclusive
+    expect(duelStars({ hits: 13, tries: 20 })).toBe(1);      // 65%
+    expect(duelStars({ hits: 0, tries: 20 })).toBe(1);       // never zero stars: one is the floor a mission has
+  });
+  it('is Player 1\'s accuracy, not the scoreline — a race won on speed is not a measurement', () => {
+    // Ten rounds, Player 1 takes six, and cut wrongly four times on the way. The scoreline says 6–4; the
+    // slices say 6 right of 10 tried, which is 60% and one star. Reading `scoreA` here would print three.
+    const r = played(['a', 'wrongA', 'a', 'wrongA', 'a', 'wrongA', 'a', 'wrongA', 'a', 'a']);
+    expect(duelAccuracy(r)).toEqual({ hits: 6, tries: 10 });
+    expect(duelStars(duelAccuracy(r))).toBe(1);
+    expect(duelStars({ hits: r.scoreA, tries: r.scoreA }), 'the scoreline read as a tally would be three').toBe(3);
+  });
+  it('scores an empty tally 1, not 3 — no answers is not perfect accuracy', () => {
+    expect(duelStars({ hits: 0, tries: 0 })).toBe(1);
+    // Unreachable from a won match — a win needs a hit, and a hit is a try — so this is the hand-edited floor.
+    expect(duelAccuracy(played(['b', 'b']))).toEqual({ hits: 0, tries: 0 });
   });
 });
