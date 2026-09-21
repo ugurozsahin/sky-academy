@@ -1,12 +1,19 @@
 ---
 paths:
   - "tests/unit/guardrails.test.ts"
+  - "tests/unit/governance.test.ts"
+  - "tests/unit/workflows.test.ts"
+  - "tests/unit/scripts.test.ts"
+  - "tests/unit/helpers/sources.ts"
+  - "tests/unit/helpers.test.ts"
   - "scripts/**"
 ---
 
 # Guard rails and scripts (#101)
 
-- `tests/unit/guardrails.test.ts` and the `guard rail:` tests in the e2e spec encode mistakes already made —
+- `tests/unit/guardrails.test.ts` — with `governance.test.ts`, `workflows.test.ts` and `scripts.test.ts`
+  beside it, split out by subject in #321, and the readers all four share in `tests/unit/helpers/sources.ts` —
+  and the `guard rail:` tests in the e2e spec encode mistakes already made:
   render frame rate, screen teardown on a route change, screen-class CSS collisions, `as any` in game logic,
   comparator shuffles, `shadowBlur`, the dependency allowlist, listener pairing; British English lives in
   `british.test.ts`. They are text/DOM checks, not proofs: they catch the exact spellings and the exact
