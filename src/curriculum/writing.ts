@@ -203,6 +203,11 @@ export const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass
   // rule `pud` and `paps` already follow: what is blocked is the spelling a card can **show**, not an entry
   // in a dictionary — and it is an exact homophone of this set's first member.
   'poove', 'hore',
+  // #416: `poo_` (from `poor`) still offered `v`, spelling `poov` — the clipped form of the slur `poove`
+  // above. Found by driving the real generator 300,000 times rather than re-reading the stem: `poove` had
+  // already been closed by #419, but `poov` sits on the same stem one letter short, the same way `poon`
+  // sat one letter past `poof` in #324 item 1.
+  'poov',
   // Review of #418: four more, found by driving the registry rather than by re-reading the list — which is
   // the whole lesson. `cun` is on `cu_`, the same three letters as the `cum` above it: the stem was audited
   // and the audit stopped one letter short, exactly as #324 did on `poo_`. `cok`/`coc` follow the `hore`
