@@ -28,8 +28,19 @@ import type { DuelHooks } from './hooks';
 export interface DuelScreenOpts { year: YearInfo }
 const PLAYERS = ['a', 'b'] as const;
 const NAME: Record<DuelPlayer, string> = { a: 'Player 1', b: 'Player 2' };
-/** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. */
-const HOLD = { won: 1000, draw: 900 } as const;
+/** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. `miss` is the
+ *  wrong-slice toast, which holds nothing back — the round keeps running — but is scaled with the other two so
+ *  `setGameSpeed` stretches every verdict on this screen rather than all but one (PR #428 review, note 3). */
+const HOLD = { won: 1000, draw: 900, miss: 900 } as const;
+/**
+ * The longest line this screen can put in the `#toast`, and the call site that raises it. Exported because the
+ * layout rail in `tests/e2e/duel.spec.ts` measures what a *wrapped* verdict costs the arenas — the toast sits
+ * in the question bar's own `grid-area: q` (`src/style.css`), so growing that row is the one way the placement
+ * can still take height off both children, and the rail must probe the real worst case rather than a copy of it
+ * that drifts the moment a longer line is added here (PR #428 review, B2). `tests/unit/guardrails.test.ts`
+ * holds it to being the genuine longest across every `toast(` in this file.
+ */
+export const DUEL_TOAST_LONGEST = 'No problem — you can save it next time!';
 
 export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
@@ -130,7 +141,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       for (const p of PLAYERS) arenas[p].reveal({ good: q.answer });
       endWave(scaled(HOLD.won));
     },
-    onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', 900); },
+    onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', scaled(HOLD.miss)); },
     onRoundDraw() { sfx.miss(); toast('Nobody sliced it — no point', 'bad', scaled(HOLD.draw)); },
     onMatchEnd: r => later(() => showResults(r), scaled(HOLD.won) + scaled(300)),
   });
@@ -217,7 +228,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
         if (how === 'shared') toast('Certificate shared!', 'good');
         else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
-        else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
+        else if (how === 'declined') toast(DUEL_TOAST_LONGEST, 'good');
         // 'shown' opens the full-screen view with its own save hint, so no toast
       }
       catch { toast('Could not make the certificate', 'bad'); }
@@ -276,7 +287,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // which is how a wrong `avatar` survived round 1's rails (#397 round 2, B1).
     certWords: () => cert ? certWords(cert) : null,
     setSpeed: k => { setGameSpeed(k); },
-    timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),
+    timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw), miss: scaled(HOLD.miss) } }),
   };
   window.__sna = hooks;
   duel.start();

@@ -4,6 +4,7 @@ import { topicsFor, YEARS, type Question, type Topic, type Visual } from '../../
 import { renderVisual } from '../../src/ui/visuals';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { DuelHooks } from '../../src/ui/hooks';
+import { DUEL_TOAST_LONGEST } from '../../src/ui/duel';
 
 // Ninja Duel (#16 items 2–4): two arenas on one screen, the same question in both, first correct slice wins
 // the round. Driven through the duel screen's own `window.__sna` hooks, which name the player every call is for.
@@ -414,6 +415,11 @@ test.describe('Ninja Duel', () => {
    */
   const ABSURD: Card = {
     what: 'taller than anything in the pool',
+    // `kind` and `topic` are not optional on `Card` and were omitted, which `tsc` flags when pointed at this
+    // file — it does not fail CI because `tsconfig.json`'s `include` is `["src", "tests/unit"]` and
+    // `.claude/rules/e2e.md`'s compile check is a parse, not a typecheck (PR #428 review, note 2). `'none'`
+    // and `'synthetic'` are honest: this card is built by hand and is deliberately out of the pool catalogue.
+    kind: 'none', topic: 'synthetic',
     html: '<div class="vis"><div style="width:120px;height:600px"></div></div>',
     prompt: 'Which day comes before Wednesday?', hint: 'yellow sunflower: 14 cm',
   };
@@ -617,34 +623,58 @@ test.describe('Ninja Duel', () => {
       // The shortest real hint in the pool: a long one wraps to more lines and is harder to swallow whole, so
       // the card most at risk is the briefest, not the wordiest.
       const card = POOL_CARDS.filter(c => c.hint).sort((a, b) => a.hint.length - b.hint.length)[0];
-      const seen = await page.evaluate(c => {
+      // Asserted, not skipped in silence. The dressing below used to be guarded by a bare `if (c)`, so a pool
+      // that stopped carrying hints would have measured whatever the live draw dealt and reported green
+      // (PR #428 review, B3) — the sampling trap this very file names twice.
+      expect(card, 'the pool still carries a hint to dress the card with').toBeTruthy();
+      const seen = await page.evaluate(([c, longest]) => {
         // Dressed inside the same evaluate as the measurement: the hint's share depends entirely on which card
         // is up, and sampling whatever the draw dealt is the trap this file has fallen into twice.
-        if (c) {
-          document.querySelector('#vis')!.innerHTML = c.html;
-          document.querySelector('#prompt')!.textContent = c.prompt;
-          document.querySelector('#hint')!.textContent = c.hint;
-        }
+        document.querySelector('#vis')!.innerHTML = c.html;
+        document.querySelector('#prompt')!.textContent = c.prompt;
+        document.querySelector('#hint')!.textContent = c.hint;
         const t = document.querySelector('.toast') as HTMLElement;
         const tr = t.getBoundingClientRect();
+        // A box that is missing or unlaid-out scores **-1**, not 0. It used to score 0 — the same value as
+        // "the toast covers none of it" — and `.duel-half.a .duel-tag` is a two-class descendant selector
+        // duplicated from the stylesheet, so renaming `.duel-tag` would have put both name-and-score
+        // assertions permanently green while the toast sat on a child's live score (PR #428 review, B3).
+        // -1 fails every `toBe(0)` below, so the rail now fails on a selector it cannot find.
         const cover = (sel: string) => {
           const e = document.querySelector(sel);
           const r = e?.getBoundingClientRect();
-          if (!r || !r.width || !r.height) return 0;
+          if (!r || !r.width || !r.height) return -1;
           const w = Math.max(0, Math.min(tr.right, r.right) - Math.max(tr.x, r.x));
           const h = Math.max(0, Math.min(tr.bottom, r.bottom) - Math.max(tr.y, r.y));
           return (w * h) / (r.width * r.height);          // the share of that box the toast hides
         };
-        const strip = () => document.querySelector('#strip')!.getBoundingClientRect().height;
-        const withToast = strip();
-        t.classList.remove('show'); const withoutToast = strip(); t.classList.add('show');
-        return {
-          decided: window.__sna.state().decided, toastArea: Math.round(tr.width * tr.height),
+        const covers = {
           arenaA: cover('#arena-a'), arenaB: cover('#arena-b'),
           tagA: cover('.duel-half.a .duel-tag'), tagB: cover('.duel-half.b .duel-tag'),
-          hint: cover('#hint'), withToast, withoutToast,
+          hint: cover('#hint'),
         };
-      }, card);
+        // The height probe, AFTER every coverage read above, because it rewrites the toast's own text.
+        // Measured against `display: none` rather than against `.show`: `.toast.show` is defined once, in
+        // `src/style.css`, as `opacity: 1; transform: none` — neither is a layout property, so toggling the
+        // class measured the identical layout twice and the assertion held however the CSS changed
+        // (PR #428 review, B2). Taking the box out of the flow is what actually asks the question.
+        // And measured on the arenas, the things that lose the height, rather than on `#strip`; and on the
+        // LONGEST line this screen can raise, because a toast that wraps to a second line is the one way the
+        // `q` row can outgrow the strip and take the 32px back off both children. `grid-area: q` has made
+        // overlap impossible by construction, so this is the only harm the placement can still do.
+        const arenas = () => [document.querySelector('#arena-a')!.getBoundingClientRect().height,
+          document.querySelector('#arena-b')!.getBoundingClientRect().height];
+        const wasText = t.textContent ?? '';
+        t.textContent = longest;
+        const withToast = arenas();
+        t.style.display = 'none'; const withoutToast = arenas(); t.style.display = '';
+        const wrapped = Math.round(t.getBoundingClientRect().height);
+        t.textContent = wasText;
+        return {
+          decided: window.__sna.state().decided, toastArea: Math.round(tr.width * tr.height),
+          ...covers, withToast, withoutToast, wrapped,
+        };
+      }, [card, DUEL_TOAST_LONGEST] as const);
       const at = `${vp.width}x${vp.height}`;
       expect(seen.toastArea, `${at}: the toast is laid out, so there is something to cover an arena with`).toBeGreaterThan(0);
       expect(seen.arenaA, `${at}: the toast covers none of Player 1's arena`).toBe(0);
@@ -658,19 +688,13 @@ test.describe('Ninja Duel', () => {
       // toast can cover entirely: 0% at three viewports and 25% at 568x320, against 100% when the toast was
       // centred in the bar rather than aligned to its top.
       expect(seen.hint, `${at}: the round's verdict never swallows the hint line whole`).toBeLessThan(0.5);
+      expect(seen.hint, `${at}: there IS a hint box to measure, so 'covers none of it' means something`).toBeGreaterThanOrEqual(0);
       // And the overlay still costs no layout, which is the whole reason it is an overlay rather than a row of
-      // its own — the 32px it bought back for the arenas. Never asserted before; the margin at 844x390 is 8px.
-      expect(seen.withToast, `${at}: the toast on the bar costs the arenas no height`).toBe(seen.withoutToast);
-      // The card it moved ONTO. Moving the slab off the arenas put it over the question, and that trade is
-      // deliberate — one child's live bubbles, asymmetrically, is worse than both children's static card,
-      // symmetrically — but it is a trade and belongs in the rail rather than only in a comment. The line that
-      // may not be swallowed whole is `#hint`: five pool topics carry the values being compared there and
-      // NOWHERE else on the card, so a fully covered hint is a round of "Which is fuller?" over two coloured
-      // bubbles. The prompt and the visual are covered and that is accepted; the hint has to stay readable.
-
-      // And the overlay still costs no layout, which is the whole reason it is an overlay rather than a row of
-      // its own — the 32px it bought back for the arenas. Never asserted before; the margin at 844x390 is 8px.
-
+      // its own — the 32px it bought back for the arenas. Both arenas, on the longest line the screen can
+      // raise, against the toast taken out of the flow. Never asserted for real before; the margin at
+      // 844x390 is 8px.
+      expect(seen.withToast, `${at}: the toast on the bar costs the arenas no height, even wrapped`).toEqual(seen.withoutToast);
+      expect(seen.wrapped, `${at}: the longest verdict is laid out, so the height probe measured something`).toBeGreaterThan(0);
     }
 
     // INPUT — still load bearing, and now for a different target. When the toast sat over the arenas it

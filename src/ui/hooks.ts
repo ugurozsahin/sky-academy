@@ -120,7 +120,7 @@ export interface DuelHooks {
   /** The words on that certificate, read off the object actually drawn (#397 round 2, B1), or null. */
   certWords(): CertText | null;
   setSpeed(k: number): void;
-  timing(): { speed: number; hold: { won: number; draw: number } };
+  timing(): { speed: number; hold: { won: number; draw: number; miss: number } };
 }
 
 /** Whichever screen is live owns `window.__sna`; it is deleted on cleanup. */
