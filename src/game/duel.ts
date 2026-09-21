@@ -95,9 +95,13 @@ export class Duel {
    * and two children got a miss sound with nothing to read (#425 review).
    */
   settleDraw(): boolean {
-    if (this.ended || this.roundDecided) return false;
+    // `this.current` is guarded the way `hit()` guards it two methods up, and for the same reason: this one is
+    // newly public and reachable through `window.__sna.duel`, so a call before the first question would have
+    // handed `onRoundDraw` a non-null assertion on nothing. Not reachable in play — `waveEnd()` cannot run
+    // before a wave — so this is hardening, not a fix (#425 review, note 4).
+    if (this.ended || this.roundDecided || !this.current) return false;
     this.roundDecided = true;
-    this.ev.onRoundDraw(this.current!);
+    this.ev.onRoundDraw(this.current);
     return true;
   }
   /** The wave finished: a round nobody decided is a draw, then move on to the next round (or end the match). */

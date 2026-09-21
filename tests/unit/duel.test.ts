@@ -50,6 +50,24 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     expect(d.round).toBe(2);
   });
 
+  it('settleDraw before the first question is a no-op, not a draw about nothing (#425 review, note 4)', () => {
+    const ev = events();
+    const d = new Duel({ topic, difficulty: 1, rng: rng(7) }, ev);
+    // Not reachable in play — `waveEnd()` cannot run before a wave — but `settleDraw()` is newly PUBLIC and
+    // reachable through `window.__sna.duel`, and `current` is null until `start()`. Without the guard the
+    // non-null assertion inside handed `onRoundDraw` a null question and latched `roundDecided` on a round
+    // that had not begun, so the real round 1 could then never be drawn.
+    expect(d.current).toBe(null);
+    expect(d.settleDraw()).toBe(false);
+    expect(ev.onRoundDraw).not.toHaveBeenCalled();
+    expect(d.roundDecided).toBe(false);
+    // And the match still runs normally afterwards, which is what makes the no-op a no-op.
+    d.start();
+    expect(d.settleDraw()).toBe(true);
+    expect(ev.onRoundDraw).toHaveBeenCalledTimes(1);
+    expect(ev.onRoundDraw.mock.calls[0][0]).toBe(d.current);
+  });
+
   it('waveEnd still draws and advances in one call, for every caller that has not split them (#425 review)', () => {
     const ev = events();
     const d = new Duel({ topic, difficulty: 1, rng: rng(8) }, ev);

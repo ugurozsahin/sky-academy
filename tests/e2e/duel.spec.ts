@@ -645,19 +645,43 @@ test.describe('Ninja Duel', () => {
         // duplicated from the stylesheet, so renaming `.duel-tag` would have put both name-and-score
         // assertions permanently green while the toast sat on a child's live score (PR #428 review, B3).
         // -1 fails every `toBe(0)` below, so the rail now fails on a selector it cannot find.
-        const cover = (sel: string) => {
+        // Takes the toast's own box, because the entry-frame probe below measures against a DIFFERENT one:
+        // closing over a single settled `tr` was how the fade's own geometry went unmeasured.
+        const cover = (sel: string, box: DOMRect) => {
           const e = document.querySelector(sel);
           const r = e?.getBoundingClientRect();
           if (!r || !r.width || !r.height) return -1;
-          const w = Math.max(0, Math.min(tr.right, r.right) - Math.max(tr.x, r.x));
-          const h = Math.max(0, Math.min(tr.bottom, r.bottom) - Math.max(tr.y, r.y));
+          const w = Math.max(0, Math.min(box.right, r.right) - Math.max(box.x, r.x));
+          const h = Math.max(0, Math.min(box.bottom, r.bottom) - Math.max(box.y, r.y));
           return (w * h) / (r.width * r.height);          // the share of that box the toast hides
         };
         const covers = {
-          arenaA: cover('#arena-a'), arenaB: cover('#arena-b'),
-          tagA: cover('.duel-half.a .duel-tag'), tagB: cover('.duel-half.b .duel-tag'),
-          hint: cover('#hint'),
+          arenaA: cover('#arena-a', tr), arenaB: cover('#arena-b', tr),
+          tagA: cover('.duel-half.a .duel-tag', tr), tagB: cover('.duel-half.b .duel-tag', tr),
+          hint: cover('#hint', tr),
         };
+        // THE ENTRY FRAME — the one a child actually sees first, and the only reading that holds
+        // `src/style.css`'s `.duel-screen > .toast { transform: none }`. Every measurement above is of the
+        // SETTLED toast, so that rule was named by nothing in the repository: deleting the line left this whole
+        // spec green at 12 passed, while the shared `.toast` entered from `translateY(-6px)` over its 200ms
+        // transition — 6px ABOVE a bar the toast is aligned to the top of, which in portrait is inside Player
+        // 2's arena, for the entry frames of every single round verdict (PR #428 review, B1).
+        // Read with `.show` OFF and the transition suppressed. Both matter: `.toast.show` sets
+        // `transform: none` ITSELF, so asserting it while shown measures the override twice and stays green
+        // however line 413 changes — the same trap the height probe below avoids with `display: none`; and
+        // without `transition: none` the box is wherever the 200ms happens to have reached, which is a
+        // stopwatch, not a rail. `opacity: 0` costs no layout, so the un-shown box is still there to measure.
+        const wasTransition = t.style.transition;
+        t.style.transition = 'none';
+        t.classList.remove('show');
+        const entryBox = t.getBoundingClientRect();
+        const entry = {
+          transform: getComputedStyle(t).transform,
+          arenaA: cover('#arena-a', entryBox), arenaB: cover('#arena-b', entryBox),
+          tagA: cover('.duel-half.a .duel-tag', entryBox), tagB: cover('.duel-half.b .duel-tag', entryBox),
+        };
+        t.classList.add('show');
+        t.style.transition = wasTransition;
         // The height probe, AFTER every coverage read above, because it rewrites the toast's own text.
         // Measured against `display: none` rather than against `.show`: `.toast.show` is defined once, in
         // `src/style.css`, as `opacity: 1; transform: none` — neither is a layout property, so toggling the
@@ -677,14 +701,32 @@ test.describe('Ninja Duel', () => {
         t.textContent = wasText;
         return {
           decided: window.__sna.state().decided, toastArea: Math.round(tr.width * tr.height),
-          ...covers, withToast, withoutToast, wrapped,
+          ...covers, entry, withToast, withoutToast, wrapped,
         };
       }, [card, DUEL_TOAST_LONGEST] as const);
       const at = `${vp.width}x${vp.height}`;
       expect(seen.toastArea, `${at}: the toast is laid out, so there is something to cover an arena with`).toBeGreaterThan(0);
+      // The round is still live at every viewport, which is the premise of the whole loop: a slab over an
+      // arena only matters while there are bubbles under it. Collected and never asserted before, so a match
+      // that decided mid-loop would have had the rest of these readings taken over a settled arena (review,
+      // note 3).
+      expect(seen.decided, `${at}: the round is still live, so the arenas hold bubbles a slab can hide`).toBe(false);
       expect(seen.arenaA, `${at}: the toast covers none of Player 1's arena`).toBe(0);
       expect(seen.arenaB, `${at}: the toast covers none of Player 2's arena`).toBe(0);
-      expect(seen.tagA + seen.tagB, `${at}: nor either player's name and score`).toBe(0);
+      // TWO assertions, not a sum. `cover()` returns **-1** for a box it cannot find, so `tagA + tagB` went
+      // green on a renamed `.duel-tag` on ONE half (-1) plus that half's partner fully covered (+1): the
+      // sentinel that closed B3 opened a second road to the same green (review, note 2).
+      expect(seen.tagA, `${at}: nor Player 1's name and score`).toBe(0);
+      expect(seen.tagB, `${at}: nor Player 2's name and score`).toBe(0);
+      // And the ENTRY frame, where the fade starts. `transform: none` is asserted on the un-shown toast, so it
+      // is `src/style.css`'s `.duel-screen > .toast` rule being read and not `.toast.show`'s own override; the
+      // coverage readings are the same question asked in pixels, at the 6px offset the shared `.toast` would
+      // otherwise enter from (PR #428 review, B1).
+      expect(seen.entry.transform, `${at}: the duel toast fades in PLACE — the shared 6px slide is overridden`).toBe('none');
+      expect(seen.entry.arenaA, `${at}: and covers none of Player 1's arena in the frame it enters on`).toBe(0);
+      expect(seen.entry.arenaB, `${at}: nor any of Player 2's, which is where a 6px slide upwards lands`).toBe(0);
+      expect(seen.entry.tagA, `${at}: nor Player 1's name and score, entering`).toBe(0);
+      expect(seen.entry.tagB, `${at}: nor Player 2's name and score, entering`).toBe(0);
       // The card it moved ONTO. Moving the slab off the arenas put it over the question, and covering the prompt
       // and the picture is the accepted trade — one child's live bubbles, asymmetrically, is worse than both
       // children's static card, symmetrically. `#hint` is not part of that trade: five pool topics carry the
