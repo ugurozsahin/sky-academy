@@ -372,7 +372,18 @@ img { -webkit-user-drag: none; }
    most of the time. Floated instead: bottom-centre, where the flex column used to put it, and in the sideways
    layout that is on the divider, where both children can read it. */
 .duel-screen { position: relative; }
-.duel-screen > .toast { position: absolute; bottom: calc(8px + var(--sab)); left: 50%; translate: -50% 0; margin-top: 0; z-index: 3; }
+/* `pointer-events: none` is load bearing, not tidiness. The toast fades with `opacity: 0` and is never
+   `display: none` (`screenScope().toast` only drops `.show`), so once a round has been announced it stays in the
+   DOM at full size for the rest of the match. Floating it put it OVER both canvases, and `Arena` binds input to
+   its own canvas — so an invisible 296x43 box across the bottom of the arenas swallowed a slice outright: no
+   miss, no swish, no feedback, and it straddles the divider so it took a bite out of both players at once.
+   Measured before the fix: a gesture starting inside the faded toast reached neither canvas (0 pointerdowns),
+   the same gesture 25px higher reached Player 1's. Same reason `.duel-tag`, `.hud` and `.duel-half.b::after`
+   carry it. */
+.duel-screen > .toast {
+  position: absolute; bottom: calc(8px + var(--sab)); left: 50%; translate: -50% 0;
+  margin-top: 0; z-index: 3; pointer-events: none;
+}
 .duel-arena { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 /* The divider is drawn, never a BORDER (#388/#389). With `box-sizing: border-box` a 1px border on half B took
    1px off Player 2's canvas and not Player 1's, so the two arenas had different geometry — and `layoutWave`
@@ -440,8 +451,16 @@ img { -webkit-user-drag: none; }
      shrinks the LAYOUT box, which is the whole point; a transform would shrink the picture and leave the bar
      just as tall. The factor is what makes the pool's tallest visual, the 120px clock, fit the budget.
      A tall landscape screen keeps the base 132px and no scaling — see below. */
-  .duel-q { --duel-vis: 76px; }
+  .duel-q { --duel-vis: 100px; }
   .duel-q .vis-wrap { display: flex; justify-content: center; }
+  /* KNOWN TRADE, measured rather than assumed (raised as a note on PR #394's round-2 review). `zoom` scales the
+     painted result while viewport units still resolve against the unzoomed viewport, so it walks through
+     `--slot`'s `clamp(22px, …)` floor — which #107 set as a measured minimum for something a child has to COUNT.
+     A five-frame star renders at 11.6px on a landscape phone. The alternative was tried and measured: exempting
+     `.vis.objs` from the zoom gets 18.7px, but the bar then needs 176px and each arena drops to 214px, which
+     breaks the bound above. On a 390px-tall screen both cannot be had, and which one gives is a legibility
+     judgement for the owner rather than one to settle in a stylesheet. Nothing is CROPPED either way — the budget
+     fits the tallest visual at both bands and `tests/e2e/duel.spec.ts` pins that. */
   .duel-q .vis { margin: 0; zoom: 0.62; }
   /* The bar is a row, so anything that does not fit across it WRAPS, and every wrapped line is height taken off
      both arenas. At 844px a 34px prompt will not sit beside the pool's longest hint and a visual, so on a short
@@ -458,7 +477,11 @@ img { -webkit-user-drag: none; }
    IS the question — so a landscape tablet pays nothing for the rule above: above 700px tall the visuals keep
    their full size. The 390px-tall phone band is the one that has to shrink them. */
 @media (orientation: landscape) and (min-height: 700px) {
-  .duel-q { --duel-vis: 132px; }                          /* back to the base budget: the clock is untouched */
+  /* 160px, not the base 132px: at this width `--slot` reaches its 40px maximum, so twelve objects to count are
+     three rows of 49px — 155px — and 132px would CROP the bottom row. A cropped row of objects is a wrong count,
+     which is worse than a small one, so the budget fits the tallest visual the pool can build instead of cutting
+     it. There is height to spare here; that is the whole reason this band exists. */
+  .duel-q { --duel-vis: 160px; }
   .duel-q .vis { zoom: 1; }
   .duel-q .prompt { font-size: clamp(22px, 5.5vw, 34px); }
 }

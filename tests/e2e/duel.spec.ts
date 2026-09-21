@@ -287,19 +287,41 @@ test.describe('Ninja Duel', () => {
     'frac (110px)': '<div class="vis"><svg viewBox="0 0 100 100" class="frac"><path d="M0 0H100V100H0Z"/></svg></div>',
     'dots (100px)': '<div class="vis"><svg viewBox="0 0 120 80" class="dots"><circle cx="20" cy="20" r="9"/></svg></div>',
     'two ten-frames': `<div class="vis">${'<div class="tenframe">' + '<i></i>'.repeat(10) + '</div>'}</div>`,
+    // The tallest thing in the pool that REFLOWS rather than being a fixed box: twelve objects to count, three
+    // rows of five. It is the case the `--slot` floor exists for, so it is deliberately not scaled — see the
+    // `.vis.objs` rule. Three rows is what `fiveFrames(12)` produces.
+    'twelve objects to count (three rows)': `<div class="vis objs"><div class="grp">${[5, 5, 2].map(n => `<span class="five">${Array.from({ length: 5 }, (_, i) => `<span class="slot">${i < n ? '<span class="obj">⭐</span>' : ''}</span>`).join('')}</span>`).join('')}</div></div>`,
     'taller than anything in the pool': '<div class="vis"><div style="width:120px;height:600px"></div></div>',
   };
   /**
-   * Put `html` in the card's visual slot, along with the longest prompt and hint the year-1 duel pool can
-   * actually produce — 33 and 49 characters, from `y1-months` and `y1-length`, found by generating 200 questions
-   * for each of the pool's 28 topics. Real strings, not invented ones: a hint half again as long as anything the
-   * pool holds would cap the layout against a case no child ever sees. The text matters as much as the visual —
-   * in a ROW the card wraps, and a long prompt with a long hint is another 20px of bar.
+   * Dress the card with `html` and the longest prompt and hint the year-1 duel pool can actually produce, then
+   * measure it — **in one `evaluate`**. One round trip is the point: a round can end between two of them,
+   * `onQuestion` rewrites `#prompt`, `#vis` and `#hint`, and the measurement is then of the real question rather
+   * than the dressed worst case — which reports GREEN, because a real question is smaller. That cost a red CI on
+   * the full mobile suite while passing eight repeats in isolation, and this file already names the same hazard at
+   * the `#hint` rail above: read the DOM and the state in ONE evaluate.
+   *
+   * The strings are 33 and 49 characters, from `y1-months` and `y1-length`, found by generating 200 questions for
+   * each of the pool's 28 topics. Real strings, not invented ones: a hint half again as long as anything the pool
+   * holds would cap the layout against a case no child ever sees. The text matters as much as the visual — in a
+   * ROW the card wraps, and a long prompt with a long hint is another 20px of bar.
    */
-  const dressCard = (page: Page, html: string) => page.evaluate(h => {
+  const dressAndMeasure = (page: Page, html: string) => page.evaluate(h => {
     document.querySelector('#vis')!.innerHTML = h;
     document.querySelector('#prompt')!.textContent = 'Which day comes before Wednesday?';
     document.querySelector('#hint')!.textContent = 'yellow sunflower: 14 cm · purple sunflower: 10 cm';
+    const box = (sel: string) => {
+      const r = document.querySelector(sel)!.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom, cx: r.x + r.width / 2 };
+    };
+    const wrap = document.querySelector('#vis')!.getBoundingClientRect();
+    return {
+      a: box('#half-a'), b: box('#half-b'), strip: box('#strip'), rotate: box('.duel-rotate'),
+      prompt: box('#prompt'), vis: box('#vis'), canvasA: box('#arena-a'), canvasB: box('#arena-b'),
+      // Counted here too, in the same tick, for the same reason.
+      cropped: Array.from(document.querySelectorAll('#vis .five, #vis .tenframe'))
+        .filter(r => r.getBoundingClientRect().bottom > wrap.bottom + 0.5).length,
+    };
   }, html);
 
   test('sideways, the duel splits left and right with the question centred over the divider (#388)', async ({ page }) => {
@@ -332,8 +354,7 @@ test.describe('Ninja Duel', () => {
     for (const vp of [{ width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }]) {
       await resizeTo(page, vp);
       for (const [what, html] of Object.entries(VISUALS)) {
-        await dressCard(page, html);
-        const L = await boxes(page);
+        const L = await dressAndMeasure(page, html);
         const where = `${vp.width}x${vp.height}, ${what}`;
         // The measured worst case is a clock question carrying the pool's longest prompt AND hint at 844x390:
         // 141px of bar, 249px of arena — 36% and 64%. The thresholds sit clear of that rather than hugging it,
@@ -355,7 +376,12 @@ test.describe('Ninja Duel', () => {
         if (!html) continue;
         // The visual is scaled to fit the budget rather than the bar growing to fit the visual, so it is still on
         // screen — a bound that worked by hiding the picture would fail the question instead of the layout.
-        expect(L.strip.h, `${where}: the visual is scaled into the bar, not dropped out of it`).toBeGreaterThan(40);
+        // `L.vis.h`, not `L.strip.h`: the strip clears 40px on the prompt's own line box alone, so the old form
+        // would have passed with `#vis` removed from the DOM entirely and its label would have been a lie.
+        expect(L.vis.h, `${where}: the visual is scaled into the bar, not dropped out of it`).toBeGreaterThan(20);
+        // `overflow: hidden` bounds the bar, so the thing to check is that it never actually CROPS: a cropped row
+        // of objects is a wrong count, which is worse than a small one. Counted in the same tick as the boxes.
+        expect(L.cropped, `${where}: no row of the visual is cropped by the budget`).toBe(0);
         // No assertion here that the prompt and the visual share a LINE. One was written and removed: whether the
         // row fits on one line depends on text metrics, Fredoka is fetched from Google Fonts, and CI has no
         // network — so `dots` wrapped there and not locally, 46px against 42px. That is the same
@@ -366,6 +392,49 @@ test.describe('Ninja Duel', () => {
     }
   });
 
+  test('guard rail: nothing the screen floats over the arenas swallows a slice (#388)', async ({ page }) => {
+    await startDuel(page);
+    // The one rail here that uses REAL pointer input. Every other slice in this file goes through `window.__sna`,
+    // which calls into the Arena directly and so cannot see anything sitting on top of the canvas. Floating the
+    // toast to buy back 32px of arena put it OVER both halves at `z-index: 3`, and because it fades with
+    // `opacity: 0` rather than `display: none` it stays there, full size, for the rest of the match: an invisible
+    // 296x43 box across the bottom of both arenas in which a slice did nothing at all — no miss, no swish, no
+    // feedback. Sideways it straddles the divider, so it took the same bite out of each player.
+    await resizeTo(page, { width: 844, height: 390 });
+    const dead = await page.evaluate(() => {
+      // Make the toast carry text and stay up, exactly as a round announcement leaves it.
+      const t = document.querySelector('.toast') as HTMLElement;
+      t.textContent = 'Player 1 takes the round!';
+      t.classList.add('show', 'good');
+      const r = t.getBoundingClientRect();
+      const hits: Record<string, number> = { a: 0, b: 0 };
+      for (const p of ['a', 'b']) {
+        document.querySelector(`#arena-${p}`)!.addEventListener('pointerdown', () => { hits[p]++; }, true);
+      }
+      (window as unknown as { __hits: Record<string, number> }).__hits = hits;
+      return {
+        w: r.width, h: r.height, cx: r.x + r.width / 2, cy: r.y + r.height / 2,
+        // The toast really is over an arena, so this case is not vacuous.
+        overA: r.bottom > document.querySelector('#arena-a')!.getBoundingClientRect().top,
+      };
+    });
+    expect(dead.w, 'the toast is laid out, so there is something to swallow a slice').toBeGreaterThan(0);
+    expect(dead.overA, 'the toast overlaps an arena, so this case is not vacuous').toBe(true);
+    // What a child's hand does: an upward swipe begun in the arena's bottom inner corner.
+    await page.mouse.move(dead.cx - 60, dead.cy);
+    await page.mouse.down();
+    await page.mouse.move(dead.cx - 40, dead.cy - 30, { steps: 4 });
+    await page.mouse.up();
+    const hits = await page.evaluate(() => (window as unknown as { __hits: Record<string, number> }).__hits);
+    expect(hits.a + hits.b, 'a slice begun under the faded toast still reaches an arena').toBeGreaterThan(0);
+    // And the element actually under that point is the canvas, not the thing floating over it.
+    const at = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      return el ? el.tagName : 'null';
+    }, [dead.cx, dead.cy]);
+    expect(at, 'the arena is what is under the toast, not the toast').toBe('CANVAS');
+  });
+
   test('portrait keeps the stacked duel as a fallback, and asks for a sideways screen (#388)', async ({ page }) => {
     await startDuel(page);
     // A rotate GATE was rejected: a tablet with its orientation locked would lose the mode outright. So portrait
@@ -373,8 +442,7 @@ test.describe('Ninja Duel', () => {
     // new thing on the card is the nudge.
     await resizeTo(page, { width: 390, height: 844 });
     for (const [what, html] of Object.entries(VISUALS)) {
-      await dressCard(page, html);
-      const P = await boxes(page);
+      const P = await dressAndMeasure(page, html);
       expect(P.b.bottom, `${what}: Player 2 keeps the top half`).toBeLessThanOrEqual(P.strip.y + 1);
       expect(P.strip.bottom, `${what}: Player 1 keeps the bottom half, the card between them`).toBeLessThanOrEqual(P.a.y + 1);
       expect(Math.abs(P.a.x - P.b.x), `${what}: the halves are stacked, not side by side`).toBeLessThan(2);
