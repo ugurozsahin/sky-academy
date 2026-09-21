@@ -195,7 +195,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         ${dojoRowsHTML(dojo)}
         ${stickersHTML(fresh)}
         ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div>' : ''}
-        <div class="row"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
+        <div class="row nav"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });

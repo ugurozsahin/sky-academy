@@ -58,7 +58,7 @@ export function resultsModal(p: ResultsModalParts): string {
         <div class="coin-row"><span class="coin-gain">+${p.coins} 🪙</span>${p.pills ?? ''}</div>
         ${p.dojoRows}
         ${p.stickerHTML}
-        <div class="row"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
+        <div class="row nav"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
         ${p.cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this mission">🎓 Certificate</button></div>' : ''}
       </div>`;
 }
