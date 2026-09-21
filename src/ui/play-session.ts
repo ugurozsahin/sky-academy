@@ -74,8 +74,13 @@ export interface PlaySession {
    * One of the screen's overlays (pause, stage clear, results) opened (`true`) or closed. The arena is paused
    * while an overlay OR a sentence peek holds it, and a peek's clock stops while an overlay is open — so a
    * child who pauses mid-peek finds the sentence still there on resume, with the rest of its time to run (#65).
+   *
+   * `beats` is false for a hold that NEVER LIFTS — the results overlay (PR #474 review, B1). Freezing the
+   * screen's beats (#301) is right for pause and stage clear, which both reopen; after the results hold a
+   * frozen beat has no resume to be re-armed by, so it sat in the set unarmed until `dispose()` threw it
+   * away, in silence. That cost the sticker jingle and left every results toast pinned over the modal.
    */
-  hold(open: boolean): void;
+  hold(open: boolean, beats?: boolean): void;
   /**
    * The child tapped the card or 🔊. On a device that speaks the screen reads the line again; on one that
    * cannot, a hidden sentence is shown again for the peek time. Returns true when it was handled here, so
@@ -271,7 +276,15 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         // but the coincidence that showTutorial()'s 1800 ms happens to exceed the 1200 ms cap.
         const gatedSpawn = () => {
           if (fontsReady) { spawn(); return; }
-          fontReady().then(() => { if (deps.mounted()) spawn(); });   // never into a torn-down screen
+          // Through `later(..., 0)` and not straight out of the promise (PR #474 review, B2). `mounted()` is
+          // the only guard a raw continuation has and it does not read the hold, so a pause pressed inside
+          // this gate — up to the 1200ms cap, on a cold font cache — let `say()` speak the question behind
+          // the overlay and `spawnWave` land with `launchAt` already past. That is #301 word for word, in the
+          // one place the fix did not reach. A 0ms beat defers rather than drops: frozen at 0 remaining and
+          // re-armed at 0 on resume, so the wave goes up when the child comes back rather than never.
+          // `scaled(0)` rather than a bare `0`: it is 0 either way, and #138's rail is right that a beat belongs
+          // on the scaled clock — this one is a "next task", not a wait, and says so by going through it.
+          fontReady().then(() => deps.later(() => { if (deps.mounted()) spawn(); }, scaled(0)));   // never into a torn-down screen
         };
         const launch = () => { if (demo) deps.later(gatedSpawn, demo); else gatedSpawn(); };
         if (peek) showPeek(q, launch); else launch();   // #65: the peek owns the launch — it runs when the sentence hides
@@ -336,13 +349,13 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       const gap = scaled(lastOutcome === 'correct' ? 450 : lastOutcome === 'none' ? 0 : 650);
       deps.later(() => session.waveEnd(), Math.max(0, revealUntil - performance.now()) + gap);
     },
-    hold(open) {
+    hold(open, beats = true) {
       if (open === holdOpen) return;
       holdOpen = open;
       // The screen's beats freeze with the arena (#301). The peek's own clock below already worked this way —
       // #65 stopped it so a child pausing mid-sentence found the sentence still there — and the outcome hold,
       // the inter-question gap and the results cue were the ones still running behind the overlay.
-      deps.holdTimers(open);
+      if (beats) deps.holdTimers(open);
       if (peekActive && activeQuestion) {
         if (open) { peekLeft = Math.max(0, peekLeft - (performance.now() - peekSince)); peekToken++; }   // stop the clock
         else runPeek(activeQuestion);                                                                 // and restart it

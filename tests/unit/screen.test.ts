@@ -164,6 +164,39 @@ describe('screenScope beats freeze under a hold (#301)', () => {
     expect(fired).toEqual(['late']);
   });
 
+  it('a 0ms beat is DEFERRED by a hold, not run and not dropped (#474 review, B2)', () => {
+    const scope = screenScope();
+    const fired: string[] = [];
+    scope.holdTimers(true);
+    // What the font gate leans on: `fontReady().then(() => later(spawn, 0))`. A raw promise continuation had
+    // no way to read the hold, so a pause inside that gate spoke the question and launched the wave behind
+    // the overlay. Routed through the beat clock it waits — and a 0ms remainder must still come back, or the
+    // first wave would simply never go up.
+    scope.later(() => fired.push('spawn'), 0);
+    vi.advanceTimersByTime(5000);
+    expect(fired, 'nothing spawns behind the overlay').toEqual([]);
+    scope.holdTimers(false);
+    vi.advanceTimersByTime(0);
+    expect(fired, 'and it goes up the moment the child comes back').toEqual(['spawn']);
+  });
+
+  it('a beat armed under a hold that is NEVER lifted never runs — the hazard the results screen must avoid (#474 review, B1)', () => {
+    const scope = screenScope();
+    const fired: string[] = [];
+    scope.holdTimers(true);
+    scope.later(() => fired.push('jingle'), 600);
+    vi.advanceTimersByTime(60_000);
+    // Pinned as the documented hazard, not as desirable behaviour. `holdTimers(true)` is a promise that a
+    // `holdTimers(false)` follows, and the results overlay cannot keep it: it offers only Play again and
+    // Islands, both of which tear the screen down. So a screen whose hold is terminal must not put its beats
+    // on this clock at all — which is what `hold(true, false)` in `play.ts`/`duel.ts` does, and what
+    // `guardrails.test.ts` holds those two call sites to. Before that, the sticker jingle never played and
+    // every results toast pinned itself over the modal for the life of the screen.
+    expect(fired, 'a hold with no resume has no future for the beats armed under it').toEqual([]);
+    scope.dispose();
+    expect(fired, 'and teardown throws them away rather than running them').toEqual([]);
+  });
+
   it('an unheld scope is unchanged: a beat still fires on time, and once', () => {
     const scope = screenScope();
     const fired: string[] = [];

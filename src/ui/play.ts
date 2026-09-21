@@ -179,7 +179,10 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     $('#next').addEventListener('click', () => { sfx.tap(); els.overlay.hidden = true; playSession.hold(false); session.nextStage(); });
   }
   function showResults(r: SessionResult) {
-    playSession.hold(true);                       // the game is over: syncPaused() also reads session.ended, so nothing here can undo it
+    // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
+    // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
+    // certificate toasts' own auto-hide) belong to this overlay rather than to the held game, so they still run.
+    playSession.hold(true, false);
     let newBest = false;
     if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
     else if (training) { if (r.won) recordTraining(o.year.id); }

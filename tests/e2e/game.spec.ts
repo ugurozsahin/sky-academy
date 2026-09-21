@@ -679,6 +679,13 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#cert')).toBeEnabled();
     await expect(page.locator('#toast')).toContainText('saved');
     expect(await page.evaluate(() => (window as any).__saved)).toMatch(/^sky-ninja-certificate-.*\.png$/);
+    // AND IT GOES AWAY AGAIN. The auto-hide is 1300ms, and nothing asserted it until now: PR #474's round-1
+    // review found that a beat armed under the results screen's own hold was frozen and never armed, so this
+    // toast pinned itself over the modal for the life of the screen — and the untested auto-hide made the
+    // assertion above *steadier* while the behaviour broke. The worst of the four messages is
+    // 'Could not make the certificate', which a child cannot clear by pressing the button again.
+    await expect(page.locator('#toast'), 'the certificate toast hides itself again (PR #474 review, B1)')
+      .not.toHaveClass(/show/, { timeout: 4000 });
     // (b) artifact viewer WITHOUT a downloads grant → the full-screen "press and hold" fallback
     await page.evaluate(() => { (window as any).claude = { use: async () => null }; });
     await page.click('#cert');

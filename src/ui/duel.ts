@@ -94,7 +94,13 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       const speed = o.year.speeds[0] ?? 2;
       const opts = waveOptsFor(q, { labels: q.options, speed }, 0);
       // #44: the first wave waits for Fredoka (cached after that); #138: a spawn that waited must still be this wave's.
-      fontReady().then(() => {
+      // Through `later(..., 0)` and not straight out of the promise (PR #474 review, B2). `waveId`/`alive`
+      // are the only guards a raw continuation has, and neither reads the hold — so a pause pressed inside
+      // this gate, up to the 1200ms cap on a cold font cache, let `say()` speak a question behind the overlay
+      // and `spawnWave` land with `launchAt` already past. That is #301 word for word, in the one place the
+      // fix did not reach. A 0ms beat defers rather than drops: frozen at 0 remaining, re-armed at 0 on
+      // resume, so the wave goes up the moment the child comes back instead of never.
+      fontReady().then(() => later(() => {
         if (waveId !== myWave || !scope.alive) return;
         // Round 1 carries the hand-over line in the same utterance. On a rematch it would be spoken in the very
         // task that `hush()` cancelled the old screen's voice in — the cancel-then-speak drop audio.ts documents —
@@ -113,7 +119,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         // look symmetrical while giving the left-handed and right-handed reach a different problem.
         const seed = (Math.random() * 0x100000000) >>> 0, at = performance.now();
         for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts, { rng: seededRng(seed), now: at }); }
-      });
+      }, scaled(0)));   // scaled(0) is 0 — a "next task", on the same clock every other beat here uses (#138)
     },
     onRoundWon(player, q) {
       sfx.correct(); haptic('slice');
@@ -150,10 +156,19 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   // The arena's pause AND the screen's beats (#301): `syncPaused()` alone left `endWave`'s `clearWave`, the
   // `duel.waveEnd()` that follows it and the results cue running behind the pause overlay, so a pause inside
   // the outcome hold advanced the round and spawned the next wave out of sight.
-  const hold = (open: boolean) => { holdOpen = open; scope.holdTimers(open); syncPaused(); };
+  //
+  // `beats` is false for a hold that NEVER LIFTS (PR #474 review, B1). Freezing beats is right for the pause
+  // overlay, which reopens; it is exactly wrong for the results overlay, which does not — a beat armed after
+  // that hold would sit in the set unarmed until `dispose()` threw it away, in silence. That cost this screen
+  // the sticker jingle below and left every results toast pinned over the modal for the life of the screen.
+  // The results hold still pauses both arenas (`syncPaused()` reads `duel.ended` too); it just leaves the
+  // overlay's own presentation timers alone, which is what `main` did before #301 and is the only behaviour
+  // the game is over for.
+  const hold = (open: boolean, beats = true) => { holdOpen = open; if (beats) scope.holdTimers(open); syncPaused(); };
 
   function showResults(r: DuelResult) {
-    hold(true);
+    hold(true, false);   // terminal: the beats below (the jingle, the certificate toasts) must still run — see `hold`
+
     // #16 item 5: the match pays into the one shared save before the overlay is built, so the coin row and
     // any sticker it unlocked are on the screen the children are already looking at. The Daily Dojo hears
     // about the match here too — ten questions answered correctly on this screen move the day's volume
