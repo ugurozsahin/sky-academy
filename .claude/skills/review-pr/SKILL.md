@@ -74,7 +74,9 @@ The reviews that missed something here all read the diff for whether it works. R
   the three — the marker costs grounds, a count costs a method, silence costs nothing and is read by nobody.
   Ask for the method before you weigh it, and weigh it by §7's bar like anything else. **The `agents:` line
   is a claim of the same kind**, and you are the only reader it has: compare it with what §4 returns for you.
-  An author's `nothing` beside two findings of your own is the gap that line was added to expose.
+  An author's `nothing` beside two findings of your own is the gap that line was added to expose — and **an
+  absent `agents:` line is the same finding as an absent sweep claim**, for the same reason: `open-pr` §4
+  calls that line the whole of the evidence, so a body without one has no evidence, not good news.
 
 ## 4. Run the three review agents, then check their reachability
 

@@ -3368,24 +3368,45 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
    * assertions and fail the floor. That is `slice(0, 460)` again — a guard that cannot fail — which is the
    * failure `slice`'s own docstring says the inside-the-helper floor exists to prevent.
    */
-  const SIZES = Object.freeze({ s4: 6003, sweep: 2542, attack: 1753, s3: 2729, bullet: 589, bodyCheck: 667 });
+  const SIZES = Object.freeze({ s4: 6447, sweep: 2789, attack: 1950, s3: 3165, bullet: 589, bodyCheck: 1103 });
+
+  /**
+   * Measured **after** the last prose edit of the round, in `trim()`ed characters, which is what `slice()`
+   * compares. Both halves of that sentence are a defect this rail already had: the first set was taken before
+   * the same commit added prose to both skills and was never re-measured, leaving four windows 225–249
+   * characters of slack — enough to delete step 1's test for whether you are holding a class, step 2's
+   * exhaustiveness requirement, and §3's only instruction for weighing a sweep claim, with every rail green
+   * (PR #469 round 3, B1). A budget calibrated to yesterday's file is not a budget.
+   *
+   * `slice()` gets `STRUCTURAL` instead, not these. Passing a window's own size as the slicer's floor made
+   * five of the six `expect`s below unreachable — `body.length >= body.trim().length >= min` — so the message
+   * written for exactly this case could never be printed, which is the dominated floor one more time.
+   */
+  const STRUCTURAL = 120;
 
   const s4 = () => openPr.S(4);
   const sweep = () => slice(s4(), 'the sweep', '### Sweep the class, not the instance',
-    '### Then attack it with something that is not you', SIZES.sweep);
-  const attack = () => slice(s4(), 'attack it yourself', '### Then attack it with something that is not you', null, SIZES.attack);
+    '### Then attack it with something that is not you', STRUCTURAL);
+  const attack = () => slice(s4(), 'attack it yourself', '### Then attack it with something that is not you', null, STRUCTURAL);
   const s3 = () => slice(flatten(reviewPr()), 'review-pr §3', '## 3. Attack the change, do not confirm it',
-    '## 4. Run the three review agents', SIZES.s3);
+    '## 4. Run the three review agents', STRUCTURAL);
+  // One home each (PR #469 round 3, N7): these anchors were written out twice, so a wording change updated in
+  // one copy left the size rail measuring a window the assertions never read — #258's shape, in miniature.
+  const bullet = () => slice(s3(), 'the sweep bullet', '**A finding that came from a sweep leaves the sweep behind',
+    '**Check the pull request body against the code**', STRUCTURAL);
+  const bodyCheck = () => slice(s3(), 'the body-check bullet', '**Check the pull request body against the code**', null, STRUCTURAL);
 
   it('the windows have not shrunk — the one check a qualifier cannot walk past', () => {
-    const measured = {
-      s4: s4().length,
-      sweep: sweep().length,
-      attack: attack().length,
-      s3: s3().length,
-      bullet: slice(s3(), 'the sweep bullet', '**A finding that came from a sweep leaves the sweep behind',
-        '**Check the pull request body against the code**', SIZES.bullet).length,
-      bodyCheck: slice(s3(), 'the body-check bullet', '**Check the pull request body against the code**', null, SIZES.bodyCheck).length,
+    // Typed over `SIZES`, so a budget deleted from the literal is a compile error rather than a silent
+    // disappearance (PR #469 round 3, N1) — the same argument `sliceSkill`'s docstring makes for its
+    // `keys must be [1..7]` guard. Trimmed, because that is what `slice()` compares.
+    const measured: Record<keyof typeof SIZES, number> = {
+      s4: s4().trim().length,
+      sweep: sweep().trim().length,
+      attack: attack().trim().length,
+      s3: s3().trim().length,
+      bullet: bullet().trim().length,
+      bodyCheck: bodyCheck().trim().length,
     };
     for (const [name, size] of Object.entries(measured))
       expect(size, `${name} has shrunk below ${SIZES[name as keyof typeof SIZES]} — if that is an honest trim, `
@@ -3441,6 +3462,12 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
    */
   const loadBearing = (label: string, alternatives: readonly string[], voices: readonly string[],
     build: (alts: readonly string[]) => RegExp) => {
+    // A voice that matches nothing satisfies every drop, so one dead voice makes every term freely
+    // removable with this helper green (PR #469 round 3, N4). The corpus is checked against the whole
+    // detector first, here rather than only at the call sites, so the helper cannot be used wrongly.
+    const whole = build(alternatives);
+    for (const voice of voices)
+      expect(whole.test(voice), `${label}: the corpus carries a voice the detector does not match: "${voice}"`).toBe(true);
     for (const dropped of alternatives) {
       const narrowed = build(alternatives.filter((a) => a !== dropped));
       expect(voices.some((v) => !narrowed.test(v)),
@@ -3582,7 +3609,7 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .not.toMatch(SELF_MERGE);
     expect(SELF_MERGE_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(12);
     for (const voice of SELF_MERGE_VOICES)
-      expect(`${section} ${voice}`, `the detector must catch: "${voice}"`).toMatch(SELF_MERGE);
+      expect(grants(`${section} ${voice}`), `the detector must catch: "${voice}"`).toMatch(SELF_MERGE);
     expect('You never review, mark or merge your own pull request.', 'a ban is not a licence')
       .not.toMatch(SELF_MERGE);
 
@@ -3612,6 +3639,10 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     expect(a, 'three `unavailable`s in a row must not read as compliance').toMatch(/is not\s+compliance/);
     expect(a, 'and the case it covers must be named: a run that cannot spawn an agent at all')
       .toMatch(/cannot spawn an agent \*\*at all\*\*/);
+    // PR #469 round 3, N6: "say so, in those words" gave no words, so that case was free text —
+    // indistinguishable from the three `unavailable`s the same paragraph calls not compliance.
+    expect(a, 'and it must give the words, or a gap and a result are written the same way again')
+      .toMatch(/agents: cannot spawn \(subagent\)/);
     expect(a, "§4's reachability test comes with the agents, or the diff grows hardening nobody can reach")
       .toMatch(/reachability test before you change anything/);
     expect(a, 'and what to do with such a finding, which is the disposition the test is for')
@@ -3625,37 +3656,40 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
 
   it('review-pr §3: a sweep is handed over as an issue, which is the only form a reviewer may create', () => {
     const section = s3();
-    const bullet = slice(section, 'the sweep bullet', '**A finding that came from a sweep leaves the sweep behind',
-      '**Check the pull request body against the code**', SIZES.bullet);
-    expect(bullet, 'a commit is the one form a reviewer cannot use').toMatch(/as an issue, not a commit/);
-    expect(bullet, "and the rule says so in the reviewer's own terms, not only by implication")
+    const b = bullet();
+    expect(b, 'a commit is the one form a reviewer cannot use').toMatch(/as an issue, not a commit/);
+    expect(b, "and the rule says so in the reviewer's own terms, not only by implication")
       .toMatch(/develops nothing and may not\s+push/);
-    expect(bullet, 'with a title shape, so two reviewers file the same thing under the same name')
+    expect(b, 'with a title shape, so two reviewers file the same thing under the same name')
       .toMatch(/sweep: <the class>/);
-    expect(bullet, 'and labels the developer routine can actually select on').toMatch(/`routine-ok`/);
-    expect(bullet, 'and a link from the review comment, which is what makes its absence visible')
+    expect(b, 'and labels the developer routine can actually select on').toMatch(/`routine-ok`/);
+    expect(b, 'and a link from the review comment, which is what makes its absence visible')
       .toMatch(/linked from your review comment/);
-    expect(bullet, 'the cost it removes: today each round enumerates the class again from nothing')
+    expect(b, 'the cost it removes: today each round enumerates the class again from nothing')
       .toMatch(/re-derived from scratch next round/);
 
-    const bodyCheck = slice(section, 'the body-check bullet', '**Check the pull request body against the code**', null, SIZES.bodyCheck);
-    expect(bodyCheck, 'the author-side claim must have a reader on the reviewer side')
+    const body = bodyCheck();
+    expect(body, 'the author-side claim must have a reader on the reviewer side')
       .toMatch(/SWEEP: NOT ENUMERABLE/);
-    expect(bodyCheck, 'and the reviewer must know which half of the claim is unverifiable')
+    expect(body, 'and the reviewer must know which half of the claim is unverifiable')
       .toMatch(/no checked-in enumeration and no method beside it/);
-    expect(bodyCheck, 'and silence must not be the cheapest exit — a body with no claim has not done step 4')
+    expect(body, 'and silence must not be the cheapest exit — a body with no claim has not done step 4')
       .toMatch(/says nothing about the sweep has not done step 4/);
-    expect(bodyCheck, 'with the ranking said plainly, because that is what makes silence visible as a choice')
+    expect(body, 'with the ranking said plainly, because that is what makes silence visible as a choice')
       .toMatch(/silence costs nothing and is read by nobody/);
     // Round 2, note 4: the sweep claim got a reader and the `agents:` line did not, so half the rule this
     // pull request adds to `open-pr` §4 was addressed to nobody.
-    expect(bodyCheck, 'the `agents:` line needs its reader too, or it is a claim nobody compares')
+    expect(body, 'the `agents:` line needs its reader too, or it is a claim nobody compares')
       .toMatch(/`agents:` line is a claim of the same kind/);
     // Round 2, note 5: this bullet predates the pull request and no rail held it, so the half that was here
     // first could be deleted green while the half added today could not.
-    expect(bodyCheck, 'the bullet\'s original subject must survive as well as the sweep added to it')
+    // PR #469 round 3, N5: silence was closed for the sweep claim and left open for the `agents:` line in
+    // the same paragraph — what was pinned covered a line present and false, never one that is absent.
+    expect(body, 'an absent `agents:` line is a finding too, not an absence of news')
+      .toMatch(/absent `agents:` line is the same finding/);
+    expect(body, 'the bullet\'s original subject must survive as well as the sweep added to it')
       .toMatch(/no look change/);
-    expect(bodyCheck, 'including how that one is settled, which is the part that makes it cheap')
+    expect(body, 'including how that one is settled, which is the part that makes it cheap')
       .toMatch(/CSS diff of the build output/);
   });
 
@@ -3678,6 +3712,7 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       'Enumerate it by driving the real code, not by reading the lists.',
       'Enumerate the class before you push.',
     ]);
+    expect(ADR002_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(6);
     expect(p, 'the reasoning belongs in the skill, not in a second copy here').not.toMatch(adr002());
     for (const restatement of ADR002_VOICES)
       expect(`${p} ${restatement}`, `the detector must catch: "${restatement}"`).toMatch(adr002());
