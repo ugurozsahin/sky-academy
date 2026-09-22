@@ -118,6 +118,39 @@ describe('mission session', () => {
     s.nextStage();
     expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
   });
+  /**
+   * #484 review round 2, B2: every case above uses `stages: 1`, where "the last question of the last stage"
+   * and "the last question of ANY stage" are the same question — so a mutated boundary (`this.stage <
+   * this.stages` weakened to `this.stage < this.stages - 1`, firing one stage early) passed every existing
+   * test. A real mission has several stages; `onCommit` must stay silent through every one but the true last.
+   */
+  it("onCommit stays silent through every stage but the mission's actual last one", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 2 }, ev);
+    s.start();
+    for (let i = 0; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.hit(s.current!.answer)).toBe('correct');   // stage 1 of 2's last question
+    expect(ev.onCommit, 'stage 1 of 2 is not the mission — onCommit must not preview it as won').not.toHaveBeenCalled();
+    s.advance(); s.nextStage();
+    for (let i = 0; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.hit(s.current!.answer)).toBe('correct');   // stage 2 of 2's last question — the true last one
+    expect(ev.onCommit, 'stage 2 of 2 is the mission — onCommit must fire now').toHaveBeenCalledTimes(1);
+  });
+  /**
+   * #484 review round 2, B3: no existing Endless/Sprint/Boss test ever wires a spy `onCommit`, so
+   * `maybeCommitFinalStage()`'s `!this.ev.onCommit` clause always short-circuits first in the existing suite —
+   * `!this.spec.staged` is never actually reached, so removing it passed everything. With `onCommit` wired,
+   * a non-staged mode answering many questions correctly must never preview a "won" mission that does not
+   * exist for it.
+   */
+  it('onCommit never fires for a non-staged mode, even with onCommit wired and many questions answered', () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const pool = topicsFor('year1').filter(t => t.input !== 'tracing');
+    const s = new Session({ mode: 'sprint', year: Y1, pool, rng: rng(1) }, ev);
+    s.start();
+    for (let i = 0; i < 10; i++) { const c = s.current!; if (c.sequence) c.sequence.forEach(l => s.hit(l)); else s.hit(c.answer); s.advance(); }
+    expect(ev.onCommit, 'sprint is never staged — onCommit must stay silent regardless').not.toHaveBeenCalled();
+  });
   it('Sensei training: a mission over a pool tallies hits and tries per topic', () => {
     const ev = events();
     const pool = [topicById('y1-add')!, topicById('y1-sub')!];
