@@ -25,7 +25,9 @@ export function nearby(rng: Rng, answer: number, count: number, min: number, max
   for (let v = min; set.size < count && v <= max; v++) if (v !== answer && !exclude.has(v)) set.add(v);
   return [...set];
 }
-const EMPTY_SET: ReadonlySet<number> = new Set();
+// Frozen (review agent finding): a plain `Set` shared across every no-`exclude` call would let a future edit
+// mutate the "empty" default for the rest of the session with nothing to catch it.
+const EMPTY_SET: ReadonlySet<number> = Object.freeze(new Set<number>());
 
 /** Build a numeric multiple-choice question. */
 export function numQ(rng: Rng, prompt: string, answer: number, opts: { min?: number; max?: number; n?: number; say?: string; visual?: Question['visual']; hint?: string; distractors?: number[] } = {}): Question {
