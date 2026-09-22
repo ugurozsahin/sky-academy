@@ -4133,8 +4133,23 @@ describe('the licence grants the code and reserves the art, in both files (#520)
   // ("Reserved status does not apply to these images") without reopening the false positive above: the
   // window is short enough that "reserved … and may not be reused without permission" — `not` six words
   // downstream, correctly describing the restriction rather than lifting it — stays outside it.
+  //
+  // PR #521 round 4 — B3, the more serious of the two: the mechanism rejected genuinely correct text, not
+  // just weaker adversarial text than before. "the icons under `public/icons/` remain reserved, and nothing
+  // about that changes because the engine above is MIT" reads `nothing` (word 2 after `reserved`, inside
+  // `FORWARD_WORD_WINDOW`) as a denial — but "reserved, and nothing about that changes" is two independent
+  // clauses joined by `, and `, and `nothing about that changes` negates `changes`, not `reserved`; it
+  // *affirms* the reservation holds. `CLAUSE_BREAKS` treated the whole comma-joined sentence as one clause,
+  // which is the same "clause vs. character span" gap `WORD_WINDOW` itself was built to close two rounds ago,
+  // one syntactic level up: a comma followed by a coordinating conjunction starts a new independent clause as
+  // surely as a period does, so it is a clause boundary now too — `', and '` and `', but '` only, not every
+  // comma, since an ordinary comma inside one clause ("reserved, and no permission... is granted" — the real
+  // LICENSE sentence) must still let the forward scan stop at it rather than reach past it into unrelated
+  // territory, which is exactly what made this the right fix rather than a wider `DENIAL` exclusion list: the
+  // real LICENSE text already stops its forward scan at this same boundary today, undetected only because
+  // `FORWARD_WORD_WINDOW` happened to be short enough not to reach `no permission` either way.
   const DENIAL = /\b(not|no|never|nothing|isn't|aren't|doesn't|don't|won't|cannot|can't)\b/i;
-  const CLAUSE_BREAKS = ['.', ':', ';', '—', '\n\n'];
+  const CLAUSE_BREAKS = ['.', ':', ';', '—', '\n\n', ', and ', ', but '];
   const WORD_WINDOW = 6;
   const FORWARD_WORD_WINDOW = 4;
   // Collapses a word-wrap `\n` to a space (no boundary) while keeping a real paragraph break as one, so the
@@ -4183,7 +4198,21 @@ describe('the licence grants the code and reserves the art, in both files (#520)
   // would have failed this test for no policy reason. `notwithstanding` and `provided that` have no such
   // everyday use; they are not added on the strength of round 3's one mutation, but because nothing found
   // reads them any other way.
-  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bexcluding\b|\bnotwithstanding\b|\bprovided that\b/i;
+  //
+  // PR #521 round 4 — B1, `barring` missing entirely: "reserved by the copyright holder, barring personal
+  // non-commercial use, and no permission..." granted away exactly the commercial-use right the carve-out
+  // exists to withhold, and no word in the list caught it. Unlike `apart from`/`however`, `barring` has no
+  // everyday use restating an existing split — it always introduces a new condition on what follows it — so
+  // it carries none of round 3's false-positive risk.
+  //
+  // B2 — round 3 was right to leave bare `other than` out (a correct rewrite can use it exactly like `apart
+  // from`: "Other than the code, everything here is reserved" restates the split with no new exception), but
+  // wrong that leaving it out entirely was safe: "reserved by the copyright holder, other than for personal
+  // non-commercial use, and no permission..." is the same carve-out-of-a-carve-out as `barring`'s, using
+  // `other than` in its other, exception-introducing sense. The two readings differ by exactly one word —
+  // `other than for` names a condition, bare `other than X` names an alternative — so only the narrower
+  // three-word phrase is added, leaving the ordinary connective round 3 protected untouched.
+  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bexcluding\b|\bnotwithstanding\b|\bprovided that\b|\bbarring\b|\bother than for\b/i;
 
   it('LICENSE grants MIT and names the holder', () => {
     const l = doc('LICENSE');
