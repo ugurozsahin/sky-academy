@@ -191,11 +191,18 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
    */
   function commitResult(r: SessionResult): ResultPayout {
     let newBest = false;
-    if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
-    else if (training) { if (r.won) recordTraining(o.year.id); }
-    else if (o.mode === 'sprint') newBest = recordSprint(o.year.id, r.score);
-    else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
-    else recordEndless(o.year.id, r.score);
+    // #522 review (silent-failure-hunter): a generator throw is not a genuine finished play of this topic/mode
+    // — `recordTopic`'s `plays`/`best` and `recordSprint`/`recordEndless`'s "new best" are permanent per-topic/
+    // per-year history, the same kind of record `duel.ts` withholds with its own `!r.incomplete` gate on
+    // `recordDuel`. A phantom `plays` increment or an unearned best score would otherwise stick around forever
+    // and skew `parents.ts`'s "topics tried" count and `sensei.ts`'s weakest-topic ranking.
+    if (!r.incomplete) {
+      if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
+      else if (training) { if (r.won) recordTraining(o.year.id); }
+      else if (o.mode === 'sprint') newBest = recordSprint(o.year.id, r.score);
+      else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
+      else recordEndless(o.year.id, r.score);
+    }
     for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t.hits, t.tries);   // every mode teaches Sensei what is hard
     const bySubject = (s: Topic['subject']) =>
       Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicsFor(o.year.id).find(x => x.id === id)?.subject === s ? t.hits : 0), 0);
@@ -234,7 +241,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     say(headline);
     els.overlay.hidden = false;
     els.overlay.innerHTML = resultsHTML({
-      mode: r.mode, won: r.won, training, glow: speaker.glow, img: speaker.img, name: speaker.name,
+      mode: r.mode, won: r.won, training, incomplete: r.incomplete, glow: speaker.glow, img: speaker.img, name: speaker.name,
       headline, medal, heading, starCount: r.stars, score: r.score, correct: r.correct, attempts: r.attempts,
       bestCombo: r.bestCombo, coins: r.coins, newBest, streak, dojoRows: dojoRowsHTML(dojo), stickerHTML, cert: !!cert,
     });

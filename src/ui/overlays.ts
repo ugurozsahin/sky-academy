@@ -29,7 +29,7 @@ export function stageClearHTML(d: StageClearData): string {
 /** The end-of-run results modal (every mode). Fragments that need other modules — the dojo rows and the
  *  freshly-earned stickers — are rendered by the caller and passed in as strings. */
 export interface ResultsData {
-  mode: Mode; won: boolean; training: boolean;
+  mode: Mode; won: boolean; training: boolean; incomplete?: boolean;
   glow: string; img: string; name: string;   // the speaker (Sensei on a training win, else the child's ninja)
   headline: string; medal: string; heading: string;
   starCount: number; score: number; correct: number; attempts: number; bestCombo: number;
@@ -39,7 +39,9 @@ export interface ResultsData {
 export function resultsHTML(d: ResultsData): string {
   return resultsModal({
     ko: d.mode === 'boss' && d.won ? `<div class="ko" aria-hidden="true"><img src="${VILLAIN.img}" alt=""><b>K.O.</b></div>` : undefined,
-    heroExtra: ` ${d.won ? '' : 'sad'}${d.training ? ' sensei' : ''}`,
+    // #522: `sad` is the genuine-loss face — an incomplete run (a generator throw, never a real defeat) keeps
+    // the ordinary expression, the same way `won: true` already does.
+    heroExtra: ` ${d.won || d.incomplete ? '' : 'sad'}${d.training ? ' sensei' : ''}`,
     glow: d.glow, img: d.img, name: d.name, headline: d.headline,
     medal: d.medal, heading: d.heading,
     stars: d.mode !== 'endless' ? d.starCount : undefined,

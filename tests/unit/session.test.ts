@@ -92,7 +92,11 @@ describe('mission session', () => {
     const ev = events();
     let calls = 0;
     const good = topicById('y1-add')!;
-    const flaky = { ...good, gen: (d: Parameters<typeof good.gen>[0], r: Parameters<typeof good.gen>[1]) => { calls++; if (calls > 2) throw new Error('boom'); return good.gen(d, r); } };
+    // A unique `hint` per call (review, pr-test-analyzer) keeps `nextQuestion()`'s own "avoid immediate
+    // repeat" retry loop from ever firing here — without it, a real `y1-add` draw that happened to repeat
+    // would burn an extra `gen()` call on the retry and make the throw land one `nextQuestion()` early,
+    // failing this test somewhere that doesn't point at the retry loop at all.
+    const flaky = { ...good, gen: (d: Parameters<typeof good.gen>[0], r: Parameters<typeof good.gen>[1]) => { calls++; if (calls > 2) throw new Error('boom'); return { ...good.gen(d, r), hint: `call-${calls}` }; } };
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const s = new Session({ mode: 'mission', year: Y1, topic: flaky, rng: rng(1) }, ev);
     s.start();
