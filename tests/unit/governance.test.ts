@@ -3923,6 +3923,30 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
   const UNTOUCHABLE = ['`owner-session`', '`later`', '`refine-hold`'];
   const PULSES = ['routine: heartbeat', 'reviewer: heartbeat', 'board: heartbeat', 'watchdog: heartbeat'];
 
+  /**
+   * PR #513 round 1, B2 — and the same class as PR #517's B1 and PR #521's B1, all found in one day.
+   * **A rail that lists the words a policy must contain cannot tell a statement from its negation.** The
+   * reviewer rewrote mechanism point 1 to "Read yesterday's reasoning on the issue and confirm it still
+   * reads true. If it does, that stands in for today's check" — the exact degradation ADR-008 warns about —
+   * and all eight rails stayed green, because `/re-deriv/` and `never the plan` still occurred in points 2
+   * and 3. So: bind a claim to the thing it governs, and refuse an escape beside it.
+   *
+   * `binds` window is characters rather than sentences because these are hard-wrapped documents with lists
+   * in them. Neither helper is a wording pin — the control mutations in this PR's table reword every pinned
+   * passage and stay green.
+   *
+   * (The #516 and #520 branches carry the same two helpers, defined in their own blocks. All three touch
+   * this file and are open at once, so they collapse into one definition when the last of them lands, not
+   * before — a shared helper now would conflict three ways.)
+   */
+  const SPAN = 250;
+  const binds = (text: string, subject: string, claim: RegExp) => {
+    const i = text.indexOf(subject);
+    if (i < 0) return false;
+    return claim.test(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN));
+  };
+  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bstands in for\b/i;
+
   it('the refiner prompt exists and says it develops nothing', () => {
     const text = doc('docs/REFINER-PROMPT.md');
     expect(text.length, 'docs/REFINER-PROMPT.md must be read from disk, or every rail below is vacuous')
@@ -3952,18 +3976,76 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
   // Read the mechanism block, not the whole file: `/re-deriv/` anywhere in the document is satisfied by the
   // incidental "a proposal that no longer re-derives is dropped" three paragraphs down, so a rail spanning
   // the file stays green with the instruction itself deleted. Found by mutation, not by reading.
+  //
+  // And read each numbered point separately (#513 round 1, B2): scoping to the block was not enough either,
+  // because points 2 and 3 carry the same words as point 1 and kept it green while point 1 said the
+  // opposite. Point 1 is the whole gate — everything else is bookkeeping around it.
   it('a proposal is re-derived from the repo, never replayed from the ledger', () => {
     const text = doc('docs/REFINER-PROMPT.md');
     const mech = text.slice(text.indexOf('The mechanism'), text.indexOf('A lost or unreadable ledger'));
     expect(mech.length, 'the numbered mechanism must be found, or this rail reads an empty string')
       .toBeGreaterThan(400);
-    expect(mech, 'the gate is only a delay unless tomorrow derives the proposal again from tomorrow\'s tree')
+    const points = mech.split(/\n(?=\d+\. )/).filter((p) => /^\d+\. /.test(p));
+    expect(points.length, 'the mechanism must be a numbered list, or the per-point checks below read nothing')
+      .toBeGreaterThanOrEqual(4);
+    const [one] = points;
+    expect(one, 'POINT 1 is the gate itself: it must tell the run to derive again from the repo')
       .toMatch(/re-deriv/i);
+    expect(one, 'and it must refuse the replay in as many words — "read yesterday\'s reasoning and confirm '
+      + 'it still reads true" satisfied every earlier check and is the exact failure ADR-008 names')
+      .toMatch(/do not read yesterday|never read yesterday/i);
+    expect(one, 'no clause may let stored reasoning stand in for today\'s derivation').not.toMatch(NO_ESCAPE);
     expect(mech, 'a gate with no stated bound closes whenever the next run happens to be')
       .toMatch(/\b20 hours\b/);
+    expect(binds(mech, '20 hours', /derived it again|re-deriv/i),
+      'the bound and the re-derivation are one condition, not two — the wait alone is a delay').toBe(true);
     expect(mech, 'the ledger must hold when a proposal was made and not what it was — a stored plan is what '
       + 'turns re-deriving back into replaying').toMatch(/never the plan/i);
     expect(mech, 'and it must name the issue that carries it').toMatch(/refiner: backlog/);
+  });
+
+  /**
+   * #513 round 1, B1 — the reviewer's finding, and the reason the fix is structural rather than remembered.
+   *
+   * The prompt used to promise "a priority you set, that someone changed back, is never set again", with the
+   * ledger as its only memory — and the ledger holds *outstanding* proposals, dropping a line the moment it
+   * is applied. So: apply P2, the owner corrects it to P1, and days later an unrelated re-scan re-derives P2
+   * against a ledger that never knew. The safety case the whole loosening rests on did not hold.
+   *
+   * The owner chose (2026-09-22) to close it by construction AND by state: a missing priority may be set, an
+   * existing one may only be argued for in a comment. The hole cannot reopen, because the moment any hand
+   * touches a priority the label exists, and an existing label is out of reach whatever any record says.
+   */
+  it('an existing priority is never changed, only argued for (#513 review B1)', () => {
+    const text = doc('docs/REFINER-PROMPT.md');
+    const gate = text.slice(text.indexOf('## The two-phase gate'), text.indexOf('## The work'));
+    expect(gate.length, 'the gate and the signals must be found, or this rail reads an empty string')
+      .toBeGreaterThan(800);
+    // Every check below is a CONJUNCTION, deliberately, and three of them were alternations until this PR's
+    // own mutation table caught them. **An `|` in a policy assertion is the token-presence defect one level
+    // down**: a mutation satisfies one branch while breaking the rule, exactly as "everything is MIT" kept
+    // three required tokens. "Behind the gate, with evidence, you may" left `Applying it is not one of your
+    // options` standing and stayed green; "Keep it in the ledger" left `ledger holds only` standing; and
+    // widening the grant to "any issue" was covered by the gate line three paragraphs up. Each is now
+    // required on its own, and bound to the sentence it governs.
+    expect(binds(gate, 'You may set a `priority:*`', /has none|is missing/i),
+      'the grant must be bound to a MISSING priority, in its own sentence — the gate line saying "missing" '
+      + 'three paragraphs up covered a bullet that granted any priority at all').toBe(true);
+    expect(binds(gate, 'never change one that is already there', /priority|existing/i),
+      'the prompt must refuse to change an existing priority, in as many words').toBe(true);
+    expect(gate, 'the refusal must rule out the gate as a route — a gated exception IS the hole reopening')
+      .toMatch(/[Nn]ot behind the gate/);
+    expect(gate, 'and it must say applying is not an available option, so "may" cannot creep back')
+      .toMatch(/Applying it is not one of your options/);
+    expect(gate, 'the alternative must be stated, or the rule reads as "do nothing about a wrong priority"')
+      .toMatch(/comment your reasoning/i);
+    // The memory half: derived from the issue timeline, never from the ledger, because the ledger forgets.
+    expect(gate, 'the timeline is where a changed value is read from').toMatch(/issues\/<n>\/events/);
+    expect(binds(gate, 'issues/<n>/events', /labeled|timeline/i),
+      'and it must say what that endpoint is read for').toBe(true);
+    expect(gate, 'the ledger must be named as the WRONG place for this memory — that it "holds only '
+      + 'outstanding proposals" is a fact that survives a sentence telling the run to keep it there anyway')
+      .toMatch(/Not from the ledger/);
   });
 
   it('what the refiner may never touch stays out of its reach', () => {

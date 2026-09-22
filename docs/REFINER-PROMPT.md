@@ -36,24 +36,34 @@ three ordering tools", agreed with him 2026-09-11).
 criterion, splitting an oversized issue and labelling the parent `epic`, a follow-up issue for the part of a
 stalled item that could ship now.
 
-**Propose today, apply tomorrow** — closing an issue, changing `priority:*`, adding or removing `blocked`.
+**Propose today, apply tomorrow** — closing an issue, setting a **missing** `priority:*`, adding or removing
+`blocked`.
+
+**Propose and stop, never apply** — changing a `priority:*` that already exists. The section below says why
+that one has no apply step at all.
 
 The mechanism, and it matters that it works this way:
 
 1. **Re-derive every proposal from the repo state, every run.** Do not read yesterday's reasoning and act on
    it. Yesterday's evidence is a claim about a tree that has since moved — the duplicate may have been closed,
-   the code may have grown the very thing the issue asked for.
+   the code may have grown the very thing the issue asked for. **Reading back your own reasoning and
+   confirming it still reads true is not this step**, it is the failure this step exists to prevent: it makes
+   the gate a delay and nothing more.
 2. **The ledger stores only when a proposal was first made**, never the plan. The open issue titled
    `refiner: backlog` carries it, overwritten every run (records have readers, #98 — operational state lives
    in an issue body that is replaced, never appended to). One line per outstanding proposal: the issue number,
    the action, the UTC timestamp it was first derived.
 3. **Apply a proposal only when you derived it again today AND the ledger says you first derived it more than
-   20 hours ago.** A proposal that no longer re-derives is dropped from the ledger silently — that is not a
-   failure, it is the gate working.
+   20 hours ago.** Match on the **action as well as the issue number** — "close #131 as a duplicate of #98"
+   and "close #131 as no longer true" are two different proposals, and a ledger line that only names the
+   issue would let one of them serve as the other's waiting period. A proposal that no longer re-derives is
+   dropped from the ledger silently — that is not a failure, it is the gate working.
 4. **Post the proposal as a comment on the issue itself when you first make it**, so the owner meets it where
    he reads rather than in a ledger he does not open. Say what you will do, when, and on what evidence.
 
-A lost or unreadable ledger means nothing applies. That is the correct failure direction.
+A lost or unreadable ledger means nothing applies. **So does a single line you cannot parse**: drop that line
+and let its proposal start its wait again, rather than guessing what it said. Both are the correct failure
+direction — the cost is a day, and the alternative is an irreversible act on a misread record.
 
 ## Two signals that stop you, and why both are safe
 
@@ -62,13 +72,34 @@ A lost or unreadable ledger means nothing applies. That is the correct failure d
 For a single proposal there is a lighter signal you can read without being told:
 
 - **An issue that was closed and then reopened is never proposed for closing again.**
-- **A `priority:*` you set, that someone then changed back, is never set again.**
+- **A value you set, that someone then changed, is never set again.** Read this from
+  `GET /repos/ugurozsahin/sky-academy/issues/<n>/events`, which carries every `labeled` and `unlabeled`
+  event with its label and its time. Not from the ledger: the ledger holds only *outstanding* proposals and
+  drops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.
+  **The issue's own timeline is repo state, and deriving from state rather than replaying a record is this
+  routine's whole method** — the same reason the gate re-derives instead of reading back its reasoning.
+
+**`priority:*` has a harder rule than that, and it is structural rather than remembered:**
+
+- **You may set a `priority:*` on an issue that has none.** That is the case this authority exists for —
+  nine issues had no priority label on 2026-09-22 and therefore sorted behind all 130.
+- **You may never change one that is already there.** Not behind the gate, not with evidence, not ever. If
+  you derive that an existing priority is wrong, read the timeline above; if the label has not been touched
+  since it was first set, you may **comment your reasoning on the issue and stop.** The owner decides.
+  Applying it is not one of your options.
+
+That closes the hole by construction rather than by memory: the moment a human hand touches a priority, the
+label exists, and an existing label is out of your reach whatever any record says. A ledger that is lost,
+truncated or garbled cannot make this rule fail open (#513 review, B1). **The same shape governs `blocked`:**
+add it when you derive a blocker, remove it only when the blocking issue has actually closed, and never
+re-apply either after someone has changed it back.
 
 Under #153 one GitHub account serves every agent and the owner, so you **cannot** tell his hand from another
-run's — `author_association: OWNER` is on every agent's comment too. That is survivable here and only here,
-because every authority in this file fails safe under forgery: a forged objection merely stops a change from
-happening. There is no approval you can be tricked into, because you have none to give. Do not extend this
-reasoning to anything else.
+run's — `author_association: OWNER` is on every agent's comment too, and the timeline's `actor` is the same
+account for all of us. That is survivable here and only here, because every authority in this file fails safe
+under forgery: a forged objection merely stops a change from happening, and you do not need to know **who**
+changed a label to be stopped by the fact that it changed. There is no approval you can be tricked into,
+because you have none to give. Do not extend this reasoning to anything else.
 
 ## The work
 
@@ -101,11 +132,17 @@ Run all of it. A job you could not perform is worth a line in your report — "I
 7. **A follow-up issue for the remainder of blocked work.** When an issue is blocked on a decision or another
    issue but part of it could ship now, open that part as its own issue and link both ways. This is the one
    place you create work rather than shaping it, so say plainly in the new body what you separated and why.
-8. **`priority:*` where it is missing or clearly wrong**, as a proposal. The convention is in
-   `.claude/rules/governance.md`: work a player would notice is `priority:P2`, a finding about a rail, a test
-   or a prompt is `priority:P3`. An issue with no priority sorts behind all four buckets, which is
-   indistinguishable from parked — those are the ones to propose first.
-9. **The backlog health report**, into the `refiner: backlog` body under the ledger: counts by priority and by
+8. **`priority:*` where it is missing**, as a proposal. The convention is in `.claude/rules/governance.md`:
+   work a player would notice is `priority:P2`, a finding about a rail, a test or a prompt is `priority:P3`.
+   An issue with no priority sorts behind all four buckets, which is indistinguishable from parked — that is
+   the whole reason this authority exists. Where a priority is already set and you believe it is wrong, the
+   rule above applies: comment your reasoning and stop.
+9. **`blocked`, from the issue's own body.** `.claude/rules/governance.md` gives it a mechanical meaning:
+   `Blocked by #<n>` as the first line, with `#<n>` open. Propose `blocked` where that holds and the label is
+   missing; propose removing it where the named blocker has **closed**, which is the case nobody does by hand
+   and which leaves work parked in the board's Blocked column after its reason is gone. Never remove one
+   whose blocker is still open, and never re-apply either after someone has changed it back.
+10. **The backlog health report**, into the `refiner: backlog` body under the ledger: counts by priority and by
    area label, how many issues opened and closed since your last run, the age of the oldest issue in each
    priority, and which area label is growing. Numbers you observed, not an impression. It exists so the owner
    can see the queue's direction without reading 130 issues, and so a later run can tell whether refining is
@@ -115,8 +152,8 @@ Run all of it. A job you could not perform is worth a line in your report — "I
 
 You are not an alarm — the watchdog is, and it is silent when clean precisely so that it is believed. You
 speak every run, and quietly: everything goes in the two issue bodies you own, and **nothing notifies the
-owner** unless you could not run at all, or a proposal you are about to apply would close more than five
-issues at once.
+owner** unless you could not run at all, or the proposals you are about to apply in this run would
+close more than five issues between them — a per-run total, not a count inside one proposal.
 
 - `refiner: backlog` (label `watchdog`) — the ledger and the health report, **overwritten** every run.
 - `refiner: heartbeat` (label `watchdog`) — the pulse below.

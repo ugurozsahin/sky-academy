@@ -45,7 +45,28 @@ would only be a delay.
 ## Why the objection signals are the ones they are
 
 `refine-hold` is a standing per-issue exemption. For a single proposal the signals are **a reopened issue** and
-**a priority changed back**, both read from state rather than from words.
+**a value changed after the refiner set it**, both read from state rather than from words — from the issue's
+own `events` timeline, never from the ledger.
+
+**That last distinction was a defect before it was a principle (#513 round 1, B1).** The rule first read "a
+priority you set, that someone changed back, is never set again", with the ledger as its only memory — and the
+ledger holds *outstanding* proposals, dropping a line the moment it is applied. So the sequence that mattered
+was unprotected: apply `P2`, the owner corrects it to `P1`, and days later an unrelated re-scan re-derives
+`P2` against a ledger that never knew. The safety case this whole loosening rests on did not hold for the one
+act it was written about.
+
+The fix is **structural first, remembered second**, and the owner chose both halves on 2026-09-22:
+
+- **A missing `priority:*` may be set. An existing one may never be changed** — not behind the gate, not with
+  evidence. If the refiner derives that an existing priority is wrong it comments its reasoning and stops.
+- **A value it did set is checked against the issue timeline** before it would ever be set again.
+
+The first half is what makes this safe rather than merely careful: the moment any hand touches a priority the
+label exists, and an existing label is out of reach whatever any record says. A ledger that is lost, truncated
+or garbled cannot make it fail open. A memory-based fix — a permanent "do not touch" list in the ledger — was
+considered and rejected for exactly that: its failure direction is *unsafe*, because a forgotten entry means
+the refiner overwrites the owner, and it would have made the ledger store a plan, which the gate above forbids
+for the same reason.
 
 Under #153 one GitHub account serves every agent and the owner, so `author_association: OWNER` proves nothing
 and a comment saying "no" could have been written by any run. This is survivable **only** because every
