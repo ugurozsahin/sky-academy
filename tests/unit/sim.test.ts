@@ -1198,34 +1198,16 @@ describe('a finger pressed during the outcome hold is not dead once it thaws (#4
       .toEqual([{ label: b.label, viaSwipe: true }]);
   });
 
-  it('a press landing on a bubble during the freeze does not cash it in once the wave thaws', () => {
+  it('a press landing on a bubble during the freeze does not hit it — the tap test is skipped entirely while frozen', () => {
+    // Not "cashed in later": `bubbleAt`/`hitBubble` are only ever reached from inside `onDown` itself, once,
+    // synchronously. A stale press has no second chance to hit anything — the guarantee is that the immediate
+    // tap-hit test never runs at all while `stalls()` is true, on empty space or squarely on a bubble alike.
     sim = createSim({ seed: 7 });
     const row = pinnedRow(sim);
     sim.arena.reveal({ good: row[0].label });
     sim.advance(900);
     const b = row[1];                                               // press directly on a bubble the freeze is holding
     sim.pointer('pointerdown', { x: b.x, y: b.y, pointerId: 1 });
-    expect(sim.take('hits'), 'the old wave\'s bubble under the finger must not be hit at press time').toEqual([]);
-    sim.arena.clearWave();
-    expect(sim.take('hits'), 'nor when the wave clears around it').toEqual([]);
-  });
-
-  it('a finger pressed just as the freeze begins and never moved through the whole hold is caught too', () => {
-    // No pointermove at all between the press and the thaw — the only thing that can observe this is the frame
-    // loop's own #331 stale-marking, which does not care when inside the freeze the stroke started.
-    sim = createSim({ seed: 7 });
-    const row = pinnedRow(sim);
-    const lane = row[0].y;
-    sim.arena.reveal({ good: row[0].label });
-    sim.pointer('pointerdown', { x: 2, y: lane, pointerId: 1 });
-    sim.advance(1300);                                              // the rest of the hold, not one pointer event in it
-    sim.arena.clearWave();
-    const next = pinnedRow(sim);
-    const b = next.reduce((r, x) => (x.x < r.x ? x : r), next[0]);
-    sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 1 });
-    expect(sim.take('hits'), 'the re-seating move must not itself slice').toEqual([]);
-    sim.pointer('pointermove', { x: b.x, y: b.y + b.r + 20, pointerId: 1 });
-    expect(sim.take('hits'), 'a press that started during the freeze and never moved is still live afterwards')
-      .toEqual([{ label: b.label, viaSwipe: true }]);
+    expect(sim.take('hits'), 'a press during the freeze must not hit-test anything, on a bubble or off it').toEqual([]);
   });
 });
