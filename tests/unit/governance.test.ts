@@ -4043,6 +4043,184 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
 });
 
 
+
+
+/**
+ * #520 — the licence split: MIT for the code, all rights reserved for the art and the written content.
+ *
+ * The repository was public from 2026-09-16 with no licence at all, so the default applied and nobody who
+ * read it had any right to use it. The owner settled the split in session on 2026-09-22, choosing it over a
+ * non-commercial source-available licence for a reason worth keeping: the code is not the part worth
+ * protecting — it is dependency-free vanilla TypeScript anyone would rewrite faster than read — while the
+ * twelve avatars and the look are what is actually copyable, and those are protected by reserving them
+ * rather than by restricting the code.
+ *
+ * **The carve-out is the whole decision, and it lives in two files that have to agree.** That is the failure
+ * to guard against: `LICENSE` opens with the MIT grant, so a later edit that trims the section below it —
+ * or a README tidy-up that drops the Licence heading — leaves a repository whose only visible statement is
+ * "MIT", silently licensing the art. Nothing else in the repo would notice, and unlike a broken rail it is
+ * not recoverable: an asset released permissively cannot be called back.
+ *
+ * **Six review rounds, two mechanisms, both broken the same way.** Rounds 1-5 detected the negation with a
+ * word-list/proximity heuristic (`binds`/`positivelyStates`/`NO_ESCAPE`) and each round found a fresh
+ * bypass. Round 5's own conclusion — pin the load-bearing sentences verbatim instead of detecting their
+ * negation — was right in kind and wrong in strength: round 6 found a bare substring `.includes()` pin still
+ * passes when the pinned sentence is quoted, verbatim, inside a wrapping paragraph that frames it as
+ * superseded ("an earlier draft ... which no longer applies: '<the real sentence>' ... that restriction has
+ * been lifted"), and separately that the two carve-out directory names had no pin at all — only an unbound
+ * `toContain` anywhere in the rest of the file, so a later "Exception: public/icons/ is additionally
+ * released" sentence passed untouched.
+ *
+ * **So the pin is now on the whole paragraph, matched by equality against `\n\n`-delimited units — the same
+ * `unitsOf`/`toContain(unit)` shape PR #527 used the same day for `guardrails.md`/`review-pr` §7 (the #526
+ * block below).** A sentence quoted inside a longer wrapping paragraph is not the same unit as the paragraph
+ * that is only that sentence, so the wrapper is a different string and equality fails it. Each protected
+ * directory name is additionally required to occur in exactly one unit within its carve-out section, and
+ * that unit must be the pinned list — a second unit naming the same directory anywhere in that section fails
+ * the count before its words are even read.
+ *
+ * **The ceiling, named rather than implied, the one #526 states for its own two pins too:** a contradicting
+ * paragraph placed as its own new unit, *outside* the section a check here bounds, and without repeating a
+ * protected directory name, still passes — nothing here reads the whole document hunting for an unrelated
+ * reversal. That is a job for a human reader, not a string comparison.
+ *
+ * Prove it red: reword any pinned unit, even slightly; add a sentence inside the LICENSE directory list or
+ * the README carve-out paragraph; add a second paragraph anywhere in either carve-out section that names
+ * `public/avatars/` or `public/icons/`; remove the README's Licence section; drop either third-party notice
+ * from either file; set `package.json`'s `license` to something else.
+ */
+describe('the licence grants the code and reserves the art, in both files (#520)', () => {
+  const root = new URL('../../', import.meta.url);
+  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  const norm = (text: string) => text.replace(/\s+/g, ' ').trim();
+
+  // Paragraph units, matched by equality rather than substring — the shape PR #527 already uses in this
+  // file for `guardrails.md`/`review-pr` §7 (see the #526 block below). A sentence quoted inside a longer
+  // wrapping paragraph is a different unit than the paragraph that is only that sentence, so a wrapper that
+  // frames the pinned words as superseded cannot pass (PR #521 round 6, B1).
+  const unitsOf = (text: string) => text.split(/\n\n+/).map(norm);
+
+  // A bounded slice between two literal anchors, refusing rather than defaulting when either is missing —
+  // an unbounded or silently-widened slice is exactly how #148 and PR #513 round 2's B1 hid a gutted
+  // section behind text pasted past the real one.
+  const between = (text: string, start: string, end: string) => {
+    const s = text.indexOf(start);
+    if (s < 0) throw new Error(`section start ${JSON.stringify(start)} not found`);
+    const e = text.indexOf(end, s + start.length);
+    if (e < 0) throw new Error(`section end ${JSON.stringify(end)} not found`);
+    return text.slice(s, e);
+  };
+
+  // Exactly one paragraph in `section` may mention `needle` — refusing ambiguity the way PR #527's
+  // `unitWith` does, rather than asserting against a count. Closes PR #521 round 6's B2: a regrant added as
+  // a fresh paragraph, leaving the pinned list itself untouched, is a second unit mentioning the same
+  // directory and fails here before anything downstream reads its words.
+  const onlyUnitMentioning = (section: string, needle: string) => {
+    const hits = unitsOf(section).filter((u) => u.includes(needle));
+    if (hits.length !== 1) {
+      throw new Error(`${hits.length} units in this section mention ${JSON.stringify(needle)}, want exactly 1`);
+    }
+    return hits[0];
+  };
+
+  // The exact paragraphs the owner settled on (#520, session 2026-09-22), each a whole `\n\n`-delimited unit
+  // in the real file. Round 6 found the third-party notices vulnerable to the same wrapper as the
+  // carve-outs, so all six are pinned whole now rather than as a leading phrase.
+  const LICENSE_CARVEOUT = "The artwork and the game's written content are NOT licensed. All rights in them "
+    + "are reserved by the copyright holder, and no permission to use, copy, modify or redistribute them is "
+    + "granted by this file:";
+  const LICENSE_DIRLIST = "- public/avatars/ the twelve ninja character illustrations - public/icons/ the "
+    + "app and home-screen icons - the name \"Sky Ninja Academy\", and the game's visual identity, including "
+    + "the favicon drawn inline in index.html - the praise lines, character names and other written game "
+    + "text";
+  const LICENSE_FREDOKA = "- Fredoka (public/fonts/) is (c) The Fredoka Project Authors, under the SIL Open "
+    + "Font License 1.1 — see public/fonts/OFL.txt. That licence governs the font files whatever this file "
+    + "says, and its notice must travel with them.";
+  const LICENSE_APACHE = "- .claude/skills/frontend-design/ is vendored from a third party under the Apache "
+    + "License 2.0 — see .claude/skills/frontend-design/LICENSE.txt.";
+  const README_CARVEOUT = "**The artwork and the game's written content are not.** The twelve character "
+    + "illustrations under `public/avatars/` and the icons under `public/icons/` are **not licensed**: all "
+    + "rights in them are reserved, along with the name \"Sky Ninja Academy\", the game's visual identity "
+    + "and its written text. The split is deliberate and it is the usual one for a game: the engine is worth "
+    + "sharing, the characters are not mine to give away twice. `LICENSE` states exactly what falls each "
+    + "side of the line.";
+  const README_THIRDPARTY = "Two third-party components carry their own licences, and they apply whatever "
+    + "the above says: **Fredoka** under the SIL Open Font License 1.1 (`public/fonts/OFL.txt`), and a "
+    + "vendored `frontend-design` skill under the Apache License 2.0 "
+    + "(`.claude/skills/frontend-design/LICENSE.txt`).";
+
+  it('LICENSE grants MIT and names the holder', () => {
+    const l = doc('LICENSE');
+    expect(l.length, 'LICENSE must be read from disk, or every check here is vacuous').toBeGreaterThan(1_000);
+    expect(l, 'the grant must be the MIT text, not a summary of it').toContain('MIT License');
+    expect(l, 'and carry MIT\'s operative permission clause').toMatch(/Permission is hereby granted, free of charge/);
+    expect(l, 'a copyright line with a holder — an MIT file with no holder grants nothing clearly')
+      .toMatch(/Copyright \(c\) \d{4} \S/);
+  });
+
+  it('LICENSE reserves the art below the grant, in the exact paragraphs the owner settled on', () => {
+    const l = doc('LICENSE');
+    const gi = l.indexOf('Permission is hereby granted');
+    expect(gi, 'the carve-out must sit AFTER the grant, or a reader stops at "MIT" and takes the art')
+      .toBeGreaterThanOrEqual(0);
+    expect(l.indexOf('WHAT THIS LICENCE DOES NOT COVER'), 'and the carve-out section itself must follow it')
+      .toBeGreaterThan(gi);
+    const section = between(l, 'WHAT THIS LICENCE DOES NOT COVER', 'THIRD-PARTY COMPONENTS');
+    const units = unitsOf(section);
+    expect(units, 'the carve-out sentence must read exactly as the owner settled it (whitespace aside) — '
+      + 'see the doc-comment above for why this is a whole-paragraph pin rather than a substring or a '
+      + 'negation detector').toContain(LICENSE_CARVEOUT);
+    expect(units, 'and the directory list must read exactly as settled, as one paragraph')
+      .toContain(LICENSE_DIRLIST);
+    for (const dir of ['public/avatars/', 'public/icons/']) {
+      expect(onlyUnitMentioning(section, dir), `${dir} must be named exactly once in the carve-out section, `
+        + 'inside the pinned list — a second, later paragraph naming it is an unpinned regrant (PR #521 '
+        + 'round 6, B2)').toBe(LICENSE_DIRLIST);
+    }
+  });
+
+  it('README states the same split, in the exact paragraph the owner settled on', () => {
+    const r = doc('README.md');
+    const section = r.slice(r.lastIndexOf('## Licence'));
+    expect(section.length, 'README must carry a Licence section — it is where a reader actually looks')
+      .toBeGreaterThan(200);
+    expect(unitsOf(section), 'the README\'s Licence section must carry the pinned carve-out paragraph '
+      + 'verbatim (whitespace aside) — a rewrite that changes the words has to change this test too, on '
+      + 'purpose').toContain(README_CARVEOUT);
+    for (const dir of ['public/avatars/', 'public/icons/']) {
+      expect(onlyUnitMentioning(section, dir), `${dir} must be named exactly once in the Licence section, `
+        + 'inside the pinned carve-out — a second, later paragraph naming it is an unpinned regrant (PR '
+        + '#521 round 6, B2)').toBe(README_CARVEOUT);
+    }
+  });
+
+  it('package.json agrees with LICENSE, since tooling reads the field and not the file', () => {
+    const pkg = JSON.parse(doc('package.json'));
+    expect(pkg.license, 'package.json must carry the same licence the LICENSE file grants').toBe('MIT');
+  });
+
+  // Per file, not over their union (PR #521 round 1, non-blocking) — LICENSE is the file a redistributor
+  // ships, so dropping a notice from it alone while the README still carries it must not pass.
+  it('LICENSE acknowledges both third-party licences, since neither was this project\'s to choose', () => {
+    const l = doc('LICENSE');
+    expect(l.indexOf('THIRD-PARTY COMPONENTS'), 'the section itself must exist').toBeGreaterThan(-1);
+    const section = l.slice(l.indexOf('THIRD-PARTY COMPONENTS'));
+    const units = unitsOf(section);
+    expect(units, 'LICENSE must name Fredoka\'s SIL OFL notice verbatim, as its own paragraph')
+      .toContain(LICENSE_FREDOKA);
+    expect(units, 'LICENSE must name the vendored skill\'s Apache-2.0 notice verbatim, as its own paragraph')
+      .toContain(LICENSE_APACHE);
+  });
+
+  it('README acknowledges both third-party licences, since neither was this project\'s to choose', () => {
+    const r = doc('README.md');
+    const section = r.slice(r.lastIndexOf('## Licence'));
+    expect(unitsOf(section), 'README must name both third-party notices verbatim, in their one paragraph')
+      .toContain(README_THIRDPARTY);
+  });
+});
+
+
 /**
  * #526 — a class fix names its population.
  *
