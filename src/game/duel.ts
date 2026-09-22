@@ -111,17 +111,31 @@ export class Duel {
     this.advance();
   }
   private advance() {
-    if (this.round >= this.rounds) { this.end(); return; }
+    if (this.onLastRound) { this.end(); return; }   // the getter, not a second copy of the comparison (#375 round 2, note 5)
     this.nextQuestion();
   }
-  private end() {
-    if (this.ended) return;
-    this.ended = true;
+  /** True once the match is on its last round — the round after which `waveEnd()` ends it rather than advancing. */
+  get onLastRound() { return this.round >= this.rounds; }
+  /**
+   * The match's result as it stands, without ending the match or firing anything (#375 round 1, B1).
+   *
+   * **Final, not provisional, once the last round is settled**, which is what lets a caller commit a finished
+   * match ahead of the screen's own pacing timers. Nothing after a round is decided can move any field this
+   * reads: `hit()` returns `'ignored'` before it touches `tally` once `roundDecided` is set, and a draw adds
+   * to neither score. So `result()` taken the moment the last round is decided — or the moment its wave runs
+   * out undecided, a draw scoring nothing — equals the one `end()` builds later.
+   */
+  result(): DuelResult {
     const winner: DuelPlayer | 'draw' = this.scoreA > this.scoreB ? 'a' : this.scoreB > this.scoreA ? 'b' : 'draw';
     // A snapshot, not the live counters: a `hit()` after the match ends returns 'ignored' and cannot move
     // them, but the result outlives this screen's rematch and must not be a window onto a restarted tally.
     const tally = { a: { ...this.tally.a }, b: { ...this.tally.b } };
-    this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds: this.rounds, tally });
+    return { winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds: this.rounds, tally };
+  }
+  private end() {
+    if (this.ended) return;
+    this.ended = true;
+    this.ev.onMatchEnd(this.result());
   }
 }
 

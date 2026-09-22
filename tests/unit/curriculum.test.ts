@@ -1964,7 +1964,7 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     'y1-coins d3', 'y1-shapes d3', 'y1-plurals d1', 'y1-punct d1', 'y1-days d3',
     'y1-sentence d1', 'y1-sentence d2', 'y1-sentence d3',
     'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
-    'y2-add d3', 'y2-tables d1', 'y2-balance d2', 'y2-line d2', 'y2-line d3',
+    'y2-add d3', 'y2-tables d1', 'y2-line d2', 'y2-line d3',
     'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
     'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d1', 'y2-duration d3',
     'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
@@ -2023,5 +2023,21 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     expect(wordQ(r, 'Which is more?', '1p', ['50p']).wide).toBe(true);
     // And a card whose options really are all short stays narrow, so nothing is widened wholesale.
     expect(wordQ(r, 'Which letter?', 'ox', ['ax', 'ex']).wide).toBe(false);
+  });
+});
+
+describe("numQ's decoy top-up never drops a bubble short (#462)", () => {
+  /**
+   * `numQ` asked `nearby` for exactly the decoys it was short of, without telling it which ones `ds`
+   * already held, then dropped any duplicate `nearby` handed back and never asked again — silently
+   * shipping a card with three bubbles instead of four. A sweep of every topic × difficulty found 20
+   * affected pairs, worst of them `r-share` d2 at 25.3% of draws and `r-balance` d3 at 24.9%.
+   */
+  it('r-share d2 and r-balance d3, the two worst-hit pairs from the sweep, always draw four options', () => {
+    const share = TOPICS.find(t => t.id === 'r-share')!;
+    const balance = TOPICS.find(t => t.id === 'r-balance')!;
+    const r = rng(462);
+    for (let i = 0; i < 4000; i++) expect(share.gen(2, r).options.length, 'r-share d2').toBe(4);
+    for (let i = 0; i < 4000; i++) expect(balance.gen(3, r).options.length, 'r-balance d3').toBe(4);
   });
 });
