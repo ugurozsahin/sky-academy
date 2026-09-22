@@ -4412,9 +4412,9 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     { what: "the 20-hour bound is a condition on re-derivation",
       file: "docs/REFINER-PROMPT.md",
       unit: "3. **Apply a proposal only when you derived it again today AND the ledger says you first derived it more than\n   20 hours ago.** Match on the **action as well as the issue number** — \"close #131 as a duplicate of #98\"\n   and \"close #131 as no longer true\" are two different proposals, and a ledger line that only names the\n   issue would let one of them serve as the other's waiting period. A proposal that no longer re-derives is\n   dropped from the ledger silently — that is not a failure, it is the gate working." },
-    { what: "a proposal is posted on the issue when first made",
+    { what: "the comment posts before the ledger line, and a lost comment writes none",
       file: "docs/REFINER-PROMPT.md",
-      unit: "4. **Post the proposal as a comment on the issue itself when you first make it**, so the owner meets it where\n   he reads rather than in a ledger he does not open. Say what you will do, when, and on what evidence." },
+      unit: "4. **Post the proposal as a comment on the issue itself when you first make it**, so the owner meets it where\n   he reads rather than in a ledger he does not open. Say what you will do, when, and on what evidence.\n   **The comment comes first and the ledger line only after it has actually posted — one step in that order,\n   not two calls that happen to be adjacent.** Read the response: if the comment did not post, write no ledger\n   line for that proposal, and it starts its wait again tomorrow. The two writes look independent and are not,\n   because the ledger line is what licenses an irreversible act in twenty hours' time while the comment is the\n   only thing that gives the owner those twenty hours to object. A run that wrote the line and lost the comment\n   has built a gate with nobody outside it: tomorrow re-derives the proposal, finds a ledger entry old enough,\n   and closes the issue or sets the label with the owner never having been shown it. So the failure direction\n   here is the one every other read in this file takes — the check did not happen, so the act does not\n   (#513 review, round 10)." },
     { what: "a lost ledger applies nothing, and so does one unparseable line",
       file: "docs/REFINER-PROMPT.md",
       unit: "A lost or unreadable ledger means nothing applies. **So does a single line you cannot parse**: drop that line\nand let its proposal start its wait again, rather than guessing what it said. Both are the correct failure\ndirection — the cost is a day, and the alternative is an irreversible act on a misread record." },
@@ -4629,8 +4629,14 @@ describe('a rail that enumerates the routine prompts covers all of them (#512, r
   const PROMPTS = readdirSync(new URL('docs/', root))
     .filter((f) => f.endsWith('-PROMPT.md')).map((f) => `docs/${f}`).sort();
 
-  const SOURCES = ['tests/unit/governance.test.ts', 'tests/unit/pulse-stamp.test.ts',
-                   'tests/unit/instructions.test.ts'];
+  /**
+   * And the files scanned are read from disk too. Round 10: this was a hand-written list of three, which is
+   * this block's own defect one level up — the mechanism written to stop a hand-enumerated population going
+   * stale had a hand-enumerated population. A fourth test file with a stale enumeration was invisible to it.
+   * Every `tests/unit/*.test.ts`, so a new test file is scanned the day it lands and nobody has to remember.
+   */
+  const SOURCES = readdirSync(new URL('tests/unit/', root))
+    .filter((f) => f.endsWith('.test.ts')).map((f) => `tests/unit/${f}`).sort();
 
   /** Adjacent quoted literals separated only by commas and whitespace — how every one of these is written. */
   const RUN = /'[^'\n]*'(?:\s*,\s*'[^'\n]*')*/g;
@@ -4671,17 +4677,21 @@ describe('a rail that enumerates the routine prompts covers all of them (#512, r
   const runsOf = (file: string) => [...scannable(file).matchAll(RUN)].map((m) => norm(m[0]))
     .filter((run) => PROMPTS.filter((p) => run.includes(`'${p}'`)).length >= 2);
 
-  it('the population is read from disk, and it is the four routines', () => {
+  it('both populations are read from disk, and neither is empty', () => {
     expect(PROMPTS, 'a routine prompt that stopped matching docs/*-PROMPT.md would shrink this rail to '
       + 'nothing without failing it').toContain('docs/REFINER-PROMPT.md');
     expect(PROMPTS.length, 'four routines develop, review, watch and refine').toBeGreaterThanOrEqual(4);
+    expect(SOURCES, 'the file this rail lives in must be among the files it scans').toContain(
+      'tests/unit/governance.test.ts');
+    // Most test files carry no enumeration at all, so "at least one" cannot be asserted per file the way it
+    // could when SOURCES was three hand-picked files. It is asserted over the population instead: a RUN regex
+    // that matched nothing anywhere would otherwise pass every row below by finding nothing to fault.
+    expect(SOURCES.flatMap(runsOf).length, 'the scan must find the enumerations that exist, or every row '
+      + 'below passes vacuously').toBeGreaterThanOrEqual(8);
   });
 
   it.each(SOURCES)('%s enumerates every routine prompt, or says why not', (file) => {
-    const runs = runsOf(file);
-    expect(runs.length, `${file} must contain at least one enumeration, or this row asserts nothing`)
-      .toBeGreaterThan(0);
-    const short = runs.filter((run) => !EXEMPT.has(run))
+    const short = runsOf(file).filter((run) => !EXEMPT.has(run))
       .filter((run) => PROMPTS.some((p) => !run.includes(`'${p}'`)));
     expect(short, 'each of these claims to cover every routine and does not — add the missing prompt file, '
       + 'or add the run to EXEMPT with the reason it is genuinely a subset').toEqual([]);

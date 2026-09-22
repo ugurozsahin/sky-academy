@@ -78,6 +78,15 @@ The mechanism, and it matters that it works this way:
    dropped from the ledger silently — that is not a failure, it is the gate working.
 4. **Post the proposal as a comment on the issue itself when you first make it**, so the owner meets it where
    he reads rather than in a ledger he does not open. Say what you will do, when, and on what evidence.
+   **The comment comes first and the ledger line only after it has actually posted — one step in that order,
+   not two calls that happen to be adjacent.** Read the response: if the comment did not post, write no ledger
+   line for that proposal, and it starts its wait again tomorrow. The two writes look independent and are not,
+   because the ledger line is what licenses an irreversible act in twenty hours' time while the comment is the
+   only thing that gives the owner those twenty hours to object. A run that wrote the line and lost the comment
+   has built a gate with nobody outside it: tomorrow re-derives the proposal, finds a ledger entry old enough,
+   and closes the issue or sets the label with the owner never having been shown it. So the failure direction
+   here is the one every other read in this file takes — the check did not happen, so the act does not
+   (#513 review, round 10).
 
 A lost or unreadable ledger means nothing applies. **So does a single line you cannot parse**: drop that line
 and let its proposal start its wait again, rather than guessing what it said. Both are the correct failure
