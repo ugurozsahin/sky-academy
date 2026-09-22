@@ -53,6 +53,8 @@ export interface PlayHooks {
   state(): PlayState;
   /** PNG data URL of the finished mission's certificate, or null. */
   certificate(): Promise<string | null>;
+  /** The words on that certificate, read off the object actually filed (#410), or null. */
+  certWords(): CertText | null;
   /** Test-only (#32): set the game-speed multiplier that compresses the holds, gap, stagger and flight time. */
   setSpeed(k: number): void;
   /** Test-only (#32): the effective outcome holds (ms) and the current speed multiplier. */

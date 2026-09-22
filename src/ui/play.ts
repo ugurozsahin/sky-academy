@@ -18,7 +18,7 @@ import { BOMB, createPlaySession, type ResultPayout } from './play-session';   /
 import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
 import { resultMedal, resultHeading } from './results';
 import { dojoRowsHTML } from './memory';
-import { drawCertificate, deliverCertificate, type CertInfo } from './certificate';
+import { certWords, drawCertificate, deliverCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
 export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
@@ -60,7 +60,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'),
     overlay: $('#overlay'), qcard: $('#qcard'), speak: $('#speak'),
   };
-  let arena: Arena | null = null; let tracer: Tracer | null = null; let lastResult: SessionResult | null = null;
+  let arena: Arena | null = null; let tracer: Tracer | null = null;
+  let lastCert: CertInfo | null = null;   // the one CertInfo actually filed (#410) — hooks read this, not a fresh certInfo() call
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
   const { later, toast, holdTimers } = scope;
   const hud = createHud(els, o.year.lives, canHear);   // #36: HUD writers live in hud.ts
@@ -206,7 +207,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'),
     }, r.coins);
     const streak = touchStreak();
-    const cert = certInfo(r); lastResult = r;
+    const cert = certInfo(r); lastCert = cert;
     if (cert) fileCertificate(cert);   // #205: filed when it is *earned*, not when the button works
     return { newBest, dojo, fresh, streak, cert };
   }
@@ -252,21 +253,29 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
    * Keep the certificate this mission earned (#205). It is filed the moment the results overlay is built,
    * not from the 🎓 button: the bug this issue opened with is a device where pressing that button does
    * nothing at all, and the child who most needs the certificate kept is the one it silently failed for.
+   *
+   * The stored day comes from `c.date` (#410), not a fresh `today()` — this can run a beat after `certInfo()`
+   * built `c`, and the same certificate is drawn later still, whenever the child presses the button. Reading
+   * the clock again here would give the stored album row and the printed keepsake two different instants to
+   * take their day from, on top of the UTC-vs-local split `certificate.ts`'s `displayDay()` now closes.
    */
   function fileCertificate(c: CertInfo) {
     recordCert({
       id: `${o.year.id}:${training ? 'sensei' : o.topic?.id ?? 'mission'}`,
       name: c.name, avatar: d.avatar, year: c.year, title: c.title,
       stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
-      date: today(), training: c.training,
+      date: today(c.date), training: c.training,
     });
   }
-  /** Certificate details for a won mission / Sensei session (null for the other modes and lost runs). */
+  /** Certificate details for a won mission / Sensei session (null for the other modes and lost runs). `date`
+   *  is fixed here, at the moment it is earned (#410), rather than left for `certificateText()` to default —
+   *  the same object is filed by `fileCertificate()` now and drawn by the 🎓 button later, and both must read
+   *  the same instant rather than two calls to `new Date()` a click apart. */
   const certInfo = (r: SessionResult): CertInfo | null =>
     r.won && o.mode === 'mission'
       ? {
           name: d.name, avatar: av, year: o.year.title, title: o.topic?.title ?? 'Sensei training',
-          stars: r.stars, score: r.score, correct: r.correct, attempts: r.attempts, training,
+          stars: r.stars, score: r.score, correct: r.correct, attempts: r.attempts, training, date: new Date(),
         }
       : null;
   function showPause() {
@@ -307,11 +316,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null,
       shots: arena?.shotsThrown ?? 0,
     }),
-    // PNG data URL of the certificate for the finished mission
-    certificate: async () => {
-      const c = lastResult && certInfo(lastResult);
-      return c ? (await drawCertificate(c)).toDataURL('image/png') : null;
-    },
+    // PNG data URL of the certificate for the finished mission — the one `CertInfo` actually filed (#410),
+    // not a fresh `certInfo()` call: that used to hand back a certificate with its own `new Date()`, live at
+    // whatever moment the hook was asked, disagreeing with the day already written to the album.
+    certificate: async () => lastCert ? (await drawCertificate(lastCert)).toDataURL('image/png') : null,
+    // The words `drawCertificate()` paints, read off the same filed object (#410) — mirrors `ui/duel.ts`'s
+    // own `certWords` hook, so an e2e test can check the printed day against the stored one without decoding
+    // a PNG.
+    certWords: () => lastCert ? certWords(lastCert) : null,
     // #32: test-only time compression — set the multiplier (affects the next wave's flight/stagger and the holds).
     setSpeed: (k: number) => { setGameSpeed(k); },
     // #32: effective outcome holds (ms) and the current multiplier — the normal-speed rail asserts the base holds.
