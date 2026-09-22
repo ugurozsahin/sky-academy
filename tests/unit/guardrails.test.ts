@@ -2381,3 +2381,45 @@ it('every CSS custom property style.css reads with var() is declared somewhere �
   expect(undeclared, 'a var() naming a property nothing declares resolves to its fallback (or nothing, with '
     + 'none) silently — no console warning, nothing failing (#399)').toEqual([]);
 });
+
+/*
+ * #399's own next slice: `.hud` (shared by the bubble arena and the tracing pad, `.trace-wrap` sitting
+ * inside it) and `.play.duel-screen` (landscape) both reach the true screen edge once the viewport is
+ * narrower than `--arena-w` — a notched phone on its side is exactly that case — and both used a fixed
+ * left/right number with no `--sal`/`--sar` at all, the same silent-zero shape #530 already fixed for
+ * `.screen`. Neither Playwright project emulates safe-area insets, so nothing here is reachable from the
+ * e2e suite (`.claude/rules/e2e.md`'s own reason the sibling rail above is text-only); this is the
+ * pull-request-time half, same as the #18 rail above it.
+ */
+describe('.hud and the duel screen use --sal/--sar too, not just a fixed number (#399)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  it('.hud pads left/right by --sal/--sar, not a bare 12px — the tracing pad inherits it, nested inside', () => {
+    const block = bare.match(/(?:^|[}\s])\.hud\s*\{([^}]*)\}/)?.[1];
+    expect(block, 'the base .hud rule must exist').toBeTruthy();
+    // Positional, not just "appears somewhere in the shorthand": the 4-value list is top/right/bottom/left,
+    // so a transposed pair (--sar on the left, --sal on the right) insets away from the wrong edge on a real
+    // notched phone — nothing else here could catch that, since env() is always 0 under Playwright (review
+    // finding, both the silent-failure-hunter and pr-test-analyzer agents flagged the presence-only version).
+    expect(block, 'the shorthand must read top(--sat) right(--sar) bottom(0) left(--sal), in that order')
+      .toMatch(/padding:\s*calc\([^)]*var\(--sat\)[^)]*\)\s+calc\([^)]*var\(--sar\)[^)]*\)\s+0\s+calc\([^)]*var\(--sal\)[^)]*\)/);
+  });
+
+  it('the landscape duel screen insets the arena PAIR by --sal/--sar, never a .duel-half on its own', () => {
+    const block = bare.match(/\.play\.duel-screen\s*\{([^}]*)\}/)?.[1];
+    expect(block, 'the .play.duel-screen landscape rule must exist').toBeTruthy();
+    expect(block, 'padding-left must read --sal').toMatch(/padding-left:\s*var\(--sal\)/);
+    expect(block, 'padding-right must read --sar').toMatch(/padding-right:\s*var\(--sar\)/);
+    // A per-half inset would put unequal padding on two boxes the centred-divider assertion in
+    // tests/e2e/duel.spec.ts compares directly — the issue's own reason to inset the pair instead. Every
+    // `.duel-half { ... }` block, not just the first: a non-global match here would miss the landscape
+    // override two rules below the one this test itself patches (pr-test-analyzer review finding) — exactly
+    // where a wrong per-half inset would actually land.
+    const halfBlocks = [...bare.matchAll(/(?:^|[}\s])\.duel-half\s*\{([^}]*)\}/g)].map((m) => m[1]);
+    expect(halfBlocks.length, '.duel-half must still be declared somewhere, or this checks nothing').toBeGreaterThan(0);
+    for (const halfBlock of halfBlocks)
+      expect(halfBlock, '.duel-half itself must never carry --sal/--sar — that is the per-half shape #399 rejected')
+        .not.toMatch(/--sa[lr]/);
+  });
+});

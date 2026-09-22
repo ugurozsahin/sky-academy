@@ -574,6 +574,12 @@ img { -webkit-user-drag: none; }
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas: 'q q' 'a b';
     max-width: calc(var(--arena-w) * 2); margin-inline: auto;
+    /* #399: insets the PAIR, not each half — padding on this one box shrinks both `1fr` columns by the same
+       share of whatever is left after --sal/--sar come off, so the divider stays exactly where the two equal
+       columns meet (`tests/e2e/duel.spec.ts`'s "the card is centred over the divider" is a check against that
+       meeting point, never against the viewport's own centre, so unequal --sal/--sar cannot fail it) — the
+       fix the issue itself asked for over padding each `.duel-half` on its own, which would not. */
+    padding-left: var(--sal); padding-right: var(--sar);
   }
   .duel-half { max-width: none; }
   /* Height is the scarce axis now and width is not, so the bar spends width to buy height back: it takes the
@@ -843,7 +849,11 @@ img { -webkit-user-drag: none; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: calc(10px + var(--sat)) 12px 0;
+  /* #399: the arena/tracing HUD only reaches the screen edges once the viewport is narrower than --arena-w
+     (600px) — most phones in landscape clear that, so this is silent everywhere the e2e suite runs, same as
+     .screen's own left/right fix. A narrower notched phone on its side is the case it exists for. `.trace-wrap`
+     sits inside .hud, so the tracing pad picks this up too, without its own copy. */
+  padding: calc(10px + var(--sat)) calc(12px + var(--sar)) 0 calc(12px + var(--sal));
 }
 /* Only once the window is wider than the play area: frame the arena against the sky so the bounded width
    reads as intentional (a hairline edge, a soft inner vignette and a drop shadow). Owner tunes --arena-w. */
