@@ -80,8 +80,17 @@ const isoDay = (d: Date) => d.toISOString().slice(0, 10);
  * `certToStored()` is about to file this same certificate under — the split this issue describes. Routing
  * through the stored day first means the printed keepsake and the album row always name the same day, whatever
  * the child's timezone and whatever the clock read at the exact moment each was computed.
+ *
+ * Guards an Invalid `Date` before it reaches `isoDay`'s `toISOString()`, which throws rather than degrading
+ * (#410 review): `date` is required on every fresh `CertInfo`, but `certFromStored()` parses it back out of
+ * `StoredCert.date`, a plain string `isCert()` only checks is a `string`, never that it parses. A hand-edited
+ * or corrupted save reaches `showStoredCertificate()` → `drawCertificate()` → `certificateText()` →
+ * `displayDay()` with no `catch` above it, so a throw here is an unhandled rejection, not a caught error — the
+ * "My certificates" view button silently re-enables and nothing opens. Returning `''` instead matches the
+ * degradation `certAlbumHTML` already applies to the same input (`Number.isNaN(d.getTime()) ? '' : ...`).
  */
 const displayDay = (d: Date): string =>
+  Number.isNaN(d.getTime()) ? '' :
   new Date(`${isoDay(d)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
 /** The words on a certificate that has just been earned — what `drawCertificate()` will paint (#397 round 2,

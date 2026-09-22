@@ -56,6 +56,17 @@ describe('mission certificate text', () => {
     expect(certificateText({ ...base, stars: 1, attempts: 0, correct: 0 }).stars).toBe('★☆☆');
     expect(certificateText({ ...base, stars: 1, attempts: 0, correct: 0 }).detail).toContain('(0%)');
   });
+  // #410 review: `isCert()` only checks `date` is a string, never that it parses, so a hand-edited or
+  // corrupted save reaches here via `certFromStored()` with an Invalid `Date` — the reachable path
+  // `showStoredCertificate()` → `drawCertificate()` → `certificateText()` walks with no `catch` above it.
+  // `toISOString()` throws on an Invalid Date; proved against the bug by reverting `displayDay`'s guard and
+  // watching this fail with `RangeError: Invalid time value` instead of the assertion below.
+  it('tolerates an unparsable stored date via certFromStored, instead of throwing', () => {
+    const stored: StoredCert = { id: 'x', name: 'Ada', avatar: AVATARS[0].id, year: 'Year 1', title: 'Number Bonds', stars: 3, score: 30, correct: 3, attempts: 3, date: 'not-a-date' };
+    const c = certFromStored(stored);
+    expect(() => certificateText(c)).not.toThrow();
+    expect(certificateText(c).date).toBe('');
+  });
 });
 
 /**
