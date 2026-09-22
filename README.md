@@ -63,10 +63,11 @@ the setup and the signing story.
 
 **The code is MIT.** See [`LICENSE`](LICENSE) — take it, build something with it.
 
-**The artwork and the game's written content are not.** All rights in the twelve character illustrations
-under `public/avatars/`, the name "Sky Ninja Academy", its visual identity and the game's written text are
-reserved. The split is deliberate and it is the usual one for a game: the engine is worth sharing, the
-characters are not mine to give away twice. `LICENSE` states exactly what falls each side of the line.
+**The artwork and the game's written content are not.** The twelve character illustrations under
+`public/avatars/` and the icons under `public/icons/` are **not licensed**: all rights in them are reserved,
+along with the name "Sky Ninja Academy", the game's visual identity and its written text. The split is
+deliberate and it is the usual one for a game: the engine is worth sharing, the characters are not mine to
+give away twice. `LICENSE` states exactly what falls each side of the line.
 
 Planning a commercial adaptation? Please get in touch first — that is an ask, not a licence condition.
 

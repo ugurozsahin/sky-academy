@@ -31,7 +31,9 @@ them are reserved by the copyright holder, and no permission to use, copy,
 modify or redistribute them is granted by this file:
 
   - public/avatars/          the twelve ninja character illustrations
-  - the name "Sky Ninja Academy", and the game's visual identity
+  - public/icons/            the app and home-screen icons
+  - the name "Sky Ninja Academy", and the game's visual identity, including
+    the favicon drawn inline in index.html
   - the praise lines, character names and other written game text
 
 You may take the code and build something of your own with it. You may not

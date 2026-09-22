@@ -3907,6 +3907,36 @@ describe('the licence grants the code and reserves the art, in both files (#520)
   const root = new URL('../../', import.meta.url);
   const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
 
+  /**
+   * PR #521 round 1, B1 — and the fourth instance of one class in a day, so it is fixed as a class.
+   *
+   * **A rail that lists the words a policy must contain cannot tell a statement from its negation.** The
+   * reviewer rewrote this README's Licence section to "Everything here is MIT — the game engine, the question
+   * generators, and the twelve character illustrations under `public/avatars/` alike… ship the characters if
+   * you like them", the exact reverse of #520's decision, and all five tests stayed green: `MIT`,
+   * `public/avatars/` and `LICENSE` were each still present, independently of what was said about them.
+   * The same shape defeated the #516 rail (an exception appended beside the pinned phrases) and the #512 one
+   * (the governed sentence replaced while its keywords survived elsewhere in the block).
+   *
+   * Two mechanisms replace token presence, and a policy rail here needs both:
+   *
+   *  - **`binds`** — the claim must sit within a sentence or two of the subject it governs, so naming the
+   *    subject somewhere and making a contrary claim somewhere else no longer satisfies it. The window is
+   *    characters rather than sentences because these are hard-wrapped documents with lists in them.
+   *  - **`NO_ESCAPE`** — no exception vocabulary in the same passage. A policy whose content is "no exception"
+   *    is defeated by adding one, which deletes nothing and so passes every presence check ever written.
+   *
+   * Neither is a wording pin: any rewrite that still reserves the art near the path, without an escape,
+   * passes. That is what the control mutations in this PR's table demonstrate.
+   */
+  const SPAN = 250;
+  const binds = (text: string, subject: string, claim: RegExp) => {
+    const i = text.indexOf(subject);
+    if (i < 0) return false;
+    return claim.test(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN));
+  };
+  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bexcluding\b/i;
+
   it('LICENSE grants MIT and names the holder', () => {
     const l = doc('LICENSE');
     expect(l.length, 'LICENSE must be read from disk, or every check here is vacuous').toBeGreaterThan(1_000);
@@ -3920,14 +3950,28 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     const l = doc('LICENSE');
     const i = l.indexOf('Permission is hereby granted');
     const carve = l.slice(i);
+    // A deliberate phrase pin, and the only one in this block. `not licensed` is the operative wording of a
+    // licence file rather than a stylistic choice: "withheld", "not covered" and "outside the grant" all
+    // read as description to a lawyer, and this is the one document in the repo where the words are the act.
+    // Everything else here is checked by property, and a control mutation proves the rest of the sentence
+    // stays free to be rewritten.
     expect(carve, 'the carve-out must sit AFTER the grant, or a reader stops at "MIT" and takes the art')
       .toMatch(/NOT licensed|not licensed/);
-    expect(carve, 'and name the directory it protects — a carve-out that names nothing protects nothing')
+    expect(carve, 'and name the directories it protects — a carve-out that names nothing protects nothing')
       .toContain('public/avatars/');
-    // `[\s\S]`, not `.`: the phrase wraps across a line in a hard-wrapped licence file, and `.` does not
-    // match a newline — the first version of this rail was red on a correct LICENSE for that reason alone.
-    expect(carve, 'reserving the rights rather than merely describing them')
-      .toMatch(/rights[\s\S]{0,40}reserved/i);
+    expect(carve, 'the app icons are owner art too, referenced from the manifest, and fall through to the '
+      + 'grant unless named (PR #521 review)').toContain('public/icons/');
+    // A `/rights[\s\S]{0,40}reserved/` check stood here and was dropped: a control mutation that reworded
+    // the clause to "every right in them stays reserved" — identical policy — turned it red, which is a rail
+    // pinning prose. `binds` below asserts the same property and only that property.
+    //
+    // Bound to the path, not merely present in the same file: "all rights reserved" three paragraphs from a
+    // sentence that grants the avatars is not a carve-out.
+    for (const dir of ['public/avatars/', 'public/icons/']) {
+      expect(binds(carve, dir, /\breserved\b|not licensed/i),
+        `${dir} must be named inside the reservation, not merely somewhere in the file`).toBe(true);
+    }
+    expect(carve, 'a carve-out with an exception in it is a grant with extra words').not.toMatch(NO_ESCAPE);
   });
 
   it('README states the same split, so the two cannot drift apart', () => {
@@ -3936,8 +3980,15 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     expect(lic.length, 'README must carry a Licence section — it is where a reader actually looks')
       .toBeGreaterThan(200);
     expect(lic, 'the README must say the code is MIT').toMatch(/MIT/);
-    expect(lic, 'and that the art is not — the half a tidy-up drops').toContain('public/avatars/');
     expect(lic, 'pointing at the file that states the line exactly').toContain('LICENSE');
+    // The reviewer's mutation kept all three tokens and reversed the policy. So the art paths are checked
+    // for what is SAID about them, within a sentence or two, and the section may carry no escape clause.
+    for (const dir of ['public/avatars/', 'public/icons/']) {
+      expect(binds(lic, dir, /not licensed|\breserved\b/i),
+        `the README must state that ${dir} is withheld, beside the path — naming it inside an "everything `
+        + 'here is MIT" sentence passes a token check and says the opposite (PR #521 round 1, B1)').toBe(true);
+    }
+    expect(lic, 'and it must not reopen what it just reserved').not.toMatch(NO_ESCAPE);
   });
 
   it('package.json agrees with LICENSE, since tooling reads the field and not the file', () => {
@@ -3945,12 +3996,17 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     expect(pkg.license, 'package.json must carry the same licence the LICENSE file grants').toBe('MIT');
   });
 
-  it('both third-party licences are acknowledged, since neither was this project\'s to choose', () => {
-    const text = doc('LICENSE') + doc('README.md');
-    expect(text, 'Fredoka is under the SIL OFL and its notice must travel with the font')
-      .toMatch(/SIL Open Font License/);
-    expect(text, 'and the OFL text itself has to be pointed at, not only named')
-      .toContain('public/fonts/OFL.txt');
-    expect(text, 'the vendored skill is Apache-2.0').toMatch(/Apache License,? 2\.0/);
-  });
+  // Per file, not over their union (PR #521 round 1, non-blocking). Concatenating them meant dropping the
+  // Apache-2.0 notice from `LICENSE` alone stayed green because the README still carried it — and `LICENSE`
+  // is the file a redistributor ships. Each has to stand on its own.
+  it.each(['LICENSE', 'README.md'])(
+    '%s acknowledges both third-party licences, since neither was this project\'s to choose', (name) => {
+      const text = doc(name);
+      expect(text.length, `${name} must be read from disk, or this rail checks nothing`).toBeGreaterThan(500);
+      expect(text, 'Fredoka is under the SIL OFL and its notice must travel with the font')
+        .toMatch(/SIL Open Font License/);
+      expect(text, 'and the OFL text itself has to be pointed at, not only named')
+        .toContain('public/fonts/OFL.txt');
+      expect(text, 'the vendored skill is Apache-2.0').toMatch(/Apache License,? 2\.0/);
+    });
 });
