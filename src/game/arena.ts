@@ -120,6 +120,9 @@ export class Arena {
     // The question card moves too, and its measured bottom is what bounds the next wave's apex
     // (`play-session.ts` re-measures on the next question; this keeps the one in between in the box).
     this.topInset = Math.min(this.topInset * sy, to.H * 0.5);
+    this.strokeStale = true;   // #331's rule, at the other boundary that invalidates coordinates: `lastPt` is
+                                // in the OLD box and nothing above rescales it, so the next move must re-seat
+                                // the anchor rather than draw from a point that no longer means anything (#463)
   }
 
   /** Bubble radius scales with viewport; words get wider bubbles. */

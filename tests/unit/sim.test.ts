@@ -1086,3 +1086,75 @@ describe('a stroke held through a freeze does not draw a line through time (#331
     expect(sim.take('hits'), 'a swipe drawn after the freeze still counts').toEqual([{ label: b.label, viaSwipe: true }]);
   });
 });
+
+// #463: #331's mechanism, at the other boundary that invalidates coordinates. `reanchor` moves every
+// coordinate-bearing thing the arena holds into the resized box — bubbles, particles, shots, the trail — except
+// `lastPt`, the point slice segments are actually drawn from. Rotating the phone (or the address bar collapsing
+// on first scroll) with a finger down leaves `lastPt` in the OLD box, so the next twitch draws a segment from a
+// point that no longer means anything to one that does — a line across the whole of the new, resized wave.
+describe('a stroke held through a resize does not slice from a point the old box left behind (#463)', () => {
+  function pinnedRow(s: Sim) {
+    s.spawn({ labels: ['1', '2', '3', '4'], speed: 1 });
+    advanceUntil(s, () => s.live().length === 4, 'the wave never fully launched');
+    for (const b of s.arena.bubbles) { b.vx = 0; b.vy = 0; b.g = 0; b.y = s.arena.H * 0.5; }
+    s.frame();
+    return s.live();
+  }
+  /** Halves the arena's box and fires the resize `Arena` itself listens for — the same call `window`'s own
+   *  `resize` event drives, so this exercises `reanchor` exactly as a real rotation or address-bar collapse
+   *  would, not a shortcut around it. */
+  function halveBox(s: Sim) {
+    const canvas = s.arena.canvas as unknown as { getBoundingClientRect: () => { left: number; top: number; width: number; height: number; right: number; bottom: number; x: number; y: number } };
+    const w = s.arena.W / 2, h = s.arena.H;
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: w, height: h, right: w, bottom: h, x: 0, y: 0 });
+    s.arena.resize();
+  }
+
+  it('a finger down before a resize slices nothing of the row from a two-pixel twitch after it', () => {
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: sim.arena.W - 2, y: lane, pointerId: 1 });   // down in the empty right margin
+    expect(sim.take('hits'), 'the finger went down on nothing').toEqual([]);
+
+    halveBox(sim);                                                              // e.g. a rotation, finger still down
+
+    sim.pointer('pointermove', { x: 2, y: lane, pointerId: 1 });                 // one twitch, into the new box's own left margin
+    expect(sim.take('hits'), 'the twitch sliced the row from a point the old box left behind').toEqual([]);
+    expect(sim.live().length, 'the row is still up, unsliced').toBe(row.length);
+  });
+
+  it('a finger perfectly still through a resize, sending no move at all, is caught too', () => {
+    // The case a `pointermove` handler alone cannot see: nothing moves during the resize itself, so only the
+    // resize's own reanchor can observe it — the same asymmetry #331 found in the freeze/frame relationship.
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: sim.arena.W - 2, y: lane, pointerId: 1 });
+    sim.take('hits');
+
+    halveBox(sim);
+
+    sim.pointer('pointermove', { x: 2, y: lane, pointerId: 1 });
+    expect(sim.take('hits'), 'the still finger\'s first twitch after the resize sliced the row').toEqual([]);
+  });
+
+  it('the stroke itself survives a resize: the next real swipe still slices', () => {
+    // The fix must not end the stroke — a child who rotates the phone mid-hold and then swipes properly is
+    // still playing. Only the segment spanning the resize is dropped.
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: sim.arena.W - 2, y: lane, pointerId: 1 });
+    sim.take('hits');
+
+    halveBox(sim);
+    const resized = sim.live();
+    const b = resized.reduce((r, x) => (x.x < r.x ? x : r), resized[0]);         // the leftmost bubble, post-reanchor
+
+    sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 1 });     // the dropped segment: into the clear lane above
+    expect(sim.take('hits'), 'the lane above the row is empty').toEqual([]);
+    sim.pointer('pointermove', { x: b.x, y: b.y + b.r + 20, pointerId: 1 });     // then straight down through b alone
+    expect(sim.take('hits'), 'a swipe drawn after the resize still counts').toEqual([{ label: b.label, viaSwipe: true }]);
+  });
+});
