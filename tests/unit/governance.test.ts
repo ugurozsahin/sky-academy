@@ -3916,8 +3916,27 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
 describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', () => {
   const root = new URL('../../', import.meta.url);
   const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
-  const lineWith = (text: string, needle: string) =>
-    text.split('\n\n').find((p) => p.includes(needle)) ?? '';
+  /**
+   * Both of these REFUSE rather than default, which is this repository's own rule turned on its rails
+   * (round 2, non-blocking). `text.slice(text.indexOf(a), text.indexOf(b))` with a missing anchor silently
+   * widens to "from the top" or "to the end of the file", and the length floors below cannot catch it
+   * because the whole document clears them trivially — the absence read as a pass, inside the checks built
+   * to stop exactly that. `lineWith` had the same shape, returning `''` for both "no such paragraph" and
+   * "an empty one", so every call site had to remember to test for it.
+   */
+  const between = (text: string, from: string, to: string) => {
+    const a = text.indexOf(from);
+    const b = to === '' ? text.length : text.indexOf(to, a < 0 ? 0 : a + from.length);
+    if (a < 0) throw new Error(`section start not found: ${from}`);
+    if (b < 0) throw new Error(`section end not found: ${to}`);
+    if (b <= a) throw new Error(`section end precedes its start: ${from} … ${to}`);
+    return text.slice(a, b);
+  };
+  const lineWith = (text: string, needle: string) => {
+    const para = text.split('\n\n').find((p) => p.includes(needle));
+    if (para === undefined) throw new Error(`no paragraph contains: ${needle}`);
+    return para;
+  };
 
   const IRREVERSIBLE = ['`priority:*`', '`blocked`'];
   const UNTOUCHABLE = ['`owner-session`', '`later`', '`refine-hold`'];
@@ -3940,10 +3959,19 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
    * before — a shared helper now would conflict three ways.)
    */
   const SPAN = 250;
+  /**
+   * True when SOME mention of `subject` has `claim` within a sentence or two of it.
+   *
+   * It checked only the FIRST mention until round 2 (non-blocking), and that produced a false red on a
+   * correct document: `refiner: heartbeat` is named in the watchdog's check 3 pulse list before check 10
+   * states its bound, so the rail read the wrong occurrence. A decoy mention added to satisfy this is not
+   * what stops it — `NO_ESCAPE` and slicing to the governing section are.
+   */
   const binds = (text: string, subject: string, claim: RegExp) => {
-    const i = text.indexOf(subject);
-    if (i < 0) return false;
-    return claim.test(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN));
+    for (let i = text.indexOf(subject); i >= 0; i = text.indexOf(subject, i + 1)) {
+      if (claim.test(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN))) return true;
+    }
+    return false;
   };
   const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bstands in for\b/i;
 
@@ -3954,6 +3982,9 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     expect(text, 'the refiner must be told it writes no code and opens no pull request')
       .toMatch(/never writes code/i);
     expect(text, 'and that pull requests are outside its surface entirely').toMatch(/every pull request/i);
+    const surface = between(text, '## What this task may and may not do', '**Out of reach entirely');
+    expect(surface, 'no clause may carve an exception into "never develops" — an addition is how this '
+      + 'rule dies, never a deletion (round 2 sweep)').not.toMatch(NO_ESCAPE);
   });
 
   it('every irreversible act sits on the deferred side of the gate, and none on the immediate side', () => {
@@ -3982,7 +4013,7 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
   // opposite. Point 1 is the whole gate — everything else is bookkeeping around it.
   it('a proposal is re-derived from the repo, never replayed from the ledger', () => {
     const text = doc('docs/REFINER-PROMPT.md');
-    const mech = text.slice(text.indexOf('The mechanism'), text.indexOf('A lost or unreadable ledger'));
+    const mech = between(text, 'The mechanism', 'A lost or unreadable ledger');
     expect(mech.length, 'the numbered mechanism must be found, or this rail reads an empty string')
       .toBeGreaterThan(400);
     const points = mech.split(/\n(?=\d+\. )/).filter((p) => /^\d+\. /.test(p));
@@ -4018,7 +4049,7 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
    */
   it('an existing priority is never changed, only argued for (#513 review B1)', () => {
     const text = doc('docs/REFINER-PROMPT.md');
-    const gate = text.slice(text.indexOf('## The two-phase gate'), text.indexOf('## The work'));
+    const gate = between(text, '## The two-phase gate', '## The work');
     expect(gate.length, 'the gate and the signals must be found, or this rail reads an empty string')
       .toBeGreaterThan(800);
     // Every check below is a CONJUNCTION, deliberately, and three of them were alternations until this PR's
@@ -4043,6 +4074,8 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     expect(gate, 'the timeline is where a changed value is read from').toMatch(/issues\/<n>\/events/);
     expect(binds(gate, 'issues/<n>/events', /labeled|timeline/i),
       'and it must say what that endpoint is read for').toBe(true);
+    expect(gate, 'and no clause may reopen what the refusal just closed (round 2 sweep)')
+      .not.toMatch(NO_ESCAPE);
     expect(gate, 'the ledger must be named as the WRONG place for this memory — that it "holds only '
       + 'outstanding proposals" is a fact that survives a sentence telling the run to keep it there anyway')
       .toMatch(/Not from the ledger/);
@@ -4050,11 +4083,17 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
 
   it('what the refiner may never touch stays out of its reach', () => {
     const text = doc('docs/REFINER-PROMPT.md');
-    const reach = text.slice(0, text.indexOf('## The two-phase gate'));
+    const reach = between(text, '## What this task may and may not do', '## The two-phase gate');
     expect(reach.length, 'the out-of-reach section must come before the gate, or this rail reads the wrong half')
       .toBeGreaterThan(200);
     for (const label of [...UNTOUCHABLE, ...PULSES]) {
       expect(reach, `${label} must be named as out of the refiner's reach`).toContain(label);
+    }
+    expect(reach, '"out of reach entirely" means entirely — a qualifier here reopens every label at '
+      + 'once (round 2 sweep)').not.toMatch(NO_ESCAPE);
+    for (const label of UNTOUCHABLE) {
+      expect(binds(reach, label, /out of reach|never touch|leave this one alone|cannot take/i),
+        `${label} must be named INSIDE the refusal, not merely listed nearby`).toBe(true);
     }
   });
 
@@ -4069,28 +4108,128 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
       .toMatch(/loosening/i);
     expect(tools, 'pointing at the decision record that holds the alternatives dropped')
       .toContain('docs/decisions/008-the-backlog-is-refined-by-a-routine.md');
+    expect(tools, 'and the grant may carry no exception of its own (round 2 sweep)')
+      .not.toMatch(NO_ESCAPE);
+    expect(binds(tools, 'never `later`', /priority|blocked|refiner/i),
+      'the `later` exclusion must sit inside the grant it narrows, not elsewhere in the bullet')
+      .toBe(true);
   });
 
   it('the epic\'s progress is GitHub\'s to count, not the refiner\'s to write', () => {
     const text = doc('docs/REFINER-PROMPT.md');
     expect(text, 'the parent must carry task-list lines GitHub can count').toMatch(/- \[ \] #/);
-    expect(text, 'and the refiner must be forbidden from writing a progress number of its own')
+    const split = between(text, '4. **Split `L` and `XL`.**',
+      '5. **An acceptance criterion');
+    expect(split, 'and the refiner must be forbidden from writing a progress number of its own')
       .toMatch(/do not write a progress number/i);
+    expect(split, 'with no exception beside it — "unless the bar looks stale" is how a hand-kept count '
+      + 'comes back (round 2 sweep)').not.toMatch(NO_ESCAPE);
   });
 
+  /**
+   * Round 2, B1. `toContain('`epic`')` + `/children/i` stayed green when STEP 3 rule 1 was rewritten to
+   * "note that `epic` no longer means dropping it — its children stay queued alongside it", the literal
+   * opposite of the policy: both tokens survive a reversal that adds words rather than removing them.
+   *
+   * **`binds` cannot save this one, and that is the point worth recording.** The drop list opens with the
+   * word "drop", so any clause inside rule 1 is within a sentence or two of it, negated or not — and a
+   * negation vocabulary (`no longer`, `stays queued`, `rather than drop`…) is whack-a-mole, because prose
+   * negation is not mechanically detectable in general.
+   *
+   * So: **where a policy is a single clause, pin the clause.** That is what this repository already does
+   * deliberately for its load-bearing sentences (#194, #204, #218, the #161 pointer), and it is the right
+   * tool at this size — fifteen words whose whole content is one membership statement. `binds` and
+   * `NO_ESCAPE` are for passages; neither replaces a verbatim pin on a clause, and pretending otherwise is
+   * what produced this finding.
+   *
+   * The cost is honest and small: reword the clause and this rail asks you to update it, which for a rule
+   * this short is a prompt to re-read the policy rather than an obstacle.
+   */
   it('an `epic` parent drops out of the developer routine\'s query', () => {
     const text = doc('docs/ROUTINE-PROMPT.md');
-    const step3 = text.slice(text.indexOf('STEP 3 —'), text.indexOf('STEP 4 —'));
+    const step3 = between(text, 'STEP 3 —', 'STEP 4 —');
+    expect(text.indexOf('STEP 3 —'), 'STEP 3 must exist, or the slice below silently starts at the top')
+      .toBeGreaterThan(-1);
+    expect(text.indexOf('STEP 4 —'), 'STEP 4 must exist, or the slice silently runs to the end of the file')
+      .toBeGreaterThan(-1);
     expect(step3.length, 'STEP 3 must be found, or this rail checks nothing').toBeGreaterThan(500);
-    expect(step3, 'STEP 3 must drop `epic`, or a run develops the parent the refiner split because no run '
-      + 'could finish it').toContain('`epic`');
-    expect(step3, 'and say the children are the work instead').toMatch(/children/i);
+    expect(step3, 'STEP 3 rule 1 must drop `epic` in its own words, or a run develops the parent the refiner '
+      + 'split precisely because no run could finish it — this clause is pinned verbatim on purpose, see above')
+      .toContain('anything labelled `epic` — the refiner split it, so its children are the work');
+    // A verbatim pin holds the clause, and nothing else: append "; but note it stays queued" and the
+    // pin is still satisfied. The drop list needs the escape guard too (found by the coverage rail
+    // below, not by reading — which is the whole argument for having it).
+    const epicClause = between(step3, 'anything labelled `epic`', '2. **drop**');
+    expect(epicClause, 'no clause may reverse the membership this one just stated — rule 1 as a whole '
+      + 'carries a legitimate "unless" for `owner-input`, so the guard scopes to this clause')
+      .not.toMatch(NO_ESCAPE);
   });
 
+  /**
+   * Round 2, B2. `toContain('refiner: backlog')` said nothing about the stall check surviving: the whole
+   * "more than three days … has quietly become a refusal" clause was replaced by its opposite and the rail
+   * stayed green. A two-phase gate that nobody watches can become a permanent refusal, which is the failure
+   * mode this loosening's safety argument quietly depends on not happening.
+   *
+   * Here `binds` does work, because the check is a passage rather than a clause: the bound has to sit beside
+   * the thing it bounds, and the passage may carry no escape.
+   */
   it('the watchdog holds the refiner\'s pulse, since nothing else does', () => {
     const text = doc('docs/WATCHDOG-PROMPT.md');
     expect(text, 'the watchdog must read `refiner: heartbeat`').toContain('refiner: heartbeat');
-    expect(text, 'a daily routine needs a daily staleness bound, not the hourly one').toMatch(/30 hours/);
-    expect(text, 'and it must notice a gate that has stalled into a refusal').toContain('refiner: backlog');
+    // Scoped to check 10, so a mention of the pulse anywhere else in the file cannot stand in for the check.
+    const check10 = between(text, '10. **Is the refiner alive?**', '## Reporting');
+    expect(check10.length, 'check 10 must be found, or every assertion below reads an empty string')
+      .toBeGreaterThan(400);
+    // No `binds` for the 30-hour bound: slicing to check 10 already puts it beside the pulse it bounds, and
+    // a proximity check on top was redundant — and red, because the bound sits 340 characters after the
+    // pulse's first mention in a correct file. Scoping is the stronger of the two tools where a section
+    // exists to scope to; `binds` is for a claim inside one.
+    expect(check10, 'a daily routine needs a daily staleness bound, not the hourly one').toMatch(/30 hours/);
+    expect(check10, 'the ledger is read in the same pass').toContain('refiner: backlog');
+    expect(check10, 'and a gate that never closes must be a finding — three days is the stated bound')
+      .toMatch(/three days/i);
+    expect(binds(check10, 'three days', /(is|are) a finding|has stalled|become a refusal/i),
+      'the three-day bound must be attached to what it makes a finding — the whole stall clause was replaced '
+      + 'by its opposite and only `refiner: backlog` was checked (round 2, B2)').toBe(true);
+    expect(binds(check10, 'refiner: backlog', /finding|refusal|stalled/i),
+      'the ledger must be read FOR the stall, not merely mentioned').toBe(true);
+    expect(check10, 'and no clause may excuse the stall it just made a finding').not.toMatch(NO_ESCAPE);
+  });
+
+  /**
+   * COVERAGE, not another rule — the answer to why this block was blocked three times.
+   *
+   * Each round found the same class (a positive-only rail cannot tell a statement from its negation) and
+   * each fix treated the assertions the author's own mutation table happened to touch. That table is
+   * written after the fix, by the mind that wrote the fix, so it inherits the blind spot: the rails left
+   * unswept were exactly the ones not imagined. "Fix the class, not the instance" is a reminder, and a
+   * reminder cannot enumerate a population.
+   *
+   * So enumerate it here, mechanically. **Every `it` in this block must carry at least one negative
+   * assertion**, because the defect is precisely a block of positives. This test reads this file's own
+   * source to do it, which is the only reason it can count what a comment can only promise.
+   *
+   * It found two on the run that introduced it: the priority rule and the `epic` drop list, both added in
+   * the round-2 fix that claimed to sweep everything.
+   *
+   * What it cannot do: judge whether a negative is the RIGHT one. It converts "did I remember?" into a
+   * counted property, and leaves "is it the correct guard?" to the reviewer, where it belongs.
+   */
+  it('every rail in this block carries a negative assertion, not only positives', () => {
+    const src = doc('tests/unit/governance.test.ts');
+    const block = between(src, "describe('the refiner shapes the backlog", '\n});\n');
+    const tests = block.split(/\n  it(?:\.each\([^)]*\))?\(/).slice(1);
+    expect(tests.length, 'the block must be parsed into its tests, or this rail counts nothing')
+      .toBeGreaterThanOrEqual(8);
+    // One exemption, named rather than silent: this rail itself. Its subject is a count of the others, not
+    // a prose policy, so it has no reversal to guard against — and a self-reference would make it vacuous.
+    const SELF = 'every rail in this block carries a negative assertion';
+    const naked = tests
+      .filter((body) => !body.startsWith(`'${SELF}`))
+      .filter((body) => !/\.not\.(toMatch|toContain|toEqual)\(/.test(body))
+      .map((body) => body.slice(0, body.indexOf(',')).replace(/['\u0060]/g, '').slice(0, 60));
+    expect(naked, 'a rail of positives only cannot tell a statement from its negation — every rail here '
+      + 'needs a guard against the reversal, not just a check that the words are present').toEqual([]);
   });
 });
