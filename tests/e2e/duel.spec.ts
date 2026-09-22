@@ -693,5 +693,28 @@ test.describe('Ninja Duel', () => {
     // the actual defect (the row laid out below the fold).
     await expect(page.locator('#again')).toBeInViewport();
     await expect(page.locator('#home')).toBeInViewport();
+    // #398 round 2 review, non-blocking: `resultsModal()`'s own worst case got a click-target sweep for the
+    // nav row painting over `#cert`; `.duel-end` is hand-maintained separately and received the identical
+    // sticky→flex-sibling fix, so it needs the same sweep rather than trusting the shared CSS selector alone.
+    const scroller = page.locator('.duel-end .scroll');
+    const scrollerBox = (await scroller.boundingBox())!;
+    const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
+    let sawCertOnScreen = false;
+    // See the matching sweep in game.spec.ts for why this tolerance is wider than one pixel.
+    const slack = 24;
+    for (let top = 0; top <= maxScroll; top += 15) {
+      await scroller.evaluate((el, t) => { el.scrollTop = t; }, top);
+      const certBox = (await page.locator('.duel-end #cert').boundingBox())!;
+      const onScreen = certBox.y >= scrollerBox.y - slack && certBox.y + certBox.height <= scrollerBox.y + scrollerBox.height + slack;
+      if (!onScreen) continue;
+      sawCertOnScreen = true;
+      const atCertTop = await page.evaluate(({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        return el ? `${el.id} ${el.className}` : '';
+      }, { x: certBox.x + certBox.width / 2, y: certBox.y + 2 });
+      expect(atCertTop, `at scrollTop ${top}, the nav row must not paint over the certificate button`).not.toContain('nav');
+      expect(atCertTop, `at scrollTop ${top}, the point must land on the certificate button itself`).toContain('cert');
+    }
+    expect(sawCertOnScreen, 'the sweep must actually see the certificate button visible at some scroll position').toBe(true);
   });
 });

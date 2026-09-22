@@ -651,20 +651,36 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.unlock')).toHaveCount(3);              // 120 coins → the three coin stickers at 30, 70, 120 (#114: the rest is achievement-based, not more coins)
     const dojoBonus = (await results.locator('.dojo-bonus .gain').allTextContents()).reduce((n, t) => n + Number(t.replace(/\D/g, '')), 0);   // today's Daily Dojo may pay for the mission / 3 stars / no slips / combo
     await expect(results.locator('#cert')).toBeVisible();                   // printable certificate for a completed mission
-    // guard rail (#398 round 1, B1/B2), on the exact scenario the review found both in: a mission this tall
+    // guard rail (#398 round 1/2, B1/B2), on the exact scenario the review found both in: a mission this tall
     // (a medal, three unlocks and a dojo bonus) overflows the overlay, which is what exposes them.
-    // B1 — the sticky `.row.nav` used to sit before `#cert` in DOM order, so its stuck box painted over the
-    // top of a visually normal-looking certificate button once it scrolled into view: a tap there landed on
-    // empty space rather than the button. Read near the button's own top edge, not its centre — a click
-    // there already worked and would not catch this.
-    await results.locator('#cert').scrollIntoViewIfNeeded();
-    const certBox = (await results.locator('#cert').boundingBox())!;
-    const atCertTop = await page.evaluate(({ x, y }) => {
-      const el = document.elementFromPoint(x, y);
-      return el ? `${el.id} ${el.className}` : '';
-    }, { x: certBox.x + certBox.width / 2, y: certBox.y + 2 });
-    expect(atCertTop, 'the sticky nav row must not paint over the certificate button').not.toContain('nav');
-    expect(atCertTop, 'and the point must land on the certificate button itself').toContain('cert');
+    // B1 — a `position: sticky` nav row held a fixed on-screen band for most of the scroll range, so
+    // reordering the DOM only changed which *other* element's static position fell into that band, never
+    // whether the overlap happened — caught only by sweeping scroll positions, not the one spot
+    // `scrollIntoViewIfNeeded()` happens to land on (round 2 review). `.row.nav` is now a flex sibling outside
+    // the scrolling `.scroll` region, so no scroll position should put anything underneath it.
+    const scroller = results.locator('.scroll');
+    const scrollerBox = (await scroller.boundingBox())!;
+    const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(maxScroll, 'this scenario must actually overflow, or the sweep below proves nothing').toBeGreaterThan(0);
+    let sawCertOnScreen = false;
+    // A tolerance wider than one pixel: `scrollHeight`/`clientHeight` are integers and the fractional
+    // `getBoundingClientRect()` values they are compared against are not, so the very last step or two of a
+    // sweep can read a few px "short" of the scroller's box with no scroll position actually cutting it off.
+    const slack = 24;
+    for (let top = 0; top <= maxScroll; top += 15) {
+      await scroller.evaluate((el, t) => { el.scrollTop = t; }, top);
+      const stepBox = (await results.locator('#cert').boundingBox())!;
+      const onScreen = stepBox.y >= scrollerBox.y - slack && stepBox.y + stepBox.height <= scrollerBox.y + scrollerBox.height + slack;
+      if (!onScreen) continue;   // cert clipped by the scroll region at this position — nothing visible to hit-test
+      sawCertOnScreen = true;
+      const atCertTop = await page.evaluate(({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        return el ? `${el.id} ${el.className}` : '';
+      }, { x: stepBox.x + stepBox.width / 2, y: stepBox.y + 2 });
+      expect(atCertTop, `at scrollTop ${top}, the nav row must not paint over the certificate button`).not.toContain('nav');
+      expect(atCertTop, `at scrollTop ${top}, the point must land on the certificate button itself`).toContain('cert');
+    }
+    expect(sawCertOnScreen, 'the sweep must actually see the certificate button visible at some scroll position').toBe(true);
     // B2 — `.modal.results` switching to a flex column stretched `.hero-big` (normally ~200px, shrink-wrapping
     // its avatar art) to the column's full width, which pushed `.speech` — positioned at 68% of ITS OWN box —
     // off the right edge of a phone screen on any headline longer than the shortest one.

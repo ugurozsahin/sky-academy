@@ -49,16 +49,18 @@ export interface ResultsModalParts {
 export function resultsModal(p: ResultsModalParts): string {
   return `
       <div class="modal results">
-        ${p.ko ?? ''}
-        <div class="hero-big${p.heroExtra ?? ''}" style="--glow:${p.glow}"><img src="${p.img}" alt="${p.name}"><div class="speech">${esc(p.headline)}</div></div>
-        <div class="medal">${p.medal}</div>
-        <h2>${p.heading}</h2>
-        ${p.stars !== undefined ? `<div class="big-stars">${stars(p.stars)}</div>` : ''}
-        <div class="statgrid">${p.stats}</div>
-        <div class="coin-row"><span class="coin-gain">+${p.coins} 🪙</span>${p.pills ?? ''}</div>
-        ${p.dojoRows}
-        ${p.stickerHTML}
-        ${p.cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this mission">🎓 Certificate</button></div>' : ''}
+        <div class="scroll">
+          ${p.ko ?? ''}
+          <div class="hero-big${p.heroExtra ?? ''}" style="--glow:${p.glow}"><img src="${p.img}" alt="${p.name}"><div class="speech">${esc(p.headline)}</div></div>
+          <div class="medal">${p.medal}</div>
+          <h2>${p.heading}</h2>
+          ${p.stars !== undefined ? `<div class="big-stars">${stars(p.stars)}</div>` : ''}
+          <div class="statgrid">${p.stats}</div>
+          <div class="coin-row"><span class="coin-gain">+${p.coins} 🪙</span>${p.pills ?? ''}</div>
+          ${p.dojoRows}
+          ${p.stickerHTML}
+          ${p.cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this mission">🎓 Certificate</button></div>' : ''}
+        </div>
         <div class="row nav"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
 }

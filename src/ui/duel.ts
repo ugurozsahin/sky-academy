@@ -188,13 +188,15 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     overlay.hidden = false;
     overlay.innerHTML = `
       <div class="modal results duel-end">
-        <div class="hero-big sensei" style="--glow:${SENSEI.glow}"><img src="${SENSEI.img}" alt="${SENSEI.name}"><div class="speech">${esc(headline)}</div></div>
-        <h2>${r.winner === 'draw' ? 'A draw!' : `${esc(NAME[r.winner])} wins!`}</h2>
-        <div class="statgrid duel-final"><div><b>${r.scoreA}</b><small>${NAME.a}</small></div><div><b>${r.rounds}</b><small>rounds</small></div><div><b>${r.scoreB}</b><small>${NAME.b}</small></div></div>
-        <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
-        ${dojoRowsHTML(dojo)}
-        ${stickersHTML(fresh)}
-        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div>' : ''}
+        <div class="scroll">
+          <div class="hero-big sensei" style="--glow:${SENSEI.glow}"><img src="${SENSEI.img}" alt="${SENSEI.name}"><div class="speech">${esc(headline)}</div></div>
+          <h2>${r.winner === 'draw' ? 'A draw!' : `${esc(NAME[r.winner])} wins!`}</h2>
+          <div class="statgrid duel-final"><div><b>${r.scoreA}</b><small>${NAME.a}</small></div><div><b>${r.rounds}</b><small>rounds</small></div><div><b>${r.scoreB}</b><small>${NAME.b}</small></div></div>
+          <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
+          ${dojoRowsHTML(dojo)}
+          ${stickersHTML(fresh)}
+          ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div>' : ''}
+        </div>
         <div class="row nav"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });

@@ -1319,15 +1319,18 @@ img { -webkit-user-drag: none; }
 /* #398: a results modal taller than the viewport (two dojo rows, a sticker unlock, a certificate button) used
    to push Play again/Rematch and Islands off the bottom with nothing on screen saying there was more below —
    `.overlay`'s own `overflow-y: auto` scrolled the WHOLE modal, hero art and all, which reads as a finished
-   screen rather than one with a hidden tail. The modal scrolls internally now, capped to the space `.overlay`
-   actually has (its grid row stretches to fill it, so `100%` here is definite), and the one row that is the
-   only way off the screen stays pinned to the bottom of whatever is visible rather than travelling with the
-   content above it. Scoped to `.results` — the pause and stage-clear modals are always short enough to fit. */
-.modal.results { max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; }
+   screen rather than one with a hidden tail. The modal is capped to the space `.overlay` actually has (its
+   grid row stretches to fill it, so `100%` here is definite). Scoped to `.results` — the pause and stage-clear
+   modals are always short enough to fit.
+   #398 round 2, B1: `.row.nav` used to be `position: sticky` on the LAST child of the scrolling element
+   itself, so its stuck box held a fixed on-screen band for most of the scroll range — reordering DOM only
+   changed which *other* element's static position fell inside that band, it never stopped the overlap.
+   `.row.nav` is now a flex sibling OUTSIDE the scrolling region (`.scroll` is the only thing that scrolls),
+   so nothing can ever be positioned underneath it: the overlap is structurally impossible, not just moved. */
+.modal.results { max-height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+.modal.results .scroll { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .modal.results .row.nav {
-  position: sticky;
-  bottom: -22px;
-  z-index: 1;
+  flex: 0 0 auto;
   margin: 14px -18px -22px;
   padding: 12px 18px calc(22px + var(--sab, 0px));
   background: linear-gradient(0deg, #10163a 60%, transparent);
