@@ -230,10 +230,21 @@ export class Session {
   nextQuestion() {
     if (this.ended) return;
     const topic = this.pickTopic(); this.currentTopic = topic;
-    let q = topic.gen(this.difficulty, this.rng);
-    // avoid immediate repeats — of the whole card, not merely of its answer (#390)
-    const prev = this.current && repeatKey(this.current);
-    for (let i = 0; i < 5 && prev && repeatKey(q) === prev; i++) q = topic.gen(this.difficulty, this.rng);
+    let q: Question;
+    try {
+      q = topic.gen(this.difficulty, this.rng);
+      // avoid immediate repeats — of the whole card, not merely of its answer (#390)
+      const prev = this.current && repeatKey(this.current);
+      for (let i = 0; i < 5 && prev && repeatKey(q) === prev; i++) q = topic.gen(this.difficulty, this.rng);
+    } catch (e) {
+      // #444: a generator that refuses to draw (a floor rail like #433's tripped by a future curriculum
+      // edit) must not leave the screen frozen mid-question — nothing else ever calls `nextQuestion()`
+      // again, so `waiting` would stay stuck while the arena's rAF loop keeps it looking alive. Ending
+      // through the normal path pays what was already earned; `won: false` because nothing was completed.
+      console.error(`Sky Ninja Academy: "${topic.id}" question generator threw`, e);
+      this.end(false);
+      return;
+    }
     this.current = q; this.seqIndex = 0; this.waiting = false; this.questionsAsked++;
     this.ev.onQuestion(q, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(q) });
   }
