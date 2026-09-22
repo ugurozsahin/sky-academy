@@ -93,6 +93,31 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     expect(ev.onRoundDraw).not.toHaveBeenCalled(); // the round was already decided; waveEnd must not also draw it
   });
 
+  it('a generator that throws mid-match ends the match instead of freezing it (#444 review, B1)', () => {
+    const ev = events();
+    let calls = 0;
+    // Throws from round 3 on — duelPool()'s own 8-fixed-seed screen would have passed this topic cleanly,
+    // since nothing here throws for seeds 1..8; only live play (this test's own rng) reaches the failure.
+    const flaky = { ...topic, gen: (d: Parameters<typeof topic.gen>[0], r: Parameters<typeof topic.gen>[1]) => { calls++; if (calls > 2) throw new Error('boom'); return topic.gen(d, r); } };
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const duel = new Duel({ topic: flaky, difficulty: 1, rng: rng(1) }, ev);
+    duel.start();
+    expect(duel.hit('a', duel.current!.answer)).toBe('won');
+    duel.waveEnd();   // round 2, still fine
+    expect(duel.hit('a', duel.current!.answer)).toBe('won');
+    duel.waveEnd();   // round 3's draw is what throws
+    expect(duel.ended).toBe(true);
+    expect(ev.onMatchEnd).toHaveBeenCalledTimes(1);
+    // #444 review (PR #502 round 2), B1: `rounds` must report what was actually played (2), never the
+    // configured target — round 3 never became a question either child saw — and `incomplete` must say so,
+    // so the UI can withhold the certificate and the permanent history row for a technical failure.
+    expect(ev.onMatchEnd.mock.calls[0][0]).toMatchObject({ winner: 'a', scoreA: 2, scoreB: 0, rounds: 2, incomplete: true });
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining(topic.id), expect.any(Error));
+    // The match is over — no further round starts, and hits are ignored the same way any ended match's are.
+    expect(duel.hit('a', 'anything')).toBe('ignored');
+    spy.mockRestore();
+  });
+
   it('a wrong slice does not decide the round; the other player can still win it', () => {
     const ev = events();
     const d = new Duel({ topic, difficulty: 1, rng: rng(3) }, ev);
@@ -140,7 +165,7 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     expect(d.ended).toBe(true);
     expect(ev.onMatchEnd).toHaveBeenCalledTimes(1);
     expect(ev.onMatchEnd.mock.calls[0][0]).toEqual({
-      winner: 'a', scoreA: 2, scoreB: 1, rounds: 3,
+      winner: 'a', scoreA: 2, scoreB: 1, rounds: 3, incomplete: false,
       tally: { a: { hits: 2, tries: 2 }, b: { hits: 1, tries: 1 } },
     });
   });
@@ -152,9 +177,37 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     d.hit('a', d.current!.answer); d.waveEnd();
     d.hit('b', d.current!.answer); d.waveEnd();
     expect(ev.onMatchEnd.mock.calls[0][0]).toEqual({
-      winner: 'draw', scoreA: 1, scoreB: 1, rounds: 2,
+      winner: 'draw', scoreA: 1, scoreB: 1, rounds: 2, incomplete: false,
       tally: { a: { hits: 1, tries: 1 }, b: { hits: 1, tries: 1 } },
     });
+  });
+
+  /**
+   * The invariant the #375 fix rests on, pinned where no clock runs (#375 round 2, `type-design-analyzer`).
+   *
+   * `duelScreen` commits a finished match from `result()` **before** `end()` has run — at the last slice, or
+   * when the last wave runs out — so a result taken then must equal the one `onMatchEnd` would deliver. Note
+   * that `onLastRound` alone is not the licence: it reports *position*, not settledness. What makes the early
+   * read safe is that the round is also settled, and these two cases are the two ways that happens.
+   */
+  it('result() on a settled last round is already the result end() delivers — won, and undecided (#375)', () => {
+    for (const settle of ['won', 'undecided'] as const) {
+      const ev = events();
+      const d = new Duel({ topic, difficulty: 1, rounds: 3, rng: rng(11) }, ev);
+      d.start();
+      d.hit('a', d.current!.answer); d.waveEnd();          // round 1: a
+      d.hit('a', d.current!.answer); d.waveEnd();          // round 2: a
+      expect(d.onLastRound, 'round 3 of 3 is the last round').toBe(true);
+      if (settle === 'won') d.hit('b', d.current!.answer);  // decided, but the wave has not ended
+      const early = d.result();
+      expect(d.ended, 'the match has NOT ended yet — this is the window the screen commits in').toBe(false);
+      // A slice after the round is decided changes nothing; on the undecided path there is nothing left to
+      // slice, which is `Arena`'s `live === 0` in the real screen and is asserted there.
+      if (settle === 'won') expect(d.hit('a', d.current!.answer)).toBe('ignored');
+      d.waveEnd();                                          // now the match really ends
+      expect(d.ended).toBe(true);
+      expect(early, `the early ${settle} read is the final result, field for field`).toEqual(ev.onMatchEnd.mock.calls[0][0]);
+    }
   });
 
   it('nothing fires once the match has ended', () => {
@@ -191,6 +244,16 @@ describe('duelPool (#16 item 4: which topics a duel is played on)', () => {
     // Generators that mix a sequence branch in only at difficulty 3 (PR #295 review) are out at 3 and in below it.
     expect(duelPool(topicsFor('year1'), 3).map(t => t.id)).not.toContain('y1-spelling');
     expect(duelPool(topicsFor('year1'), 1).map(t => t.id)).toContain('y1-spelling');
+  });
+  it('a topic whose generator throws is dropped, not left to freeze the whole year (#444)', () => {
+    const good = topicById('y1-add')!;
+    const boom = { ...good, id: 'y1-boom', gen: () => { throw new Error('boom'); } };
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => duelPool([good, boom], 1)).not.toThrow();
+    const pool = duelPool([good, boom], 1);
+    expect(pool.map(t => t.id)).toEqual(['y1-add']);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('y1-boom'), expect.any(Error));
+    spy.mockRestore();
   });
 });
 
@@ -245,10 +308,20 @@ describe('spokenQuestion (#16: the hand-over line is heard)', () => {
 });
 
 describe('Duel refuses a sequence question (#16: the pool is the filter, this is the floor)', () => {
-  it('throws on start rather than draining ten unwinnable rounds', () => {
+  it('ends the match instead of draining ten unwinnable rounds (#444 review, B1: the floor is now caught, not a raw throw out of start())', () => {
+    const ev = events();
     const seqTopic = { ...topic, id: 'fake-seq', gen: () => ({ ...topic.gen(1, rng(1)), sequence: ['a', 'b'], answer: 'ab' }) };
-    const d = new Duel({ topic: seqTopic, difficulty: 1, rng: rng(1) }, events());
-    expect(() => d.start()).toThrow(/sequence question/);
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const d = new Duel({ topic: seqTopic, difficulty: 1, rng: rng(1) }, ev);
+    // #444 review (PR #502) widened this file's own error boundary to cover this throw too, alongside a
+    // generator's own: both are "this topic misbehaved for a duel", and duelPool()'s screening is the same
+    // 8-fixed-seed sample for either, so a topic reaching this floor live is caught the same way, not left to
+    // propagate uncaught out of start().
+    expect(() => d.start()).not.toThrow();
+    expect(d.ended).toBe(true);
+    expect(ev.onMatchEnd).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('fake-seq'), expect.any(Error));
+    spy.mockRestore();
   });
 });
 
@@ -733,6 +806,12 @@ describe('duelEarnsCertificate (#397 review round 2, note 1: only Player 1 wins 
     // not second-guess it: `winner` is the scorer's own verdict and the one field the rest of the screen uses.
     expect(duelEarnsCertificate(ended('a', 0, 9))).toBe(true);
     expect(duelEarnsCertificate(ended('b', 9, 0))).toBe(false);
+  });
+  // #444 review (PR #502 round 2), B1: a Player 1 "win" a generator throw cut short is not a genuine one —
+  // whichever side happened to be ahead when the match was aborted, it earns nothing.
+  it('never, for an incomplete match, whichever side was ahead', () => {
+    expect(duelEarnsCertificate({ ...ended('a', 2, 0), incomplete: true })).toBe(false);
+    expect(duelEarnsCertificate({ ...ended('a', 2, 0), incomplete: false })).toBe(true);
   });
 });
 

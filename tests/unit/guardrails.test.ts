@@ -1116,16 +1116,51 @@ describe('guard rails', () => {
     const raised = [...body.matchAll(/\btoast\(\s*(?:'([^']*)'|"([^"]*)"|`([^`]*)`)/g)]
       .map(m => (m[1] ?? m[2] ?? m[3]).replace(/\$\{NAME\[[^\]]+\]\}/g, seat))
       .filter(s => s.length > 0);
-    expect(raised.length, 'the toast call sites must be found, or this rail passes vacuously').toBeGreaterThanOrEqual(5);
+    // 2, not 5: #436 moved the certificate outcome ('Certificate saved!' etc.) off `#toast` entirely — it now
+    // reports through `#cert-msg`, inside the results overlay `#toast` sits BEHIND — so the family this rail
+    // guards has shrunk to the round verdicts that still share the query-bar slot. `onRoundWon`/`onRoundMiss`
+    // are the two left as string literals; the draw verdict raises the constant directly (checked below) rather
+    // than repeating its text, so it is deliberately not double-counted here.
+    expect(raised.length, 'the toast call sites must be found, or this rail passes vacuously').toBeGreaterThanOrEqual(2);
     // The constant is raised by a real call site, not merely declared beside them.
     expect(body, 'DUEL_TOAST_LONGEST is what one of those calls passes').toMatch(/toast\(DUEL_TOAST_LONGEST/);
     for (const s of raised) {
       expect(s.length, `"${s}" is longer than DUEL_TOAST_LONGEST, so the e2e layout rail no longer measures the worst case`)
         .toBeLessThanOrEqual(longest.length);
     }
+    // #436: the certificate outcome must stay off `#toast` — the whole reason it moved — so a regression that
+    // routes it back through `toast(` (where the overlay hides it again) is caught here rather than by a child
+    // never seeing whether their certificate saved.
+    expect(body, 'the certificate outcome is reported through #cert-msg, not the toast the overlay covers')
+      .toMatch(/certMsg\(/);
+    expect(body, 'and never back through toast() — that is the bug #436 fixed')
+      .not.toMatch(/toast\(['"`](?:Certificate|Could not make the certificate)/);
     // And the e2e really uses it, rather than a copy that drifts the moment this constant changes.
     const spec = readFileSync(new URL('../e2e/duel.spec.ts', import.meta.url), 'utf8');
     expect(spec, 'the duel spec imports the constant').toContain("import { DUEL_TOAST_LONGEST } from '../../src/ui/duel'");
+  });
+
+  /*
+   * #436 round-1 review, B1 — `.cert-msg { color: var(--good); ... }` on its own is (0,1,0): one class. The
+   * pre-existing `.modal p { margin: 4px 0 14px; color: var(--muted); ... }` is (0,1,1) — one class AND one
+   * element selector — which beats it regardless of source order, since class-count ties and the tiebreak goes
+   * to the element-selector column. `#cert-msg` is a `<p class="cert-msg">`, so it matches both, and the bare
+   * class silently lost: every successful save/share rendered in `--muted` grey with the wrong margin, and
+   * nothing failed — it just wasn't green. `.modal .cert-msg`, two classes, (0,2,0), wins outright.
+   */
+  it('.cert-msg is qualified enough to beat .modal p, not a bare class a higher-specificity rule can silently win against (#436 review, B1)', () => {
+    const raw = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    expect(raw.length, 'style.css must be read from disk, not a blank import').toBeGreaterThan(5000);
+    // Comments stripped (`code()`): this rule's own explanatory comment names the bare selector in prose, which
+    // would otherwise trip the last assertion below on the very sentence describing why it must not appear.
+    const css = code(raw);
+    expect(css, 'the pre-existing higher-specificity rule this is qualified against must still exist').toMatch(/\.modal p \{/);
+    expect(css, '.cert-msg must be qualified under .modal, not left as a bare one-class selector').toMatch(/\.modal \.cert-msg \{/);
+    expect(css, 'the .bad modifier must be qualified the same way').toMatch(/\.modal \.cert-msg\.bad \{/);
+    // A `.cert-msg` not immediately preceded by `.modal ` would mean the qualifier was dropped again — a
+    // negative lookbehind rather than a bare "not present" check, since `.modal .cert-msg` must NOT itself
+    // count as the regression it is the fix for.
+    expect(css, 'no .cert-msg selector may reappear unqualified by .modal').not.toMatch(/(?<!\.modal )\.cert-msg\b/);
   });
 
   it('the wave layout draws only from the rng it is given (#43)', () => {
