@@ -213,6 +213,72 @@ describe('the wave launches on its own timetable', () => {
     }
   });
 
+  /**
+   * #490: `update()` is skipped entirely while `paused` (the pause overlay), so nothing launches DURING a
+   * pause — but nothing shifted `launchAt` either, so every bubble whose moment passed behind the overlay
+   * became due all at once on the first resumed frame. A wave a child left climbing one bubble at a time
+   * came back as a clump.
+   *
+   * Both scenarios below pause mid-wave for a full second — long enough that every un-launched bubble's
+   * original `launchAt` has already passed by the time the pause lifts, which is exactly what makes
+   * `now >= b.launchAt` true for all of them at once without the fix. The un-fixed arena fails both: every
+   * remaining bubble reports `launched` on the very first resumed frame.
+   */
+  it('a pause mid-wave does not collapse the rest of a 4-option wave onto the resume frame', () => {
+    sim = createSim({ seed: 7 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2 });
+    const plannedAt = new Map(sim.all().map(b => [b.label, b.launchAt]));
+
+    advanceUntil(sim, () => sim!.now() >= 200, 'never reached the pause point');
+    sim.arena.paused = true;
+    sim.advance(1000);                                      // well past every bubble's own (pre-pause) launchAt
+    sim.arena.paused = false;
+    sim.frame();                                             // the first resumed frame
+
+    const dueBeforePause = [...plannedAt].filter(([, at]) => at <= 200).map(([label]) => label).sort();
+    const launchedNow = sim.all().filter(b => b.launched).map(b => b.label).sort();
+    expect(launchedNow, 'only the bubbles already due before the pause may be airborne on the resume frame')
+      .toEqual(dueBeforePause);
+
+    // And the rest still rise on their own staggered schedule from here — not together either.
+    const seen = new Map<string, number>();
+    const remaining = 4 - dueBeforePause.length;
+    for (let f = 0; f < 600 && seen.size < remaining; f++) {
+      sim.frame();
+      for (const b of sim.all()) if (b.launched && !dueBeforePause.includes(b.label) && !seen.has(b.label)) seen.set(b.label, sim.now());
+    }
+    expect(seen.size, 'the remaining bubbles never all launched').toBe(remaining);
+    const times = [...seen.values()].sort((a, b) => a - b);
+    for (let i = 1; i < times.length; i++) {
+      expect(times[i] - times[i - 1], 'consecutive bubbles still launched a stagger interval apart, not together')
+        .toBeGreaterThan(FRAME);
+    }
+  });
+
+  it('the same holds for a 6-option wave, across two launch batches', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4', '5', '6'], speed: 2 });
+    const plannedAt = new Map(sim.all().map(b => [b.label, b.launchAt]));
+
+    advanceUntil(sim, () => sim!.now() >= 200, 'never reached the pause point');
+    sim.arena.paused = true;
+    sim.advance(1000);
+    sim.arena.paused = false;
+    sim.frame();
+
+    const dueBeforePause = [...plannedAt].filter(([, at]) => at <= 200).map(([label]) => label).sort();
+    const launchedNow = sim.all().filter(b => b.launched).map(b => b.label).sort();
+    expect(launchedNow, 'the second batch (well past the pause) must not launch early either').toEqual(dueBeforePause);
+  });
+
+  it('a wave that never pauses is unaffected — the shift is inert when paused never becomes true', () => {
+    sim = createSim({ seed: 7 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2 });
+    const before = sim.all().map(b => b.launchAt);
+    sim.frame();
+    expect(sim.all().map(b => b.launchAt), 'a frame with no pause must not move launchAt at all').toEqual(before);
+  });
+
   it('a long wave really does rise in batches, measured by when bubbles appear', () => {
     // Note what this does NOT claim. A draft asserted that fewer than nine bubbles are ever airborne at once,
     // and it failed — correctly. `batchGap` is 0.62 of the flight time here, so the second batch goes up while

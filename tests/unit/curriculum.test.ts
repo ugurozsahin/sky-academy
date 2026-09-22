@@ -2055,3 +2055,72 @@ describe("numQ's decoy top-up never drops a bubble short (#462)", () => {
     }
   });
 });
+
+/**
+ * A repeated letter must not shrink `r-build`'s tile count (#481).
+ *
+ * `spellQ` used to size its decoys off `uniq.length` — the *unique* letters in the word — while the child
+ * still had to slice the repeat too. `egg` (e, g, g) has two unique letters against three for every other
+ * `CVC` word, so it dealt two fewer tiles than its siblings at every difficulty: the identical "bubble count
+ * reveals the answer" shape #369 found in bubble *width*, one channel over in bubble *count*, found by
+ * `silent-failure-hunter` over 20,000 draws while reviewing PR #471.
+ *
+ * The fix keeps the total (word length + the caller's `decoys`) constant whatever the word repeats, so this
+ * asserts the total directly — `egg` proved drawn at least once so the rail cannot pass by never meeting it
+ * — rather than re-deriving the formula, which would only restate the implementation.
+ */
+describe("r-build's tile count does not shrink on a repeated letter (#481)", () => {
+  const TILES: Record<Difficulty, number> = { 1: 5, 2: 6, 3: 7 };   // word length (3) + that difficulty's decoys
+
+  it('always deals the same number of tiles, "egg" included', () => {
+    const topic = TOPICS.find(t => t.id === 'r-build')!;
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(481 * 7 + d);
+      let sawEgg = false;
+      for (let i = 0; i < 1000; i++) {
+        const q = topic.gen(d, r);
+        expect(q.options.length, `r-build d${d}, answer "${q.answer}"`).toBe(TILES[d]);
+        if (q.answer === 'egg') sawEgg = true;
+      }
+      expect(sawEgg, `r-build d${d}: "egg" was never drawn — this rail would pass vacuously`).toBe(true);
+    }
+  });
+});
+
+/**
+ * The same fix generalises to every other `spellQ` caller, and none of them had a rail (#481, found by
+ * `pr-test-analyzer` reviewing this fix): `y1-days` d3, `y1-spelling` d3 and `y2-spelling` d3 size their
+ * decoys the same way `r-build` does and were carrying the identical bug — `Saturday` (a repeated `a`)
+ * against `Thursday` (no repeat), both eight letters, used to deal a different tile count. Algebraically the
+ * fixed total is `min(word.length + decoys, 10)` for *any* word, repeats included (the `+ repeated` term and
+ * the `10 - uniq.length` cap move in lockstep, so the cap's own threshold reduces to `decoys > 10 - length`,
+ * independent of how much the word repeats) — so this checks it holds for real draws rather than trusting
+ * the derivation on its own.
+ *
+ * Each generator mixes a spelling branch (`spellQ`, which sets `sequence`) with a gap-fill branch (`gapQ`,
+ * which does not) — only the spelling draws are checked, and grouped by **answer length**, since a
+ * genuinely longer word is allowed more tiles; a repeated letter is not allowed to take any away.
+ */
+describe("every other spellQ caller keeps the same invariant (#481)", () => {
+  const SPELL_CASES: [string, Difficulty][] = [['y1-days', 3], ['y1-spelling', 3], ['y2-spelling', 3]];
+
+  it('a repeated letter never changes the tile count for a same-length answer', () => {
+    for (const [id, d] of SPELL_CASES) {
+      const topic = TOPICS.find(t => t.id === id)!;
+      expect(topic, id).toBeDefined();
+      const r = rng(id.length * 11 + d);
+      const byLength = new Map<number, number>();
+      let spellingDraws = 0;
+      for (let i = 0; i < 4000; i++) {
+        const q = topic.gen(d, r);
+        if (!q.sequence) continue;   // the gap-fill branch of the same generator, not spellQ
+        spellingDraws++;
+        const seen = byLength.get(q.answer.length);
+        if (seen === undefined) byLength.set(q.answer.length, q.options.length);
+        else expect(q.options.length, `${id} d${d}, answer "${q.answer}" (length ${q.answer.length})`).toBe(seen);
+      }
+      expect(spellingDraws, `${id} d${d}: the spellQ branch was never drawn — this rail would pass vacuously`)
+        .toBeGreaterThan(50);
+    }
+  });
+});

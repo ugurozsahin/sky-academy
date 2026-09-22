@@ -248,7 +248,15 @@ function spellQ(rng: Rng, word: string, hintEmoji?: string, decoys = 3, from: st
   const letters = word.split('');
   const pool = from.filter(l => !letters.includes(l));
   const uniq = [...new Set(letters)];
-  const ds = shuffle(rng, pool).slice(0, Math.max(1, Math.min(decoys, 10 - uniq.length)));
+  // A repeated letter shrinks `uniq` below `letters.length`, and that used to shrink the total tile count
+  // with it: "egg" (e, g, g — two unique letters) dealt two fewer tiles than a same-length word with none
+  // repeated, so the tile count alone gave the answer away every time it was drawn (#481 — the same shape
+  // as #369 one channel over: there it was bubble size, here it is bubble count). Topping the decoy count
+  // up by the letters lost to repetition keeps the total (word length + decoys) the same for every word at
+  // a difficulty, whatever it repeats.
+  const repeated = letters.length - uniq.length;
+  const need = Math.max(1, Math.min(decoys + repeated, 10 - uniq.length));
+  const ds = shuffle(rng, pool).slice(0, need);
   return { prompt: hintEmoji ? `${hintEmoji}  Spell it!` : `Spell: ${word}`, say: `Spell the word ${word}`, answer: word, sequence: letters, options: shuffle(rng, [...uniq, ...ds]), visual: { type: 'word', text: word.replace(/./g, '_ ').trim(), emoji: hintEmoji }, hint: 'Slice the letters in order', listen: word };
 }
 
