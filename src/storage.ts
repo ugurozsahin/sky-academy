@@ -467,6 +467,13 @@ export function renameProfile(id: ProfileId, name: string): RenameProfileResult 
  *   no longer listed while their game is still on the device. It has its own arm because `'store'`'s sentence
  *   is "nothing was removed", and here something was: a family told that would be told a falsehood about their
  *   own device.
+ * - `'stranded'` — every profile this removal would leave is a `'future'` save (#446): a build newer than this
+ *   one wrote every remaining slot, so the device would be left with nobody this build can read, and the first
+ *   thing it does with nobody readable is send the family to the first-run wizard over a store `readOnly`
+ *   latches — `onboarded()` reports `false` for a slot this build cannot open. That wizard cannot be completed:
+ *   nothing typed into it is ever kept. `'last'` already refuses deleting the *only* profile for exactly this
+ *   reason; this is the same refusal for the case `'last'` cannot see, where other slots exist but none of them
+ *   are ones this build can play.
  *
  * `self` on the accepted arm is "this session was playing the child who has just gone", and it is the storage
  * layer's answer because `cacheProfile` is the only thing that knows: the index's `active` is a different
@@ -477,7 +484,7 @@ export function renameProfile(id: ProfileId, name: string): RenameProfileResult 
  * reads `self` and `main.ts`'s `relaunch()` re-derives where to go from the index, which is the one place that
  * rule lives. A second copy of the destination is a second rule to keep in step.
  */
-export type DeleteProfileResult = { ok: true; self: boolean } | { ok: false; why: 'unknown' | 'last' | 'future' | 'store' | 'orphaned' };
+export type DeleteProfileResult = { ok: true; self: boolean } | { ok: false; why: 'unknown' | 'last' | 'future' | 'stranded' | 'store' | 'orphaned' };
 /** As `RenameRefusal`, derived rather than restated (#420 review note 3). */
 export type DeleteRefusal = Extract<DeleteProfileResult, { ok: false }>['why'];
 /**
@@ -544,6 +551,10 @@ export function deleteProfile(id: ProfileId): DeleteProfileResult {
   // Before the index write, so a refusal changes nothing at all — the same reason `addProfile` checks the
   // store before writing (#380 round 5, B2).
   if (futureSaveIn(id)) return { ok: false, why: 'future' };
+  // #446: `rest` surviving in the index is not the same as `rest` being playable. A slot this build cannot
+  // read answers `onboarded: false` (`profileCard`/`load()`'s own rule), which sends the family to the
+  // first-run wizard over a store `readOnly` latches shut — the wizard nothing typed into it ever keeps.
+  if (rest.every(futureSaveIn)) return { ok: false, why: 'stranded' };
   const self = id === sessionProfile();
   const next: ProfileIndex = { v: 1, active: idx.active === id ? rest[0] : idx.active, ids: rest };
   if (!writeIndex(next)) return { ok: false, why: 'store' };

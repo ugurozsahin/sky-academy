@@ -1779,6 +1779,32 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(load().name, "the last child's save survives the refusal").toBe('Bo');
     });
 
+    /**
+     * #446: `'last'` refuses deleting the *only* profile, but a device can have two slots and still be one
+     * delete away from nobody this build can read — a newer build wrote the sibling's slot. Removing the
+     * readable one leaves `readIndex()` an index whose one remaining id resolves to a `future` save, which
+     * sends the family into the first-run wizard over a store `readOnly` latches shut.
+     */
+    it('refuses a delete that would leave nobody this build can read (#446)', () => {
+      twoChildren('p1');
+      const future = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', coins: 99 });
+      localStorage.setItem(saveKeyFor('p2'), future);
+      expect(deleteProfile('p1'), 'p2 is the only slot left, and this build cannot read it').toEqual({ ok: false, why: 'stranded' });
+      expect(profileIds(), 'a refused delete changes nothing about who is listed').toEqual(['p1', 'p2']);
+      expect(load().name, "Ada's own save is untouched").toBe('Ada');
+      expect(localStorage.getItem(saveKeyFor('p2')), "and Bo's bytes are exactly as they were").toBe(future);
+
+      // A third, readable sibling is enough: the family is not stranded as long as one slot survives.
+      expect(setActiveProfile('p1')).toBe(true);
+      // addProfile() switches the session onto the new slot, so this session is now p3's, not p1's.
+      expect(addProfile(), 'p3 is created and deliberately never played').toEqual({ ok: true, id: 'p3' });
+      expect(deleteProfile('p1'), 'p3 is empty but readable — an unplayed slot is not a future save').toEqual({ ok: true, self: false });
+      expect(profileIds()).toEqual(['p2', 'p3']);
+
+      // And the future slot itself is still refused on its own terms first — 'future', not 'stranded'.
+      expect(deleteProfile('p2')).toEqual({ ok: false, why: 'future' });
+    });
+
     it('refuses a slot that is not a profile of this device', () => {
       twoChildren('p1');
       expect(deleteProfile('p3')).toEqual({ ok: false, why: 'unknown' });

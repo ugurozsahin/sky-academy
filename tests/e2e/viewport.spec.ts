@@ -272,4 +272,51 @@ test.describe('tablet viewports (#116)', () => {
       await expectFitsViewport(page, `grown-ups dashboard at ${w}x${h}`);
     });
   }
+
+  /**
+   * #18 slice 2, group C — the three defects the owner's 11:54Z pick said carry no look decision: two tap
+   * targets, five long lines, and one nested scroller. None of these wait on group A/B, and none is gated to
+   * a landscape viewport — `#grownups.foot-link` was already fixed in flight by PR #380 before the picks
+   * landed (`min-height: 44px`, unrelated to this issue), so only `#speak` is measured here.
+   */
+  for (const [w, h] of [[1280, 800], [1024, 768]] as const) {
+    test(`the read-aloud button meets the 44px floor at ${w}x${h} (#18 group C)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedPlayer(page);
+      await startTopic(page, 'reception', 'r-count');
+      const play = await page.locator('#speak').boundingBox();
+      expect(play?.width, '#speak on the play screen (#18 group C)').toBeGreaterThanOrEqual(44);
+      expect(play?.height, '#speak on the play screen (#18 group C)').toBeGreaterThanOrEqual(44);
+    });
+
+    test(`long informational lines wrap under a readable width at ${w}x${h} (#18 group C)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedProgress(page);
+      await page.click('#rewards');
+      await expect(page.locator('.rewards')).toBeVisible();
+      // the "rest of the album" copy is the long one (81 chars); seeded progress has no stickers yet.
+      const sticker = await page.locator('.next-sticker').boundingBox();
+      expect(sticker!.width, `.next-sticker at ${w}x${h} (#18 group C)`).toBeLessThan(700);
+      const certEmpty = await page.locator('.cert-empty').boundingBox();
+      expect(certEmpty!.width, `.cert-empty at ${w}x${h} (#18 group C)`).toBeLessThan(700);
+      const duelEmpty = await page.locator('.duel-empty').boundingBox();
+      expect(duelEmpty!.width, `.duel-empty at ${w}x${h} (#18 group C)`).toBeLessThan(700);
+
+      await page.click('#back');
+      await expect(page.locator('.map')).toBeVisible();
+      await openDashboard(page);
+      const note = await page.locator('.p-note').first().boundingBox();
+      expect(note!.width, `.p-note at ${w}x${h} (#18 group C)`).toBeLessThan(700);
+      const resetSay = await page.locator('.p-reset-say').boundingBox();
+      expect(resetSay!.width, `.p-reset-say at ${w}x${h} (#18 group C)`).toBeLessThan(700);
+    });
+
+    test(`the save code does not nest a scroller inside the dashboard's own scroll at ${w}x${h} (#18 group C)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedProgress(page);
+      await openDashboard(page);
+      const overflow = await page.locator('#save-code').evaluate(el => (el as HTMLTextAreaElement).scrollHeight - (el as HTMLTextAreaElement).clientHeight);
+      expect(overflow, `#save-code scrolls internally on top of the dashboard's own scroll at ${w}x${h} (#18 group C)`).toBeLessThanOrEqual(0);
+    });
+  }
 });

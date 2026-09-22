@@ -4043,6 +4043,8 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
 });
 
 
+
+
 /**
  * #520 — the licence split: MIT for the code, all rights reserved for the art and the written content.
  *
@@ -4059,56 +4061,93 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
  * "MIT", silently licensing the art. Nothing else in the repo would notice, and unlike a broken rail it is
  * not recoverable: an asset released permissively cannot be called back.
  *
- * **This block used to detect the negation instead of pinning the sentence — five review rounds on PR #521
- * found the mechanism has a ceiling.** `binds`/`positivelyStates`/`NO_ESCAPE` tried to tell a statement from
- * its negation by proximity, a denial-word list and an exception-word list, and every round hardened one of
- * the three against a fresh bypass: round 2 found `reserved` bound to the path inside a plain negation;
- * round 3 added a denial word and a forward scan, then found the fix's own window swallowed an unrelated
- * "Nothing" eleven words upstream; round 4 fixed that window and found two missing exception words and a
- * false positive on genuinely correct prose; round 5 found three more independent bypasses in one pass —
- * a clause-boundary side effect, an unbound phrase pin one check still lacked, and confirmed the whole
- * approach never checks for a reversing addendum stated later in the document using neither list's
- * vocabulary at all. Round 5's own conclusion: on the one property in this file where being wrong is not
- * recoverable, a word-list/window heuristic can be tightened against attacks or loosened against false
- * positives, but not both at once, and the fix belongs in the test, not in another round of vocabulary.
+ * **Six review rounds, two mechanisms, both broken the same way.** Rounds 1-5 detected the negation with a
+ * word-list/proximity heuristic (`binds`/`positivelyStates`/`NO_ESCAPE`) and each round found a fresh
+ * bypass. Round 5's own conclusion — pin the load-bearing sentences verbatim instead of detecting their
+ * negation — was right in kind and wrong in strength: round 6 found a bare substring `.includes()` pin still
+ * passes when the pinned sentence is quoted, verbatim, inside a wrapping paragraph that frames it as
+ * superseded ("an earlier draft ... which no longer applies: '<the real sentence>' ... that restriction has
+ * been lifted"), and separately that the two carve-out directory names had no pin at all — only an unbound
+ * `toContain` anywhere in the rest of the file, so a later "Exception: public/icons/ is additionally
+ * released" sentence passed untouched.
  *
- * So the two load-bearing sentences are pinned verbatim instead — the property this file is actually meant
- * to hold cannot be phrased any other way and still be checked mechanically, and a sentence that says what
- * it says is not vulnerable to being read as its own negation. Whitespace is normalised first so a hard-wrap
- * reflow doesn't fail this test for a reason that isn't a policy change, but the wording itself is exact,
- * deliberately: this is the one document in the repo where the words are the act, so a maintainer who wants
- * to reword the carve-out has to touch this test too, on purpose, rather than slide past a heuristic by
- * accident. The third-party notices get the same treatment for the same reason — they are two sentences,
- * not a policy with infinite rewordings, so there is nothing a proximity check buys over pinning them.
+ * **So the pin is now on the whole paragraph, matched by equality against `\n\n`-delimited units — the same
+ * `unitsOf`/`toContain(unit)` shape PR #527 used the same day for `guardrails.md`/`review-pr` §7 (the #526
+ * block below).** A sentence quoted inside a longer wrapping paragraph is not the same unit as the paragraph
+ * that is only that sentence, so the wrapper is a different string and equality fails it. Each protected
+ * directory name is additionally required to occur in exactly one unit within its carve-out section, and
+ * that unit must be the pinned list — a second unit naming the same directory anywhere in that section fails
+ * the count before its words are even read.
  *
- * It pins no prose beyond those sentences; both files stay free to be rewritten everywhere else.
+ * **The ceiling, named rather than implied, the one #526 states for its own two pins too:** a contradicting
+ * paragraph placed as its own new unit, *outside* the section a check here bounds, and without repeating a
+ * protected directory name, still passes — nothing here reads the whole document hunting for an unrelated
+ * reversal. That is a job for a human reader, not a string comparison.
  *
- * Prove it red: reword either pinned sentence, even slightly; drop `public/avatars/` or `public/icons/` from
- * the LICENSE list; remove the README's Licence section; drop either third-party notice from either file;
- * set `package.json`'s `license` to something else.
+ * Prove it red: reword any pinned unit, even slightly; add a sentence inside the LICENSE directory list or
+ * the README carve-out paragraph; add a second paragraph anywhere in either carve-out section that names
+ * `public/avatars/` or `public/icons/`; remove the README's Licence section; drop either third-party notice
+ * from either file; set `package.json`'s `license` to something else.
  */
 describe('the licence grants the code and reserves the art, in both files (#520)', () => {
   const root = new URL('../../', import.meta.url);
   const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
   const norm = (text: string) => text.replace(/\s+/g, ' ').trim();
-  const pinned = (text: string, phrase: string) => norm(text).includes(norm(phrase));
 
-  // The exact carve-out sentences the owner settled on (#520, session 2026-09-22). Reworded, PR #521 rounds
-  // 1-5 found a way past whatever checked for the policy by property instead of by these words.
-  const LICENSE_CARVEOUT = 'The artwork and the game\'s written content are NOT licensed. All rights in '
-    + 'them are reserved by the copyright holder, and no permission to use, copy, modify or redistribute '
-    + 'them is granted by this file:';
-  const README_CARVEOUT = '**The artwork and the game\'s written content are not.** The twelve character '
-    + 'illustrations under `public/avatars/` and the icons under `public/icons/` are **not licensed**: all '
-    + 'rights in them are reserved, along with the name "Sky Ninja Academy", the game\'s visual identity and '
-    + 'its written text.';
-  const LICENSE_FREDOKA = 'Fredoka (public/fonts/) is (c) The Fredoka Project Authors, under the SIL Open '
-    + 'Font License 1.1 — see public/fonts/OFL.txt.';
-  const LICENSE_APACHE = '.claude/skills/frontend-design/ is vendored from a third party under the Apache '
-    + 'License 2.0 — see .claude/skills/frontend-design/LICENSE.txt.';
-  const README_FREDOKA = '**Fredoka** under the SIL Open Font License 1.1 (`public/fonts/OFL.txt`)';
-  const README_APACHE = 'a vendored `frontend-design` skill under the Apache License 2.0 '
-    + '(`.claude/skills/frontend-design/LICENSE.txt`).';
+  // Paragraph units, matched by equality rather than substring — the shape PR #527 already uses in this
+  // file for `guardrails.md`/`review-pr` §7 (see the #526 block below). A sentence quoted inside a longer
+  // wrapping paragraph is a different unit than the paragraph that is only that sentence, so a wrapper that
+  // frames the pinned words as superseded cannot pass (PR #521 round 6, B1).
+  const unitsOf = (text: string) => text.split(/\n\n+/).map(norm);
+
+  // A bounded slice between two literal anchors, refusing rather than defaulting when either is missing —
+  // an unbounded or silently-widened slice is exactly how #148 and PR #513 round 2's B1 hid a gutted
+  // section behind text pasted past the real one.
+  const between = (text: string, start: string, end: string) => {
+    const s = text.indexOf(start);
+    if (s < 0) throw new Error(`section start ${JSON.stringify(start)} not found`);
+    const e = text.indexOf(end, s + start.length);
+    if (e < 0) throw new Error(`section end ${JSON.stringify(end)} not found`);
+    return text.slice(s, e);
+  };
+
+  // Exactly one paragraph in `section` may mention `needle` — refusing ambiguity the way PR #527's
+  // `unitWith` does, rather than asserting against a count. Closes PR #521 round 6's B2: a regrant added as
+  // a fresh paragraph, leaving the pinned list itself untouched, is a second unit mentioning the same
+  // directory and fails here before anything downstream reads its words.
+  const onlyUnitMentioning = (section: string, needle: string) => {
+    const hits = unitsOf(section).filter((u) => u.includes(needle));
+    if (hits.length !== 1) {
+      throw new Error(`${hits.length} units in this section mention ${JSON.stringify(needle)}, want exactly 1`);
+    }
+    return hits[0];
+  };
+
+  // The exact paragraphs the owner settled on (#520, session 2026-09-22), each a whole `\n\n`-delimited unit
+  // in the real file. Round 6 found the third-party notices vulnerable to the same wrapper as the
+  // carve-outs, so all six are pinned whole now rather than as a leading phrase.
+  const LICENSE_CARVEOUT = "The artwork and the game's written content are NOT licensed. All rights in them "
+    + "are reserved by the copyright holder, and no permission to use, copy, modify or redistribute them is "
+    + "granted by this file:";
+  const LICENSE_DIRLIST = "- public/avatars/ the twelve ninja character illustrations - public/icons/ the "
+    + "app and home-screen icons - the name \"Sky Ninja Academy\", and the game's visual identity, including "
+    + "the favicon drawn inline in index.html - the praise lines, character names and other written game "
+    + "text";
+  const LICENSE_FREDOKA = "- Fredoka (public/fonts/) is (c) The Fredoka Project Authors, under the SIL Open "
+    + "Font License 1.1 — see public/fonts/OFL.txt. That licence governs the font files whatever this file "
+    + "says, and its notice must travel with them.";
+  const LICENSE_APACHE = "- .claude/skills/frontend-design/ is vendored from a third party under the Apache "
+    + "License 2.0 — see .claude/skills/frontend-design/LICENSE.txt.";
+  const README_CARVEOUT = "**The artwork and the game's written content are not.** The twelve character "
+    + "illustrations under `public/avatars/` and the icons under `public/icons/` are **not licensed**: all "
+    + "rights in them are reserved, along with the name \"Sky Ninja Academy\", the game's visual identity "
+    + "and its written text. The split is deliberate and it is the usual one for a game: the engine is worth "
+    + "sharing, the characters are not mine to give away twice. `LICENSE` states exactly what falls each "
+    + "side of the line.";
+  const README_THIRDPARTY = "Two third-party components carry their own licences, and they apply whatever "
+    + "the above says: **Fredoka** under the SIL Open Font License 1.1 (`public/fonts/OFL.txt`), and a "
+    + "vendored `frontend-design` skill under the Apache License 2.0 "
+    + "(`.claude/skills/frontend-design/LICENSE.txt`).";
 
   it('LICENSE grants MIT and names the holder', () => {
     const l = doc('LICENSE');
@@ -4119,28 +4158,40 @@ describe('the licence grants the code and reserves the art, in both files (#520)
       .toMatch(/Copyright \(c\) \d{4} \S/);
   });
 
-  it('LICENSE reserves the art below the grant, in the exact sentence the owner settled on', () => {
+  it('LICENSE reserves the art below the grant, in the exact paragraphs the owner settled on', () => {
     const l = doc('LICENSE');
-    const i = l.indexOf('Permission is hereby granted');
-    expect(i, 'the carve-out must sit AFTER the grant, or a reader stops at "MIT" and takes the art')
+    const gi = l.indexOf('Permission is hereby granted');
+    expect(gi, 'the carve-out must sit AFTER the grant, or a reader stops at "MIT" and takes the art')
       .toBeGreaterThanOrEqual(0);
-    expect(pinned(l.slice(i), LICENSE_CARVEOUT), 'the carve-out sentence must read exactly as the owner '
-      + 'settled it (whitespace aside) — see the doc-comment above for why this is pinned rather than '
-      + 'detected by property').toBe(true);
+    expect(l.indexOf('WHAT THIS LICENCE DOES NOT COVER'), 'and the carve-out section itself must follow it')
+      .toBeGreaterThan(gi);
+    const section = between(l, 'WHAT THIS LICENCE DOES NOT COVER', 'THIRD-PARTY COMPONENTS');
+    const units = unitsOf(section);
+    expect(units, 'the carve-out sentence must read exactly as the owner settled it (whitespace aside) — '
+      + 'see the doc-comment above for why this is a whole-paragraph pin rather than a substring or a '
+      + 'negation detector').toContain(LICENSE_CARVEOUT);
+    expect(units, 'and the directory list must read exactly as settled, as one paragraph')
+      .toContain(LICENSE_DIRLIST);
     for (const dir of ['public/avatars/', 'public/icons/']) {
-      expect(l.slice(i), `${dir} must be listed under the carve-out, or a carve-out that names nothing `
-        + 'protects nothing').toContain(dir);
+      expect(onlyUnitMentioning(section, dir), `${dir} must be named exactly once in the carve-out section, `
+        + 'inside the pinned list — a second, later paragraph naming it is an unpinned regrant (PR #521 '
+        + 'round 6, B2)').toBe(LICENSE_DIRLIST);
     }
   });
 
-  it('README states the same split, in the exact sentence the owner settled on', () => {
+  it('README states the same split, in the exact paragraph the owner settled on', () => {
     const r = doc('README.md');
-    const lic = r.slice(r.lastIndexOf('## Licence'));
-    expect(lic.length, 'README must carry a Licence section — it is where a reader actually looks')
+    const section = r.slice(r.lastIndexOf('## Licence'));
+    expect(section.length, 'README must carry a Licence section — it is where a reader actually looks')
       .toBeGreaterThan(200);
-    expect(pinned(lic, README_CARVEOUT), 'the README\'s Licence section must carry the pinned carve-out '
-      + 'sentence verbatim (whitespace aside) — a rewrite that changes the words has to change this test '
-      + 'too, on purpose').toBe(true);
+    expect(unitsOf(section), 'the README\'s Licence section must carry the pinned carve-out paragraph '
+      + 'verbatim (whitespace aside) — a rewrite that changes the words has to change this test too, on '
+      + 'purpose').toContain(README_CARVEOUT);
+    for (const dir of ['public/avatars/', 'public/icons/']) {
+      expect(onlyUnitMentioning(section, dir), `${dir} must be named exactly once in the Licence section, `
+        + 'inside the pinned carve-out — a second, later paragraph naming it is an unpinned regrant (PR '
+        + '#521 round 6, B2)').toBe(README_CARVEOUT);
+    }
   });
 
   it('package.json agrees with LICENSE, since tooling reads the field and not the file', () => {
@@ -4152,15 +4203,131 @@ describe('the licence grants the code and reserves the art, in both files (#520)
   // ships, so dropping a notice from it alone while the README still carries it must not pass.
   it('LICENSE acknowledges both third-party licences, since neither was this project\'s to choose', () => {
     const l = doc('LICENSE');
-    expect(pinned(l, LICENSE_FREDOKA), 'LICENSE must name Fredoka\'s SIL OFL notice verbatim').toBe(true);
-    expect(pinned(l, LICENSE_APACHE), 'LICENSE must name the vendored skill\'s Apache-2.0 notice verbatim')
-      .toBe(true);
+    expect(l.indexOf('THIRD-PARTY COMPONENTS'), 'the section itself must exist').toBeGreaterThan(-1);
+    const section = l.slice(l.indexOf('THIRD-PARTY COMPONENTS'));
+    const units = unitsOf(section);
+    expect(units, 'LICENSE must name Fredoka\'s SIL OFL notice verbatim, as its own paragraph')
+      .toContain(LICENSE_FREDOKA);
+    expect(units, 'LICENSE must name the vendored skill\'s Apache-2.0 notice verbatim, as its own paragraph')
+      .toContain(LICENSE_APACHE);
   });
 
   it('README acknowledges both third-party licences, since neither was this project\'s to choose', () => {
     const r = doc('README.md');
-    expect(pinned(r, README_FREDOKA), 'README must name Fredoka\'s SIL OFL notice verbatim').toBe(true);
-    expect(pinned(r, README_APACHE), 'README must name the vendored skill\'s Apache-2.0 notice verbatim')
-      .toBe(true);
+    const section = r.slice(r.lastIndexOf('## Licence'));
+    expect(unitsOf(section), 'README must name both third-party notices verbatim, in their one paragraph')
+      .toContain(README_THIRDPARTY);
+  });
+});
+
+
+/**
+ * #526 — a class fix names its population.
+ *
+ * "Fix the class, not the instance" (#466) was followed on three pull requests in one day and failed on all
+ * three, because a reminder cannot enumerate a set: the author fixes the class across the instances their own
+ * mutation table touches, and that table is written after the fix, by the mind that wrote it. The untreated
+ * instances are exactly the ones not imagined. PR #513's round 2 found it *inside the commit whose message
+ * claimed to fix the class*.
+ *
+ * Two homes, and this rail holds both ends so neither can drift out alone: the author's obligation in
+ * `.claude/rules/guardrails.md`, beside the other rail rules, and the reviewer's in `review-pr` §7, beside
+ * the two other findings that block whatever the round.
+ *
+ * Each check below carries a negative as well as a positive, because the rule this rail states is the one it
+ * would otherwise break: a block of positives cannot tell a statement from its negation.
+ *
+ * Prove it red: drop the population sentence from either file; add "where practical" to either.
+ */
+describe('a class fix names the population it covers (#526)', () => {
+  const root = new URL('../../', import.meta.url);
+  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
+
+  /**
+   * Round 1, B1–B6 — and the finding is the shape of this PR's own rule, one level down: a rail meant to
+   * stop a fix claiming "fixed as a class" without naming its population did not name its own.
+   *
+   * Every loose mechanism the reviewer broke is the same one #512 was blocked on four times, so it takes the
+   * same answer rather than a sixth patch. A **five-word `NO_ESCAPE`** passed "Derive the mutation table from
+   * the set, **when convenient**". A **substring check** passed "**You need not** name the set", because the
+   * literal words survived a flat negation. An **`|`** let "pick a member" cover for "Count it rather than
+   * trusting it" being replaced by "Trust the author's word". A `.find()` **first-match** read a decoy bullet
+   * while the real one was gutted — the exact hazard the `open-pr` rail in this file already throws on. An
+   * **unbounded `## 7.` slice** was satisfied by the paragraph pasted at the end of the file.
+   *
+   * So both halves of the rule are pinned **word for word, as whole document units**, matched by equality.
+   * A reversal fails, a qualifier fails, an edit fails, and a sentence appended inside the unit fails — and
+   * none of it depends on a vocabulary, a proximity window or a substring. `unitWith` **refuses** on anything
+   * other than exactly one match, which is B5 closed by construction rather than by a uniqueness assertion.
+   *
+   * **The ceiling, stated rather than implied**, the same as #512's: a contradicting sentence added as its
+   * OWN new unit, beside an untouched pin, still passes, and nothing mechanical can see it. Human review is
+   * the backstop there — which is how all six of these were found.
+   */
+  const unitsOf = (text: string) =>
+    text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=(?:- |\d+\. ))/)).map((u) => u.trim());
+  const unitWith = (text: string, needle: string) => {
+    const hits = unitsOf(text).filter((u) => u.includes(needle));
+    if (hits.length !== 1) throw new Error(`${hits.length} units contain ${JSON.stringify(needle)}, want 1`);
+    return hits[0];
+  };
+
+  const CLAIMS: Array<{ what: string; file: string; unit: string }> = [
+    { what: "the author's obligation, whole",
+      file: ".claude/rules/guardrails.md",
+      unit: "- **A fix that addresses a *class* names the population it covers (#526).** \"Fix the class, not the instance\"\n  (#466) is followed and still fails, because a reminder cannot enumerate a set. What happens instead: the\n  author fixes the class **across the instances their own mutation table touches** — and that table is written\n  after the fix, by the mind that wrote the fix, so it inherits the same blind spot. The instances left\n  untreated are exactly the ones not imagined. It happened three times on 2026-09-22 (PRs #513, #517, #521),\n  once *inside the commit whose message claimed to fix the class*, and all three were found by reviewers.\n  So, three parts, each turning a promise into something countable:\n  **(a) Name the set** — *every assertion in this describe block*, *every rail that reads a prose document*,\n  *every call of `code()`*. \"I fixed them all\" is a claim; a named set is an object a reader can count.\n  **(b) Rail the coverage where the set is mechanically enumerable.** Test files are files, so a rail can read\n  them — the worked example is a rail that reads `tests/unit/governance.test.ts`'s own source and asserts\n  every rail in a block carries a negative assertion, the class defect there being precisely \"a block of\n  positives\". **That is the shape to copy, not a claim that it is already in place**: it was written for #512\n  and lands with it. A rule that says a mechanism exists when it does not is the \"it only documents existing\n  behaviour\" cover story the `open-pr` skill §6 warns about, and it was this bullet's first draft (#527\n  review, B4).\n  **(c) Derive the mutation table from the set, not from imagination** — one mutation per member. That turns\n  *did I think of it?* into *is the list complete?*, and only the second is checkable.\n  **What this does not do**: catch a class nobody has named. It catches *named the class, treated it\n  partially*. An unnamed class still needs an independent mind, which is why those three rounds were the\n  reviewer's finds and not the author's. The reviewer's half is in `.claude/skills/review-pr/SKILL.md` §7." },
+    { what: "the reviewer's, whole",
+      file: ".claude/skills/review-pr/SKILL.md",
+      unit: "**A third, and it is the same shape: a fix that claims a *class* and does not name its population (#526).**\n\"Fixed as a class\" is unverifiable on its own, and unverifiable is how it keeps being half true — three pull\nrequests were blocked on one defect on 2026-09-22, one of them *inside the commit whose message claimed to fix\nthe class*, because each fix reached only the instances its author's own mutation table touched. So a class\nfix has to say what set it covers — *every assertion in this block*, *every rail reading prose*, *every call\nof `code()`* — and then you can count it, which is the point. `.claude/rules/guardrails.md` has the author's\nhalf. **Count it rather than trusting it**: pick a member the body does not mention and mutate it. That is\nhow all three of those were found, and none of them by the author." },
+  ];
+
+  it.each(CLAIMS)('the rule still reads, word for word: $what', ({ file, unit }) => {
+    const units = unitsOf(doc(file));
+    expect(units.length, `${file} must split into its units, or this row asserts nothing`).toBeGreaterThan(5);
+    // Equality against a whole unit, not a substring of the file: a substring match is satisfied by the
+    // pinned words sitting inside a longer, negated sentence, which is B2 in one line.
+    expect(units, `${file} must still carry this rule as written — if the wording changed on purpose, `
+      + 're-pin it here deliberately and say so in the commit').toContain(unit);
+  });
+
+  it('each half is found exactly once, and sits where a reader of that file would meet it', () => {
+    // B5: `.find()` took the first match, so a decoy bullet ahead of a gutted real one passed. B6: the `## 7.`
+    // slice ran to end-of-file, so the paragraph pasted past the last heading satisfied it. Both are closed
+    // by refusing ambiguity rather than by asserting against it.
+    const g = doc('.claude/rules/guardrails.md');
+    expect(() => unitWith(g, 'A fix that addresses a *class*'),
+      'the obligation must appear exactly once in guardrails.md').not.toThrow();
+    const skill = doc('.claude/skills/review-pr/SKILL.md');
+    const s7 = skill.slice(skill.indexOf('## 7. '), skill.indexOf('\n## ', skill.indexOf('## 7. ') + 6));
+    expect(skill.indexOf('## 7. '), '§7 must exist').toBeGreaterThan(-1);
+    expect(s7.length, '§7 must be BOUNDED by the next heading — an unbounded slice is satisfied by anything '
+      + 'later in the file, which is how a gutted section hid behind a paragraph pasted at the end (#148)')
+      .toBeGreaterThan(500);
+    expect(s7, 'and the finding must live inside §7, the section about what may block a merge')
+      .toContain('does not name its population');
+    expect(s7, 'beside the two findings that already block whatever the round')
+      .toContain('a rail does not hold what it claims');
+  });
+
+  it('each file points at the other, so neither half can be read as the whole rule', () => {
+    expect(doc('.claude/rules/guardrails.md'), 'guardrails.md must point at the reviewer\'s half')
+      .toContain('.claude/skills/review-pr/SKILL.md');
+    expect(doc('.claude/skills/review-pr/SKILL.md'), 'and the skill at the author\'s')
+      .toContain('.claude/rules/guardrails.md');
+  });
+
+  it('clause (b) does not claim a mechanism that is not here (#527 review, B4)', () => {
+    const bullet = unitWith(doc('.claude/rules/guardrails.md'), 'A fix that addresses a *class*');
+    // The first draft said this file "carries one that reads its own source…" and "found two more rails…on
+    // its first run" — present tense, settled fact, about a rail that exists only on #512's open branch.
+    // That is the "it only documents existing behaviour" cover story `open-pr` §6 names, and nothing caught
+    // it because clause (b) had no rail at all.
+    expect(bullet, 'clause (b) must offer the coverage rail as a shape to copy')
+      .toContain('the shape to copy');
+    expect(bullet, 'and say plainly that it is not already in place, with where it lands')
+      .toMatch(/not a claim that it is already in place/);
+    expect(bullet, 'a rule may not assert a mechanism exists until it does — that is the cover story §6 warns '
+      + 'about, and this bullet was its own first example')
+      .toMatch(/only documents existing\s+behaviour/);
   });
 });
