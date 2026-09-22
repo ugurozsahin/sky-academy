@@ -107,6 +107,18 @@ img { -webkit-user-drag: none; }
   .screen:not(.play):not(.memory) { max-width: min(1180px, 100% - 40px); }
 }
 
+/*
+ * #18 group A, the tracing pad — the second of group A's two look-changing caps. `--arena-w` (600 px) still
+ * gates the bubble arena and is untouched: a tracing screen renders no `#arena` canvas at all (`play.ts`'s
+ * `tracing ? '' : '<canvas id="arena">'`), so `.hud`'s own `max-width: var(--arena-w)` was only ever
+ * borrowed here, not load-bearing for gameplay. Widening it for `.tracing` alone cannot affect bubble speed
+ * or spawn spread, which is what kept the arena's own cap out of this pull request. Still `owner-approval`:
+ * a wider tracing pad is a bigger canvas and bigger letters, which is a look change like the arena's.
+ */
+@media (min-width: 900px) {
+  .play.tracing .hud, .play.tracing .trace-wrap { max-width: min(880px, 100% - 40px); }
+}
+
 /* ---------- shared components ---------- */
 .btn {
   display: inline-flex;
