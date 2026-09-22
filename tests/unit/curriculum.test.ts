@@ -1922,8 +1922,8 @@ describe('a hint is instruction text unless the generator says it is data (#328,
  * check that reads the labels — "can a child predict the answer from the wave's size?" included — is
  * satisfied by the implementation restating itself. Only asking whether one option set was ever drawn at two
  * different widths compares the card against another real card rather than against the formula. The price is
- * that it can speak only where an option set recurs with more than one answer: 205 of the 252 cells.
- * `NO_REPEATED_SET` names the other 47 and is asserted in both directions, so it stays honest.
+ * that it can speak only where an option set recurs with more than one answer: 203 of the 252 cells.
+ * `NO_REPEATED_SET` names the other 49 and is asserted in both directions, so it stays honest.
  *
  * It goes through the real `waveOptsFor` (`src/ui/play-session.ts`), the bridge `tests/unit/sim.test.ts`
  * already uses, so a copy of the derivation cannot drift away from the screen's.
@@ -1965,7 +1965,7 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     'y1-sentence d1', 'y1-sentence d2', 'y1-sentence d3',
     'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
     'y2-add d3', 'y2-tables d1', 'y2-line d2', 'y2-line d3',
-    'y2-money d1', 'y2-money d2', 'y2-time d1', 'y2-time d2', 'y2-time d3',
+    'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
     'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d1', 'y2-duration d3',
     'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
   ]);

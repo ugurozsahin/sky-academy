@@ -356,11 +356,13 @@ const y2Money: Generator = (d, rng) => {
   const price = 5 * ri(rng, 1, 19);
   const change = 100 - price;
   // At exactly one price (50p), `price` as a decoy equals `change` (the answer) — wordQ's own de-dup then
-  // drops it, one card in nineteen shipping three bubbles instead of four (#462 rail). `change + 10` can
-  // never equal `change`, so it is there to take that decoy's place; the other three prices never collide
-  // with it (`change + 10` collides with `price` only when `price` itself would already have been filtered),
-  // and wordQ's own slice(0, 3) never reaches it unless one of the first three was removed.
-  return wordQ(rng, `Change from £1 for ${price}p?`, `${change}p`, [`${change + 5}p`, `${change - 5}p`, `${price}p`, `${change + 10}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?` });
+  // drops it, one card in nineteen shipping three bubbles instead of four (#462 rail). `change + 15` is the
+  // fourth candidate that takes its place: since `price` is always a multiple of 5, `change + k` (= 100 −
+  // price + k) can only ever equal `price` when k is itself a multiple of 10 (an earlier `+10` draft missed
+  // this — it collided with `price` at 55p too, silently saved only by wordQ's own dedup, with no margin
+  // left). 15 is not a multiple of 10 and not ±5, so this candidate can never equal `price`, `change` or
+  // either of the other two decoys, at any price in range.
+  return wordQ(rng, `Change from £1 for ${price}p?`, `${change}p`, [`${change + 5}p`, `${change - 5}p`, `${price}p`, `${change + 15}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?` });
 };
 /**
  * The clock phrase for `h:mm` on a 12-hour dial — `3 o'clock`, `quarter past 3`, `half past 3`, `quarter to 4`,
