@@ -330,10 +330,12 @@ img { -webkit-user-drag: none; }
  * portrait pins it at 54px so the text column absorbs all of it, which is what the ellipsis rules are for
  * (round 1 review, B1: unpinned, the portrait rendered at 12px instead of 54 at 320×568 with a big purse). */
 @media (max-width: 400px) {
-  .hero { min-width: 0; }
+  .topbar { gap: 8px; }
+  .hero { min-width: 0; gap: 8px; padding: 6px 8px 6px 6px; }
   .hero .portrait { flex-shrink: 0; }
-  .hero > span:last-child { min-width: 0; overflow: hidden; }
+  .hero > span:last-child { min-width: 24px; overflow: hidden; }
   .hero b, .hero small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .settings { gap: 4px; }
 }
 .section-title { margin: 22px 4px 10px; font-size: 20px; color: #dfe6ff; }
 .islands { display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: 12px; }
@@ -592,6 +594,11 @@ img { -webkit-user-drag: none; }
   color: #ffd87a;
 }
 .coin-pill b { font-size: 16px; } .coin-pill .streak { color: #ff8a4c; font-size: 13px; }
+/* #414 round 2: this rule has to come after the base `.coin-pill` above — same specificity, so whichever is
+ * later in the file wins, and a copy inside the narrow-phone media query at `.hero` (further up the file)
+ * would lose to this one regardless of the viewport. The topbar's own narrow-phone shrink (`.hero`, same
+ * issue) needs a few px back from the coin pill to give the ninja's name a non-zero floor instead of 0×0. */
+@media (max-width: 400px) { .coin-pill { padding: 0 6px; } }
 .reward-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
 .reward-stats div { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 6px; text-align: center; }
 .reward-stats b { display: block; font-size: 22px; } .reward-stats small { color: var(--muted); font-weight: 600; }

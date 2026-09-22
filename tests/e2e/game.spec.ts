@@ -2452,6 +2452,12 @@ test.describe('profile picker (#20 slice 2)', () => {
         const portrait = await page.locator('.hero .portrait').boundingBox();
         expect(portrait!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the ninja's portrait is squeezed instead of the text`)
           .toBeGreaterThanOrEqual(53);
+        // round 2 review, B1: pinning the portrait moved 100% of the remaining shrink onto the identity text,
+        // which collapsed to 0×0 (invisible, not truncated) at this exact scenario. The child's own name is
+        // #414's explicit "name last" priority, so the name has to render at a non-zero width everywhere.
+        const heroName = await page.locator('.hero b').boundingBox();
+        expect(heroName!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the ninja's name has vanished, not just truncated`)
+          .toBeGreaterThan(0);
         await expectFitsViewport(page, `sky map at ${w}x${h}, ${purse.coins} coins/${purse.days}-day streak`);
       }
     }
