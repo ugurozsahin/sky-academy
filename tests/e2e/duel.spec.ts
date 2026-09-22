@@ -267,6 +267,31 @@ test.describe('Ninja Duel', () => {
     expect(leaked).toEqual({ advanced: [0, 0], sna: 'undefined' });
   });
 
+  test('guard rail: a certificate that resolves after the screen tears down is dropped, not written into the new one (#436 review, B2)', async ({ page }) => {
+    await startDuel(page);
+    for (let r = 1; r <= 10; r++) await winRound(page, 'a');
+    await expect(page.locator('.duel-end #cert')).toBeVisible();
+    // `deliverCertificate` carries real `await` points (fonts, canvas encode, a save-prompt round trip) long
+    // enough for a child to leave mid-flight. Held open here so the test controls exactly when it resolves,
+    // rather than racing the real timing.
+    await page.evaluate(() => {
+      (navigator as any).canShare = () => false;
+      let release: (v: unknown) => void;
+      (window as any).__certGate = new Promise(r => { release = r; });
+      (window as any).__releaseCert = () => release!({ status: 'saved' });
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async () => (window as any).__certGate } : null };
+    });
+    await page.click('.duel-end #cert');   // delivery is now suspended, awaiting the held gate
+    await page.evaluate(() => { history.back(); });
+    await expect(page.locator('.island-screen')).toBeVisible();
+    const errors: string[] = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.evaluate(() => (window as any).__releaseCert());
+    await page.waitForTimeout(200);
+    expect(errors, "a torn-down match's certificate outcome must not throw once it finally resolves").toEqual([]);
+    expect(await page.locator('#cert-msg').count(), 'nor write its message into whatever screen replaced it').toBe(0);
+  });
+
   test('the card carries the line the round is decided by, every round (#65, PR #295 review)', async ({ page }) => {
     await startDuel(page);
     // The pool's comparison topics (length, mass, capacity, temperature) put the values being compared in

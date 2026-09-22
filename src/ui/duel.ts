@@ -255,19 +255,41 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // #436: this outcome fires while `#overlay` is up, and the shared `#toast` sits BEHIND it (`grid-area: q`,
     // z-index 3, under the overlay's z-index 5) — a child who taps 🎓 never saw whether it worked. `certMsg`
     // reports inside the modal itself instead, next to the button that earned it, where nothing can cover it.
+    //
+    // Scoped to `overlay` (round-1 review, B2), not a bare `$`: `deliverCertificate`/`drawCertificate` carry
+    // several real `await` points (fonts, canvas encode, the share sheet, a native filesystem round trip),
+    // long enough for a child to Rematch/Islands/Quit mid-flight. That tears this screen down and builds a new
+    // one with its own `#cert-msg` — a bare `$('#cert-msg')` would write the OLD match's outcome into the NEW
+    // match's live element. Scoped to the closed-over `overlay`, a write after teardown lands on that overlay's
+    // own now-detached copy instead, where nobody is looking.
+    //
+    // Revealed, THEN mutated (round-1 review note): `hidden` and `textContent` set in the same synchronous step
+    // is the same unreliable live-region pattern this file's own `#toast` avoids by never using `hidden` at all
+    // (visibility toggled by a class, mutation always into an element already in the layout). `#cert-msg` starts
+    // `hidden` so nothing shows before a certificate exists to report on; the reveal goes out one task ahead of
+    // the text so assistive tech sees the region exist before it changes.
     const certMsg = (text: string, bad = false) => {
-      const el = $('#cert-msg'); el.textContent = text; el.classList.toggle('bad', bad); el.hidden = false;
+      const el = $('#cert-msg', overlay);
+      el.hidden = false; el.classList.toggle('bad', bad);
+      requestAnimationFrame(() => { el.textContent = text; });
     };
-    if (earned) $('#cert').addEventListener('click', async () => {
-      sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
+    if (earned) $('#cert', overlay).addEventListener('click', async () => {
+      sfx.tap();
+      const b = $('#cert', overlay) as HTMLButtonElement; b.disabled = true;
+      // Cleared before this attempt starts (round-1 review, B3): the 'shown' route below never calls `certMsg`
+      // (the full-screen view carries its own save hint), so a stale error from an earlier failed attempt would
+      // otherwise still be sitting there, unread, once the child closes a screen that just worked fine.
+      const msg = $('#cert-msg', overlay); msg.hidden = true; msg.textContent = '';
       try {
         const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
+        if (!scope.alive) return;   // torn down mid-delivery — see the comment on `certMsg` above
         if (how === 'shared') certMsg('Certificate shared!');
         else if (how === 'saved' || how === 'downloaded') certMsg('Certificate saved!');
         else if (how === 'declined') certMsg('No problem — you can save it next time!');
-        // 'shown' opens the full-screen view with its own save hint, so no message here
+        // 'shown' opens the full-screen view with its own save hint — the reset above already cleared any
+        // earlier message, so there is nothing left to show here.
       }
-      catch { certMsg('Could not make the certificate', true); }
+      catch { if (scope.alive) certMsg('Could not make the certificate', true); }
       b.disabled = false;
     });
   }
