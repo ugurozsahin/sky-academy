@@ -3916,6 +3916,38 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
     return s.slice(s.indexOf('## 6. '), s.indexOf('## 7. '));
   };
 
+  /**
+   * PR #517 round 1, B1 — and one of three PRs blocked on the same defect in a day.
+   *
+   * **A rail that lists the words a policy must contain cannot tell a statement from its negation.** The
+   * reviewer kept every phrase this block requires and appended an exception: *"…Nothing outside the diff
+   * postpones it (#516) — with one narrow exception worth the wait… verdict is `REVIEW: CLEARED` — whatever
+   * else is true of the branch, **unless a merge conflict is present, in which case hold the mark** until
+   * the author resolves it…"* All four assertions still passed, because each was a presence check and an
+   * addition deletes nothing. The same shape defeated the #512 rail (the governed sentence replaced while
+   * its keywords survived elsewhere in the block) and the #520 one (a README that named the art inside an
+   * "everything here is MIT" sentence).
+   *
+   * `NO_ESCAPE` is the answer for a rule whose entire content is *there is no exception*: such a rule is
+   * defeated by adding one, never by deleting a word, so the absence of exception vocabulary is the property
+   * worth asserting. `binds` is the answer where a claim must stay attached to what it governs.
+   *
+   * **And one level down: an `|` in a policy assertion is the same defect.** A mutation satisfies one branch
+   * while breaking the rule — found on the #512 branch, where "Behind the gate, with evidence, you may" left
+   * an alternative standing and stayed green. Every check below is a conjunction for that reason.
+   *
+   * Neither helper pins wording: the control mutations in this PR's table reword each pinned passage and
+   * stay green. (The #512 and #520 branches carry the same two helpers in their own blocks; all three touch
+   * this file and are open at once, so they collapse into one definition when the last of them lands.)
+   */
+  const SPAN = 250;
+  const binds = (text: string, subject: string, claim: RegExp) => {
+    const i = text.indexOf(subject);
+    if (i < 0) return false;
+    return claim.test(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN));
+  };
+  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bnarrow case\b|\bhold the mark\b/i;
+
   it('review-pr §6 makes a performed review end in one of the two marks, naming the conflict case', () => {
     const s6 = section6();
     expect(s6.length, '§6 must be read from disk and §7 must still follow it, or these rails are vacuous')
@@ -3934,6 +3966,16 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
     // rule. Rephrase it and this rail is what asks you to prove the exception is still refused.
     expect(rule, '§6 must refuse the exception in as many words, not merely state the rule — an escape added '
       + 'beside it reads as caution and is what stranded #492, #503 and #502').toMatch(/nothing outside the diff/i);
+    // The half the phrase pin above cannot do (round 1, B1): the reviewer kept every required phrase and
+    // APPENDED "unless a merge conflict is present, in which case hold the mark". Adding deletes nothing, so
+    // no presence check can see it. For a rule whose whole content is "there is no exception", the property
+    // worth asserting is that no exception is stated.
+    expect(rule, 'no exception clause may sit beside the rule — that is the only way this rule ever dies')
+      .not.toMatch(NO_ESCAPE);
+    expect(binds(rule, 'REVIEW: CLEARED', /no blocking finding|whatever else is true/i),
+      'the clear verdict must stay attached to the condition that earns it, not merely appear in the '
+      + 'paragraph — a sentence naming it and then qualifying it elsewhere passes a bare presence check')
+      .toBe(true);
     // Both marks must still be the only two: a rule that ends in "or defer" is the defect wearing the fix.
     expect(s6, '§6 must still define the blocking mark').toContain('REVIEW: CHANGES REQUESTED');
   });
@@ -3988,5 +4030,14 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
       .toMatch(/loosening/i);
     expect(rule, 'naming the rule that bars the merge, so the two acts are visibly different')
       .toMatch(/rule 4/i);
+    // The reviewer flagged this paragraph as the same shape as B1, unverified. It was: "…though a loosening
+    // PR is optional to review, per rule 4" keeps both tokens and reverses the instruction.
+    expect(rule, 'no exception may be attached to it either — "optional to review" keeps every token here')
+      .not.toMatch(NO_ESCAPE);
+    expect(binds(rule, 'loosening', /review it|still one you review|post the verdict/i),
+      'the loosening case must be bound to the instruction to review it, not merely mentioned nearby')
+      .toBe(true);
+    expect(rule, 'and it must say the merge is the owner\'s, or "review it" has no stated end')
+      .toMatch(/merge is (his|the owner)|owner('s|s) to merge|stays the owner/i);
   });
 });
