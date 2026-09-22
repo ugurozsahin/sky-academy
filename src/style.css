@@ -1366,8 +1366,36 @@ img { -webkit-user-drag: none; }
 .cert-view.zoomed { overflow: auto; }
 .cert-view-img.zoomed { max-height: none; transform: scale(1.6); cursor: zoom-out; }
 .cert-view-hint { margin: 0; color: #dff3ff; font-weight: 700; text-align: center; text-shadow: 0 2px 8px #000a; }
+/* #398: a results modal taller than the viewport (two dojo rows, a sticker unlock, a certificate button) used
+   to push Play again/Rematch and Islands off the bottom with nothing on screen saying there was more below —
+   `.overlay`'s own `overflow-y: auto` scrolled the WHOLE modal, hero art and all, which reads as a finished
+   screen rather than one with a hidden tail. The modal is capped to the space `.overlay` actually has (its
+   grid row stretches to fill it, so `100%` here is definite). Scoped to `.results` — the pause and stage-clear
+   modals are always short enough to fit.
+   #398 round 2, B1: `.row.nav` used to be `position: sticky` on the LAST child of the scrolling element
+   itself, so its stuck box held a fixed on-screen band for most of the scroll range — reordering DOM only
+   changed which *other* element's static position fell inside that band, it never stopped the overlap.
+   `.row.nav` is now a flex sibling OUTSIDE the scrolling region (`.scroll` is the only thing that scrolls),
+   so nothing can ever be positioned underneath it: the overlap is structurally impossible, not just moved.
+   #398 round 3, B1: `.scroll` itself declared no `position`, so `.results .ko`'s `position: absolute` skipped
+   past it to `.modal.results` (the nearest ancestor that IS positioned) instead of scrolling with the hero
+   art it decorates — a Boss Battle win's K.O. stamp stayed pinned to the modal's corner while `.hero-big`
+   scrolled away underneath it. `.scroll` is the containing block it needs to be now. */
+.modal.results { max-height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+.modal.results .scroll { position: relative; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+.modal.results .row.nav {
+  flex: 0 0 auto;
+  margin: 14px -18px -22px;
+  padding: 12px 18px calc(22px + var(--sab, 0px));
+  background: linear-gradient(0deg, #10163a 60%, transparent);
+}
 .modal h2 { margin: 12px 0 6px; font-size: 28px; } .modal p { margin: 4px 0 14px; color: var(--muted); font-weight: 600; }
-.hero-big { position: relative; display: inline-block; margin-top: 4px; }
+/* #398 round 1, B2: a flex column's default `align-items: stretch` widened this from its ~200px image to the
+   modal's full content width, which pushed `.speech` — positioned at `left: 68%` of ITS OWN box — off the
+   right edge of the phone on anything but the shortest headline. `align-self` opts this one item back out;
+   everything else in `.modal.results` is already full-width by design (a grid, a flex row, or plain text
+   centred by `.modal`'s own `text-align`), so nothing else needs it. */
+.hero-big { position: relative; display: inline-block; align-self: center; margin-top: 4px; }
 .hero-big img {
   width: 200px;
   height: 200px;

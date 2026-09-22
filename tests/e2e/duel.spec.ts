@@ -36,21 +36,22 @@ async function expectHandoverHeard(page: Page) {
   expect(said.slice(at + 1), 'no cancel() after it').not.toContain('<cancel>');
 }
 
-async function startDuel(page: Page, dojoByDate?: Record<string, unknown>) {
+async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins = 0) {
   // The dojo seed is chosen by the PAGE's date, not this process's: `storage.ts`'s `today()` runs in the
   // browser, and a seed built against a different day is silently rolled over by `dojoFor()` — progress
   // gone, the case green for the wrong reason. The two clocks straddle midnight UTC in the general case,
   // so `dojoSeeds()` hands over every day the page could be on and the page picks.
-  await page.addInitScript(({ save, dojoByDate }) => {
+  await page.addInitScript(({ save, dojoByDate, coins }) => {
     window.__seedMiss = false;
     if (localStorage.getItem('sna:v1')) return;
     const d = JSON.parse(save) as Record<string, unknown>;
+    if (coins) d.coins = coins;
     if (dojoByDate) {
       const seed = dojoByDate[new Date().toISOString().slice(0, 10)];
       if (seed) d.dojo = seed; else window.__seedMiss = true;
     }
     localStorage.setItem('sna:v1', JSON.stringify(d));
-  }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }), dojoByDate });
+  }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }), dojoByDate, coins });
   await page.addInitScript(() => { window.__SNA_FAST = 4; });
   await recordingEngine(page);
   await page.goto('/');
@@ -1088,6 +1089,60 @@ test.describe('Ninja Duel', () => {
     expect(saved.duels[0]).toMatchObject({ winner: 'draw', scoreA: 5, scoreB: 5, rounds: 10 });
     expect(await page.evaluate(() => window.__sna.certificate())).toBeNull();
     expect(await page.evaluate(() => window.__sna.certWords()), 'nothing to draw, so no words either').toBeNull();
+  });
+
+  /**
+   * guard rail (#398). The worst case needs a win (draws earn no certificate button), two dojo rows (the
+   * volume challenge one answer short, its set finishing with it) and a starting purse that crosses a sticker
+   * threshold when the match's own coins and the dojo bonus land — every row this overlay can show, at once,
+   * on the shortest phone in the matrix. Before the fix `#again` sat off the bottom of a 390x664 viewport with
+   * nothing on screen saying there was more to scroll to; `Rematch`/`Islands` is the only way off this screen.
+   */
+  test('Rematch/Islands stays reachable when the results overlay is at its tallest (#398)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('short'), 25);
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    for (let r = 1; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');      // every round to Player 1: a win, not a draw, is what earns the certificate
+    }
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    // Every row this overlay can carry, confirmed present before the position is checked — a modal that is
+    // short because a row silently failed to render would pass the bounding-box assertion for the wrong reason.
+    await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(2);
+    await expect(page.locator('.duel-end .unlock')).toHaveCount(2);   // 25 + 10 + 35 = 70 crosses both 30 and 70
+    await expect(page.locator('.duel-end #cert')).toBeVisible();
+    // Class-independent on purpose: the fix's own markup adds a class to this row, and a locator naming it
+    // would stop failing on the un-fixed markup for the wrong reason (the class not existing) rather than for
+    // the actual defect (the row laid out below the fold).
+    await expect(page.locator('#again')).toBeInViewport();
+    await expect(page.locator('#home')).toBeInViewport();
+    // #398 round 2 review, non-blocking: `resultsModal()`'s own worst case got a click-target sweep for the
+    // nav row painting over `#cert`; `.duel-end` is hand-maintained separately and received the identical
+    // sticky→flex-sibling fix, so it needs the same sweep rather than trusting the shared CSS selector alone.
+    // Settle `.modal`'s own pop-in first — see the matching comment in game.spec.ts's sweep for why.
+    await page.waitForTimeout(500);
+    const scroller = page.locator('.duel-end .scroll');
+    const scrollerBox = (await scroller.boundingBox())!;
+    const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
+    let sawCertOnScreen = false;
+    // See the matching sweep in game.spec.ts for why this tolerance is wider than one pixel.
+    const slack = 24;
+    // `maxScroll` itself is always swept explicitly (round 3 review, non-blocking B2) — see game.spec.ts.
+    const steps = []; for (let top = 0; top < maxScroll; top += 15) steps.push(top); steps.push(maxScroll);
+    for (const top of steps) {
+      await scroller.evaluate((el, t) => { el.scrollTop = t; }, top);
+      const certBox = (await page.locator('.duel-end #cert').boundingBox())!;
+      const onScreen = certBox.y >= scrollerBox.y - slack && certBox.y + certBox.height <= scrollerBox.y + scrollerBox.height + slack;
+      if (!onScreen) continue;
+      sawCertOnScreen = true;
+      const atCertTop = await page.evaluate(({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        return el ? `${el.id} ${el.className}` : '';
+      }, { x: certBox.x + certBox.width / 2, y: certBox.y + 2 });
+      expect(atCertTop, `at scrollTop ${top}, the nav row must not paint over the certificate button`).not.toContain('nav');
+      expect(atCertTop, `at scrollTop ${top}, the point must land on the certificate button itself`).toContain('cert');
+    }
+    expect(sawCertOnScreen, 'the sweep must actually see the certificate button visible at some scroll position').toBe(true);
   });
 
   /**
