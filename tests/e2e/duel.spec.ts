@@ -36,21 +36,22 @@ async function expectHandoverHeard(page: Page) {
   expect(said.slice(at + 1), 'no cancel() after it').not.toContain('<cancel>');
 }
 
-async function startDuel(page: Page, dojoByDate?: Record<string, unknown>) {
+async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins = 0) {
   // The dojo seed is chosen by the PAGE's date, not this process's: `storage.ts`'s `today()` runs in the
   // browser, and a seed built against a different day is silently rolled over by `dojoFor()` — progress
   // gone, the case green for the wrong reason. The two clocks straddle midnight UTC in the general case,
   // so `dojoSeeds()` hands over every day the page could be on and the page picks.
-  await page.addInitScript(({ save, dojoByDate }) => {
+  await page.addInitScript(({ save, dojoByDate, coins }) => {
     window.__seedMiss = false;
     if (localStorage.getItem('sna:v1')) return;
     const d = JSON.parse(save) as Record<string, unknown>;
+    if (coins) d.coins = coins;
     if (dojoByDate) {
       const seed = dojoByDate[new Date().toISOString().slice(0, 10)];
       if (seed) d.dojo = seed; else window.__seedMiss = true;
     }
     localStorage.setItem('sna:v1', JSON.stringify(d));
-  }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }), dojoByDate });
+  }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }), dojoByDate, coins });
   await page.addInitScript(() => { window.__SNA_FAST = 4; });
   await recordingEngine(page);
   await page.goto('/');
@@ -192,6 +193,18 @@ test.describe('Ninja Duel', () => {
     // overlay is built, BEFORE the 🎓 button is pressed (#205's rule, the bug being a device where pressing it
     // does nothing). Read from the save, not the overlay: the button would be on screen with nothing recorded.
     await expect(page.locator('.duel-end #cert')).toBeVisible();
+    // #436: the certificate outcome used to report through the shared `#toast`, which sits BEHIND this results
+    // overlay (`#toast` is `grid-area: q`, z-index 3; `.overlay` is z-index 5) — a child pressing 🎓 never saw
+    // whether it worked. It now reports through `#cert-msg`, inside the modal itself, so nothing can cover it.
+    // Forcing the 'save' route the same way `game.spec.ts`'s certificate test does, for a deterministic outcome
+    // headless Chromium's real Web Share cannot give.
+    await page.evaluate(() => {
+      (navigator as any).canShare = () => false;
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async () => ({ status: 'saved' }) } : null };
+    });
+    await page.click('.duel-end #cert');
+    await expect(page.locator('.duel-end #cert-msg'), 'reported where the child is already looking, not behind the overlay').toHaveText('Certificate saved!');
+    await page.evaluate(() => { delete (window as any).claude; });   // leave the runtime clean for the rest of the test
     // ...and the history takes the same match (#415 review, note 3). The loss test below proved a row is
     // filed with no certificate; this proves the win path files exactly one of each, not two rows or none.
     const won = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).duels);
@@ -253,6 +266,31 @@ test.describe('Ninja Duel', () => {
       setTimeout(() => res({ advanced: window.__deadArenas.map((a, i) => +(a.time - t0[i]).toFixed(2)), sna: typeof window.__sna }), 500);
     }));
     expect(leaked).toEqual({ advanced: [0, 0], sna: 'undefined' });
+  });
+
+  test('guard rail: a certificate that resolves after the screen tears down is dropped, not written into the new one (#436 review, B2)', async ({ page }) => {
+    await startDuel(page);
+    for (let r = 1; r <= 10; r++) await winRound(page, 'a');
+    await expect(page.locator('.duel-end #cert')).toBeVisible();
+    // `deliverCertificate` carries real `await` points (fonts, canvas encode, a save-prompt round trip) long
+    // enough for a child to leave mid-flight. Held open here so the test controls exactly when it resolves,
+    // rather than racing the real timing.
+    await page.evaluate(() => {
+      (navigator as any).canShare = () => false;
+      let release: (v: unknown) => void;
+      (window as any).__certGate = new Promise(r => { release = r; });
+      (window as any).__releaseCert = () => release!({ status: 'saved' });
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async () => (window as any).__certGate } : null };
+    });
+    await page.click('.duel-end #cert');   // delivery is now suspended, awaiting the held gate
+    await page.evaluate(() => { history.back(); });
+    await expect(page.locator('.island-screen')).toBeVisible();
+    const errors: string[] = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.evaluate(() => (window as any).__releaseCert());
+    await page.waitForTimeout(200);
+    expect(errors, "a torn-down match's certificate outcome must not throw once it finally resolves").toEqual([]);
+    expect(await page.locator('#cert-msg').count(), 'nor write its message into whatever screen replaced it').toBe(0);
   });
 
   test('the card carries the line the round is decided by, every round (#65, PR #295 review)', async ({ page }) => {
@@ -1051,5 +1089,194 @@ test.describe('Ninja Duel', () => {
     expect(saved.duels[0]).toMatchObject({ winner: 'draw', scoreA: 5, scoreB: 5, rounds: 10 });
     expect(await page.evaluate(() => window.__sna.certificate())).toBeNull();
     expect(await page.evaluate(() => window.__sna.certWords()), 'nothing to draw, so no words either').toBeNull();
+  });
+
+  /**
+   * guard rail (#398). The worst case needs a win (draws earn no certificate button), two dojo rows (the
+   * volume challenge one answer short, its set finishing with it) and a starting purse that crosses a sticker
+   * threshold when the match's own coins and the dojo bonus land — every row this overlay can show, at once,
+   * on the shortest phone in the matrix. Before the fix `#again` sat off the bottom of a 390x664 viewport with
+   * nothing on screen saying there was more to scroll to; `Rematch`/`Islands` is the only way off this screen.
+   */
+  test('Rematch/Islands stays reachable when the results overlay is at its tallest (#398)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('short'), 25);
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    for (let r = 1; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');      // every round to Player 1: a win, not a draw, is what earns the certificate
+    }
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    // Every row this overlay can carry, confirmed present before the position is checked — a modal that is
+    // short because a row silently failed to render would pass the bounding-box assertion for the wrong reason.
+    await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(2);
+    await expect(page.locator('.duel-end .unlock')).toHaveCount(2);   // 25 + 10 + 35 = 70 crosses both 30 and 70
+    await expect(page.locator('.duel-end #cert')).toBeVisible();
+    // Class-independent on purpose: the fix's own markup adds a class to this row, and a locator naming it
+    // would stop failing on the un-fixed markup for the wrong reason (the class not existing) rather than for
+    // the actual defect (the row laid out below the fold).
+    await expect(page.locator('#again')).toBeInViewport();
+    await expect(page.locator('#home')).toBeInViewport();
+    // #398 round 2 review, non-blocking: `resultsModal()`'s own worst case got a click-target sweep for the
+    // nav row painting over `#cert`; `.duel-end` is hand-maintained separately and received the identical
+    // sticky→flex-sibling fix, so it needs the same sweep rather than trusting the shared CSS selector alone.
+    // Settle `.modal`'s own pop-in first — see the matching comment in game.spec.ts's sweep for why.
+    await page.waitForTimeout(500);
+    const scroller = page.locator('.duel-end .scroll');
+    const scrollerBox = (await scroller.boundingBox())!;
+    const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
+    let sawCertOnScreen = false;
+    // See the matching sweep in game.spec.ts for why this tolerance is wider than one pixel.
+    const slack = 24;
+    // `maxScroll` itself is always swept explicitly (round 3 review, non-blocking B2) — see game.spec.ts.
+    const steps = []; for (let top = 0; top < maxScroll; top += 15) steps.push(top); steps.push(maxScroll);
+    for (const top of steps) {
+      await scroller.evaluate((el, t) => { el.scrollTop = t; }, top);
+      const certBox = (await page.locator('.duel-end #cert').boundingBox())!;
+      const onScreen = certBox.y >= scrollerBox.y - slack && certBox.y + certBox.height <= scrollerBox.y + scrollerBox.height + slack;
+      if (!onScreen) continue;
+      sawCertOnScreen = true;
+      const atCertTop = await page.evaluate(({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        return el ? `${el.id} ${el.className}` : '';
+      }, { x: certBox.x + certBox.width / 2, y: certBox.y + 2 });
+      expect(atCertTop, `at scrollTop ${top}, the nav row must not paint over the certificate button`).not.toContain('nav');
+      expect(atCertTop, `at scrollTop ${top}, the point must land on the certificate button itself`).toContain('cert');
+    }
+    expect(sawCertOnScreen, 'the sweep must actually see the certificate button visible at some scroll position').toBe(true);
+  });
+
+  /**
+   * #375/#441: a finished match is committed at match end, so leaving before the overlay appears keeps it.
+   *
+   * Every write a duel produces used to sit inside `showResults()`, which `onMatchEnd` schedules ~1.3 s later
+   * through the screen's scope-bound `later()`. That window is live and interactive — `hold()` is only reached
+   * *inside* `showResults`, so both arenas are still running and `#pause` is still bound — and Pause → Quit
+   * runs `cleanup()` → `scope.dispose()`, which clears every pending timer. A completed ten-round match paid
+   * the child nothing: no coins, no dojo move, no accuracy, no certificate, no history row, and no toast or
+   * log to tell it from a match that was never finished. A child who wins and immediately backs out to show
+   * someone got nothing for it.
+   *
+   * **The quit here is at the EARLIEST point the window opens, not the latest** (#375 round 1, B1). Waiting
+   * for `state().ended` would only prove the ~1.3 s the overlay's own timer holds, and miss the larger
+   * ~1.45 s before it: winning the last round schedules `endWave` (~1 s) and then `waveEnd` (~450 ms), both
+   * scope-bound, and only that second callback runs `duel.waveEnd()` → `end()` → `onMatchEnd`. Throughout it
+   * `duel.ended` is false, so `syncPaused()` leaves both arenas running and `#pause` bound. So this polls for
+   * `round === rounds && decided && !ended` — the instant the last round is won, before either timer — and
+   * quits there. A commit that happened any later than that would fail this.
+   *
+   * The clicks after the poll are synchronous: `#pause` builds the pause modal in the same task, so `#quit`
+   * is in the DOM by the time this asks for it.
+   */
+  test('a match left through Pause the instant the last round is won is still paid, recorded and filed (#375, #441)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    const topic = await page.evaluate(() => window.__sna.state().topic);
+    for (let r = 1; r <= 9; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');                     // rounds 1-9; round 10 is driven by hand below
+    }
+    // Round 10 is sliced, read and quit inside ONE page.evaluate, so no timer of any kind can run in between
+    // (#375 round 2, B2). Polling for `decided && !ended` and quitting afterwards could not tell the winning
+    // slice's commit from the `waveEnd` one 250 ms later: `{round: 10, decided: true, ended: false}` is true
+    // of both, so the test passed either way and its pass depended on beating `endWave` on the runner. Here
+    // `answer('a')` and the `state()` read are in the same synchronous task, so `coins: 10` can only have
+    // been written by the commit inside `duel.hit()` itself.
+    await page.waitForFunction(() => window.__sna.state().round === 10);
+    await page.waitForFunction(p => { const s = window.__sna.state(); return !s.decided && !s.ended && window.__sna.bubbles(p).some(b => b.label === s.answer); }, 'a');
+    const afterHit = await page.evaluate(() => {
+      const t0 = performance.now();
+      const ok = window.__sna.answer('a');
+      const ms = performance.now() - t0;            // the slice's whole task, commit included (#375 round 2, B3)
+      const s = window.__sna.state();
+      (document.querySelector('#pause') as HTMLButtonElement).click();
+      (document.querySelector('#quit') as HTMLButtonElement).click();
+      return { ok, ms, ...s };
+    });
+    expect(afterHit, 'the winning slice commits in its own task, not on a timer')
+      .toMatchObject({ ok: true, round: 10, decided: true, ended: false, coins: 10, taught: { hits: 10, tries: 10 } });
+    // #375 round 2, B3: `commitMatch` now runs inside the slice handler, which `Arena.onHit` calls from the
+    // render loop's own task. This is the measurement the game rules ask for before a change on that path is
+    // pushed. The budget is a ceiling on the WHOLE handler — hit detection, the burst, `floatText`, the
+    // toast and the four load/save round trips — and it only ever goes down (`.claude/rules/guardrails.md`).
+    // Observed headless over four runs: 1.5, 2.2, 2.7, 4.4 ms. One frame at 60 fps is 16.7 ms, and this task
+    // runs once per match. The render loop itself is held separately by `game.spec.ts`'s "still renders at
+    // speed" rail, which reads fps=60.3 ratio=1.00 on this head — unchanged, since no arena code moved.
+    console.log(`[guard rail] last-slice task = ${afterHit.ms.toFixed(1)} ms (commit included)`);
+    expect(afterHit.ms, 'the commit must not cost the slice its frame').toBeLessThan(16);
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
+    await expect(page.locator('.duel-end')).toHaveCount(0);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.coins, 'a coin per decided round reached the save').toBe(10);
+    expect(saved.progress[topic], 'and Sensei was told what Player 1 answered').toMatchObject({ hits: 10, tries: 10, plays: 0, stars: 0 });
+    // Exactly one of the three volume ids is the day's, and `dojoSeeds('fresh')` leaves it untouched, so the
+    // day's challenge carries this match's ten answers and the other two are absent.
+    const volume = (['correct15', 'correct20', 'correct25'] as const).map(id => saved.dojo.progress[id]).filter((n: number | undefined) => n !== undefined);
+    expect(volume, "the Daily Dojo heard about the match").toEqual([10]);
+    expect(saved.duels, 'the match itself outlived the overlay that never opened').toHaveLength(1);
+    expect(saved.duels[0]).toMatchObject({ winner: 'a', scoreA: 10, scoreB: 0, rounds: 10 });
+    expect(saved.certs, 'and the win filed its certificate').toHaveLength(1);
+    expect(saved.certs[0]).toMatchObject({ id: 'year1:duel', title: 'Ninja Duel', duel: true });
+  });
+
+  /**
+   * The draw half of the same window (#375 round 2, B1): a last round **nobody slices**.
+   *
+   * The test above only ever exercises a last round that is WON, so the commit in `waveEnd` — the one that
+   * covers an undecided last round — was dead code under the whole suite: deleting it left 1932 unit tests
+   * and all eleven duel e2e tests green. Two children failing to slice the answer in time on the last round
+   * is an ordinary way for a match to end, and quitting right then is exactly what #375/#441 are about.
+   *
+   * The quit is driven off `Arena`'s own `waveActive`, not off a timeout and not off anything the commit
+   * writes. `waveActive` flips false in the same statement that calls `onWaveEnd` (`arena.ts`), which is what
+   * sets `waveDone[p]`, so "both false" is precisely the moment the screen's own `waveEnd(p)` runs its body:
+   * the early commit below, then `duel.settleDraw()` (#301/#425 — announced synchronously, not on a timer, so
+   * the round is already `decided` by the time this reads `state()`), and only THEN the deferred
+   * `duel.waveEnd()` — which would advance and end the match — is left sitting on its `HOLD.draw + 100` timer
+   * when `dispose()` cancels it. Reading `bubbles()` instead would be wrong: a bubble that is fading is
+   * already out of `bubbles()` while the arena still counts it live, so the poll could fire before the commit
+   * and fail for a reason that is not the bug. It needs a cast because `waveActive` is private to `Arena` —
+   * deliberately, since only this rail has any business reading it.
+   */
+  test('a last round nobody slices is still paid and recorded if the child quits before the overlay (#375, #441)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    const topic = await page.evaluate(() => window.__sna.state().topic);
+    for (let r = 1; r <= 9; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');
+    }
+    // Round 10 arrives and both waves launch; then nobody slices, and they run out.
+    await page.waitForFunction(() => window.__sna.state().round === 10);
+    const waveActive = (p: 'a' | 'b') => (window.__sna.arenas[p] as unknown as { waveActive: boolean }).waveActive;
+    await page.waitForFunction(`(${waveActive})('a') && (${waveActive})('b')`);
+    const quitState = await page.evaluate(async fn => {
+      const active = eval(`(${fn})`) as (p: 'a' | 'b') => boolean;
+      await new Promise<void>(done => {
+        const tick = () => { if (!active('a') && !active('b')) done(); else requestAnimationFrame(tick); };
+        tick();
+      });
+      const s = window.__sna.state();
+      (document.querySelector('#pause') as HTMLButtonElement).click();
+      (document.querySelector('#quit') as HTMLButtonElement).click();
+      return s;
+    }, waveActive.toString());
+    // Decided (as a draw, by `settleDraw()` above) but unended: `duel.waveEnd()` — which would advance and
+    // end the match — was still sitting on its deferred timer when `dispose()` cleared it. Only the early
+    // commit in the screen's own `waveEnd(p)` can have paid this match.
+    expect(quitState, 'quit with the last round drawn and the match not ended')
+      .toMatchObject({ round: 10, decided: true, ended: false, coins: 9 });
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    await expect(page.locator('.duel-end')).toHaveCount(0);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    // Nine decided rounds, not ten: the last one paid nobody, which is what makes this the draw path.
+    expect(saved.coins, 'a coin per DECIDED round — round 10 decided nothing').toBe(9);
+    expect(saved.progress[topic], 'Player 1 answered nine rounds; round 10 he never answered at all')
+      .toMatchObject({ hits: 9, tries: 9, plays: 0, stars: 0 });
+    const volume = (['correct15', 'correct20', 'correct25'] as const).map(id => saved.dojo.progress[id]).filter((n: number | undefined) => n !== undefined);
+    expect(volume, 'the Daily Dojo heard about the nine').toEqual([9]);
+    expect(saved.duels, 'the match still happened, and a 9-0 is still a Player 1 win').toHaveLength(1);
+    expect(saved.duels[0]).toMatchObject({ winner: 'a', scoreA: 9, scoreB: 0, rounds: 10 });
+    expect(saved.certs, 'and a Player 1 win earns its certificate however the last round went').toHaveLength(1);
   });
 });

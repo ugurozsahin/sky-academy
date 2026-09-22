@@ -120,6 +120,9 @@ export class Arena {
     // The question card moves too, and its measured bottom is what bounds the next wave's apex
     // (`play-session.ts` re-measures on the next question; this keeps the one in between in the box).
     this.topInset = Math.min(this.topInset * sy, to.H * 0.5);
+    this.strokeStale = true;   // #331's rule, at the other boundary that invalidates coordinates: `lastPt` is
+                                // in the OLD box and nothing above rescales it, so the next move must re-seat
+                                // the anchor rather than draw from a point that no longer means anything (#463)
   }
 
   /** Bubble radius scales with viewport; words get wider bubbles. */
@@ -233,17 +236,25 @@ export class Arena {
 
   // ---------- input ----------
   private pos(e: PointerEvent) { const r = this.canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  // #464: one predicate for "the game is not accepting real input right now", read at every site that must
+  // agree on it (`onDown`, `onMove`, the loop's per-frame poll below) — #464 was exactly `onDown` alone not
+  // yet enforcing the rule the other two already did, so a fourth site copying the condition by hand is
+  // precisely the failure mode to close off, not repeat.
+  private stalls() { return this.paused || this.frozen; }
   private onDown = (e: PointerEvent) => {
-    if (this.paused || this.frozen) return;
     this.activeId = e.pointerId; this.moved = 0; this.downPos = this.pos(e); this.lastPt = this.downPos;
-    this.strokeStale = false;                       // #331: a stroke that starts here spans no freeze — never skip its first segment
     this.trail = [{ ...this.downPos, t: performance.now() }];
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (this.stalls()) { this.strokeStale = true; return; }   // #464: a press during the outcome hold is a real
+    // intent, not nothing — record it as this canvas's stroke so `onMove` can pick it up, but stale, so the first
+    // move after the freeze arms it (same #331 contract) rather than cashing in the bubble under the finger right now,
+    // which belongs to the wave that is about to clear.
+    this.strokeStale = false;                       // #331: a stroke that starts here spans no freeze — never skip its first segment
     const b = this.bubbleAt(this.downPos.x, this.downPos.y);
     if (b) this.hitBubble(b, false);
   };
   private onMove = (e: PointerEvent) => {
-    if (this.activeId === null || this.paused || this.frozen) { if (this.activeId === e.pointerId) this.strokeStale = true; return; }
+    if (this.activeId === null || this.stalls()) { if (this.activeId === e.pointerId) this.strokeStale = true; return; }
     if (e.pointerId !== this.activeId) return;      // a second finger's drift is not this stroke (#16: the move half of the rule below)
     const p = this.pos(e);
     // #331: a freeze is not a pause mid-stroke, it is a gap in the game. A finger that never lifts kept
@@ -314,7 +325,7 @@ export class Arena {
     // #331: the home of the rule. A freeze lasting at least one frame stales the stroke whichever field caused
     // it and whoever set it — `paused` is assigned from the play screen and has no entry point of its own — so
     // a finger held perfectly still through the outcome hold, sending no pointermove at all, is caught here.
-    if (this.paused || this.frozen) this.strokeStale = true;
+    if (this.stalls()) this.strokeStale = true;
     if (!this.paused) { this.time += dt; for (let left = dt; left > 0; left -= 1 / 60) this.update(Math.min(left, 1 / 60), now); }
     this.cull(now);
     this.render(now);

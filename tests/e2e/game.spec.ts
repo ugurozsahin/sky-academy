@@ -651,6 +651,57 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.unlock')).toHaveCount(3);              // 120 coins → the three coin stickers at 30, 70, 120 (#114: the rest is achievement-based, not more coins)
     const dojoBonus = (await results.locator('.dojo-bonus .gain').allTextContents()).reduce((n, t) => n + Number(t.replace(/\D/g, '')), 0);   // today's Daily Dojo may pay for the mission / 3 stars / no slips / combo
     await expect(results.locator('#cert')).toBeVisible();                   // printable certificate for a completed mission
+    // guard rail (#398 round 1/2, B1/B2), on the exact scenario the review found both in: a mission this tall
+    // (a medal, three unlocks and a dojo bonus) overflows the overlay, which is what exposes them.
+    // B1 — a `position: sticky` nav row held a fixed on-screen band for most of the scroll range, so
+    // reordering the DOM only changed which *other* element's static position fell into that band, never
+    // whether the overlap happened — caught only by sweeping scroll positions, not the one spot
+    // `scrollIntoViewIfNeeded()` happens to land on (round 2 review). `.row.nav` is now a flex sibling outside
+    // the scrolling `.scroll` region, so no scroll position should put anything underneath it.
+    //
+    // Settle `.modal`'s own 350ms pop-in (`transform: scale(.7 → 1)`) before capturing ANY position on this
+    // overlay — found chasing `pr-test-analyzer`'s round-3 desktop flake (6/10 pass) and a real failure of
+    // this exact assertion in my own desktop run. A scale still in flight shifts every descendant's rect by a
+    // different amount from the transform origin, so `scrollerBox` captured mid-animation and `stepBox`
+    // captured later, once it has settled, describe two different geometries — the sweep below can then miss
+    // every position where the button is genuinely visible. See the K.O. test further down for the same
+    // mechanism measured directly.
+    await page.waitForTimeout(500);
+    const scroller = results.locator('.scroll');
+    const scrollerBox = (await scroller.boundingBox())!;
+    const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(maxScroll, 'this scenario must actually overflow, or the sweep below proves nothing').toBeGreaterThan(0);
+    let sawCertOnScreen = false;
+    // A tolerance wider than one pixel: `scrollHeight`/`clientHeight` are integers and the fractional
+    // `getBoundingClientRect()` values they are compared against are not, so the very last step or two of a
+    // sweep can read a few px "short" of the scroller's box with no scroll position actually cutting it off.
+    const slack = 24;
+    // `maxScroll` itself is always swept explicitly (round 3 review, non-blocking B2): a fixed stride can
+    // land short of it by up to (stride - 1)px on a viewport/content combination where `maxScroll` is not a
+    // multiple of the stride, which left the last few pixels of real scroll range untested.
+    const steps = []; for (let top = 0; top < maxScroll; top += 15) steps.push(top); steps.push(maxScroll);
+    for (const top of steps) {
+      await scroller.evaluate((el, t) => { el.scrollTop = t; }, top);
+      const stepBox = (await results.locator('#cert').boundingBox())!;
+      const onScreen = stepBox.y >= scrollerBox.y - slack && stepBox.y + stepBox.height <= scrollerBox.y + scrollerBox.height + slack;
+      if (!onScreen) continue;   // cert clipped by the scroll region at this position — nothing visible to hit-test
+      sawCertOnScreen = true;
+      const atCertTop = await page.evaluate(({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        return el ? `${el.id} ${el.className}` : '';
+      }, { x: stepBox.x + stepBox.width / 2, y: stepBox.y + 2 });
+      expect(atCertTop, `at scrollTop ${top}, the nav row must not paint over the certificate button`).not.toContain('nav');
+      expect(atCertTop, `at scrollTop ${top}, the point must land on the certificate button itself`).toContain('cert');
+    }
+    expect(sawCertOnScreen, 'the sweep must actually see the certificate button visible at some scroll position').toBe(true);
+    // B2 — `.modal.results` switching to a flex column stretched `.hero-big` (normally ~200px, shrink-wrapping
+    // its avatar art) to the column's full width, which pushed `.speech` — positioned at 68% of ITS OWN box —
+    // off the right edge of a phone screen on any headline longer than the shortest one.
+    const heroBox = (await results.locator('.hero-big').boundingBox())!;
+    expect(heroBox.width, 'hero-big must keep shrink-wrapping its ~200px avatar art').toBeLessThan(260);
+    const speechBox = (await results.locator('.speech').boundingBox())!;
+    expect(speechBox.x + speechBox.width, 'the speech bubble must stay on screen')
+      .toBeLessThanOrEqual(page.viewportSize()!.width);
     const png = await page.evaluate(() => window.__sna.certificate());
     expect(png).toMatch(/^data:image\/png;base64,/); expect(png.length).toBeGreaterThan(20_000);
 
@@ -1655,6 +1706,50 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#boss small')).toContainText('KOs 1');
   });
 
+  /**
+   * guard rail (#398 round 3, B1). `.ko` is `position: absolute`, and its containing block moved when the
+   * overlay became a `.modal.results` > `.scroll` > (content) shell (round 2): `.scroll` declared no
+   * `position`, so `.ko` skipped past it to `.modal.results` itself and stayed pinned to the modal's corner
+   * while the hero art it decorates scrolled away underneath it. Coverage was a real gap on both axes: the
+   * only test that renders `.ko` (above) never overflows the overlay, and neither scroll-sweep test (this
+   * file's mission one, `duel.spec.ts`'s) ever renders `.ko`. A 118-coin purse crosses the 120-coin sticker
+   * threshold on the KO's own payout, which is enough on its own to overflow a 390x664 viewport.
+   */
+  test('Boss Battle: the K.O. badge scrolls with the hero art it is stamped on, not pinned to the modal (#398)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 118 });
+    await page.click('.island[data-year="year2"]');
+    await page.click('#boss');
+    await expect(page.locator('.villain.boss img')).toBeVisible();
+    await page.waitForFunction(() => window.__sna.state().bossHp === 8);
+    await page.evaluate(() => { window.__sna.session.bossHp = 1; });   // skip straight to the final blow
+    await solveCurrent(page);
+    const results = page.locator('.results');
+    await expect(results.locator('h2')).toHaveText('Knock-out!');
+    await expect(results.locator('.ko')).toBeVisible();
+    const scroller = results.locator('.scroll');
+    const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(maxScroll, 'this seed must actually overflow the overlay, or the sweep below proves nothing').toBeGreaterThan(0);
+    // `.modal`'s own 350ms pop-in (`transform: scale(.7 → 1)`) shifts every descendant's rect by a different
+    // amount depending on its distance from the transform origin while it is still running, which is enough
+    // on its own to move the ko-to-hero-big gap by the tens of pixels this assertion is trying to measure —
+    // observed directly, and unrelated to scrolling. Settled well before the sweep test above ever reads a
+    // position, because it does not compare two time-separated absolute measurements the way this one does.
+    await page.waitForTimeout(500);
+    const gap = async () => {
+      const ko = (await results.locator('.ko').boundingBox())!;
+      const hero = (await results.locator('.hero-big').boundingBox())!;
+      return ko.y - hero.y;
+    };
+    const gapAtTop = await gap();
+    await scroller.evaluate((el, t) => { el.scrollTop = t; }, maxScroll);
+    const gapAtBottom = await gap();
+    // Pinned to the modal (the round 3 defect) holds `.ko` at a near-constant screen position while `.hero-big`
+    // moves the full `maxScroll` distance underneath it, so the gap changes by roughly `maxScroll`. Scrolling
+    // correctly with the content keeps the two in lock-step, so the gap barely moves at all.
+    expect(Math.abs(gapAtBottom - gapAtTop), `the K.O. badge must scroll with the hero art (gap moved by ${gapAtBottom - gapAtTop}px, `
+      + `not the modal's fixed position (which would move it close to maxScroll = ${maxScroll}px)`).toBeLessThan(10);
+  });
+
   test('Memory Match: cards flip, a miss turns back, pairs lock, and the finished board is counted', async ({ page }) => {
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="reception"]');
@@ -2422,6 +2517,52 @@ test.describe('profile picker (#20 slice 2)', () => {
     await page.click('#rewards');
     await expect(page.locator('.home.rewards')).toBeVisible();
     await expectFitsViewport(page, 'rewards screen');
+  });
+
+  /**
+   * guard rail (#414): the same topbar row, on the two widths #20 slice 2's own test never measured — a 320px
+   * phone, and a 360px one once the coin pill carries four digits and a streak. Measured on `main`, `#spk`'s
+   * right edge sat at 344 against a 320px viewport (24px off) and, with a four-figure purse and a streak, at
+   * 388 against 360 (28px off) — a child on a small phone saw the read-aloud button sliced by the screen edge,
+   * with horizontal scroll on every screen the shared topbar appears on. The empty-purse case at 360px happened
+   * to fit on `main` (344/360), so both purses are checked at both widths rather than assuming one implies the
+   * other.
+   */
+  test('the topbar fits a 320px and a 360px phone, empty purse and a four-figure one with a streak (#414)', async ({ page }) => {
+    for (const [w, h] of [[320, 568], [360, 640]] as const) {
+      for (const purse of [{ coins: 40, days: 0 }, { coins: 1250, days: 12 }]) {
+        await page.addInitScript(save => {
+          localStorage.removeItem('sna:v1');
+          localStorage.setItem('sna:v1', save);
+        }, JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: purse.coins, spent: 0, onboarded: true, streak: { last: '', days: purse.days } }));
+        await page.setViewportSize({ width: w, height: h });
+        await page.goto('/');
+        await expect(page.locator('.home.map')).toBeVisible();
+        const spk = await page.locator('#spk').boundingBox();
+        expect(spk!.x + spk!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the read-aloud button is sliced by the screen edge`)
+          .toBeLessThanOrEqual(w);
+        expect(spk!.height, 'and it still clears the 44px touch floor (`design-language` §4)').toBeGreaterThanOrEqual(44);
+        // round 3 review, B1: `.icon-btn` had no `flex-shrink: 0`, so once `.hero` hit its own floor the
+        // remaining deficit shrank #snd/#spk below the 44px touch floor (measured 41.5px) with no overflow to
+        // catch it — height alone can't see a width-only shrink, so both buttons' width is checked too.
+        expect(spk!.width, 'and the read-aloud button keeps its 44px width, not just its height').toBeGreaterThanOrEqual(44);
+        const snd = await page.locator('#snd').boundingBox();
+        expect(snd!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the mute button is squeezed under the touch floor`)
+          .toBeGreaterThanOrEqual(44);
+        // round 1 review, B1: `.hero`'s `min-width: 0` alone let the shrink pressure fall on the fixed-size
+        // portrait too (54px -> 12px at this exact scenario), not just on the text it was meant for.
+        const portrait = await page.locator('.hero .portrait').boundingBox();
+        expect(portrait!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the ninja's portrait is squeezed instead of the text`)
+          .toBeGreaterThanOrEqual(53);
+        // round 2 review, B1: pinning the portrait moved 100% of the remaining shrink onto the identity text,
+        // which collapsed to 0×0 (invisible, not truncated) at this exact scenario. The child's own name is
+        // #414's explicit "name last" priority, so the name has to render at a non-zero width everywhere.
+        const heroName = await page.locator('.hero b').boundingBox();
+        expect(heroName!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the ninja's name has vanished, not just truncated`)
+          .toBeGreaterThan(0);
+        await expectFitsViewport(page, `sky map at ${w}x${h}, ${purse.coins} coins/${purse.days}-day streak`);
+      }
+    }
   });
 
   /**

@@ -125,25 +125,39 @@ export class Duel {
     this.advance();
   }
   private advance() {
-    if (this.round >= this.rounds) { this.end(); return; }
+    if (this.onLastRound) { this.end(); return; }   // the getter, not a second copy of the comparison (#375 round 2, note 5)
     this.nextQuestion();
   }
+  /** True once the match is on its last round — the round after which `waveEnd()` ends it rather than advancing. */
+  get onLastRound() { return this.round >= this.rounds; }
   /**
-   * `incomplete` is set by `nextQuestion()`'s catch above, never by `advance()`'s ordinary call: a match that
-   * reached its target round count is not the same event as one a generator throw cut short (#444 review, PR
-   * #502 round 2, B1). Reported `rounds` reflects the difference — `this.rounds`, the configured target, is
-   * only true of a finished match; an aborted one reports `this.round - 1`, the rounds actually played, since
-   * the round that failed to draw never became a question either child saw, so it was not one of them.
+   * The match's result as it stands, without ending the match or firing anything (#375 round 1, B1).
+   *
+   * **Final, not provisional, once the last round is settled**, which is what lets a caller commit a finished
+   * match ahead of the screen's own pacing timers. Nothing after a round is decided can move any field this
+   * reads: `hit()` returns `'ignored'` before it touches `tally` once `roundDecided` is set, and a draw adds
+   * to neither score. So `result()` taken the moment the last round is decided — or the moment its wave runs
+   * out undecided, a draw scoring nothing — equals the one `end()` builds later.
+   *
+   * `incomplete` is passed by `end()` alone — never by the two early-commit call sites in `src/ui/duel.ts`,
+   * both of which only fire once `onLastRound` is true, so they can never be the aborted case. Reported
+   * `rounds` reflects the difference (#444 review, PR #502 round 2, B1): `this.rounds`, the configured
+   * target, is only true of a finished match; an aborted one reports `this.round - 1`, the rounds actually
+   * played, since the round that failed to draw never became a question either child saw, so it was not one
+   * of them.
    */
-  private end(incomplete = false) {
-    if (this.ended) return;
-    this.ended = true;
+  result(incomplete = false): DuelResult {
     const winner: DuelPlayer | 'draw' = this.scoreA > this.scoreB ? 'a' : this.scoreB > this.scoreA ? 'b' : 'draw';
     // A snapshot, not the live counters: a `hit()` after the match ends returns 'ignored' and cannot move
     // them, but the result outlives this screen's rematch and must not be a window onto a restarted tally.
     const tally = { a: { ...this.tally.a }, b: { ...this.tally.b } };
     const rounds = incomplete ? this.round - 1 : this.rounds;
-    this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds, tally, incomplete });
+    return { winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds, tally, incomplete };
+  }
+  private end(incomplete = false) {
+    if (this.ended) return;
+    this.ended = true;
+    this.ev.onMatchEnd(this.result(incomplete));
   }
 }
 

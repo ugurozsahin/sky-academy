@@ -422,29 +422,28 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * | the question is carried by | covered here |
  * | --- | --- |
  * | `prompt`, `answer`, `hint`, `listen`, `sequence` | **yes** — `asked()` reads all five |
- * | a `visual` type in `VISUAL_QUESTION` (`objects`, `sentence`, `symmetry`) | **no rail here** — see below |
- * | a `visual` type outside it (`coins`, `numberline`, `chart`, …) | **no** |
+ * | `coins`, `numberline`, `chart` | **yes** — `asked()` reads them too, independently of `VISUAL_QUESTION` (#455) |
+ * | `objects`, `sentence`, `symmetry` (the #390 names in `VISUAL_QUESTION`) | **no rail here** — see below |
  * | `options` | **no** |
  *
- * Both noes are measured, and both are `main`'s behaviour rather than anything this change introduces.
- * `options`: `intervalCompare`'s own comment reads *"No hint: the bubbles **are** the durations"*, and
- * `y2-duration` at d2 gives 22 keys with 18 covering more than one comparison (#451). An unread `visual`:
- * `visualKey` returns `''` on a lookup miss, so `y1-coins` at d2 gives 14 keys with **12 covering more than
- * one spoken question** — one holding `£1 or 20p`, `£1 or 10p` and `£1 or 2p` — and `y1-line` d3 93 of 95,
- * `y2-line` d3 25 of 32, `y2-money` d1 30 of 33, `y2-stats` d2 **194 of 194**, worst key covering 77 charts,
- * where the chart *is* the question (#455).
+ * The one remaining no is measured, and is `main`'s behaviour rather than anything this change introduces:
+ * `intervalCompare`'s own comment reads *"No hint: the bubbles **are** the durations"*, and `y2-duration` at
+ * d2 gives 22 keys with 18 covering more than one comparison (#451).
  *
- * The allowlisted visuals get **no rail in this describe either**, which round 3's version of this table got
- * wrong (round 4, note 1): `asked()` omits `q.visual`, so deleting any single `VISUAL_QUESTION` entry leaves
- * both exact rails green and only the pre-existing #390 band rail above reddens. A fourth entry, or a new topic
- * carrying its question in an `objects`/`sentence` visual with a varying prompt, would reach no rail in this
- * file. That is the ones *inside* the allowlist and is not #455, which is the types outside it.
+ * The three #390 names still get **no rail in this describe**, which round 3's version of this table got wrong
+ * (round 4, note 1): `asked()` omits them, so deleting any single one of the three leaves both exact rails
+ * green and only the pre-existing #390 band rail above reddens. A fourth `VISUAL_QUESTION` entry in that shape
+ * — a new topic carrying its question in an `objects`/`sentence`/`symmetry`-like visual with a varying prompt —
+ * would reach no rail in this file. `coins`/`numberline`/`chart` do not share that gap: `asked()` reads them
+ * directly (#455), so deleting one of those three from `VISUAL_QUESTION` now reddens `two cards that ask the
+ * same thing never take two keys` below, the key having fallen behind the oracle it is measured against.
  *
- * Neither is keyed here, for the same reason in both cases: doing it unconditionally switches de-duplication
- * off wherever that field is decoration. `options` are a decoy pool on forty-odd topics, which is why `the key
- * ignores every field that carries presentation` pins the exclusion; and a `word` visual carries `orderQ`'s
- * *shuffled* display, so `y2-order` is correctly outside rather than missed. Both want the same thing — a
- * signal from the generator that its field is the question — which is #451 and #455, not this pull request.
+ * `options` is not keyed for the same reason `objects`/`sentence`/`symmetry` are not read by `asked()`:
+ * unconditionally folding it in switches de-duplication off wherever the field is decoration. `options` are a
+ * decoy pool on forty-odd topics, which is why `the key ignores every field that carries presentation` pins
+ * the exclusion; and a `word` visual carries `orderQ`'s *shuffled* display, so `y2-order` is correctly outside
+ * rather than missed. `options` wants the same remedy #455 already took — a signal from the generator that its
+ * field is the question — which is #451, not this pull request.
  *
  * So: no rail here names a topic, and within the carriers marked yes, a new topic is covered the day it ships.
  * The adjective-shaped version of that sentence is the mistake this file diagnoses two paragraphs up, and it
@@ -470,9 +469,9 @@ describe('the repeat key holds the whole question (#412)', () => {
    * reading either. Today there are none — `', '` appears in four sentence topics' prose and collides with
    * nothing.
    *
-   * What neither this nor the key sees: `options`, and a `visual` type outside `VISUAL_QUESTION`. The describe
-   * header enumerates it by carrier, with the measurements — `y2-duration` (#451), `y1-coins` and four more
-   * (#455).
+   * What neither this nor the key sees: `options`, and the three `VISUAL_QUESTION` types `asked()` does not read
+   * directly (`objects`, `sentence`, `symmetry`). The describe header enumerates it by carrier, with the one
+   * remaining measurement — `y2-duration` (#451).
    */
   const asked = (q: Question) => {
     // A superset of the key's own list, which is the point: `', '` is here and deliberately not there, because
@@ -482,7 +481,15 @@ describe('the repeat key holds the whole question (#412)', () => {
       for (const sep of LIST_SEPARATORS) if (s.includes(sep)) return s.split(sep).sort().join(sep);
       return s;
     };
-    return [q.prompt, q.answer, set(q.hint ?? ''), set(q.listen ?? ''), (q.sequence ?? []).join('\u0001')].join('\u0000');
+    // #455's three carriers read here too, independently of `VISUAL_QUESTION` — this is the requirement, not a
+    // copy of the key under test. `objects`/`sentence`/`symmetry` stay unread: the pre-existing gap the table
+    // above notes, covered instead by the `constantPromptBinary` band rail rather than by this oracle.
+    const v = q.visual;
+    const visual = v?.type === 'coins' ? [...new Set(v.coins)].sort((a, b) => a - b).join('/')
+      : v?.type === 'numberline' ? `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}`
+      : v?.type === 'chart' ? `${v.kind}/${v.rows.map(r => r.n).join(',')}`
+      : '';
+    return [q.prompt, q.answer, set(q.hint ?? ''), set(q.listen ?? ''), (q.sequence ?? []).join('\u0001'), visual].join('\u0000');
   };
   const playable = TOPICS.filter(t => t.input !== 'tracing');
 

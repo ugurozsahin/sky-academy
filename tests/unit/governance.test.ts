@@ -297,14 +297,30 @@ describe('no live rule points at the retired priority-order issue (#171)', () =>
                 'docs/WATCHDOG-PROMPT.md', 'README.md'];
   // Built from parts so this rail's own source does not contain the string it bans — otherwise the file
   // could never be checked by a sibling rail, and a reader grepping the repo gets a false hit here.
-  const RETIRED = '#' + '46';
+  //
+  // **It matches the issue number, not the digits (#466).** A bare `toContain` here read `#466` as a
+  // reference to the retired issue, and would have read every issue from #460 to #469 — and #4600 upward —
+  // the same way: a rail that turns red on an unrelated number nobody can change is one the next author
+  // reaches for rather than the rule. This does not narrow what is banned. `#46` is still refused in every
+  // position it can appear in prose, which the self-test below holds; only a longer number is let through.
+  const RETIRED = new RegExp('#' + '46' + '(?!\\d)');
 
   it.each(LIVE)('%s does not route work through it', (name) => {
     const text = readFileSync(new URL(name, root), 'utf8');
     expect(text.length, `${name} must be read from disk as text, or this rail checks nothing`)
       .toBeGreaterThan(300);
     expect(text, `${name} still points at the retired ordered list — work is chosen from the labels (#171)`)
-      .not.toContain(RETIRED);
+      .not.toMatch(RETIRED);
+  });
+
+  // Self-test the negative: a `.not.toMatch` whose pattern matches nothing passes for ever, which is the
+  // vacuity failure wearing the other sign — and this pattern was just narrowed, so what it still catches
+  // is the half worth asserting, not the half it now lets through.
+  it('the retired-pointer pattern still fires on every way the number is written', () => {
+    for (const fires of ['see #' + '46', 'the list (#' + '46' + ')', '#' + '46' + ', which is retired', '#' + '46' + '.'])
+      expect(fires, 'a real pointer at the retired issue must still be caught').toMatch(RETIRED);
+    for (const quiet of ['#' + '466', '#' + '460', '#' + '4601'])
+      expect(quiet, 'a different issue whose number begins with those digits is not a pointer').not.toMatch(RETIRED);
   });
 
   // The other half: removing the pointer is only right if something replaced it. A file with neither is a
@@ -401,6 +417,88 @@ describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
       .toMatch(/priority:P0`? before `?priority:P1/);
     expect(step2, 'and it must still keep the age tie-break, or two runs can disagree on which PR goes first')
       .toMatch(/oldest first/i);
+  });
+});
+
+
+/**
+ * #499 — a reviewer ran the whole e2e suite BEFORE the three agents that decide whether the tree survives.
+ * Measured over the 45 most recently merged pull requests: 51 blocking rounds against 45 merges, so about
+ * half of all reviewer suite runs were evidence about a head the same review was about to invalidate — and
+ * each was the third run of that suite on that tree, after the author's pre-push run and CI's.
+ *
+ * The rail is about ORDER, and it is written as order rather than as prose, because the thing that decays
+ * here is a sequence: somebody moves the browser command back up next to `npm test` and nothing else changes.
+ * Two anchors per file, each of them load-bearing on its own, and the rail asserts which comes first. It
+ * cannot be satisfied by a sentence claiming the order — only by the commands actually being in it.
+ *
+ * What this rail deliberately does NOT hold: that a reviewer obeys the order at run time. Nothing here can
+ * see a review's shell. What it holds is that the instruction still says it, which is the part that rots.
+ */
+describe('the browser runs after the agents, not before them (#499)', () => {
+  const root = new URL('../../', import.meta.url);
+
+  it('the reviewer prompt puts the agents before the browser in STEP 2', () => {
+    const text = readFileSync(new URL('docs/REVIEWER-PROMPT.md', root), 'utf8');
+    const step2 = text.slice(text.indexOf('STEP 2 — REVIEW'), text.indexOf('Four things make a PR unmergeable'));
+    expect(step2.length, 'STEP 2 must be read from disk as text, or this rail checks nothing').toBeGreaterThan(500);
+    // Anchored on the literal instruction to RUN the agents, not merely on the word "agents" appearing
+    // somewhere earlier — a sentence that mentions review agents in passing and then tells a run to fire
+    // playwright immediately used to satisfy a bare indexOf ordering check (#500 round 1, B1).
+    const agents = step2.indexOf('run the three vendored review agents on the diff');
+    const browser = step2.indexOf('playwright test');
+    expect(agents, 'STEP 2 must tell a run to RUN the three vendored review agents on the diff, not merely mention agents in passing').toBeGreaterThan(-1);
+    expect(browser, 'STEP 2 must still tell a run to run the suite before it merges — this is an ordering rail, not a deletion').toBeGreaterThan(-1);
+    expect(browser, 'STEP 2 runs the suite before the agents again: about half of those runs are on a head the same review then invalidates (#499)')
+      .toBeGreaterThan(agents);
+    // The order alone is not the rule the owner asked for (2026-09-22): a finding means the suite does not
+    // run AT ALL, and a review with no finding runs it as the guarantor. Both halves are pinned, because
+    // "last" without "only if" is the version that still pays for half of these runs.
+    // Required BETWEEN the agents anchor and the browser command, not merely somewhere in STEP 2 — so the
+    // finding-stops-the-suite rule actually governs the playwright command rather than sitting unconnected
+    // elsewhere in the same paragraph (#500 round 1, B1).
+    const between = step2.slice(agents, browser);
+    expect(between, 'STEP 2 must say a finding stops the suite running, and that rule must sit between the agents step and the playwright command (#499)')
+      .toMatch(/does not run/);
+    expect(between, 'and that a review with no finding runs it as the guarantor, governing the playwright command that follows it (#499)')
+      .toMatch(/no finding[\s\S]{0,60}guarantor/);
+  });
+
+  it('the review-pr skill opens §2 with the cheap checks and no browser in them', () => {
+    const skill = readFileSync(new URL('.claude/skills/review-pr/SKILL.md', root), 'utf8');
+    const s2 = skill.slice(skill.indexOf('## 2. '), skill.indexOf('## 3. '));
+    expect(s2.length, '§2 must be read from disk, and §3 must still follow it').toBeGreaterThan(500);
+    // The FIRST fenced block in §2 is the one a reviewer runs before reading anything. A browser command in
+    // it is #499 restored, whatever the prose around it says.
+    const parts = s2.split('```');
+    const first = parts[1];
+    expect(first, '§2 must still open with a runnable block').toBeTruthy();
+    expect(first, "§2's first block is what runs before the diff is read — it must be the seconds-long checks, not the suite (#499)")
+      .not.toMatch(/playwright/);
+    expect(first, 'and it must still be the real cheap three, or the block has been gutted rather than reordered').toMatch(/npm test/);
+    // Exactly two fenced command blocks, and the text BETWEEN them must be what governs the second one —
+    // not merely "playwright" appearing somewhere later in §2. A §2 that puts the browser block straight
+    // after the first one, with an "immediately, before the diff or the agents" instruction ahead of it and
+    // the guarantor/does-not-run language pushed into unrelated filler afterward, used to pass every check
+    // in this block on word presence alone (#500 round 1, B1, pr-test-analyzer).
+    expect(parts.length, '§2 must have exactly two fenced command blocks — the cheap checks, then the browser (#499)').toBe(5);
+    const [, , between, second] = parts;
+    expect(second, 'the second fenced block must be the browser commands, not renamed or moved (#499)')
+      .toMatch(/playwright test --project=mobile/);
+    expect(between, 'the text immediately before the browser block must say it runs only as the guarantor for a clean review — not merely mention that somewhere later in §2 (#499)')
+      .toMatch(/guarantor/);
+    // ...and the suite is still REQUIRED later in the same section: this issue reorders it, never drops it.
+    expect(s2, '§2 must still require the mobile suite before a clear or a merge (#499)').toMatch(/playwright test --project=mobile/);
+    expect(s2, "§2 must still carry the non-run's prescribed spelling").toContain('e2e not run (env)');
+    // The owner's sharpening (2026-09-22): a finding means the suite does not run at all — no exception, not
+    // even a finding about runtime behaviour. That case is real and §2 must still answer it, but with a
+    // TARGETED REPRODUCTION rather than the suite. Both halves are pinned: drop the first and the rule loses
+    // its teeth; drop the second and a reviewer blocks on an untested runtime claim with nothing behind it.
+    expect(s2, '§2 must say a finding stops the suite running at all (#499)').toMatch(/the suite does not run/);
+    expect(s2, '§2 must still answer a runtime-behaviour finding, with a targeted reproduction rather than the suite (#499)')
+      .toMatch(/targeted reproduction/);
+    expect(s2, "and must name the suite's one job on a review, so \"last\" is not read as \"optional\" (#499)")
+      .toMatch(/guarantor/);
   });
 });
 
@@ -1735,7 +1833,8 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
  * green about a file whose §6 said the opposite. Two skills' rails now sit behind one piece of code, and that
  * was weighed: a slicer bug hits both, but each block keeps its own vacuity guard (`keys` must be exactly
  * `[1..7]`) against its own file, so a slicer that matched nothing fails both loudly rather than passing both
- * quietly. Divergence, by contrast, fails neither. A third skill rail uses this too, or says why not.
+ * quietly. Divergence, by contrast, fails neither. A third skill rail uses this too, or says why not —
+ * the #466 block does (`open-pr` §4), and it is why `slice()` below sits beside this rather than in a third copy.
  *
  * What it returns, and why each is there:
  *  - `SECTIONS` — number → `{ flat, raw, heading }`. `flat` is whitespace-normalised (wrapping is prose, not a
@@ -1753,11 +1852,17 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
  *    then on an absent section; then, separately, on an empty one — `if (!text)` conflated the two, and "no
  *    section 5" sends the next editor looking for a heading that is there.
  */
+/** Whitespace-normalised text, trimmed. `sliceSkill` and the #326/#466 blocks share this one; seven other
+ *  `const flat = …` locals in this file do NOT trim and are therefore a different function, so they were left
+ *  alone rather than half-merged (PR #469 round 2, note 2). Merging them is its own change, with its own
+ *  reading of whether any rail depends on the untrimmed edges. */
+const flatten = (t: string) => t.replace(/\s+/g, ' ').trim();
+
 function sliceSkill(path: string) {
   const raw = readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
   /** `open-pr/SKILL.md` in a message, not the whole repo path — the same spelling the two rails always used. */
   const file = path.replace(/^\.claude\/skills\//, '');
-  const flat = (t: string) => t.replace(/\s+/g, ' ').trim();
+  const flat = flatten;   // one copy, not two (PR #469 review, note 3): the hoist that closed #258 left its own duplicate directly above it
   const SECTIONS = new Map<number, { flat: string; raw: string; heading: string }>();
   const DUPLICATE_HEADINGS: number[] = [];
   for (const m of raw.matchAll(/^## (\d+)\.([^\n]*)\n([\s\S]*?)(?=^## \d+\.|$(?![\s\S]))/gm)) {
@@ -1778,6 +1883,44 @@ function sliceSkill(path: string) {
   return { raw, flat, SECTIONS, DUPLICATE_HEADINGS, ALL_HEADINGS, PREAMBLE, S };
 }
 
+
+
+/**
+ * The text between one rule's own heading and the next one's, with the non-vacuity floor applied **here**
+ * rather than by the caller. Throws — never returns a short or empty window — and names which anchor and
+ * which rule, because the slicer aborting a whole `it` is only readable if it says what moved.
+ * `end: null` means "to the end of the text given", which is what a rule at the end of its section needs;
+ * an open-tailed window's floor gets monotonically easier to clear as text is appended after it, so bound
+ * the text you pass in rather than relying on the floor alone.
+ *
+ * This is the second helper `sliceSkill` above shares with its callers, and for the same reason: two copies
+ * of a slicer is how #258 happened — the `add-guard-rail` copy grew a duplicate-heading guard, `open-pr`'s
+ * did not, and one rail reported green about a file whose §6 said the opposite. It was written for #326 and
+ * hoisted here by #466, which was the third block to want it; the two copies had already drifted apart in
+ * their comments before either moved.
+ *
+ * Bought, line by line, by blocking rounds on PR #440: the exactly-once guard on `start` (a pasted duplicate
+ * heading is a decoy), the same guard on `end` (a second `**Merge**` truncates the window silently while
+ * its floor still clears), the ordering check, and the floor living inside — `slice(0, 460)` was a floor
+ * that could not fail, and a guard a caller may forget is a guard callers forget.
+ */
+
+const slice = (text: string, label: string, start: string, end: string | null, min: number) => {
+  const count = (needle: string) => text.split(needle).length - 1;
+  if (count(start) !== 1)
+    throw new Error(`${label}: the start anchor "${start}" appears ${count(start)} times, expected exactly once`);
+  let body = text.split(start)[1];
+  if (end !== null) {
+    if (count(end) !== 1)
+      throw new Error(`${label}: the end anchor "${end}" appears ${count(end)} times, expected exactly once`);
+    const cut = body.split(end)[0];
+    if (cut === body) throw new Error(`${label}: "${end}" does not follow "${start}" — the section was reorganised`);
+    body = cut;
+  }
+  if (body.trim().length < min)
+    throw new Error(`${label}: ${body.trim().length} characters of body, under the floor of ${min} — the rule was gutted, so every assertion on it would be vacuous`);
+  return body;
+};
 
 /**
  * The `open-pr` skill's load-bearing lines (#180).
@@ -2774,10 +2917,10 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_418;   // → 21,418: the pulse-stamp sentence in STEP 1 (#439), paid for in the cadence note, both bootstrap asides, the game description in the intro, the `watchdog` bullet and STEP 4's QA aside   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
+  const ROUTINE_PROMPT_BUDGET = 21_412;   // → 21,412 (#466): STEP 3 restates §4 and enumerates what the skill adds, so the sweep and self-agent rules needed a pointer there or a run reading the step got a complete-looking account — paid for by shortening the review-gate clause and the WIP sentence, whose instructions both survive beside the cut words   // → 21,418: the pulse-stamp sentence in STEP 1 (#439), paid for in the cadence note, both bootstrap asides, the game description in the intro, the `watchdog` bullet and STEP 4's QA aside   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 9_988;   // → 9,988: the pulse-stamp sentence after STEP 1 (#439), paid for in the bootstrap aside, the cadence note, the game description in the intro, STEP 2's fork sentence and rule 1's re-run clause (which the `Do NOT:` line already carries verbatim)   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
+  const REVIEWER_PROMPT_BUDGET = 9_968;   // → 9,968: a finding stops the suite running at all, not merely last (#499, owner 2026-09-22), paid for in rule 2 lead-in, the Do NOT line re-listing the four rules above it, and the commands the review-pr skill already owns   // → 9,976: STEP 2 reordered so the browser follows the agents (#499), paid for by reducing the mobile/desktop recording rule to a pointer at its home in `review-pr` §2   // → 9,988: the pulse-stamp sentence after STEP 1 (#439), paid for in the bootstrap aside, the cadence note, the game description in the intro, STEP 2's fork sentence and rule 1's re-run clause (which the `Do NOT:` line already carries verbatim)   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -3152,37 +3295,13 @@ describe('the reviewer routine keeps a pulse, and something reads it (#327, #320
 describe('a reviewer run does not hold two diffs at once (#326)', () => {
   const skill = () => readFileSync(new URL('../../.claude/skills/review-pr/SKILL.md', import.meta.url), 'utf8');
   const prompt = () => readFileSync(new URL('../../docs/REVIEWER-PROMPT.md', import.meta.url), 'utf8');
-  const flat = (t: string) => t.replace(/\s+/g, ' ');
-
-  /**
-   * The text between one rule's own heading and the next one's, with the non-vacuity floor applied here
-   * rather than by the caller. Throws — never returns a short or empty window — and names which anchor and
-   * which rule, because the slicer aborting the whole `it` is only readable if it says what moved.
-   * `end: null` means "to the end of the text given", which is what a rule at the end of its section needs.
-   */
-  const slice = (text: string, label: string, start: string, end: string | null, min: number) => {
-    const count = (needle: string) => text.split(needle).length - 1;
-    if (count(start) !== 1)
-      throw new Error(`${label}: the start anchor "${start}" appears ${count(start)} times, expected exactly once`);
-    let body = text.split(start)[1];
-    if (end !== null) {
-      if (count(end) !== 1)
-        throw new Error(`${label}: the end anchor "${end}" appears ${count(end)} times, expected exactly once`);
-      const cut = body.split(end)[0];
-      if (cut === body) throw new Error(`${label}: "${end}" does not follow "${start}" — the section was reorganised`);
-      body = cut;
-    }
-    if (body.trim().length < min)
-      throw new Error(`${label}: ${body.trim().length} characters of body, under the floor of ${min} — the rule was gutted, so every assertion on it would be vacuous`);
-    return body;
-  };
 
   // The two homes. Taking the layer and contract slices out of these, rather than out of the file, is also
   // what pins the subsection's *location*: renumbering `## 4.`, or moving the block below `## 5.`, makes
   // §4's own slice throw — and the prompt sends a run to `§4` by name (round 2, N5).
-  const s4 = () => slice(flat(skill()), '§4', '## 4. Run the three review agents, then check their reachability',
+  const s4 = () => slice(flatten(skill()), '§4', '## 4. Run the three review agents, then check their reachability',
     '## 5. Four things make a pull request unmergeable', 2500);
-  const s6 = () => slice(flat(skill()), '§6 above the Merge rule', '## 6. Then decide, and make the decision visible',
+  const s6 = () => slice(flatten(skill()), '§6 above the Merge rule', '## 6. Then decide, and make the decision visible',
     '**Merge** — squash into `main`', 600);   // 1,156 today: a backstop under the two layer floors, not a byte budget
 
   it('layer 1: a finding goes somewhere that outlives the context that found it', () => {
@@ -3264,7 +3383,7 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
   });
 
   it('the reviewer prompt routes a run to it from STEP 2, and does not restate it', () => {
-    const p = flat(prompt());
+    const p = flatten(prompt());
     const step2 = slice(p, 'STEP 2', 'STEP 2 — REVIEW & QA', 'Four things make a PR unmergeable', 1500);
     // Round 2, B4: whole-prompt, moving the clause into STEP 1 was green — and there it is read during the
     // cheap exit, before the run knows how many pull requests are waiting, while the step that loops says
@@ -3280,5 +3399,480 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
     expect(p.replace('(§4, #326)', '(auto-compaction fires past a point, §4, #326)'),
       'the ADR-002 detector must fire on a real restatement, or it is a green tick over an unchecked property')
       .toMatch(/auto-compaction/i);
+  });
+});
+
+/**
+ * #466: the four- and five-round pull requests all have one shape. Each round named the *next member of the
+ * same class* as the round before it — PR #427's four rounds walked `listen`, then `y2-duration`, then
+ * `y1-coins`, then four measurement topics — so every round met `review-pr` §7's bar and the round cap could
+ * not stop any of it. The round count was the size of the class, not a measure of review or of care.
+ *
+ * The root cause is that the class-wide sweep lives only on the reviewer's side, and only after the diff: the
+ * author fixes the instance the issue names, the reviewer enumerates the class and finds member N+1. The
+ * author cannot simply be more careful, either — the rail an author writes is usually derived from the code
+ * under test, so it shares the blind spot and reports the defect green (#427 round 2, in those words).
+ *
+ * So the rule is in two skills and costs `docs/ROUTINE-PROMPT.md` nothing (`docs/decisions/002`): the prompt
+ * already says "follow the `open-pr` skill". `open-pr` §4 makes the sweep part of proving it green; `review-pr`
+ * §3 stops the sweep being re-derived every round.
+ *
+ * Scoping follows the PR #440 round-2 lesson exactly: the floor lives **inside** `slice()`, both anchors must
+ * appear exactly once, and every assertion reads one subsection rather than a whole Markdown file. A pinned
+ * string is a substring of the whole document, so a whole-file `toContain` here would go green with the rule
+ * deleted from the section that needs it.
+ *
+ * What this cannot catch: whether a run sweeps anything. It is text over two instruction files. The pull
+ * request body's claim about the sweep is the reviewer's to check, and nothing here re-runs it.
+ *
+ * Prove one red: delete any numbered step, the cannot-enumerate escape, the different-context reason, or the
+ * `review-pr` §3 bullet — each fails on its own assertion or on its subsection's floor.
+ */
+describe('a fix is sized to the class, not the instance (#466)', () => {
+  const openPr = sliceSkill('.claude/skills/open-pr/SKILL.md');
+  const reviewPr = () => readFileSync(new URL('../../.claude/skills/review-pr/SKILL.md', import.meta.url), 'utf8');
+  const prompt = () => readFileSync(new URL('../../docs/ROUTINE-PROMPT.md', import.meta.url), 'utf8');
+
+  /**
+   * **The sizes are the rail.** Everything else here pins that a phrase is *present*; nothing pins that it is
+   * an *obligation*, and nothing can — a qualifier can always be appended, and `if you can` is four words.
+   * PR #469 round 2 demonstrated it: all sixteen pinned phrases survived a rewrite opening *"Treat the four
+   * numbered items below as a menu, not a checklist"*, and the grounds clause survived **inverted**, because
+   * `whether or not the code cannot produce the list` contains the pinned substring and means the reverse.
+   *
+   * So the load-bearing check is the one a budget rail makes, in the idiom `ROUTINE_PROMPT_BUDGET` uses two
+   * thousand lines above: **a window may grow, never shrink.** A rewrite that guts a rule is then a number
+   * going down in a reviewed diff, which is all any budget rail achieves and it is enough. An honest trim
+   * lowers the number in the same commit and says so in the body.
+   *
+   * These replaced the per-slice `min` floors, which were **dominated**: the minimum text satisfying all
+   * thirteen `attack()` assertions is 444 characters against a floor of 400, so no string could pass the
+   * assertions and fail the floor. That is `slice(0, 460)` again — a guard that cannot fail — which is the
+   * failure `slice`'s own docstring says the inside-the-helper floor exists to prevent.
+   */
+  const SIZES = Object.freeze({ s4: 6447, sweep: 2789, attack: 1950, s3: 3165, bullet: 589, bodyCheck: 1103 });
+
+  /**
+   * Measured **after** the last prose edit of the round, in `trim()`ed characters, which is what `slice()`
+   * compares. Both halves of that sentence are a defect this rail already had: the first set was taken before
+   * the same commit added prose to both skills and was never re-measured, leaving four windows 225–249
+   * characters of slack — enough to delete step 1's test for whether you are holding a class, step 2's
+   * exhaustiveness requirement, and §3's only instruction for weighing a sweep claim, with every rail green
+   * (PR #469 round 3, B1). A budget calibrated to yesterday's file is not a budget.
+   *
+   * `slice()` gets `STRUCTURAL` instead, not these. Passing a window's own size as the slicer's floor made
+   * five of the six `expect`s below unreachable — `body.length >= body.trim().length >= min` — so the message
+   * written for exactly this case could never be printed, which is the dominated floor one more time.
+   */
+  const STRUCTURAL = 120;
+
+  const s4 = () => openPr.S(4);
+  const sweep = () => slice(s4(), 'the sweep', '### Sweep the class, not the instance',
+    '### Then attack it with something that is not you', STRUCTURAL);
+  const attack = () => slice(s4(), 'attack it yourself', '### Then attack it with something that is not you', null, STRUCTURAL);
+  const s3 = () => slice(flatten(reviewPr()), 'review-pr §3', '## 3. Attack the change, do not confirm it',
+    '## 4. Run the three review agents', STRUCTURAL);
+  // One home each (PR #469 round 3, N7): these anchors were written out twice, so a wording change updated in
+  // one copy left the size rail measuring a window the assertions never read — #258's shape, in miniature.
+  const bullet = () => slice(s3(), 'the sweep bullet', '**A finding that came from a sweep leaves the sweep behind',
+    '**Check the pull request body against the code**', STRUCTURAL);
+  const bodyCheck = () => slice(s3(), 'the body-check bullet', '**Check the pull request body against the code**', null, STRUCTURAL);
+
+  // PR #469 round 4, B1: `attack` and `bodyCheck` are the last subsection in their section, so `end: null`
+  // runs to the section's true end rather than to the rule's own end — the same thing today, but it means
+  // text appended anywhere later in the section, however close to that end, reads as part of the rule and
+  // pads the floor above. Deleting a sentence from inside either window and appending unrelated filler right
+  // before the next `##` heading left the floor above unmoved on both — the reviewer's own reproduction.
+  // `sweep` and `bullet` cannot be gamed this way because their end anchor is the next `###` heading, pinned
+  // exactly once; `attack` and `bodyCheck` have no such heading to anchor on, so the anchor here is each
+  // rule's own last sentence instead, and this pins it the same way — as the section's literal last content,
+  // with nothing after it. It does not narrow what the floor above measures: the window `attack`/`bodyCheck`
+  // return is unchanged, so this is a genuinely separate check, not a rename of the one it accompanies.
+  const attackEnd = 'A run that re-reads its own work runs its own rail, sees its own green, '
+    + 'and concludes what it concluded the first time.';
+  const bodyCheckEnd = "An author's `nothing` beside two findings of your own is the gap that line was added "
+    + 'to expose — and **an absent `agents:` line is the same finding as an absent sweep claim**, for the '
+    + 'same reason: `open-pr` §4 calls that line the whole of the evidence, so a body without one has no '
+    + 'evidence, not good news.';
+
+  it('the windows have not shrunk — the one check a qualifier cannot walk past', () => {
+    // Typed over `SIZES`, so a budget deleted from the literal is a compile error rather than a silent
+    // disappearance (PR #469 round 3, N1) — the same argument `sliceSkill`'s docstring makes for its
+    // `keys must be [1..7]` guard. Trimmed, because that is what `slice()` compares.
+    const measured: Record<keyof typeof SIZES, number> = {
+      s4: s4().trim().length,
+      sweep: sweep().trim().length,
+      attack: attack().trim().length,
+      s3: s3().trim().length,
+      bullet: bullet().trim().length,
+      bodyCheck: bodyCheck().trim().length,
+    };
+    for (const [name, size] of Object.entries(measured))
+      expect(size, `${name} has shrunk below ${SIZES[name as keyof typeof SIZES]} — if that is an honest trim, `
+        + 'lower the number in this commit and say so in the body; otherwise a rule has been gutted')
+        .toBeGreaterThanOrEqual(SIZES[name as keyof typeof SIZES]);
+  });
+
+  /**
+   * PR #469 round 4, B1. `sweep` and `bullet` are bounded by the next `###` heading, so nothing can be
+   * appended after them without either landing inside the next rule (visible, and covered by that rule's own
+   * floor) or introducing a third heading (caught by the subsection test below). `attack` and `bodyCheck`
+   * have no such heading — they are the last rule in their section — so the one thing that can still happen
+   * to them is exactly what the reviewer's reproduction did: delete a sentence from inside the rule, and
+   * append unrelated prose right before the section's own end, where it reads as a plausible new bullet
+   * rather than as padding. The floor above cannot see it, because the window still runs to the section's
+   * true end and simply counts the filler as if it were the rule. This is the structural half `slice`'s own
+   * docstring says an open-tailed window needs: the rule's own last sentence, pinned as the section's literal
+   * last content, so anything appended after it — however small, however close to the true end — fails here
+   * even though the floor above stays green.
+   */
+  it('attack and bodyCheck end where their own last sentence ends, not wherever the section does', () => {
+    // PR #469 round 5, B1. `endsWith` alone still passes if the section keeps a filler-then-duplicate shape:
+    // delete a sentence from inside the rule, append dead-zone filler before the section's true end, then
+    // append a SECOND copy of `attackEnd`/`bodyCheckEnd` after the filler — the text still literally ends
+    // with the pinned sentence, so round 4's check alone cannot see the pad between the real rule and the
+    // duplicate. The exactly-once guard below is the same one `slice()` already applies to every `start`/`end`
+    // anchor it takes (line ~1828), extended to this open-tailed pin the same way.
+    const count = (text: string, needle: string) => text.split(needle).length - 1;
+    expect(s4().trim().endsWith(attackEnd),
+      'text appended after "attack it yourself"\'s own last sentence pads the floor above without tripping it — '
+      + 'the PR #469 round 4 reproduction')
+      .toBe(true);
+    expect(count(s4(), attackEnd),
+      'attackEnd appears more than once — a duplicate pasted after filler would satisfy the endsWith check above '
+      + 'while the filler still pads the size floor, the PR #469 round 5 reproduction')
+      .toBe(1);
+    expect(s3().trim().endsWith(bodyCheckEnd),
+      'text appended after the body-check bullet\'s own last sentence pads the floor above without tripping it — '
+      + 'the PR #469 round 4 reproduction')
+      .toBe(true);
+    expect(count(s3(), bodyCheckEnd),
+      'bodyCheckEnd appears more than once — a duplicate pasted after filler would satisfy the endsWith check '
+      + 'above while the filler still pads the size floor, the PR #469 round 5 reproduction')
+      .toBe(1);
+  });
+
+  /**
+   * PR #469 round 2, B3 and note 3. The subsection count read `/^### /` over the **whole file**, so `####
+   * Appendix` was invisible (no space at offset 3) and a `###` under §6 would have reddened a test whose
+   * message is about §4. Demoting §4's real text under a `#### Appendix`, with an opt-out sentence left in
+   * its place, ran **221 passed** — every pin matched because the text was still inside the open tail, and
+   * the floor cleared because the window got *longer*. `<details>` does the same with no heading at all.
+   *
+   * Sizes cannot catch this one: it makes the window bigger. The structure has to.
+   */
+  it('§4 has exactly its two subsections, at one depth, with nothing folded away', () => {
+    const raw = openPr.SECTIONS.get(4)?.raw ?? '';
+    expect(raw.length, '§4 must be read from the section, not the file — a `###` under §6 is not this rule')
+      .toBeGreaterThan(1000);
+    expect([...raw.matchAll(/^#{3,6}[^\n]*/gm)].map((m) => m[0].trim()),
+      'a third heading at any depth lands inside an open-tailed window and is covered by nothing')
+      .toEqual(['### Sweep the class, not the instance', '### Then attack it with something that is not you']);
+    expect(raw, 'and nothing may be folded behind a disclosure element, where there is no heading to count')
+      .not.toMatch(/<details|<summary/i);
+  });
+
+  it('review-pr §3 folds nothing away either', () => {
+    const raw = readFileSync(new URL('../../.claude/skills/review-pr/SKILL.md', import.meta.url), 'utf8');
+    const section = raw.split(/^## 3\.[^\n]*\n/m)[1]?.split(/^## 4\./m)[0] ?? '';
+    expect(section.length, '§3 must be read from the section').toBeGreaterThan(1000);
+    expect(section, 'a bullet demoted into a disclosure element keeps every pin and loses every reader')
+      .not.toMatch(/<details|<summary/i);
+    expect([...section.matchAll(/^#{3,6}[^\n]*/gm)].map((m) => m[0].trim()), '§3 has no subsections').toEqual([]);
+  });
+
+  /**
+   * The two detectors. They do a narrow job well — they catch a reversal written in a voice on their list —
+   * and PR #469 round 2 is the reason the docstring no longer claims more than that.
+   *
+   * **What was claimed and was not true:** that one voice per alternative made deleting a term red exactly
+   * one assertion, and that the corpora were exercised for dead alternatives in both directions. The reverse
+   * loop existed for one detector, iterated the *surviving* alternatives, and so could not see a deletion at
+   * all; `SELF_MERGE` had none; `guidance rather than` passed it while being freely removable, because its
+   * only voice also matched another alternative.
+   *
+   * What holds now is the property itself, computed rather than asserted: **drop any one alternative and
+   * some voice must stop matching.** A dead term is impossible, and so is a narrowing that keeps the corpus
+   * green — both are the same check. The gap width gets the same treatment, because a bisection found it
+   * shrinkable to 35 characters with every voice still matched.
+   *
+   * **What none of this proves, and what the sizes above are for:** that a rule is still an obligation.
+   */
+  const loadBearing = (label: string, alternatives: readonly string[], voices: readonly string[],
+    build: (alts: readonly string[]) => RegExp) => {
+    // A voice that matches nothing satisfies every drop, so one dead voice makes every term freely
+    // removable with this helper green (PR #469 round 3, N4). The corpus is checked against the whole
+    // detector first, here rather than only at the call sites, so the helper cannot be used wrongly.
+    const whole = build(alternatives);
+    for (const voice of voices)
+      expect(whole.test(voice), `${label}: the corpus carries a voice the detector does not match: "${voice}"`).toBe(true);
+    for (const dropped of alternatives) {
+      const narrowed = build(alternatives.filter((a) => a !== dropped));
+      expect(voices.some((v) => !narrowed.test(v)),
+        `${label}: dropping "${dropped}" leaves every voice matched, so the term is dead and removable`).toBe(true);
+    }
+  };
+
+  const PERMIT = Object.freeze(['may', 'can', 'could', 'are free to', 'is allowed to', 'welcome to', 'is fine',
+    'nothing(?: here| in this file)? (?:stops|prevents)', 'no rule (?:stops|prevents)']);
+  const ACTION = Object.freeze(['merg(?:e|es|ed|ing)', 'undraft(?:s|ed|ing)?', 'approv(?:e|es|ed|ing)',
+    'squash(?:es|ed|ing)?']);
+  const GAP = 80;
+  const selfMerge = (permit: readonly string[] = PERMIT, action: readonly string[] = ACTION, gap = GAP) =>
+    new RegExp(`\\b(?:${permit.join('|')})\\b[^.]{0,${gap}}\\b(?:${action.join('|')})\\b`
+      + `|\\b(?:${action.join('|')})\\b[^.]{0,${gap}}\\b(?:${permit.join('|')})\\b`, 'i');
+  const SELF_MERGE = selfMerge();
+
+  const SELF_MERGE_VOICES = Object.freeze([
+    'If all three agents come back clean and CI is green, you may undraft and merge it in this same run.',
+    'You can merge it yourself once the agents report nothing.',
+    'It is fine to merge your own pull request when the diff is small.',
+    'A run is allowed to undraft and merge after the agents are quiet.',
+    'Authors are free to approve their own work once the rails are green.',
+    'You are welcome to merge it yourself once the agents report nothing.',
+    'Nothing here stops you taking it out of draft and merging it in this same run.',
+    'Merging your own pull request is fine once the three agents have come back clean.',
+    'Nothing stops a run from undrafting its own pull request once the agents are quiet.',
+    'No rule prevents you merging this yourself.',
+    'A run could squash its own pull request when the three agents are quiet.',
+    // Distance, on purpose: the gap bisected to 35 characters with every other voice still matched.
+    'You may, once the three agents have all come back clean and CI is green on the head, merge it yourself.',
+  ]);
+
+  const EXEMPTION_ALTERNATIVES = Object.freeze(['counsel of perfection', 'guidance rather than',
+    'rather than a (?:gate|bar)', 'not a (?:gate|bar)', 'describe the ideal', 'aim for', 'short of time',
+    'little of its window', 'is fine when', 'skip the (?:agents|sweep)']);
+  const exemption = (alts: readonly string[] = EXEMPTION_ALTERNATIVES) => new RegExp(`\\b(?:${alts.join('|')})\\b`, 'i');
+  const EXEMPTION = exemption();
+  const EXEMPTION_VOICES = Object.freeze([
+    'Steps 1 to 4 are a counsel of perfection.',
+    'This is guidance rather than an obligation.',
+    'Treat the sweep as advice rather than a bar.',
+    'The sweep is not a gate.',
+    'Steps 1 to 4 describe the ideal; write the line and move on.',
+    'Aim for a full sweep, but say so if you cannot.',
+    'A run short of time may simply write the line.',
+    'A run with little of its window left writes the line instead.',
+    'Reading the registry table is fine when driving it is slow.',
+    'Skip the agents when the diff is under twenty lines.',
+    'Skip the sweep on a one-line fix.',
+  ]);
+
+  /**
+   * §4 states a threat in order to forbid it, so a prohibition trips the ban it writes and has to come out
+   * before the detector runs. Two failures are behind the shape below.
+   *
+   * It first ran to the next comma or full stop while §4's sentence uses em-dashes, swallowing 104 characters
+   * **including the positive rule after it** (round 1, B3). Bounding it at the dash was not enough either:
+   * a prohibition can be *rewritten* to carry an exemption inside it — `never that a one-line diff is fine
+   * when nothing moved` is 53 characters, passes a length bound, and hides one of `EXEMPTION`'s own ten terms
+   * where nothing reads it (round 2, B4).
+   *
+   * So the spans are not bounded, they are **enumerated**: §4 has exactly these two prohibitions, and a third
+   * one — or a reworded one — is a visible diff rather than a laundering channel.
+   */
+  const PROHIBITION = /\bnever that\b[^,.—]*/gi;
+  const PROHIBITIONS = Object.freeze(['never that the run was short of time',
+    'never that steps 1 to 4 are more than a bar']);
+  const grants = (text: string) => text.replace(PROHIBITION, ' ');
+
+  it('open-pr §4: the sweep names its class, drives the real code, and is checked in', () => {
+    const s = sweep();
+    expect(s, 'the timing is the thesis — the sweep moves to before the push, or nothing changes')
+      .toMatch(/So before you push/);
+    expect(s, 'step 1 — a class you cannot state in a sentence is an instance you have not recognised')
+      .toMatch(/Say what the class is, in one sentence/);
+    expect(s, 'step 2 — reading the tables the fix edits is the method that produced the miss')
+      .toMatch(/Enumerate it by driving the real code/);
+    expect(s, 'and its prohibition, which is the half a softening drops first')
+      .toMatch(/never by reading the lists the fix edits/);
+    expect(s, "and the reason it has to be driven: a derived rail shares the fix's blind spot")
+      .toMatch(/shares the fix's blind spot/);
+    expect(s, 'step 3 — the instruction, not only the worked example beside it')
+      .toMatch(/Check the enumeration in/);
+    expect(s, 'which names a real file, or the example is an idea rather than a shape to copy')
+      .toMatch(/reception-gap-spellings\.txt/);
+    expect(s, 'and says what that buys, or checking a list in reads as bookkeeping')
+      .toMatch(/rather than as a review round/);
+    expect(s, 'step 4 — the size goes in the body, where a reviewer can check it against the diff')
+      .toMatch(/Put the size in the body/);
+    expect(s, 'a count with no enumeration behind it must carry the method that produced it')
+      .toMatch(/give the method and the seed count beside it/);
+  });
+
+  it('open-pr §4: "cannot enumerate" is an answer with grounds, not an exemption with an excuse', () => {
+    const s = sweep();
+    expect(s, 'a prescribed spelling, for the reason `e2e not run (env)` has one')
+      .toMatch(/`SWEEP: NOT ENUMERABLE`/);
+    // Round 2, note 7: that precedent does not carry on its own — §2 and §5 already oblige a body to hold
+    // the e2e evidence, and for the sweep it is `review-pr` §3's check that makes silence a finding.
+    expect(s, 'and it must say what makes the precedent transfer, or it is an argument that does not hold')
+      .toMatch(/§3 supplies the other half|§3's body check/);
+    expect(s, 'and the run must say what it did instead, or "cannot" becomes the escape from the rule')
+      .toMatch(/what bounds the risk/);
+    expect(s, 'the grounds are the code, not the run — this is the half an inversion drops first')
+      .toMatch(/the code cannot produce the list, or it is unbounded/);
+    expect(s, 'said again as a claim, because the permission survives a rewrite that drops the limit')
+      .toMatch(/It is an answer, not an exemption/);
+    expect(s, 'the incident that bought this — and that every one of those rounds was correct')
+      .toMatch(/four blocking rounds/);
+    expect(s, 'which is the whole point: the round cap cannot fix this, because no round was wrong')
+      .toMatch(/Every one of those rounds was correct/);
+  });
+
+  it('open-pr §4 concedes no exemption, in any of the voices one would be written in', () => {
+    const section = s4();
+    const stripped = grants(section);
+    // The prohibitions are enumerated rather than measured: a reworded one can carry an exemption inside it
+    // and pass any length bound, and this stripper is the one place §4's text is hidden from the detector.
+    expect((section.match(PROHIBITION) ?? []).map((s) => s.trim()),
+      '§4 has exactly these two prohibitions — a third, or a reworded one, is a diff and not a side effect')
+      .toEqual([...PROHIBITIONS]);
+    expect(stripped.length, 'and removing them must leave the section essentially intact')
+      .toBeGreaterThan(section.length * 0.95);
+
+    expect(stripped, '§4 must grant no time-, size- or effort-based way past the sweep or the agents')
+      .not.toMatch(EXEMPTION);
+    expect(EXEMPTION_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(11);
+    for (const voice of EXEMPTION_VOICES)
+      expect(grants(`${section} ${voice}`), `the detector must catch: "${voice}"`).toMatch(EXEMPTION);
+    loadBearing('EXEMPTION', EXEMPTION_ALTERNATIVES, EXEMPTION_VOICES, exemption);
+  });
+
+  it('open-pr §4 grants no licence to merge your own pull request, however it is phrased', () => {
+    const section = s4();
+    // §4 hands an author the reviewer's own three agents, so the sentence after "they found nothing" is where
+    // a licence would be written — and §5's rail is scoped to `S(5)`, so it never looks here.
+    expect(grants(section), 'no permission to merge, undraft, squash or approve may appear in this section')
+      .not.toMatch(SELF_MERGE);
+    expect(SELF_MERGE_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(12);
+    for (const voice of SELF_MERGE_VOICES)
+      expect(grants(`${section} ${voice}`), `the detector must catch: "${voice}"`).toMatch(SELF_MERGE);
+    expect('You never review, mark or merge your own pull request.', 'a ban is not a licence')
+      .not.toMatch(SELF_MERGE);
+
+    loadBearing('SELF_MERGE permission', PERMIT, SELF_MERGE_VOICES, (alts) => selfMerge(alts));
+    loadBearing('SELF_MERGE action', ACTION, SELF_MERGE_VOICES, (alts) => selfMerge(PERMIT, alts));
+    // The gap is an alternative too: it bisected to 35 characters with every voice still matched.
+    expect(SELF_MERGE_VOICES.some((v) => !selfMerge(PERMIT, ACTION, GAP - 20).test(v)),
+      'no voice needs more than 60 characters between the permission and the action, so the gap is free to shrink')
+      .toBe(true);
+  });
+
+  it('open-pr §4: the agents leave a line behind, and their output is filtered before it changes the diff', () => {
+    const a = attack();
+    expect(a, 'the timing again — after the reviewer has it, this is worth nothing').toMatch(/before\s+you hand it over/);
+    expect(a, 'the agents are named where the author will look for them').toMatch(/three review agents in `\.claude\/agents\/`/);
+    expect(a, 'a run that ran them and a run that did not must not produce the same output')
+      .toMatch(/say in the body what each returned/);
+    expect(a, 'the line needs a prefix a reader and a grep can both find').toMatch(/\bagents:/);
+    for (const agent of ['pr-test-analyzer', 'silent-failure-hunter', 'type-design-analyzer'])
+      expect(a, `${agent} must appear in the shape, or the line can be written with two of the three`).toContain(agent);
+    expect(a, '#180: the roster registers late, so "unavailable" in the first minutes means retry')
+      .toMatch(/roster registers later than the skill list/);
+    expect(a, 'and a genuinely unavailable agent is named, not omitted — §4\'s own rule')
+      .toMatch(/still unavailable, name it in that line/);
+    // Round 2, note 1: these were one assertion ORed together, so deleting the clause the message names
+    // stayed green on the weaker half.
+    expect(a, 'three `unavailable`s in a row must not read as compliance').toMatch(/is not\s+compliance/);
+    expect(a, 'and the case it covers must be named: a run that cannot spawn an agent at all')
+      .toMatch(/cannot spawn an agent \*\*at all\*\*/);
+    // PR #469 round 3, N6: "say so, in those words" gave no words, so that case was free text —
+    // indistinguishable from the three `unavailable`s the same paragraph calls not compliance.
+    expect(a, 'and it must give the words, or a gap and a result are written the same way again')
+      .toMatch(/agents: cannot spawn \(subagent\)/);
+    expect(a, "§4's reachability test comes with the agents, or the diff grows hardening nobody can reach")
+      .toMatch(/reachability test before you change anything/);
+    expect(a, 'and what to do with such a finding, which is the disposition the test is for')
+      .toMatch(/a note for the body, not an edit to the diff/);
+    expect(a, 'the reason, which is the only one that survives "but you cannot review your own work"')
+      .toMatch(/different context/);
+    expect(a, 'it is not a verdict').toMatch(/not for a verdict/i);
+    expect(a, 'and §5 does not move — no marks, no merge, no review of your own work')
+      .toMatch(/never review, mark or merge your own pull request/);
+    // PR #469 round 6, B1: the sole stated reason for writing "unavailable" rather than omitting it was
+    // present in the file but pinned by nothing — a rewrite could drop the equivalence and every assertion
+    // above still passed, because none of them reads this sentence.
+    expect(a, 'the reason itself, not only the instruction it justifies, must be pinned')
+      .toContain('That line is the whole of the evidence');
+    expect(a, 'the equivalence the section states — an agent that never ran and one that found nothing must read the same')
+      .toContain('an agent that never ran and an agent that found nothing produce the same silence');
+  });
+
+  it('review-pr §3: a sweep is handed over as an issue, which is the only form a reviewer may create', () => {
+    const section = s3();
+    const b = bullet();
+    expect(b, 'a commit is the one form a reviewer cannot use').toMatch(/as an issue, not a commit/);
+    expect(b, "and the rule says so in the reviewer's own terms, not only by implication")
+      .toMatch(/develops nothing and may not\s+push/);
+    expect(b, 'with a title shape, so two reviewers file the same thing under the same name')
+      .toMatch(/sweep: <the class>/);
+    expect(b, 'and labels the developer routine can actually select on').toMatch(/`routine-ok`/);
+    // PR #469 round 6, B2: only `routine-ok` was pinned, so the other two labels the bullet names could be
+    // dropped green — and without `tests`/`priority:P3` a sweep issue is free to land unlabelled or at
+    // whatever priority a run guesses, rather than the P3 the governance rule sets for a rail/test finding.
+    expect(b, 'the second required label, or the issue can file without it and still pass this rail')
+      .toMatch(/`tests`/);
+    expect(b, 'the third required label, or a sweep issue is free to land at any priority a run guesses')
+      .toMatch(/`priority:P3`/);
+    expect(b, 'and a link from the review comment, which is what makes its absence visible')
+      .toMatch(/linked from your review comment/);
+    expect(b, 'the cost it removes: today each round enumerates the class again from nothing')
+      .toMatch(/re-derived from scratch next round/);
+
+    const body = bodyCheck();
+    expect(body, 'the author-side claim must have a reader on the reviewer side')
+      .toMatch(/SWEEP: NOT ENUMERABLE/);
+    expect(body, 'and the reviewer must know which half of the claim is unverifiable')
+      .toMatch(/no checked-in enumeration and no method beside it/);
+    expect(body, 'and silence must not be the cheapest exit — a body with no claim has not done step 4')
+      .toMatch(/says nothing about the sweep has not done step 4/);
+    expect(body, 'with the ranking said plainly, because that is what makes silence visible as a choice')
+      .toMatch(/silence costs nothing and is read by nobody/);
+    // Round 2, note 4: the sweep claim got a reader and the `agents:` line did not, so half the rule this
+    // pull request adds to `open-pr` §4 was addressed to nobody.
+    expect(body, 'the `agents:` line needs its reader too, or it is a claim nobody compares')
+      .toMatch(/`agents:` line is a claim of the same kind/);
+    // Round 2, note 5: this bullet predates the pull request and no rail held it, so the half that was here
+    // first could be deleted green while the half added today could not.
+    // PR #469 round 3, N5: silence was closed for the sweep claim and left open for the `agents:` line in
+    // the same paragraph — what was pinned covered a line present and false, never one that is absent.
+    expect(body, 'an absent `agents:` line is a finding too, not an absence of news')
+      .toMatch(/absent `agents:` line is the same finding/);
+    expect(body, 'the bullet\'s original subject must survive as well as the sweep added to it')
+      .toMatch(/no look change/);
+    expect(body, 'including how that one is settled, which is the part that makes it cheap')
+      .toMatch(/CSS diff of the build output/);
+  });
+
+  it('the routine prompt points at the sweep from the step that restates §4', () => {
+    const p = flatten(prompt());
+    const step3 = slice(p, 'STEP 3', 'STEP 3 — DEVELOP ONE ITEM', 'STEP 4 — NOTHING ELIGIBLE?', 1500);
+    expect(step3, 'the step that restates "prove it green" must name what else §4 now carries')
+      .toMatch(/§4's sweep and agent rules \(#466\)/);
+    // ADR 002: the prompt is flow, the skill is protocol, and this file sits at its budget. Whole-document on
+    // purpose — a copy in STEP 5 is the same violation as one in STEP 3 (`add-guard-rail` §6).
+    const ADR002_ALTERNATIVES = Object.freeze(['cannot enumerate', 'SWEEP: NOT ENUMERABLE',
+      "blind spot of the (?:fix|code under test)", "shares the fix['’]s blind spot", 'driving the real code',
+      'enumerate(?:s|d)? the class']);
+    const adr002 = (alts: readonly string[] = ADR002_ALTERNATIVES) => new RegExp(alts.join('|'), 'i');
+    const ADR002_VOICES = Object.freeze([
+      'A class you cannot enumerate gets a line instead.',
+      'Write `SWEEP: NOT ENUMERABLE` in the body.',
+      'That is the blind spot of the fix, and of the code under test.',
+      "A sweep that reads the same table the fix edits shares the fix's blind spot.",
+      'Enumerate it by driving the real code, not by reading the lists.',
+      'Enumerate the class before you push.',
+    ]);
+    expect(ADR002_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(6);
+    expect(p, 'the reasoning belongs in the skill, not in a second copy here').not.toMatch(adr002());
+    for (const restatement of ADR002_VOICES)
+      expect(`${p} ${restatement}`, `the detector must catch: "${restatement}"`).toMatch(adr002());
+    // Round 2, B4: five of this detector's six alternatives were freely removable — it had neither a length
+    // guard nor a reverse loop, while the docstring claimed both detectors had them.
+    loadBearing('ADR002', ADR002_ALTERNATIVES, ADR002_VOICES, adr002);
+    // And the other side, which is why a bare `blind spot` was refused: ordinary prose must not trip it.
+    for (const innocent of ['A reviewer has a blind spot for their own prose.', 'The class of 2026.'])
+      expect(innocent, `the detector must stay quiet on: "${innocent}"`).not.toMatch(adr002());
   });
 });
