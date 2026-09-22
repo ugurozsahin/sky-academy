@@ -305,11 +305,14 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // every test green while the album and the child's keepsake disagreed about what had been won. `certToStored`
     // is now the only writer, so the e2e's stored assertions cover the drawn object too.
     if (cert) recordCert(certToStored(cert, { id: `${o.year.id}:duel` }));
-    // The last piece of item 5: the match itself, so it outlives this overlay. Filed for **every** finished
-    // match — a loss and a draw are as much a thing that happened as a win — which is the one place this
-    // parts company with the certificate above: that is an award, and only a Player 1 win earns one
-    // (`duelEarnsCertificate`). A rematch files a second row rather than replacing this one; `fileDuel()` has why.
-    recordDuel({ at: Date.now(), topic: topic.id, title: topic.title, year: o.year.title, winner: r.winner, scoreA: r.scoreA, scoreB: r.scoreB, rounds: r.rounds });
+    // The last piece of item 5: the match itself, so it outlives this overlay. Filed for every finished match
+    // — a loss and a draw are as much a thing that happened as a win, which is the one place this parts
+    // company with the certificate above (that is an award; only a Player 1 win earns one, `duelEarnsCertificate`)
+    // — EXCEPT an incomplete one (#444 review, PR #502 round 2, B1): a generator throw cut the match short, not
+    // the children, and filing it would misrepresent a technical failure as a real result forever — the one
+    // write `duelHistoryLine()` has no way to tell apart from a genuine finish. A rematch files a second row
+    // rather than replacing this one; `fileDuel()` has why.
+    if (!r.incomplete) recordDuel({ at: Date.now(), topic: topic.id, title: topic.title, year: o.year.title, winner: r.winner, scoreA: r.scoreA, scoreB: r.scoreB, rounds: r.rounds });
     // Returned rather than recomputed by the overlay: `recordGameEnd` IS the write, so a redraw that called
     // it again would pay the match a second time.
     return { dojo, fresh };
@@ -319,13 +322,17 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   function showResults(r: DuelResult, { dojo, fresh }: GameEndOutcome) {
     hold(true, false);   // terminal: the beats below (the jingle, the certificate toasts) must still run — see `hold`
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
-    const headline = duelHeadline(r); say(headline);
+    // #444 review (PR #502 round 2), B1: an incomplete match has no winner worth announcing — `duelHeadline()`
+    // would read a scoreline nobody decided as if the match had run its course. Everything already earned
+    // (the coins/dojo/Sensei writes above) still shows; only the winner framing and the certificate are withheld.
+    const headline = r.incomplete ? 'That question broke — here is what you earned so far!' : duelHeadline(r);
+    say(headline);
     overlay.hidden = false;
     overlay.innerHTML = `
       <div class="modal results duel-end">
         <div class="scroll">
           <div class="hero-big sensei" style="--glow:${SENSEI.glow}"><img src="${SENSEI.img}" alt="${SENSEI.name}"><div class="speech">${esc(headline)}</div></div>
-          <h2>${r.winner === 'draw' ? 'A draw!' : `${esc(NAME[r.winner])} wins!`}</h2>
+          <h2>${r.incomplete ? 'Match ended early' : r.winner === 'draw' ? 'A draw!' : `${esc(NAME[r.winner])} wins!`}</h2>
           <div class="statgrid duel-final"><div><b>${r.scoreA}</b><small>${NAME.a}</small></div><div><b>${r.rounds}</b><small>rounds</small></div><div><b>${r.scoreB}</b><small>${NAME.b}</small></div></div>
           <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
           ${dojoRowsHTML(dojo)}
