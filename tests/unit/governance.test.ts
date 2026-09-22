@@ -2913,11 +2913,11 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
 
   // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 9_488;    // → 9,488: the fourth routine named beside the other two (#512), paid for in the e2e stack line, one British-English example, and the board bullet, which named two of the routines that cannot run the sync when four of them read that board   // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them; → 9,518: #97 reduced to a pointer at its home (#145); → 9,509: the external-assets rule stopped naming its one exception and pointed at #479 instead
+  const CLAUDE_MD_BUDGET = 9_509;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them; → 9,518: #97 reduced to a pointer at its home (#145); → 9,509: the external-assets rule stopped naming its one exception and pointed at #479 instead
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_363;   // → 21,363: STEP 3 rule 1 drops `epic` (#512), paid for in STEP 4's list, rule 2's #27 aside, rule 1's `later` gloss, and a STEP 1 sentence that STEP 3 rule 3 now covers — that rule named "the two heartbeat issues" when there were already four, and drops every `: heartbeat` issue instead. One first attempt shortened "`chore/` for everything else", which a rail pins word for word, and was reverted   // → 21,412 (#466): STEP 3 restates §4 and enumerates what the skill adds, so the sweep and self-agent rules needed a pointer there or a run reading the step got a complete-looking account — paid for by shortening the review-gate clause and the WIP sentence, whose instructions both survive beside the cut words   // → 21,418: the pulse-stamp sentence in STEP 1 (#439), paid for in the cadence note, both bootstrap asides, the game description in the intro, the `watchdog` bullet and STEP 4's QA aside   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
+  const ROUTINE_PROMPT_BUDGET = 21_412;   // → 21,412 (#466): STEP 3 restates §4 and enumerates what the skill adds, so the sweep and self-agent rules needed a pointer there or a run reading the step got a complete-looking account — paid for by shortening the review-gate clause and the WIP sentence, whose instructions both survive beside the cut words   // → 21,418: the pulse-stamp sentence in STEP 1 (#439), paid for in the cadence note, both bootstrap asides, the game description in the intro, the `watchdog` bullet and STEP 4's QA aside   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
   const REVIEWER_PROMPT_BUDGET = 9_961;   // → 9,961: the waiting test also covers a merge rule you cannot satisfy (#516), paid for in rule 4's look-must-not-change clause, the cadence and bootstrap asides in the header, and STEP 0's re-run limit   // → 9,967: the waiting test is applied, not re-judged (#516), paid for by collapsing STEP 2's restatement of rule 3's clear-and-wait parenthetical and rule 3's second pointer at the same skill section, and by dropping "decorations" from rule 4's new-look list, which CLAUDE.md's copy of that list does not carry either   // → 9,968: a finding stops the suite running at all, not merely last (#499, owner 2026-09-22), paid for in rule 2 lead-in, the Do NOT line re-listing the four rules above it, and the commands the review-pr skill already owns   // → 9,976: STEP 2 reordered so the browser follows the agents (#499), paid for by reducing the mobile/desktop recording rule to a pointer at its home in `review-pr` §2   // → 9,988: the pulse-stamp sentence after STEP 1 (#439), paid for in the bootstrap aside, the cadence note, the game description in the intro, STEP 2's fork sentence and rule 1's re-run clause (which the `Do NOT:` line already carries verbatim)   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
@@ -4044,458 +4044,312 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
 
 
 /**
+ * #526 — a class fix names its population.
+ *
+ * "Fix the class, not the instance" (#466) was followed on three pull requests in one day and failed on all
+ * three, because a reminder cannot enumerate a set: the author fixes the class across the instances their own
+ * mutation table touches, and that table is written after the fix, by the mind that wrote it. The untreated
+ * instances are exactly the ones not imagined. PR #513's round 2 found it *inside the commit whose message
+ * claimed to fix the class*.
+ *
+ * Two homes, and this rail holds both ends so neither can drift out alone: the author's obligation in
+ * `.claude/rules/guardrails.md`, beside the other rail rules, and the reviewer's in `review-pr` §7, beside
+ * the two other findings that block whatever the round.
+ *
+ * Each check below carries a negative as well as a positive, because the rule this rail states is the one it
+ * would otherwise break: a block of positives cannot tell a statement from its negation.
+ *
+ * Prove it red: drop the population sentence from either file; add "where practical" to either.
+ */
+describe('a class fix names the population it covers (#526)', () => {
+  const root = new URL('../../', import.meta.url);
+  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
+
+  /**
+   * Round 1, B1–B6 — and the finding is the shape of this PR's own rule, one level down: a rail meant to
+   * stop a fix claiming "fixed as a class" without naming its population did not name its own.
+   *
+   * Every loose mechanism the reviewer broke is the same one #512 was blocked on four times, so it takes the
+   * same answer rather than a sixth patch. A **five-word `NO_ESCAPE`** passed "Derive the mutation table from
+   * the set, **when convenient**". A **substring check** passed "**You need not** name the set", because the
+   * literal words survived a flat negation. An **`|`** let "pick a member" cover for "Count it rather than
+   * trusting it" being replaced by "Trust the author's word". A `.find()` **first-match** read a decoy bullet
+   * while the real one was gutted — the exact hazard the `open-pr` rail in this file already throws on. An
+   * **unbounded `## 7.` slice** was satisfied by the paragraph pasted at the end of the file.
+   *
+   * So both halves of the rule are pinned **word for word, as whole document units**, matched by equality.
+   * A reversal fails, a qualifier fails, an edit fails, and a sentence appended inside the unit fails — and
+   * none of it depends on a vocabulary, a proximity window or a substring. `unitWith` **refuses** on anything
+   * other than exactly one match, which is B5 closed by construction rather than by a uniqueness assertion.
+   *
+   * **The ceiling, stated rather than implied**, the same as #512's: a contradicting sentence added as its
+   * OWN new unit, beside an untouched pin, still passes, and nothing mechanical can see it. Human review is
+   * the backstop there — which is how all six of these were found.
+   */
+  const unitsOf = (text: string) =>
+    text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=(?:- |\d+\. ))/)).map((u) => u.trim());
+  const unitWith = (text: string, needle: string) => {
+    const hits = unitsOf(text).filter((u) => u.includes(needle));
+    if (hits.length !== 1) throw new Error(`${hits.length} units contain ${JSON.stringify(needle)}, want 1`);
+    return hits[0];
+  };
+
+  const CLAIMS: Array<{ what: string; file: string; unit: string }> = [
+    { what: "the author's obligation, whole",
+      file: ".claude/rules/guardrails.md",
+      unit: "- **A fix that addresses a *class* names the population it covers (#526).** \"Fix the class, not the instance\"\n  (#466) is followed and still fails, because a reminder cannot enumerate a set. What happens instead: the\n  author fixes the class **across the instances their own mutation table touches** — and that table is written\n  after the fix, by the mind that wrote the fix, so it inherits the same blind spot. The instances left\n  untreated are exactly the ones not imagined. It happened three times on 2026-09-22 (PRs #513, #517, #521),\n  once *inside the commit whose message claimed to fix the class*, and all three were found by reviewers.\n  So, three parts, each turning a promise into something countable:\n  **(a) Name the set** — *every assertion in this describe block*, *every rail that reads a prose document*,\n  *every call of `code()`*. \"I fixed them all\" is a claim; a named set is an object a reader can count.\n  **(b) Rail the coverage where the set is mechanically enumerable.** Test files are files, so a rail can read\n  them — the worked example is a rail that reads `tests/unit/governance.test.ts`'s own source and asserts\n  every rail in a block carries a negative assertion, the class defect there being precisely \"a block of\n  positives\". **That is the shape to copy, not a claim that it is already in place**: it was written for #512\n  and lands with it. A rule that says a mechanism exists when it does not is the \"it only documents existing\n  behaviour\" cover story the `open-pr` skill §6 warns about, and it was this bullet's first draft (#527\n  review, B4).\n  **(c) Derive the mutation table from the set, not from imagination** — one mutation per member. That turns\n  *did I think of it?* into *is the list complete?*, and only the second is checkable.\n  **What this does not do**: catch a class nobody has named. It catches *named the class, treated it\n  partially*. An unnamed class still needs an independent mind, which is why those three rounds were the\n  reviewer's finds and not the author's. The reviewer's half is in `.claude/skills/review-pr/SKILL.md` §7." },
+    { what: "the reviewer's, whole",
+      file: ".claude/skills/review-pr/SKILL.md",
+      unit: "**A third, and it is the same shape: a fix that claims a *class* and does not name its population (#526).**\n\"Fixed as a class\" is unverifiable on its own, and unverifiable is how it keeps being half true — three pull\nrequests were blocked on one defect on 2026-09-22, one of them *inside the commit whose message claimed to fix\nthe class*, because each fix reached only the instances its author's own mutation table touched. So a class\nfix has to say what set it covers — *every assertion in this block*, *every rail reading prose*, *every call\nof `code()`* — and then you can count it, which is the point. `.claude/rules/guardrails.md` has the author's\nhalf. **Count it rather than trusting it**: pick a member the body does not mention and mutate it. That is\nhow all three of those were found, and none of them by the author." },
+  ];
+
+  it.each(CLAIMS)('the rule still reads, word for word: $what', ({ file, unit }) => {
+    const units = unitsOf(doc(file));
+    expect(units.length, `${file} must split into its units, or this row asserts nothing`).toBeGreaterThan(5);
+    // Equality against a whole unit, not a substring of the file: a substring match is satisfied by the
+    // pinned words sitting inside a longer, negated sentence, which is B2 in one line.
+    expect(units, `${file} must still carry this rule as written — if the wording changed on purpose, `
+      + 're-pin it here deliberately and say so in the commit').toContain(unit);
+  });
+
+  it('each half is found exactly once, and sits where a reader of that file would meet it', () => {
+    // B5: `.find()` took the first match, so a decoy bullet ahead of a gutted real one passed. B6: the `## 7.`
+    // slice ran to end-of-file, so the paragraph pasted past the last heading satisfied it. Both are closed
+    // by refusing ambiguity rather than by asserting against it.
+    const g = doc('.claude/rules/guardrails.md');
+    expect(() => unitWith(g, 'A fix that addresses a *class*'),
+      'the obligation must appear exactly once in guardrails.md').not.toThrow();
+    const skill = doc('.claude/skills/review-pr/SKILL.md');
+    const s7 = skill.slice(skill.indexOf('## 7. '), skill.indexOf('\n## ', skill.indexOf('## 7. ') + 6));
+    expect(skill.indexOf('## 7. '), '§7 must exist').toBeGreaterThan(-1);
+    expect(s7.length, '§7 must be BOUNDED by the next heading — an unbounded slice is satisfied by anything '
+      + 'later in the file, which is how a gutted section hid behind a paragraph pasted at the end (#148)')
+      .toBeGreaterThan(500);
+    expect(s7, 'and the finding must live inside §7, the section about what may block a merge')
+      .toContain('does not name its population');
+    expect(s7, 'beside the two findings that already block whatever the round')
+      .toContain('a rail does not hold what it claims');
+  });
+
+  it('each file points at the other, so neither half can be read as the whole rule', () => {
+    expect(doc('.claude/rules/guardrails.md'), 'guardrails.md must point at the reviewer\'s half')
+      .toContain('.claude/skills/review-pr/SKILL.md');
+    expect(doc('.claude/skills/review-pr/SKILL.md'), 'and the skill at the author\'s')
+      .toContain('.claude/rules/guardrails.md');
+  });
+
+  it('clause (b) does not claim a mechanism that is not here (#527 review, B4)', () => {
+    const bullet = unitWith(doc('.claude/rules/guardrails.md'), 'A fix that addresses a *class*');
+    // The first draft said this file "carries one that reads its own source…" and "found two more rails…on
+    // its first run" — present tense, settled fact, about a rail that exists only on #512's open branch.
+    // That is the "it only documents existing behaviour" cover story `open-pr` §6 names, and nothing caught
+    // it because clause (b) had no rail at all.
+    expect(bullet, 'clause (b) must offer the coverage rail as a shape to copy')
+      .toContain('the shape to copy');
+    expect(bullet, 'and say plainly that it is not already in place, with where it lands')
+      .toMatch(/not a claim that it is already in place/);
+    expect(bullet, 'a rule may not assert a mechanism exists until it does — that is the cover story §6 warns '
+      + 'about, and this bullet was its own first example')
+      .toMatch(/only documents existing\s+behaviour/);
+  });
+});
+
+
+/**
  * #512 — the refiner routine (`docs/REFINER-PROMPT.md`,
  * `docs/decisions/008-the-backlog-is-refined-by-a-routine.md`), the fourth scheduled task and the first one
  * permitted to set `priority:*` and `blocked`, which `.claude/rules/governance.md` had called the owner's
- * alone since 2026-09-11. That permission is the whole risk, so these rails hold the two things that make it
- * survivable rather than the prose that explains them.
+ * alone since 2026-09-11. That permission is the whole risk, so these rails hold the guarantees that make it
+ * survivable.
  *
- * What decays, and a rail each:
+ * **This block was blocked five times, and every round found the same thing: the previous round's fix was
+ * applied where the finding pointed rather than across the population.** Round 4 established that a regex
+ * vocabulary cannot hold a natural-language guarantee — an ordinary English sentence reverses one without
+ * using any word a vocabulary lists — and replaced twelve assertions with verbatim pins. Round 5 then found
+ * the other eight, still on the mechanism round 4 had just named as broken, and every one of them still
+ * exploitable the same way.
  *
- *  1. **The gate slides.** The value of this design is entirely in *which side* of it each act sits on: a
- *     wrong label is one click back, a closed issue and a changed priority are not. Move `priority:*` up into
- *     the immediate list and every sentence in the file still reads correctly — that is the edit no reviewer
- *     would catch by reading, so it is pinned by structure: the three deferred acts must be named on the
- *     deferred line and none of them on the immediate one. Deliberately matched on the label in a code span,
- *     so prose like "work that cannot move yet" does not satisfy or trip it.
- *  2. **The reach widens.** `owner-session`, `later` and `refine-hold` are what the owner has left of his own
- *     hand here, and the four pulse issues are permanently open with bodies a "no longer true, close it" pass
- *     would read as dead. Losing any one of them from the out-of-reach list is silent until the day it closes
- *     a heartbeat.
- *  3. **`later` quietly becomes the refiner's too.** It is the one ordering tool the loosening did not touch,
- *     and the exclusion lives in the sentence that grants the other two — the likeliest place for it to be
- *     dropped as an awkward clause.
- *  4. **The epic grows a progress number.** A count an agent maintains looks correct either side of the
- *     moment it stops being true; GitHub's own task-list count cannot. This is `docs/WATCHDOG-PROMPT.md`'s
- *     opening defect in a new costume, so the prohibition is pinned, not only the mechanism.
- *  5. **`epic` stops dropping out of STEP 3.** The parent then queues as ordinary work and a run develops an
- *     issue the refiner split precisely because no run could finish it.
- *  6. **Nothing watches the refiner.** It writes no `IN PROGRESS` stamp, so a missing pulse is the only
- *     evidence a dead run leaves; if the watchdog stops reading it, the silence reads as a tidy backlog.
+ * So the population is converted **whole**: every safety-bearing claim is a `CLAIMS` row, pinned word for
+ * word as a document unit and matched by equality. **`binds` and `NO_ESCAPE` are deleted from this block,
+ * not widened** — there is no second mechanism left to exploit, which is the only thing that ends this.
+ * That is `.claude/rules/guardrails.md`'s rule about naming a population, applied to the pull request that
+ * kept failing to apply it.
  *
- * It pins no wording beyond those hooks: the prose has to stay free to shrink, like every other prompt here.
+ * What a verbatim unit pin catches: a reversal, a qualifier, an edit, a deletion, and a sentence appended
+ * inside the unit. What it costs: a deliberate rewording turns a row red and asks for a re-pin, which for
+ * twenty-five safety guarantees is a prompt to re-read the policy.
  *
- * Prove it red: move "changing `priority:*`" onto the **Apply immediately** line; drop `refine-hold` from the
- * out-of-reach list; delete `epic` from STEP 3 rule 1; remove `refiner: heartbeat` from the watchdog.
+ * **The ceiling, stated rather than implied.** A contradicting sentence added as its OWN new unit, beside an
+ * untouched pin, still passes — no regex, vocabulary or equality check can see it. That is not a gap this
+ * table can close, so it is named here instead of covered over: human review is the backstop, which is how
+ * all five of these rounds were found.
+ *
+ * Prove it red: change any word inside any pinned unit.
  */
 describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', () => {
   const root = new URL('../../', import.meta.url);
   const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
-  /**
-   * Both of these REFUSE rather than default, which is this repository's own rule turned on its rails
-   * (round 2, non-blocking). `text.slice(text.indexOf(a), text.indexOf(b))` with a missing anchor silently
-   * widens to "from the top" or "to the end of the file", and the length floors below cannot catch it
-   * because the whole document clears them trivially — the absence read as a pass, inside the checks built
-   * to stop exactly that. `paraWith` had the same shape, returning `''` for both "no such paragraph" and
-   * "an empty one", so every call site had to remember to test for it.
-   */
-  const between = (text: string, from: string, to: string) => {
-    const a = text.indexOf(from);
-    const b = text.indexOf(to, a < 0 ? 0 : a + from.length);
-    if (a < 0) throw new Error(`section start not found: ${from}`);
-    if (b < 0) throw new Error(`section end not found: ${to}`);
-    if (b <= a) throw new Error(`section end precedes its start: ${from} … ${to}`);
-    return text.slice(a, b);
-  };
-  const paraWith = (text: string, needle: string) => {
-    const para = text.split('\n\n').find((p) => p.includes(needle));
-    if (para === undefined) throw new Error(`no paragraph contains: ${needle}`);
-    return para;
-  };
 
-  const IRREVERSIBLE = ['`priority:*`', '`blocked`'];
-  const UNTOUCHABLE = ['`owner-session`', '`later`', '`refine-hold`'];
-  const PULSES = ['routine: heartbeat', 'reviewer: heartbeat', 'board: heartbeat', 'watchdog: heartbeat'];
-
-  /**
-   * PR #513 round 1, B2 — and the same class as PR #517's B1 and PR #521's B1, all found in one day.
-   * **A rail that lists the words a policy must contain cannot tell a statement from its negation.** The
-   * reviewer rewrote mechanism point 1 to "Read yesterday's reasoning on the issue and confirm it still
-   * reads true. If it does, that stands in for today's check" — the exact degradation ADR-008 warns about —
-   * and all eight rails stayed green, because `/re-deriv/` and `never the plan` still occurred in points 2
-   * and 3. So: bind a claim to the thing it governs, and refuse an escape beside it.
-   *
-   * `binds` window is characters rather than sentences because these are hard-wrapped documents with lists
-   * in them. Neither helper is a wording pin — the control mutations in this PR's table reword every pinned
-   * passage and stay green.
-   *
-   * (The #516 and #520 branches carry the same two helpers, defined in their own blocks. All three touch
-   * this file and are open at once, so they collapse into one definition when the last of them lands, not
-   * before — a shared helper now would conflict three ways.)
-   */
-  const SPAN = 250;
-  /**
-   * True when SOME mention of `subject` has `claim` within a sentence or two of it.
-   *
-   * It checked only the FIRST mention until round 2 (non-blocking), and that produced a false red on a
-   * correct document: `refiner: heartbeat` is named in the watchdog's check 3 pulse list before check 10
-   * states its bound, so the rail read the wrong occurrence. A decoy mention added to satisfy this is not
-   * what stops it — `NO_ESCAPE` and slicing to the governing section are.
-   */
-  const binds = (text: string, subject: string, claim: RegExp) => {
-    // A /g regex keeps `lastIndex` between `test` calls, so looping over occurrences with one would skip
-    // matches silently — under-matching that reads as "the claim is not bound". Refused rather than noted.
-    if (claim.global) throw new Error(`binds() needs a non-global regex, got ${claim}`);
-    for (let i = text.indexOf(subject); i >= 0; i = text.indexOf(subject, i + 1)) {
-      if (claim.test(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN))) return true;
-    }
-    return false;
-  };
-  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bstands in for\b/i;
-
-  it('the refiner prompt exists and says it develops nothing', () => {
-    const text = doc('docs/REFINER-PROMPT.md');
-    expect(text.length, 'docs/REFINER-PROMPT.md must be read from disk, or every rail below is vacuous')
-      .toBeGreaterThan(2_000);
-    expect(text, 'the refiner must be told it writes no code and opens no pull request')
-      .toMatch(/never writes code/i);
-    expect(text, 'and that pull requests are outside its surface entirely').toMatch(/every pull request/i);
-    const surface = between(text, '## What this task may and may not do', '**Out of reach entirely');
-    expect(surface, 'no clause may carve an exception into "never develops" — an addition is how this '
-      + 'rule dies, never a deletion (round 2 sweep)').not.toMatch(NO_ESCAPE);
-  });
-
-  it('every irreversible act sits on the deferred side of the gate, and none on the immediate side', () => {
-    const text = doc('docs/REFINER-PROMPT.md');
-    const immediate = paraWith(text, '**Apply immediately**');
-    const deferred = paraWith(text, '**Propose today');
-    expect(immediate, 'the prompt must carry an "Apply immediately" list').not.toEqual('');
-    expect(deferred, 'the prompt must carry a "Propose today, apply tomorrow" list').not.toEqual('');
-    expect(text.indexOf('**Apply immediately**'), 'the cheap half is stated first, so the gate reads as an '
-      + 'exception to it rather than the other way round').toBeLessThan(text.indexOf('**Propose today'));
-    expect(deferred, 'closing an issue is irreversible and must be proposed, never applied the same run')
-      .toMatch(/clos/i);
-    expect(immediate, 'nothing on the immediate side may close an issue').not.toMatch(/clos/i);
-    for (const act of IRREVERSIBLE) {
-      expect(deferred, `${act} must be named on the deferred side of the gate`).toContain(act);
-      expect(immediate, `${act} is irreversible and must not be applied in the same run`).not.toContain(act);
-    }
-  });
-
-  // Read the mechanism block, not the whole file: `/re-deriv/` anywhere in the document is satisfied by the
-  // incidental "a proposal that no longer re-derives is dropped" three paragraphs down, so a rail spanning
-  // the file stays green with the instruction itself deleted. Found by mutation, not by reading.
-  //
-  // And read each numbered point separately (#513 round 1, B2): scoping to the block was not enough either,
-  // because points 2 and 3 carry the same words as point 1 and kept it green while point 1 said the
-  // opposite. Point 1 is the whole gate — everything else is bookkeeping around it.
-  it('a proposal is re-derived from the repo, never replayed from the ledger', () => {
-    const text = doc('docs/REFINER-PROMPT.md');
-    const mech = between(text, 'The mechanism', 'A lost or unreadable ledger');
-    expect(mech.length, 'the numbered mechanism must be found, or this rail reads an empty string')
-      .toBeGreaterThan(400);
-    const points = mech.split(/\n(?=\d+\. )/).filter((p) => /^\d+\. /.test(p));
-    expect(points.length, 'the mechanism must be a numbered list, or the per-point checks below read nothing')
-      .toBeGreaterThanOrEqual(4);
-    const [one] = points;
-    expect(one, 'POINT 1 is the gate itself: it must tell the run to derive again from the repo')
-      .toMatch(/re-deriv/i);
-    expect(one, 'and it must refuse the replay in as many words — "read yesterday\'s reasoning and confirm '
-      + 'it still reads true" satisfied every earlier check and is the exact failure ADR-008 names')
-      .toMatch(/do not read yesterday|never read yesterday/i);
-    expect(one, 'no clause may let stored reasoning stand in for today\'s derivation').not.toMatch(NO_ESCAPE);
-    expect(mech, 'a gate with no stated bound closes whenever the next run happens to be')
-      .toMatch(/\b20 hours\b/);
-    expect(binds(mech, '20 hours', /derived it again|re-deriv/i),
-      'the bound and the re-derivation are one condition, not two — the wait alone is a delay').toBe(true);
-    expect(mech, 'the ledger must hold when a proposal was made and not what it was — a stored plan is what '
-      + 'turns re-deriving back into replaying').toMatch(/never the plan/i);
-    expect(mech, 'and it must name the issue that carries it').toMatch(/refiner: backlog/);
-  });
-
-  /**
-   * #513 round 1, B1 — the reviewer's finding, and the reason the fix is structural rather than remembered.
-   *
-   * The prompt used to promise "a priority you set, that someone changed back, is never set again", with the
-   * ledger as its only memory — and the ledger holds *outstanding* proposals, dropping a line the moment it
-   * is applied. So: apply P2, the owner corrects it to P1, and days later an unrelated re-scan re-derives P2
-   * against a ledger that never knew. The safety case the whole loosening rests on did not hold.
-   *
-   * The owner chose (2026-09-22) to close it by construction AND by state: a missing priority may be set, an
-   * existing one may only be argued for in a comment. The hole cannot reopen, because the moment any hand
-   * touches a priority the label exists, and an existing label is out of reach whatever any record says.
-   */
-  it('an existing priority is never changed, only argued for (#513 review B1)', () => {
-    const text = doc('docs/REFINER-PROMPT.md');
-    const gate = between(text, '## The two-phase gate', '## The work');
-    expect(gate.length, 'the gate and the signals must be found, or this rail reads an empty string')
-      .toBeGreaterThan(800);
-    // Every check below is a CONJUNCTION, deliberately, and three of them were alternations until this PR's
-    // own mutation table caught them. **An `|` in a policy assertion is the token-presence defect one level
-    // down**: a mutation satisfies one branch while breaking the rule, exactly as "everything is MIT" kept
-    // three required tokens. "Behind the gate, with evidence, you may" left `Applying it is not one of your
-    // options` standing and stayed green; "Keep it in the ledger" left `ledger holds only` standing; and
-    // widening the grant to "any issue" was covered by the gate line three paragraphs up. Each is now
-    // required on its own, and bound to the sentence it governs.
-    expect(binds(gate, 'You may set a `priority:*`', /has none|is missing/i),
-      'the grant must be bound to a MISSING priority, in its own sentence — the gate line saying "missing" '
-      + 'three paragraphs up covered a bullet that granted any priority at all').toBe(true);
-    expect(binds(gate, 'never change one that is already there', /priority|existing/i),
-      'the prompt must refuse to change an existing priority, in as many words').toBe(true);
-    expect(gate, 'the refusal must rule out the gate as a route — a gated exception IS the hole reopening')
-      .toMatch(/[Nn]ot behind the gate/);
-    expect(gate, 'and it must say applying is not an available option, so "may" cannot creep back')
-      .toMatch(/Applying it is not one of your options/);
-    expect(gate, 'the alternative must be stated, or the rule reads as "do nothing about a wrong priority"')
-      .toMatch(/comment your reasoning/i);
-    // The memory half: derived from the issue timeline, never from the ledger, because the ledger forgets.
-    expect(gate, 'the timeline is where a changed value is read from').toMatch(/issues\/<n>\/events/);
-    expect(binds(gate, 'issues/<n>/events', /labeled|timeline/i),
-      'and it must say what that endpoint is read for').toBe(true);
-    expect(gate, 'and no clause may reopen what the refusal just closed (round 2 sweep)')
-      .not.toMatch(NO_ESCAPE);
-    expect(gate, 'the ledger must be named as the WRONG place for this memory — that it "holds only '
-      + 'outstanding proposals" is a fact that survives a sentence telling the run to keep it there anyway')
-      .toMatch(/Not from the ledger/);
-  });
-
-  it('what the refiner may never touch stays out of its reach', () => {
-    const text = doc('docs/REFINER-PROMPT.md');
-    const reach = between(text, '## What this task may and may not do', '## The two-phase gate');
-    expect(reach.length, 'the out-of-reach section must come before the gate, or this rail reads the wrong half')
-      .toBeGreaterThan(200);
-    for (const label of [...UNTOUCHABLE, ...PULSES]) {
-      expect(reach, `${label} must be named as out of the refiner's reach`).toContain(label);
-    }
-    expect(reach, '"out of reach entirely" means entirely — a qualifier here reopens every label at '
-      + 'once (round 2 sweep)').not.toMatch(NO_ESCAPE);
-    for (const label of UNTOUCHABLE) {
-      expect(binds(reach, label, /out of reach|never touch|leave this one alone|cannot take/i),
-        `${label} must be named INSIDE the refusal, not merely listed nearby`).toBe(true);
-    }
-  });
-
-  it('the loosening is recorded where the rule it relaxes lives, and spares `later` (#512)', () => {
-    const text = doc('.claude/rules/governance.md');
-    const tools = paraWith(text, 'The three ordering tools');
-    expect(tools, 'the ordering-tools rule must say the refiner may now set two of the three')
-      .toMatch(/docs\/REFINER-PROMPT\.md/);
-    expect(tools, '`later` is the one ordering tool the loosening did not touch — say so, or it drifts in')
-      .toMatch(/never `later`/);
-    expect(tools, 'and it must name itself a loosening, since that is what gates it on the owner')
-      .toMatch(/loosening/i);
-    expect(tools, 'pointing at the decision record that holds the alternatives dropped')
-      .toContain('docs/decisions/008-the-backlog-is-refined-by-a-routine.md');
-    expect(tools, 'and the grant may carry no exception of its own (round 2 sweep)')
-      .not.toMatch(NO_ESCAPE);
-    expect(binds(tools, 'never `later`', /priority|blocked|refiner/i),
-      'the `later` exclusion must sit inside the grant it narrows, not elsewhere in the bullet')
-      .toBe(true);
-  });
-
-  it('the epic\'s progress is GitHub\'s to count, not the refiner\'s to write', () => {
-    const text = doc('docs/REFINER-PROMPT.md');
-    expect(text, 'the parent must carry task-list lines GitHub can count').toMatch(/- \[ \] #/);
-    const split = between(text, '4. **Split `L` and `XL`.**',
-      '5. **An acceptance criterion');
-    expect(split, 'and the refiner must be forbidden from writing a progress number of its own')
-      .toMatch(/do not write a progress number/i);
-    expect(split, 'with no exception beside it — "unless the bar looks stale" is how a hand-kept count '
-      + 'comes back (round 2 sweep)').not.toMatch(NO_ESCAPE);
-  });
-
-  /**
-   * Round 2, B1. `toContain('`epic`')` + `/children/i` stayed green when STEP 3 rule 1 was rewritten to
-   * "note that `epic` no longer means dropping it — its children stay queued alongside it", the literal
-   * opposite of the policy: both tokens survive a reversal that adds words rather than removing them.
-   *
-   * **`binds` cannot save this one, and that is the point worth recording.** The drop list opens with the
-   * word "drop", so any clause inside rule 1 is within a sentence or two of it, negated or not — and a
-   * negation vocabulary (`no longer`, `stays queued`, `rather than drop`…) is whack-a-mole, because prose
-   * negation is not mechanically detectable in general.
-   *
-   * So: **where a policy is a single clause, pin the clause.** That is what this repository already does
-   * deliberately for its load-bearing sentences (#194, #204, #218, the #161 pointer), and it is the right
-   * tool at this size — fifteen words whose whole content is one membership statement. `binds` and
-   * `NO_ESCAPE` are for passages; neither replaces a verbatim pin on a clause, and pretending otherwise is
-   * what produced this finding.
-   *
-   * The cost is honest and small: reword the clause and this rail asks you to update it, which for a rule
-   * this short is a prompt to re-read the policy rather than an obstacle.
-   */
-  it('an `epic` parent drops out of the developer routine\'s query', () => {
-    const text = doc('docs/ROUTINE-PROMPT.md');
-    const step3 = between(text, 'STEP 3 —', 'STEP 4 —');
-    expect(text.indexOf('STEP 3 —'), 'STEP 3 must exist, or the slice below silently starts at the top')
-      .toBeGreaterThan(-1);
-    expect(text.indexOf('STEP 4 —'), 'STEP 4 must exist, or the slice silently runs to the end of the file')
-      .toBeGreaterThan(-1);
-    expect(step3.length, 'STEP 3 must be found, or this rail checks nothing').toBeGreaterThan(500);
-    expect(step3, 'STEP 3 rule 1 must drop `epic` in its own words, or a run develops the parent the refiner '
-      + 'split precisely because no run could finish it — this clause is pinned verbatim on purpose, see above')
-      .toContain('anything labelled `epic` — the refiner split it, so its children are the work');
-    // A verbatim pin holds the clause, and nothing else: append "; but note it stays queued" and the
-    // pin is still satisfied. The drop list needs the escape guard too (found by the coverage rail
-    // below, not by reading — which is the whole argument for having it).
-    const epicClause = between(step3, 'anything labelled `epic`', '2. **drop**');
-    expect(epicClause, 'no clause may reverse the membership this one just stated — rule 1 as a whole '
-      + 'carries a legitimate "unless" for `owner-input`, so the guard scopes to this clause')
-      .not.toMatch(NO_ESCAPE);
-  });
-
-  /**
-   * Round 2, B2. `toContain('refiner: backlog')` said nothing about the stall check surviving: the whole
-   * "more than three days … has quietly become a refusal" clause was replaced by its opposite and the rail
-   * stayed green. A two-phase gate that nobody watches can become a permanent refusal, which is the failure
-   * mode this loosening's safety argument quietly depends on not happening.
-   *
-   * Here `binds` does work, because the check is a passage rather than a clause: the bound has to sit beside
-   * the thing it bounds, and the passage may carry no escape.
-   */
-  it('the watchdog holds the refiner\'s pulse, since nothing else does', () => {
-    const text = doc('docs/WATCHDOG-PROMPT.md');
-    expect(text, 'the watchdog must read `refiner: heartbeat`').toContain('refiner: heartbeat');
-    // Scoped to check 10, so a mention of the pulse anywhere else in the file cannot stand in for the check.
-    const check10 = between(text, '10. **Is the refiner alive?**', '## Reporting');
-    expect(check10.length, 'check 10 must be found, or every assertion below reads an empty string')
-      .toBeGreaterThan(400);
-    // No `binds` for the 30-hour bound: slicing to check 10 already puts it beside the pulse it bounds, and
-    // a proximity check on top was redundant — and red, because the bound sits 340 characters after the
-    // pulse's first mention in a correct file. Scoping is the stronger of the two tools where a section
-    // exists to scope to; `binds` is for a claim inside one.
-    expect(check10, 'a daily routine needs a daily staleness bound, not the hourly one').toMatch(/30 hours/);
-    expect(check10, 'the ledger is read in the same pass').toContain('refiner: backlog');
-    expect(check10, 'and a gate that never closes must be a finding — three days is the stated bound')
-      .toMatch(/three days/i);
-    expect(binds(check10, 'three days', /(is|are) a finding|has stalled|become a refusal/i),
-      'the three-day bound must be attached to what it makes a finding — the whole stall clause was replaced '
-      + 'by its opposite and only `refiner: backlog` was checked (round 2, B2)').toBe(true);
-    expect(binds(check10, 'refiner: backlog', /finding|refusal|stalled/i),
-      'the ledger must be read FOR the stall, not merely mentioned').toBe(true);
-    expect(check10, 'and no clause may excuse the stall it just made a finding').not.toMatch(NO_ESCAPE);
-  });
-
-  /**
-   * COVERAGE, not another rule — the answer to why this block was blocked three times.
-   *
-   * Each round found the same class (a positive-only rail cannot tell a statement from its negation) and
-   * each fix treated the assertions the author's own mutation table happened to touch. That table is
-   * written after the fix, by the mind that wrote the fix, so it inherits the blind spot: the rails left
-   * unswept were exactly the ones not imagined. "Fix the class, not the instance" is a reminder, and a
-   * reminder cannot enumerate a population.
-   *
-   * So enumerate it here, mechanically. **Every `it` in this block must carry at least one negative
-   * assertion**, because the defect is precisely a block of positives. This test reads this file's own
-   * source to do it, which is the only reason it can count what a comment can only promise.
-   *
-   * It found two on the run that introduced it: the priority rule and the `epic` drop list, both added in
-   * the round-2 fix that claimed to sweep everything.
-   *
-   * What it cannot do: judge whether a negative is the RIGHT one. It converts "did I remember?" into a
-   * counted property, and leaves "is it the correct guard?" to the reviewer, where it belongs.
-   */
-  /**
-   * Round 4, B2/B3/B4 — and the ceiling the reviewer named, which is the real finding.
-   *
-   * `NO_ESCAPE` was a five-word vocabulary. The reviewer appended *"A second closure raised by a different
-   * run still goes forward, since it is a fresh proposal."* directly after the reopen guarantee — ordinary
-   * English, none of the five words, the literal opposite of the rule — and every row stayed green,
-   * `beside`-guarded rows included, because `binds` checks proximity and never polarity.
-   *
-   * **Widening the vocabulary is a losing game and this stops playing it.** Prose negation is not
-   * mechanically detectable; that was already written into this file in round 2 and then contradicted by
-   * three more rounds of regex. So each guarantee is now pinned **word for word, as a whole unit** — the
-   * paragraph or list item it lives in, matched by equality against the document's own units. A reversal
-   * fails. An edit fails. A sentence appended *inside* the unit fails, which is exactly what defeated the
-   * vocabulary. Nothing clever, and nothing to outwit.
-   *
-   * The cost is real and is the right one: a deliberate rewording turns a row red and asks the author to
-   * re-pin it, which for nine safety guarantees is a prompt to re-read the policy rather than an obstacle.
-   * It is what this repository already does for its load-bearing sentences (#194, #204, #218).
-   *
-   * **The ceiling, stated rather than implied.** A contradicting sentence added as its OWN new unit, beside
-   * an untouched pin, still passes — and no regex, vocabulary or equality check can see it. That is not a
-   * gap this table can close, so it is named here instead of covered over: for that case human review is
-   * the backstop, which is how all four of these rounds were actually found.
-   *
-   * `conditional` is gone with the vocabulary it excused (B4): an unchecked per-row opt-out that turned the
-   * guard off, which the coverage rail could not see because it scans the shared `it.each` body statically.
-   * There is nothing left to opt out of.
-   */
+  /** A document's units: paragraphs, and each list item inside one. */
   const unitsOf = (text: string) =>
     text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=(?:- |\d+\. ))/)).map((u) => u.trim());
+  /** Refuses on anything but exactly one match: a first-match helper reads a decoy and reports health. */
+  const unitWith = (text: string, needle: string) => {
+    const hits = unitsOf(text).filter((u) => u.includes(needle));
+    if (hits.length !== 1) throw new Error(`${hits.length} units contain ${JSON.stringify(needle)}, want 1`);
+    return hits[0];
+  };
 
-  const CLAIMS: Array<{ what: string; unit: string }> = [
-    { what: "a reopened issue is never proposed for closing again",
-      unit: "- **An issue that was closed and then reopened is never proposed for closing again.**" },
-    { what: "blocked is added and removed only on the blocker, and never re-applied",
-      unit: "That closes the hole by construction rather than by memory: the moment a human hand touches a priority, the\nlabel exists, and an existing label is out of your reach whatever any record says. A ledger that is lost,\ntruncated or garbled cannot make this rule fail open (#513 review, B1). **The same shape governs `blocked`:**\nadd it when you derive a blocker, remove it only when the blocking issue has actually closed, and never\nre-apply either after someone has changed it back." },
-    { what: "a lost ledger applies nothing, and so does one unparseable line",
-      unit: "A lost or unreadable ledger means nothing applies. **So does a single line you cannot parse**: drop that line\nand let its proposal start its wait again, rather than guessing what it said. Both are the correct failure\ndirection — the cost is a day, and the alternative is an irreversible act on a misread record." },
-    { what: "the duplicate survivor is the earlier issue",
-      unit: "1. **Duplicates and overlap, across every open issue in reach.** Two issues describing the same defect, or one\n   whose scope wholly contains another's. Link them both ways in a comment naming the overlap in one sentence,\n   and propose closing the later one — the earlier issue number is the survivor, because pointers are written\n   against it. Where the overlap is partial, link and say so; do not propose a close." },
-    { what: "the owner is notified only for a failure to run or a large close",
-      unit: "You are not an alarm — the watchdog is, and it is silent when clean precisely so that it is believed. You\nspeak every run, and quietly: everything goes in the two issue bodies you own, and **nothing notifies the\nowner** unless you could not run at all, or the proposals you are about to apply in this run would\nclose more than five issues between them — a per-run total, not a count inside one proposal." },
-    { what: "the forgery-safety argument is scoped to this file and nothing else",
-      unit: "Under #153 one GitHub account serves every agent and the owner, so you **cannot** tell his hand from another\nrun's — `author_association: OWNER` is on every agent's comment too, and the timeline's `actor` is the same\naccount for all of us. That is survivable here and only here, because every authority in this file fails safe\nunder forgery: a forged objection merely stops a change from happening, and you do not need to know **who**\nchanged a label to be stopped by the fact that it changed. There is no approval you can be tricked into,\nbecause you have none to give. Do not extend this reasoning to anything else." },
-    { what: "the pulse and ledger issues are created in one call",
-      unit: "Create either with its body already in it, in the single `POST /issues` call that takes `title`, `body` and\n`labels` together. Never create one empty and fill it afterwards: a run that dies in between leaves an open\nissue with no content, which ages into nothing and reads as healthy forever." },
-    { what: "an unreadable events timeline fails closed",
-      unit: "- **A value you set, that someone then changed, is never set again.** Read this from\n  `GET /repos/ugurozsahin/sky-academy/issues/<n>/events`, which carries every `labeled` and `unlabeled`\n  event with its label and its time. Not from the ledger: the ledger holds only *outstanding* proposals and\n  drops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.\n  **The issue's own timeline is repo state, and deriving from state rather than replaying a record is this\n  routine's whole method** — the same reason the gate re-derives instead of reading back its reasoning.\n  **If you cannot read that timeline — the call fails, the body will not parse, the page is truncated — then\n  do not set the value.** Say so in your report and move on. An unreadable timeline is the same shape as an\n  unreadable ledger and takes the same answer: the check was not made, so the act does not happen. Reading a\n  failed call as \"no change found\" is the absence read as a pass, which is the defect this whole project is\n  built around." },
-    { what: "an existing priority is never changed, only argued for",
-      unit: "- **You may never change one that is already there.** Not behind the gate, not with evidence, not ever. If\n  you derive that an existing priority is wrong, read the timeline above; if the label has not been touched\n  since it was first set, you may **comment your reasoning on the issue and stop.** The owner decides.\n  Applying it is not one of your options." },
-    { what: "a missing priority may be set",
-      unit: "- **You may set a `priority:*` on an issue that has none.** That is the case this authority exists for —\n  nine issues had no priority label on 2026-09-22 and therefore sorted behind all 130." },
-    { what: "re-derive, never replay",
+  const CLAIMS: Array<{ what: string; file: string; unit: string }> = [
+    { what: "the refiner develops nothing and never touches a pull request",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "It never writes code, never opens a pull request on a branch, never merges, never touches a pull request at\nall. Its whole surface is issues." },
+    { what: "what is out of reach entirely",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "**Out of reach entirely, whatever else this file says:**" },
+    { what: "the four pulse issues are out of reach",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- the four pulse issues — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`,\n  `watchdog: heartbeat`, and your own two below. They are permanently open on purpose and their bodies are\n  deliberately odd, so a \"this claim is no longer true, close it\" pass would kill every one of them. Match\n  them by title, not by label: they carry `watchdog`, and so do real findings." },
+    { what: "the immediate side of the gate",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "**Apply immediately** — duplicate and overlap links, a missing area label, `complexity:*`, an acceptance\ncriterion, splitting an oversized issue and labelling the parent `epic`, a follow-up issue for the part of a\nstalled item that could ship now." },
+    { what: "the deferred side of the gate",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "**Propose today, apply tomorrow** — closing an issue, setting a **missing** `priority:*`, adding or removing\n`blocked`." },
+    { what: "an existing priority is proposed and never applied",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "**Propose and stop, never apply** — changing a `priority:*` that already exists. The section below says why\nthat one has no apply step at all." },
+    { what: "re-derive every proposal, never replay",
+      file: "docs/REFINER-PROMPT.md",
       unit: "1. **Re-derive every proposal from the repo state, every run.** Do not read yesterday's reasoning and act on\n   it. Yesterday's evidence is a claim about a tree that has since moved — the duplicate may have been closed,\n   the code may have grown the very thing the issue asked for. **Reading back your own reasoning and\n   confirming it still reads true is not this step**, it is the failure this step exists to prevent: it makes\n   the gate a delay and nothing more." },
-    { what: "a split that died halfway is completed, never restarted",
-      unit: "4. **Split `L` and `XL`.** Into pieces that each stand alone and each leave the game working. Label the parent\n   `epic`, which drops it out of `docs/ROUTINE-PROMPT.md` STEP 3's query, and put `- [ ] #<child>` lines in\n   the parent body. **Do not write a progress number.** GitHub counts those lines, draws the bar and ticks the\n   box itself when a child closes; a bar you maintain by hand still looks correct at the exact moment it stops\n   being true, which is this project's signature defect wearing a new hat. Each child says `Part of #<parent>`\n   — never a closing keyword, which would shut the parent from a child's body (`open-pr` skill §3).\n   **A split is three dependent writes, so begin by looking for one you already started.** Create the\n   children, label the parent `epic`, rewrite its checklist — and a run that dies between the first and the\n   second leaves children nobody points at, which tomorrow's re-derivation would read as an unsplit parent\n   and split a second time. So **before splitting anything, search for open issues whose body says\n   `Part of #<parent>`**. If any exist, the split is already under way: finish it — label the parent and\n   write the checklist against the children that exist — and never create a second set. That search is the\n   idempotency check, and it works because the child's `Part of` line is written in the same call that\n   creates it, so there is no moment where a child exists without it." },
+    { what: "the ledger stores when, never the plan",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "2. **The ledger stores only when a proposal was first made**, never the plan. The open issue titled\n   `refiner: backlog` carries it, overwritten every run (records have readers, #98 — operational state lives\n   in an issue body that is replaced, never appended to). One line per outstanding proposal: the issue number,\n   the action, the UTC timestamp it was first derived." },
+    { what: "the 20-hour bound is a condition on re-derivation",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "3. **Apply a proposal only when you derived it again today AND the ledger says you first derived it more than\n   20 hours ago.** Match on the **action as well as the issue number** — \"close #131 as a duplicate of #98\"\n   and \"close #131 as no longer true\" are two different proposals, and a ledger line that only names the\n   issue would let one of them serve as the other's waiting period. A proposal that no longer re-derives is\n   dropped from the ledger silently — that is not a failure, it is the gate working." },
+    { what: "a proposal is posted on the issue when first made",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "4. **Post the proposal as a comment on the issue itself when you first make it**, so the owner meets it where\n   he reads rather than in a ledger he does not open. Say what you will do, when, and on what evidence." },
+    { what: "a lost ledger applies nothing, and so does one unparseable line",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "A lost or unreadable ledger means nothing applies. **So does a single line you cannot parse**: drop that line\nand let its proposal start its wait again, rather than guessing what it said. Both are the correct failure\ndirection — the cost is a day, and the alternative is an irreversible act on a misread record." },
+    { what: "refine-hold is a standing exemption",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "**`refine-hold`** is a standing exemption: never touch that issue again, in any way, until the label comes off." },
+    { what: "a reopened issue is never proposed for closing again",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- **An issue that was closed and then reopened is never proposed for closing again.**" },
+    { what: "a changed value is never set again, read from a timeline read to its end",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- **A value you set, that someone then changed, is never set again.** Read this from\n  `GET /repos/ugurozsahin/sky-academy/issues/<n>/events`, which carries every `labeled` and `unlabeled`\n  event with its label and its time. Not from the ledger: the ledger holds only *outstanding* proposals and\n  drops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.\n  **The issue's own timeline is repo state, and deriving from state rather than replaying a record is this\n  routine's whole method** — the same reason the gate re-derives instead of reading back its reasoning.\n  **A timeline you have not read to the end is a timeline you have not read.** `events` is paginated, and the\n  relabel this rule exists to find is as likely to sit on page three as page one — so follow `Link:\n  rel=\"next\"` until there is no next page. A response that arrives clean, parses clean and is page one of\n  several is the most dangerous shape here, because nothing about it looks like a failure (#513 review, B8).\n  **If you cannot read that timeline to its end — the call fails, the body will not parse, a page is\n  truncated, or a `next` link you cannot follow — then do not set the value.** Say so in your report and move on. An unreadable timeline is the same shape as an\n  unreadable ledger and takes the same answer: the check was not made, so the act does not happen. Reading a\n  failed call as \"no change found\" is the absence read as a pass, which is the defect this whole project is\n  built around." },
+    { what: "a missing priority may be set",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- **You may set a `priority:*` on an issue that has none.** That is the case this authority exists for —\n  nine issues had no priority label on 2026-09-22 and therefore sorted behind all 130." },
+    { what: "an existing priority is never changed",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- **You may never change one that is already there.** Not behind the gate, not with evidence, not ever. If\n  you derive that an existing priority is wrong, read the timeline above; if the label has not been touched\n  since it was first set, you may **comment your reasoning on the issue and stop.** The owner decides.\n  Applying it is not one of your options." },
+    { what: "the hole is closed by construction, and blocked takes the same shape",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "That closes the hole by construction rather than by memory: the moment a human hand touches a priority, the\nlabel exists, and an existing label is out of your reach whatever any record says. A ledger that is lost,\ntruncated or garbled cannot make this rule fail open (#513 review, B1). **The same shape governs `blocked`:**\nadd it when you derive a blocker, remove it only when the blocking issue has actually closed, and never\nre-apply either after someone has changed it back." },
+    { what: "the forgery-safety argument is scoped to this file",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "Under #153 one GitHub account serves every agent and the owner, so you **cannot** tell his hand from another\nrun's — `author_association: OWNER` is on every agent's comment too, and the timeline's `actor` is the same\naccount for all of us. That is survivable here and only here, because every authority in this file fails safe\nunder forgery: a forged objection merely stops a change from happening, and you do not need to know **who**\nchanged a label to be stopped by the fact that it changed. There is no approval you can be tricked into,\nbecause you have none to give. Do not extend this reasoning to anything else." },
+    { what: "the duplicate survivor is the earlier issue",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "1. **Duplicates and overlap, across every open issue in reach.** Two issues describing the same defect, or one\n   whose scope wholly contains another's. Link them both ways in a comment naming the overlap in one sentence,\n   and propose closing the later one — the earlier issue number is the survivor, because pointers are written\n   against it. Where the overlap is partial, link and say so; do not propose a close." },
+    { what: "a split is idempotent and its progress bar belongs to GitHub",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "4. **Split `L` and `XL`.** Into pieces that each stand alone and each leave the game working. Label the parent\n   `epic`, which drops it out of `docs/ROUTINE-PROMPT.md` STEP 3's query, and put `- [ ] #<child>` lines in\n   the parent body. **Do not write a progress number.** GitHub counts those lines, draws the bar and ticks the\n   box itself when a child closes; a bar you maintain by hand still looks correct at the exact moment it stops\n   being true, which is this project's signature defect wearing a new hat. Each child says `Part of #<parent>`\n   — never a closing keyword, which would shut the parent from a child's body (`open-pr` skill §3).\n   **A split is three dependent writes, so begin by looking for one you already started.** Create the\n   children, label the parent `epic`, rewrite its checklist — and a run that dies between the first and the\n   second leaves children nobody points at, which tomorrow's re-derivation would read as an unsplit parent\n   and split a second time. So **before splitting anything, search for open issues whose body says\n   `Part of #<parent>`**. If any exist, the split is already under way: finish it rather than starting again.\n   **Finishing means re-deriving the whole split and creating only the pieces that are missing**, matched by\n   what each child covers — never labelling the parent against whatever children happen to exist. A run that\n   died after two of four children would otherwise leave the parent `epic`, its checklist naming two, and the\n   other two gone for good: `epic` drops the parent out of `docs/ROUTINE-PROMPT.md` STEP 3, so nothing ever\n   re-queues the missing scope (#513 review, B7). Nothing records the intended count, and nothing needs to —\n   the split is re-derived from the issue every run, which is this routine's method everywhere else.\n   The `Part of` line is written in the same call that creates the child, so there is no moment where a child\n   exists without one." },
+    { what: "the owner is notified only for a failure to run or a large close",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "You are not an alarm — the watchdog is, and it is silent when clean precisely so that it is believed. You\nspeak every run, and quietly: everything goes in the two issue bodies you own, and **nothing notifies the\nowner** unless you could not run at all, or the proposals you are about to apply in this run would\nclose more than five issues between them — a per-run total, not a count inside one proposal." },
+    { what: "the pulse and ledger issues are created in one call",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "Create either with its body already in it, in the single `POST /issues` call that takes `title`, `body` and\n`labels` together. Never create one empty and fill it afterwards: a run that dies in between leaves an open\nissue with no content, which ages into nothing and reads as healthy forever." },
+    { what: "an epic parent drops out of the developer query",
+      file: "docs/ROUTINE-PROMPT.md",
+      unit: "1. **drop** anything labelled `later` — the owner's \"not yet\", without arguing with a priority; and anything labelled `owner-input` or `owner-approval`, unless a non-visual part is clearly separable, in which case take that part and say so in the PR; and anything labelled `epic` — the refiner split it, so its children are the work (`docs/REFINER-PROMPT.md`);" },
+    { what: "the watchdog bounds the refiner pulse and the stalled gate",
+      file: "docs/WATCHDOG-PROMPT.md",
+      unit: "10. **Is the refiner alive?** Read the body of the open issue titled `refiner: heartbeat` (label `watchdog`;\n   exclude it from the duplicate search below like the other pulses). `docs/REFINER-PROMPT.md` describes a\n   **daily** task that rewrites it with a UTC timestamp as the last thing it does, so the numbers here are\n   the day's, not the hour's: **older than ~30 hours is a finding.** Everything check 3 says applies unchanged\n   — an open issue is not evidence of a pulse, an unparseable body counts as stale, a closed one is a finding\n   rather than a pass, `stopped: limit` is a finding however fresh it is, and the stamp is checked against\n   the write exactly as check 3 says — that paragraph names this pulse and is the one home of the invocation.\n   One difference: this routine has no `IN PROGRESS` stamp, because it writes nothing on the way in. So a\n   missing pulse here is the *only* evidence a refiner run leaves of having died, and there is no second\n   record to cross-check it against.\n   Read `refiner: backlog` in the same pass — the same label, never work, and never a duplicate report of a\n   finding. You are not judging its contents. One thing only: if its ledger lists a proposal first derived\n   **more than three days ago** and still not applied, the two-phase gate has stalled rather than held, and\n   that is a finding. A gate that never closes is a gate that has quietly become a refusal." },
+    { what: "the loosening is recorded where the rule it relaxes lives",
+      file: ".claude/rules/governance.md",
+      unit: "- **The three ordering tools (agreed with the owner, 2026-09-11).** The project board is a read-only view, not\n  a second list — `docs/ROUTINE-PROMPT.md` STEP 1 has why a cloud session cannot write to it. The owner\n  reorders work with three things, all set on the issue itself: **`priority:P0`** means now — two or three\n  cards at most, oldest first within it (`docs/ROUTINE-PROMPT.md` STEP 3 rule 5); **`Blocked by #<n>` as the\n  first line of the issue body, plus the `blocked` label**, means after that one — STEP 3 rule 2 already skips\n  an issue blocked by an open issue it references, and the label is what puts the card in the board's Blocked\n  column, coming off by hand once the blocker closes; **`later`** means not yet, the parking label. There is\n  no hand order inside a priority — oldest issue number first, full stop — which is acceptable because the\n  routine merges roughly fifteen PRs a day, so a `priority:P1` bucket drains in a day or two, not a week.\n  **Two of the three are no longer his alone (#512, owner 2026-09-22).** The refiner routine\n  (`docs/REFINER-PROMPT.md`) may set `priority:*` and `blocked` — never `later` — but only behind a one-day\n  gate: it proposes today, re-derives the proposal from the repo tomorrow, and applies it then. That is a\n  **loosening** under the `open-pr` skill §6 and was gated as one. The rule it relaxes existed to stop a run\n  promoting its own work, and it does not reach a routine that opens no pull request and so has nothing to\n  promote itself into; `docs/decisions/008-the-backlog-is-refined-by-a-routine.md` has the reasoning, the\n  alternatives dropped, and why a forged objection is survivable here when a forged approval would not be." },
   ];
 
-  it.each(CLAIMS)('the prompt still carries, word for word: $what', ({ unit }) => {
-    const units = unitsOf(doc('docs/REFINER-PROMPT.md'));
-    expect(units.length, 'the document must split into its units, or this row asserts nothing')
-      .toBeGreaterThan(40);
-    // Equality against a whole unit, not `toContain` on the text: a substring match is satisfied by the
-    // pinned words sitting inside a longer, reversed sentence, which is round 4's B2 in one line.
-    expect(units, 'this guarantee is part of the safety argument the loosening rests on — if the wording '
-      + 'changed on purpose, re-pin it here deliberately and say so in the commit').toContain(unit);
+  it.each(CLAIMS)('the guarantee still reads, word for word: $what', ({ file, unit }) => {
+    const units = unitsOf(doc(file));
+    expect(units.length, `${file} must split into its units, or this row asserts nothing`).toBeGreaterThan(5);
+    // Equality against a whole unit, never a substring of the file: a substring is satisfied by the pinned
+    // words sitting inside a longer, reversed sentence, which was round 4's B2 in one line.
+    expect(units, `${file} must still carry this guarantee as written — if the wording changed on purpose, `
+      + 're-pin it here deliberately and say so in the commit').toContain(unit);
   });
 
-  it('the claim table is not allowed to quietly shrink', () => {
+  it('the claim table covers the whole population and cannot quietly shrink', () => {
     expect(CLAIMS.length, 'a row removed is a guarantee unpinned — lower this only when the document '
-      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(12);
+      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(25);
     expect(new Set(CLAIMS.map((c) => c.what)).size, 'two rows must not claim the same thing')
       .toBe(CLAIMS.length);
     expect(new Set(CLAIMS.map((c) => c.unit)).size, 'two rows must not pin the same unit — that is one '
-      + 'guarantee counted twice, which inflates the floor above without covering anything')
+      + 'guarantee counted twice, inflating the floor above without covering anything')
       .toBe(CLAIMS.length);
+    // The population spans four files; a table that drifted to one of them would still pass the floor.
+    expect(new Set(CLAIMS.map((c) => c.file)).size, 'the guarantees live in four files and all four must be '
+      + 'covered — the developer query, the watchdog check and the governance record are each half of a rule '
+      + 'whose other half is in the prompt').toBeGreaterThanOrEqual(4);
   });
 
-  it('every rail in this block carries a negative assertion, not only positives', () => {
+  // Structure, not wording: the cheap half is stated first, so the gate reads as an exception to it rather
+  // than the other way round. A pin cannot express an ordering between two units.
+  it('the immediate side of the gate is stated before the deferred side', () => {
+    const text = doc('docs/REFINER-PROMPT.md');
+    const immediate = text.indexOf('**Apply immediately**');
+    const deferred = text.indexOf('**Propose today, apply tomorrow**');
+    expect(immediate, 'the prompt must carry an "Apply immediately" list').toBeGreaterThan(-1);
+    expect(deferred, 'and a "Propose today, apply tomorrow" list').toBeGreaterThan(-1);
+    expect(immediate, 'the cheap half comes first').toBeLessThan(deferred);
+    expect(unitWith(text, '**Apply immediately**'), 'nothing on the immediate side may close an issue or '
+      + 'touch the owner\'s ordering labels').not.toMatch(/clos|`priority:\*`|`blocked`/i);
+  });
+
+  /**
+   * COVERAGE, not another rule — the answer to why this block was blocked five times. Each round's fix
+   * treated the population as the assertions its own mutation table touched, and that table is written after
+   * the fix by the mind that wrote it. A reminder cannot enumerate a population; a test can.
+   *
+   * Every `it` here must either pin a unit by equality or carry a negative assertion. Exemptions are matched
+   * by **exact identity**, not by name prefix (round 5, B6): a prefix match silently exempted an unrelated
+   * test that merely began with an exempt one's name.
+   */
+  it('every rail in this block pins a unit or carries a negative assertion', () => {
     const src = doc('tests/unit/governance.test.ts');
-    const block = between(src, "describe('the refiner shapes the backlog", '\n});\n');
-    // Every Vitest modifier, not only `.each` (round 4, B1): a live `it.concurrent(...)` ran beside this
-    // rail, uncounted, because the pattern matched a bare `it(` alone. The rail that exists to stop a
-    // test evading detection by an unusual shape had been evading it by an unusual shape, twice.
-    const MODIFIERS = '(?:\\.(?:each\\([^)]*\\)|concurrent|sequential|skip|only|todo|fails|extend))*';
-    // Any indentation, not the two spaces this block happens to use (round 3, B3): a test wrapped at
-    // four spaces merged into the previous body string and went uncounted, so the rail reported clean
-    // while a naked positive-only test ran beside it. The split is then CROSS-CHECKED against a raw
-    // count, because a parser that silently sees fewer tests than exist is this rail's own failure mode —
-    // and the rail exists to say that a count is worth more than a promise.
-    const tests = block.split(new RegExp('\\n\\s*it' + MODIFIERS + '\\(')).slice(1);
-    const raw = (block.match(new RegExp('\\n\\s*it' + MODIFIERS + '\\(', 'g')) ?? []).length;
-    expect(tests.length, 'the block must be parsed into its tests, or this rail counts nothing')
-      .toBeGreaterThanOrEqual(8);
-    expect(tests.length, 'every `it(` in the block must be counted — a test the split cannot see is '
-      + 'exactly the test this rail exists to catch').toBe(raw);
-    // One exemption, named rather than silent: this rail itself. Its subject is a count of the others, not
-    // a prose policy, so it has no reversal to guard against — and a self-reference would make it vacuous.
-    // Two exemptions, both named rather than silent: the rails whose subject is a COUNT of the others
-    // rather than a prose policy. Neither has a reversal to guard against, and a self-reference would
-    // make them vacuous.
-    const META = ['every rail in this block carries a negative assertion',
-                  'the claim table is not allowed to quietly shrink',
-                  // Exact equality against a whole document unit already fails on a reversal, an edit
-                  // and a sentence appended inside the unit — strictly stronger than the negative this
-                  // rail asks for, not an escape from it (round 4).
-                  'the prompt still carries, word for word'];
+    const start = src.indexOf("describe('the refiner shapes the backlog");
+    expect(start, 'the block must be found in this file\'s own source').toBeGreaterThan(-1);
+    const block = src.slice(start, src.indexOf('\n});\n', start));
+    // Every Vitest modifier, at any indentation (rounds 3 and 4): a bare-`it(`-only pattern let a live
+    // `it.concurrent` and a four-space `it` run beside this rail, uncounted.
+    const MOD = '(?:\\.(?:each\\([^)]*\\)|concurrent|sequential|skip|only|todo|fails|extend))*';
+    const tests = block.split(new RegExp(`\\n\\s*it${MOD}\\(`)).slice(1);
+    const raw = (block.match(new RegExp(`\\n\\s*it${MOD}\\(`, 'g')) ?? []).length;
+    expect(tests.length, 'the block must parse into its tests').toBeGreaterThanOrEqual(4);
+    expect(tests.length, 'every `it(` must be counted — a test the split cannot see is the one this rail '
+      + 'exists to catch').toBe(raw);
+    // Exact names, because a prefix let `'<exempt name>, and also ...'` exempt itself (round 5, B6).
+    const META = new Set([
+      // Its subject is a count of the others, so it has no reversal to guard and a self-reference would
+      // make it vacuous.
+      'the claim table covers the whole population and cannot quietly shrink',
+      'every rail in this block pins a unit or carries a negative assertion',
+    ]);
+    const nameOf = (body: string) => (body.match(/^'([^']*)'/) ?? [, ''])[1];
     const naked = tests
-      .filter((body) => !META.some((m) => body.startsWith(`'${m}`)))
+      .filter((body) => !META.has(nameOf(body)))
       .filter((body) => !/\.not\.(toMatch|toContain|toEqual)\(/.test(body))
-      .map((body) => body.slice(0, body.indexOf(',')).replace(/['\u0060]/g, '').slice(0, 60));
+      .filter((body) => !/toContain\(unit\)/.test(body))
+      .map(nameOf);
     expect(naked, 'a rail of positives only cannot tell a statement from its negation — every rail here '
-      + 'needs a guard against the reversal, not just a check that the words are present').toEqual([]);
+      + 'either pins a unit by equality or guards the reversal explicitly').toEqual([]);
   });
 });

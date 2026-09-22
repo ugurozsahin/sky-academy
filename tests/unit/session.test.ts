@@ -31,6 +31,126 @@ describe('mission session', () => {
     expect(r.won).toBe(true); expect(r.stars).toBe(3); expect(r.correct).toBe(Y1.perStage * s.stages); expect(r.score).toBeGreaterThan(0);
     expect(r.coins).toBe(Y1.perStage * s.stages + 3 * s.stages * 5 + 20);
   });
+  /**
+   * #484 (review round 1, B1): `advance()` — which is what fires `onStageClear`, and thus what lets the "Next"
+   * click reach `nextStage()`/`end()` — is only ever called by the UI, never by `hit()`/`waveEnd()` itself. So
+   * the very last question of the very last stage must decide the whole mission from inside the synchronous
+   * `hit()` call that answers it, via `onCommit` — well before `advance()` (and the UI's own deferred timer to
+   * reach it) ever runs. This is the exact scenario the review reproduced: driven to the last question, only
+   * `hit()` called — `advance()`/`nextStage()`/`end()` deliberately never invoked — proving the payout does not
+   * wait on either of them.
+   */
+  it("onCommit fires the instant the mission's last question is answered, before advance() or nextStage() ever run", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(ev.onCommit).not.toHaveBeenCalled();
+    expect(s.hit(s.current!.answer)).toBe('correct');           // the last question of the only stage
+    expect(ev.onCommit, 'onCommit fired inside hit() itself, with no advance()/nextStage() call anywhere above').toHaveBeenCalledTimes(1);
+    expect(ev.onStageClear).not.toHaveBeenCalled();
+    expect(ev.onEnd).not.toHaveBeenCalled();
+    expect(s.ended, "a preview must not end the session — that is still advance()/nextStage()'s job").toBe(false);
+    const preview = ev.onCommit.mock.calls[0][0];
+    expect(preview).toMatchObject({ won: true, stars: 3, correct: Y1.perStage, coins: Y1.perStage + 3 * 5 + 20 });
+    // The natural path still runs exactly as before, and produces an EQUAL result from onEnd — proving this
+    // is a preview that gets reused, never a second, possibly-different payout (which would double-pay or
+    // pay a different amount than what was already committed).
+    s.advance();
+    expect(ev.onStageClear).toHaveBeenCalledTimes(1);
+    s.nextStage();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
+  });
+  /**
+   * The loss counterpart: a wrong answer on the last question that ALSO empties the last life is a LOST
+   * mission, not a stage clear — `onCommit` must never fire `won: true` for it. `loseLife()`'s own `end(false)`
+   * settles this first; `maybeCommitFinalStage()`'s `!this.ended` guard is what stops it firing at all.
+   */
+  it('onCommit never fires when the last question is wrong and also costs the last life', () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    expect(Y1.lives).toBeLessThan(Y1.perStage);   // room to spend every life but one before the last question
+    for (let i = 0; i < Y1.lives - 1; i++) { expect(s.hit('not-the-answer')).toBe('wrong'); s.advance(); }
+    for (let i = Y1.lives - 1; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.lives).toBe(1); expect(s.ended).toBe(false); expect(s.index).toBe(Y1.perStage - 1);
+    expect(s.hit('still-not-the-answer')).toBe('wrong');   // the last question, and the last life together
+    expect(s.ended, 'the mission is lost, not cleared').toBe(true);
+    expect(ev.onCommit, 'a loss is never previewed as a won stage clear').not.toHaveBeenCalled();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0].won).toBe(false);
+  });
+  /**
+   * The same preview, from the other two places `maybeCommitFinalStage()` is called (review round 2 follow-up:
+   * `hit()`'s correct/wrong paths above are not the only way a mission's last question gets decided) — the
+   * target bubble falling uncaught (`fall()`), and a wave that runs out with nothing hit at all
+   * (`waveEnd()`'s own "nothing decided" branch). Reception is gentle, so neither costs a life, which is what
+   * lets the stage still clear (on a lower accuracy) rather than ending the mission as a loss.
+   */
+  it("onCommit fires from fall() too, when the mission's last question is missed rather than answered", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: R, topic: topicById('r-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < R.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    s.fall(s.current!.answer);                                    // the last question's correct bubble, uncaught
+    expect(ev.onCommit, 'onCommit fired inside fall() itself').toHaveBeenCalledTimes(1);
+    expect(s.ended).toBe(false); expect(s.lives).toBe(R.lives);    // gentle: the miss costs no life
+    const preview = ev.onCommit.mock.calls[0][0];
+    expect(preview.won).toBe(true);
+    s.advance(); s.nextStage();
+    expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
+  });
+  it("onCommit fires from waveEnd()'s own miss branch too, when the last question's wave ends with nothing decided", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: R, topic: topicById('r-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < R.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.waiting).toBe(false);
+    s.waveEnd();                                                  // the last question's wave ends with no hit and no fall
+    expect(ev.onCommit, 'onCommit fired inside waveEnd() itself').toHaveBeenCalledTimes(1);
+    const preview = ev.onCommit.mock.calls[0][0];
+    expect(preview.won).toBe(true);
+    // waveEnd() itself calls advance() right after its miss branch, so the mission is already showing its
+    // stage-clear by the time this returns — proving the preview and the real end() agree even when both the
+    // miss AND advance() happen inside the very same call.
+    expect(ev.onStageClear).toHaveBeenCalledTimes(1);
+    s.nextStage();
+    expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
+  });
+  /**
+   * #484 review round 2, B2: every case above uses `stages: 1`, where "the last question of the last stage"
+   * and "the last question of ANY stage" are the same question — so a mutated boundary (`this.stage <
+   * this.stages` weakened to `this.stage < this.stages - 1`, firing one stage early) passed every existing
+   * test. A real mission has several stages; `onCommit` must stay silent through every one but the true last.
+   */
+  it("onCommit stays silent through every stage but the mission's actual last one", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 2 }, ev);
+    s.start();
+    for (let i = 0; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.hit(s.current!.answer)).toBe('correct');   // stage 1 of 2's last question
+    expect(ev.onCommit, 'stage 1 of 2 is not the mission — onCommit must not preview it as won').not.toHaveBeenCalled();
+    s.advance(); s.nextStage();
+    for (let i = 0; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.hit(s.current!.answer)).toBe('correct');   // stage 2 of 2's last question — the true last one
+    expect(ev.onCommit, 'stage 2 of 2 is the mission — onCommit must fire now').toHaveBeenCalledTimes(1);
+  });
+  /**
+   * #484 review round 2, B3: no existing Endless/Sprint/Boss test ever wires a spy `onCommit`, so
+   * `maybeCommitFinalStage()`'s `!this.ev.onCommit` clause always short-circuits first in the existing suite —
+   * `!this.spec.staged` is never actually reached, so removing it passed everything. With `onCommit` wired,
+   * a non-staged mode answering many questions correctly must never preview a "won" mission that does not
+   * exist for it.
+   */
+  it('onCommit never fires for a non-staged mode, even with onCommit wired and many questions answered', () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const pool = topicsFor('year1').filter(t => t.input !== 'tracing');
+    const s = new Session({ mode: 'sprint', year: Y1, pool, rng: rng(1) }, ev);
+    s.start();
+    for (let i = 0; i < 10; i++) { const c = s.current!; if (c.sequence) c.sequence.forEach(l => s.hit(l)); else s.hit(c.answer); s.advance(); }
+    expect(ev.onCommit, 'sprint is never staged — onCommit must stay silent regardless').not.toHaveBeenCalled();
+  });
   it('Sensei training: a mission over a pool tallies hits and tries per topic', () => {
     const ev = events();
     const pool = [topicById('y1-add')!, topicById('y1-sub')!];
@@ -424,11 +544,8 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * | `prompt`, `answer`, `hint`, `listen`, `sequence` | **yes** — `asked()` reads all five |
  * | `coins`, `numberline`, `chart` | **yes** — `asked()` reads them too, independently of `VISUAL_QUESTION` (#455) |
  * | `objects`, `sentence`, `symmetry` (the #390 names in `VISUAL_QUESTION`) | **no rail here** — see below |
- * | `options` | **no** |
- *
- * The one remaining no is measured, and is `main`'s behaviour rather than anything this change introduces:
- * `intervalCompare`'s own comment reads *"No hint: the bubbles **are** the durations"*, and `y2-duration` at
- * d2 gives 22 keys with 18 covering more than one comparison (#451).
+ * | `options`, where the generator sets `optionsAreContent` | **yes** — `asked()` reads it too (#451) |
+ * | `options`, everywhere else | **no**, deliberately — see below |
  *
  * The three #390 names still get **no rail in this describe**, which round 3's version of this table got wrong
  * (round 4, note 1): `asked()` omits them, so deleting any single one of the three leaves both exact rails
@@ -438,12 +555,13 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * directly (#455), so deleting one of those three from `VISUAL_QUESTION` now reddens `two cards that ask the
  * same thing never take two keys` below, the key having fallen behind the oracle it is measured against.
  *
- * `options` is not keyed for the same reason `objects`/`sentence`/`symmetry` are not read by `asked()`:
- * unconditionally folding it in switches de-duplication off wherever the field is decoration. `options` are a
- * decoy pool on forty-odd topics, which is why `the key ignores every field that carries presentation` pins
- * the exclusion; and a `word` visual carries `orderQ`'s *shuffled* display, so `y2-order` is correctly outside
- * rather than missed. `options` wants the same remedy #455 already took — a signal from the generator that its
- * field is the question — which is #451, not this pull request.
+ * `options` is keyed only where the generator opts in with `optionsAreContent` (#451): unconditionally folding
+ * it in for every topic switches de-duplication off wherever the field is decoration. `options` are a decoy
+ * pool on forty-odd topics, which is why `the key ignores every field that carries presentation` still pins
+ * the default exclusion; and a `word` visual carries `orderQ`'s *shuffled* display, so `y2-order` is correctly
+ * outside rather than missed. `intervalCompare` is the one generator that sets it, because it sets no `hint`,
+ * `listen` or visual and its own comment says the bubbles *are* the durations — `asked()` below reads
+ * `options`, sorted, on exactly the same condition the key does, so the rails below now cover `y2-duration`.
  *
  * So: no rail here names a topic, and within the carriers marked yes, a new topic is covered the day it ships.
  * The adjective-shaped version of that sentence is the mistake this file diagnoses two paragraphs up, and it
@@ -469,9 +587,9 @@ describe('the repeat key holds the whole question (#412)', () => {
    * reading either. Today there are none — `', '` appears in four sentence topics' prose and collides with
    * nothing.
    *
-   * What neither this nor the key sees: `options`, and the three `VISUAL_QUESTION` types `asked()` does not read
-   * directly (`objects`, `sentence`, `symmetry`). The describe header enumerates it by carrier, with the one
-   * remaining measurement — `y2-duration` (#451).
+   * What neither this nor the key sees, everywhere `optionsAreContent` is unset: `options`, and the three
+   * `VISUAL_QUESTION` types `asked()` does not read directly (`objects`, `sentence`, `symmetry`). The describe
+   * header enumerates it by carrier.
    */
   const asked = (q: Question) => {
     // A superset of the key's own list, which is the point: `', '` is here and deliberately not there, because
@@ -489,7 +607,10 @@ describe('the repeat key holds the whole question (#412)', () => {
       : v?.type === 'numberline' ? `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}`
       : v?.type === 'chart' ? `${v.kind}/${v.rows.map(r => r.n).join(',')}`
       : '';
-    return [q.prompt, q.answer, set(q.hint ?? ''), set(q.listen ?? ''), (q.sequence ?? []).join('\u0001'), visual].join('\u0000');
+    // #451: the same opt-in the key reads — `options` is a re-shuffled decoy pool everywhere else, so folding
+    // it in unconditionally would make this oracle too fine, the B1 direction #412's own review already found.
+    const options = q.optionsAreContent ? [...q.options].sort().join('\u0001') : '';
+    return [q.prompt, q.answer, set(q.hint ?? ''), set(q.listen ?? ''), (q.sequence ?? []).join('\u0001'), visual, options].join('\u0000');
   };
   const playable = TOPICS.filter(t => t.input !== 'tracing');
 
@@ -565,6 +686,23 @@ describe('the repeat key holds the whole question (#412)', () => {
         expect(repeatKey({ ...q, ...field }), `${t.id}: \`${name}\` reached the card's identity`).toBe(base);
       }
     }
+  });
+
+  /**
+   * The rail above runs at d1 only, and `y2-duration`'s d1 branch is the plain numeric-fact generator, not
+   * `intervalCompare` — so it never actually exercises `optionsAreContent` (`options` there is decoration, the
+   * flag is unset, and the reversal it tries is the no-op every other topic gets). This is that direct case,
+   * at d2 where `intervalCompare` runs, on a real generated card rather than a hand-built one: order is
+   * ignored, a different set of durations is not, and turning the flag off returns to the old, coarser key.
+   */
+  it('optionsAreContent normalises option order but not option identity (#451)', () => {
+    const topic = topicById('y2-duration')!;
+    const q = topic.gen(2, rng(5));
+    expect(q.optionsAreContent, 'this draw did not exercise intervalCompare').toBe(true);
+    const base = repeatKey(q);
+    expect(repeatKey({ ...q, options: [...q.options].reverse() }), 'order').toBe(base);
+    expect(repeatKey({ ...q, options: [...q.options, 'a duration not really on this card'] }), 'a genuinely different set').not.toBe(base);
+    expect(repeatKey({ ...q, optionsAreContent: false }), 'the flag itself').not.toBe(base);
   });
 
   /**

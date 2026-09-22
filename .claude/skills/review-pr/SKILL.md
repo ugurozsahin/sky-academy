@@ -317,6 +317,15 @@ blocks: **name what breaks for a run, for a reader, or for a child if this merge
 answer is "nothing yet, but", it is a note. Two findings block whatever the round: the pull request does not
 do what its body says, and a rail does not hold what it claims. Those are not preferences.
 
+**A third, and it is the same shape: a fix that claims a *class* and does not name its population (#526).**
+"Fixed as a class" is unverifiable on its own, and unverifiable is how it keeps being half true — three pull
+requests were blocked on one defect on 2026-09-22, one of them *inside the commit whose message claimed to fix
+the class*, because each fix reached only the instances its author's own mutation table touched. So a class
+fix has to say what set it covers — *every assertion in this block*, *every rail reading prose*, *every call
+of `code()`* — and then you can count it, which is the point. `.claude/rules/guardrails.md` has the author's
+half. **Count it rather than trusting it**: pick a member the body does not mention and mutate it. That is
+how all three of those were found, and none of them by the author.
+
 **The third round is the last one that blocks.** Count the `REVIEW: CHANGES REQUESTED` comments on the pull
 request, whoever wrote them: the count is over the whole pull request, a push never resets it, and two
 reviewers do not get three rounds apiece. On the third, list everything you would still change and say which

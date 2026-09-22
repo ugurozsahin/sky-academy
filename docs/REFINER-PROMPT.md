@@ -78,8 +78,12 @@ For a single proposal there is a lighter signal you can read without being told:
   drops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.
   **The issue's own timeline is repo state, and deriving from state rather than replaying a record is this
   routine's whole method** — the same reason the gate re-derives instead of reading back its reasoning.
-  **If you cannot read that timeline — the call fails, the body will not parse, the page is truncated — then
-  do not set the value.** Say so in your report and move on. An unreadable timeline is the same shape as an
+  **A timeline you have not read to the end is a timeline you have not read.** `events` is paginated, and the
+  relabel this rule exists to find is as likely to sit on page three as page one — so follow `Link:
+  rel="next"` until there is no next page. A response that arrives clean, parses clean and is page one of
+  several is the most dangerous shape here, because nothing about it looks like a failure (#513 review, B8).
+  **If you cannot read that timeline to its end — the call fails, the body will not parse, a page is
+  truncated, or a `next` link you cannot follow — then do not set the value.** Say so in your report and move on. An unreadable timeline is the same shape as an
   unreadable ledger and takes the same answer: the check was not made, so the act does not happen. Reading a
   failed call as "no change found" is the absence read as a pass, which is the defect this whole project is
   built around.
@@ -133,10 +137,15 @@ Run all of it. A job you could not perform is worth a line in your report — "I
    children, label the parent `epic`, rewrite its checklist — and a run that dies between the first and the
    second leaves children nobody points at, which tomorrow's re-derivation would read as an unsplit parent
    and split a second time. So **before splitting anything, search for open issues whose body says
-   `Part of #<parent>`**. If any exist, the split is already under way: finish it — label the parent and
-   write the checklist against the children that exist — and never create a second set. That search is the
-   idempotency check, and it works because the child's `Part of` line is written in the same call that
-   creates it, so there is no moment where a child exists without it.
+   `Part of #<parent>`**. If any exist, the split is already under way: finish it rather than starting again.
+   **Finishing means re-deriving the whole split and creating only the pieces that are missing**, matched by
+   what each child covers — never labelling the parent against whatever children happen to exist. A run that
+   died after two of four children would otherwise leave the parent `epic`, its checklist naming two, and the
+   other two gone for good: `epic` drops the parent out of `docs/ROUTINE-PROMPT.md` STEP 3, so nothing ever
+   re-queues the missing scope (#513 review, B7). Nothing records the intended count, and nothing needs to —
+   the split is re-derived from the issue every run, which is this routine's method everywhere else.
+   The `Part of` line is written in the same call that creates the child, so there is no moment where a child
+   exists without one.
 5. **An acceptance criterion where there is none.** One sentence: *what has to be true for this to be
    finished.* Not a design. The developer routine's job is to decide how; this only stops it deciding what.
 6. **A missing area label** — `tests`, `debt`, `bug`, `curriculum`, `guard-rail`, `mode`, and the rest of the
