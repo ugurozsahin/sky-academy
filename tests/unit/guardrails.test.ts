@@ -2306,3 +2306,41 @@ describe('the landscape screen width cannot silently return to the phone column 
       .toMatch(/max-width:\s*820px/);
   });
 });
+
+/*
+ * #399: `--sal`/`--sar` were read at `.cert-view` (`var(--sal, 0px)`/`var(--sar, 0px)`) but never declared
+ * beside `--sat`/`--sab` in `:root` — an undefined custom property with no fallback in the `var()` that
+ * reads it is invalid at computed-value time and falls back to nothing at all, silently. Neither Playwright
+ * project emulates safe-area insets (`env()` resolves to its fallback in both), so no viewport-level e2e
+ * check can catch this class at all — this is the cheap, exhaustive complement: every `var(--x…)` in
+ * `style.css` names a property declared somewhere, in either the stylesheet (a `:root`/rule declaration) or
+ * a `.ts` source's own inline `style="--x:…"` (`--focus`/`--cols`/`--tint`/the confetti particles' `--i`/
+ * `--x`/`--d`/`--c` and the shop trail swatch's `--c`/`--k` are all set that way, never in CSS, so the
+ * search has to cover both or it reports its own five real properties as five false positives).
+ *
+ * Comments are stripped from the CSS first — this file's own doc-comments quote `env()`/`var()` syntax by
+ * name, which would otherwise read as a declaration of whatever property the prose happens to mention. The
+ * `.ts` half is narrowed to `style="…"` attribute values for the same reason one level up: scanning a whole
+ * source file for `--word:` would also match the shape inside an unrelated string or comment (review note,
+ * PR #399) — the declaration only really exists if it sits inside a `style` attribute a browser reads.
+ */
+it('every CSS custom property style.css reads with var() is declared somewhere — in the stylesheet or a .ts inline style (#399)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  const referenced = new Set([...bare.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]));
+  expect(referenced.size, 'style.css must reference at least one custom property, or this rail checks nothing')
+    .toBeGreaterThan(10);
+  const declared = new Set([...bare.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+
+  const styleAttrs = [...inDir('/src')].flatMap(([, src]) => [...code(src).matchAll(/\bstyle="([^"]*)"/g)]);
+  expect(styleAttrs.length, 'src/**/*.ts must set at least one inline style="…", or this half checks nothing')
+    .toBeGreaterThan(0);
+  for (const [, attr] of styleAttrs)
+    for (const m of attr.matchAll(/(--[\w-]+)\s*:/g)) declared.add(m[1]);
+
+  const undeclared = [...referenced].filter((name) => !declared.has(name)).sort();
+  expect(undeclared, 'a var() naming a property nothing declares resolves to its fallback (or nothing, with '
+    + 'none) silently — no console warning, nothing failing (#399)').toEqual([]);
+});
