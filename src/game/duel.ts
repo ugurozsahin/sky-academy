@@ -32,7 +32,7 @@ export interface DuelEvents {
  * that way read as 10/28 to a parent about a child who won ten out of ten.
  */
 export interface DuelTally { hits: number; tries: number }
-export interface DuelResult { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number; rounds: number; tally: Record<DuelPlayer, DuelTally> }
+export interface DuelResult { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number; rounds: number; tally: Record<DuelPlayer, DuelTally>; incomplete?: boolean }
 export interface DuelOpts { topic: Topic; difficulty: Difficulty; rng?: () => number; rounds?: number }
 
 export class Duel {
@@ -68,7 +68,7 @@ export class Duel {
       // closed for missions, reachable here too. Ending gracefully pays whatever the scoreline already is,
       // the same shape `Session.nextQuestion()` uses.
       console.error(`Ninja Duel: "${this.o.topic.id}" question generator failed mid-match`, e);
-      this.end();
+      this.end(true);
       return;
     }
     this.ev.onQuestion(this.current, { round: this.round, total: this.rounds });
@@ -128,14 +128,22 @@ export class Duel {
     if (this.round >= this.rounds) { this.end(); return; }
     this.nextQuestion();
   }
-  private end() {
+  /**
+   * `incomplete` is set by `nextQuestion()`'s catch above, never by `advance()`'s ordinary call: a match that
+   * reached its target round count is not the same event as one a generator throw cut short (#444 review, PR
+   * #502 round 2, B1). Reported `rounds` reflects the difference — `this.rounds`, the configured target, is
+   * only true of a finished match; an aborted one reports `this.round - 1`, the rounds actually played, since
+   * the round that failed to draw never became a question either child saw, so it was not one of them.
+   */
+  private end(incomplete = false) {
     if (this.ended) return;
     this.ended = true;
     const winner: DuelPlayer | 'draw' = this.scoreA > this.scoreB ? 'a' : this.scoreB > this.scoreA ? 'b' : 'draw';
     // A snapshot, not the live counters: a `hit()` after the match ends returns 'ignored' and cannot move
     // them, but the result outlives this screen's rematch and must not be a window onto a restarted tally.
     const tally = { a: { ...this.tally.a }, b: { ...this.tally.b } };
-    this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds: this.rounds, tally });
+    const rounds = incomplete ? this.round - 1 : this.rounds;
+    this.ev.onMatchEnd({ winner, scoreA: this.scoreA, scoreB: this.scoreB, rounds, tally, incomplete });
   }
 }
 
@@ -306,8 +314,12 @@ export function duelStars(t: DuelTally): 1 | 2 | 3 {
  *
  * Player 2 is the friend `DUEL_HANDOVER` sends to the top half, and the save has one profile, so there is no
  * second child to award — the same reason `duelCoins()` pays no win bonus and `duelAccuracy()` reports one seat.
+ *
+ * Never for an `incomplete` match (#444 review, PR #502 round 2, B1): a generator throw that cut the match
+ * short is not a genuine win, whichever side happened to be ahead when it did, and a certificate is a keepsake
+ * the child can save and share — the wrong kind of thing to hand out for a technical failure.
  */
-export const duelEarnsCertificate = (r: DuelResult): boolean => r.winner === 'a';
+export const duelEarnsCertificate = (r: DuelResult): boolean => r.winner === 'a' && !r.incomplete;
 
 /** The match-end line the duel screen shows and says. Player 1 is `a`, Player 2 is `b`. */
 export function duelHeadline(r: DuelResult): string {

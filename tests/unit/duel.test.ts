@@ -108,7 +108,10 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     duel.waveEnd();   // round 3's draw is what throws
     expect(duel.ended).toBe(true);
     expect(ev.onMatchEnd).toHaveBeenCalledTimes(1);
-    expect(ev.onMatchEnd.mock.calls[0][0]).toMatchObject({ winner: 'a', scoreA: 2, scoreB: 0 });
+    // #444 review (PR #502 round 2), B1: `rounds` must report what was actually played (2), never the
+    // configured target — round 3 never became a question either child saw — and `incomplete` must say so,
+    // so the UI can withhold the certificate and the permanent history row for a technical failure.
+    expect(ev.onMatchEnd.mock.calls[0][0]).toMatchObject({ winner: 'a', scoreA: 2, scoreB: 0, rounds: 2, incomplete: true });
     expect(spy).toHaveBeenCalledWith(expect.stringContaining(topic.id), expect.any(Error));
     // The match is over — no further round starts, and hits are ignored the same way any ended match's are.
     expect(duel.hit('a', 'anything')).toBe('ignored');
@@ -162,7 +165,7 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     expect(d.ended).toBe(true);
     expect(ev.onMatchEnd).toHaveBeenCalledTimes(1);
     expect(ev.onMatchEnd.mock.calls[0][0]).toEqual({
-      winner: 'a', scoreA: 2, scoreB: 1, rounds: 3,
+      winner: 'a', scoreA: 2, scoreB: 1, rounds: 3, incomplete: false,
       tally: { a: { hits: 2, tries: 2 }, b: { hits: 1, tries: 1 } },
     });
   });
@@ -174,7 +177,7 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
     d.hit('a', d.current!.answer); d.waveEnd();
     d.hit('b', d.current!.answer); d.waveEnd();
     expect(ev.onMatchEnd.mock.calls[0][0]).toEqual({
-      winner: 'draw', scoreA: 1, scoreB: 1, rounds: 2,
+      winner: 'draw', scoreA: 1, scoreB: 1, rounds: 2, incomplete: false,
       tally: { a: { hits: 1, tries: 1 }, b: { hits: 1, tries: 1 } },
     });
   });
@@ -775,6 +778,12 @@ describe('duelEarnsCertificate (#397 review round 2, note 1: only Player 1 wins 
     // not second-guess it: `winner` is the scorer's own verdict and the one field the rest of the screen uses.
     expect(duelEarnsCertificate(ended('a', 0, 9))).toBe(true);
     expect(duelEarnsCertificate(ended('b', 9, 0))).toBe(false);
+  });
+  // #444 review (PR #502 round 2), B1: a Player 1 "win" a generator throw cut short is not a genuine one —
+  // whichever side happened to be ahead when the match was aborted, it earns nothing.
+  it('never, for an incomplete match, whichever side was ahead', () => {
+    expect(duelEarnsCertificate({ ...ended('a', 2, 0), incomplete: true })).toBe(false);
+    expect(duelEarnsCertificate({ ...ended('a', 2, 0), incomplete: false })).toBe(true);
   });
 });
 
