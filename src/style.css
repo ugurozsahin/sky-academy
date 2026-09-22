@@ -622,8 +622,10 @@ img { -webkit-user-drag: none; }
 .reward-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
 .reward-stats div { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 6px; text-align: center; }
 .reward-stats b { display: block; font-size: 22px; } .reward-stats small { color: var(--muted); font-weight: 600; }
+/* #18 group C: same 60ch cap as the other empty-state/note text — 81 characters measured uncapped on a
+ * 1280px landscape window ("the rest of the album is earned by playing..."). */
 .next-sticker {
-  margin: 12px 0;
+  margin: 12px auto;
   padding: 10px 14px;
   border-radius: 14px;
   background: var(--panel);
@@ -633,6 +635,7 @@ img { -webkit-user-drag: none; }
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-width: 60ch;
 }
 .album { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
 .sticker {
@@ -652,8 +655,11 @@ img { -webkit-user-drag: none; }
 /* "My certificates" (#110): a row per earned certificate, next to the sticker album — and, since #16, the
    "Recent duels" list below it, which reuses these rules (see `duelHistoryHTML`). The empty states share this
    rule but not a class name: `.cert-empty` means "no certificates" to the album's own e2e. */
+/* #18 group C: `max-width` + centred margins cap the sentence at a readable width instead of letting a
+ * tablet's wider `.screen` stretch it edge to edge — 96 (`.cert-empty`) and, by the same rule, any future
+ * `.duel-empty` copy this long. */
 .cert-empty, .duel-empty {
-  margin: 12px 0 0;
+  margin: 12px auto 0;
   padding: 14px 16px;
   border-radius: 16px;
   background: var(--panel);
@@ -661,6 +667,7 @@ img { -webkit-user-drag: none; }
   color: var(--muted);
   font-weight: 600;
   text-align: center;
+  max-width: 60ch;
 }
 .cert-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .cert-row {
@@ -993,7 +1000,10 @@ img { -webkit-user-drag: none; }
 }
 .qhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .qhead .ttl { color: var(--muted); font-weight: 700; font-size: 13px; flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.qhead .speak { width: 38px; height: 38px; font-size: 18px; }
+/* #18 group C: was 38x38, six px under the `design-language` §4 floor for a tappable control — the read-aloud
+ * button a child who cannot read the card depends on (#65). `.qhead`'s title already absorbs the six px back
+ * via its own `flex: 1` + ellipsis, so nothing else in the row needs to move. */
+.qhead .speak { width: 44px; height: 44px; font-size: 20px; }
 /* mission progress pill (#55): stage name · segments · 3/6 */
 #stage { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 9px; white-space: nowrap; }
 #stage .segs {
@@ -1606,7 +1616,9 @@ img { -webkit-user-drag: none; }
 .p-table th, .p-table td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line); }
 .p-table thead th { color: var(--muted); font-size: 13px; }
 .p-table tbody th { text-align: left; }
-.p-note { margin-top: 16px; color: var(--muted); font-size: 12px; font-weight: 600; text-align: center; }
+/* #18 group C: capped so a tablet's wider `.screen` can't stretch a sentence into one long line — 155
+ * characters measured uncapped on a 1280px landscape window, against the issue's own ~75-char bar. */
+.p-note { margin-top: 16px; color: var(--muted); font-size: 12px; font-weight: 600; text-align: center; max-width: 60ch; margin-left: auto; margin-right: auto; }
 /* move to another device (#64) */
 .p-move { display: flex; flex-direction: column; gap: 8px; }
 .p-move-say { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; }
@@ -1614,6 +1626,8 @@ img { -webkit-user-drag: none; }
   width: 100%; box-sizing: border-box; resize: vertical; padding: 10px;
   border-radius: 12px; border: 1px solid var(--line); background: #0e1330; color: #cfd8ff;
   font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.4;
+  max-height: 240px; /* #18 group C: `#save-code` sizes to its own content in JS; this caps a pathologically
+                         large save so it scrolls internally rather than growing without bound. */
 }
 .p-move .btn { width: 100%; }
 .p-move-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--good); }
@@ -1661,7 +1675,8 @@ img { -webkit-user-drag: none; }
    unchanged; this one now centres on the viewport wherever the grown-up has scrolled to. */
 #reset-overlay { position: fixed; }
 .p-reset { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; text-align: center; }
-.p-reset-say { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; }
+/* #18 group C: same cap as `.p-note` — 102 characters measured uncapped on a 1280px landscape window. */
+.p-reset-say { margin: 0 auto; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; max-width: 60ch; }
 .btn.bad { background: linear-gradient(180deg, #ff8a80, #ff5f6d); color: #2a0a0a; border-color: #ffb4bb; text-shadow: 0 1px 0 #fff5; }
 .reset-modal p { text-align: left; line-height: 1.45; }
 .reset-label { display: block; margin: 4px 0 8px; font-weight: 700; text-align: left; }

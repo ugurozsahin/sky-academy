@@ -31,6 +31,126 @@ describe('mission session', () => {
     expect(r.won).toBe(true); expect(r.stars).toBe(3); expect(r.correct).toBe(Y1.perStage * s.stages); expect(r.score).toBeGreaterThan(0);
     expect(r.coins).toBe(Y1.perStage * s.stages + 3 * s.stages * 5 + 20);
   });
+  /**
+   * #484 (review round 1, B1): `advance()` — which is what fires `onStageClear`, and thus what lets the "Next"
+   * click reach `nextStage()`/`end()` — is only ever called by the UI, never by `hit()`/`waveEnd()` itself. So
+   * the very last question of the very last stage must decide the whole mission from inside the synchronous
+   * `hit()` call that answers it, via `onCommit` — well before `advance()` (and the UI's own deferred timer to
+   * reach it) ever runs. This is the exact scenario the review reproduced: driven to the last question, only
+   * `hit()` called — `advance()`/`nextStage()`/`end()` deliberately never invoked — proving the payout does not
+   * wait on either of them.
+   */
+  it("onCommit fires the instant the mission's last question is answered, before advance() or nextStage() ever run", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(ev.onCommit).not.toHaveBeenCalled();
+    expect(s.hit(s.current!.answer)).toBe('correct');           // the last question of the only stage
+    expect(ev.onCommit, 'onCommit fired inside hit() itself, with no advance()/nextStage() call anywhere above').toHaveBeenCalledTimes(1);
+    expect(ev.onStageClear).not.toHaveBeenCalled();
+    expect(ev.onEnd).not.toHaveBeenCalled();
+    expect(s.ended, "a preview must not end the session — that is still advance()/nextStage()'s job").toBe(false);
+    const preview = ev.onCommit.mock.calls[0][0];
+    expect(preview).toMatchObject({ won: true, stars: 3, correct: Y1.perStage, coins: Y1.perStage + 3 * 5 + 20 });
+    // The natural path still runs exactly as before, and produces an EQUAL result from onEnd — proving this
+    // is a preview that gets reused, never a second, possibly-different payout (which would double-pay or
+    // pay a different amount than what was already committed).
+    s.advance();
+    expect(ev.onStageClear).toHaveBeenCalledTimes(1);
+    s.nextStage();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
+  });
+  /**
+   * The loss counterpart: a wrong answer on the last question that ALSO empties the last life is a LOST
+   * mission, not a stage clear — `onCommit` must never fire `won: true` for it. `loseLife()`'s own `end(false)`
+   * settles this first; `maybeCommitFinalStage()`'s `!this.ended` guard is what stops it firing at all.
+   */
+  it('onCommit never fires when the last question is wrong and also costs the last life', () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    expect(Y1.lives).toBeLessThan(Y1.perStage);   // room to spend every life but one before the last question
+    for (let i = 0; i < Y1.lives - 1; i++) { expect(s.hit('not-the-answer')).toBe('wrong'); s.advance(); }
+    for (let i = Y1.lives - 1; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.lives).toBe(1); expect(s.ended).toBe(false); expect(s.index).toBe(Y1.perStage - 1);
+    expect(s.hit('still-not-the-answer')).toBe('wrong');   // the last question, and the last life together
+    expect(s.ended, 'the mission is lost, not cleared').toBe(true);
+    expect(ev.onCommit, 'a loss is never previewed as a won stage clear').not.toHaveBeenCalled();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0].won).toBe(false);
+  });
+  /**
+   * The same preview, from the other two places `maybeCommitFinalStage()` is called (review round 2 follow-up:
+   * `hit()`'s correct/wrong paths above are not the only way a mission's last question gets decided) — the
+   * target bubble falling uncaught (`fall()`), and a wave that runs out with nothing hit at all
+   * (`waveEnd()`'s own "nothing decided" branch). Reception is gentle, so neither costs a life, which is what
+   * lets the stage still clear (on a lower accuracy) rather than ending the mission as a loss.
+   */
+  it("onCommit fires from fall() too, when the mission's last question is missed rather than answered", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: R, topic: topicById('r-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < R.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    s.fall(s.current!.answer);                                    // the last question's correct bubble, uncaught
+    expect(ev.onCommit, 'onCommit fired inside fall() itself').toHaveBeenCalledTimes(1);
+    expect(s.ended).toBe(false); expect(s.lives).toBe(R.lives);    // gentle: the miss costs no life
+    const preview = ev.onCommit.mock.calls[0][0];
+    expect(preview.won).toBe(true);
+    s.advance(); s.nextStage();
+    expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
+  });
+  it("onCommit fires from waveEnd()'s own miss branch too, when the last question's wave ends with nothing decided", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: R, topic: topicById('r-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < R.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.waiting).toBe(false);
+    s.waveEnd();                                                  // the last question's wave ends with no hit and no fall
+    expect(ev.onCommit, 'onCommit fired inside waveEnd() itself').toHaveBeenCalledTimes(1);
+    const preview = ev.onCommit.mock.calls[0][0];
+    expect(preview.won).toBe(true);
+    // waveEnd() itself calls advance() right after its miss branch, so the mission is already showing its
+    // stage-clear by the time this returns — proving the preview and the real end() agree even when both the
+    // miss AND advance() happen inside the very same call.
+    expect(ev.onStageClear).toHaveBeenCalledTimes(1);
+    s.nextStage();
+    expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
+  });
+  /**
+   * #484 review round 2, B2: every case above uses `stages: 1`, where "the last question of the last stage"
+   * and "the last question of ANY stage" are the same question — so a mutated boundary (`this.stage <
+   * this.stages` weakened to `this.stage < this.stages - 1`, firing one stage early) passed every existing
+   * test. A real mission has several stages; `onCommit` must stay silent through every one but the true last.
+   */
+  it("onCommit stays silent through every stage but the mission's actual last one", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 2 }, ev);
+    s.start();
+    for (let i = 0; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.hit(s.current!.answer)).toBe('correct');   // stage 1 of 2's last question
+    expect(ev.onCommit, 'stage 1 of 2 is not the mission — onCommit must not preview it as won').not.toHaveBeenCalled();
+    s.advance(); s.nextStage();
+    for (let i = 0; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.hit(s.current!.answer)).toBe('correct');   // stage 2 of 2's last question — the true last one
+    expect(ev.onCommit, 'stage 2 of 2 is the mission — onCommit must fire now').toHaveBeenCalledTimes(1);
+  });
+  /**
+   * #484 review round 2, B3: no existing Endless/Sprint/Boss test ever wires a spy `onCommit`, so
+   * `maybeCommitFinalStage()`'s `!this.ev.onCommit` clause always short-circuits first in the existing suite —
+   * `!this.spec.staged` is never actually reached, so removing it passed everything. With `onCommit` wired,
+   * a non-staged mode answering many questions correctly must never preview a "won" mission that does not
+   * exist for it.
+   */
+  it('onCommit never fires for a non-staged mode, even with onCommit wired and many questions answered', () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const pool = topicsFor('year1').filter(t => t.input !== 'tracing');
+    const s = new Session({ mode: 'sprint', year: Y1, pool, rng: rng(1) }, ev);
+    s.start();
+    for (let i = 0; i < 10; i++) { const c = s.current!; if (c.sequence) c.sequence.forEach(l => s.hit(l)); else s.hit(c.answer); s.advance(); }
+    expect(ev.onCommit, 'sprint is never staged — onCommit must stay silent regardless').not.toHaveBeenCalled();
+  });
   it('Sensei training: a mission over a pool tallies hits and tries per topic', () => {
     const ev = events();
     const pool = [topicById('y1-add')!, topicById('y1-sub')!];

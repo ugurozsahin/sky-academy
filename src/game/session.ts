@@ -19,6 +19,15 @@ export interface SessionEvents {
   onTime?: (secondsLeft: number) => void;               // sprint clock, once per whole second
   onBoss?: (hp: number, max: number, kind: 'hit' | 'heal') => void;   // boss health changed
   onEnd: (r: SessionResult) => void;
+  /**
+   * A staged mission's LAST question was just decided (#484) — fired synchronously, in the same call as
+   * `hit()`/`fall()`/`waveEnd()`, well before `advance()` is even reached (the UI defers that for the
+   * outcome-reveal pacing) and long before the child could click "Next" on the stage-clear overlay `advance()`
+   * eventually shows. `onEnd` still fires later, at its normal display-driven time, with an equal
+   * `SessionResult` — this is only so a UI can commit the payout (coins, Sensei accuracy, the certificate…)
+   * the instant it is decided rather than risk losing it to a quit in either of those two windows.
+   */
+  onCommit?: (r: SessionResult) => void;
 }
 export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number }
 
@@ -274,6 +283,7 @@ export class Session {
     this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false);
     this.ev.onMiss(q); this.bossHeal();
     if (!this.o.year.gentle) this.loseLife();
+    this.maybeCommitFinalStage();
   }
   /** Wave finished (all bubbles gone). Decide what happens next. */
   waveEnd() {
@@ -281,6 +291,7 @@ export class Session {
     if (!this.waiting) { // nothing decided (e.g. only decoys fell) – for sequences relaunch remaining letters
       if (this.current?.sequence) { this.respawn(); return; }
       this.waiting = true; this.attempts++; this.stageAttempts++; this.tally(false); this.ev.onMiss(this.current!); this.bossHeal(); if (!this.o.year.gentle) this.loseLife(); if (this.ended) return;
+      this.maybeCommitFinalStage();
     }
     this.advance();
   }
@@ -293,11 +304,13 @@ export class Session {
     this.score += points;
     this.ev.onCorrect(q, points, this.combo);
     if (this.spec.boss) { this.bossHp = Math.max(0, this.bossHp - 1); this.ev.onBoss?.(this.bossHp, this.bossMax, 'hit'); if (this.bossHp === 0) this.end(true); }
+    this.maybeCommitFinalStage();
   }
   private markWrong(label: string) {
     const q = this.current!; this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false);
     this.ev.onWrong(q, label); this.bossHeal();
     this.loseLife();
+    this.maybeCommitFinalStage();
   }
   private tally(hit: boolean) {
     const id = this.currentTopic?.id; if (!id) return;
@@ -329,15 +342,37 @@ export class Session {
     this.ev.onLives(this.lives);
     this.nextQuestion();
   }
-  end(won: boolean) {
-    if (this.ended) return;
-    this.ended = true;
-    const total = this.stageStars.reduce((s, x) => s + x, 0);
+  /**
+   * The `SessionResult` this session would end with right now, given `won` and a stage-stars list — pure,
+   * no side effects, so `maybeCommitFinalStage()` below can preview it before `stageStars` itself carries the
+   * final stage (#484). `end()` calls it with the real, already-mutated `this.stageStars`.
+   */
+  private buildResult(won: boolean, stageStars: number[]): SessionResult {
+    const total = stageStars.reduce((s, x) => s + x, 0);
     const acc = this.attempts ? this.correct / this.attempts : 0;
     // End-stars and coins come from the mode's own rules in modes.ts (coins reads back the stars just computed).
     const end = { won, score: this.score, correct: this.correct, accuracy: acc, stageStarsTotal: total, stages: this.stages, stars: 0 };
     const stars = this.spec.stars(end);
     const coins = this.spec.coins({ ...end, stars });
-    this.ev.onEnd({ mode: this.o.mode, won, score: this.score, stars, stageStars: this.stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins });
+    return { mode: this.o.mode, won, score: this.score, stars, stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins };
+  }
+  /**
+   * #484: the moment a staged mission's last question is decided — inside `markCorrect()`/`markWrong()`/
+   * `fall()`/`waveEnd()`'s own miss branch, all synchronous, none of them behind the deferred `waveEnd()` the
+   * UI schedules for pacing — preview the SAME `SessionResult` `end()` will build once `advance()` and the
+   * "Next" click eventually run, and hand it to `onCommit`. Never mutates `stageStars` or `index` itself:
+   * those still change exactly once, naturally, when `advance()` is actually reached, so this is a preview,
+   * not a second write. Guarded on `!this.ended` so a wrong answer that also empties the last life (a LOSS,
+   * not a stage clear) can never fire this with `won: true` — `loseLife()`'s own `end(false)` runs first.
+   */
+  private maybeCommitFinalStage() {
+    if (!this.ev.onCommit || this.ended || !this.spec.staged || this.stage < this.stages || this.index + 1 < this.perStage) return;
+    const acc = this.stageAttempts ? this.stageCorrect / this.stageAttempts : 0;
+    this.ev.onCommit(this.buildResult(true, [...this.stageStars, starsForAccuracy(acc)]));
+  }
+  end(won: boolean) {
+    if (this.ended) return;
+    this.ended = true;
+    this.ev.onEnd(this.buildResult(won, this.stageStars));
   }
 }

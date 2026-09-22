@@ -70,7 +70,13 @@ function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
     // The real one freezes and re-arms these (#301); this stub only records that the screen calls it, which is
     // what `screen.test.ts` then holds the freezing itself to.
     holdTimers: (open) => { holdCalls.push(open); },
-    toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {}, showResults() {},
+    toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {},
+    commitResult: () => ({
+      newBest: false,
+      dojo: { state: { date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 }, completed: [], setDone: false, coins: 0, multiplier: 1 },
+      fresh: [], streak: 1, cert: null,
+    }),
+    showResults() {},
     ...over,
   };
   const ps = createPlaySession({ mode: 'mission', year: YEARS[1], stages: 1, topic: { id: 't', title: 't', icon: 't', subject: 'writing', year: 'year1', nc: '', gen } }, deps);
@@ -392,5 +398,115 @@ describe('the line under the prompt says whose it is (#328)', () => {
     await vi.advanceTimersByTimeAsync(NO_VOICE_PEEK_MS);
     expect(els.hint.textContent).toBe('Slice the words in order');
     expect(els.hint.classes.has('own')).toBe(false);
+  });
+});
+
+/**
+ * #484 (mirroring #375/#441's `commitMatch` for Ninja Duel): a finished game's writes must be committed the
+ * instant `session.end()` decides it, not ~1.2s later inside the results overlay's own scope-bound `later()`
+ * — where a quit before the overlay's timer fires (Pause -> Islands, or the Android back button) used to
+ * cancel them outright, in every mode but Duel.
+ */
+describe('onEnd commits the payout before the results overlay is ever scheduled to draw it (#484)', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('commitResult runs synchronously from the losing hit, before showResults is scheduled — and survives teardown that cancels showResults', async () => {
+    const els = { score: fakeEl(), stage: fakeEl(), prompt: fakeEl(), vis: fakeEl(), hint: fakeEl(), qcard: fakeEl(), speak: fakeEl() };
+    const arena = {
+      paused: false, W: 390, topInset: 0, spawned: [] as WaveOpts[],
+      spawnWave(o: WaveOpts) { this.spawned.push(o); }, rush() { return false; }, floatText() {}, reveal() {}, clearWave() {},
+    };
+    let mounted = true;
+    const calls: string[] = [];
+    const payout = {
+      newBest: false,
+      dojo: { state: { date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 }, completed: [], setDone: false, coins: 0, multiplier: 1 },
+      fresh: [], streak: 1, cert: null,
+    };
+    const deps: PlaySessionDeps = {
+      training: false, tracing: false, villain: false, av: AVATARS[0],
+      els: els as unknown as PlaySessionEls,
+      hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {} },
+      hold: { correct: 900, wrong: 1200, miss: 900 },
+      arena: () => arena as never, mounted: () => mounted,
+      later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },
+      holdTimers() {}, toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {},
+      commitResult: () => { calls.push('commit'); return payout; },
+      showResults: (r, p) => { calls.push('show'); expect(p, 'the overlay draws the payout it was handed, never a second one it computed itself').toBe(payout); },
+    };
+    const gen = (): Question => ({ prompt: 'Pick one', answer: 'right', options: ['right', 'wrong'] });
+    const topic = { id: 't', title: 't', icon: 't', subject: 'writing' as const, year: 'year1' as const, nc: '', gen };
+    const ps = createPlaySession({ mode: 'endless', year: YEARS[1], pool: [topic] }, deps);
+    ps.session.start(); await settle();
+    // year1 has 3 lives (#484 test targets Endless, one of the modes #375/#441 never touched): three slips end
+    // the run. `waveEnd()` advances to the next question between slips, exactly as the arena's own onWaveEnd
+    // would — the LAST slip is what matters: `end()` calls `onEnd` synchronously from inside that `hit()`,
+    // no timer runs in between, and nothing here advances past it.
+    for (let i = 0; i < YEARS[1].lives - 1; i++) { ps.session.hit('wrong'); ps.waveEnd(); await vi.advanceTimersByTimeAsync(5000); }
+    ps.session.hit('wrong');
+    expect(ps.session.ended, 'three slips end an Endless run').toBe(true);
+    expect(calls, 'the commit already ran; the overlay is only scheduled, not drawn').toEqual(['commit']);
+    // Teardown (the screen's own `cleanup()` -> `scope.dispose()`) is exactly `mounted` going false: the real
+    // `later()` guards every callback on it. The commit already happened and cannot be undone by this.
+    mounted = false;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(calls, 'a quit before the overlay timer fires drops the DRAWING, never the payout').toEqual(['commit']);
+  });
+
+  /**
+   * #484 review round 2, B1: the test above drives Endless, which never fires `session.ts`'s `onCommit` at
+   * all — so it cannot exercise the one line that makes the staged-mission fix work, `onCommit(r) { earlyPayout
+   * = deps.commitResult(r); }` (and `onEnd`'s `earlyPayout ?? deps.commitResult(r)` reuse below it). The
+   * reviewer replaced that handler with a no-op and the full suite stayed green — this drives a real, staged
+   * (`stages: 1`) mission through `createPlaySession` itself, so a no-op there fails this test directly:
+   * `deps.commitResult` would then only run later, from `onEnd`'s fallback, defeating the whole point of the
+   * early commit (a quit between the last question and the deferred `advance()`/"Next" chain would go back to
+   * losing the payout, session.ts's own preview notwithstanding).
+   */
+  it("play-session.ts's onCommit handler calls deps.commitResult synchronously on a staged mission's last question, and onEnd reuses it rather than committing twice", async () => {
+    const els = { score: fakeEl(), stage: fakeEl(), prompt: fakeEl(), vis: fakeEl(), hint: fakeEl(), qcard: fakeEl(), speak: fakeEl() };
+    const arena = {
+      paused: false, W: 390, topInset: 0, spawned: [] as WaveOpts[],
+      spawnWave(o: WaveOpts) { this.spawned.push(o); }, rush() { return false; }, floatText() {}, reveal() {}, clearWave() {},
+    };
+    let mounted = true;
+    const commitCalls: unknown[] = []; const showCalls: unknown[] = [];
+    const payout = {
+      newBest: false,
+      dojo: { state: { date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 }, completed: [], setDone: false, coins: 0, multiplier: 1 },
+      fresh: [], streak: 1, cert: null,
+    };
+    const deps: PlaySessionDeps = {
+      training: false, tracing: false, villain: false, av: AVATARS[0],
+      els: els as unknown as PlaySessionEls,
+      hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {} },
+      hold: { correct: 900, wrong: 1200, miss: 900 },
+      arena: () => arena as never, mounted: () => mounted,
+      later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },
+      holdTimers() {}, toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {},
+      commitResult: (r) => { commitCalls.push(r); return payout; },
+      showResults: (r, p) => { showCalls.push(p); },
+    };
+    const gen = (): Question => ({ prompt: 'Pick one', answer: 'right', options: ['right', 'wrong'] });
+    const topic = { id: 't', title: 't', icon: 't', subject: 'writing' as const, year: 'year1' as const, nc: '', gen };
+    const ps = createPlaySession({ mode: 'mission', year: YEARS[1], stages: 1, topic }, deps);
+    ps.session.start(); await settle();
+    for (let i = 0; i < YEARS[1].perStage - 1; i++) {
+      expect(ps.session.hit('right')).toBe('correct');
+      ps.waveEnd(); await vi.advanceTimersByTimeAsync(5000);
+    }
+    // The last question of the only (and so last) stage: the commit must land INSIDE this call, synchronously
+    // — nothing below advances a fake timer before the assertion, so a deferred-only commit fails this.
+    expect(ps.session.hit('right')).toBe('correct');
+    expect(commitCalls, "deps.commitResult ran inside hit() itself, via session.ts's onCommit").toHaveLength(1);
+    expect(showCalls, 'the overlay is not drawn yet — only committed').toHaveLength(0);
+    // The natural path still runs afterwards (advance() -> onStageClear, then the "Next" click's nextStage()
+    // -> end() -> onEnd) — and must reuse the same payout rather than committing a second time.
+    ps.waveEnd(); await vi.advanceTimersByTimeAsync(5000);
+    ps.session.nextStage();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(commitCalls, 'onEnd must reuse the early payout, never call commitResult a second time').toHaveLength(1);
+    expect(showCalls, 'the overlay eventually draws the SAME payout object commitResult returned').toEqual([payout]);
   });
 });

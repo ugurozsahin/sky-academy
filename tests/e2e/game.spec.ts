@@ -758,6 +758,65 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.sticker.got')).toHaveCount(3);
   });
 
+  /**
+   * #484 (mirroring #375/#441's Ninja Duel fix — and its own round 2, which is exactly what this review round
+   * found here too): a finished mission is committed the instant it is decided, not later inside a deferred
+   * timer or behind a click the child might never make.
+   *
+   * Round 1 of this fix committed only from `nextStage()`/`end()`, reached solely through the "Next" click on
+   * the LAST stage's clear overlay — but `advance()` (what fires that overlay at all) is itself reached only
+   * through `play-session.ts`'s own deferred `waveEnd()`, `session.ts`'s pure logic having no timers of its
+   * own. So two windows were still open on the mission, the mode the issue calls "at least as important as
+   * the Duel instance PR #480 just fixed": quitting in the ~1–1.45s before the stage-clear overlay even
+   * appeared lost everything (`advance()` never ran, so neither did `onStageClear`), and quitting FROM that
+   * overlay without tapping Next lost it just as permanently (nothing else ever reaches `nextStage()`).
+   * `session.ts` now fires `onCommit` — a new event, separate from `onEnd` — synchronously inside `hit()`
+   * itself the instant the mission's last question is answered, before either window opens.
+   *
+   * The quit is driven at the true earliest point: the winning slice and the quit run inside one
+   * `page.evaluate`, straight off `window.__sna.answer()` (no freeze, no swipe — the same hook `solveCurrent`
+   * uses elsewhere in this file) — no timer of any kind, and no click, gets to run between the game being
+   * decided and `#quit` reaching `scope.dispose()`. `index` stays at `perStage - 1` and `ended` stays `false`
+   * in the state read back inside that same task, proving `advance()` never ran either.
+   */
+  test('a mission left through Pause the instant the last question is answered is still paid, recorded and filed (#484)', async ({ page }) => {
+    test.setTimeout(150_000);
+    await seedPlayer(page, 'terra');
+    await startTopic(page, 'reception', 'r-count');
+    const stages = await page.evaluate(() => window.__sna.session.stages);
+    const perStage = await page.evaluate(() => window.__sna.session.perStage as number);
+    expect(stages).toBe(5);
+    for (let stage = 1; stage < stages; stage++) {
+      await answerAll(page, perStage);
+      await expect(page.locator('.celebrate')).toBeVisible();
+      await page.click('#next');
+    }
+    // Stage 5: every question but the last one, the normal way.
+    await answerAll(page, perStage - 1);
+    // The last question of the last stage: answer it and quit inside ONE task, before `advance()` — and so
+    // `onStageClear`/the stage-clear overlay itself — has any chance to run at all.
+    await waitForTarget(page);
+    const quitState = await page.evaluate(() => {
+      const ok = window.__sna.answer();        // the winning slice: onCommit fires inside this very call (#484)
+      const s = window.__sna.state();
+      (document.querySelector('#pause') as HTMLButtonElement).click();
+      (document.querySelector('#quit') as HTMLButtonElement).click();
+      return { ok, ...s };
+    });
+    expect(quitState, 'the mission is committed inside the slice itself, before advance() or the stage-clear overlay ever run')
+      .toMatchObject({ ok: true, index: perStage - 1, ended: false });
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    // Neither overlay ran: this is the window, not a test that quit after either one paid out.
+    await expect(page.locator('.celebrate')).toHaveCount(0);
+    await expect(page.locator('.results')).toHaveCount(0);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.progress['r-count'], 'the topic star and best score reached the save').toMatchObject({ stars: 3, plays: 1 });
+    expect(saved.progress['r-count'].best).toBeGreaterThan(0);
+    expect(saved.coins, 'coins were paid though neither overlay ever opened').toBeGreaterThan(0);
+    expect(saved.certs, 'and the win filed its certificate').toHaveLength(1);
+    expect(saved.certs[0]).toMatchObject({ id: 'reception:r-count', name: 'Ada', avatar: 'terra' });
+  });
+
   test('"My certificates" (#110): an earned certificate lists on the rewards screen, and View opens it full-screen with tap-to-zoom', async ({ page }) => {
     const cert = { id: 'reception:r-count', name: 'Ada', avatar: 'volt', year: 'Reception', title: 'Counting to 10', stars: 3, score: 250, correct: 20, attempts: 20, date: '2026-09-10' };
     // Seeded with a duel as well as a certificate (#415 round 2, note 3). With no duel on the page
@@ -1782,6 +1841,58 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.speech')).toContainText('Mia');
     await page.click('#home');
     await expect(page.locator('#memory small')).toContainText('boards 1');
+  });
+
+  /**
+   * #484 (mirroring #375/#441's Ninja Duel fix): a finished board is committed the instant the winning pair
+   * matches, not 900ms later inside `finish()`'s own scope-bound `later()`.
+   *
+   * `flip()` used to make every write — the board count, the coins, the Daily Dojo move and the streak —
+   * only from inside `finish()`. `#back` stays clickable throughout the 900ms wait, so leaving through it in
+   * that window ran `cleanup()` -> `scope.dispose()`, which cancelled `finish()` and every write with it: the
+   * last board of a session paid the child nothing.
+   *
+   * The winning flip and the quit run inside one `page.evaluate`, so no timer of any kind gets to run between
+   * the match completing the board and `#back` reaching `scope.dispose()` — a commit that happened any later
+   * than the flip itself would fail this.
+   */
+  test('Memory Match left through Back the instant the last pair matches is still paid and recorded (#484)', async ({ page }) => {
+    await seedPlayer(page, 'splash', 'Mia');
+    await page.click('.island[data-year="reception"]');
+    await page.click('#memory');
+    await expect(page.locator('.card')).toHaveCount(8);
+    const cards = await page.evaluate(() => window.__sna.cards() as { pair: number; matched: boolean }[]);
+    // Match every pair but the last one normally, through the same hook the test above uses.
+    const pairs = [...new Set(cards.map(c => c.pair))];
+    for (const p of pairs.slice(0, -1)) {
+      const i = cards.findIndex(c => c.pair === p);
+      const mate = cards.findIndex((c, k) => k !== i && c.pair === p);
+      await page.waitForFunction(() => !window.__sna.state().waiting);
+      expect(await page.evaluate((k) => window.__sna.flip(k), i)).toBe(true);
+      expect(await page.evaluate((k) => window.__sna.flip(k), mate)).toBe(true);
+      await expect(page.locator(`.card[data-i="${i}"]`)).toHaveClass(/matched/);
+    }
+    // The last pair: both flips and the quit inside one task — `flip()`'s second call is the synchronous
+    // commit (#484), and `#back` reaches it before `finish()`'s 900ms timer ever gets a chance to run.
+    const lastPair = pairs[pairs.length - 1];
+    const i = cards.findIndex(c => c.pair === lastPair);
+    const mate = cards.findIndex((c, k) => k !== i && c.pair === lastPair);
+    await page.waitForFunction(() => !window.__sna.state().waiting);
+    expect(await page.evaluate((k) => window.__sna.flip(k), i)).toBe(true);
+    const quitState = await page.evaluate((k) => {
+      const ok = window.__sna.flip(k);                    // the winning flip: commit() runs inside this call
+      const s = window.__sna.state();
+      (document.querySelector('#back') as HTMLButtonElement).click();
+      return { ok, ...s };
+    }, mate);
+    expect(quitState, 'the board is done the instant the last pair is flipped, before any results timer runs').toMatchObject({ ok: true, ended: true });
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
+    await expect(page.locator('.results')).toHaveCount(0);
+    await expect(page.locator('#memory small'), 'the board was counted though the overlay never opened').toContainText('boards 1');
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.memory?.reception, 'the board count reached the save').toBe(1);
+    expect(saved.coins, 'coins were paid though the overlay never opened').toBeGreaterThan(0);
   });
 
   test('guard rail: a Memory board never leaves a short row hanging off one edge (#372)', async ({ page }) => {
@@ -2830,6 +2941,33 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
     await expect(newer).toContainText('Open the game on the other device');
     // The bytes are still there, which is the whole point: the other device still reads them.
     expect(await page.evaluate(() => localStorage.getItem('sna:v1:p2'))).toContain('99');
+  });
+
+  /**
+   * #446. The row above withholds Remove on the *future* slot itself — 99 coins behind it — but that alone
+   * still let a grown-up remove the *readable* sibling and strand the family: with p2 unreadable by this
+   * build, taking p1 out leaves an index whose one remaining id resolves to a save this build cannot open,
+   * which sends the device into the first-run wizard over a store `readOnly` latches shut. Nothing typed into
+   * that wizard is ever kept, so the family is stuck until the other device or an update comes back.
+   */
+  test('removing the readable ninja is withheld when the only sibling is a newer-build save (#446)', async ({ page }) => {
+    await page.addInitScript(({ index, ada, future }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', future);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      future: JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    // p1 is readable and has a sibling, but that sibling is the only one and it is `future` — stranded.
+    await expect(page.locator('button[data-del="p1"]'), 'removing Ada would leave only Bo\'s unreadable save').toHaveCount(0);
+    await expect(page.locator('button[data-del="p2"]'), 'the future slot is still withheld on its own terms too').toHaveCount(0);
   });
 
   /**

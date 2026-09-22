@@ -14,7 +14,7 @@ import { canHear, haptic, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { screenScope, stickersHTML } from './screen';
 import { createHud } from './hud';
-import { BOMB, createPlaySession } from './play-session';   // #36: the Session callbacks live in play-session.ts
+import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
 import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
 import { resultMedal, resultHeading } from './results';
 import { dojoRowsHTML } from './memory';
@@ -87,7 +87,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     arena: () => arena,
     mounted: () => window.__sna === hooks,        // the screen the callbacks were built for is still the live one
     later, toast, holdTimers,
-    startTrace, showTutorial, showTaunt, showStageClear, showResults,
+    startTrace, showTutorial, showTaunt, showStageClear, commitResult, showResults,
   });
   const { session, waveEnd } = playSession;
   hud.drawLives(o.year.lives); hud.drawTimer(session.secondsLeft); hud.drawHp(session.bossHp, session.bossMax);
@@ -178,11 +178,18 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     els.overlay.innerHTML = stageClearHTML({ glow: av.glow, img: av.img, name: av.name, line, stage, stages: session.stages, starCount: st, acc, score: session.score });
     $('#next').addEventListener('click', () => { sfx.tap(); els.overlay.hidden = true; playSession.hold(false); session.nextStage(); });
   }
-  function showResults(r: SessionResult) {
-    // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
-    // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
-    // certificate toasts' own auto-hide) belong to this overlay rather than to the held game, so they still run.
-    playSession.hold(true, false);
+  /**
+   * Every write a finished game makes (#484, mirroring #375/#441's `commitMatch` for Ninja Duel). This used to
+   * run inside `showResults()`, which `onEnd` reaches only through the overlay's own scope-bound `later()` —
+   * up to ~1.2 s after the game is actually decided, and both `#pause` and the arena stay live for the whole
+   * wait. Quitting in that window (Pause → Islands, or the Android back button) runs `cleanup()` →
+   * `scope.dispose()`, which cancels the pending call and, with it, every write below: no coins, no Daily
+   * Dojo move, no Sensei accuracy, no certificate, no streak — in Mission, Training, Sprint, Boss and Endless,
+   * the modes children play most. `createPlaySession`'s `onEnd` now calls this straight from `session.end()`,
+   * synchronously, before the timer is even scheduled — the payout is handed to `showResults()` rather than
+   * recomputed there, so the overlay can never pay the game a second time.
+   */
+  function commitResult(r: SessionResult): ResultPayout {
     let newBest = false;
     if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
     else if (training) { if (r.won) recordTraining(o.year.id); }
@@ -199,6 +206,16 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'),
     }, r.coins);
     const streak = touchStreak();
+    const cert = certInfo(r); lastResult = r;
+    if (cert) fileCertificate(cert);   // #205: filed when it is *earned*, not when the button works
+    return { newBest, dojo, fresh, streak, cert };
+  }
+  function showResults(r: SessionResult, payout: ResultPayout) {
+    // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
+    // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
+    // certificate toasts' own auto-hide) belong to this overlay rather than to the held game, so they still run.
+    playSession.hold(true, false);
+    const { newBest, dojo, fresh, streak, cert } = payout;
     const stickerHTML = stickersHTML(fresh);
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138
     const medal = resultMedal(r);
@@ -210,8 +227,6 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const heading = resultHeading(r.mode, { won: r.won, training });   // from the mode table (mission distinguishes a Sensei-training win)
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
-    const cert = certInfo(r); lastResult = r;
-    if (cert) fileCertificate(cert);   // #205: filed when it is *earned*, not when the button works
     els.overlay.hidden = false;
     els.overlay.innerHTML = resultsHTML({
       mode: r.mode, won: r.won, training, glow: speaker.glow, img: speaker.img, name: speaker.name,
