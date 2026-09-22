@@ -235,8 +235,9 @@ describe('every option label the curriculum can generate — the #348 sweep (def
   const layoutRng = rng(1);
   const radiusFor = (labels: string[], wide: boolean) =>
     layoutWave({ labels, speed: 1, wide }, { W, H, topInset: 0 }, 1, 0, layoutRng).r;
-  /** One key shape for both sides of the exception check, so a mismatched delimiter cannot silently mean
-   *  "always new" on one side and "always stale" on the other. */
+  /** The delimiter a finding is recorded under, matching what `KNOWN_OVERFLOW`'s literals are hand-typed
+   *  against — not a guarantee those literals are built from this function, only that a finding this sweep
+   *  records and a finding this sweep looks up use the same shape (review note, PR #529 round 1). */
   const key = (topicId: string, label: string) => `${topicId}\t${label}`;
 
   /**
@@ -264,27 +265,42 @@ describe('every option label the curriculum can generate — the #348 sweep (def
     'y2-stats\tstrawberries',
   ]);
 
+  /**
+   * A 2% safety margin on the radius (review B3, PR #529 round 1): the 0.571px/char calibration is a flat
+   * average, and several real labels sit within ~1% of the fitted budget today — close enough that the gap
+   * between this calibration and a real Fredoka-bold render could tip them either way, with nothing here to
+   * catch it. Checking at a radius 2% smaller than the game actually lays the wave out at turns "uncomfortably
+   * close to the edge" into a finding this sweep reports, rather than a margin the calibration cannot vouch
+   * for silently deciding it either way.
+   */
+  const MARGIN = 0.98;
+
   it('never draws an option label wider than its bubble, beyond the named, checked exceptions', () => {
     const found = new Set<string>();
-    let swept = 0, cards = 0;
+    const sweptCells = new Set<string>();
     for (const topic of BUBBLE_TOPICS) {
-      swept++;
       for (const d of [1, 2, 3] as Difficulty[]) {
+        sweptCells.add(key(topic.id, String(d)));
         const draw = rng(topic.id.length * 11 + d);
         for (let i = 0; i < DRAWS; i++) {
           const q = topic.gen(d, draw);
-          cards++;
           const wide = !!waveOptsFor(q, { labels: q.options, speed: 1 }, 0).wide;
-          const r = radiusFor(q.options, wide);
+          const r = radiusFor(q.options, wide) * MARGIN;
           for (const label of q.options) {
             if (fitLabelLines(label, r, measure).state === 'overflow') found.add(key(topic.id, label));
           }
         }
       }
     }
-    // A topic dropped from the sweep would otherwise vanish silently (#369's own rail states the same check).
-    expect(swept, 'the sweep no longer covers every bubble topic').toBe(BUBBLE_TOPICS.length);
-    expect(cards).toBeGreaterThan(0);
+    // Independent of the loop above — recomputed straight from `TOPICS`, not from `BUBBLE_TOPICS` or the
+    // difficulty list the loop iterates — so a topic or difficulty silently dropped from either shows up as
+    // a mismatch here, rather than a count derived from the very loop it is meant to check (review B1/B2, PR
+    // #529 round 1: `swept === BUBBLE_TOPICS.length` and `cards > 0` were both true by construction and
+    // stayed true when a topic, or a whole difficulty, was cut from the loop that fed them).
+    const expectedCells = new Set(
+      TOPICS.filter(t => t.input !== 'tracing').flatMap(t => ([1, 2, 3] as Difficulty[]).map(d => key(t.id, String(d))))
+    );
+    expect([...sweptCells].sort()).toEqual([...expectedCells].sort());
     const newOverflow = [...found].filter(k => !KNOWN_OVERFLOW.has(k));
     expect(newOverflow, `new label(s) spill past their bubble:\n${newOverflow.join('\n')}`).toEqual([]);
     const stale = [...KNOWN_OVERFLOW].filter(k => !found.has(k));
