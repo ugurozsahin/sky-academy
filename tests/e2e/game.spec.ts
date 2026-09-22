@@ -759,52 +759,60 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   /**
-   * #484 (mirroring #375/#441's Ninja Duel fix): a finished mission is committed the instant it is decided,
-   * not ~1.2s later inside the results overlay's own scope-bound `later()`.
+   * #484 (mirroring #375/#441's Ninja Duel fix — and its own round 2, which is exactly what this review round
+   * found here too): a finished mission is committed the instant it is decided, not later inside a deferred
+   * timer or behind a click the child might never make.
    *
-   * Every write a mission produces — the topic's stars, the coins, the Daily Dojo move, Sensei's accuracy and
-   * the certificate — used to sit inside `showResults()`, which `onEnd` reached only through that timer.
-   * `#pause` stays bound throughout the wait (`syncPaused()` only pauses the arena, never hides the button),
-   * so Pause → Quit in that window ran `cleanup()` -> `scope.dispose()`, which cancelled the pending call and
-   * every write with it: a five-star mission paid the child nothing, with no toast or log to tell it from a
-   * mission that was never finished.
+   * Round 1 of this fix committed only from `nextStage()`/`end()`, reached solely through the "Next" click on
+   * the LAST stage's clear overlay — but `advance()` (what fires that overlay at all) is itself reached only
+   * through `play-session.ts`'s own deferred `waveEnd()`, `session.ts`'s pure logic having no timers of its
+   * own. So two windows were still open on the mission, the mode the issue calls "at least as important as
+   * the Duel instance PR #480 just fixed": quitting in the ~1–1.45s before the stage-clear overlay even
+   * appeared lost everything (`advance()` never ran, so neither did `onStageClear`), and quitting FROM that
+   * overlay without tapping Next lost it just as permanently (nothing else ever reaches `nextStage()`).
+   * `session.ts` now fires `onCommit` — a new event, separate from `onEnd` — synchronously inside `hit()`
+   * itself the instant the mission's last question is answered, before either window opens.
    *
-   * The quit is driven at the EARLIEST point the window opens: `#next` on the LAST stage's clear overlay is
-   * what calls `session.nextStage()` -> `end(true)` synchronously, so the click, the pause and the quit run
-   * inside one `page.evaluate` — no timer of any kind gets to run between the game being decided and the
-   * quit reaching `scope.dispose()`. A commit that happened any later than the click itself would fail this.
+   * The quit is driven at the true earliest point: the winning slice and the quit run inside one
+   * `page.evaluate`, straight off `window.__sna.answer()` (no freeze, no swipe — the same hook `solveCurrent`
+   * uses elsewhere in this file) — no timer of any kind, and no click, gets to run between the game being
+   * decided and `#quit` reaching `scope.dispose()`. `index` stays at `perStage - 1` and `ended` stays `false`
+   * in the state read back inside that same task, proving `advance()` never ran either.
    */
-  test('a mission left through Pause the instant the last stage clears is still paid, recorded and filed (#484)', async ({ page }) => {
+  test('a mission left through Pause the instant the last question is answered is still paid, recorded and filed (#484)', async ({ page }) => {
     test.setTimeout(150_000);
     await seedPlayer(page, 'terra');
     await startTopic(page, 'reception', 'r-count');
     const stages = await page.evaluate(() => window.__sna.session.stages);
+    const perStage = await page.evaluate(() => window.__sna.session.perStage as number);
     expect(stages).toBe(5);
     for (let stage = 1; stage < stages; stage++) {
-      await answerAll(page, 5);
+      await answerAll(page, perStage);
       await expect(page.locator('.celebrate')).toBeVisible();
       await page.click('#next');
     }
-    // Stage 5, the last one: answer every question, then wait for its own stage-clear overlay before the
-    // synchronous quit — clicking `#next` while `.celebrate` from an EARLIER stage was still up would let the
-    // click land on the wrong overlay's button.
-    await answerAll(page, 5);
-    await expect(page.locator('.celebrate h2')).toContainText('Stage 5 clear');
+    // Stage 5: every question but the last one, the normal way.
+    await answerAll(page, perStage - 1);
+    // The last question of the last stage: answer it and quit inside ONE task, before `advance()` — and so
+    // `onStageClear`/the stage-clear overlay itself — has any chance to run at all.
+    await waitForTarget(page);
     const quitState = await page.evaluate(() => {
-      (document.querySelector('#next') as HTMLButtonElement).click();     // -> nextStage() -> end(true), synchronously
+      const ok = window.__sna.answer();        // the winning slice: onCommit fires inside this very call (#484)
       const s = window.__sna.state();
       (document.querySelector('#pause') as HTMLButtonElement).click();
       (document.querySelector('#quit') as HTMLButtonElement).click();
-      return s;
+      return { ok, ...s };
     });
-    expect(quitState, 'the mission is over the instant #next is clicked, before any results timer runs').toMatchObject({ ended: true });
+    expect(quitState, 'the mission is committed inside the slice itself, before advance() or the stage-clear overlay ever run')
+      .toMatchObject({ ok: true, index: perStage - 1, ended: false });
     await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
-    // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
+    // Neither overlay ran: this is the window, not a test that quit after either one paid out.
+    await expect(page.locator('.celebrate')).toHaveCount(0);
     await expect(page.locator('.results')).toHaveCount(0);
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
     expect(saved.progress['r-count'], 'the topic star and best score reached the save').toMatchObject({ stars: 3, plays: 1 });
     expect(saved.progress['r-count'].best).toBeGreaterThan(0);
-    expect(saved.coins, 'coins were paid though the overlay never opened').toBeGreaterThan(0);
+    expect(saved.coins, 'coins were paid though neither overlay ever opened').toBeGreaterThan(0);
     expect(saved.certs, 'and the win filed its certificate').toHaveLength(1);
     expect(saved.certs[0]).toMatchObject({ id: 'reception:r-count', name: 'Ada', avatar: 'terra' });
   });

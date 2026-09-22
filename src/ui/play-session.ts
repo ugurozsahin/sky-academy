@@ -137,6 +137,9 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
   const mission = opts.mode === 'mission';        // only missions show the stage pill and its segments
   let lastOutcome: Outcome | 'none' = 'none';
   let waveId = 0; let revealUntil = 0;
+  // #484: set by `onCommit` when a staged mission's last question is decided ahead of `onEnd` — so `onEnd`
+  // reuses that payout instead of committing (and so paying) the game a second time.
+  let earlyPayout: ResultPayout | null = null;
   let activeQuestion: Question | null = null;
   // The peek (#65): a sentence shown for NO_VOICE_PEEK_MS of un-paused time, then hidden. `peekLeft` is the
   // time still to run, `peekSince` when the current run started, `peekDone` what the hide releases (the wave
@@ -346,13 +349,21 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       if (kind === 'hit') { sfx.life(); if (hp > 0) deps.toast(hp <= 3 ? 'Hammer Man is wobbling!' : 'Hit!', 'good'); }
       else deps.showTaunt();
     },
+    // #484 (review round 1, B1): a staged mission's last question decides the game well before `advance()`
+    // even runs — `advance()` sits behind the SAME deferred `waveEnd()` below, and the last stage's own
+    // `end()` is reached only from the "Next" click on the stage-clear overlay `advance()` shows. `onCommit`
+    // fires synchronously at that true decision point (`session.ts`) and commits there; this reuses its
+    // payout instead of committing a second time. Every other mode (Endless, Sprint, Boss, Memory Match's
+    // own `commit()`) never fires `onCommit` at all, so `earlyPayout` stays null and this commits as before.
+    onCommit(r) { earlyPayout = deps.commitResult(r); },
     // #138: the floor and the breath after it are game beats and scale; `revealUntil - now` is real time
     // already remaining on a hold that was itself scaled when it started, so it must NOT be scaled again.
-    // #484: the writes are committed here, in the same synchronous call as `end()` — before the overlay's own
-    // timer is even scheduled — so a quit during the wait below can only ever cancel the DRAWING of the
-    // results, never the payout itself.
+    // #484: for every mode but a staged mission's last stage, the writes are committed here, in the same
+    // synchronous call as `end()` — before the overlay's own timer is even scheduled — so a quit during the
+    // wait below can only ever cancel the DRAWING of the results, never the payout itself.
     onEnd(r) {
-      const payout = deps.commitResult(r);
+      const payout = earlyPayout ?? deps.commitResult(r);
+      earlyPayout = null;
       const wait = lastOutcome === 'none' || r.mode === 'sprint' ? 0 : Math.max(scaled(900), revealUntil - performance.now() + scaled(300));
       deps.later(() => deps.showResults(r, payout), wait);
     },

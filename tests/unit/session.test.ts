@@ -31,6 +31,56 @@ describe('mission session', () => {
     expect(r.won).toBe(true); expect(r.stars).toBe(3); expect(r.correct).toBe(Y1.perStage * s.stages); expect(r.score).toBeGreaterThan(0);
     expect(r.coins).toBe(Y1.perStage * s.stages + 3 * s.stages * 5 + 20);
   });
+  /**
+   * #484 (review round 1, B1): `advance()` — which is what fires `onStageClear`, and thus what lets the "Next"
+   * click reach `nextStage()`/`end()` — is only ever called by the UI, never by `hit()`/`waveEnd()` itself. So
+   * the very last question of the very last stage must decide the whole mission from inside the synchronous
+   * `hit()` call that answers it, via `onCommit` — well before `advance()` (and the UI's own deferred timer to
+   * reach it) ever runs. This is the exact scenario the review reproduced: driven to the last question, only
+   * `hit()` called — `advance()`/`nextStage()`/`end()` deliberately never invoked — proving the payout does not
+   * wait on either of them.
+   */
+  it("onCommit fires the instant the mission's last question is answered, before advance() or nextStage() ever run", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(ev.onCommit).not.toHaveBeenCalled();
+    expect(s.hit(s.current!.answer)).toBe('correct');           // the last question of the only stage
+    expect(ev.onCommit, 'onCommit fired inside hit() itself, with no advance()/nextStage() call anywhere above').toHaveBeenCalledTimes(1);
+    expect(ev.onStageClear).not.toHaveBeenCalled();
+    expect(ev.onEnd).not.toHaveBeenCalled();
+    expect(s.ended, "a preview must not end the session — that is still advance()/nextStage()'s job").toBe(false);
+    const preview = ev.onCommit.mock.calls[0][0];
+    expect(preview).toMatchObject({ won: true, stars: 3, correct: Y1.perStage, coins: Y1.perStage + 3 * 5 + 20 });
+    // The natural path still runs exactly as before, and produces an EQUAL result from onEnd — proving this
+    // is a preview that gets reused, never a second, possibly-different payout (which would double-pay or
+    // pay a different amount than what was already committed).
+    s.advance();
+    expect(ev.onStageClear).toHaveBeenCalledTimes(1);
+    s.nextStage();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
+  });
+  /**
+   * The loss counterpart: a wrong answer on the last question that ALSO empties the last life is a LOST
+   * mission, not a stage clear — `onCommit` must never fire `won: true` for it. `loseLife()`'s own `end(false)`
+   * settles this first; `maybeCommitFinalStage()`'s `!this.ended` guard is what stops it firing at all.
+   */
+  it('onCommit never fires when the last question is wrong and also costs the last life', () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    expect(Y1.lives).toBeLessThan(Y1.perStage);   // room to spend every life but one before the last question
+    for (let i = 0; i < Y1.lives - 1; i++) { expect(s.hit('not-the-answer')).toBe('wrong'); s.advance(); }
+    for (let i = Y1.lives - 1; i < Y1.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.lives).toBe(1); expect(s.ended).toBe(false); expect(s.index).toBe(Y1.perStage - 1);
+    expect(s.hit('still-not-the-answer')).toBe('wrong');   // the last question, and the last life together
+    expect(s.ended, 'the mission is lost, not cleared').toBe(true);
+    expect(ev.onCommit, 'a loss is never previewed as a won stage clear').not.toHaveBeenCalled();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0].won).toBe(false);
+  });
   it('Sensei training: a mission over a pool tallies hits and tries per topic', () => {
     const ev = events();
     const pool = [topicById('y1-add')!, topicById('y1-sub')!];
