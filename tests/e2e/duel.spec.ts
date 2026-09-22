@@ -696,6 +696,8 @@ test.describe('Ninja Duel', () => {
     // #398 round 2 review, non-blocking: `resultsModal()`'s own worst case got a click-target sweep for the
     // nav row painting over `#cert`; `.duel-end` is hand-maintained separately and received the identical
     // sticky→flex-sibling fix, so it needs the same sweep rather than trusting the shared CSS selector alone.
+    // Settle `.modal`'s own pop-in first — see the matching comment in game.spec.ts's sweep for why.
+    await page.waitForTimeout(500);
     const scroller = page.locator('.duel-end .scroll');
     const scrollerBox = (await scroller.boundingBox())!;
     const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);

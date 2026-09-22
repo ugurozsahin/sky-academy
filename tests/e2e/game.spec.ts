@@ -658,6 +658,15 @@ test.describe('Sky Ninja Academy', () => {
     // whether the overlap happened — caught only by sweeping scroll positions, not the one spot
     // `scrollIntoViewIfNeeded()` happens to land on (round 2 review). `.row.nav` is now a flex sibling outside
     // the scrolling `.scroll` region, so no scroll position should put anything underneath it.
+    //
+    // Settle `.modal`'s own 350ms pop-in (`transform: scale(.7 → 1)`) before capturing ANY position on this
+    // overlay — found chasing `pr-test-analyzer`'s round-3 desktop flake (6/10 pass) and a real failure of
+    // this exact assertion in my own desktop run. A scale still in flight shifts every descendant's rect by a
+    // different amount from the transform origin, so `scrollerBox` captured mid-animation and `stepBox`
+    // captured later, once it has settled, describe two different geometries — the sweep below can then miss
+    // every position where the button is genuinely visible. See the K.O. test further down for the same
+    // mechanism measured directly.
+    await page.waitForTimeout(500);
     const scroller = results.locator('.scroll');
     const scrollerBox = (await scroller.boundingBox())!;
     const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
