@@ -125,6 +125,12 @@ const SPEAK_LABEL = {
 // a guard rail would be wrong to touch it: `revealUntil - performance.now()` is real time still owed on a
 // hold that was already scaled when it began, so scaling it a second time would cut short the pause a child
 // sees. (The beats play.ts still owns — the tutorial hold, the taunt, the results cue — are scaled there.)
+// #490: being an absolute wall is also why a PAUSE does not shift it, unlike the wave's own launchAt (arena.ts,
+// fixed there). A pause that outlasts the remaining reveal makes all three readers below compute a negative
+// `revealUntil - now()`, never a hang: each already floors it (`Math.max(0, …)` / `Math.max(scaled(900), …)`),
+// so the effect is the reveal reading as already over the moment the pause lifts — early by at most the floor
+// each reader already carries, not stuck. Left this way rather than shifted: the wave's clock decides what a
+// child SEES fly, so a collapsed stagger is visible; a slightly-early internal deadline here is not.
 const OUTCOME = {
   correct: { seg: 'good', taunt: false, hold: 'correct', advance: 900 },
   wrong: { seg: 'bad', taunt: true, hold: 'wrong', advance: 1200 },
