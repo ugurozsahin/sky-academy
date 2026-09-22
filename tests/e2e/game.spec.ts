@@ -2447,6 +2447,13 @@ test.describe('profile picker (#20 slice 2)', () => {
         expect(spk!.x + spk!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the read-aloud button is sliced by the screen edge`)
           .toBeLessThanOrEqual(w);
         expect(spk!.height, 'and it still clears the 44px touch floor (`design-language` §4)').toBeGreaterThanOrEqual(44);
+        // round 3 review, B1: `.icon-btn` had no `flex-shrink: 0`, so once `.hero` hit its own floor the
+        // remaining deficit shrank #snd/#spk below the 44px touch floor (measured 41.5px) with no overflow to
+        // catch it — height alone can't see a width-only shrink, so both buttons' width is checked too.
+        expect(spk!.width, 'and the read-aloud button keeps its 44px width, not just its height').toBeGreaterThanOrEqual(44);
+        const snd = await page.locator('#snd').boundingBox();
+        expect(snd!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the mute button is squeezed under the touch floor`)
+          .toBeGreaterThanOrEqual(44);
         // round 1 review, B1: `.hero`'s `min-width: 0` alone let the shrink pressure fall on the fixed-size
         // portrait too (54px -> 12px at this exact scenario), not just on the text it was meant for.
         const portrait = await page.locator('.hero .portrait').boundingBox();
