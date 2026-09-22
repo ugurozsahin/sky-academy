@@ -62,7 +62,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   };
   let arena: Arena | null = null; let tracer: Tracer | null = null; let lastResult: SessionResult | null = null;
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
-  const { later, toast } = scope;
+  const { later, toast, holdTimers } = scope;
   const hud = createHud(els, o.year.lives, canHear);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
@@ -86,7 +86,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
     arena: () => arena,
     mounted: () => window.__sna === hooks,        // the screen the callbacks were built for is still the live one
-    later, toast,
+    later, toast, holdTimers,
     startTrace, showTutorial, showTaunt, showStageClear, showResults,
   });
   const { session, waveEnd } = playSession;
@@ -179,7 +179,10 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     $('#next').addEventListener('click', () => { sfx.tap(); els.overlay.hidden = true; playSession.hold(false); session.nextStage(); });
   }
   function showResults(r: SessionResult) {
-    playSession.hold(true);                       // the game is over: syncPaused() also reads session.ended, so nothing here can undo it
+    // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
+    // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
+    // certificate toasts' own auto-hide) belong to this overlay rather than to the held game, so they still run.
+    playSession.hold(true, false);
     let newBest = false;
     if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
     else if (training) { if (r.won) recordTraining(o.year.id); }
@@ -282,7 +285,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     },
     bubbles: () =>
       arena?.bubbles.filter(b => b.launched && !b.dead && !b.hit && !b.fade)
-        .map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })) ?? [],
+        .map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy, lines: b.lines, labelState: b.labelState })) ?? [],
     state: () => ({
       stage: session.stage, index: session.index, score: session.score, lives: session.lives,
       ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt,

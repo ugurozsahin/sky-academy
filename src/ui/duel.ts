@@ -29,8 +29,25 @@ import type { DuelHooks } from './hooks';
 export interface DuelScreenOpts { year: YearInfo }
 const PLAYERS = ['a', 'b'] as const;
 const NAME: Record<DuelPlayer, string> = { a: 'Player 1', b: 'Player 2' };
-/** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. */
-const HOLD = { won: 1000, draw: 900 } as const;
+/** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. `miss` is the
+ *  wrong-slice toast, which holds nothing back — the round keeps running — but is scaled with the other two so
+ *  `setGameSpeed` stretches every verdict on this screen rather than all but one (PR #428 review, note 3). */
+const HOLD = { won: 1000, draw: 900, miss: 900 } as const;
+/**
+ * The longest line this screen can put in the `#toast`, and the call site that raises it. Exported because the
+ * layout rail in `tests/e2e/duel.spec.ts` measures what a *wrapped* verdict costs the arenas — the toast sits
+ * in the question bar's own `grid-area: q` (`src/style.css`), so growing that row is the one way the placement
+ * can still take height off both children, and the rail must probe the real worst case rather than a copy of it
+ * that drifts the moment a longer line is added here (PR #428 review, B2). `tests/unit/guardrails.test.ts`
+ * holds it to being the genuine longest across every `toast(` in this file.
+ *
+ * The certificate outcome ('Certificate saved!' etc.) used to be the longest candidate and raised this same
+ * constant, but it never belonged to this class: it fires while the results overlay is up, and `#toast` sits
+ * BEHIND that overlay (`#436`) — the child never saw it. It now reports through `#cert-msg`, inside the overlay
+ * itself, so `#toast`'s only remaining raisers are the three round verdicts below, and this constant is the
+ * longest of THOSE — the draw line, which now raises it directly rather than repeating its text.
+ */
+export const DUEL_TOAST_LONGEST = 'Nobody sliced it — no point';
 
 export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => void) {
   const d = load(); const av = avatarById(d.avatar);
@@ -65,6 +82,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
 
   const scope = screenScope(); const { later, toast } = scope;
   const overlay = $('#overlay'); const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
+  const toastEl = $('#toast');
   let waveId = 0; let holdOpen = false;
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
   let hintLine = '';
@@ -91,6 +109,13 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       // shows its words on a device that cannot be heard, and the hint line carries the data five of the pool's
       // comparison topics keep nowhere else — without it "Which is fuller?" is two coloured bubbles and a guess.
       // A duel has no peek timing, so a peek question reads through here rather than hiding its text.
+      // A BACKSTOP, not the mechanism: no verdict should still be up by the time its question is replaced. What
+      // keeps the drawn round's verdict off the next question is `settleDraw()` in `waveEnd` below, which
+      // announces it and advances a hold later. Clearing here was tried as the whole fix and was worse than the
+      // bug — `onRoundDraw` and `onQuestion` share a synchronous task on the draw path, so the class was added
+      // and removed before the browser painted a frame and the verdict was never shown AT ALL: two children got
+      // `sfx.miss()` and nothing to read, on the outcome that most needs explaining (#425 review).
+      toastEl.classList.remove('show');
       const reveal = promptMode(q, canHear()) !== 'hear';
       speak.hidden = reveal;
       prompt.innerHTML = promptHTML(q, 0, reveal); $('#vis').innerHTML = renderVisual(q.visual);
@@ -99,7 +124,13 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       const speed = o.year.speeds[0] ?? 2;
       const opts = waveOptsFor(q, { labels: q.options, speed }, 0);
       // #44: the first wave waits for Fredoka (cached after that); #138: a spawn that waited must still be this wave's.
-      fontReady().then(() => {
+      // Through `later(..., 0)` and not straight out of the promise (PR #474 review, B2). `waveId`/`alive`
+      // are the only guards a raw continuation has, and neither reads the hold — so a pause pressed inside
+      // this gate, up to the 1200ms cap on a cold font cache, let `say()` speak a question behind the overlay
+      // and `spawnWave` land with `launchAt` already past. That is #301 word for word, in the one place the
+      // fix did not reach. A 0ms beat defers rather than drops: frozen at 0 remaining, re-armed at 0 on
+      // resume, so the wave goes up the moment the child comes back instead of never.
+      fontReady().then(() => later(() => {
         if (waveId !== myWave || !scope.alive) return;
         // Round 1 carries the hand-over line in the same utterance. On a rematch it would be spoken in the very
         // task that `hush()` cancelled the old screen's voice in — the cancel-then-speak drop audio.ts documents —
@@ -118,7 +149,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         // look symmetrical while giving the left-handed and right-handed reach a different problem.
         const seed = (Math.random() * 0x100000000) >>> 0, at = performance.now();
         for (const p of PLAYERS) { arenas[p].topInset = 8; arenas[p].spawnWave(opts, { rng: seededRng(seed), now: at }); }
-      });
+      }, scaled(0)));   // scaled(0) is 0 — a "next task", on the same clock every other beat here uses (#138)
     },
     onRoundWon(player, q) {
       sfx.correct(); haptic('slice');
@@ -132,8 +163,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       if (duel.onLastRound) commitOnce(duel.result());
       endWave(scaled(HOLD.won));
     },
-    onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', 900); },
-    onRoundDraw() { sfx.miss(); toast('Nobody sliced it — no point', 'bad', scaled(HOLD.draw)); },
+    onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', scaled(HOLD.miss)); },
+    onRoundDraw() { sfx.miss(); toast(DUEL_TOAST_LONGEST, 'bad', scaled(HOLD.draw)); },
     // #375/#441: the match is **committed here, synchronously**, and only the overlay waits on the timer.
     // `later()` is scope-bound, so the ~1.3 s of pacing below is a window in which `cleanup()` — Pause →
     // Islands, or Android's hardware back — calls `scope.dispose()` and cancels the pending callback. When
@@ -157,7 +188,12 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // there is no bubble either child could still slice and no route left to `duel.hit()`. If that ever
     // changes — a wave that ends with bubbles still catchable — this commit stops being safe, silently.
     if (duel.onLastRound) commitOnce(duel.result());
-    later(() => duel.waveEnd(), scaled(duel.roundDecided ? 450 : 650));
+    // Settle a draw NOW, so its verdict goes up on the question it is about, and advance after the hold. Done in
+    // one step — `duel.waveEnd()` alone — `onRoundDraw` and `onQuestion` share a task and the toast is added and
+    // removed before a frame paints, so the children get `sfx.miss()` and nothing to read. `HOLD.draw + 100` so
+    // this does not ride on two equal timers firing in the order they happened to be queued.
+    const drew = duel.settleDraw();
+    later(() => duel.waveEnd(), scaled(drew ? HOLD.draw + 100 : 450));
   };
   for (const p of PLAYERS) {
     arenas[p] = new Arena($(`#arena-${p}`) as HTMLCanvasElement, {
@@ -170,7 +206,18 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     }, { trailColor: av.glow, fx: av.fx, onSwish: () => sfx.swish(), onThrow: () => sfx.whoosh(), onLand: () => sfx.slice() });
   }
   const syncPaused = () => { for (const p of PLAYERS) arenas[p].paused = holdOpen || duel.ended; };
-  const hold = (open: boolean) => { holdOpen = open; syncPaused(); };
+  // The arena's pause AND the screen's beats (#301): `syncPaused()` alone left `endWave`'s `clearWave`, the
+  // `duel.waveEnd()` that follows it and the results cue running behind the pause overlay, so a pause inside
+  // the outcome hold advanced the round and spawned the next wave out of sight.
+  //
+  // `beats` is false for a hold that NEVER LIFTS (PR #474 review, B1). Freezing beats is right for the pause
+  // overlay, which reopens; it is exactly wrong for the results overlay, which does not — a beat armed after
+  // that hold would sit in the set unarmed until `dispose()` threw it away, in silence. That cost this screen
+  // the sticker jingle below and left every results toast pinned over the modal for the life of the screen.
+  // The results hold still pauses both arenas (`syncPaused()` reads `duel.ended` too); it just leaves the
+  // overlay's own presentation timers alone, which is what `main` did before #301 and is the only behaviour
+  // the game is over for.
+  const hold = (open: boolean, beats = true) => { holdOpen = open; if (beats) scope.holdTimers(open); syncPaused(); };
 
   /**
    * What the finished match paid, or null until it is committed — the overlay draws from this (#375/#441).
@@ -231,7 +278,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
    */
   function commitMatch(r: DuelResult): GameEndOutcome {
     // #16 item 5: the match pays into the one shared save, so the coin row and any sticker it unlocked are on
-    // the screen the children are about to look at. The Daily Dojo hears about the match here too — ten
+    // the screen the children are already looking at. The Daily Dojo hears about the match here too — ten
     // questions answered correctly on this screen move the day's volume challenges exactly as they would in
     // any other mode — and its bonus rides the same single write (#365).
     paid = duelCoins(r);
@@ -270,7 +317,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
 
   /** Draws what `commitMatch()` already wrote — this runs on a timer the child can outrun, and writes nothing. */
   function showResults(r: DuelResult, { dojo, fresh }: GameEndOutcome) {
-    hold(true);
+    hold(true, false);   // terminal: the beats below (the jingle, the certificate toasts) must still run — see `hold`
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
     overlay.hidden = false;
@@ -282,7 +329,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
         ${dojoRowsHTML(dojo)}
         ${stickersHTML(fresh)}
-        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div>' : ''}
+        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div><p class="cert-msg" id="cert-msg" role="status" hidden></p>' : ''}
         <div class="row"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
@@ -293,16 +340,44 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // now?" and answers null until the match is settled (#16 review, note 7; narrowed by #375 round 2, note 1:
     // "before the match ends" was the old boundary, and `cert` is now set at the last slice, not the overlay).
     const earned = cert;
-    if (earned) $('#cert').addEventListener('click', async () => {
-      sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
+    // #436: this outcome fires while `#overlay` is up, and the shared `#toast` sits BEHIND it (`grid-area: q`,
+    // z-index 3, under the overlay's z-index 5) — a child who taps 🎓 never saw whether it worked. `certMsg`
+    // reports inside the modal itself instead, next to the button that earned it, where nothing can cover it.
+    //
+    // Scoped to `overlay` (round-1 review, B2), not a bare `$`: `deliverCertificate`/`drawCertificate` carry
+    // several real `await` points (fonts, canvas encode, the share sheet, a native filesystem round trip),
+    // long enough for a child to Rematch/Islands/Quit mid-flight. That tears this screen down and builds a new
+    // one with its own `#cert-msg` — a bare `$('#cert-msg')` would write the OLD match's outcome into the NEW
+    // match's live element. Scoped to the closed-over `overlay`, a write after teardown lands on that overlay's
+    // own now-detached copy instead, where nobody is looking.
+    //
+    // Revealed, THEN mutated (round-1 review note): `hidden` and `textContent` set in the same synchronous step
+    // is the same unreliable live-region pattern this file's own `#toast` avoids by never using `hidden` at all
+    // (visibility toggled by a class, mutation always into an element already in the layout). `#cert-msg` starts
+    // `hidden` so nothing shows before a certificate exists to report on; the reveal goes out one task ahead of
+    // the text so assistive tech sees the region exist before it changes.
+    const certMsg = (text: string, bad = false) => {
+      const el = $('#cert-msg', overlay);
+      el.hidden = false; el.classList.toggle('bad', bad);
+      requestAnimationFrame(() => { el.textContent = text; });
+    };
+    if (earned) $('#cert', overlay).addEventListener('click', async () => {
+      sfx.tap();
+      const b = $('#cert', overlay) as HTMLButtonElement; b.disabled = true;
+      // Cleared before this attempt starts (round-1 review, B3): the 'shown' route below never calls `certMsg`
+      // (the full-screen view carries its own save hint), so a stale error from an earlier failed attempt would
+      // otherwise still be sitting there, unread, once the child closes a screen that just worked fine.
+      const msg = $('#cert-msg', overlay); msg.hidden = true; msg.textContent = '';
       try {
         const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-duel-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
-        if (how === 'shared') toast('Certificate shared!', 'good');
-        else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
-        else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
-        // 'shown' opens the full-screen view with its own save hint, so no toast
+        if (!scope.alive) return;   // torn down mid-delivery — see the comment on `certMsg` above
+        if (how === 'shared') certMsg('Certificate shared!');
+        else if (how === 'saved' || how === 'downloaded') certMsg('Certificate saved!');
+        else if (how === 'declined') certMsg('No problem — you can save it next time!');
+        // 'shown' opens the full-screen view with its own save hint — the reset above already cleared any
+        // earlier message, so there is nothing left to show here.
       }
-      catch { toast('Could not make the certificate', 'bad'); }
+      catch { if (scope.alive) certMsg('Could not make the certificate', true); }
       b.disabled = false;
     });
   }
@@ -347,7 +422,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     duel, arenas,
     answer: p => { const t = target(p, false); return t !== undefined && arenas[p].hitLabel(t); },
     wrong: p => { const t = target(p, true); return t !== undefined && arenas[p].hitLabel(t); },
-    bubbles: p => arenas[p].bubbles.filter(inFlight).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy })),
+    bubbles: p => arenas[p].bubbles.filter(inFlight).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy, lines: b.lines, labelState: b.labelState })),
     state: () => ({
       mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
@@ -358,7 +433,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // which is how a wrong `avatar` survived round 1's rails (#397 round 2, B1).
     certWords: () => cert ? certWords(cert) : null,
     setSpeed: k => { setGameSpeed(k); },
-    timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw) } }),
+    timing: () => ({ speed: gameSpeed(), hold: { won: scaled(HOLD.won), draw: scaled(HOLD.draw), miss: scaled(HOLD.miss) } }),
   };
   window.__sna = hooks;
   duel.start();

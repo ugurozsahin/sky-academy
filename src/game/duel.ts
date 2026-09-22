@@ -84,10 +84,30 @@ export class Duel {
     this.ev.onRoundWon(player, q);
     return 'won';
   }
+  /**
+   * Nobody sliced it: settle the round as a draw and announce it, WITHOUT advancing. Returns whether this call
+   * is what settled it.
+   *
+   * Split out of `waveEnd()` for the same reason `hit()` keeps them apart — announcing a verdict is not moving
+   * on — and the split is what lets the screen keep the two apart in TIME. Joined, `onRoundDraw` and the
+   * `onQuestion` that follows ran in one synchronous task, so a screen that clears its toast on a new question
+   * added and removed the class before the browser painted a frame: the draw verdict was never shown at all,
+   * and two children got a miss sound with nothing to read (#425 review).
+   */
+  settleDraw(): boolean {
+    // `this.current` is guarded the way `hit()` guards it two methods up, and for the same reason: this one is
+    // newly public and reachable through `window.__sna.duel`, so a call before the first question would have
+    // handed `onRoundDraw` a non-null assertion on nothing. Not reachable in play — `waveEnd()` cannot run
+    // before a wave — so this is hardening, not a fix (#425 review, note 4).
+    if (this.ended || this.roundDecided || !this.current) return false;
+    this.roundDecided = true;
+    this.ev.onRoundDraw(this.current);
+    return true;
+  }
   /** The wave finished: a round nobody decided is a draw, then move on to the next round (or end the match). */
   waveEnd() {
     if (this.ended) return;
-    if (!this.roundDecided) { this.roundDecided = true; this.ev.onRoundDraw(this.current!); }
+    this.settleDraw();
     this.advance();
   }
   private advance() {

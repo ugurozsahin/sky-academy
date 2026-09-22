@@ -203,11 +203,20 @@ export const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass
   // rule `pud` and `paps` already follow: what is blocked is the spelling a card can **show**, not an entry
   // in a dictionary — and it is an exact homophone of this set's first member.
   'poove', 'hore',
+  // #416: `poo_` (from `poor`) still offered `v`, spelling `poov` — the clipped form of the slur `poove`
+  // above. Found by driving the real generator 300,000 times rather than re-reading the stem: `poove` had
+  // already been closed by #419, but `poov` sits on the same stem one letter short, the same way `poon`
+  // sat one letter past `poof` in #324 item 1.
+  'poov',
   // Review of #418: four more, found by driving the registry rather than by re-reading the list — which is
   // the whole lesson. `cun` is on `cu_`, the same three letters as the `cum` above it: the stem was audited
   // and the audit stopped one letter short, exactly as #324 did on `poo_`. `cok`/`coc` follow the `hore`
   // rule — an exact homophone of a member of this set (`cock`), blocked for what a card would show.
-  'nig', 'pak', 'hun', 'cun', 'cok', 'coc']);
+  'nig', 'pak', 'hun', 'cun', 'cok', 'coc',
+  // #443: `le_` offered `z` on a Reception card, and the fifth sweep is what found it — the fourth
+  // (#418/#419) had already closed `cu_` and `ja_` without reaching this stem. A slur, by the same rule
+  // `poon` and `hore` are here under.
+  'lez']);
 /**
  * **Reachable and deliberately left** (#418 asks for this stated rather than assumed, the way the comment
  * above `gapLetters` records `hag`, `cur` and `rut`). These are spellings a gap card can show and that two
@@ -218,6 +227,10 @@ export const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass
  *   `pis`, `hoor`, `ho`, `hos`, `pish`, `ars` — non-words, and none an exact homophone of an `AVOID` member,
  *   which is the line `hore` and `cok` are on the other side of. `ho` in particular cannot be closed without
  *   a rule that reads oddly for Reception (`do`, `to`, `no`, `go`, `so`, `he` all reach it).
+ *   `fux` — the fifth sweep's other find (#443), on `f_x`. A leetspeak rendering of a swear word rather than
+ *   a spelling; `hore` and `cok`'s exact-homophone rule does not reach it, because nothing in `AVOID` is
+ *   spelt `fux`.
+ *   `les` — the fifth sweep's third find, on `le_`. An ordinary name, the way `ho` is an ordinary word.
  *
  * The point of writing them down is that the next sweep reads which were decided instead of re-finding them
  * by eye — the fourth sweep of this kind found four spellings the third had not listed.

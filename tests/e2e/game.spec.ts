@@ -679,6 +679,13 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#cert')).toBeEnabled();
     await expect(page.locator('#toast')).toContainText('saved');
     expect(await page.evaluate(() => (window as any).__saved)).toMatch(/^sky-ninja-certificate-.*\.png$/);
+    // AND IT GOES AWAY AGAIN. The auto-hide is 1300ms, and nothing asserted it until now: PR #474's round-1
+    // review found that a beat armed under the results screen's own hold was frozen and never armed, so this
+    // toast pinned itself over the modal for the life of the screen — and the untested auto-hide made the
+    // assertion above *steadier* while the behaviour broke. The worst of the four messages is
+    // 'Could not make the certificate', which a child cannot clear by pressing the button again.
+    await expect(page.locator('#toast'), 'the certificate toast hides itself again (PR #474 review, B1)')
+      .not.toHaveClass(/show/, { timeout: 4000 });
     // (b) artifact viewer WITHOUT a downloads grant → the full-screen "press and hold" fallback
     await page.evaluate(() => { (window as any).claude = { use: async () => null }; });
     await page.click('#cert');
@@ -860,6 +867,33 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
     await solveCurrent(page);                                                          // whole sentence, word by word
     await expect(page.locator('#score')).not.toHaveText('0');
+  });
+
+  test('guard rail: a pause inside the outcome hold holds the question — nothing advances behind the overlay (#301)', async ({ page }) => {
+    // #301, the play-screen half of the same defect the duel carries. `hold(true)` paused the ARENA and left
+    // the beats scheduled through `later()` running, so a pause pressed inside the ~1 s outcome hold let
+    // `endWave`'s `clearWave` fire, `session.waveEnd()` advance, and the next question render, be SPOKEN and
+    // spawn its wave with `launchAt` already in the past. The child came back to a wave flying at a question
+    // they had never been shown. #65 stopped the peek's clock under an overlay; the outcome beats were left.
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // #32: real holds — a compressed one is not a hold anybody can press pause inside
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    await waitForTarget(page);
+    expect(await answer(page)).toBe(true);
+    const before = await state(page);
+    expect(before.waiting, 'the verdict is up and the hold has begun — this is the window the bug lives in').toBe(true);
+    await page.click('#pause');
+    await expect(page.locator('#resume')).toBeVisible();
+    // Well past the correct hold AND the inter-question gap. Before the fix index had moved on by here.
+    await page.waitForTimeout(3000);
+    const held = await state(page);
+    expect(held.index, 'the question does not advance behind the overlay').toBe(before.index);
+    expect(held.prompt, 'nor is the next one written onto the card').toBe(before.prompt);
+    expect(await page.evaluate(() => window.__sna.arena.frozen), 'and the sliced wave was never cleared').toBe(true);
+    // And resuming spends the time the hold had LEFT, so the mission carries on rather than stalling.
+    await page.click('#resume');
+    await page.waitForFunction(i => window.__sna.state().index === i + 1 && !window.__sna.state().waiting,
+      before.index as number, { timeout: 5000 });
   });
 
   test('outcome beat: a slice freezes the wave, spotlights the answer and fills in the card before moving on', async ({ page }) => {
@@ -1653,6 +1687,50 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.speech')).toContainText('Mia');
     await page.click('#home');
     await expect(page.locator('#memory small')).toContainText('boards 1');
+  });
+
+  test('guard rail: a Memory board never leaves a short row hanging off one edge (#372)', async ({ page }) => {
+    // Nothing in this repository rendered a Memory board to LOOK at it, so a five-pair deck shipped as
+    // 4 + 4 + 2 with two empty cells beside the last row — the first ragged board the mode had ever had, and
+    // the only one whose card count is not a multiple of four. The existing Memory test above plays Reception
+    // (8 cards, two full rows) and `viewport.spec.ts` seeds a board count into storage without opening the
+    // screen, so both were green throughout. This measures the real boxes.
+    await seedPlayer(page, 'splash', 'Mia');
+    await page.click('.island[data-year="year2"]');
+    // The theme is drawn at random; re-enter until the 3-D board comes up, which is the deck at issue.
+    let theme = '';
+    for (let tries = 0; tries < 60 && theme !== 'shapes'; tries++) {
+      await page.click('#memory');
+      await expect(page.locator('.card').first()).toBeVisible();
+      theme = await page.evaluate(() => window.__sna.theme as string);
+      if (theme !== 'shapes') await page.click('#back');
+    }
+    expect(theme, 'a 3-D shapes board came up inside 60 draws').toBe('shapes');
+    // The count comes from the DECK, not a literal 10 (#372 review round 2, note 2): this is a rail about
+    // GEOMETRY, and a literal would turn it red for a curriculum reason the moment a shape table grew.
+    const cards = await page.evaluate(() => window.__sna.memory.pairs.length * 2);
+    await expect(page.locator('.card')).toHaveCount(cards);
+    const rows = await page.evaluate(() => {
+      const grid = document.querySelector('#cards')!.getBoundingClientRect();
+      const byRow = new Map<number, DOMRect[]>();
+      for (const c of document.querySelectorAll('#cards .card')) {
+        const r = c.getBoundingClientRect(); const key = Math.round(r.y);
+        (byRow.get(key) ?? byRow.set(key, []).get(key)!).push(r);
+      }
+      return [...byRow.entries()].sort((a, b) => a[0] - b[0]).map(([, cards]) => ({
+        n: cards.length,
+        left: Math.round(Math.min(...cards.map(c => c.left)) - grid.left),
+        right: Math.round(grid.right - Math.max(...cards.map(c => c.right))),
+      }));
+    });
+    expect(rows.length, 'the deck fills whole rows of four plus a short one').toBe(Math.ceil(cards / 4));
+    for (const r of rows) {
+      // The gap each side of a row is equal: a full row has none, and a short one is centred rather than
+      // pushed against the left edge with the whole remainder showing on the right.
+      expect(Math.abs(r.left - r.right), `a row of ${r.n} sits centred (left ${r.left}px, right ${r.right}px)`).toBeLessThanOrEqual(2);
+    }
+    expect(rows.map(r => r.n).slice(0, -1).every(n => n === 4), 'every row but the last is full').toBe(true);
+    expect(rows[rows.length - 1].n, 'and the short row is the last one').toBe(cards % 4 || 4);
   });
 
   // #138: the one test that still walks the whole cold start — avatar screen → intro (#67) → sky map → island

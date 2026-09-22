@@ -1,6 +1,6 @@
 // Memory Match: flip two cards, keep the pairs. Pure logic + pair decks (no DOM) so it is unit-testable.
 import type { Rng, YearId } from '../curriculum';
-import { coinLabel, numberWord, OBJECTS, pick, ri, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
+import { coinLabel, numberWord, OBJECTS, pick, ri, SAME_SOLID, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
 
 export interface Face { text: string; say: string; coin?: number; small?: boolean }  // coin = pence, drawn as a coin
 export interface Pair { a: Face; b: Face }
@@ -14,7 +14,31 @@ const objs = (n: number, emoji: string): Face => ({ text: emoji.repeat(n), say: 
 const words = (rng: Rng, from: number, to: number, n: number): Pair[] => shuffle(rng, Array.from({ length: to - from + 1 }, (_, i) => from + i)).slice(0, n).map(v => ({ a: txt(String(v), numberWord(v)), b: txt(numberWord(v), numberWord(v), v > 20) }));
 // Shape tables come from curriculum/util.ts (SHAPES_2D/SHAPES_3D); Memory only needs the glyph + name, so
 // `shapes()` reads the first two members and ignores the extra fact field (sides / faces).
-const shapes = (rng: Rng, list: readonly (readonly [string, string, ...unknown[]])[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(([g, name]) => ({ a: txt(g, name), b: txt(name, name, name.length > 6) }));
+// At most ONE name from `SAME_SOLID` per board (#372). A cube IS a cuboid — the Year 1 NC's own "cuboids
+// including cubes" — so a deck carrying both 🎲/cube and 🧱/cuboid scores a child who pairs 🎲 with "cuboid"
+// a MISS for doing exactly what the curriculum teaches, and `shapes()` pairs one glyph with one name, so only
+// 🎲↔cube counts. `maths.ts` has held the two apart in its decoys since #371; the deck is the other place they
+// can meet. `SHAPES_3D` has exactly six rows, so the Year 2 board is five pairs rather than six — a smaller
+// board, not a wrong one, and Reception already plays four.
+//
+// `SAME_SOLID` is ONE set, deliberately read here as "at most one of these", and this comment does not call it
+// a class (#372 review, note 3): the set cannot express a second group, and its two readers would diverge if
+// one were added — `maths.ts:411` reads it pairwise, this reads it as a union, and with one group those are
+// indistinguishable. A second group needs a `Map<name, groupId>` and both readers changed together, not
+// another name dropped into this set.
+//
+// `max`, not an exact count: the filter can return fewer rows than asked for, which is exactly what makes the
+// Year 2 board five. Each theme's exact size is pinned in `tests/unit/memory.test.ts`.
+const shapes = (rng: Rng, list: readonly (readonly [string, string, ...unknown[]])[], max: number): Pair[] => {
+  const out: Pair[] = [];
+  let solid = false;
+  for (const [g, name] of shuffle(rng, list)) {
+    if (out.length >= max) break;
+    if (SAME_SOLID.has(name)) { if (solid) continue; solid = true; }
+    out.push({ a: txt(g, name), b: txt(name, name, name.length > 6) });
+  }
+  return out;
+};
 const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
 
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
@@ -79,4 +103,31 @@ export function pickTheme(year: YearId, rng: Rng = Math.random, id?: string): Th
   // Fall back to Reception's decks for any year that has no themes yet (e.g. Y3–Y6 before their own are added).
   const list = THEMES[year] ?? THEMES.reception!;
   return list.find(t => t.id === id) ?? pick(rng, list);
+}
+
+/**
+ * How to lay a board of `cards` out: the column count, and the column its last row starts at.
+ *
+ * Four columns was hard-coded with the comment "8 / 12 / 16 cards → 2 / 3 / 4 rows", and that enumeration
+ * stopped being true the moment a deck was not a multiple of four: the Year 2 3-D board is five pairs, which
+ * four columns lay out as 4 + 4 + 2 — a last row shoved left with two empty cells beside it, on the one mode
+ * whose whole visual is a tidy grid (#372 review B1). Pure and unit-tested here rather than inline in
+ * `src/ui/memory.ts`, because "no board lays out ragged" is a claim about arithmetic, not about a screen.
+ *
+ * **Four columns still, for every board, and the short row is CENTRED instead.** Five columns was built and
+ * rendered first, because ten cards divide into 5 x 2 exactly — and it is the wrong answer: at 390px the
+ * cards drop from 82px to 63px and `overflow-wrap: anywhere` breaks the names mid-syllable, `spher/e` and
+ * `cylin/der` and `cuboi/d`, on cards a Year 2 child is there to READ. A centred short row keeps every card
+ * the size it has always been and every word whole. So `cols` is the constant the screen already had, and
+ * `offset` is the only new thing: how far in the last row starts when it does not fill.
+ */
+export function gridFor(cards: number): { cols: number; offset: number; lastRowStart: number } {
+  const cols = 4;
+  const short = cards % cols;
+  // `lastRowStart` is the INDEX of the card the offset applies to, or -1 when the grid comes out square, so
+  // the caller has nothing left to derive (#372 review round 2, note 6). It was `cards % cols` again in
+  // `src/ui/memory.ts`, gated on `offset` being non-zero — which disagree for a row of three, where the row
+  // is short and `Math.floor((4 - 3) / 2)` is 0. Unreachable on a deck of pairs, and not the caller's to
+  // know: this function owns the arithmetic or it owns nothing.
+  return { cols, offset: short ? Math.floor((cols - short) / 2) : 0, lastRowStart: short ? cards - short : -1 };
 }

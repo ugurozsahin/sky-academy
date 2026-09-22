@@ -30,6 +30,30 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
   retries: 0,   // #32: the suite now runs at 4× (tests/e2e set window.__SNA_FAST), so a flake is a real race to fix, not to silently retry
+  // #483. Playwright's default parallelises across FILES only: the tests inside one file are a single
+  // sequential chain on one worker. 97 of this project's 104 mobile tests live in tests/e2e/game.spec.ts, so
+  // the whole e2e step was as long as that one chain no matter how many workers the runner offered — CI's
+  // second worker finished duel.spec.ts inside the first minute and then idled for about six.
+  // What the flag fixes is unambiguous, and it is worker UTILISATION rather than wall clock. Run
+  // 35640634022, flag off: 107 tests summing 466 s of test time against a 416 s step on 2 workers — 56 %,
+  // the idle worker. The same tree with the flag on reaches 98-99 % on every attempt.
+  // What that is WORTH is much smaller on a runner than on a laptop, and the difference is contention:
+  //   - the owner's Mac, --project=mobile at 2 workers: 204 s -> 120/123/123 s, and the test-time sum barely
+  //     moves (226 -> 243 s). A big box runs two browsers for almost the price of one.
+  //   - a 4-vCPU GitHub runner, the same commit re-run three times: 374 / 292 / 254 s, against a twelve-run
+  //     flag-off baseline of 340-437 s (median 406 s). The test-time sum goes 466 s -> 575-731 s, so most of
+  //     the reclaimed idle time is spent again on tests slowing each other down.
+  // So: a real but noisy ~25 % there, ~40 % on a developer machine, and the mechanism is sound in both.
+  // The honest reading of the runner numbers is that it is CPU-bound, not worker-bound — one Chromium plus
+  // the preview server already uses most of 4 vCPUs. More parallelism on ONE runner cannot fix that; more
+  // runners (--shard) could, and that is #81's territory and the owner's call, not this file's.
+  // `workers` is deliberately left at Playwright's default (half the logical cores) — the numbers above are
+  // what the runner already picks, and raising it is a separate decision to be measured on a runner.
+  // What this costs: two tests now share a CPU, so a test whose assertion depends on real wall-clock pacing
+  // can expose a race it used to hide (the frame counters below game.spec.ts:1184 and :1325, the 400 ms
+  // flight sampling at :890). With `retries: 0` (#32) that surfaces as a red build, which is the intent —
+  // a flake here is a race to fix, and the alternative is a green tick that means less.
+  fullyParallel: true,
   reporter: [['list']],
   use: { baseURL, trace: 'retain-on-failure', launchOptions: executablePath ? { executablePath } : {} },
   webServer: { command: `npx vite preview --port ${port} --strictPort`, url: baseURL, reuseExistingServer: true, timeout: 30_000 },
