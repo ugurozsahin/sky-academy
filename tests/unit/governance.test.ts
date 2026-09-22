@@ -4086,18 +4086,18 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
    * (round 2, non-blocking). `text.slice(text.indexOf(a), text.indexOf(b))` with a missing anchor silently
    * widens to "from the top" or "to the end of the file", and the length floors below cannot catch it
    * because the whole document clears them trivially — the absence read as a pass, inside the checks built
-   * to stop exactly that. `lineWith` had the same shape, returning `''` for both "no such paragraph" and
+   * to stop exactly that. `paraWith` had the same shape, returning `''` for both "no such paragraph" and
    * "an empty one", so every call site had to remember to test for it.
    */
   const between = (text: string, from: string, to: string) => {
     const a = text.indexOf(from);
-    const b = to === '' ? text.length : text.indexOf(to, a < 0 ? 0 : a + from.length);
+    const b = text.indexOf(to, a < 0 ? 0 : a + from.length);
     if (a < 0) throw new Error(`section start not found: ${from}`);
     if (b < 0) throw new Error(`section end not found: ${to}`);
     if (b <= a) throw new Error(`section end precedes its start: ${from} … ${to}`);
     return text.slice(a, b);
   };
-  const lineWith = (text: string, needle: string) => {
+  const paraWith = (text: string, needle: string) => {
     const para = text.split('\n\n').find((p) => p.includes(needle));
     if (para === undefined) throw new Error(`no paragraph contains: ${needle}`);
     return para;
@@ -4133,6 +4133,9 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
    * what stops it — `NO_ESCAPE` and slicing to the governing section are.
    */
   const binds = (text: string, subject: string, claim: RegExp) => {
+    // A /g regex keeps `lastIndex` between `test` calls, so looping over occurrences with one would skip
+    // matches silently — under-matching that reads as "the claim is not bound". Refused rather than noted.
+    if (claim.global) throw new Error(`binds() needs a non-global regex, got ${claim}`);
     for (let i = text.indexOf(subject); i >= 0; i = text.indexOf(subject, i + 1)) {
       if (claim.test(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN))) return true;
     }
@@ -4154,8 +4157,8 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
 
   it('every irreversible act sits on the deferred side of the gate, and none on the immediate side', () => {
     const text = doc('docs/REFINER-PROMPT.md');
-    const immediate = lineWith(text, '**Apply immediately**');
-    const deferred = lineWith(text, '**Propose today');
+    const immediate = paraWith(text, '**Apply immediately**');
+    const deferred = paraWith(text, '**Propose today');
     expect(immediate, 'the prompt must carry an "Apply immediately" list').not.toEqual('');
     expect(deferred, 'the prompt must carry a "Propose today, apply tomorrow" list').not.toEqual('');
     expect(text.indexOf('**Apply immediately**'), 'the cheap half is stated first, so the gate reads as an '
@@ -4264,7 +4267,7 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
 
   it('the loosening is recorded where the rule it relaxes lives, and spares `later` (#512)', () => {
     const text = doc('.claude/rules/governance.md');
-    const tools = lineWith(text, 'The three ordering tools');
+    const tools = paraWith(text, 'The three ordering tools');
     expect(tools, 'the ordering-tools rule must say the refiner may now set two of the three')
       .toMatch(/docs\/REFINER-PROMPT\.md/);
     expect(tools, '`later` is the one ordering tool the loosening did not touch — say so, or it drifts in')
@@ -4381,17 +4384,113 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
    * What it cannot do: judge whether a negative is the RIGHT one. It converts "did I remember?" into a
    * counted property, and leaves "is it the correct guard?" to the reviewer, where it belongs.
    */
+  /**
+   * Round 3, B1/B2/B4 and five non-blocking siblings — and the reviewer's framing, which is the finding:
+   * "every fix so far has hardened exactly the assertions its own mutation table touched, and each time the
+   * next round found the ones it didn't."
+   *
+   * Three rounds treated the population as *the rails already written*. It is not. **The population is every
+   * safety-bearing claim in `docs/REFINER-PROMPT.md`** — the sentences the loosening's argument rests on —
+   * and it is enumerable, so it is enumerated here as data rather than as prose spread across nine tests.
+   *
+   * What this buys, and it is the whole point of #526: the set is now **visible and countable**. A reviewer
+   * diffs this table against the document instead of guessing what was swept. A claim added to the document
+   * without a row here is still possible — prose cannot be mined for "safety claim" mechanically — but the
+   * gap is then a missing row someone can see, not an assertion nobody thought to write.
+   *
+   * Each row: where the claim lives, a phrase that must survive, and what must sit beside it. A reversal and
+   * an appended exception both fail it, which is what the last three rounds were about.
+   */
+  const CLAIMS: Array<{ what: string; section: [string, string]; phrase: RegExp; beside?: [string, RegExp];
+                        conditional?: string }> = [
+    // B2 — the reopen guard. Flipping it to "may be proposed again right away" left all ten rails green.
+    { what: 'a reopened issue is never proposed for closing again',
+      section: ['## Two signals that stop you', '## The work'],
+      phrase: /closed and then reopened is never proposed for closing again/ },
+    // B1 — the `blocked` half of the forgery-safety guarantee, called "the same shape" and pinned nowhere.
+    { what: 'blocked is added on a derived blocker and removed only when that blocker closed',
+      section: ['## Two signals that stop you', '## The work'],
+      phrase: /same shape governs `blocked`/,
+      beside: ['same shape governs `blocked`', /has actually closed/] },
+    { what: 'and blocked is never re-applied after a hand changed it back',
+      section: ['## Two signals that stop you', '## The work'],
+      phrase: /never\s*\n?\s*re-apply either after someone has changed it back/ },
+    // B4 — the malformed-ledger-line guarantee, used only as a slice boundary until now.
+    { what: 'an unparseable ledger line fails closed, like a lost ledger',
+      section: ['## The two-phase gate', '## Two signals'],
+      phrase: /a single line you cannot parse/,
+      beside: ['a single line you cannot parse', /drop that line/] },
+    // Non-blocking, taken in the same pass: the population is the document, not the findings list.
+    { what: 'the duplicate survivor is the earlier issue',
+      section: ['## The work', '## Reporting'],
+      phrase: /the earlier issue number is the survivor/ },
+    { what: 'the owner is notified only for a failure to run or a large close',
+      section: ['## Reporting', '## The heartbeat'],
+      phrase: /nothing notifies the\s*\n?owner/,
+      beside: ['a per-run total', /five issues/],
+      conditional: 'the rule IS a conditional — "nothing notifies the owner unless you could not run at '
+        + 'all" — so the escape vocabulary is the claim here, not an exception to it' },
+    { what: 'the forgery-safety argument is scoped to this file and nothing else',
+      section: ['## Two signals that stop you', '## The work'],
+      phrase: /Do not extend this reasoning to anything else/ },
+    { what: 'the pulse and ledger issues are created in one call, never created empty and filled',
+      section: ['## Reporting', '## The heartbeat'],
+      phrase: /[Nn]ever create one empty and fill it afterwards/,
+      beside: ['single `POST /issues`', /title[\s\S]{0,30}body[\s\S]{0,30}labels/] },
+    // The spec gap the reviewer found: the timeline read had no stated failure direction.
+    { what: 'an unreadable events timeline fails closed',
+      section: ['## Two signals that stop you', '## The work'],
+      phrase: /cannot read that timeline/,
+      beside: ['cannot read that timeline', /do not (set|propose)|nothing is set/i] },
+  ];
+
+  it.each(CLAIMS)('the prompt still carries: $what', ({ section, phrase, beside, conditional }) => {
+    const text = doc('docs/REFINER-PROMPT.md');
+    const scope = between(text, section[0], section[1]);
+    expect(scope.length, 'the section must be found, or this row asserts nothing').toBeGreaterThan(200);
+    expect(scope, 'this claim is part of the safety argument the loosening rests on').toMatch(phrase);
+    if (beside) {
+      expect(binds(scope, beside[0], beside[1]),
+        'and the claim must stay attached to what makes it true').toBe(true);
+    }
+    if (!conditional) {
+      const at = scope.search(phrase);
+      const window = scope.slice(Math.max(0, at - SPAN), at + SPAN);
+      expect(window, 'with no exception clause beside it — an addition is how a guarantee dies')
+        .not.toMatch(NO_ESCAPE);
+    }
+  });
+
+  it('the claim table is not allowed to quietly shrink', () => {
+    expect(CLAIMS.length, 'a row removed is a guarantee unpinned — lower this only when the document '
+      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(9);
+    expect(new Set(CLAIMS.map((c) => c.what)).size, 'two rows must not claim the same thing')
+      .toBe(CLAIMS.length);
+  });
+
   it('every rail in this block carries a negative assertion, not only positives', () => {
     const src = doc('tests/unit/governance.test.ts');
     const block = between(src, "describe('the refiner shapes the backlog", '\n});\n');
-    const tests = block.split(/\n  it(?:\.each\([^)]*\))?\(/).slice(1);
+    // Any indentation, not the two spaces this block happens to use (round 3, B3): a test wrapped at
+    // four spaces merged into the previous body string and went uncounted, so the rail reported clean
+    // while a naked positive-only test ran beside it. The split is then CROSS-CHECKED against a raw
+    // count, because a parser that silently sees fewer tests than exist is this rail's own failure mode —
+    // and the rail exists to say that a count is worth more than a promise.
+    const tests = block.split(/\n\s*it(?:\.each\([^)]*\))?\(/).slice(1);
+    const raw = (block.match(/\n\s*it(?:\.each)?\(/g) ?? []).length;
     expect(tests.length, 'the block must be parsed into its tests, or this rail counts nothing')
       .toBeGreaterThanOrEqual(8);
+    expect(tests.length, 'every `it(` in the block must be counted — a test the split cannot see is '
+      + 'exactly the test this rail exists to catch').toBe(raw);
     // One exemption, named rather than silent: this rail itself. Its subject is a count of the others, not
     // a prose policy, so it has no reversal to guard against — and a self-reference would make it vacuous.
-    const SELF = 'every rail in this block carries a negative assertion';
+    // Two exemptions, both named rather than silent: the rails whose subject is a COUNT of the others
+    // rather than a prose policy. Neither has a reversal to guard against, and a self-reference would
+    // make them vacuous.
+    const META = ['every rail in this block carries a negative assertion',
+                  'the claim table is not allowed to quietly shrink'];
     const naked = tests
-      .filter((body) => !body.startsWith(`'${SELF}`))
+      .filter((body) => !META.some((m) => body.startsWith(`'${m}`)))
       .filter((body) => !/\.not\.(toMatch|toContain|toEqual)\(/.test(body))
       .map((body) => body.slice(0, body.indexOf(',')).replace(/['\u0060]/g, '').slice(0, 60));
     expect(naked, 'a rail of positives only cannot tell a statement from its negation — every rail here '

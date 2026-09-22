@@ -78,6 +78,11 @@ For a single proposal there is a lighter signal you can read without being told:
   drops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.
   **The issue's own timeline is repo state, and deriving from state rather than replaying a record is this
   routine's whole method** — the same reason the gate re-derives instead of reading back its reasoning.
+  **If you cannot read that timeline — the call fails, the body will not parse, the page is truncated — then
+  do not set the value.** Say so in your report and move on. An unreadable timeline is the same shape as an
+  unreadable ledger and takes the same answer: the check was not made, so the act does not happen. Reading a
+  failed call as "no change found" is the absence read as a pass, which is the defect this whole project is
+  built around.
 
 **`priority:*` has a harder rule than that, and it is structural rather than remembered:**
 
