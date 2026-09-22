@@ -59,6 +59,22 @@ describe('mission session', () => {
     expect(s.lives).toBe(0);
     expect(ev.onEnd.mock.calls[0][0].won).toBe(false);
   });
+  it('a generator that throws ends the run instead of leaving it frozen mid-question (#444)', () => {
+    const ev = events();
+    const real = topicById('y1-add')!;
+    let calls = 0;
+    const flaky = { ...real, gen: (d: Parameters<typeof real.gen>[0], r: Parameters<typeof real.gen>[1]) => { calls++; if (calls > 1) throw new Error('boom'); return real.gen(d, r); } };
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const s = new Session({ mode: 'mission', year: Y1, topic: flaky, rng: rng(3) }, ev);
+    s.start();
+    expect(s.hit(s.current!.answer)).toBe('correct');   // waiting flips true; the next draw is what throws
+    s.advance();
+    expect(s.ended).toBe(true);
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0].won).toBe(false);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining(real.id), expect.any(Error));
+    spy.mockRestore();
+  });
   it('ignores hits while waiting for the next question', () => {
     const ev = events();
     const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(3) }, ev);
