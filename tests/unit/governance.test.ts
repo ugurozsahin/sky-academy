@@ -3708,6 +3708,13 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     expect(a, 'it is not a verdict').toMatch(/not for a verdict/i);
     expect(a, 'and §5 does not move — no marks, no merge, no review of your own work')
       .toMatch(/never review, mark or merge your own pull request/);
+    // PR #469 round 6, B1: the sole stated reason for writing "unavailable" rather than omitting it was
+    // present in the file but pinned by nothing — a rewrite could drop the equivalence and every assertion
+    // above still passed, because none of them reads this sentence.
+    expect(a, 'the reason itself, not only the instruction it justifies, must be pinned')
+      .toContain('That line is the whole of the evidence');
+    expect(a, 'the equivalence the section states — an agent that never ran and one that found nothing must read the same')
+      .toContain('an agent that never ran and an agent that found nothing produce the same silence');
   });
 
   it('review-pr §3: a sweep is handed over as an issue, which is the only form a reviewer may create', () => {
@@ -3719,6 +3726,13 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     expect(b, 'with a title shape, so two reviewers file the same thing under the same name')
       .toMatch(/sweep: <the class>/);
     expect(b, 'and labels the developer routine can actually select on').toMatch(/`routine-ok`/);
+    // PR #469 round 6, B2: only `routine-ok` was pinned, so the other two labels the bullet names could be
+    // dropped green — and without `tests`/`priority:P3` a sweep issue is free to land unlabelled or at
+    // whatever priority a run guesses, rather than the P3 the governance rule sets for a rail/test finding.
+    expect(b, 'the second required label, or the issue can file without it and still pass this rail')
+      .toMatch(/`tests`/);
+    expect(b, 'the third required label, or a sweep issue is free to land at any priority a run guesses')
+      .toMatch(/`priority:P3`/);
     expect(b, 'and a link from the review comment, which is what makes its absence visible')
       .toMatch(/linked from your review comment/);
     expect(b, 'the cost it removes: today each round enumerates the class again from nothing')
