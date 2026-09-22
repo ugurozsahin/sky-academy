@@ -4385,6 +4385,12 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     { what: "what is out of reach entirely",
       file: "docs/REFINER-PROMPT.md",
       unit: "**Out of reach entirely, whatever else this file says:**" },
+    { what: "pull requests are out of reach",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- every pull request." },
+    { what: "the decision record restates that an existing priority is never touched",
+      file: "docs/decisions/008-the-backlog-is-refined-by-a-routine.md",
+      unit: "- **A missing `priority:*` may be set. An existing one may never be changed** — not behind the gate, not with\n  evidence. If the refiner derives that an existing priority is wrong it comments its reasoning and stops." },
     { what: "the four pulse issues are out of reach",
       file: "docs/REFINER-PROMPT.md",
       unit: "- the four pulse issues — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`,\n  `watchdog: heartbeat`, and your own two below. They are permanently open on purpose and their bodies are\n  deliberately odd, so a \"this claim is no longer true, close it\" pass would kill every one of them. Match\n  them by title, not by label: they carry `watchdog`, and so do real findings." },
@@ -4418,18 +4424,36 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     { what: "a reopened issue is never proposed for closing again",
       file: "docs/REFINER-PROMPT.md",
       unit: "- **An issue that was closed and then reopened is never proposed for closing again.**" },
-    { what: "a changed value is never set again, read from a timeline read to its end",
+    { what: "a changed value is never set again",
       file: "docs/REFINER-PROMPT.md",
-      unit: "- **A value you set, that someone then changed, is never set again.** Read this from\n  `GET /repos/ugurozsahin/sky-academy/issues/<n>/events`, which carries every `labeled` and `unlabeled`\n  event with its label and its time. Not from the ledger: the ledger holds only *outstanding* proposals and\n  drops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.\n  **The issue's own timeline is repo state, and deriving from state rather than replaying a record is this\n  routine's whole method** — the same reason the gate re-derives instead of reading back its reasoning.\n  **A timeline you have not read to the end is a timeline you have not read.** `events` is paginated, and the\n  relabel this rule exists to find is as likely to sit on page three as page one — so follow `Link:\n  rel=\"next\"` until there is no next page. A response that arrives clean, parses clean and is page one of\n  several is the most dangerous shape here, because nothing about it looks like a failure (#513 review, B8).\n  **If you cannot read that timeline to its end — the call fails, the body will not parse, a page is\n  truncated, or a `next` link you cannot follow — then do not set the value.** Say so in your report and move on. An unreadable timeline is the same shape as an\n  unreadable ledger and takes the same answer: the check was not made, so the act does not happen. Reading a\n  failed call as \"no change found\" is the absence read as a pass, which is the defect this whole project is\n  built around." },
+      unit: "- **A value you set, that someone then changed, is never set again.**" },
+    { what: "both signals are read from one timeline and governed by one discipline",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "For a single proposal there are two lighter signals you can read without being told. Both are read from the\nsame place — `GET /repos/ugurozsahin/sky-academy/issues/<n>/events`, which carries every `closed`,\n`reopened`, `labeled` and `unlabeled` event with its time — and **both are governed by every paragraph below\nthem.** The discipline is written once, under both, because it is one discipline: a `reopened` event missed on\npage two closes an issue somebody deliberately reopened, which is exactly as irreversible as re-setting a\nvalue somebody changed, and reading the pagination rule as belonging to the second signal only is the reading\nthat defeats it (#513 review, round 7 B2)." },
+    { what: "the timeline is repo state, never the ledger",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "Read both from that timeline, and neither from the ledger: the ledger holds only *outstanding* proposals and\ndrops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.\n**The issue's own timeline is repo state, and deriving from state rather than replaying a record is this\nroutine's whole method** — the same reason the gate re-derives instead of reading back its reasoning." },
+    { what: "a timeline is followed to its last page",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "**A timeline you have not read to the end is a timeline you have not read.** `events` is paginated, and the\nevent either rule exists to find is as likely to sit on page three as page one — so follow `Link:\nrel=\"next\"` until there is no next page. A response that arrives clean, parses clean and is page one of\nseveral is the most dangerous shape here, because nothing about it looks like a failure (#513 review, B8)." },
+    { what: "an unreadable timeline stops the close and the label alike",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "**If you cannot read that timeline to its end — the call fails, the body will not parse, a page is\ntruncated, or a `next` link you cannot follow — then the proposal it was guarding does not happen.** Not the\nclose, and not the label. Say so in your report and move on. An unreadable timeline is the same shape as an\nunreadable ledger and takes the same answer: the check was not made, so the act does not happen. Reading a\nfailed call as \"no change found\" is the absence read as a pass, which is the defect this whole project is\nbuilt around." },
     { what: "a missing priority may be set",
       file: "docs/REFINER-PROMPT.md",
       unit: "- **You may set a `priority:*` on an issue that has none.** That is the case this authority exists for —\n  nine issues had no priority label on 2026-09-22 and therefore sorted behind all 130." },
     { what: "an existing priority is never changed",
       file: "docs/REFINER-PROMPT.md",
       unit: "- **You may never change one that is already there, and removing one is changing it.** Not behind the gate,\n  not with evidence, not ever. \"Remove `priority:P2`, then set `priority:P1` on an issue that now has none\"\n  is two steps that together do the thing this rule exists to forbid, and reading the rule as silent on\n  removal is the reading that defeats it (#513 review, round 6 B3). An existing `priority:*` is untouchable:\n  not changed, not removed, not replaced. If\n  you derive that an existing priority is wrong, read the timeline above; if the label has not been touched\n  since it was first set, you may **comment your reasoning on the issue and stop.** The owner decides.\n  Applying it is not one of your options." },
-    { what: "the hole is closed by construction, and blocked takes the same shape",
+    { what: "the priority hole is closed by construction, not by memory",
       file: "docs/REFINER-PROMPT.md",
-      unit: "That closes the hole by construction rather than by memory: the moment a human hand touches a priority, the\nlabel exists, and an existing label is out of your reach whatever any record says. A ledger that is lost,\ntruncated or garbled cannot make this rule fail open (#513 review, B1). **The same shape governs `blocked`:**\nadd it when you derive a blocker, remove it only when the blocking issue has actually closed, and never\nre-apply either after someone has changed it back." },
+      unit: "That closes the hole by construction rather than by memory: the moment a human hand touches a priority, the\nlabel exists, and an existing label is out of your reach whatever any record says. A ledger that is lost,\ntruncated or garbled cannot make this rule fail open (#513 review, B1)." },
+    { what: "blocked is not protected the way priority is, and the timeline is all it has",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "**`blocked` reads the same and is not protected the same way. Do not treat it as though it is.** Add it when\nyou derive a blocker, remove it only when the blocking issue has actually closed, and never re-apply either\nafter someone has changed it back — that is the rule, and what enforces it is much weaker. A priority someone\nset is a label that *exists*, and its existence is what stops you, whatever you remember. `blocked` taken off\nby hand leaves the issue in a state that is character for character the state that made you propose the label\nin the first place: the label missing, the body still opening `Blocked by #<n>`, the blocker still open. There\nis nothing on the issue to stop you. **So for `blocked` the timeline above is not a second opinion or a\ncourtesy — it is the only thing between someone's objection and your silent re-application of the label they\nremoved, and a timeline you did not read to its end means you do not add it** (#513 review, round 7 B1)." },
+    { what: "the asymmetry is in the label, and refine-hold is the durable objection",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "That asymmetry is in the shape of the label, not in the wording of this rule, and no rewriting here closes it:\nan objection to a priority is a label left behind, an objection to `blocked` is a label taken away, and an\nabsence cannot be told from a beginning. **The durable form of the objection is `refine-hold`.** So when you\nre-derive `blocked` on an issue whose timeline shows the label was removed while its blocker was still open,\ndo not add it, and say in your comment that `refine-hold` is what makes that decision stick without needing\nanyone to win the same argument again tomorrow." },
     { what: "the forgery-safety argument is scoped to this file",
       file: "docs/REFINER-PROMPT.md",
       unit: "Under #153 one GitHub account serves every agent and the owner, so you **cannot** tell his hand from another\nrun's — `author_association: OWNER` is on every agent's comment too, and the timeline's `actor` is the same\naccount for all of us. That is survivable here and only here, because every authority in this file fails safe\nunder forgery: a forged objection merely stops a change from happening, and you do not need to know **who**\nchanged a label to be stopped by the fact that it changed. There is no approval you can be tricked into,\nbecause you have none to give. Do not extend this reasoning to anything else." },
@@ -4476,16 +4500,18 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
 
   it('the claim table covers the whole population and cannot quietly shrink', () => {
     expect(CLAIMS.length, 'a row removed is a guarantee unpinned — lower this only when the document '
-      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(28);
+      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(36);
     expect(new Set(CLAIMS.map((c) => c.what)).size, 'two rows must not claim the same thing')
       .toBe(CLAIMS.length);
     expect(new Set(CLAIMS.map((c) => c.unit)).size, 'two rows must not pin the same unit — that is one '
       + 'guarantee counted twice, inflating the floor above without covering anything')
       .toBe(CLAIMS.length);
-    // The population spans four files; a table that drifted to one of them would still pass the floor.
-    expect(new Set(CLAIMS.map((c) => c.file)).size, 'the guarantees live in four files and all four must be '
-      + 'covered — the developer query, the watchdog check and the governance record are each half of a rule '
-      + 'whose other half is in the prompt').toBeGreaterThanOrEqual(4);
+    // The population spans five files; a table that drifted to one of them would still pass the floor.
+    // Round 7 added the fifth: `docs/decisions/008-...md` restates priority immutability in its own words,
+    // and the floor of four was satisfied without ever requiring it, so the restatement was unpinned.
+    expect(new Set(CLAIMS.map((c) => c.file)).size, 'the guarantees live in five files and all five must be '
+      + 'covered — the developer query, the watchdog check, the governance record and the decision record are '
+      + 'each half of a rule whose other half is in the prompt').toBeGreaterThanOrEqual(5);
   });
 
   // Structure, not wording: the cheap half is stated first, so the gate reads as an exception to it rather
@@ -4540,10 +4566,14 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
       'every rail in this block pins a unit or carries a negative assertion',
     ]);
     const nameOf = (body: string) => (body.match(/^'([^']*)'/) ?? [, ''])[1];
+    // Round 7, non-blocking: these two patterns were matched as substrings anywhere in a test body, comments
+    // included — so `expect(1).toBe(1)` under a comment mentioning `toContain(unit)` satisfied this rail
+    // without asserting anything. A comment is not an assertion; strip both comment forms before looking.
+    const code = (body: string) => body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
     const naked = tests
       .filter((body) => !META.has(nameOf(body)))
-      .filter((body) => !/\.not\.(toMatch|toContain|toEqual)\(/.test(body))
-      .filter((body) => !/toContain\(unit\)/.test(body))
+      .filter((body) => !/\.not\.(toMatch|toContain|toEqual)\(/.test(code(body)))
+      .filter((body) => !/toContain\(unit\)/.test(code(body)))
       .map(nameOf);
     expect(naked, 'a rail of positives only cannot tell a statement from its negation — every rail here '
       + 'either pins a unit by equality or guards the reversal explicitly').toEqual([]);

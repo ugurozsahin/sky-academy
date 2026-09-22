@@ -68,6 +68,15 @@ considered and rejected for exactly that: its failure direction is *unsafe*, bec
 the refiner overwrites the owner, and it would have made the ledger store a plan, which the gate above forbids
 for the same reason.
 
+**`blocked` gets only the second half, and that is a property of the label rather than a choice made here**
+(#513 review, round 7). The structural half works for `priority:*` because an objection *leaves a label
+behind* and the refiner is barred from every issue that has one. An objection to `blocked` is the label being
+*taken away* — which restores, character for character, the state that triggered the proposal in the first
+place — so there is nothing left on the issue for a structural rule to catch, and the timeline read is the
+whole of the protection. `docs/REFINER-PROMPT.md` says so in as many words rather than implying the two
+labels are equally safe, because a future run that believed they were would treat the timeline read as a
+courtesy. The durable objection to `blocked` is `refine-hold`, which is a label that stays.
+
 Under #153 one GitHub account serves every agent and the owner, so `author_association: OWNER` proves nothing
 and a comment saying "no" could have been written by any run. This is survivable **only** because every
 authority the refiner holds fails safe under forgery: a forged objection stops a change from happening, and

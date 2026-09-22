@@ -69,24 +69,33 @@ direction — the cost is a day, and the alternative is an irreversible act on a
 
 **`refine-hold`** is a standing exemption: never touch that issue again, in any way, until the label comes off.
 
-For a single proposal there is a lighter signal you can read without being told:
+For a single proposal there are two lighter signals you can read without being told. Both are read from the
+same place — `GET /repos/ugurozsahin/sky-academy/issues/<n>/events`, which carries every `closed`,
+`reopened`, `labeled` and `unlabeled` event with its time — and **both are governed by every paragraph below
+them.** The discipline is written once, under both, because it is one discipline: a `reopened` event missed on
+page two closes an issue somebody deliberately reopened, which is exactly as irreversible as re-setting a
+value somebody changed, and reading the pagination rule as belonging to the second signal only is the reading
+that defeats it (#513 review, round 7 B2).
 
 - **An issue that was closed and then reopened is never proposed for closing again.**
-- **A value you set, that someone then changed, is never set again.** Read this from
-  `GET /repos/ugurozsahin/sky-academy/issues/<n>/events`, which carries every `labeled` and `unlabeled`
-  event with its label and its time. Not from the ledger: the ledger holds only *outstanding* proposals and
-  drops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.
-  **The issue's own timeline is repo state, and deriving from state rather than replaying a record is this
-  routine's whole method** — the same reason the gate re-derives instead of reading back its reasoning.
-  **A timeline you have not read to the end is a timeline you have not read.** `events` is paginated, and the
-  relabel this rule exists to find is as likely to sit on page three as page one — so follow `Link:
-  rel="next"` until there is no next page. A response that arrives clean, parses clean and is page one of
-  several is the most dangerous shape here, because nothing about it looks like a failure (#513 review, B8).
-  **If you cannot read that timeline to its end — the call fails, the body will not parse, a page is
-  truncated, or a `next` link you cannot follow — then do not set the value.** Say so in your report and move on. An unreadable timeline is the same shape as an
-  unreadable ledger and takes the same answer: the check was not made, so the act does not happen. Reading a
-  failed call as "no change found" is the absence read as a pass, which is the defect this whole project is
-  built around.
+- **A value you set, that someone then changed, is never set again.**
+
+Read both from that timeline, and neither from the ledger: the ledger holds only *outstanding* proposals and
+drops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.
+**The issue's own timeline is repo state, and deriving from state rather than replaying a record is this
+routine's whole method** — the same reason the gate re-derives instead of reading back its reasoning.
+
+**A timeline you have not read to the end is a timeline you have not read.** `events` is paginated, and the
+event either rule exists to find is as likely to sit on page three as page one — so follow `Link:
+rel="next"` until there is no next page. A response that arrives clean, parses clean and is page one of
+several is the most dangerous shape here, because nothing about it looks like a failure (#513 review, B8).
+
+**If you cannot read that timeline to its end — the call fails, the body will not parse, a page is
+truncated, or a `next` link you cannot follow — then the proposal it was guarding does not happen.** Not the
+close, and not the label. Say so in your report and move on. An unreadable timeline is the same shape as an
+unreadable ledger and takes the same answer: the check was not made, so the act does not happen. Reading a
+failed call as "no change found" is the absence read as a pass, which is the defect this whole project is
+built around.
 
 **`priority:*` has a harder rule than that, and it is structural rather than remembered:**
 
@@ -103,9 +112,24 @@ For a single proposal there is a lighter signal you can read without being told:
 
 That closes the hole by construction rather than by memory: the moment a human hand touches a priority, the
 label exists, and an existing label is out of your reach whatever any record says. A ledger that is lost,
-truncated or garbled cannot make this rule fail open (#513 review, B1). **The same shape governs `blocked`:**
-add it when you derive a blocker, remove it only when the blocking issue has actually closed, and never
-re-apply either after someone has changed it back.
+truncated or garbled cannot make this rule fail open (#513 review, B1).
+
+**`blocked` reads the same and is not protected the same way. Do not treat it as though it is.** Add it when
+you derive a blocker, remove it only when the blocking issue has actually closed, and never re-apply either
+after someone has changed it back — that is the rule, and what enforces it is much weaker. A priority someone
+set is a label that *exists*, and its existence is what stops you, whatever you remember. `blocked` taken off
+by hand leaves the issue in a state that is character for character the state that made you propose the label
+in the first place: the label missing, the body still opening `Blocked by #<n>`, the blocker still open. There
+is nothing on the issue to stop you. **So for `blocked` the timeline above is not a second opinion or a
+courtesy — it is the only thing between someone's objection and your silent re-application of the label they
+removed, and a timeline you did not read to its end means you do not add it** (#513 review, round 7 B1).
+
+That asymmetry is in the shape of the label, not in the wording of this rule, and no rewriting here closes it:
+an objection to a priority is a label left behind, an objection to `blocked` is a label taken away, and an
+absence cannot be told from a beginning. **The durable form of the objection is `refine-hold`.** So when you
+re-derive `blocked` on an issue whose timeline shows the label was removed while its blocker was still open,
+do not add it, and say in your comment that `refine-hold` is what makes that decision stick without needing
+anyone to win the same argument again tomorrow.
 
 Under #153 one GitHub account serves every agent and the owner, so you **cannot** tell his hand from another
 run's — `author_association: OWNER` is on every agent's comment too, and the timeline's `actor` is the same
