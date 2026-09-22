@@ -23,23 +23,58 @@ owner reorders, re-scopes and offers stopgaps there, and a criterion he added in
 body. Then ask what the diff would have to do to satisfy them, and only then read the diff. Reading the diff
 first makes you a proof-reader of the author's plan instead of a check on it.
 
-## 2. Run it yourself, on the head you are judging
+## 2. Run it yourself, on the head you are judging — cheap first, the browser last
 
 ```
 npx tsc --noEmit
 npm test
-npm run build && npx playwright test --project=mobile
+npm run build
+```
+
+Seconds, and they gate everything after them. Run them now. Then §3 and §4 — the diff, and the agents.
+
+**The browser comes after those, because it belongs to the merge decision and not to the block decision
+(#499).** A review that is going to block ends with the author pushing a new commit, so a suite run before the
+block was evidence about a head that no longer exists by the time anyone acts on it. Measured over 45 merged
+pull requests: 51 blocking rounds against 45 merges, so **about half of all reviewer suite runs were on a tree
+replaced within the hour** — and it is the third run of the same suite on that tree, after the author's own
+pre-push run and CI's.
+
+You are not flying blind in the meantime. That head's e2e result is already known: a pull request reaches you
+"Ready for review" only once CI was green on it (`docs/ROUTINE-PROMPT.md` STEP 3), §5's first unmergeable
+condition makes you read that run anyway, and CI tests `refs/pull/N/merge` — the head merged with `main` —
+which is a better tree to have evidence about than the bare branch you checked out.
+
+**No finding? Then run it, as the guarantor before you clear or merge:**
+
+```
+npx playwright test --project=mobile
 npx playwright test --project=desktop        # when the diff could behave differently by viewport
 ```
 
 Take screenshots too if the change is player-visible.
 
-Record what you actually ran. Never write "mobile + desktop" over a mobile-only pass. A pull request runs e2e
-on **mobile only** (#141) and only when the diff can reach the game (#176), so a viewport-sensitive change —
-CSS, layout, canvas maths — has no desktop evidence at all until the nightly unless you produce it. **If the
-browsers are unavailable, write "e2e not run (env)"** — that exact phrase, so a pass and a non-run are never
-the same mark on the page. It is the one place in this file where "did not run" has a prescribed spelling,
-and §4's argument is why it needs one.
+Three cases where your run is the **only** e2e evidence that will ever exist for this tree, so a merge without
+it is a merge on nothing: CI's e2e step was **skipped** by the path filter (#176); the change is
+viewport-sensitive and needs desktop, which a pull request never runs (#141); it is player-visible and wants
+pictures.
+
+**If you have a finding, the suite does not run at all. Report the finding and stop (owner, 2026-09-22).**
+No exception, and in particular not "but the finding is about runtime behaviour". That case is real — "this
+breaks when a child taps twice" is a claim, not a reading of a diff, and §7's bar still wants it evidenced —
+but **the suite is the wrong instrument for it.** 110 tests that exercise something else prove nothing about
+one claim; what evidences it is a targeted reproduction: the smallest thing that makes the defect visible,
+quoted in the comment. Build that. Do not reach for the whole suite because it is the runnable thing nearest
+to hand.
+
+So the suite has exactly one job on a review: **guarantor for a tree you are about to let through.** Findings
+are decided before it and without it.
+
+Record what you actually ran, and when you skipped the browser say that you skipped it and why — a block whose
+report is silent about the suite reads like a block that ran it. Never write "mobile + desktop" over a
+mobile-only pass. **If the browsers are unavailable, write "e2e not run (env)"** — that exact phrase, so a
+pass and a non-run are never the same mark on the page. It is the one place in this file where "did not run"
+has a prescribed spelling, and §4's argument is why it needs one.
 
 ## 3. Attack the change, do not confirm it
 
@@ -59,8 +94,24 @@ The reviews that missed something here all read the diff for whether it works. R
 - **Check the guard rail's reach.** Rails here are text and DOM checks. Ask which spellings and which screens
   this one actually sees, and which plausible rewrite walks straight past it.
 - **A budget number may only go down.** One raised to make a build pass is the finding.
+- **A finding that came from a sweep leaves the sweep behind — as an issue, not a commit.** You enumerated a
+  class to find it: every topic, every spelling, every route. A reviewer run develops nothing and may not
+  push, so the enumeration goes in an issue titled `sweep: <the class>` — the list itself, or the script that
+  produces it — labelled `tests`, `priority:P3` and `routine-ok` so the developer query can reach it, and
+  linked from your review comment. A sweep described only in a comment is
+  re-derived from scratch next round, by you or by whoever supersedes you, and that re-derivation is most of
+  what a four-round pull request costs (#466).
 - **Check the pull request body against the code**, especially "this only documents existing behaviour" and
-  "no look change". A CSS diff of the build output settles the second one in a second.
+  "no look change". A CSS diff of the build output settles the second one in a second. The sweep claim
+  `open-pr` §4 asks for is the same kind: a count with no checked-in enumeration and no method beside it
+  cannot be verified, and `SWEEP: NOT ENUMERABLE` on a class the code plainly can enumerate is the cheap exit
+  taken. **A body that says nothing about the sweep has not done step 4**, and that is the cheapest exit of
+  the three — the marker costs grounds, a count costs a method, silence costs nothing and is read by nobody.
+  Ask for the method before you weigh it, and weigh it by §7's bar like anything else. **The `agents:` line
+  is a claim of the same kind**, and you are the only reader it has: compare it with what §4 returns for you.
+  An author's `nothing` beside two findings of your own is the gap that line was added to expose — and **an
+  absent `agents:` line is the same finding as an absent sweep claim**, for the same reason: `open-pr` §4
+  calls that line the whole of the evidence, so a body without one has no evidence, not good news.
 
 ## 4. Run the three review agents, then check their reachability
 
@@ -79,6 +130,11 @@ They are input to your review, never its verdict. The marks stay yours, and so d
 
 Equally, a finding no agent flagged as critical may still be the one that matters. Rank by what it costs the
 child, not by the label it arrived with.
+
+**Now go back to §2's browser step, knowing which way this review goes.** No finding: run the suite, as the
+guarantor for the tree you are about to let through. **Any finding: do not run it** — report the finding, say
+in the comment that the suite did not run and why, and if the finding needs runtime evidence produce the
+targeted reproduction §2 asks for rather than the suite.
 
 ### Reviewing more than one: one review, one context
 

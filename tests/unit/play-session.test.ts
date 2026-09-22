@@ -59,6 +59,7 @@ function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
     spawnWave(o: WaveOpts) { this.spawned.push(o); }, rush() { return false; }, floatText() {}, reveal() {}, clearWave() {},
   };
   let mounted = true;
+  const holdCalls: boolean[] = [];
   const deps: PlaySessionDeps = {
     training: false, tracing: false, villain: false, av: AVATARS[0],
     els: els as unknown as PlaySessionEls,
@@ -66,11 +67,14 @@ function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
     hold: { correct: 900, wrong: 1200, miss: 900 },
     arena: () => arena as never, mounted: () => mounted,
     later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },
+    // The real one freezes and re-arms these (#301); this stub only records that the screen calls it, which is
+    // what `screen.test.ts` then holds the freezing itself to.
+    holdTimers: (open) => { holdCalls.push(open); },
     toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {}, showResults() {},
     ...over,
   };
   const ps = createPlaySession({ mode: 'mission', year: YEARS[1], stages: 1, topic: { id: 't', title: 't', icon: 't', subject: 'writing', year: 'year1', nc: '', gen } }, deps);
-  return { els: els as Record<keyof typeof els, FakeEl>, arena, ps, unmount: () => { mounted = false; ps.dispose(); } };
+  return { els: els as Record<keyof typeof els, FakeEl>, arena, ps, holdCalls, unmount: () => { mounted = false; ps.dispose(); } };
 }
 
 /** The wave launch waits on the font gate's promise, so a launch is only visible after the microtasks drain. */
@@ -131,7 +135,7 @@ describe('the no-voice sentence peek (#65)', () => {
 
   it('the pause overlay stops the peek clock — the sentence is still there on resume, with its time left', async () => {
     save({ voice: 'no' });
-    const { els, arena, ps } = build(sentenceQ);
+    const { els, arena, ps, holdCalls } = build(sentenceQ);
     ps.session.start(); await settle();
     await vi.advanceTimersByTimeAsync(1000);
     ps.hold(true);
@@ -141,6 +145,10 @@ describe('the no-voice sentence peek (#65)', () => {
     expect(arena.spawned, 'and nothing launches under the overlay').toEqual([]);
     ps.hold(false);
     expect(arena.paused, 'resume: the peek still holds the arena').toBe(true);
+    // #301: the screen's own beats are handed the same open/close, so the outcome hold and the gap freeze with
+    // the arena rather than running behind the overlay. What the freezing itself must do is in `screen.test.ts`;
+    // this is the wiring, which no rail held before.
+    expect(holdCalls, 'the scope is told to freeze and re-arm its beats, in that order').toEqual([true, false]);
     await vi.advanceTimersByTimeAsync(NO_VOICE_PEEK_MS - 1000 - 1);
     expect(els.prompt.innerHTML, 'the remaining 2 s run from the resume, not from the start').toBe(SENTENCE);
     await vi.advanceTimersByTimeAsync(1);

@@ -151,6 +151,22 @@ describe('guard rails', () => {
     expect(body).not.toMatch(/createRadialGradient|measureText/);
   });
 
+  // #348: a label that had to be wrapped reaches the screen only if drawBubble iterates every fitted line
+  // and recentres the block on the disc. Dropping either is a one-line edit that reverts the whole feature,
+  // so the shape is pinned here as well as behaviourally in `arena-spawn.test.ts` (PR #467 review, B2).
+  it('drawBubble draws every fitted line, recentred on the disc (#348)', () => {
+    const src = code(SOURCES['/src/game/arena.ts']);
+    const from = src.indexOf('private drawBubble(');
+    expect(from).toBeGreaterThan(0);
+    const body = src.slice(from, from + 1 + src.slice(from + 1).indexOf('\n  private '));
+    // Both text passes (the dark outline, then the white fill) walk the whole `lines` array…
+    expect([...body.matchAll(/for \(let i = 0; i < lines\.length; i\+\+\) c\.(stroke|fill)Text\(lines\[i\]/g)]).toHaveLength(2);
+    // …and neither draws `b.label`, which is the answer key and not what a wrapped bubble shows.
+    expect(body).not.toMatch(/(stroke|fill)Text\(\s*(b\.label|text)\b/);
+    // …and the block's first baseline is offset by half the stack, not pinned to the single-line one.
+    expect(body).toMatch(/top = 2 - \(lines\.length - 1\) \* lh \/ 2/);
+  });
+
   // #48 review: tapping a TNT threw a ninja star at it, so the bomb burst once from play.ts's BOMB branch and
   // again when the star landed — and the landing fired the avatar's *slice* sound, rewarding the child for
   // hitting the bomb, while the exploded bubble kept falling for the 150 ms flight. The arena now asks
@@ -1063,6 +1079,90 @@ describe('guard rails', () => {
     expect(arena, 'and ordinary play still draws for itself').toMatch(/shared\?\.now \?\? performance\.now\(\), shared\?\.rng \?\? Math\.random/);
   });
 
+  /*
+   * #425/PR #428 — the duel's toast sits in the question bar's own `grid-area: q`, overlapping the card and
+   * neither arena. That placement bought the arenas back the 32px a third grid row had cost them, and it holds
+   * only while the toast stays SHORTER than the strip: a line long enough to wrap grows the `q` row and takes
+   * the height off both children again. The e2e rail measures exactly that, on `DUEL_TOAST_LONGEST` — so this
+   * rail's whole job is to keep that constant the real worst case. A longer line added to `duel.ts` would
+   * otherwise leave the e2e measuring a case that no longer exists, green, which is the shape of the failure
+   * #425 was opened about: "the guard rail that should have caught it did not".
+   */
+  it('the duel e2e probes the longest verdict the screen can actually raise (#425)', () => {
+    const src = SOURCES['/src/ui/duel.ts'] ?? '';
+    expect(src.length, 'duel.ts must be read, not a blank import').toBeGreaterThan(1000);
+    // Read out of the source rather than imported: `src/ui/duel.ts` pulls the arena, the certificate canvas
+    // and the audio graph in behind it, and a rail about a string is not a reason to stand all that up here.
+    // EVERY read below is off `body`, never off `src`. `seat` used to be read raw, so the first `a: '…'`
+    // anywhere in the file — a COMMENT included — became the seat name every `${NAME[player]}` verdict was
+    // measured at, and one comment above `NAME` reading `` {  a: 'P1', b: 'P2' } `` shortened a 44-char
+    // verdict to 38 and slipped it under the bound (PR #428 review, B2). This is a file that quotes code in
+    // its comments as a matter of habit — `src/ui/duel.ts` carries a literal `` `toast(` `` in prose — which
+    // is why the call-site scan below always stripped them. One `body` now, so the three reads cannot
+    // disagree about whether comments count.
+    const body = code(src);
+    const longest = /export const DUEL_TOAST_LONGEST = '([^']*)'/.exec(body)?.[1] ?? '';
+    const seat = /a: '([^']*)'/.exec(body)?.[1] ?? '';
+    expect({ longest: longest.length > 0, seat: seat.length > 0 },
+      'both must be found in the source, or every comparison below is against an empty string').toEqual({ longest: true, seat: true });
+    // Every `toast(` argument in the file, with the two seat names substituted at their real width. Both are
+    // 'Player N', so either stands for both; a name that stopped being fixed-width would need this widened.
+    // All three quote styles, because nothing in this repository makes `toast("…")` unreachable — there is no
+    // linter forbidding double quotes, and a double-quoted 62-char verdict was invisible here (review, note 1).
+    // The substitution handles exactly ONE interpolation shape, `${NAME[…]}`: a verdict that reached a seat
+    // name any other way (a local alias, `NAME.a`, a template helper) is measured at SOURCE length, which
+    // over-states it and so cannot green a real overflow — but it does mean this rail's "every `toast(` in the
+    // file" is exact only for the shapes named here.
+    const raised = [...body.matchAll(/\btoast\(\s*(?:'([^']*)'|"([^"]*)"|`([^`]*)`)/g)]
+      .map(m => (m[1] ?? m[2] ?? m[3]).replace(/\$\{NAME\[[^\]]+\]\}/g, seat))
+      .filter(s => s.length > 0);
+    // 2, not 5: #436 moved the certificate outcome ('Certificate saved!' etc.) off `#toast` entirely — it now
+    // reports through `#cert-msg`, inside the results overlay `#toast` sits BEHIND — so the family this rail
+    // guards has shrunk to the round verdicts that still share the query-bar slot. `onRoundWon`/`onRoundMiss`
+    // are the two left as string literals; the draw verdict raises the constant directly (checked below) rather
+    // than repeating its text, so it is deliberately not double-counted here.
+    expect(raised.length, 'the toast call sites must be found, or this rail passes vacuously').toBeGreaterThanOrEqual(2);
+    // The constant is raised by a real call site, not merely declared beside them.
+    expect(body, 'DUEL_TOAST_LONGEST is what one of those calls passes').toMatch(/toast\(DUEL_TOAST_LONGEST/);
+    for (const s of raised) {
+      expect(s.length, `"${s}" is longer than DUEL_TOAST_LONGEST, so the e2e layout rail no longer measures the worst case`)
+        .toBeLessThanOrEqual(longest.length);
+    }
+    // #436: the certificate outcome must stay off `#toast` — the whole reason it moved — so a regression that
+    // routes it back through `toast(` (where the overlay hides it again) is caught here rather than by a child
+    // never seeing whether their certificate saved.
+    expect(body, 'the certificate outcome is reported through #cert-msg, not the toast the overlay covers')
+      .toMatch(/certMsg\(/);
+    expect(body, 'and never back through toast() — that is the bug #436 fixed')
+      .not.toMatch(/toast\(['"`](?:Certificate|Could not make the certificate)/);
+    // And the e2e really uses it, rather than a copy that drifts the moment this constant changes.
+    const spec = readFileSync(new URL('../e2e/duel.spec.ts', import.meta.url), 'utf8');
+    expect(spec, 'the duel spec imports the constant').toContain("import { DUEL_TOAST_LONGEST } from '../../src/ui/duel'");
+  });
+
+  /*
+   * #436 round-1 review, B1 — `.cert-msg { color: var(--good); ... }` on its own is (0,1,0): one class. The
+   * pre-existing `.modal p { margin: 4px 0 14px; color: var(--muted); ... }` is (0,1,1) — one class AND one
+   * element selector — which beats it regardless of source order, since class-count ties and the tiebreak goes
+   * to the element-selector column. `#cert-msg` is a `<p class="cert-msg">`, so it matches both, and the bare
+   * class silently lost: every successful save/share rendered in `--muted` grey with the wrong margin, and
+   * nothing failed — it just wasn't green. `.modal .cert-msg`, two classes, (0,2,0), wins outright.
+   */
+  it('.cert-msg is qualified enough to beat .modal p, not a bare class a higher-specificity rule can silently win against (#436 review, B1)', () => {
+    const raw = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    expect(raw.length, 'style.css must be read from disk, not a blank import').toBeGreaterThan(5000);
+    // Comments stripped (`code()`): this rule's own explanatory comment names the bare selector in prose, which
+    // would otherwise trip the last assertion below on the very sentence describing why it must not appear.
+    const css = code(raw);
+    expect(css, 'the pre-existing higher-specificity rule this is qualified against must still exist').toMatch(/\.modal p \{/);
+    expect(css, '.cert-msg must be qualified under .modal, not left as a bare one-class selector').toMatch(/\.modal \.cert-msg \{/);
+    expect(css, 'the .bad modifier must be qualified the same way').toMatch(/\.modal \.cert-msg\.bad \{/);
+    // A `.cert-msg` not immediately preceded by `.modal ` would mean the qualifier was dropped again — a
+    // negative lookbehind rather than a bare "not present" check, since `.modal .cert-msg` must NOT itself
+    // count as the regression it is the fix for.
+    expect(css, 'no .cert-msg selector may reappear unqualified by .modal').not.toMatch(/(?<!\.modal )\.cert-msg\b/);
+  });
+
   it('the wave layout draws only from the rng it is given (#43)', () => {
     const src = code(SOURCES['/src/game/arena.ts'] ?? '');
     expect(src.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
@@ -1236,6 +1336,98 @@ describe('guard rails', () => {
       .toMatch(/await expectFitsViewport\(/);
   });
 
+  // #483: Playwright's default parallelises across FILES only — the tests inside one file are a single
+  // sequential chain on one worker. 97 of the mobile project's 104 tests live in tests/e2e/game.spec.ts, so
+  // with the flag off the e2e step is as long as that one chain however many workers the runner offers, and
+  // the rest idle: CI run 35640634022 paid 416 s of a 488 s job while worker 2 sat done after 57 s.
+  // This is worth a rail because turning it back off breaks NOTHING that goes red. The suite still passes,
+  // just three times slower, and a regression whose only symptom is a bill is one nobody files.
+  //
+  // **The first version of this rail matched TEXT, and review of PR #487 found three ways round it in one
+  // round** — a spread defined above `defineConfig(` and mixed into a project; a spec in a subdirectory the
+  // non-recursive `readdirSync` never saw; and a `//` inside a string, which `code()` strips to end of line,
+  // hiding the very call being searched for. Each was real and each was reproduced with the rail green.
+  //
+  // They are not three bugs. They are three members of ONE class — ways to write a thing so that a regex
+  // does not see it — and in a Turing-complete language that class has no end: patch three spellings and a
+  // fourth exists. So the fix is not a fourth regex. It is to **stop reading the text and read the value**:
+  // import the config and ask what Playwright will actually resolve. A spread resolves. An indirection
+  // resolves. A computed value resolves. A comment cannot lie to it because no comment is read.
+  //
+  // Round 2 found the SECOND lever still failing the first way, and named the shape better than round 1 did:
+  // a check that **substitutes a placeholder for a value it does not recognise** cannot fail on the values it
+  // does not recognise. `workers` is typed `number | string` and a percentage is resolved against the
+  // runner's cores at run time, so `'50%'` is one worker on a two-core box — and this rail used to default
+  // any non-number to a passing `2`. One rule now covers both levers: **what this rail cannot judge, it
+  // refuses.** Not a number above 1, or a worker flag on the command line in any spelling — red, and say so.
+  //
+  // The ceiling of "read the resolved value", stated because the next rail to use the technique should know
+  // it: a config that reads its own importer (`process.env.VITEST ? … : …`) resolves one way here and
+  // another under Playwright. Nothing in this file can close that, and nothing pretends to.
+  //
+  // What is left textual is the spec half, and deliberately: Playwright's reporters do not expose a file's
+  // parallel mode, so there is nothing to ask. That half reads RAW text rather than `code()` — the opposite
+  // trade from the first version and the right way round for a guard rail. Raw text can produce a false
+  // POSITIVE (the word in a comment turns it red, and somebody rewords the comment); `code()` produced a
+  // false NEGATIVE (the defect ships green), which is the failure this whole file exists against.
+  it('the e2e suite parallelises inside a file, not only across files (#483)', async () => {
+    // The resolved config, not its source text. `defineConfig` returns the object; importing it runs the
+    // port derivation at the top of the file, which is pure.
+    const cfg = (await import('../../playwright.config')).default;
+    expect(cfg.fullyParallel, 'fullyParallel must be on at the top level — with it off, 97 of the suite\'s tests are one sequential chain on one worker (#483)').toBe(true);
+    expect(cfg.projects?.length, 'the config must still declare its projects, or this rail checks nothing').toBeGreaterThanOrEqual(4);
+    for (const p of cfg.projects ?? []) {
+      // `?? cfg.fullyParallel` is how Playwright resolves it: a project that says nothing inherits the top
+      // level. A project that says `false` governs itself alone, and every OTHER project would still look
+      // fine — which is exactly what the text version could not see through a spread.
+      expect(p.fullyParallel ?? cfg.fullyParallel, `project '${p.name}' resolves fullyParallel to false — however it is spelt, that project is back to one file at a time (#483)`).toBe(true);
+    }
+    // Same class, other lever: one worker makes the flag moot without touching it. `workers` is typed
+    // `number | string` and a percentage is resolved against the runner at RUN time (`resolveWorkers`,
+    // playwright/lib/common/config.js), so no value this rail can see tells it how many workers a runner
+    // will get. Unset is the default — half the logical cores — and is what every #483 measurement was
+    // taken at. So the rule is not "is it 1?" but "can this rail judge it at all?", and an unjudgeable
+    // value fails. `? cfg.workers : 2` here used to hand a passing number to every value it did not
+    // understand, which is the defect the config half above was rewritten to remove, in the same rail.
+    expect(cfg.workers === undefined || (typeof cfg.workers === 'number' && cfg.workers > 1),
+      `workers is ${JSON.stringify(cfg.workers)} — leave it unset, or give a plain number above 1. One worker runs the suite a test at a time with fullyParallel still resolving true, and a percentage takes its meaning from the runner, so this rail cannot approve it on sight (#483)`).toBe(true);
+    // ...and the same lever on the command line, where no config rail can see it. "No worker flag at all"
+    // rather than "not --workers=1": the flag has a short form (`-j`), takes `=` or a space, and a
+    // percentage means whatever the runner makes it — so there is no value this rail could approve by
+    // reading. ci.yml passes none today, and every #483 measurement was taken with none.
+    const e2eStep = workflow('ci.yml').split('\n').filter(l => l.includes('playwright test')).join('\n');
+    expect(e2eStep, 'the rail must have found the e2e command in ci.yml').toContain('playwright test');
+    expect(e2eStep, "ci.yml's e2e command must pass no worker flag at all — `--workers` or `-j`, in any spelling, is #483 undone from the command line where no config rail can see it (#483)")
+      .not.toMatch(/--workers|(?<![\w-])-j/);
+
+    // The spec half. RECURSIVE, because Playwright's own discovery is: a spec under tests/e2e/sub/ runs, and
+    // the first version of this rail never opened it. Raw text, quote-agnostic: `mode: "serial"` type-checks
+    // just as well as `mode: 'serial'`, `describe.serial` is a third spelling and `describe['serial']` a
+    // fourth (round 2 — semantically identical, and the dot form is what the regex used to want).
+    //
+    // `isDirectory()` deliberately, WITHOUT `isSymbolicLink()`. That looks like the same non-recursive gap
+    // one level down, and it was raised as one — but measured, Playwright does not follow a symlinked
+    // directory either: `--list` reports the same 106 tests with `tests/e2e/link -> /tmp/outside` present as
+    // without it, that directory's spec included. This walk is meant to mean "everything Playwright would
+    // discover", so following the link would make the rail STRICTER than the thing it models and turn red
+    // on a file that never runs. If Playwright's discovery ever changes, this changes with it.
+    const dir = new URL('../../tests/e2e/', import.meta.url);
+    const specs: string[] = [];
+    const walk = (rel: string) => {
+      for (const e of readdirSync(new URL(rel, dir), { withFileTypes: true })) {
+        if (e.isDirectory()) walk(`${rel}${e.name}/`);
+        else if (e.name.endsWith('.spec.ts')) specs.push(`${rel}${e.name}`);
+      }
+    };
+    walk('');
+    expect(specs.length, 'the e2e specs must be read from disk — an empty walk would pass vacuously').toBeGreaterThanOrEqual(3);
+    const serial = specs.filter(f =>
+      /mode:\s*['"`]serial['"`]|describe\s*(?:\.\s*serial\b|\[\s*['"`]serial['"`]\s*\])/
+        .test(readFileSync(new URL(f, dir), 'utf8')));
+    expect(serial, 'no e2e spec may re-serialise itself — that undoes #483 for that file with the config still resolving true. If a flow genuinely needs ordering, scope it to its own describe and name it here with the reason')
+      .toEqual([]);
+  });
+
   // #138: fast mode (#32) is only sound while it is a *pure time compression* — the same game, fewer seconds.
   // It shipped with two leaks. `layoutWave` divided the flight time but left `vx` in px/second, so at 4x a
   // bubble drifted a quarter as far sideways as a child ever sees; and a handful of `later(...)` beats in
@@ -1243,6 +1435,69 @@ describe('guard rails', () => {
   // Neither failed anything — which is exactly what makes them worth a rail. A test written against the
   // compressed trajectory would have been asserting a path the game does not have, and the next beat added
   // in real time would be just as invisible as these were.
+  /**
+   * #301's hold, wired — and the two shapes of it no other unit test can see (PR #474 round-1 review).
+   *
+   * Reverting the user-visible half of #301 outright — `holdTimers` a no-op in `play.ts`, `scope.holdTimers`
+   * deleted from `duel.ts` — left the whole unit suite green at 1,931: only the two new e2e specs caught it,
+   * and a `testIgnore` could quietly drop those (review, note 7). The terminal-hold rule had nothing at all:
+   * `hold(true)` at the results screen froze beats no resume would ever re-arm, so the sticker jingle never
+   * played and every results toast pinned itself over the modal — and CI stayed green through both, because
+   * nothing asserted that a toast goes AWAY. Text checks, like every rail in this file: they hold the exact
+   * call sites named in their comments, and say nothing about a third screen or a new way to arm a beat.
+   */
+  it('both game screens put their beats on the hold, and take the terminal hold off it (#301, PR #474 review B1)', () => {
+    const play = code(SOURCES['/src/ui/play.ts'] ?? '');
+    const playSession = code(SOURCES['/src/ui/play-session.ts'] ?? '');
+    const duel = code(SOURCES['/src/ui/duel.ts'] ?? '');
+    expect({ play: play.length > 1000, playSession: playSession.length > 1000, duel: duel.length > 1000 },
+      'all three must be read, not blank imports').toEqual({ play: true, playSession: true, duel: true });
+    // Wired at all: the pause hold reaches the beat clock on both screens.
+    expect(playSession, "play-session's hold drives the screen's beats, not only the arena").toMatch(/\bdeps\.holdTimers\(open\)/);
+    expect(play, "and play.ts hands the scope's holdTimers to the session").toMatch(/\bholdTimers\b/);
+    expect(duel, "the duel's hold drives them too").toMatch(/\bscope\.holdTimers\(open\)/);
+    // And taken OFF it where the hold is TERMINAL. `showResults` never reopens — both screens offer only
+    // Play again and Islands, and both go straight to cleanup — so a beat armed after it has no resume.
+    expect(play, 'the play results hold does not freeze the beats it is about to arm')
+      .toMatch(/playSession\.hold\(true,\s*false\)/);
+    expect(duel, 'nor does the duel results hold').toMatch(/\bhold\(true,\s*false\)/);
+    // The beat that proved it, still inside the results path on both screens. Named so that moving it out is
+    // a deliberate act rather than something this rail silently stops covering.
+    for (const [name, src] of [['play.ts', play], ['duel.ts', duel]] as const) {
+      const at = src.indexOf('function showResults');
+      expect(at, `${name} still has a showResults for this rule to be about`).toBeGreaterThan(-1);
+      expect(src.slice(at), `${name}'s results screen still arms the unlock jingle after its hold`)
+        .toMatch(/later\(\(\) => sfx\.stage\(\)/);
+    }
+  });
+
+  /**
+   * #301's one gap, closed in PR #474's round 1 (review, B2): the first wave's font gate.
+   *
+   * `fontReady()` is a promise, and a raw `.then()` continuation is guarded by `mounted()`/`waveId` and by
+   * nothing that reads the hold — so a pause pressed inside that gate, up to the 1200 ms cap on a cold font
+   * cache, spoke the question and launched the wave behind the overlay, which is the very symptom #301's
+   * docblock says it removes. Routed through `later(..., scaled(0))` it defers instead of dropping. A text
+   * check: it holds that the two known gates go through the beat clock, not that no third way to spawn exists.
+   */
+  it('the font-gated first spawn goes through the beat clock, not straight out of the promise (#301, PR #474 review B2)', () => {
+    for (const [name, path] of [['play-session.ts', '/src/ui/play-session.ts'], ['duel.ts', '/src/ui/duel.ts']] as const) {
+      const src = code(SOURCES[path] ?? '');
+      expect(src.length, `${name} must be read, not a blank import`).toBeGreaterThan(1000);
+      // EVERY occurrence, not the first. `play-session.ts` has two — `fontReady().then(() => { fontsReady =
+      // true; })`, which sets the flag and launches nothing, and the gate itself — and slicing by first match
+      // read the wrong one, green. That is the same trap #395 files against the prose rails, met here.
+      const gates = [...src.matchAll(/fontReady\(\)\.then\(/g)].map(m => m.index ?? -1);
+      expect(gates.length, `${name} still gates on fontReady at all`).toBeGreaterThan(0);
+      const launching = gates.filter(at => /\bspawn(Wave)?\(/.test(src.slice(at, at + 900)));
+      expect(launching.length, `${name} has a fontReady gate that goes on to launch a wave`).toBe(1);
+      // The beat clock must be the FIRST thing inside that continuation, not something reached later in it.
+      expect(src.slice(launching[0], launching[0] + 80).replace(/\s+/g, ' '),
+        `${name}'s font gate hands its continuation to later(), so a pause inside the gate holds the spawn`)
+        .toMatch(/^fontReady\(\)\.then\(\(\) => (deps\.)?later\(/);
+    }
+  });
+
   it('fast mode compresses time only — the drift scales with it and no beat is left in real time (#138)', () => {
     const arena = code(SOURCES['/src/game/arena.ts'] ?? '');
     expect(arena.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);

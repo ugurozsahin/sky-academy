@@ -445,7 +445,10 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       // against a 151-entry list — and `p_ove` was offering `o` the whole time. `hore` is settled the same
       // way rather than left for the next sweep to re-find: not a dictionary word, an exact homophone of
       // this set's first member, and blocked because `AVOID` is about what a card can show.
-      ['prove', 1, 'o'], ['here', 1, 'o']] as [string, number, string][]) {
+      ['prove', 1, 'o'], ['here', 1, 'o'],
+      // #416: found driving the real generator 300,000 times — `poove` above (from `prove@1`) had already
+      // closed the family, but `poor@3` still offered `v`, spelling `poov`, the clipped form of the same slur.
+      ['poor', 3, 'v']] as [string, number, string][]) {
       expect(GAP_WORDS.has(w.slice(0, i) + l + w.slice(i + 1)), `${w.slice(0, i)}_${w.slice(i + 1)}: ${l} belongs in AVOID, not the word lists`).toBe(false);
       expect(gapLetters(w, i), `${w.slice(0, i)}_${w.slice(i + 1)} may never offer ${l}`).not.toContain(l);
     }
@@ -461,7 +464,10 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     const R_POOL = (i: number) => (i === 0 ? R_LETTERS_P2 : i === 1 ? ['a', 'e', 'i', 'o', 'u'] : R_LETTERS_ALL);
     for (const [w, i, l] of [['cup', 2, 'm'], ['cup', 2, 'n'], ['pot', 2, 'o'], ['pan', 2, 'p'], ['pan', 2, 'k'],
       ['bus', 2, 'm'], ['jam', 2, 'p'], ['bug', 2, 'm'], ['van', 2, 'g'], ['put', 2, 's'],
-      ['pig', 0, 'n'], ['hen', 1, 'u'], ['cow', 2, 'k'], ['cow', 2, 'c']] as [string, number, string][]) {
+      ['pig', 0, 'n'], ['hen', 1, 'u'], ['cow', 2, 'k'], ['cow', 2, 'c'],
+      // #443: the fifth sweep, and this stem was reachable through the whole fourth (#418/#419) — `le_`
+      // offered `z`, a slur, to a Reception card.
+      ['leg', 2, 'z']] as [string, number, string][]) {
       const filled = w.slice(0, i) + l + w.slice(i + 1);
       const gap = `${w.slice(0, i)}_${w.slice(i + 1)}`;
       expect(AVOID.has(filled), `${gap}: ${l} spells ${filled}, which belongs in AVOID`).toBe(true);
