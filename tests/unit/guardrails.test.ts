@@ -2322,13 +2322,18 @@ describe('the tracing pad cannot silently return to the phone column, and the fi
   const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
-  it('a wide-viewport media query widens .play.tracing .hud and .trace-wrap past 560px', () => {
+  it('a wide-viewport media query widens .play.tracing .hud and .trace-wrap to close to 880px, not merely past 560px', () => {
     const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*\.play\.tracing\s*\.hud,\s*\.play\.tracing\s*\.trace-wrap\s*\{([^}]*)\}/);
     expect(block, 'the #18 group A tracing rule must stay a min-width: 900px block over .play.tracing .hud, .play.tracing .trace-wrap').toBeTruthy();
-    expect(block![1], 'the widened cap must still be a max-width')
-      .toMatch(/max-width:\s*min\(\s*\d{3,4}px\s*,/);
-    expect(block![1], 'the widened cap must be bigger than the 560 px column it replaces')
-      .not.toMatch(/max-width:\s*min\(\s*(?:[0-4]?\d{1,2}|5[0-5]\d|560)px/);
+    const cap = block![1].match(/max-width:\s*min\(\s*(\d{3,4})px\s*,/);
+    // #534 review (pr-test-analyzer): a bound that only ruled out `<= 560px` still passed a hand-edit down to
+    // 600px — barely more than the old phone column and nowhere near the 880px this PR ships and measures in
+    // its own body. A range around 880 catches that regression while still allowing a genuine future retune.
+    expect(cap, 'the widened cap must still be a max-width: min(NNNpx, ...)').toBeTruthy();
+    expect(Number(cap![1]), 'the widened cap must stay close to the shipped 880px, not merely wider than 560px')
+      .toBeGreaterThanOrEqual(850);
+    expect(Number(cap![1]), 'the widened cap must stay close to the shipped 880px, not merely wider than 560px')
+      .toBeLessThanOrEqual(920);
   });
 
   it('--arena-w stays at 600px, untouched by the tracing-pad widening', () => {

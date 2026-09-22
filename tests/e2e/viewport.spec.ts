@@ -278,8 +278,15 @@ test.describe('tablet viewports (#116)', () => {
    * 600 px) is deliberately NOT touched or measured here: a tracing screen renders no `#arena` canvas, so
    * widening `.trace-wrap`/`.hud` for `.play.tracing` alone cannot change bubble speed or spawn spread —
    * only the arena screens still carry the old cap, which the second assertion below pins.
+   *
+   * #534 review (pr-test-analyzer): a bare `> 560` bound here (and in the matching guard rail) stayed green
+   * against a hand-edit of the shipped CSS down to `min(600px, ...)` — barely more than the old phone column
+   * and nowhere near what the fix actually ships. `.trace-wrap`'s rendered width is 816px, not the 880px the
+   * CSS source names, because it sits inside `.hud`'s own `min(880px, 100% - 40px)` and then applies its own
+   * `100% - 40px` branch against that already-narrower container (measured directly, both viewports below).
+   * `TRACE_TARGET`/`TRACE_TOLERANCE` pin that rendered value rather than merely ruling out the old one.
    */
-  const OLD_TRACE_CAP = 560;
+  const TRACE_TARGET = 816, TRACE_TOLERANCE = 30;
 
   for (const [w, h] of [[1280, 800], [1024, 768]] as const) {
     test(`the tracing pad uses a ${w}x${h} landscape window, not a 560 px column (#18 group A)`, async ({ page }) => {
@@ -288,8 +295,10 @@ test.describe('tablet viewports (#116)', () => {
       await startTopic(page, 'reception', 'r-trace', 'writing');
       await expect(page.locator('.trace-wrap')).toBeVisible();
       const wrap = await page.locator('.trace-wrap').boundingBox();
-      expect(wrap!.width, `.trace-wrap at ${w}x${h}: still the ${OLD_TRACE_CAP} px phone column (#18 group A)`)
-        .toBeGreaterThan(OLD_TRACE_CAP);
+      expect(wrap!.width, `.trace-wrap at ${w}x${h}: should be close to ${TRACE_TARGET}px, not the 560px phone column or some other regressed value (#18 group A)`)
+        .toBeGreaterThanOrEqual(TRACE_TARGET - TRACE_TOLERANCE);
+      expect(wrap!.width, `.trace-wrap at ${w}x${h}: should be close to ${TRACE_TARGET}px, not wider than intended (#18 group A)`)
+        .toBeLessThanOrEqual(TRACE_TARGET + TRACE_TOLERANCE);
       await expectFitsViewport(page, `tracing screen at ${w}x${h}`);   // widening must not start an overflow
 
       // the bubble arena is a different screen and keeps its own 600 px cap — this pull request never reads it.
