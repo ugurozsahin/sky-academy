@@ -2308,6 +2308,43 @@ describe('the landscape screen width cannot silently return to the phone column 
 });
 
 /*
+ * #18 slice 2, group A — the tracing pad, group A's other look-changing cap (the arena's 600 px stays
+ * `owner-approval` and unstarted). Same shape as the rail above and for the same reason: the only
+ * behavioural check is `tests/e2e/viewport.spec.ts`, which the `mobile`/`desktop` projects a pull request
+ * runs skip entirely (`.claude/rules/e2e.md`), so a revert here would ship green.
+ *
+ * The rail holds two things a revert or a careless edit could break independently: the tracing pad widens
+ * past 560 px on a wide viewport, and `--arena-w` (the bubble arena's own cap, which this change must never
+ * touch — a tracing screen renders no `#arena` canvas, so there is no reason for this rule to reach it)
+ * stays at exactly 600 px.
+ */
+describe('the tracing pad cannot silently return to the phone column, and the fix cannot silently reach the arena (#18)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  it('a wide-viewport media query widens .play.tracing .hud and .trace-wrap to close to 880px, not merely past 560px', () => {
+    const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*\.play\.tracing\s*\.hud,\s*\.play\.tracing\s*\.trace-wrap\s*\{([^}]*)\}/);
+    expect(block, 'the #18 group A tracing rule must stay a min-width: 900px block over .play.tracing .hud, .play.tracing .trace-wrap').toBeTruthy();
+    const cap = block![1].match(/max-width:\s*min\(\s*(\d{3,4})px\s*,/);
+    // #534 review (pr-test-analyzer): a bound that only ruled out `<= 560px` still passed a hand-edit down to
+    // 600px — barely more than the old phone column and nowhere near the 880px this PR ships and measures in
+    // its own body. A range around 880 catches that regression while still allowing a genuine future retune.
+    expect(cap, 'the widened cap must still be a max-width: min(NNNpx, ...)').toBeTruthy();
+    expect(Number(cap![1]), 'the widened cap must stay close to the shipped 880px, not merely wider than 560px')
+      .toBeGreaterThanOrEqual(850);
+    expect(Number(cap![1]), 'the widened cap must stay close to the shipped 880px, not merely wider than 560px')
+      .toBeLessThanOrEqual(920);
+  });
+
+  it('--arena-w stays at 600px, untouched by the tracing-pad widening', () => {
+    const play = bare.match(/(?:^|[}\s])\.play\s*\{([^}]*)\}/)?.[1];
+    expect(play, 'the base .play rule must exist').toBeTruthy();
+    expect(play, 'the bubble arena keeps its own 600 px cap — this fix has no reason to touch it')
+      .toMatch(/--arena-w:\s*600px/);
+  });
+});
+
+/*
  * #399: `--sal`/`--sar` were read at `.cert-view` (`var(--sal, 0px)`/`var(--sar, 0px)`) but never declared
  * beside `--sat`/`--sab` in `:root` — an undefined custom property with no fallback in the `var()` that
  * reads it is invalid at computed-value time and falls back to nothing at all, silently. Neither Playwright
