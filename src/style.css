@@ -1326,9 +1326,13 @@ img { -webkit-user-drag: none; }
    itself, so its stuck box held a fixed on-screen band for most of the scroll range — reordering DOM only
    changed which *other* element's static position fell inside that band, it never stopped the overlap.
    `.row.nav` is now a flex sibling OUTSIDE the scrolling region (`.scroll` is the only thing that scrolls),
-   so nothing can ever be positioned underneath it: the overlap is structurally impossible, not just moved. */
+   so nothing can ever be positioned underneath it: the overlap is structurally impossible, not just moved.
+   #398 round 3, B1: `.scroll` itself declared no `position`, so `.results .ko`'s `position: absolute` skipped
+   past it to `.modal.results` (the nearest ancestor that IS positioned) instead of scrolling with the hero
+   art it decorates — a Boss Battle win's K.O. stamp stayed pinned to the modal's corner while `.hero-big`
+   scrolled away underneath it. `.scroll` is the containing block it needs to be now. */
 .modal.results { max-height: 100%; overflow: hidden; display: flex; flex-direction: column; }
-.modal.results .scroll { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+.modal.results .scroll { position: relative; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .modal.results .row.nav {
   flex: 0 0 auto;
   margin: 14px -18px -22px;

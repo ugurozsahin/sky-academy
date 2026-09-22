@@ -667,7 +667,11 @@ test.describe('Sky Ninja Academy', () => {
     // `getBoundingClientRect()` values they are compared against are not, so the very last step or two of a
     // sweep can read a few px "short" of the scroller's box with no scroll position actually cutting it off.
     const slack = 24;
-    for (let top = 0; top <= maxScroll; top += 15) {
+    // `maxScroll` itself is always swept explicitly (round 3 review, non-blocking B2): a fixed stride can
+    // land short of it by up to (stride - 1)px on a viewport/content combination where `maxScroll` is not a
+    // multiple of the stride, which left the last few pixels of real scroll range untested.
+    const steps = []; for (let top = 0; top < maxScroll; top += 15) steps.push(top); steps.push(maxScroll);
+    for (const top of steps) {
       await scroller.evaluate((el, t) => { el.scrollTop = t; }, top);
       const stepBox = (await results.locator('#cert').boundingBox())!;
       const onScreen = stepBox.y >= scrollerBox.y - slack && stepBox.y + stepBox.height <= scrollerBox.y + scrollerBox.height + slack;
@@ -1657,6 +1661,44 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.speech')).toContainText('K.O.');
     await page.click('#home');
     await expect(page.locator('#boss small')).toContainText('KOs 1');
+  });
+
+  /**
+   * guard rail (#398 round 3, B1). `.ko` is `position: absolute`, and its containing block moved when the
+   * overlay became a `.modal.results` > `.scroll` > (content) shell (round 2): `.scroll` declared no
+   * `position`, so `.ko` skipped past it to `.modal.results` itself and stayed pinned to the modal's corner
+   * while the hero art it decorates scrolled away underneath it. Coverage was a real gap on both axes: the
+   * only test that renders `.ko` (above) never overflows the overlay, and neither scroll-sweep test (this
+   * file's mission one, `duel.spec.ts`'s) ever renders `.ko`. A 118-coin purse crosses the 120-coin sticker
+   * threshold on the KO's own payout, which is enough on its own to overflow a 390x664 viewport.
+   */
+  test('Boss Battle: the K.O. badge scrolls with the hero art it is stamped on, not pinned to the modal (#398)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 118 });
+    await page.click('.island[data-year="year2"]');
+    await page.click('#boss');
+    await expect(page.locator('.villain.boss img')).toBeVisible();
+    await page.waitForFunction(() => window.__sna.state().bossHp === 8);
+    await page.evaluate(() => { window.__sna.session.bossHp = 1; });   // skip straight to the final blow
+    await solveCurrent(page);
+    const results = page.locator('.results');
+    await expect(results.locator('h2')).toHaveText('Knock-out!');
+    await expect(results.locator('.ko')).toBeVisible();
+    const scroller = results.locator('.scroll');
+    const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(maxScroll, 'this seed must actually overflow the overlay, or the sweep below proves nothing').toBeGreaterThan(0);
+    const gap = async () => {
+      const ko = (await results.locator('.ko').boundingBox())!;
+      const hero = (await results.locator('.hero-big').boundingBox())!;
+      return ko.y - hero.y;
+    };
+    const gapAtTop = await gap();
+    await scroller.evaluate((el, t) => { el.scrollTop = t; }, maxScroll);
+    const gapAtBottom = await gap();
+    // Pinned to the modal (the round 3 defect) holds `.ko` at a near-constant screen position while `.hero-big`
+    // moves the full `maxScroll` distance underneath it, so the gap changes by roughly `maxScroll`. Scrolling
+    // correctly with the content keeps the two in lock-step, so the gap barely moves at all.
+    expect(Math.abs(gapAtBottom - gapAtTop), `the K.O. badge must scroll with the hero art (gap moved by ${gapAtBottom - gapAtTop}px, `
+      + `not the modal's fixed position (which would move it close to maxScroll = ${maxScroll}px)`).toBeLessThan(10);
   });
 
   test('Memory Match: cards flip, a miss turns back, pairs lock, and the finished board is counted', async ({ page }) => {

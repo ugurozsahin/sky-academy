@@ -702,7 +702,9 @@ test.describe('Ninja Duel', () => {
     let sawCertOnScreen = false;
     // See the matching sweep in game.spec.ts for why this tolerance is wider than one pixel.
     const slack = 24;
-    for (let top = 0; top <= maxScroll; top += 15) {
+    // `maxScroll` itself is always swept explicitly (round 3 review, non-blocking B2) — see game.spec.ts.
+    const steps = []; for (let top = 0; top < maxScroll; top += 15) steps.push(top); steps.push(maxScroll);
+    for (const top of steps) {
       await scroller.evaluate((el, t) => { el.scrollTop = t; }, top);
       const certBox = (await page.locator('.duel-end #cert').boundingBox())!;
       const onScreen = certBox.y >= scrollerBox.y - slack && certBox.y + certBox.height <= scrollerBox.y + scrollerBox.height + slack;
