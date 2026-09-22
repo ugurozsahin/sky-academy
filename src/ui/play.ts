@@ -219,12 +219,17 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const stickerHTML = stickersHTML(fresh);
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138
     const medal = resultMedal(r);
-    const headline = training ? senseiLine(r.won, d.name)
+    // #522: a generator throw ends the session through the same `won: false` path as a genuine loss, but it
+    // is not one — `r.incomplete` withholds the win/loss framing (never a certificate either: `certInfo`
+    // already requires `r.won`, which an incomplete session never has) and says plainly what happened instead,
+    // mirroring `duel.ts`'s identical `r.incomplete` handling for an aborted match.
+    const headline = r.incomplete ? 'That question broke — here is what you earned so far!'
+      : training ? senseiLine(r.won, d.name)
       : r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!`
       : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!`
       : r.won ? praiseLine(av, d.name)
       : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
-    const heading = resultHeading(r.mode, { won: r.won, training });   // from the mode table (mission distinguishes a Sensei-training win)
+    const heading = r.incomplete ? 'Session ended early' : resultHeading(r.mode, { won: r.won, training });   // from the mode table (mission distinguishes a Sensei-training win)
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
     els.overlay.hidden = false;
