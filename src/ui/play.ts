@@ -6,7 +6,7 @@ import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import { Tracer } from '../game/tracing';
 import {
-  isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd,
+  isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd,
   recordSprint, recordTopic, recordTraining, save, today, touchStreak, wallet,
 } from '../storage';
 import { equippedItem } from '../game/shop';
@@ -270,7 +270,9 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
       date: today(), training: c.training,
     });
-    return !isWriteFailing();
+    // Both refusal paths (#470 review round 1): `isWriteFailing()` alone missed a write `save()` skipped
+    // deliberately under `isReadOnlySave()`'s latch (#232) — the row was offered though the album never got it.
+    return !isWriteFailing() && !isReadOnlySave();
   }
   /** Certificate details for a won mission / Sensei session (null for the other modes and lost runs). */
   const certInfo = (r: SessionResult): CertInfo | null =>

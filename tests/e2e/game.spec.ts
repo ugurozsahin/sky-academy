@@ -803,6 +803,51 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   /**
+   * #470 review round 1 (silent-failure-hunter): the fix above only read `isWriteFailing()`, missing the
+   * *other* refusal `recordCert()`'s own `save()` can hit — `isReadOnlySave()`'s latch (#232), set when the
+   * active profile's stored blob is from a newer build. That is not hypothetical: it is exactly the
+   * family-sharing-a-save scenario `tests/e2e/game.spec.ts`'s own onboarding/profile tests already cover
+   * (`onboarding: a reload...`, `ninjas on this device`) — a device opens a slot this build cannot read, the
+   * session runs on defaults, and the wizard walks through it exactly as a genuinely fresh child would, only
+   * with nothing typed into it ever kept (`storage.ts`'s own doc comment on `readOnly`).
+   */
+  test('a won mission earned under a newer-build save offers no certificate row (#470 review round 1)', async ({ page }) => {
+    test.setTimeout(150_000);
+    await page.addInitScript(v => localStorage.setItem('sna:v1', v), JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99, onboarded: true }));
+    await page.goto('/');
+    // The future blob is unreadable, so `load()` latches read-only and hands back `DEFAULT` — onboarded: false —
+    // which sends this session through the first-run wizard exactly as `avatar wizard:` above.
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await page.click('.avatar-card[data-id="volt"]');
+    await page.click('#next');
+    await page.fill('#name', 'Ada');
+    await page.click('#go');
+    await expect(page.locator('.intro-card')).toBeVisible();
+    await page.click('#intro-go');
+    await expect(page.locator('.home')).toBeVisible();
+    await startTopic(page, 'reception', 'r-count');
+    const stages = await page.evaluate(() => window.__sna.session.stages);
+    for (let stage = 1; stage <= stages; stage++) {
+      await answerAll(page, 5);
+      const modal = page.locator('.celebrate');
+      await expect(modal).toBeVisible();
+      await page.click('#next');
+    }
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    await expect(results.locator('.medal')).toHaveText('🥇');   // the mission was genuinely won, certificate path reached
+    await expect(results.locator('#cert'), 'a read-only latch earns no row, whatever was won').toHaveCount(0);
+    // The stored blob is the untouched future save this build must never overwrite — not `Bo`'s bytes rewritten
+    // as `Ada`'s session, and no `certs` key added to it.
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(stored.name, 'the newer-build blob on disk must survive this session untouched').toBe('Bo');
+    expect(stored.certs, 'nothing reached the store').toBeUndefined();
+    // What was EARNED this session is unaffected — the `certificate()` hook answers the mission's own result.
+    const png = await page.evaluate(() => window.__sna.certificate());
+    expect(png, 'the mission itself still earned one — only the album is missing it').toMatch(/^data:image\/png;base64,/);
+  });
+
+  /**
    * #484 (mirroring #375/#441's Ninja Duel fix — and its own round 2, which is exactly what this review round
    * found here too): a finished mission is committed the instant it is decided, not later inside a deferred
    * timer or behind a click the child might never make.

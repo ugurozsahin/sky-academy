@@ -3,6 +3,7 @@ import { DUEL_HANDOVER, duelPool, seededRng } from '../../src/game/duel';
 import { topicsFor, YEARS, type Question, type Topic, type Visual } from '../../src/curriculum';
 import { renderVisual } from '../../src/ui/visuals';
 import { dailyChallenges } from '../../src/game/dojo';
+import { SAVE_VERSION } from '../../src/storage';
 import type { DuelHooks } from '../../src/ui/hooks';
 import { DUEL_TOAST_LONGEST } from '../../src/ui/duel';
 
@@ -1091,6 +1092,49 @@ test.describe('Ninja Duel', () => {
     expect(png, 'the match itself still earned one — only the album is missing it').toMatch(/^data:image\/png;base64,/);
     const words = await page.evaluate(() => window.__sna.certWords());
     expect(words?.child, 'the drawn certificate is unaffected — #470 only withholds the row that claims to have kept it').toBe('Ada');
+  });
+
+  /**
+   * #470 review round 1 (silent-failure-hunter): the fix above only read `isWriteFailing()`, missing the
+   * *other* refusal `recordCert()`'s own `save()` can hit — `isReadOnlySave()`'s latch (#232), set when the
+   * active profile's stored blob is from a newer build. Reached through the same first-run wizard the
+   * `game.spec.ts` mission-side sibling of this test walks through, since a future-build blob is unreadable
+   * and cannot skip it the way `startDuel`'s own seed (an old-but-readable `v: 1`) does.
+   */
+  test('a won match earned under a newer-build save offers no certificate row (#470 review round 1)', async ({ page }) => {
+    await page.addInitScript(v => localStorage.setItem('sna:v1', v), JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99 }));
+    await page.addInitScript(() => { window.__SNA_FAST = 4; });
+    await recordingEngine(page);
+    await page.goto('/');
+    // The future blob is unreadable, so `load()` latches read-only and hands back `DEFAULT` — onboarded: false —
+    // which sends this session through the first-run wizard.
+    await expect(page.locator('.avatar-screen')).toBeVisible();
+    await page.click('.avatar-card[data-id="volt"]');
+    await page.click('#next');
+    await page.fill('#name', 'Ada');
+    await page.click('#go');
+    await expect(page.locator('.intro-card')).toBeVisible();
+    await page.click('#intro-go');
+    await expect(page.locator('.home')).toBeVisible();
+    await page.click('.island[data-year="year1"]');
+    await page.click('#duel');
+    await expect(page.locator('.duel-screen')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    for (let r = 1; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');   // Player 1 takes every round, so the certificate path is definitely reached
+    }
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
+    await expect(page.locator('.duel-end #cert'), 'a read-only latch earns no row, whatever was won').toHaveCount(0);
+    // The stored blob is the untouched future save this build must never overwrite — not `Bo`'s bytes
+    // rewritten as `Ada`'s session, and no `certs` key added to it.
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(stored.name, 'the newer-build blob on disk must survive this session untouched').toBe('Bo');
+    expect(stored.certs, 'nothing reached the store').toBeUndefined();
+    // What was EARNED this session is unaffected — the window hooks answer the match's own result.
+    const png = await page.evaluate(() => window.__sna.certificate());
+    expect(png, 'the match itself still earned one — only the album is missing it').toMatch(/^data:image\/png;base64,/);
   });
 
   test('a finished match moves the day\'s Daily Dojo challenge and pays its bonus into the same save (#16 item 5)', async ({ page }) => {

@@ -13,7 +13,7 @@ import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
 import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { isWriteFailing, load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type GameEndOutcome, type StoredDuel } from '../storage';
+import { isReadOnlySave, isWriteFailing, load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type GameEndOutcome, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
@@ -314,7 +314,9 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // so `duel: true` had two independent writers and deleting the one that reaches the printed certificate left
     // every test green while the album and the child's keepsake disagreed about what had been won. `certToStored`
     // is now the only writer, so the e2e's stored assertions cover the drawn object too.
-    if (cert) { recordCert(certToStored(cert, { id: `${o.year.id}:duel` })); certSaved = !isWriteFailing(); }
+    // Both refusal paths (#470 review round 1): `isWriteFailing()` alone missed a write `save()` skipped
+    // deliberately under `isReadOnlySave()`'s latch (#232) — the row was offered though the album never got it.
+    if (cert) { recordCert(certToStored(cert, { id: `${o.year.id}:duel` })); certSaved = !isWriteFailing() && !isReadOnlySave(); }
     // The last piece of item 5: the match itself, so it outlives this overlay. Filed for every finished match
     // — a loss and a draw are as much a thing that happened as a win, which is the one place this parts
     // company with the certificate above (that is an award; only a Player 1 win earns one, `duelEarnsCertificate`)
