@@ -4109,8 +4109,34 @@ describe('the licence grants the code and reserves the art, in both files (#520)
   const SPAN = 250;
   // PR #521 round 3, B1 (round 2's finding, still open on this head) — see the doc-comment above for why a
   // clause boundary and not a character count, and why a lone `\n` is not one of the boundaries.
-  const DENIAL = /\b(not|never|nothing|isn't|aren't|doesn't|don't|won't|cannot|can't)\b/i;
+  //
+  // Sent for a second look after the round-3 push (self-requested, two different vendored agents): both found
+  // the same two gaps independently, which is why both are fixed here rather than left as one round's word.
+  //
+  //  - **`no` was missing from `DENIAL`** — "no reserved rights" and "no exception" deny a claim as plainly
+  //    as "not" does and neither review agent's mutation needed a second word to prove it.
+  //  - **The whole clause was too wide a backward window.** The real README's "are **not licensed**: all
+  //    rights in them are reserved" is seven words from "not" to "reserved", correctly unbound by `binds`'s
+  //    character span but still inside one clause — so a *sentence* built the other way round, "Nothing in
+  //    the MIT grant above extends to `public/avatars/`, which remains reserved", read the unrelated `Nothing`
+  //    eleven words upstream as a denial of `reserved` and failed a correct rewrite. `WORD_WINDOW` bounds the
+  //    scan to the nearest few words either side of the match, inside the clause, rather than the whole
+  //    clause: wide enough for "does NOT use the SIL Open Font License" (3 words) and "nothing here is
+  //    vendored under the Apache License" (6 words back), narrow enough to leave "Nothing … eleven words …
+  //    reserved" alone.
+  //
+  // What this still does not catch, named rather than hidden (the reason is the same as `SWEEP: NOT
+  // ENUMERABLE` elsewhere in this repo): a denial that governs the claim from a **different clause** —
+  // "art in `public/avatars/` is reserved on paper only; that reservation no longer applies" — needs the
+  // pronoun `that reservation` resolved back to `reserved`, which is parsing, not proximity, and no rail in
+  // this file attempts it. A forward scan bounded the same way covers the in-clause case a review agent found
+  // ("Reserved status does not apply to these images") without reopening the false positive above: the
+  // window is short enough that "reserved … and may not be reused without permission" — `not` six words
+  // downstream, correctly describing the restriction rather than lifting it — stays outside it.
+  const DENIAL = /\b(not|no|never|nothing|isn't|aren't|doesn't|don't|won't|cannot|can't)\b/i;
   const CLAUSE_BREAKS = ['.', ':', ';', '—', '\n\n'];
+  const WORD_WINDOW = 6;
+  const FORWARD_WORD_WINDOW = 4;
   // Collapses a word-wrap `\n` to a space (no boundary) while keeping a real paragraph break as one, so the
   // boundary search below never has to special-case which kind of newline it met.
   const unwrap = (text: string) => text.replace(/\n{2,}/g, '\n\n').replace(/(?<!\n)\n(?!\n)/g, ' ');
@@ -4119,6 +4145,12 @@ describe('the licence grants the code and reserves the art, in both files (#520)
       const idx = text.lastIndexOf(brk, at - 1);
       return idx < 0 ? -1 : idx + brk.length;
     }));
+  const clauseEnd = (text: string, at: number) => {
+    const idxs = CLAUSE_BREAKS.map((brk) => text.indexOf(brk, at)).filter((idx) => idx >= 0);
+    return idxs.length ? Math.min(...idxs) : text.length;
+  };
+  const lastWords = (text: string, n: number) => text.trim().split(/\s+/).slice(-n).join(' ');
+  const firstWords = (text: string, n: number) => text.trim().split(/\s+/).slice(0, n).join(' ');
   // Every occurrence of `claim` in `text`, not just the first — a document can state a claim twice, once
   // inside a denial and once plainly, and the plain one has to be enough on its own to pass.
   const positivelyStates = (rawText: string, claim: RegExp) => {
@@ -4126,8 +4158,10 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     const global = new RegExp(claim.source, claim.flags.includes('g') ? claim.flags : `${claim.flags}g`);
     let m: RegExpExecArray | null;
     while ((m = global.exec(text))) {
-      const before = text.slice(clauseStart(text, m.index), m.index);
-      if (!DENIAL.test(before)) return true;
+      const before = lastWords(text.slice(clauseStart(text, m.index), m.index), WORD_WINDOW);
+      const after = firstWords(text.slice(m.index + m[0].length, clauseEnd(text, m.index + m[0].length)),
+        FORWARD_WORD_WINDOW);
+      if (!DENIAL.test(before) && !DENIAL.test(after)) return true;
       if (global.lastIndex === m.index) global.lastIndex += 1; // no zero-width claim exists here today
     }
     return false;
@@ -4140,9 +4174,16 @@ describe('the licence grants the code and reserves the art, in both files (#520)
   // PR #521 round 3, B3 — the list named only the vocabulary round 1's mutation happened to use.
   // `pr-test-analyzer`'s carve-out-of-a-carve-out ("reserved notwithstanding any personal, non-commercial
   // use, which is freely permitted") kept `reserved` bound to the path and undenied, and added an exception
-  // word this list did not know. The five added below are the ordinary ways English attaches a condition to
-  // a sentence that otherwise states none.
-  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bexcluding\b|\bnotwithstanding\b|\bhowever\b|\bapart from\b|\bother than\b|\bprovided that\b/i;
+  // word this list did not know.
+  //
+  // Only `notwithstanding` and `provided that` are added below, not the wider set first tried here. A second
+  // look at the fix (the same two agents, same request) found `however`, `apart from` and `other than` are
+  // ordinary connectives a correct rewrite can use without conceding an exception — "Apart from the code,
+  // everything here is reserved" and "the art, however, remains reserved" both restate #520's policy and
+  // would have failed this test for no policy reason. `notwithstanding` and `provided that` have no such
+  // everyday use; they are not added on the strength of round 3's one mutation, but because nothing found
+  // reads them any other way.
+  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bexcluding\b|\bnotwithstanding\b|\bprovided that\b/i;
 
   it('LICENSE grants MIT and names the holder', () => {
     const l = doc('LICENSE');
