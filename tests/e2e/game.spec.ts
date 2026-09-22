@@ -1686,6 +1686,12 @@ test.describe('Sky Ninja Academy', () => {
     const scroller = results.locator('.scroll');
     const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
     expect(maxScroll, 'this seed must actually overflow the overlay, or the sweep below proves nothing').toBeGreaterThan(0);
+    // `.modal`'s own 350ms pop-in (`transform: scale(.7 → 1)`) shifts every descendant's rect by a different
+    // amount depending on its distance from the transform origin while it is still running, which is enough
+    // on its own to move the ko-to-hero-big gap by the tens of pixels this assertion is trying to measure —
+    // observed directly, and unrelated to scrolling. Settled well before the sweep test above ever reads a
+    // position, because it does not compare two time-separated absolute measurements the way this one does.
+    await page.waitForTimeout(500);
     const gap = async () => {
       const ko = (await results.locator('.ko').boundingBox())!;
       const hero = (await results.locator('.hero-big').boundingBox())!;
