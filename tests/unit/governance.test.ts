@@ -3876,3 +3876,81 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       expect(innocent, `the detector must stay quiet on: "${innocent}"`).not.toMatch(adr002());
   });
 });
+
+
+/**
+ * #520 — the licence split: MIT for the code, all rights reserved for the art and the written content.
+ *
+ * The repository was public from 2026-09-16 with no licence at all, so the default applied and nobody who
+ * read it had any right to use it. The owner settled the split in session on 2026-09-22, choosing it over a
+ * non-commercial source-available licence for a reason worth keeping: the code is not the part worth
+ * protecting — it is dependency-free vanilla TypeScript anyone would rewrite faster than read — while the
+ * twelve avatars and the look are what is actually copyable, and those are protected by reserving them
+ * rather than by restricting the code.
+ *
+ * **The carve-out is the whole decision, and it lives in two files that have to agree.** That is the failure
+ * to guard against: `LICENSE` opens with the MIT grant, so a later edit that trims the section below it —
+ * or a README tidy-up that drops the Licence heading — leaves a repository whose only visible statement is
+ * "MIT", silently licensing the art. Nothing else in the repo would notice, and unlike a broken rail it is
+ * not recoverable: an asset released permissively cannot be called back.
+ *
+ * So: the grant and the carve-out are pinned together, in both files, plus the `package.json` field that a
+ * tool reads instead of either. The third-party notices are pinned too — SIL OFL 1.1 for Fredoka and
+ * Apache-2.0 for the vendored skill are obligations this project did not choose and cannot drop.
+ *
+ * It pins no prose beyond those hooks; both files stay free to be rewritten.
+ *
+ * Prove it red: delete the "WHAT THIS LICENCE DOES NOT COVER" section; drop `public/avatars/` from it;
+ * remove the README's Licence section; set `package.json`'s `license` to something else.
+ */
+describe('the licence grants the code and reserves the art, in both files (#520)', () => {
+  const root = new URL('../../', import.meta.url);
+  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
+
+  it('LICENSE grants MIT and names the holder', () => {
+    const l = doc('LICENSE');
+    expect(l.length, 'LICENSE must be read from disk, or every check here is vacuous').toBeGreaterThan(1_000);
+    expect(l, 'the grant must be the MIT text, not a summary of it').toContain('MIT License');
+    expect(l, 'and carry MIT\'s operative permission clause').toMatch(/Permission is hereby granted, free of charge/);
+    expect(l, 'a copyright line with a holder — an MIT file with no holder grants nothing clearly')
+      .toMatch(/Copyright \(c\) \d{4} \S/);
+  });
+
+  it('LICENSE reserves the art below the grant, naming the directory', () => {
+    const l = doc('LICENSE');
+    const i = l.indexOf('Permission is hereby granted');
+    const carve = l.slice(i);
+    expect(carve, 'the carve-out must sit AFTER the grant, or a reader stops at "MIT" and takes the art')
+      .toMatch(/NOT licensed|not licensed/);
+    expect(carve, 'and name the directory it protects — a carve-out that names nothing protects nothing')
+      .toContain('public/avatars/');
+    // `[\s\S]`, not `.`: the phrase wraps across a line in a hard-wrapped licence file, and `.` does not
+    // match a newline — the first version of this rail was red on a correct LICENSE for that reason alone.
+    expect(carve, 'reserving the rights rather than merely describing them')
+      .toMatch(/rights[\s\S]{0,40}reserved/i);
+  });
+
+  it('README states the same split, so the two cannot drift apart', () => {
+    const r = doc('README.md');
+    const lic = r.slice(r.lastIndexOf('## Licence'));
+    expect(lic.length, 'README must carry a Licence section — it is where a reader actually looks')
+      .toBeGreaterThan(200);
+    expect(lic, 'the README must say the code is MIT').toMatch(/MIT/);
+    expect(lic, 'and that the art is not — the half a tidy-up drops').toContain('public/avatars/');
+    expect(lic, 'pointing at the file that states the line exactly').toContain('LICENSE');
+  });
+
+  it('package.json agrees with LICENSE, since tooling reads the field and not the file', () => {
+    const pkg = JSON.parse(doc('package.json'));
+    expect(pkg.license, 'package.json must carry the same licence the LICENSE file grants').toBe('MIT');
+  });
+
+  it('both third-party licences are acknowledged, since neither was this project\'s to choose', () => {
+    const text = doc('LICENSE') + doc('README.md');
+    expect(text, 'Fredoka is under the SIL OFL and its notice must travel with the font')
+      .toMatch(/SIL Open Font License/);
+    expect(text, 'and the OFL text itself has to be pointed at, not only named')
+      .toContain('public/fonts/OFL.txt');
+    expect(text, 'the vendored skill is Apache-2.0').toMatch(/Apache License,? 2\.0/);
+  });
+});

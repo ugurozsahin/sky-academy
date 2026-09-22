@@ -1,0 +1,48 @@
+MIT License
+
+Copyright (c) 2026 Ugur Ozsahin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+WHAT THIS LICENCE DOES NOT COVER
+
+The MIT grant above applies to the source code only.
+
+The artwork and the game's written content are NOT licensed. All rights in
+them are reserved by the copyright holder, and no permission to use, copy,
+modify or redistribute them is granted by this file:
+
+  - public/avatars/          the twelve ninja character illustrations
+  - the name "Sky Ninja Academy", and the game's visual identity
+  - the praise lines, character names and other written game text
+
+You may take the code and build something of your own with it. You may not
+ship this game's characters or its look.
+
+THIRD-PARTY COMPONENTS
+
+  - Fredoka (public/fonts/) is (c) The Fredoka Project Authors, under the
+    SIL Open Font License 1.1 — see public/fonts/OFL.txt. That licence
+    governs the font files whatever this file says, and its notice must
+    travel with them.
+
+  - .claude/skills/frontend-design/ is vendored from a third party under the
+    Apache License 2.0 — see .claude/skills/frontend-design/LICENSE.txt.
