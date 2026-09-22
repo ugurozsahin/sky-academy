@@ -81,6 +81,43 @@ describe('mission session', () => {
     expect(ev.onEnd).toHaveBeenCalledTimes(1);
     expect(ev.onEnd.mock.calls[0][0].won).toBe(false);
   });
+  /**
+   * The same preview, from the other two places `maybeCommitFinalStage()` is called (review round 2 follow-up:
+   * `hit()`'s correct/wrong paths above are not the only way a mission's last question gets decided) — the
+   * target bubble falling uncaught (`fall()`), and a wave that runs out with nothing hit at all
+   * (`waveEnd()`'s own "nothing decided" branch). Reception is gentle, so neither costs a life, which is what
+   * lets the stage still clear (on a lower accuracy) rather than ending the mission as a loss.
+   */
+  it("onCommit fires from fall() too, when the mission's last question is missed rather than answered", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: R, topic: topicById('r-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < R.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    s.fall(s.current!.answer);                                    // the last question's correct bubble, uncaught
+    expect(ev.onCommit, 'onCommit fired inside fall() itself').toHaveBeenCalledTimes(1);
+    expect(s.ended).toBe(false); expect(s.lives).toBe(R.lives);    // gentle: the miss costs no life
+    const preview = ev.onCommit.mock.calls[0][0];
+    expect(preview.won).toBe(true);
+    s.advance(); s.nextStage();
+    expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
+  });
+  it("onCommit fires from waveEnd()'s own miss branch too, when the last question's wave ends with nothing decided", () => {
+    const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: R, topic: topicById('r-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < R.perStage - 1; i++) { expect(s.hit(s.current!.answer)).toBe('correct'); s.advance(); }
+    expect(s.waiting).toBe(false);
+    s.waveEnd();                                                  // the last question's wave ends with no hit and no fall
+    expect(ev.onCommit, 'onCommit fired inside waveEnd() itself').toHaveBeenCalledTimes(1);
+    const preview = ev.onCommit.mock.calls[0][0];
+    expect(preview.won).toBe(true);
+    // waveEnd() itself calls advance() right after its miss branch, so the mission is already showing its
+    // stage-clear by the time this returns — proving the preview and the real end() agree even when both the
+    // miss AND advance() happen inside the very same call.
+    expect(ev.onStageClear).toHaveBeenCalledTimes(1);
+    s.nextStage();
+    expect(ev.onEnd.mock.calls[0][0]).toEqual(preview);
+  });
   it('Sensei training: a mission over a pool tallies hits and tries per topic', () => {
     const ev = events();
     const pool = [topicById('y1-add')!, topicById('y1-sub')!];
