@@ -2447,6 +2447,11 @@ test.describe('profile picker (#20 slice 2)', () => {
         expect(spk!.x + spk!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the read-aloud button is sliced by the screen edge`)
           .toBeLessThanOrEqual(w);
         expect(spk!.height, 'and it still clears the 44px touch floor (`design-language` §4)').toBeGreaterThanOrEqual(44);
+        // round 1 review, B1: `.hero`'s `min-width: 0` alone let the shrink pressure fall on the fixed-size
+        // portrait too (54px -> 12px at this exact scenario), not just on the text it was meant for.
+        const portrait = await page.locator('.hero .portrait').boundingBox();
+        expect(portrait!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the ninja's portrait is squeezed instead of the text`)
+          .toBeGreaterThanOrEqual(53);
         await expectFitsViewport(page, `sky map at ${w}x${h}, ${purse.coins} coins/${purse.days}-day streak`);
       }
     }

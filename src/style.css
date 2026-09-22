@@ -324,9 +324,14 @@ img { -webkit-user-drag: none; }
  * column gets `min-width: 0` and both lines ellipsise rather than pushing the row off the right edge. The
  * element line is the one that actually runs long ("Electric Ninja"), so in practice it is what truncates —
  * the child's own name is short enough to survive whole at every measured width. `.settings` is untouched: the
- * coin pill and the two `.icon-btn`s are the fixed part of the row and nothing here should make them smaller. */
+ * coin pill and the two `.icon-btn`s are the fixed part of the row and nothing here should make them smaller.
+ * `.hero`'s `min-width: 0` alone splits the shrink pressure across BOTH its children — the fixed-size portrait
+ * too, since a flex item with `overflow: hidden` already has an automatic minimum of 0. `flex-shrink: 0` on the
+ * portrait pins it at 54px so the text column absorbs all of it, which is what the ellipsis rules are for
+ * (round 1 review, B1: unpinned, the portrait rendered at 12px instead of 54 at 320×568 with a big purse). */
 @media (max-width: 400px) {
   .hero { min-width: 0; }
+  .hero .portrait { flex-shrink: 0; }
   .hero > span:last-child { min-width: 0; overflow: hidden; }
   .hero b, .hero small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
