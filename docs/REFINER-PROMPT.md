@@ -26,6 +26,24 @@ all. Its whole surface is issues.
   them by title, not by label: they carry `watchdog`, and so do real findings.
 - every pull request.
 
+**Everything else open is in reach — and reading "everything else" is a paginated call, every time.** Every
+list endpoint in this file is `per_page=100` **and** following `Link: rel="next"` until there is no next page:
+the duplicate sweep, each triage pass, the health report's counts, and the split-resumption search in item 4.
+This is the same discipline the `events` timeline gets below, for the same reason, and it is not a precaution
+against future growth — on 2026-09-22 `GET /issues?state=open&per_page=100` returned exactly 100 items **and a
+`rel="next"` link**, so one call already stops short of the backlog and a call that omits `per_page` returns
+thirty.
+
+**A list you have not read to the end is a list you have not read**, and here the truncation lands precisely
+on the work: this endpoint sorts newest-first by default, so the oldest open issues — the stale claims, the
+long-dead duplicates, the things this routine exists to find — are the ones on the last page, and a first page
+that arrives clean looks exactly like a tidy backlog. **If you cannot read a list to its end, the pass that
+needed it does not run.** Say so in your report, and do not act on the part you did read: a duplicate sweep
+over half the issues reports the other half as having no duplicate. In item 4 that is not a matter of report
+quality — a split-resumption search that stopped at page one concludes the split never started, and splitting
+a second time orphans the first run's children behind an `epic` label that drops the parent out of the
+developer query for good (#513 review, round 8).
+
 ## The two-phase gate
 
 Split by **reversibility**, not by importance. A wrong label is one click back. A closed issue and a changed
@@ -166,7 +184,10 @@ Run all of it. A job you could not perform is worth a line in your report — "I
    second leaves children nobody points at, which tomorrow's re-derivation would read as an unsplit parent
    and split a second time. So **before splitting anything, search for open issues whose body says
    `Part of #<parent>` **among issues the owner's account created** —
-   `GET /repos/ugurozsahin/sky-academy/issues?state=open&creator=ugurozsahin&per_page=100`. **The `creator=`
+   `GET /repos/ugurozsahin/sky-academy/issues?state=open&creator=ugurozsahin&per_page=100`, **paginated to the
+   last page like every other list call above — that call returned a full 100 items and a `rel="next"` link on
+   2026-09-22, so stopping at the response you get back is stopping mid-search, and a search that stops early
+   reports "no children" and splits the issue twice.** **The `creator=`
    filter is the whole safety of this step.** Without it this is a free-text search over every open issue on
    a public repository, so anyone could open issues whose bodies read `Part of #<parent>`, and you would
    conclude the split was done, label the real parent `epic` — which drops it out of
@@ -200,7 +221,9 @@ Run all of it. A job you could not perform is worth a line in your report — "I
    `Blocked by #<n>` as the first line, with `#<n>` open. Propose `blocked` where that holds and the label is
    missing; propose removing it where the named blocker has **closed**, which is the case nobody does by hand
    and which leaves work parked in the board's Blocked column after its reason is gone. Never remove one
-   whose blocker is still open, and never re-apply either after someone has changed it back.
+   whose blocker is still open, and never re-apply either after someone has changed it back. The section above
+   says what actually enforces that last clause here, and it is weaker than it is for `priority:*`: read it
+   before you add this label, because a timeline you did not read to its end means you do not add it.
 10. **The backlog health report**, into the `refiner: backlog` body under the ledger: counts by priority and by
    area label, how many issues opened and closed since your last run, the age of the oldest issue in each
    priority, and which area label is growing. Numbers you observed, not an impression. It exists so the owner
