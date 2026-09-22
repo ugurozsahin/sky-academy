@@ -1158,3 +1158,74 @@ describe('a stroke held through a resize does not slice from a point the old box
     expect(sim.take('hits'), 'a swipe drawn after the resize still counts').toEqual([{ label: b.label, viaSwipe: true }]);
   });
 });
+
+// #464: `onDown` returned early while `paused || frozen` WITHOUT taking `activeId` at all, so a press that
+// landed mid-hold left the canvas with no owned stroke — every `pointermove` after it (`activeId === null`)
+// was silently dropped until the finger lifted completely and pressed again, which is not something a child
+// knows to do. The wrong-answer hold is 1.8s, exactly the moment a frustrated child presses the glass, and the
+// next wave keeps rising underneath a dead finger the whole time. The fix reuses #331's `strokeStale`
+// contract: a press during a freeze is now recorded (armed), so the same "first move after the thaw re-seats,
+// slices nothing; the next one slices for real" rule that already covers a stroke spanning the freeze also
+// covers one that starts inside it.
+describe('a finger pressed during the outcome hold is not dead once it thaws (#464)', () => {
+  function pinnedRow(s: Sim) {
+    s.spawn({ labels: ['1', '2', '3', '4'], speed: 1 });
+    advanceUntil(s, () => s.live().length === 4, 'the wave never fully launched');
+    for (const b of s.arena.bubbles) { b.vx = 0; b.vy = 0; b.g = 0; b.y = s.arena.H * 0.5; }
+    s.frame();
+    return s.live();
+  }
+
+  it('a press 900ms into the hold is armed, and the next wave\'s first real swipe still slices', () => {
+    // The issue's own reproduction: pinned row, reveal(), press mid-hold, clearWave(), a fresh wave, then a
+    // genuine swipe through a bubble.
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.arena.reveal({ good: row[0].label });                       // the wave freezes for the outcome
+    sim.advance(900);                                               // partway through the 1.8s hold
+    sim.pointer('pointerdown', { x: 2, y: lane, pointerId: 1 });    // the finger presses while everything is held
+    expect(sim.take('hits'), 'a press during the freeze must not hit-test anything').toEqual([]);
+
+    sim.arena.clearWave();
+    const next = pinnedRow(sim);
+    const b = next.reduce((r, x) => (x.x < r.x ? x : r), next[0]);  // the leftmost bubble of the new row
+
+    sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 1 });   // first move after the thaw: re-seats, slices nothing (#331)
+    expect(sim.take('hits'), 'the re-seating move must not itself slice').toEqual([]);
+    sim.pointer('pointermove', { x: b.x, y: b.y + b.r + 20, pointerId: 1 });   // straight down through b alone
+    expect(sim.take('hits'), 'a finger held dead through the freeze must be live again for the next wave')
+      .toEqual([{ label: b.label, viaSwipe: true }]);
+  });
+
+  it('a press landing on a bubble during the freeze does not cash it in once the wave thaws', () => {
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    sim.arena.reveal({ good: row[0].label });
+    sim.advance(900);
+    const b = row[1];                                               // press directly on a bubble the freeze is holding
+    sim.pointer('pointerdown', { x: b.x, y: b.y, pointerId: 1 });
+    expect(sim.take('hits'), 'the old wave\'s bubble under the finger must not be hit at press time').toEqual([]);
+    sim.arena.clearWave();
+    expect(sim.take('hits'), 'nor when the wave clears around it').toEqual([]);
+  });
+
+  it('a finger pressed just as the freeze begins and never moved through the whole hold is caught too', () => {
+    // No pointermove at all between the press and the thaw — the only thing that can observe this is the frame
+    // loop's own #331 stale-marking, which does not care when inside the freeze the stroke started.
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.arena.reveal({ good: row[0].label });
+    sim.pointer('pointerdown', { x: 2, y: lane, pointerId: 1 });
+    sim.advance(1300);                                              // the rest of the hold, not one pointer event in it
+    sim.arena.clearWave();
+    const next = pinnedRow(sim);
+    const b = next.reduce((r, x) => (x.x < r.x ? x : r), next[0]);
+    sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 1 });
+    expect(sim.take('hits'), 'the re-seating move must not itself slice').toEqual([]);
+    sim.pointer('pointermove', { x: b.x, y: b.y + b.r + 20, pointerId: 1 });
+    expect(sim.take('hits'), 'a press that started during the freeze and never moved is still live afterwards')
+      .toEqual([{ label: b.label, viaSwipe: true }]);
+  });
+});

@@ -237,11 +237,14 @@ export class Arena {
   // ---------- input ----------
   private pos(e: PointerEvent) { const r = this.canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   private onDown = (e: PointerEvent) => {
-    if (this.paused || this.frozen) return;
     this.activeId = e.pointerId; this.moved = 0; this.downPos = this.pos(e); this.lastPt = this.downPos;
-    this.strokeStale = false;                       // #331: a stroke that starts here spans no freeze — never skip its first segment
     this.trail = [{ ...this.downPos, t: performance.now() }];
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (this.paused || this.frozen) { this.strokeStale = true; return; }   // #464: a press during the outcome hold is a
+    // real intent, not nothing — record it as this canvas's stroke so `onMove` can pick it up, but stale, so the first
+    // move after the freeze arms it (same #331 contract) rather than cashing in the bubble under the finger right now,
+    // which belongs to the wave that is about to clear.
+    this.strokeStale = false;                       // #331: a stroke that starts here spans no freeze — never skip its first segment
     const b = this.bubbleAt(this.downPos.x, this.downPos.y);
     if (b) this.hitBubble(b, false);
   };
