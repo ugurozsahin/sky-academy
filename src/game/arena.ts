@@ -332,11 +332,12 @@ export class Arena {
     // due all at once on the resumed frame. `paused` is assigned from the play screen with no entry point of
     // its own (same constraint the comment above already lives with), so the transition is read here, once a
     // frame, the only place both edges of it are ever seen. Mirrors `rush()`'s own `launchAt -= shift` for the
-    // opposite direction — same clock, same reason: `launchAt` stays an absolute timestamp throughout.
+    // opposite direction — same clock, same reason: `launchAt` stays an absolute timestamp throughout, and the
+    // same `Math.max(0, …)`/`!x.dead` guards, so a review reading the two side by side sees one shape, not two.
     if (this.paused) { if (this.pausedSince === null) this.pausedSince = now; }
     else if (this.pausedSince !== null) {
-      const shift = now - this.pausedSince;
-      for (const b of this.bubbles) if (!b.launched) b.launchAt += shift;
+      const shift = Math.max(0, now - this.pausedSince);
+      for (const b of this.bubbles) if (!b.launched && !b.dead) b.launchAt += shift;
       this.pausedSince = null;
     }
     if (!this.paused) { this.time += dt; for (let left = dt; left > 0; left -= 1 / 60) this.update(Math.min(left, 1 / 60), now); }
