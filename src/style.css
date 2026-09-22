@@ -1300,6 +1300,13 @@ img { -webkit-user-drag: none; }
   animation: pop .35s cubic-bezier(.2, 1.4, .4, 1);
 }
 @keyframes pop { from { transform: scale(.7); opacity: 0; } }
+/* #436: the certificate outcome, reported inside the results modal next to the 🎓 button rather than through
+   the shared `#toast` (which the overlay this modal lives in sits above and so covers).
+   `.modal .cert-msg`, not the bare class (round-1 review, B1): `.modal p` below is (0,1,1) — one class AND one
+   element selector — which beats a bare one-class `.cert-msg` regardless of source order, so the success/
+   neutral colour and margin were silently coming from `.modal p` instead. Two classes, (0,2,0), wins outright. */
+.modal .cert-msg { margin: 4px 0 0; text-align: center; font-size: 14px; font-weight: 700; color: var(--good); }
+.modal .cert-msg.bad { color: var(--bad); }
 /* certificate full-screen fallback (artifact viewer with no downloads grant) */
 .cert-view {
   position: fixed;
