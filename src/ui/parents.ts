@@ -251,6 +251,12 @@ function wireMove(redraw: () => void) {
   const paste = $<HTMLTextAreaElement>('#restore-code');
   const msg = $('#move-msg');
   code.value = exportSave();
+  // #18 group C: a save grows with progress/stickers/certs/duels, so a fixed row count always has a save
+  // that overflows it — sized to this save's own content instead, capped by `.p-code`'s `max-height` (still
+  // `resize: vertical`, so a grown-up can pull a capped one taller by hand).
+  code.style.height = 'auto';
+  const border = parseFloat(getComputedStyle(code).borderTopWidth) + parseFloat(getComputedStyle(code).borderBottomWidth);
+  code.style.height = `${code.scrollHeight + border}px`;
 
   const say = (text: string, bad = false) => {
     msg.textContent = text;
