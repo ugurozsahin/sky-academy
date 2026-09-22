@@ -266,6 +266,14 @@ state at once on 2026-09-22 — #492, #503 and #502 — across at least nine rev
 diff, each concluded "no blocking finding in the diff itself", and each posted nothing. "Left for a developer
 run" names no recipient. If a rule really does stop you acting, say which rule and what would unstop it.
 
+**A pull request you may not merge is still one you review.** `docs/REVIEWER-PROMPT.md` rule 4 bars the merge;
+it says nothing about the review, and the two are different acts. This bites hardest on exactly the class that
+can least afford it: a `loosening` governance pull request stays the owner's to merge even after he approves,
+so a run that skips it for being unmergeable leaves **him** merging an unreviewed change to what a run is
+allowed to do. Review it, post the verdict, and say in the comment that the merge is his. The same holds for
+an `owner-approval` PR waiting on his marker. Observed on 2026-09-22: a reviewer pulse recorded
+`#513: not reviewed — owner-session/loosening, not routine-mergeable regardless of review state`.
+
 **A block its reviewer leaves unanswered is superseded by a fresh review (#161).** The reviewer who set a
 `REVIEW: CHANGES REQUESTED` block clears it with `REVIEW: CLEARED` and "Ready for review". If they do not, a
 later run that neither opened the pull request nor pushed a commit to it reviews it from scratch against the
