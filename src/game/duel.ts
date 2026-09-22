@@ -53,10 +53,24 @@ export class Duel {
   private nextQuestion() {
     if (this.ended) return;
     this.round++; this.roundDecided = false; this.answered.a = this.answered.b = false;
-    this.current = this.o.topic.gen(this.o.difficulty, this.rng);
-    // "First correct slice" has no meaning for a sequence: `answer` is the joined string, every slice would be
-    // wrong and the match would drain in draws with nothing red. duelPool() keeps these out; this is the floor.
-    if (this.current.sequence) throw new Error(`Ninja Duel: ${this.o.topic.id} produced a sequence question`);
+    try {
+      this.current = this.o.topic.gen(this.o.difficulty, this.rng);
+      // "First correct slice" has no meaning for a sequence: `answer` is the joined string, every slice would
+      // be wrong and the match would drain in draws with nothing red. duelPool() screens this out too, at the
+      // same 8 fixed seeds the comment below explains the limit of — this is the floor for what live play can
+      // still reach.
+      if (this.current.sequence) throw new Error(`Ninja Duel: ${this.o.topic.id} produced a sequence question`);
+    } catch (e) {
+      // #444 review (PR #502), B1: duelPool() only screens each topic against 8 FIXED seeds before the match
+      // starts; live play draws with `this.rng` (`Math.random` by default), which is not limited to that
+      // sample. A topic that only misbehaves outside those 8 seeds — a generator throw, or the sequence case
+      // above — passes the pool screen cleanly and can still fail mid-match, the exact frozen-screen bug #444
+      // closed for missions, reachable here too. Ending gracefully pays whatever the scoreline already is,
+      // the same shape `Session.nextQuestion()` uses.
+      console.error(`Ninja Duel: "${this.o.topic.id}" question generator failed mid-match`, e);
+      this.end();
+      return;
+    }
     this.ev.onQuestion(this.current, { round: this.round, total: this.rounds });
   }
   /**
