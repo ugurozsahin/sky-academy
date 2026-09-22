@@ -66,6 +66,7 @@ export class Arena {
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
+  private pausedSince: number | null = null;       // #490: when the CURRENT pause began, so resuming can shift launchAt by its length
   private onThrow?: () => void; private onLand?: () => void;
   /** Which bubbles a tap throws a projectile at; anything else pops instantly, like a swipe (the TNT does — #48). */
   private throwFor?: (b: Bubble) => boolean;
@@ -326,6 +327,18 @@ export class Arena {
     // it and whoever set it — `paused` is assigned from the play screen and has no entry point of its own — so
     // a finger held perfectly still through the outcome hold, sending no pointermove at all, is caught here.
     if (this.stalls()) this.strokeStale = true;
+    // #490: `update()` below is skipped entirely while `paused`, so nothing launches DURING a pause — but
+    // nothing used to shift `launchAt` either, so every bubble whose moment passed behind the overlay became
+    // due all at once on the resumed frame. `paused` is assigned from the play screen with no entry point of
+    // its own (same constraint the comment above already lives with), so the transition is read here, once a
+    // frame, the only place both edges of it are ever seen. Mirrors `rush()`'s own `launchAt -= shift` for the
+    // opposite direction — same clock, same reason: `launchAt` stays an absolute timestamp throughout.
+    if (this.paused) { if (this.pausedSince === null) this.pausedSince = now; }
+    else if (this.pausedSince !== null) {
+      const shift = now - this.pausedSince;
+      for (const b of this.bubbles) if (!b.launched) b.launchAt += shift;
+      this.pausedSince = null;
+    }
     if (!this.paused) { this.time += dt; for (let left = dt; left > 0; left -= 1 / 60) this.update(Math.min(left, 1 / 60), now); }
     this.cull(now);
     this.render(now);
