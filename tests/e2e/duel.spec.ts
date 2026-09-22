@@ -36,7 +36,17 @@ async function expectHandoverHeard(page: Page) {
   expect(said.slice(at + 1), 'no cancel() after it').not.toContain('<cancel>');
 }
 
-async function startDuel(page: Page, dojoByDate?: Record<string, unknown>) {
+/**
+ * A store that takes every `setItem` and throws, the same fixture `game.spec.ts`'s profile-picker tests use
+ * (#380 review) — registered as its own `addInitScript` so it runs AFTER `startDuel`'s seed write lands and
+ * only refuses the running match's own writes.
+ */
+const refuseWrites = (page: Page) => page.addInitScript(() => {
+  const proto = Object.getPrototypeOf(localStorage) as Storage;
+  proto.setItem = () => { throw new DOMException('quota', 'QuotaExceededError'); };
+});
+
+async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, opts?: { refuseWrites?: boolean }) {
   // The dojo seed is chosen by the PAGE's date, not this process's: `storage.ts`'s `today()` runs in the
   // browser, and a seed built against a different day is silently rolled over by `dojoFor()` — progress
   // gone, the case green for the wrong reason. The two clocks straddle midnight UTC in the general case,
@@ -51,6 +61,7 @@ async function startDuel(page: Page, dojoByDate?: Record<string, unknown>) {
     }
     localStorage.setItem('sna:v1', JSON.stringify(d));
   }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }), dojoByDate });
+  if (opts?.refuseWrites) await refuseWrites(page);   // after the seed above, so only the match's own writes are refused
   await page.addInitScript(() => { window.__SNA_FAST = 4; });
   await recordingEngine(page);
   await page.goto('/');
@@ -1049,6 +1060,36 @@ test.describe('Ninja Duel', () => {
     expect(duels[0].topic, 'the topic id, which survives a rename').toMatch(/^y1-/);
     expect(duels[0].title, 'and the title a child reads, which does not').toBeTruthy();
     expect(duels[0].title).not.toBe(duels[0].topic);
+  });
+
+  /**
+   * #470: `recordCert()`'s own `save()` swallows a refused `setItem` (#151) and the 🎓 row used to be drawn
+   * from the in-memory `cert` regardless, offering a keepsake the album does not actually hold. A win on a
+   * store that refuses every write must not offer the row at all — the same shape as the loss/draw cases
+   * above, but reached because the store refused rather than because nothing was earned.
+   */
+  test('a won match on a refusing store offers no certificate row, and the album stays untouched (#470)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'), { refuseWrites: true });
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    for (let r = 1; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');   // Player 1 takes every round, so the certificate path is definitely reached
+    }
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 10, scoreB: 0 });
+    // The row a refused write must not offer — this is the fix's own point, not a side effect of the loss/draw
+    // cases above: a certificate WAS earned here, and is still withheld because it was not kept.
+    await expect(page.locator('.duel-end #cert'), 'a refused write earns no row, whatever was won').toHaveCount(0);
+    // The seeded save from before `refuseWrites` took hold has no `certs` key at all — proving the album is
+    // genuinely untouched rather than merely not re-read.
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs), 'nothing reached the store').toBeUndefined();
+    // What was EARNED is unaffected by the store refusing it (#470's own scope: it does not touch `save()`'s
+    // swallow) — the window hooks answer the match's own result, not the album's, same as every other test here.
+    const png = await page.evaluate(() => window.__sna.certificate());
+    expect(png, 'the match itself still earned one — only the album is missing it').toMatch(/^data:image\/png;base64,/);
+    const words = await page.evaluate(() => window.__sna.certWords());
+    expect(words?.child, 'the drawn certificate is unaffected — #470 only withholds the row that claims to have kept it').toBe('Ada');
   });
 
   test('a finished match moves the day\'s Daily Dojo challenge and pays its bonus into the same save (#16 item 5)', async ({ page }) => {

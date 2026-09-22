@@ -169,6 +169,16 @@ async function answerAll(page: Page, n: number) {
     await page.waitForFunction((i) => { const s = window.__sna?.state(); return s && (s.index > i || s.ended || document.querySelector('.celebrate')); }, i);
   }
 }
+/**
+ * A store that takes every `setItem` and throws. Registered as its own `addInitScript` AFTER whatever seeded
+ * localStorage, so `addInitScript`s' registration order (#380 review) lets the seed land and only refuses the
+ * running game's own writes from then on. Module-scoped so both the profile-picker suite and any other
+ * describe block here can reuse it rather than each keeping its own copy.
+ */
+const refuseWrites = (page: Page) => page.addInitScript(() => {
+  const proto = Object.getPrototypeOf(localStorage) as Storage;
+  proto.setItem = () => { throw new DOMException('quota', 'QuotaExceededError'); };
+});
 
 test.describe('Sky Ninja Academy', () => {
   // #32: run the whole suite at 4× game speed. The app reads `window.__SNA_FAST` at boot (src/game/speed.ts)
@@ -705,6 +715,40 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#rewards');
     await expect(page.locator('.rewards')).toBeVisible();
     await expect(page.locator('.sticker.got')).toHaveCount(3);
+  });
+
+  /**
+   * #470: `recordCert()`'s own `save()` swallows a refused `setItem` (#151) and the 🎓 row used to be drawn
+   * from the in-memory certificate regardless, offering a keepsake the album does not actually hold. Same
+   * shape as the Ninja Duel case (`tests/e2e/duel.spec.ts`), the other of the two `recordCert()` call sites.
+   */
+  test('a won mission on a refusing store offers no certificate row, and the album stays untouched (#470)', async ({ page }) => {
+    test.setTimeout(150_000);
+    await page.addInitScript(save => {
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({ v: 1, name: 'Ada', avatar: 'terra' }));
+    await refuseWrites(page);   // after the seed above, so only the running mission's own writes are refused
+    await page.goto('/');
+    await expect(page.locator('.home')).toBeVisible();
+    await startTopic(page, 'reception', 'r-count');
+    const stages = await page.evaluate(() => window.__sna.session.stages);
+    for (let stage = 1; stage <= stages; stage++) {
+      await answerAll(page, 5);
+      const modal = page.locator('.celebrate');
+      await expect(modal).toBeVisible();
+      await page.click('#next');
+    }
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    await expect(results.locator('.medal')).toHaveText('🥇');   // the mission was genuinely won, certificate path reached
+    await expect(results.locator('#cert'), 'a refused write earns no row, whatever was won').toHaveCount(0);
+    // The seeded save from before `refuseWrites` took hold has no `certs` key at all — proving the album is
+    // genuinely untouched rather than merely not re-read.
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs), 'nothing reached the store').toBeUndefined();
+    // What was EARNED is unaffected by the store refusing it (#470's own scope: it does not touch `save()`'s
+    // swallow) — the `certificate()` hook answers the mission's own result, not the album's.
+    const png = await page.evaluate(() => window.__sna.certificate());
+    expect(png, 'the mission itself still earned one — only the album is missing it').toMatch(/^data:image\/png;base64,/);
   });
 
   test('"My certificates" (#110): an earned certificate lists on the rewards screen, and View opens it full-screen with tap-to-zoom', async ({ page }) => {
@@ -2470,14 +2514,6 @@ test.describe('profile picker (#20 slice 2)', () => {
     }
   });
 
-  /**
-   * A store that takes every `setItem` and throws. Registered *after* `seedSiblings`, so the seed lands and
-   * only the running game's writes are refused — `addInitScript`s run in registration order.
-   */
-  const refuseWrites = (page: Page) => page.addInitScript(() => {
-    const proto = Object.getPrototypeOf(localStorage) as Storage;
-    proto.setItem = () => { throw new DOMException('quota', 'QuotaExceededError'); };
-  });
   /** Record every line handed to the engine, so a test can assert a sentence was *spoken* and not only printed. */
   const captureSpeech = (page: Page) => page.addInitScript(() => {
     window.__spoken = [];

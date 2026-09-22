@@ -13,7 +13,7 @@ import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, type Bubble } from '../game/arena';
 import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type GameEndOutcome, type StoredDuel } from '../storage';
+import { isWriteFailing, load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type GameEndOutcome, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
@@ -99,6 +99,12 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   let taught: DuelTally = { hits: 0, tries: 0 };
   /** The certificate a Player 1 win earned, or null — the other two outcomes earn none (#16 item 5). */
   let cert: CertInfo | null = null;
+  /** Whether `cert`'s write actually reached the store (#470) — `isWriteFailing()` read the instant after the
+   *  attempt, per `save()`'s own contract that it reflects only the last write. `cert` itself stays set
+   *  either way: it is what the match earned, which `window.__sna`'s `certificate()`/`certWords()` hooks
+   *  answer about regardless of storage, same as before #470. Only the 🎓 row — which promises a keepsake
+   *  kept in the album — reads this too, so a refused write is never offered as one. */
+  let certSaved = false;
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
 
@@ -296,6 +302,10 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     const { dojo, fresh } = recordGameEnd(duelDojoEvent(r, topic.subject), paid);
     dojoPaid = dojo.coins;
     cert = duelCert(r);
+    // Reset with `cert`, not left to the caller (#470 review, type-design-analyzer): `certSaved` must never
+    // outlive the `cert` it describes, and pinning that to `commitOnce`'s single-invocation guarantee alone
+    // would make the invariant one refactor away from breaking silently.
+    certSaved = false;
     // #205's rule, unchanged here: filed by the match, never from the 🎓 button, because the bug that issue
     // opened with is a device where pressing the button does nothing at all. #375 moves the filing a further
     // 1.3 s earlier — from the overlay being built to the match ending — which only strengthens that rule.
@@ -304,7 +314,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // so `duel: true` had two independent writers and deleting the one that reaches the printed certificate left
     // every test green while the album and the child's keepsake disagreed about what had been won. `certToStored`
     // is now the only writer, so the e2e's stored assertions cover the drawn object too.
-    if (cert) recordCert(certToStored(cert, { id: `${o.year.id}:duel` }));
+    if (cert) { recordCert(certToStored(cert, { id: `${o.year.id}:duel` })); certSaved = !isWriteFailing(); }
     // The last piece of item 5: the match itself, so it outlives this overlay. Filed for **every** finished
     // match — a loss and a draw are as much a thing that happened as a win — which is the one place this
     // parts company with the certificate above: that is an award, and only a Player 1 win earns one
@@ -320,6 +330,16 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     hold(true, false);   // terminal: the beats below (the jingle, the certificate toasts) must still run — see `hold`
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
     const headline = duelHeadline(r); say(headline);
+    // Captured, not read back off `cert`: this handler is async and fires long after this frame, and it must
+    // draw the certificate *this* match earned, so it binds the value the `if` tested. The `certificate()` hook
+    // below deliberately does the opposite and reads the live binding — it is asked "what has been earned
+    // now?" and answers null until the match is settled (#16 review, note 7; narrowed by #375 round 2, note 1:
+    // "before the match ends" was the old boundary, and `cert` is now set at the last slice, not the overlay).
+    //
+    // Gated on `certSaved` too (#470): a write `commitMatch` already made and found refused is not offered as
+    // a keepsake the album has. `cert` itself stays untouched by this — the window hooks below still answer
+    // what was *earned* — this is only what the row promises to have *kept*.
+    const earned = certSaved ? cert : null;
     overlay.hidden = false;
     overlay.innerHTML = `
       <div class="modal results duel-end">
@@ -329,17 +349,11 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
         ${dojoRowsHTML(dojo)}
         ${stickersHTML(fresh)}
-        ${cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div><p class="cert-msg" id="cert-msg" role="status" hidden></p>' : ''}
+        ${earned ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div><p class="cert-msg" id="cert-msg" role="status" hidden></p>' : ''}
         <div class="row"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>
       </div>`;
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
-    // Captured, not read back off `cert`: this handler is async and fires long after this frame, and it must
-    // draw the certificate *this* match earned, so it binds the value the `if` tested. The `certificate()` hook
-    // below deliberately does the opposite and reads the live binding — it is asked "what has been earned
-    // now?" and answers null until the match is settled (#16 review, note 7; narrowed by #375 round 2, note 1:
-    // "before the match ends" was the old boundary, and `cert` is now set at the last slice, not the overlay).
-    const earned = cert;
     // #436: this outcome fires while `#overlay` is up, and the shared `#toast` sits BEHIND it (`grid-area: q`,
     // z-index 3, under the overlay's z-index 5) — a child who taps 🎓 never saw whether it worked. `certMsg`
     // reports inside the modal itself instead, next to the button that earned it, where nothing can cover it.
