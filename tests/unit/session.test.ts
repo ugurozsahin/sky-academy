@@ -544,11 +544,8 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * | `prompt`, `answer`, `hint`, `listen`, `sequence` | **yes** — `asked()` reads all five |
  * | `coins`, `numberline`, `chart` | **yes** — `asked()` reads them too, independently of `VISUAL_QUESTION` (#455) |
  * | `objects`, `sentence`, `symmetry` (the #390 names in `VISUAL_QUESTION`) | **no rail here** — see below |
- * | `options` | **no** |
- *
- * The one remaining no is measured, and is `main`'s behaviour rather than anything this change introduces:
- * `intervalCompare`'s own comment reads *"No hint: the bubbles **are** the durations"*, and `y2-duration` at
- * d2 gives 22 keys with 18 covering more than one comparison (#451).
+ * | `options`, where the generator sets `optionsAreContent` | **yes** — `asked()` reads it too (#451) |
+ * | `options`, everywhere else | **no**, deliberately — see below |
  *
  * The three #390 names still get **no rail in this describe**, which round 3's version of this table got wrong
  * (round 4, note 1): `asked()` omits them, so deleting any single one of the three leaves both exact rails
@@ -558,12 +555,13 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * directly (#455), so deleting one of those three from `VISUAL_QUESTION` now reddens `two cards that ask the
  * same thing never take two keys` below, the key having fallen behind the oracle it is measured against.
  *
- * `options` is not keyed for the same reason `objects`/`sentence`/`symmetry` are not read by `asked()`:
- * unconditionally folding it in switches de-duplication off wherever the field is decoration. `options` are a
- * decoy pool on forty-odd topics, which is why `the key ignores every field that carries presentation` pins
- * the exclusion; and a `word` visual carries `orderQ`'s *shuffled* display, so `y2-order` is correctly outside
- * rather than missed. `options` wants the same remedy #455 already took — a signal from the generator that its
- * field is the question — which is #451, not this pull request.
+ * `options` is keyed only where the generator opts in with `optionsAreContent` (#451): unconditionally folding
+ * it in for every topic switches de-duplication off wherever the field is decoration. `options` are a decoy
+ * pool on forty-odd topics, which is why `the key ignores every field that carries presentation` still pins
+ * the default exclusion; and a `word` visual carries `orderQ`'s *shuffled* display, so `y2-order` is correctly
+ * outside rather than missed. `intervalCompare` is the one generator that sets it, because it sets no `hint`,
+ * `listen` or visual and its own comment says the bubbles *are* the durations — `asked()` below reads
+ * `options`, sorted, on exactly the same condition the key does, so the rails below now cover `y2-duration`.
  *
  * So: no rail here names a topic, and within the carriers marked yes, a new topic is covered the day it ships.
  * The adjective-shaped version of that sentence is the mistake this file diagnoses two paragraphs up, and it
@@ -589,9 +587,9 @@ describe('the repeat key holds the whole question (#412)', () => {
    * reading either. Today there are none — `', '` appears in four sentence topics' prose and collides with
    * nothing.
    *
-   * What neither this nor the key sees: `options`, and the three `VISUAL_QUESTION` types `asked()` does not read
-   * directly (`objects`, `sentence`, `symmetry`). The describe header enumerates it by carrier, with the one
-   * remaining measurement — `y2-duration` (#451).
+   * What neither this nor the key sees, everywhere `optionsAreContent` is unset: `options`, and the three
+   * `VISUAL_QUESTION` types `asked()` does not read directly (`objects`, `sentence`, `symmetry`). The describe
+   * header enumerates it by carrier.
    */
   const asked = (q: Question) => {
     // A superset of the key's own list, which is the point: `', '` is here and deliberately not there, because
@@ -609,7 +607,10 @@ describe('the repeat key holds the whole question (#412)', () => {
       : v?.type === 'numberline' ? `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}`
       : v?.type === 'chart' ? `${v.kind}/${v.rows.map(r => r.n).join(',')}`
       : '';
-    return [q.prompt, q.answer, set(q.hint ?? ''), set(q.listen ?? ''), (q.sequence ?? []).join('\u0001'), visual].join('\u0000');
+    // #451: the same opt-in the key reads — `options` is a re-shuffled decoy pool everywhere else, so folding
+    // it in unconditionally would make this oracle too fine, the B1 direction #412's own review already found.
+    const options = q.optionsAreContent ? [...q.options].sort().join('\u0001') : '';
+    return [q.prompt, q.answer, set(q.hint ?? ''), set(q.listen ?? ''), (q.sequence ?? []).join('\u0001'), visual, options].join('\u0000');
   };
   const playable = TOPICS.filter(t => t.input !== 'tracing');
 
