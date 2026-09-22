@@ -33,9 +33,12 @@ paths:
   **(a) Name the set** — *every assertion in this describe block*, *every rail that reads a prose document*,
   *every call of `code()`*. "I fixed them all" is a claim; a named set is an object a reader can count.
   **(b) Rail the coverage where the set is mechanically enumerable.** Test files are files, so a rail can read
-  them: `tests/unit/governance.test.ts` carries one that reads its own source and asserts every rail in a
-  block has a negative assertion, the class defect there being precisely "a block of positives". It found two
-  more rails and a bug in its own helper on its first run.
+  them — the worked example is a rail that reads `tests/unit/governance.test.ts`'s own source and asserts
+  every rail in a block carries a negative assertion, the class defect there being precisely "a block of
+  positives". **That is the shape to copy, not a claim that it is already in place**: it was written for #512
+  and lands with it. A rule that says a mechanism exists when it does not is the "it only documents existing
+  behaviour" cover story the `open-pr` skill §6 warns about, and it was this bullet's first draft (#527
+  review, B4).
   **(c) Derive the mutation table from the set, not from imagination** — one mutation per member. That turns
   *did I think of it?* into *is the list complete?*, and only the second is checkable.
   **What this does not do**: catch a class nobody has named. It catches *named the class, treated it
