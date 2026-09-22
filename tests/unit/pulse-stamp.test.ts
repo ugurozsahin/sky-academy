@@ -248,7 +248,8 @@ describe('the CLI both routines and the watchdog are pointed at', () => {
  * Prove it red: drop the `scripts/pulse-stamp.mjs` mention from any one of the three.
  */
 describe('every routine that writes or reads a pulse is pointed at the one home (#439)', () => {
-  it.each(['docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md', 'docs/WATCHDOG-PROMPT.md'])(
+  it.each(['docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md', 'docs/WATCHDOG-PROMPT.md',
+           'docs/REFINER-PROMPT.md'])(
     '%s names scripts/pulse-stamp.mjs', (file) => {
       expect(readFileSync(join(root, file), 'utf8')).toContain('scripts/pulse-stamp.mjs');
     });

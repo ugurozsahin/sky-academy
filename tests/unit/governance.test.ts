@@ -83,7 +83,7 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
   // here: it is the archive, it describes itself in the past tense, and a rail that policed it would be
   // policing history. `tests/` is not here either, for the reason in the block comment above.
   const LIVE = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
-                'docs/WATCHDOG-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
+                'docs/WATCHDOG-PROMPT.md', 'docs/REFINER-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
   const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
 
   it('WORKLOG.md is gone from the repository root, and the archive is still there', () => {
@@ -294,7 +294,7 @@ describe('an unattended run cannot write under .claude/, and cannot be tricked i
 describe('no live rule points at the retired priority-order issue (#171)', () => {
   const root = new URL('../../', import.meta.url);
   const LIVE = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
-                'docs/WATCHDOG-PROMPT.md', 'README.md'];
+                'docs/WATCHDOG-PROMPT.md', 'docs/REFINER-PROMPT.md', 'README.md'];
   // Built from parts so this rail's own source does not contain the string it bans — otherwise the file
   // could never be checked by a sibling rail, and a reader grepping the repo gets a false hit here.
   //
@@ -532,7 +532,7 @@ describe('the browser runs after the agents, not before them (#499)', () => {
 describe('branches are named for the change, and nothing matches on the old prefix (#160)', () => {
   const root = new URL('../../', import.meta.url);
   const LIVE = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
-                'docs/WATCHDOG-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
+                'docs/WATCHDOG-PROMPT.md', 'docs/REFINER-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
   const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
   // Built from parts so this rail's own source does not contain the instruction form it bans.
   const RETIRED = 'claude/' + 'issue-';
@@ -1301,7 +1301,7 @@ describe('the project board is synced from the Mac, read by pulse in the cloud, 
  */
 describe('a bullet is never swallowed onto the line above it (#195)', () => {
   const PROCESS = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
-                   'docs/WATCHDOG-PROMPT.md'];
+                   'docs/WATCHDOG-PROMPT.md', 'docs/REFINER-PROMPT.md'];
 
   // A sentence end, then a list marker, mid-line: `.- ` or `. 1. `. Deliberately narrow — the marker must be a
   // hyphen or a number, and what precedes it a full stop, question or exclamation mark. Widening it to `*` or
@@ -3226,7 +3226,7 @@ describe('the reviewer routine keeps a pulse, and something reads it (#327, #320
     expect(w, 'and say plainly it is a finding — freshness is exactly what makes this one look fine')
       .toMatch(/`stopped: limit`[^.]{0,80}is a finding, not a pass/i);
     // Both STEP 0s write it, so the check covers both routines or it covers the wrong half.
-    for (const p of ['docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md'])
+    for (const p of ['docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md', 'docs/REFINER-PROMPT.md'])
       expect(doc(p), `${p} STEP 0 must still write the shape the watchdog now looks for`).toContain('stopped: limit');
   });
 
@@ -4595,5 +4595,104 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
       .map(nameOf);
     expect(naked, 'a rail of positives only cannot tell a statement from its negation — every rail here '
       + 'either pins a unit by equality or guards the reversal explicitly').toEqual([]);
+  });
+});
+
+/**
+ * COVERAGE, not another rule — the answer to why #512 was blocked nine times. Round 9's finding was that two
+ * rails enumerating "every routine with a pulse" never grew to four when the refiner arrived. That is round
+ * 8's finding (the CLAIMS table did not cover item 9), round 7's (the pagination rule did not cover both
+ * signals) and rounds 3/4/6/8's (the modifier list did not cover every `it`) wearing a different hat: **a
+ * population enumerated by hand does not grow when the population does.**
+ *
+ * The reviewer named two such rails. Probing for the real shape found **six** that the refiner belonged in,
+ * so a third hand-audit would have been the same mistake a fourth time. This rail replaces the audit: the
+ * population is a **directory listing**, and every enumeration in the test sources is found by reading them.
+ * The day a fifth routine's prompt file lands, every enumeration below that has not grown goes red.
+ *
+ * An enumeration is a run of adjacent quoted literals naming **two or more** `docs/*-PROMPT.md` files — one
+ * file is an ordinary reference, two is a claim about a set. Exemptions are listed with the reason each one
+ * is genuinely not the whole population, matched by the exact run text and **refused unless they match
+ * exactly once** (round 5, B6: a loose match silently exempts something it was never written for).
+ *
+ * What this does not do: catch a rail that names the files some other way — a glob, a variable, a template
+ * string. It catches the shape every one of these rails is actually written in today, and a new shape is a
+ * new population that nobody has named, which is still a job for a reviewer.
+ *
+ * Prove it red: delete `docs/REFINER-PROMPT.md` from any unexempted run below.
+ */
+describe('a rail that enumerates the routine prompts covers all of them (#512, round 9)', () => {
+  const root = new URL('../../', import.meta.url);
+  const src = (name: string) => readFileSync(new URL(name, root), 'utf8');
+
+  /** The population, read from disk rather than remembered. Four routines today. */
+  const PROMPTS = readdirSync(new URL('docs/', root))
+    .filter((f) => f.endsWith('-PROMPT.md')).map((f) => `docs/${f}`).sort();
+
+  const SOURCES = ['tests/unit/governance.test.ts', 'tests/unit/pulse-stamp.test.ts',
+                   'tests/unit/instructions.test.ts'];
+
+  /** Adjacent quoted literals separated only by commas and whitespace — how every one of these is written. */
+  const RUN = /'[^'\n]*'(?:\s*,\s*'[^'\n]*')*/g;
+  const norm = (s: string) => s.replace(/\s+/g, ' ');
+
+  /**
+   * Runs that are deliberately not the whole set, each with the reason. Keyed by the exact normalised run,
+   * so adding a file to one of these changes the key and it stops being exempt — which is the correct
+   * direction: a deliberate edit asks for a deliberate re-exemption.
+   */
+  const EXEMPT = new Map([
+    [norm("'docs/REVIEWER-PROMPT.md', 'docs/ROUTINE-PROMPT.md'"),
+     'the two routines that read the open pull request list; the refiner never touches a pull request and '
+     + 'the watchdog does not list them'],
+    [norm("'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md'"),
+     'the two routines that read the board projection (#158); the reviewer and the refiner do not'],
+    [norm("'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md'"),
+     'the two prompts that have a STEP 1 with a pull in it; the refiner pulls in its bootstrap instead and '
+     + 'the watchdog has no STEP 1'],
+    [norm("'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md', 'docs/REFINER-PROMPT.md'"),
+     'the three routines that WRITE `stopped: limit`; the watchdog is the reader and is asserted separately '
+     + 'in the same test'],
+  ]);
+
+  /**
+   * This block's own source is excluded, because EXEMPT below quotes each run it exempts and those quotations
+   * are textually identical to the runs themselves — leaving them in, every exemption matches twice and the
+   * uniqueness check below can never pass. Excluded rather than disguised: building the keys "from parts" so
+   * they do not appear literally would hide them from a reader too, and a reader is who exemptions are for.
+   * The cost is that a genuine enumeration written inside this block would not be seen; there is none, and
+   * this block is about the population rather than a member of it.
+   */
+  const scannable = (file: string) => {
+    const text = src(file);
+    const own = text.indexOf("describe('a rail that enumerates the routine prompts");
+    return own < 0 ? text : text.slice(0, own);
+  };
+  const runsOf = (file: string) => [...scannable(file).matchAll(RUN)].map((m) => norm(m[0]))
+    .filter((run) => PROMPTS.filter((p) => run.includes(`'${p}'`)).length >= 2);
+
+  it('the population is read from disk, and it is the four routines', () => {
+    expect(PROMPTS, 'a routine prompt that stopped matching docs/*-PROMPT.md would shrink this rail to '
+      + 'nothing without failing it').toContain('docs/REFINER-PROMPT.md');
+    expect(PROMPTS.length, 'four routines develop, review, watch and refine').toBeGreaterThanOrEqual(4);
+  });
+
+  it.each(SOURCES)('%s enumerates every routine prompt, or says why not', (file) => {
+    const runs = runsOf(file);
+    expect(runs.length, `${file} must contain at least one enumeration, or this row asserts nothing`)
+      .toBeGreaterThan(0);
+    const short = runs.filter((run) => !EXEMPT.has(run))
+      .filter((run) => PROMPTS.some((p) => !run.includes(`'${p}'`)));
+    expect(short, 'each of these claims to cover every routine and does not — add the missing prompt file, '
+      + 'or add the run to EXEMPT with the reason it is genuinely a subset').toEqual([]);
+  });
+
+  it('every exemption is used, exactly once, across the sources', () => {
+    const all = SOURCES.flatMap(runsOf);
+    for (const [run, why] of EXEMPT) {
+      const hits = all.filter((r) => r === run).length;
+      expect(hits, `the exemption "${why}" matches ${hits} runs, want exactly 1 — a stale exemption is a `
+        + 'hole nobody can see, and one matching twice exempts something it was never written for').toBe(1);
+    }
   });
 });
