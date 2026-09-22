@@ -689,6 +689,23 @@ describe('the repeat key holds the whole question (#412)', () => {
   });
 
   /**
+   * The rail above runs at d1 only, and `y2-duration`'s d1 branch is the plain numeric-fact generator, not
+   * `intervalCompare` — so it never actually exercises `optionsAreContent` (`options` there is decoration, the
+   * flag is unset, and the reversal it tries is the no-op every other topic gets). This is that direct case,
+   * at d2 where `intervalCompare` runs, on a real generated card rather than a hand-built one: order is
+   * ignored, a different set of durations is not, and turning the flag off returns to the old, coarser key.
+   */
+  it('optionsAreContent normalises option order but not option identity (#451)', () => {
+    const topic = topicById('y2-duration')!;
+    const q = topic.gen(2, rng(5));
+    expect(q.optionsAreContent, 'this draw did not exercise intervalCompare').toBe(true);
+    const base = repeatKey(q);
+    expect(repeatKey({ ...q, options: [...q.options].reverse() }), 'order').toBe(base);
+    expect(repeatKey({ ...q, options: [...q.options, 'a duration not really on this card'] }), 'a genuinely different set').not.toBe(base);
+    expect(repeatKey({ ...q, optionsAreContent: false }), 'the flag itself').not.toBe(base);
+  });
+
+  /**
    * Per topic at d1: the generator's own consecutive-agreement rate, the rate a driven `Session` produces, and
    * how many distinct cards there are per distinct answer. Computed once — three of these numbers are wanted
    * by the discovery and by the assertion, and a second pass would double the cost of the file.
