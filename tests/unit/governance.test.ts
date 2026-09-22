@@ -4041,3 +4041,66 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
       .toMatch(/merge is (his|the owner)|owner('s|s) to merge|stays the owner/i);
   });
 });
+
+
+/**
+ * #526 — a class fix names its population.
+ *
+ * "Fix the class, not the instance" (#466) was followed on three pull requests in one day and failed on all
+ * three, because a reminder cannot enumerate a set: the author fixes the class across the instances their own
+ * mutation table touches, and that table is written after the fix, by the mind that wrote it. The untreated
+ * instances are exactly the ones not imagined. PR #513's round 2 found it *inside the commit whose message
+ * claimed to fix the class*.
+ *
+ * Two homes, and this rail holds both ends so neither can drift out alone: the author's obligation in
+ * `.claude/rules/guardrails.md`, beside the other rail rules, and the reviewer's in `review-pr` §7, beside
+ * the two other findings that block whatever the round.
+ *
+ * Each check below carries a negative as well as a positive, because the rule this rail states is the one it
+ * would otherwise break: a block of positives cannot tell a statement from its negation.
+ *
+ * Prove it red: drop the population sentence from either file; add "where practical" to either.
+ */
+describe('a class fix names the population it covers (#526)', () => {
+  const root = new URL('../../', import.meta.url);
+  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  const NO_ESCAPE = /\bunless\b|\bwhere practical\b|\bwhere possible\b|\bif time allows\b|\bideally\b/i;
+
+  it('guardrails.md carries the author\'s obligation, with the reason it is not a reminder', () => {
+    const text = doc('.claude/rules/guardrails.md');
+    const bullet = text.split('\n- ').find((b) => /addresses a \*class\*/.test(b)) ?? '';
+    expect(bullet, 'the rule must sit beside the other rail rules, as its own bullet').not.toEqual('');
+    expect(bullet, 'it must ask for the population to be named — that is the whole obligation')
+      .toMatch(/name the (set|population)/i);
+    expect(bullet, 'and say why a reminder is not enough, or the next author reads it as ceremony')
+      .toMatch(/cannot enumerate|inherits the same blind spot|not imagined/i);
+    expect(bullet, 'the mutation table must be derived from the set rather than from imagination')
+      .toMatch(/one mutation per member|derive the mutation table/i);
+    expect(bullet, 'it must say what it does NOT catch, or the rule reads as a cure for every blind spot')
+      .toMatch(/[Ww]hat this does not do/);
+    expect(bullet, 'and name what it does catch instead — "named the class, treated it partially"')
+      .toMatch(/treated it\n?\s*partially/i);
+    expect(bullet, 'no qualifier may make naming the set optional — that is the rule dissolving')
+      .not.toMatch(NO_ESCAPE);
+  });
+
+  it('review-pr §7 makes an unnamed population a finding, beside the other two', () => {
+    const skill = doc('.claude/skills/review-pr/SKILL.md');
+    const s7 = skill.slice(skill.indexOf('## 7. '));
+    expect(s7.length, '§7 must be read from disk, or this rail checks nothing').toBeGreaterThan(800);
+    expect(s7, 'the two standing findings must still be there — this is added beside them, not instead')
+      .toMatch(/a rail does not hold what it claims/);
+    expect(s7, '§7 must make an unnamed population a finding').toMatch(/does not name its population/i);
+    expect(s7, 'and tell the reviewer to count it rather than trust it, which is how all three were found')
+      .toMatch(/[Cc]ount it rather than trusting it|pick a member/);
+    expect(s7, 'no qualifier may make it a preference — §7 is the section about what may block')
+      .not.toMatch(NO_ESCAPE);
+  });
+
+  it('each file points at the other, so neither half can be read as the whole rule', () => {
+    expect(doc('.claude/rules/guardrails.md'), 'guardrails.md must point at the reviewer\'s half')
+      .toContain('.claude/skills/review-pr/SKILL.md');
+    expect(doc('.claude/skills/review-pr/SKILL.md'), 'and the skill at the author\'s')
+      .toContain('.claude/rules/guardrails.md');
+  });
+});
