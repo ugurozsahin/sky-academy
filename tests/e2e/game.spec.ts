@@ -2692,6 +2692,33 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
   });
 
   /**
+   * #446. The row above withholds Remove on the *future* slot itself — 99 coins behind it — but that alone
+   * still let a grown-up remove the *readable* sibling and strand the family: with p2 unreadable by this
+   * build, taking p1 out leaves an index whose one remaining id resolves to a save this build cannot open,
+   * which sends the device into the first-run wizard over a store `readOnly` latches shut. Nothing typed into
+   * that wizard is ever kept, so the family is stuck until the other device or an update comes back.
+   */
+  test('removing the readable ninja is withheld when the only sibling is a newer-build save (#446)', async ({ page }) => {
+    await page.addInitScript(({ index, ada, future }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', future);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      future: JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    // p1 is readable and has a sibling, but that sibling is the only one and it is `future` — stranded.
+    await expect(page.locator('button[data-del="p1"]'), 'removing Ada would leave only Bo\'s unreadable save').toHaveCount(0);
+    await expect(page.locator('button[data-del="p2"]'), 'the future slot is still withheld on its own terms too').toHaveCount(0);
+  });
+
+  /**
    * The grown-ups list draws a slot the picker's ＋ created and nothing ever played — the same state #380
    * review B1 was about, one screen over. It must not offer a rename it would refuse, and it must still be
    * removable, because that is the only way the family gets the slot back.

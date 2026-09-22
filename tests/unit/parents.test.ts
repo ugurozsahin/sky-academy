@@ -151,14 +151,22 @@ describe('ninjas on this device (#20 slice 3)', () => {
   });
 
   /**
-   * `canRemoveCard`'s two exclusions, which had no unit test while `canRenameCard`'s did (#420 review round 2,
-   * note 1) — both were held only by the mobile e2e, and inverting either was green on the unit suite.
+   * `canRemoveCard`'s three exclusions, which had no unit test for the first two while `canRenameCard`'s did
+   * (#420 review round 2, note 1) — both were held only by the mobile e2e, and inverting either was green on
+   * the unit suite. The third (#446) is the one this rail was written for: it has no e2e coverage yet, because
+   * reproducing it needs two profiles, one of them a `future` save.
    */
-  it('offers Remove for every ninja except the last one, and except a save a newer build wrote', () => {
-    expect(canRemoveCard(card({ onboarded: true }), false), 'one of several').toBe(true);
-    expect(canRemoveCard(card({ onboarded: true }), true), 'the only one — that is "Start again"').toBe(false);
-    expect(canRemoveCard(card({ future: true }), false), '99 coins this build cannot read are behind it').toBe(false);
-    expect(canRemoveCard(card(), false), 'an unplayed slot is removable: it is the only way the family gets it back').toBe(true);
+  it('offers Remove for every ninja except the last one, except a save a newer build wrote, and except one whose removal would strand the family (#446)', () => {
+    expect(canRemoveCard(card({ onboarded: true }), [card({ id: 'p2' })]), 'one of several, sibling readable').toBe(true);
+    expect(canRemoveCard(card({ onboarded: true }), []), 'the only one — that is "Start again"').toBe(false);
+    expect(canRemoveCard(card({ future: true }), [card({ id: 'p2' })]), '99 coins this build cannot read are behind it').toBe(false);
+    expect(canRemoveCard(card(), [card({ id: 'p2' })]), 'an unplayed slot is removable: it is the only way the family gets it back').toBe(true);
+    // #446: a readable profile with siblings, but every sibling is a `future` save — removing it would leave
+    // nobody this build can open, so the button must not offer that.
+    expect(canRemoveCard(card({ onboarded: true }), [card({ id: 'p2', future: true })]),
+      'the only sibling is unreadable by this build').toBe(false);
+    expect(canRemoveCard(card({ onboarded: true }), [card({ id: 'p2', future: true }), card({ id: 'p3', onboarded: true })]),
+      'one sibling unreadable, another readable — the family is not stranded').toBe(true);
   });
 
   /**
