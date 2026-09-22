@@ -1650,7 +1650,7 @@ describe('guard rails', () => {
       // "a markdown file that cannot reach the game", and pointing at a path that no longer exists would
       // have made this line read as a leftover rather than a check.
       for (const path of ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/worklog/2026-09.md',
-                          'tests/unit/guardrails.test.ts', 'scripts/seed-issues.py',
+                          'tests/unit/guardrails.test.ts', 'scripts/board-sync.mjs',
                           '.claude/skills/add-topic/SKILL.md', '.github/workflows/review-gate.yml'])
         expect({ path, e2e: re.test(path) }, `${path} cannot reach the game, so it must not pay for e2e (#176)`)
           .toEqual({ path, e2e: false });
