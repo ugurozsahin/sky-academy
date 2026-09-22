@@ -61,17 +61,30 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     if (lock) return false;
     const r = game.flip(i); if (r === 'ignored') return false;
     sfx.tap(); say(game.cards[i].face.say, false); draw();
-    if (r === 'match') { sfx.correct(); toast(`${cheerLine(av)} A pair!`, 'good'); cardEls[i].classList.add('pop'); cardEls[game.cards.findIndex((c, k) => k !== i && c.pair === game.cards[i].pair && c.matched)]?.classList.add('pop'); if (game.done) later(finish, 900); }
+    // #484: the board's own writes are committed here, the instant the winning pair is matched — not 900ms
+    // later inside `finish()`, which used to run them from the overlay's own scope-bound timer. Quitting
+    // through `#back` in that window (`cleanup()` -> `scope.dispose()`) cancelled `finish()` outright: the
+    // last board of a session lost its coins, its Daily Dojo move and its streak, with nothing to say so.
+    if (r === 'match') {
+      sfx.correct(); toast(`${cheerLine(av)} A pair!`, 'good'); cardEls[i].classList.add('pop');
+      cardEls[game.cards.findIndex((c, k) => k !== i && c.pair === game.cards[i].pair && c.matched)]?.classList.add('pop');
+      if (game.done) { const payout = commit(); later(() => finish(payout), 900); }
+    }
     else if (r === 'miss') { lock = true; later(() => { game.hide(); lock = false; draw(); }, 900); toast('Not a pair — try again', 'bad'); }
     return true;
   }
   cardEls.forEach((el, i) => el.addEventListener('click', () => flip(i)));
 
-  function finish() {
+  /** The board's writes (#484, mirroring #375/#441's `commitMatch` for Ninja Duel) — see `flip()`'s comment. */
+  function commit() {
     const boards = recordMemory(o.year.id);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd({ mode: 'memory', won: true, correct: game.pairs.length, attempts: game.moves, bestCombo: 0, stars: game.stars, score: game.score }, game.coins);
     const streak = touchStreak();
+    return { boards, dojo, fresh, streak };
+  }
+  function finish(payout: ReturnType<typeof commit>) {
+    const { boards, dojo, fresh, streak } = payout;
     const stickerHTML = stickersHTML(fresh);
     if (fresh.length) later(() => sfx.stage(), 600);
     sfx.stage();

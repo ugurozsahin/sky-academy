@@ -11,9 +11,11 @@
 import { cheerLine, type Avatar } from '../avatars';
 import { STAGE_NAMES, type Question } from '../curriculum';
 import type { Arena, WaveOpts } from '../game/arena';
+import type { DojoOutcome } from '../game/dojo';
 import { Session, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
+import type { CertInfo } from './certificate';
 import { $, esc } from './dom';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
 import { hintText, promptHTML, promptMode, stageHTML, type Hud, type Outcome } from './hud';
@@ -34,6 +36,13 @@ export const BOMB = '💣';
 export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, seqIndex: number): WaveOpts {
   return { labels: info.labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), ordered: q.sequence?.slice(seqIndex) };
 }
+
+/**
+ * Every write a finished game produces (coins, the Daily Dojo move, Sensei's accuracy, the certificate, the
+ * daily streak) — handed from `commitResult()` to `showResults()` rather than a second one recomputing them,
+ * which would pay the game twice (#484, mirroring #375/#441's `MatchPayout` for Ninja Duel).
+ */
+export interface ResultPayout { newBest: boolean; dojo: DojoOutcome; fresh: string[]; streak: number; cert: CertInfo | null }
 
 /** The HUD elements the callbacks write to — play.ts owns them and passes its own `els` straight in. */
 export interface PlaySessionEls {
@@ -62,7 +71,15 @@ export interface PlaySessionDeps {
   showTutorial: () => number;
   showTaunt: () => void;
   showStageClear: (stage: number, stars: number, acc: number) => void;
-  showResults: (r: SessionResult) => void;
+  /**
+   * The writes a finished game makes — every `record*()` call, run synchronously the moment the game is
+   * decided (#484). `showResults()` used to make them itself, from inside the overlay's own scope-bound
+   * timer: a quit between the game ending and that timer firing (Pause → Islands, or the Android back
+   * button) ran `dispose()`, which cancelled it — coins, the Daily Dojo move, Sensei's accuracy, the
+   * certificate and the streak all lost, with no toast or log to say so, in every mode but Ninja Duel.
+   */
+  commitResult: (r: SessionResult) => ResultPayout;
+  showResults: (r: SessionResult, payout: ResultPayout) => void;
 }
 
 export interface PlaySession {
@@ -331,9 +348,13 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     },
     // #138: the floor and the breath after it are game beats and scale; `revealUntil - now` is real time
     // already remaining on a hold that was itself scaled when it started, so it must NOT be scaled again.
+    // #484: the writes are committed here, in the same synchronous call as `end()` — before the overlay's own
+    // timer is even scheduled — so a quit during the wait below can only ever cancel the DRAWING of the
+    // results, never the payout itself.
     onEnd(r) {
+      const payout = deps.commitResult(r);
       const wait = lastOutcome === 'none' || r.mode === 'sprint' ? 0 : Math.max(scaled(900), revealUntil - performance.now() + scaled(300));
-      deps.later(() => deps.showResults(r), wait);
+      deps.later(() => deps.showResults(r, payout), wait);
     },
   });
 

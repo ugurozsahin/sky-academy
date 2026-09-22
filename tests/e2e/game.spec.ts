@@ -758,6 +758,57 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.sticker.got')).toHaveCount(3);
   });
 
+  /**
+   * #484 (mirroring #375/#441's Ninja Duel fix): a finished mission is committed the instant it is decided,
+   * not ~1.2s later inside the results overlay's own scope-bound `later()`.
+   *
+   * Every write a mission produces — the topic's stars, the coins, the Daily Dojo move, Sensei's accuracy and
+   * the certificate — used to sit inside `showResults()`, which `onEnd` reached only through that timer.
+   * `#pause` stays bound throughout the wait (`syncPaused()` only pauses the arena, never hides the button),
+   * so Pause → Quit in that window ran `cleanup()` -> `scope.dispose()`, which cancelled the pending call and
+   * every write with it: a five-star mission paid the child nothing, with no toast or log to tell it from a
+   * mission that was never finished.
+   *
+   * The quit is driven at the EARLIEST point the window opens: `#next` on the LAST stage's clear overlay is
+   * what calls `session.nextStage()` -> `end(true)` synchronously, so the click, the pause and the quit run
+   * inside one `page.evaluate` — no timer of any kind gets to run between the game being decided and the
+   * quit reaching `scope.dispose()`. A commit that happened any later than the click itself would fail this.
+   */
+  test('a mission left through Pause the instant the last stage clears is still paid, recorded and filed (#484)', async ({ page }) => {
+    test.setTimeout(150_000);
+    await seedPlayer(page, 'terra');
+    await startTopic(page, 'reception', 'r-count');
+    const stages = await page.evaluate(() => window.__sna.session.stages);
+    expect(stages).toBe(5);
+    for (let stage = 1; stage < stages; stage++) {
+      await answerAll(page, 5);
+      await expect(page.locator('.celebrate')).toBeVisible();
+      await page.click('#next');
+    }
+    // Stage 5, the last one: answer every question, then wait for its own stage-clear overlay before the
+    // synchronous quit — clicking `#next` while `.celebrate` from an EARLIER stage was still up would let the
+    // click land on the wrong overlay's button.
+    await answerAll(page, 5);
+    await expect(page.locator('.celebrate h2')).toContainText('Stage 5 clear');
+    const quitState = await page.evaluate(() => {
+      (document.querySelector('#next') as HTMLButtonElement).click();     // -> nextStage() -> end(true), synchronously
+      const s = window.__sna.state();
+      (document.querySelector('#pause') as HTMLButtonElement).click();
+      (document.querySelector('#quit') as HTMLButtonElement).click();
+      return s;
+    });
+    expect(quitState, 'the mission is over the instant #next is clicked, before any results timer runs').toMatchObject({ ended: true });
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
+    await expect(page.locator('.results')).toHaveCount(0);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.progress['r-count'], 'the topic star and best score reached the save').toMatchObject({ stars: 3, plays: 1 });
+    expect(saved.progress['r-count'].best).toBeGreaterThan(0);
+    expect(saved.coins, 'coins were paid though the overlay never opened').toBeGreaterThan(0);
+    expect(saved.certs, 'and the win filed its certificate').toHaveLength(1);
+    expect(saved.certs[0]).toMatchObject({ id: 'reception:r-count', name: 'Ada', avatar: 'terra' });
+  });
+
   test('"My certificates" (#110): an earned certificate lists on the rewards screen, and View opens it full-screen with tap-to-zoom', async ({ page }) => {
     const cert = { id: 'reception:r-count', name: 'Ada', avatar: 'volt', year: 'Reception', title: 'Counting to 10', stars: 3, score: 250, correct: 20, attempts: 20, date: '2026-09-10' };
     // Seeded with a duel as well as a certificate (#415 round 2, note 3). With no duel on the page
@@ -1782,6 +1833,58 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.speech')).toContainText('Mia');
     await page.click('#home');
     await expect(page.locator('#memory small')).toContainText('boards 1');
+  });
+
+  /**
+   * #484 (mirroring #375/#441's Ninja Duel fix): a finished board is committed the instant the winning pair
+   * matches, not 900ms later inside `finish()`'s own scope-bound `later()`.
+   *
+   * `flip()` used to make every write — the board count, the coins, the Daily Dojo move and the streak —
+   * only from inside `finish()`. `#back` stays clickable throughout the 900ms wait, so leaving through it in
+   * that window ran `cleanup()` -> `scope.dispose()`, which cancelled `finish()` and every write with it: the
+   * last board of a session paid the child nothing.
+   *
+   * The winning flip and the quit run inside one `page.evaluate`, so no timer of any kind gets to run between
+   * the match completing the board and `#back` reaching `scope.dispose()` — a commit that happened any later
+   * than the flip itself would fail this.
+   */
+  test('Memory Match left through Back the instant the last pair matches is still paid and recorded (#484)', async ({ page }) => {
+    await seedPlayer(page, 'splash', 'Mia');
+    await page.click('.island[data-year="reception"]');
+    await page.click('#memory');
+    await expect(page.locator('.card')).toHaveCount(8);
+    const cards = await page.evaluate(() => window.__sna.cards() as { pair: number; matched: boolean }[]);
+    // Match every pair but the last one normally, through the same hook the test above uses.
+    const pairs = [...new Set(cards.map(c => c.pair))];
+    for (const p of pairs.slice(0, -1)) {
+      const i = cards.findIndex(c => c.pair === p);
+      const mate = cards.findIndex((c, k) => k !== i && c.pair === p);
+      await page.waitForFunction(() => !window.__sna.state().waiting);
+      expect(await page.evaluate((k) => window.__sna.flip(k), i)).toBe(true);
+      expect(await page.evaluate((k) => window.__sna.flip(k), mate)).toBe(true);
+      await expect(page.locator(`.card[data-i="${i}"]`)).toHaveClass(/matched/);
+    }
+    // The last pair: both flips and the quit inside one task — `flip()`'s second call is the synchronous
+    // commit (#484), and `#back` reaches it before `finish()`'s 900ms timer ever gets a chance to run.
+    const lastPair = pairs[pairs.length - 1];
+    const i = cards.findIndex(c => c.pair === lastPair);
+    const mate = cards.findIndex((c, k) => k !== i && c.pair === lastPair);
+    await page.waitForFunction(() => !window.__sna.state().waiting);
+    expect(await page.evaluate((k) => window.__sna.flip(k), i)).toBe(true);
+    const quitState = await page.evaluate((k) => {
+      const ok = window.__sna.flip(k);                    // the winning flip: commit() runs inside this call
+      const s = window.__sna.state();
+      (document.querySelector('#back') as HTMLButtonElement).click();
+      return { ok, ...s };
+    }, mate);
+    expect(quitState, 'the board is done the instant the last pair is flipped, before any results timer runs').toMatchObject({ ok: true, ended: true });
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
+    await expect(page.locator('.results')).toHaveCount(0);
+    await expect(page.locator('#memory small'), 'the board was counted though the overlay never opened').toContainText('boards 1');
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.memory?.reception, 'the board count reached the save').toBe(1);
+    expect(saved.coins, 'coins were paid though the overlay never opened').toBeGreaterThan(0);
   });
 
   test('guard rail: a Memory board never leaves a short row hanging off one edge (#372)', async ({ page }) => {
