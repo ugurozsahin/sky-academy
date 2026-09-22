@@ -4059,160 +4059,56 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
  * "MIT", silently licensing the art. Nothing else in the repo would notice, and unlike a broken rail it is
  * not recoverable: an asset released permissively cannot be called back.
  *
- * So: the grant and the carve-out are pinned together, in both files, plus the `package.json` field that a
- * tool reads instead of either. The third-party notices are pinned too — SIL OFL 1.1 for Fredoka and
- * Apache-2.0 for the vendored skill are obligations this project did not choose and cannot drop.
+ * **This block used to detect the negation instead of pinning the sentence — five review rounds on PR #521
+ * found the mechanism has a ceiling.** `binds`/`positivelyStates`/`NO_ESCAPE` tried to tell a statement from
+ * its negation by proximity, a denial-word list and an exception-word list, and every round hardened one of
+ * the three against a fresh bypass: round 2 found `reserved` bound to the path inside a plain negation;
+ * round 3 added a denial word and a forward scan, then found the fix's own window swallowed an unrelated
+ * "Nothing" eleven words upstream; round 4 fixed that window and found two missing exception words and a
+ * false positive on genuinely correct prose; round 5 found three more independent bypasses in one pass —
+ * a clause-boundary side effect, an unbound phrase pin one check still lacked, and confirmed the whole
+ * approach never checks for a reversing addendum stated later in the document using neither list's
+ * vocabulary at all. Round 5's own conclusion: on the one property in this file where being wrong is not
+ * recoverable, a word-list/window heuristic can be tightened against attacks or loosened against false
+ * positives, but not both at once, and the fix belongs in the test, not in another round of vocabulary.
  *
- * It pins no prose beyond those hooks; both files stay free to be rewritten.
+ * So the two load-bearing sentences are pinned verbatim instead — the property this file is actually meant
+ * to hold cannot be phrased any other way and still be checked mechanically, and a sentence that says what
+ * it says is not vulnerable to being read as its own negation. Whitespace is normalised first so a hard-wrap
+ * reflow doesn't fail this test for a reason that isn't a policy change, but the wording itself is exact,
+ * deliberately: this is the one document in the repo where the words are the act, so a maintainer who wants
+ * to reword the carve-out has to touch this test too, on purpose, rather than slide past a heuristic by
+ * accident. The third-party notices get the same treatment for the same reason — they are two sentences,
+ * not a policy with infinite rewordings, so there is nothing a proximity check buys over pinning them.
  *
- * Prove it red: delete the "WHAT THIS LICENCE DOES NOT COVER" section; drop `public/avatars/` from it;
- * remove the README's Licence section; set `package.json`'s `license` to something else.
+ * It pins no prose beyond those sentences; both files stay free to be rewritten everywhere else.
+ *
+ * Prove it red: reword either pinned sentence, even slightly; drop `public/avatars/` or `public/icons/` from
+ * the LICENSE list; remove the README's Licence section; drop either third-party notice from either file;
+ * set `package.json`'s `license` to something else.
  */
 describe('the licence grants the code and reserves the art, in both files (#520)', () => {
   const root = new URL('../../', import.meta.url);
   const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  const norm = (text: string) => text.replace(/\s+/g, ' ').trim();
+  const pinned = (text: string, phrase: string) => norm(text).includes(norm(phrase));
 
-  /**
-   * PR #521 round 1, B1 — and the fourth instance of one class in a day, so it is fixed as a class.
-   *
-   * **A rail that lists the words a policy must contain cannot tell a statement from its negation.** The
-   * reviewer rewrote this README's Licence section to "Everything here is MIT — the game engine, the question
-   * generators, and the twelve character illustrations under `public/avatars/` alike… ship the characters if
-   * you like them", the exact reverse of #520's decision, and all five tests stayed green: `MIT`,
-   * `public/avatars/` and `LICENSE` were each still present, independently of what was said about them.
-   * The same shape defeated the #516 rail (an exception appended beside the pinned phrases) and the #512 one
-   * (the governed sentence replaced while its keywords survived elsewhere in the block).
-   *
-   * Three mechanisms replace token presence, and a policy rail here needs all three:
-   *
-   *  - **`binds`** — the claim must sit within a sentence or two of the subject it governs, so naming the
-   *    subject somewhere and making a contrary claim somewhere else no longer satisfies it. The window is
-   *    characters rather than sentences because these are hard-wrapped documents with lists in them.
-   *  - **`positivelyStates`** — the claim, once found near the subject, must not itself be inside a denial.
-   *    PR #521 round 2/3, B1: `binds` bound `reserved` to `public/avatars/` and stayed green on "are not
-   *    reserved and are free to reuse, including commercially" — bound to the path is not the same as stated
-   *    of the path. It looks backward from each match to the nearest clause boundary (`. : ; —` or a blank
-   *    line) and rejects a match whose own clause carries `not`/`never`/`nothing`/a negative contraction. A
-   *    clause boundary rather than a character count on purpose, for two reasons found by hand before this
-   *    landed: the real README binds `reserved` a few words after "are **not licensed**:" — a colon apart,
-   *    one clause reinforcing the other, which a plain proximity check over that same short distance would
-   *    have condemned along with the mutation; and these are hard-wrapped files, so "is not\nreserved" is a
-   *    single clause split by a line wrap that carries no meaning — a single `\n` is normalised to a space
-   *    before the boundary search runs, and only a blank line (an actual paragraph break) counts as one.
-   *  - **`NO_ESCAPE`** — no exception vocabulary in the same passage. A policy whose content is "no exception"
-   *    is defeated by adding one, which deletes nothing and so passes every presence check ever written.
-   *
-   * None of the three is a wording pin: any rewrite that still reserves the art near the path, states it
-   * rather than denying it, and adds no escape, passes. That is what the control mutations in this PR's table
-   * demonstrate.
-   */
-  const SPAN = 250;
-  // PR #521 round 3, B1 (round 2's finding, still open on this head) — see the doc-comment above for why a
-  // clause boundary and not a character count, and why a lone `\n` is not one of the boundaries.
-  //
-  // Sent for a second look after the round-3 push (self-requested, two different vendored agents): both found
-  // the same two gaps independently, which is why both are fixed here rather than left as one round's word.
-  //
-  //  - **`no` was missing from `DENIAL`** — "no reserved rights" and "no exception" deny a claim as plainly
-  //    as "not" does and neither review agent's mutation needed a second word to prove it.
-  //  - **The whole clause was too wide a backward window.** The real README's "are **not licensed**: all
-  //    rights in them are reserved" is seven words from "not" to "reserved", correctly unbound by `binds`'s
-  //    character span but still inside one clause — so a *sentence* built the other way round, "Nothing in
-  //    the MIT grant above extends to `public/avatars/`, which remains reserved", read the unrelated `Nothing`
-  //    eleven words upstream as a denial of `reserved` and failed a correct rewrite. `WORD_WINDOW` bounds the
-  //    scan to the nearest few words either side of the match, inside the clause, rather than the whole
-  //    clause: wide enough for "does NOT use the SIL Open Font License" (3 words) and "nothing here is
-  //    vendored under the Apache License" (6 words back), narrow enough to leave "Nothing … eleven words …
-  //    reserved" alone.
-  //
-  // What this still does not catch, named rather than hidden (the reason is the same as `SWEEP: NOT
-  // ENUMERABLE` elsewhere in this repo): a denial that governs the claim from a **different clause** —
-  // "art in `public/avatars/` is reserved on paper only; that reservation no longer applies" — needs the
-  // pronoun `that reservation` resolved back to `reserved`, which is parsing, not proximity, and no rail in
-  // this file attempts it. A forward scan bounded the same way covers the in-clause case a review agent found
-  // ("Reserved status does not apply to these images") without reopening the false positive above: the
-  // window is short enough that "reserved … and may not be reused without permission" — `not` six words
-  // downstream, correctly describing the restriction rather than lifting it — stays outside it.
-  //
-  // PR #521 round 4 — B3, the more serious of the two: the mechanism rejected genuinely correct text, not
-  // just weaker adversarial text than before. "the icons under `public/icons/` remain reserved, and nothing
-  // about that changes because the engine above is MIT" reads `nothing` (word 2 after `reserved`, inside
-  // `FORWARD_WORD_WINDOW`) as a denial — but "reserved, and nothing about that changes" is two independent
-  // clauses joined by `, and `, and `nothing about that changes` negates `changes`, not `reserved`; it
-  // *affirms* the reservation holds. `CLAUSE_BREAKS` treated the whole comma-joined sentence as one clause,
-  // which is the same "clause vs. character span" gap `WORD_WINDOW` itself was built to close two rounds ago,
-  // one syntactic level up: a comma followed by a coordinating conjunction starts a new independent clause as
-  // surely as a period does, so it is a clause boundary now too — `', and '` and `', but '` only, not every
-  // comma, since an ordinary comma inside one clause ("reserved, and no permission... is granted" — the real
-  // LICENSE sentence) must still let the forward scan stop at it rather than reach past it into unrelated
-  // territory, which is exactly what made this the right fix rather than a wider `DENIAL` exclusion list: the
-  // real LICENSE text already stops its forward scan at this same boundary today, undetected only because
-  // `FORWARD_WORD_WINDOW` happened to be short enough not to reach `no permission` either way.
-  const DENIAL = /\b(not|no|never|nothing|isn't|aren't|doesn't|don't|won't|cannot|can't)\b/i;
-  const CLAUSE_BREAKS = ['.', ':', ';', '—', '\n\n', ', and ', ', but '];
-  const WORD_WINDOW = 6;
-  const FORWARD_WORD_WINDOW = 4;
-  // Collapses a word-wrap `\n` to a space (no boundary) while keeping a real paragraph break as one, so the
-  // boundary search below never has to special-case which kind of newline it met.
-  const unwrap = (text: string) => text.replace(/\n{2,}/g, '\n\n').replace(/(?<!\n)\n(?!\n)/g, ' ');
-  const clauseStart = (text: string, at: number) =>
-    Math.max(0, ...CLAUSE_BREAKS.map((brk) => {
-      const idx = text.lastIndexOf(brk, at - 1);
-      return idx < 0 ? -1 : idx + brk.length;
-    }));
-  const clauseEnd = (text: string, at: number) => {
-    const idxs = CLAUSE_BREAKS.map((brk) => text.indexOf(brk, at)).filter((idx) => idx >= 0);
-    return idxs.length ? Math.min(...idxs) : text.length;
-  };
-  const lastWords = (text: string, n: number) => text.trim().split(/\s+/).slice(-n).join(' ');
-  const firstWords = (text: string, n: number) => text.trim().split(/\s+/).slice(0, n).join(' ');
-  // Every occurrence of `claim` in `text`, not just the first — a document can state a claim twice, once
-  // inside a denial and once plainly, and the plain one has to be enough on its own to pass.
-  const positivelyStates = (rawText: string, claim: RegExp) => {
-    const text = unwrap(rawText);
-    const global = new RegExp(claim.source, claim.flags.includes('g') ? claim.flags : `${claim.flags}g`);
-    let m: RegExpExecArray | null;
-    while ((m = global.exec(text))) {
-      const before = lastWords(text.slice(clauseStart(text, m.index), m.index), WORD_WINDOW);
-      const after = firstWords(text.slice(m.index + m[0].length, clauseEnd(text, m.index + m[0].length)),
-        FORWARD_WORD_WINDOW);
-      if (!DENIAL.test(before) && !DENIAL.test(after)) return true;
-      if (global.lastIndex === m.index) global.lastIndex += 1; // no zero-width claim exists here today
-    }
-    return false;
-  };
-  const binds = (text: string, subject: string, claim: RegExp) => {
-    const i = text.indexOf(subject);
-    if (i < 0) return false;
-    return positivelyStates(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN), claim);
-  };
-  // PR #521 round 3, B3 — the list named only the vocabulary round 1's mutation happened to use.
-  // `pr-test-analyzer`'s carve-out-of-a-carve-out ("reserved notwithstanding any personal, non-commercial
-  // use, which is freely permitted") kept `reserved` bound to the path and undenied, and added an exception
-  // word this list did not know.
-  //
-  // Only `notwithstanding` and `provided that` are added below, not the wider set first tried here. A second
-  // look at the fix (the same two agents, same request) found `however`, `apart from` and `other than` are
-  // ordinary connectives a correct rewrite can use without conceding an exception — "Apart from the code,
-  // everything here is reserved" and "the art, however, remains reserved" both restate #520's policy and
-  // would have failed this test for no policy reason. `notwithstanding` and `provided that` have no such
-  // everyday use; they are not added on the strength of round 3's one mutation, but because nothing found
-  // reads them any other way.
-  //
-  // PR #521 round 4 — B1, `barring` missing entirely: "reserved by the copyright holder, barring personal
-  // non-commercial use, and no permission..." granted away exactly the commercial-use right the carve-out
-  // exists to withhold, and no word in the list caught it. Unlike `apart from`/`however`, `barring` has no
-  // everyday use restating an existing split — it always introduces a new condition on what follows it — so
-  // it carries none of round 3's false-positive risk.
-  //
-  // B2 — round 3 was right to leave bare `other than` out (a correct rewrite can use it exactly like `apart
-  // from`: "Other than the code, everything here is reserved" restates the split with no new exception), but
-  // wrong that leaving it out entirely was safe: "reserved by the copyright holder, other than for personal
-  // non-commercial use, and no permission..." is the same carve-out-of-a-carve-out as `barring`'s, using
-  // `other than` in its other, exception-introducing sense. The two readings differ by exactly one word —
-  // `other than for` names a condition, bare `other than X` names an alternative — so only the narrower
-  // three-word phrase is added, leaving the ordinary connective round 3 protected untouched.
-  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bexcluding\b|\bnotwithstanding\b|\bprovided that\b|\bbarring\b|\bother than for\b/i;
+  // The exact carve-out sentences the owner settled on (#520, session 2026-09-22). Reworded, PR #521 rounds
+  // 1-5 found a way past whatever checked for the policy by property instead of by these words.
+  const LICENSE_CARVEOUT = 'The artwork and the game\'s written content are NOT licensed. All rights in '
+    + 'them are reserved by the copyright holder, and no permission to use, copy, modify or redistribute '
+    + 'them is granted by this file:';
+  const README_CARVEOUT = '**The artwork and the game\'s written content are not.** The twelve character '
+    + 'illustrations under `public/avatars/` and the icons under `public/icons/` are **not licensed**: all '
+    + 'rights in them are reserved, along with the name "Sky Ninja Academy", the game\'s visual identity and '
+    + 'its written text.';
+  const LICENSE_FREDOKA = 'Fredoka (public/fonts/) is (c) The Fredoka Project Authors, under the SIL Open '
+    + 'Font License 1.1 — see public/fonts/OFL.txt.';
+  const LICENSE_APACHE = '.claude/skills/frontend-design/ is vendored from a third party under the Apache '
+    + 'License 2.0 — see .claude/skills/frontend-design/LICENSE.txt.';
+  const README_FREDOKA = '**Fredoka** under the SIL Open Font License 1.1 (`public/fonts/OFL.txt`)';
+  const README_APACHE = 'a vendored `frontend-design` skill under the Apache License 2.0 '
+    + '(`.claude/skills/frontend-design/LICENSE.txt`).';
 
   it('LICENSE grants MIT and names the holder', () => {
     const l = doc('LICENSE');
@@ -4223,49 +4119,28 @@ describe('the licence grants the code and reserves the art, in both files (#520)
       .toMatch(/Copyright \(c\) \d{4} \S/);
   });
 
-  it('LICENSE reserves the art below the grant, naming the directory', () => {
+  it('LICENSE reserves the art below the grant, in the exact sentence the owner settled on', () => {
     const l = doc('LICENSE');
     const i = l.indexOf('Permission is hereby granted');
-    const carve = l.slice(i);
-    // A deliberate phrase pin, and the only one in this block. `not licensed` is the operative wording of a
-    // licence file rather than a stylistic choice: "withheld", "not covered" and "outside the grant" all
-    // read as description to a lawyer, and this is the one document in the repo where the words are the act.
-    // Everything else here is checked by property, and a control mutation proves the rest of the sentence
-    // stays free to be rewritten.
-    expect(carve, 'the carve-out must sit AFTER the grant, or a reader stops at "MIT" and takes the art')
-      .toMatch(/NOT licensed|not licensed/);
-    expect(carve, 'and name the directories it protects — a carve-out that names nothing protects nothing')
-      .toContain('public/avatars/');
-    expect(carve, 'the app icons are owner art too, referenced from the manifest, and fall through to the '
-      + 'grant unless named (PR #521 review)').toContain('public/icons/');
-    // A `/rights[\s\S]{0,40}reserved/` check stood here and was dropped: a control mutation that reworded
-    // the clause to "every right in them stays reserved" — identical policy — turned it red, which is a rail
-    // pinning prose. `binds` below asserts the same property and only that property.
-    //
-    // Bound to the path, not merely present in the same file: "all rights reserved" three paragraphs from a
-    // sentence that grants the avatars is not a carve-out.
+    expect(i, 'the carve-out must sit AFTER the grant, or a reader stops at "MIT" and takes the art')
+      .toBeGreaterThanOrEqual(0);
+    expect(pinned(l.slice(i), LICENSE_CARVEOUT), 'the carve-out sentence must read exactly as the owner '
+      + 'settled it (whitespace aside) — see the doc-comment above for why this is pinned rather than '
+      + 'detected by property').toBe(true);
     for (const dir of ['public/avatars/', 'public/icons/']) {
-      expect(binds(carve, dir, /\breserved\b|not licensed/i),
-        `${dir} must be named inside the reservation, not merely somewhere in the file`).toBe(true);
+      expect(l.slice(i), `${dir} must be listed under the carve-out, or a carve-out that names nothing `
+        + 'protects nothing').toContain(dir);
     }
-    expect(carve, 'a carve-out with an exception in it is a grant with extra words').not.toMatch(NO_ESCAPE);
   });
 
-  it('README states the same split, so the two cannot drift apart', () => {
+  it('README states the same split, in the exact sentence the owner settled on', () => {
     const r = doc('README.md');
     const lic = r.slice(r.lastIndexOf('## Licence'));
     expect(lic.length, 'README must carry a Licence section — it is where a reader actually looks')
       .toBeGreaterThan(200);
-    expect(lic, 'the README must say the code is MIT').toMatch(/MIT/);
-    expect(lic, 'pointing at the file that states the line exactly').toContain('LICENSE');
-    // The reviewer's mutation kept all three tokens and reversed the policy. So the art paths are checked
-    // for what is SAID about them, within a sentence or two, and the section may carry no escape clause.
-    for (const dir of ['public/avatars/', 'public/icons/']) {
-      expect(binds(lic, dir, /not licensed|\breserved\b/i),
-        `the README must state that ${dir} is withheld, beside the path — naming it inside an "everything `
-        + 'here is MIT" sentence passes a token check and says the opposite (PR #521 round 1, B1)').toBe(true);
-    }
-    expect(lic, 'and it must not reopen what it just reserved').not.toMatch(NO_ESCAPE);
+    expect(pinned(lic, README_CARVEOUT), 'the README\'s Licence section must carry the pinned carve-out '
+      + 'sentence verbatim (whitespace aside) — a rewrite that changes the words has to change this test '
+      + 'too, on purpose').toBe(true);
   });
 
   it('package.json agrees with LICENSE, since tooling reads the field and not the file', () => {
@@ -4273,27 +4148,19 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     expect(pkg.license, 'package.json must carry the same licence the LICENSE file grants').toBe('MIT');
   });
 
-  // Per file, not over their union (PR #521 round 1, non-blocking). Concatenating them meant dropping the
-  // Apache-2.0 notice from `LICENSE` alone stayed green because the README still carried it — and `LICENSE`
-  // is the file a redistributor ships. Each has to stand on its own.
-  //
-  // PR #521 round 3, B2 — this block had no negation guard at all, not even the subject-binding half `binds`
-  // gives the carve-out checks above: plain `toMatch`/`toContain`, so a flat denial defeats every assertion
-  // with no qualifier word involved. `pr-test-analyzer` rewrote LICENSE's THIRD-PARTY COMPONENTS section to
-  // "This project does NOT use the SIL Open Font License 1.1 for anything… nothing here is vendored under
-  // the Apache License 2.0" and all three stayed green. `positivelyStates` is the same primitive the
-  // carve-out checks above use, called with no subject to bind to since there is none here — just the claim,
-  // and whether a denial sits in its own clause.
-  it.each(['LICENSE', 'README.md'])(
-    '%s acknowledges both third-party licences, since neither was this project\'s to choose', (name) => {
-      const text = doc(name);
-      expect(text.length, `${name} must be read from disk, or this rail checks nothing`).toBeGreaterThan(500);
-      expect(positivelyStates(text, /SIL Open Font License/),
-        'Fredoka is under the SIL OFL and its notice must travel with the font, stated rather than denied')
-        .toBe(true);
-      expect(positivelyStates(text, /public\/fonts\/OFL\.txt/),
-        'and the OFL text itself has to be pointed at, not only named, and not inside a denial').toBe(true);
-      expect(positivelyStates(text, /Apache License,? 2\.0/),
-        'the vendored skill is Apache-2.0, stated rather than denied').toBe(true);
-    });
+  // Per file, not over their union (PR #521 round 1, non-blocking) — LICENSE is the file a redistributor
+  // ships, so dropping a notice from it alone while the README still carries it must not pass.
+  it('LICENSE acknowledges both third-party licences, since neither was this project\'s to choose', () => {
+    const l = doc('LICENSE');
+    expect(pinned(l, LICENSE_FREDOKA), 'LICENSE must name Fredoka\'s SIL OFL notice verbatim').toBe(true);
+    expect(pinned(l, LICENSE_APACHE), 'LICENSE must name the vendored skill\'s Apache-2.0 notice verbatim')
+      .toBe(true);
+  });
+
+  it('README acknowledges both third-party licences, since neither was this project\'s to choose', () => {
+    const r = doc('README.md');
+    expect(pinned(r, README_FREDOKA), 'README must name Fredoka\'s SIL OFL notice verbatim').toBe(true);
+    expect(pinned(r, README_APACHE), 'README must name the vendored skill\'s Apache-2.0 notice verbatim')
+      .toBe(true);
+  });
 });
