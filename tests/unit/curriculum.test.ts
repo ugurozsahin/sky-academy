@@ -2030,14 +2030,28 @@ describe("numQ's decoy top-up never drops a bubble short (#462)", () => {
   /**
    * `numQ` asked `nearby` for exactly the decoys it was short of, without telling it which ones `ds`
    * already held, then dropped any duplicate `nearby` handed back and never asked again — silently
-   * shipping a card with three bubbles instead of four. A sweep of every topic × difficulty found 20
-   * affected pairs, worst of them `r-share` d2 at 25.3% of draws and `r-balance` d3 at 24.9%.
+   * shipping a card with three bubbles instead of four. Fixed for the helper itself (PR #506); this is
+   * "the rail" the issue's second half asks for, so a future regression in any of these 20 pairs — not
+   * just the two the original sweep singled out — cannot ship silently again.
+   *
+   * The issue's own 4,000-draw sweep found these 20 topic/difficulty pairs, from `r-share` d2 at 25.3% of
+   * cards down to `y2-tables` d1/d2/d3 at 0.2–0.75% — every one of them a `numQ` card meant to carry four
+   * bubbles. 1,500 draws per pair, at a seed chosen for this rail, is enough margin over where the
+   * reverted (pre-#506) code first drops a bubble for each pair (worst case: `y2-tables` d2 at draw 409) —
+   * proved red against that reverted code before this rail was written, green after.
    */
-  it('r-share d2 and r-balance d3, the two worst-hit pairs from the sweep, always draw four options', () => {
-    const share = TOPICS.find(t => t.id === 'r-share')!;
-    const balance = TOPICS.find(t => t.id === 'r-balance')!;
-    const r = rng(462);
-    for (let i = 0; i < 4000; i++) expect(share.gen(2, r).options.length, 'r-share d2').toBe(4);
-    for (let i = 0; i < 4000; i++) expect(balance.gen(3, r).options.length, 'r-balance d3').toBe(4);
+  const AFFECTED_PAIRS: [string, Difficulty][] = [
+    ['r-share', 2], ['r-balance', 3], ['y1-line', 2], ['r-share', 3], ['y1-balance', 3],
+    ['y2-pv', 1], ['y1-line', 3], ['y2-line', 1], ['y2-pv', 2], ['y2-pv', 3],
+    ['y2-balance', 1], ['y1-balance', 2], ['y2-money', 3], ['y2-balance', 2], ['y1-words', 3],
+    ['y2-balance', 3], ['y2-words', 3], ['y2-tables', 1], ['y2-tables', 2], ['y2-tables', 3],
+  ];
+  it('every affected pair always draws four options, not three', () => {
+    for (const [id, d] of AFFECTED_PAIRS) {
+      const topic = TOPICS.find(t => t.id === id)!;
+      expect(topic, id).toBeDefined();
+      const r = rng(id.length * 7 + d);
+      for (let i = 0; i < 1500; i++) expect(topic.gen(d, r).options.length, `${id} d${d}`).toBe(4);
+    }
   });
 });
