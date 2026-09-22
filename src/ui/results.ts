@@ -9,13 +9,18 @@ export interface RunOutcome {
   won: boolean;
   score: number;
   stars: number;
+  incomplete?: boolean;
 }
 
 /**
  * The medal shown on the results screen. Endless grades on score, Sprint on its star tier, and the
  * staged/boss modes on stars when won; a lost run that can be lost (mission/boss) shows the effort medal.
+ * #522: a generator throw is graded on nothing — Endless/Sprint would otherwise still hand out a real
+ * 🥇/🥈/🥉 for whatever partial score/stars had accrued before the crash, next to a heading that says the
+ * session did not really finish.
  */
 export function resultMedal(r: RunOutcome): string {
+  if (r.incomplete) return '💪';
   if (r.mode === 'endless') return r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉';
   if (r.mode === 'sprint') return r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪';
   return r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
