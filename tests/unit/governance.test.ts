@@ -4041,3 +4041,115 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
       .toMatch(/merge is (his|the owner)|owner('s|s) to merge|stays the owner/i);
   });
 });
+
+
+/**
+ * #526 — a class fix names its population.
+ *
+ * "Fix the class, not the instance" (#466) was followed on three pull requests in one day and failed on all
+ * three, because a reminder cannot enumerate a set: the author fixes the class across the instances their own
+ * mutation table touches, and that table is written after the fix, by the mind that wrote it. The untreated
+ * instances are exactly the ones not imagined. PR #513's round 2 found it *inside the commit whose message
+ * claimed to fix the class*.
+ *
+ * Two homes, and this rail holds both ends so neither can drift out alone: the author's obligation in
+ * `.claude/rules/guardrails.md`, beside the other rail rules, and the reviewer's in `review-pr` §7, beside
+ * the two other findings that block whatever the round.
+ *
+ * Each check below carries a negative as well as a positive, because the rule this rail states is the one it
+ * would otherwise break: a block of positives cannot tell a statement from its negation.
+ *
+ * Prove it red: drop the population sentence from either file; add "where practical" to either.
+ */
+describe('a class fix names the population it covers (#526)', () => {
+  const root = new URL('../../', import.meta.url);
+  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
+
+  /**
+   * Round 1, B1–B6 — and the finding is the shape of this PR's own rule, one level down: a rail meant to
+   * stop a fix claiming "fixed as a class" without naming its population did not name its own.
+   *
+   * Every loose mechanism the reviewer broke is the same one #512 was blocked on four times, so it takes the
+   * same answer rather than a sixth patch. A **five-word `NO_ESCAPE`** passed "Derive the mutation table from
+   * the set, **when convenient**". A **substring check** passed "**You need not** name the set", because the
+   * literal words survived a flat negation. An **`|`** let "pick a member" cover for "Count it rather than
+   * trusting it" being replaced by "Trust the author's word". A `.find()` **first-match** read a decoy bullet
+   * while the real one was gutted — the exact hazard the `open-pr` rail in this file already throws on. An
+   * **unbounded `## 7.` slice** was satisfied by the paragraph pasted at the end of the file.
+   *
+   * So both halves of the rule are pinned **word for word, as whole document units**, matched by equality.
+   * A reversal fails, a qualifier fails, an edit fails, and a sentence appended inside the unit fails — and
+   * none of it depends on a vocabulary, a proximity window or a substring. `unitWith` **refuses** on anything
+   * other than exactly one match, which is B5 closed by construction rather than by a uniqueness assertion.
+   *
+   * **The ceiling, stated rather than implied**, the same as #512's: a contradicting sentence added as its
+   * OWN new unit, beside an untouched pin, still passes, and nothing mechanical can see it. Human review is
+   * the backstop there — which is how all six of these were found.
+   */
+  const unitsOf = (text: string) =>
+    text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=(?:- |\d+\. ))/)).map((u) => u.trim());
+  const unitWith = (text: string, needle: string) => {
+    const hits = unitsOf(text).filter((u) => u.includes(needle));
+    if (hits.length !== 1) throw new Error(`${hits.length} units contain ${JSON.stringify(needle)}, want 1`);
+    return hits[0];
+  };
+
+  const CLAIMS: Array<{ what: string; file: string; unit: string }> = [
+    { what: "the author's obligation, whole",
+      file: ".claude/rules/guardrails.md",
+      unit: "- **A fix that addresses a *class* names the population it covers (#526).** \"Fix the class, not the instance\"\n  (#466) is followed and still fails, because a reminder cannot enumerate a set. What happens instead: the\n  author fixes the class **across the instances their own mutation table touches** — and that table is written\n  after the fix, by the mind that wrote the fix, so it inherits the same blind spot. The instances left\n  untreated are exactly the ones not imagined. It happened three times on 2026-09-22 (PRs #513, #517, #521),\n  once *inside the commit whose message claimed to fix the class*, and all three were found by reviewers.\n  So, three parts, each turning a promise into something countable:\n  **(a) Name the set** — *every assertion in this describe block*, *every rail that reads a prose document*,\n  *every call of `code()`*. \"I fixed them all\" is a claim; a named set is an object a reader can count.\n  **(b) Rail the coverage where the set is mechanically enumerable.** Test files are files, so a rail can read\n  them — the worked example is a rail that reads `tests/unit/governance.test.ts`'s own source and asserts\n  every rail in a block carries a negative assertion, the class defect there being precisely \"a block of\n  positives\". **That is the shape to copy, not a claim that it is already in place**: it was written for #512\n  and lands with it. A rule that says a mechanism exists when it does not is the \"it only documents existing\n  behaviour\" cover story the `open-pr` skill §6 warns about, and it was this bullet's first draft (#527\n  review, B4).\n  **(c) Derive the mutation table from the set, not from imagination** — one mutation per member. That turns\n  *did I think of it?* into *is the list complete?*, and only the second is checkable.\n  **What this does not do**: catch a class nobody has named. It catches *named the class, treated it\n  partially*. An unnamed class still needs an independent mind, which is why those three rounds were the\n  reviewer's finds and not the author's. The reviewer's half is in `.claude/skills/review-pr/SKILL.md` §7." },
+    { what: "the reviewer's, whole",
+      file: ".claude/skills/review-pr/SKILL.md",
+      unit: "**A third, and it is the same shape: a fix that claims a *class* and does not name its population (#526).**\n\"Fixed as a class\" is unverifiable on its own, and unverifiable is how it keeps being half true — three pull\nrequests were blocked on one defect on 2026-09-22, one of them *inside the commit whose message claimed to fix\nthe class*, because each fix reached only the instances its author's own mutation table touched. So a class\nfix has to say what set it covers — *every assertion in this block*, *every rail reading prose*, *every call\nof `code()`* — and then you can count it, which is the point. `.claude/rules/guardrails.md` has the author's\nhalf. **Count it rather than trusting it**: pick a member the body does not mention and mutate it. That is\nhow all three of those were found, and none of them by the author." },
+  ];
+
+  it.each(CLAIMS)('the rule still reads, word for word: $what', ({ file, unit }) => {
+    const units = unitsOf(doc(file));
+    expect(units.length, `${file} must split into its units, or this row asserts nothing`).toBeGreaterThan(5);
+    // Equality against a whole unit, not a substring of the file: a substring match is satisfied by the
+    // pinned words sitting inside a longer, negated sentence, which is B2 in one line.
+    expect(units, `${file} must still carry this rule as written — if the wording changed on purpose, `
+      + 're-pin it here deliberately and say so in the commit').toContain(unit);
+  });
+
+  it('each half is found exactly once, and sits where a reader of that file would meet it', () => {
+    // B5: `.find()` took the first match, so a decoy bullet ahead of a gutted real one passed. B6: the `## 7.`
+    // slice ran to end-of-file, so the paragraph pasted past the last heading satisfied it. Both are closed
+    // by refusing ambiguity rather than by asserting against it.
+    const g = doc('.claude/rules/guardrails.md');
+    expect(() => unitWith(g, 'A fix that addresses a *class*'),
+      'the obligation must appear exactly once in guardrails.md').not.toThrow();
+    const skill = doc('.claude/skills/review-pr/SKILL.md');
+    const s7 = skill.slice(skill.indexOf('## 7. '), skill.indexOf('\n## ', skill.indexOf('## 7. ') + 6));
+    expect(skill.indexOf('## 7. '), '§7 must exist').toBeGreaterThan(-1);
+    expect(s7.length, '§7 must be BOUNDED by the next heading — an unbounded slice is satisfied by anything '
+      + 'later in the file, which is how a gutted section hid behind a paragraph pasted at the end (#148)')
+      .toBeGreaterThan(500);
+    expect(s7, 'and the finding must live inside §7, the section about what may block a merge')
+      .toContain('does not name its population');
+    expect(s7, 'beside the two findings that already block whatever the round')
+      .toContain('a rail does not hold what it claims');
+  });
+
+  it('each file points at the other, so neither half can be read as the whole rule', () => {
+    expect(doc('.claude/rules/guardrails.md'), 'guardrails.md must point at the reviewer\'s half')
+      .toContain('.claude/skills/review-pr/SKILL.md');
+    expect(doc('.claude/skills/review-pr/SKILL.md'), 'and the skill at the author\'s')
+      .toContain('.claude/rules/guardrails.md');
+  });
+
+  it('clause (b) does not claim a mechanism that is not here (#527 review, B4)', () => {
+    const bullet = unitWith(doc('.claude/rules/guardrails.md'), 'A fix that addresses a *class*');
+    // The first draft said this file "carries one that reads its own source…" and "found two more rails…on
+    // its first run" — present tense, settled fact, about a rail that exists only on #512's open branch.
+    // That is the "it only documents existing behaviour" cover story `open-pr` §6 names, and nothing caught
+    // it because clause (b) had no rail at all.
+    expect(bullet, 'clause (b) must offer the coverage rail as a shape to copy')
+      .toContain('the shape to copy');
+    expect(bullet, 'and say plainly that it is not already in place, with where it lands')
+      .toMatch(/not a claim that it is already in place/);
+    expect(bullet, 'a rule may not assert a mechanism exists until it does — that is the cover story §6 warns '
+      + 'about, and this bullet was its own first example')
+      .toMatch(/only documents existing\s+behaviour/);
+  });
+});
