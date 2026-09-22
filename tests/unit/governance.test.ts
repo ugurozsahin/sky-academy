@@ -4083,24 +4083,66 @@ describe('the licence grants the code and reserves the art, in both files (#520)
    * The same shape defeated the #516 rail (an exception appended beside the pinned phrases) and the #512 one
    * (the governed sentence replaced while its keywords survived elsewhere in the block).
    *
-   * Two mechanisms replace token presence, and a policy rail here needs both:
+   * Three mechanisms replace token presence, and a policy rail here needs all three:
    *
    *  - **`binds`** — the claim must sit within a sentence or two of the subject it governs, so naming the
    *    subject somewhere and making a contrary claim somewhere else no longer satisfies it. The window is
    *    characters rather than sentences because these are hard-wrapped documents with lists in them.
+   *  - **`positivelyStates`** — the claim, once found near the subject, must not itself be inside a denial.
+   *    PR #521 round 2/3, B1: `binds` bound `reserved` to `public/avatars/` and stayed green on "are not
+   *    reserved and are free to reuse, including commercially" — bound to the path is not the same as stated
+   *    of the path. It looks backward from each match to the nearest clause boundary (`. : ; —` or a blank
+   *    line) and rejects a match whose own clause carries `not`/`never`/`nothing`/a negative contraction. A
+   *    clause boundary rather than a character count on purpose, for two reasons found by hand before this
+   *    landed: the real README binds `reserved` a few words after "are **not licensed**:" — a colon apart,
+   *    one clause reinforcing the other, which a plain proximity check over that same short distance would
+   *    have condemned along with the mutation; and these are hard-wrapped files, so "is not\nreserved" is a
+   *    single clause split by a line wrap that carries no meaning — a single `\n` is normalised to a space
+   *    before the boundary search runs, and only a blank line (an actual paragraph break) counts as one.
    *  - **`NO_ESCAPE`** — no exception vocabulary in the same passage. A policy whose content is "no exception"
    *    is defeated by adding one, which deletes nothing and so passes every presence check ever written.
    *
-   * Neither is a wording pin: any rewrite that still reserves the art near the path, without an escape,
-   * passes. That is what the control mutations in this PR's table demonstrate.
+   * None of the three is a wording pin: any rewrite that still reserves the art near the path, states it
+   * rather than denying it, and adds no escape, passes. That is what the control mutations in this PR's table
+   * demonstrate.
    */
   const SPAN = 250;
+  // PR #521 round 3, B1 (round 2's finding, still open on this head) — see the doc-comment above for why a
+  // clause boundary and not a character count, and why a lone `\n` is not one of the boundaries.
+  const DENIAL = /\b(not|never|nothing|isn't|aren't|doesn't|don't|won't|cannot|can't)\b/i;
+  const CLAUSE_BREAKS = ['.', ':', ';', '—', '\n\n'];
+  // Collapses a word-wrap `\n` to a space (no boundary) while keeping a real paragraph break as one, so the
+  // boundary search below never has to special-case which kind of newline it met.
+  const unwrap = (text: string) => text.replace(/\n{2,}/g, '\n\n').replace(/(?<!\n)\n(?!\n)/g, ' ');
+  const clauseStart = (text: string, at: number) =>
+    Math.max(0, ...CLAUSE_BREAKS.map((brk) => {
+      const idx = text.lastIndexOf(brk, at - 1);
+      return idx < 0 ? -1 : idx + brk.length;
+    }));
+  // Every occurrence of `claim` in `text`, not just the first — a document can state a claim twice, once
+  // inside a denial and once plainly, and the plain one has to be enough on its own to pass.
+  const positivelyStates = (rawText: string, claim: RegExp) => {
+    const text = unwrap(rawText);
+    const global = new RegExp(claim.source, claim.flags.includes('g') ? claim.flags : `${claim.flags}g`);
+    let m: RegExpExecArray | null;
+    while ((m = global.exec(text))) {
+      const before = text.slice(clauseStart(text, m.index), m.index);
+      if (!DENIAL.test(before)) return true;
+      if (global.lastIndex === m.index) global.lastIndex += 1; // no zero-width claim exists here today
+    }
+    return false;
+  };
   const binds = (text: string, subject: string, claim: RegExp) => {
     const i = text.indexOf(subject);
     if (i < 0) return false;
-    return claim.test(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN));
+    return positivelyStates(text.slice(Math.max(0, i - SPAN), i + subject.length + SPAN), claim);
   };
-  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bexcluding\b/i;
+  // PR #521 round 3, B3 — the list named only the vocabulary round 1's mutation happened to use.
+  // `pr-test-analyzer`'s carve-out-of-a-carve-out ("reserved notwithstanding any personal, non-commercial
+  // use, which is freely permitted") kept `reserved` bound to the path and undenied, and added an exception
+  // word this list did not know. The five added below are the ordinary ways English attaches a condition to
+  // a sentence that otherwise states none.
+  const NO_ESCAPE = /\bunless\b|\bexcept\b|\bexception\b|\bsave that\b|\bexcluding\b|\bnotwithstanding\b|\bhowever\b|\bapart from\b|\bother than\b|\bprovided that\b/i;
 
   it('LICENSE grants MIT and names the holder', () => {
     const l = doc('LICENSE');
@@ -4164,14 +4206,24 @@ describe('the licence grants the code and reserves the art, in both files (#520)
   // Per file, not over their union (PR #521 round 1, non-blocking). Concatenating them meant dropping the
   // Apache-2.0 notice from `LICENSE` alone stayed green because the README still carried it — and `LICENSE`
   // is the file a redistributor ships. Each has to stand on its own.
+  //
+  // PR #521 round 3, B2 — this block had no negation guard at all, not even the subject-binding half `binds`
+  // gives the carve-out checks above: plain `toMatch`/`toContain`, so a flat denial defeats every assertion
+  // with no qualifier word involved. `pr-test-analyzer` rewrote LICENSE's THIRD-PARTY COMPONENTS section to
+  // "This project does NOT use the SIL Open Font License 1.1 for anything… nothing here is vendored under
+  // the Apache License 2.0" and all three stayed green. `positivelyStates` is the same primitive the
+  // carve-out checks above use, called with no subject to bind to since there is none here — just the claim,
+  // and whether a denial sits in its own clause.
   it.each(['LICENSE', 'README.md'])(
     '%s acknowledges both third-party licences, since neither was this project\'s to choose', (name) => {
       const text = doc(name);
       expect(text.length, `${name} must be read from disk, or this rail checks nothing`).toBeGreaterThan(500);
-      expect(text, 'Fredoka is under the SIL OFL and its notice must travel with the font')
-        .toMatch(/SIL Open Font License/);
-      expect(text, 'and the OFL text itself has to be pointed at, not only named')
-        .toContain('public/fonts/OFL.txt');
-      expect(text, 'the vendored skill is Apache-2.0').toMatch(/Apache License,? 2\.0/);
+      expect(positivelyStates(text, /SIL Open Font License/),
+        'Fredoka is under the SIL OFL and its notice must travel with the font, stated rather than denied')
+        .toBe(true);
+      expect(positivelyStates(text, /public\/fonts\/OFL\.txt/),
+        'and the OFL text itself has to be pointed at, not only named, and not inside a denial').toBe(true);
+      expect(positivelyStates(text, /Apache License,? 2\.0/),
+        'the vendored skill is Apache-2.0, stated rather than denied').toBe(true);
     });
 });
