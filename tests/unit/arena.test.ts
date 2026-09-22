@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type Collidable, compact, dealOrdered, LABEL_MIN_FS, LABEL_READABLE_FS, WRAP_STACK, fitLabel, fitLabelLines, labelFont, splitLabel, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
 import { ALL_AVATARS } from '../../src/avatars';
+import { TOPICS, type Difficulty } from '../../src/curriculum';
+import { waveOptsFor } from '../../src/ui/play-session';
 
 describe('dealOrdered — sequence words are dealt in order across the batches (#62)', () => {
   const batchOf = (order: number[], perBatch: number, idx: number) => Math.floor(order.indexOf(idx) / perBatch);
@@ -197,6 +199,96 @@ describe('splitLabel / fitLabelLines — a label #348 squeezed wraps; one it did
         if (fit.lines.length === 2) expect(fit.fs).toBeGreaterThanOrEqual(fitLabel(label, r, measure));
       }
     }
+  });
+});
+
+/**
+ * #348's own "deferred piece 1": a rail that measures every topic's real generated labels, rather than the
+ * hand-picked ones above. The suite above pins `fitLabelLines`'s *mechanism* against labels the issue quoted;
+ * this sweeps the real curriculum through it, at the narrowest phone the e2e suite already treats as the
+ * floor (320×568 — `tests/e2e/duel.spec.ts`, `viewport.spec.ts`), so a future generator that emits a label
+ * nobody hand-picked is caught here instead of measured for the first time by a reviewer with a screenshot.
+ *
+ * `measure` is the same 0.571px/char-per-fs-unit calibration the suite above already uses (Fredoka bold,
+ * measured in the running game against #348's own table) — not real `CanvasRenderingContext2D.measureText`,
+ * which needs a browser this file does not have. That is a real gap, stated rather than papered over: the
+ * calibration is one number for every character, so it cannot tell a narrow 'i' from a wide 'W' the way the
+ * real font does. What it is good for is exactly what this rail asks — *does this label's real character
+ * count blow the budget* — which is a length question first and a glyph-shape question a distant second.
+ */
+describe('every option label the curriculum can generate — the #348 sweep (deferred piece 1)', () => {
+  const sizeOf = (font: string) => parseFloat(font.match(/([\d.]+)px/)![1]);
+  const measure = (font: string, text: string) => sizeOf(font) * text.length * 0.571;
+  const W = 320, H = 568;   // the narrowest phone viewport the e2e suite ever runs (portrait)
+  const BUBBLE_TOPICS = TOPICS.filter(t => t.input !== 'tracing');   // a tracing mission has no wave
+  const DRAWS = 200;
+
+  function rng(seed: number) {
+    return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+
+  /** The real radius a wave of these labels is laid out at (`layoutWave` in `src/game/arena.ts`), not a
+   *  re-derived copy of its formula: the crowding factor for a busy wave and the "at least three always fit
+   *  across" cap both change which radius a real card is actually drawn at, and a hand-copied formula could
+   *  drift from `layoutWave`'s own the next time it changes without either side failing loudly. `now`/`rng`
+   *  only affect launch timing and shuffle order, neither of which `.r` depends on. */
+  const layoutRng = rng(1);
+  const radiusFor = (labels: string[], wide: boolean) =>
+    layoutWave({ labels, speed: 1, wide }, { W, H, topInset: 0 }, 1, 0, layoutRng).r;
+  /** One key shape for both sides of the exception check, so a mismatched delimiter cannot silently mean
+   *  "always new" on one side and "always stale" on the other. */
+  const key = (topicId: string, label: string) => `${topicId}\t${label}`;
+
+  /**
+   * Labels the sweep already knows overflow at this radius, whatever the wrap does with them — every one is
+   * a single word or run with no space or hyphen for `splitLabel` to break on, so `fitLabelLines` has only
+   * `fitLabel`'s one-line shrink to offer, and that stops at `LABEL_MIN_FS` whether or not it fits. Fixing
+   * any of these needs a decision the sweep itself cannot make — shorten the word, grow the bubble for long
+   * single-word answers, or thin the decoy count that pushes `n` past the crowding threshold — so they stay
+   * a named, checked exception rather than either failing the build today or being silently swallowed.
+   * Asserted in both directions below, the same discipline `NO_REPEATED_SET` (`curriculum.test.ts`) uses, so
+   * a fix that lands quietly is caught as a stale entry rather than left to rot as false cover.
+   */
+  const KNOWN_OVERFLOW = new Set([
+    'y1-sentence\taeroplane?',
+    'y2-position\ta three-quarter turn',
+    'y2-sentence\tEverybody',
+    'y2-sentence\tbeautifully.',
+    'y2-sentence\tcolourful',
+    'y2-sentence\tfinished.',
+    'y2-sentence\toverslept.',
+    'y2-sentence\tpictures.',
+    'y2-sentence\tsandcastle.',
+    'y2-sentence\tsunflowers.',
+    'y2-sentencetype\texclamation',
+    'y2-stats\tstrawberries',
+  ]);
+
+  it('never draws an option label wider than its bubble, beyond the named, checked exceptions', () => {
+    const found = new Set<string>();
+    let swept = 0, cards = 0;
+    for (const topic of BUBBLE_TOPICS) {
+      swept++;
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        const draw = rng(topic.id.length * 11 + d);
+        for (let i = 0; i < DRAWS; i++) {
+          const q = topic.gen(d, draw);
+          cards++;
+          const wide = !!waveOptsFor(q, { labels: q.options, speed: 1 }, 0).wide;
+          const r = radiusFor(q.options, wide);
+          for (const label of q.options) {
+            if (fitLabelLines(label, r, measure).state === 'overflow') found.add(key(topic.id, label));
+          }
+        }
+      }
+    }
+    // A topic dropped from the sweep would otherwise vanish silently (#369's own rail states the same check).
+    expect(swept, 'the sweep no longer covers every bubble topic').toBe(BUBBLE_TOPICS.length);
+    expect(cards).toBeGreaterThan(0);
+    const newOverflow = [...found].filter(k => !KNOWN_OVERFLOW.has(k));
+    expect(newOverflow, `new label(s) spill past their bubble:\n${newOverflow.join('\n')}`).toEqual([]);
+    const stale = [...KNOWN_OVERFLOW].filter(k => !found.has(k));
+    expect(stale, `these no longer overflow — drop them from KNOWN_OVERFLOW:\n${stale.join('\n')}`).toEqual([]);
   });
 });
 
