@@ -185,7 +185,11 @@ const y1MoreLess: Generator = (d, rng) => {
 const y1Words: Generator = (d, rng) => {
   const n = ri(rng, d === 1 ? 1 : 10, d === 3 ? 20 : d === 2 ? 15 : 10);
   if (rng() < 0.5) return numQ(rng, numberWord(n), n, { min: 0, max: 20, say: `Which number is ${numberWord(n)}?`, visual: { type: 'word', text: numberWord(n) } });
-  const ds = shuffle(rng, [n - 1, n + 1, n + 2, n - 2].filter(x => x >= 0 && x <= 20)).slice(0, 3).map(numberWord);
+  // At the top of the range (n = 20, only reachable at d3) both n+1 and n+2 fall outside [0,20], leaving only
+  // two neighbours — a card with three bubbles instead of four (#462 rail). n±3 is there as a fourth
+  // candidate so a boundary this tight never runs the pool short; unreachable in the middle of the range,
+  // where the first four already give three or more.
+  const ds = shuffle(rng, [n - 1, n + 1, n + 2, n - 2, n - 3, n + 3].filter(x => x >= 0 && x <= 20)).slice(0, 3).map(numberWord);
   return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which word says ${n}?`, hint: 'Slice the word' });
 };
 const y1Half: Generator = (d, rng) => {
@@ -350,7 +354,13 @@ const y2Money: Generator = (d, rng) => {
   // one source for the label, so the distractors are filtered as amounts before they are ever formatted.
   if (d === 2) { const coins = Array.from({ length: 2 }, () => pick(rng, [50, 100, 200])); const total = coins.reduce((s, c) => s + c, 0); const ds = [total + 50, total - 50, total + 100].filter(p => p > 0 && p !== total); return wordQ(rng, 'How much money?', coinLabel(total), ds.map(coinLabel), { visual: { type: 'coins', coins }, say: 'How much money altogether?' }); }
   const price = 5 * ri(rng, 1, 19);
-  return wordQ(rng, `Change from £1 for ${price}p?`, `${100 - price}p`, [`${100 - price + 5}p`, `${100 - price - 5}p`, `${price}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?` });
+  const change = 100 - price;
+  // At exactly one price (50p), `price` as a decoy equals `change` (the answer) — wordQ's own de-dup then
+  // drops it, one card in nineteen shipping three bubbles instead of four (#462 rail). `change + 10` can
+  // never equal `change`, so it is there to take that decoy's place; the other three prices never collide
+  // with it (`change + 10` collides with `price` only when `price` itself would already have been filtered),
+  // and wordQ's own slice(0, 3) never reaches it unless one of the first three was removed.
+  return wordQ(rng, `Change from £1 for ${price}p?`, `${change}p`, [`${change + 5}p`, `${change - 5}p`, `${price}p`, `${change + 10}p`], { say: `You pay with £1 for something costing ${price} pence. How much change?` });
 };
 /**
  * The clock phrase for `h:mm` on a 12-hour dial — `3 o'clock`, `quarter past 3`, `half past 3`, `quarter to 4`,
@@ -373,7 +383,11 @@ const y2Time: Generator = (d, rng) => {
 const y2Words: Generator = (d, rng) => {
   const n = ri(rng, d === 1 ? 10 : 21, d === 1 ? 20 : d === 2 ? 60 : 100);
   if (rng() < 0.5) return numQ(rng, numberWord(n), n, { min: 0, max: 100, say: `Which number is ${numberWord(n)}?`, visual: { type: 'word', text: numberWord(n) }, distractors: [n + 10, n - 10, n + 1] });
-  const ds = shuffle(rng, [n + 10, n - 10, n + 1, n - 1].filter(x => x >= 0 && x <= 100)).slice(0, 3).map(numberWord);
+  // At n = 100 (the top of the range, only reachable at d3) both n+10 and n+1 fall outside [0,100], leaving
+  // only two neighbours — a card with three bubbles instead of four (#462 rail). n-2 is there as a fourth
+  // candidate for that boundary; unreachable everywhere else in the range, where the first four already
+  // give three or more.
+  const ds = shuffle(rng, [n + 10, n - 10, n + 1, n - 1, n - 2].filter(x => x >= 0 && x <= 100)).slice(0, 3).map(numberWord);
   return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which words say ${n}?` });
 };
 const y2Skip: Generator = (d, rng) => {
