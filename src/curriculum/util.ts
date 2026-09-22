@@ -8,26 +8,36 @@ export function shuffle<T>(rng: Rng, arr: readonly T[]): T[] {
   return a;
 }
 
-/** Numeric distractors near the answer, within [min,max], never equal to answer. */
-export function nearby(rng: Rng, answer: number, count: number, min: number, max: number): number[] {
+/**
+ * Numeric distractors near the answer, within [min,max], never equal to answer or to `exclude` (#462: a
+ * caller topping up an existing decoy set has to tell `nearby` what it already has, or a collision just
+ * gets dropped downstream with no second attempt — silently shipping a card short a bubble).
+ */
+export function nearby(rng: Rng, answer: number, count: number, min: number, max: number, exclude: ReadonlySet<number> = EMPTY_SET): number[] {
   const set = new Set<number>();
   let guard = 0;
   while (set.size < count && guard++ < 200) {
     const spread = Math.max(2, Math.min(10, Math.ceil(Math.abs(answer) * 0.3) + 2));
     const v = answer + ri(rng, -spread, spread);
-    if (v !== answer && v >= min && v <= max) set.add(v);
+    if (v !== answer && v >= min && v <= max && !exclude.has(v)) set.add(v);
   }
   // fallback fill if range is tiny
-  for (let v = min; set.size < count && v <= max; v++) if (v !== answer) set.add(v);
+  for (let v = min; set.size < count && v <= max; v++) if (v !== answer && !exclude.has(v)) set.add(v);
   return [...set];
 }
+// Frozen (review agent finding): a plain `Set` shared across every no-`exclude` call would let a future edit
+// mutate the "empty" default for the rest of the session with nothing to catch it.
+const EMPTY_SET: ReadonlySet<number> = Object.freeze(new Set<number>());
 
 /** Build a numeric multiple-choice question. */
 export function numQ(rng: Rng, prompt: string, answer: number, opts: { min?: number; max?: number; n?: number; say?: string; visual?: Question['visual']; hint?: string; distractors?: number[] } = {}): Question {
   const n = opts.n ?? 3;
   const min = opts.min ?? 0, max = opts.max ?? Math.max(20, answer + 10);
   let ds = opts.distractors ? [...new Set(opts.distractors.filter(d => d !== answer && d >= min && d <= max))] : [];
-  if (ds.length < n) ds = ds.concat(nearby(rng, answer, n - ds.length, min, max).filter(d => !ds.includes(d)));
+  // #462: `nearby` used to be asked for exactly the decoys `ds` was short of without being told which ones
+  // `ds` already held, so a collision got dropped downstream with no second attempt — silently shipping a
+  // card one bubble short. Passing `ds` as its exclusion set means every value it returns is already new.
+  if (ds.length < n) ds = ds.concat(nearby(rng, answer, n - ds.length, min, max, new Set(ds)));
   const options = shuffle(rng, [String(answer), ...ds.slice(0, n).map(String)]);
   return { prompt, answer: String(answer), options, say: opts.say, visual: opts.visual, hint: opts.hint };
 }

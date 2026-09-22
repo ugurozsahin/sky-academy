@@ -94,8 +94,24 @@ The reviews that missed something here all read the diff for whether it works. R
 - **Check the guard rail's reach.** Rails here are text and DOM checks. Ask which spellings and which screens
   this one actually sees, and which plausible rewrite walks straight past it.
 - **A budget number may only go down.** One raised to make a build pass is the finding.
+- **A finding that came from a sweep leaves the sweep behind — as an issue, not a commit.** You enumerated a
+  class to find it: every topic, every spelling, every route. A reviewer run develops nothing and may not
+  push, so the enumeration goes in an issue titled `sweep: <the class>` — the list itself, or the script that
+  produces it — labelled `tests`, `priority:P3` and `routine-ok` so the developer query can reach it, and
+  linked from your review comment. A sweep described only in a comment is
+  re-derived from scratch next round, by you or by whoever supersedes you, and that re-derivation is most of
+  what a four-round pull request costs (#466).
 - **Check the pull request body against the code**, especially "this only documents existing behaviour" and
-  "no look change". A CSS diff of the build output settles the second one in a second.
+  "no look change". A CSS diff of the build output settles the second one in a second. The sweep claim
+  `open-pr` §4 asks for is the same kind: a count with no checked-in enumeration and no method beside it
+  cannot be verified, and `SWEEP: NOT ENUMERABLE` on a class the code plainly can enumerate is the cheap exit
+  taken. **A body that says nothing about the sweep has not done step 4**, and that is the cheapest exit of
+  the three — the marker costs grounds, a count costs a method, silence costs nothing and is read by nobody.
+  Ask for the method before you weigh it, and weigh it by §7's bar like anything else. **The `agents:` line
+  is a claim of the same kind**, and you are the only reader it has: compare it with what §4 returns for you.
+  An author's `nothing` beside two findings of your own is the gap that line was added to expose — and **an
+  absent `agents:` line is the same finding as an absent sweep claim**, for the same reason: `open-pr` §4
+  calls that line the whole of the evidence, so a body without one has no evidence, not good news.
 
 ## 4. Run the three review agents, then check their reachability
 

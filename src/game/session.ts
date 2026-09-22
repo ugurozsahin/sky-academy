@@ -39,7 +39,7 @@ export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?:
 
 /**
  * Which `Visual` types carry their question in a form this key can read, and which part of them does it
- * (PR #407 review, B1).
+ * (PR #407 review, B1; widened by #455).
  *
  * The first cut stringified the **whole** visual, and decoration went into the card's identity: five
  * Reception generators re-roll `emoji` per draw independent of the sum, so `1 + 4 = ?` came round twice
@@ -53,16 +53,25 @@ export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?:
  * could "never cost a repeat the re-roll existed to prevent", which is false and is contradicted by the key's
  * own docstring below (#412 review round 4, note 6). An unread carrier drives the *answer* to stop repeating,
  * which is #390's defect: `y1-coins` at d2 keys 14 identities over 112 exercises. Safe here means a needless
- * re-roll, not no cost. The uncovered types are #455.
+ * re-roll, not no cost.
  *
- * Only the three #390 names are here, because those are the ones where the visual *is* the question:
- * `objects` for `r-oddeven`, `sentence` for `y2-sentencetype` and `y2-tense`, `symmetry` for `y2-symmetry`.
+ * Six names are here now, each taking only the part of the visual that is the question. The first three are
+ * #390's: `objects` for `r-oddeven`, `sentence` for `y2-sentencetype` and `y2-tense`, `symmetry` for
+ * `y2-symmetry`. The last three are #455's, where the visual carries a comparison or a chart a bare
+ * `(prompt, answer)` cannot tell apart: `coins` (the pence values as a **set** — so `£1 or 20p` and `£1 or
+ * 10p` take different keys, which their shared prompt and answer do not), `numberline` (`from`/`to`/`mark`/
+ * `step`) and `chart` (`kind` plus the rows' counts — deliberately **not** a row's `label` or a pictogram's
+ * `icon`, which is where `y2-stats` hides its re-rolled emoji, the same trap PR #407's B1 found in `objects`).
+ * `word` stays out: it carries `orderQ`'s per-draw *shuffled* display order, which is presentation.
  * Adding a type is a deliberate act, and the rails in `tests/unit/session.test.ts` measure both directions.
  */
 const VISUAL_QUESTION = {
   objects: (v: Extract<Visual, { type: 'objects' }>) => `${v.n}/${v.n2 ?? ''}`,
   sentence: (v: Extract<Visual, { type: 'sentence' }>) => v.text,
   symmetry: (v: Extract<Visual, { type: 'symmetry' }>) => v.grid.join('/'),
+  coins: (v: Extract<Visual, { type: 'coins' }>) => [...new Set(v.coins)].sort((a, b) => a - b).join('/'),
+  numberline: (v: Extract<Visual, { type: 'numberline' }>) => `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}`,
+  chart: (v: Extract<Visual, { type: 'chart' }>) => `${v.kind}/${v.rows.map(r => r.n).join(',')}`,
 } satisfies Partial<{ [T in Visual['type']]: (v: Extract<Visual, { type: T }>) => string }>;
 const visualKey = (v: Visual): string => {
   const f = (VISUAL_QUESTION as Record<string, ((x: Visual) => string) | undefined>)[v.type];
@@ -109,9 +118,9 @@ const visualKey = (v: Visual): string => {
  * never on the card — what the child reads is unchanged. Nothing enforces that inventory; the rails answer it
  * from the other end by normalising over four separators, so a generator switching to one of them goes red.
  *
- * **Two carriers this key does not read, and the topics that leaves uncovered** (#412 review rounds 2 and 3).
- * Both are `main`'s behaviour rather than anything #412 introduces, and both want the same remedy — a signal
- * from the generator that the field is the question, not decoration — so neither is keyed here:
+ * **One carrier this key does not read, and the topics that leaves uncovered** (#412 review rounds 2 and 3).
+ * `main`'s behaviour rather than anything #412 introduces, and it wants the same remedy #455 already took below
+ * — a signal from the generator that the field is the question, not decoration — so it is not keyed here:
  *
  * - **`options`.** #412 rules them out in its own words, because they are shuffled and re-drawn per draw, so
  *   keying them switches repeat-avoidance off for the forty-odd topics whose extra bubbles are decoys. But
@@ -136,14 +145,6 @@ const visualKey = (v: Visual): string => {
  * which keying it is simply correct and this paragraph should go, with the table above re-measured to 0.00%. No
  * rail here can see any of this — `asked()` reads `hint`, and no Playwright project is shorter than 640px — so
  * it is written down instead of pinned, which is the honest shape and not a good one.
- *
- * - **A `visual` type `VISUAL_QUESTION` does not list.** `visualKey` returns `''` on a lookup miss, which the
- *   comment above calls the safe direction — and it is safe against *over*-discrimination, but it is silent
- *   about the cost, so say it here: `coins`, `numberline` and `chart` carry their question, and the key cannot
- *   read it. `y1-coins` at d2 gives 14 keys with 12 covering more than one spoken question, one of them holding
- *   `£1 or 20p`, `£1 or 10p` and `£1 or 2p`; `y1-line` d3 93 of 95; `y2-line` d3 25 of 32; `y2-money` d1 30 of
- *   33; `y2-stats` d2 194 of 194, the worst key covering 77 charts, where the chart *is* the question. A `word`
- *   visual, by contrast, carries `orderQ`'s shuffled display, so leaving that one unread is right. **#455**.
  *
  * `sequence` is not in the key either, which is safe only because every sequence generator encodes the order
  * in `answer` (`orderQ`'s is the joined `sequence`) — an invariant pinned in `tests/unit/curriculum.test.ts`,

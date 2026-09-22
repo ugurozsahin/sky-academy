@@ -2425,6 +2425,52 @@ test.describe('profile picker (#20 slice 2)', () => {
   });
 
   /**
+   * guard rail (#414): the same topbar row, on the two widths #20 slice 2's own test never measured — a 320px
+   * phone, and a 360px one once the coin pill carries four digits and a streak. Measured on `main`, `#spk`'s
+   * right edge sat at 344 against a 320px viewport (24px off) and, with a four-figure purse and a streak, at
+   * 388 against 360 (28px off) — a child on a small phone saw the read-aloud button sliced by the screen edge,
+   * with horizontal scroll on every screen the shared topbar appears on. The empty-purse case at 360px happened
+   * to fit on `main` (344/360), so both purses are checked at both widths rather than assuming one implies the
+   * other.
+   */
+  test('the topbar fits a 320px and a 360px phone, empty purse and a four-figure one with a streak (#414)', async ({ page }) => {
+    for (const [w, h] of [[320, 568], [360, 640]] as const) {
+      for (const purse of [{ coins: 40, days: 0 }, { coins: 1250, days: 12 }]) {
+        await page.addInitScript(save => {
+          localStorage.removeItem('sna:v1');
+          localStorage.setItem('sna:v1', save);
+        }, JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: purse.coins, spent: 0, onboarded: true, streak: { last: '', days: purse.days } }));
+        await page.setViewportSize({ width: w, height: h });
+        await page.goto('/');
+        await expect(page.locator('.home.map')).toBeVisible();
+        const spk = await page.locator('#spk').boundingBox();
+        expect(spk!.x + spk!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the read-aloud button is sliced by the screen edge`)
+          .toBeLessThanOrEqual(w);
+        expect(spk!.height, 'and it still clears the 44px touch floor (`design-language` §4)').toBeGreaterThanOrEqual(44);
+        // round 3 review, B1: `.icon-btn` had no `flex-shrink: 0`, so once `.hero` hit its own floor the
+        // remaining deficit shrank #snd/#spk below the 44px touch floor (measured 41.5px) with no overflow to
+        // catch it — height alone can't see a width-only shrink, so both buttons' width is checked too.
+        expect(spk!.width, 'and the read-aloud button keeps its 44px width, not just its height').toBeGreaterThanOrEqual(44);
+        const snd = await page.locator('#snd').boundingBox();
+        expect(snd!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the mute button is squeezed under the touch floor`)
+          .toBeGreaterThanOrEqual(44);
+        // round 1 review, B1: `.hero`'s `min-width: 0` alone let the shrink pressure fall on the fixed-size
+        // portrait too (54px -> 12px at this exact scenario), not just on the text it was meant for.
+        const portrait = await page.locator('.hero .portrait').boundingBox();
+        expect(portrait!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the ninja's portrait is squeezed instead of the text`)
+          .toBeGreaterThanOrEqual(53);
+        // round 2 review, B1: pinning the portrait moved 100% of the remaining shrink onto the identity text,
+        // which collapsed to 0×0 (invisible, not truncated) at this exact scenario. The child's own name is
+        // #414's explicit "name last" priority, so the name has to render at a non-zero width everywhere.
+        const heroName = await page.locator('.hero b').boundingBox();
+        expect(heroName!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the ninja's name has vanished, not just truncated`)
+          .toBeGreaterThan(0);
+        await expectFitsViewport(page, `sky map at ${w}x${h}, ${purse.coins} coins/${purse.days}-day streak`);
+      }
+    }
+  });
+
+  /**
    * A store that takes every `setItem` and throws. Registered *after* `seedSiblings`, so the seed lands and
    * only the running game's writes are refused — `addInitScript`s run in registration order.
    */

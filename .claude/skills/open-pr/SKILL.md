@@ -120,6 +120,70 @@ desktop evidence anywhere until the nightly. Say so in the body in as many words
 change is going out unexercised — so a reviewer who *does* have browsers knows to run it rather than reading
 the marker as a formality.
 
+### Sweep the class, not the instance
+
+A defect has an **instance** — the one the issue names — and a **class**: every place the same mistake can
+occur. Fix the instance and the reviewer sweeps the class, and that is how this repository's longest pull
+requests are made. PR #427 took four blocking rounds, each naming the next topic carrying the defect it
+existed to close; #380 took five, #394 four. **Every one of those rounds was correct** and met `review-pr`
+§7's bar, so nothing in the round cap could stop them: the round count was simply how many members the class
+had (#466).
+
+So before you push:
+
+1. **Say what the class is, in one sentence.** *"Every topic whose question is not carried by `repeatKey`."*
+   *"Every spelling a single-letter gap can produce."* If you cannot write that sentence, what you are holding
+   is an instance and you have not found the defect yet.
+2. **Enumerate it by driving the real code**, never by reading the lists the fix edits. Drive the shipped
+   registry, the real generator, the real routes, with enough seeds to exhaust the draw. A sweep that reads
+   the same table the fix touches shares the fix's blind spot — and so does a rail derived from the code under
+   test, which is how one can certify the defect green (PR #427 round 2, in those words).
+3. **Check the enumeration in** when a machine can produce the list.
+   `tests/unit/fixtures/reception-gap-spellings.txt` is the worked example: 889 spellings, with a rail that
+   diffs them. The next member then arrives as a line in somebody's diff rather than as a review round — #443
+   was found that way, for the cost of one line.
+4. **Put the size in the body**: what the class is, how many members you swept, how many this diff fixes, and
+   which you are leaving, each with its reason. *"Fifteen (word, gap, letter) pairs in all"* is the shape.
+   When step 3 did not fire, nothing in the repository can check that number, so give the method and the seed
+   count beside it — a bare total reads as evidence and is not.
+
+**A class you genuinely cannot enumerate** — the code cannot produce the list, or it is unbounded — gets a
+body line beginning **`SWEEP: NOT ENUMERABLE`**, naming the class and what bounds the risk instead. That exact
+spelling, for the reason `e2e not run (env)` has one: a sweep nobody did and a sweep that found nothing must
+never read the same. That precedent only carries because `review-pr` §3 supplies the other half of it — for
+e2e, §2 and §5 already oblige a body to carry the evidence, and for the sweep it is §3's body check that
+makes an absent claim a finding rather than a silence. **It is an answer, not an exemption.** The grounds are that the code cannot produce the
+list — never that the run was short of time, and never that steps 1 to 4 are more than a bar — and the
+grounds are what a reviewer weighs (`review-pr` §3).
+
+### Then attack it with something that is not you
+
+Run the three review agents in `.claude/agents/` — the three `review-pr` §4 names — over your own diff before
+you hand it over, and **say in the body what each returned**, in one line:
+
+```
+agents: pr-test-analyzer — nothing · silent-failure-hunter — 2, both fixed · type-design-analyzer — unavailable
+```
+
+That line is the whole of the evidence, and §4 says why in its own voice: *an agent that never ran and an agent
+that found nothing produce the same silence*. If one reports itself unavailable in the first minutes of a
+session, retry — the agent roster registers later than the skill list does (#180) — and **if it is still
+unavailable, name it in that line** rather than leaving it out. Three `unavailable`s in a row is not
+compliance: a run that cannot spawn an agent **at all** — a subagent has no agent-launching tool, which
+`review-pr` §4 already records — writes the line as `agents: cannot spawn (subagent)` and nothing else. That
+exact spelling, for the third time in this section and the same reason each time: a gap and a result must
+never be written the same way, and "say so in your own words" leaves them indistinguishable.
+
+**Apply §4's reachability test before you change anything.** They reason forward from a bad input to a bad
+outcome and do not reason backwards to whether the input can occur, so a finding whose input the code cannot
+produce is a note for the body, not an edit to the diff. Fixing everything they raise is how a ten-line pin
+becomes 276 lines (#292), and a diff inflated that way looks exactly like a diff that had to be that big.
+
+**And not for a verdict.** You never review, mark or merge your own pull request, and §5 below does not move an
+inch. They are worth running here for one reason: they are a **different context**, which is the one thing a
+re-read of your own diff can never be. A run that re-reads its own work runs its own rail, sees its own green,
+and concludes what it concluded the first time.
+
 ## 5. Open it as a draft, and hand it over
 
 Open as **draft**. Undraft only once the **newest** CI run on the current head is green — a tick from before
