@@ -127,15 +127,14 @@ const visualKey = (v: Visual): string => {
  * never on the card — what the child reads is unchanged. Nothing enforces that inventory; the rails answer it
  * from the other end by normalising over four separators, so a generator switching to one of them goes red.
  *
- * **One carrier this key does not read, and the topics that leaves uncovered** (#412 review rounds 2 and 3).
- * `main`'s behaviour rather than anything #412 introduces, and it wants the same remedy #455 already took below
- * — a signal from the generator that the field is the question, not decoration — so it is not keyed here:
- *
- * - **`options`.** #412 rules them out in its own words, because they are shuffled and re-drawn per draw, so
- *   keying them switches repeat-avoidance off for the forty-odd topics whose extra bubbles are decoys. But
- *   `intervalCompare` sets no `hint`, no `listen` and no visual, and its own comment says the bubbles *are* the
- *   durations, so `y2-duration` reduces to `(prompt, answer)`: at d2, 22 keys over 3,000 draws with 18 covering
- *   more than one comparison. **#451**.
+ * **`options` is read only when the generator says it is the question** (#451, `Question.optionsAreContent`).
+ * #412 ruled out folding `options` in unconditionally, because they are shuffled and re-drawn per draw on the
+ * forty-odd topics whose extra bubbles are decoys — keying them there switches repeat-avoidance off. But
+ * `intervalCompare` sets no `hint`, no `listen` and no visual, and its own comment says the bubbles *are* the
+ * durations, so unmarked it reduced to `(prompt, answer)`: at d2, 22 keys over 3,000 draws with 18 covering more
+ * than one comparison. `intervalCompare` sets `optionsAreContent` and the key then reads `options` as the sorted
+ * set it is judged as — order is the per-draw shuffle, presentation rather than content, exactly `contentList`'s
+ * distinction for `hint`/`listen` above.
  * **The one cost this widening carries, stated because a child pays it** (#412 review round 4). `hint` is
  * content on a tall screen and **not on the card at all on a short one**: `src/style.css`'s
  * `@media (max-height: 640px)` hides `.hint` until the answer is given, and a landscape phone is exactly that
@@ -182,7 +181,7 @@ const contentList = (s: string) => {
   for (const sep of LIST_SEPARATORS) if (s.includes(sep)) return s.split(sep).sort().join(sep);
   return s;
 };
-export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : ''].join('\u0000');
+export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : '', q.optionsAreContent ? [...q.options].sort().join('\u0001') : ''].join('\u0000');
 
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;

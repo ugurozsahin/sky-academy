@@ -33,6 +33,15 @@ export interface Question {
   say?: string;           // spoken form (Web Speech), defaults to prompt
   answer: string;         // correct option OR, for 'sequence', the letters joined
   options: string[];      // bubble labels (shuffled, includes answer / all sequence letters)
+  /**
+   * `options` is a decoy pool on most topics — re-drawn per draw, so `repeatKey` (`src/game/session.ts`) must
+   * ignore it or repeat-avoidance switches off. `intervalCompare` (#451) is the one generator whose *bubbles*
+   * are the question: it sets no `hint`, `listen` or `visual`, so without this the key reduces to
+   * `(prompt, answer)` and 18 of 22 `y2-duration` d2 cards share a key. Set by the generator, read by
+   * `repeatKey` as an opt-in — folding `options` into the key unconditionally is the defect #412 fixed, not a
+   * remedy for it.
+   */
+  optionsAreContent?: boolean;
   sequence?: string[];    // slice these in order (spelling); options = sequence letters + decoys
   visual?: Visual;
   hint?: string;          // small instruction text under the prompt
