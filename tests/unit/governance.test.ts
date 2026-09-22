@@ -426,17 +426,25 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     const text = readFileSync(new URL('docs/REVIEWER-PROMPT.md', root), 'utf8');
     const step2 = text.slice(text.indexOf('STEP 2 — REVIEW'), text.indexOf('Four things make a PR unmergeable'));
     expect(step2.length, 'STEP 2 must be read from disk as text, or this rail checks nothing').toBeGreaterThan(500);
-    const agents = step2.indexOf('review agents');
+    // Anchored on the literal instruction to RUN the agents, not merely on the word "agents" appearing
+    // somewhere earlier — a sentence that mentions review agents in passing and then tells a run to fire
+    // playwright immediately used to satisfy a bare indexOf ordering check (#500 round 1, B1).
+    const agents = step2.indexOf('run the three vendored review agents on the diff');
     const browser = step2.indexOf('playwright test');
-    expect(agents, 'STEP 2 must still tell a run to use the review agents').toBeGreaterThan(-1);
+    expect(agents, 'STEP 2 must tell a run to RUN the three vendored review agents on the diff, not merely mention agents in passing').toBeGreaterThan(-1);
     expect(browser, 'STEP 2 must still tell a run to run the suite before it merges — this is an ordering rail, not a deletion').toBeGreaterThan(-1);
     expect(browser, 'STEP 2 runs the suite before the agents again: about half of those runs are on a head the same review then invalidates (#499)')
       .toBeGreaterThan(agents);
     // The order alone is not the rule the owner asked for (2026-09-22): a finding means the suite does not
     // run AT ALL, and a review with no finding runs it as the guarantor. Both halves are pinned, because
     // "last" without "only if" is the version that still pays for half of these runs.
-    expect(step2, 'STEP 2 must say a finding stops the suite running (#499)').toMatch(/does not run/);
-    expect(step2, 'and that a review with no finding runs it as the guarantor — "last" alone still pays for it (#499)')
+    // Required BETWEEN the agents anchor and the browser command, not merely somewhere in STEP 2 — so the
+    // finding-stops-the-suite rule actually governs the playwright command rather than sitting unconnected
+    // elsewhere in the same paragraph (#500 round 1, B1).
+    const between = step2.slice(agents, browser);
+    expect(between, 'STEP 2 must say a finding stops the suite running, and that rule must sit between the agents step and the playwright command (#499)')
+      .toMatch(/does not run/);
+    expect(between, 'and that a review with no finding runs it as the guarantor, governing the playwright command that follows it (#499)')
       .toMatch(/no finding[\s\S]{0,60}guarantor/);
   });
 
@@ -446,11 +454,23 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     expect(s2.length, '§2 must be read from disk, and §3 must still follow it').toBeGreaterThan(500);
     // The FIRST fenced block in §2 is the one a reviewer runs before reading anything. A browser command in
     // it is #499 restored, whatever the prose around it says.
-    const first = s2.split('```')[1];
+    const parts = s2.split('```');
+    const first = parts[1];
     expect(first, '§2 must still open with a runnable block').toBeTruthy();
     expect(first, "§2's first block is what runs before the diff is read — it must be the seconds-long checks, not the suite (#499)")
       .not.toMatch(/playwright/);
     expect(first, 'and it must still be the real cheap three, or the block has been gutted rather than reordered').toMatch(/npm test/);
+    // Exactly two fenced command blocks, and the text BETWEEN them must be what governs the second one —
+    // not merely "playwright" appearing somewhere later in §2. A §2 that puts the browser block straight
+    // after the first one, with an "immediately, before the diff or the agents" instruction ahead of it and
+    // the guarantor/does-not-run language pushed into unrelated filler afterward, used to pass every check
+    // in this block on word presence alone (#500 round 1, B1, pr-test-analyzer).
+    expect(parts.length, '§2 must have exactly two fenced command blocks — the cheap checks, then the browser (#499)').toBe(5);
+    const [, , between, second] = parts;
+    expect(second, 'the second fenced block must be the browser commands, not renamed or moved (#499)')
+      .toMatch(/playwright test --project=mobile/);
+    expect(between, 'the text immediately before the browser block must say it runs only as the guarantor for a clean review — not merely mention that somewhere later in §2 (#499)')
+      .toMatch(/guarantor/);
     // ...and the suite is still REQUIRED later in the same section: this issue reorders it, never drops it.
     expect(s2, '§2 must still require the mobile suite before a clear or a merge (#499)').toMatch(/playwright test --project=mobile/);
     expect(s2, "§2 must still carry the non-run's prescribed spelling").toContain('e2e not run (env)');
