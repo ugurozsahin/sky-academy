@@ -4385,99 +4385,97 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
    * counted property, and leaves "is it the correct guard?" to the reviewer, where it belongs.
    */
   /**
-   * Round 3, B1/B2/B4 and five non-blocking siblings — and the reviewer's framing, which is the finding:
-   * "every fix so far has hardened exactly the assertions its own mutation table touched, and each time the
-   * next round found the ones it didn't."
+   * Round 4, B2/B3/B4 — and the ceiling the reviewer named, which is the real finding.
    *
-   * Three rounds treated the population as *the rails already written*. It is not. **The population is every
-   * safety-bearing claim in `docs/REFINER-PROMPT.md`** — the sentences the loosening's argument rests on —
-   * and it is enumerable, so it is enumerated here as data rather than as prose spread across nine tests.
+   * `NO_ESCAPE` was a five-word vocabulary. The reviewer appended *"A second closure raised by a different
+   * run still goes forward, since it is a fresh proposal."* directly after the reopen guarantee — ordinary
+   * English, none of the five words, the literal opposite of the rule — and every row stayed green,
+   * `beside`-guarded rows included, because `binds` checks proximity and never polarity.
    *
-   * What this buys, and it is the whole point of #526: the set is now **visible and countable**. A reviewer
-   * diffs this table against the document instead of guessing what was swept. A claim added to the document
-   * without a row here is still possible — prose cannot be mined for "safety claim" mechanically — but the
-   * gap is then a missing row someone can see, not an assertion nobody thought to write.
+   * **Widening the vocabulary is a losing game and this stops playing it.** Prose negation is not
+   * mechanically detectable; that was already written into this file in round 2 and then contradicted by
+   * three more rounds of regex. So each guarantee is now pinned **word for word, as a whole unit** — the
+   * paragraph or list item it lives in, matched by equality against the document's own units. A reversal
+   * fails. An edit fails. A sentence appended *inside* the unit fails, which is exactly what defeated the
+   * vocabulary. Nothing clever, and nothing to outwit.
    *
-   * Each row: where the claim lives, a phrase that must survive, and what must sit beside it. A reversal and
-   * an appended exception both fail it, which is what the last three rounds were about.
+   * The cost is real and is the right one: a deliberate rewording turns a row red and asks the author to
+   * re-pin it, which for nine safety guarantees is a prompt to re-read the policy rather than an obstacle.
+   * It is what this repository already does for its load-bearing sentences (#194, #204, #218).
+   *
+   * **The ceiling, stated rather than implied.** A contradicting sentence added as its OWN new unit, beside
+   * an untouched pin, still passes — and no regex, vocabulary or equality check can see it. That is not a
+   * gap this table can close, so it is named here instead of covered over: for that case human review is
+   * the backstop, which is how all four of these rounds were actually found.
+   *
+   * `conditional` is gone with the vocabulary it excused (B4): an unchecked per-row opt-out that turned the
+   * guard off, which the coverage rail could not see because it scans the shared `it.each` body statically.
+   * There is nothing left to opt out of.
    */
-  const CLAIMS: Array<{ what: string; section: [string, string]; phrase: RegExp; beside?: [string, RegExp];
-                        conditional?: string }> = [
-    // B2 — the reopen guard. Flipping it to "may be proposed again right away" left all ten rails green.
-    { what: 'a reopened issue is never proposed for closing again',
-      section: ['## Two signals that stop you', '## The work'],
-      phrase: /closed and then reopened is never proposed for closing again/ },
-    // B1 — the `blocked` half of the forgery-safety guarantee, called "the same shape" and pinned nowhere.
-    { what: 'blocked is added on a derived blocker and removed only when that blocker closed',
-      section: ['## Two signals that stop you', '## The work'],
-      phrase: /same shape governs `blocked`/,
-      beside: ['same shape governs `blocked`', /has actually closed/] },
-    { what: 'and blocked is never re-applied after a hand changed it back',
-      section: ['## Two signals that stop you', '## The work'],
-      phrase: /never\s*\n?\s*re-apply either after someone has changed it back/ },
-    // B4 — the malformed-ledger-line guarantee, used only as a slice boundary until now.
-    { what: 'an unparseable ledger line fails closed, like a lost ledger',
-      section: ['## The two-phase gate', '## Two signals'],
-      phrase: /a single line you cannot parse/,
-      beside: ['a single line you cannot parse', /drop that line/] },
-    // Non-blocking, taken in the same pass: the population is the document, not the findings list.
-    { what: 'the duplicate survivor is the earlier issue',
-      section: ['## The work', '## Reporting'],
-      phrase: /the earlier issue number is the survivor/ },
-    { what: 'the owner is notified only for a failure to run or a large close',
-      section: ['## Reporting', '## The heartbeat'],
-      phrase: /nothing notifies the\s*\n?owner/,
-      beside: ['a per-run total', /five issues/],
-      conditional: 'the rule IS a conditional — "nothing notifies the owner unless you could not run at '
-        + 'all" — so the escape vocabulary is the claim here, not an exception to it' },
-    { what: 'the forgery-safety argument is scoped to this file and nothing else',
-      section: ['## Two signals that stop you', '## The work'],
-      phrase: /Do not extend this reasoning to anything else/ },
-    { what: 'the pulse and ledger issues are created in one call, never created empty and filled',
-      section: ['## Reporting', '## The heartbeat'],
-      phrase: /[Nn]ever create one empty and fill it afterwards/,
-      beside: ['single `POST /issues`', /title[\s\S]{0,30}body[\s\S]{0,30}labels/] },
-    // The spec gap the reviewer found: the timeline read had no stated failure direction.
-    { what: 'an unreadable events timeline fails closed',
-      section: ['## Two signals that stop you', '## The work'],
-      phrase: /cannot read that timeline/,
-      beside: ['cannot read that timeline', /do not (set|propose)|nothing is set/i] },
+  const unitsOf = (text: string) =>
+    text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=(?:- |\d+\. ))/)).map((u) => u.trim());
+
+  const CLAIMS: Array<{ what: string; unit: string }> = [
+    { what: "a reopened issue is never proposed for closing again",
+      unit: "- **An issue that was closed and then reopened is never proposed for closing again.**" },
+    { what: "blocked is added and removed only on the blocker, and never re-applied",
+      unit: "That closes the hole by construction rather than by memory: the moment a human hand touches a priority, the\nlabel exists, and an existing label is out of your reach whatever any record says. A ledger that is lost,\ntruncated or garbled cannot make this rule fail open (#513 review, B1). **The same shape governs `blocked`:**\nadd it when you derive a blocker, remove it only when the blocking issue has actually closed, and never\nre-apply either after someone has changed it back." },
+    { what: "a lost ledger applies nothing, and so does one unparseable line",
+      unit: "A lost or unreadable ledger means nothing applies. **So does a single line you cannot parse**: drop that line\nand let its proposal start its wait again, rather than guessing what it said. Both are the correct failure\ndirection — the cost is a day, and the alternative is an irreversible act on a misread record." },
+    { what: "the duplicate survivor is the earlier issue",
+      unit: "1. **Duplicates and overlap, across every open issue in reach.** Two issues describing the same defect, or one\n   whose scope wholly contains another's. Link them both ways in a comment naming the overlap in one sentence,\n   and propose closing the later one — the earlier issue number is the survivor, because pointers are written\n   against it. Where the overlap is partial, link and say so; do not propose a close." },
+    { what: "the owner is notified only for a failure to run or a large close",
+      unit: "You are not an alarm — the watchdog is, and it is silent when clean precisely so that it is believed. You\nspeak every run, and quietly: everything goes in the two issue bodies you own, and **nothing notifies the\nowner** unless you could not run at all, or the proposals you are about to apply in this run would\nclose more than five issues between them — a per-run total, not a count inside one proposal." },
+    { what: "the forgery-safety argument is scoped to this file and nothing else",
+      unit: "Under #153 one GitHub account serves every agent and the owner, so you **cannot** tell his hand from another\nrun's — `author_association: OWNER` is on every agent's comment too, and the timeline's `actor` is the same\naccount for all of us. That is survivable here and only here, because every authority in this file fails safe\nunder forgery: a forged objection merely stops a change from happening, and you do not need to know **who**\nchanged a label to be stopped by the fact that it changed. There is no approval you can be tricked into,\nbecause you have none to give. Do not extend this reasoning to anything else." },
+    { what: "the pulse and ledger issues are created in one call",
+      unit: "Create either with its body already in it, in the single `POST /issues` call that takes `title`, `body` and\n`labels` together. Never create one empty and fill it afterwards: a run that dies in between leaves an open\nissue with no content, which ages into nothing and reads as healthy forever." },
+    { what: "an unreadable events timeline fails closed",
+      unit: "- **A value you set, that someone then changed, is never set again.** Read this from\n  `GET /repos/ugurozsahin/sky-academy/issues/<n>/events`, which carries every `labeled` and `unlabeled`\n  event with its label and its time. Not from the ledger: the ledger holds only *outstanding* proposals and\n  drops a line the moment it is applied, so a memory kept there would be gone exactly when it is needed.\n  **The issue's own timeline is repo state, and deriving from state rather than replaying a record is this\n  routine's whole method** — the same reason the gate re-derives instead of reading back its reasoning.\n  **If you cannot read that timeline — the call fails, the body will not parse, the page is truncated — then\n  do not set the value.** Say so in your report and move on. An unreadable timeline is the same shape as an\n  unreadable ledger and takes the same answer: the check was not made, so the act does not happen. Reading a\n  failed call as \"no change found\" is the absence read as a pass, which is the defect this whole project is\n  built around." },
+    { what: "an existing priority is never changed, only argued for",
+      unit: "- **You may never change one that is already there.** Not behind the gate, not with evidence, not ever. If\n  you derive that an existing priority is wrong, read the timeline above; if the label has not been touched\n  since it was first set, you may **comment your reasoning on the issue and stop.** The owner decides.\n  Applying it is not one of your options." },
+    { what: "a missing priority may be set",
+      unit: "- **You may set a `priority:*` on an issue that has none.** That is the case this authority exists for —\n  nine issues had no priority label on 2026-09-22 and therefore sorted behind all 130." },
+    { what: "re-derive, never replay",
+      unit: "1. **Re-derive every proposal from the repo state, every run.** Do not read yesterday's reasoning and act on\n   it. Yesterday's evidence is a claim about a tree that has since moved — the duplicate may have been closed,\n   the code may have grown the very thing the issue asked for. **Reading back your own reasoning and\n   confirming it still reads true is not this step**, it is the failure this step exists to prevent: it makes\n   the gate a delay and nothing more." },
+    { what: "a split that died halfway is completed, never restarted",
+      unit: "4. **Split `L` and `XL`.** Into pieces that each stand alone and each leave the game working. Label the parent\n   `epic`, which drops it out of `docs/ROUTINE-PROMPT.md` STEP 3's query, and put `- [ ] #<child>` lines in\n   the parent body. **Do not write a progress number.** GitHub counts those lines, draws the bar and ticks the\n   box itself when a child closes; a bar you maintain by hand still looks correct at the exact moment it stops\n   being true, which is this project's signature defect wearing a new hat. Each child says `Part of #<parent>`\n   — never a closing keyword, which would shut the parent from a child's body (`open-pr` skill §3).\n   **A split is three dependent writes, so begin by looking for one you already started.** Create the\n   children, label the parent `epic`, rewrite its checklist — and a run that dies between the first and the\n   second leaves children nobody points at, which tomorrow's re-derivation would read as an unsplit parent\n   and split a second time. So **before splitting anything, search for open issues whose body says\n   `Part of #<parent>`**. If any exist, the split is already under way: finish it — label the parent and\n   write the checklist against the children that exist — and never create a second set. That search is the\n   idempotency check, and it works because the child's `Part of` line is written in the same call that\n   creates it, so there is no moment where a child exists without it." },
   ];
 
-  it.each(CLAIMS)('the prompt still carries: $what', ({ section, phrase, beside, conditional }) => {
-    const text = doc('docs/REFINER-PROMPT.md');
-    const scope = between(text, section[0], section[1]);
-    expect(scope.length, 'the section must be found, or this row asserts nothing').toBeGreaterThan(200);
-    expect(scope, 'this claim is part of the safety argument the loosening rests on').toMatch(phrase);
-    if (beside) {
-      expect(binds(scope, beside[0], beside[1]),
-        'and the claim must stay attached to what makes it true').toBe(true);
-    }
-    if (!conditional) {
-      const at = scope.search(phrase);
-      const window = scope.slice(Math.max(0, at - SPAN), at + SPAN);
-      expect(window, 'with no exception clause beside it — an addition is how a guarantee dies')
-        .not.toMatch(NO_ESCAPE);
-    }
+  it.each(CLAIMS)('the prompt still carries, word for word: $what', ({ unit }) => {
+    const units = unitsOf(doc('docs/REFINER-PROMPT.md'));
+    expect(units.length, 'the document must split into its units, or this row asserts nothing')
+      .toBeGreaterThan(40);
+    // Equality against a whole unit, not `toContain` on the text: a substring match is satisfied by the
+    // pinned words sitting inside a longer, reversed sentence, which is round 4's B2 in one line.
+    expect(units, 'this guarantee is part of the safety argument the loosening rests on — if the wording '
+      + 'changed on purpose, re-pin it here deliberately and say so in the commit').toContain(unit);
   });
 
   it('the claim table is not allowed to quietly shrink', () => {
     expect(CLAIMS.length, 'a row removed is a guarantee unpinned — lower this only when the document '
-      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(9);
+      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(12);
     expect(new Set(CLAIMS.map((c) => c.what)).size, 'two rows must not claim the same thing')
+      .toBe(CLAIMS.length);
+    expect(new Set(CLAIMS.map((c) => c.unit)).size, 'two rows must not pin the same unit — that is one '
+      + 'guarantee counted twice, which inflates the floor above without covering anything')
       .toBe(CLAIMS.length);
   });
 
   it('every rail in this block carries a negative assertion, not only positives', () => {
     const src = doc('tests/unit/governance.test.ts');
     const block = between(src, "describe('the refiner shapes the backlog", '\n});\n');
+    // Every Vitest modifier, not only `.each` (round 4, B1): a live `it.concurrent(...)` ran beside this
+    // rail, uncounted, because the pattern matched a bare `it(` alone. The rail that exists to stop a
+    // test evading detection by an unusual shape had been evading it by an unusual shape, twice.
+    const MODIFIERS = '(?:\\.(?:each\\([^)]*\\)|concurrent|sequential|skip|only|todo|fails|extend))*';
     // Any indentation, not the two spaces this block happens to use (round 3, B3): a test wrapped at
     // four spaces merged into the previous body string and went uncounted, so the rail reported clean
     // while a naked positive-only test ran beside it. The split is then CROSS-CHECKED against a raw
     // count, because a parser that silently sees fewer tests than exist is this rail's own failure mode —
     // and the rail exists to say that a count is worth more than a promise.
-    const tests = block.split(/\n\s*it(?:\.each\([^)]*\))?\(/).slice(1);
-    const raw = (block.match(/\n\s*it(?:\.each)?\(/g) ?? []).length;
+    const tests = block.split(new RegExp('\\n\\s*it' + MODIFIERS + '\\(')).slice(1);
+    const raw = (block.match(new RegExp('\\n\\s*it' + MODIFIERS + '\\(', 'g')) ?? []).length;
     expect(tests.length, 'the block must be parsed into its tests, or this rail counts nothing')
       .toBeGreaterThanOrEqual(8);
     expect(tests.length, 'every `it(` in the block must be counted — a test the split cannot see is '
@@ -4488,7 +4486,11 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     // rather than a prose policy. Neither has a reversal to guard against, and a self-reference would
     // make them vacuous.
     const META = ['every rail in this block carries a negative assertion',
-                  'the claim table is not allowed to quietly shrink'];
+                  'the claim table is not allowed to quietly shrink',
+                  // Exact equality against a whole document unit already fails on a reversal, an edit
+                  // and a sentence appended inside the unit — strictly stronger than the negative this
+                  // rail asks for, not an escape from it (round 4).
+                  'the prompt still carries, word for word'];
     const naked = tests
       .filter((body) => !META.some((m) => body.startsWith(`'${m}`)))
       .filter((body) => !/\.not\.(toMatch|toContain|toEqual)\(/.test(body))

@@ -129,6 +129,14 @@ Run all of it. A job you could not perform is worth a line in your report — "I
    box itself when a child closes; a bar you maintain by hand still looks correct at the exact moment it stops
    being true, which is this project's signature defect wearing a new hat. Each child says `Part of #<parent>`
    — never a closing keyword, which would shut the parent from a child's body (`open-pr` skill §3).
+   **A split is three dependent writes, so begin by looking for one you already started.** Create the
+   children, label the parent `epic`, rewrite its checklist — and a run that dies between the first and the
+   second leaves children nobody points at, which tomorrow's re-derivation would read as an unsplit parent
+   and split a second time. So **before splitting anything, search for open issues whose body says
+   `Part of #<parent>`**. If any exist, the split is already under way: finish it — label the parent and
+   write the checklist against the children that exist — and never create a second set. That search is the
+   idempotency check, and it works because the child's `Part of` line is written in the same call that
+   creates it, so there is no moment where a child exists without it.
 5. **An acceptance criterion where there is none.** One sentence: *what has to be true for this to be
    finished.* Not a design. The developer routine's job is to decide how; this only stops it deciding what.
 6. **A missing area label** — `tests`, `debt`, `bug`, `curriculum`, `guard-rail`, `mode`, and the rest of the
