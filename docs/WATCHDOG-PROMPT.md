@@ -94,7 +94,8 @@ your first finding and the only one you can report.
    a finding about the pulse, and 2 means the check was never made** — a missing or mangled argument, an
    unreadable file — and prints to stderr, so read the code rather than the fact that it failed: a 2 is a
    fault in your call, never evidence about the routine, and filing it as one would spend a developer run.
-   Do this for all three pulses you read — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`.
+   Do this for every pulse you read — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`, and
+   `refiner: heartbeat` (check 10).
    A stamp **behind** its write is healthy and says nothing: the clock was read, then the write landed. Ahead
    of it by more than a couple of minutes of clock skew is the finding, whatever the body otherwise says, and
    the age you computed above is wrong by that much — say both numbers in the issue. Found on 2026-09-21,
@@ -225,6 +226,21 @@ your first finding and the only one you can report.
    until the owner wants an APK on the tablet — which is exactly how #129 was found, by him, at the moment he
    needed the build. Reading it costs no Actions minutes. Name the run's URL and the failing step in the
    issue, since the cause is usually in a third-party action's output rather than in our code.
+
+10. **Is the refiner alive?** Read the body of the open issue titled `refiner: heartbeat` (label `watchdog`;
+   exclude it from the duplicate search below like the other pulses). `docs/REFINER-PROMPT.md` describes a
+   **daily** task that rewrites it with a UTC timestamp as the last thing it does, so the numbers here are
+   the day's, not the hour's: **older than ~30 hours is a finding.** Everything check 3 says applies unchanged
+   — an open issue is not evidence of a pulse, an unparseable body counts as stale, a closed one is a finding
+   rather than a pass, `stopped: limit` is a finding however fresh it is, and the stamp is checked against
+   the write exactly as check 3 says — that paragraph names this pulse and is the one home of the invocation.
+   One difference: this routine has no `IN PROGRESS` stamp, because it writes nothing on the way in. So a
+   missing pulse here is the *only* evidence a refiner run leaves of having died, and there is no second
+   record to cross-check it against.
+   Read `refiner: backlog` in the same pass — the same label, never work, and never a duplicate report of a
+   finding. You are not judging its contents. One thing only: if its ledger lists a proposal first derived
+   **more than three days ago** and still not applied, the two-phase gate has stalled rather than held, and
+   that is a finding. A gate that never closes is a gate that has quietly become a refusal.
 
 ## Reporting
 

@@ -3344,3 +3344,139 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
       .toMatch(/auto-compaction/i);
   });
 });
+
+
+/**
+ * #512 — the refiner routine (`docs/REFINER-PROMPT.md`,
+ * `docs/decisions/008-the-backlog-is-refined-by-a-routine.md`), the fourth scheduled task and the first one
+ * permitted to set `priority:*` and `blocked`, which `.claude/rules/governance.md` had called the owner's
+ * alone since 2026-09-11. That permission is the whole risk, so these rails hold the two things that make it
+ * survivable rather than the prose that explains them.
+ *
+ * What decays, and a rail each:
+ *
+ *  1. **The gate slides.** The value of this design is entirely in *which side* of it each act sits on: a
+ *     wrong label is one click back, a closed issue and a changed priority are not. Move `priority:*` up into
+ *     the immediate list and every sentence in the file still reads correctly — that is the edit no reviewer
+ *     would catch by reading, so it is pinned by structure: the three deferred acts must be named on the
+ *     deferred line and none of them on the immediate one. Deliberately matched on the label in a code span,
+ *     so prose like "work that cannot move yet" does not satisfy or trip it.
+ *  2. **The reach widens.** `owner-session`, `later` and `refine-hold` are what the owner has left of his own
+ *     hand here, and the four pulse issues are permanently open with bodies a "no longer true, close it" pass
+ *     would read as dead. Losing any one of them from the out-of-reach list is silent until the day it closes
+ *     a heartbeat.
+ *  3. **`later` quietly becomes the refiner's too.** It is the one ordering tool the loosening did not touch,
+ *     and the exclusion lives in the sentence that grants the other two — the likeliest place for it to be
+ *     dropped as an awkward clause.
+ *  4. **The epic grows a progress number.** A count an agent maintains looks correct either side of the
+ *     moment it stops being true; GitHub's own task-list count cannot. This is `docs/WATCHDOG-PROMPT.md`'s
+ *     opening defect in a new costume, so the prohibition is pinned, not only the mechanism.
+ *  5. **`epic` stops dropping out of STEP 3.** The parent then queues as ordinary work and a run develops an
+ *     issue the refiner split precisely because no run could finish it.
+ *  6. **Nothing watches the refiner.** It writes no `IN PROGRESS` stamp, so a missing pulse is the only
+ *     evidence a dead run leaves; if the watchdog stops reading it, the silence reads as a tidy backlog.
+ *
+ * It pins no wording beyond those hooks: the prose has to stay free to shrink, like every other prompt here.
+ *
+ * Prove it red: move "changing `priority:*`" onto the **Apply immediately** line; drop `refine-hold` from the
+ * out-of-reach list; delete `epic` from STEP 3 rule 1; remove `refiner: heartbeat` from the watchdog.
+ */
+describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', () => {
+  const root = new URL('../../', import.meta.url);
+  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  const lineWith = (text: string, needle: string) =>
+    text.split('\n\n').find((p) => p.includes(needle)) ?? '';
+
+  const IRREVERSIBLE = ['`priority:*`', '`blocked`'];
+  const UNTOUCHABLE = ['`owner-session`', '`later`', '`refine-hold`'];
+  const PULSES = ['routine: heartbeat', 'reviewer: heartbeat', 'board: heartbeat', 'watchdog: heartbeat'];
+
+  it('the refiner prompt exists and says it develops nothing', () => {
+    const text = doc('docs/REFINER-PROMPT.md');
+    expect(text.length, 'docs/REFINER-PROMPT.md must be read from disk, or every rail below is vacuous')
+      .toBeGreaterThan(2_000);
+    expect(text, 'the refiner must be told it writes no code and opens no pull request')
+      .toMatch(/never writes code/i);
+    expect(text, 'and that pull requests are outside its surface entirely').toMatch(/every pull request/i);
+  });
+
+  it('every irreversible act sits on the deferred side of the gate, and none on the immediate side', () => {
+    const text = doc('docs/REFINER-PROMPT.md');
+    const immediate = lineWith(text, '**Apply immediately**');
+    const deferred = lineWith(text, '**Propose today');
+    expect(immediate, 'the prompt must carry an "Apply immediately" list').not.toEqual('');
+    expect(deferred, 'the prompt must carry a "Propose today, apply tomorrow" list').not.toEqual('');
+    expect(text.indexOf('**Apply immediately**'), 'the cheap half is stated first, so the gate reads as an '
+      + 'exception to it rather than the other way round').toBeLessThan(text.indexOf('**Propose today'));
+    expect(deferred, 'closing an issue is irreversible and must be proposed, never applied the same run')
+      .toMatch(/clos/i);
+    expect(immediate, 'nothing on the immediate side may close an issue').not.toMatch(/clos/i);
+    for (const act of IRREVERSIBLE) {
+      expect(deferred, `${act} must be named on the deferred side of the gate`).toContain(act);
+      expect(immediate, `${act} is irreversible and must not be applied in the same run`).not.toContain(act);
+    }
+  });
+
+  // Read the mechanism block, not the whole file: `/re-deriv/` anywhere in the document is satisfied by the
+  // incidental "a proposal that no longer re-derives is dropped" three paragraphs down, so a rail spanning
+  // the file stays green with the instruction itself deleted. Found by mutation, not by reading.
+  it('a proposal is re-derived from the repo, never replayed from the ledger', () => {
+    const text = doc('docs/REFINER-PROMPT.md');
+    const mech = text.slice(text.indexOf('The mechanism'), text.indexOf('A lost or unreadable ledger'));
+    expect(mech.length, 'the numbered mechanism must be found, or this rail reads an empty string')
+      .toBeGreaterThan(400);
+    expect(mech, 'the gate is only a delay unless tomorrow derives the proposal again from tomorrow\'s tree')
+      .toMatch(/re-deriv/i);
+    expect(mech, 'a gate with no stated bound closes whenever the next run happens to be')
+      .toMatch(/\b20 hours\b/);
+    expect(mech, 'the ledger must hold when a proposal was made and not what it was — a stored plan is what '
+      + 'turns re-deriving back into replaying').toMatch(/never the plan/i);
+    expect(mech, 'and it must name the issue that carries it').toMatch(/refiner: backlog/);
+  });
+
+  it('what the refiner may never touch stays out of its reach', () => {
+    const text = doc('docs/REFINER-PROMPT.md');
+    const reach = text.slice(0, text.indexOf('## The two-phase gate'));
+    expect(reach.length, 'the out-of-reach section must come before the gate, or this rail reads the wrong half')
+      .toBeGreaterThan(200);
+    for (const label of [...UNTOUCHABLE, ...PULSES]) {
+      expect(reach, `${label} must be named as out of the refiner's reach`).toContain(label);
+    }
+  });
+
+  it('the loosening is recorded where the rule it relaxes lives, and spares `later` (#512)', () => {
+    const text = doc('.claude/rules/governance.md');
+    const tools = lineWith(text, 'The three ordering tools');
+    expect(tools, 'the ordering-tools rule must say the refiner may now set two of the three')
+      .toMatch(/docs\/REFINER-PROMPT\.md/);
+    expect(tools, '`later` is the one ordering tool the loosening did not touch — say so, or it drifts in')
+      .toMatch(/never `later`/);
+    expect(tools, 'and it must name itself a loosening, since that is what gates it on the owner')
+      .toMatch(/loosening/i);
+    expect(tools, 'pointing at the decision record that holds the alternatives dropped')
+      .toContain('docs/decisions/008-the-backlog-is-refined-by-a-routine.md');
+  });
+
+  it('the epic\'s progress is GitHub\'s to count, not the refiner\'s to write', () => {
+    const text = doc('docs/REFINER-PROMPT.md');
+    expect(text, 'the parent must carry task-list lines GitHub can count').toMatch(/- \[ \] #/);
+    expect(text, 'and the refiner must be forbidden from writing a progress number of its own')
+      .toMatch(/do not write a progress number/i);
+  });
+
+  it('an `epic` parent drops out of the developer routine\'s query', () => {
+    const text = doc('docs/ROUTINE-PROMPT.md');
+    const step3 = text.slice(text.indexOf('STEP 3 —'), text.indexOf('STEP 4 —'));
+    expect(step3.length, 'STEP 3 must be found, or this rail checks nothing').toBeGreaterThan(500);
+    expect(step3, 'STEP 3 must drop `epic`, or a run develops the parent the refiner split because no run '
+      + 'could finish it').toContain('`epic`');
+    expect(step3, 'and say the children are the work instead').toMatch(/children/i);
+  });
+
+  it('the watchdog holds the refiner\'s pulse, since nothing else does', () => {
+    const text = doc('docs/WATCHDOG-PROMPT.md');
+    expect(text, 'the watchdog must read `refiner: heartbeat`').toContain('refiner: heartbeat');
+    expect(text, 'a daily routine needs a daily staleness bound, not the hourly one').toMatch(/30 hours/);
+    expect(text, 'and it must notice a gate that has stalled into a refusal').toContain('refiner: backlog');
+  });
+});

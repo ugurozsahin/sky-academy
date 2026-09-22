@@ -269,7 +269,9 @@ describe('every routine that writes or reads a pulse is pointed at the one home 
       .toHaveLength(1);
     const text = para[0];
     expect(text, 'against the field the writing run cannot author for itself').toContain('updated_at');
-    for (const pulse of ['routine: heartbeat', 'reviewer: heartbeat', 'board: heartbeat']) {
+    // `refiner: heartbeat` joined the list with #512. It is the one pulse whose routine writes no IN PROGRESS
+    // stamp, so a forward-dated stamp there is uncheckable against anything but `updated_at`.
+    for (const pulse of ['routine: heartbeat', 'reviewer: heartbeat', 'board: heartbeat', 'refiner: heartbeat']) {
       expect(text, `${pulse} must be one of the pulses that paragraph covers`).toContain(pulse);
     }
     expect(text, 'and it must say what a non-zero exit means, or exit 2 reads as a finding')
