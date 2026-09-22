@@ -19,6 +19,15 @@ export interface SessionEvents {
   onTime?: (secondsLeft: number) => void;               // sprint clock, once per whole second
   onBoss?: (hp: number, max: number, kind: 'hit' | 'heal') => void;   // boss health changed
   onEnd: (r: SessionResult) => void;
+  /**
+   * A staged mission's LAST question was just decided (#484) — fired synchronously, in the same call as
+   * `hit()`/`fall()`/`waveEnd()`, well before `advance()` is even reached (the UI defers that for the
+   * outcome-reveal pacing) and long before the child could click "Next" on the stage-clear overlay `advance()`
+   * eventually shows. `onEnd` still fires later, at its normal display-driven time, with an equal
+   * `SessionResult` — this is only so a UI can commit the payout (coins, Sensei accuracy, the certificate…)
+   * the instant it is decided rather than risk losing it to a quit in either of those two windows.
+   */
+  onCommit?: (r: SessionResult) => void;
 }
 export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number }
 
@@ -118,15 +127,14 @@ const visualKey = (v: Visual): string => {
  * never on the card — what the child reads is unchanged. Nothing enforces that inventory; the rails answer it
  * from the other end by normalising over four separators, so a generator switching to one of them goes red.
  *
- * **One carrier this key does not read, and the topics that leaves uncovered** (#412 review rounds 2 and 3).
- * `main`'s behaviour rather than anything #412 introduces, and it wants the same remedy #455 already took below
- * — a signal from the generator that the field is the question, not decoration — so it is not keyed here:
- *
- * - **`options`.** #412 rules them out in its own words, because they are shuffled and re-drawn per draw, so
- *   keying them switches repeat-avoidance off for the forty-odd topics whose extra bubbles are decoys. But
- *   `intervalCompare` sets no `hint`, no `listen` and no visual, and its own comment says the bubbles *are* the
- *   durations, so `y2-duration` reduces to `(prompt, answer)`: at d2, 22 keys over 3,000 draws with 18 covering
- *   more than one comparison. **#451**.
+ * **`options` is read only when the generator says it is the question** (#451, `Question.optionsAreContent`).
+ * #412 ruled out folding `options` in unconditionally, because they are shuffled and re-drawn per draw on the
+ * forty-odd topics whose extra bubbles are decoys — keying them there switches repeat-avoidance off. But
+ * `intervalCompare` sets no `hint`, no `listen` and no visual, and its own comment says the bubbles *are* the
+ * durations, so unmarked it reduced to `(prompt, answer)`: at d2, 22 keys over 3,000 draws with 18 covering more
+ * than one comparison. `intervalCompare` sets `optionsAreContent` and the key then reads `options` as the sorted
+ * set it is judged as — order is the per-draw shuffle, presentation rather than content, exactly `contentList`'s
+ * distinction for `hint`/`listen` above.
  * **The one cost this widening carries, stated because a child pays it** (#412 review round 4). `hint` is
  * content on a tall screen and **not on the card at all on a short one**: `src/style.css`'s
  * `@media (max-height: 640px)` hides `.hint` until the answer is given, and a landscape phone is exactly that
@@ -173,7 +181,7 @@ const contentList = (s: string) => {
   for (const sep of LIST_SEPARATORS) if (s.includes(sep)) return s.split(sep).sort().join(sep);
   return s;
 };
-export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : ''].join('\u0000');
+export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : '', q.optionsAreContent ? [...q.options].sort().join('\u0001') : ''].join('\u0000');
 
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
@@ -230,10 +238,21 @@ export class Session {
   nextQuestion() {
     if (this.ended) return;
     const topic = this.pickTopic(); this.currentTopic = topic;
-    let q = topic.gen(this.difficulty, this.rng);
-    // avoid immediate repeats — of the whole card, not merely of its answer (#390)
-    const prev = this.current && repeatKey(this.current);
-    for (let i = 0; i < 5 && prev && repeatKey(q) === prev; i++) q = topic.gen(this.difficulty, this.rng);
+    let q: Question;
+    try {
+      q = topic.gen(this.difficulty, this.rng);
+      // avoid immediate repeats — of the whole card, not merely of its answer (#390)
+      const prev = this.current && repeatKey(this.current);
+      for (let i = 0; i < 5 && prev && repeatKey(q) === prev; i++) q = topic.gen(this.difficulty, this.rng);
+    } catch (e) {
+      // #444: a generator that refuses to draw (a floor rail like #433's tripped by a future curriculum
+      // edit) must not leave the screen frozen mid-question — nothing else ever calls `nextQuestion()`
+      // again, so `waiting` would stay stuck while the arena's rAF loop keeps it looking alive. Ending
+      // through the normal path pays what was already earned; `won: false` because nothing was completed.
+      console.error(`Sky Ninja Academy: "${topic.id}" question generator threw`, e);
+      this.end(false);
+      return;
+    }
     this.current = q; this.seqIndex = 0; this.waiting = false; this.questionsAsked++;
     this.ev.onQuestion(q, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(q) });
   }
@@ -263,6 +282,7 @@ export class Session {
     this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false);
     this.ev.onMiss(q); this.bossHeal();
     if (!this.o.year.gentle) this.loseLife();
+    this.maybeCommitFinalStage();
   }
   /** Wave finished (all bubbles gone). Decide what happens next. */
   waveEnd() {
@@ -270,6 +290,7 @@ export class Session {
     if (!this.waiting) { // nothing decided (e.g. only decoys fell) – for sequences relaunch remaining letters
       if (this.current?.sequence) { this.respawn(); return; }
       this.waiting = true; this.attempts++; this.stageAttempts++; this.tally(false); this.ev.onMiss(this.current!); this.bossHeal(); if (!this.o.year.gentle) this.loseLife(); if (this.ended) return;
+      this.maybeCommitFinalStage();
     }
     this.advance();
   }
@@ -282,11 +303,13 @@ export class Session {
     this.score += points;
     this.ev.onCorrect(q, points, this.combo);
     if (this.spec.boss) { this.bossHp = Math.max(0, this.bossHp - 1); this.ev.onBoss?.(this.bossHp, this.bossMax, 'hit'); if (this.bossHp === 0) this.end(true); }
+    this.maybeCommitFinalStage();
   }
   private markWrong(label: string) {
     const q = this.current!; this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false);
     this.ev.onWrong(q, label); this.bossHeal();
     this.loseLife();
+    this.maybeCommitFinalStage();
   }
   private tally(hit: boolean) {
     const id = this.currentTopic?.id; if (!id) return;
@@ -318,15 +341,37 @@ export class Session {
     this.ev.onLives(this.lives);
     this.nextQuestion();
   }
-  end(won: boolean) {
-    if (this.ended) return;
-    this.ended = true;
-    const total = this.stageStars.reduce((s, x) => s + x, 0);
+  /**
+   * The `SessionResult` this session would end with right now, given `won` and a stage-stars list — pure,
+   * no side effects, so `maybeCommitFinalStage()` below can preview it before `stageStars` itself carries the
+   * final stage (#484). `end()` calls it with the real, already-mutated `this.stageStars`.
+   */
+  private buildResult(won: boolean, stageStars: number[]): SessionResult {
+    const total = stageStars.reduce((s, x) => s + x, 0);
     const acc = this.attempts ? this.correct / this.attempts : 0;
     // End-stars and coins come from the mode's own rules in modes.ts (coins reads back the stars just computed).
     const end = { won, score: this.score, correct: this.correct, accuracy: acc, stageStarsTotal: total, stages: this.stages, stars: 0 };
     const stars = this.spec.stars(end);
     const coins = this.spec.coins({ ...end, stars });
-    this.ev.onEnd({ mode: this.o.mode, won, score: this.score, stars, stageStars: this.stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins });
+    return { mode: this.o.mode, won, score: this.score, stars, stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins };
+  }
+  /**
+   * #484: the moment a staged mission's last question is decided — inside `markCorrect()`/`markWrong()`/
+   * `fall()`/`waveEnd()`'s own miss branch, all synchronous, none of them behind the deferred `waveEnd()` the
+   * UI schedules for pacing — preview the SAME `SessionResult` `end()` will build once `advance()` and the
+   * "Next" click eventually run, and hand it to `onCommit`. Never mutates `stageStars` or `index` itself:
+   * those still change exactly once, naturally, when `advance()` is actually reached, so this is a preview,
+   * not a second write. Guarded on `!this.ended` so a wrong answer that also empties the last life (a LOSS,
+   * not a stage clear) can never fire this with `won: true` — `loseLife()`'s own `end(false)` runs first.
+   */
+  private maybeCommitFinalStage() {
+    if (!this.ev.onCommit || this.ended || !this.spec.staged || this.stage < this.stages || this.index + 1 < this.perStage) return;
+    const acc = this.stageAttempts ? this.stageCorrect / this.stageAttempts : 0;
+    this.ev.onCommit(this.buildResult(true, [...this.stageStars, starsForAccuracy(acc)]));
+  }
+  end(won: boolean) {
+    if (this.ended) return;
+    this.ended = true;
+    this.ev.onEnd(this.buildResult(won, this.stageStars));
   }
 }

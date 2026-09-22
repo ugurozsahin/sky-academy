@@ -661,6 +661,57 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.unlock')).toHaveCount(3);              // 120 coins → the three coin stickers at 30, 70, 120 (#114: the rest is achievement-based, not more coins)
     const dojoBonus = (await results.locator('.dojo-bonus .gain').allTextContents()).reduce((n, t) => n + Number(t.replace(/\D/g, '')), 0);   // today's Daily Dojo may pay for the mission / 3 stars / no slips / combo
     await expect(results.locator('#cert')).toBeVisible();                   // printable certificate for a completed mission
+    // guard rail (#398 round 1/2, B1/B2), on the exact scenario the review found both in: a mission this tall
+    // (a medal, three unlocks and a dojo bonus) overflows the overlay, which is what exposes them.
+    // B1 — a `position: sticky` nav row held a fixed on-screen band for most of the scroll range, so
+    // reordering the DOM only changed which *other* element's static position fell into that band, never
+    // whether the overlap happened — caught only by sweeping scroll positions, not the one spot
+    // `scrollIntoViewIfNeeded()` happens to land on (round 2 review). `.row.nav` is now a flex sibling outside
+    // the scrolling `.scroll` region, so no scroll position should put anything underneath it.
+    //
+    // Settle `.modal`'s own 350ms pop-in (`transform: scale(.7 → 1)`) before capturing ANY position on this
+    // overlay — found chasing `pr-test-analyzer`'s round-3 desktop flake (6/10 pass) and a real failure of
+    // this exact assertion in my own desktop run. A scale still in flight shifts every descendant's rect by a
+    // different amount from the transform origin, so `scrollerBox` captured mid-animation and `stepBox`
+    // captured later, once it has settled, describe two different geometries — the sweep below can then miss
+    // every position where the button is genuinely visible. See the K.O. test further down for the same
+    // mechanism measured directly.
+    await page.waitForTimeout(500);
+    const scroller = results.locator('.scroll');
+    const scrollerBox = (await scroller.boundingBox())!;
+    const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(maxScroll, 'this scenario must actually overflow, or the sweep below proves nothing').toBeGreaterThan(0);
+    let sawCertOnScreen = false;
+    // A tolerance wider than one pixel: `scrollHeight`/`clientHeight` are integers and the fractional
+    // `getBoundingClientRect()` values they are compared against are not, so the very last step or two of a
+    // sweep can read a few px "short" of the scroller's box with no scroll position actually cutting it off.
+    const slack = 24;
+    // `maxScroll` itself is always swept explicitly (round 3 review, non-blocking B2): a fixed stride can
+    // land short of it by up to (stride - 1)px on a viewport/content combination where `maxScroll` is not a
+    // multiple of the stride, which left the last few pixels of real scroll range untested.
+    const steps = []; for (let top = 0; top < maxScroll; top += 15) steps.push(top); steps.push(maxScroll);
+    for (const top of steps) {
+      await scroller.evaluate((el, t) => { el.scrollTop = t; }, top);
+      const stepBox = (await results.locator('#cert').boundingBox())!;
+      const onScreen = stepBox.y >= scrollerBox.y - slack && stepBox.y + stepBox.height <= scrollerBox.y + scrollerBox.height + slack;
+      if (!onScreen) continue;   // cert clipped by the scroll region at this position — nothing visible to hit-test
+      sawCertOnScreen = true;
+      const atCertTop = await page.evaluate(({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        return el ? `${el.id} ${el.className}` : '';
+      }, { x: stepBox.x + stepBox.width / 2, y: stepBox.y + 2 });
+      expect(atCertTop, `at scrollTop ${top}, the nav row must not paint over the certificate button`).not.toContain('nav');
+      expect(atCertTop, `at scrollTop ${top}, the point must land on the certificate button itself`).toContain('cert');
+    }
+    expect(sawCertOnScreen, 'the sweep must actually see the certificate button visible at some scroll position').toBe(true);
+    // B2 — `.modal.results` switching to a flex column stretched `.hero-big` (normally ~200px, shrink-wrapping
+    // its avatar art) to the column's full width, which pushed `.speech` — positioned at 68% of ITS OWN box —
+    // off the right edge of a phone screen on any headline longer than the shortest one.
+    const heroBox = (await results.locator('.hero-big').boundingBox())!;
+    expect(heroBox.width, 'hero-big must keep shrink-wrapping its ~200px avatar art').toBeLessThan(260);
+    const speechBox = (await results.locator('.speech').boundingBox())!;
+    expect(speechBox.x + speechBox.width, 'the speech bubble must stay on screen')
+      .toBeLessThanOrEqual(page.viewportSize()!.width);
     const png = await page.evaluate(() => window.__sna.certificate());
     expect(png).toMatch(/^data:image\/png;base64,/); expect(png.length).toBeGreaterThan(20_000);
 
@@ -749,6 +800,65 @@ test.describe('Sky Ninja Academy', () => {
     // swallow) — the `certificate()` hook answers the mission's own result, not the album's.
     const png = await page.evaluate(() => window.__sna.certificate());
     expect(png, 'the mission itself still earned one — only the album is missing it').toMatch(/^data:image\/png;base64,/);
+  });
+
+  /**
+   * #484 (mirroring #375/#441's Ninja Duel fix — and its own round 2, which is exactly what this review round
+   * found here too): a finished mission is committed the instant it is decided, not later inside a deferred
+   * timer or behind a click the child might never make.
+   *
+   * Round 1 of this fix committed only from `nextStage()`/`end()`, reached solely through the "Next" click on
+   * the LAST stage's clear overlay — but `advance()` (what fires that overlay at all) is itself reached only
+   * through `play-session.ts`'s own deferred `waveEnd()`, `session.ts`'s pure logic having no timers of its
+   * own. So two windows were still open on the mission, the mode the issue calls "at least as important as
+   * the Duel instance PR #480 just fixed": quitting in the ~1–1.45s before the stage-clear overlay even
+   * appeared lost everything (`advance()` never ran, so neither did `onStageClear`), and quitting FROM that
+   * overlay without tapping Next lost it just as permanently (nothing else ever reaches `nextStage()`).
+   * `session.ts` now fires `onCommit` — a new event, separate from `onEnd` — synchronously inside `hit()`
+   * itself the instant the mission's last question is answered, before either window opens.
+   *
+   * The quit is driven at the true earliest point: the winning slice and the quit run inside one
+   * `page.evaluate`, straight off `window.__sna.answer()` (no freeze, no swipe — the same hook `solveCurrent`
+   * uses elsewhere in this file) — no timer of any kind, and no click, gets to run between the game being
+   * decided and `#quit` reaching `scope.dispose()`. `index` stays at `perStage - 1` and `ended` stays `false`
+   * in the state read back inside that same task, proving `advance()` never ran either.
+   */
+  test('a mission left through Pause the instant the last question is answered is still paid, recorded and filed (#484)', async ({ page }) => {
+    test.setTimeout(150_000);
+    await seedPlayer(page, 'terra');
+    await startTopic(page, 'reception', 'r-count');
+    const stages = await page.evaluate(() => window.__sna.session.stages);
+    const perStage = await page.evaluate(() => window.__sna.session.perStage as number);
+    expect(stages).toBe(5);
+    for (let stage = 1; stage < stages; stage++) {
+      await answerAll(page, perStage);
+      await expect(page.locator('.celebrate')).toBeVisible();
+      await page.click('#next');
+    }
+    // Stage 5: every question but the last one, the normal way.
+    await answerAll(page, perStage - 1);
+    // The last question of the last stage: answer it and quit inside ONE task, before `advance()` — and so
+    // `onStageClear`/the stage-clear overlay itself — has any chance to run at all.
+    await waitForTarget(page);
+    const quitState = await page.evaluate(() => {
+      const ok = window.__sna.answer();        // the winning slice: onCommit fires inside this very call (#484)
+      const s = window.__sna.state();
+      (document.querySelector('#pause') as HTMLButtonElement).click();
+      (document.querySelector('#quit') as HTMLButtonElement).click();
+      return { ok, ...s };
+    });
+    expect(quitState, 'the mission is committed inside the slice itself, before advance() or the stage-clear overlay ever run')
+      .toMatchObject({ ok: true, index: perStage - 1, ended: false });
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    // Neither overlay ran: this is the window, not a test that quit after either one paid out.
+    await expect(page.locator('.celebrate')).toHaveCount(0);
+    await expect(page.locator('.results')).toHaveCount(0);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.progress['r-count'], 'the topic star and best score reached the save').toMatchObject({ stars: 3, plays: 1 });
+    expect(saved.progress['r-count'].best).toBeGreaterThan(0);
+    expect(saved.coins, 'coins were paid though neither overlay ever opened').toBeGreaterThan(0);
+    expect(saved.certs, 'and the win filed its certificate').toHaveLength(1);
+    expect(saved.certs[0]).toMatchObject({ id: 'reception:r-count', name: 'Ada', avatar: 'terra' });
   });
 
   test('"My certificates" (#110): an earned certificate lists on the rewards screen, and View opens it full-screen with tap-to-zoom', async ({ page }) => {
@@ -1699,6 +1809,50 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#boss small')).toContainText('KOs 1');
   });
 
+  /**
+   * guard rail (#398 round 3, B1). `.ko` is `position: absolute`, and its containing block moved when the
+   * overlay became a `.modal.results` > `.scroll` > (content) shell (round 2): `.scroll` declared no
+   * `position`, so `.ko` skipped past it to `.modal.results` itself and stayed pinned to the modal's corner
+   * while the hero art it decorates scrolled away underneath it. Coverage was a real gap on both axes: the
+   * only test that renders `.ko` (above) never overflows the overlay, and neither scroll-sweep test (this
+   * file's mission one, `duel.spec.ts`'s) ever renders `.ko`. A 118-coin purse crosses the 120-coin sticker
+   * threshold on the KO's own payout, which is enough on its own to overflow a 390x664 viewport.
+   */
+  test('Boss Battle: the K.O. badge scrolls with the hero art it is stamped on, not pinned to the modal (#398)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 118 });
+    await page.click('.island[data-year="year2"]');
+    await page.click('#boss');
+    await expect(page.locator('.villain.boss img')).toBeVisible();
+    await page.waitForFunction(() => window.__sna.state().bossHp === 8);
+    await page.evaluate(() => { window.__sna.session.bossHp = 1; });   // skip straight to the final blow
+    await solveCurrent(page);
+    const results = page.locator('.results');
+    await expect(results.locator('h2')).toHaveText('Knock-out!');
+    await expect(results.locator('.ko')).toBeVisible();
+    const scroller = results.locator('.scroll');
+    const maxScroll = await scroller.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(maxScroll, 'this seed must actually overflow the overlay, or the sweep below proves nothing').toBeGreaterThan(0);
+    // `.modal`'s own 350ms pop-in (`transform: scale(.7 → 1)`) shifts every descendant's rect by a different
+    // amount depending on its distance from the transform origin while it is still running, which is enough
+    // on its own to move the ko-to-hero-big gap by the tens of pixels this assertion is trying to measure —
+    // observed directly, and unrelated to scrolling. Settled well before the sweep test above ever reads a
+    // position, because it does not compare two time-separated absolute measurements the way this one does.
+    await page.waitForTimeout(500);
+    const gap = async () => {
+      const ko = (await results.locator('.ko').boundingBox())!;
+      const hero = (await results.locator('.hero-big').boundingBox())!;
+      return ko.y - hero.y;
+    };
+    const gapAtTop = await gap();
+    await scroller.evaluate((el, t) => { el.scrollTop = t; }, maxScroll);
+    const gapAtBottom = await gap();
+    // Pinned to the modal (the round 3 defect) holds `.ko` at a near-constant screen position while `.hero-big`
+    // moves the full `maxScroll` distance underneath it, so the gap changes by roughly `maxScroll`. Scrolling
+    // correctly with the content keeps the two in lock-step, so the gap barely moves at all.
+    expect(Math.abs(gapAtBottom - gapAtTop), `the K.O. badge must scroll with the hero art (gap moved by ${gapAtBottom - gapAtTop}px, `
+      + `not the modal's fixed position (which would move it close to maxScroll = ${maxScroll}px)`).toBeLessThan(10);
+  });
+
   test('Memory Match: cards flip, a miss turns back, pairs lock, and the finished board is counted', async ({ page }) => {
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="reception"]');
@@ -1731,6 +1885,58 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.speech')).toContainText('Mia');
     await page.click('#home');
     await expect(page.locator('#memory small')).toContainText('boards 1');
+  });
+
+  /**
+   * #484 (mirroring #375/#441's Ninja Duel fix): a finished board is committed the instant the winning pair
+   * matches, not 900ms later inside `finish()`'s own scope-bound `later()`.
+   *
+   * `flip()` used to make every write — the board count, the coins, the Daily Dojo move and the streak —
+   * only from inside `finish()`. `#back` stays clickable throughout the 900ms wait, so leaving through it in
+   * that window ran `cleanup()` -> `scope.dispose()`, which cancelled `finish()` and every write with it: the
+   * last board of a session paid the child nothing.
+   *
+   * The winning flip and the quit run inside one `page.evaluate`, so no timer of any kind gets to run between
+   * the match completing the board and `#back` reaching `scope.dispose()` — a commit that happened any later
+   * than the flip itself would fail this.
+   */
+  test('Memory Match left through Back the instant the last pair matches is still paid and recorded (#484)', async ({ page }) => {
+    await seedPlayer(page, 'splash', 'Mia');
+    await page.click('.island[data-year="reception"]');
+    await page.click('#memory');
+    await expect(page.locator('.card')).toHaveCount(8);
+    const cards = await page.evaluate(() => window.__sna.cards() as { pair: number; matched: boolean }[]);
+    // Match every pair but the last one normally, through the same hook the test above uses.
+    const pairs = [...new Set(cards.map(c => c.pair))];
+    for (const p of pairs.slice(0, -1)) {
+      const i = cards.findIndex(c => c.pair === p);
+      const mate = cards.findIndex((c, k) => k !== i && c.pair === p);
+      await page.waitForFunction(() => !window.__sna.state().waiting);
+      expect(await page.evaluate((k) => window.__sna.flip(k), i)).toBe(true);
+      expect(await page.evaluate((k) => window.__sna.flip(k), mate)).toBe(true);
+      await expect(page.locator(`.card[data-i="${i}"]`)).toHaveClass(/matched/);
+    }
+    // The last pair: both flips and the quit inside one task — `flip()`'s second call is the synchronous
+    // commit (#484), and `#back` reaches it before `finish()`'s 900ms timer ever gets a chance to run.
+    const lastPair = pairs[pairs.length - 1];
+    const i = cards.findIndex(c => c.pair === lastPair);
+    const mate = cards.findIndex((c, k) => k !== i && c.pair === lastPair);
+    await page.waitForFunction(() => !window.__sna.state().waiting);
+    expect(await page.evaluate((k) => window.__sna.flip(k), i)).toBe(true);
+    const quitState = await page.evaluate((k) => {
+      const ok = window.__sna.flip(k);                    // the winning flip: commit() runs inside this call
+      const s = window.__sna.state();
+      (document.querySelector('#back') as HTMLButtonElement).click();
+      return { ok, ...s };
+    }, mate);
+    expect(quitState, 'the board is done the instant the last pair is flipped, before any results timer runs').toMatchObject({ ok: true, ended: true });
+    await expect(page.locator('.home'), 'the child is back on the islands').toBeVisible();
+    // The overlay never ran: this is the window, not a test that quit after the results screen paid out.
+    await expect(page.locator('.results')).toHaveCount(0);
+    await expect(page.locator('#memory small'), 'the board was counted though the overlay never opened').toContainText('boards 1');
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(saved.memory?.reception, 'the board count reached the save').toBe(1);
+    expect(saved.coins, 'coins were paid though the overlay never opened').toBeGreaterThan(0);
   });
 
   test('guard rail: a Memory board never leaves a short row hanging off one edge (#372)', async ({ page }) => {
@@ -2771,6 +2977,33 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
     await expect(newer).toContainText('Open the game on the other device');
     // The bytes are still there, which is the whole point: the other device still reads them.
     expect(await page.evaluate(() => localStorage.getItem('sna:v1:p2'))).toContain('99');
+  });
+
+  /**
+   * #446. The row above withholds Remove on the *future* slot itself — 99 coins behind it — but that alone
+   * still let a grown-up remove the *readable* sibling and strand the family: with p2 unreadable by this
+   * build, taking p1 out leaves an index whose one remaining id resolves to a save this build cannot open,
+   * which sends the device into the first-run wizard over a store `readOnly` latches shut. Nothing typed into
+   * that wizard is ever kept, so the family is stuck until the other device or an update comes back.
+   */
+  test('removing the readable ninja is withheld when the only sibling is a newer-build save (#446)', async ({ page }) => {
+    await page.addInitScript(({ index, ada, future }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', future);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      future: JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    // p1 is readable and has a sibling, but that sibling is the only one and it is `future` — stranded.
+    await expect(page.locator('button[data-del="p1"]'), 'removing Ada would leave only Bo\'s unreadable save').toHaveCount(0);
+    await expect(page.locator('button[data-del="p2"]'), 'the future slot is still withheld on its own terms too').toHaveCount(0);
   });
 
   /**

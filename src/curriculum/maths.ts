@@ -729,8 +729,9 @@ function intervalCompare(rng: Rng, n: number): Question {
   const target = chosen.reduce((best, cur) => (big ? cur[1] > best[1] : cur[1] < best[1]) ? cur : best);
   const ask = n === 2 ? (big ? 'Which takes longer?' : 'Which takes less time?') : (big ? 'Which takes the longest?' : 'Which takes the shortest?');
   // No hint: the bubbles *are* the durations, so a hint listing them again would only repeat the question —
-  // and a hint is the one line a landscape phone can hide (#328).
-  return wordQ(rng, ask, target[0], chosen.filter(c => c !== target).map(c => c[0]), { say: `${chosen.map(c => c[0]).join(', ')}. ${ask}` });
+  // and a hint is the one line a landscape phone can hide (#328). `optionsAreContent` tells `repeatKey`
+  // (#451) that this generator's question lives in `options`, since no other field carries it.
+  return wordQ(rng, ask, target[0], chosen.filter(c => c !== target).map(c => c[0]), { say: `${chosen.map(c => c[0]).join(', ')}. ${ask}`, optionsAreContent: true });
 }
 
 /**

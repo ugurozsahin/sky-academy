@@ -249,6 +249,31 @@ projects you ran, and the commit hash — ending, like every comment you post he
 
 Do **not** fix it yourself in the same run: a session that pushes to a pull request may no longer review it.
 
+**A review that ran ends in one of those two marks. Nothing outside the diff postpones it (#516).** If §2's
+checks were performed and produced no blocking finding, the verdict is `REVIEW: CLEARED` — whatever else is
+true of the branch. A **merge conflict** is the case this was written for, and the argument that withholds the
+mark refutes itself: a conflict is mechanical staleness rather than a defect in what the diff does, which is
+exactly why it cannot be a review verdict. It is the author's to resolve, `mergeStateStatus` already reports
+it, and it already blocks the merge on its own — so holding the mark adds no protection, and it removes the
+one signal that says who owns the pull request next. The same goes for a red check you did not cause: say so
+in the clearing comment and let the merge rule hold it.
+
+**Withholding the mark is not the cautious option — it is the one that strands the pull request.** A blocked
+pull request whose block has been *answered* is picked up by nobody: this skill's §6 brings it back to a
+reviewer only when a fresh review gives a verdict, and `docs/ROUTINE-PROMPT.md` STEP 2.5 takes only an
+**unaddressed** block — one with no fix pushed against it — so a developer run is right to skip it too. Three pull requests sat in exactly that
+state at once on 2026-09-22 — #492, #503 and #502 — across at least nine reviewer passes that each read the
+diff, each concluded "no blocking finding in the diff itself", and each posted nothing. "Left for a developer
+run" names no recipient. If a rule really does stop you acting, say which rule and what would unstop it.
+
+**A pull request you may not merge is still one you review.** `docs/REVIEWER-PROMPT.md` rule 4 bars the merge;
+it says nothing about the review, and the two are different acts. This bites hardest on exactly the class that
+can least afford it: a `loosening` governance pull request stays the owner's to merge even after he approves,
+so a run that skips it for being unmergeable leaves **him** merging an unreviewed change to what a run is
+allowed to do. Review it, post the verdict, and say in the comment that the merge is his. The same holds for
+an `owner-approval` PR waiting on his marker. Observed on 2026-09-22: a reviewer pulse recorded
+`#513: not reviewed — owner-session/loosening, not routine-mergeable regardless of review state`.
+
 **A block its reviewer leaves unanswered is superseded by a fresh review (#161).** The reviewer who set a
 `REVIEW: CHANGES REQUESTED` block clears it with `REVIEW: CLEARED` and "Ready for review". If they do not, a
 later run that neither opened the pull request nor pushed a commit to it reviews it from scratch against the
@@ -291,6 +316,15 @@ as a non-blocking note, or open an issue and say you have. The test to put to yo
 blocks: **name what breaks for a run, for a reader, or for a child if this merges as it stands.** If the
 answer is "nothing yet, but", it is a note. Two findings block whatever the round: the pull request does not
 do what its body says, and a rail does not hold what it claims. Those are not preferences.
+
+**A third, and it is the same shape: a fix that claims a *class* and does not name its population (#526).**
+"Fixed as a class" is unverifiable on its own, and unverifiable is how it keeps being half true — three pull
+requests were blocked on one defect on 2026-09-22, one of them *inside the commit whose message claimed to fix
+the class*, because each fix reached only the instances its author's own mutation table touched. So a class
+fix has to say what set it covers — *every assertion in this block*, *every rail reading prose*, *every call
+of `code()`* — and then you can count it, which is the point. `.claude/rules/guardrails.md` has the author's
+half. **Count it rather than trusting it**: pick a member the body does not mention and mutate it. That is
+how all three of those were found, and none of them by the author.
 
 **The third round is the last one that blocks.** Count the `REVIEW: CHANGES REQUESTED` comments on the pull
 request, whoever wrote them: the count is over the whole pull request, a push never resets it, and two

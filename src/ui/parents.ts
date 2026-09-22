@@ -57,15 +57,21 @@ function saveNote(): string | null {
  *  offering a control that refuses. */
 export const canRenameCard = (c: ProfileCard) => !c.future && (c.onboarded || !!c.avatar || !!c.name.trim());
 /**
- * Whether a row offers "Remove" — every profile except the last one on the device, and except a slot holding a
- * save a newer build wrote (#420 review B2).
+ * Whether a row offers "Remove" — every profile except the last one on the device, except a slot holding a save
+ * a newer build wrote (#420 review B2), and except one whose removal would leave the device with no profile
+ * this build can read (#446: `others` all `future` — the family's last readable profile).
  *
- * Both exclusions are `deleteProfile`'s own refusals, mirrored here so a grown-up is never invited to tap a
- * button that answers no. The **guard** is in the store, not in this predicate: a rail on a withheld button
- * only pins the current screen, and "there is exactly one way to wipe this device" and "this build does not
- * destroy a newer build's save" are properties of the store.
+ * All three exclusions are `deleteProfile`'s own refusals, mirrored here so a grown-up is never invited to tap
+ * a button that answers no. The **guard** is in the store, not in this predicate: a rail on a withheld button
+ * only pins the current screen, and "there is exactly one way to wipe this device", "this build does not
+ * destroy a newer build's save" and "a delete never strands the family on an unplayable wizard" are properties
+ * of the store.
+ *
+ * `others` — every card on the device except `c` — replaces the old `only: boolean`: "the last profile" is
+ * `others.length === 0`, and the two questions share one answer once a second exclusion needs the same list.
  */
-export const canRemoveCard = (c: ProfileCard, only: boolean) => !only && !c.future;
+export const canRemoveCard = (c: ProfileCard, others: ProfileCard[]) =>
+  others.length > 0 && !c.future && others.some(o => !o.future);
 /** What the card is called when the child has not typed a name yet. The slot number is what tells two unnamed
  *  rows apart — the picker's `cardName` rule (#380 review B1), the same words for the same reason. */
 const rowName = (c: ProfileCard, slot: number) => (c.name.trim() ? c.name : `Ninja ${slot}`);
@@ -99,8 +105,12 @@ export const DELETE_HINTS: Record<DeleteRefusal, string> = {
   // It says what is true, and that the slot does not come back, because it does not: only clearing this
   // browser's storage frees it.
   orphaned: 'That ninja is off the list, but the game saved for them is still on this device and the app can no longer reach it — the device is out of space. That slot stays used up, so only three ninjas will fit until this browser’s storage is cleared.',
+  // Same family as FUTURE_SAY (#446, `deleteProfile`'s own docstring): the remedy is the other device, or an
+  // update to this one — never "clear the wizard and start again", which is the loop this refusal exists to
+  // stop the family walking into.
+  stranded: 'Every other ninja on this device was saved by a newer version of the app, so removing this one would leave none this build can open. Open the game on the other device, or update this app, then come back to remove this ninja.',
 };
-function profileRow(c: ProfileCard, slot: number, only: boolean): string {
+function profileRow(c: ProfileCard, slot: number, others: ProfileCard[]): string {
   const a = avatarOrNull(c.avatar);      // not `avatarById`: an unplayed slot is a state this list must draw (#380 review B1)
   const label = rowName(c, slot);
   return `
@@ -114,16 +124,15 @@ function profileRow(c: ProfileCard, slot: number, only: boolean): string {
         // played" about a sibling's newer save — bytes it could not read and had no business claiming
         // anything about — and offered to destroy it.
         : `<span class="p-prof-wait">${c.future ? esc(FUTURE_SAY) : 'No name yet — this ninja has not played.'}</span>`}
-      ${canRemoveCard(c, only) ? `<button class="btn bad" data-del="${c.id}">Remove</button>` : ''}
+      ${canRemoveCard(c, others) ? `<button class="btn bad" data-del="${c.id}">Remove</button>` : ''}
     </li>`;
 }
 function profilesHtml(cards: ProfileCard[]): string {
-  const only = cards.length === 1;
   return `
     <h3 class="p-h">Ninjas on this device</h3>
     <div class="p-profs">
       <p class="p-profs-say">Each ninja has their own progress, coins and certificates. A new one is added by the child, from “Who is playing?” on the sky map.</p>
-      <ul class="p-prof-list">${cards.map((c, i) => profileRow(c, i + 1, only)).join('')}</ul>
+      <ul class="p-prof-list">${cards.map((c, i) => profileRow(c, i + 1, cards.filter(o => o.id !== c.id))).join('')}</ul>
       <p class="p-prof-msg" id="prof-msg" role="status" hidden></p>
     </div>`;
 }
@@ -242,6 +251,12 @@ function wireMove(redraw: () => void) {
   const paste = $<HTMLTextAreaElement>('#restore-code');
   const msg = $('#move-msg');
   code.value = exportSave();
+  // #18 group C: a save grows with progress/stickers/certs/duels, so a fixed row count always has a save
+  // that overflows it — sized to this save's own content instead, capped by `.p-code`'s `max-height` (still
+  // `resize: vertical`, so a grown-up can pull a capped one taller by hand).
+  code.style.height = 'auto';
+  const border = parseFloat(getComputedStyle(code).borderTopWidth) + parseFloat(getComputedStyle(code).borderBottomWidth);
+  code.style.height = `${code.scrollHeight + border}px`;
 
   const say = (text: string, bad = false) => {
     msg.textContent = text;
