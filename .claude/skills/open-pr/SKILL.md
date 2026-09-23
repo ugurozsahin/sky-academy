@@ -49,6 +49,54 @@ whether the refusal was real, and its own summary says so. A reviewer checks the
 a second `BRANCH: PUSH REFUSED` in this repository's history is something to investigate rather than
 accommodate.
 
+**When `main` moves under you.** A branch can stop being mergeable with nothing wrong in it and no commit of its own to show for it: `main`
+lands something that touches the same lines. It happened to #568 on 2026-09-23, hours after that pull request
+had been reviewed and cleared. `docs/REVIEWER-PROMPT.md` STEP 1 clause (c) and §6 of the `review-pr` skill say
+how such a pull request gets back to a developer; this is what the developer then does (#585).
+
+**Merge, never rebase.** `git merge origin/main` into the branch, resolve, commit, push.
+
+```
+git fetch origin && git merge origin/main
+```
+
+A rebase or a squash of your own would rewrite commits already pushed, which needs a force-push, and the hook
+refuses one unless the owner asks for it in session. So a rebase does not leave you where you started — it
+strands the branch worse than the conflict did.
+
+**A branch cut from another branch is the usual cause, and it is avoidable.** This repository squash-merges,
+so the parent branch's commits never become ancestors of what lands on `main`. A child of that parent then
+conflicts with `main` the moment the parent merges, every time, and re-merging brings the whole parent diff
+back with it. Branch from `main`. `#512` hit this three times in one pull request.
+
+**Two additions are almost never a choice between them.** The common conflict here is two branches appending
+to the same region of one file — sibling children of an epic each adding tests, most often. Keep both sides.
+#568 conflicted with #564 that way in `tests/e2e/viewport.spec.ts`, and both belonged: #563's two tests read
+`.mode-grid`, #564's four read `.rewards-cols`.
+
+**Check the resolution by counting, not by reading it back.** "Both sides kept" is a claim about a file you
+have just spent ten minutes staring at, which is the worst moment to judge it. Count the things that should
+have survived — tests, exports, cases — on each side and on the result:
+
+```
+git show origin/main:<file> | grep -c '<the declaration>'
+git show origin/<branch>:<file> | grep -c '<the declaration>'
+grep -c '<the declaration>' <file>
+```
+
+On #568 that was 23 on `main`, 21 on the branch, 25 resolved — and 25 is right only because the two sides
+added 4 and 2 to a common 19. A silently dropped block looks exactly like a clean resolution otherwise.
+
+**A `git worktree` breaks the credential helper.** `credential.helper store --file=.git/github-credentials`
+cannot resolve where `.git` is a file rather than a directory, so a push from a worktree prints
+`unable to get credential storage lock in 1000 ms: Not a directory`. It may still succeed by another route —
+check whether the ref moved before treating it as a failure — and this is worth knowing because the reviewer
+workflow recommends worktrees for exactly this kind of work.
+
+**Say in the comment that you merged `main` and what you resolved**, with the counts. A merge commit in a pull
+request that was already reviewed makes it waiting again under clause (a), so it gets a fresh review — of a
+tree nobody has seen before, which is the correct outcome and worth the reviewer knowing the shape of.
+
 ## 3. Write the body, then check what it would actually close
 
 The title carries `(#<n>)`. The body says, in this order: the closing line, what changed and why, what you
