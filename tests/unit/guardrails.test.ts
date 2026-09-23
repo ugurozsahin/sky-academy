@@ -2422,4 +2422,17 @@ describe('.hud and the duel screen use --sal/--sar too, not just a fixed number 
       expect(halfBlock, '.duel-half itself must never carry --sal/--sar — that is the per-half shape #399 rejected')
         .not.toMatch(/--sa[lr]/);
   });
+
+  // #399's own last miss: `.villain` is `position: absolute` inside `.hud`, and an absolutely positioned
+  // child's own offsets are measured from its containing block's PADDING edge — the padding `.hud` itself
+  // carries does not shift them. `bottom` already read `--sab` (correct by the same containing-block rule,
+  // since `.hud`'s bottom padding is 0 and so never masked the gap); `right` stayed a bare 10px and so sat
+  // flush with the true screen edge on a landscape notched phone, the exact silent-zero shape this issue is
+  // for. Text-only, like the sibling rail above: neither Playwright project emulates safe-area insets.
+  it('.villain reads --sar on its right offset, not a bare 10px', () => {
+    const block = bare.match(/(?:^|[}\s])\.villain\s*\{([^}]*)\}/)?.[1];
+    expect(block, 'the base .villain rule must exist').toBeTruthy();
+    expect(block, 'right must read calc(10px + var(--sar))').toMatch(/right:\s*calc\([^)]*var\(--sar\)[^)]*\)/);
+    expect(block, 'bottom must still read var(--sab), unshifted by this change').toMatch(/bottom:\s*calc\([^)]*var\(--sab\)[^)]*\)/);
+  });
 });
