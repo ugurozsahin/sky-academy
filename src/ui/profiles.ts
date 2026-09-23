@@ -30,6 +30,12 @@ const cardName = (name: string, slot: number) => (name.trim() ? name : `Ninja ${
 const FULL_HINT = `Four ninjas is the most one device can hold. 🥷`;
 const STORE_HINT = `This browser will not let the game save, so a new ninja cannot be added. 😕`;
 const SWITCH_HINT = `This browser will not let the game save, so it cannot swap ninja. 😕`;
+/** `addProfile`'s own refusal union, read off it rather than written out a second time (#401 item 1). */
+type AddRefusal = Extract<AddProfileResult, { ok: false }>['why'];
+/** A `Record` rather than `addOutcome`'s old ternary (#401 item 2): `AddProfileResult['why']` gaining a third
+ *  reason makes this a `tsc` error at the one place that words a refusal, instead of the ternary's silent
+ *  `STORE_HINT` fallback for whatever the new reason was. */
+const ADD_HINTS: Record<AddRefusal, string> = { full: FULL_HINT, store: STORE_HINT };
 
 /**
  * What a tap on a profile card comes to, as a value.
@@ -41,8 +47,15 @@ const SWITCH_HINT = `This browser will not let the game save, so it cannot swap 
  * `move: true` arm, so falling out of the refusal branch is a type error rather than a silent bug.
  */
 export type PickOutcome = { move: true; id: ProfileId } | { move: false; hint: string };
-export const pickOutcome = (id: ProfileId, switched: boolean): PickOutcome =>
-  switched ? { move: true, id } : { move: false, hint: SWITCH_HINT };
+/**
+ * Takes the committer, not its answer (#401 item 3): the old `(id, switched: boolean)` let
+ * `pickOutcome(idA, setActiveProfile(idB))` type-check, since the id moved to and the id the store actually
+ * saw were two independent parameters agreeing only by whoever wrote the call site. With one `id` and the
+ * function that decides its fate, there is no second identifier left to disagree with it — the call site
+ * (`pickOutcome(id, setActiveProfile)`) cannot express the mismatch any more.
+ */
+export const pickOutcome = (id: ProfileId, switchTo: (id: ProfileId) => boolean): PickOutcome =>
+  switchTo(id) ? { move: true, id } : { move: false, hint: SWITCH_HINT };
 
 /**
  * The same for the "New ninja" card: `addProfile`'s two refusals become the two sentences the picker shows
@@ -50,7 +63,7 @@ export const pickOutcome = (id: ProfileId, switched: boolean): PickOutcome =>
  */
 export type AddOutcome = { add: true; id: ProfileId } | { add: false; hint: string };
 export const addOutcome = (r: AddProfileResult): AddOutcome =>
-  r.ok ? { add: true, id: r.id } : { add: false, hint: r.why === 'full' ? FULL_HINT : STORE_HINT };
+  r.ok ? { add: true, id: r.id } : { add: false, hint: ADD_HINTS[r.why] };
 
 /**
  * Render the picker. `go` is called with the chosen profile once the store has actually accepted the switch —
@@ -97,9 +110,16 @@ export function profilesScreen(go: (id: ProfileId) => void, onNew: (id: ProfileI
   // (`avatar.ts`'s `SENSEI_LINES.locked`): these sentences are the only thing standing between a pre-reader
   // and a screen that looks broken, and `.claude/rules/style.md` is "read-aloud everywhere" (#380 review B6).
   const refuse = (text: string) => { sfx.wrong(); hint.textContent = text; say(text); };
+  // A lookup against `cards`, not `b.dataset.profile as ProfileId` (#401 item 1): `data-profile` stays on the
+  // button for e2e's own selectors, but the id the handler acts on now comes off the matching `ProfileCard`
+  // rather than the DOM string, the one unchecked widening into `ProfileId` in the codebase gone with it. By
+  // value, not by NodeList position: a positional `cards[i]` would trade the cast for an equally unchecked
+  // trust that `$$`'s order can never drift from `cards.map`'s, which a later reshuffle of the markup could
+  // break with nothing to catch it — `.find` makes the pairing itself the thing checked, not assumed.
   $$('.avatar-card[data-profile]').forEach(b => b.addEventListener('click', () => {
-    const id = b.dataset.profile as ProfileId;
-    const o = pickOutcome(id, setActiveProfile(id));
+    const c = cards.find(c => c.id === b.dataset.profile);
+    if (!c) return;                 // cannot happen — every such button was drawn from `cards` above
+    const o = pickOutcome(c.id, setActiveProfile);
     if (!o.move) return refuse(o.hint);
     sfx.correct(); go(o.id);
   }));

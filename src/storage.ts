@@ -126,7 +126,11 @@ export const MAX_PROFILES = PROFILE_IDS.length;
 const INDEX_KEY = 'sna:profiles';
 /** Profile 1 is the save that is already on the device; the rest hang off the same slot name. */
 export const saveKeyFor = (id: ProfileId) => (id === 'p1' ? KEY : `${KEY}:${id}`);
-export interface ProfileIndex { v: 1; active: ProfileId; ids: ProfileId[] }
+/** Not exported: nothing outside this file reads the shape of the stored index directly, only through
+ *  `profileIds()`/`activeProfile()` (#401 item 4). `ids` is `readonly` for the same reason `profileIds()`
+ *  itself is (#335 item 5) — every value here is a caller's copy of parsed state, never a live array a write
+ *  goes through. */
+interface ProfileIndex { v: 1; active: ProfileId; ids: readonly ProfileId[] }
 
 const isProfileId = (x: unknown): x is ProfileId => typeof x === 'string' && (PROFILE_IDS as readonly string[]).includes(x);
 const readItem = (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } };
