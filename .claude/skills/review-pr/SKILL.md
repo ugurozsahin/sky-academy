@@ -284,7 +284,7 @@ cannot merge it must, by §6's own rule, end in one of the two marks, so it woul
 itself cleared, every hour, for as long as the thing it cannot do stays undone.
 
 **First, though: has a commit landed since that clear?** Compare the `REVIEW: CLEARED` comment's `created_at`
-with the newest commit on the branch. If the commit is newer, **this is clause (a) in substance however well it
+with the newest commit on the branch. If the commit is newer, or they share a timestamp, **this is clause (a) in substance however well it
 matches (c)'s wording, and it takes the ordinary full review** — the diff, the agents, the suite, a fresh mark.
 Never the finish-path.
 
