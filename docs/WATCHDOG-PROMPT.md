@@ -276,11 +276,22 @@ your first finding and the only one you can report.
    untouched fork and the entire unreviewed queue as abandoned, every six hours, forever — a watchdog
    manufacturing false alarms, which is the one failure this document says is worse than no watchdog at all
    (#580 review).
-   **`loosening` is the only carve-out.** A run may never merge one even after the owner approves
-   (`docs/REVIEWER-PROMPT.md` rule 4), so it belongs in your pulse rather than in an issue. **`owner-approval`
-   is not a carve-out**: once he writes his marker the gate goes green and a routine may merge it, so an
-   approved one still sitting there is exactly the finding. The first draft of this check excluded it and
-   would have stayed silent on #568 and #577 — the two pull requests it was written for.
+   **There is no carve-out here, and `loosening` is not one.** A cleared, approved, green `loosening` pull request
+   meets every condition above, so it is a finding — "a check whose condition is met is a finding. Full stop",
+   at the top of this document, and that rule says explicitly that a benign cause changes **the wording of the
+   issue, never whether you raise it**. So raise it, and word it as what it is: a pull request finished and
+   waiting on the owner's own hand, which no routine may merge (`docs/REVIEWER-PROMPT.md` rule 4). It is not a
+   defect report and should not read like one.
+   **Repetition is already solved and does not need an exception.** `## Reporting` below forbids a second issue
+   for a problem that already has an open `watchdog` one — comment that it persists and for how long instead —
+   and tells the owner only about a finding that is new or has materially changed. One issue, then comments, and
+   he hears once. A first draft of this said to put it in the pulse rather than an issue, which was wrong twice
+   over: it invented a third behaviour the document already had a better answer for, and the pulse is a single
+   line overwritten every run with nowhere to keep a pull request number — so "record it in the pulse" is how a
+   stranded pull request stays invisible, which is the exact shape this check exists to end (#580 review).
+   **`owner-approval` is not an exception either**: once he writes his marker the gate goes green and a routine
+   may merge it, so an approved one still sitting there is a defect and reads like one. The first draft of this
+   check excluded it and would have stayed silent on #568 and #577 — the two pull requests it was written for.
    This check exists because of a real stranding, and the shape matters more than the instance:
    `docs/REVIEWER-PROMPT.md` STEP 1 decides what a reviewer looks at, and until #579 both its clauses compared
    **a commit against a review verdict**. The owner writing his marker after a clear moves no commit, so a
