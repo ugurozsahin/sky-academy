@@ -281,7 +281,23 @@ PR #583 was in exactly that state while this was being written: non-draft, gate 
 review). Watchdog check 11 carries the same condition for the same reason; it was written first and this is it
 back-ported to the clause that needed it more. **Re-reviewing it is the wrong act and the loop is real**: a run that
 cannot merge it must, by §6's own rule, end in one of the two marks, so it would block a pull request it had
-itself cleared, every hour, for as long as the thing it cannot do stays undone. So under (c):
+itself cleared, every hour, for as long as the thing it cannot do stays undone.
+
+**First, though: has a commit landed since that clear?** Compare the `REVIEW: CLEARED` comment's `created_at`
+with the newest commit on the branch. If the commit is newer, **this is clause (a) in substance however well it
+matches (c)'s wording, and it takes the ordinary full review** — the diff, the agents, the suite, a fresh mark.
+Never the finish-path.
+
+That order matters because nothing else enforces it. `scripts/review-gate.mjs`'s `blockState()` takes
+`{draft, labels, comments}` and **no commit information at all**, so it compares `REVIEW:` and `OWNER:`
+timestamps against each other and never against the branch. A push re-runs it on the new head against unchanged
+comments, so a stale `REVIEW: CLEARED` keeps the gate green over a commit nobody has read — and (c)'s three
+conditions, which is where the clause stops, contain no term about commits. Clause (a) does: *no `REVIEW:`
+verdict newer than its newest commit*. Both clauses match such a pull request, and without this paragraph a run
+has no textual reason to take the slower one — the wording around (c) pushes the other way, since it frames the
+thing as already decided (#580 review).
+
+So under (c), once that check says no commit has landed since the clear:
 
 - **Merge it if the four rules let you.** That is the whole point of the clause, and it is the ordinary case.
 - **If a rule bars the merge and the branch is fine — `loosening` is the owner's however he voted — record it

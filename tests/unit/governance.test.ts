@@ -4049,25 +4049,31 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
       .toMatch(/means\s+\*not\s+blocked\*,\s+never\s+\*reviewed\*/);
     expect(s6, 'and name what the gap would have instructed — merging an unreviewed diff')
       .toMatch(/merge\s+an\s+unreviewed\s+diff/);
-    expect(s6, '§6 must forbid a fresh block on a pull request nothing about whose diff changed')
-      .toMatch(/not\s+a\s+fresh\s+block/);
-    // …and the exception that keeps the work moving. A cleared pull request that `main` has since made
-    // unmergeable reaches no routine at all on its own: the reviewer cannot push, and STEP 2.5 only takes a
-    // pull request whose newest verdict is an unaddressed CHANGES REQUESTED, which a cleared one is not. The
-    // block is the whole routing mechanism, so §6 has to distinguish "I may not merge this" from "this can no
-    // longer be merged" — the first is a pulse line, the second is a mark (#568 sat between the two).
-    expect(s6, '§6 must send a branch that stopped being mergeable back to a developer, not to the pulse')
-      .toMatch(/If\s+the\s+branch\s+itself\s+stopped\s+being\s+mergeable/);
-    // Scoped to the routing bullet itself: §6 names STEP 2.5 elsewhere, so a section-wide search stayed
-    // green when the destination was cut from this rule. Found by mutation.
-    const routing = s6.slice(s6.indexOf('If the branch itself stopped being mergeable'),
-      s6.indexOf('- **A `REVIEW:` mark under (c)'));
-    expect(routing.length, 'the routing bullet must be found, or the assertion below reads an empty string')
-      .toBeGreaterThan(200);
-    expect(routing, 'and it must name where the mark sends the work, or the rule is a preference with no '
-      + 'destination').toMatch(/STEP\s+2\.5/);
-    expect(s6, 'and why the block also ends the repetition — it drafts the pull request, so (c) stops matching')
-      .toMatch(/clause\s+\(c\)\s+stops\s+matching/);
+
+    /**
+     * #580 review, round 4: a commit landing after the clear is still unreviewed, and neither (c) nor §6 had
+     * a term about it. `blockState()` takes `{draft, labels, comments}` and no commit information, so a push
+     * re-runs it against unchanged comments and the gate stays green over the new head. Clause (a) matches
+     * such a pull request too, and nothing said which path wins — while the prose around (c) pushes toward
+     * the shortcut by framing it as already decided.
+     *
+     * Pinned by equality rather than by phrase presence, which is the other half of the same round's finding:
+     * a `\s+`-joined phrase match is satisfied by its own words sitting inside a longer, qualified sentence,
+     * so "merge anyway if the gate alone is green" could be added beside any of the assertions above without
+     * turning one red. Fourteen rounds on #513 ended on exactly this: whole units, matched by equality.
+     */
+    const PRECEDENCE = '**First, though: has a commit landed since that clear?** Compare the `REVIEW: CLEARED` '
+      + "comment's `created_at`\nwith the newest commit on the branch. If the commit is newer, **this is clause "
+      + "(a) in substance however well it\nmatches (c)'s wording, and it takes the ordinary full review** — the "
+      + 'diff, the agents, the suite, a fresh mark.\nNever the finish-path.';
+    expect(s6, 'a commit after the clear takes the full review, not the finish-path — word for word, because '
+      + 'a phrase match is satisfied by the same words inside a sentence that qualifies them away')
+      .toContain(PRECEDENCE);
+    // And the order, which the pin alone cannot express: the check has to come before the bullets it gates.
+    expect(s6.indexOf(PRECEDENCE), 'and it must precede the finish-path, or a run meets the shortcut first')
+      .toBeLessThan(s6.indexOf('**Merge it if the four rules let you.**'));
+    expect(s6, 'and say why nothing else enforces it — `blockState()` never sees a commit')
+      .toMatch(/no\s+commit\s+information\s+at\s+all/);
   });
 
   it('the waiting test carries clause (c) word for word, conjunction included (#579)', () => {
@@ -4544,7 +4550,7 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
       unit: "`blocked` sits lower than the rest, at three, because it is the only one of the four that moves work **out**\nof reach rather than into it, and because adding and removing it are counted together: a run that parks two\nitems and unparks two has touched four pieces of the owner's own ordering while no single number looks large.\nFour issues quietly parked is a bigger change to what happens next week than four issues closed." },
     { what: "the watchdog catches a reviewed pull request nothing is coming for",
       file: "docs/WATCHDOG-PROMPT.md",
-      unit: "11. **Is any pull request reviewed, unblocked and still sitting there?** List every open pull request —\n   `GET /repos/ugurozsahin/sky-academy/pulls?state=open&per_page=100`, following `Link: rel=\"next\"`.\n   **Skip forks exactly as the reviewer does** — `head.repo.full_name != base.repo.full_name`, or\n   `head.repo.fork` is `true`, and fail-closed when `head.repo` is missing. `docs/REVIEWER-PROMPT.md` STEP 2\n   never reviews, comments on or merges one by design, so a fork is not abandoned, it is excluded.\n   A finding is a pull request where **all** of these hold: it is **not a draft**; its newest `REVIEW:` verdict\n   is a **`REVIEW: CLEARED`**; its `review-gate` status is **`success`** — `GET /commits/<head sha>/status`,\n   never the Actions API, and a missing or pending status is not a pass; and more than ~2 hours have passed\n   since the later of that clear and the owner's own marker — or since the clear alone where there is no marker, which is the ordinary case. Name it by number.\n   **The cleared verdict is what makes this check mean anything, and \"the gate is green\" will not stand in for\n   it.** `scripts/review-gate.mjs`'s `blockState()` reports `blocked: false` whenever nothing is blocking —\n   which is true of a pull request nobody has looked at yet, since no `REVIEW:` comment exists to be open. A\n   green gate says *not blocked*, never *reviewed*. Built on the gate alone this check would report every\n   untouched fork and the entire unreviewed queue as abandoned, every six hours, forever — a watchdog\n   manufacturing false alarms, which is the one failure this document says is worse than no watchdog at all\n   (#580 review).\n   **`loosening` is the only carve-out.** A run may never merge one even after the owner approves\n   (`docs/REVIEWER-PROMPT.md` rule 4), so it belongs in your pulse rather than in an issue. **`owner-approval`\n   is not a carve-out**: once he writes his marker the gate goes green and a routine may merge it, so an\n   approved one still sitting there is exactly the finding. The first draft of this check excluded it and\n   would have stayed silent on #568 and #577 — the two pull requests it was written for.\n   This check exists because of a real stranding, and the shape matters more than the instance:\n   `docs/REVIEWER-PROMPT.md` STEP 1 decides what a reviewer looks at, and until #579 both its clauses compared\n   **a commit against a review verdict**. The owner writing his marker after a clear moves no commit, so a\n   pull request stopped matching either at the moment it became mergeable — #568 and #577 sat open and green\n   on 2026-09-23 with two reviewer runs seeing the problem and no rule letting them act. STEP 1 clause (c)\n   closes that, and this check is the backstop **because it is keyed on nothing the reviewer believes**: it\n   reads the repository's own answer to \"was this finished and is it still here\", so a fourth kind of event\n   that no waiting clause anticipates still surfaces." },
+      unit: "11. **Is any pull request reviewed, unblocked and still sitting there?** List every open pull request —\n   `GET /repos/ugurozsahin/sky-academy/pulls?state=open&per_page=100`, following `Link: rel=\"next\"`.\n   **Skip forks exactly as the reviewer does** — `head.repo.full_name != base.repo.full_name`, or\n   `head.repo.fork` is `true`, and fail-closed when `head.repo` is missing. `docs/REVIEWER-PROMPT.md` STEP 2\n   never reviews, comments on or merges one by design, so a fork is not abandoned, it is excluded.\n   A finding is a pull request where **all** of these hold: it is **not a draft**; its newest `REVIEW:` verdict\n   is a **`REVIEW: CLEARED`**; its `review-gate` status is **`success`** — `GET /commits/<head sha>/status`,\n   never the Actions API, and a missing or pending status is not a pass; and more than ~2 hours have passed\n   since the later of that clear and the owner's own marker — or since the clear alone where there is no marker, which is the ordinary case. Name it by number.\n   **And no commit has landed since that clear.** If one has, the pull request is not finished and waiting — it is waiting for a review of the commit, which `docs/REVIEWER-PROMPT.md` STEP 1 clause (a) already asks for. Reporting it here would say \"nothing is coming for this\" about a pull request the reviewer is due to pick up, which is a false finding of exactly the kind this check was rewritten to stop making. `blockState()` never compares a verdict against a commit, so the gate cannot tell you this and you have to look (#580 review).\n   **The cleared verdict is what makes this check mean anything, and \"the gate is green\" will not stand in for\n   it.** `scripts/review-gate.mjs`'s `blockState()` reports `blocked: false` whenever nothing is blocking —\n   which is true of a pull request nobody has looked at yet, since no `REVIEW:` comment exists to be open. A\n   green gate says *not blocked*, never *reviewed*. Built on the gate alone this check would report every\n   untouched fork and the entire unreviewed queue as abandoned, every six hours, forever — a watchdog\n   manufacturing false alarms, which is the one failure this document says is worse than no watchdog at all\n   (#580 review).\n   **`loosening` is the only carve-out.** A run may never merge one even after the owner approves\n   (`docs/REVIEWER-PROMPT.md` rule 4), so it belongs in your pulse rather than in an issue. **`owner-approval`\n   is not a carve-out**: once he writes his marker the gate goes green and a routine may merge it, so an\n   approved one still sitting there is exactly the finding. The first draft of this check excluded it and\n   would have stayed silent on #568 and #577 — the two pull requests it was written for.\n   This check exists because of a real stranding, and the shape matters more than the instance:\n   `docs/REVIEWER-PROMPT.md` STEP 1 decides what a reviewer looks at, and until #579 both its clauses compared\n   **a commit against a review verdict**. The owner writing his marker after a clear moves no commit, so a\n   pull request stopped matching either at the moment it became mergeable — #568 and #577 sat open and green\n   on 2026-09-23 with two reviewer runs seeing the problem and no rule letting them act. STEP 1 clause (c)\n   closes that, and this check is the backstop **because it is keyed on nothing the reviewer believes**: it\n   reads the repository's own answer to \"was this finished and is it still here\", so a fourth kind of event\n   that no waiting clause anticipates still surfaces." },
     { what: "the four pulse issues are out of reach",
       file: "docs/REFINER-PROMPT.md",
       unit: "- the four pulse issues — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`,\n  `watchdog: heartbeat`, and your own two below. They are permanently open on purpose and their bodies are\n  deliberately odd, so a \"this claim is no longer true, close it\" pass would kill every one of them. Match\n  them by title, not by label: they carry `watchdog`, and so do real findings." },
