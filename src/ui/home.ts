@@ -203,10 +203,16 @@ export function rewardsScreen(nav: Nav) {
     </div>
     <div class="next-sticker">${banner}</div>
     <div class="album">${cards}</div>
-    <div class="isl-head"><span class="icon-btn" aria-hidden="true">🎓</span><div><b>My certificates</b><small>${certs.length ? `${certs.length} earned` : 'Win a mission to earn one'}</small></div></div>
-    ${certAlbumHTML(certs)}
-    <div class="isl-head"><span class="icon-btn" aria-hidden="true">⚔️</span><div><b>Recent duels</b><small>${duelsSub}</small></div></div>
-    ${duelHistoryHTML(duels)}
+    <div class="rewards-cols">
+      <div class="rewards-col">
+        <div class="isl-head"><span class="icon-btn" aria-hidden="true">🎓</span><div><b>My certificates</b><small>${certs.length ? `${certs.length} earned` : 'Win a mission to earn one'}</small></div></div>
+        ${certAlbumHTML(certs)}
+      </div>
+      <div class="rewards-col">
+        <div class="isl-head"><span class="icon-btn" aria-hidden="true">⚔️</span><div><b>Recent duels</b><small>${duelsSub}</small></div></div>
+        ${duelHistoryHTML(duels)}
+      </div>
+    </div>
   </section>`, 'bg-sky');
   tb.bind();
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
