@@ -234,18 +234,42 @@ test.describe('tablet viewports (#116)', () => {
     });
 
   /**
-   * #594: a fixed-size `.tenframe i` forced its 5-column grid to a 140px min-content width regardless of
-   * what the card actually had to give it, which is a page-level horizontal overflow rather than a glyph
-   * painting outside one slot — `expectFitsViewport` is the check that catches that shape, the same one
-   * #109's dashboard fix above is proven with.
+   * #594, corrected after review, twice. Round 1: `expectFitsViewport` cannot see this bug at all —
+   * `.play { overflow: hidden; }` (`src/style.css:891`) is a clipping ancestor of `.tenframe`, and
+   * `horizontalOverflow` deliberately excludes anything with one (the exclusion exists for the arena
+   * canvas), so a `.tenframe` forced wide would be invisibly clipped, never counted as page overflow.
+   * Verified by reverting `.tenframe i` to a fixed 24px: the old version of this test still passed.
+   *
+   * Round 2: the obvious fix — `outsideItsBox(page, '.qcard', '.tenframe')`, comparing rects directly
+   * instead of relying on page scroll — turns out to have the same defect for a different reason. Checked
+   * by reverting `.tenframe`/`.tenframe i` the same way and re-running: it *still* passed, at both tablet
+   * sizes, because `.qcard { max-width: 560px; padding: 10px 14px 12px }` gives ~530px of content width at
+   * *every* viewport this game supports, down to the narrowest phone it's tested at (390x664, `game.spec.ts`
+   * "the shortest phone we support"; 320px turns up as the narrowest measured width, `game.spec.ts:2928`) —
+   * and `.tenframe`'s pre-fix natural width was 140px. There is no reachable screen in the shipped app where
+   * the card is ever narrower than the ten-frame's own content, so a page-level or card-level overflow
+   * assertion has nothing to catch here: this is the same "unreachable today" shape as the multi-tenframe
+   * case in the PR body, not a gap in test-writing effort.
+   *
+   * So this stays a rendering check, not an overflow claim, and the actual regression guard for a fixed
+   * pixel size returning to `.tenframe`/`.tenframe i` is the mutation-tested unit rail in
+   * `tests/unit/guardrails.test.ts` ("the ten-frame dot scales with its grid cell…") — which does catch it,
+   * independently confirmed by reverting each half of the fix in turn.
    */
   for (const [w, h] of [[800, 1280], [1024, 768]] as const)
-    test(`the ten-frame play screen fits across at ${w}x${h} (#594)`, async ({ page }) => {
+    test(`the ten-frame renders at ${w}x${h} (#594)`, async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
       await seedPlayer(page);
       await startTopic(page, 'reception', 'r-bonds');
       await expect(page.locator('.tenframe i').first()).toBeVisible();
-      await expectFitsViewport(page, `ten-frame play screen at ${w}x${h}`);
+      const [cardWidth, frameWidth] = await Promise.all([
+        page.locator('.qcard').evaluate(el => el.getBoundingClientRect().width),
+        page.locator('.tenframe').first().evaluate(el => el.getBoundingClientRect().width),
+      ]);
+      expect(frameWidth, 'the ten-frame must render at a real, positive width — a 0 width would make every other check here vacuous')
+        .toBeGreaterThan(0);
+      expect(frameWidth, "sanity check on the premise above: if the card ever were narrower than the frame's natural width, this rail would need the overflow assertion back")
+        .toBeLessThanOrEqual(cardWidth);
     });
 
   /**
