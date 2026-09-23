@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { activeProfile, addProfile, deleteProfile, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { duelHeadline, duelHistoryLine, type DuelResult } from '../../src/game/duel';
@@ -119,6 +119,7 @@ describe('rewards storage', () => {
     expect(load().memory).toEqual({ reception: 2, year2: 1 });
   });
   it('topic accuracy accumulates across runs and keeps stars; training sessions are counted per year', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     recordTopic('y1-add', 2, 80);
     recordAccuracy('y1-add', { hits: 5, tries: 6 }); recordAccuracy('y1-add', { hits: 3, tries: 4 }); recordAccuracy('y1-add', { hits: 0, tries: 0 });   // an empty tally changes nothing
     expect(load().progress['y1-add']).toEqual({ stars: 2, best: 80, plays: 1, hits: 8, tries: 10 });
@@ -127,12 +128,23 @@ describe('rewards storage', () => {
     expect(load().training).toEqual({});
     expect(recordTraining('year1')).toBe(1); expect(recordTraining('year1')).toBe(2);
     expect(load().training).toEqual({ year1: 2 });
+    // Every tally above was already well-formed — silence is the guarantee the clamp's warning makes (#379).
+    expect(warn, 'a well-formed tally must never trip the clamp warning').not.toHaveBeenCalled();
+    warn.mockRestore();
   });
-  it('recordAccuracy clamps hits into [0, tries] — a caller cannot write an accuracy above 100% (#379)', () => {
+  it('recordAccuracy clamps hits into [0, tries] and warns — a caller cannot write an accuracy above 100%, silently (#379)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     recordAccuracy('y1-add', { hits: 9, tries: 4 });     // more hits than tries: clamped down to the ceiling
     expect(load().progress['y1-add']).toEqual({ stars: 0, best: 0, plays: 0, hits: 4, tries: 4 });
     recordAccuracy('y1-sub', { hits: -3, tries: 5 });    // negative hits: clamped up to the floor
     expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 0, tries: 5 });
+    recordAccuracy('y1-time', { hits: NaN, tries: 3 });  // NaN: the clamp itself cannot bound it, so it is 0
+    expect(load().progress['y1-time']).toEqual({ stars: 0, best: 0, plays: 0, hits: 0, tries: 3 });
+    // Each of the three malformed tallies above left a trace — the review finding this test guards: a silent
+    // repair would trade one silent failure (accuracy over 100%) for another (no evidence the bug happened).
+    expect(warn).toHaveBeenCalledTimes(3);
+    for (const call of warn.mock.calls) expect(call[0]).toContain('tally out of range');
+    warn.mockRestore();
   });
   it('streak counts consecutive days only', () => {
     expect(touchStreak(new Date('2026-09-05T10:00:00Z'))).toBe(1);
