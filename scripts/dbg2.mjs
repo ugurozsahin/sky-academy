@@ -1,8 +1,9 @@
 import { chromium } from '@playwright/test';
+import onboard from './flow-onboard.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 const p = await ctx.newPage();
-await p.goto('http://localhost:4173/?reset=1'); await p.click('.avatar-card[data-id="blaze"]'); await p.click('#go');
+await p.goto('http://localhost:4173/?reset=1'); await onboard(p, 'blaze', 'Ada');
 await p.click('.island[data-year="year1"]'); await p.click('.topic[data-id="y1-add"]'); await p.waitForSelector('#arena');
 await p.waitForTimeout(1500);
 await p.mouse.move(100, 500); await p.mouse.down();
