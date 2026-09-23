@@ -1,4 +1,6 @@
+import { pickNinja } from './flow-onboard.mjs';
+
 export default async function run(p) {
-  await p.click('.avatar-card[data-id="volt"]'); await p.click('#next');
+  await pickNinja(p, 'volt');
   await p.waitForSelector('#name');
 }

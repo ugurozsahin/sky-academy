@@ -2,13 +2,10 @@
 // quarter past 10 and lasts three quarters of an hour. When does it end?" at 83 characters, against
 // 65 for the previous longest (`y1-position`). The shot exists to show that prompt wrapping in the
 // 390 px viewport, so the flow keeps drawing until it gets a card over 70 characters.
+import onboard from './flow-onboard.mjs';
+
 export default async function run(p) {
-  // #67 split onboarding into a ninja step, a name step and an introduction — the same sequence
-  // `pickAvatar()` in `tests/e2e/game.spec.ts` walks. The older `flow-*.mjs` scripts still fill `#name`
-  // on the avatar screen and time out there.
-  await p.click('.avatar-card[data-id="blaze"]'); await p.click('#next');
-  await p.fill('#name', 'Ada'); await p.click('#go');
-  await p.waitForSelector('.intro-card'); await p.click('#intro-go');
+  await onboard(p, 'blaze', 'Ada');
   await p.waitForSelector('.home');
   await p.click('.island[data-year="year2"]'); await p.click('.tab[data-s="maths"]');
   await p.click('.topic[data-id="y2-duration"]');

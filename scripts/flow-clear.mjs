@@ -1,5 +1,7 @@
+import onboard from './flow-onboard.mjs';
+
 export default async function run(p) {
-  await p.click('.avatar-card[data-id="blaze"]'); await p.fill('#name', 'Ada'); await p.click('#go');
+  await onboard(p, 'blaze', 'Ada');
   await p.waitForSelector('.home'); await p.click('.island[data-year="reception"]'); await p.click('.topic[data-id="r-count"]');
   for (let i = 0; i < 5; i++) {
     await p.waitForFunction(() => { const s = window.__sna?.state(); return s && !s.waiting && window.__sna.bubbles().some(b => b.label === s.answer); }, null, { timeout: 20000 });

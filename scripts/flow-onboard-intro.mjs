@@ -1,5 +1,6 @@
+import { enterName } from './flow-onboard.mjs';
+
 export default async function run(p) {
-  await p.click('.avatar-card[data-id="volt"]'); await p.click('#next');
-  await p.waitForSelector('#name'); await p.fill('#name', 'Ada'); await p.click('#go');
+  await enterName(p, 'volt', 'Ada');
   await p.waitForSelector('.intro-card');
 }

@@ -3,9 +3,26 @@ import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type 
 import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
 import { TOPICS, YEARS, type YearId } from './curriculum';
 import { AVATARS, VILLAIN } from './avatars';
-// hits/tries = lifetime questions answered, one try per question whoever writes them: missions and Sensei
-// training (`session.ts`, latched by `waiting`) and a Ninja Duel's own seat (`duelAccuracy()`, latched per round
-// — #374's review found it counting slices, which this field cannot hold: `weakestTopics()` and parents.ts divide it).
+/**
+ * A tally of questions answered for one topic — `hits` right of `tries` attempted — while it is still being
+ * built, before `recordAccuracy()` folds it into `TopicProgress`'s own optional `hits?`/`tries?` below (the
+ * persisted lifetime totals; `AnswerTally` itself is never partial). One shape, one home, for the two
+ * producers that build it: `Session.byTopic` (`src/game/session.ts`) and `DuelTally` (`src/game/duel.ts`),
+ * both type-only imports of this (#379).
+ */
+export interface AnswerTally { hits: number; tries: number }
+/**
+ * hits/tries = lifetime questions answered, **at most** one try per question — not "always one", which is
+ * only true within a single writer. `session.ts` (missions, Sensei training) counts every question
+ * PRESENTED: a bubble that falls untouched, or a wave that ends with nothing decided, is a try nobody won
+ * (`tally()`, latched by `waiting`). `duel.ts` counts every round a seat ANSWERED OR THE ROUND WENT UNDECIDED:
+ * a round it never sliced into because the other seat won it first drops the try — a race lost on speed is not
+ * a wrong answer — but a round that ends a genuine draw, nobody deciding it, is a try with no hit, exactly like
+ * a mission's untouched question (`DuelTally`, latched by `answered`; the draw case is `settleDraw()`, #379).
+ * Both are "one write per question/round, whoever writes them" (#374's review found a duel counting slices,
+ * which this field cannot hold: `weakestTopics()` and `parents.ts` divide it) — they now agree on every case
+ * except a round lost purely to the other seat's speed, which duel.ts alone still drops.
+ */
 export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }
 /**
  * One earned certificate, kept as **data rather than a PNG** (#205): `certFromStored()` in `ui/certificate.ts`
@@ -862,11 +879,25 @@ export function recordTopic(topicId: string, stars: number, score: number) {
   const next = { stars: Math.max(p.stars, stars), best: Math.max(p.best, score), plays: p.plays + 1 };
   save({ progress: { ...load().progress, [topicId]: next } });
 }
-/** Add answered questions to a topic's lifetime tally (Sensei picks the weakest topics from these). */
-export function recordAccuracy(topicId: string, hits: number, tries: number) {
-  if (tries <= 0) return;
+/**
+ * Add answered questions to a topic's lifetime tally (Sensei picks the weakest topics from these). Takes an
+ * `AnswerTally` rather than two positional numbers a caller could pass in the wrong order (#379) — the two
+ * call sites (`ui/play.ts`, `ui/duel.ts`) already build one before this. Clamped to `0 <= hits <= tries`:
+ * `accuracy()` divides `hits/tries`, and an out-of-range write is a topic Sensei can rank above 100%.
+ *
+ * **Warns when the clamp actually changes the value** (review finding, #379) — the same shape `ui/visuals.ts`'s
+ * chart clamps and `arena.ts`'s label-fit warning already use: silently repairing a malformed tally would trade
+ * one silent failure (an accuracy over 100%) for another (evidence of the bug that produced it, gone without a
+ * trace). Both real producers (`session.ts`'s `tally()`, `duel.ts`'s `hit()`) build a well-formed tally today,
+ * so this should never fire in play; `Number.isFinite` catches a `NaN` the same way, rather than letting it
+ * through a clamp that cannot bound it.
+ */
+export function recordAccuracy(topicId: string, t: AnswerTally) {
+  if (t.tries <= 0) return;
+  const hits = Number.isFinite(t.hits) ? Math.min(Math.max(t.hits, 0), t.tries) : 0;
+  if (hits !== t.hits) console.warn(`recordAccuracy("${topicId}"): tally out of range (hits=${t.hits}, tries=${t.tries}) — clamped to ${hits}`);
   const p = load().progress[topicId] ?? { stars: 0, best: 0, plays: 0 };
-  save({ progress: { ...load().progress, [topicId]: { ...p, hits: (p.hits ?? 0) + hits, tries: (p.tries ?? 0) + tries } } });
+  save({ progress: { ...load().progress, [topicId]: { ...p, hits: (p.hits ?? 0) + hits, tries: (p.tries ?? 0) + t.tries } } });
 }
 /** Count a completed Sensei training session for this year. Returns the new total. */
 export function recordTraining(year: string): number {

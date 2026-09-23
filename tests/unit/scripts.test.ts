@@ -300,3 +300,65 @@ describe('bundle-single.mjs regenerates dist/sw.js after vite build deletes it (
     }
   }, 30_000);
 });
+
+
+/**
+ * #370: every navigation script in `scripts/` used to walk its own copy of the first-run wizard (avatar pick →
+ * name → introduction). The wizard split into three screens (#67) left eleven of the sixteen `flow-*.mjs`
+ * scripts — and the two ad-hoc `dbg*.mjs` scripts, the same class of mistake under a different name — clicking
+ * `#go` straight after the avatar card with no `#next` in between. `page.fill('#name', …)` then timed out,
+ * because the name field lives on a screen that click never reached. `flow-onboard.mjs` is now the one place
+ * that walks the wizard; the rest call it instead of growing a fresh copy of the same clicks for the next
+ * onboarding change to leave behind again. **Every `.mjs` file in `scripts/` is the set** (not just ones
+ * spelled `flow-*`), because the defect is "hand-rolls the avatar screen", not "is named like a flow".
+ */
+describe('every navigation script walks the wizard through flow-onboard.mjs, not its own copy (#370)', () => {
+  const dir = new URL('../../scripts/', import.meta.url);
+  const others = readdirSync(dir).filter((f) => f.endsWith('.mjs') && f !== 'flow-onboard.mjs');
+  const onboardSrc = readFileSync(new URL('flow-onboard.mjs', dir), 'utf8');
+
+  it('found more than one other script, or every check below would pass on an empty set', () => {
+    expect(others.length).toBeGreaterThan(10);
+  });
+
+  it.each(others)('%s does not click .avatar-card itself — that is flow-onboard.mjs alone', (name) => {
+    const src = readFileSync(new URL(name, dir), 'utf8');
+    expect(src, `${name} walks the avatar screen itself instead of calling flow-onboard.mjs`).not.toMatch(/\.avatar-card\[/);
+  });
+
+  // Scoped to each function's own body (not "somewhere in the file") so reordering the functions cannot
+  // false-fail this, and a stray click sitting outside the real call path cannot false-pass it.
+  const functionBody = (name: string) => {
+    const m = new RegExp(`function ${name}\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\n\\}`).exec(onboardSrc);
+    if (!m) throw new Error(`flow-onboard.mjs does not define ${name}() — every check below would pass vacuously`);
+    return m[1];
+  };
+
+  it('pickNinja() clicks the avatar card, then #next', () => {
+    const body = functionBody('pickNinja');
+    const clickCard = body.indexOf('.avatar-card[');
+    const clickNext = body.indexOf("click('#next')");
+    expect(clickCard, 'no avatar-card click in pickNinja()').toBeGreaterThan(-1);
+    expect(clickNext, 'no #next click in pickNinja()').toBeGreaterThan(-1);
+    expect(clickCard, '#next must be clicked after the avatar card, not before').toBeLessThan(clickNext);
+  });
+
+  it('enterName() calls pickNinja() before filling #name — the call the eleven broken scripts had skipped', () => {
+    const body = functionBody('enterName');
+    const callPick = body.indexOf('pickNinja(');
+    const fillName = body.indexOf("fill('#name'");
+    expect(callPick, 'enterName() does not call pickNinja()').toBeGreaterThan(-1);
+    expect(fillName, 'no #name fill in enterName()').toBeGreaterThan(-1);
+    expect(callPick, 'pickNinja() must run before #name is filled').toBeLessThan(fillName);
+  });
+
+  // flow-onboard.mjs's selectors are hardcoded against the real screens in src/ui/avatar.ts; nothing else
+  // ties the two together, since the QA scripts never run in CI (`.claude/rules/e2e.md`) and `tests/e2e/game.
+  // spec.ts`'s own `pickAvatar()` is an independent copy of the same ids that would not fail if these ids did.
+  it('every id/class flow-onboard.mjs clicks or waits for still exists in src/ui/avatar.ts', () => {
+    const avatarSrc = readFileSync(new URL('../../src/ui/avatar.ts', import.meta.url), 'utf8');
+    for (const needle of ['avatar-card', 'id="next"', 'id="name"', 'id="go"', 'intro-card', 'id="intro-go"']) {
+      expect(avatarSrc, `flow-onboard.mjs depends on ${needle}, no longer in src/ui/avatar.ts`).toContain(needle);
+    }
+  });
+});

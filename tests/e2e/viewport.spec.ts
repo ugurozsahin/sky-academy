@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { expectFitsViewport, outsideItsBox, overrideSafeAreaInsets } from './viewport';
+import { AVATARS, VILLAIN } from '../../src/avatars';
+import type { StoredCert, StoredDuel } from '../../src/storage';
 
 /**
  * The tablet specs (#116). This file is the whole of what the `tablet` and `tablet-landscape` projects
@@ -18,11 +20,15 @@ import { expectFitsViewport, outsideItsBox, overrideSafeAreaInsets } from './vie
  * `storage.ts` reads (#138), so hoisting it silently turns that rail into a check on nothing.
  */
 
-/** Land on the sky map with the avatar already chosen, exactly as `game.spec.ts` does (#138). */
-async function seedPlayer(page: Page, id = 'volt', name = 'Ada') {
+/**
+ * Land on the sky map with the avatar already chosen, exactly as `game.spec.ts` does (#138). `extra`
+ * mirrors that file's own `seedPlayer` signature (same optional fourth argument) rather than inventing a
+ * shape of its own — the #399 `.cert-view` test below needs a seeded `certs` array.
+ */
+async function seedPlayer(page: Page, id = 'volt', name = 'Ada', extra: Record<string, unknown> = {}) {
   await page.addInitScript(save => {
     if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
-  }, JSON.stringify({ v: 1, name, avatar: id }));
+  }, JSON.stringify({ v: 1, name, avatar: id, ...extra }));
   await page.goto('/');
   await expect(page.locator('.home')).toBeVisible();
 }
@@ -469,6 +475,73 @@ test.describe('tablet viewports (#116)', () => {
         .toBeGreaterThanOrEqual(target - ISLAND_TOLERANCE);
       expect(total, `island content height at ${w}x${h}: expected close to ${target}px, not still the old ~1200px stack (#563)`)
         .toBeLessThanOrEqual(target + ISLAND_TOLERANCE);
+   * #564 (#18 group B): rewards and shop, measured on a seeded save with progress, stickers, certificates
+   * and duels — not a fresh one, which is the narrowest either screen ever is and would pass this
+   * vacuously (#109's own reasoning for `seedProgress`, above). The per-element breakdown on the issue
+   * found a fresh-save read of 1040px for rewards was an empty-state artefact; this is the re-measure it
+   * asked for. `cert`/`match` mirror `game.spec.ts`'s own row shapes rather than inventing new ones.
+   */
+  async function seedRewardsData(page: Page) {
+    // Typed against the real StoredCert/StoredDuel shapes (type-design-analyzer, #564 review) — a future
+    // required field would otherwise go uncaught here exactly as it already does in game.spec.ts's own
+    // untyped builders of the same shape.
+    const cert = (id: string, title: string, year: string, date: string): StoredCert =>
+      ({ id, name: 'Ada', avatar: 'volt', year, title, stars: 3, score: 250, correct: 20, attempts: 20, date });
+    const match = (at: number, extra: Partial<StoredDuel> = {}): StoredDuel =>
+      ({ at, topic: 'y1-bonds', title: 'Number bonds', year: 'Year 1', winner: 'a', scoreA: 6, scoreB: 4, rounds: 10, ...extra });
+    await page.addInitScript(save => {
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({
+      v: 1, name: 'Ada', avatar: 'volt',
+      coins: 1250, streak: { last: '', days: 12 },
+      stickers: [...AVATARS.slice(0, 5).map(a => a.id), VILLAIN.id],
+      certs: [
+        cert('reception:r-count', 'Counting to 10', 'Reception', '2026-09-10'),
+        cert('year1:y1-bonds', 'Number bonds to 20', 'Year 1', '2026-09-12'),
+        cert('year2:y2-tables', 'Times tables', 'Year 2', '2026-09-15'),
+      ],
+      duels: [
+        match(1_757_100_000_000, { topic: 'y1-days', title: 'Days of the week', winner: 'b', scoreA: 3, scoreB: 7 }),
+        match(1_757_000_000_000),
+        match(1_756_900_000_000, { topic: 'y2-tables', title: 'Times tables', winner: 'a', scoreA: 9, scoreB: 5 }),
+      ],
+    }));
+    await page.goto('/');
+    await expect(page.locator('.home')).toBeVisible();
+  }
+
+  const REWARDS_TOLERANCE = 20;
+  // Real, measured with "My certificates" and "Recent duels" now side by side at ≥900px (`.rewards-cols`,
+  // #564's own open question, same `display: contents` → grid pattern as `.mode-grid`, #563's precedent):
+  // 1159px at 1280x800, 1202px at 1024x768 — down from the stacked 1475/1518px this replaces, but still past
+  // one viewport at both sizes. The remainder is the stats tiles + next-sticker banner + sticker album above
+  // the two-column split, none of which this slice touches (the album's own grid already reflows by content,
+  // not by a stacking bug the way the shop's does — see SHOP_CASES below). Pinned directly, not as a
+  // "less than the old value" bound, for the same reason #563's island target is.
+  const REWARDS_CASES = [
+    { w: 1280, h: 800, target: 1159 },
+    { w: 1024, h: 768, target: 1202 },
+  ] as const;
+
+  for (const { w, h, target } of REWARDS_CASES) {
+    test(`the rewards screen's content height is pinned at ${w}x${h}, on a seeded save (#564)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedRewardsData(page);
+      await page.click('#rewards');
+      await expect(page.locator('.rewards')).toBeVisible();
+      await expect(page.locator('.cert-row')).toHaveCount(6);   // 3 certs + 3 duels (both share .cert-row)
+      const grid = await page.locator('.rewards-cols').evaluate(el => getComputedStyle(el).display);
+      expect(grid, `.rewards-cols at ${w}x${h}: must be a grid at the ≥900px breakpoint (#564)`).toBe('grid');
+      // pr-test-analyzer (#564 review): `.rewards-col`'s two children (`.cert-open`, the duel `.cert-info`
+      // text) have no `min-width: 0`/ellipsis of their own, unlike `.cert-info b`'s certificate title — a grid
+      // item's default `min-width: auto` lets a non-shrinkable child push its 1fr track wider than half the
+      // row, so this proves neither column actually forces the page to scroll sideways rather than assuming it.
+      await expectFitsViewport(page, `rewards screen at ${w}x${h}`);
+      const total = await page.evaluate(() => document.documentElement.scrollHeight);
+      expect(total, `rewards content height at ${w}x${h}: expected close to ${target}px (#564)`)
+        .toBeGreaterThanOrEqual(target - REWARDS_TOLERANCE);
+      expect(total, `rewards content height at ${w}x${h}: expected close to ${target}px (#564)`)
+        .toBeLessThanOrEqual(target + REWARDS_TOLERANCE);
     });
   }
 
@@ -493,16 +566,57 @@ test.describe('tablet viewports (#116)', () => {
     expect(total, "the phone island's own scroll height must stay the old stacked value, not shrink to the tablet grid's (#563)")
       .toBeGreaterThan(1500);
   });
+   * The other half of the acceptance criterion, same as `.mode-grid`'s #563 precedent: a phone stays a
+   * single-column stack. `display: contents` on `.rewards-cols` should make the wrapper invisible to layout
+   * below 900px, so this is the only place that is proven rather than assumed from the CSS rule alone
+   * (pr-test-analyzer, #563 review, same reasoning applied here).
+   */
+  test("the rewards screen's certificates and duels stay a single-column stack below the 900px breakpoint, on a phone (#564)", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedRewardsData(page);
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+
+    const display = await page.locator('.rewards-cols').evaluate(el => getComputedStyle(el).display);
+    expect(display, '.rewards-cols on a phone: must stay `contents`, not switch to the ≥900px grid (#564)').toBe('contents');
+  });
+
+  const SHOP_TOLERANCE = 20;
+  // Real, measured: 1130px at 1280x800, 1145px at 1024x768 — matches the issue's own audit. `.shop-grid`
+  // already reflows (`repeat(auto-fill, minmax(140px, 1fr))`); the remainder is the Slice trails grid's real
+  // item count needing two rows, which is content rather than a stacking bug, so there is nothing group-B
+  // shaped to fix here.
+  const SHOP_CASES = [
+    { w: 1280, h: 800, target: 1130 },
+    { w: 1024, h: 768, target: 1145 },
+  ] as const;
+
+  for (const { w, h, target } of SHOP_CASES) {
+    test(`the shop screen's content height is pinned at ${w}x${h} (#564)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedPlayer(page);
+      await page.click('#rewards');
+      await expect(page.locator('.rewards')).toBeVisible();
+      await page.click('#shop');
+      await expect(page.locator('.shop')).toBeVisible();
+      const total = await page.evaluate(() => document.documentElement.scrollHeight);
+      expect(total, `shop content height at ${w}x${h}: expected close to ${target}px (#564) — the 12-item trail grid needing two rows, content rather than a stacking bug`)
+        .toBeGreaterThanOrEqual(target - SHOP_TOLERANCE);
+      expect(total, `shop content height at ${w}x${h}: expected close to ${target}px (#564)`)
+        .toBeLessThanOrEqual(target + SHOP_TOLERANCE);
+    });
+  }
 });
 
 /**
  * #399's own item 4: a real inset, injected via CDP (`overrideSafeAreaInsets`), read back as real computed
  * padding — not the text-only grep the `tests/unit/guardrails.test.ts` rails already run at pull-request
  * time (`env()` has no notch to resolve under either project, which is why those rails exist at all). This
- * covers three of the four sites the issue's own sweep named: `.hud` (PR #530), the landscape duel screen
- * (PR #542) and `.villain` (PR #551). `.cert-view` is NOT covered here — reaching it needs a full mission
- * played to completion (`game.spec.ts`'s own certificate test), which is a bigger duplicate than this file's
- * "small and deliberate" convention stretches to; left for a further slice, per the issue's own item 4.
+ * covers all four sites the issue's own sweep named: `.hud` (PR #530), the landscape duel screen (PR #542),
+ * `.villain` (PR #551) and `.cert-view` below. An earlier slice assumed `.cert-view` "needs a full mission
+ * played to completion" and left it uncovered on that basis — it does not: `game.spec.ts`'s own "My
+ * certificates" test already reaches it cheaply via a seeded `certs` row on the rewards album, which is the
+ * path used here too.
  *
  * Each test uses its own distinct inset value per side, on purpose: a transposed pair (top swapped for
  * left, `--sar` read where `--sal` was meant) would still pass a same-value check.
@@ -546,5 +660,24 @@ test.describe('a real safe-area inset becomes real padding, not just a declared 
     });
     // src/style.css: `.villain { right: calc(10px + var(--sar)); bottom: calc(12px + var(--sab)) }`
     expect(pos, '.villain must reach the CDP-overridden --sar/--sab, not the env() fallback').toEqual({ right: '55px', bottom: '37px' });
+  });
+
+  test('.cert-view pads by the real --sar/--sab/--sal values; top has no --sat and stays a flat 16px', async ({ page }) => {
+    await overrideSafeAreaInsets(page, { top: 60, right: 25, bottom: 45, left: 15 });
+    const cert = { id: 'reception:r-count', name: 'Ada', avatar: 'volt', year: 'Reception', title: 'Counting to 10', stars: 3, score: 250, correct: 20, attempts: 20, date: '2026-09-10' };
+    await seedPlayer(page, 'volt', 'Ada', { certs: [cert] });
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+    await page.click('.cert-open');
+    const view = page.locator('.cert-view');
+    await expect(view).toBeVisible();
+    const pad = await view.evaluate(el => {
+      const s = getComputedStyle(el);
+      return { top: s.paddingTop, right: s.paddingRight, bottom: s.paddingBottom, left: s.paddingLeft };
+    });
+    // src/style.css: `.cert-view { padding: 16px calc(16px + var(--sar, 0px)) calc(16px + var(--sab, 0px)) calc(16px + var(--sal, 0px)) }`
+    expect(pad, '.cert-view padding must reach the CDP-overridden --sar/--sab/--sal; top is a fixed 16px, not --sat').toEqual({
+      top: '16px', right: '41px', bottom: '61px', left: '31px',
+    });
   });
 });

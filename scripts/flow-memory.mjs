@@ -3,12 +3,13 @@
 // this re-enters the screen until the wanted one comes up rather than stubbing `Math.random` — what it shoots
 // is then the real screen a child gets. Added for the #372 review: the Year 2 3-D board is the one deck whose
 // card count is not a multiple of four, and nothing else in the repository renders a board to look at it.
+import onboard from './flow-onboard.mjs';
+
 const YEAR = process.env.MEM_YEAR || 'year2';
 const THEME = process.env.MEM_THEME || '3-D shapes';
 
 export default async function run(p) {
-  await p.click('.avatar-card[data-id="blaze"]'); await p.click('#next'); await p.fill('#name', 'Ada'); await p.click('#go');   // #67 wizard
-  await p.waitForSelector('#intro-go'); await p.click('#intro-go');
+  await onboard(p, 'blaze', 'Ada');
   await p.waitForSelector('.home');
   await p.click(`.island[data-year="${YEAR}"]`);
   for (let tries = 0; tries < 60; tries++) {

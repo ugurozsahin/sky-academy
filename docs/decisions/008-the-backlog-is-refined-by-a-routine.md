@@ -7,8 +7,34 @@ routine beside the three `docs/decisions/003-two-routines.md` and `docs/WATCHDOG
 
 A daily scheduled task, `docs/REFINER-PROMPT.md`, shapes the backlog: duplicates, dead issues, complexity,
 epics, acceptance criteria, area labels, and a health report. It may **apply** the cheap, reversible changes
-at once. It may **propose** the irreversible ones — closing an issue, `priority:*`, `blocked` — and apply them
-on the next day's run if it still derives the same proposal and nothing objected.
+at once. It may **propose** the irreversible ones — closing an issue, `priority:*`, `blocked`, `routine-ok` —
+and apply them on the next day's run if it still derives the same proposal and nothing objected.
+
+## `routine-ok` joined that list on 2026-09-23 (#569), and it is the biggest of them
+
+The first live run, 2026-09-23T08:02Z, refined 55 issues and could not mark one of them ready, because item 6
+said the label was the owner's alone. Every issue it readied stayed invisible to the only routine that could
+take it — half a refinement, and the owner's answer was that the refiner may make this call for anything not
+`owner-session`.
+
+**What makes this a bigger loosening than `priority:*` was, and the reason it is gated rather than immediate:**
+`docs/ROUTINE-PROMPT.md` STEP 3 queries on `routine-ok`, so granting it puts an issue in front of an hourly
+developer run, which opens a pull request, which the reviewer routine merges. It is the one lever in the whole
+prompt that reaches the repository's source; nothing else there can cause a line of code to change. The label
+itself is one click back, but its effect stops being reversible within the hour — and that file splits its gate
+**by reversibility, not by importance**, so this belongs on the deferred side however obviously right a grant
+looks.
+
+Three conditions on a fresh grant, because the label means *ready for development*: acceptance criteria
+present, no `owner-input`/`owner-approval`/`blocked`, and in reach at all. Removing the label is forbidden
+outright — under #153 a run cannot tell the owner's hand from another run's, so a removal could revoke a
+release he gave and no evidence would show it.
+
+**The one case that is not gated** is a split child inheriting its parent's `routine-ok` and `priority:*`. That
+exercises no authority: the parent becomes `epic` in the same step and leaves the developer's query, so a child
+without the labels would leave the owner's release and his ordering attached to nothing. Preserving a decision
+is not making one — which is also the answer to why the first run's children were right to inherit before any
+of this was written down.
 
 ## Why a routine may touch priority at all
 

@@ -110,9 +110,10 @@ export const SHAPES_2D: readonly [string, string, number][] = [['▲', 'triangle
  *
  * `edges` and `vertices` are the Year 2 addition, and are carried by the polyhedra only. Whether a sphere,
  * cylinder or cone has edges or vertices at all is a matter of KS1 convention rather than a fact a card can
- * mark right or wrong, so the curved shapes carry neither and are never asked for them.
+ * mark right or wrong, so the curved shapes carry neither and are never asked for them. The pair is
+ * unrepresentable half-filled (#373): a shape carries both `edges` and `vertices`, or neither.
  */
-export type Shape3DProps = { readonly as: string; readonly flat: number; readonly edges?: number; readonly vertices?: number };
+export type Shape3DProps = { readonly as: string; readonly flat: number } & ({ readonly edges: number; readonly vertices: number } | { readonly edges?: never; readonly vertices?: never });
 /** 3-D shapes: glyph, name, properties. One source for maths.ts and Memory Match (#35). */
 export const SHAPES_3D: readonly [string, string, Shape3DProps][] = [
   ['🎲', 'cube', { as: 'cube', flat: 6, edges: 12, vertices: 8 }],

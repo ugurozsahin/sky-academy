@@ -11,7 +11,7 @@
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
-import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
+import { Duel, DUEL_PLAYERS, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
 import { isReadOnlySave, isWriteFailing, load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type GameEndOutcome, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
@@ -27,7 +27,7 @@ import { fontReady } from './font';
 import type { DuelHooks } from './hooks';
 
 export interface DuelScreenOpts { year: YearInfo }
-const PLAYERS = ['a', 'b'] as const;
+const PLAYERS = DUEL_PLAYERS;
 const NAME: Record<DuelPlayer, string> = { a: 'Player 1', b: 'Player 2' };
 /** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. `miss` is the
  *  wrong-slice toast, which holds nothing back — the round keeps running — but is scaled with the other two so
@@ -187,18 +187,23 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     if (!waveDone.a || !waveDone.b) return;
     // The draw half of B1: a last round nobody sliced is settled the moment both waves run out, and a draw
     // scores nothing, so the result is already final — but `duel.waveEnd()` below, which is what would
-    // register the draw and end the match, is a scope-bound timer a quit can still cancel. Commit first.
+    // register the draw and end the match, is a scope-bound timer a quit can still cancel. Commit before that.
     //
     // **What makes it final here is `Arena`'s own contract** (#375 round 2, note 6): `onWaveEnd` fires only at
     // `live === 0` (`arena.ts`), and every hit path requires `!b.dead`, so once BOTH arenas have reported
     // there is no bubble either child could still slice and no route left to `duel.hit()`. If that ever
     // changes — a wave that ends with bubbles still catchable — this commit stops being safe, silently.
-    if (duel.onLastRound) commitOnce(duel.result());
-    // Settle a draw NOW, so its verdict goes up on the question it is about, and advance after the hold. Done in
-    // one step — `duel.waveEnd()` alone — `onRoundDraw` and `onQuestion` share a task and the toast is added and
-    // removed before a frame paints, so the children get `sfx.miss()` and nothing to read. `HOLD.draw + 100` so
-    // this does not ride on two equal timers firing in the order they happened to be queued.
+    //
+    // Settle the draw FIRST, so `result()` sees it (#379): `settleDraw()` is what tallies a 0/1 try for a seat
+    // that never touched a bubble this round, and `result()`'s snapshot is frozen the instant it is taken — a
+    // commit ahead of this line would permanently drop that seat's try from the match this pays. Both calls
+    // stay synchronous, ahead of the scope-bound `later()` below, so which of the two runs first costs nothing;
+    // it also lets the draw's verdict go up on the question it is about, before `onQuestion` replaces it —
+    // `onRoundDraw` and `onQuestion` share a task, so clearing the toast on the next question instead added and
+    // removed the class before a frame painted and the verdict was never shown at all (#425 review). `HOLD.draw
+    // + 100` so advancing does not ride on two equal timers firing in the order they happened to be queued.
     const drew = duel.settleDraw();
+    if (duel.onLastRound) commitOnce(duel.result());
     later(() => duel.waveEnd(), scaled(drew ? HOLD.draw + 100 : 450));
   };
   for (const p of PLAYERS) {
@@ -297,7 +302,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // of the topic, so a duel-only topic keeps `plays: 0` and `accuracy()` reads null for it — the same way a
     // topic met only in Sensei training or Sky Storm already behaves.
     taught = duelAccuracy(r);
-    recordAccuracy(topic.id, taught.hits, taught.tries);
+    recordAccuracy(topic.id, taught);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd(duelDojoEvent(r, topic.subject), paid);
     dojoPaid = dojo.coins;
