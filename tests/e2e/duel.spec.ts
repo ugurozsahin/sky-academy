@@ -1023,6 +1023,33 @@ test.describe('Ninja Duel', () => {
   });
 
   /**
+   * A draw earlier in the match, not the last round (#379 review, pr-test-analyzer). The quit-before-overlay
+   * test below proves the LAST round's draw survives the early-commit path; this proves a draw's tally, once
+   * recorded by `settleDraw()`, is carried forward inside `Duel`'s own `tally` object through every later round
+   * and still reaches the real save at match end — through the real screen, not only the pure `Duel` class the
+   * unit tests exercise.
+   */
+  test('a round nobody slices mid-match still tallies a try, no hit, for the seat that never answered — reaching the real save (#379)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    const topic = await page.evaluate(() => window.__sna.state().topic);
+    // Round 1: nobody slices, same trigger as the pause test above — both waves fall untouched.
+    await page.waitForFunction(() => window.__sna.state().round === 2, undefined, { timeout: 30_000 });
+    // Rounds 2-10: Player 1 wins every one.
+    for (let r = 2; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');
+    }
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    // Nine rounds won outright plus round 1's untouched draw: ten tries, nine hits — round 1 counts as a try
+    // Player 1 never answered, the same shape a mission scores an untouched question.
+    expect(saved.progress[topic], "round 1's draw reaches the save as a try with no hit, not as nothing")
+      .toMatchObject({ hits: 9, tries: 10, plays: 0, stars: 0 });
+    expect(saved.duels[0]).toMatchObject({ winner: 'a', scoreA: 9, scoreB: 0, rounds: 10 });
+  });
+
+  /**
    * The third `winner` arm (#397 round 2, note 1). `duelEarnsCertificate` is unit-pinned for all three values,
    * but the *call site* in `ui/duel.ts` is reachable only from a real match — and weakening it to
    * `r.winner === 'draw'` leaves every unit test green while a **defeat** files `year1:duel` into the child's
@@ -1356,8 +1383,13 @@ test.describe('Ninja Duel', () => {
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
     // Nine decided rounds, not ten: the last one paid nobody, which is what makes this the draw path.
     expect(saved.coins, 'a coin per DECIDED round — round 10 decided nothing').toBe(9);
-    expect(saved.progress[topic], 'Player 1 answered nine rounds; round 10 he never answered at all')
-      .toMatchObject({ hits: 9, tries: 9, plays: 0, stars: 0 });
+    // Ten tries, not nine (#379): round 10 is a genuine draw — nobody sliced it — and `settleDraw()` now tallies
+    // that the same way a mission scores an untouched question, a try with no hit. This is also the proof the
+    // early-commit ordering fix holds: `settleDraw()` runs before the screen's own `commitOnce(duel.result())`
+    // for the last round, so this quit-before-overlay path is the one case that would have silently dropped
+    // round 10's try forever if that ordering ever regressed.
+    expect(saved.progress[topic], 'Player 1 answered nine rounds and round 10 counts as a tenth, unanswered')
+      .toMatchObject({ hits: 9, tries: 10, plays: 0, stars: 0 });
     const volume = (['correct15', 'correct20', 'correct25'] as const).map(id => saved.dojo.progress[id]).filter((n: number | undefined) => n !== undefined);
     expect(volume, 'the Daily Dojo heard about the nine').toEqual([9]);
     expect(saved.duels, 'the match still happened, and a 9-0 is still a Player 1 win').toHaveLength(1);

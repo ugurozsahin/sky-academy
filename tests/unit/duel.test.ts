@@ -189,8 +189,14 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
    * when the last wave runs out — so a result taken then must equal the one `onMatchEnd` would deliver. Note
    * that `onLastRound` alone is not the licence: it reports *position*, not settledness. What makes the early
    * read safe is that the round is also settled, and these two cases are the two ways that happens.
+   *
+   * **The undecided path also needs `settleDraw()` called first, same as the real caller (#379).** A draw now
+   * tallies a try for whichever seat never touched a bubble (`settleDraw()`), so a `result()` taken before that
+   * — the bug this issue found in `src/ui/duel.ts`, fixed by reordering its own `settleDraw()`/`commitOnce()`
+   * pair — would drop that seat's try from the committed result forever. This test drives the two calls in the
+   * same order the real screen now does, so a regression back to the old order fails here first.
    */
-  it('result() on a settled last round is already the result end() delivers — won, and undecided (#375)', () => {
+  it('result() on a settled last round is already the result end() delivers — won, and undecided (#375, #379)', () => {
     for (const settle of ['won', 'undecided'] as const) {
       const ev = events();
       const d = new Duel({ topic, difficulty: 1, rounds: 3, rng: rng(11) }, ev);
@@ -199,6 +205,7 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
       d.hit('a', d.current!.answer); d.waveEnd();          // round 2: a
       expect(d.onLastRound, 'round 3 of 3 is the last round').toBe(true);
       if (settle === 'won') d.hit('b', d.current!.answer);  // decided, but the wave has not ended
+      else d.settleDraw();   // undecided: settle the draw's tally BEFORE result(), as the real caller does (#379)
       const early = d.result();
       expect(d.ended, 'the match has NOT ended yet — this is the window the screen commits in').toBe(false);
       // A slice after the round is decided changes nothing; on the undecided path there is nothing left to
@@ -569,10 +576,10 @@ describe('the duel tallies each seat\'s answers, one per round (#16 item 5: Sens
     expect(d.tally.a).toEqual({ hits: 0, tries: 0 });
   });
 
-  it('counts nothing at all for a round nobody sliced', () => {
+  it('a round nobody sliced tallies a try, no hit, for BOTH seats — a mission scores an untouched question the same way (#379)', () => {
     const d = match(2); d.start();
     d.waveEnd();                                   // round 1 drawn
-    expect(d.tally).toEqual({ a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } });
+    expect(d.tally).toEqual({ a: { hits: 0, tries: 1 }, b: { hits: 0, tries: 1 } });
   });
 
   it('hands the match result a snapshot a rematch cannot move', () => {
@@ -628,9 +635,14 @@ describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', (
     expect(duelAccuracy(r)).toEqual({ hits: 0, tries: 0 });   // and `recordAccuracy` ignores a 0-try tally
   });
 
-  it('teaches nothing after a match Player 1 never sliced in', () => {
-    expect(duelAccuracy(played(['draw', 'draw']))).toEqual({ hits: 0, tries: 0 });
-    expect(duelAccuracy(played(['b', 'draw']))).toEqual({ hits: 0, tries: 0 });
+  it('a round Player 1 never reached teaches a try with no hit, not nothing (#379) — except a round the OTHER seat won outright, which stays dropped', () => {
+    // Two genuine draws: nobody sliced either round, so both count exactly as a mission scores an unanswered
+    // question — a try, no hit — same as the seat-level assertion above.
+    expect(duelAccuracy(played(['draw', 'draw']))).toEqual({ hits: 0, tries: 2 });
+    // Round 1 is Player 2's clean win — decided before the wave ends, so `settleDraw()` never runs and Player 1's
+    // try for it stays dropped, per `duelAccuracy`'s own "round lost on speed is not a wrong answer" rule. Round 2
+    // is a genuine draw and tallies.
+    expect(duelAccuracy(played(['b', 'draw']))).toEqual({ hits: 0, tries: 1 });
   });
 
   // Every case below writes to the save, so the save is cleared before each one rather than inline: a shim

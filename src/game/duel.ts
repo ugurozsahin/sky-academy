@@ -8,6 +8,9 @@ import type { DojoEvent } from './dojo';
 import type { AnswerTally, StoredDuel } from '../storage';
 
 export type DuelPlayer = 'a' | 'b';
+/** The two seats, once — `src/ui/duel.ts`'s own `PLAYERS` imports this rather than repeating the literal, so a
+ *  third seat or a rename cannot drift between the two files (#379 review, type-design-analyzer). */
+export const DUEL_PLAYERS = ['a', 'b'] as const satisfies readonly DuelPlayer[];
 export const DUEL_ROUNDS = 10;
 
 export interface DuelEvents {
@@ -107,6 +110,12 @@ export class Duel {
    * `onQuestion` that follows ran in one synchronous task, so a screen that clears its toast on a new question
    * added and removed the class before the browser painted a frame: the draw verdict was never shown at all,
    * and two children got a miss sound with nothing to read (#425 review).
+   *
+   * **Also where a seat that never answered gets its try (#379).** `hit()` only tallies a seat that touches a
+   * bubble, so a round nobody sliced left a silent seat with nothing recorded at all — unlike a mission, which
+   * tallies an untouched question as a miss (`Session.waveEnd()`). A seat that *did* answer wrong already has
+   * its try from `hit()` (`this.answered[p]` is true); only a seat still `false` here gets one added, so this
+   * never double-counts the seat that missed and never touches the seat that won.
    */
   settleDraw(): boolean {
     // `this.current` is guarded the way `hit()` guards it two methods up, and for the same reason: this one is
@@ -115,6 +124,7 @@ export class Duel {
     // before a wave — so this is hardening, not a fix (#425 review, note 4).
     if (this.ended || this.roundDecided || !this.current) return false;
     this.roundDecided = true;
+    for (const p of DUEL_PLAYERS) if (!this.answered[p]) this.tally[p].tries++;
     this.ev.onRoundDraw(this.current);
     return true;
   }
@@ -282,7 +292,10 @@ export function duelDojoEvent(r: DuelResult, subject: Topic['subject']): DojoEve
  * match teaches Sensei about the friend instead — the cost of one shared profile, and the reason this records
  * one seat rather than both: Player 2's tally has no profile to go to and is deliberately thrown away.
  *
- * A match nobody sliced returns `{ hits: 0, tries: 0 }`, which `recordAccuracy()` already ignores.
+ * A match with every round drawn now returns `{ hits: 0, tries: rounds }` (#379): `settleDraw()` tallies a try,
+ * no hit, for a seat that never touched a bubble — same as `Session.waveEnd()` scores a mission question nobody
+ * answered. Only a round the OTHER seat won outright stays a dropped try, per the "round lost on speed is not a
+ * wrong answer" rule two paragraphs up; that is decided before the wave ends, so `settleDraw()` never runs for it.
  */
 export function duelAccuracy(r: DuelResult): DuelTally {
   return { ...r.tally.a };   // a copy: the duel screen puts this on `window.__sna`, and the result is a record
