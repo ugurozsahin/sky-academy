@@ -866,8 +866,12 @@ describe('starsForAccuracy — the one three-star bar (#397 review round 2, B2)'
     expect(starsForAccuracy(0)).toBe(1);         // never zero stars: one is the floor
   });
   it('is what a mission stage actually awards, not a second copy of it', () => {
-    // Drives a real stage and checks the stage star is this function applied to the stage accuracy. If
-    // `Session` ever stops calling it, this goes red — the guarantee the old comment claimed and did not have.
+    // Drives a real stage and checks the stage star is this function applied to the stage accuracy — at this
+    // one accuracy, `Session`'s own star and a fresh call to the bar must agree. **Not** a guarantee that
+    // `Session` still calls `starsForAccuracy` at all (#409 item 3): replacing the call in `session.ts` with
+    // the identical inline ternary leaves this green too, because the two sides of the `toBe` would then
+    // compute the same number by two independent routes rather than share one. Catching a lost call would need
+    // a spy on the module's own export, not a value comparison — a different test than this one.
     const ev = events();
     const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(7) }, ev);
     s.start();

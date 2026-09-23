@@ -210,12 +210,29 @@ test.describe('Ninja Duel', () => {
     // whether it worked. It now reports through `#cert-msg`, inside the modal itself, so nothing can cover it.
     // Forcing the 'save' route the same way `game.spec.ts`'s certificate test does, for a deterministic outcome
     // headless Chromium's real Web Share cannot give.
+    await page.evaluate(() => { (navigator as any).canShare = () => false; });
+    // (a) artifact viewer WITH the downloads grant → the save prompt (#409 item 2: the filename and the
+    // disable/re-enable pair, neither of which the earlier version of this test checked at all — only that the
+    // button existed and that *a* message appeared).
     await page.evaluate(() => {
-      (navigator as any).canShare = () => false;
-      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async () => ({ status: 'saved' }) } : null };
+      (window as any).__saved = null;
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; return { status: 'saved' }; } } : null };
     });
     await page.click('.duel-end #cert');
+    // The button disables for the length of the delivery and re-enables once it settles — the handler's own
+    // `b.disabled = true` / `b.disabled = false` pair, unchecked by the earlier version of this test.
+    await expect(page.locator('.duel-end #cert')).toBeEnabled();
     await expect(page.locator('.duel-end #cert-msg'), 'reported where the child is already looking, not behind the overlay').toHaveText('Certificate saved!');
+    expect(await page.evaluate(() => (window as any).__saved), "the duel handler's own filename, not the mission path's").toMatch(/^sky-ninja-duel-.*\.png$/);
+    // (b) artifact viewer WITHOUT a downloads grant → the full-screen "press and hold" fallback (the 'shown'
+    // route, the mission path's own second half of the same #50 rule: the button never silently does nothing).
+    await page.evaluate(() => { (window as any).claude = { use: async () => null }; });
+    await page.click('.duel-end #cert');
+    const certView = page.locator('.cert-view');
+    await expect(certView).toBeVisible();
+    await expect(certView.locator('.cert-view-hint')).toContainText('Press and hold');
+    await certView.getByRole('button', { name: 'Done' }).click();
+    await expect(certView).toHaveCount(0);
     await page.evaluate(() => { delete (window as any).claude; });   // leave the runtime clean for the rest of the test
     // ...and the history takes the same match (#415 review, note 3). The loss test below proved a row is
     // filed with no certificate; this proves the win path files exactly one of each, not two rows or none.
