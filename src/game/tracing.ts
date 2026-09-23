@@ -31,12 +31,18 @@ export interface TracePt { x: number; y: number }
  */
 export function markPoint(grid: TraceGrid, tally: TraceTally, x: number, y: number, brush: number): void {
   const cx = Math.round(x * MASK_SCALE), cy = Math.round(y * MASK_SCALE);
-  const r = Math.ceil(brush * MASK_SCALE), tol = r * 2;
+  const r = Math.ceil(brush * MASK_SCALE);
+  // The "inside" test (below) and the claim disc must agree on one radius (#592): `tol` used to be `r * 2`,
+  // a bound with no relation to `claimR2`, so a point could be judged "on the glyph" — and so exempted from
+  // OUTSIDE_MAX — from up to a full brush-width clear of it. `tol` is now just the claim disc's own radius,
+  // rounded out to the next cell, so the search square is the smallest one that can still reach every
+  // claimable cell and nothing scores "inside" that the disc itself would reject.
+  const claimR2 = r * r * 1.2, tol = Math.ceil(Math.sqrt(claimR2));
   let inside = false;
   for (let dy = -tol; dy <= tol; dy++) for (let dx = -tol; dx <= tol; dx++) {
     const px = cx + dx, py = cy + dy; if (px < 0 || py < 0 || px >= grid.mw || py >= grid.mh) continue;
     const i = py * grid.mw + px;
-    if (grid.mask[i]) { inside = true; if (dx * dx + dy * dy <= r * r * 1.2 && !grid.covered[i]) { grid.covered[i] = 1; tally.glyphHits[grid.mask[i] - 1]++; } }
+    if (grid.mask[i]) { inside = true; if (dx * dx + dy * dy <= claimR2 && !grid.covered[i]) { grid.covered[i] = 1; tally.glyphHits[grid.mask[i] - 1]++; } }
   }
   if (inside) tally.insidePts++; else tally.outsidePts++;
 }
@@ -60,8 +66,15 @@ export class Tracer {
     this.setup();
     canvas.addEventListener('pointerdown', this.down); canvas.addEventListener('pointermove', this.move);
     window.addEventListener('pointerup', this.up); window.addEventListener('pointercancel', this.up);
+    window.addEventListener('resize', this.resize);
   }
-  destroy() { this.canvas.removeEventListener('pointerdown', this.down); this.canvas.removeEventListener('pointermove', this.move); window.removeEventListener('pointerup', this.up); window.removeEventListener('pointercancel', this.up); }
+  destroy() { this.canvas.removeEventListener('pointerdown', this.down); this.canvas.removeEventListener('pointermove', this.move); window.removeEventListener('pointerup', this.up); window.removeEventListener('pointercancel', this.up); window.removeEventListener('resize', this.resize); }
+  /** #592: `setup()` re-reads the canvas box and rebuilds the mask for it — same fix as Arena's own `resize`.
+   *  Assigning `canvas.width` below wipes the bitmap, so this also clears the child's ink; that is deliberate,
+   *  not a side effect to work around — scoring the old strokes against a mask built for a different box is
+   *  the bug this closes, and a rotation mid-letter is rare enough that starting the letter over is the
+   *  honest outcome, not a silent one (`onProgress` reports the reset zero straight away). */
+  private resize = () => { this.setup(); this.onProgress(this.result()); };
   private font(size: number) { return `700 ${size}px "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif`; }
   setup() {
     const rect = this.canvas.getBoundingClientRect();
@@ -90,6 +103,7 @@ export class Tracer {
     });
     this.tally = { glyphHits: chars.map(() => 0), insidePts: 0, outsidePts: 0 };
     this.strokes = 0; this.done = false;
+    this.drawing = false; this.last = null;   // #592: a stroke in progress when the box changes must not resume against the new mask
     this.redraw(size);
   }
   private redraw(size: number) {
