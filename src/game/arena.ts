@@ -13,6 +13,14 @@ export interface Bubble {
   labelState: LabelState;   // #348: `small` or `overflow` says this bubble's label did not fit readably
   mark?: 'good' | 'bad'; markAt?: number; fade?: boolean;   // outcome reveal: spotlighted (✓/✗) or faded out
 }
+/** A bubble the player can still slice or tap: launched, and not already resolved by a hit, a miss, or the
+ *  outcome fade (#304). Both screens' `window.__sna.bubbles()` hooks and the sim harness's `live()` spelled
+ *  this out separately; `Arena.hitLabel` had a fourth copy missing `!fade` — harmless in practice (a `fade`
+ *  bubble only exists while `reveal()` has also set `frozen`, which `hitLabel` already refuses outright) but
+ *  a silent way for a fifth copy to miss it for real. Not `inFlight` below: that one is arena-internal physics
+ *  (is this bubble still moving, for collision resolution), a different question with the same name.
+ */
+export const hittable = (b: Bubble) => b.launched && !b.dead && !b.hit && !b.fade;
 type PKind = 'dot' | 'ring' | 'shard' | 'text' | 'ember' | 'drop' | 'bolt' | 'rock' | 'leaf' | 'crystal' | 'star' | 'smoke' | 'pixel' | 'slash';
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; size: number; kind: PKind; text?: string; rot?: number }
 // The one list every element-typed table derives from (#214): add an element here and `FxKind` gains it
@@ -211,7 +219,7 @@ export class Arena {
   /** Programmatic hit (tests / accessibility). */
   hitLabel(label: string) {
     if (this.frozen) return false;
-    const b = this.bubbles.find(x => x.label === label && x.launched && !x.hit && !x.dead);
+    const b = this.bubbles.find(x => x.label === label && hittable(x));
     if (b) this.hitBubble(b, false);
     return !!b;
   }

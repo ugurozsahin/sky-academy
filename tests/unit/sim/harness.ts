@@ -18,7 +18,7 @@
 // have, the test is worse than no test at all. It owns no bridge to the session either: every scenario that
 // needs one writes its own few lines, next to its assertions, so a reader can check them against the screen
 // (`src/ui/play-session.ts`) rather than trust a helper.
-import { Arena, type ArenaOpts, type Bubble, type WaveOpts } from '../../../src/game/arena';
+import { Arena, hittable, type ArenaOpts, type Bubble, type WaveOpts } from '../../../src/game/arena';
 
 /** A small seeded PRNG (mulberry32): same seed, same stream, no dependency. */
 export function rngFor(seed: number): () => number {
@@ -267,9 +267,10 @@ export function createSim(opts: SimOpts = {}): Sim {
       return n;
     },
     spawn(o: WaveOpts) { arena.spawnWave(o); },
-    // Exactly the predicate `window.__sna.bubbles()` uses in src/ui/play.ts — a scenario asking "what can the
-    // child see?" must ask it the same way the e2e does, or the two disagree about the same moment.
-    live: () => arena.bubbles.filter(b => b.launched && !b.dead && !b.hit && !b.fade),
+    // The one `hittable` predicate (#304) every screen's `window.__sna.bubbles()` hook also filters through —
+    // a scenario asking "what can the child see?" must ask it the same way the e2e does, or the two disagree
+    // about the same moment.
+    live: () => arena.bubbles.filter(hittable),
     all: () => arena.bubbles,
     // Both halves: Arena splits its five listeners across the canvas and the window.
     listeners: () => canvas.listenerCount() + win.listenerCount(),
