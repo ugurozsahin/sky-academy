@@ -214,15 +214,21 @@ test.describe('Ninja Duel', () => {
     // (a) artifact viewer WITH the downloads grant → the save prompt (#409 item 2: the filename and the
     // disable/re-enable pair, neither of which the earlier version of this test checked at all — only that the
     // button existed and that *a* message appeared).
+    // A deliberate delay in the fake `save`, not an instant resolve (pr-test-analyzer review of this PR): a
+    // `toBeEnabled()` check taken only after `page.click()` returns would pass whether or not the handler ever
+    // disabled the button at all, since Playwright's auto-retry keeps polling past a synchronous flip either
+    // way. The delay gives a window in which `#cert` must genuinely be disabled before this test claims it saw it.
     await page.evaluate(() => {
       (window as any).__saved = null;
-      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; return { status: 'saved' }; } } : null };
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 60)); return { status: 'saved' }; } } : null };
     });
     await page.click('.duel-end #cert');
-    // The button disables for the length of the delivery and re-enables once it settles — the handler's own
-    // `b.disabled = true` / `b.disabled = false` pair, unchecked by the earlier version of this test.
-    await expect(page.locator('.duel-end #cert')).toBeEnabled();
+    // Disabled for the length of the delivery — the handler's own `b.disabled = true`, set synchronously before
+    // its first `await`, checked while the fake `save` above is still mid-flight.
+    await expect(page.locator('.duel-end #cert')).toBeDisabled();
     await expect(page.locator('.duel-end #cert-msg'), 'reported where the child is already looking, not behind the overlay').toHaveText('Certificate saved!');
+    // ...and re-enabled once delivery settles — the handler's matching `b.disabled = false`.
+    await expect(page.locator('.duel-end #cert')).toBeEnabled();
     expect(await page.evaluate(() => (window as any).__saved), "the duel handler's own filename, not the mission path's").toMatch(/^sky-ninja-duel-.*\.png$/);
     // (b) artifact viewer WITHOUT a downloads grant → the full-screen "press and hold" fallback (the 'shown'
     // route, the mission path's own second half of the same #50 rule: the button never silently does nothing).
