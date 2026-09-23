@@ -2371,12 +2371,16 @@ describe('the bubble arena cannot silently return to the phone column, and the f
   });
 
   it('the arena-widening rule excludes .duel-screen by selector, not merely by the base rule losing a specificity tie', () => {
-    const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*\.play:not\(\.tracing\):not\(\.duel-screen\)\s*\{[^}]*\}/);
-    expect(block, 'the #18 group A arena rule must exist').toBeTruthy();
+    // Anchored on the DECLARATION, not on the selector text itself — a match that already required
+    // `:not(.duel-screen)` to exist would make the assertion below pass whenever the match succeeded at all,
+    // proving nothing a dropped exclusion wouldn't also let through. This finds whichever `.play`-rooted
+    // selector sets the widened `--arena-w` inside a >=900px block, then reads ITS selector separately.
+    const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*(\.play[^{]*)\{\s*--arena-w:\s*min\(/);
+    expect(block, 'a >=900px block must set --arena-w: min(...) on a .play-rooted selector').toBeTruthy();
     // a selector that dropped :not(.duel-screen) would still beat the base .play rule on specificity, so a
     // careless simplification would ship green on every rail above and only show up in duel.spec.ts's own
     // 600px pin — which a pull request's mobile-only CI project may not even run against a duel change.
-    expect(block![0], "duel must be excluded from the widening rule's own selector").toMatch(/:not\(\.duel-screen\)/);
+    expect(block![1], "duel must be excluded from the widening rule's own selector").toMatch(/:not\(\.duel-screen\)/);
   });
 });
 

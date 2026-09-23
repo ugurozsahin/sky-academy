@@ -1056,7 +1056,18 @@ test.describe('Sky Ninja Academy', () => {
     await startTopic(page, 'reception', 'r-count');
     const m = await page.evaluate(() => {
       const c = document.getElementById('arena')!.getBoundingClientRect();
-      const cap = parseFloat(getComputedStyle(document.querySelector('.play')!).getPropertyValue('--arena-w'));
+      // #18 group A: --arena-w widens to `min(880px, 100% - 40px)` at >=900px, and `getComputedStyle(...)`
+      // returns that expression's own text rather than a resolved length for a `min()`/`calc()` custom
+      // property (browser-dependent; Chromium does this for BOTH the custom property on `.play` and the
+      // regular `max-width` on `#arena` that reads it) — `parseFloat` on that text used to read the old
+      // plain `600px` fine and silently returned NaN once the value became a function. A probe element
+      // whose own `width` reads the same variable forces the browser to resolve it to a real used value,
+      // the same way layout already has to for `#arena` itself.
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:absolute; visibility:hidden; width:var(--arena-w);';
+      document.querySelector('.play')!.appendChild(probe);
+      const cap = probe.getBoundingClientRect().width;
+      probe.remove();
       return { boxW: c.width, left: c.left, right: window.innerWidth - c.right, vw: window.innerWidth, W: window.__sna.arena.W, cap };
     });
     expect(m.W).toBeLessThanOrEqual(m.cap + 1);              // Arena.W follows the capped canvas box, not the window

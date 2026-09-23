@@ -287,9 +287,15 @@ test.describe('tablet viewports (#116)', () => {
    * CSS source names, because it sits inside `.hud`'s own `min(880px, 100% - 40px)` and then applies its own
    * `100% - 40px` branch against that already-narrower container (measured directly, both viewports below).
    * `TRACE_TARGET`/`TRACE_TOLERANCE` pin that rendered value rather than merely ruling out the old one.
+   *
+   * `#arena` carries no such nesting — `max-width: min(880px, 100% - 40px)` applies directly, with nothing
+   * else narrowing it, so it lands on exactly 880px at both viewports (measured directly). `ARENA_TOLERANCE`
+   * is 3px, not `TRACE_TOLERANCE`'s 30: a wider band here would still pass a regression that shaved off up
+   * to 19px — a stray margin, an extra inset — with no nested calculation to blame it on the way the tracing
+   * pad's own comment can.
    */
   const TRACE_TARGET = 816, TRACE_TOLERANCE = 30;
-  const ARENA_TARGET = 880, ARENA_TOLERANCE = 20;
+  const ARENA_TARGET = 880, ARENA_TOLERANCE = 3;
 
   for (const [w, h] of [[1280, 800], [1024, 768]] as const) {
     test(`the tracing pad uses a ${w}x${h} landscape window, not a 560 px column (#18 group A)`, async ({ page }) => {
@@ -352,6 +358,8 @@ test.describe('tablet viewports (#116)', () => {
       await page.click('.topic[data-id="r-trace"]');
       await expect(page.locator('.trace-wrap')).toBeVisible();
       const wrap = await page.locator('.trace-wrap').boundingBox();
+      expect(wrap!.width, `.trace-wrap at ${w}x${h}: must stay at its own 816px, untouched by the arena fix (#18 group A) — a specificity fight between the two rules could shrink it as easily as leave it too wide`)
+        .toBeGreaterThanOrEqual(TRACE_TARGET - TRACE_TOLERANCE);
       expect(wrap!.width, `.trace-wrap at ${w}x${h}: must stay at its own 880px cap, untouched by the arena fix (#18 group A)`)
         .toBeLessThanOrEqual(TRACE_TARGET + TRACE_TOLERANCE);
     });
