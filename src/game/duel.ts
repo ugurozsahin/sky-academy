@@ -8,6 +8,9 @@ import type { DojoEvent } from './dojo';
 import type { AnswerTally, StoredDuel } from '../storage';
 
 export type DuelPlayer = 'a' | 'b';
+/** The two seats, once — `src/ui/duel.ts`'s own `PLAYERS` imports this rather than repeating the literal, so a
+ *  third seat or a rename cannot drift between the two files (#379 review, type-design-analyzer). */
+export const DUEL_PLAYERS = ['a', 'b'] as const satisfies readonly DuelPlayer[];
 export const DUEL_ROUNDS = 10;
 
 export interface DuelEvents {
@@ -121,7 +124,7 @@ export class Duel {
     // before a wave — so this is hardening, not a fix (#425 review, note 4).
     if (this.ended || this.roundDecided || !this.current) return false;
     this.roundDecided = true;
-    for (const p of ['a', 'b'] as DuelPlayer[]) if (!this.answered[p]) this.tally[p].tries++;
+    for (const p of DUEL_PLAYERS) if (!this.answered[p]) this.tally[p].tries++;
     this.ev.onRoundDraw(this.current);
     return true;
   }

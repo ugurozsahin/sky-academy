@@ -1023,6 +1023,33 @@ test.describe('Ninja Duel', () => {
   });
 
   /**
+   * A draw earlier in the match, not the last round (#379 review, pr-test-analyzer). The quit-before-overlay
+   * test below proves the LAST round's draw survives the early-commit path; this proves a draw's tally, once
+   * recorded by `settleDraw()`, is carried forward inside `Duel`'s own `tally` object through every later round
+   * and still reaches the real save at match end — through the real screen, not only the pure `Duel` class the
+   * unit tests exercise.
+   */
+  test('a round nobody slices mid-match still tallies a try, no hit, for the seat that never answered — reaching the real save (#379)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    const topic = await page.evaluate(() => window.__sna.state().topic);
+    // Round 1: nobody slices, same trigger as the pause test above — both waves fall untouched.
+    await page.waitForFunction(() => window.__sna.state().round === 2, undefined, { timeout: 30_000 });
+    // Rounds 2-10: Player 1 wins every one.
+    for (let r = 2; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');
+    }
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    // Nine rounds won outright plus round 1's untouched draw: ten tries, nine hits — round 1 counts as a try
+    // Player 1 never answered, the same shape a mission scores an untouched question.
+    expect(saved.progress[topic], "round 1's draw reaches the save as a try with no hit, not as nothing")
+      .toMatchObject({ hits: 9, tries: 10, plays: 0, stars: 0 });
+    expect(saved.duels[0]).toMatchObject({ winner: 'a', scoreA: 9, scoreB: 0, rounds: 10 });
+  });
+
+  /**
    * The third `winner` arm (#397 round 2, note 1). `duelEarnsCertificate` is unit-pinned for all three values,
    * but the *call site* in `ui/duel.ts` is reachable only from a real match — and weakening it to
    * `r.winner === 'draw'` leaves every unit test green while a **defeat** files `year1:duel` into the child's
