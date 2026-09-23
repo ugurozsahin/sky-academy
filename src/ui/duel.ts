@@ -10,7 +10,7 @@
 // history the rewards screen lists.
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
-import { Arena, type Bubble } from '../game/arena';
+import { Arena, hittable } from '../game/arena';
 import { Duel, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
 import { load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type GameEndOutcome, type StoredDuel } from '../storage';
@@ -420,18 +420,16 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   // #73: a route change tears the arenas down — two rAF loops leaked across screens would be twice the incident.
   function cleanup() { for (const p of PLAYERS) arenas[p].destroy(); scope.dispose(); }
 
-  /** A bubble a player can still slice — the one predicate `bubbles()` and `wrong()` share. */
-  const inFlight = (b: Bubble) => b.launched && !b.dead && !b.hit && !b.fade;
   const target = (p: DuelPlayer, wrong: boolean): string | undefined => {
     const q: Question | null = duel.current; if (!q) return undefined;
     if (!wrong) return q.answer;
-    return arenas[p].bubbles.find(x => inFlight(x) && x.label !== q.answer)?.label;
+    return arenas[p].bubbles.find(x => hittable(x) && x.label !== q.answer)?.label;
   };
   const hooks: DuelHooks = {
     duel, arenas,
     answer: p => { const t = target(p, false); return t !== undefined && arenas[p].hitLabel(t); },
     wrong: p => { const t = target(p, true); return t !== undefined && arenas[p].hitLabel(t); },
-    bubbles: p => arenas[p].bubbles.filter(inFlight).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy, lines: b.lines, labelState: b.labelState })),
+    bubbles: p => arenas[p].bubbles.filter(hittable).map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy, lines: b.lines, labelState: b.labelState })),
     state: () => ({
       mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,

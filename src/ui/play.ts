@@ -1,6 +1,6 @@
 import { avatarById, praiseLine, SENSEI, SENSEI_LINES, senseiLine, VILLAIN } from '../avatars';
 import { topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
-import { Arena } from '../game/arena';
+import { Arena, hittable } from '../game/arena';
 import { type Mode, type SessionResult } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
@@ -320,7 +320,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       return b ? arena.hitLabel(b.label) : false;
     },
     bubbles: () =>
-      arena?.bubbles.filter(b => b.launched && !b.dead && !b.hit && !b.fade)
+      arena?.bubbles.filter(hittable)
         .map(b => ({ label: b.label, x: b.x, y: b.y, r: b.r, vy: b.vy, lines: b.lines, labelState: b.labelState })) ?? [],
     state: () => ({
       stage: session.stage, index: session.index, score: session.score, lives: session.lives,
