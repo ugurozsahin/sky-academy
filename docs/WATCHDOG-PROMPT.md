@@ -258,25 +258,36 @@ your first finding and the only one you can report.
    invisible from outside: a ledger that has silently stopped parsing means proposals never apply, the gate
    never closes, and this check reports a healthy backlog every day while nothing is being refined at all
    (#513 review, round 11).
-11. **Is any pull request finished and still open?** List every open pull request —
-   `GET /repos/ugurozsahin/sky-academy/pulls?state=open&per_page=100`, following `Link: rel="next"` — and for
-   each read `GET /commits/<head sha>/status`, **never the Actions API**: they answer different questions and
-   the workflow can succeed at reporting a failure. A pull request that is **not a draft, whose `review-gate`
-   is `success`, and which is still open more than ~2 hours later** has nothing left holding it and nobody
-   coming for it. That is a finding, named by number.
-   This check exists because of a real stranding, and the shape is worth keeping in mind rather than the
-   instance: `docs/REVIEWER-PROMPT.md` STEP 1 decides what a reviewer looks at, and until #579 both its
-   clauses compared **a commit against a review verdict**. The owner writing his marker after a clear moves no
-   commit, so the pull request stopped matching either clause at the moment it became mergeable — #568 and
-   #577 sat open and green on 2026-09-23 with two reviewer runs seeing the problem and no rule letting them
-   act. STEP 1 clause (c) closes that, and this check is the backstop **because it is keyed on nothing the
-   reviewer believes**: it reads the repository's own answer to "is this finished", so a fourth kind of event
-   that no waiting clause anticipates still surfaces here.
-   Two that are **not** findings, and both will be most of what you see: a pull request labelled `loosening`
-   or `owner-approval` that the owner has not merged — those are his by rule and no routine may take them, so
-   they are a line in your pulse rather than an issue — and one younger than ~2 hours, which is simply a
-   reviewer run that has not come round yet. **A finding here is a pull request no rule bars anyone from
-   merging and which nothing merged**, which means a routine is skipping it.
+
+11. **Is any pull request reviewed, unblocked and still sitting there?** List every open pull request —
+   `GET /repos/ugurozsahin/sky-academy/pulls?state=open&per_page=100`, following `Link: rel="next"`.
+   **Skip forks exactly as the reviewer does** — `head.repo.full_name != base.repo.full_name`, or
+   `head.repo.fork` is `true`, and fail-closed when `head.repo` is missing. `docs/REVIEWER-PROMPT.md` STEP 2
+   never reviews, comments on or merges one by design, so a fork is not abandoned, it is excluded.
+   A finding is a pull request where **all** of these hold: it is **not a draft**; its newest `REVIEW:` verdict
+   is a **`REVIEW: CLEARED`**; its `review-gate` status is **`success`** — `GET /commits/<head sha>/status`,
+   never the Actions API, and a missing or pending status is not a pass; and more than ~2 hours have passed
+   since the later of that clear and the owner's own marker. Name it by number.
+   **The cleared verdict is what makes this check mean anything, and "the gate is green" will not stand in for
+   it.** `scripts/review-gate.mjs`'s `blockState()` reports `blocked: false` whenever nothing is blocking —
+   which is true of a pull request nobody has looked at yet, since no `REVIEW:` comment exists to be open. A
+   green gate says *not blocked*, never *reviewed*. Built on the gate alone this check would report every
+   untouched fork and the entire unreviewed queue as abandoned, every six hours, forever — a watchdog
+   manufacturing false alarms, which is the one failure this document says is worse than no watchdog at all
+   (#580 review).
+   **`loosening` is the only carve-out.** A run may never merge one even after the owner approves
+   (`docs/REVIEWER-PROMPT.md` rule 4), so it belongs in your pulse rather than in an issue. **`owner-approval`
+   is not a carve-out**: once he writes his marker the gate goes green and a routine may merge it, so an
+   approved one still sitting there is exactly the finding. The first draft of this check excluded it and
+   would have stayed silent on #568 and #577 — the two pull requests it was written for.
+   This check exists because of a real stranding, and the shape matters more than the instance:
+   `docs/REVIEWER-PROMPT.md` STEP 1 decides what a reviewer looks at, and until #579 both its clauses compared
+   **a commit against a review verdict**. The owner writing his marker after a clear moves no commit, so a
+   pull request stopped matching either at the moment it became mergeable — #568 and #577 sat open and green
+   on 2026-09-23 with two reviewer runs seeing the problem and no rule letting them act. STEP 1 clause (c)
+   closes that, and this check is the backstop **because it is keyed on nothing the reviewer believes**: it
+   reads the repository's own answer to "was this finished and is it still here", so a fourth kind of event
+   that no waiting clause anticipates still surfaces.
 
 ## Reporting
 
