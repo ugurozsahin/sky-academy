@@ -735,7 +735,7 @@ describe('Year 1 money recognises denominations and stays within 20 (#298 slice 
   const DENOM: Record<string, number> = { '1p': 1, '2p': 2, '5p': 5, '10p': 10, '20p': 20, '50p': 50, '£1': 100, '£2': 200, '£5': 500, '£10': 1000 };
   it('d1 recognises one coin or note, d2 compares two coins, d3 adds two coins to at most 20p', () => {
     const t = TOPICS.find(x => x.id === 'y1-coins')!; const r = rng(298 + 4);
-    let recognise = 0, notes = 0, compare = 0, less = 0, adds = 0;
+    let recognise = 0, notes = 0, compare = 0, less = 0, adds = 0, total20 = 0;
     for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 400; i++) {
       const q = t.gen(d, r);
       let m;
@@ -748,6 +748,9 @@ describe('Year 1 money recognises denominations and stays within 20 (#298 slice 
         // a pool that simply grew would get wrong.
         expect(m[1], `${q.answer} called a ${m[1]}`).toBe(v >= 500 ? 'note' : 'coin');
         if (v >= 500) notes++;
+        // #361: a mutation that shrank the decoy `.slice(0, 3)` left this rail green (nothing counted
+        // options), shipping a card with fewer than the usual four bubbles (1 answer + 3 decoys).
+        expect(q.options.length, q.prompt).toBe(4);
         for (const o of q.options) expect(DENOM[o], `option "${o}" is not a UK denomination`).toBeDefined();
         expect(q.visual, q.prompt).toEqual({ type: 'coins', coins: [v] });
       } else if ((m = q.prompt.match(/^Which is worth (more|less)\?$/))) {
@@ -759,6 +762,11 @@ describe('Year 1 money recognises denominations and stays within 20 (#298 slice 
           .toBe(m[1] === 'more' ? Math.max(...vals) : Math.min(...vals));
         // Coins only at d2 — a note against a 1p compares nothing (the topic's own comment says so).
         for (const v of vals) expect(v, `d2 offered ${v}p, which is a note`).toBeLessThan(500);
+        // #361: the two coins drawn onto the bubbles must be the same two the options are built from — a
+        // rail reading only `q.options` would pass a card whose picture showed a different pair.
+        const visualCoins = (q.visual as { type: 'coins'; coins: number[] }).coins;
+        expect(visualCoins.length, q.prompt).toBe(2);
+        expect(new Set(visualCoins), `${q.prompt}: pictured ${visualCoins} but options are ${vals}`).toEqual(new Set(vals));
         if (m[1] === 'less') less++;
       } else if (q.prompt === 'How much money?') {
         adds++;
@@ -766,6 +774,13 @@ describe('Year 1 money recognises denominations and stays within 20 (#298 slice 
         const coins = (q.visual as { type: 'coins'; coins: number[] }).coins;
         expect(coins.length, 'Year 1 adds two coins, not three').toBe(2);
         expect(q.answer, q.prompt).toBe(`${coins.reduce((s, c) => s + c, 0)}p`);
+        const total = coins.reduce((s, c) => s + c, 0);
+        if (total === 20) total20++;
+        // #361: a mutation that always used the first four decoys, skipping the fallback to the wider pool,
+        // left this rail green — nothing counted options — and would ship a 20p (10p+10p) card two bubbles
+        // short (1 answer + 3 decoys expected), since only one of the first four decoys survives the
+        // `<= 20` cap at that total.
+        expect(q.options.length, q.prompt).toBe(4);
         // The answer *and* every decoy stay inside Year 1's range: a 30p bubble is the same overreach.
         for (const o of q.options) {
           const v = Number(o.replace(/p$/, ''));
@@ -782,6 +797,9 @@ describe('Year 1 money recognises denominations and stays within 20 (#298 slice 
     expect(compare, 'd2 comparison cards').toBeGreaterThan(350);
     expect(less, 'd2 cards asking for the *smaller* coin').toBeGreaterThan(100);
     expect(adds, 'd3 addition cards').toBeGreaterThan(350);
+    // #361: the 10p+10p total is the one case that forces unitQ's fallback decoy pool; without this counter
+    // the sweep could pass while never drawing it at all.
+    expect(total20, 'd3 drew a 20p (10p+10p) total, exercising the widened decoy pool').toBeGreaterThan(0);
   });
 });
 

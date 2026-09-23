@@ -1,6 +1,6 @@
 // Maths topics for Reception (EYFS ELGs), Year 1 and Year 2 (National Curriculum KS1).
 import type { Difficulty, Generator, Question, Rng, Topic } from './types';
-import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel, SAME_SOLID, SHAPES_2D, SHAPES_3D } from './util';
+import { ri, pick, shuffle, numQ, wordQ, numberWord, OBJECTS, symSay, coinLabel, NOTES, isNote, SAME_SOLID, SHAPES_2D, SHAPES_3D } from './util';
 
 const q = (prompt: string) => ({ prompt, say: symSay(prompt) });
 /**
@@ -213,10 +213,10 @@ const COINS = [1, 2, 5, 10, 20, 50, 100, 200];
 /**
  * The notes Year 1 recognises beside the coins — the programme of study says "coins **and notes**" (#298
  * slice 4). Held in pence like every other denomination, so `coinLabel` writes `£5`/`£10` from the same
- * source that writes `50p`, and `coinSVG` draws them from the same table.
+ * source that writes `50p`, and `coinSVG` draws them from the same table. `NOTES` itself lives in `util.ts`
+ * (#361), so this pool and `visuals.ts`'s rendering can't name the two notes differently.
  */
-const NOTES = [500, 1000];
-const MONEY = [...COINS, ...NOTES];
+const MONEY: readonly number[] = [...COINS, ...NOTES];
 /** Year 1's addition stops at 20, so d3 adds two coins drawn from these — the largest pair is 10p + 10p. */
 const Y1_ADD_COINS = [1, 2, 5, 10];
 /**
@@ -229,7 +229,7 @@ const Y1_ADD_COINS = [1, 2, 5, 10];
 const y1Coins: Generator = (d, rng) => {
   if (d === 1) {
     const c = pick(rng, MONEY);
-    const kind = c >= 500 ? 'note' : 'coin';
+    const kind = isNote(c) ? 'note' : 'coin';
     return wordQ(rng, `Which ${kind} is this?`, coinLabel(c), shuffle(rng, MONEY.filter(x => x !== c)).slice(0, 3).map(coinLabel), { visual: { type: 'coins', coins: [c] }, say: `How much is this ${kind} worth?` });
   }
   if (d === 2) {
@@ -251,12 +251,19 @@ const y1Coins: Generator = (d, rng) => {
  * `30p` answer. The first four decoys are the long-standing ones and are all `y2-money` ever uses; the rest
  * only come into play when the cap bites hard enough to leave fewer than three (a 20p total loses `+1`, `+5`
  * and `+10` at once).
+ *
+ * Both guards below are unreachable through every caller today (#361) — `total` never exceeds `max` and the
+ * pool always yields three survivors — so this is insurance against a future caller, not railed behaviour: a
+ * card `max` can't actually satisfy is a wrong-range answer bubble, and one three decoys can't fill is the
+ * one-bubble card #35's shape-table bug already showed this project.
  */
 function unitQ(rng: Rng, total: number, coins: number[], max = Infinity) {
+  if (total > max) throw new Error(`unitQ: total ${total}p exceeds its own max ${max}p`);
   const pool = [total + 1, total - 1, total + 5, total + 10, total - 5, total + 2, total - 2];
   const ok = (x: number) => x > 0 && x !== total && x <= max;
   const first = pool.slice(0, 4).filter(ok);
   const ds = shuffle(rng, first.length >= 3 ? first : pool.filter(ok)).slice(0, 3);
+  if (ds.length < 3) throw new Error(`unitQ: only ${ds.length} decoy(s) available for total ${total}p (max ${max}p)`);
   return wordQ(rng, 'How much money?', `${total}p`, ds.map(x => `${x}p`), { visual: { type: 'coins', coins }, say: 'How many pence altogether?' });
 }
 const y1Time: Generator = (d, rng) => {
@@ -940,7 +947,7 @@ export const MATHS_TOPICS: Topic[] = [
   { id: 'y1-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year1', nc: 'Y1 NPV: numbers to 20 in words', gen: y1Words },
   { id: 'y1-half', title: 'Halves & Quarters', icon: '🍕', subject: 'maths', year: 'year1', nc: 'Y1 Fractions: half, quarter', gen: y1Half },
   { id: 'y1-arrays', title: 'Arrays', icon: '🟦', subject: 'maths', year: 'year1', nc: 'Y1 M&D: arrays, grouping', gen: y1Arrays },
-  { id: 'y1-coins', title: 'Coins', icon: '🪙', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: coins', gen: y1Coins },
+  { id: 'y1-coins', title: 'Coins', icon: '🪙', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: coins & notes', gen: y1Coins },
   { id: 'y1-time', title: "O'clock & Half Past", icon: '🕐', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time', gen: y1Time },
   { id: 'y1-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year1', nc: 'Y1 NPV: order numbers to 20', gen: y1Order },
   { id: 'y1-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 NPV: number line', gen: y1Line },

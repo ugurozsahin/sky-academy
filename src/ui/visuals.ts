@@ -1,6 +1,6 @@
 // Renders a Question.visual into HTML (inline SVG / emoji). Keeps pictorial support for non-readers.
 import type { Visual } from '../curriculum';
-import { coinLabel } from '../curriculum/util';
+import { coinLabel, NOTES, isNote } from '../curriculum/util';
 import { esc } from './dom';
 
 /** `n` objects in rows of five; slots past `keep` are crossed out ("take away"); at least one full row of slots is always shown. */
@@ -149,15 +149,19 @@ const DOT_LAYOUTS: Record<number, [number, number][]> = {
  * leaves height auto, so it renders wider and shorter than the coins it sits beside instead of reading as a
  * very large coin.
  */
-const NOTE_INK: Record<number, [string, string]> = { 500: ['#8ed4c4', '#2c6b5e'], 1000: ['#e8a765', '#8a4e1c'] };
-export function noteSVG(p: number): string {
-  const [fill, ink] = NOTE_INK[p] ?? ['#c9b6e0', '#5b3f7a'];
+// Keyed to `typeof NOTES[number]` rather than `number` (#361): a note added to `NOTES` without an ink entry
+// here is a compile error instead of the silent `?? ['#c9b6e0', '#5b3f7a']` fallback this used to fall back
+// to — the same "unknown value draws with confident, wrong colours" shape #35 already found in the shape
+// tables.
+const NOTE_INK: Record<(typeof NOTES)[number], [string, string]> = { 500: ['#8ed4c4', '#2c6b5e'], 1000: ['#e8a765', '#8a4e1c'] };
+export function noteSVG(p: (typeof NOTES)[number]): string {
+  const [fill, ink] = NOTE_INK[p];
   const label = coinLabel(p);
   return `<svg viewBox="0 0 96 48" class="coin note" style="width:76px"><rect x="3" y="3" width="90" height="42" rx="5" fill="${fill}" stroke="${ink}" stroke-width="3"/><rect x="11" y="11" width="74" height="26" rx="3" fill="none" stroke="${ink}" stroke-width="1.5" opacity="0.55"/><text x="48" y="31" text-anchor="middle" font-size="20" font-weight="700" fill="${ink}">${label}</text></svg>`;
 }
 
 export function coinSVG(p: number): string {
-  if (p >= 500) return noteSVG(p);
+  if (isNote(p)) return noteSVG(p);
   const gold = p === 1 || p === 2 ? ['#c9803a', '#7a4a1c'] : p >= 100 ? ['#e6c250', '#8a6d1f'] : ['#d5d9e2', '#7d8594'];
   const label = coinLabel(p);
   const r = p === 1 ? 22 : p === 2 ? 26 : p === 5 ? 20 : p === 10 ? 25 : p === 20 ? 24 : p === 50 ? 28 : p === 100 ? 24 : 28;

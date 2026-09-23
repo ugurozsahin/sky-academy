@@ -9,7 +9,7 @@ export type Visual =
   | { type: 'tenframe'; n: number; n2?: number }         // ten-frame with n filled (n2 = second colour)
   | { type: 'dots'; n: number }                          // subitising dots (random arrangement)
   | { type: 'array'; rows: number; cols: number }        // multiplication array
-  | { type: 'coins'; coins: number[] }                   // pence values, 100 = £1, 200 = £2
+  | { type: 'coins'; coins: number[] }                   // pence values, 100 = £1, 200 = £2, 500/1000 = £5/£10 notes
   | { type: 'clock'; h: number; m: number }
   | { type: 'fraction'; parts: number; shaded: number; shape?: 'circle' | 'bar' }
   | { type: 'numberline'; from: number; to: number; mark?: number; step?: number }   // mark = hidden number shown as ?

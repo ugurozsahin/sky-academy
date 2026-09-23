@@ -81,6 +81,16 @@ export const coinLabel = (p: number) => {
 
 export const OBJECTS = ['🍎', '⭐', '🐟', '🎈', '🍪', '🦋', '🐸', '🚗', '🌼', '🧁'];
 
+/**
+ * The two banknotes Year 1 recognises beside its coins (#298 slice 4, #361) — one source, so a "coin" or
+ * "note" label (`maths.ts`'s `y1Coins`) and a note's rendering (`visuals.ts`'s `coinSVG`/`NOTE_INK`) read the
+ * same pool instead of each keeping its own `>= 500` copy that could silently drift apart.
+ */
+export const NOTES = [500, 1000] as const;
+export function isNote(p: number): p is (typeof NOTES)[number] {
+  return (NOTES as readonly number[]).includes(p);
+}
+
 // Canonical shape tables — one source for the maths shape topics (maths.ts) and Memory Match (game/memory.ts),
 // which used to keep their own copies at different arities (#35). The first four 2-D shapes are the
 // Reception-easy set (circle/square/triangle/rectangle) so Memory's `SHAPES_2D.slice(0, 4)` still holds.
