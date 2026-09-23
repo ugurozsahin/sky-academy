@@ -4428,6 +4428,12 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     { what: "the decision record exempts only the inheriting child",
       file: "docs/decisions/008-the-backlog-is-refined-by-a-routine.md",
       unit: "**The one case that is not gated** is a split child inheriting its parent's `routine-ok` and `priority:*`. That\nexercises no authority: the parent becomes `epic` in the same step and leaves the developer's query, so a child\nwithout the labels would leave the owner's release and his ordering attached to nothing. Preserving a decision\nis not making one — which is also the answer to why the first run's children were right to inherit before any\nof this was written down." },
+    { what: "the blocked threshold",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- **add or remove `blocked`** on more than three." },
+    { what: "why blocked sits lower, and why its two directions are counted together",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "`blocked` sits lower than the rest, at three, because it is the only one of the four that moves work **out**\nof reach rather than into it, and because adding and removing it are counted together: a run that parks two\nitems and unparks two has touched four pieces of the owner's own ordering while no single number looks large.\nFour issues quietly parked is a bigger change to what happens next week than four issues closed." },
     { what: "the four pulse issues are out of reach",
       file: "docs/REFINER-PROMPT.md",
       unit: "- the four pulse issues — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`,\n  `watchdog: heartbeat`, and your own two below. They are permanently open on purpose and their bodies are\n  deliberately odd, so a \"this claim is no longer true, close it\" pass would kill every one of them. Match\n  them by title, not by label: they carry `watchdog`, and so do real findings." },
@@ -4500,9 +4506,24 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     { what: "a split is idempotent, its bar belongs to GitHub, and its children inherit",
       file: "docs/REFINER-PROMPT.md",
       unit: "4. **Split `L` and `XL`.** Into pieces that each stand alone and each leave the game working. Label the parent\n   `epic`, which drops it out of `docs/ROUTINE-PROMPT.md` STEP 3's query, and put `- [ ] #<child>` lines in\n   the parent body. **Do not write a progress number.** GitHub counts those lines, draws the bar and ticks the\n   box itself when a child closes; a bar you maintain by hand still looks correct at the exact moment it stops\n   being true, which is this project's signature defect wearing a new hat. Each child says `Part of #<parent>`\n   — never a closing keyword, which would shut the parent from a child's body (`open-pr` skill §3).\n   **A split is three dependent writes, so begin by looking for one you already started.** Create the\n   children, label the parent `epic`, rewrite its checklist — and a run that dies between the first and the\n   second leaves children nobody points at, which tomorrow's re-derivation would read as an unsplit parent\n   and split a second time. So **before splitting anything, search for open issues whose body says\n   `Part of #<parent>` **among issues the owner's account created** —\n   `GET /repos/ugurozsahin/sky-academy/issues?state=open&creator=ugurozsahin&per_page=100`, **paginated to the\n   last page like every other list call above — that call returned a full 100 items and a `rel=\"next\"` link on\n   2026-09-22, so stopping at the response you get back is stopping mid-search, and a search that stops early\n   reports \"no children\" and splits the issue twice.** **The `creator=`\n   filter is the whole safety of this step.** Without it this is a free-text search over every open issue on\n   a public repository, so anyone could open issues whose bodies read `Part of #<parent>`, and you would\n   conclude the split was done, label the real parent `epic` — which drops it out of\n   `docs/ROUTINE-PROMPT.md` STEP 3 permanently — and orphan the actual work behind a forgery. That is the\n   one authority in this file that is not keyed on a label or the `events` timeline, both of which need\n   write access; issue *bodies* need none. `creator=` is the same defence `docs/ROUTINE-PROMPT.md` STEP 3\n   already applies for the same reason (#215; #513 review, round 6 B1).\n   If any exist, the split is already under way: finish it rather than starting again.\n   **Finishing means re-deriving the whole split and creating only the pieces that are missing**, matched by\n   what each child covers — never labelling the parent against whatever children happen to exist. A run that\n   died after two of four children would otherwise leave the parent `epic`, its checklist naming two, and the\n   other two gone for good: `epic` drops the parent out of `docs/ROUTINE-PROMPT.md` STEP 3, so nothing ever\n   re-queues the missing scope (#513 review, B7). Nothing records the intended count, and nothing needs to —\n   the split is re-derived from the issue every run, which is this routine's method everywhere else.\n   **Each child is created carrying its parent's `priority:*` and its `routine-ok` if the parent had one**, in\n   the same call, and never a `routine-ok` the parent did not have. That is a decision of the owner's being\n   preserved rather than one of yours being made, which is why it is not gated: the parent becomes `epic` in\n   this same step and leaves the developer's query, so a child without the label would leave his release\n   attached to nothing and his ordering attached to nothing. Say in your report that the children inherited,\n   so he can change a child's labels if he meant the split to change either (owner, 2026-09-23).\n   The `Part of` line is written in the same call that creates the child, so there is no moment where a child\n   exists without one." },
-    { what: "the owner is notified only for a failure to run or a large close",
+    { what: "the notification rule, and that it has four thresholds",
       file: "docs/REFINER-PROMPT.md",
-      unit: "You are not an alarm — the watchdog is, and it is silent when clean precisely so that it is believed. You\nspeak every run, and quietly: everything goes in the two issue bodies you own, and **nothing notifies the\nowner** unless you could not run at all, or the proposals you are about to apply in this run would\nclose more than five issues between them — a per-run total, not a count inside one proposal." },
+      unit: "You are not an alarm — the watchdog is, and it is silent when clean precisely so that it is believed. You\nspeak every run, and quietly: everything goes in the two issue bodies you own, and **nothing notifies the\nowner** unless you could not run at all, or the proposals you are about to apply in this run would cross any\none of these (owner, 2026-09-23):" },
+    { what: "the close threshold",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- **close** more than five issues," },
+    { what: "the routine-ok threshold",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- **grant `routine-ok`** to more than five," },
+    { what: "the priority threshold",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "- **set a missing `priority:*`** on more than five," },
+    { what: "the four totals are separate, per-run, and count applications not proposals",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "Each is counted on its own — four separate totals, not one sum, so six grants notify him even in a run that\ncloses nothing. Each is a **per-run total**, not a count inside one proposal. And each counts what you are\nabout to **apply**, never what you propose: a proposal is already a comment on its own issue, which he sees,\nwhile an application is the quiet half and is the half that cannot be taken back." },
+    { what: "the two irreversible acts are counted precisely because the reversible one was",
+      file: "docs/REFINER-PROMPT.md",
+      unit: "Count the second and third even though the first is the only one that deletes anything. A close is reversible\n— reopening restores the issue whole — and the two below it are not: a `priority:*` you set is out of your\nreach forever afterwards, and a `routine-ok` you grant puts work in front of an hourly developer run whose\npull requests get merged. Threshold on the reversible act alone was the alarm on the wrong side of the door\n(#538)." },
     { what: "the pulse and ledger issues are created in one call",
       file: "docs/REFINER-PROMPT.md",
       unit: "Create either with its body already in it, in the single `POST /issues` call that takes `title`, `body` and\n`labels` together. Never create one empty and fill it afterwards: a run that dies in between leaves an open\nissue with no content, which ages into nothing and reads as healthy forever." },
@@ -4546,7 +4567,7 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
 
   it('the claim table covers the whole population and cannot quietly shrink', () => {
     expect(CLAIMS.length, 'a row removed is a guarantee unpinned — lower this only when the document '
-      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(50);
+      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(57);
     expect(new Set(CLAIMS.map((c) => c.what)).size, 'two rows must not claim the same thing')
       .toBe(CLAIMS.length);
     expect(new Set(CLAIMS.map((c) => c.unit)).size, 'two rows must not pin the same unit — that is one '
