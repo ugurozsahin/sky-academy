@@ -144,9 +144,11 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       <button class="tab${subject === 'writing' ? ' on' : ''}" data-s="writing" role="tab">✍️ Writing</button>
     </div>
     <div class="topics" id="topics"></div>
-    ${menu.map(m =>
-      `<button class="btn mode-btn${m.mod ? ` ${m.mod}` : ''}" id="${m.id}">${m.vport}<span><b>${m.title}</b><small>${m.blurb}</small></span></button>`
-    ).join('\n    ')}
+    <div class="mode-grid">
+      ${menu.map(m =>
+        `<button class="btn mode-btn${m.mod ? ` ${m.mod}` : ''}" id="${m.id}">${m.vport}<span><b>${m.title}</b><small>${m.blurb}</small></span></button>`
+      ).join('\n      ')}
+    </div>
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {
