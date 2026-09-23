@@ -1,5 +1,6 @@
 // Synthesised sound effects (Web Audio, no files) + Web Speech for reading prompts aloud.
 import { load, save, type SaveData } from './storage';
+import type { Element, FxKind } from './game/arena';   // type only (#214) — audio.ts must not gain a runtime import from game/
 
 let ctx: AudioContext | null = null;
 function ac(): AudioContext | null {
@@ -50,8 +51,10 @@ function noise(dur: number, gain = 0.2, hp = 1200, lp = 0) {
   s.start(t, Math.random() * Math.max(0, NOISE_SECONDS - dur), dur);   // a different slice of the buffer each time
 }
 
-/** Element-flavoured slice sounds, keyed by Avatar.fx. */
-export const sliceFx: Record<string, () => void> = {
+/** Element-flavoured slice sounds, keyed by Avatar.fx. `master` mixes in the elemental table below, at the
+ *  literal (#214) rather than assigned after it — `sliceFx` is typed `Record<FxKind, ...>`, so a `FxKind`
+ *  gaining a new element fails here at `tsc` time until this table covers it too. */
+const elementSlice: Record<Element, () => void> = {
   fire: () => { noise(0.22, 0.18, 300, 1800); tone(180, 0.2, 'sawtooth', 0.08, 90); },
   water: () => { noise(0.25, 0.16, 500, 2400); tone(700, 0.18, 'sine', 0.12, 250); tone(1100, 0.08, 'sine', 0.06, 1500, 0.05); },
   electric: () => { tone(1800, 0.06, 'square', 0.08, 400); tone(2600, 0.05, 'square', 0.06, 900, 0.05); noise(0.06, 0.12, 3000); },
@@ -63,8 +66,11 @@ export const sliceFx: Record<string, () => void> = {
   blade: () => { noise(0.07, 0.22, 2500); tone(2400, 0.16, 'sine', 0.07, 1900, 0.02); },
   robot: () => { tone(880, 0.05, 'square', 0.08); tone(1320, 0.05, 'square', 0.08, undefined, 0.06); },
 };
-/** The Master Ninja's slice borrows a different element's sound each time. */
-sliceFx.master = () => { const keys = Object.keys(sliceFx).filter(k => k !== 'master'); sliceFx[keys[Math.floor(Math.random() * keys.length)]](); };
+export const sliceFx: Record<FxKind, () => void> = {
+  ...elementSlice,
+  // The Master Ninja's slice borrows a different element's sound each time.
+  master: () => { const keys = Object.keys(elementSlice) as (keyof typeof elementSlice)[]; elementSlice[keys[Math.floor(Math.random() * keys.length)]](); },
+};
 
 export const sfx = {
   swish: () => noise(0.12, 0.12, 2500),                                   // blade trail

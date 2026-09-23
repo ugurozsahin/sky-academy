@@ -1,6 +1,7 @@
 // Avatar roster. Art lives in public/avatars/<id>.webp (transparent character illustrations supplied by the project owner).
 // Replace the images to change the look — nothing else in the game depends on the artwork.
-export type Fx = 'fire' | 'water' | 'electric' | 'earth' | 'wind' | 'ice' | 'light' | 'shadow' | 'blade' | 'robot' | 'master';   // master = every element mixed
+import type { FxKind } from './game/arena';
+export type Fx = FxKind;   // one source of truth for the element list (#214); master = every element mixed
 export interface Avatar {
   id: string;
   name: string;
