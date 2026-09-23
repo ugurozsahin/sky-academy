@@ -65,19 +65,24 @@ export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?:
  * which is #390's defect: `y1-coins` at d2 keys 14 identities over 112 exercises. Safe here means a needless
  * re-roll, not no cost.
  *
- * Six names are here now, each taking only the part of the visual that is the question. The first three are
+ * Seven names are here now, each taking only the part of the visual that is the question. The first three are
  * #390's: `objects` for `r-oddeven`, `sentence` for `y2-sentencetype` and `y2-tense`, `symmetry` for
- * `y2-symmetry`. The last three are #455's, where the visual carries a comparison or a chart a bare
+ * `y2-symmetry`. The next three are #455's, where the visual carries a comparison or a chart a bare
  * `(prompt, answer)` cannot tell apart: `coins` (the pence values as a **set** — so `£1 or 20p` and `£1 or
  * 10p` take different keys, which their shared prompt and answer do not), `numberline` (`from`/`to`/`mark`/
  * `step`) and `chart` (`kind` plus the rows' counts — deliberately **not** a row's `label` or a pictogram's
  * `icon`, which is where `y2-stats` hides its re-rolled emoji, the same trap PR #407's B1 found in `objects`).
+ * `strip` is #391's: `y2-patterns` used to ship as a `sentence`, which incidentally kept it keyed on its own
+ * `v.text` here; splitting it into its own `Visual` variant (#391) would otherwise have silently dropped that
+ * key back to `''` for every pattern card, the exact #390 shape (`d1` is one constant prompt and one glyph
+ * answer per card — the pattern itself, not the prompt or answer, is what tells two cards apart).
  * `word` stays out: it carries `orderQ`'s per-draw *shuffled* display order, which is presentation.
  * Adding a type is a deliberate act, and the rails in `tests/unit/session.test.ts` measure both directions.
  */
 const VISUAL_QUESTION = {
   objects: (v: Extract<Visual, { type: 'objects' }>) => `${v.n}/${v.n2 ?? ''}`,
   sentence: (v: Extract<Visual, { type: 'sentence' }>) => v.text,
+  strip: (v: Extract<Visual, { type: 'strip' }>) => v.text,
   symmetry: (v: Extract<Visual, { type: 'symmetry' }>) => v.grid.join('/'),
   coins: (v: Extract<Visual, { type: 'coins' }>) => [...new Set(v.coins)].sort((a, b) => a - b).join('/'),
   numberline: (v: Extract<Visual, { type: 'numberline' }>) => `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}`,

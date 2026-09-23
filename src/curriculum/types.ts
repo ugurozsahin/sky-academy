@@ -26,7 +26,11 @@ export type Visual =
   // the whole question is whether the left half and the right half match.
   | { type: 'symmetry'; grid: string[] }
   | { type: 'word'; text: string; emoji?: string }       // big word / letter card (writing)
-  | { type: 'sentence'; text: string };                  // sentence with a blank "_"
+  | { type: 'sentence'; text: string }                   // sentence with a blank "_" (writing — English text)
+  // a repeating-pattern glyph strip with a blank "_" (y2-patterns): not language, so the drawing keeps it on
+  // one line instead of word-wrapping it mid-pattern — its own variant, not a flag on `sentence`, because
+  // every other `sentence` producer writes real English and nothing here should have to opt out (#391).
+  | { type: 'strip'; text: string };
 
 export interface Question {
   prompt: string;         // shown on the question card ("7 + 5 = ?")

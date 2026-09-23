@@ -1338,7 +1338,11 @@ img { -webkit-user-drag: none; }
   padding: 2px 14px;
   border-radius: 12px;
 }
-.sentence { font-size: clamp(20px, 5vw, 28px); font-weight: 600; } .sentence .gap { border-bottom: 3px solid var(--accent); text-decoration: none; }
+.sentence, .strip { font-size: clamp(20px, 5vw, 28px); font-weight: 600; }
+.sentence .gap, .strip .gap { border-bottom: 3px solid var(--accent); text-decoration: none; }
+/* A repeating-pattern glyph strip (y2-patterns, #391), not language: reading it split across two lines breaks
+   "read the pattern from both sides of the gap", so it stays on one line rather than word-wrapping. */
+.strip { white-space: nowrap; }
 /*
  * Line symmetry (#299 slice 4). A `clamp()` on the width only, with `height: auto` — the viewBox carries the
  * grid's aspect, so a 6x4 picture and a taller one both keep their proportions instead of each needing a box.

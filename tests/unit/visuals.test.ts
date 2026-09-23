@@ -108,6 +108,13 @@ describe('renderVisual — a builder for every Visual.type (#43)', () => {
     expect(h).not.toContain('_');                             // every run of underscores becomes the gap
   });
 
+  it('a pattern strip is its own visual, kept on one line unlike a sentence (#391)', () => {
+    const h = renderVisual({ type: 'strip', text: '🔴 ⭐ _' });
+    expect(h).toContain('class="vis strip"');
+    expect(h).toContain('<u class="gap">');
+    expect(renderVisual({ type: 'sentence', text: 'The ___ sat' })).not.toContain('strip');
+  });
+
   /**
    * #299 review B1: the join between the `grid` string and the squares a child actually sees is this
    * topic's whole correctness. The card asks "Is the dotted line a line of symmetry?", so a drawing that is
@@ -156,10 +163,15 @@ describe('renderVisual — a builder for every Visual.type (#43)', () => {
     expect(renderVisual({ type: 'symmetry', grid: [''] }), 'a zero-width grid draws nothing rather than throwing').toBe('');
     expect(warn, 'and says so, rather than failing silently').toHaveBeenCalled();
     warn.mockRestore();
-    // A ragged row is padded or truncated to the first row's width, so the squares never fall out of step
-    // with the columns the fold line was placed against.
-    expect(gridFromSvg(renderVisual({ type: 'symmetry', grid: ['..##..', '.#', '########'] }), 6))
-      .toEqual(['..##..', '.#....', '######']);
+  });
+
+  it('symmetry: a ragged or over-wide grid draws nothing rather than being padded, truncated or reshaped', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // A reshape could turn a symmetric grid asymmetric or the reverse (#391) — worse than no picture at all.
+    expect(renderVisual({ type: 'symmetry', grid: ['..##..', '.#', '########'] }), 'a ragged grid draws nothing').toBe('');
+    expect(renderVisual({ type: 'symmetry', grid: ['#'.repeat(15)] }), 'a wider-than-SYM_MAX row draws nothing').toBe('');
+    expect(warn, 'and says so, rather than failing silently').toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 
