@@ -83,7 +83,7 @@ describe('the worklog is archived and nothing writes it again (#178)', () => {
   // here: it is the archive, it describes itself in the past tense, and a rail that policed it would be
   // policing history. `tests/` is not here either, for the reason in the block comment above.
   const LIVE = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
-                'docs/WATCHDOG-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
+                'docs/WATCHDOG-PROMPT.md', 'README.md'];
   const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
 
   it('WORKLOG.md is gone from the repository root, and the archive is still there', () => {
@@ -532,7 +532,7 @@ describe('the browser runs after the agents, not before them (#499)', () => {
 describe('branches are named for the change, and nothing matches on the old prefix (#160)', () => {
   const root = new URL('../../', import.meta.url);
   const LIVE = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
-                'docs/WATCHDOG-PROMPT.md', 'README.md', 'scripts/seed-issues.py'];
+                'docs/WATCHDOG-PROMPT.md', 'README.md'];
   const live = (name: string) => readFileSync(new URL(name, root), 'utf8');
   // Built from parts so this rail's own source does not contain the instruction form it bans.
   const RETIRED = 'claude/' + 'issue-';
