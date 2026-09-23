@@ -467,15 +467,16 @@ test.describe('tablet viewports (#116)', () => {
   }
 
   const REWARDS_TOLERANCE = 20;
-  // Real, measured (see the function above's docstring): 1475px at 1280x800, 1518px at 1024x768 — both well
-  // past one viewport, and neither close to the fresh-save 1249/1252px the issue's own audit read before
-  // asking for a re-measure. Whether two of the four sections (stats+album, certificates, duels) can sit
-  // side by side at this breakpoint is a look decision #564 leaves open rather than guesses at here (#18
-  // group B's own precedent: #563 took the same question to the owner for the island's mode buttons rather
-  // than picking a layout unasked).
+  // Real, measured with "My certificates" and "Recent duels" now side by side at ≥900px (`.rewards-cols`,
+  // #564's own open question, same `display: contents` → grid pattern as `.mode-grid`, #563's precedent):
+  // 1159px at 1280x800, 1202px at 1024x768 — down from the stacked 1475/1518px this replaces, but still past
+  // one viewport at both sizes. The remainder is the stats tiles + next-sticker banner + sticker album above
+  // the two-column split, none of which this slice touches (the album's own grid already reflows by content,
+  // not by a stacking bug the way the shop's does — see SHOP_CASES below). Pinned directly, not as a
+  // "less than the old value" bound, for the same reason #563's island target is.
   const REWARDS_CASES = [
-    { w: 1280, h: 800, target: 1475 },
-    { w: 1024, h: 768, target: 1518 },
+    { w: 1280, h: 800, target: 1159 },
+    { w: 1024, h: 768, target: 1202 },
   ] as const;
 
   for (const { w, h, target } of REWARDS_CASES) {
@@ -485,6 +486,8 @@ test.describe('tablet viewports (#116)', () => {
       await page.click('#rewards');
       await expect(page.locator('.rewards')).toBeVisible();
       await expect(page.locator('.cert-row')).toHaveCount(6);   // 3 certs + 3 duels (both share .cert-row)
+      const grid = await page.locator('.rewards-cols').evaluate(el => getComputedStyle(el).display);
+      expect(grid, `.rewards-cols at ${w}x${h}: must be a grid at the ≥900px breakpoint (#564)`).toBe('grid');
       const total = await page.evaluate(() => document.documentElement.scrollHeight);
       expect(total, `rewards content height at ${w}x${h}: expected close to ${target}px (#564)`)
         .toBeGreaterThanOrEqual(target - REWARDS_TOLERANCE);
@@ -492,6 +495,22 @@ test.describe('tablet viewports (#116)', () => {
         .toBeLessThanOrEqual(target + REWARDS_TOLERANCE);
     });
   }
+
+  /**
+   * The other half of the acceptance criterion, same as `.mode-grid`'s #563 precedent: a phone stays a
+   * single-column stack. `display: contents` on `.rewards-cols` should make the wrapper invisible to layout
+   * below 900px, so this is the only place that is proven rather than assumed from the CSS rule alone
+   * (pr-test-analyzer, #563 review, same reasoning applied here).
+   */
+  test("the rewards screen's certificates and duels stay a single-column stack below the 900px breakpoint, on a phone (#564)", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedRewardsData(page);
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+
+    const display = await page.locator('.rewards-cols').evaluate(el => getComputedStyle(el).display);
+    expect(display, '.rewards-cols on a phone: must stay `contents`, not switch to the ≥900px grid (#564)').toBe('contents');
+  });
 
   const SHOP_TOLERANCE = 20;
   // Real, measured: 1130px at 1280x800, 1145px at 1024x768 — matches the issue's own audit. `.shop-grid`
