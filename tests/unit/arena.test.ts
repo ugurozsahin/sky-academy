@@ -616,6 +616,23 @@ describe('re-anchoring a wave when the arena is resized (#146)', () => {
     reanchorBubble(b, PORTRAIT, LANDSCAPE);
     expect(b.r).toBe(33);
   });
+
+  // #591 review (silent-failure-hunter): a required sequence bubble remembers its spawn arc in ox/ovx/ovy so a
+  // later re-launch is not left running whatever a collision did to x/vx/vy. That memory has to move with a
+  // resize exactly as the live x/vx/vy above do — otherwise a relaunch after a rotation resets the bubble to
+  // an arc sized for a box that no longer exists, which can be off-screen or too short to ever come back up.
+  it('rescales a bubble\'s remembered spawn arc (ox/ovx/ovy) the same way it rescales the live one', () => {
+    const b = { ...airborne(300, PORTRAIT, { vy: 120, g: 180, x: 195 }), ox: 195, ovx: 8, ovy: -400 };
+    reanchorBubble(b, PORTRAIT, LANDSCAPE);
+    expect(b.ox, 'ox scales by the same width ratio as x').toBeCloseTo(195 * (LANDSCAPE.W / PORTRAIT.W), 6);
+    expect(b.ovx, 'ovx scales by the same width ratio as vx').toBeCloseTo(8 * (LANDSCAPE.W / PORTRAIT.W), 6);
+    expect(b.ovy, 'ovy scales by the same height ratio as vy').toBeCloseTo(-400 * (LANDSCAPE.H / PORTRAIT.H), 6);
+  });
+
+  it('leaves ox/ovx/ovy alone when they are absent — a plain Collidable has none', () => {
+    const b = airborne(300);   // no ox/ovx/ovy at all, the shape every other test in this file uses
+    expect(() => reanchorBubble(b, PORTRAIT, LANDSCAPE)).not.toThrow();
+  });
 });
 
 /**
