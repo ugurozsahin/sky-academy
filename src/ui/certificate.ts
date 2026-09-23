@@ -4,7 +4,11 @@ import { avatarById, type Avatar } from '../avatars';
 import { esc } from './dom';
 import type { StoredCert } from '../storage';
 
-export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date?: Date; training?: boolean; duel?: boolean }
+// `date` is required, not defaulted (#410): the printed certificate and the album row it files alongside must
+// read one fixed instant, decided once by the caller that earned it — a live `new Date()` default here would
+// let `certificateText()` and `certToStored()` each read the clock at a different moment (or, before #410,
+// read the same instant in two different calendars) and disagree about which day it is.
+export interface CertInfo { name: string; avatar: Avatar; year: string; title: string; stars: number; score: number; correct: number; attempts: number; date: Date; training?: boolean; duel?: boolean }
 
 /**
  * Which of the three things a certificate was earned for (#16 item 5). `training` and `duel` are separate
@@ -55,19 +59,39 @@ export function certFromStored(c: StoredCert): CertInfo {
  * So the avatar's id comes from the resolved `Avatar` this certificate actually carries, and the award day from
  * its own `date`. Both are narrowings of the same value rather than second readings of the source — which is
  * what makes "the stored assertions cover the drawn object" true rather than merely claimed (#397 round 2, B1).
- * `date` defaults to now for a `CertInfo` that omits it, exactly as `certificateText()` already does, so the
- * two cannot disagree about the day either.
+ * `date` is required on `CertInfo` (#410) precisely so this function's UTC day and `certificateText()`'s
+ * printed day are always narrowings of that one caller-supplied instant, rather than two independent
+ * `new Date()` defaults free to land a whole calendar day apart.
  */
 export function certToStored(c: CertInfo, o: { id: string }): StoredCert {
   return {
     id: o.id, name: c.name, avatar: c.avatar.id, year: c.year, title: c.title,
     stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
-    date: isoDay(c.date ?? new Date()), training: c.training, duel: c.duel,
+    date: isoDay(c.date), training: c.training, duel: c.duel,
   };
 }
 /** The award day as the album stores it. Mirrors `storage.ts`'s `today()`; kept here so this module's two
  *  directions (`certToStored`/`certFromStored`) agree about the format without importing save machinery. */
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+/**
+ * `isoDay(d)`, read for a human at local noon (#410) — the same trick `certFromStored()` uses when it parses
+ * a stored day back into a `Date`, applied here going the other way so `certificateText()` never has to format
+ * `d` itself. Formatting `d` directly would read *its* local calendar day, which is not necessarily the UTC day
+ * `certToStored()` is about to file this same certificate under — the split this issue describes. Routing
+ * through the stored day first means the printed keepsake and the album row always name the same day, whatever
+ * the child's timezone and whatever the clock read at the exact moment each was computed.
+ *
+ * Guards an Invalid `Date` before it reaches `isoDay`'s `toISOString()`, which throws rather than degrading
+ * (#410 review): `date` is required on every fresh `CertInfo`, but `certFromStored()` parses it back out of
+ * `StoredCert.date`, a plain string `isCert()` only checks is a `string`, never that it parses. A hand-edited
+ * or corrupted save reaches `showStoredCertificate()` → `drawCertificate()` → `certificateText()` →
+ * `displayDay()` with no `catch` above it, so a throw here is an unhandled rejection, not a caught error — the
+ * "My certificates" view button silently re-enables and nothing opens. Returning `''` instead matches the
+ * degradation `certAlbumHTML` already applies to the same input (`Number.isNaN(d.getTime()) ? '' : ...`).
+ */
+const displayDay = (d: Date): string =>
+  Number.isNaN(d.getTime()) ? '' :
+  new Date(`${isoDay(d)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
 /** The words on a certificate that has just been earned — what `drawCertificate()` will paint (#397 round 2,
  *  B1). Exposed so the duel e2e can read the signature and the reason off the *drawn* object rather than
@@ -96,8 +120,7 @@ export interface CertText { heading: string; awarded: string; child: string; rea
 
 /** The words on the certificate (pure, unit-tested). */
 export function certificateText(i: CertInfo): CertText {
-  const d = i.date ?? new Date();
-  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const date = displayDay(i.date);
   const acc = i.attempts ? Math.round(100 * i.correct / i.attempts) : 0;
   // A duel is not a mission and the certificate may not call it one: the child won a race against a friend on
   // one device, and "completed the Counting mission" would be the wrong claim on a printed, kept record.
