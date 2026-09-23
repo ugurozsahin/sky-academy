@@ -4041,6 +4041,23 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
     // this the rule reads as advice and the loop comes back through the mark rather than through the review.
     expect(s6, '§6 must forbid a fresh block on a pull request nothing about whose diff changed')
       .toMatch(/not\s+a\s+fresh\s+block/);
+    // …and the exception that keeps the work moving. A cleared pull request that `main` has since made
+    // unmergeable reaches no routine at all on its own: the reviewer cannot push, and STEP 2.5 only takes a
+    // pull request whose newest verdict is an unaddressed CHANGES REQUESTED, which a cleared one is not. The
+    // block is the whole routing mechanism, so §6 has to distinguish "I may not merge this" from "this can no
+    // longer be merged" — the first is a pulse line, the second is a mark (#568 sat between the two).
+    expect(s6, '§6 must send a branch that stopped being mergeable back to a developer, not to the pulse')
+      .toMatch(/If\s+the\s+branch\s+itself\s+stopped\s+being\s+mergeable/);
+    // Scoped to the routing bullet itself: §6 names STEP 2.5 elsewhere, so a section-wide search stayed
+    // green when the destination was cut from this rule. Found by mutation.
+    const routing = s6.slice(s6.indexOf('If the branch itself stopped being mergeable'),
+      s6.indexOf('- **A `REVIEW:` mark under (c)'));
+    expect(routing.length, 'the routing bullet must be found, or the assertion below reads an empty string')
+      .toBeGreaterThan(200);
+    expect(routing, 'and it must name where the mark sends the work, or the rule is a preference with no '
+      + 'destination').toMatch(/STEP\s+2\.5/);
+    expect(s6, 'and why the block also ends the repetition — it drafts the pull request, so (c) stops matching')
+      .toMatch(/clause\s+\(c\)\s+stops\s+matching/);
   });
 
   it('the waiting test carries clause (c) word for word, conjunction included (#579)', () => {

@@ -273,13 +273,22 @@ cannot merge it must, by §6's own rule, end in one of the two marks, so it woul
 itself cleared, every hour, for as long as the thing it cannot do stays undone. So under (c):
 
 - **Merge it if the four rules let you.** That is the whole point of the clause, and it is the ordinary case.
-- **If they do not — `loosening` is the owner's however he voted, a conflict is the branch's to fix, a red
-  check is not yours to clear — record it in your pulse by number with the one-line reason and leave it.**
-  Not a new review, not a new mark, and above all not a fresh block: the verdict already there is still the
-  truth about the diff, and nothing about the diff changed. Your pulse is where a run says "I saw this and it
-  is not mine to move".
-- **A `REVIEW:` mark under (c) is only for something you actually found in the diff this run** — which means
-  you were reviewing it for a real reason, not because clause (c) listed it.
+- **If a rule bars the merge and the branch is fine — `loosening` is the owner's however he voted — record it
+  in your pulse by number with the one-line reason and leave it.** Not a new review, not a new mark, and not a
+  fresh block: the verdict already there is still the truth about the diff, and nothing about the diff
+  changed. Your pulse is where a run says "I saw this and it is not mine to move".
+- **If the branch itself stopped being mergeable — a conflict, a red check — block it, naming what you found.**
+  That is not re-judging the diff; it is a new fact about the branch, and `main` moving is how it usually
+  arrives, hours after the clear and with no commit on the pull request to mark it. A conflict "is what your
+  verdict says" (#516), and the block is the only thing that routes the work anywhere: it marks the pull
+  request a draft, so clause (c) stops matching and this stops repeating, and its newest `REVIEW:` comment
+  becomes an unaddressed `REVIEW: CHANGES REQUESTED`, which is exactly what `docs/ROUTINE-PROMPT.md` STEP 2.5
+  looks for. A developer run then pushes the merge from `main` and the ordinary (b) path takes it from there.
+  **Without this the chain has no end**: the reviewer cannot push, STEP 2.5 never sees a cleared pull request,
+  and a conflicted one sits until a human notices. #568 sat that way on 2026-09-23, cleared at 09:48Z and
+  conflicted at 12:53Z by the merge of #577 (#579).
+- **A `REVIEW:` mark under (c) is for the merge, for a branch that stopped being mergeable, or for something
+  you actually found in the diff this run** — never because clause (c) listed the pull request.
 
 Two things follow that are easy to get backwards. A pull request under (c) is not evidence the reviewer is
 behind, so it does not belong in any "nobody is reviewing" count. And the watchdog's check 11 exists for the
