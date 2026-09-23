@@ -154,6 +154,13 @@ paths:
   column, coming off by hand once the blocker closes; **`later`** means not yet, the parking label. There is
   no hand order inside a priority — oldest issue number first, full stop — which is acceptable because the
   routine merges roughly fifteen PRs a day, so a `priority:P1` bucket drains in a day or two, not a week.
+  **Two of the three are no longer his alone (#512, owner 2026-09-22).** The refiner routine
+  (`docs/REFINER-PROMPT.md`) may set `priority:*` and `blocked` — never `later` — but only behind a one-day
+  gate: it proposes today, re-derives the proposal from the repo tomorrow, and applies it then. That is a
+  **loosening** under the `open-pr` skill §6 and was gated as one. The rule it relaxes existed to stop a run
+  promoting its own work, and it does not reach a routine that opens no pull request and so has nothing to
+  promote itself into; `docs/decisions/008-the-backlog-is-refined-by-a-routine.md` has the reasoning, the
+  alternatives dropped, and why a forged objection is survivable here when a forged approval would not be.
 - **The labels (#218 moved the list here).** `priority:P0`/`P1`/`P2`/`P3` — P0 outranks P1,
   the ordering `docs/ROUTINE-PROMPT.md` STEP 3 and `scripts/board-sync.mjs`'s `PRIORITIES` array both use;
   `routine-ok` (the developer routine may take it); `owner-session` (changed only in a session with the owner —
@@ -162,7 +169,11 @@ paths:
   a governance pull request that loosens a constraint: the same hold, #112); `later` (parked
   by the owner); `blocked` (cannot move until another issue or a decision lands — it is what puts a card in
   the board's Blocked column, #87); `new-ui` (gates the `frontend-design` skill, #99); `watchdog` (opened by
-  the watchdog); and the area labels `mode`, `curriculum`, `art`, `reward`, `platform`, `playtest`, `review`,
+  the watchdog); `complexity:S`/`M`/`L`/`XL` (how big the work is, not how long it takes — the refiner sets it
+  and splits `L` and `XL`, #512); `epic` (split into sub-issues: `docs/ROUTINE-PROMPT.md` STEP 3 rule 1 drops
+  it, so a run takes the children and never the parent, and the parent's `- [ ] #<child>` lines are counted by
+  GitHub rather than by any agent); `refine-hold` (the refiner never touches this issue again — the owner's
+  standing exemption from it); and the area labels `mode`, `curriculum`, `art`, `reward`, `platform`, `playtest`, `review`,
   `perf`, `debt`, `tests`, `guard-rail`, `accessibility`.
   **Default priority when filing (owner, 2026-09-19):** work a player would notice is `priority:P2`; a finding
   about a rail, a test or a prompt is `priority:P3`. Hardening findings arrive daily, and at the same priority

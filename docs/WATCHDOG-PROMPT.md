@@ -94,7 +94,8 @@ your first finding and the only one you can report.
    a finding about the pulse, and 2 means the check was never made** — a missing or mangled argument, an
    unreadable file — and prints to stderr, so read the code rather than the fact that it failed: a 2 is a
    fault in your call, never evidence about the routine, and filing it as one would spend a developer run.
-   Do this for all three pulses you read — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`.
+   Do this for every pulse you read — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`, and
+   `refiner: heartbeat` (check 10).
    A stamp **behind** its write is healthy and says nothing: the clock was read, then the write landed. Ahead
    of it by more than a couple of minutes of clock skew is the finding, whatever the body otherwise says, and
    the age you computed above is wrong by that much — say both numbers in the issue. Found on 2026-09-21,
@@ -225,6 +226,38 @@ your first finding and the only one you can report.
    until the owner wants an APK on the tablet — which is exactly how #129 was found, by him, at the moment he
    needed the build. Reading it costs no Actions minutes. Name the run's URL and the failing step in the
    issue, since the cause is usually in a third-party action's output rather than in our code.
+
+10. **Is the refiner alive?** Read the body of the open issue titled `refiner: heartbeat` (label `watchdog`;
+   exclude it from the duplicate search below like the other pulses). `docs/REFINER-PROMPT.md` describes a
+   **daily** task that rewrites it with a UTC timestamp as the last thing it does, so the numbers here are
+   the day's, not the hour's: **older than ~30 hours is a finding.** Everything check 3 says applies unchanged
+   — an open issue is not evidence of a pulse, an unparseable body counts as stale, a closed one is a finding
+   rather than a pass, `stopped: limit` is a finding however fresh it is, and the stamp is checked against
+   the write exactly as check 3 says — that paragraph names this pulse and is the one home of the invocation.
+   One difference: this routine has no `IN PROGRESS` stamp, because it writes nothing on the way in. So a
+   missing pulse here is the *only* evidence a refiner run leaves of having died, and there is no second
+   record to cross-check it against.
+   Read `refiner: backlog` in the same pass — the same label, never work, and never a duplicate report of a
+   finding. You are not judging its contents. One thing only: if its ledger lists a proposal first made
+   **more than three days ago** and still not applied, the two-phase gate has stalled rather than held, and
+   that is a finding. A gate that never closes is a gate that has quietly become a refusal.
+   **Take that age from the proposal comment, not from the ledger line.** Each line carries the comment's id:
+   fetch it — `GET /repos/ugurozsahin/sky-academy/issues/comments/<id>` — and read `created_at`, which GitHub
+   wrote. The refiner writes the ledger body itself and rewrites it whole every run, so a line's own timestamp
+   is self-reported; reading it here would mean a run that re-stamped its proposals could hide a permanently
+   stalled gate from the only check built to find one (#439's shape, #513 review, round 12). A line whose
+   comment id is missing, unfetchable or deleted is itself a finding — the proposal has no clock, which means
+   the refiner cannot apply it either, so it is stuck by construction.
+   **And a ledger you could not read is a finding in its own right, not a quiet nothing.** No open
+   `refiner: backlog` issue, a body you cannot fetch, a body with no ledger section in it, or a single line
+   whose issue number, action or timestamp will not parse: each of those is reported, naming which it was.
+   The reason is the shape, not the severity — every one of them arrives looking exactly like a ledger with no
+   stalled proposal in it, and this check's only output is whether something is over three days old. So
+   "I read nothing" and "there was nothing to read" are the same sentence here unless you make them different
+   ones. The refiner's own rule is that an unparseable line applies nothing, which is safe for the refiner and
+   invisible from outside: a ledger that has silently stopped parsing means proposals never apply, the gate
+   never closes, and this check reports a healthy backlog every day while nothing is being refined at all
+   (#513 review, round 11).
 
 ## Reporting
 

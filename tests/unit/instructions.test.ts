@@ -22,7 +22,7 @@ const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven
 const mdIn = (dir: string) => readdirSync(join(root, dir)).filter((f) => f.endsWith('.md')).map((f) => `${dir}/${f}`);
 const INSTRUCTION_FILES = [
   'CLAUDE.md', 'AGENTS.md', 'README.md', 'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md',
-  'docs/WATCHDOG-PROMPT.md', ...mdIn('.claude/rules'), ...mdIn('docs/decisions'), ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
+  'docs/WATCHDOG-PROMPT.md', 'docs/REFINER-PROMPT.md', ...mdIn('.claude/rules'), ...mdIn('docs/decisions'), ...OWN_SKILLS.map((s) => `.claude/skills/${s}/SKILL.md`),
 ];
 // The instruction files a session reads to be told what to do. The decision records are excluded because they
 // are the thing pointed *at*: counting them would let ADRs satisfy the rails below by citing one another, and

@@ -248,7 +248,8 @@ describe('the CLI both routines and the watchdog are pointed at', () => {
  * Prove it red: drop the `scripts/pulse-stamp.mjs` mention from any one of the three.
  */
 describe('every routine that writes or reads a pulse is pointed at the one home (#439)', () => {
-  it.each(['docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md', 'docs/WATCHDOG-PROMPT.md'])(
+  it.each(['docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md', 'docs/WATCHDOG-PROMPT.md',
+           'docs/REFINER-PROMPT.md'])(
     '%s names scripts/pulse-stamp.mjs', (file) => {
       expect(readFileSync(join(root, file), 'utf8')).toContain('scripts/pulse-stamp.mjs');
     });
@@ -269,7 +270,9 @@ describe('every routine that writes or reads a pulse is pointed at the one home 
       .toHaveLength(1);
     const text = para[0];
     expect(text, 'against the field the writing run cannot author for itself').toContain('updated_at');
-    for (const pulse of ['routine: heartbeat', 'reviewer: heartbeat', 'board: heartbeat']) {
+    // `refiner: heartbeat` joined the list with #512. It is the one pulse whose routine writes no IN PROGRESS
+    // stamp, so a forward-dated stamp there is uncheckable against anything but `updated_at`.
+    for (const pulse of ['routine: heartbeat', 'reviewer: heartbeat', 'board: heartbeat', 'refiner: heartbeat']) {
       expect(text, `${pulse} must be one of the pulses that paragraph covers`).toContain(pulse);
     }
     expect(text, 'and it must say what a non-zero exit means, or exit 2 reads as a finding')
