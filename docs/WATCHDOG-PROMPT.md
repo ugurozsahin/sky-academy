@@ -258,6 +258,25 @@ your first finding and the only one you can report.
    invisible from outside: a ledger that has silently stopped parsing means proposals never apply, the gate
    never closes, and this check reports a healthy backlog every day while nothing is being refined at all
    (#513 review, round 11).
+11. **Is any pull request finished and still open?** List every open pull request —
+   `GET /repos/ugurozsahin/sky-academy/pulls?state=open&per_page=100`, following `Link: rel="next"` — and for
+   each read `GET /commits/<head sha>/status`, **never the Actions API**: they answer different questions and
+   the workflow can succeed at reporting a failure. A pull request that is **not a draft, whose `review-gate`
+   is `success`, and which is still open more than ~2 hours later** has nothing left holding it and nobody
+   coming for it. That is a finding, named by number.
+   This check exists because of a real stranding, and the shape is worth keeping in mind rather than the
+   instance: `docs/REVIEWER-PROMPT.md` STEP 1 decides what a reviewer looks at, and until #579 both its
+   clauses compared **a commit against a review verdict**. The owner writing his marker after a clear moves no
+   commit, so the pull request stopped matching either clause at the moment it became mergeable — #568 and
+   #577 sat open and green on 2026-09-23 with two reviewer runs seeing the problem and no rule letting them
+   act. STEP 1 clause (c) closes that, and this check is the backstop **because it is keyed on nothing the
+   reviewer believes**: it reads the repository's own answer to "is this finished", so a fourth kind of event
+   that no waiting clause anticipates still surfaces here.
+   Two that are **not** findings, and both will be most of what you see: a pull request labelled `loosening`
+   or `owner-approval` that the owner has not merged — those are his by rule and no routine may take them, so
+   they are a line in your pulse rather than an issue — and one younger than ~2 hours, which is simply a
+   reviewer run that has not come round yet. **A finding here is a pull request no rule bars anyone from
+   merging and which nothing merged**, which means a routine is skipping it.
 
 ## Reporting
 
