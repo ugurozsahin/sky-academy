@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { expectFitsViewport, outsideItsBox, overrideSafeAreaInsets } from './viewport';
 import { AVATARS, VILLAIN } from '../../src/avatars';
+import type { StoredCert, StoredDuel } from '../../src/storage';
 
 /**
  * The tablet specs (#116). This file is the whole of what the `tablet` and `tablet-landscape` projects
@@ -437,9 +438,12 @@ test.describe('tablet viewports (#116)', () => {
    * asked for. `cert`/`match` mirror `game.spec.ts`'s own row shapes rather than inventing new ones.
    */
   async function seedRewardsData(page: Page) {
-    const cert = (id: string, title: string, year: string, date: string) =>
+    // Typed against the real StoredCert/StoredDuel shapes (type-design-analyzer, #564 review) — a future
+    // required field would otherwise go uncaught here exactly as it already does in game.spec.ts's own
+    // untyped builders of the same shape.
+    const cert = (id: string, title: string, year: string, date: string): StoredCert =>
       ({ id, name: 'Ada', avatar: 'volt', year, title, stars: 3, score: 250, correct: 20, attempts: 20, date });
-    const match = (at: number, extra: Record<string, unknown> = {}) =>
+    const match = (at: number, extra: Partial<StoredDuel> = {}): StoredDuel =>
       ({ at, topic: 'y1-bonds', title: 'Number bonds', year: 'Year 1', winner: 'a', scoreA: 6, scoreB: 4, rounds: 10, ...extra });
     await page.addInitScript(save => {
       if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
