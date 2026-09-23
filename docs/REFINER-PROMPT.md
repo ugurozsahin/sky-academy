@@ -87,8 +87,11 @@ The mechanism, and it matters that it works this way:
 3. **Apply a proposal only when you derived it again today AND the proposal comment's `created_at` is more
    than 20 hours old.** Fetch that comment — `GET /repos/ugurozsahin/sky-academy/issues/comments/<id>` — and
    read `created_at` from the response, never `updated_at` (an edit moves that one) and never the ledger's
-   copy. **A comment you cannot fetch applies nothing**: if the call fails, or the id is not in the ledger
-   line, or the comment has been deleted, the proposal has no clock and so has not waited. Say so and move on
+   copy. **Check that the comment you fetched belongs to the issue the ledger line names** — the response's
+   `issue_url` ends in that number — because the id is the only key and two lines whose ids were transposed
+   would each time the other's proposal, with both fetches succeeding. A mismatch applies nothing and is
+   reported. **A comment you cannot fetch applies nothing** either: if the call fails, or the id is not in the
+   ledger line, or the comment has been deleted, the proposal has no clock and so has not waited. Say so and move on
    — a missing clock read as a passed wait is the absence read as a pass, and this one authorises an
    irreversible act. Match on the **action as well as the issue number** — "close #131 as a duplicate of #98"
    and "close #131 as no longer true" are two different proposals, and a ledger line that only names the
@@ -102,6 +105,14 @@ The mechanism, and it matters that it works this way:
    derived today, look for a line naming this issue *and this exact action*. If one is there, **post nothing**:
    carry its comment id forward into today's ledger unchanged and go to item 3's age check. Post a comment only
    for a proposal that has no line yet.
+   **And a ledger you cannot read at this check means you post nothing at all** — not for one proposal, for
+   any of them. If the `refiner: backlog` fetch fails, the issue is missing, the body will not parse, or a line
+   is unreadable, you cannot tell a proposal that has no line from one whose line you did not see, and those
+   two want opposite actions. "I found no line" and "I could not look" are the same sentence unless you make
+   them different ones, and reading the first as the second posts a second comment and discards the first
+   clock — round 13's failure reached through this door instead. Report what you could not read and let
+   tomorrow re-derive; the cost is a day and nothing is lost, because the proposals are re-derived from the
+   repo and never from this record (#513 review, round 14).
    This is the one place where nothing fails and everything is wrong. Re-deriving is unconditional (item 1) and
    the ledger is rewritten whole every run (item 2), so a run that reposts instead of recognising mints a fresh
    `created_at` — the comment posts, the id is fetchable, every read succeeds, and the gate resets. Do that
