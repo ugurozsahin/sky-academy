@@ -267,7 +267,7 @@ your first finding and the only one you can report.
    A finding is a pull request where **all** of these hold: it is **not a draft**; its newest `REVIEW:` verdict
    is a **`REVIEW: CLEARED`**; its `review-gate` status is **`success`** — `GET /commits/<head sha>/status`,
    never the Actions API, and a missing or pending status is not a pass; and more than ~2 hours have passed
-   since the later of that clear and the owner's own marker. Name it by number.
+   since the later of that clear and the owner's own marker — or since the clear alone where there is no marker, which is the ordinary case. Name it by number.
    **The cleared verdict is what makes this check mean anything, and "the gate is green" will not stand in for
    it.** `scripts/review-gate.mjs`'s `blockState()` reports `blocked: false` whenever nothing is blocking —
    which is true of a pull request nobody has looked at yet, since no `REVIEW:` comment exists to be open. A

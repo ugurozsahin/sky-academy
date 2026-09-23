@@ -268,7 +268,18 @@ run" names no recipient. If a rule really does stop you acting, say which rule a
 
 **Clause (c) asks you to finish a pull request, not to review it again (#579).** STEP 1's third waiting clause
 catches one that was already cleared and became mergeable afterwards — the owner's marker landing after the
-clear, most often. It has a verdict. **Re-reviewing it is the wrong act and the loop is real**: a run that
+clear, most often.
+
+**It has a verdict, and (c) says so itself rather than inferring it from the gate.** That is load-bearing: a green
+`review-gate` means *not blocked*, never *reviewed*, because
+`scripts/review-gate.mjs`'s `blockState()` has nothing to report on a pull request nobody has commented on —
+so a brand-new one, CI green and unlabelled, reads `success` before anyone has read a line of it. Clause (c)
+therefore requires the newest `REVIEW:` verdict to be a `REVIEW: CLEARED`. Without that condition this
+paragraph would be an instruction to **merge an unreviewed diff**: (c) would match the new pull request, "finish
+it" would apply, and §5's four rules check CI, blocks, drafts and labels — not whether anyone read the change.
+PR #583 was in exactly that state while this was being written: non-draft, gate green, zero comments (#580
+review). Watchdog check 11 carries the same condition for the same reason; it was written first and this is it
+back-ported to the clause that needed it more. **Re-reviewing it is the wrong act and the loop is real**: a run that
 cannot merge it must, by §6's own rule, end in one of the two marks, so it would block a pull request it had
 itself cleared, every hour, for as long as the thing it cannot do stays undone. So under (c):
 
