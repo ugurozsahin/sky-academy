@@ -7,6 +7,7 @@ import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds 
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
 import { SOURCES, inDir, code, workflow } from './helpers/sources';
+import { YEARS } from '../../src/curriculum/types';   // #392: the rail below holds docs/CURRICULUM.md's per-year headers to this table
 
 /**
  * The Fredoka weight axis the app actually serves, `[lo, hi]`, read from the @font-face rules in
@@ -2491,4 +2492,34 @@ describe('.hud and the duel screen use --sal/--sar too, not just a fixed number 
     expect(block, 'right must read calc(10px + var(--sar))').toMatch(/right:\s*calc\([^)]*var\(--sar\)[^)]*\)/);
     expect(block, 'bottom must still read var(--sab), unshifted by this change').toMatch(/bottom:\s*calc\([^)]*var\(--sab\)[^)]*\)/);
   });
+});
+
+
+/**
+ * #392: docs/CURRICULUM.md said Year 2 was "8 q/stage" while `YEARS` (src/curriculum/types.ts) has always
+ * played 7 — the play screen's own progress pips show 1/7 on a Year 2 mission, so the game and the doc
+ * contradicted each other where a parent can see both. That was one number on one line, caught only by a
+ * reviewer reading both sides; this rail reads docs/CURRICULUM.md itself and holds each year's "N q/stage"
+ * and "N lives" header text to the `YEARS` entry it describes, so the next `perStage`/`lives` change cannot
+ * leave the doc behind the way this one did.
+ */
+describe('docs/CURRICULUM.md\'s per-year headers match YEARS (#392)', () => {
+  const doc = readFileSync(new URL('../../docs/CURRICULUM.md', import.meta.url), 'utf8');
+
+  for (const year of YEARS) {
+    it(`${year.title}'s header states ${year.perStage} q/stage and ${year.lives} lives`, () => {
+      const header = doc.split('\n').find((line) => line.startsWith(`## ${year.title}`));
+      expect(header, `docs/CURRICULUM.md must have a "## ${year.title}" header`).toBeTruthy();
+
+      const stageMatch = header!.match(/(\d+)\s+q\/stage/);
+      expect(stageMatch, `${year.title}'s header must state its questions-per-stage as "N q/stage"`).toBeTruthy();
+      expect(Number(stageMatch![1]), `docs/CURRICULUM.md's ${year.title} q/stage must match YEARS.perStage (#392)`)
+        .toBe(year.perStage);
+
+      const livesMatch = header!.match(/(\d+)\s+lives/);
+      expect(livesMatch, `${year.title}'s header must state its lives as "N lives"`).toBeTruthy();
+      expect(Number(livesMatch![1]), `docs/CURRICULUM.md's ${year.title} lives must match YEARS.lives (#392)`)
+        .toBe(year.lives);
+    });
+  }
 });
