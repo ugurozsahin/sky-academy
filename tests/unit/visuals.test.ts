@@ -183,8 +183,13 @@ describe('coinSVG — real UK coin shapes (#43)', () => {
     }
     expect(coinSVG(500)).toContain('>£5<');
     expect(coinSVG(1000)).toContain('>£10<');
-    // Distinguishable from each other, and both from the gold the £1/£2 use.
+    // Distinguishable from each other, and both from the gold the £1/£2 use. #361: the two labels alone
+    // already made `coinSVG(500) !== coinSVG(1000)` true, so a mutation giving both notes the same fill
+    // colour left this rail green — the `fill=` on the outer `<rect>` is the actual colour a child sees.
     expect(coinSVG(500)).not.toBe(coinSVG(1000));
+    const fill = (svg: string) => svg.match(/<rect[^>]*fill="(#[0-9a-f]+)"/i)?.[1];
+    expect(fill(coinSVG(500)), '£5 note fill').toBeDefined();
+    expect(fill(coinSVG(500)), '£5 and £10 use the same fill').not.toBe(fill(coinSVG(1000)));
     for (const p of [500, 1000]) expect(coinSVG(p), `${p}p reuses the coin gold`).not.toContain('#e6c250');
   });
   it('a note is wider than it is tall — the coin viewBox would render it as a square', () => {
