@@ -1483,6 +1483,51 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
 
+  test('a viewport resize mid-trace rebuilds the mask instead of scoring against a stale one (#592)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-trace');
+    const word = (await state(page)).answer as string;
+    expect(word.length).toBeGreaterThanOrEqual(2);
+    await page.evaluate((n) => window.__sna.tracer.autoTrace([...Array(n).keys()]), word.length - 1);
+    let r = await page.evaluate(() => window.__sna.tracer.result());
+    expect(r.pass).toBe(false); expect(r.coverage).toBeGreaterThan(0.3);
+    const beforeWidth = await page.evaluate(() => window.__sna.tracer.canvas.width);
+    const size = page.viewportSize()!;
+    await page.setViewportSize({ width: size.height, height: size.width });   // simulate a rotation
+    await page.waitForFunction((w) => window.__sna.tracer.canvas.width !== w, beforeWidth);
+    // the mask rebuild is also what clears the stale progress — scoring it against the new box instead
+    // of resetting it would silently carry a coverage figure computed for a canvas that no longer exists
+    r = await page.evaluate(() => window.__sna.tracer.result());
+    expect(r.coverage).toBe(0);
+    expect(await page.evaluate(() => window.__sna.tracer.strokes)).toBe(0);
+    expect(await answer(page)).toBe(true);          // a fresh trace against the rebuilt mask still passes
+    await expect(page.locator('.toast.good')).toBeVisible();
+  });
+
+  // pr-test-analyzer (#592 review): the two prior tests both drive the tracer through autoTrace(), which never
+  // touches `drawing`/`last` — so nothing exercised the actual reported trigger, a finger still down when the
+  // tablet rotates. This drives it with a real held pointer instead.
+  test('a real stroke held down through a rotation does not resume against the rebuilt mask (#592)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-trace');
+    await expect(page.locator('#trace')).toBeVisible();
+    const box = (await page.locator('#trace').boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();                                                  // finger still down…
+    expect(await page.evaluate(() => window.__sna.tracer.strokes)).toBe(1);
+    const size = page.viewportSize()!;
+    await page.setViewportSize({ width: size.height, height: size.width });   // …when the tablet rotates
+    await page.waitForFunction(() => window.__sna.tracer.strokes === 0);      // setup() reset the in-progress stroke
+    const newBox = (await page.locator('#trace').boundingBox())!;
+    await page.mouse.move(newBox.x + 10, newBox.y + 10);        // the same held pointer's next move, now over the new box
+    await page.mouse.up();
+    // a stray move/up from the pre-rotation drag must be a no-op — not a stroke painted against the rebuilt mask
+    expect(await page.evaluate(() => window.__sna.tracer.strokes)).toBe(0);
+    expect(await page.evaluate(() => window.__sna.tracer.result().coverage)).toBe(0);
+    expect(await answer(page)).toBe(true);                      // the rebuilt mask is still usable afterwards
+    await expect(page.locator('.toast.good')).toBeVisible();
+  });
+
   test('back button steps back one screen: play → island → sky map (Android/browser history)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
