@@ -488,6 +488,11 @@ test.describe('tablet viewports (#116)', () => {
       await expect(page.locator('.cert-row')).toHaveCount(6);   // 3 certs + 3 duels (both share .cert-row)
       const grid = await page.locator('.rewards-cols').evaluate(el => getComputedStyle(el).display);
       expect(grid, `.rewards-cols at ${w}x${h}: must be a grid at the ≥900px breakpoint (#564)`).toBe('grid');
+      // pr-test-analyzer (#564 review): `.rewards-col`'s two children (`.cert-open`, the duel `.cert-info`
+      // text) have no `min-width: 0`/ellipsis of their own, unlike `.cert-info b`'s certificate title — a grid
+      // item's default `min-width: auto` lets a non-shrinkable child push its 1fr track wider than half the
+      // row, so this proves neither column actually forces the page to scroll sideways rather than assuming it.
+      await expectFitsViewport(page, `rewards screen at ${w}x${h}`);
       const total = await page.evaluate(() => document.documentElement.scrollHeight);
       expect(total, `rewards content height at ${w}x${h}: expected close to ${target}px (#564)`)
         .toBeGreaterThanOrEqual(target - REWARDS_TOLERANCE);
