@@ -266,6 +266,26 @@ state at once on 2026-09-22 — #492, #503 and #502 — across at least nine rev
 diff, each concluded "no blocking finding in the diff itself", and each posted nothing. "Left for a developer
 run" names no recipient. If a rule really does stop you acting, say which rule and what would unstop it.
 
+**Clause (c) asks you to finish a pull request, not to review it again (#579).** STEP 1's third waiting clause
+catches one that was already cleared and became mergeable afterwards — the owner's marker landing after the
+clear, most often. It has a verdict. **Re-reviewing it is the wrong act and the loop is real**: a run that
+cannot merge it must, by §6's own rule, end in one of the two marks, so it would block a pull request it had
+itself cleared, every hour, for as long as the thing it cannot do stays undone. So under (c):
+
+- **Merge it if the four rules let you.** That is the whole point of the clause, and it is the ordinary case.
+- **If they do not — `loosening` is the owner's however he voted, a conflict is the branch's to fix, a red
+  check is not yours to clear — record it in your pulse by number with the one-line reason and leave it.**
+  Not a new review, not a new mark, and above all not a fresh block: the verdict already there is still the
+  truth about the diff, and nothing about the diff changed. Your pulse is where a run says "I saw this and it
+  is not mine to move".
+- **A `REVIEW:` mark under (c) is only for something you actually found in the diff this run** — which means
+  you were reviewing it for a real reason, not because clause (c) listed it.
+
+Two things follow that are easy to get backwards. A pull request under (c) is not evidence the reviewer is
+behind, so it does not belong in any "nobody is reviewing" count. And the watchdog's check 11 exists for the
+case where even this fails — it is keyed on the repository's own state rather than on anything a reviewer
+believes, which is why it is a backstop and not a duplicate of this rule.
+
 **A pull request you may not merge is still one you review.** `docs/REVIEWER-PROMPT.md` rule 4 bars the merge;
 it says nothing about the review, and the two are different acts. This bites hardest on exactly the class that
 can least afford it: a `loosening` governance pull request stays the owner's to merge even after he approves,
