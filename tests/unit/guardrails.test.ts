@@ -1874,10 +1874,13 @@ describe('the tablet layout rails (#107, #109)', () => {
 // complement #107 asks for by name, and it is the exhaustive half: it holds the *arithmetic* for every
 // `--slot` the stylesheet declares, at every viewport, for the two-group and take-away variants too.
 //
-// 0.801 is not a preference. Every emoji in `OBJECTS` advances 1.248 em (measured: all ten identical,
-// Noto Color Emoji's 2550/2048 design width), so a glyph is inside its slot only while
-// font-size <= slot / 1.248 = 0.801 * slot. A ratio above that is the bug returning, whatever it looks
-// like in the browser CI happens to have.
+// 0.801 is the exact-fit line, not the rail's bound. Every emoji in `OBJECTS` advances 1.248 em (measured:
+// all ten identical, Noto Color Emoji's 2550/2048 design width), so a glyph is inside its slot only while
+// font-size <= slot / 1.248 = 0.801 * slot — but #594 found the game shipping at 0.78, ~3% of headroom at
+// the `--slot` clamp's own 40px cap (the size a tablet in portrait sits at), against a font metric measured
+// from one face this game is not guaranteed to render with. 0.72 is the rail's bound so the margin cannot
+// silently drift back to that: it leaves at least ~10% in hand under the exact-fit line, whatever ratio a
+// future change picks below it.
 //
 // The stylesheet is read with readFileSync, not the `?raw` glob at the top of this file: Vite's css
 // plugin returns an empty string for CSS outside the browser, which would make this rail pass vacuously.
@@ -1900,14 +1903,56 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
     .toBe(objDecls);
   expect(objDecls, '--obj must be declared at least once (#107)').toBeGreaterThanOrEqual(1);
   for (const k of ratios)
-    expect(k, `an emoji advances 1.248em, so ${k} * slot paints outside the slot — #107 exactly`)
-      .toBeLessThanOrEqual(0.801);
+    expect(k, `0.801 is the exact-fit line for a 1.248em advance; ${k} leaves less than #594's ~10% margin`)
+      .toBeLessThanOrEqual(0.72);
 
   // The box half: if `.slot` goes back to its own viewport clamp, the single source of truth is gone and
   // the ratio above is measured against a width nothing else uses.
   const slotWidth = bare.match(/\.slot\s*\{[^}]*?width:\s*([^;}]+)/)?.[1].trim();
   expect(slotWidth, 'the slot must take its width from --slot, so box and glyph cannot drift apart (#107)')
     .toBe('var(--slot)');
+});
+
+// #594: the margin above only holds if nothing narrows it back on a height gate. #107's own fix once lived
+// inside `@media (max-height: 640px)`, which never reaches a real tablet (768–1280px tall) — so the exact
+// bug it fixed on a phone was still live on the device the issue was filed from. This rail reads every
+// `@media (…)` block whose condition list mentions `max-height` anywhere — not only one written with
+// `max-height` as the query's sole or first clause — because this sheet already pairs conditions with
+// `and` elsewhere (`@media (orientation: landscape) and (min-height: 700px)`), and a compound query is
+// exactly how a future edit could smuggle the #594 gate back in past a narrower match.
+it('no @media (…max-height…) block narrows the five-frame slot or glyph ratio (#594)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const blocks = [...bare.matchAll(/@media\s+([^{]*max-height:[^{]*)\{((?:[^{}]|\{[^{}]*\})*)\}/g)].map(m => m[2]);
+  expect(blocks.length, 'this rail checks nothing if no max-height block exists — update it, do not delete it')
+    .toBeGreaterThanOrEqual(1);
+  for (const block of blocks) {
+    expect(block, 'a height query must never re-declare --slot — that is the #594 gate returning')
+      .not.toMatch(/--slot\s*:/);
+    expect(block, 'a height query must never re-declare --obj — that is the #594 gate returning')
+      .not.toMatch(/--obj\s*:/);
+  }
+});
+
+// #594: `.tenframe i` was a fixed 24px in a `1fr` track — five of them need 140px before the dots overflow
+// their own column, and nothing stopped the container being narrower than that. Both halves must hold: the
+// dot has to scale with its cell instead of carrying its own px size, AND `.tenframe` itself has to be free
+// to shrink below 140px — a fixed-px container would reintroduce the exact same overflow even with a
+// perfectly responsive dot inside it.
+it('the ten-frame dot scales with its grid cell, never a fixed pixel size (#594)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const rule = bare.match(/\.tenframe\s+i\s*\{([^}]*)\}/)?.[1];
+  expect(rule, '.tenframe i must exist (#594)').toBeTruthy();
+  expect(rule, 'the dot must not carry a fixed pixel width — that is the #594 overflow returning')
+    .not.toMatch(/width:\s*[\d.]+px/);
+  expect(rule, 'the dot must not carry a fixed pixel height — that is the #594 overflow returning')
+    .not.toMatch(/height:\s*[\d.]+px/);
+
+  const container = bare.match(/\.tenframe\s*\{([^}]*)\}/)?.[1];
+  expect(container, '.tenframe must exist (#594)').toBeTruthy();
+  expect(container, ".tenframe's own width must not be a fixed pixel value — a fixed container is the #594 overflow, even with a responsive dot inside it")
+    .not.toMatch(/width:\s*[\d.]+px/);
 });
 
   // #109: the grown-ups dashboard laid itself out 936 px wide inside an 800 px portrait tablet, at every

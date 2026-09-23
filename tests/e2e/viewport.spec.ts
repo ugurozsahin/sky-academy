@@ -177,9 +177,9 @@ test.describe('tablet viewports (#116)', () => {
   });
 
   /**
-   * #107, fixed: the five-frame now has one size, `--slot`, and the glyph is `calc(var(--slot) * 0.78)`.
-   * This measures the two rendered boxes rather than reading the CSS, so it stays true whatever units a
-   * later change lands on.
+   * #107, fixed: the five-frame has one size, `--slot`, and the glyph is `calc(var(--slot) * 0.7)` (#594
+   * widened the margin — see `src/style.css`). This measures the two rendered boxes rather than reading
+   * the CSS, so it stays true whatever units a later change lands on.
    *
    * One correction to what the `test.fixme` here used to say, because it would have sent the fix to the
    * wrong place: it recorded "the arithmetic alone does not produce a visible overflow at any viewport CI
@@ -199,20 +199,54 @@ test.describe('tablet viewports (#116)', () => {
   });
 
   /**
-   * The same containment in the band the bug was actually reported from (#107). `@media (max-height: 640px)`
-   * is a separate set of rules, and it was the worst offender of the lot — a tablet held in landscape lands
-   * here, so a check that only ever runs at 1280x800 would have left the real spill in place.
+   * The two-group layout (`r-add`/`r-sub`) gets its own smaller `--slot` clamp (`.objs.two .five`), which
+   * the single-group test above never exercises — #348's evidence table measured the two-group case as the
+   * worse of the two (9.95px outside the slot, against 4.97px for one group) before #107's fix, so it earns
+   * its own real-device check rather than relying on the arithmetic rail alone.
    */
-  test('objects stay inside their slots on a short screen too (#107)', async ({ page }) => {
-    await page.setViewportSize({ width: 844, height: 390 });
+  test('two-group objects stay inside their five-frame slots (#107)', async ({ page }) => {
     await seedPlayer(page);
-    await startTopic(page, 'reception', 'r-count');
-    await expect(page.locator('.objs .slot .obj').first()).toBeVisible();
-    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.five')!).getPropertyValue('--slot').trim()),
-      'the short-screen block must still set --slot, or this test is measuring the default (#107)').toBe('24px');
-    expect(await outsideItsBox(page, '.objs .slot', '.obj'),
-      'an object painted outside its five-frame slot on a short screen (#107)').toEqual([]);
+    await startTopic(page, 'reception', 'r-add');
+    await expect(page.locator('.objs.two .slot .obj').first()).toBeVisible();
+    expect(await outsideItsBox(page, '.objs.two .slot', '.obj'),
+      'an object painted outside its two-group five-frame slot (#107)').toEqual([]);
   });
+
+  /**
+   * The same containment in the band the original bug was reported from (#107), plus the two real tablet
+   * sizes #594 was actually filed from — 800x1280 portrait and 1024x768 landscape, neither of which is
+   * `max-height: 640px` or shorter. #594 removed the height-gated `--slot` override entirely, so at 844x390
+   * `--slot` now comes from the base clamp's own floor rather than a media-query pin — this does not pin
+   * that number (a later clamp tweak is free to move it), only that the rendered slot is a real, positive
+   * width and that nothing painted outside it, which is what an overflow can actually violate.
+   */
+  for (const [w, h] of [[844, 390], [800, 1280], [1024, 768]] as const)
+    test(`objects stay inside their slots at ${w}x${h} (#107, #594)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedPlayer(page);
+      await startTopic(page, 'reception', 'r-count');
+      await expect(page.locator('.objs .slot .obj').first()).toBeVisible();
+      const slotWidth = await page.locator('.objs .slot').first().evaluate(el => el.getBoundingClientRect().width);
+      expect(slotWidth, 'the slot must render at a real, positive width — a 0 slot would pass containment vacuously')
+        .toBeGreaterThan(0);
+      expect(await outsideItsBox(page, '.objs .slot', '.obj'),
+        `an object painted outside its five-frame slot at ${w}x${h} (#107, #594)`).toEqual([]);
+    });
+
+  /**
+   * #594: a fixed-size `.tenframe i` forced its 5-column grid to a 140px min-content width regardless of
+   * what the card actually had to give it, which is a page-level horizontal overflow rather than a glyph
+   * painting outside one slot — `expectFitsViewport` is the check that catches that shape, the same one
+   * #109's dashboard fix above is proven with.
+   */
+  for (const [w, h] of [[800, 1280], [1024, 768]] as const)
+    test(`the ten-frame play screen fits across at ${w}x${h} (#594)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedPlayer(page);
+      await startTopic(page, 'reception', 'r-bonds');
+      await expect(page.locator('.tenframe i').first()).toBeVisible();
+      await expectFitsViewport(page, `ten-frame play screen at ${w}x${h}`);
+    });
 
   /**
    * #18 slice 2, group A — the DOM-screen width cap, and the third of group A that carries no look decision.
