@@ -1356,8 +1356,13 @@ test.describe('Ninja Duel', () => {
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
     // Nine decided rounds, not ten: the last one paid nobody, which is what makes this the draw path.
     expect(saved.coins, 'a coin per DECIDED round — round 10 decided nothing').toBe(9);
-    expect(saved.progress[topic], 'Player 1 answered nine rounds; round 10 he never answered at all')
-      .toMatchObject({ hits: 9, tries: 9, plays: 0, stars: 0 });
+    // Ten tries, not nine (#379): round 10 is a genuine draw — nobody sliced it — and `settleDraw()` now tallies
+    // that the same way a mission scores an untouched question, a try with no hit. This is also the proof the
+    // early-commit ordering fix holds: `settleDraw()` runs before the screen's own `commitOnce(duel.result())`
+    // for the last round, so this quit-before-overlay path is the one case that would have silently dropped
+    // round 10's try forever if that ordering ever regressed.
+    expect(saved.progress[topic], 'Player 1 answered nine rounds and round 10 counts as a tenth, unanswered')
+      .toMatchObject({ hits: 9, tries: 10, plays: 0, stars: 0 });
     const volume = (['correct15', 'correct20', 'correct25'] as const).map(id => saved.dojo.progress[id]).filter((n: number | undefined) => n !== undefined);
     expect(volume, 'the Daily Dojo heard about the nine').toEqual([9]);
     expect(saved.duels, 'the match still happened, and a 9-0 is still a Player 1 win').toHaveLength(1);

@@ -15,11 +15,13 @@ export interface AnswerTally { hits: number; tries: number }
  * hits/tries = lifetime questions answered, **at most** one try per question — not "always one", which is
  * only true within a single writer. `session.ts` (missions, Sensei training) counts every question
  * PRESENTED: a bubble that falls untouched, or a wave that ends with nothing decided, is a try nobody won
- * (`tally()`, latched by `waiting`). `duel.ts` counts every round a seat ANSWERED: a round it never sliced
- * into — because the other seat won it first, or nobody did — adds nothing at all (`DuelTally`, latched by
- * `answered`). Both are "one write per question/round, whoever writes them" (#374's review found a duel
- * counting slices, which this field cannot hold: `weakestTopics()` and `parents.ts` divide it) — they differ
- * on whether an unanswered question/round counts as a miss, which is #379's still-open remainder.
+ * (`tally()`, latched by `waiting`). `duel.ts` counts every round a seat ANSWERED OR THE ROUND WENT UNDECIDED:
+ * a round it never sliced into because the other seat won it first drops the try — a race lost on speed is not
+ * a wrong answer — but a round that ends a genuine draw, nobody deciding it, is a try with no hit, exactly like
+ * a mission's untouched question (`DuelTally`, latched by `answered`; the draw case is `settleDraw()`, #379).
+ * Both are "one write per question/round, whoever writes them" (#374's review found a duel counting slices,
+ * which this field cannot hold: `weakestTopics()` and `parents.ts` divide it) — they now agree on every case
+ * except a round lost purely to the other seat's speed, which duel.ts alone still drops.
  */
 export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }
 /**
