@@ -286,10 +286,12 @@ test.describe('tablet viewports (#116)', () => {
   }
 
   /**
-   * #18 slice 2, group A — the tracing pad, group A's other look-changing cap. The arena (`--arena-w`,
-   * 600 px) is deliberately NOT touched or measured here: a tracing screen renders no `#arena` canvas, so
-   * widening `.trace-wrap`/`.hud` for `.play.tracing` alone cannot change bubble speed or spawn spread —
-   * only the arena screens still carry the old cap, which the second assertion below pins.
+   * #18 slice 2, group A — the tracing pad, group A's second look-changing cap. The arena and the tracing
+   * pad each carry their own, independent rule (`.play:not(.tracing):not(.duel-screen) { --arena-w }` vs.
+   * `.play.tracing .hud, .play.tracing .trace-wrap`), so the cross-navigation check below now confirms the
+   * arena has ALSO widened (group A's third cap, landed after this test was first written) rather than
+   * that it stayed at the old 600 px — what it still proves is that the two mechanisms are independent:
+   * a revert of one cannot silently take the other with it.
    *
    * #534 review (pr-test-analyzer): a bare `> 560` bound here (and in the matching guard rail) stayed green
    * against a hand-edit of the shipped CSS down to `min(600px, ...)` — barely more than the old phone column
@@ -297,8 +299,15 @@ test.describe('tablet viewports (#116)', () => {
    * CSS source names, because it sits inside `.hud`'s own `min(880px, 100% - 40px)` and then applies its own
    * `100% - 40px` branch against that already-narrower container (measured directly, both viewports below).
    * `TRACE_TARGET`/`TRACE_TOLERANCE` pin that rendered value rather than merely ruling out the old one.
+   *
+   * `#arena` carries no such nesting — `max-width: min(880px, 100% - 40px)` applies directly, with nothing
+   * else narrowing it, so it lands on exactly 880px at both viewports (measured directly). `ARENA_TOLERANCE`
+   * is 3px, not `TRACE_TOLERANCE`'s 30: a wider band here would still pass a regression that shaved off up
+   * to 19px — a stray margin, an extra inset — with no nested calculation to blame it on the way the tracing
+   * pad's own comment can.
    */
   const TRACE_TARGET = 816, TRACE_TOLERANCE = 30;
+  const ARENA_TARGET = 880, ARENA_TOLERANCE = 3;
 
   for (const [w, h] of [[1280, 800], [1024, 768]] as const) {
     test(`the tracing pad uses a ${w}x${h} landscape window, not a 560 px column (#18 group A)`, async ({ page }) => {
@@ -313,7 +322,8 @@ test.describe('tablet viewports (#116)', () => {
         .toBeLessThanOrEqual(TRACE_TARGET + TRACE_TOLERANCE);
       await expectFitsViewport(page, `tracing screen at ${w}x${h}`);   // widening must not start an overflow
 
-      // the bubble arena is a different screen and keeps its own 600 px cap — this pull request never reads it.
+      // the bubble arena is a different screen, widened by its own independent rule (#18 group A's third
+      // cap) — this checks the two mechanisms don't depend on each other, not that either is disabled.
       // `up` (play.ts's goHome) pops history back to the island rather than the map, since the island push is
       // still on the stack from startTopic's own navigation.
       await page.click('#pause');
@@ -323,8 +333,47 @@ test.describe('tablet viewports (#116)', () => {
       await page.click('.topic[data-id="r-count"]');
       await expect(page.locator('.play')).toBeVisible();
       const arena = await page.locator('#arena').boundingBox();
-      expect(arena!.width, `#arena at ${w}x${h}: must stay at --arena-w, untouched by the tracing-pad fix (#18 group A)`)
-        .toBeLessThanOrEqual(600);
+      expect(arena!.width, `#arena at ${w}x${h}: should be close to ${ARENA_TARGET}px too, independently of the tracing-pad fix (#18 group A)`)
+        .toBeGreaterThanOrEqual(ARENA_TARGET - ARENA_TOLERANCE);
+      expect(arena!.width, `#arena at ${w}x${h}: should be close to ${ARENA_TARGET}px, not wider than intended (#18 group A)`)
+        .toBeLessThanOrEqual(ARENA_TARGET + ARENA_TOLERANCE);
+    });
+  }
+
+  /**
+   * #18 slice 2, group A — the bubble arena, group A's last and sharpest cap (owner's 11:54Z pick: 680 px
+   * empty at 1280×800, "the screen the child plays on"). `#arena` and `.hud` both read `max-width:
+   * var(--arena-w)` with no further nesting, so — unlike the tracing pad's `.trace-wrap`, which sits a
+   * layer inside `.hud` — the rendered width should land on the 880 px the CSS source names, not some
+   * smaller value a nested container would produce. `ARENA_TARGET`/`ARENA_TOLERANCE` (declared above, by
+   * the tracing pad's own test) pin that, the same shape #534's review asked for on the tracing pad: a
+   * bound that only rules out the old 600 px would still pass a hand-edit down to, say, 620 px.
+   */
+  for (const [w, h] of [[1280, 800], [1024, 768]] as const) {
+    test(`the bubble arena uses a ${w}x${h} landscape window, not a 600 px column (#18 group A)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedPlayer(page);
+      await startTopic(page, 'reception', 'r-count');
+      const arena = await page.locator('#arena').boundingBox();
+      expect(arena!.width, `#arena at ${w}x${h}: should be close to ${ARENA_TARGET}px, not the 600px phone column or some other regressed value (#18 group A)`)
+        .toBeGreaterThanOrEqual(ARENA_TARGET - ARENA_TOLERANCE);
+      expect(arena!.width, `#arena at ${w}x${h}: should be close to ${ARENA_TARGET}px, not wider than intended (#18 group A)`)
+        .toBeLessThanOrEqual(ARENA_TARGET + ARENA_TOLERANCE);
+      await expectFitsViewport(page, `play screen at ${w}x${h}`);   // widening must not start an overflow
+
+      // the tracing pad is a different screen and keeps its own cap, set directly rather than through
+      // --arena-w (#18 group A's tracing-pad fix) — this pull request never touches it.
+      await page.click('#pause');
+      await page.click('#quit');
+      await expect(page.locator('.island-screen')).toBeVisible();
+      await page.click('.tab[data-s="writing"]');
+      await page.click('.topic[data-id="r-trace"]');
+      await expect(page.locator('.trace-wrap')).toBeVisible();
+      const wrap = await page.locator('.trace-wrap').boundingBox();
+      expect(wrap!.width, `.trace-wrap at ${w}x${h}: must stay at its own 816px, untouched by the arena fix (#18 group A) — a specificity fight between the two rules could shrink it as easily as leave it too wide`)
+        .toBeGreaterThanOrEqual(TRACE_TARGET - TRACE_TOLERANCE);
+      expect(wrap!.width, `.trace-wrap at ${w}x${h}: must stay at its own 880px cap, untouched by the arena fix (#18 group A)`)
+        .toBeLessThanOrEqual(TRACE_TARGET + TRACE_TOLERANCE);
     });
   }
 

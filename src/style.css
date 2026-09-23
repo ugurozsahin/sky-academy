@@ -119,6 +119,29 @@ img { -webkit-user-drag: none; }
   .play.tracing .hud, .play.tracing .trace-wrap { max-width: min(880px, 100% - 40px); }
 }
 
+/*
+ * #18 group A, the bubble arena — the last of group A's three look-changing caps, and the one the owner's
+ * 11:54Z pick called "the sharpest": 600 px left 680 px empty (53%) on a 1280 px window, more than either
+ * of the other two. Same value and the same breakpoint as the DOM-screen cap and the tracing pad, chosen
+ * for the same reason: 900 px reuses the dashboard's own breakpoint rather than a fifth number, and
+ * `min(880px, 100% - 40px)` matches the tracing pad exactly, so the two canvases the child moves between
+ * (arena, tracing pad) end up the same width rather than two different "wide" numbers with no reason to
+ * differ.
+ *
+ * `--arena-w` is redeclared on `.play`, not on `#arena`/`.hud` directly, because `#388`'s duel layout reads
+ * the SAME variable for its own, unrelated width maths (`.duel-half`'s `max-width: var(--arena-w)` in
+ * portrait, `.play.duel-screen`'s `max-width: calc(var(--arena-w) * 2)` in landscape) — widening the
+ * variable under `.play.duel-screen` would silently double the change into a fixed layout the owner has
+ * not been asked about. `:not(.duel-screen)` keeps this to the single-player arena only, and `:not(.tracing)`
+ * is belt-and-braces: the tracing pad's own rule above already overrides `.hud`'s max-width directly and
+ * wins on specificity regardless of what `--arena-w` holds, but a screen with no `#arena` canvas has no
+ * reason to carry the variable at all. Widening changes how far a thumb travels mid-wave, which is why this
+ * is still `owner-approval` like the tracing pad, not "stops wasting the width" like the DOM-screen cap.
+ */
+@media (min-width: 900px) {
+  .play:not(.tracing):not(.duel-screen) { --arena-w: min(880px, 100% - 40px); }
+}
+
 /* ---------- shared components ---------- */
 .btn {
   display: inline-flex;

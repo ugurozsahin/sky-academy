@@ -2309,15 +2309,15 @@ describe('the landscape screen width cannot silently return to the phone column 
 });
 
 /*
- * #18 slice 2, group A — the tracing pad, group A's other look-changing cap (the arena's 600 px stays
- * `owner-approval` and unstarted). Same shape as the rail above and for the same reason: the only
- * behavioural check is `tests/e2e/viewport.spec.ts`, which the `mobile`/`desktop` projects a pull request
- * runs skip entirely (`.claude/rules/e2e.md`), so a revert here would ship green.
+ * #18 slice 2, group A — the tracing pad, group A's second look-changing cap. Same shape as the rail
+ * above and for the same reason: the only behavioural check is `tests/e2e/viewport.spec.ts`, which the
+ * `mobile`/`desktop` projects a pull request runs skip entirely (`.claude/rules/e2e.md`), so a revert here
+ * would ship green.
  *
  * The rail holds two things a revert or a careless edit could break independently: the tracing pad widens
- * past 560 px on a wide viewport, and `--arena-w` (the bubble arena's own cap, which this change must never
- * touch — a tracing screen renders no `#arena` canvas, so there is no reason for this rule to reach it)
- * stays at exactly 600 px.
+ * past 560 px on a wide viewport, and the BASE `--arena-w` declaration (mobile default, and the value the
+ * bubble arena keeps under 900 px, and under `.duel-screen` at every width — the follow-up rail below
+ * covers the arena's own ≥900 px widening) stays at exactly 600 px.
  */
 describe('the tracing pad cannot silently return to the phone column, and the fix cannot silently reach the arena (#18)', () => {
   const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
@@ -2337,11 +2337,51 @@ describe('the tracing pad cannot silently return to the phone column, and the fi
       .toBeLessThanOrEqual(920);
   });
 
-  it('--arena-w stays at 600px, untouched by the tracing-pad widening', () => {
+  it('the base .play rule still declares --arena-w at exactly 600px', () => {
     const play = bare.match(/(?:^|[}\s])\.play\s*\{([^}]*)\}/)?.[1];
     expect(play, 'the base .play rule must exist').toBeTruthy();
-    expect(play, 'the bubble arena keeps its own 600 px cap — this fix has no reason to touch it')
+    expect(play, 'the mobile default, and the value duel and the sub-900px arena keep, is 600 px')
       .toMatch(/--arena-w:\s*600px/);
+  });
+});
+
+/*
+ * #18 slice 2, group A — the bubble arena, group A's third and last look-changing cap. Same shape as the
+ * two rails above: the only behavioural check is `tests/e2e/viewport.spec.ts`, skipped by the `mobile`/
+ * `desktop` projects a pull request runs, so a revert here would ship green too.
+ *
+ * The rail holds three things a revert or a careless edit could break independently: the widening rule
+ * targets the single-player arena and no other screen, its value is close to the shipped 880 px rather
+ * than a token amount past 600, and duel — which reads the same `--arena-w` variable for its own,
+ * unrelated width maths (`tests/e2e/duel.spec.ts`'s "a half is half the screen, capped at --arena-w") —
+ * is excluded by selector, not merely by accident of specificity.
+ */
+describe('the bubble arena cannot silently return to the phone column, and the fix cannot silently reach duel or tracing (#18)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  it('a wide-viewport media query widens --arena-w on the single-player arena to close to 880px, not merely past 600px', () => {
+    const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*\.play:not\(\.tracing\):not\(\.duel-screen\)\s*\{([^}]*)\}/);
+    expect(block, 'the #18 group A arena rule must stay a min-width: 900px block over .play:not(.tracing):not(.duel-screen)').toBeTruthy();
+    const cap = block![1].match(/--arena-w:\s*min\(\s*(\d{3,4})px\s*,/);
+    expect(cap, 'the widened value must still be --arena-w: min(NNNpx, ...)').toBeTruthy();
+    expect(Number(cap![1]), 'the widened value must stay close to the shipped 880px, not merely wider than 600px')
+      .toBeGreaterThanOrEqual(850);
+    expect(Number(cap![1]), 'the widened value must stay close to the shipped 880px, not merely wider than 600px')
+      .toBeLessThanOrEqual(920);
+  });
+
+  it('the arena-widening rule excludes .duel-screen by selector, not merely by the base rule losing a specificity tie', () => {
+    // Anchored on the DECLARATION, not on the selector text itself — a match that already required
+    // `:not(.duel-screen)` to exist would make the assertion below pass whenever the match succeeded at all,
+    // proving nothing a dropped exclusion wouldn't also let through. This finds whichever `.play`-rooted
+    // selector sets the widened `--arena-w` inside a >=900px block, then reads ITS selector separately.
+    const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*(\.play[^{]*)\{\s*--arena-w:\s*min\(/);
+    expect(block, 'a >=900px block must set --arena-w: min(...) on a .play-rooted selector').toBeTruthy();
+    // a selector that dropped :not(.duel-screen) would still beat the base .play rule on specificity, so a
+    // careless simplification would ship green on every rail above and only show up in duel.spec.ts's own
+    // 600px pin — which a pull request's mobile-only CI project may not even run against a duel change.
+    expect(block![1], "duel must be excluded from the widening rule's own selector").toMatch(/:not\(\.duel-screen\)/);
   });
 });
 
