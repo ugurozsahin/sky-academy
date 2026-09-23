@@ -847,16 +847,18 @@ let readOnly = false;
  */
 export const isReadOnlySave = () => readOnly;
 /**
- * Set by `save()` when its own `localStorage.setItem` just threw — private browsing, a WebView with DOM
- * storage disabled, or a full quota (#151). Distinct from `isReadOnlySave()`: that one refuses to write
- * *deliberately*, to protect a newer save already on disk, and its remedy is "update this device"; this one
- * is the browser refusing an ordinary write, and its remedy is "this browser will not let the game save".
- * Conflating them would send a grown-up to update an app that already writes fine, or wait for a device
- * update that will never fix a private-browsing tab.
+ * Set when a write to this device's store is refused — `save()`'s own `localStorage.setItem` throwing
+ * (private browsing, a WebView with DOM storage disabled, a full quota, #151), **and, since #384 item 2,
+ * `addProfile()` or `setActiveProfile()`'s `writeIndex()` call refusing either way it can**: a throw, or a
+ * `setItem` that returns without error and a read-back that disagrees (`writeIndex`'s own doc, #330). Distinct
+ * from `isReadOnlySave()`: that one refuses to write *deliberately*, to protect a newer save already on disk,
+ * and its remedy is "update this device"; this one is the browser refusing an ordinary write, and its remedy
+ * is "this browser will not let the game save". Conflating them would send a grown-up to update an app that
+ * already writes fine, or wait for a device update that will never fix a private-browsing tab.
  *
  * Reflects only the *last* attempted write, the same way `readOnly` reflects only the last `load()` — a caller
- * that wants to know whether *this* save landed checks it immediately after calling `save()`, before anything
- * else can write again.
+ * that wants to know whether *this* write landed checks it immediately afterwards, before anything else can
+ * write again.
  */
 let writeFailed = false;
 export const isWriteFailing = () => writeFailed;
@@ -878,8 +880,8 @@ export function save(patch: Partial<SaveData> = {}): SaveData {
   cache = { ...load(), ...patch };
   // #232: the blob on disk is newer than this build, or carries a version we cannot read. The session keeps
   // working against `cache`; writing would relabel it as our shape and make the loss permanent. Not an
-  // attempted write, so it does not touch `writeFailed` either way (#151) — that flag is only ever set by an
-  // actual `setItem` call, immediately below.
+  // attempted write, so it does not touch `writeFailed` either way (#151) — this function only ever sets that
+  // flag from an actual `setItem` call, immediately below (`writeIndex`'s callers set it their own way, #384).
   if (readOnly) return cache;
   try { localStorage.setItem(saveKeyFor(sessionProfile()), JSON.stringify(cache)); writeFailed = false; }
   catch { writeFailed = true; /* private mode, WebView storage disabled, full quota (#151) */ }
