@@ -1,6 +1,8 @@
 // Grown-ups dashboard screenshot: pick an avatar, seed some realistic progress, pass the gate.
+import onboard from './flow-onboard.mjs';
+
 export default async function run(p) {
-  await p.click('.avatar-card[data-id="volt"]'); await p.fill('#name', 'Ada'); await p.click('#go');
+  await onboard(p, 'volt', 'Ada');
   await p.waitForSelector('.home');
   await p.evaluate(() => {
     const raw = JSON.parse(localStorage.getItem('sna:v1'));

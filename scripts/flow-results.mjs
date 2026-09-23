@@ -1,5 +1,7 @@
+import onboard from './flow-onboard.mjs';
+
 export default async function run(p) {
-  await p.click('.avatar-card[data-id="frost"]'); await p.fill('#name', 'Ada'); await p.click('#go');
+  await onboard(p, 'frost', 'Ada');
   await p.waitForSelector('.map'); await p.click('.island[data-year="reception"]'); await p.click('.topic[data-id="r-count"]');
   const stages = await p.evaluate(() => window.__sna.session.stages);
   for (let st = 0; st < stages; st++) {
