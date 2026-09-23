@@ -475,6 +475,10 @@ test.describe('tablet viewports (#116)', () => {
         .toBeGreaterThanOrEqual(target - ISLAND_TOLERANCE);
       expect(total, `island content height at ${w}x${h}: expected close to ${target}px, not still the old ~1200px stack (#563)`)
         .toBeLessThanOrEqual(target + ISLAND_TOLERANCE);
+    });
+  }
+
+  /**
    * #564 (#18 group B): rewards and shop, measured on a seeded save with progress, stickers, certificates
    * and duels — not a fresh one, which is the narrowest either screen ever is and would pass this
    * vacuously (#109's own reasoning for `seedProgress`, above). The per-element breakdown on the issue
@@ -566,6 +570,8 @@ test.describe('tablet viewports (#116)', () => {
     expect(total, "the phone island's own scroll height must stay the old stacked value, not shrink to the tablet grid's (#563)")
       .toBeGreaterThan(1500);
   });
+
+  /**
    * The other half of the acceptance criterion, same as `.mode-grid`'s #563 precedent: a phone stays a
    * single-column stack. `display: contents` on `.rewards-cols` should make the wrapper invisible to layout
    * below 900px, so this is the only place that is proven rather than assumed from the CSS rule alone
