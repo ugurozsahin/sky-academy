@@ -215,7 +215,7 @@ Run all of it. A job you could not perform is worth a line in your report — "I
    exists without one.
 5. **An acceptance criterion where there is none.** One sentence: *what has to be true for this to be
    finished.* Not a design. The developer routine's job is to decide how; this only stops it deciding what.
-6. **A missing area label** — `tests`, `debt`, `bug`, `curriculum`, `guard-rail`, `mode`, and the rest of the
+6. **A missing area label** — `tests`, `debt`, `curriculum`, `guard-rail`, `mode`, `perf`, and the rest of the
    list in `.claude/rules/governance.md`. Never `routine-ok`: that one says the owner has released the work,
    and it is his.
 7. **A follow-up issue for the remainder of blocked work.** When an issue is blocked on a decision or another

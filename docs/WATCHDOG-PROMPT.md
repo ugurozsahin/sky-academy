@@ -241,6 +241,16 @@ your first finding and the only one you can report.
    finding. You are not judging its contents. One thing only: if its ledger lists a proposal first derived
    **more than three days ago** and still not applied, the two-phase gate has stalled rather than held, and
    that is a finding. A gate that never closes is a gate that has quietly become a refusal.
+   **And a ledger you could not read is a finding in its own right, not a quiet nothing.** No open
+   `refiner: backlog` issue, a body you cannot fetch, a body with no ledger section in it, or a single line
+   whose issue number, action or timestamp will not parse: each of those is reported, naming which it was.
+   The reason is the shape, not the severity — every one of them arrives looking exactly like a ledger with no
+   stalled proposal in it, and this check's only output is whether something is over three days old. So
+   "I read nothing" and "there was nothing to read" are the same sentence here unless you make them different
+   ones. The refiner's own rule is that an unparseable line applies nothing, which is safe for the refiner and
+   invisible from outside: a ledger that has silently stopped parsing means proposals never apply, the gate
+   never closes, and this check reports a healthy backlog every day while nothing is being refined at all
+   (#513 review, round 11).
 
 ## Reporting
 

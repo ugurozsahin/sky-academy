@@ -4472,9 +4472,9 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     { what: "an epic parent drops out of the developer query",
       file: "docs/ROUTINE-PROMPT.md",
       unit: "1. **drop** anything labelled `later` — the owner's \"not yet\", without arguing with a priority; and anything labelled `owner-input` or `owner-approval`, unless a non-visual part is clearly separable, in which case take that part and say so in the PR; and anything labelled `epic` — the refiner split it, so its children are the work (`docs/REFINER-PROMPT.md`);" },
-    { what: "the watchdog bounds the refiner pulse and the stalled gate",
+    { what: "the watchdog bounds the refiner pulse, the stalled gate, and an unreadable ledger",
       file: "docs/WATCHDOG-PROMPT.md",
-      unit: "10. **Is the refiner alive?** Read the body of the open issue titled `refiner: heartbeat` (label `watchdog`;\n   exclude it from the duplicate search below like the other pulses). `docs/REFINER-PROMPT.md` describes a\n   **daily** task that rewrites it with a UTC timestamp as the last thing it does, so the numbers here are\n   the day's, not the hour's: **older than ~30 hours is a finding.** Everything check 3 says applies unchanged\n   — an open issue is not evidence of a pulse, an unparseable body counts as stale, a closed one is a finding\n   rather than a pass, `stopped: limit` is a finding however fresh it is, and the stamp is checked against\n   the write exactly as check 3 says — that paragraph names this pulse and is the one home of the invocation.\n   One difference: this routine has no `IN PROGRESS` stamp, because it writes nothing on the way in. So a\n   missing pulse here is the *only* evidence a refiner run leaves of having died, and there is no second\n   record to cross-check it against.\n   Read `refiner: backlog` in the same pass — the same label, never work, and never a duplicate report of a\n   finding. You are not judging its contents. One thing only: if its ledger lists a proposal first derived\n   **more than three days ago** and still not applied, the two-phase gate has stalled rather than held, and\n   that is a finding. A gate that never closes is a gate that has quietly become a refusal." },
+      unit: "10. **Is the refiner alive?** Read the body of the open issue titled `refiner: heartbeat` (label `watchdog`;\n   exclude it from the duplicate search below like the other pulses). `docs/REFINER-PROMPT.md` describes a\n   **daily** task that rewrites it with a UTC timestamp as the last thing it does, so the numbers here are\n   the day's, not the hour's: **older than ~30 hours is a finding.** Everything check 3 says applies unchanged\n   — an open issue is not evidence of a pulse, an unparseable body counts as stale, a closed one is a finding\n   rather than a pass, `stopped: limit` is a finding however fresh it is, and the stamp is checked against\n   the write exactly as check 3 says — that paragraph names this pulse and is the one home of the invocation.\n   One difference: this routine has no `IN PROGRESS` stamp, because it writes nothing on the way in. So a\n   missing pulse here is the *only* evidence a refiner run leaves of having died, and there is no second\n   record to cross-check it against.\n   Read `refiner: backlog` in the same pass — the same label, never work, and never a duplicate report of a\n   finding. You are not judging its contents. One thing only: if its ledger lists a proposal first derived\n   **more than three days ago** and still not applied, the two-phase gate has stalled rather than held, and\n   that is a finding. A gate that never closes is a gate that has quietly become a refusal.\n   **And a ledger you could not read is a finding in its own right, not a quiet nothing.** No open\n   `refiner: backlog` issue, a body you cannot fetch, a body with no ledger section in it, or a single line\n   whose issue number, action or timestamp will not parse: each of those is reported, naming which it was.\n   The reason is the shape, not the severity — every one of them arrives looking exactly like a ledger with no\n   stalled proposal in it, and this check's only output is whether something is over three days old. So\n   \"I read nothing\" and \"there was nothing to read\" are the same sentence here unless you make them different\n   ones. The refiner's own rule is that an unparseable line applies nothing, which is safe for the refiner and\n   invisible from outside: a ledger that has silently stopped parsing means proposals never apply, the gate\n   never closes, and this check reports a healthy backlog every day while nothing is being refined at all\n   (#513 review, round 11)." },
     { what: "the loosening is recorded where the rule it relaxes lives",
       file: ".claude/rules/governance.md",
       unit: "- **The three ordering tools (agreed with the owner, 2026-09-11).** The project board is a read-only view, not\n  a second list — `docs/ROUTINE-PROMPT.md` STEP 1 has why a cloud session cannot write to it. The owner\n  reorders work with three things, all set on the issue itself: **`priority:P0`** means now — two or three\n  cards at most, oldest first within it (`docs/ROUTINE-PROMPT.md` STEP 3 rule 5); **`Blocked by #<n>` as the\n  first line of the issue body, plus the `blocked` label**, means after that one — STEP 3 rule 2 already skips\n  an issue blocked by an open issue it references, and the label is what puts the card in the board's Blocked\n  column, coming off by hand once the blocker closes; **`later`** means not yet, the parking label. There is\n  no hand order inside a priority — oldest issue number first, full stop — which is acceptable because the\n  routine merges roughly fifteen PRs a day, so a `priority:P1` bucket drains in a day or two, not a week.\n  **Two of the three are no longer his alone (#512, owner 2026-09-22).** The refiner routine\n  (`docs/REFINER-PROMPT.md`) may set `priority:*` and `blocked` — never `later` — but only behind a one-day\n  gate: it proposes today, re-derives the proposal from the repo tomorrow, and applies it then. That is a\n  **loosening** under the `open-pr` skill §6 and was gated as one. The rule it relaxes existed to stop a run\n  promoting its own work, and it does not reach a routine that opens no pull request and so has nothing to\n  promote itself into; `docs/decisions/008-the-backlog-is-refined-by-a-routine.md` has the reasoning, the\n  alternatives dropped, and why a forged objection is survivable here when a forged approval would not be." },
@@ -4495,7 +4495,7 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
       unit: "**A list you have not read to the end is a list you have not read**, and here the truncation lands precisely\non the work: this endpoint sorts newest-first by default, so the oldest open issues — the stale claims, the\nlong-dead duplicates, the things this routine exists to find — are the ones on the last page, and a first page\nthat arrives clean looks exactly like a tidy backlog. **If you cannot read a list to its end, the pass that\nneeded it does not run.** Say so in your report, and do not act on the part you did read: a duplicate sweep\nover half the issues reports the other half as having no duplicate. In item 4 that is not a matter of report\nquality — a split-resumption search that stopped at page one concludes the split never started, and splitting\na second time orphans the first run's children behind an `epic` label that drops the parent out of the\ndeveloper query for good (#513 review, round 8)." },
     { what: "routine-ok is never the refiner’s to add",
       file: "docs/REFINER-PROMPT.md",
-      unit: "6. **A missing area label** — `tests`, `debt`, `bug`, `curriculum`, `guard-rail`, `mode`, and the rest of the\n   list in `.claude/rules/governance.md`. Never `routine-ok`: that one says the owner has released the work,\n   and it is his." },
+      unit: "6. **A missing area label** — `tests`, `debt`, `curriculum`, `guard-rail`, `mode`, `perf`, and the rest of the\n   list in `.claude/rules/governance.md`. Never `routine-ok`: that one says the owner has released the work,\n   and it is his." },
   ];
 
   it.each(CLAIMS)('the guarantee still reads, word for word: $what', ({ file, unit }) => {
@@ -4515,12 +4515,17 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     expect(new Set(CLAIMS.map((c) => c.unit)).size, 'two rows must not pin the same unit — that is one '
       + 'guarantee counted twice, inflating the floor above without covering anything')
       .toBe(CLAIMS.length);
-    // The population spans five files; a table that drifted to one of them would still pass the floor.
-    // Round 7 added the fifth: `docs/decisions/008-...md` restates priority immutability in its own words,
-    // and the floor of four was satisfied without ever requiring it, so the restatement was unpinned.
-    expect(new Set(CLAIMS.map((c) => c.file)).size, 'the guarantees live in five files and all five must be '
-      + 'covered — the developer query, the watchdog check, the governance record and the decision record are '
-      + 'each half of a rule whose other half is in the prompt').toBeGreaterThanOrEqual(5);
+    // Round 11: this counted how many distinct files appeared and never which ones — so repointing the lone
+    // `docs/decisions/008` row at an already-covered file and adding a decoy row for a sixth file kept the
+    // count at five and the test green, with the decision record's guarantee silently unpinned. Cardinality
+    // is not identity, which is rounds 9 and 10's finding reappearing inside the check written to guard it.
+    // Named files now, as a subset test: each of the five must be covered, and a sixth may be added freely.
+    const covered = new Set(CLAIMS.map((c) => c.file));
+    for (const file of ['docs/REFINER-PROMPT.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md',
+      '.claude/rules/governance.md', 'docs/decisions/008-the-backlog-is-refined-by-a-routine.md']) {
+      expect([...covered], `${file} carries half of a guarantee whose other half is in the prompt, so it must `
+        + 'have a row of its own — a count of distinct files cannot tell which ones they are').toContain(file);
+    }
   });
 
   // Structure, not wording: the cheap half is stated first, so the gate reads as an exception to it rather
@@ -4659,6 +4664,10 @@ describe('a rail that enumerates the routine prompts covers all of them (#512, r
     [norm("'docs/ROUTINE-PROMPT.md', 'docs/REVIEWER-PROMPT.md', 'docs/REFINER-PROMPT.md'"),
      'the three routines that WRITE `stopped: limit`; the watchdog is the reader and is asserted separately '
      + 'in the same test'],
+    [norm("'docs/REFINER-PROMPT.md', 'docs/ROUTINE-PROMPT.md', 'docs/WATCHDOG-PROMPT.md', "
+      + "'.claude/rules/governance.md', 'docs/decisions/008-the-backlog-is-refined-by-a-routine.md'"),
+     'the five files #512’s CLAIMS table must cover, which is a different set from the routine prompts: it '
+     + 'includes two non-prompts and excludes docs/REVIEWER-PROMPT.md, where that block pins nothing'],
   ]);
 
   /**
@@ -4686,6 +4695,9 @@ describe('a rail that enumerates the routine prompts covers all of them (#512, r
     // Most test files carry no enumeration at all, so "at least one" cannot be asserted per file the way it
     // could when SOURCES was three hand-picked files. It is asserted over the population instead: a RUN regex
     // that matched nothing anywhere would otherwise pass every row below by finding nothing to fault.
+    // A budget rail, so it may be lowered — but only when the enumerations genuinely merge. Hoisting the two
+    // byte-identical seven-item `LIVE` arrays into one shared const would legitimately drop this to 9; say so
+    // in the commit when you lower it, and do not lower it to make an accidental deletion pass (round 11).
     expect(SOURCES.flatMap(runsOf).length, 'the scan must find the enumerations that exist, or every row '
       + 'below passes vacuously').toBeGreaterThanOrEqual(8);
   });
