@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { expectFitsViewport, outsideItsBox } from './viewport';
+import { expectFitsViewport, outsideItsBox, overrideSafeAreaInsets } from './viewport';
 
 /**
  * The tablet specs (#116). This file is the whole of what the `tablet` and `tablet-landscape` projects
@@ -67,6 +67,18 @@ async function startTopic(page: Page, year: string, topic: string, subject = 'ma
   await page.click(`.topic[data-id="${topic}"]`);
   await expect(page.locator('.play')).toBeVisible();
   await expect(page.locator('#prompt')).not.toBeEmpty();   // the first question is drawn: measured from the DOM, so this file needs no `window.__sna`
+}
+
+/**
+ * Reaches Ninja Duel's landscape screen on top of `seedPlayer`, deliberately smaller than `duel.spec.ts`'s
+ * own `startDuel` (#399's safe-area tests below only need `.play.duel-screen` to render, never a round
+ * played, so this skips that file's speech-recording stub and dojo seeding).
+ */
+async function startDuel(page: Page) {
+  await seedPlayer(page);
+  await page.click('.island[data-year="year1"]');
+  await page.click('#duel');
+  await expect(page.locator('.duel-screen')).toBeVisible();
 }
 
 test.describe('tablet viewports (#116)', () => {
@@ -362,4 +374,58 @@ test.describe('tablet viewports (#116)', () => {
       expect(overflow, `#save-code scrolls internally on top of the dashboard's own scroll at ${w}x${h} (#18 group C)`).toBeLessThanOrEqual(0);
     });
   }
+});
+
+/**
+ * #399's own item 4: a real inset, injected via CDP (`overrideSafeAreaInsets`), read back as real computed
+ * padding — not the text-only grep the `tests/unit/guardrails.test.ts` rails already run at pull-request
+ * time (`env()` has no notch to resolve under either project, which is why those rails exist at all). This
+ * covers three of the four sites the issue's own sweep named: `.hud` (PR #530), the landscape duel screen
+ * (PR #542) and `.villain` (PR #551). `.cert-view` is NOT covered here — reaching it needs a full mission
+ * played to completion (`game.spec.ts`'s own certificate test), which is a bigger duplicate than this file's
+ * "small and deliberate" convention stretches to; left for a further slice, per the issue's own item 4.
+ *
+ * Each test uses its own distinct inset value per side, on purpose: a transposed pair (top swapped for
+ * left, `--sar` read where `--sal` was meant) would still pass a same-value check.
+ */
+test.describe('a real safe-area inset becomes real padding, not just a declared calc() (#399)', () => {
+  test('.hud pads by the real --sat/--sar/--sal values, not the env() fallback', async ({ page }) => {
+    await overrideSafeAreaInsets(page, { top: 30, right: 40, bottom: 20, left: 50 });
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    const hud = await page.locator('.hud').evaluate(el => {
+      const s = getComputedStyle(el);
+      return { top: s.paddingTop, right: s.paddingRight, bottom: s.paddingBottom, left: s.paddingLeft };
+    });
+    // src/style.css: `padding: calc(10px + var(--sat)) calc(12px + var(--sar)) 0 calc(12px + var(--sal))`
+    expect(hud, '.hud padding must reach the CDP-overridden insets, not the env() fallback of 0').toEqual({
+      top: '40px', right: '52px', bottom: '0px', left: '62px',
+    });
+  });
+
+  test('the landscape duel screen insets the arena PAIR by the real --sal/--sar values', async ({ page }) => {
+    await overrideSafeAreaInsets(page, { left: 55, right: 35 });
+    await page.setViewportSize({ width: 1280, height: 800 });   // orientation: landscape gates this rule
+    await startDuel(page);
+    const pad = await page.locator('.play.duel-screen').evaluate(el => {
+      const s = getComputedStyle(el);
+      return { left: s.paddingLeft, right: s.paddingRight };
+    });
+    // src/style.css: `.play.duel-screen { padding-left: var(--sal); padding-right: var(--sar) }`
+    expect(pad, '.play.duel-screen padding must reach the CDP-overridden insets').toEqual({ left: '55px', right: '35px' });
+  });
+
+  test('.villain reads the real --sar on its right offset, same as its already-correct --sab on bottom', async ({ page }) => {
+    await overrideSafeAreaInsets(page, { right: 45, bottom: 25 });
+    await seedPlayer(page, 'blaze', 'Ivy');
+    await page.click('.island[data-year="year2"]');
+    await page.click('#endless');
+    await expect(page.locator('.villain img')).toBeVisible();
+    const pos = await page.locator('.villain').evaluate(el => {
+      const s = getComputedStyle(el);
+      return { right: s.right, bottom: s.bottom };
+    });
+    // src/style.css: `.villain { right: calc(10px + var(--sar)); bottom: calc(12px + var(--sab)) }`
+    expect(pos, '.villain must reach the CDP-overridden --sar/--sab, not the env() fallback').toEqual({ right: '55px', bottom: '37px' });
+  });
 });

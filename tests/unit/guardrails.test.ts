@@ -2348,8 +2348,9 @@ describe('the tracing pad cannot silently return to the phone column, and the fi
  * #399: `--sal`/`--sar` were read at `.cert-view` (`var(--sal, 0px)`/`var(--sar, 0px)`) but never declared
  * beside `--sat`/`--sab` in `:root` — an undefined custom property with no fallback in the `var()` that
  * reads it is invalid at computed-value time and falls back to nothing at all, silently. Neither Playwright
- * project emulates safe-area insets (`env()` resolves to its fallback in both), so no viewport-level e2e
- * check can catch this class at all — this is the cheap, exhaustive complement: every `var(--x…)` in
+ * project emulated safe-area insets at the time this rail was written (`env()` resolved to its fallback in
+ * both, since nothing injected a real one), so no viewport-level e2e check could catch this class at all —
+ * this was the cheap, exhaustive complement: every `var(--x…)` in
  * `style.css` names a property declared somewhere, in either the stylesheet (a `:root`/rule declaration) or
  * a `.ts` source's own inline `style="--x:…"` (`--focus`/`--cols`/`--tint`/the confetti particles' `--i`/
  * `--x`/`--d`/`--c` and the shop trail swatch's `--c`/`--k` are all set that way, never in CSS, so the
@@ -2360,6 +2361,13 @@ describe('the tracing pad cannot silently return to the phone column, and the fi
  * `.ts` half is narrowed to `style="…"` attribute values for the same reason one level up: scanning a whole
  * source file for `--word:` would also match the shape inside an unrelated string or comment (review note,
  * PR #399) — the declaration only really exists if it sits inside a `style` attribute a browser reads.
+ *
+ * The "no viewport-level e2e check can catch this class" half is no longer true for three of the four sites
+ * (`.hud`/`.play.duel-screen`/`.villain`, not `.cert-view` yet): `tests/e2e/viewport.ts`'s
+ * `overrideSafeAreaInsets` drives Chromium's own `Emulation.setSafeAreaInsetsOverride` over CDP, and
+ * `viewport.spec.ts`'s "a real safe-area inset becomes real padding" tests read the real computed padding
+ * back. This rail and its siblings below stay as they are regardless — they still run at pull-request time
+ * with no browser at all, and they are the only check left for `.cert-view`.
  */
 it('every CSS custom property style.css reads with var() is declared somewhere — in the stylesheet or a .ts inline style (#399)', () => {
   const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
@@ -2387,9 +2395,13 @@ it('every CSS custom property style.css reads with var() is declared somewhere �
  * inside it) and `.play.duel-screen` (landscape) both reach the true screen edge once the viewport is
  * narrower than `--arena-w` — a notched phone on its side is exactly that case — and both used a fixed
  * left/right number with no `--sal`/`--sar` at all, the same silent-zero shape #530 already fixed for
- * `.screen`. Neither Playwright project emulates safe-area insets, so nothing here is reachable from the
- * e2e suite (`.claude/rules/e2e.md`'s own reason the sibling rail above is text-only); this is the
- * pull-request-time half, same as the #18 rail above it.
+ * `.screen`. At the time this rail was written neither Playwright project emulated safe-area insets, so
+ * nothing here was reachable from the e2e suite (`.claude/rules/e2e.md`'s own reason the sibling rail above
+ * is text-only); this is the pull-request-time half, same as the #18 rail above it. Both sites now ALSO
+ * have a real e2e check — `tests/e2e/viewport.spec.ts`'s "a real safe-area inset becomes real padding"
+ * describe, driving Chromium's `Emulation.setSafeAreaInsetsOverride` over CDP — but that only runs on the
+ * nightly full matrix, same as everything else in that file, so this text-only pair stays as the
+ * pull-request-time check.
  */
 describe('.hud and the duel screen use --sal/--sar too, not just a fixed number (#399)', () => {
   const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
@@ -2428,7 +2440,8 @@ describe('.hud and the duel screen use --sal/--sar too, not just a fixed number 
   // carries does not shift them. `bottom` already read `--sab` (correct by the same containing-block rule,
   // since `.hud`'s bottom padding is 0 and so never masked the gap); `right` stayed a bare 10px and so sat
   // flush with the true screen edge on a landscape notched phone, the exact silent-zero shape this issue is
-  // for. Text-only, like the sibling rail above: neither Playwright project emulates safe-area insets.
+  // for. Text-only, like the sibling rail above, and for the same pull-request-time reason — a real e2e
+  // check now exists too, in the "a real safe-area inset becomes real padding" describe in viewport.spec.ts.
   it('.villain reads --sar on its right offset, not a bare 10px', () => {
     const block = bare.match(/(?:^|[}\s])\.villain\s*\{([^}]*)\}/)?.[1];
     expect(block, 'the base .villain rule must exist').toBeTruthy();
