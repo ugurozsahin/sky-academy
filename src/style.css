@@ -478,6 +478,26 @@ img { -webkit-user-drag: none; }
 .mode-btn.memory .vport { box-shadow: 0 0 0 3px #3ec9ff; }
 .mode-btn.duel { margin-top: 10px; background: linear-gradient(90deg, #3b1a2a, #1a2a44); border-color: #ff5f6d66; box-shadow: 0 0 30px #ff5f6d33, 0 8px 24px #0008; }
 .mode-btn.duel .vport { box-shadow: 0 0 0 3px var(--bad); }
+/*
+ * #563 (#18 group B): below 900px the five mode buttons stay exactly as they were — `display: contents`
+ * makes the wrapper invisible to layout, so each `.mode-btn` is still a direct flow child of `.island-screen`,
+ * stacked by its own `margin-top` above. At ≥900px (the breakpoint `.screen`/`.p-stats`/`.p-years` already
+ * use) they move into a 3-column grid instead: stacked full-width they ran 566px tall, more than half an
+ * 800px-tall 1280×800 window and the reason the island needed two viewports of scroll (#18's 2026-09-22
+ * 14:02Z comment). Five cards read as a group either way; a grid reads differently from a stack, so the
+ * pull request that adds this rule carries `owner-approval`.
+ *
+ * `.island-screen .mode-grid .mode-btn` (three classes) rather than `.mode-grid .mode-btn` (two) — the
+ * per-mode rules above (`.mode-btn.train` etc.) are also two classes, so a two-class override would only
+ * win by being declared later in the file, a tie a future edit could silently flip back to a 10-18px
+ * margin-top at ≥900px with no error (silent-failure-hunter, #563 review). Three classes wins by
+ * specificity instead, regardless of source order.
+ */
+.mode-grid { display: contents; }
+@media (min-width: 900px) {
+  .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+  .island-screen .mode-grid .mode-btn { width: auto; margin-top: 0; }
+}
 /* Ninja Duel (#16, #388): the play shell split into two arenas, one per player, with the shared question card
    between them. Each half is its own canvas (its own pointer input). The screen class is `.duel-screen`, never
    bare `.duel` — the island's mode button carries that (#63).
