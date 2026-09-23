@@ -156,14 +156,25 @@ paths:
   routine merges roughly fifteen PRs a day, so a `priority:P1` bucket drains in a day or two, not a week.
   **Two of the three are no longer his alone (#512, owner 2026-09-22).** The refiner routine
   (`docs/REFINER-PROMPT.md`) may set `priority:*` and `blocked` — never `later` — but only behind a one-day
-  gate: it proposes today, re-derives the proposal from the repo tomorrow, and applies it then. That is a
+  gate: it proposes today, re-derives the proposal from the repo tomorrow, and applies it then.
+  **And `routine-ok` is no longer his alone either (#569, owner 2026-09-23), behind the same gate.** A refiner
+  that may size an issue, write its acceptance criteria and split it, and then may not say it is ready, has
+  finished half a refinement — the work it readies stays invisible to the only routine that could take it.
+  This one is worth naming separately from the ordering labels because of what it reaches: `routine-ok` is
+  what `docs/ROUTINE-PROMPT.md` STEP 3 queries on, so it is the single lever by which the refiner can cause
+  code to be written and merged, and nothing else in its prompt touches the source at all. Hence the gate,
+  three conditions on a fresh grant (acceptance criteria present; no `owner-input`/`owner-approval`/`blocked`;
+  in reach at all), and a ban on ever *removing* the label — under #153 a run cannot tell the owner's hand
+  from another run's, so removing it could revoke a release he gave. A split child inheriting the parent's
+  `routine-ok` and `priority:*` is not gated, because it preserves a decision rather than making one. That is a
   **loosening** under the `open-pr` skill §6 and was gated as one. The rule it relaxes existed to stop a run
   promoting its own work, and it does not reach a routine that opens no pull request and so has nothing to
   promote itself into; `docs/decisions/008-the-backlog-is-refined-by-a-routine.md` has the reasoning, the
   alternatives dropped, and why a forged objection is survivable here when a forged approval would not be.
 - **The labels (#218 moved the list here).** `priority:P0`/`P1`/`P2`/`P3` — P0 outranks P1,
   the ordering `docs/ROUTINE-PROMPT.md` STEP 3 and `scripts/board-sync.mjs`'s `PRIORITIES` array both use;
-  `routine-ok` (the developer routine may take it); `owner-session` (changed only in a session with the owner —
+  `routine-ok` (the developer routine may take it; the refiner may grant it behind its one-day gate and may
+  never remove it, #569); `owner-session` (changed only in a session with the owner —
   the routine never takes it); `owner-input` (needs the owner's art or decision); `owner-approval` (on a pull
   request: holds the merge until the owner writes his marker — for a genuinely new look only); `loosening` (on
   a governance pull request that loosens a constraint: the same hold, #112); `later` (parked

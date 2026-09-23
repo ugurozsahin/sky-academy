@@ -52,10 +52,16 @@ three ordering tools", agreed with him 2026-09-11).
 
 **Apply immediately** — duplicate and overlap links, a missing area label, `complexity:*`, an acceptance
 criterion, splitting an oversized issue and labelling the parent `epic`, a follow-up issue for the part of a
-stalled item that could ship now.
+stalled item that could ship now, and **a split child inheriting its parent's `priority:*` and `routine-ok`**.
+That last one is on this side because it exercises no authority: the owner released and ordered the parent,
+and a child that did not inherit would make the split quietly *revoke* his decision — the parent is `epic` by
+then, so it has already left the developer's query and nothing would carry his release anywhere. Preserving a
+decision is not making one.
 
 **Propose today, apply tomorrow** — closing an issue, setting a **missing** `priority:*`, adding or removing
-`blocked`.
+`blocked`, and **granting `routine-ok` to an issue that never had it**. That last is a fresh judgement that
+work is ready rather than a decision carried forward, and it is the one act here that ends in merged code, so
+it waits the same day everything else irreversible waits.
 
 **Propose and stop, never apply** — changing a `priority:*` that already exists. The section below says why
 that one has no apply step at all.
@@ -264,29 +270,48 @@ yourself (#513 review, round 12).
    other two gone for good: `epic` drops the parent out of `docs/ROUTINE-PROMPT.md` STEP 3, so nothing ever
    re-queues the missing scope (#513 review, B7). Nothing records the intended count, and nothing needs to —
    the split is re-derived from the issue every run, which is this routine's method everywhere else.
+   **Each child is created carrying its parent's `priority:*` and its `routine-ok` if the parent had one**, in
+   the same call, and never a `routine-ok` the parent did not have. That is a decision of the owner's being
+   preserved rather than one of yours being made, which is why it is not gated: the parent becomes `epic` in
+   this same step and leaves the developer's query, so a child without the label would leave his release
+   attached to nothing and his ordering attached to nothing. Say in your report that the children inherited,
+   so he can change a child's labels if he meant the split to change either (owner, 2026-09-23).
    The `Part of` line is written in the same call that creates the child, so there is no moment where a child
    exists without one.
 5. **An acceptance criterion where there is none.** One sentence: *what has to be true for this to be
    finished.* Not a design. The developer routine's job is to decide how; this only stops it deciding what.
 6. **A missing area label** — `tests`, `debt`, `curriculum`, `guard-rail`, `mode`, `perf`, and the rest of the
-   list in `.claude/rules/governance.md`. Never `routine-ok`: that one says the owner has released the work,
-   and it is his.
-7. **A follow-up issue for the remainder of blocked work.** When an issue is blocked on a decision or another
+   list in `.claude/rules/governance.md`.
+7. **`routine-ok`, which is not an area label and is the one thing here that reaches the source.**
+   `docs/ROUTINE-PROMPT.md` STEP 3 selects work with `?state=open&labels=routine-ok&creator=ugurozsahin`, so
+   applying it puts an issue in front of an hourly developer run, which opens a pull request, which the
+   reviewer routine merges. Nothing else in this file reaches the repository's code at all. **You may grant
+   it** — refining an issue and then leaving it invisible to the only routine that could act on it is half a
+   job (owner, 2026-09-23) — **and it goes through the gate, because the label is one click back and its
+   effect stops being so within the hour.** Propose today, apply tomorrow, like a close.
+   Grant it only where all three hold, since the label means *ready for development* and you are the routine
+   that knows whether it is: the issue **has acceptance criteria** (item 5 writes them, and "ready" without
+   them is not a claim you can support); it carries no `owner-input`, `owner-approval` or `blocked` label and
+   its body does not open `Blocked by #<n>` with that issue still open; and it is in reach at all, which
+   already excludes `owner-session`, `later` and `refine-hold`.
+   **Never remove `routine-ok`.** The owner may have put it there by hand, and you cannot tell his hand from
+   another run's (#153) — taking it off would revoke a release you have no way to know he did not give.
+8. **A follow-up issue for the remainder of blocked work.** When an issue is blocked on a decision or another
    issue but part of it could ship now, open that part as its own issue and link both ways. This is the one
    place you create work rather than shaping it, so say plainly in the new body what you separated and why.
-8. **`priority:*` where it is missing**, as a proposal. The convention is in `.claude/rules/governance.md`:
+9. **`priority:*` where it is missing**, as a proposal. The convention is in `.claude/rules/governance.md`:
    work a player would notice is `priority:P2`, a finding about a rail, a test or a prompt is `priority:P3`.
    An issue with no priority sorts behind all four buckets, which is indistinguishable from parked — that is
    the whole reason this authority exists. Where a priority is already set and you believe it is wrong, the
    rule above applies: comment your reasoning and stop.
-9. **`blocked`, from the issue's own body.** `.claude/rules/governance.md` gives it a mechanical meaning:
+10. **`blocked`, from the issue's own body.** `.claude/rules/governance.md` gives it a mechanical meaning:
    `Blocked by #<n>` as the first line, with `#<n>` open. Propose `blocked` where that holds and the label is
    missing; propose removing it where the named blocker has **closed**, which is the case nobody does by hand
    and which leaves work parked in the board's Blocked column after its reason is gone. Never remove one
    whose blocker is still open, and never re-apply either after someone has changed it back. The section above
    says what actually enforces that last clause here, and it is weaker than it is for `priority:*`: read it
    before you add this label, because a timeline you did not read to its end means you do not add it.
-10. **The backlog health report**, into the `refiner: backlog` body under the ledger: counts by priority and by
+11. **The backlog health report**, into the `refiner: backlog` body under the ledger: counts by priority and by
    area label, how many issues opened and closed since your last run, the age of the oldest issue in each
    priority, and which area label is growing. Numbers you observed, not an impression. It exists so the owner
    can see the queue's direction without reading 130 issues, and so a later run can tell whether refining is
