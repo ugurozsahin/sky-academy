@@ -2957,7 +2957,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   const ROUTINE_PROMPT_BUDGET = 21_359   // → 21,363: STEP 3 rule 1 gained `epic` and rule 3 generalised from the two heartbeat issues to every `: heartbeat` issue (#512), paid for in both; this lowering was made once before and lost in an earlier merge with main, which is why it is stated here again;   // → 21,412 (#466): STEP 3 restates §4 and enumerates what the skill adds, so the sweep and self-agent rules needed a pointer there or a run reading the step got a complete-looking account — paid for by shortening the review-gate clause and the WIP sentence, whose instructions both survive beside the cut words   // → 21,418: the pulse-stamp sentence in STEP 1 (#439), paid for in the cadence note, both bootstrap asides, the game description in the intro, the `watchdog` bullet and STEP 4's QA aside   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 9_961;   // → 9,961: the waiting test also covers a merge rule you cannot satisfy (#516), paid for in rule 4's look-must-not-change clause, the cadence and bootstrap asides in the header, and STEP 0's re-run limit   // → 9,967: the waiting test is applied, not re-judged (#516), paid for by collapsing STEP 2's restatement of rule 3's clear-and-wait parenthetical and rule 3's second pointer at the same skill section, and by dropping "decorations" from rule 4's new-look list, which CLAUDE.md's copy of that list does not carry either   // → 9,968: a finding stops the suite running at all, not merely last (#499, owner 2026-09-22), paid for in rule 2 lead-in, the Do NOT line re-listing the four rules above it, and the commands the review-pr skill already owns   // → 9,976: STEP 2 reordered so the browser follows the agents (#499), paid for by reducing the mobile/desktop recording rule to a pointer at its home in `review-pr` §2   // → 9,988: the pulse-stamp sentence after STEP 1 (#439), paid for in the bootstrap aside, the cadence note, the game description in the intro, STEP 2's fork sentence and rule 1's re-run clause (which the `Do NOT:` line already carries verbatim)   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
+  const REVIEWER_PROMPT_BUDGET = 9_950   // → 9,954: STEP 1 gains waiting clause (c), a PR whose gate went green after its clear (#579), paid for in the fork pointer, the idle-pulse aside, two duplicated review-pr pointers, the branch-name restatement, a doubled "report and stop", and the snapshot aside. One first attempt also cut "a pull request this session opened or pushed to is never yours" as a copy of line 12 and was reverted: two rails require it inside the waiting definition itself (#516)   // → 9,949: STEP 1 gains waiting clause (c), a PR whose gate went green after its clear (#579), paid for in the third copy of the self-review bar (line 12 and the Do NOT line already carry it), the fork pointer, the idle-pulse aside, and two duplicated review-pr pointers;   // → 9,961: the waiting test also covers a merge rule you cannot satisfy (#516), paid for in rule 4's look-must-not-change clause, the cadence and bootstrap asides in the header, and STEP 0's re-run limit   // → 9,967: the waiting test is applied, not re-judged (#516), paid for by collapsing STEP 2's restatement of rule 3's clear-and-wait parenthetical and rule 3's second pointer at the same skill section, and by dropping "decorations" from rule 4's new-look list, which CLAUDE.md's copy of that list does not carry either   // → 9,968: a finding stops the suite running at all, not merely last (#499, owner 2026-09-22), paid for in rule 2 lead-in, the Do NOT line re-listing the four rules above it, and the commands the review-pr skill already owns   // → 9,976: STEP 2 reordered so the browser follows the agents (#499), paid for by reducing the mobile/desktop recording rule to a pointer at its home in `review-pr` §2   // → 9,988: the pulse-stamp sentence after STEP 1 (#439), paid for in the bootstrap aside, the cadence note, the game description in the intro, STEP 2's fork sentence and rule 1's re-run clause (which the `Do NOT:` line already carries verbatim)   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -4025,6 +4025,141 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
       + 'one reaches nobody').toMatch(/unaddressed/i);
   });
 
+  /**
+   * #579, the sibling gap. (a) and (b) both compare a commit against a review verdict, so the owner writing
+   * his marker after a clear — which moves no commit — made a pull request stop matching either at the exact
+   * moment it became mergeable. #568 and #577 sat open, green and untouched on 2026-09-23 while two reviewer
+   * runs reported the problem and no rule let them act. This is not #516 above: that was a run re-judging a
+   * pull request the test DID match. Clause (c) is written over state rather than events, which is what stops
+   * a fourth kind of event reopening the same hole.
+   *
+   * **Pinned by equality, and the first version of this rail was not.** It asserted five tokens separately —
+   * `review-gate`, `green`, `open`, `not a draft`, `moves no commit` — and swapping the clause's **and** for
+   * an **or** kept every one of them while inverting the rule: any non-draft open pull request would satisfy
+   * (c) whatever colour the gate was. That is the token-presence defect this very block's comment warned
+   * about, rebuilt inside the guard against it (#580 review). A conjunction is not a token, so nothing short
+   * of the whole clause can hold it.
+   *
+   * What this costs is what every verbatim pin costs: a deliberate rewording turns it red and asks to be
+   * re-pinned on purpose. That is the trade the `CLAIMS` table made across fourteen rounds and it is the only
+   * mechanism here that has not been walked through.
+   */
+  /**
+   * Everything §6 says about clause (c), pinned by **equality on whole units** — and the population is read
+   * from the document rather than kept in this file.
+   *
+   * That last part is the correction, and it took five rounds. Round 4 pinned one assertion and left seven
+   * phrase matches. Round 5 named two of the seven and I converted all seven. Round 6 then found that "the
+   * rules" was the wrong set: the sentence deciding *when* the bullets apply — `So under (c), once that check
+   * says no commit has landed since the clear:` — is its own unit, was in none of the seven, and dropping its
+   * "no" inverts every bullet beneath it with the suite green throughout. Each time I re-derived the set from
+   * the fix I had just written, which is `guardrails.md` (c) exactly.
+   *
+   * So the set is now **every unit between the clause-(c) heading sentence and the paragraph after it**, taken
+   * from `review-pr/SKILL.md` itself. A unit added there without a row turns `covers every unit` red, which
+   * is the only version of this that a sixth round cannot reach.
+   *
+   * Why equality and not phrase presence: appending deletes nothing. "Merge it if the four rules let you —
+   * unless it feels safer to leave it blocked" keeps every word a regex looked for and brings back the loop
+   * this pull request exists to close (round 5, demonstrated against the real file).
+   *
+   * What it costs: a deliberate rewording of §6 turns a row red and asks to be re-pinned on purpose.
+   */
+  describe('§6 on clause (c), word for word (#579)', () => {
+    const REGION_FROM = '**Clause (c) asks you to finish';
+    const REGION_TO = '**A pull request you may not merge is still one you review.**';
+    const region = () => {
+      const s = doc('.claude/skills/review-pr/SKILL.md');
+      const six = s.indexOf('## 6. '), seven = s.indexOf('## 7. ');
+      if (six < 0 || seven < 0 || seven < six) throw new Error('§6 not found in review-pr/SKILL.md');
+      const s6 = s.slice(six, seven);
+      const a = s6.indexOf(REGION_FROM), b = s6.indexOf(REGION_TO);
+      if (a < 0) throw new Error(`§6 must still open the clause-(c) rules with "${REGION_FROM}"`);
+      if (b < 0 || b < a) throw new Error(`§6 must still carry "${REGION_TO}" after them`);
+      return s6.slice(a, b);
+    };
+    /** Paragraphs, and each `- **…` bullet inside one — the shape §6 is written in. */
+    const unitsOf = (text: string) =>
+      text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=- \*\*)/)).map((u) => u.trim()).filter(Boolean);
+
+    const PINS: Array<{ what: string; unit: string }> = [
+      { what: "finishing, not re-reviewing", unit: "**Clause (c) asks you to finish a pull request, not to review it again (#579).** STEP 1's third waiting clause\ncatches one that was already cleared and became mergeable afterwards — the owner's marker landing after the\nclear, most often." },
+      { what: "the verdict is required, not inferred from the gate", unit: "**It has a verdict, and (c) says so itself rather than inferring it from the gate.** That is load-bearing: a green\n`review-gate` means *not blocked*, never *reviewed*, because\n`scripts/review-gate.mjs`'s `blockState()` has nothing to report on a pull request nobody has commented on —\nso a brand-new one, CI green and unlabelled, reads `success` before anyone has read a line of it. Clause (c)\ntherefore requires the newest `REVIEW:` verdict to be a `REVIEW: CLEARED`. Without that condition this\nparagraph would be an instruction to **merge an unreviewed diff**: (c) would match the new pull request, \"finish\nit\" would apply, and §5's four rules check CI, blocks, drafts and labels — not whether anyone read the change.\nPR #583 was in exactly that state while this was being written: non-draft, gate green, zero comments (#580\nreview). Watchdog check 11 carries the same condition for the same reason; it was written first and this is it\nback-ported to the clause that needed it more. **Re-reviewing it is the wrong act and the loop is real**: a run that\ncannot merge it must, by §6's own rule, end in one of the two marks, so it would block a pull request it had\nitself cleared, every hour, for as long as the thing it cannot do stays undone." },
+      { what: "a commit after the clear takes the full review", unit: "**First, though: has a commit landed since that clear?** Compare the `REVIEW: CLEARED` comment's `created_at`\nwith the newest commit on the branch. If the commit is newer, or they share a timestamp, **this is clause (a) in substance however well it\nmatches (c)'s wording, and it takes the ordinary full review** — the diff, the agents, the suite, a fresh mark.\nNever the finish-path." },
+      { what: "why nothing else enforces that — blockState sees no commits", unit: "That order matters because nothing else enforces it. `scripts/review-gate.mjs`'s `blockState()` takes\n`{draft, labels, comments}` and **no commit information at all**, so it compares `REVIEW:` and `OWNER:`\ntimestamps against each other and never against the branch. A push re-runs it on the new head against unchanged\ncomments, so a stale `REVIEW: CLEARED` keeps the gate green over a commit nobody has read — and (c)'s three\nconditions, which is where the clause stops, contain no term about commits. Clause (a) does: *no `REVIEW:`\nverdict newer than its newest commit*. Both clauses match such a pull request, and without this paragraph a run\nhas no textual reason to take the slower one — the wording around (c) pushes the other way, since it frames the\nthing as already decided (#580 review)." },
+      { what: "the transition: the bullets apply only when NO commit has landed", unit: "So under (c), once that check says no commit has landed since the clear:" },
+      { what: "the merge is the ordinary case, and the check is retaken before it", unit: "- **Merge it if the four rules let you.** That is the whole point of the clause, and it is the ordinary case. **Take the commit check again immediately before you merge, not only once at the start of the pass.** §5's four rules are real wall-clock steps — a CI lookup, a status read, label checks — and a commit can land inside them. Nothing downstream would tell you: `blockState()` sees no commits, the draft flag does not move, and the newest verdict is still the old clear, so every signal you would reach for reads exactly as it did before. STEP 1 asks for the same re-check on the waiting test itself, and that one watches only for a new `REVIEW:` comment — which a commit does not produce (#580 review)." },
+      { what: "a barred merge goes to the pulse, not to a mark", unit: "- **If a rule bars the merge and the branch is fine — `loosening` is the owner's however he voted — record it\n  in your pulse by number with the one-line reason and leave it.** Not a new review, not a new mark, and not a\n  fresh block: the verdict already there is still the truth about the diff, and nothing about the diff\n  changed. Your pulse is where a run says \"I saw this and it is not mine to move\"." },
+      { what: "a branch that stopped being mergeable goes back to a developer", unit: "- **If the branch itself stopped being mergeable — a conflict, a red check — block it, naming what you found.**\n  That is not re-judging the diff; it is a new fact about the branch, and `main` moving is how it usually\n  arrives, hours after the clear and with no commit on the pull request to mark it. A conflict \"is what your\n  verdict says\" (#516), and the block is the only thing that routes the work anywhere: it marks the pull\n  request a draft, so clause (c) stops matching and this stops repeating, and its newest `REVIEW:` comment\n  becomes an unaddressed `REVIEW: CHANGES REQUESTED`, which is exactly what `docs/ROUTINE-PROMPT.md` STEP 2.5\n  looks for. A developer run then pushes the merge from `main` and the ordinary (b) path takes it from there.\n  **Without this the chain has no end**: the reviewer cannot push, STEP 2.5 never sees a cleared pull request,\n  and a conflicted one sits until a human notices. #568 sat that way on 2026-09-23, cleared at 09:48Z and\n  conflicted at 12:53Z by the merge of #577 (#579)." },
+      { what: "a mark under (c) is for the merge, the broken branch, or a real finding", unit: "- **A `REVIEW:` mark under (c) is for the merge, for a branch that stopped being mergeable, or for something\n  you actually found in the diff this run** — never because clause (c) listed the pull request." },
+      { what: "what follows: (c) is not a review backlog, and check 11 is the backstop", unit: "Two things follow that are easy to get backwards. A pull request under (c) is not evidence the reviewer is\nbehind, so it does not belong in any \"nobody is reviewing\" count. And the watchdog's check 11 exists for the\ncase where even this fails — it is keyed on the repository's own state rather than on anything a reviewer\nbelieves, which is why it is a backstop and not a duplicate of this rule." },
+    ];
+
+    it.each(PINS)('§6 still reads, word for word: $what', ({ unit }) => {
+      expect(unitsOf(region()),
+        'if §6 was reworded on purpose, re-pin it here deliberately and say so in the commit').toContain(unit);
+    });
+
+    it('the table covers every unit of the region, so a new one cannot arrive unpinned', () => {
+      const units = unitsOf(region());
+      expect(units.length, 'the region must split into its units, or every row above asserts nothing')
+        .toBeGreaterThanOrEqual(10);
+      const pinned = new Set(PINS.map((p) => p.unit));
+      expect(units.filter((u) => !pinned.has(u)),
+        'every unit between the clause-(c) opening and the paragraph after the rules must have a row — an '
+        + 'unpinned one is a rule, or a sentence deciding when the rules apply, that any edit can invert '
+        + 'silently (round 6)').toEqual([]);
+      expect(new Set(PINS.map((p) => p.unit)).size, 'two rows must not pin the same unit').toBe(PINS.length);
+      expect(new Set(PINS.map((p) => p.what)).size, 'two rows must not claim the same thing').toBe(PINS.length);
+    });
+
+    // Structure a pin cannot express: the commit check gates the bullets, so it has to come before them.
+    it('the commit-after-clear check precedes the finish-path it gates', () => {
+      const r = region();
+      const check = r.indexOf('**First, though: has a commit landed since that clear?**');
+      const merge = r.indexOf('- **Merge it if the four rules let you.**');
+      expect(check, '§6 must carry the commit check').toBeGreaterThan(-1);
+      expect(merge, 'and the merge bullet it gates').toBeGreaterThan(-1);
+      expect(check, 'a run that meets the shortcut first has already taken it').toBeLessThan(merge);
+    });
+
+    // And the pointer, without which none of §6 is reached from the prompt a run actually follows.
+    it('the reviewer prompt sends a clause (c) run to §6', () => {
+      expect(doc('docs/REVIEWER-PROMPT.md'), 'clause (c) must point at the section that says what it asks for')
+        .toContain('§6 has what (c) asks');
+    });
+  });
+
+  it('the waiting test carries clause (c) word for word, conjunction included (#579)', () => {
+    const text = doc('docs/REVIEWER-PROMPT.md');
+    const step1 = text.slice(text.indexOf('STEP 1 — SETUP'), text.indexOf('STEP 2 — REVIEW'));
+    expect(step1.length, 'STEP 1 must be found, or this rail reads an empty string').toBeGreaterThan(500);
+    // #580 review, finding 3: the pin held clause (c) alone and an ordering assertion claimed it "sits
+    // inside the definition". It did not — relocating the whole clause verbatim to the END of STEP 1, fully
+    // detached from the sentence defining "waiting", kept both green, because `indexOf` only proved (c)
+    // appeared somewhere after (b) ended. Position is not a property of a substring. So the junction itself
+    // is inside the pin: (b)'s last words and (c) in one string, which can only hold if (c) continues that
+    // very sentence.
+    const CLAUSE_C = 'newer than that block; or (c) it is open, not a draft, its newest `REVIEW:` verdict '
+      + 'is `REVIEW: CLEARED`, and `review-gate` green \u2014 his marker after a clear moves no commit, so (a) '
+      + 'and (b) miss it; \u00a76 has what (c) asks (#579).';
+    expect(step1, 'clause (c) must read exactly this, joined to the end of clause (b) — every condition, the '
+      + '**and** that binds them, the reason (a) and (b) miss the case, and the semicolon that keeps it in '
+      + 'the same sentence. If the wording changed on purpose, re-pin it here and say so in the commit')
+      .toContain(CLAUSE_C);
+    expect(step1.indexOf(CLAUSE_C), 'and the whole definition must still precede the rule about applying it')
+      .toBeLessThan(step1.indexOf('never re-judge it'));
+    // The condition that keeps (c) from being an instruction to merge an unread diff, asserted on its own as
+    // well as inside the pin above. A green `review-gate` means *not blocked*, never *reviewed*:
+    // `blockState()` has nothing to report on a pull request with no comments, so a brand-new one reads
+    // `success` before anyone has read a line — PR #583 was in that state when this was written. Without the
+    // verdict condition, (c) matches it and §6 says finish rather than review (#580 review).
+    const clause = step1.slice(step1.indexOf('or (c) it is open'));
+    expect(clause.slice(0, clause.indexOf('(#579)')), '(c) must require a cleared verdict, not merely a green '
+      + 'gate — otherwise it matches a pull request nobody has read and §6 tells a run to merge it')
+      .toMatch(/newest\s+`REVIEW:`\s+verdict\s+is\s+`REVIEW:\s+CLEARED`/);
+  });
+
   it('the reviewer prompt puts "apply the test, do not re-judge it" inside the waiting definition', () => {
     const text = doc('docs/REVIEWER-PROMPT.md');
     const step1 = text.slice(text.indexOf('STEP 1 — SETUP'), text.indexOf('STEP 2 — REVIEW'));
@@ -4467,6 +4602,9 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
     { what: "why blocked sits lower, and why its two directions are counted together",
       file: "docs/REFINER-PROMPT.md",
       unit: "`blocked` sits lower than the rest, at three, because it is the only one of the four that moves work **out**\nof reach rather than into it, and because adding and removing it are counted together: a run that parks two\nitems and unparks two has touched four pieces of the owner's own ordering while no single number looks large.\nFour issues quietly parked is a bigger change to what happens next week than four issues closed." },
+    { what: "the watchdog catches a reviewed pull request nothing is coming for",
+      file: "docs/WATCHDOG-PROMPT.md",
+      unit: "11. **Is any pull request reviewed, unblocked and still sitting there?** List every open pull request —\n   `GET /repos/ugurozsahin/sky-academy/pulls?state=open&per_page=100`, following `Link: rel=\"next\"`.\n   **Skip forks exactly as the reviewer does** — `head.repo.full_name != base.repo.full_name`, or\n   `head.repo.fork` is `true`, and fail-closed when `head.repo` is missing. `docs/REVIEWER-PROMPT.md` STEP 2\n   never reviews, comments on or merges one by design, so a fork is not abandoned, it is excluded.\n   A finding is a pull request where **all** of these hold: it is **not a draft**; its newest `REVIEW:` verdict\n   is a **`REVIEW: CLEARED`**; its `review-gate` status is **`success`** — `GET /commits/<head sha>/status`,\n   never the Actions API, and a missing or pending status is not a pass; and more than ~2 hours have passed\n   since the later of that clear and the owner's own marker — or since the clear alone where there is no marker, which is the ordinary case. Name it by number.\n   **And no commit has landed since that clear.** If one has, the pull request is not finished and waiting — it is waiting for a review of the commit, which `docs/REVIEWER-PROMPT.md` STEP 1 clause (a) already asks for. Reporting it here would say \"nothing is coming for this\" about a pull request the reviewer is due to pick up, which is a false finding of exactly the kind this check was rewritten to stop making. `blockState()` never compares a verdict against a commit, so the gate cannot tell you this and you have to look (#580 review).\n   **The cleared verdict is what makes this check mean anything, and \"the gate is green\" will not stand in for\n   it.** `scripts/review-gate.mjs`'s `blockState()` reports `blocked: false` whenever nothing is blocking —\n   which is true of a pull request nobody has looked at yet, since no `REVIEW:` comment exists to be open. A\n   green gate says *not blocked*, never *reviewed*. Built on the gate alone this check would report every\n   untouched fork and the entire unreviewed queue as abandoned, every six hours, forever — a watchdog\n   manufacturing false alarms, which is the one failure this document says is worse than no watchdog at all\n   (#580 review).\n   **There is no carve-out here, and `loosening` is not one.** A cleared, approved, green `loosening` pull request\n   meets every condition above, so it is a finding — \"a check whose condition is met is a finding. Full stop\",\n   at the top of this document, and that rule says explicitly that a benign cause changes **the wording of the\n   issue, never whether you raise it**. So raise it, and word it as what it is: a pull request finished and\n   waiting on the owner's own hand, which no routine may merge (`docs/REVIEWER-PROMPT.md` rule 4). It is not a\n   defect report and should not read like one.\n   **Repetition is already solved and does not need an exception.** `## Reporting` below forbids a second issue\n   for a problem that already has an open `watchdog` one — comment that it persists and for how long instead —\n   and tells the owner only about a finding that is new or has materially changed. One issue, then comments, and\n   he hears once. A first draft of this said to put it in the pulse rather than an issue, which was wrong twice\n   over: it invented a third behaviour the document already had a better answer for, and the pulse is a single\n   line overwritten every run with nowhere to keep a pull request number — so \"record it in the pulse\" is how a\n   stranded pull request stays invisible, which is the exact shape this check exists to end (#580 review).\n   **`owner-approval` is not an exception either**: once he writes his marker the gate goes green and a routine\n   may merge it, so an approved one still sitting there is a defect and reads like one. The first draft of this\n   check excluded it and would have stayed silent on #568 and #577 — the two pull requests it was written for.\n   This check exists because of a real stranding, and the shape matters more than the instance:\n   `docs/REVIEWER-PROMPT.md` STEP 1 decides what a reviewer looks at, and until #579 both its clauses compared\n   **a commit against a review verdict**. The owner writing his marker after a clear moves no commit, so a\n   pull request stopped matching either at the moment it became mergeable — #568 and #577 sat open and green\n   on 2026-09-23 with two reviewer runs seeing the problem and no rule letting them act. STEP 1 clause (c)\n   closes that, and this check is the backstop **because it is keyed on nothing the reviewer believes**: it\n   reads the repository's own answer to \"was this finished and is it still here\", so a fourth kind of event\n   that no waiting clause anticipates still surfaces." },
     { what: "the four pulse issues are out of reach",
       file: "docs/REFINER-PROMPT.md",
       unit: "- the four pulse issues — `routine: heartbeat`, `reviewer: heartbeat`, `board: heartbeat`,\n  `watchdog: heartbeat`, and your own two below. They are permanently open on purpose and their bodies are\n  deliberately odd, so a \"this claim is no longer true, close it\" pass would kill every one of them. Match\n  them by title, not by label: they carry `watchdog`, and so do real findings." },
@@ -4600,7 +4738,7 @@ describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', (
 
   it('the claim table covers the whole population and cannot quietly shrink', () => {
     expect(CLAIMS.length, 'a row removed is a guarantee unpinned — lower this only when the document '
-      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(57);
+      + 'genuinely drops a claim, and say so in the commit').toBeGreaterThanOrEqual(58);
     expect(new Set(CLAIMS.map((c) => c.what)).size, 'two rows must not claim the same thing')
       .toBe(CLAIMS.length);
     expect(new Set(CLAIMS.map((c) => c.unit)).size, 'two rows must not pin the same unit — that is one '
