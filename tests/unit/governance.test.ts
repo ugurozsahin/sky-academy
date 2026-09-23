@@ -632,8 +632,9 @@ describe('branches are named for the change, and nothing matches on the old pref
  *
  * Two things this describe pins, because each is a way the rule would decay:
  *
- *  - **`scripts/review-gate.mjs` has no clock.** A block must never expire by itself — that is how #74 was
- *    merged over five open review items. The gate reads marker ORDER (which `created_at` is later), never
+ *  - **`scripts/review-gate.mjs` has no clock.** A block must never expire by itself — that is how
+ *    `ugurozsahin/sky-academy-private-archive#74` was merged over five open review items. The gate reads
+ *    marker ORDER (which `created_at` is later), never
  *    elapsed time, so `Date.now` appearing in it at all means someone taught it to age a block out.
  *  - **The skill keeps the phrase the gate keys on.** `isAdoptionClear()` recognises a superseding clear by
  *    the words "another reviewer's block" and `blockState()` then demands a session URL of it (#191/#195).
@@ -697,12 +698,14 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
 
   /**
    * #305 — §6 says a block never expires and who may supersede it; nothing said what a block is *for*, or that
-   * the rounds have a floor. PR #292 blocked six times over five hours for a ten-line pin, each round inventing
-   * a further YAML shape, and ended only because #161 let a second reviewer supersede the sixth block.
+   * the rounds have a floor. PR #292 blocked seven times across 6h14m for a ten-line pin, each round inventing
+   * a further YAML shape, and ended only because #161 was used twice — the clear that superseded the sixth
+   * block was itself followed by a seventh, and a further fix push and a second supersession finished it.
    *
    * §7 is the answer and this pins its two halves, because either alone decays into the other's failure: a bar
    * with no round cap is the loop again one finding at a time, and a cap with no bar is "merge on the fourth
-   * round" — which is how #74 went in over five open items. The closing paragraph is pinned with them: the cap
+   * round" — which is how `ugurozsahin/sky-academy-private-archive#74` went in over five open items. The
+   * closing paragraph is pinned with them: the cap
    * is about rounds, never about reviewing less carefully, and a reviewer reading one without the other gets
    * the wrong rule.
    *
@@ -1048,11 +1051,12 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     expect(text, 'a second copy of the paragraph is what one home per rule removed').not.toContain('footer is not a substitute');
   });
 
-  // The gate reports the block; it never ages one out. #74 is what an expiring block costs.
+  // The gate reports the block; it never ages one out. `ugurozsahin/sky-academy-private-archive#74` is what
+  // an expiring block costs.
   it('review-gate.mjs orders the markers and never reads a clock', () => {
     const src = read('scripts/review-gate.mjs');
     expect(src, 'the gate must still decide by marker order').toContain('created_at');
-    expect(src, 'but never by elapsed time — a block that expires by itself is #74 again')
+    expect(src, 'but never by elapsed time — a block that expires by itself is `ugurozsahin/sky-academy-private-archive#74` again')
       .not.toMatch(/Date\.now|getTime\(\)|\b\d+\s*\*\s*60\s*\*\s*60\b/);
   });
 

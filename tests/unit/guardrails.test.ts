@@ -236,7 +236,8 @@ describe('guard rails', () => {
     expect(main).toMatch(/dispose\s*=\s*playScreen\(/);
     expect(main).toMatch(/dispose\s*=\s*memoryScreen\(/);
     expect(main).toMatch(/dispose\s*=\s*duelScreen\(/);      // #16: the third arena-owning screen
-    // Match each route's *body*, not its layout: an equivalent reformat must not turn this red (#74 review).
+    // Match each route's *body*, not its layout: an equivalent reformat must not turn this red
+    // (ugurozsahin/sky-academy-private-archive#74 review).
     // The route names are read from the source, so a screen added later is covered without editing this test.
     // Bound the slice at the router's closing brace: unbounded, the LAST route's "body" ran to end of file, so
     // any `leave()` written lower in main.ts made a genuinely broken route pass (#77 review).

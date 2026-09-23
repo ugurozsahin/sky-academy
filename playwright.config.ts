@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 // The cloud dev container ships Chromium at a fixed path and blocks `playwright install`; a GitHub runner
 // (and a laptop) has its own download under ~/.cache/ms-playwright. Point at the bundled binary only when it
-// is really there, or CI launches nothing and every e2e test fails (#74 review). PW_CHROMIUM overrides both.
+// is really there, or CI launches nothing and every e2e test fails (ugurozsahin/sky-academy-private-archive#74
+// review). PW_CHROMIUM overrides both.
 const bundled = '/opt/pw-browsers/chromium';
 const executablePath = process.env.PW_CHROMIUM || (existsSync(bundled) ? bundled : undefined);
 // #123: this used to be a bare `4173` shared by `baseURL` and `webServer`, with `reuseExistingServer: true`.

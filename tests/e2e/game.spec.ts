@@ -1580,7 +1580,8 @@ test.describe('Sky Ninja Academy', () => {
     // the back button left the old Arena's rAF loop running on a detached canvas — with its window listeners
     // attached and `window.__sna` pointing at the dead session. Every play → back → play stacked another one.
     // Sample only once the route change has finished: the arena legitimately ticks a frame or two between
-    // `history.back()` and `popstate` running, so measuring across the pop would flake at ~0.02 s (#74 review).
+    // `history.back()` and `popstate` running, so measuring across the pop would flake at ~0.02 s
+    // (ugurozsahin/sky-academy-private-archive#74 review).
     await page.evaluate(() => { (window as any).__deadArena = window.__sna.arena; history.back(); });
     await expect(page.locator('.island-screen')).toBeVisible();
     const leaked = await page.evaluate(() => new Promise<any>(res => {
