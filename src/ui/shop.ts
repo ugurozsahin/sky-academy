@@ -1,4 +1,6 @@
-// Ninja Shop (#6): spend coins on skins. Infrastructure + one placeholder trail skin; every look goes to the owner for approval.
+// Ninja Shop (#6): spend coins on skins. The trail catalogue is real (#69) — a free element trail, one paid
+// trail per element and the gold trail; bubble, decor and costume stay "coming soon" placeholders. Every look
+// goes to the owner for approval.
 import { buyItem, coinBalance, equipItem, wallet } from '../storage';
 import { canBuy, equippedItem, KIND_LABEL, SHOP_ITEMS, type ItemKind } from '../game/shop';
 import { sfx, say } from '../audio';
