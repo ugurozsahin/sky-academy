@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { expectFitsViewport, outsideItsBox, overrideSafeAreaInsets } from './viewport';
+import { AVATARS, VILLAIN } from '../../src/avatars';
+import type { StoredCert, StoredDuel } from '../../src/storage';
 
 /**
  * The tablet specs (#116). This file is the whole of what the `tablet` and `tablet-landscape` projects
@@ -425,6 +427,95 @@ test.describe('tablet viewports (#116)', () => {
       await openDashboard(page);
       const overflow = await page.locator('#save-code').evaluate(el => (el as HTMLTextAreaElement).scrollHeight - (el as HTMLTextAreaElement).clientHeight);
       expect(overflow, `#save-code scrolls internally on top of the dashboard's own scroll at ${w}x${h} (#18 group C)`).toBeLessThanOrEqual(0);
+    });
+  }
+
+  /**
+   * #564 (#18 group B): rewards and shop, measured on a seeded save with progress, stickers, certificates
+   * and duels — not a fresh one, which is the narrowest either screen ever is and would pass this
+   * vacuously (#109's own reasoning for `seedProgress`, above). The per-element breakdown on the issue
+   * found a fresh-save read of 1040px for rewards was an empty-state artefact; this is the re-measure it
+   * asked for. `cert`/`match` mirror `game.spec.ts`'s own row shapes rather than inventing new ones.
+   */
+  async function seedRewardsData(page: Page) {
+    // Typed against the real StoredCert/StoredDuel shapes (type-design-analyzer, #564 review) — a future
+    // required field would otherwise go uncaught here exactly as it already does in game.spec.ts's own
+    // untyped builders of the same shape.
+    const cert = (id: string, title: string, year: string, date: string): StoredCert =>
+      ({ id, name: 'Ada', avatar: 'volt', year, title, stars: 3, score: 250, correct: 20, attempts: 20, date });
+    const match = (at: number, extra: Partial<StoredDuel> = {}): StoredDuel =>
+      ({ at, topic: 'y1-bonds', title: 'Number bonds', year: 'Year 1', winner: 'a', scoreA: 6, scoreB: 4, rounds: 10, ...extra });
+    await page.addInitScript(save => {
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({
+      v: 1, name: 'Ada', avatar: 'volt',
+      coins: 1250, streak: { last: '', days: 12 },
+      stickers: [...AVATARS.slice(0, 5).map(a => a.id), VILLAIN.id],
+      certs: [
+        cert('reception:r-count', 'Counting to 10', 'Reception', '2026-09-10'),
+        cert('year1:y1-bonds', 'Number bonds to 20', 'Year 1', '2026-09-12'),
+        cert('year2:y2-tables', 'Times tables', 'Year 2', '2026-09-15'),
+      ],
+      duels: [
+        match(1_757_100_000_000, { topic: 'y1-days', title: 'Days of the week', winner: 'b', scoreA: 3, scoreB: 7 }),
+        match(1_757_000_000_000),
+        match(1_756_900_000_000, { topic: 'y2-tables', title: 'Times tables', winner: 'a', scoreA: 9, scoreB: 5 }),
+      ],
+    }));
+    await page.goto('/');
+    await expect(page.locator('.home')).toBeVisible();
+  }
+
+  const REWARDS_TOLERANCE = 20;
+  // Real, measured (see the function above's docstring): 1475px at 1280x800, 1518px at 1024x768 — both well
+  // past one viewport, and neither close to the fresh-save 1249/1252px the issue's own audit read before
+  // asking for a re-measure. Whether two of the four sections (stats+album, certificates, duels) can sit
+  // side by side at this breakpoint is a look decision #564 leaves open rather than guesses at here (#18
+  // group B's own precedent: #563 took the same question to the owner for the island's mode buttons rather
+  // than picking a layout unasked).
+  const REWARDS_CASES = [
+    { w: 1280, h: 800, target: 1475 },
+    { w: 1024, h: 768, target: 1518 },
+  ] as const;
+
+  for (const { w, h, target } of REWARDS_CASES) {
+    test(`the rewards screen's content height is pinned at ${w}x${h}, on a seeded save (#564)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedRewardsData(page);
+      await page.click('#rewards');
+      await expect(page.locator('.rewards')).toBeVisible();
+      await expect(page.locator('.cert-row')).toHaveCount(6);   // 3 certs + 3 duels (both share .cert-row)
+      const total = await page.evaluate(() => document.documentElement.scrollHeight);
+      expect(total, `rewards content height at ${w}x${h}: expected close to ${target}px (#564)`)
+        .toBeGreaterThanOrEqual(target - REWARDS_TOLERANCE);
+      expect(total, `rewards content height at ${w}x${h}: expected close to ${target}px (#564)`)
+        .toBeLessThanOrEqual(target + REWARDS_TOLERANCE);
+    });
+  }
+
+  const SHOP_TOLERANCE = 20;
+  // Real, measured: 1130px at 1280x800, 1145px at 1024x768 — matches the issue's own audit. `.shop-grid`
+  // already reflows (`repeat(auto-fill, minmax(140px, 1fr))`); the remainder is the Slice trails grid's real
+  // item count needing two rows, which is content rather than a stacking bug, so there is nothing group-B
+  // shaped to fix here.
+  const SHOP_CASES = [
+    { w: 1280, h: 800, target: 1130 },
+    { w: 1024, h: 768, target: 1145 },
+  ] as const;
+
+  for (const { w, h, target } of SHOP_CASES) {
+    test(`the shop screen's content height is pinned at ${w}x${h} (#564)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedPlayer(page);
+      await page.click('#rewards');
+      await expect(page.locator('.rewards')).toBeVisible();
+      await page.click('#shop');
+      await expect(page.locator('.shop')).toBeVisible();
+      const total = await page.evaluate(() => document.documentElement.scrollHeight);
+      expect(total, `shop content height at ${w}x${h}: expected close to ${target}px (#564) — the 12-item trail grid needing two rows, content rather than a stacking bug`)
+        .toBeGreaterThanOrEqual(target - SHOP_TOLERANCE);
+      expect(total, `shop content height at ${w}x${h}: expected close to ${target}px (#564)`)
+        .toBeLessThanOrEqual(target + SHOP_TOLERANCE);
     });
   }
 });
