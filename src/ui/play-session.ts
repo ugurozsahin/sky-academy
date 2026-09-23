@@ -42,7 +42,12 @@ export function waveOptsFor(q: Question, info: { labels: string[]; speed: number
  * daily streak) — handed from `commitResult()` to `showResults()` rather than a second one recomputing them,
  * which would pay the game twice (#484, mirroring #375/#441's `MatchPayout` for Ninja Duel).
  */
-export interface ResultPayout { newBest: boolean; dojo: DojoOutcome; fresh: string[]; streak: number; cert: CertInfo | null }
+export interface ResultPayout {
+  newBest: boolean; dojo: DojoOutcome; fresh: string[]; streak: number; cert: CertInfo | null;
+  /** Whether `cert`'s write actually reached the store (#470) — see `play.ts`'s `commitResult()`. `cert`
+   *  itself stays what was earned regardless; only this says whether the album kept it. */
+  certSaved: boolean;
+}
 
 /** The HUD elements the callbacks write to — play.ts owns them and passes its own `els` straight in. */
 export interface PlaySessionEls {

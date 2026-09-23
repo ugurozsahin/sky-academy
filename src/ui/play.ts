@@ -6,7 +6,7 @@ import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import { Tracer } from '../game/tracing';
 import {
-  load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd,
+  isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd,
   recordSprint, recordTopic, recordTraining, save, today, touchStreak, wallet,
 } from '../storage';
 import { equippedItem } from '../game/shop';
@@ -215,15 +215,19 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     }, r.coins);
     const streak = touchStreak();
     const cert = certInfo(r); lastCert = cert;
-    if (cert) fileCertificate(cert);   // #205: filed when it is *earned*, not when the button works
-    return { newBest, dojo, fresh, streak, cert };
+    // #205: filed when it is *earned*, not when the button works. `certSaved` (#470) is read the instant
+    // after that write, per `isWriteFailing()`'s own contract of reflecting only the last attempt — a refusal
+    // is not offered to the child as a keepsake the album does not actually hold. `cert` itself stays what
+    // was earned regardless: the `certificate()` hook below still answers that, same as before #470.
+    const certSaved = cert ? fileCertificate(cert) : false;
+    return { newBest, dojo, fresh, streak, cert, certSaved };
   }
   function showResults(r: SessionResult, payout: ResultPayout) {
     // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
     // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
     // certificate toasts' own auto-hide) belong to this overlay rather than to the held game, so they still run.
     playSession.hold(true, false);
-    const { newBest, dojo, fresh, streak, cert } = payout;
+    const { newBest, dojo, fresh, streak, cert, certSaved } = payout;
     const stickerHTML = stickersHTML(fresh);
     if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138
     const medal = resultMedal(r);
@@ -240,18 +244,23 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     const heading = r.incomplete ? 'Session ended early' : resultHeading(r.mode, { won: r.won, training });   // from the mode table (mission distinguishes a Sensei-training win)
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
+    // `certSaved` (#470) is read the instant after `fileCertificate`'s own write, inside `commitResult()` —
+    // per `isWriteFailing()`'s own contract of reflecting only the last attempt — a refusal is not offered to
+    // the child as a keepsake the album does not actually hold. `cert` itself stays what was earned regardless:
+    // the `certificate()` hook below still answers that, same as before #470.
+    const earned = certSaved ? cert : null;
     els.overlay.hidden = false;
     els.overlay.innerHTML = resultsHTML({
       mode: r.mode, won: r.won, training, incomplete: r.incomplete, glow: speaker.glow, img: speaker.img, name: speaker.name,
       headline, medal, heading, starCount: r.stars, score: r.score, correct: r.correct, attempts: r.attempts,
-      bestCombo: r.bestCombo, coins: r.coins, newBest, streak, dojoRows: dojoRowsHTML(dojo), stickerHTML, cert: !!cert,
+      bestCombo: r.bestCombo, coins: r.coins, newBest, streak, dojoRows: dojoRowsHTML(dojo), stickerHTML, cert: !!earned,
     });
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
-    if (cert) $('#cert').addEventListener('click', async () => {
+    if (earned) $('#cert').addEventListener('click', async () => {
       sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
       try {
-        const how = await deliverCertificate(await drawCertificate(cert), `sky-ninja-certificate-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
+        const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-certificate-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
         if (how === 'shared') toast('Certificate shared!', 'good');
         else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
         else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
@@ -262,22 +271,26 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     });
   }
   /**
-   * Keep the certificate this mission earned (#205). It is filed the moment the results overlay is built,
-   * not from the 🎓 button: the bug this issue opened with is a device where pressing that button does
-   * nothing at all, and the child who most needs the certificate kept is the one it silently failed for.
+   * Keep the certificate this mission earned (#205), and report whether the write actually landed (#470).
+   * It is filed the moment the results overlay is built, not from the 🎓 button: the bug #205 opened with is
+   * a device where pressing that button does nothing at all, and the child who most needs the certificate
+   * kept is the one it silently failed for.
    *
    * The stored day comes from `c.date` (#410), not a fresh `today()` — this can run a beat after `certInfo()`
    * built `c`, and the same certificate is drawn later still, whenever the child presses the button. Reading
    * the clock again here would give the stored album row and the printed keepsake two different instants to
    * take their day from, on top of the UTC-vs-local split `certificate.ts`'s `displayDay()` now closes.
    */
-  function fileCertificate(c: CertInfo) {
+  function fileCertificate(c: CertInfo): boolean {
     recordCert({
       id: `${o.year.id}:${training ? 'sensei' : o.topic?.id ?? 'mission'}`,
       name: c.name, avatar: d.avatar, year: c.year, title: c.title,
       stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
       date: today(c.date), training: c.training,
     });
+    // Both refusal paths (#470 review round 1): `isWriteFailing()` alone missed a write `save()` skipped
+    // deliberately under `isReadOnlySave()`'s latch (#232) — the row was offered though the album never got it.
+    return !isWriteFailing() && !isReadOnlySave();
   }
   /** Certificate details for a won mission / Sensei session (null for the other modes and lost runs). `date`
    *  is fixed here, at the moment it is earned (#410), rather than left for `certificateText()` to default —
