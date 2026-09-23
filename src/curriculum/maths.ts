@@ -825,11 +825,13 @@ const y2Position: Generator = (d, rng) => {
  * Half-pictures, three squares wide. A card's grid is a half beside its own reflection, so a symmetric
  * picture is symmetric **by construction** rather than by a table someone has to keep correct by hand:
  * there is no way to mistype a half into an asymmetric whole. `#` is a coloured square, `.` an empty one.
+ * Each row's rightmost square sits against the fold, so most rows fill it — a row that instead leaves
+ * the fold empty (like the butterfly's top) is a deliberate gap, not an accident (#391).
  */
 const SYM_HALVES: readonly (readonly string[])[] = [
   ['..#', '.##', '###', '..#'],   // a tree on a trunk
   ['.##', '###', '.##', '..#'],   // a balloon on a string
-  ['#..', '##.', '###', '.##'],   // a mountain
+  ['..#', '.##', '###', '.##'],   // a mountain
   ['..#', '.##', '.##', '###'],   // a fir
   ['.#.', '###', '###', '..#'],   // a butterfly
   ['###', '.##', '..#', '..#'],   // a funnel
@@ -861,8 +863,8 @@ const ASYM_LETTERS = ['B', 'C', 'D', 'E', 'F', 'G', 'J', 'K', 'L', 'N', 'P', 'Q'
 const y2Symmetry: Generator = (d, rng) => {
   if (d === 1 || rng() < 0.6) {
     const half = pick(rng, SYM_HALVES);
-    const yes = rng() < 0.5;
-    const grid = yes ? mirrored(half) : breakSymmetry(rng, half, d === 1 ? 3 : d === 2 ? 2 : 1);
+    const grid = rng() < 0.5 ? mirrored(half) : breakSymmetry(rng, half, d === 1 ? 3 : d === 2 ? 2 : 1);
+    const yes = isVertSymmetric(grid);
     return wordQ(rng, 'Is the dotted line a line of symmetry?', yes ? 'yes' : 'no', [yes ? 'no' : 'yes'], {
       visual: { type: 'symmetry', grid }, wide: true,
       say: 'Look at the dotted line. Are the two halves the same? Say yes or no.',
@@ -915,7 +917,7 @@ const y2Patterns: Generator = (d, rng) => {
   // pool fills up to three so an AB pattern still gets a full card.
   const decoys = [...chosen.filter(o => o !== answer), ...shuffle(rng, PATTERN_GLYPHS.filter(o => !chosen.includes(o)))];
   return wordQ(rng, last ? 'What comes next?' : 'Which one is missing?', answer, decoys, {
-    visual: { type: 'sentence', text: seq.map((o, i) => i === gap ? '_' : o).join(' ') },
+    visual: { type: 'strip', text: seq.map((o, i) => i === gap ? '_' : o).join(' ') },
     say: last ? 'Look at the pattern. What comes next?' : 'Look at the pattern. Which one is missing?',
     hint: last ? 'Slice what comes next' : 'Slice the missing one',
   });

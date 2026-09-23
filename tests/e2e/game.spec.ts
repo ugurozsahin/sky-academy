@@ -600,7 +600,8 @@ test.describe('Sky Ninja Academy', () => {
   // is unanswerable without the picture and the line, and a unit test of `renderVisual` cannot see whether
   // the SVG is laid out, sized or visible in a browser. Stage 1 is difficulty 1 (`YEARS[year2].diffs` is
   // `[1, 2, 2, 3, 3]`), which `y2Symmetry` makes the drawn card unconditionally, so the first question is
-  // always this visual — nothing here depends on the roll.
+  // always this visual — nothing here depends on the roll. Every `SYM_HALVES` entry is 4 rows of a 3-square
+  // half, so the mirrored grid is always 4×6 = 24 cells.
   test('symmetry: the mirror line and both halves of the picture reach the card (#299)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-symmetry');
@@ -608,20 +609,71 @@ test.describe('Sky Ninja Academy', () => {
     // `toBeVisible()` is not the check for the fold line: an SVG `<line>` is zero-wide, so Playwright reads
     // its bounding box as empty and calls it hidden. Its geometry below is what proves it was laid out.
     await expect(page.locator('.vis .symgrid .mirror')).toHaveCount(1);
-    // Every square is drawn, and at least one is filled: a card of empty slots is a picture of nothing, and
-    // the answer would be "yes" for the wrong reason.
-    expect(await page.locator('.vis .symgrid rect').count()).toBeGreaterThan(3);
-    expect(await page.locator('.vis .symgrid rect.on').count()).toBeGreaterThan(0);
-    // The fold line sits on the middle of the grid, which is what makes the two halves comparable at a glance.
+    expect(await page.locator('.vis .symgrid rect').count(), 'every one of the 24 cells is drawn').toBe(24);
+    expect(await page.locator('.vis .symgrid rect.on').count(), 'a card of empty slots is a picture of nothing').toBeGreaterThan(0);
+    // The fold line sits on the middle of the grid, and a filled square on each side of it is what "both
+    // halves reach the card" actually means — a regression drawing only the left half still centres the fold
+    // (the viewBox is recomputed from `cols`) and still draws a filled square, so neither check above would
+    // catch it (#391 item 4). `getComputedStyle` on a filled and an unfilled rect also raises item 6's CSS
+    // rail past a class-name check, to the fill colour a child actually sees.
     const geom = await page.locator('.vis .symgrid').evaluate(el => {
       const svg = el as unknown as SVGSVGElement, box = svg.getBoundingClientRect();
-      const line = svg.querySelector('line')!.getBoundingClientRect();
-      return { centre: box.left + box.width / 2, line: line.left + line.width / 2, span: line.height, height: box.height, width: box.width, overflow: el.parentElement!.scrollWidth - el.parentElement!.clientWidth };
+      const line = svg.querySelector('line')!.getBoundingClientRect(), midX = line.left + line.width / 2;
+      const rects = [...svg.querySelectorAll('rect')];
+      const onEachSide = (side: 'left' | 'right') => rects.some(r => {
+        if (r.getAttribute('class') !== 'on') return false;
+        const cx = r.getBoundingClientRect().left + r.getBoundingClientRect().width / 2;
+        return side === 'left' ? cx < midX : cx > midX;
+      });
+      const on = rects.find(r => r.getAttribute('class') === 'on'), off = rects.find(r => r.getAttribute('class') !== 'on');
+      return {
+        centre: box.left + box.width / 2, line: midX, span: line.height, height: box.height, width: box.width,
+        overflow: el.parentElement!.scrollWidth - el.parentElement!.clientWidth,
+        leftFilled: onEachSide('left'), rightFilled: onEachSide('right'),
+        hasOn: !!on, hasOff: !!off, onFill: on && getComputedStyle(on).fill, offFill: off && getComputedStyle(off).fill,
+      };
     });
     expect(Math.abs(geom.centre - geom.line), 'the mirror line is down the middle').toBeLessThanOrEqual(1.5);
     expect(geom.span, 'the fold line runs the height of the picture').toBeGreaterThanOrEqual(geom.height * 0.9);
-    expect(geom.width, 'the picture is drawn at a readable size').toBeGreaterThan(100);
-    expect(geom.overflow, `the picture overflowed the viewport by ${geom.overflow}px`).toBeLessThanOrEqual(1);
+    // `.symgrid`'s own `clamp(120px, 34vw, 190px)` (src/style.css) is the readability floor; a bare `> 100`
+    // is a non-zero check dressed as one, and passes even with the floor removed entirely.
+    expect(geom.width, 'the picture is drawn at least at its CSS floor').toBeGreaterThanOrEqual(120);
+    // `overflow` measures `.vis`, the picture's own scroller — not the viewport, which this element never
+    // reaches directly and which the message used to claim.
+    expect(geom.overflow, `the picture overflowed its box by ${geom.overflow}px`).toBeLessThanOrEqual(1);
+    expect(geom.leftFilled, 'the left half of the picture is reached, not just the right').toBe(true);
+    expect(geom.rightFilled, 'the right half of the picture is reached, not just the left').toBe(true);
+    // Guard the check above from passing vacuously: every `SYM_HALVES` entry has both a filled and an unfilled
+    // cell today, but this is what turns "no such rect" into a failure rather than into `undefined` quietly
+    // comparing unequal to a real colour string.
+    expect(geom.hasOn, 'a filled rect exists to read a fill colour from').toBe(true);
+    expect(geom.hasOff, 'an unfilled rect exists to read a fill colour from').toBe(true);
+    expect(geom.onFill, 'a filled square has a real fill colour applied').toBeTruthy();
+    expect(geom.onFill, 'a filled and an unfilled square are visually distinct, not just class-named apart').not.toBe(geom.offFill);
+    await waitForTarget(page);
+    expect(await answer(page)).toBe(true);
+    await page.waitForFunction(() => window.__sna.state().index > 0);
+  });
+
+  // #299 slice 4 / #391 item 8: the pattern strip is a `strip` visual, not a `sentence` (src/curriculum/types.ts),
+  // specifically so it never word-wraps mid-pattern — a unit test can see the CSS class but not whether the
+  // browser actually keeps it on one line. Stage 1 is difficulty 1, and `y2Patterns` draws the sentence visual
+  // unconditionally, so the first question is always this strip.
+  test('patterns: the glyph strip stays on one line, not wrapped mid-pattern (#391)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-patterns');
+    const strip = page.locator('.vis.strip');
+    await expect(strip).toBeVisible();
+    await expect(strip.locator('.gap')).toHaveCount(1);
+    const geom = await strip.evaluate(el => {
+      const cs = getComputedStyle(el);
+      return { whiteSpace: cs.whiteSpace, height: el.getBoundingClientRect().height, fontSize: parseFloat(cs.fontSize) };
+    });
+    expect(geom.whiteSpace, 'the strip must not wrap, or a pattern reads across two lines').toBe('nowrap');
+    // A wrapped strip is at least two line-heights tall; a single line is under 1.6 — generous above a normal
+    // line-height (~1.2–1.4×) and well under 2×, so this cannot pass by accident either way. Compared against
+    // font-size rather than a fixed pixel count because both move together with the clamp()ed viewport size.
+    expect(geom.height, 'the strip is drawn on one line, not wrapped onto two').toBeLessThan(geom.fontSize * 1.6);
     await waitForTarget(page);
     expect(await answer(page)).toBe(true);
     await page.waitForFunction(() => window.__sna.state().index > 0);

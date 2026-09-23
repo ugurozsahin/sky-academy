@@ -581,17 +581,21 @@ describe('the previous answer carries no signal about the next (#390)', () => {
  * | --- | --- |
  * | `prompt`, `answer`, `hint`, `listen`, `sequence` | **yes** — `asked()` reads all five |
  * | `coins`, `numberline`, `chart` | **yes** — `asked()` reads them too, independently of `VISUAL_QUESTION` (#455) |
- * | `objects`, `sentence`, `symmetry` (the #390 names in `VISUAL_QUESTION`) | **no rail here** — see below |
+ * | `objects`, `sentence`, `strip`, `symmetry` (the `VISUAL_QUESTION` names with no other carrier) | **no rail here** — see below |
  * | `options`, where the generator sets `optionsAreContent` | **yes** — `asked()` reads it too (#451) |
  * | `options`, everywhere else | **no**, deliberately — see below |
  *
- * The three #390 names still get **no rail in this describe**, which round 3's version of this table got wrong
- * (round 4, note 1): `asked()` omits them, so deleting any single one of the three leaves both exact rails
- * green and only the pre-existing #390 band rail above reddens. A fourth `VISUAL_QUESTION` entry in that shape
- * — a new topic carrying its question in an `objects`/`sentence`/`symmetry`-like visual with a varying prompt —
- * would reach no rail in this file. `coins`/`numberline`/`chart` do not share that gap: `asked()` reads them
- * directly (#455), so deleting one of those three from `VISUAL_QUESTION` now reddens `two cards that ask the
- * same thing never take two keys` below, the key having fallen behind the oracle it is measured against.
+ * These four names still get **no rail in this describe**, which round 3's version of this table got wrong
+ * (round 4, note 1): `asked()` omits them, so deleting any single one of the four leaves both exact rails
+ * green and only the pre-existing #390 band rail above reddens — and only for a topic that band rail's own
+ * filter finds, which `strip`'s one topic (`y2-patterns`) does not (its d1 cards offer four bubbles, not two).
+ * `strip` is exactly the fourth entry this paragraph already predicted before #391 added it: "a new topic
+ * carrying its question in an `objects`/`sentence`/`symmetry`-like visual with a varying prompt would reach no
+ * rail in this file" — true of `y2-patterns` in both its `sentence` days and its `strip` ones, and left that
+ * way deliberately rather than widened here, which is outside #391's scope. `coins`/`numberline`/`chart` do
+ * not share that gap: `asked()` reads them directly (#455), so deleting one of those three from
+ * `VISUAL_QUESTION` now reddens `two cards that ask the same thing never take two keys` below, the key having
+ * fallen behind the oracle it is measured against.
  *
  * `options` is keyed only where the generator opts in with `optionsAreContent` (#451): unconditionally folding
  * it in for every topic switches de-duplication off wherever the field is decoration. `options` are a decoy
@@ -625,9 +629,9 @@ describe('the repeat key holds the whole question (#412)', () => {
    * reading either. Today there are none — `', '` appears in four sentence topics' prose and collides with
    * nothing.
    *
-   * What neither this nor the key sees, everywhere `optionsAreContent` is unset: `options`, and the three
-   * `VISUAL_QUESTION` types `asked()` does not read directly (`objects`, `sentence`, `symmetry`). The describe
-   * header enumerates it by carrier.
+   * What neither this nor the key sees, everywhere `optionsAreContent` is unset: `options`, and the four
+   * `VISUAL_QUESTION` types `asked()` does not read directly (`objects`, `sentence`, `strip`, `symmetry`). The
+   * describe header enumerates it by carrier.
    */
   const asked = (q: Question) => {
     // A superset of the key's own list, which is the point: `', '` is here and deliberately not there, because
@@ -638,8 +642,9 @@ describe('the repeat key holds the whole question (#412)', () => {
       return s;
     };
     // #455's three carriers read here too, independently of `VISUAL_QUESTION` — this is the requirement, not a
-    // copy of the key under test. `objects`/`sentence`/`symmetry` stay unread: the pre-existing gap the table
-    // above notes, covered instead by the `constantPromptBinary` band rail rather than by this oracle.
+    // copy of the key under test. `objects`/`sentence`/`strip`/`symmetry` stay unread: the pre-existing gap the
+    // table above notes, left uncovered by the `constantPromptBinary` band rail too for `strip` specifically
+    // (#391) — `y2-patterns` does not have that rail's binary-options shape.
     const v = q.visual;
     const visual = v?.type === 'coins' ? [...new Set(v.coins)].sort((a, b) => a - b).join('/')
       : v?.type === 'numberline' ? `${v.from}/${v.to}/${v.mark ?? ''}/${v.step ?? ''}`

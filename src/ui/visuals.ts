@@ -105,15 +105,22 @@ export function renderVisual(v: Visual | undefined): string {
     }
     case 'symmetry': {
       // A vertical line of symmetry drawn as squares on a grid, with a dashed mirror line down the middle
-      // (#299 slice 4). `grid` is an unconstrained `string[]` on a public `Visual`, reached exactly as the
-      // chart rows above are, so the drawing defends itself the same way (#137): at most SYM_MAX rows, every
-      // row padded or truncated to the first row's width, and any character that is not `#` drawn as an empty
-      // square. A malformed blob renders as a plain grid rather than throwing out of `renderVisual` — which
-      // `play-session.ts`'s `show()` does not catch, so a throw here would leave a card with no bubbles.
+      // (#299 slice 4). `grid` is documented as `string[]` but nothing pins its *shape* the way the type
+      // pins its element type, so the drawing defends against a shape a generator could still emit: at most
+      // SYM_MAX rows — safe to truncate, since dropping rows cannot change left/right symmetry — and no row
+      // padded or truncated to fit another row's width, since silently reshaping could turn a symmetric grid
+      // asymmetric or the reverse (#391), worse here than no picture. An empty, ragged or over-wide grid
+      // renders as nothing, with a warning, rather than being reshaped or thrown out of `renderVisual` —
+      // which `play-session.ts`'s `show()` does not catch. This is a shape guarantee only: an element that is
+      // not itself a string (`grid: [null]`, say) is outside `Visual`'s own type and still throws, same as
+      // every other visual here.
       const SYM_MAX = 14;
       const rows = v.grid.slice(0, SYM_MAX);
-      const cols = Math.min(SYM_MAX, rows.length ? [...rows[0]].length : 0);
-      if (!rows.length || cols < 1) { console.warn('symmetry visual: empty grid — nothing drawn'); return ''; }
+      const cols = rows.length ? [...rows[0]].length : 0;
+      if (!rows.length || cols < 1 || cols > SYM_MAX || rows.some(r => [...r].length !== cols)) {
+        console.warn('symmetry visual: empty, ragged or over-wide grid — nothing drawn');
+        return '';
+      }
       const S = 10, w = cols * S, h = rows.length * S;
       const cells = rows.map((row, r) => {
         const chars = [...row];
@@ -124,6 +131,7 @@ export function renderVisual(v: Visual | undefined): string {
     }
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
     case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
+    case 'strip': return `<div class="vis strip">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
   }
 }
 
