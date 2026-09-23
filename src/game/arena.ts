@@ -59,7 +59,12 @@ export class Arena {
   bubbles: Bubble[] = [];
   private particles: Particle[] = [];
   shots: Shot[] = []; shotsThrown = 0;                          // projectiles in flight / thrown so far (the e2e reads the count)
-  clampCounts: ClampCounts = { left: 0, right: 0, ceiling: 0 }; // #152: lifetime clamp count — a sim test asserts .ceiling stays zero across a normal wave; the wall clamps see real traffic
+  // #152: lifetime count of `clampIntoArena`'s three clamps, applied during collision resolution only — a sim
+  // test asserts .ceiling stays zero across a normal wave; the wall clamps see real traffic. `reanchor()`'s
+  // own x-position bound on resize (below) is a separate, uncounted clamp of the same shape — not this field
+  // (silent-failure-hunter review): folding it in would need `resize`/`reanchor` to carry `clampCounts`
+  // through, which is a real extension, not a one-line fix, and out of this pull request's scope.
+  clampCounts: ClampCounts = { left: 0, right: 0, ceiling: 0 };
   private trail: { x: number; y: number; t: number }[] = [];
   private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
   private activeId: number | null = null;         // the pointer that is down on THIS canvas, null = no stroke (#16: two arenas share one window)

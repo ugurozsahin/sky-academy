@@ -840,9 +840,14 @@ describe('bubbles collide instead of passing through each other (#108)', () => {
   // this counter non-zero instead of needing a screenshot to notice, on the same drive-from-`layoutWave`
   // cases the "does not retime or reshape a REAL wave" test above uses.
   it('never clamps a bubble against the ceiling across a real wave the game can produce', () => {
-    const flightCounts = (W: number, H: number, speedK: number, stage: 1 | 2 | 3): ClampCounts => {
+    // `rng` is driven at both 0.5 (the mid-range apex, an arbitrary interior point) AND 0 (pr-test-analyzer
+    // review: `layoutWave`'s `apexMin + usable * (0.05 + rng() * 0.45)` collapses to its MINIMUM offset —
+    // 0.05 of `usable` above `apexMin` — only when `rng()` returns 0, so a constant 0.5 alone never actually
+    // approaches the `apexMin` margin this test claims to protect. Checked directly that `rng = () => 0` is
+    // still a legal wave (every bubble clears) before relying on it as a second case, not a degenerate one.
+    const flightCounts = (W: number, H: number, speedK: number, stage: 1 | 2 | 3, rng: () => number): ClampCounts => {
       const geom = { W, H, topInset: 120 };
-      const plan = layoutWave({ labels: ['1', '2', '3', '4', '5', '6'], speed: stage }, geom, speedK, 0, () => 0.5);
+      const plan = layoutWave({ labels: ['1', '2', '3', '4', '5', '6'], speed: stage }, geom, speedK, 0, rng);
       const bs: Collidable[] = plan.bubbles.map(b =>
         ({ x: b.x, y: H + plan.r, vx: b.vx, vy: b.vy, g: b.g, r: plan.r, launched: true, dead: false }));
       const counts: ClampCounts = { left: 0, right: 0, ceiling: 0 };
@@ -863,6 +868,7 @@ describe('bubbles collide instead of passing through each other (#108)', () => {
       ['tablet @4x stage 3', 800, 1180, 4, 3],
     ];
     for (const [name, W, H, k, stage] of cases)
-      expect(flightCounts(W, H, k, stage).ceiling, `${name}: a bubble's arc bent against the HUD`).toBe(0);
+      for (const [rngName, rng] of [['mid apex', () => 0.5], ['minimum apex (the actual margin)', () => 0]] as const)
+        expect(flightCounts(W, H, k, stage, rng).ceiling, `${name}, ${rngName}: a bubble's arc bent against the HUD`).toBe(0);
   });
 });
