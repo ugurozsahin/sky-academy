@@ -127,7 +127,7 @@ function profileRow(c: ProfileCard, slot: number, others: ProfileCard[]): string
       ${canRemoveCard(c, others) ? `<button class="btn bad" data-del="${c.id}">Remove</button>` : ''}
     </li>`;
 }
-function profilesHtml(cards: ProfileCard[]): string {
+function profilesHtml(cards: readonly ProfileCard[]): string {
   return `
     <h3 class="p-h">Ninjas on this device</h3>
     <div class="p-profs">
@@ -150,7 +150,7 @@ function deleteConfirmHTML(name: string): string {
         </div>
       </div>`;
 }
-function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: ProfileCard[] = profileCards()): string {
+function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: readonly ProfileCard[] = profileCards()): string {
   const modeRows = sm.modes.map(m => `
     <tr><th scope="row">${esc(m.title)}</th><td>${m.endless}</td><td>${m.sprint}</td><td>${m.boss}</td><td>${m.memory}</td><td>${m.training}</td></tr>`).join('');
   const yearCards = sm.years.map(y => `

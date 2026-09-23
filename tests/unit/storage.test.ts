@@ -1267,6 +1267,9 @@ describe('profiles: siblings on one device (#20)', () => {
     finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
 
     expect(added, 'no profile was added, and the caller is told it is the store').toEqual({ ok: false, why: 'store' });
+    // #384 item 2: a kept-but-different index is a refusal `writeIndex` catches by its read-back, not by a
+    // throw, and the latch has to catch it the same way — `save()`'s own catch never sees this shape either.
+    expect(isWriteFailing(), 'addProfile latches on a silently-dropped write too, not only a throw').toBe(true);
     // p1 is the only profile and already the active one, so this is not a switch at all: it persists nothing,
     // and a store that keeps nothing therefore has nothing to refuse (#380 review B1). It read `false` here
     // until that review, which is the bug — see the three tests below for what that cost a child.
@@ -1274,6 +1277,23 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(activeProfile(), 'the child on the device is still the one who was playing').toBe('p1');
     expect(profileIds()).toEqual(['p1']);
     expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it('setActiveProfile latches writeFailed on a kept-but-different index too, not only a throw (#384 item 2)', () => {
+    save({ name: 'Ada', coins: 30 });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    save({ name: 'Bo', coins: 3 });
+    expect(setActiveProfile('p1')).toBe(true);
+
+    const realSet = localStorage.setItem;
+    // A genuine switch this time (p1 → p2), refused the read-back way rather than by a throw.
+    (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => { if (k !== INDEX) realSet.call(localStorage, k, v); };
+    let switched: boolean;
+    try { switched = setActiveProfile('p2'); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+
+    expect(switched, 'the index kept p1 active, so this is refused').toBe(false);
+    expect(isWriteFailing()).toBe(true);
+    expect(activeProfile(), 'and the store really did keep the old value').toBe('p1');
   });
 
   /*
@@ -1478,6 +1498,31 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(isWriteFailing(), "the refused write was the other child's, and this session has attempted none").toBe(false);
   });
 
+  it('addProfile latches writeFailed on a refused store, the way save() already does (#384 item 2)', () => {
+    save({ name: 'Ada' });
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    let added: ReturnType<typeof addProfile>;
+    // `writeIndex`'s catch used to be the only place that knew a store refused the write, and it discarded
+    // that — `isWriteFailing()` stayed false and `parents.ts:35`'s sentence stayed quiet until an unrelated
+    // ordinary save() happened to set the latch for a different reason.
+    try { added = addProfile(); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(added).toEqual({ ok: false, why: 'store' });
+    expect(isWriteFailing(), 'the refusal now latches on its own').toBe(true);
+  });
+
+  it('setActiveProfile latches writeFailed on a refused switch (#384 item 2)', () => {
+    save({ name: 'Ada' });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    expect(setActiveProfile('p1')).toBe(true);
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    let ok: boolean;
+    try { ok = setActiveProfile('p2'); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(ok, "the switch is refused, so this session is still Ada's").toBe(false);
+    expect(isWriteFailing()).toBe(true);
+  });
+
   it('reset() is a fresh start for the active profile only', () => {
     save({ name: 'Ada', coins: 30 });
     addProfile(); save({ name: 'Bo', coins: 3 });
@@ -1510,6 +1555,18 @@ describe('profiles: siblings on one device (#20)', () => {
     // The count says one profile and three slots spare; the probe says there is nowhere to put a child. The
     // picker shows two different sentences for these, so the refusal has to carry which one it is.
     expect(addProfile()).toEqual({ ok: false, why: 'full' });
+  });
+
+  it('addProfile refuses a slot it can read but cannot parse, not only one it parses cleanly (#384 item 4)', () => {
+    save({ name: 'Ada' });
+    // `holdsSave`'s old shape test answered `false` for "empty" and "garbled" alike, so `addProfile`'s
+    // free-slot probe read a slot it could not make sense of as free — the same blind spot #335 item 1 fixed
+    // one call site over, for a blob nothing anywhere writes on purpose (no app path leaves one; `setItem` is
+    // atomic and every writer goes through `save()`) but nothing stopped either.
+    localStorage.setItem(saveKeyFor('p2'), 'not json at all');
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1'] }));
+    expect(addProfile(), 'p2 is unreadable, not free — the next real slot is p3').toEqual({ ok: true, id: 'p3' });
+    expect(localStorage.getItem(saveKeyFor('p2')), 'and the garbled bytes are left alone, not handed out').toBe('not json at all');
   });
 
   it("profileCard reads a sibling's name and ninja without moving this session (#20 slice 2)", () => {

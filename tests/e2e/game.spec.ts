@@ -2663,6 +2663,17 @@ test.describe('profile picker (#20 slice 2)', () => {
     }
     await expect(page.locator('.avatar-card[data-profile]')).toHaveCount(4);
     await expect(page.locator('#new-ninja'), 'four is the most one device holds').toHaveCount(0);
+
+    // #384 item 3: two siblings onboarded through this card must not have merged over the two who were
+    // already there — the failure #335 item 1 exists to prevent, asserted end to end rather than inferred.
+    await page.click('.avatar-card[data-profile="p1"]');
+    await expect(page.locator('#change-av'), "Ada's save survived Cass and Dee being added").toContainText('Ada');
+    await expect(page.locator('#rewards')).toContainText('40');
+    await page.click('#who');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await page.click('.avatar-card[data-profile="p2"]');
+    await expect(page.locator('#change-av'), "and so did Bo's").toContainText('Bo');
+    await expect(page.locator('#rewards')).toContainText('7');
   });
 
   /**

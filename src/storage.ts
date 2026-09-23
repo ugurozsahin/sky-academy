@@ -186,15 +186,20 @@ function defaultIndex(): ProfileIndex {
   const ids = PROFILE_IDS.filter(id => id === 'p1' || holdsSave(id));
   return { v: 1, active: 'p1', ids };
 }
-/** Whether a slot holds something this module could have written. A bare `!== null` counted any foreign blob
- *  under our key — `sna:v1:p3 = 'garbage'` invented a phantom profile that loaded as `DEFAULT` and consumed
- *  one of the four slots for good (#330 review, 02:36Z). Shape only, like `migrate()`'s own front door. */
-function holdsSave(id: ProfileId): boolean {
+/** Whether a slot is empty, holds something this module could have written, or holds bytes it cannot make
+ *  sense of. `holdsSave` used to collapse the last two into one "no save" answer, and `addProfile`'s free-slot
+ *  probe read that as "free" — the probe added to stop a slot being handed out twice (#330 review, 02:36Z) had
+ *  a blind spot of exactly the shape it was added for (#384 item 4). No app path writes a garbled blob
+ *  (`setItem` is atomic and every writer goes through `save()`), which is why this is hardening rather than a
+ *  bug: nothing has been seen to reach it, only nothing stopped it either. Shape only, like `migrate()`'s own
+ *  front door. */
+function slotState(id: ProfileId): 'empty' | 'save' | 'garbled' {
   const raw = readItem(saveKeyFor(id));
-  if (!raw) return false;
-  try { const parsed: unknown = JSON.parse(raw); return !!parsed && typeof parsed === 'object' && !Array.isArray(parsed); }
-  catch { return false; }
+  if (!raw) return 'empty';
+  try { const parsed: unknown = JSON.parse(raw); return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? 'save' : 'garbled'; }
+  catch { return 'garbled'; }
 }
+function holdsSave(id: ProfileId): boolean { return slotState(id) === 'save'; }
 const currentIndex = (): ProfileIndex => readIndex() ?? defaultIndex();
 /**
  * Persist an index. False when the store did not keep it, and then nothing about the profiles has changed.
@@ -312,7 +317,7 @@ function rereadProfile(id: ProfileId) {
 export function setActiveProfile(id: ProfileId): boolean {
   const idx = currentIndex();
   if (!idx.ids.includes(id)) return false;
-  if (idx.active !== id && !writeIndex({ ...idx, active: id })) return false;
+  if (idx.active !== id && !writeIndex({ ...idx, active: id })) { writeFailed = true; return false; }
   rereadProfile(id);
   return true;
 }
@@ -320,8 +325,10 @@ export function setActiveProfile(id: ProfileId): boolean {
  * The two ways adding a profile can be refused, told apart (#335 item 2). `null` carried both, and the picker
  * has to say two different things: `'full'` is "four ninjas is the most" — a sentence about this family —
  * while `'store'` is "this browser will not let the game save", a fault the child cannot do anything about.
- * `writeIndex`'s catch is the only place that knows the difference and it used to discard it, and neither
- * refusal sets `writeFailed`, so `isWriteFailing()` could not recover it afterwards either.
+ * `writeIndex`'s catch is the only place that knows the difference, and a `'store'` refusal now sets
+ * `writeFailed` here too, the way `save()` already does, so `isWriteFailing()` can recover it afterwards
+ * (#384 item 2) — it used to discard it, and `parents.ts:35`'s sentence stayed quiet through a refused add
+ * or switch until the next ordinary `save()` set the latch for an unrelated reason.
  *
  * A result object rather than a widened string union: `ProfileId` is itself a string literal union, so
  * `'full' | ProfileId` would need `isProfileId()` at every call site to be read at all.
@@ -358,10 +365,10 @@ export type AddProfileResult = { ok: true; id: ProfileId } | { ok: false; why: '
  */
 export function addProfile(): AddProfileResult {
   const idx = currentIndex();
-  const free = PROFILE_IDS.find(id => !idx.ids.includes(id) && !holdsSave(id));
+  const free = PROFILE_IDS.find(id => !idx.ids.includes(id) && slotState(id) === 'empty');
   if (!free) return { ok: false, why: 'full' };
   if (writeFailed) return { ok: false, why: 'store' };
-  if (!writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) return { ok: false, why: 'store' };
+  if (!writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) { writeFailed = true; return { ok: false, why: 'store' }; }
   leaveProfile();
   return { ok: true, id: free };
 }
@@ -658,8 +665,12 @@ export function profileCard(id: ProfileId): ProfileCard {
  */
 export const onboardedOf = (s: RawSave): boolean =>
   typeof s.onboarded === 'boolean' ? s.onboarded : typeof s.avatar === 'string' && !!s.avatar;
-/** Every profile on this device as a card, in slot order — the picker's whole data source. */
-export const profileCards = (): ProfileCard[] => profileIds().map(profileCard);
+/** Every profile on this device as a card, in slot order — the picker's whole data source.
+ *
+ *  `readonly`, matching `profileIds()` (#384 item 1): the array is the caller's copy of parsed state and
+ *  pushing to it changed nothing, the same shape #335 item 5 fixed on `profileIds()` one function up — the
+ *  two answered the same question about mutability differently until now. */
+export const profileCards = (): readonly ProfileCard[] => profileIds().map(profileCard);
 
 // A raw blob read back from storage: JSON of unknown shape (any past version, or hand-edited). Migrations walk it.
 type RawSave = Record<string, unknown>;
@@ -836,16 +847,18 @@ let readOnly = false;
  */
 export const isReadOnlySave = () => readOnly;
 /**
- * Set by `save()` when its own `localStorage.setItem` just threw — private browsing, a WebView with DOM
- * storage disabled, or a full quota (#151). Distinct from `isReadOnlySave()`: that one refuses to write
- * *deliberately*, to protect a newer save already on disk, and its remedy is "update this device"; this one
- * is the browser refusing an ordinary write, and its remedy is "this browser will not let the game save".
- * Conflating them would send a grown-up to update an app that already writes fine, or wait for a device
- * update that will never fix a private-browsing tab.
+ * Set when a write to this device's store is refused — `save()`'s own `localStorage.setItem` throwing
+ * (private browsing, a WebView with DOM storage disabled, a full quota, #151), **and, since #384 item 2,
+ * `addProfile()` or `setActiveProfile()`'s `writeIndex()` call refusing either way it can**: a throw, or a
+ * `setItem` that returns without error and a read-back that disagrees (`writeIndex`'s own doc, #330). Distinct
+ * from `isReadOnlySave()`: that one refuses to write *deliberately*, to protect a newer save already on disk,
+ * and its remedy is "update this device"; this one is the browser refusing an ordinary write, and its remedy
+ * is "this browser will not let the game save". Conflating them would send a grown-up to update an app that
+ * already writes fine, or wait for a device update that will never fix a private-browsing tab.
  *
  * Reflects only the *last* attempted write, the same way `readOnly` reflects only the last `load()` — a caller
- * that wants to know whether *this* save landed checks it immediately after calling `save()`, before anything
- * else can write again.
+ * that wants to know whether *this* write landed checks it immediately afterwards, before anything else can
+ * write again.
  */
 let writeFailed = false;
 export const isWriteFailing = () => writeFailed;
@@ -867,8 +880,8 @@ export function save(patch: Partial<SaveData> = {}): SaveData {
   cache = { ...load(), ...patch };
   // #232: the blob on disk is newer than this build, or carries a version we cannot read. The session keeps
   // working against `cache`; writing would relabel it as our shape and make the loss permanent. Not an
-  // attempted write, so it does not touch `writeFailed` either way (#151) — that flag is only ever set by an
-  // actual `setItem` call, immediately below.
+  // attempted write, so it does not touch `writeFailed` either way (#151) — this function only ever sets that
+  // flag from an actual `setItem` call, immediately below (`writeIndex`'s callers set it their own way, #384).
   if (readOnly) return cache;
   try { localStorage.setItem(saveKeyFor(sessionProfile()), JSON.stringify(cache)); writeFailed = false; }
   catch { writeFailed = true; /* private mode, WebView storage disabled, full quota (#151) */ }
