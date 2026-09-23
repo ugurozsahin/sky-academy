@@ -655,7 +655,7 @@ export interface ArenaBox { W: number; H: number }
  * does not scale — the label's font size was fitted to it once at spawn (#28), and a bubble that changed
  * size mid-flight would re-open that.
  */
-export function reanchorBubble(b: { x: number; y: number; vx: number; vy: number; g: number; r: number }, from: ArenaBox, to: ArenaBox) {
+export function reanchorBubble(b: { x: number; y: number; vx: number; vy: number; g: number; r: number; ox?: number; ovx?: number; ovy?: number }, from: ArenaBox, to: ArenaBox) {
   const sx = to.W / from.W, sy = to.H / from.H;
   const risen = (from.H + b.r) - b.y;                      // height above the launch line, which may be negative on the way out
   b.y = to.H + b.r - risen * sy;
@@ -666,6 +666,12 @@ export function reanchorBubble(b: { x: number; y: number; vx: number; vy: number
   // putting x below `b.r` — `bubbleRadius` caps r at 64, so that needs a viewport under 128 CSS px.
   b.x = Math.min(to.W - b.r, Math.max(b.r, b.x * sx));
   b.vx *= sx;
+  // #591: a bubble mid-relaunch-wait remembers its spawn arc in ox/ovx/ovy so a re-launch is not left running
+  // an arc sized for a box that no longer exists — optional here (a plain `Collidable` in a test has none) so
+  // only a real `Bubble` carries the extra work.
+  if (b.ox !== undefined) b.ox = Math.min(to.W - b.r, Math.max(b.r, b.ox * sx));
+  if (b.ovx !== undefined) b.ovx *= sx;
+  if (b.ovy !== undefined) b.ovy *= sy;
 }
 /** The arena's shape, as much of it as the wave layout depends on. */
 export interface WaveGeom { W: number; H: number; topInset: number }

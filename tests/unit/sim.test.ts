@@ -871,6 +871,23 @@ describe('#591: a required sequence bubble knocked out of the arena is re-launch
     expect(b.vx, 'vx resets to the spawn value').toBe(ovx);
     expect(b.vy, 'vy resets to the spawn value').toBe(ovy);
   });
+
+  // pr-test-analyzer review: the only thing that stops a wave-relaunch cycle firing `onWaveEnd` (and so
+  // `Session.waveEnd()`, which loses a life for a sequence question nothing else has decided) is one line —
+  // `live++` before the `continue` in the relaunch branch — asserted nowhere else here, since every other
+  // scenario above only reads the bubble's own fields and `events.falls`. A wave with nothing but the
+  // required word live makes that line the only thing between "still airborne" and "wave's over".
+  it('never reports the wave as over while the only live bubble is waiting to reappear', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1'], speed: 2, ordered: ['1'] });   // nothing else on screen to keep `live` above zero
+
+    for (let n = 1; n <= 3; n++) {
+      forceDeparture(sim, '1');
+      expect(sim.drainWaveEnds(), `departure ${n} of 3: the one bubble is due back, the wave is not over`).toBe(0);
+    }
+    forceDeparture(sim, '1');   // the fourth departure is a real miss — now nothing is left live
+    expect(sim.drainWaveEnds(), 'the wave ends once the required bubble is truly gone').toBe(1);
+  });
 });
 
 describe('#142: the arena drives the whole mission stage machine', () => {
