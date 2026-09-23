@@ -2,6 +2,7 @@
 import type { Difficulty, Question, Topic, Visual, YearInfo } from '../curriculum';
 import { shuffle } from '../curriculum/util';
 import { MODES, type Mode, type ModeCtx, type ModeSpec } from './modes';
+import type { AnswerTally } from '../storage';
 
 // mission = 5 staged waves with lives · endless = Sky Storm, ramps until lives run out · sprint = 60-second time attack, no lives
 // boss = Boss Battle: every correct slice hits Hammer Man, every slip heals him; KO him before your lives run out
@@ -187,7 +188,7 @@ export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
   correct = 0; attempts = 0; stageCorrect = 0; stageAttempts = 0; stageStars: number[] = [];
   current: Question | null = null; currentTopic: Topic | null = null; seqIndex = 0; waiting = false; ended = false; questionsAsked = 0;
-  byTopic: Record<string, { hits: number; tries: number }> = {};   // per-topic tally (pool modes feed Sensei's weakest-topic ranking)
+  byTopic: Record<string, AnswerTally> = {};   // per-topic tally (pool modes feed Sensei's weakest-topic ranking)
   timeLeft: number;                                     // ms, sprint only (0 otherwise)
   bossHp: number; readonly bossMax: number;             // boss only (0 otherwise)
   private rng: () => number; readonly stages: number;

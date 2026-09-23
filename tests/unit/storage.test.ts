@@ -120,13 +120,19 @@ describe('rewards storage', () => {
   });
   it('topic accuracy accumulates across runs and keeps stars; training sessions are counted per year', () => {
     recordTopic('y1-add', 2, 80);
-    recordAccuracy('y1-add', 5, 6); recordAccuracy('y1-add', 3, 4); recordAccuracy('y1-add', 0, 0);   // an empty tally changes nothing
+    recordAccuracy('y1-add', { hits: 5, tries: 6 }); recordAccuracy('y1-add', { hits: 3, tries: 4 }); recordAccuracy('y1-add', { hits: 0, tries: 0 });   // an empty tally changes nothing
     expect(load().progress['y1-add']).toEqual({ stars: 2, best: 80, plays: 1, hits: 8, tries: 10 });
-    recordAccuracy('y1-sub', 1, 2);                                                                    // a topic met only in Sensei training / Sky Storm
+    recordAccuracy('y1-sub', { hits: 1, tries: 2 });                                                    // a topic met only in Sensei training / Sky Storm
     expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 1, tries: 2 });
     expect(load().training).toEqual({});
     expect(recordTraining('year1')).toBe(1); expect(recordTraining('year1')).toBe(2);
     expect(load().training).toEqual({ year1: 2 });
+  });
+  it('recordAccuracy clamps hits into [0, tries] — a caller cannot write an accuracy above 100% (#379)', () => {
+    recordAccuracy('y1-add', { hits: 9, tries: 4 });     // more hits than tries: clamped down to the ceiling
+    expect(load().progress['y1-add']).toEqual({ stars: 0, best: 0, plays: 0, hits: 4, tries: 4 });
+    recordAccuracy('y1-sub', { hits: -3, tries: 5 });    // negative hits: clamped up to the floor
+    expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 0, tries: 5 });
   });
   it('streak counts consecutive days only', () => {
     expect(touchStreak(new Date('2026-09-05T10:00:00Z'))).toBe(1);
@@ -600,7 +606,7 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     }))).toBe(true);
 
     expect(() => recordTopic('y1-add', 2, 40)).not.toThrow();
-    expect(() => recordAccuracy('y1-add', 3, 4)).not.toThrow();
+    expect(() => recordAccuracy('y1-add', { hits: 3, tries: 4 })).not.toThrow();
     expect(() => recordTraining('year1')).not.toThrow();
     expect(() => recordEndless('year1', 50)).not.toThrow();
     expect(() => recordSprint('year1', 20)).not.toThrow();
