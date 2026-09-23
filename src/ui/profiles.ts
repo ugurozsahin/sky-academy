@@ -34,7 +34,9 @@ const SWITCH_HINT = `This browser will not let the game save, so it cannot swap 
 type AddRefusal = Extract<AddProfileResult, { ok: false }>['why'];
 /** A `Record` rather than `addOutcome`'s old ternary (#401 item 2): `AddProfileResult['why']` gaining a third
  *  reason makes this a `tsc` error at the one place that words a refusal, instead of the ternary's silent
- *  `STORE_HINT` fallback for whatever the new reason was. */
+ *  `STORE_HINT` fallback for whatever the new reason was. That guarantee holds only while `why` stays a
+ *  finite string-literal union, as it is today — widen it to plain `string` and `Record<AddRefusal, string>`
+ *  stops requiring any particular keys at all (PR #590 review round 1, non-blocking). */
 const ADD_HINTS: Record<AddRefusal, string> = { full: FULL_HINT, store: STORE_HINT };
 
 /**
@@ -50,9 +52,11 @@ export type PickOutcome = { move: true; id: ProfileId } | { move: false; hint: s
 /**
  * Takes the committer, not its answer (#401 item 3): the old `(id, switched: boolean)` let
  * `pickOutcome(idA, setActiveProfile(idB))` type-check, since the id moved to and the id the store actually
- * saw were two independent parameters agreeing only by whoever wrote the call site. With one `id` and the
- * function that decides its fate, there is no second identifier left to disagree with it — the call site
- * (`pickOutcome(id, setActiveProfile)`) cannot express the mismatch any more.
+ * saw were two independent parameters agreeing only by whoever wrote the call site. The call site's laziest
+ * form is now also the correct one — `pickOutcome(id, setActiveProfile)` cannot express the mismatch any
+ * more — though a caller determined to disagree still can, through a closure (`pickOutcome(idA, () =>
+ * setActiveProfile(idB))` still compiles): the type does not rule that out, it just stops being the shortest
+ * way to write the bug (PR #590 review round 1, non-blocking).
  */
 export const pickOutcome = (id: ProfileId, switchTo: (id: ProfileId) => boolean): PickOutcome =>
   switchTo(id) ? { move: true, id } : { move: false, hint: SWITCH_HINT };
