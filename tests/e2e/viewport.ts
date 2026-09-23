@@ -70,6 +70,23 @@ export async function expectFitsViewport(page: Page, where: string, tolerance = 
  * `.obj` against the `.slot` that contains it, so a missing or extra slot fails loudly instead of
  * silently comparing the wrong two boxes.
  */
+/**
+ * Overrides the four `safe-area-inset-*` env() values via CDP (#399's own item 4). A Playwright page has no
+ * notch, so `env(safe-area-inset-*)` always resolves to its fallback under either project — which is why
+ * #399's `--sal`/`--sar` rails in `tests/unit/guardrails.test.ts` are text-only (grepping the CSS, not
+ * rendering it), and stayed that way through three merged slices (#530, #542, #551). Chromium exposes
+ * `Emulation.setSafeAreaInsetsOverride` over CDP; Playwright does not wrap it, so this opens the session
+ * directly. Confirmed against the bundled 141.0.7390.37 build the override takes effect on the CURRENT
+ * document with no reload — style is invalidated immediately, the same way a DevTools-panel edit would be.
+ */
+export async function overrideSafeAreaInsets(
+  page: Page,
+  insets: { top?: number; right?: number; bottom?: number; left?: number },
+) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets });
+}
+
 export async function outsideItsBox(page: Page, parentSel: string, childSel: string, tolerance = 0.5) {
   return page.evaluate(([p, c, t]) => {
     const out: { i: number; over: Record<string, number> }[] = [];
