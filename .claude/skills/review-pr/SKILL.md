@@ -299,7 +299,7 @@ thing as already decided (#580 review).
 
 So under (c), once that check says no commit has landed since the clear:
 
-- **Merge it if the four rules let you.** That is the whole point of the clause, and it is the ordinary case.
+- **Merge it if the four rules let you.** That is the whole point of the clause, and it is the ordinary case. **Take the commit check again immediately before you merge, not only once at the start of the pass.** §5's four rules are real wall-clock steps — a CI lookup, a status read, label checks — and a commit can land inside them. Nothing downstream would tell you: `blockState()` sees no commits, the draft flag does not move, and the newest verdict is still the old clear, so every signal you would reach for reads exactly as it did before. STEP 1 asks for the same re-check on the waiting test itself, and that one watches only for a new `REVIEW:` comment — which a commit does not produce (#580 review).
 - **If a rule bars the merge and the branch is fine — `loosening` is the owner's however he voted — record it
   in your pulse by number with the one-line reason and leave it.** Not a new review, not a new mark, and not a
   fresh block: the verdict already there is still the truth about the diff, and nothing about the diff
