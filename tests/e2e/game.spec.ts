@@ -718,6 +718,11 @@ test.describe('Sky Ninja Academy', () => {
     expect(album[0]).toMatchObject({ id: 'reception:r-count', year: 'Reception', training: false, name: 'Ada', avatar: 'terra' });
     expect(album[0].stars).toBeGreaterThan(0);
     expect(album[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // The drawn day and the stored day are one value now, not two reads of the clock a UTC/local split apart
+    // (#410) — the mission-path half of the same property `duel.spec.ts` already pins for a duel win.
+    const words = await page.evaluate(() => window.__sna.certWords());
+    const longDate = new Date(`${album[0].date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    expect(words!.date, 'the album entry and the keepsake agree about the day').toBe(longDate);
 
     // #50: the 🎓 button always delivers — it never silently does nothing.
     await page.evaluate(() => { (navigator as any).canShare = () => false; });   // exercise the non-share routes deterministically (headless can't complete a real Web Share)

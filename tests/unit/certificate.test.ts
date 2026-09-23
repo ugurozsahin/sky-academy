@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { certAlbumHTML, certFromStored, certificateText, certKind, certRoute, deliverCertificate, hasCapacitorShare, isNativeShell } from '../../src/ui/certificate';
+import { certAlbumHTML, certFromStored, certificateText, certKind, certRoute, certToStored, deliverCertificate, hasCapacitorShare, isNativeShell } from '../../src/ui/certificate';
 import { AVATARS } from '../../src/avatars';
 import type { StoredCert } from '../../src/storage';
 
@@ -55,6 +55,54 @@ describe('mission certificate text', () => {
     expect(t.detail).toBe('21/25 correct (84%) · score 340');
     expect(certificateText({ ...base, stars: 1, attempts: 0, correct: 0 }).stars).toBe('★☆☆');
     expect(certificateText({ ...base, stars: 1, attempts: 0, correct: 0 }).detail).toContain('(0%)');
+  });
+  // #410 review: `isCert()` only checks `date` is a string, never that it parses, so a hand-edited or
+  // corrupted save reaches here via `certFromStored()` with an Invalid `Date` — the reachable path
+  // `showStoredCertificate()` → `drawCertificate()` → `certificateText()` walks with no `catch` above it.
+  // `toISOString()` throws on an Invalid Date; proved against the bug by reverting `displayDay`'s guard and
+  // watching this fail with `RangeError: Invalid time value` instead of the assertion below.
+  it('tolerates an unparsable stored date via certFromStored, instead of throwing', () => {
+    const stored: StoredCert = { id: 'x', name: 'Ada', avatar: AVATARS[0].id, year: 'Year 1', title: 'Number Bonds', stars: 3, score: 30, correct: 3, attempts: 3, date: 'not-a-date' };
+    const c = certFromStored(stored);
+    expect(() => certificateText(c)).not.toThrow();
+    expect(certificateText(c).date).toBe('');
+  });
+});
+
+/**
+ * #410: the printed certificate and the album row it files alongside used to read the same instant two
+ * different ways — `certificateText()` formatted `date` in the *local* calendar, `certToStored()` filed it
+ * under the *UTC* one — so anywhere the two disagree about which day it is, the keepsake and the album entry
+ * named different days. Node genuinely changes `Date`/`Intl` behaviour when `process.env.TZ` changes mid-run
+ * (checked directly: a fixed instant reads a different weekday either side of a `TZ` swap here), which is what
+ * makes this reproducible without a browser or Playwright's own `timezoneId`.
+ *
+ * Each row's own instant is chosen to cross a day boundary IN THAT ZONE'S OWN DIRECTION — a zone east of UTC
+ * (`Pacific/Kiritimati`, +14) needs an instant late in the UTC day so local rolls onto the *next* day; a zone
+ * west of UTC (`Pacific/Honolulu`, -10) needs one early in the UTC day so local falls back onto the *previous*
+ * one. One shared instant does not exercise both directions — an earlier version of this test used a single
+ * late-UTC instant for every zone and its comment claimed "fails under every zone but UTC", which was false
+ * for `America/New_York`: 23:30 UTC minus four hours is still the same UTC calendar day, so that row passed
+ * on the pre-fix code too and proved nothing (pr-test-analyzer review, caught because the old test used one
+ * `expect` per loop iteration rather than `it.each`, so the false claim was never actually checked against
+ * every row). Proved against the bug, not just the fix: with `certificateText()`'s old
+ * `d.toLocaleDateString(...)` restored, every non-UTC row below fails at the intended assertion.
+ */
+describe('the printed date and the filed date agree, whatever the timezone (#410)', () => {
+  const restoreTZ = process.env.TZ;
+  afterEach(() => { if (restoreTZ === undefined) delete process.env.TZ; else process.env.TZ = restoreTZ; });
+
+  it.each([
+    ['UTC', '2026-09-06T23:30:00Z'],
+    ['Pacific/Kiritimati', '2026-09-06T23:30:00Z'],   // +14: local rolls onto the NEXT UTC day
+    ['Pacific/Honolulu', '2026-09-07T01:00:00Z'],      // -10: local falls back onto the PREVIOUS UTC day
+    ['America/Los_Angeles', '2026-09-07T01:00:00Z'],   // -7 (PDT): same direction, a more everyday zone
+  ])('%s never names a different day than the album row, for its own boundary-crossing instant', (tz, iso) => {
+    process.env.TZ = tz;
+    const cert = { ...base, date: new Date(iso) };
+    const stored = certToStored(cert, { id: 'year1:number-bonds' });
+    const albumDate = new Date(`${stored.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    expect(certificateText(cert).date, `disagreed under ${tz}`).toBe(albumDate);
   });
 });
 

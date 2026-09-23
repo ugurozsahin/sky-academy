@@ -82,6 +82,44 @@ describe('mission session', () => {
     expect(ev.onEnd.mock.calls[0][0].won).toBe(false);
   });
   /**
+   * #522: a generator throw ends the session through the exact same `won: false` path as a genuine no-lives
+   * loss (`console.error` + `end(false)`), which left `SessionResult` with no way to tell "a technical failure
+   * cut this short" apart from "the child ran out of lives" — the UI showed the identical defeat screen for
+   * both. `incomplete: true` is the one field that distinguishes them, mirroring `Duel`'s own `incomplete` for
+   * the same #444-shaped failure.
+   */
+  it('a generator that throws mid-mission ends the session as incomplete, not as a genuine loss (#522)', () => {
+    const ev = events();
+    let calls = 0;
+    const good = topicById('y1-add')!;
+    // A unique `hint` per call (review, pr-test-analyzer) keeps `nextQuestion()`'s own "avoid immediate
+    // repeat" retry loop from ever firing here — without it, a real `y1-add` draw that happened to repeat
+    // would burn an extra `gen()` call on the retry and make the throw land one `nextQuestion()` early,
+    // failing this test somewhere that doesn't point at the retry loop at all.
+    const flaky = { ...good, gen: (d: Parameters<typeof good.gen>[0], r: Parameters<typeof good.gen>[1]) => { calls++; if (calls > 2) throw new Error('boom'); return { ...good.gen(d, r), hint: `call-${calls}` }; } };
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const s = new Session({ mode: 'mission', year: Y1, topic: flaky, rng: rng(1) }, ev);
+    s.start();
+    expect(s.hit(s.current!.answer)).toBe('correct'); s.advance();
+    expect(s.hit(s.current!.answer)).toBe('correct'); s.advance();   // the third nextQuestion() is what throws
+    expect(s.ended).toBe(true);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('y1-add'), expect.any(Error));
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    // won: false, exactly like a genuine loss — incomplete is the only field that tells them apart, and it
+    // must never be set on a real loss (the earlier "onCommit never fires..." test's own onEnd result, which
+    // this mirrors, carries no `incomplete` key at all).
+    expect(ev.onEnd.mock.calls[0][0]).toMatchObject({ won: false, correct: 2, attempts: 2, incomplete: true });
+    spy.mockRestore();
+  });
+  it('a genuine loss never carries incomplete', () => {
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(1), stages: 1 }, ev);
+    s.start();
+    for (let i = 0; i < Y1.lives; i++) { s.hit('not-the-answer'); s.advance(); }   // spend every life
+    expect(s.ended).toBe(true);
+    expect(ev.onEnd.mock.calls[0][0]).toMatchObject({ won: false, incomplete: false });
+  });
+  /**
    * The same preview, from the other two places `maybeCommitFinalStage()` is called (review round 2 follow-up:
    * `hit()`'s correct/wrong paths above are not the only way a mission's last question gets decided) — the
    * target bubble falling uncaught (`fall()`), and a wave that runs out with nothing hit at all

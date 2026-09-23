@@ -67,6 +67,10 @@ The mechanism, and it matters that it works this way:
    the code may have grown the very thing the issue asked for. **Reading back your own reasoning and
    confirming it still reads true is not this step**, it is the failure this step exists to prevent: it makes
    the gate a delay and nothing more.
+   **Re-deriving a proposal is not the same as making it again**: a proposal you derive today and derived
+   yesterday is one proposal that has been waiting, and item 4 says how you tell — by its ledger line, before
+   you post anything. Deriving afresh is what keeps the evidence honest; reposting is what would reset the
+   clock and is forbidden there.
 2. **The ledger stores only where to find out when a proposal was first made**, never the plan and never the
    clock. The open issue titled `refiner: backlog` carries it, overwritten every run (records have readers,
    #98 — operational state lives in an issue body that is replaced, never appended to). One line per
@@ -90,10 +94,21 @@ The mechanism, and it matters that it works this way:
    and "close #131 as no longer true" are two different proposals, and a ledger line that only names the
    issue would let one of them serve as the other's waiting period. A proposal that no longer re-derives is
    dropped from the ledger silently — that is not a failure, it is the gate working.
-4. **Post the proposal as a comment on the issue itself when you first make it**, so the owner meets it where
-   he reads rather than in a ledger he does not open. Say what you will do, when, and on what evidence.
-   **Keep the `id` the API returns for it**: that comment is both the owner's notice and the proposal's clock,
-   and item 2 records the id so tomorrow can find it.
+4. **Post the proposal as a comment on the issue itself — once, the first time you make it**, so the owner
+   meets it where he reads rather than in a ledger he does not open. Say what you will do, when, and on what
+   evidence. **Keep the `id` the API returns for it**: that comment is both the owner's notice and the
+   proposal's clock, and item 2 records the id so tomorrow can find it.
+   **"The first time" is a step, not a description, so read the ledger before you post.** For each proposal you
+   derived today, look for a line naming this issue *and this exact action*. If one is there, **post nothing**:
+   carry its comment id forward into today's ledger unchanged and go to item 3's age check. Post a comment only
+   for a proposal that has no line yet.
+   This is the one place where nothing fails and everything is wrong. Re-deriving is unconditional (item 1) and
+   the ledger is rewritten whole every run (item 2), so a run that reposts instead of recognising mints a fresh
+   `created_at` — the comment posts, the id is fetchable, every read succeeds, and the gate resets. Do that
+   daily and the twenty hours never elapse and check 10's three-day stall never trips, so a proposal can be
+   made forever and applied never, with the whole two-phase gate reading healthy the entire time. **Comment
+   continuity is what makes the clock a clock**; it became load-bearing the moment the clock moved out of the
+   ledger, and it is not a read that can fail safe (#513 review, round 13).
    **The comment comes first and the ledger line only after it has actually posted — one step in that order,
    not two calls that happen to be adjacent.** Read the response: if the comment did not post, write no ledger
    line for that proposal, and it starts its wait again tomorrow. The two writes look independent and are not,
