@@ -306,13 +306,19 @@ describe('guard rails', () => {
   // only on the accepted arm — so falling out of the refusal is a type error, caught by `tsc`, not a rail.
   it('the picker moves a child only once the store has accepted the switch (#20 slice 2)', () => {
     const pick = code(SOURCES['/src/ui/profiles.ts']);
-    expect(pick, "the store is asked, and its answer is the decision's only input").toMatch(/pickOutcome\(id, setActiveProfile\(id\)\)/);
+    expect(pick, "the store is asked, and its answer is the decision's only input").toMatch(/pickOutcome\(c\.id, setActiveProfile\)/);
     expect(pick.match(/\bgo\(/g) ?? [], 'one call site for go(), inside the guarded handler').toHaveLength(1);
     expect(pick, 'and the child is moved with the id off the accepted arm').toMatch(/go\(o\.id\)/);
     expect(pick, 'the same shape for "New ninja": onboarding starts on the added profile').toMatch(/onNew\(o\.id\)/);
     // Both refusals are told apart on screen (#335 item 2): a picker that shows one sentence for both tells a
-    // child with four siblings that their browser is broken, or the reverse.
-    expect(pick).toMatch(/why === 'full'/);
+    // child with four siblings that their browser is broken, or the reverse. A `Record`, not the ternary this
+    // used to pin (#401 item 2): a third refusal reason missing from it is a `tsc` error here, not a silent
+    // fallback to one of the two sentences a rail this shallow could not have told apart either.
+    // The call site, not the declaration (PR #590 review round 1): `Record<AddRefusal, string>` alone matches
+    // anywhere in the file, so a revert of `addOutcome` back to the ternary left the now-dead `ADD_HINTS`
+    // declaration sitting unused beside it and this rail green throughout — reproduced and confirmed by two
+    // independent reviewers. Pinning `hint: ADD_HINTS[r.why]` reads the use, not a type sitting nearby.
+    expect(pick).toMatch(/hint: ADD_HINTS\[r\.why\]/);
     // And both are read aloud, not only printed — `.claude/rules/style.md`, "read-aloud everywhere" (B6).
     // Two halves, because this rail can only ever hold one of them. It reads `refuse`'s *definition*, and
     // deleting both calls left `tsc` clean and 1436/1436 green while a refused tap did nothing at all — no

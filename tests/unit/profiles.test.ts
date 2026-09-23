@@ -13,11 +13,11 @@ import type { AddProfileResult } from '../../src/storage';
  */
 describe('pickOutcome (#20 slice 2 — tapping a sibling\'s card)', () => {
   it('moves the child, with the id to move them to, only when the store accepted the switch', () => {
-    expect(pickOutcome('p2', true)).toEqual({ move: true, id: 'p2' });
+    expect(pickOutcome('p2', () => true)).toEqual({ move: true, id: 'p2' });
   });
 
   it('refuses with a reason when the store did not, and carries no id to move anyone with', () => {
-    const o = pickOutcome('p2', false);
+    const o = pickOutcome('p2', () => false);
     expect(o.move).toBe(false);
     expect(o).not.toHaveProperty('id');            // the caller cannot move a child off a refusal, even by mistake
     expect(o.move === false && o.hint).toContain('will not let the game save');
@@ -25,9 +25,15 @@ describe('pickOutcome (#20 slice 2 — tapping a sibling\'s card)', () => {
 
   it('the store\'s answer is the only thing that decides — the id never overrides it', () => {
     for (const id of ['p1', 'p2', 'p3', 'p4'] as const) {
-      expect(pickOutcome(id, true)).toEqual({ move: true, id });
-      expect(pickOutcome(id, false).move).toBe(false);
+      expect(pickOutcome(id, () => true)).toEqual({ move: true, id });
+      expect(pickOutcome(id, () => false).move).toBe(false);
     }
+  });
+
+  it('asks the committer for this card\'s own id, never a different one (#401 item 3)', () => {
+    const seen: string[] = [];
+    pickOutcome('p3', id => { seen.push(id); return true; });
+    expect(seen).toEqual(['p3']);          // one call, and it is the id the caller tapped — nothing else to pass it
   });
 });
 
