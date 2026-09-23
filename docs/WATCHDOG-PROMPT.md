@@ -238,9 +238,16 @@ your first finding and the only one you can report.
    missing pulse here is the *only* evidence a refiner run leaves of having died, and there is no second
    record to cross-check it against.
    Read `refiner: backlog` in the same pass — the same label, never work, and never a duplicate report of a
-   finding. You are not judging its contents. One thing only: if its ledger lists a proposal first derived
+   finding. You are not judging its contents. One thing only: if its ledger lists a proposal first made
    **more than three days ago** and still not applied, the two-phase gate has stalled rather than held, and
    that is a finding. A gate that never closes is a gate that has quietly become a refusal.
+   **Take that age from the proposal comment, not from the ledger line.** Each line carries the comment's id:
+   fetch it — `GET /repos/ugurozsahin/sky-academy/issues/comments/<id>` — and read `created_at`, which GitHub
+   wrote. The refiner writes the ledger body itself and rewrites it whole every run, so a line's own timestamp
+   is self-reported; reading it here would mean a run that re-stamped its proposals could hide a permanently
+   stalled gate from the only check built to find one (#439's shape, #513 review, round 12). A line whose
+   comment id is missing, unfetchable or deleted is itself a finding — the proposal has no clock, which means
+   the refiner cannot apply it either, so it is stuck by construction.
    **And a ledger you could not read is a finding in its own right, not a quiet nothing.** No open
    `refiner: backlog` issue, a body you cannot fetch, a body with no ledger section in it, or a single line
    whose issue number, action or timestamp will not parse: each of those is reported, naming which it was.
