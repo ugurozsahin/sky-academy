@@ -18,11 +18,15 @@ import { expectFitsViewport, outsideItsBox, overrideSafeAreaInsets } from './vie
  * `storage.ts` reads (#138), so hoisting it silently turns that rail into a check on nothing.
  */
 
-/** Land on the sky map with the avatar already chosen, exactly as `game.spec.ts` does (#138). */
-async function seedPlayer(page: Page, id = 'volt', name = 'Ada') {
+/**
+ * Land on the sky map with the avatar already chosen, exactly as `game.spec.ts` does (#138). `extra`
+ * mirrors that file's own `seedPlayer` signature (same optional fourth argument) rather than inventing a
+ * shape of its own — the #399 `.cert-view` test below needs a seeded `certs` array.
+ */
+async function seedPlayer(page: Page, id = 'volt', name = 'Ada', extra: Record<string, unknown> = {}) {
   await page.addInitScript(save => {
     if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
-  }, JSON.stringify({ v: 1, name, avatar: id }));
+  }, JSON.stringify({ v: 1, name, avatar: id, ...extra }));
   await page.goto('/');
   await expect(page.locator('.home')).toBeVisible();
 }
@@ -429,10 +433,11 @@ test.describe('tablet viewports (#116)', () => {
  * #399's own item 4: a real inset, injected via CDP (`overrideSafeAreaInsets`), read back as real computed
  * padding — not the text-only grep the `tests/unit/guardrails.test.ts` rails already run at pull-request
  * time (`env()` has no notch to resolve under either project, which is why those rails exist at all). This
- * covers three of the four sites the issue's own sweep named: `.hud` (PR #530), the landscape duel screen
- * (PR #542) and `.villain` (PR #551). `.cert-view` is NOT covered here — reaching it needs a full mission
- * played to completion (`game.spec.ts`'s own certificate test), which is a bigger duplicate than this file's
- * "small and deliberate" convention stretches to; left for a further slice, per the issue's own item 4.
+ * covers all four sites the issue's own sweep named: `.hud` (PR #530), the landscape duel screen (PR #542),
+ * `.villain` (PR #551) and `.cert-view` below. An earlier slice assumed `.cert-view` "needs a full mission
+ * played to completion" and left it uncovered on that basis — it does not: `game.spec.ts`'s own "My
+ * certificates" test already reaches it cheaply via a seeded `certs` row on the rewards album, which is the
+ * path used here too.
  *
  * Each test uses its own distinct inset value per side, on purpose: a transposed pair (top swapped for
  * left, `--sar` read where `--sal` was meant) would still pass a same-value check.
@@ -476,5 +481,24 @@ test.describe('a real safe-area inset becomes real padding, not just a declared 
     });
     // src/style.css: `.villain { right: calc(10px + var(--sar)); bottom: calc(12px + var(--sab)) }`
     expect(pos, '.villain must reach the CDP-overridden --sar/--sab, not the env() fallback').toEqual({ right: '55px', bottom: '37px' });
+  });
+
+  test('.cert-view pads by the real --sar/--sab/--sal values; top has no --sat and stays a flat 16px', async ({ page }) => {
+    await overrideSafeAreaInsets(page, { top: 60, right: 25, bottom: 45, left: 15 });
+    const cert = { id: 'reception:r-count', name: 'Ada', avatar: 'volt', year: 'Reception', title: 'Counting to 10', stars: 3, score: 250, correct: 20, attempts: 20, date: '2026-09-10' };
+    await seedPlayer(page, 'volt', 'Ada', { certs: [cert] });
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+    await page.click('.cert-open');
+    const view = page.locator('.cert-view');
+    await expect(view).toBeVisible();
+    const pad = await view.evaluate(el => {
+      const s = getComputedStyle(el);
+      return { top: s.paddingTop, right: s.paddingRight, bottom: s.paddingBottom, left: s.paddingLeft };
+    });
+    // src/style.css: `.cert-view { padding: 16px calc(16px + var(--sar, 0px)) calc(16px + var(--sab, 0px)) calc(16px + var(--sal, 0px)) }`
+    expect(pad, '.cert-view padding must reach the CDP-overridden --sar/--sab/--sal; top is a fixed 16px, not --sat').toEqual({
+      top: '16px', right: '41px', bottom: '61px', left: '31px',
+    });
   });
 });
