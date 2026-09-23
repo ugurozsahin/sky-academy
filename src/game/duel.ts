@@ -5,7 +5,7 @@ import { starsForAccuracy } from './session';
 import type { DojoEvent } from './dojo';
 // Type-only, so it erases at compile time and adds no runtime edge — the same shape `game/parents.ts` and
 // `game/sensei.ts` already use to name a stored type without depending on the store.
-import type { StoredDuel } from '../storage';
+import type { AnswerTally, StoredDuel } from '../storage';
 
 export type DuelPlayer = 'a' | 'b';
 export const DUEL_ROUNDS = 10;
@@ -31,7 +31,7 @@ export interface DuelEvents {
  * the cheap and obvious play when a wrong slice costs nothing, used to add a try per bubble. Ten rounds won
  * that way read as 10/28 to a parent about a child who won ten out of ten.
  */
-export interface DuelTally { hits: number; tries: number }
+export type DuelTally = AnswerTally;
 export interface DuelResult { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number; rounds: number; tally: Record<DuelPlayer, DuelTally>; incomplete?: boolean }
 export interface DuelOpts { topic: Topic; difficulty: Difficulty; rng?: () => number; rounds?: number }
 

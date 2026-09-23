@@ -297,7 +297,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // of the topic, so a duel-only topic keeps `plays: 0` and `accuracy()` reads null for it — the same way a
     // topic met only in Sensei training or Sky Storm already behaves.
     taught = duelAccuracy(r);
-    recordAccuracy(topic.id, taught.hits, taught.tries);
+    recordAccuracy(topic.id, taught);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd(duelDojoEvent(r, topic.subject), paid);
     dojoPaid = dojo.coins;

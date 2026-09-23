@@ -204,7 +204,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
       else recordEndless(o.year.id, r.score);
     }
-    for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t.hits, t.tries);   // every mode teaches Sensei what is hard
+    for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t);   // every mode teaches Sensei what is hard
     const bySubject = (s: Topic['subject']) =>
       Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicsFor(o.year.id).find(x => x.id === id)?.subject === s ? t.hits : 0), 0);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
