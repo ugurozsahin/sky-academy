@@ -3999,27 +3999,30 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
    * runs reported the problem and no rule let them act. This is not #516 above: that was a run re-judging a
    * pull request the test DID match. Clause (c) is written over state rather than events, which is what stops
    * a fourth kind of event reopening the same hole.
+   *
+   * **Pinned by equality, and the first version of this rail was not.** It asserted five tokens separately —
+   * `review-gate`, `green`, `open`, `not a draft`, `moves no commit` — and swapping the clause's **and** for
+   * an **or** kept every one of them while inverting the rule: any non-draft open pull request would satisfy
+   * (c) whatever colour the gate was. That is the token-presence defect this very block's comment warned
+   * about, rebuilt inside the guard against it (#580 review). A conjunction is not a token, so nothing short
+   * of the whole clause can hold it.
+   *
+   * What this costs is what every verbatim pin costs: a deliberate rewording turns it red and asks to be
+   * re-pinned on purpose. That is the trade the `CLAIMS` table made across fourteen rounds and it is the only
+   * mechanism here that has not been walked through.
    */
-  it('the waiting test has a state-shaped clause, not only the two event-shaped ones (#579)', () => {
+  it('the waiting test carries clause (c) word for word, conjunction included (#579)', () => {
     const text = doc('docs/REVIEWER-PROMPT.md');
     const step1 = text.slice(text.indexOf('STEP 1 — SETUP'), text.indexOf('STEP 2 — REVIEW'));
     expect(step1.length, 'STEP 1 must be found, or this rail reads an empty string').toBeGreaterThan(500);
-    const c = step1.indexOf('or (c) it is not a draft');
-    expect(c, 'STEP 1 must carry a third waiting clause').toBeGreaterThan(-1);
-    const clause = step1.slice(c, step1.indexOf('.', step1.indexOf('(#579)')) + 1);
-    // Each condition separately, never as one alternation: a mutation satisfies one branch and breaks the
-    // rule, which is the token-presence defect one level down (#513 rounds 3-6).
-    expect(clause, 'the gate status is what (c) reads — not a commit, not a verdict').toContain('review-gate');
-    expect(clause, 'and it must read green, not merely present').toMatch(/green/i);
-    expect(clause, '(c) applies to a pull request that is still open; without that it would match merged ones')
-      .toMatch(/\bopen\b/);
-    expect(clause, '(c) must not be draft-blind — a draft is how a block is expressed here')
-      .toMatch(/not a draft/);
-    // The reason, not only the rule: a clause whose "why" is gone is the one a byte-budget trim takes first,
-    // and this file is at zero headroom. Found by mutation — the conditions above all stayed green with the
-    // explanation deleted, which would leave a future editor no way to know what (c) is protecting.
-    expect(clause, 'it must say why (a) and (b) miss this case, or the next trim removes (c) as redundant')
-      .toMatch(/moves no commit/);
+    const CLAUSE_C = 'or (c) it is not a draft, its `review-gate` is green, and open — his marker after a '
+      + 'clear moves no commit, so (a) and (b) miss it (#579).';
+    expect(step1, 'clause (c) must read exactly this — every condition, the **and** that joins them, and the '
+      + 'reason (a) and (b) miss the case. If the wording changed on purpose, re-pin it here deliberately '
+      + 'and say so in the commit').toContain(CLAUSE_C);
+    // Structure the pin cannot express: (c) has to sit inside the definition, after the clause it extends.
+    expect(step1.indexOf(CLAUSE_C), 'and it must follow clause (b), so a run reading the test in order meets '
+      + 'all three').toBeGreaterThan(step1.indexOf('newer than that block'));
   });
 
   it('the reviewer prompt puts "apply the test, do not re-judge it" inside the waiting definition', () => {
