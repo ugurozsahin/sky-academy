@@ -309,6 +309,26 @@ describe('the wave launches on its own timetable', () => {
     expect(sim.events.hits).toEqual([]);
   });
 
+  // #152 review note 3, and the PR's own review (pr-test-analyzer): `resolveCollisions`/`clampIntoArena` are
+  // exercised directly with a hand-built `counts` object elsewhere (`tests/unit/arena.test.ts`), but the
+  // actual integration point — `Arena.clampCounts` threaded through the real `update()` loop — had no test of
+  // its own, unlike `shotsThrown`, the sibling field it mirrors (asserted via `sim.arena.shotsThrown` above).
+  // This drives a real multi-bubble wave through a real `Arena` and checks the field the e2e hook would read.
+  it('Arena.clampCounts is actually wired through update(), and stays at zero ceiling for a real wave', () => {
+    sim = createSim();
+    expect(sim.arena.clampCounts, 'a fresh arena starts at zero').toEqual({ left: 0, right: 0, ceiling: 0 });
+    // A nine-label wave, not four: this is what makes the test able to fail. A small wave never reaches
+    // either wall in this 390-wide harness (checked directly), so a `ceiling === 0` assertion alone would
+    // read the same whether update() passes clampCounts through or the wiring was dropped entirely — the
+    // field starts at zero either way. Nine bubbles collide often enough to push some against a wall for
+    // real (measured: low hundreds of left/right hits), so asserting that traffic too is what actually
+    // proves this field is the one update() writes to, not merely one that shares its shape.
+    sim.spawn({ labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9'], speed: 3 });
+    advanceUntil(sim, () => sim!.events.waveEnds === 1, 'the wave never ended');
+    expect(sim.arena.clampCounts.left + sim.arena.clampCounts.right, 'proof the field update() writes to is this one').toBeGreaterThan(0);
+    expect(sim.arena.clampCounts.ceiling, 'the true invariant — see tests/unit/arena.test.ts for why only this one').toBe(0);
+  });
+
   it('a bubble tapped on its way down crosses the bottom mid-flight, and is still not a miss', () => {
     // `update` guards this: a bubble past the bottom edge only calls `onFall` `if (!b.hit)`.
     //
