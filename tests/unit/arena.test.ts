@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type Collidable, compact, dealOrdered, LABEL_MIN_FS, LABEL_READABLE_FS, WRAP_STACK, fitLabel, fitLabelLines, labelFont, splitLabel, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
+import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type ClampCounts, type Collidable, compact, dealOrdered, LABEL_MIN_FS, LABEL_READABLE_FS, WRAP_STACK, fitLabel, fitLabelLines, labelFont, splitLabel, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
 import { ALL_AVATARS } from '../../src/avatars';
 import { TOPICS, type Difficulty } from '../../src/curriculum';
 import { waveOptsFor } from '../../src/ui/play-session';
@@ -806,5 +806,69 @@ describe('bubbles collide instead of passing through each other (#108)', () => {
     resolveCollisions([a, b], GEOM);
     expect(Math.hypot(b.x - a.x, b.y - a.y), 'concentric is a real case and must not divide by zero')
       .toBeGreaterThanOrEqual(a.r + b.r - EPS);
+  });
+
+  // #152 review note 4: nothing set `dead: true` anywhere in this block, so the filter excluding a dead
+  // bubble from `live` was uncovered — deleting `!b.dead` from `resolveCollisions` left the whole suite green.
+  it('never collides a bubble that has already died, even while overlapping a live one', () => {
+    const gone = ball({ x: 195, y: 400, dead: true }), live = ball({ x: 210, y: 400 });
+    resolveCollisions([gone, live], GEOM);
+    expect(gone.x, 'a dead bubble is not moved').toBe(195);
+    expect(live.x, 'and does not push the live one away either — it was never in the pass').toBe(210);
+  });
+
+  // #152 review note 1: `reveal()`'s ghost bubble (and a tap-hit spotlighted one) sets `mark`, and is placed
+  // deliberately — including a nudge away from the other spotlighted bubble — so a resolver moving it
+  // afterwards would be a visible defect. Structural now (the filter itself excludes it), not merely true by
+  // coincidence of every `frozen`/`clearWave` writer staying correct.
+  it('never collides a spotlighted outcome bubble ("mark" set), even while overlapping a live one', () => {
+    const good = ball({ x: 195, y: 400, mark: 'good' }), live = ball({ x: 210, y: 400 });
+    resolveCollisions([good, live], GEOM);
+    expect(good.x, 'the spotlighted bubble stays exactly where reveal() placed it').toBe(195);
+    expect(live.x, 'and does not get pushed away by it either').toBe(210);
+  });
+
+  // #152 review note 3: the wall/ceiling clamps in `clampIntoArena` silently discarded what they corrected,
+  // with no symptom a test could assert on — #255's speed-cap bug needed a reviewer to derive it from
+  // launch-speed arithmetic by hand. The wall clamps are not asserted here: a bubble pushed sideways by a
+  // collision near the edge legitimately reaches them (measured directly while writing this test — the
+  // 390-wide phone case clamps the wall over a thousand times across one wave), so a count of zero would not
+  // mean anything. The CEILING clamp is different and is the issue's actual invariant: `apexMin = topInset +
+  // r + 10` is strictly above `ceiling = topInset + r` by construction, and a resize scales both by the same
+  // factor, so nothing in ordinary play should ever bend a bubble's arc against the HUD. A regression that
+  // lets one through (an illegal `layoutWave`, an apex computed on the wrong side of `topInset`) now turns
+  // this counter non-zero instead of needing a screenshot to notice, on the same drive-from-`layoutWave`
+  // cases the "does not retime or reshape a REAL wave" test above uses.
+  it('never clamps a bubble against the ceiling across a real wave the game can produce', () => {
+    // `rng` is driven at both 0.5 (the mid-range apex, an arbitrary interior point) AND 0 (pr-test-analyzer
+    // review: `layoutWave`'s `apexMin + usable * (0.05 + rng() * 0.45)` collapses to its MINIMUM offset —
+    // 0.05 of `usable` above `apexMin` — only when `rng()` returns 0, so a constant 0.5 alone never actually
+    // approaches the `apexMin` margin this test claims to protect. Checked directly that `rng = () => 0` is
+    // still a legal wave (every bubble clears) before relying on it as a second case, not a degenerate one.
+    const flightCounts = (W: number, H: number, speedK: number, stage: 1 | 2 | 3, rng: () => number): ClampCounts => {
+      const geom = { W, H, topInset: 120 };
+      const plan = layoutWave({ labels: ['1', '2', '3', '4', '5', '6'], speed: stage }, geom, speedK, 0, rng);
+      const bs: Collidable[] = plan.bubbles.map(b =>
+        ({ x: b.x, y: H + plan.r, vx: b.vx, vy: b.vy, g: b.g, r: plan.r, launched: true, dead: false }));
+      const counts: ClampCounts = { left: 0, right: 0, ceiling: 0 };
+      const gone = new Set<number>();
+      for (let f = 0; f < 1200 && gone.size < bs.length; f++) {
+        for (const b of bs) { b.vy += b.g / 60; b.x += b.vx / 60; b.y += b.vy / 60; }
+        resolveCollisions(bs, geom, COLLIDE.bounce, counts);
+        bs.forEach((b, i) => { if (!gone.has(i) && b.y - b.r > H + 10 && b.vy > 0) gone.add(i); });
+      }
+      expect(gone.size, 'every bubble must clear, or the count below means nothing').toBe(bs.length);
+      return counts;
+    };
+    const cases: [string, number, number, number, 1 | 2 | 3][] = [
+      ['phone 390x760 @1x stage 3', 390, 760, 1, 3],
+      ['tablet 800x1180 @1x stage 3', 800, 1180, 1, 3],
+      ['phone @4x stage 1', 390, 760, 4, 1],
+      ['phone @4x stage 3', 390, 760, 4, 3],
+      ['tablet @4x stage 3', 800, 1180, 4, 3],
+    ];
+    for (const [name, W, H, k, stage] of cases)
+      for (const [rngName, rng] of [['mid apex', () => 0.5], ['minimum apex (the actual margin)', () => 0]] as const)
+        expect(flightCounts(W, H, k, stage, rng).ceiling, `${name}, ${rngName}: a bubble's arc bent against the HUD`).toBe(0);
   });
 });

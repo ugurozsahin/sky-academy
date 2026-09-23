@@ -118,8 +118,9 @@ const afterPick = () => { if (load().onboarded) nav.map(); else nav.avatar(); };
  * twice it would be two rules that agree today; `parents.ts` calls `nav.launch()` and this stays the only copy.
  */
 const relaunch = () => {
-  // `leave()` here and not only in the routes it hands off to: the #74 rail in `guardrails.test.ts` follows a
-  // route's hand-off exactly one level and fails on a chain it cannot read, which is the right answer — a
+  // `leave()` here and not only in the routes it hands off to: the ugurozsahin/sky-academy-private-archive#74
+  // rail in `guardrails.test.ts` follows a route's hand-off exactly one level and fails on a chain it cannot
+  // read, which is the right answer — a
   // relaunch that tore nothing down would leak whatever arena the grown-ups screen was opened from.
   leave();
   // `goProfiles(true)`: this is the *launch* picker, with no way back past the question of who is playing —

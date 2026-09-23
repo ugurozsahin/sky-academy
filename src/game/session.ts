@@ -29,7 +29,7 @@ export interface SessionEvents {
    */
   onCommit?: (r: SessionResult) => void;
 }
-export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number }
+export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number; incomplete?: boolean }
 
 /**
  * The three-star bar, from an accuracy in 0..1 — the **one** definition (#397 review round 2, B2).
@@ -250,7 +250,7 @@ export class Session {
       // again, so `waiting` would stay stuck while the arena's rAF loop keeps it looking alive. Ending
       // through the normal path pays what was already earned; `won: false` because nothing was completed.
       console.error(`Sky Ninja Academy: "${topic.id}" question generator threw`, e);
-      this.end(false);
+      this.end(false, true);
       return;
     }
     this.current = q; this.seqIndex = 0; this.waiting = false; this.questionsAsked++;
@@ -346,14 +346,19 @@ export class Session {
    * no side effects, so `maybeCommitFinalStage()` below can preview it before `stageStars` itself carries the
    * final stage (#484). `end()` calls it with the real, already-mutated `this.stageStars`.
    */
-  private buildResult(won: boolean, stageStars: number[]): SessionResult {
+  private buildResult(won: boolean, stageStars: number[], incomplete = false): SessionResult {
+    // #522 review (type-design-analyzer): `incomplete` only ever means a technical failure, never a genuine
+    // finish — "won but incomplete" is not a state anything should reach, but `end(won, incomplete)` is two
+    // independent booleans, so nothing stops a future call site asserting it by mistake. Clamped here, once,
+    // rather than trusted at every call site: a bad call degrades to a safe loss instead of shipping a win.
+    const safeWon = incomplete ? false : won;
     const total = stageStars.reduce((s, x) => s + x, 0);
     const acc = this.attempts ? this.correct / this.attempts : 0;
     // End-stars and coins come from the mode's own rules in modes.ts (coins reads back the stars just computed).
-    const end = { won, score: this.score, correct: this.correct, accuracy: acc, stageStarsTotal: total, stages: this.stages, stars: 0 };
+    const end = { won: safeWon, score: this.score, correct: this.correct, accuracy: acc, stageStarsTotal: total, stages: this.stages, stars: 0 };
     const stars = this.spec.stars(end);
     const coins = this.spec.coins({ ...end, stars });
-    return { mode: this.o.mode, won, score: this.score, stars, stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins };
+    return { mode: this.o.mode, won: safeWon, score: this.score, stars, stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins, incomplete };
   }
   /**
    * #484: the moment a staged mission's last question is decided — inside `markCorrect()`/`markWrong()`/
@@ -369,9 +374,9 @@ export class Session {
     const acc = this.stageAttempts ? this.stageCorrect / this.stageAttempts : 0;
     this.ev.onCommit(this.buildResult(true, [...this.stageStars, starsForAccuracy(acc)]));
   }
-  end(won: boolean) {
+  end(won: boolean, incomplete = false) {
     if (this.ended) return;
     this.ended = true;
-    this.ev.onEnd(this.buildResult(won, this.stageStars));
+    this.ev.onEnd(this.buildResult(won, this.stageStars, incomplete));
   }
 }

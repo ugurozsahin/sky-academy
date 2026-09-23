@@ -24,7 +24,8 @@ describe('coin shop rules (#6)', () => {
       expect(it!.trail?.color).toBeTruthy();
       expect(it!.trail?.core).toBeTruthy();
     }
-    expect(trails.some(i => i.fx === 'master')).toBe(false);           // the all-topics reward is never for sale
+    // the all-topics reward is never for sale — `ShopItem.fx?: Exclude<FxKind, 'master'>` (#214) now makes
+    // `i.fx === 'master'` a compile error rather than a runtime check, so the guarantee is the type itself.
     expect(itemById('trail-element')!.fx).toBeUndefined();             // the free default keeps the avatar's own element
     const prices = trails.map(i => i.price);
     expect(prices).toEqual([...prices].sort((a, b) => a - b));         // strictly the ladder the owner asked for

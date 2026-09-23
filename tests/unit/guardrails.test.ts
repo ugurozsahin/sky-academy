@@ -236,7 +236,8 @@ describe('guard rails', () => {
     expect(main).toMatch(/dispose\s*=\s*playScreen\(/);
     expect(main).toMatch(/dispose\s*=\s*memoryScreen\(/);
     expect(main).toMatch(/dispose\s*=\s*duelScreen\(/);      // #16: the third arena-owning screen
-    // Match each route's *body*, not its layout: an equivalent reformat must not turn this red (#74 review).
+    // Match each route's *body*, not its layout: an equivalent reformat must not turn this red
+    // (ugurozsahin/sky-academy-private-archive#74 review).
     // The route names are read from the source, so a screen added later is covered without editing this test.
     // Bound the slice at the router's closing brace: unbounded, the LAST route's "body" ran to end of file, so
     // any `leave()` written lower in main.ts made a genuinely broken route pass (#77 review).
@@ -1650,7 +1651,7 @@ describe('guard rails', () => {
       // "a markdown file that cannot reach the game", and pointing at a path that no longer exists would
       // have made this line read as a leftover rather than a check.
       for (const path of ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md', 'docs/worklog/2026-09.md',
-                          'tests/unit/guardrails.test.ts', 'scripts/seed-issues.py',
+                          'tests/unit/guardrails.test.ts', 'scripts/board-sync.mjs',
                           '.claude/skills/add-topic/SKILL.md', '.github/workflows/review-gate.yml'])
         expect({ path, e2e: re.test(path) }, `${path} cannot reach the game, so it must not pay for e2e (#176)`)
           .toEqual({ path, e2e: false });
@@ -2308,6 +2309,43 @@ describe('the landscape screen width cannot silently return to the phone column 
 });
 
 /*
+ * #18 slice 2, group A — the tracing pad, group A's other look-changing cap (the arena's 600 px stays
+ * `owner-approval` and unstarted). Same shape as the rail above and for the same reason: the only
+ * behavioural check is `tests/e2e/viewport.spec.ts`, which the `mobile`/`desktop` projects a pull request
+ * runs skip entirely (`.claude/rules/e2e.md`), so a revert here would ship green.
+ *
+ * The rail holds two things a revert or a careless edit could break independently: the tracing pad widens
+ * past 560 px on a wide viewport, and `--arena-w` (the bubble arena's own cap, which this change must never
+ * touch — a tracing screen renders no `#arena` canvas, so there is no reason for this rule to reach it)
+ * stays at exactly 600 px.
+ */
+describe('the tracing pad cannot silently return to the phone column, and the fix cannot silently reach the arena (#18)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  it('a wide-viewport media query widens .play.tracing .hud and .trace-wrap to close to 880px, not merely past 560px', () => {
+    const block = bare.match(/@media\s*\(min-width:\s*900px\)\s*\{\s*\.play\.tracing\s*\.hud,\s*\.play\.tracing\s*\.trace-wrap\s*\{([^}]*)\}/);
+    expect(block, 'the #18 group A tracing rule must stay a min-width: 900px block over .play.tracing .hud, .play.tracing .trace-wrap').toBeTruthy();
+    const cap = block![1].match(/max-width:\s*min\(\s*(\d{3,4})px\s*,/);
+    // #534 review (pr-test-analyzer): a bound that only ruled out `<= 560px` still passed a hand-edit down to
+    // 600px — barely more than the old phone column and nowhere near the 880px this PR ships and measures in
+    // its own body. A range around 880 catches that regression while still allowing a genuine future retune.
+    expect(cap, 'the widened cap must still be a max-width: min(NNNpx, ...)').toBeTruthy();
+    expect(Number(cap![1]), 'the widened cap must stay close to the shipped 880px, not merely wider than 560px')
+      .toBeGreaterThanOrEqual(850);
+    expect(Number(cap![1]), 'the widened cap must stay close to the shipped 880px, not merely wider than 560px')
+      .toBeLessThanOrEqual(920);
+  });
+
+  it('--arena-w stays at 600px, untouched by the tracing-pad widening', () => {
+    const play = bare.match(/(?:^|[}\s])\.play\s*\{([^}]*)\}/)?.[1];
+    expect(play, 'the base .play rule must exist').toBeTruthy();
+    expect(play, 'the bubble arena keeps its own 600 px cap — this fix has no reason to touch it')
+      .toMatch(/--arena-w:\s*600px/);
+  });
+});
+
+/*
  * #399: `--sal`/`--sar` were read at `.cert-view` (`var(--sal, 0px)`/`var(--sar, 0px)`) but never declared
  * beside `--sat`/`--sab` in `:root` — an undefined custom property with no fallback in the `var()` that
  * reads it is invalid at computed-value time and falls back to nothing at all, silently. Neither Playwright
@@ -2343,4 +2381,59 @@ it('every CSS custom property style.css reads with var() is declared somewhere �
   const undeclared = [...referenced].filter((name) => !declared.has(name)).sort();
   expect(undeclared, 'a var() naming a property nothing declares resolves to its fallback (or nothing, with '
     + 'none) silently — no console warning, nothing failing (#399)').toEqual([]);
+});
+
+/*
+ * #399's own next slice: `.hud` (shared by the bubble arena and the tracing pad, `.trace-wrap` sitting
+ * inside it) and `.play.duel-screen` (landscape) both reach the true screen edge once the viewport is
+ * narrower than `--arena-w` — a notched phone on its side is exactly that case — and both used a fixed
+ * left/right number with no `--sal`/`--sar` at all, the same silent-zero shape #530 already fixed for
+ * `.screen`. Neither Playwright project emulates safe-area insets, so nothing here is reachable from the
+ * e2e suite (`.claude/rules/e2e.md`'s own reason the sibling rail above is text-only); this is the
+ * pull-request-time half, same as the #18 rail above it.
+ */
+describe('.hud and the duel screen use --sal/--sar too, not just a fixed number (#399)', () => {
+  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  it('.hud pads left/right by --sal/--sar, not a bare 12px — the tracing pad inherits it, nested inside', () => {
+    const block = bare.match(/(?:^|[}\s])\.hud\s*\{([^}]*)\}/)?.[1];
+    expect(block, 'the base .hud rule must exist').toBeTruthy();
+    // Positional, not just "appears somewhere in the shorthand": the 4-value list is top/right/bottom/left,
+    // so a transposed pair (--sar on the left, --sal on the right) insets away from the wrong edge on a real
+    // notched phone — nothing else here could catch that, since env() is always 0 under Playwright (review
+    // finding, both the silent-failure-hunter and pr-test-analyzer agents flagged the presence-only version).
+    expect(block, 'the shorthand must read top(--sat) right(--sar) bottom(0) left(--sal), in that order')
+      .toMatch(/padding:\s*calc\([^)]*var\(--sat\)[^)]*\)\s+calc\([^)]*var\(--sar\)[^)]*\)\s+0\s+calc\([^)]*var\(--sal\)[^)]*\)/);
+  });
+
+  it('the landscape duel screen insets the arena PAIR by --sal/--sar, never a .duel-half on its own', () => {
+    const block = bare.match(/\.play\.duel-screen\s*\{([^}]*)\}/)?.[1];
+    expect(block, 'the .play.duel-screen landscape rule must exist').toBeTruthy();
+    expect(block, 'padding-left must read --sal').toMatch(/padding-left:\s*var\(--sal\)/);
+    expect(block, 'padding-right must read --sar').toMatch(/padding-right:\s*var\(--sar\)/);
+    // A per-half inset would put unequal padding on two boxes the centred-divider assertion in
+    // tests/e2e/duel.spec.ts compares directly — the issue's own reason to inset the pair instead. Every
+    // `.duel-half { ... }` block, not just the first: a non-global match here would miss the landscape
+    // override two rules below the one this test itself patches (pr-test-analyzer review finding) — exactly
+    // where a wrong per-half inset would actually land.
+    const halfBlocks = [...bare.matchAll(/(?:^|[}\s])\.duel-half\s*\{([^}]*)\}/g)].map((m) => m[1]);
+    expect(halfBlocks.length, '.duel-half must still be declared somewhere, or this checks nothing').toBeGreaterThan(0);
+    for (const halfBlock of halfBlocks)
+      expect(halfBlock, '.duel-half itself must never carry --sal/--sar — that is the per-half shape #399 rejected')
+        .not.toMatch(/--sa[lr]/);
+  });
+
+  // #399's own last miss: `.villain` is `position: absolute` inside `.hud`, and an absolutely positioned
+  // child's own offsets are measured from its containing block's PADDING edge — the padding `.hud` itself
+  // carries does not shift them. `bottom` already read `--sab` (correct by the same containing-block rule,
+  // since `.hud`'s bottom padding is 0 and so never masked the gap); `right` stayed a bare 10px and so sat
+  // flush with the true screen edge on a landscape notched phone, the exact silent-zero shape this issue is
+  // for. Text-only, like the sibling rail above: neither Playwright project emulates safe-area insets.
+  it('.villain reads --sar on its right offset, not a bare 10px', () => {
+    const block = bare.match(/(?:^|[}\s])\.villain\s*\{([^}]*)\}/)?.[1];
+    expect(block, 'the base .villain rule must exist').toBeTruthy();
+    expect(block, 'right must read calc(10px + var(--sar))').toMatch(/right:\s*calc\([^)]*var\(--sar\)[^)]*\)/);
+    expect(block, 'bottom must still read var(--sab), unshifted by this change').toMatch(/bottom:\s*calc\([^)]*var\(--sab\)[^)]*\)/);
+  });
 });

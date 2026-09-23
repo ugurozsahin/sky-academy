@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { TOPICS } from '../../src/curriculum';
+import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
@@ -728,6 +729,11 @@ test.describe('Sky Ninja Academy', () => {
     expect(album[0]).toMatchObject({ id: 'reception:r-count', year: 'Reception', training: false, name: 'Ada', avatar: 'terra' });
     expect(album[0].stars).toBeGreaterThan(0);
     expect(album[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // The drawn day and the stored day are one value now, not two reads of the clock a UTC/local split apart
+    // (#410) — the mission-path half of the same property `duel.spec.ts` already pins for a duel win.
+    const words = await page.evaluate(() => window.__sna.certWords());
+    const longDate = new Date(`${album[0].date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    expect(words!.date, 'the album entry and the keepsake agree about the day').toBe(longDate);
 
     // #50: the 🎓 button always delivers — it never silently does nothing.
     await page.evaluate(() => { (navigator as any).canShare = () => false; });   // exercise the non-share routes deterministically (headless can't complete a real Web Share)
@@ -986,6 +992,83 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.cert-empty'), 'the album keeps its own empty state').toHaveCount(1);
     // The other two `duelsSub` branches are the singular and the empty one; this is the empty one.
     await expect(page.getByText('Play a Ninja Duel with a friend')).toBeVisible();
+  });
+
+  // #163: `rewardsScreen()`'s progress bar and three-way banner had no test coverage at all.
+  test('rewards screen banner (#163): fewer coins than the next sticker threshold names that threshold', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 10 });   // below STICKER_COST[0] (30)
+    await page.click('#rewards');
+    await expect(page.locator('.next-sticker')).toContainText('Next sticker at 🪙 30');
+  });
+
+  test('rewards screen banner (#163): every coin sticker bought but achievements still open reads "earned by playing"', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 200, stickers: [] });   // past STICKER_COST[2] (120), no achievement stickers yet
+    await page.click('#rewards');
+    await expect(page.locator('.next-sticker')).toContainText('The rest of the album is earned by playing, not by coins — see each sticker below');
+  });
+
+  test('rewards screen banner (#163): every sticker owned reads "Album complete"', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { stickers: [...AVATARS.map(a => a.id), VILLAIN.id] });
+    await page.click('#rewards');
+    await expect(page.locator('.next-sticker')).toContainText('Album complete — legendary!');
+  });
+
+  test('rewards screen (#163): a locked achievement sticker shows its progress bar and fraction', async ({ page }) => {
+    // 3 of the 5 topics `terra` (Star 5 topics) needs, so it stays locked with a part-filled bar.
+    await seedPlayer(page, 'volt', 'Ada', {
+      progress: {
+        'r-subitise': { stars: 1, best: 5, plays: 1 },
+        'r-compare': { stars: 1, best: 5, plays: 1 },
+        'r-onemore': { stars: 1, best: 5, plays: 1 },
+      },
+    });
+    await page.click('#rewards');
+    const card = page.locator('.sticker').filter({ hasText: 'Star 5 topics' });
+    await expect(card).not.toHaveClass(/\bgot\b/);
+    await expect(card.locator('b')).toHaveText('???');
+    await expect(card.locator('.prog')).toHaveText('3/5');
+    await expect(card.locator('.isl-bar i')).toHaveAttribute('style', /width:60%/);
+  });
+
+  test('rewards screen (#163): finishing the fifth starred topic through real play unlocks the achievement sticker, on the rewards screen not just in memory', async ({ page }) => {
+    test.setTimeout(150_000);
+    // One topic short of `terra` (Star 5 topics): r-count, played below, will be the fifth.
+    await seedPlayer(page, 'terra', 'Ada', {
+      progress: {
+        'r-subitise': { stars: 1, best: 5, plays: 1 },
+        'r-compare': { stars: 1, best: 5, plays: 1 },
+        'r-onemore': { stars: 1, best: 5, plays: 1 },
+        'r-bonds': { stars: 1, best: 5, plays: 1 },
+      },
+    });
+    await page.click('#rewards');
+    const card = page.locator('.sticker').filter({ hasText: 'Star 5 topics' });
+    await expect(card).not.toHaveClass(/\bgot\b/);
+    await expect(card.locator('.prog')).toHaveText('4/5');
+    await page.click('#back');
+    await startTopic(page, 'reception', 'r-count');
+    const stages = await page.evaluate(() => window.__sna.session.stages);
+    const perStage = await page.evaluate(() => window.__sna.session.perStage as number);
+    for (let stage = 1; stage <= stages; stage++) {
+      await answerAll(page, perStage);
+      await expect(page.locator('.celebrate')).toBeVisible();
+      await page.click('#next');
+    }
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    // The results overlay's own "New sticker!" card — proven separately from the rewards screen below,
+    // since the issue's own gap was a sticker offered from memory with nothing checking it was actually saved.
+    await expect(results.locator('.unlock').filter({ hasText: 'Terra' })).toBeVisible();
+    await page.click('#home');
+    await expect(page.locator('.home')).toBeVisible();
+    await page.click('#rewards');
+    const unlockedCard = page.locator('.sticker').filter({ hasText: 'Terra' });
+    await expect(unlockedCard).toHaveClass(/\bgot\b/);
+    await expect(unlockedCard.locator('b')).toHaveText('Terra');
+    await expect(unlockedCard.locator('small').first()).toHaveText('Earth Ninja');
+    await expect(unlockedCard.locator('.prog')).toHaveCount(0);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).stickers as string[]);
+    expect(saved).toContain('terra');
   });
 
   test('ninja shop: buy a trail skin with the balance, stickers keep their lifetime unlocks, the skin is equipped', async ({ page }) => {
@@ -1586,7 +1669,8 @@ test.describe('Sky Ninja Academy', () => {
     // the back button left the old Arena's rAF loop running on a detached canvas — with its window listeners
     // attached and `window.__sna` pointing at the dead session. Every play → back → play stacked another one.
     // Sample only once the route change has finished: the arena legitimately ticks a frame or two between
-    // `history.back()` and `popstate` running, so measuring across the pop would flake at ~0.02 s (#74 review).
+    // `history.back()` and `popstate` running, so measuring across the pop would flake at ~0.02 s
+    // (ugurozsahin/sky-academy-private-archive#74 review).
     await page.evaluate(() => { (window as any).__deadArena = window.__sna.arena; history.back(); });
     await expect(page.locator('.island-screen')).toBeVisible();
     const leaked = await page.evaluate(() => new Promise<any>(res => {

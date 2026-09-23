@@ -15,8 +15,12 @@ export interface Bubble {
 }
 type PKind = 'dot' | 'ring' | 'shard' | 'text' | 'ember' | 'drop' | 'bolt' | 'rock' | 'leaf' | 'crystal' | 'star' | 'smoke' | 'pixel' | 'slash';
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; size: number; kind: PKind; text?: string; rot?: number }
-export type FxKind = 'fire' | 'water' | 'electric' | 'earth' | 'wind' | 'ice' | 'light' | 'shadow' | 'blade' | 'robot' | 'master';
-const ELEMENTS: FxKind[] = ['fire', 'water', 'electric', 'earth', 'wind', 'ice', 'light', 'shadow', 'blade', 'robot'];   // `master` draws from all of these
+// The one list every element-typed table derives from (#214): add an element here and `FxKind` gains it
+// everywhere, so `FX_PARTICLE`/`FX_COLORS`/`SHOT_STYLE` below and `sliceFx` in `audio.ts` all fail to compile
+// until they cover it too — a missing entry is a build error, not a silent runtime fallback.
+export const ELEMENTS = ['fire', 'water', 'electric', 'earth', 'wind', 'ice', 'light', 'shadow', 'blade', 'robot'] as const;
+export type Element = typeof ELEMENTS[number];
+export type FxKind = Element | 'master';   // `master` draws from all of ELEMENTS
 const FX_PARTICLE: Record<FxKind, PKind> = { fire: 'ember', water: 'drop', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'crystal', light: 'star', shadow: 'smoke', blade: 'slash', robot: 'pixel', master: 'star' };
 export const FX_COLORS: Record<FxKind, string[]> ={ fire: ['#ff7a1a', '#ffd23a', '#ff3b1a'], water: ['#3ec9ff', '#9fe6ff', '#1a7fff'], electric: ['#2ea8ff', '#ffffff', '#9fe6ff'], earth: ['#a0622a', '#7ddc3a', '#6b4220'], wind: ['#7fe8c8', '#c8ffe9', '#5fcf5a'], ice: ['#9fe6ff', '#ffffff', '#5bb8e8'], light: ['#ffd23a', '#ffffff', '#ffb020'], shadow: ['#a855ff', '#5a2aa0', '#2a1050'], blade: ['#ffffff', '#ff3b5c', '#d8dce8'], robot: ['#ff5252', '#ffffff', '#9aa5cf'], master: ['#ffd87a', '#ffffff', '#ffb020'] };
 const MAX_PARTICLES = 250;   // #29: safety cap so a pathological burst can never grow the per-frame draw loop unbounded
@@ -59,6 +63,12 @@ export class Arena {
   bubbles: Bubble[] = [];
   private particles: Particle[] = [];
   shots: Shot[] = []; shotsThrown = 0;                          // projectiles in flight / thrown so far (the e2e reads the count)
+  // #152: lifetime count of `clampIntoArena`'s three clamps, applied during collision resolution only — a sim
+  // test asserts .ceiling stays zero across a normal wave; the wall clamps see real traffic. `reanchor()`'s
+  // own x-position bound on resize (below) is a separate, uncounted clamp of the same shape — not this field
+  // (silent-failure-hunter review): folding it in would need `resize`/`reanchor` to carry `clampCounts`
+  // through, which is a real extension, not a one-line fix, and out of this pull request's scope.
+  clampCounts: ClampCounts = { left: 0, right: 0, ceiling: 0 };
   private trail: { x: number; y: number; t: number }[] = [];
   private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
   private activeId: number | null = null;         // the pointer that is down on THIS canvas, null = no stroke (#16: two arenas share one window)
@@ -359,7 +369,7 @@ export class Arena {
     // still, and the e2e freeze helper predicts a bubble's position from its fixed `g`, which only stays true
     // while nothing else can move it. `ordered` sequence waves bounce softly so a required label cannot be
     // knocked out of reach before its batch is up.
-    if (!this.frozen) resolveCollisions(this.bubbles, { W: this.W, H: this.H, topInset: this.topInset }, this.orderedWave ? COLLIDE.damped : COLLIDE.bounce);
+    if (!this.frozen) resolveCollisions(this.bubbles, { W: this.W, H: this.H, topInset: this.topInset }, this.orderedWave ? COLLIDE.damped : COLLIDE.bounce, this.clampCounts);
     if (this.waveActive && live === 0) { this.waveActive = false; this.cb.onWaveEnd(); }
     for (const s of this.shots) {                   // shots fly on even while the wave is frozen for the reveal
       if (s.t >= SHOT_FLIGHT) continue;             // already landed this frame; cull() takes it out below (#31)
@@ -661,19 +671,26 @@ export const COLLIDE = {
   // `H` and `speedK`; the bound belongs on the impulse, relative to the pair it acts on. See `capToPair`.
   /** Separation passes per frame. Six, not one: a three-body pile needs more than a single sweep to come
    *  apart, and the wall clamp inside the loop can push a bubble back into a neighbour that a later pass
-   *  then has to undo. At <= 6 live bubbles this is ~90 distance checks a frame. */
+   *  then has to undo. At <= 6 live bubbles this is ~90 distance checks in a healthy frame — but `update()`
+   *  runs up to six 1/60s substeps when `dt` is capped at 0.1 (a recovered/janky frame), so the honest worst
+   *  case is up to ~540, still cheap at this `n` (#152 review note 5). */
   iters: 6,
 } as const;
 
-/** The part of a bubble collision cares about — so a test can build one without a label or a font size. */
-export interface Collidable { x: number; y: number; vx: number; vy: number; g: number; r: number; launched: boolean; dead: boolean }
+/** The part of a bubble collision cares about — so a test can build one without a label or a font size.
+ *  `mark` is optional and structural, not behavioural here: `resolveCollisions` excludes a marked bubble (see
+ *  below) whether or not the caller ever sets it, the same way `dead`/`launched` already gate participation. */
+export interface Collidable { x: number; y: number; vx: number; vy: number; g: number; r: number; launched: boolean; dead: boolean; mark?: 'good' | 'bad' }
 
 /**
  * A bubble is in flight when something is still moving it. A bubble with no gravity and no velocity has been
- * *pinned* — which is what `freezeWave` in the e2e spec does to make a wave's coordinates predictable before
- * it clicks one, and #108 requires that those tests stay deterministic. Nothing in play is ever pinned: every
- * launched bubble carries its own `g`, fixed at launch and never zero, so this excludes the test's frozen
- * wave and nothing else. (The outcome reveal is handled separately, by `frozen` in `update`.)
+ * *pinned* — which is what `freezeWave` in `tests/e2e/game.spec.ts` does to make a wave's coordinates
+ * predictable before it clicks one, and #108 requires that those tests stay deterministic. Nothing in play is
+ * ever pinned: every launched bubble carries its own `g`, fixed at launch and never zero, so this excludes
+ * `freezeWave`'s frozen wave and nothing else. (The outcome reveal is handled separately, by `frozen` in
+ * `update`.) If a future e2e helper ever pins a bubble by some other means — rather than zeroing `g`/`vx`/`vy`
+ * the way `freezeWave` does — this contract silently stops holding and the symptom is a flaky click target,
+ * not a red test (#152 review note 2).
  */
 const inFlight = (b: Collidable) => b.g !== 0 || b.vx !== 0 || b.vy !== 0;
 
@@ -683,13 +700,32 @@ const inFlight = (b: Collidable) => b.g !== 0 || b.vx !== 0 || b.vy !== 0;
  *
  * Bubbles that have not launched yet are still parked below the floor and are left alone — colliding them
  * there would shove the queue sideways before the child ever sees it. So are pinned ones; see `inFlight`.
+ * So is a spotlighted outcome bubble (`mark` set, by `hitBubble`'s tap-hit or `reveal`'s ghost): it is placed
+ * deliberately, including a nudge away from the other spotlighted one, and a resolver moving it afterwards
+ * would be a visible defect. Today every `frozen = true` write happens before a mark is set and `clearWave`
+ * kills every bubble before the next wave's marks, so "never resolve a marked bubble" already held in
+ * practice; excluding it here makes that structural rather than resting on every future caller of `frozen`
+ * staying correct (#152 review note 1).
+ *
+ * `counts`, when given, is incremented once per `left`/`right`/`ceiling` clamp `clampIntoArena` applies below —
+ * which otherwise silently discards what it corrects, the only symptom an illegal wave layout would produce
+ * (#152 review note 3). The wall clamps see real, legitimate traffic (a bubble pushed sideways by a collision
+ * near the edge), so only `ceiling` is a true zero-in-normal-play invariant — see `tests/unit/arena.test.ts`
+ * for the measurement. Passing `counts` turns a regression there into a sim test assertion, rather than
+ * something a reviewer has to notice and derive from launch-speed arithmetic by hand.
  */
 export function resolveCollisions(
   bubbles: readonly Collidable[],                 // elements are mutated; the array never is
   geom: WaveGeom,
   restitution: typeof COLLIDE.bounce | typeof COLLIDE.damped = COLLIDE.bounce,   // only these two are meaningful
+  counts?: ClampCounts,
 ) {
-  const live = bubbles.filter(b => b.launched && !b.dead && inFlight(b));
+  const live = bubbles.filter(b => b.launched && !b.dead && !b.mark && inFlight(b));
+  // Two-or-fewer live bubbles skip the whole pass, clamps included — which is also why the *last* bubble of a
+  // wave (where `live.length` drops to 1) is never wall/ceiling-clamped on its own, unlike the five before it.
+  // #255's blocking finding was exactly this asymmetry catching an illegal launch speed on bubble 6 of 6 and
+  // not on bubble 1: whatever this function becomes, that edge is worth re-deriving deliberately rather than
+  // rediscovering it the same way again (#152 review note 4).
   if (live.length < 2) return;
   for (let pass = 0; pass < COLLIDE.iters; pass++) {
     for (let i = 0; i < live.length; i++) {
@@ -719,16 +755,26 @@ export function resolveCollisions(
         }
       }
     }
-    for (const b of live) clampIntoArena(b, geom);
+    for (const b of live) clampIntoArena(b, geom, counts);
   }
 }
 
+/** How many times each of the three position clamps in `clampIntoArena` has fired — none of them ever should,
+ *  in a legal wave layout (#152 review note 3). `resolveCollisions` mutates the caller's object in place, the
+ *  same convention `Collidable`'s own fields use, rather than returning a fresh one every pass. */
+export interface ClampCounts { left: number; right: number; ceiling: number }
+
 /** Keep a bubble inside the play area and below the HUD (#108). Position only — see `COLLIDE` on why no
- *  absolute speed cap lives here. */
-function clampIntoArena(b: Collidable, geom: WaveGeom) {
+ *  absolute speed cap lives here. `counts`, when given, is told which of the three clamps fired — see
+ *  `resolveCollisions`'s own doc comment for why a caller would want that. */
+function clampIntoArena(b: Collidable, geom: WaveGeom, counts?: ClampCounts) {
+  if (counts) {
+    if (b.x < b.r) counts.left++;
+    if (b.x > geom.W - b.r) counts.right++;
+  }
   b.x = Math.min(geom.W - b.r, Math.max(b.r, b.x));
   const ceiling = geom.topInset + b.r;
-  if (b.y < ceiling) { b.y = ceiling; if (b.vy < 0) b.vy = 0; }   // never above topInset, never still climbing there
+  if (b.y < ceiling) { b.y = ceiling; if (b.vy < 0) b.vy = 0; if (counts) counts.ceiling++; }   // never above topInset, never still climbing there
 }
 
 /**
