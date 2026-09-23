@@ -969,49 +969,75 @@ describe('3-D shape topics (#299 slice 2)', () => {
   // cuboid?" with a cube on the card, or a cube glyph named with `cuboid` offered, both have two right
   // answers. Two of them as decoys on a third shape's card is harmless, and is not what this pins.
   it("never offers a cube as a cuboid's decoy, or a cuboid as a cube's", () => {
+    let checked = 0;
     for (const id of ['y1-shapes3d', 'y2-shapes']) {
       const r = rng(id.length + 299);
       for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
         const q = topic(id).gen(d, r);
         const named = q.prompt === 'What is this shape?' ? q.answer : /^Which is a (.+)\?$/.exec(q.prompt)?.[1];
         if (named !== 'cube' && named !== 'cuboid') continue;
+        checked++;
         const other = named === 'cube' ? 'cuboid' : 'cube';
         for (const form of [other, by[other].g])
           expect(q.options.includes(form), `${id} d${d}: ${q.prompt} → ${q.options.join(' ')}`).toBe(false);
       }
     }
+    // A reworded "Which is a X?"/"What is this shape?" prompt would make the regex above match nothing and
+    // this rail would pass vacuously — #373 found the cube/cuboid table swap #371 made did exactly that.
+    expect(checked).toBeGreaterThan(20);
   });
 
-  it('y1-shapes3d names only, and stays inside the Year 1 set below d3', () => {
+  it('y1-shapes3d names only, and stays inside the Year 1 set below d3, reaching every solid at d3', () => {
     const r = rng(1299);
+    const seenBelow3 = new Set<string>();
+    const seenAtD3 = new Set<string>();
     for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 200; i++) {
       const q = topic('y1-shapes3d').gen(d, r);
       expect(/^(Which is a .+\?|What is this shape\?)$/.test(q.prompt), q.prompt).toBe(true);
       expect(/face|edge|vertice/i.test(q.prompt), `Year 1 names shapes, it does not count properties: ${q.prompt}`).toBe(false);
-      if (d < 3) {
-        const named = q.prompt === 'What is this shape?' ? q.answer : q.prompt.slice('Which is a '.length, -1);
-        expect(['cube', 'cuboid', 'pyramid', 'sphere'], `d${d} asked for ${named}`).toContain(named);
-      }
+      expect(q.options.length, q.prompt).toBe(4);
+      const named = q.prompt === 'What is this shape?' ? q.answer : q.prompt.slice('Which is a '.length, -1);
+      if (q.prompt === 'What is this shape?') expect(q.visual, q.prompt).toEqual({ type: 'word', text: by[named].g });
+      if (d < 3) { seenBelow3.add(named); expect(['cube', 'cuboid', 'pyramid', 'sphere'], `d${d} asked for ${named}`).toContain(named); }
+      else seenAtD3.add(named);
     }
+    // #373: `d === 3 ? SHAPES_3D : Y1_SOLIDS` collapsing to `Y1_SOLIDS` at every difficulty is silent unless
+    // something asserts d3 actually reaches the cylinder and cone the Year 1 set excludes.
+    expect([...seenBelow3].sort()).toEqual(['cube', 'cuboid', 'pyramid', 'sphere']);
+    expect([...seenAtD3].sort()).toEqual(['cone', 'cube', 'cuboid', 'cylinder', 'pyramid', 'sphere']);
   });
 
   it('y2-shapes asks for edges and vertices, and only where the table carries them', () => {
     const r = rng(2299);
-    const asked = new Set<string>();
-    for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 400; i++) {
+    const askedByD: Record<2 | 3, Set<string>> = { 2: new Set(), 3: new Set() };
+    for (const d of [2, 3] as const) for (let i = 0; i < 400; i++) {
       const q = topic('y2-shapes').gen(d, r);
+      expect(q.options.length, q.prompt).toBe(4);
       const m = /^How many (flat faces|edges|vertices) has a (.+)\?$/.exec(q.prompt);
-      if (!m) { expect(/^(Which is a .+\?|What is this shape\?)$/.test(q.prompt), q.prompt).toBe(true); continue; }
+      if (!m) {
+        expect(/^(Which is a .+\?|What is this shape\?)$/.test(q.prompt), q.prompt).toBe(true);
+        if (q.prompt === 'What is this shape?') {
+          const entry = SHAPES_3D.find(([, name]) => name === q.answer); expect(entry, q.answer).toBeTruthy();
+          expect(q.visual, q.prompt).toEqual({ type: 'word', text: entry![0] });
+        }
+        continue;
+      }
       const [, label, as] = m;
-      asked.add(label);
+      askedByD[d].add(label);
       const entry = SHAPES_3D.find(([, , p]) => p.as === as); expect(entry, as).toBeTruthy();
-      const p = entry![2];
+      const [g, , p] = entry!;
+      // #373: the glyph drawn was never re-derived from the shape being asked about — a fixed '⚽' passed
+      // every assertion above this one.
+      expect(q.visual, q.prompt).toEqual({ type: 'word', text: g });
       const want = label === 'edges' ? p.edges : label === 'vertices' ? p.vertices : p.flat;
       expect(want, `${as} has no ${label} to ask for`).toBeDefined();
       expect(q.answer, q.prompt).toBe(String(want));
       expect(q.options).toContain(String(want));
     }
-    expect([...asked].sort()).toEqual(['edges', 'flat faces', 'vertices']);
+    // #373: `asked` used to be collected across d2 and d3 together, so dropping edges/vertices from d2 alone
+    // (`(d === 3 || rng() < 0.6)` → `(d === 3)`) still passed on d3's contribution.
+    expect([...askedByD[2]].sort(), 'd2 stretch').toEqual(['edges', 'flat faces', 'vertices']);
+    expect([...askedByD[3]].sort()).toEqual(['edges', 'flat faces', 'vertices']);
   });
 
   // The old card asked "A cone has…" and offered "1 curved face" beside "1 flat face": both true of a cone.

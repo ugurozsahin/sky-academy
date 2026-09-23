@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { activeProfile, addProfile, deleteProfile, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { duelHeadline, duelHistoryLine, type DuelResult } from '../../src/game/duel';
@@ -119,14 +119,32 @@ describe('rewards storage', () => {
     expect(load().memory).toEqual({ reception: 2, year2: 1 });
   });
   it('topic accuracy accumulates across runs and keeps stars; training sessions are counted per year', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     recordTopic('y1-add', 2, 80);
-    recordAccuracy('y1-add', 5, 6); recordAccuracy('y1-add', 3, 4); recordAccuracy('y1-add', 0, 0);   // an empty tally changes nothing
+    recordAccuracy('y1-add', { hits: 5, tries: 6 }); recordAccuracy('y1-add', { hits: 3, tries: 4 }); recordAccuracy('y1-add', { hits: 0, tries: 0 });   // an empty tally changes nothing
     expect(load().progress['y1-add']).toEqual({ stars: 2, best: 80, plays: 1, hits: 8, tries: 10 });
-    recordAccuracy('y1-sub', 1, 2);                                                                    // a topic met only in Sensei training / Sky Storm
+    recordAccuracy('y1-sub', { hits: 1, tries: 2 });                                                    // a topic met only in Sensei training / Sky Storm
     expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 1, tries: 2 });
     expect(load().training).toEqual({});
     expect(recordTraining('year1')).toBe(1); expect(recordTraining('year1')).toBe(2);
     expect(load().training).toEqual({ year1: 2 });
+    // Every tally above was already well-formed — silence is the guarantee the clamp's warning makes (#379).
+    expect(warn, 'a well-formed tally must never trip the clamp warning').not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+  it('recordAccuracy clamps hits into [0, tries] and warns — a caller cannot write an accuracy above 100%, silently (#379)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordAccuracy('y1-add', { hits: 9, tries: 4 });     // more hits than tries: clamped down to the ceiling
+    expect(load().progress['y1-add']).toEqual({ stars: 0, best: 0, plays: 0, hits: 4, tries: 4 });
+    recordAccuracy('y1-sub', { hits: -3, tries: 5 });    // negative hits: clamped up to the floor
+    expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 0, tries: 5 });
+    recordAccuracy('y1-time', { hits: NaN, tries: 3 });  // NaN: the clamp itself cannot bound it, so it is 0
+    expect(load().progress['y1-time']).toEqual({ stars: 0, best: 0, plays: 0, hits: 0, tries: 3 });
+    // Each of the three malformed tallies above left a trace — the review finding this test guards: a silent
+    // repair would trade one silent failure (accuracy over 100%) for another (no evidence the bug happened).
+    expect(warn).toHaveBeenCalledTimes(3);
+    for (const call of warn.mock.calls) expect(call[0]).toContain('tally out of range');
+    warn.mockRestore();
   });
   it('streak counts consecutive days only', () => {
     expect(touchStreak(new Date('2026-09-05T10:00:00Z'))).toBe(1);
@@ -600,7 +618,7 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     }))).toBe(true);
 
     expect(() => recordTopic('y1-add', 2, 40)).not.toThrow();
-    expect(() => recordAccuracy('y1-add', 3, 4)).not.toThrow();
+    expect(() => recordAccuracy('y1-add', { hits: 3, tries: 4 })).not.toThrow();
     expect(() => recordTraining('year1')).not.toThrow();
     expect(() => recordEndless('year1', 50)).not.toThrow();
     expect(() => recordSprint('year1', 20)).not.toThrow();
@@ -1249,6 +1267,9 @@ describe('profiles: siblings on one device (#20)', () => {
     finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
 
     expect(added, 'no profile was added, and the caller is told it is the store').toEqual({ ok: false, why: 'store' });
+    // #384 item 2: a kept-but-different index is a refusal `writeIndex` catches by its read-back, not by a
+    // throw, and the latch has to catch it the same way — `save()`'s own catch never sees this shape either.
+    expect(isWriteFailing(), 'addProfile latches on a silently-dropped write too, not only a throw').toBe(true);
     // p1 is the only profile and already the active one, so this is not a switch at all: it persists nothing,
     // and a store that keeps nothing therefore has nothing to refuse (#380 review B1). It read `false` here
     // until that review, which is the bug — see the three tests below for what that cost a child.
@@ -1256,6 +1277,23 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(activeProfile(), 'the child on the device is still the one who was playing').toBe('p1');
     expect(profileIds()).toEqual(['p1']);
     expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
+  });
+
+  it('setActiveProfile latches writeFailed on a kept-but-different index too, not only a throw (#384 item 2)', () => {
+    save({ name: 'Ada', coins: 30 });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    save({ name: 'Bo', coins: 3 });
+    expect(setActiveProfile('p1')).toBe(true);
+
+    const realSet = localStorage.setItem;
+    // A genuine switch this time (p1 → p2), refused the read-back way rather than by a throw.
+    (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => { if (k !== INDEX) realSet.call(localStorage, k, v); };
+    let switched: boolean;
+    try { switched = setActiveProfile('p2'); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+
+    expect(switched, 'the index kept p1 active, so this is refused').toBe(false);
+    expect(isWriteFailing()).toBe(true);
+    expect(activeProfile(), 'and the store really did keep the old value').toBe('p1');
   });
 
   /*
@@ -1460,6 +1498,31 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(isWriteFailing(), "the refused write was the other child's, and this session has attempted none").toBe(false);
   });
 
+  it('addProfile latches writeFailed on a refused store, the way save() already does (#384 item 2)', () => {
+    save({ name: 'Ada' });
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    let added: ReturnType<typeof addProfile>;
+    // `writeIndex`'s catch used to be the only place that knew a store refused the write, and it discarded
+    // that — `isWriteFailing()` stayed false and `parents.ts:35`'s sentence stayed quiet until an unrelated
+    // ordinary save() happened to set the latch for a different reason.
+    try { added = addProfile(); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(added).toEqual({ ok: false, why: 'store' });
+    expect(isWriteFailing(), 'the refusal now latches on its own').toBe(true);
+  });
+
+  it('setActiveProfile latches writeFailed on a refused switch (#384 item 2)', () => {
+    save({ name: 'Ada' });
+    expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    expect(setActiveProfile('p1')).toBe(true);
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    let ok: boolean;
+    try { ok = setActiveProfile('p2'); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(ok, "the switch is refused, so this session is still Ada's").toBe(false);
+    expect(isWriteFailing()).toBe(true);
+  });
+
   it('reset() is a fresh start for the active profile only', () => {
     save({ name: 'Ada', coins: 30 });
     addProfile(); save({ name: 'Bo', coins: 3 });
@@ -1492,6 +1555,18 @@ describe('profiles: siblings on one device (#20)', () => {
     // The count says one profile and three slots spare; the probe says there is nowhere to put a child. The
     // picker shows two different sentences for these, so the refusal has to carry which one it is.
     expect(addProfile()).toEqual({ ok: false, why: 'full' });
+  });
+
+  it('addProfile refuses a slot it can read but cannot parse, not only one it parses cleanly (#384 item 4)', () => {
+    save({ name: 'Ada' });
+    // `holdsSave`'s old shape test answered `false` for "empty" and "garbled" alike, so `addProfile`'s
+    // free-slot probe read a slot it could not make sense of as free — the same blind spot #335 item 1 fixed
+    // one call site over, for a blob nothing anywhere writes on purpose (no app path leaves one; `setItem` is
+    // atomic and every writer goes through `save()`) but nothing stopped either.
+    localStorage.setItem(saveKeyFor('p2'), 'not json at all');
+    localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1'] }));
+    expect(addProfile(), 'p2 is unreadable, not free — the next real slot is p3').toEqual({ ok: true, id: 'p3' });
+    expect(localStorage.getItem(saveKeyFor('p2')), 'and the garbled bytes are left alone, not handed out').toBe('not json at all');
   });
 
   it("profileCard reads a sibling's name and ninja without moving this session (#20 slice 2)", () => {

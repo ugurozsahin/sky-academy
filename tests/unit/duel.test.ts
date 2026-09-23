@@ -189,8 +189,14 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
    * when the last wave runs out — so a result taken then must equal the one `onMatchEnd` would deliver. Note
    * that `onLastRound` alone is not the licence: it reports *position*, not settledness. What makes the early
    * read safe is that the round is also settled, and these two cases are the two ways that happens.
+   *
+   * **The undecided path also needs `settleDraw()` called first, same as the real caller (#379).** A draw now
+   * tallies a try for whichever seat never touched a bubble (`settleDraw()`), so a `result()` taken before that
+   * — the bug this issue found in `src/ui/duel.ts`, fixed by reordering its own `settleDraw()`/`commitOnce()`
+   * pair — would drop that seat's try from the committed result forever. This test drives the two calls in the
+   * same order the real screen now does, so a regression back to the old order fails here first.
    */
-  it('result() on a settled last round is already the result end() delivers — won, and undecided (#375)', () => {
+  it('result() on a settled last round is already the result end() delivers — won, and undecided (#375, #379)', () => {
     for (const settle of ['won', 'undecided'] as const) {
       const ev = events();
       const d = new Duel({ topic, difficulty: 1, rounds: 3, rng: rng(11) }, ev);
@@ -199,6 +205,7 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
       d.hit('a', d.current!.answer); d.waveEnd();          // round 2: a
       expect(d.onLastRound, 'round 3 of 3 is the last round').toBe(true);
       if (settle === 'won') d.hit('b', d.current!.answer);  // decided, but the wave has not ended
+      else d.settleDraw();   // undecided: settle the draw's tally BEFORE result(), as the real caller does (#379)
       const early = d.result();
       expect(d.ended, 'the match has NOT ended yet — this is the window the screen commits in').toBe(false);
       // A slice after the round is decided changes nothing; on the undecided path there is nothing left to
@@ -569,20 +576,24 @@ describe('the duel tallies each seat\'s answers, one per round (#16 item 5: Sens
     expect(d.tally.a).toEqual({ hits: 0, tries: 0 });
   });
 
-  it('counts nothing at all for a round nobody sliced', () => {
+  it('a round nobody sliced tallies a try, no hit, for BOTH seats — a mission scores an untouched question the same way (#379)', () => {
     const d = match(2); d.start();
     d.waveEnd();                                   // round 1 drawn
-    expect(d.tally).toEqual({ a: { hits: 0, tries: 0 }, b: { hits: 0, tries: 0 } });
+    expect(d.tally).toEqual({ a: { hits: 0, tries: 1 }, b: { hits: 0, tries: 1 } });
   });
 
   it('hands the match result a snapshot a rematch cannot move', () => {
     const ev = events();
-    const d = new Duel({ topic, difficulty: 1, rounds: 1, rng: rng(12) }, ev);
-    d.start(); d.hit('a', d.current!.answer); d.waveEnd();
+    const d = new Duel({ topic, difficulty: 1, rounds: 2, rng: rng(12) }, ev);
+    d.start(); d.hit('a', d.current!.answer); d.waveEnd();                                     // round 1: a wins
+    expect(d.hit('b', d.current!.options.find(o => o !== d.current!.answer)!)).toBe('wrong');  // round 2: b answers wrongly first…
+    d.hit('a', d.current!.answer); d.waveEnd();                                                // …then a wins it
     const r: DuelResult = ev.onMatchEnd.mock.calls[0][0];
-    expect(r.tally).toEqual({ a: { hits: 1, tries: 1 }, b: { hits: 0, tries: 0 } });
-    d.tally.a.hits = 99; d.tally.a.tries = 99;     // the live counters are not the result's
-    expect(r.tally.a).toEqual({ hits: 1, tries: 1 });
+    expect(r.tally).toEqual({ a: { hits: 2, tries: 2 }, b: { hits: 0, tries: 1 } });
+    // Both seats pinned (#379) — the previous version of this test only mutated and asserted seat `a`, so a
+    // `b: this.tally.a` typo at the snapshot line (`result()`) would have left the whole suite green.
+    d.tally.a.hits = 99; d.tally.a.tries = 99; d.tally.b.hits = 99; d.tally.b.tries = 99;
+    expect(r.tally).toEqual({ a: { hits: 2, tries: 2 }, b: { hits: 0, tries: 1 } });
   });
 });
 
@@ -624,9 +635,14 @@ describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', (
     expect(duelAccuracy(r)).toEqual({ hits: 0, tries: 0 });   // and `recordAccuracy` ignores a 0-try tally
   });
 
-  it('teaches nothing after a match Player 1 never sliced in', () => {
-    expect(duelAccuracy(played(['draw', 'draw']))).toEqual({ hits: 0, tries: 0 });
-    expect(duelAccuracy(played(['b', 'draw']))).toEqual({ hits: 0, tries: 0 });
+  it('a round Player 1 never reached teaches a try with no hit, not nothing (#379) — except a round the OTHER seat won outright, which stays dropped', () => {
+    // Two genuine draws: nobody sliced either round, so both count exactly as a mission scores an unanswered
+    // question — a try, no hit — same as the seat-level assertion above.
+    expect(duelAccuracy(played(['draw', 'draw']))).toEqual({ hits: 0, tries: 2 });
+    // Round 1 is Player 2's clean win — decided before the wave ends, so `settleDraw()` never runs and Player 1's
+    // try for it stays dropped, per `duelAccuracy`'s own "round lost on speed is not a wrong answer" rule. Round 2
+    // is a genuine draw and tallies.
+    expect(duelAccuracy(played(['b', 'draw']))).toEqual({ hits: 0, tries: 1 });
   });
 
   // Every case below writes to the save, so the save is cleared before each one rather than inline: a shim
@@ -640,7 +656,7 @@ describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', (
     const r = played(['wrongA', 'a', 'a']);
     const t = duelAccuracy(r);
     expect(t).toEqual({ hits: 2, tries: 3 });
-    recordAccuracy(topic.id, t.hits, t.tries);
+    recordAccuracy(topic.id, t);
     const p = JSON.parse(localStorage.getItem('sna:v1')!).progress[topic.id];
     expect(p).toMatchObject({ hits: 2, tries: 3, plays: 0, stars: 0 });
     expect(accuracy(p), 'no plays, so the ratio is not yet a verdict on the child').toBe(null);
@@ -657,15 +673,29 @@ describe('duelAccuracy (#16 item 5: only the seat the shared save can claim)', (
     // live, so what a duel writes decides which topic Train with Sensei drills. Per-slice counting is what
     // #374's review blocked — a swiped wave would have dragged this topic to the bottom on merit it lost.
     const other = topicsFor('year1').find(x => x.id !== topic.id && x.input !== 'tracing')!;
-    recordTopic(topic.id, 2, 40); recordAccuracy(topic.id, 9, 10);        // played, 90%
-    recordTopic(other.id, 2, 40); recordAccuracy(other.id, 7, 10);        // played, 70% — the weaker of the two
+    recordTopic(topic.id, 2, 40); recordAccuracy(topic.id, { hits: 9, tries: 10 });        // played, 90%
+    recordTopic(other.id, 2, 40); recordAccuracy(other.id, { hits: 7, tries: 10 });        // played, 70% — the weaker of the two
     const before = JSON.parse(localStorage.getItem('sna:v1')!).progress;
     expect(weakestTopics([topic, other], before, 1).map(t => t.id)).toEqual([other.id]);
-    // One duel of three rounds, answered wrongly twice: 10/13 ≈ 77%, still above `other`. Four wrong slices in
-    // one of those rounds would have made it 10/16 on a per-slice tally and flipped the ranking on nothing.
-    const t = duelAccuracy(played(['wrongA', 'a', 'wrongA']));
-    expect(t).toEqual({ hits: 1, tries: 3 });
-    recordAccuracy(topic.id, t.hits, t.tries);
+    // One duel of three rounds. Round 2 is a GENUINE multi-bubble stroke — every wrong option crossed in one
+    // pass, `played()`'s own script only ever fires one `hit()` per round, which cannot exercise this even
+    // though an earlier version of this comment claimed it did (#379): a per-slice tally on that round alone
+    // would have made the total 10/16 and flipped the ranking on nothing; the per-round latch keeps it 10/13
+    // ≈ 77%, still above `other`.
+    const ev = events();
+    const d = new Duel({ topic, difficulty: 1, rounds: 3, rng: rng(13) }, ev);
+    d.start();
+    expect(d.hit('a', d.current!.options.find(o => o !== d.current!.answer)!)).toBe('wrong');   // round 1: one wrong slice
+    d.waveEnd();
+    const wrongs = d.current!.options.filter(o => o !== d.current!.answer);
+    expect(wrongs.length, 'a wave with only one wrong option could not show this').toBeGreaterThan(1);
+    for (const w of wrongs) expect(d.hit('a', w)).toBe('wrong');                                 // round 2: swipe every wrong bubble
+    d.waveEnd();
+    expect(d.hit('a', d.current!.answer)).toBe('won');                                           // round 3: a clean win
+    d.waveEnd();
+    const t = duelAccuracy(ev.onMatchEnd.mock.calls[0][0]);
+    expect(t, 'a swiped wave is one try, not one per bubble crossed').toEqual({ hits: 1, tries: 3 });
+    recordAccuracy(topic.id, t);
     const after = JSON.parse(localStorage.getItem('sna:v1')!).progress;
     expect(after[topic.id]).toMatchObject({ hits: 10, tries: 13, plays: 1 });
     expect(accuracy(after[topic.id])!).toBeCloseTo(10 / 13, 5);

@@ -461,7 +461,7 @@ const y2Shapes: Generator = (d, rng) => {
   // counts flat faces, which has one answer for all six. A number, not a phrase: "A cone has… 1 curved face"
   // was sliceable two ways.
   const counts: [string, number][] = [['flat faces', p.flat]];
-  if (p.edges !== undefined && p.vertices !== undefined && (d === 3 || rng() < 0.6)) counts.push(['edges', p.edges], ['vertices', p.vertices]);
+  if (p.edges !== undefined && (d === 3 || rng() < 0.6)) counts.push(['edges', p.edges], ['vertices', p.vertices]);
   const [label, n] = pick(rng, d === 3 && counts.length > 1 ? counts.slice(1) : counts);
   return numQ(rng, `How many ${label} has a ${p.as}?`, n, { min: 0, max: 14, visual: { type: 'word', text: g }, say: `How many ${label} has a ${p.as}?` });
 };

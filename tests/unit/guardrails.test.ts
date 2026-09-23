@@ -440,7 +440,9 @@ describe('guard rails', () => {
     const from = store.indexOf('export function addProfile('), to = store.indexOf('\n}', from);
     expect({ fn: from >= 0 && to > from }).toEqual({ fn: true });
     // Counting alone gave a new child a slot already holding a sibling's save, and onboarding merged over it.
-    expect(store.slice(from, to)).toMatch(/!idx\.ids\.includes\(id\) && !holdsSave\(id\)/);
+    // `slotState(id) === 'empty'`, not `!holdsSave(id)`: the free-slot probe must also refuse a slot it can
+    // read but cannot parse, not only one it can read cleanly (#384 item 4).
+    expect(store.slice(from, to)).toMatch(/!idx\.ids\.includes\(id\) && slotState\(id\) === 'empty'/);
   });
 
   // Incident 2026-09-06 (#27): the year union `'reception' | 'year1' | 'year2'` was retyped in four files

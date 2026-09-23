@@ -431,6 +431,50 @@ test.describe('tablet viewports (#116)', () => {
   }
 
   /**
+   * #563 (#18 group B): the island's five mode buttons, re-measured after the fix. Before this pull request
+   * they stacked full-width below the topics grid — 566px, more than half an 800px-tall window (#18's
+   * 2026-09-22 14:02Z comment) — pushing the Reception island to 1133/1235px of scroll. The `.mode-grid`
+   * wrapper moves them into a 3-column grid at ≥900px (the breakpoint `.screen`/`.p-stats`/`.p-years`
+   * already use); below it `display: contents` makes the wrapper invisible to layout, so the phone stack
+   * (covered by `game.spec.ts`, which this project does not run) is untouched.
+   *
+   * ISLAND_TARGET/ISLAND_TOLERANCE pin the measured heights directly (real: 800px at 1280×800, 865px at
+   * 1024×768) rather than merely asserting "less than the old value" — a bound that only rules out
+   * 1133/1235 would still pass a regression that shaved off only 50px. At 1280×800 the island now fits one
+   * viewport exactly; at 1024×768 it does not (865 vs 768) — the remaining ~100px is the topics grid
+   * needing a third row at that narrower width (fewer auto-fill columns than at 1280), not the mode
+   * buttons, which this issue does not touch and which #18's own 2026-09-22 14:02Z comment already found
+   * "already fine".
+   */
+  const ISLAND_TOLERANCE = 20;
+  // One array, not a separate w/h loop plus a target keyed by width: two literals that had to stay in sync
+  // (the loop's viewports and the target lookup's keys) would let a third viewport added to one and not the
+  // other read `target` as `undefined` at runtime and fail the assertions below with a confusing NaN
+  // comparison instead of a clear "no target for this viewport" error (type-design-analyzer, #563 review).
+  const ISLAND_CASES = [
+    { w: 1280, h: 800, target: 800 },
+    { w: 1024, h: 768, target: 865 },
+  ] as const;
+
+  for (const { w, h, target } of ISLAND_CASES) {
+    test(`the island's mode buttons form a grid, not a 566px stack, at ${w}x${h} (#563)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedPlayer(page);
+      await page.click('.island[data-year="reception"]');
+      await expect(page.locator('.island-screen')).toBeVisible();
+
+      const grid = await page.locator('.mode-grid').evaluate(el => ({
+        display: getComputedStyle(el).display,
+        height: el.getBoundingClientRect().height,
+      }));
+      expect(grid.display, `.mode-grid at ${w}x${h}: must be a grid at the ≥900px breakpoint (#563)`).toBe('grid');
+      expect(grid.height, `.mode-grid at ${w}x${h}: still looks like the old 566px stack, not a 2-row grid (#563)`).toBeLessThan(300);
+
+      const total = await page.evaluate(() => document.documentElement.scrollHeight);
+      expect(total, `island content height at ${w}x${h}: expected close to ${target}px (#563)`)
+        .toBeGreaterThanOrEqual(target - ISLAND_TOLERANCE);
+      expect(total, `island content height at ${w}x${h}: expected close to ${target}px, not still the old ~1200px stack (#563)`)
+        .toBeLessThanOrEqual(target + ISLAND_TOLERANCE);
    * #564 (#18 group B): rewards and shop, measured on a seeded save with progress, stickers, certificates
    * and duels — not a fresh one, which is the narrowest either screen ever is and would pass this
    * vacuously (#109's own reasoning for `seedProgress`, above). The per-element breakdown on the issue
@@ -502,6 +546,26 @@ test.describe('tablet viewports (#116)', () => {
   }
 
   /**
+   * The other half of #563's acceptance criterion — "a phone and a portrait tablet are unchanged" — pinned
+   * rather than left to the CSS mechanism alone (pr-test-analyzer, #563 review): below 900px `.mode-grid`
+   * must stay `display: contents`, never `grid`, and the phone-width stack must still be the old ~1733px
+   * (five 86-98px cards plus their own `margin-top`), not the ~300px-tall 3-column grid the ≥900px cases
+   * above pin. 390×844 matches `game.spec.ts`'s own iPhone-13 mobile project, which this file's projects
+   * don't run — this is the only place that width is exercised against `.mode-grid` at all.
+   */
+  test("the island's mode buttons stay a stack below the 900px breakpoint, on a phone (#563)", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedPlayer(page);
+    await page.click('.island[data-year="reception"]');
+    await expect(page.locator('.island-screen')).toBeVisible();
+
+    const display = await page.locator('.mode-grid').evaluate(el => getComputedStyle(el).display);
+    expect(display, '.mode-grid on a phone: must stay `contents`, not switch to the ≥900px grid (#563)').toBe('contents');
+
+    const total = await page.evaluate(() => document.documentElement.scrollHeight);
+    expect(total, "the phone island's own scroll height must stay the old stacked value, not shrink to the tablet grid's (#563)")
+      .toBeGreaterThan(1500);
+  });
    * The other half of the acceptance criterion, same as `.mode-grid`'s #563 precedent: a phone stays a
    * single-column stack. `display: contents` on `.rewards-cols` should make the wrapper invisible to layout
    * below 900px, so this is the only place that is proven rather than assumed from the CSS rule alone
