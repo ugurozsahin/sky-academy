@@ -819,6 +819,60 @@ describe('#142: sequence progress rushes only the next earned batch', () => {
   });
 });
 
+describe('#591: a required sequence bubble knocked out of the arena is re-launched, not punished', () => {
+  // The bug report is a collision knocking a word backwards; staging a real one is what `twoOverlapping`
+  // above already does for a different assertion, but the arena's fall check only ever reads `y`/`vy` — it
+  // has no idea a collision was involved — so pushing a live bubble off the bottom by hand exercises the same
+  // branch a real deflection would, without needing to stage the collision that gets it there.
+  function forceDeparture(s: Sim, label: string) {
+    advanceUntil(s, () => { const b = s.all().find(x => x.label === label); return !!b && b.launched && !b.dead; }, `${label} never (re)launched`);
+    const b = s.all().find(x => x.label === label)!;
+    b.y = s.arena.H + b.r + 50; b.vy = 250;
+    s.frame();
+  }
+
+  it('does not cost a life on the first three departures, and does on the fourth', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, ordered: ['1'] });
+
+    for (let n = 1; n <= 3; n++) {
+      forceDeparture(sim, '1');
+      expect(sim.events.falls, `departure ${n} of 3 must not be reported as a fall`).not.toContain('1');
+      const b = sim.all().find(x => x.label === '1')!;
+      expect(b.dead, `departure ${n}: the bubble is sent back up, not killed`).toBe(false);
+      expect(b.launched, `departure ${n}: it waits below the floor — it does not teleport straight back into play`).toBe(false);
+      expect(b.relaunches, `departure ${n}: the counter moves`).toBe(n);
+    }
+
+    forceDeparture(sim, '1');
+    expect(sim.events.falls, 'the fourth departure behaves as today').toContain('1');
+    expect(sim.all().find(x => x.label === '1')!.dead, 'the fourth departure is a real miss').toBe(true);
+  });
+
+  it('leaves a decoy unaffected — it falls and is reported every time, with no free trips', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, ordered: ['1'] });
+    forceDeparture(sim, '2');   // '2' is a decoy here: not in `ordered`
+    expect(sim.events.falls, 'a decoy is never re-launched').toContain('2');
+    expect(sim.all().find(x => x.label === '2')!.dead, 'a decoy that falls is dead, as before').toBe(true);
+  });
+
+  it('re-launches on the arc it first flew, not wherever a collision left it', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, ordered: ['1'] });
+    advanceUntil(sim, () => { const b = sim!.all().find(x => x.label === '1'); return !!b && b.launched; }, '1 never launched');
+    const b = sim.all().find(x => x.label === '1')!;
+    const [ox, ovx, ovy] = [b.ox, b.ovx, b.ovy];
+    // A stand-in for what a collision would have left behind: nowhere near the spawn arc, and headed off
+    // the bottom, which is the state `resolveCollisions` produced in the bug report.
+    b.x = 12345; b.vx = 999; b.y = sim.arena.H + b.r + 50; b.vy = 700;
+    sim.frame();
+    expect(b.x, 'x resets to the spawn position').toBe(ox);
+    expect(b.vx, 'vx resets to the spawn value').toBe(ovx);
+    expect(b.vy, 'vy resets to the spawn value').toBe(ovy);
+  });
+});
+
 describe('#142: the arena drives the whole mission stage machine', () => {
   it('advances questions and stages, tops up lives, records stars, and ends once', () => {
     // No `lives` override: `YEARS[1].lives` is what the top-up below is capped by, and the scenario's numbers

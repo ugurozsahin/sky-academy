@@ -12,6 +12,11 @@ export interface Bubble {
   lines: string[];
   labelState: LabelState;   // #348: `small` or `overflow` says this bubble's label did not fit readably
   mark?: 'good' | 'bad'; markAt?: number; fade?: boolean;   // outcome reveal: spotlighted (✓/✗) or faded out
+  // #591: the arc this bubble launched on, kept so a re-launch (below) starts it exactly as it first went up
+  // rather than from wherever a collision had carried it — `x`/`vx`/`vy` drift from spawn during flight, `g`
+  // never does (nothing but `resolveCollisions` and gravity touch a bubble's motion, and neither reassigns it).
+  ox: number; ovx: number; ovy: number;
+  relaunches: number;   // how many times a required sequence label has already been sent back up (max 3)
 }
 /** A bubble the player can still slice or tap: launched, and not already resolved by a hit, a miss, or the
  *  outcome fade (#304). Both screens' `window.__sna.bubbles()` hooks and the sim harness's `live()` spelled
@@ -32,6 +37,12 @@ export type FxKind = Element | 'master';   // `master` draws from all of ELEMENT
 const FX_PARTICLE: Record<FxKind, PKind> = { fire: 'ember', water: 'drop', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'crystal', light: 'star', shadow: 'smoke', blade: 'slash', robot: 'pixel', master: 'star' };
 export const FX_COLORS: Record<FxKind, string[]> ={ fire: ['#ff7a1a', '#ffd23a', '#ff3b1a'], water: ['#3ec9ff', '#9fe6ff', '#1a7fff'], electric: ['#2ea8ff', '#ffffff', '#9fe6ff'], earth: ['#a0622a', '#7ddc3a', '#6b4220'], wind: ['#7fe8c8', '#c8ffe9', '#5fcf5a'], ice: ['#9fe6ff', '#ffffff', '#5bb8e8'], light: ['#ffd23a', '#ffffff', '#ffb020'], shadow: ['#a855ff', '#5a2aa0', '#2a1050'], blade: ['#ffffff', '#ff3b5c', '#d8dce8'], robot: ['#ff5252', '#ffffff', '#9aa5cf'], master: ['#ffd87a', '#ffffff', '#ffb020'] };
 const MAX_PARTICLES = 250;   // #29: safety cap so a pathological burst can never grow the per-frame draw loop unbounded
+// #591: how long a re-launched sequence bubble waits below the floor before it rises again — long enough to
+// read as the word coming back up, not a flicker, short enough that the child is not left waiting on it.
+const RELAUNCH_DELAY = 300;
+// #591: a required sequence label gets this many free trips back up before a departure is finally a miss —
+// "the first three departures", the owner's own words on the issue.
+const MAX_RELAUNCHES = 3;
 // A tap throws the ninja's own projectile (#48): it flies from the bottom of the arena to the bubble and pops
 // it on arrival. Score, lives and the outcome reveal are all settled at the tap — only the pop waits for the
 // landing, so the flight is decoration and never changes what the child earned.
@@ -82,6 +93,7 @@ export class Arena {
   private activeId: number | null = null;         // the pointer that is down on THIS canvas, null = no stroke (#16: two arenas share one window)
   private strokeStale = false;                    // #331: a freeze happened since `lastPt` — the next move resumes the stroke, it does not continue it
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
+  private orderedLabels: Set<string> = new Set();   // #591: this wave's required sequence labels — a re-launch candidate on fall, unlike a decoy
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
   private pausedSince: number | null = null;       // #490: when the CURRENT pause began, so resuming can shift launchAt by its length
@@ -161,6 +173,7 @@ export class Arena {
   spawnWave(o: WaveOpts, shared?: { rng: Rng; now: number }) {
     this.bubbles = []; this.shots = []; this.frozen = false;
     this.orderedWave = !!o.ordered?.length;         // #108: damp collisions so a sequence bubble is never stranded
+    this.orderedLabels = new Set(o.ordered);        // #591: same set, for the fall re-launch below
     // #43: every number below — radius, air time, batching, each bubble's arc, colour and launch moment —
     // comes from the pure layoutWave() so it can be unit-tested without a canvas. All this method still does
     // is fit each label to the measured font (#28, needs the 2D context) and push the bubbles.
@@ -169,7 +182,7 @@ export class Arena {
     for (const p of plan.bubbles) {
       const fit = fitLabelLines(p.label, plan.r, (font, text) => { this.ctx.font = font; return this.ctx.measureText(text).width; });   // #28: fit once here, not every frame
       warnUnfitLabel(p.label, plan.r, fit);
-      this.bubbles.push({ id: this.nextId++, label: p.label, x: p.x, y: this.H + plan.r, vx: p.vx, vy: p.vy, g: p.g, r: plan.r, launchAt: p.launchAt, launched: false, hit: false, dead: false, color: p.color, wobble: p.wobble, fontSize: fit.fs, lines: fit.lines, labelState: fit.state });
+      this.bubbles.push({ id: this.nextId++, label: p.label, x: p.x, y: this.H + plan.r, vx: p.vx, vy: p.vy, g: p.g, r: plan.r, launchAt: p.launchAt, launched: false, hit: false, dead: false, color: p.color, wobble: p.wobble, fontSize: fit.fs, lines: fit.lines, labelState: fit.state, ox: p.x, ovx: p.vx, ovy: p.vy, relaunches: 0 });
     }
     this.waveActive = true;
   }
@@ -206,7 +219,7 @@ export class Arena {
       if (bad && Math.hypot(bad.x - x, bad.y - y) < 2.2 * r) x = bad.x < this.W / 2 ? Math.min(this.W - r - 8, bad.x + 2.4 * r) : Math.max(r + 8, bad.x - 2.4 * r);   // don't sit on the ✗ bubble
       const fit = fitLabelLines(o.good, r, (font, text) => { this.ctx.font = font; return this.ctx.measureText(text).width; });
       warnUnfitLabel(o.good, r, fit);
-      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now, fontSize: fit.fs, lines: fit.lines, labelState: fit.state });
+      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now, fontSize: fit.fs, lines: fit.lines, labelState: fit.state, ox: x, ovx: 0, ovy: 0, relaunches: 0 });
     }
   }
   /** Remove remaining bubbles (with a gentle fade) — used when the question is over. */
@@ -370,7 +383,18 @@ export class Arena {
       if (this.frozen) { live++; b.wobble += dt * 3; continue; }        // outcome reveal: everything holds still
       if (!b.launched) { if (now >= b.launchAt) b.launched = true; else { live++; continue; } }
       b.vy += b.g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.wobble += dt * 3;
-      if (b.y - b.r > this.H + 10 && b.vy > 0) { b.dead = true; if (!b.hit) this.cb.onFall(b); continue; }   // a tapped bubble with a shot on the way is not a miss
+      if (b.y - b.r > this.H + 10 && b.vy > 0) {
+        // #591: a required sequence bubble that leaves the arena un-hit — most often knocked down by a later
+        // bubble launched into it, never by anything the child did — is re-launched rather than punished, up
+        // to MAX_RELAUNCHES times. A decoy (not in `orderedLabels`) and an already-tapped bubble (`hit`, a shot
+        // still on its way) fall through to the miss exactly as before.
+        if (!b.hit && this.orderedLabels.has(b.label) && b.relaunches < MAX_RELAUNCHES) {
+          b.relaunches++; b.launched = false; b.launchAt = now + RELAUNCH_DELAY;
+          b.x = b.ox; b.y = this.H + b.r; b.vx = b.ovx; b.vy = b.ovy;   // back on the launch line, its original arc — not a teleport into play
+          live++; continue;
+        }
+        b.dead = true; if (!b.hit) this.cb.onFall(b); continue;   // a tapped bubble with a shot on the way is not a miss
+      }
       live++;
     }
     // #108: bubbles collide with each other. Skipped while `frozen` — the outcome reveal holds everything
