@@ -2220,12 +2220,17 @@ describe('STEP 3 tells a run what a missing CI run on a just-pushed head means (
     const dirtyClause = step3.slice(dirtyAt, dirtyAt + dirtyEnd + 1);
     expect(unknownClause, "unknown's own clause must tell a run to recheck, not merge")
       .toMatch(/recheck/i);
-    expect(unknownClause, "and unknown's own clause must not itself claim dirty's merge instruction")
-      .not.toContain('merge it in');
-    expect(dirtyClause, "dirty's own clause must contain its merge instruction, not merely gesture at recovery")
-      .toContain('merge it in');
-    expect(dirtyClause, "and dirty's own clause must route to the same recovery §2 already has, inside itself")
-      .toMatch(/STEP 2\.5[\s\S]{0,20}does[\s\S]{0,20}\(`open-pr`\s+§2\)/);
+    expect(unknownClause, "and unknown's own clause must not cite dirty's merge recovery at all — that pointer "
+      + "belongs to dirty alone, whatever words carry the merge action itself")
+      .not.toMatch(/STEP 2\.5|open-pr`\s+§2/);
+    // Tied into one connected match, not two independent facts about the clause (#452 review round 3): a
+    // rewrite can make both `merge it in` and the STEP 2.5/open-pr §2 citation true of dirtyClause without
+    // either being dirty's *actual* instruction — e.g. "merge it in" left dangling in an unrelated aside
+    // while the citation sits elsewhere as filler. Requiring "merge it in" to lead directly into the
+    // citation, within a short span, ties the two into one real instruction rather than two decorations.
+    expect(dirtyClause, "dirty's own clause must lead from its merge instruction straight into the same "
+      + "recovery §2 already has — not merely contain both facts somewhere, disconnected")
+      .toMatch(/merge it in[\s\S]{0,40}STEP 2\.5[\s\S]{0,20}does[\s\S]{0,20}\(`open-pr`\s+§2\)/);
     expect(dirtyClause, "and dirty's own clause must not itself claim unknown's wait-and-recheck instruction")
       .not.toMatch(/recheck|has not finished computing/i);
   });
