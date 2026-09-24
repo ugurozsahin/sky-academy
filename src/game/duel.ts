@@ -15,10 +15,14 @@ export const DUEL_PLAYERS = ['a', 'b'] as const satisfies readonly DuelPlayer[];
  * Who a finished match went to, once (#423 review item 1) — `DuelResult.winner` here and `StoredDuel.winner`
  * in `storage.ts` used to spell the same three values as two independent unions, tied only by the compiler
  * catching a widened `DuelResult` at the one call site that assigns one into the other (`recordDuel`). That
- * leaves `storage.ts`'s own runtime guard (`isWinner`) checking three hand-written literals against nothing:
- * if this union ever gained or lost a member, the guard would keep admitting or rejecting the old set with no
- * error at all. `DUEL_OUTCOMES` is what a checker there iterates instead, the same pairing `DUEL_PLAYERS`
- * above already gives the two seats.
+ * leaves `storage.ts`'s own runtime guard (`isWinner`) checking three hand-written literals against nothing.
+ * `DUEL_OUTCOMES` is what it iterates instead, the same pairing `DUEL_PLAYERS` above already gives the two
+ * seats — but `satisfies` only guards one direction (PR #613 review, pr-test-analyzer/type-design-analyzer):
+ * a member *removed* from `DuelOutcome` fails to compile here, since the array would then hold a value the
+ * narrower type disallows; a member *added* to it compiles silently, since every existing array element
+ * stays assignable to the wider type, and `isWinner` would then reject every legitimately-produced value of
+ * the new kind as corrupt data. Ties the two `winner` spellings together and catches a dropped member; a
+ * future addition still needs its own line here too.
  */
 export type DuelOutcome = DuelPlayer | 'draw';
 export const DUEL_OUTCOMES = ['a', 'b', 'draw'] as const satisfies readonly DuelOutcome[];
