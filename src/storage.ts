@@ -1027,19 +1027,40 @@ export function addCoins(n: number): string[] {
 }
 /** Certificate album cap. Far above the mission count, so it only ever trims a hand-edited or imported save. */
 export const CERT_CAP = 60;
+/**
+ * A checker per field, keyed so **adding a required field to `T` without a checker for it is a compile
+ * error** (`-?` strips the optionality of the *key*, not of the value: every key of `T` must appear here,
+ * whether or not `T` itself marks it optional). `Fields<StoredDuel>` uses this directly, since every one of
+ * its fields is meant to be checked; `Fields<CheckedCertFields>` below deliberately narrows `T` first, for
+ * the two fields that must stay out of this table.
+ */
+type Fields<T> = { [K in keyof T]-?: (v: unknown) => v is T[K] };
+const str = (v: unknown): v is string => typeof v === 'string';
+const fin = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const strOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
 // A stored certificate has to survive a hand-edited save without taking the album down with it. Still not
 // #174's full validator — it checks types, not values — but it checks **every field an entry is used
 // through**, because a half-checked entry is worse than an unchecked one here: `{ id, title }` alone passed
 // an earlier version of this guard, and then `fileCert`'s `c.stars > prev.stars` compared a real 3 against
 // `undefined`, which is `false`, so the junk entry won every comparison and a child who had genuinely earned
 // three stars could never be given that certificate. A guard that lets a partial object through does not
-// merely fail to help; it manufactures a `prev` that beats everything.
+// merely fail to help; it manufactures a `prev` that beats everything. `avatar` used to be the one exception
+// to "every field" — `avatarById()` reads it (`ui/certificate.ts`) but nothing here checked it, so a
+// hand-edited `avatar: 7` reached the album and was saved only by `avatarById()`'s own fallback, in a
+// different file, rather than by this guard (#422).
+//
+// `training`/`duel` are the two fields that stay deliberately unchecked — see `certKind()`'s comment in
+// `ui/certificate.ts`: rejecting a malformed flag here would drop a certificate a child genuinely earned,
+// which is worse than `certKind()` misreading which kind it was earned for.
+type CheckedCertFields = Omit<StoredCert, 'training' | 'duel'>;
+const CERT_FIELDS: Fields<CheckedCertFields> = {
+  id: str, name: str, avatar: strOrNull, year: str, title: str,
+  stars: fin, score: fin, correct: fin, attempts: fin, date: str,
+};
 const isCert = (c: unknown): c is StoredCert => {
   if (!c || typeof c !== 'object' || Array.isArray(c)) return false;
   const x = c as Record<string, unknown>;
-  return typeof x.id === 'string' && typeof x.title === 'string' && typeof x.name === 'string'
-    && typeof x.year === 'string' && typeof x.date === 'string'
-    && [x.stars, x.score, x.correct, x.attempts].every(n => typeof n === 'number' && Number.isFinite(n));
+  return (Object.keys(CERT_FIELDS) as (keyof CheckedCertFields)[]).every(k => CERT_FIELDS[k](x[k]));
 };
 /**
  * File a certificate into the album (pure). One entry per mission (`c.id`) — replaying a mission does not earn
@@ -1076,12 +1097,14 @@ export const DUEL_CAP = 20;
  * nobody won. The two scores and `rounds` must be finite — `Infinity` from a hand-edited save formats as
  * "Infinity–0" in a row a child reads.
  */
+const isWinner = (v: unknown): v is StoredDuel['winner'] => v === 'a' || v === 'b' || v === 'draw';
+const DUEL_FIELDS: Fields<StoredDuel> = {
+  at: fin, topic: str, title: str, year: str, winner: isWinner, scoreA: fin, scoreB: fin, rounds: fin,
+};
 const isDuel = (d: unknown): d is StoredDuel => {
   if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
   const x = d as Record<string, unknown>;
-  return typeof x.topic === 'string' && typeof x.title === 'string' && typeof x.year === 'string'
-    && (x.winner === 'a' || x.winner === 'b' || x.winner === 'draw')
-    && [x.at, x.scoreA, x.scoreB, x.rounds].every(n => typeof n === 'number' && Number.isFinite(n));
+  return (Object.keys(DUEL_FIELDS) as (keyof StoredDuel)[]).every(k => DUEL_FIELDS[k](x[k]));
 };
 /**
  * File a finished duel into the history (pure). **Every match is its own row**, which is the one way this
