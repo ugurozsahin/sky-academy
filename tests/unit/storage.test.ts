@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { activeProfile, addProfile, deleteProfile, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
+import { activeProfile, addProfile, deleteProfile, cleanName, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { duelHeadline, duelHistoryLine, type DuelResult } from '../../src/game/duel';
 import { carriedStreak } from '../../src/game/dojo';
@@ -741,6 +741,16 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     expect(typeof d.name).toBe('string');
     expect(() => esc(d.name)).not.toThrow();
     expect(() => d.name.trim()).not.toThrow();
+  });
+
+  // #424: a Restore code is a name a person freely typed, same as the wizard's field, and until this fix
+  // sanitizeTypes() only checked `typeof name`, never its length — so an over-length name walked straight
+  // past the guard #171 wrote for exactly this write path. Proved red by reverting the `cleanName(clean.name)`
+  // line: this then fails with a 400-character `d.name`, `renameProfile`'s own NAME_MAX test unaffected.
+  it('a Restore code cannot carry a name past NAME_MAX — sanitizeTypes() clamps, not just type-checks (#424)', () => {
+    const long = 'x'.repeat(400);
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION, name: long, coins: 0 }))).toBe(true);
+    expect(load().name).toBe(long.slice(0, NAME_MAX));
   });
 
   it('every record*() writer, touchStreak() and recordDojo() survive a save corrupted in every field they touch', () => {
@@ -1826,6 +1836,18 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(load().name.length, 'the cap the wizard renders is the cap the store enforces').toBe(NAME_MAX);
       // The cut can land on a space, and a trailing space is not part of a name.
       expect(renameProfile('p1', 'Ada Bo Cassie Dee')).toEqual({ ok: true, name: 'Ada Bo Cassie' });
+    });
+
+    // #424 review (pr-test-analyzer): `slice` counts UTF-16 code units, and an emoji name is a supported case
+    // (avatar.test.ts's `canStart('volt', '😀')`) — a cut landing inside its surrogate pair used to leave a
+    // dangling high surrogate, which renders as a broken glyph everywhere a name is drawn. Proved red by
+    // reverting `cleanName` to a bare `slice(0, NAME_MAX)`: this then stores a lone `'\ud83e'`.
+    it('a truncation that lands inside an emoji drops the whole character, not half of it', () => {
+      save({ name: 'Ada', onboarded: true });
+      const long = 'x'.repeat(NAME_MAX - 1) + '🤖' + 'yyyy';   // the cut falls between 🤖's two code units
+      const r = renameProfile('p1', long);
+      expect(r).toEqual({ ok: true, name: 'x'.repeat(NAME_MAX - 1) });
+      expect(load().name).not.toMatch(/[\ud800-\udbff]$/);
     });
 
     it('refuses a slot that is not a profile of this device, and one with nothing to name', () => {
