@@ -234,43 +234,75 @@ test.describe('tablet viewports (#116)', () => {
     });
 
   /**
-   * #594, corrected after review, twice. Round 1: `expectFitsViewport` cannot see this bug at all —
-   * `.play { overflow: hidden; }` (`src/style.css:891`) is a clipping ancestor of `.tenframe`, and
-   * `horizontalOverflow` deliberately excludes anything with one (the exclusion exists for the arena
-   * canvas), so a `.tenframe` forced wide would be invisibly clipped, never counted as page overflow.
-   * Verified by reverting `.tenframe i` to a fixed 24px: the old version of this test still passed.
+   * #594, corrected after review, seven times over. Rounds 1–2 found that neither `expectFitsViewport`
+   * (blind inside `.play`'s `overflow: hidden`) nor a `.qcard`-vs-`.tenframe` rect comparison (`.qcard` is
+   * never narrower than `.tenframe`'s own 140px at any viewport this game supports, down to its narrowest
+   * tested phone) can observe an overflow that never actually happens at a real, reachable size. Rounds
+   * 2–6 tried to guard the CSS instead, as unit-level text-matching over `src/style.css` — and lost to a
+   * new spelling of "this is a fixed size" every round (a bare selector, `.tenframe i.a`/`.b`, an
+   * ancestor-scoped override, `grid-template-columns`, `min-width`, the `grid-template` shorthand — round
+   * 7 then found `calc()` defeats even the properties the rail did enumerate). CSS has an unbounded number
+   * of ways to say "fixed", so grepping stylesheet text for that claim cannot terminate; round 7's own
+   * conclusion, taken here: measure what the browser actually renders instead.
    *
-   * Round 2: the obvious fix — `outsideItsBox(page, '.qcard', '.tenframe')`, comparing rects directly
-   * instead of relying on page scroll — turns out to have the same defect for a different reason. Checked
-   * by reverting `.tenframe`/`.tenframe i` the same way and re-running: it *still* passed, at both tablet
-   * sizes, because `.qcard { max-width: 560px; padding: 10px 14px 12px }` gives ~530px of content width at
-   * *every* viewport this game supports, down to the narrowest phone it's tested at (390x664, `game.spec.ts`
-   * "the shortest phone we support"; 320px turns up as the narrowest measured width, `game.spec.ts:2928`) —
-   * and `.tenframe`'s pre-fix natural width was 140px. There is no reachable screen in the shipped app where
-   * the card is ever narrower than the ten-frame's own content, so a page-level or card-level overflow
-   * assertion has nothing to catch here: this is the same "unreachable today" shape as the multi-tenframe
-   * case in the PR body, not a gap in test-writing effort.
-   *
-   * So this stays a rendering check, not an overflow claim, and the actual regression guard for a fixed
-   * pixel size returning to `.tenframe`/`.tenframe i` is the mutation-tested unit rail in
-   * `tests/unit/guardrails.test.ts` ("the ten-frame dot scales with its grid cell…") — which does catch it,
-   * independently confirmed by reverting each half of the fix in turn.
+   * This test does not rely on a real device ever reaching a narrow enough card — none does. It forces one
+   * directly, far narrower than `.tenframe`'s natural 140px, and checks that the rendered box actually
+   * shrinks. That is insensitive to how the responsive rule is spelled — `min(140px, 100%)`, a future
+   * `clamp()`, whatever — because it is never fooled by the CSS text, only by the pixel width a real
+   * browser computed from it. A regression to *any* fixed size, however written, fails this the same way:
+   * the box stops shrinking when its container does.
    */
-  for (const [w, h] of [[800, 1280], [1024, 768]] as const)
-    test(`the ten-frame renders at ${w}x${h} (#594)`, async ({ page }) => {
-      await page.setViewportSize({ width: w, height: h });
-      await seedPlayer(page);
-      await startTopic(page, 'reception', 'r-bonds');
-      await expect(page.locator('.tenframe i').first()).toBeVisible();
-      const [cardWidth, frameWidth] = await Promise.all([
-        page.locator('.qcard').evaluate(el => el.getBoundingClientRect().width),
-        page.locator('.tenframe').first().evaluate(el => el.getBoundingClientRect().width),
-      ]);
-      expect(frameWidth, 'the ten-frame must render at a real, positive width — a 0 width would make every other check here vacuous')
-        .toBeGreaterThan(0);
-      expect(frameWidth, "sanity check on the premise above: if the card ever were narrower than the frame's natural width, this rail would need the overflow assertion back")
-        .toBeLessThanOrEqual(cardWidth);
+  test('the ten-frame shrinks to fit an unrealistically narrow card (#594)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-bonds');
+    await expect(page.locator('.tenframe i').first()).toBeVisible();
+
+    const naturalWidth = await page.locator('.tenframe').first().evaluate(el => el.getBoundingClientRect().width);
+    expect(naturalWidth, 'the ten-frame must render at a real width before the card is narrowed').toBeGreaterThan(100);
+
+    const shrunk = await page.evaluate(() => {
+      const qcard = document.querySelector('.qcard') as HTMLElement;
+      qcard.style.width = '60px';
+      qcard.style.maxWidth = '60px';
+      const frame = document.querySelector('.tenframe')!.getBoundingClientRect();
+      const dot = document.querySelector('.tenframe i')!.getBoundingClientRect();
+      return { frameWidth: frame.width, dotWidth: dot.width };
     });
+
+    expect(shrunk.frameWidth, 'the ten-frame must actually shrink when its card does — a fixed pixel width, however spelled, would not')
+      .toBeLessThan(naturalWidth * 0.9);
+    expect(shrunk.frameWidth, 'and it must not collapse to nothing — a 0 width would make the shrink assertion pass vacuously')
+      .toBeGreaterThan(0);
+    expect(shrunk.dotWidth, "each dot must follow its cell down too — a fixed-size dot in a shrunk grid is the #594 overflow on the other half of the fix")
+      .toBeLessThan(20);
+    expect(shrunk.dotWidth, 'and the dot must still render at a real width, not collapse to nothing')
+      .toBeGreaterThan(0);
+  });
+
+  /**
+   * #594 round 6/7's last named gap: the `@media (max-height: 640px)` guard rail could only ever check
+   * whether the stylesheet *text* re-declared `--slot`/`--obj` — it had no way to notice a direct, literal
+   * `font-size` on `.objs .obj` inside that same block, which bypasses the `--obj` chain entirely and was
+   * confirmed, by mutation, to slip straight past it. This measures the rendered outcome instead: at the
+   * height-gated band, `.objs .obj`'s actual computed font-size must still equal `.slot`'s actual rendered
+   * width times the #107/#594 ratio (0.7) — the whole point of routing the glyph through `--obj` in the
+   * first place. A literal font-size, at any value, breaks that equality and fails this regardless of what
+   * it was spelled as.
+   */
+  test('the object glyph font-size still tracks --obj inside the short-screen height gate (#107, #594)', async ({ page }) => {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    await expect(page.locator('.objs .slot .obj').first()).toBeVisible();
+
+    const [slotWidth, objFontSize] = await Promise.all([
+      page.locator('.objs .slot').first().evaluate(el => el.getBoundingClientRect().width),
+      page.locator('.objs .obj').first().evaluate(el => parseFloat(getComputedStyle(el).fontSize)),
+    ]);
+    expect(slotWidth, 'the slot must render at a real width, or the ratio below is measured against nothing').toBeGreaterThan(0);
+    expect(Math.abs(objFontSize - slotWidth * 0.7), 'the glyph font-size must equal --slot * 0.7 — a literal font-size (any value) breaks this even if it happens to fit')
+      .toBeLessThan(2);
+  });
 
   /**
    * #18 slice 2, group A — the DOM-screen width cap, and the third of group A that carries no look decision.

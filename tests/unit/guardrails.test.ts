@@ -1913,94 +1913,21 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
     .toBe('var(--slot)');
 });
 
-// #594: the margin above only holds if nothing narrows it back on a height gate. #107's own fix once lived
-// inside `@media (max-height: 640px)`, which never reaches a real tablet (768–1280px tall) — so the exact
-// bug it fixed on a phone was still live on the device the issue was filed from. This rail reads every
-// `@media (…)` block whose condition list mentions `max-height` anywhere — not only one written with
-// `max-height` as the query's sole or first clause — because this sheet already pairs conditions with
-// `and` elsewhere (`@media (orientation: landscape) and (min-height: 700px)`), and a compound query is
-// exactly how a future edit could smuggle the #594 gate back in past a narrower match.
-it('no @media (…max-height…) block narrows the five-frame slot or glyph ratio (#594)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
-  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
-  const blocks = [...bare.matchAll(/@media\s+([^{]*max-height:[^{]*)\{((?:[^{}]|\{[^{}]*\})*)\}/g)].map(m => m[2]);
-  expect(blocks.length, 'this rail checks nothing if no max-height block exists — update it, do not delete it')
-    .toBeGreaterThanOrEqual(1);
-  for (const block of blocks) {
-    expect(block, 'a height query must never re-declare --slot — that is the #594 gate returning')
-      .not.toMatch(/--slot\s*:/);
-    expect(block, 'a height query must never re-declare --obj — that is the #594 gate returning')
-      .not.toMatch(/--obj\s*:/);
-  }
-});
-
-// #594: `.tenframe i` was a fixed 24px in a `1fr` track — five of them need 140px before the dots overflow
-// their own column, and nothing stopped the container being narrower than that. Both halves must hold: the
-// dot has to scale with its cell instead of carrying its own px size, AND `.tenframe` itself has to be free
-// to shrink below 140px — a fixed-px container would reintroduce the exact same overflow even with a
-// perfectly responsive dot inside it.
-//
-// Round 2 review (#601): a plain, non-global `.match()` only ever inspects the FIRST `.tenframe`/`.tenframe
-// i` block in the file, so a later override — inside a media query, say — reinstates a fixed pixel size
-// while this rail stays green. That is exactly how the `--slot` height-gate entered the codebase for `.five`
-// in the first place.
-//
-// Round 3 review: fixing that by widening to `matchAll` on the same two exact-selector patterns was still
-// too narrow — it anchored on the bare selector text, so `.tenframe i.a`/`.tenframe i.b` (real selectors
-// `src/style.css` already declares right next to the bare one, and the only ones a filled dot actually
-// renders with — `src/ui/visuals.ts`'s `<i class="a">`/`<i class="b">`) sat outside its reach.
-//
-// Round 4 review: a prefix match on `^\.tenframe` was still selector-*shape* matching, which is the class
-// defect, not an instance of it — an ancestor-scoped override (`.objs.two .tenframe { … }`, the identical
-// pattern this sheet already uses for `.five` via `.objs.two .five`) doesn't start with `.tenframe`, so it
-// was still invisible. The fix stops matching on selector shape at all: any selector whose comma-separated
-// parts *contain* `.tenframe` anywhere — the same "search the body, not the selector" move the sibling
-// `@media` rail above already makes.
-//
-// Round 5 review: the property side had the matching defect too, one level down. `width`/`height` alone
-// missed that `min-width`/`max-width` (a floor is the #594 shape too — the whole point of the fix is that
-// nothing stops the container being narrower) and `grid-template` (the shorthand for the same column
-// tracks `grid-template-columns` sets) reach the same overflow through ordinary, valid CSS. Chasing one
-// more property per round does not terminate — CSS's set of size-pinning properties is large — so this
-// round enumerates the bounded, complete-for-purpose list for a `display: grid` cell instead: every
-// physical and logical box-sizing property, every grid-track shorthand. **What this deliberately does not
-// cover**, named rather than silently absent: `transform: scale(...)`, a `zoom`, or a box-sizing property
-// this list omits by name (`gap`/`column-gap`/`row-gap` are spacing, not sizing, and are excluded on
-// purpose) — the same "fine as it stands, fragile past its named bound" shape the `@media` rail's one-level
-// nesting limit already uses in this file, not a promise this rail covers everything CSS can do.
-it('nothing that reaches the ten-frame pins a fixed pixel size, on every selector and every sizing property named below (#594)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
-  const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
-
-  // Every innermost `selector { body }` pair in the sheet, one level of @media nesting included — the
-  // character class excludes braces, so a match cannot span the wrapper's own `{`, only reach in to the
-  // rule declared inside it. A selector list is comma-separated; each part is checked on its own so a
-  // grouped rule (`.tenframe, .foo { … }`) cannot hide one of its selectors from the check either.
-  const rules = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .flatMap(m => m[1].split(',').map(sel => ({ selector: sel.trim(), body: m[2] })))
-    .filter(r => r.selector.includes('.tenframe'));
-
-  expect(rules.length, '.tenframe must be styled by at least one rule (#594)').toBeGreaterThanOrEqual(1);
-
-  // The named, bounded set (see the comment above): every box-sizing property a grid cell or its container
-  // can be pinned by. Each is checked for its own exact property name — `(?<![\w-])` stops `width` from
-  // also matching inside `min-width`, so `min-width` needs (and gets) its own explicit entry rather than
-  // being caught, and misreported, by the `width` check.
-  const SIZING_PROPS = ['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height', 'flex-basis'] as const;
-  const pinned = (body: string, prop: string) => new RegExp(`(?<![\\w-])${prop}:\\s*[\\d.]+px`).test(body);
-  for (const { selector, body } of rules)
-    for (const prop of SIZING_PROPS)
-      expect(pinned(body, prop), `"${selector}" must not pin a fixed pixel ${prop} — that is the #594 overflow returning`).toBe(false);
-
-  // Grid-track shorthands: `grid-template-columns` and the `grid-template`/`grid` shorthands that set the
-  // same column list. This is the container's actual #594 mechanism — a `1fr` track turning fixed forces
-  // the whole grid wide regardless of what `width` says — so it is checked as its own property, not folded
-  // into the width/height loop above.
-  for (const { selector, body } of rules)
-    if (/grid-template(-columns)?\s*:/.test(body) || /(?<![\w-])grid\s*:/.test(body))
-      expect(body, `"${selector}" must not pin a fixed pixel grid track — that is the #594 overflow by another property`)
-        .not.toMatch(/grid(-template(-columns)?)?\s*:[^;]*px/);
-});
+// #594: two text-matching rails lived here through six review rounds — one for the `@media (…max-height…)`
+// gate, one enumerating "every sizing property" a `.tenframe` selector could carry. Both kept losing to a
+// new CSS spelling every round (a compound selector, a shorthand, a logical property, case, a `calc()`
+// wrapper) because CSS has an unbounded number of ways to say "this is a fixed size", and grepping stylesheet
+// *text* for that claim cannot terminate. The reviewer's own conclusion, round 7: replace text-matching with
+// a rendered-geometry assertion — measure what the browser actually computed, which is insensitive to how
+// the CSS that produced it was spelled — or drop the text rail and lean on what already holds. Both text
+// rails are gone; what replaces them:
+//   - the `--obj` ratio bound above (still a real, mutation-tested arithmetic guarantee — a ratio is a
+//     number, not a spelling, so there's no unbounded set of ways to write it);
+//   - `tests/e2e/viewport.spec.ts`'s "the ten-frame shrinks to fit an unrealistically narrow card" and
+//     "the five-frame glyph is sized from --obj even inside a height gate" — real browser measurements of
+//     `.tenframe`'s and `.objs .obj`'s ACTUAL rendered size, which catches a fixed 140px/24px/16px/whatever
+//     future spelling produces one, because it is never fooled by how the fixed size was written, only by
+//     whether the element is genuinely, still, this many pixels wide.
 
   // #109: the grown-ups dashboard laid itself out 936 px wide inside an 800 px portrait tablet, at every
   // tablet size alike, because the width never came from the viewport. `.p-year-row span` carried
