@@ -195,7 +195,7 @@ describe('the CLI both routines and the watchdog are pointed at', () => {
    *  printed on either stream — rather than the throw. */
   const exit = (...args: string[]): { code: number; out: string; err: string } => {
     try {
-      return { code: 0, out: run(...args), err: '' };
+      return { code: 0, out: run(...args), err: '' };   // stderr is not captured on success — do not assert `.err` for a 0 exit
     } catch (e) {
       const err = e as { status: number; stdout: string; stderr: string };
       return { code: err.status, out: err.stdout, err: err.stderr };
