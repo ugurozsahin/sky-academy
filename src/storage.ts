@@ -412,7 +412,11 @@ export const NAME_MAX = 14;
  * - `'future'` — the slot holds a save a **newer build** wrote, on either side of the two paths below. Split
  *   out of `'store'` (#420 review note 4): conflating them is what `readOnly`'s own paragraph forbids, because
  *   the remedies are opposites — this one needs the other device or an update, and `'store'` needs private
- *   browsing off or space freed. Neither ever fixes the other.
+ *   browsing off or space freed. Neither ever fixes the other. **Checked before `'blank'`** (#431 review,
+ *   type-design-analyzer): a slot this build cannot touch at all is refused on that alone, whatever the
+ *   grown-up typed or left empty — a name that will never be looked at is not worth a second refusal reason.
+ *   `canRenameCard` never offers the input on a `future` row in the first place, so the combination has no
+ *   route from the screen; only a direct call can reach it.
  * - `'blank'` — a name of only spaces. `hasName` is the wizard's identical rule (`avatar.ts`).
  * - `'store'` — the browser would not keep it, the same fault `STORE_HINT` describes on the picker.
  */
@@ -460,20 +464,43 @@ function storedName(id: ProfileId): string | null {
  * one this build cannot open, and stamping a name onto it is a small corruption of a save the other device
  * still reads. It answers `'no-save'` — honest about the outcome, and the list never offers the control.
  *
+ * **`futureSaveIn(id)` is checked once, before either path, rather than each path asking its own question
+ * about "future"** (#431 review, item 1). The session path used to ask `readOnly` — a latch set only by the
+ * last `load()` this session ran, so with the latch still unset (no `load()` yet this session, the exact order
+ * `parentsScreen` happens not to hit) a newer-build save on the session's own slot fell through to `save()`,
+ * which itself sets `readOnly` too late to stop this function reaching `'store'` instead of `'future'` — the
+ * conflation `RenameProfileResult`'s own doc forbids. The sibling path asked an inline `isFutureSave(parsed)`.
+ * One call against the disk bytes, ahead of the branch, answers both and cannot go stale the way a cached
+ * latch can.
+ *
  * **Both paths end on the same read-back** — `storedName(id) === next` — because a store that accepts
  * `setItem` and keeps nothing is the failure that cost #330 a review round, and `ok` here has to mean the store
  * is holding the new name. The session path read back nothing at all until #420 review B3; when it now fails,
- * `cache`'s name is put back, so the screen never shows a name the store refused.
+ * `cache`'s name is put back, so the screen never shows a name the store refused. **Both paths now latch
+ * `writeFailed` on that same failure, throw or silent drop alike** (#431 review, item 5). The sibling path
+ * used to return a reason and nothing else. The session path goes through `save()`, which already latches on
+ * a *throw* — but `save()`'s own `writeFailed = false` runs unconditionally whenever `setItem` does not throw,
+ * so a silent drop on this path used to leave the latch clear, and could even clear a `true` a moment-earlier
+ * sibling rename or delete had correctly set (silent-failure-hunter, #431 review). This function now sets it
+ * itself once its own read-back disagrees, on either path — `parents.ts:35`'s "this device is not saving"
+ * used to stay quiet about a refused rename, of either kind, until an unrelated write happened to set it.
  */
 export function renameProfile(id: ProfileId, name: string): RenameProfileResult {
   if (!currentIndex().ids.includes(id)) return { ok: false, why: 'unknown' };
+  if (futureSaveIn(id)) return { ok: false, why: 'future' };
   const next = name.trim().slice(0, NAME_MAX).trim();   // trimmed again: the cut can land on a space
   if (!next) return { ok: false, why: 'blank' };
   if (id === sessionProfile()) {
-    if (readOnly) return { ok: false, why: 'future' };
     const before = load().name;
     save({ name: next });
     if (!writeFailed && storedName(id) === next) return { ok: true, name: next };
+    // `save()` only ever sets `writeFailed` from whether `setItem` *threw* — a silent drop (the call
+    // accepted, the read-back disagrees) leaves it `false`, which is exactly the class this review item is
+    // about (silent-failure-hunter, #431 review). Left uncorrected this would also erase a `true` some other
+    // write had just latched: `save()`'s own `writeFailed = false` runs unconditionally on a non-throwing
+    // `setItem`, so a session rename against a silently-dropping store could clear the very latch a sibling
+    // rename or a delete had set moments earlier, even though this write failed too.
+    writeFailed = true;
     // Nothing landed, so nothing may look as though it had: `cache` is what the heading and the map pill
     // read, and `save()` has already put the new name in it (#420 review B3). Assigned rather than saved —
     // a second write on a store that just refused one buys nothing and could refuse in its turn.
@@ -486,11 +513,12 @@ export function renameProfile(id: ProfileId, name: string): RenameProfileResult 
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { return { ok: false, why: 'no-save' }; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, why: 'no-save' };
-  if (isFutureSave(parsed as RawSave)) return { ok: false, why: 'future' };
   if (!isMigratable(parsed as RawSave)) return { ok: false, why: 'no-save' };
   const blob = JSON.stringify({ ...(parsed as RawSave), name: next });
-  try { localStorage.setItem(key, blob); } catch { return { ok: false, why: 'store' }; }
-  return storedName(id) === next ? { ok: true, name: next } : { ok: false, why: 'store' };
+  try { localStorage.setItem(key, blob); } catch { writeFailed = true; return { ok: false, why: 'store' }; }
+  if (storedName(id) === next) { writeFailed = false; return { ok: true, name: next }; }
+  writeFailed = true;
+  return { ok: false, why: 'store' };
 }
 /**
  * Why a delete was refused, and what the caller must do when it was not (#20 slice 3).
@@ -586,6 +614,13 @@ export type DeleteRefusal = Extract<DeleteProfileResult, { ok: false }>['why'];
  * B2). Deleting a *sibling* leaves this session untouched, and deleting the playing child is a grown-up
  * asking for exactly that blob to go. The index write still fails on its own if the store is refusing, and
  * then `'store'` is the answer.
+ *
+ * **Every `'store'`/`'orphaned'` refusal latches `writeFailed`, and a clean delete clears it** (#431 review,
+ * item 5). This function used to return a reason and touch nothing else, so `parents.ts:35`'s "this device is
+ * not saving progress" stayed quiet about a refused delete — the index write refusing, or the rollback that
+ * follows a kept-bytes refusal failing in its turn — until an unrelated ordinary `save()` happened to set the
+ * latch for a different reason. `addProfile`/`setActiveProfile` already latch on their own `writeIndex` calls;
+ * this one did not.
  */
 export function deleteProfile(id: ProfileId): DeleteProfileResult {
   const idx = currentIndex();
@@ -601,9 +636,14 @@ export function deleteProfile(id: ProfileId): DeleteProfileResult {
   if (rest.every(futureSaveIn)) return { ok: false, why: 'stranded' };
   const self = id === sessionProfile();
   const next: ProfileIndex = { v: 1, active: idx.active === id ? rest[0] : idx.active, ids: rest };
-  if (!writeIndex(next)) return { ok: false, why: 'store' };
+  if (!writeIndex(next)) { writeFailed = true; return { ok: false, why: 'store' }; }
   try { localStorage.removeItem(saveKeyFor(id)); } catch { /* the read-back below is what decides, not the throw */ }
-  if (readItem(saveKeyFor(id)) !== null) return { ok: false, why: writeIndex(idx) ? 'store' : 'orphaned' };
+  if (readItem(saveKeyFor(id)) !== null) {
+    const restored = writeIndex(idx);
+    writeFailed = !restored;
+    return { ok: false, why: restored ? 'store' : 'orphaned' };
+  }
+  writeFailed = false;
   // Only the *session's* profile going takes the session with it. A second tab that is playing someone else
   // keeps its cache and both latches even though `active` moved here — `sessionProfile()` is latched to that
   // child, so their writes still land in their own slot. This is `rereadProfile`'s rule (#380 round 5, B2)
