@@ -139,18 +139,23 @@ export class SolidView {
     const camAspect = this.camera.aspect; this.camera.aspect = 1; this.camera.updateProjectionMatrix();
     const read = new Uint8Array(big * big * 4);
     const out = new Uint8ClampedArray(cell * frames * cell * 4);
-    this.renderer.setRenderTarget(target);
-    for (let f = 0; f < frames; f++) {
-      group.rotation.y = base + (f / frames) * Math.PI * 2;
-      this.renderer.clear();
-      this.renderer.render(this.scene, this.camera);
-      this.renderer.readRenderTargetPixels(target, 0, 0, big, big, read);
-      downsampleInto(read, big, out, cell * frames, f * cell);
+    // A throw partway through the loop (render, read-back, or the target allocation above) must still restore
+    // the renderer's shared state — the visible card's own tick() keeps rendering into it every frame after.
+    try {
+      this.renderer.setRenderTarget(target);
+      for (let f = 0; f < frames; f++) {
+        group.rotation.y = base + (f / frames) * Math.PI * 2;
+        this.renderer.clear();
+        this.renderer.render(this.scene, this.camera);
+        this.renderer.readRenderTargetPixels(target, 0, 0, big, big, read);
+        downsampleInto(read, big, out, cell * frames, f * cell);
+      }
+    } finally {
+      this.renderer.setRenderTarget(null);
+      this.camera.aspect = camAspect; this.camera.updateProjectionMatrix();
+      this.scene.remove(group); dispose(group); target.dispose();
+      if (card) card.visible = true;
     }
-    this.renderer.setRenderTarget(null);
-    this.camera.aspect = camAspect; this.camera.updateProjectionMatrix();
-    this.scene.remove(group); dispose(group); target.dispose();
-    if (card) card.visible = true;
     return { width: cell * frames, height: cell, data: out };
   }
   hide() { this.stop(); this.clearMesh(); this.name = null; this.el.remove(); }

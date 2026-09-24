@@ -131,6 +131,30 @@ describe('createSolidSlot — one lazy renderer per play screen (#684)', () => {
     expect(slot.state()).toMatchObject({ name: 'sphere', error: 'load-failed' });
     warn.mockRestore();
   });
+  it('a bake that throws once is never retried — the doomed sheet() call stays doomed (#687 review)', async () => {
+    const shown: string[] = [];
+    const baked: string[] = [];
+    class SolidView {
+      el = { tag: 'solid' }; state = null;
+      show(n: string) { shown.push(n); }
+      hide() {} destroy() {}
+      sheet(n: string) { baked.push(n); throw new Error('GL context lost'); }
+    }
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const h = host();
+    const slot = createSolidSlot(() => h as never, async () => ({ SolidView }) as never);
+    slot.show(word('🎲', { options: ['🎲', '⚽'] }), 'y1-shapes3d');
+    await settle();
+    expect(shown).toEqual(['cube']);
+    expect(baked).toEqual(['cube']);
+    expect(slot.state()).toMatchObject({ error: 'no-webgl' });
+    // Two more questions on the same failed renderer: neither mounts the card again nor repeats the bake.
+    slot.show(word('⚽', { options: ['⚽'] }), 'y1-shapes3d');
+    slot.show(word('🧱', { options: ['🧱'] }), 'y1-shapes3d');
+    expect(shown).toEqual(['cube']);
+    expect(baked).toEqual(['cube']);
+    warn.mockRestore();
+  });
   it('dispose destroys the view, and a load that lands after dispose is thrown away', async () => {
     const { views, mod } = fakeModule();
     let release!: (m: unknown) => void;

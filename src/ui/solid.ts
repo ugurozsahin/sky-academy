@@ -194,7 +194,9 @@ export function createSolidSlot(host: () => Host, loader: Loader = () => import(
         ? q.options.flatMap(o => { const n = NAME_BY_GLYPH.get(o); return n && !sheets.has(o) ? [n] : []; })
         : [];
       if (!name && !toBake.length) return;
-      if (view) { if (name) mount(name); bake(); return; }
+      // A renderer that has already failed once (`bake()`'s catch below) is never retried per question — the
+      // same guard the pre-load path already takes six lines down.
+      if (view) { if (error) return; if (name) mount(name); bake(); return; }
       if (error) return;
       // The card and the bubbles already hold the emoji; three arrives a moment later and takes over — unless the
       // question moved on meanwhile, in which case `wanted`/`toBake` already describe the new one.
