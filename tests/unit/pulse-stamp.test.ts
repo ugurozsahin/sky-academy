@@ -148,6 +148,22 @@ describe('the drift a stamp carries against the write that landed it', () => {
     expect(day.code, 'behind is deliberately unbounded — this is wording, not a verdict').toBe(OK);
     expect(day.reason).toContain("further behind than a run's own length explains");
   });
+
+  /**
+   * The 90-minute boundary itself, pinned at both sides (#458 item 3): the pair above sits at 30 and 1,440
+   * minutes behind, which straddles nothing — `behind > 500` reads exactly the same as `behind > 90` against
+   * either. Wording only, never a verdict: both minutes are `OK`, since behind is unbounded either side of it.
+   */
+  it('draws that line at exactly ninety minutes behind, not some other number nearby', () => {
+    const write = Date.UTC(2026, 8, 21, 12, 0);
+    const at = (minutesBehind: number) => check(stamp(write - minutesBehind * 60_000), new Date(write).toISOString());
+    const ninety = at(90);
+    expect(ninety.code).toBe(OK);
+    expect(ninety.reason, 'ninety minutes behind is still what a run\'s own length explains').toContain('as it should be');
+    const ninetyOne = at(91);
+    expect(ninetyOne.code).toBe(OK);
+    expect(ninetyOne.reason, 'one minute past it is not').toContain("further behind than a run's own length explains");
+  });
 });
 
 /**
@@ -175,13 +191,14 @@ describe('a fault in the call is never reported as a verdict about the pulse', (
 
 describe('the CLI both routines and the watchdog are pointed at', () => {
   const run = (...args: string[]) => execFileSync('node', [script, ...args], { encoding: 'utf8' });
-  /** The exit code and stdout of a run that may fail, so a rail can assert the code rather than the throw. */
-  const exit = (...args: string[]): { code: number; out: string } => {
+  /** The exit code, stdout and stderr of a run that may fail, so a rail can assert the code — and what it
+   *  printed on either stream — rather than the throw. */
+  const exit = (...args: string[]): { code: number; out: string; err: string } => {
     try {
-      return { code: 0, out: run(...args) };
+      return { code: 0, out: run(...args), err: '' };
     } catch (e) {
-      const err = e as { status: number; stdout: string };
-      return { code: err.status, out: err.stdout };
+      const err = e as { status: number; stdout: string; stderr: string };
+      return { code: err.status, out: err.stdout, err: err.stderr };
     }
   };
 
@@ -233,6 +250,11 @@ describe('the CLI both routines and the watchdog are pointed at', () => {
         const r = exit(...args);
         expect(r.code, `${args.join(' ')} must report a fault in the call, not a verdict`).toBe(CANNOT_CHECK);
         expect(r.out, 'and must print nothing to stdout that could be read as a stamp or a verdict').toBe('');
+        // #458 item 4: nothing pinned `cannot()`'s stderr write before this — deleting it left every case
+        // above green, so exit 2 could go silent and the one line telling a mangled argument apart from an
+        // unreadable file would be gone with it.
+        expect(r.err, `${args.join(' ')} must explain itself on stderr, or exit 2 is indistinguishable from a silent failure`)
+          .toMatch(/^pulse-stamp: .+\n$/);
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -312,7 +334,11 @@ describe('every routine that writes or reads a pulse is pointed at the one home 
     expect(para, 'exactly one paragraph must carry the invocation, or this rail is reading the wrong text')
       .toHaveLength(1);
     const text = para[0];
-    expect(text, 'against the field the writing run cannot author for itself').toContain('updated_at');
+    // Not a bare `toContain('updated_at')` (#458 item 1): the paragraph's own usage line reads
+    // `<body file> <updated_at>`, so that placeholder alone satisfies a substring check and the sentence
+    // explaining *why* — "GitHub's own `updated_at` … is the one field the writing run cannot author" — could
+    // be deleted with this rail still green. Matching the explanation's own words closes that.
+    expect(text, 'against the field the writing run cannot author for itself').toMatch(/cannot author/);
     // `refiner: heartbeat` joined the list with #512. It is the one pulse whose routine writes no IN PROGRESS
     // stamp, so a forward-dated stamp there is uncheckable against anything but `updated_at`.
     for (const pulse of ['routine: heartbeat', 'reviewer: heartbeat', 'board: heartbeat', 'refiner: heartbeat']) {
@@ -320,5 +346,24 @@ describe('every routine that writes or reads a pulse is pointed at the one home 
     }
     expect(text, 'and it must say what a non-zero exit means, or exit 2 reads as a finding')
       .toMatch(/exit(s|ing)? 2|2 means/);
+  });
+
+  /**
+   * The watchdog's own pulse is written by the watchdog task itself, so it has no `updated_at` counterpart to
+   * check against (#439) — the one thing holding it honest is that the stamp comes from the same script, not
+   * from memory. Before this, only the whole-file `toContain('scripts/pulse-stamp.mjs')` above held this
+   * bullet, and that check is already satisfied by the `--check` paragraph elsewhere in the same file, so
+   * gutting this bullet outright left every rail green (#458 item 2). Bullets in this list carry no blank
+   * line between them, so the paragraph split above cannot isolate one — this splits on the list marker
+   * instead.
+   *
+   * Prove it red: delete this bullet (lines around "Read your own stamp from the clock") from
+   * `docs/WATCHDOG-PROMPT.md` and only this test goes red; the whole-file rail above stays green.
+   */
+  it('and the watchdog is told to read its own stamp from the clock, the same way', () => {
+    const w = readFileSync(join(root, 'docs/WATCHDOG-PROMPT.md'), 'utf8');
+    const bullets = w.split(/\n(?=- )/).filter((b) => b.startsWith('- ') && b.includes('node scripts/pulse-stamp.mjs') && !b.includes('--check'));
+    expect(bullets, 'exactly one bullet must carry the bare invocation, or this rail is reading the wrong text').toHaveLength(1);
+    expect(bullets[0], 'must say where the stamp comes from, not only name the script').toMatch(/from the clock/);
   });
 });
