@@ -399,6 +399,31 @@ export function addProfile(): AddProfileResult {
   return { ok: true, id: free };
 }
 /**
+ * Slice `s` to at most `max` UTF-16 code units without landing inside a grapheme cluster — a flag, a
+ * skin-tone modifier or a ZWJ family sequence is one visual character built from several code points, and a
+ * plain `.slice()` can split it, leaving a dangling remainder in the store that renders as a broken glyph in
+ * the HUD, the picker row and the certificate (#431 review, item 6). `Intl.Segmenter` gives the real cluster
+ * boundaries, so the cut always lands on a whole one. Where it is unavailable (an older WebView) this falls
+ * back to a code-point-safe slice — it still protects a plain surrogate pair, just not a multi-codepoint
+ * cluster, which is the same partial protection this repository already shipped before this fix.
+ */
+function graphemeSafeSlice(s: string, max: number): string {
+  const Segmenter = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
+  let out = '';
+  if (Segmenter) {
+    for (const { segment } of new Segmenter(undefined, { granularity: 'grapheme' }).segment(s)) {
+      if (out.length + segment.length > max) break;
+      out += segment;
+    }
+    return out;
+  }
+  for (const codePoint of s) {
+    if (out.length + codePoint.length > max) break;
+    out += codePoint;
+  }
+  return out;
+}
+/**
  * The longest name the game keeps — **the one home of that number** (#20 slice 3). The first-run wizard's
  * `maxlength` was the only statement of it, so renaming from the grown-ups screen had nothing to agree with:
  * an `<input maxlength>` is a browser courtesy a paste or an automated fill walks straight past, and a
@@ -494,7 +519,7 @@ function storedName(id: ProfileId): string | null {
 export function renameProfile(id: ProfileId, name: string): RenameProfileResult {
   if (!currentIndex().ids.includes(id)) return { ok: false, why: 'unknown' };
   if (futureSaveIn(id)) return { ok: false, why: 'future' };
-  const next = name.trim().slice(0, NAME_MAX).trim();   // trimmed again: the cut can land on a space
+  const next = graphemeSafeSlice(name.trim(), NAME_MAX).trim();   // trimmed again: the cut can land on a space
   if (!next) return { ok: false, why: 'blank' };
   if (id === sessionProfile()) {
     const before = load().name;

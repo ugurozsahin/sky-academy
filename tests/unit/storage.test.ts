@@ -1828,6 +1828,21 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(renameProfile('p1', 'Ada Bo Cassie Dee')).toEqual({ ok: true, name: 'Ada Bo Cassie' });
     });
 
+    it('a truncation cut does not land inside a multi-codepoint grapheme cluster (#431 review, item 6)', () => {
+      save({ name: 'Ada', onboarded: true });
+      // A family emoji is one grapheme cluster built from four astral codepoints joined by ZWJ — 11 UTF-16
+      // code units. Three of them is 33 units, well past NAME_MAX (14): a plain `.slice(0, NAME_MAX)` cuts
+      // inside the second cluster, leaving a lone person emoji and a dangling ZWJ with no partner.
+      const family = '👨‍👩‍👧‍👦';
+      expect(family.length).toBe(11);
+      const r = renameProfile('p1', family + family + family);
+      // The second cluster does not fit in the 3 units left after the first, so only the first is kept
+      // whole — never a partial cluster.
+      expect(r).toEqual({ ok: true, name: family });
+      expect(load().name).toBe(family);
+      expect(/[‍\ud800-\udbff]$/.test(load().name), 'no dangling joiner or lone surrogate at the end').toBe(false);
+    });
+
     it('refuses a slot that is not a profile of this device, and one with nothing to name', () => {
       save({ name: 'Ada', onboarded: true });
       expect(renameProfile('p3', 'Cass'), 'p3 is not in the index').toEqual({ ok: false, why: 'unknown' });
