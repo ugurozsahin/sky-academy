@@ -392,10 +392,24 @@ describe('certificate album (#205)', () => {
     // test in the file still passes, which is what makes it worth its own row rather than trusting `strOrNull`
     // by inspection (pr-test-analyzer, #422 review).
     const noAvatar = cert({ id: 'year1:y1-count', avatar: null });
+    // One bad-type value per field `isCert` checks, mirroring `isDuel`'s own per-field rows (#611): the
+    // `partial`/`truncated` fixtures above omit several keys at once, so an earlier missing-key rejection fires
+    // before any single field's own type check gets a chance to matter — `stars`/`avatar` were the only two
+    // fields with a row of their own, so a checker for any of the other seven could be silently dropped or
+    // swapped for the wrong type. `true` is the bad value for every one of them, deliberately, not `42` or a
+    // string: `str`'s and `fin`'s two families check each other's valid type (`name: 42` is a `fin`-valid
+    // number, `score: 'high'` is a `str`-valid string), so a value only one family would reject leaves a
+    // `str`↔`fin` transposition between fields invisible — a boolean is rejected by both (silent-failure-hunter,
+    // #611 review). `fin` is also the identical function behind `score`/`correct`/`attempts`/`stars`, so a
+    // transposition among only those four changes no type TypeScript sees either — the same reason each still
+    // gets its own row rather than trusting one to stand for the rest.
     save({ certs: [
       'nonsense', null, 42, {}, partial, truncated, { ...cert(), stars: NaN },
       { ...cert(), avatar: 7 }, { ...cert(), avatar: undefined },   // #422: avatarById()'s fallback used to be
-      cert(), noAvatar,                                             // the only thing catching these, silently
+      { ...cert(), name: true }, { ...cert(), year: true }, { ...cert(), title: true },
+      { ...cert(), score: true }, { ...cert(), correct: true }, { ...cert(), attempts: true },
+      { ...cert(), date: true },                                    // #611: the other seven fields `isCert`
+      cert(), noAvatar,                                             // type-checks, each isolated in turn
     ] as unknown as StoredCert[] });
     expect(certificates()).toEqual([cert(), noAvatar]);
     save({ certs: 'not an album' as unknown as StoredCert[] });
