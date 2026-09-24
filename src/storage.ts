@@ -436,6 +436,14 @@ export type AddProfileResult = { ok: true; id: ProfileId } | { ok: false; why: '
  * as far as anyone here is concerned, empty. Once claimed, the tombstone is dropped and the leftover bytes are
  * wiped before the new child ever reads from the slot, so they start on nothing inherited rather than on
  * whatever their predecessor's other tab last wrote.
+ *
+ * **That wipe is read back, not assumed to have landed** (PR #690 review). A store that accepts `removeItem`
+ * and keeps the bytes is the exact fault `deleteProfile`'s own read-back already treats as real and
+ * producible — and here it is worse than a display nit: the caller below would go on to hand this slot to a
+ * brand-new child, whose very first `load()` would return the deleted sibling's name, coins and progress
+ * rather than `DEFAULT`. So this refuses the whole add on a `removeItem` that did not land, the same as a
+ * failed `writeTombstones` just below it, rather than proceeding onto stray bytes it cannot see are still
+ * there.
  */
 export function addProfile(): AddProfileResult {
   const idx = currentIndex();
@@ -449,7 +457,8 @@ export function addProfile(): AddProfileResult {
   // slot forever, hiding a live profile rather than a resurrected one (silent-failure-hunter, #431 review) —
   // so this is the one tombstone write in the file that *is* gated, unlike `deleteProfile`'s.
   if (tombstoned.includes(free)) {
-    try { localStorage.removeItem(saveKeyFor(free)); } catch { /* a stray blob surviving this is a display nit, not a correctness fault */ }
+    try { localStorage.removeItem(saveKeyFor(free)); } catch { /* the read-back below is what decides, not the throw */ }
+    if (readItem(saveKeyFor(free)) !== null) { writeFailed = true; return { ok: false, why: 'store' }; }
     if (!writeTombstones(tombstoned.filter(id => id !== free))) { writeFailed = true; return { ok: false, why: 'store' }; }
   }
   if (!writeIndex({ v: 1, active: free, ids: [...idx.ids, free] })) { writeFailed = true; return { ok: false, why: 'store' }; }

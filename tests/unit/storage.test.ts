@@ -2165,6 +2165,26 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(isWriteFailing()).toBe(true);
     });
 
+    it('a store that accepts removeItem and keeps the resurrected bytes refuses the add, rather than handing them to a new child (PR #690 review)', () => {
+      twoChildren('p1');
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: false });
+      localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION, name: 'Bo', coins: 99, onboarded: true }));
+      const realRemove = localStorage.removeItem;
+      // Only p2's key survives its own removeItem — the tombstone write a moment later must never be reached.
+      (localStorage as unknown as { removeItem: unknown }).removeItem = (k: string) => {
+        if (k === saveKeyFor('p2')) return;
+        realRemove(k);
+      };
+      try {
+        expect(addProfile(), 'a new child must never load a deleted sibling’s name, coins and progress').toEqual({ ok: false, why: 'store' });
+      } finally { (localStorage as unknown as { removeItem: unknown }).removeItem = realRemove; }
+      expect(profileIds(), 'the refused add changes nothing about who is listed').toEqual(['p1']);
+      expect(isWriteFailing()).toBe(true);
+      // The tombstone itself is untouched by the refused reclaim, so p2 stays hidden from index recovery too.
+      localStorage.removeItem('sna:profiles');
+      expect(profileIds(), 'the tombstone still protects the slot after the refusal').toEqual(['p1']);
+    });
+
     /**
      * **This reads the stored index, not `activeProfile()`, and that is the whole point of it** (#420 review
      * round 2, B1).
