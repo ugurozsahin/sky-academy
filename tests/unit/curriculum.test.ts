@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
+import type { Topic } from '../../src/curriculum';
 import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
@@ -462,9 +463,16 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // are phase 2B and never in the d1 pool — and the guard meant to catch exactly that checked the wrong
     // pool and passed (review of #418). No spelling was left unpinned; the claim was what was wrong.
     const R_POOL = (i: number) => (i === 0 ? R_LETTERS_P2 : i === 1 ? ['a', 'e', 'i', 'o', 'u'] : R_LETTERS_ALL);
+    // #445: `R_POOL(i)` containing `l` is not enough — it only says the *letter* is drawable at that index,
+    // not that the *stem* is ever offered at that index at all. `cow@2` used to sit in this table: `k`/`c` are
+    // both in `R_LETTERS_ALL`, so the row passed, but `finalIsGenuine('cow')` is false, so `receptionGapFrames`
+    // never builds a `cow@2` frame and no card can ever ask it — the row proved `cok`/`coc` unreachable rather
+    // than reachable, the opposite of what every other row here claims. `known` is the same reachable-frame set
+    // `it('7. …')` below builds, so a row here can only claim a stem the generator actually draws.
+    const known = new Set(receptionGapFrames().map(f => `${f.word}@${f.idx}`));
     for (const [w, i, l] of [['cup', 2, 'm'], ['cup', 2, 'n'], ['pot', 2, 'o'], ['pan', 2, 'p'], ['pan', 2, 'k'],
-      ['bus', 2, 'm'], ['jam', 2, 'p'], ['bug', 2, 'm'], ['van', 2, 'g'], ['put', 2, 's'],
-      ['pig', 0, 'n'], ['hen', 1, 'u'], ['cow', 2, 'k'], ['cow', 2, 'c'],
+      ['bus', 2, 'm'], ['jam', 2, 'p'], ['bug', 2, 'm'], ['van', 2, 'g'],
+      ['pig', 0, 'n'], ['hen', 1, 'u'],
       // #443: the fifth sweep, and this stem was reachable through the whole fourth (#418/#419) — `le_`
       // offered `z`, a slur, to a Reception card.
       ['leg', 2, 'z']] as [string, number, string][]) {
@@ -472,8 +480,21 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       const gap = `${w.slice(0, i)}_${w.slice(i + 1)}`;
       expect(AVOID.has(filled), `${gap}: ${l} spells ${filled}, which belongs in AVOID`).toBe(true);
       expect(R_POOL(i), `${l} is not in the pool index ${i} draws from, so this row is vacuous`).toContain(l);
+      expect(known, `${w}@${i} is not a frame the generator ever draws, so this row proves nothing`).toContain(`${w}@${i}`);
       expect(gapDecoys(w, i, R_POOL(i)), `${gap} may never offer ${l} — it spells ${filled}`).not.toContain(l);
     }
+    // `cow@2` (`finalIsGenuine('cow')` is false) is not one of the rows above for exactly that reason: no
+    // frame ever offers it, so `cok`/`coc` are unreachable today. They stay in `AVOID` regardless (`writing.ts`'s
+    // own comment: the exact-homophone-of-`cock` rule, the same one `hore` is on), pinned as unreachable rather
+    // than claimed reachable (#445). Both halves are asserted, not just one: unreachable-and-gone-from-AVOID
+    // would be as silent a drift as unreachable-and-claimed-reachable was.
+    expect(known.has('cow@2'), 'cow@2 has become reachable — move it into the reachable table above').toBe(false);
+    expect(AVOID.has('cok') && AVOID.has('coc'), 'cok/coc left AVOID — cow@2 is unreachable, but this is the only place that said so').toBe(true);
+    // `put@2` is not in the table above either: `put` is not in `CVC` at all, so no Reception frame ever offers
+    // it — `put_2_s` (spelling `pus`) already has its own row in the Y1/Y2 word-list table above, which is the
+    // table that actually reaches it (#445).
+    expect(CVC.some(([w]) => w === 'put'), 'put has joined CVC — pus is now reachable and belongs in the table above').toBe(false);
+    expect(AVOID.has('pus'), 'pus left AVOID — it is still checked in the Y1/Y2 word-list table above').toBe(true);
     // The floor, at every index the generator gaps — including 1, whose pool is five letters and whose real
     // margin is one blocked letter. The first version looped `[0, 2]`, so it measured every pool except the
     // one the comment it was checking was false about (review of #418, B3).
@@ -506,13 +527,27 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // `y1-digraphs`, which the hand-written list also omitted: it gaps TWO characters (`tr__`) and builds its
     // card without `gapQ`, so it goes through neither filter. That is recorded at `writing.ts`'s `gapDecoys`
     // and is not this sweep's shape — but it is found here rather than forgotten.
-    const drawn = TOPICS.map(t => ({ id: t.id, q: t.gen(1, rng(t.id.length + 3)) }));
+    // #445: one draw at d1 used to decide membership outright — measured over 200 draws per difficulty,
+    // `y1-spelling`/`y2-spelling`/`y1-days` only gap ~50-85% of the time at d2/d3, and only d1 happens to gap
+    // unconditionally today. A future gap topic that gapped only at d2/d3, or probabilistically even at d1,
+    // would drop out of this sweep with nothing red — #418's own failure mode, behind a better-looking
+    // derivation. `drawsOver` checks every difficulty across five fixed seeds, which narrows that gap by
+    // three orders of difficulty and several draws rather than closing it outright: a topic gapping at well
+    // under the rates measured above, on every one of those fifteen fixed draws, would still pass through
+    // silently — the same failure mode this sweep exists to catch, just far less likely to hit it unnoticed.
+    const drawsOver = (t: Topic, pred: (q: Question) => boolean) => {
+      for (const d of [1, 2, 3] as Difficulty[]) for (let seed = 0; seed < 5; seed++) {
+        const q = t.gen(d, rng(t.id.length * 11 + d * 7 + seed));
+        if (!q.sequence && pred(q)) return true;
+      }
+      return false;
+    };
     // A letter gap is a single `_` INSIDE a word — no space beside it — whose options are single letters.
     // Without both halves a sentence card (`_ cat is black.`, options are words) reads as one.
     const isLetterGap = (q: Question) => /(^|\S)_(\S|$)/.test(q.prompt) && !q.prompt.includes('__')
       && q.options.every(o => /^[a-z]$/i.test(String(o)));
-    const GAP_TOPICS = drawn.filter(({ q }) => !q.sequence && isLetterGap(q)).map(({ id }) => id);
-    const MULTI_GAP = drawn.filter(({ q }) => !q.sequence && q.prompt.includes('__')).map(({ id }) => id);
+    const GAP_TOPICS = TOPICS.filter(t => drawsOver(t, isLetterGap)).map(t => t.id);
+    const MULTI_GAP = TOPICS.filter(t => drawsOver(t, q => q.prompt.includes('__'))).map(t => t.id);
     expect(GAP_TOPICS, 'the gap topics must be found, not named').toEqual(
       expect.arrayContaining(['y1-spelling', 'y2-spelling', 'y1-days', 'r-sounds']));
     expect(MULTI_GAP, 'y1-digraphs gaps two characters and is outside both filters — see writing.ts')
