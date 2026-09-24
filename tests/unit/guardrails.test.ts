@@ -820,6 +820,26 @@ describe('guard rails', () => {
     }
   });
 
+  // #453 item 2: `repeatKey` (`src/game/session.ts`) keys a `' · '`-separated `hint`/`listen` as a **set**,
+  // sorted rather than left in draw order, on the premise that the three generators building an *unordered*
+  // list (`y1-soundhunt`'s `listen`, `y1-mass`'s and `y2-temp`'s `hint`) are the only places the separator
+  // reaches a `Question`'s content fields. Nothing pinned that premise: the first generator writing an
+  // *ordered* `' · '` list — steps, a timetable, a sequence read aloud — would collapse two different
+  // questions onto one key in silence, since sorting an ordered list the same way an unordered one is sorted
+  // is exactly what makes them equal. This rail is the inventory: a fourth `hint`/`listen` line carrying the
+  // separator fails it, which is the point at which someone decides whether the list it carries is genuinely
+  // order-free before letting it stand.
+  it("' · ' reaches a hint/listen field only from the three generators contentList's premise names (#453 item 2)", () => {
+    const hits = inDir('/src/curriculum/').flatMap(([file, src]) =>
+      code(src).split('\n')
+        .filter(line => /\b(?:hint|listen):/.test(line) && line.includes(' · '))
+        .map(line => `${file}: ${line.trim()}`));
+    expect(hits, "a new ' · ' user in a hint/listen field — check it is genuinely unordered before it joins this list").toHaveLength(3);
+    for (const file of ['/src/curriculum/maths.ts', '/src/curriculum/writing.ts']) {
+      expect(hits.some(h => h.startsWith(`${file}:`)), `expected a hit from ${file}`).toBe(true);
+    }
+  });
+
   // #44: the FIRST wave must spawn behind the font gate. Canvas text bakes in whichever face is loaded when
   // fillText runs, and a bubble's label size is fitted once at spawn (#28) — so a wave launched before Fredoka
   // lands is measured against the fallback face and then changes shape in mid-air while a child reads it.
