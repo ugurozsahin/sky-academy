@@ -830,14 +830,19 @@ describe('guard rails', () => {
   // separator fails it, which is the point at which someone decides whether the list it carries is genuinely
   // order-free before letting it stand.
   it("' · ' reaches a hint/listen field only from the three generators contentList's premise names (#453 item 2)", () => {
+    // The exact three lines, not a count (PR #692 review round 1): a count plus "each file represented" lets a
+    // swap through — drop one of maths.ts's two known lines while adding an unrelated new one to the same
+    // file, and both the total and the per-file presence check stay exactly as they were. Pinning the lines
+    // themselves is what a swap cannot pass through unnoticed.
     const hits = inDir('/src/curriculum/').flatMap(([file, src]) =>
       code(src).split('\n')
         .filter(line => /\b(?:hint|listen):/.test(line) && line.includes(' · '))
         .map(line => `${file}: ${line.trim()}`));
-    expect(hits, "a new ' · ' user in a hint/listen field — check it is genuinely unordered before it joins this list").toHaveLength(3);
-    for (const file of ['/src/curriculum/maths.ts', '/src/curriculum/writing.ts']) {
-      expect(hits.some(h => h.startsWith(`${file}:`)), `expected a hit from ${file}`).toBe(true);
-    }
+    expect(hits, "a new or changed ' · ' hint/listen line — check it is genuinely unordered before updating this list").toEqual([
+      "/src/curriculum/maths.ts: hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,",
+      "/src/curriculum/maths.ts: return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, hintIsData: true, say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });",
+      "/src/curriculum/writing.ts: return wordQ(rng, '🔊 Listen!', g, ds, { say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}` });",
+    ]);
   });
 
   // #44: the FIRST wave must spawn behind the font gate. Canvas text bakes in whichever face is loaded when
