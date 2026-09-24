@@ -1,12 +1,17 @@
 import { ALL_AVATARS, avatarById, MASTER, SENSEI_LINES, welcomeLine } from '../avatars';
 import { TOPICS } from '../curriculum';
 import { masterProgress } from '../game/sensei';
-import { load, NAME_MAX, safeRecord, save, type TopicProgress } from '../storage';
+import { cleanName, load, NAME_MAX, safeRecord, save, type TopicProgress } from '../storage';
 import { sfx, say } from '../audio';
 import { $, $$, esc, render } from './dom';
 
-/** A name with something in it. The trim is the point: a space-bar name used to sail through (#110). */
-export const hasName = (name: string) => name.trim().length >= 1;
+/**
+ * A name with something in it, once cleaned. Delegates to `cleanName` rather than its own `.trim()` (#424
+ * review round 1): a raw string that is only a dangling UTF-16 high surrogate used to read as non-empty here
+ * while `cleanName` stored it as `''`, letting the wizard's `#go` handler save a blank name despite this
+ * check appearing to require one (#110's own invariant). One shared predicate can't drift from the write.
+ */
+export const hasName = (name: string) => cleanName(name).length >= 1;
 
 /**
  * Both halves of #110 in one place, so the rule can be tested without a browser: `Let's go!` needs an
@@ -92,7 +97,9 @@ export function nameScreen(go: () => void) {
   };
   nameEl.addEventListener('input', sync);
   ($('#name-heading') as HTMLElement).focus();   // focus moves to the new step (#67 a11y)
-  $('#go').addEventListener('click', () => { save({ name: nameEl.value.trim() }); sfx.correct(); go(); });
+  // #424: `maxlength` is a browser courtesy a paste or an autofill walks past — `cleanName` is the bound
+  // that actually reaches the store, the same one `renameProfile` and Restore apply.
+  $('#go').addEventListener('click', () => { save({ name: cleanName(nameEl.value) }); sfx.correct(); go(); });
 }
 
 /**

@@ -440,6 +440,25 @@ function graphemeSafeSlice(s: string, max: number): string {
  */
 export const NAME_MAX = 14;
 /**
+ * The one clamp every write path applies before a name reaches the store (#424) — `NAME_MAX` was the home of
+ * the number, but only `renameProfile` honoured it; the first-run wizard and Restore did not. The second
+ * `.trim()` matters: the cut can land on a trailing space. Delegates to `graphemeSafeSlice` (#431 review,
+ * item 6) rather than a bare `.slice()`, so every one of these write paths — the first-run wizard, Restore, a
+ * sibling rename — gets the same whole-cluster cut a flag, a skin-tone modifier or a ZWJ family sequence
+ * needs, not only a plain surrogate pair. Folding this in here, instead of leaving a second, weaker
+ * truncation helper at `renameProfile`'s own call site, is deliberate: two clamps of different strength at
+ * one seam is exactly how #424's own gap (only one of three write paths honouring `NAME_MAX`) happened. A
+ * trailing lone high surrogate is still stripped afterwards — never part of a whole cluster
+ * `graphemeSafeSlice` would keep, since every cluster ends on a complete codepoint, so this is genuinely
+ * unpaired input (a raw `'\ud800'`), which `hasName` (`avatar.ts`) must read as no name at all (#424 review
+ * round 1), not as one character.
+ */
+export const cleanName = (s: string) => {
+  const sliced = graphemeSafeSlice(s.trim(), NAME_MAX);
+  const whole = /[\ud800-\udbff]$/.test(sliced) ? sliced.slice(0, -1) : sliced;
+  return whole.trim();
+};
+/**
  * Why a rename was refused, as a value the grown-ups screen can turn into a sentence (#20 slice 3, the
  * `AddProfileResult` shape). The accepted arm carries the name **as stored**, trimmed and truncated, because
  * that — not what was typed — is what the row must redraw with.
@@ -456,7 +475,7 @@ export const NAME_MAX = 14;
  *   grown-up typed or left empty — a name that will never be looked at is not worth a second refusal reason.
  *   `canRenameCard` never offers the input on a `future` row in the first place, so the combination has no
  *   route from the screen; only a direct call can reach it.
- * - `'blank'` — a name of only spaces. `hasName` is the wizard's identical rule (`avatar.ts`).
+ * - `'blank'` — a name of only spaces. `hasName` (`avatar.ts`) delegates to this same `cleanName`.
  * - `'store'` — the browser would not keep it, the same fault `STORE_HINT` describes on the picker.
  */
 export type RenameProfileResult = { ok: true; name: string } | { ok: false; why: 'unknown' | 'no-save' | 'future' | 'blank' | 'store' };
@@ -527,7 +546,7 @@ function storedName(id: ProfileId): string | null {
 export function renameProfile(id: ProfileId, name: string): RenameProfileResult {
   if (!currentIndex().ids.includes(id)) return { ok: false, why: 'unknown' };
   if (futureSaveIn(id)) return { ok: false, why: 'future' };
-  const next = graphemeSafeSlice(name.trim(), NAME_MAX).trim();   // trimmed again: the cut can land on a space
+  const next = cleanName(name);
   if (!next) return { ok: false, why: 'blank' };
   if (id === sessionProfile()) {
     const before = load().name;
@@ -908,6 +927,11 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['name', 'year'] as const) {
     if (k in clean && typeof clean[k] !== 'string') delete clean[k];
   }
+  // #424: a Restore code is a name a person freely typed, exactly like the wizard's field below, and the
+  // `typeof` check above does not bound its length. Clamped here rather than left to `renameProfile` — a
+  // name that never goes through a rename (the common case: Restore a code and just play) must not carry an
+  // unbounded one into the store this check was meant to close.
+  if (typeof clean.name === 'string') clean.name = cleanName(clean.name);
   if ('avatar' in clean && clean.avatar !== null && typeof clean.avatar !== 'string') delete clean.avatar;
   if ('voice' in clean && clean.voice !== 'unknown' && clean.voice !== 'yes' && clean.voice !== 'no') delete clean.voice;
   for (const k of ['sound', 'speech', 'tutorialSeen', 'onboarded'] as const) {

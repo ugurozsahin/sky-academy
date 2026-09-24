@@ -677,7 +677,18 @@ test.describe('tablet viewports (#116)', () => {
     expect(display, '.rewards-cols on a phone: must stay `contents`, not switch to the ≥900px grid (#564)').toBe('contents');
   });
 
-  const SHOP_TOLERANCE = 20;
+  // #618: ±20 was tuned against one dev machine's Chromium and never actually ran in CI before this
+  // spec's first nightly (viewport.spec.ts is tablet-only, #116, which a pull request never runs, #81/#96) —
+  // it broke on that very first run, both tablet and tablet-landscape, both landing on the identical 1175px
+  // at 1024x768 (30px over target, the same overage in both projects, so a deterministic render difference
+  // rather than noise). Reproduced locally with matching per-card geometry: 12 trail cards keep their 2-row
+  // layout (no column-count regression, which would swing by a whole ~200px row, not 30), and the 3
+  // "Coming soon" placeholders' blurb text sits right at a line-wrap boundary — a few px of font-metric
+  // difference between Chromium builds (CI downloads its own; this repo's dev/cloud machines pin an older
+  // cached one, #618's body has both version numbers) is enough to wrap one of them onto an extra line.
+  // 40 keeps that one-line margin in hand while staying far short of the ~150-200px a real reflow regression
+  // would need to hide behind it.
+  const SHOP_TOLERANCE = 40;
   // Real, measured: 1130px at 1280x800, 1145px at 1024x768 — matches the issue's own audit. `.shop-grid`
   // already reflows (`repeat(auto-fill, minmax(140px, 1fr))`); the remainder is the Slice trails grid's real
   // item count needing two rows, which is content rather than a stacking bug, so there is nothing group-B

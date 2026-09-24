@@ -653,8 +653,11 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
 
     // And the filter is doing something: the set it keeps off a card is non-empty and disjoint from the set
     // above. Without this, emptying `AVOID` would only shrink the fixture and could be "fixed" by updating it.
+    // #445: pinned to the whole reachable set, not `toBeGreaterThan(8)` — a margin of two (or three, against
+    // today's eleven) against a number nobody reads is the same "arbitrary-reading floor" shape the fixture
+    // above exists to replace. A new one lands here named, in a diff a person reads, same as the fixture.
     const blocked = receptionBlocked();
-    expect(blocked.length, 'AVOID reaches no Reception card, so the filter is off').toBeGreaterThan(8);
+    expect(blocked).toEqual(['bum', 'cum', 'cun', 'hun', 'jap', 'lez', 'nig', 'pak', 'pap', 'poo', 'vag']);
     for (const w of blocked)
       expect(set.has(w), `${w} is blocked and also in the reviewed set — one of the two is wrong`).toBe(false);
   });
