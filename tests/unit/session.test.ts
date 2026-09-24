@@ -799,14 +799,23 @@ describe('the repeat key holds the whole question (#412)', () => {
    */
   const measurable = stats.filter(s => s.perAnswer >= 4 && s.answers >= 2 && s.baseline * PAIRS >= 30);
 
-  it('the measurable set holds the topics this defect was found on', () => {
-    const ids = measurable.map(s => s.id);
-    expect(ids.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(10);
-    // The two extremes of the issue's own table: the listening topics, where the key *was* the answer, and a
-    // measurement topic, where the values live in `hint`. If either drops out of this set, the set is wrong.
-    // `y2-punct` is here because it, and the sound-hunt pair, scrape in at exactly 4.00 cards per answer
-    // (round 2, N2) — it is the one that would otherwise drop out of this rail in silence.
-    for (const id of ['r-soundhunt', 'y1-soundhunt', 'y2-punct', 'y1-mass', 'y2-temp']) expect(ids).toContain(id);
+  /**
+   * Pinned exactly, not just counted (#453 item 3). A bare `toBeGreaterThanOrEqual` cannot tell "the right ten"
+   * from "ten, three of them swapped out" — several topics could drop out of this set together, in silence,
+   * as long as as many others happened to cross the threshold the same run. Listing the set exactly is the same
+   * discipline PR #692 already applies to the `' · '` hint/listen inventory: a topic joining or leaving is a
+   * deliberate edit to this list, not a number that still happens to clear a floor.
+   */
+  const MEASURABLE_TOPICS = [
+    'r-soundhunt', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-soundhunt',
+    'y1-spelling', 'y1-sub', 'y2-balance', 'y2-capacity', 'y2-compare', 'y2-inverse', 'y2-length', 'y2-mass',
+    'y2-oddeven', 'y2-punct', 'y2-pv', 'y2-spelling', 'y2-stats', 'y2-temp', 'y2-three',
+  ];
+  it('the measurable set is exactly these topics, not just this many (#453 item 3)', () => {
+    // The two extremes of the issue's own table are in this list: the listening topics, where the key *was* the
+    // answer, and a measurement topic, where the values live in `hint`. `y2-punct` scrapes in at exactly 4.00
+    // cards per answer (round 2, N2) — the one that would otherwise drop out of this rail in silence.
+    expect(measurable.map(s => s.id).sort()).toEqual([...MEASURABLE_TOPICS].sort());
   });
 
   it.each(measurable.map(s => s.id))('%s: a driven session repeats an answer about as often as the generator does', (id) => {
@@ -839,10 +848,16 @@ describe('the repeat key holds the whole question (#412)', () => {
    * was this comment's own overclaim.
    */
   const bigEnough = stats.filter(s => s.contents >= 50);
-  it('the big-topic set is not empty, and holds the topics B1 was measured on', () => {
-    const ids = bigEnough.map(s => s.id);
-    expect(ids.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(20);
-    for (const id of ['r-soundhunt', 'y1-soundhunt']) expect(ids).toContain(id);
+  /** Pinned exactly, for the same reason as `MEASURABLE_TOPICS` above (#453 item 3): a count cannot distinguish
+   *  "these twenty-eight" from "twenty-eight, several of them not the ones B1 was measured on". */
+  const BIG_ENOUGH_TOPICS = [
+    'r-soundhunt', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
+    'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-sub', 'y2-add', 'y2-balance', 'y2-capacity', 'y2-compare',
+    'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats',
+    'y2-sub', 'y2-temp', 'y2-three',
+  ];
+  it('the big-topic set is exactly these topics, not just this many (#453 item 3)', () => {
+    expect(bigEnough.map(s => s.id).sort()).toEqual([...BIG_ENOUGH_TOPICS].sort());
   });
 
   it.each(bigEnough.map(s => s.id))('%s: a driven session never serves the same question twice running', (id) => {
@@ -850,6 +865,7 @@ describe('the repeat key holds the whole question (#412)', () => {
     expect(s.repeated, `served the same question back to back ${(100 * s.repeated).toFixed(3)}% of the time over ${s.contents} distinct cards`)
       .toBeLessThan(0.001);
   });
+
 });
 
 describe('starsForAccuracy — the one three-star bar (#397 review round 2, B2)', () => {
