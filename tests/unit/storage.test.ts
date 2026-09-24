@@ -1706,6 +1706,18 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(renameProfile('p1', 'Ada Bo Cassie Dee')).toEqual({ ok: true, name: 'Ada Bo Cassie' });
     });
 
+    // #424 review (pr-test-analyzer): `slice` counts UTF-16 code units, and an emoji name is a supported case
+    // (avatar.test.ts's `canStart('volt', '😀')`) — a cut landing inside its surrogate pair used to leave a
+    // dangling high surrogate, which renders as a broken glyph everywhere a name is drawn. Proved red by
+    // reverting `cleanName` to a bare `slice(0, NAME_MAX)`: this then stores a lone `'\ud83e'`.
+    it('a truncation that lands inside an emoji drops the whole character, not half of it', () => {
+      save({ name: 'Ada', onboarded: true });
+      const long = 'x'.repeat(NAME_MAX - 1) + '🤖' + 'yyyy';   // the cut falls between 🤖's two code units
+      const r = renameProfile('p1', long);
+      expect(r).toEqual({ ok: true, name: 'x'.repeat(NAME_MAX - 1) });
+      expect(load().name).not.toMatch(/[\ud800-\udbff]$/);
+    });
+
     it('refuses a slot that is not a profile of this device, and one with nothing to name', () => {
       save({ name: 'Ada', onboarded: true });
       expect(renameProfile('p3', 'Cass'), 'p3 is not in the index').toEqual({ ok: false, why: 'unknown' });

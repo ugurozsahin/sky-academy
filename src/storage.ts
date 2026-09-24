@@ -400,9 +400,17 @@ export const NAME_MAX = 14;
 /**
  * The one clamp every write path applies before a name reaches the store (#424) — `NAME_MAX` was the home of
  * the number, but only `renameProfile` honoured it; the first-run wizard and Restore did not. The second
- * `.trim()` matters: the cut can land on a trailing space.
+ * `.trim()` matters: the cut can land on a trailing space. `slice` counts UTF-16 code units, not characters,
+ * so it can also land inside an astral emoji's surrogate pair — a name is not just a typed field here, it is
+ * also whatever a Restore code carries, and this app already treats an emoji as one valid character
+ * (`avatar.test.ts`'s `canStart('volt', '😀')`). A dangling high surrogate is dropped rather than stored, so
+ * the cut always lands on a whole character (pr-test-analyzer, #424 review).
  */
-export const cleanName = (s: string) => s.trim().slice(0, NAME_MAX).trim();
+export const cleanName = (s: string) => {
+  const sliced = s.trim().slice(0, NAME_MAX);
+  const whole = /[\ud800-\udbff]$/.test(sliced) ? sliced.slice(0, -1) : sliced;
+  return whole.trim();
+};
 /**
  * Why a rename was refused, as a value the grown-ups screen can turn into a sentence (#20 slice 3, the
  * `AddProfileResult` shape). The accepted arm carries the name **as stored**, trimmed and truncated, because
