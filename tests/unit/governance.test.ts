@@ -2156,6 +2156,86 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
   });
 });
 
+/**
+ * #452. GitHub cannot build `refs/pull/N/merge` on a tree that conflicts with its base, so a pull request
+ * pushed onto a stale `main` gets no `CI` run at all — not a red one, nothing. STEP 3 tells a run to wait
+ * for "the newest CI run on its head" to go green before marking a pull request ready; without this clause
+ * that wait never ends, because there is nothing to distinguish a conflicted push (which will never get a
+ * run) from an ordinary slow queue (which will). This does not re-explain the recovery: it routes a run to
+ * the same merge-`main`-in procedure STEP 2.5 and `open-pr` §2 already carry for #585, rather than stating a
+ * second recipe.
+ *
+ * `mergeable_state` also reads `unknown` right after a push, before GitHub finishes computing it — a case the
+ * first version of this clause left unhandled (silent-failure-hunter review of the PR opening #452): a run
+ * that read `unknown` as "not dirty, so an ordinary queue" could misclassify a conflicted push exactly as
+ * this issue describes and stall on it. So the clause, and this rail, name both states.
+ *
+ * `unknown` and `dirty` must stay **two different instructions** — recheck, versus merge `main` in now — and
+ * the first version of this rail could not tell that apart from a rewrite that collapsed them into one
+ * ("if it reads `unknown` or `dirty`, merge it in…"), because every token the rail checked for was still
+ * present (review of the PR opening #452: reached independently by two of the three review agents, by
+ * different means — a `dirty`/`unknown` swap and a collapsing rewrite). That rewrite passes every assertion
+ * above while reintroducing #452's own failure shape for `unknown`: merging on a state that is not
+ * necessarily a conflict at all. So this rail also anchors `unknown`'s own clause — the text between the
+ * `unknown` token and the `dirty` token — to its "recheck" instruction, and asserts that clause does **not**
+ * itself route to the merge recovery that belongs to `dirty` alone.
+ *
+ * Round 2 of the same review found the anchoring was still one-directional: `dirty`'s own clause was never
+ * isolated the way `unknown`'s was, so (a) a full semantic swap — `unknown` merges, `dirty` waits, with the
+ * "recheck"/routing tokens exchanged along with the meanings — passed, because each token still landed in
+ * the clause the checks expected; and (b) the STEP 2.5/`open-pr` §2 pointer was checked anywhere in `step3`,
+ * so placing it as inert filler near `dirty` while `dirty`'s own instruction said "wait" also passed. Both
+ * mutation-verified by hand and independently by two of the three review agents. So `dirtyClause` is now
+ * isolated the same way `unknownClause` is, the STEP 2.5/`open-pr` §2 match and the "merge it in" instruction
+ * are required **inside** it rather than anywhere in `step3`, and each clause is checked for not claiming the
+ * other's action — the same anchoring shape, run in both directions.
+ *
+ * Prove it red: drop the `mergeable_state` clause, or either named state, from STEP 3's CI-wait sentence;
+ * collapse `unknown` and `dirty` into one shared instruction; or swap which clause carries which action.
+ */
+describe('STEP 3 tells a run what a missing CI run on a just-pushed head means (#452)', () => {
+  it('checks mergeable_state and routes a dirty tree to the recovery STEP 2.5 already has, not a new one', () => {
+    const text = readFileSync(new URL('../../docs/ROUTINE-PROMPT.md', import.meta.url), 'utf8');
+    const step3 = text.slice(text.indexOf('STEP 3 — DEVELOP ONE ITEM'), text.indexOf('## Governance PRs'));
+    expect(step3.length, 'STEP 3 must be found by its heading, and end before the next section').toBeGreaterThan(500);
+    expect(step3, 'a run must check mergeable_state rather than wait on a run that will never start')
+      .toContain('mergeable_state');
+    expect(step3, 'and name the state that means the conflict, not just gesture at "a problem"')
+      .toMatch(/`dirty`/);
+    expect(step3, 'and name the not-yet-computed state, or a run reads it as an ordinary slow queue and stalls')
+      .toMatch(/`unknown`/);
+    // Isolate each clause, not the whole paragraph: a rewrite that swaps or collapses the two states still
+    // contains every token checked above somewhere in `step3`, so only the text within each clause's own
+    // boundary can tell it apart from the real fix. `unknownClause` runs to the `dirty` token; `dirtyClause`
+    // runs to the next sentence boundary (the first `. ` after it — `STEP 2.5` itself has a period with no
+    // following space, so it does not end the slice early).
+    const unknownAt = step3.indexOf('`unknown`');
+    const dirtyAt = step3.indexOf('`dirty`');
+    expect(unknownAt, 'unknown must be named before dirty, or this slice reads the wrong clause').toBeGreaterThan(-1);
+    expect(dirtyAt, 'and dirty must follow it').toBeGreaterThan(unknownAt);
+    const unknownClause = step3.slice(unknownAt, dirtyAt);
+    const dirtyEnd = step3.slice(dirtyAt).search(/\.\s/);
+    expect(dirtyEnd, "dirty's own clause must end in a real sentence boundary, or this slice runs unbounded")
+      .toBeGreaterThan(-1);
+    const dirtyClause = step3.slice(dirtyAt, dirtyAt + dirtyEnd + 1);
+    expect(unknownClause, "unknown's own clause must tell a run to recheck, not merge")
+      .toMatch(/recheck/i);
+    expect(unknownClause, "and unknown's own clause must not cite dirty's merge recovery at all — that pointer "
+      + "belongs to dirty alone, whatever words carry the merge action itself")
+      .not.toMatch(/STEP 2\.5|open-pr`\s+§2/);
+    // Tied into one connected match, not two independent facts about the clause (#452 review round 3): a
+    // rewrite can make both `merge it in` and the STEP 2.5/open-pr §2 citation true of dirtyClause without
+    // either being dirty's *actual* instruction — e.g. "merge it in" left dangling in an unrelated aside
+    // while the citation sits elsewhere as filler. Requiring "merge it in" to lead directly into the
+    // citation, within a short span, ties the two into one real instruction rather than two decorations.
+    expect(dirtyClause, "dirty's own clause must lead from its merge instruction straight into the same "
+      + "recovery §2 already has — not merely contain both facts somewhere, disconnected")
+      .toMatch(/merge it in[\s\S]{0,40}STEP 2\.5[\s\S]{0,20}does[\s\S]{0,20}\(`open-pr`\s+§2\)/);
+    expect(dirtyClause, "and dirty's own clause must not itself claim unknown's wait-and-recheck instruction")
+      .not.toMatch(/recheck|has not finished computing/i);
+  });
+});
+
 
 /**
  * The `add-guard-rail` skill's load-bearing lines (#180).
@@ -2954,7 +3034,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
-  const ROUTINE_PROMPT_BUDGET = 21_359   // → 21,363: STEP 3 rule 1 gained `epic` and rule 3 generalised from the two heartbeat issues to every `: heartbeat` issue (#512), paid for in both; this lowering was made once before and lost in an earlier merge with main, which is why it is stated here again;   // → 21,412 (#466): STEP 3 restates §4 and enumerates what the skill adds, so the sweep and self-agent rules needed a pointer there or a run reading the step got a complete-looking account — paid for by shortening the review-gate clause and the WIP sentence, whose instructions both survive beside the cut words   // → 21,418: the pulse-stamp sentence in STEP 1 (#439), paid for in the cadence note, both bootstrap asides, the game description in the intro, the `watchdog` bullet and STEP 4's QA aside   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
+  const ROUTINE_PROMPT_BUDGET = 21_763   // → 21,763: the #452 clause also names `unknown` — GitHub has not finished computing `mergeable_state` right after a push, and a run that read that as "not dirty, so an ordinary queue" could misclassify a conflicted push and stall on it exactly as #452 describes (silent-failure-hunter review of the PR opening #452) — a genuine content addition, not paid for elsewhere;   // → 21,641: STEP 3 tells a run to check `mergeable_state` once no `CI` run appears for a just-pushed head, rather than wait on one that will never start (#452) — a genuine content addition, not paid for elsewhere, since the missing instruction was the whole finding;   // → 21,363: STEP 3 rule 1 gained `epic` and rule 3 generalised from the two heartbeat issues to every `: heartbeat` issue (#512), paid for in both; this lowering was made once before and lost in an earlier merge with main, which is why it is stated here again;   // → 21,412 (#466): STEP 3 restates §4 and enumerates what the skill adds, so the sweep and self-agent rules needed a pointer there or a run reading the step got a complete-looking account — paid for by shortening the review-gate clause and the WIP sentence, whose instructions both survive beside the cut words   // → 21,418: the pulse-stamp sentence in STEP 1 (#439), paid for in the cadence note, both bootstrap asides, the game description in the intro, the `watchdog` bullet and STEP 4's QA aside   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
   const REVIEWER_PROMPT_BUDGET = 9_950   // → 9,954: STEP 1 gains waiting clause (c), a PR whose gate went green after its clear (#579), paid for in the fork pointer, the idle-pulse aside, two duplicated review-pr pointers, the branch-name restatement, a doubled "report and stop", and the snapshot aside. One first attempt also cut "a pull request this session opened or pushed to is never yours" as a copy of line 12 and was reverted: two rails require it inside the waiting definition itself (#516)   // → 9,949: STEP 1 gains waiting clause (c), a PR whose gate went green after its clear (#579), paid for in the third copy of the self-review bar (line 12 and the Do NOT line already carry it), the fork pointer, the idle-pulse aside, and two duplicated review-pr pointers;   // → 9,961: the waiting test also covers a merge rule you cannot satisfy (#516), paid for in rule 4's look-must-not-change clause, the cadence and bootstrap asides in the header, and STEP 0's re-run limit   // → 9,967: the waiting test is applied, not re-judged (#516), paid for by collapsing STEP 2's restatement of rule 3's clear-and-wait parenthetical and rule 3's second pointer at the same skill section, and by dropping "decorations" from rule 4's new-look list, which CLAUDE.md's copy of that list does not carry either   // → 9,968: a finding stops the suite running at all, not merely last (#499, owner 2026-09-22), paid for in rule 2 lead-in, the Do NOT line re-listing the four rules above it, and the commands the review-pr skill already owns   // → 9,976: STEP 2 reordered so the browser follows the agents (#499), paid for by reducing the mobile/desktop recording rule to a pointer at its home in `review-pr` §2   // → 9,988: the pulse-stamp sentence after STEP 1 (#439), paid for in the bootstrap aside, the cadence note, the game description in the intro, STEP 2's fork sentence and rule 1's re-run clause (which the `Do NOT:` line already carries verbatim)   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
