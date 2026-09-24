@@ -1123,6 +1123,11 @@ describe('profiles: siblings on one device (#20)', () => {
     reset();
     for (const id of PROFILE_IDS) localStorage.removeItem(saveKeyFor(id));
     localStorage.removeItem(INDEX);
+    // A delete recorded by the test before us outlives it otherwise: `sna:profiles:tombstones` is its own key,
+    // untouched by the two removals above, so a tombstoned p1 from one test silently excluded p1 from every
+    // later one's `defaultIndex()` fallback (#690 review round 2 fix exposed this — it never mattered while
+    // the tombstone check for p1 was dead code).
+    localStorage.removeItem('sna:profiles:tombstones');
     expect(setActiveProfile('p1'), 'the teardown checks its own switch').toEqual({ ok: true });   // clears the session's profile
     localStorage.removeItem(INDEX);  // ...and a one-profile device stores no index
   };
@@ -2118,6 +2123,16 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     });
 
+    it("a lost index does not resurrect p1 either — the tombstone check must gate every slot alike (#690 review round 2)", () => {
+      // p1 gets its own case because `defaultIndex()`'s filter special-cases it (`id === 'p1' || …`) to survive
+      // an index loss even with no save at all; that special case must not let it skip the tombstone check too.
+      twoChildren('p2');
+      expect(deleteProfile('p1')).toEqual({ ok: true, self: false });
+      localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Ada', coins: 40, onboarded: true }));
+      localStorage.removeItem('sna:profiles');
+      expect(profileIds(), "p1's tombstone outlives the index loss exactly like any other slot's").toEqual(['p2']);
+    });
+
     it('a second tombstoned slot survives when addProfile reclaims a different one (#431 review, item 4)', () => {
       save({ name: 'Ada', coins: 40, onboarded: true });
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
@@ -2286,6 +2301,21 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(isWriteFailing(), 'and on a silent drop, not only a throw').toBe(true);
     });
 
+    it("a refused tombstone record latches writeFailed, though the delete it hardens has already succeeded (#690 review round 2)", () => {
+      twoChildren('p1');
+      const realSet = localStorage.setItem;
+      // Only the tombstone write is refused — the index write and removeItem above it must already have landed.
+      (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => {
+        if (k === 'sna:profiles:tombstones') throw new Error('quota');
+        realSet(k, v);
+      };
+      try {
+        expect(deleteProfile('p2'), 'recording a tombstone is hardening on a kept promise — the delete itself is unaffected').toEqual({ ok: true, self: false });
+      } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+      expect(profileIds(), 'Bo really is gone from the index').toEqual(['p1']);
+      expect(isWriteFailing(), 'a refused write is a real store fault like any other, not a silent one').toBe(true);
+    });
+
     it('a store that keeps the bytes deletes nothing, rather than promising it cannot be undone (#420 review B4)', () => {
       twoChildren('p1');
       const realRemove = localStorage.removeItem;
@@ -2391,7 +2421,10 @@ describe('a finished game is persisted in one write, or not at all (#365)', () =
   // Read the blob back through the key the store is actually writing — an earlier describe in this file
   // leaves a different profile active, and a hardcoded `sna:v1` would then assert against a sibling's save.
   const disked = () => JSON.parse(localStorage.getItem(saveKeyFor(activeProfile()))!);
-  beforeEach(() => { setActiveProfile('p1'); reset(); });
+  // The describe above can leave p1 tombstoned (its own last test deletes it) — `sna:profiles:tombstones` is a
+  // key of its own that nothing here otherwise touches, so a leftover entry would make `setActiveProfile('p1')`
+  // below fail once `defaultIndex()`'s fallback excludes p1 (#690 review round 2 fix exposed this).
+  beforeEach(() => { localStorage.removeItem('sna:profiles:tombstones'); setActiveProfile('p1'); reset(); });
 
   /** A store that accepts `n` writes and then throws — the shape that made the old pair lose a challenge. */
   function refuseFromWrite(n: number) {

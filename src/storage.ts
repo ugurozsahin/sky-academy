@@ -216,7 +216,10 @@ function defaultIndex(): ProfileIndex {
   // A tombstoned slot is skipped even when it holds a save: that save is a second tab's stale write, not a
   // profile this device still has (#431 review, item 4) — see TOMBSTONES_KEY.
   const tombstoned = readTombstones();
-  const ids = PROFILE_IDS.filter(id => id === 'p1' || (holdsSave(id) && !tombstoned.includes(id)));
+  // The tombstone check cannot sit inside the `||`: `id === 'p1'` short-circuited it there, so a tombstoned
+  // p1 came back regardless of `holdsSave` (#690 review round 2). Gating the whole filter on it first makes it
+  // apply to every slot alike, p1 included.
+  const ids = PROFILE_IDS.filter(id => !tombstoned.includes(id) && (id === 'p1' || holdsSave(id)));
   return { v: 1, active: 'p1', ids };
 }
 /** Whether a slot is empty, holds something this module could have written, or holds bytes it cannot make
@@ -269,8 +272,11 @@ function readTombstones(): readonly ProfileId[] {
  *  the same as one that threw, and a caller deciding whether to trust this write needs to be told which.
  *  **Whether a `false` here matters is the caller's call, not this function's** (silent-failure-hunter, #431
  *  review) — recording a tombstone on a delete that has already succeeded is hardening on top of a kept
- *  promise, so `deleteProfile` does not gate on it; clearing one in `addProfile` is not, because a tombstone
- *  that outlives the slot it was reused from has no benign fallback, unlike the stray bytes beside it. */
+ *  promise, so `deleteProfile` does not gate its *result* on it, the delete still reports success; but a
+ *  failed record here is a real store refusal like any other, so `deleteProfile` latches `writeFailed` on it
+ *  the same as every other write in this file (#690 review round 2) — silence here is what "this device is not
+ *  saving progress" exists to rule out. Clearing one in `addProfile` gates the *result* too, because a
+ *  tombstone that outlives the slot it was reused from has no benign fallback, unlike the stray bytes beside it. */
 function writeTombstones(ids: readonly ProfileId[]): boolean {
   const blob = JSON.stringify(ids);
   try { localStorage.setItem(TOMBSTONES_KEY, blob); } catch { return false; }
@@ -772,7 +778,10 @@ export function deleteProfile(id: ProfileId): DeleteProfileResult {
   // The bytes are confirmed gone by the read-back above — the one moment this function knows a delete truly
   // landed, as opposed to a refusal it is about to roll back. Tombstoned here, not on every refusal arm, so a
   // failed or rolled-back delete never marks a slot the family can still see (#431 review, item 4).
-  writeTombstones([...readTombstones(), id]);
+  // The delete itself still reports success either way — the tombstone is hardening on a kept promise, not the
+  // promise itself — but a refusal here is a real store fault like every other write in this file, so it
+  // latches `writeFailed` rather than passing silently (#690 review round 2).
+  if (!writeTombstones([...readTombstones(), id])) writeFailed = true;
   // Only the *session's* profile going takes the session with it. A second tab that is playing someone else
   // keeps its cache and both latches even though `active` moved here — `sessionProfile()` is latched to that
   // child, so their writes still land in their own slot. This is `rereadProfile`'s rule (#380 round 5, B2)
