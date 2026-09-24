@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -234,6 +234,49 @@ describe('the CLI both routines and the watchdog are pointed at', () => {
         expect(r.code, `${args.join(' ')} must report a fault in the call, not a verdict`).toBe(CANNOT_CHECK);
         expect(r.out, 'and must print nothing to stdout that could be read as a stamp or a verdict').toBe('');
       }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * #457: `resolve(process.argv[1])` normalises `.`/`..` but does not resolve symlinks, while
+   * `import.meta.url` is always the realpath. A script reached through a symlink — a Mac Desktop alias, `/tmp`
+   * on macOS being `/private/tmp`, a `node_modules/.bin` shim — compared unequal, so the whole CLI dispatch
+   * was skipped and Node exited 0 having done nothing: no stamp on the no-args form, no verdict on `--check`.
+   * Both read as a pass. `tests/unit` itself never reproduces this, because `root` above is already resolved
+   * from `import.meta.url`, which is why the bug needed a real symlink built here to be seen at all.
+   *
+   * Prove it red: change `sameFile` in `scripts/pulse-stamp.mjs` back to `resolve(process.argv[1]) ===
+   * fileURLToPath(import.meta.url)` and both cases below go silent — exit 0, empty stdout — while every other
+   * rail in this file stays green, because none of them invokes the script through a symlink.
+   */
+  it('runs the same way through a symlinked entry point as through the real one', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pulse-symlink-'));
+    const link = join(dir, 'pulse-stamp-link.mjs');
+    try {
+      symlinkSync(script, link);
+
+      const now = Date.now();
+      const stampOut = execFileSync('node', [link], { encoding: 'utf8' }).trim();
+      expect(stampOut, 'a symlinked entry point must still print a stamp, not silently exit 0 with nothing')
+        .toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/);
+      expect(readStamp(stampOut)!).toBeGreaterThan(now - 61_000);
+
+      const file = join(dir, 'body.md');
+      writeFileSync(file, INCIDENT_BODY);
+      let code = 0;
+      let out = '';
+      try {
+        out = execFileSync('node', [link, '--check', file, INCIDENT_WRITE], { encoding: 'utf8' });
+      } catch (e) {
+        const err = e as { status: number; stdout: string };
+        code = err.status;
+        out = err.stdout;
+      }
+      expect(code, 'must still compare and fail on a real finding, not silently exit 0 having checked nothing')
+        .toBe(FINDING);
+      expect(out).toMatch(/^FINDING — /);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
