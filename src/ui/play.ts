@@ -266,7 +266,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
         // 'shown' opens the full-screen view with its own save hint, so no toast
       }
-      catch { toast('Could not make the certificate', 'bad'); }
+      catch (e) { console.error('certificate delivery failed', e); toast('Could not make the certificate', 'bad'); }
       b.disabled = false;
     });
   }

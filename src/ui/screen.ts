@@ -69,7 +69,13 @@ export function screenScope(): ScreenScope {
       }
     },
     toast(text, cls = '', ms = 1300) {
-      const el = $('#toast'); el.textContent = text; el.className = `toast show ${cls}`;
+      // No-op once the screen is gone, or if `#toast` has already left with it (#411): a long-lived async
+      // handler (certificate delivery) can still be running after Rematch/Islands tore this screen down and
+      // built the next one, and `$('#toast')` on a screen with no toast element is not a case to throw on.
+      if (!alive) return;
+      const el = document.querySelector<HTMLElement>('#toast');
+      if (!el) return;
+      el.textContent = text; el.className = `toast show ${cls}`;
       scope.later(() => el.classList.remove('show'), ms);
     },
     // hush() also voids the voice probe (#65)
