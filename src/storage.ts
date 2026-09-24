@@ -409,7 +409,11 @@ export const NAME_MAX = 14;
  * - `'future'` — the slot holds a save a **newer build** wrote, on either side of the two paths below. Split
  *   out of `'store'` (#420 review note 4): conflating them is what `readOnly`'s own paragraph forbids, because
  *   the remedies are opposites — this one needs the other device or an update, and `'store'` needs private
- *   browsing off or space freed. Neither ever fixes the other.
+ *   browsing off or space freed. Neither ever fixes the other. **Checked before `'blank'`** (#431 review,
+ *   type-design-analyzer): a slot this build cannot touch at all is refused on that alone, whatever the
+ *   grown-up typed or left empty — a name that will never be looked at is not worth a second refusal reason.
+ *   `canRenameCard` never offers the input on a `future` row in the first place, so the combination has no
+ *   route from the screen; only a direct call can reach it.
  * - `'blank'` — a name of only spaces. `hasName` is the wizard's identical rule (`avatar.ts`).
  * - `'store'` — the browser would not keep it, the same fault `STORE_HINT` describes on the picker.
  */
@@ -469,10 +473,14 @@ function storedName(id: ProfileId): string | null {
  * **Both paths end on the same read-back** — `storedName(id) === next` — because a store that accepts
  * `setItem` and keeps nothing is the failure that cost #330 a review round, and `ok` here has to mean the store
  * is holding the new name. The session path read back nothing at all until #420 review B3; when it now fails,
- * `cache`'s name is put back, so the screen never shows a name the store refused. **The sibling path now
- * latches `writeFailed` on that same failure, throw or silent drop alike** (#431 review, item 5): it used to
- * return a reason and nothing else, so `parents.ts:35`'s "this device is not saving" stayed quiet about a
- * refused sibling rename until an unrelated write on this session's own profile happened to set it.
+ * `cache`'s name is put back, so the screen never shows a name the store refused. **Both paths now latch
+ * `writeFailed` on that same failure, throw or silent drop alike** (#431 review, item 5). The sibling path
+ * used to return a reason and nothing else. The session path goes through `save()`, which already latches on
+ * a *throw* — but `save()`'s own `writeFailed = false` runs unconditionally whenever `setItem` does not throw,
+ * so a silent drop on this path used to leave the latch clear, and could even clear a `true` a moment-earlier
+ * sibling rename or delete had correctly set (silent-failure-hunter, #431 review). This function now sets it
+ * itself once its own read-back disagrees, on either path — `parents.ts:35`'s "this device is not saving"
+ * used to stay quiet about a refused rename, of either kind, until an unrelated write happened to set it.
  */
 export function renameProfile(id: ProfileId, name: string): RenameProfileResult {
   if (!currentIndex().ids.includes(id)) return { ok: false, why: 'unknown' };
@@ -483,6 +491,13 @@ export function renameProfile(id: ProfileId, name: string): RenameProfileResult 
     const before = load().name;
     save({ name: next });
     if (!writeFailed && storedName(id) === next) return { ok: true, name: next };
+    // `save()` only ever sets `writeFailed` from whether `setItem` *threw* — a silent drop (the call
+    // accepted, the read-back disagrees) leaves it `false`, which is exactly the class this review item is
+    // about (silent-failure-hunter, #431 review). Left uncorrected this would also erase a `true` some other
+    // write had just latched: `save()`'s own `writeFailed = false` runs unconditionally on a non-throwing
+    // `setItem`, so a session rename against a silently-dropping store could clear the very latch a sibling
+    // rename or a delete had set moments earlier, even though this write failed too.
+    writeFailed = true;
     // Nothing landed, so nothing may look as though it had: `cache` is what the heading and the map pill
     // read, and `save()` has already put the new name in it (#420 review B3). Assigned rather than saved —
     // a second write on a store that just refused one buys nothing and could refuse in its turn.

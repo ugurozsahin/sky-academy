@@ -1729,6 +1729,21 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(deleteProfile('p2'), 'so a corrupt slot can still be taken back').toEqual({ ok: true, self: false });
     });
 
+    /**
+     * #431 review, type-design-analyzer: hoisting `futureSaveIn(id)` above the `next`/blank check (item 1)
+     * changes which refusal wins when both apply — previously `'blank'` ran first for both paths, now
+     * `'future'` does. Deliberate: a slot this build cannot touch at all is refused on that alone, whatever
+     * was typed. Unreachable through the screen itself — `canRenameCard` never offers the input on a `future`
+     * row — so this only pins the direct call.
+     */
+    it("answers 'future' rather than 'blank' for an empty name on a slot this build cannot touch", () => {
+      save({ name: 'Ada', onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
+      localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', coins: 99 }));
+      expect(renameProfile('p2', '   ')).toEqual({ ok: false, why: 'future' });
+    });
+
     it("refuses while the session's own save is read-only, with the remedy that fault has (#232, #420 note 4)", () => {
       localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION + 1, name: 'Ada', coins: 99 }));
       expect(load().name, 'the session runs on defaults over a newer blob').toBe('');
@@ -1783,6 +1798,10 @@ describe('profiles: siblings on one device (#20)', () => {
         // #431 review item 5: a silent drop (no throw, read-back disagrees) latches too, not only a throw.
         expect(isWriteFailing(), "the sibling's raw path latches on a silent drop, not only a throw").toBe(true);
         expect(renameProfile('p1', 'Ada Two'), "the session's own path — B3").toEqual({ ok: false, why: 'store' });
+        // #431 review, silent-failure-hunter: `save()` sets `writeFailed = false` unconditionally whenever
+        // `setItem` does not throw, so this session-path silent drop used to erase the `true` the sibling
+        // path had just latched above — even though this write failed too. It must still read `true` here.
+        expect(isWriteFailing(), "a silent drop on the session's own path latches too, and does not erase a sibling's").toBe(true);
       } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       // And the cache is put back, so nothing on screen shows a name the store refused.
       expect(load().name, 'the session still reads the name that is actually stored').toBe('Ada');
@@ -1978,6 +1997,10 @@ describe('profiles: siblings on one device (#20)', () => {
       // one that actually works — a genuine successful write is what a real device gives the family next
       // (any ordinary save), and that is what clears it here, not the passage of time.
       expect(isWriteFailing(), "the failed rollback latches, same as any other refused write").toBe(true);
+      // The composition with `addProfile`'s own precheck (pr-test-analyzer, #431 review): a latch this
+      // function set is exactly the kind `addProfile` already refuses under (#380 round 5, B2), store back to
+      // working or not — it does not re-check the store itself, only the flag.
+      expect(addProfile(), "addProfile refuses on the stale latch before it ever probes a slot").toEqual({ ok: false, why: 'store' });
       save({});
       expect(isWriteFailing(), 'a write that actually lands clears a stale latch, same as any other').toBe(false);
       // And it does not heal, which is the half the docstring used to get wrong: no route back to the slot.
