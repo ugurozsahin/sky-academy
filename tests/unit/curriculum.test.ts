@@ -631,6 +631,12 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // it. Every card the real topic draws must be one of them.
     const frames = receptionGapFrames();
     const known = new Set(frames.map(f => `${f.word}@${f.idx}`));
+    // #445: `set.has(filled)` below only proves a drawn option is *somewhere* in the whole reachable fixture —
+    // it would pass just as well if `pig@0`'s card offered a decoy that only `hen@1`'s frame actually owns, an
+    // error `gapQ` cannot make today (each card's decoys come from its own `gapDecoys` call) but that this loop
+    // could not have caught either way. `frameByKey` lets each drawn card be checked against **its own**
+    // frame's pool — `gapDecoys(frame.word, frame.idx, frame.pool)` — rather than the union of all of them.
+    const frameByKey = new Map(frames.map(f => [`${f.word}@${f.idx}`, f]));
     const t = gen('r-sounds');
     let seen = 0;
     for (const d of [1, 2, 3] as Difficulty[]) {
@@ -639,13 +645,20 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
         const q = t.gen(d, r);
         const idx = q.prompt.indexOf('_');
         const word = q.prompt.slice(0, idx) + q.answer + q.prompt.slice(idx + 1);
+        const key = `${word}@${idx}`;
         expect(known, `the real generator drew ${q.prompt} (${word}@${idx}), which the frames do not carry`)
-          .toContain(`${word}@${idx}`);
+          .toContain(key);
         seen++;
-        // …and every option it really offers is in the reviewed set.
+        // this frame's own decoys — pinned, not just present somewhere in the reachable set (#445).
+        const frame = frameByKey.get(key)!;
+        const ownDecoys = new Set(gapDecoys(frame.word, frame.idx, frame.pool)
+          .map(l => (frame.word.slice(0, frame.idx) + l + frame.word.slice(frame.idx + 1)).toLowerCase()));
+        // …and every option it really offers is in the reviewed set, and in this exact frame's own pool.
         for (const o of q.options) {
           const filled = (q.prompt.slice(0, idx) + o + q.prompt.slice(idx + 1)).toLowerCase();
           expect(set.has(filled), `r-sounds: ${q.prompt} — option ${o} spells ${filled}, which is not in the fixture`).toBe(true);
+          if (filled !== frame.word.toLowerCase())
+            expect(ownDecoys, `r-sounds: ${q.prompt} — option ${o} spells ${filled}, which is not among ${frame.word}@${frame.idx}'s own decoys`).toContain(filled);
         }
       }
     }
