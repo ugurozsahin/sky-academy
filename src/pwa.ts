@@ -21,12 +21,7 @@
 //    update would serve the previous release's game with no route back but clearing app data.
 //    (Raised in review of #214; see docs/ANDROID.md.)
 
-// Typed here rather than reached for with a cast, following `src/ui/hooks.ts` — the Capacitor bridge is a
-// real global in the APK runtime and `unknown` is the honest type: this module only ever tests it for
-// presence, never reads through it.
-declare global {
-  interface Window { Capacitor?: unknown }
-}
+import { isNativeShell } from './native';
 
 /** The link whose presence means "this page was served from a real deployment that has a worker beside it". */
 export const MANIFEST_SELECTOR = 'link[rel="manifest"]';
@@ -35,8 +30,9 @@ export type RegisterEnv = {
   doc: Pick<Document, 'querySelector'>;
   nav: { serviceWorker?: Pick<ServiceWorkerContainer, 'register'> };
   loc: Pick<Location, 'protocol' | 'hostname'>;
-  /** The Capacitor bridge, when the page is running inside the Android shell. Read, never called. */
-  win: { Capacitor?: unknown };
+  /** Whether the page is running inside the Android shell (`isNativeShell` in `./native`, #699) — this
+   *  module never reads the Capacitor bridge itself. */
+  nativeShell: boolean;
 };
 
 /**
@@ -54,9 +50,7 @@ function secure(loc: Pick<Location, 'protocol' | 'hostname'>): boolean {
 
 export async function registerServiceWorker(env: RegisterEnv): Promise<RegisterOutcome> {
   if (!env.doc.querySelector(MANIFEST_SELECTOR)) return 'single-file';
-  // Presence is the whole test — the bridge is never called, so a half-initialised or polyfilled
-  // `window.Capacitor` cannot throw here the way reading through it can (#205).
-  if (env.win.Capacitor) return 'native-shell';
+  if (env.nativeShell) return 'native-shell';
   if (!env.nav.serviceWorker) return 'no-support';
   if (!secure(env.loc)) return 'insecure';
   try {
@@ -74,4 +68,4 @@ export async function registerServiceWorker(env: RegisterEnv): Promise<RegisterO
 
 /** The production call shape. Separated so the one line that reads real globals is the only untested line. */
 export const startServiceWorker = (): Promise<RegisterOutcome> =>
-  registerServiceWorker({ doc: document, nav: navigator, loc: location, win: window });
+  registerServiceWorker({ doc: document, nav: navigator, loc: location, nativeShell: isNativeShell() });

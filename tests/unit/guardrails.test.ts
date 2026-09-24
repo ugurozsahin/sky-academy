@@ -183,29 +183,43 @@ describe('guard rails', () => {
 
   // CLAUDE.md: no dependencies without reason (Capacitor is the documented exception). A new one now has
   // to be argued for in the PR that adds it, because this rail goes red until the list is updated too.
-  // `@capacitor/filesystem`/`@capacitor/share` (#110) are that exception again: the Android tablet's
-  // `certRoute` 'capacitor' path needs the native plugins registered via `npx cap sync`, the same reason
-  // `@capacitor/android`/`@capacitor/core` are here — see `shareViaCapacitor` in `src/ui/certificate.ts`,
-  // which reads them off the injected `Capacitor.Plugins` bridge rather than importing either package, so
-  // neither is a static or dynamic `import` anywhere in `src/` (checked below alongside the empty
+  // `@capacitor/filesystem`/`@capacitor/share` (#110) and `@capacitor/app` (#699) are that exception again:
+  // the Android tablet's `certRoute` 'capacitor' path and its hardware back button both need native plugin
+  // code registered via `npx cap sync`, the same reason `@capacitor/android`/`@capacitor/core` are here — see
+  // `src/native.ts`'s `plugin()`, which reads all three off the injected bridge rather than importing any of
+  // them, so none is a static or dynamic `import` anywhere in `src/` (checked below alongside the empty
   // `dependencies` list, since that only proves neither is a *runtime* dependency of the web build).
   it('dependencies match the allowlist below (CLAUDE.md explains the rule)', () => {
-    const allowed = ['@capacitor/android', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', 'typescript', 'vite', 'vitest'];
+    const allowed = ['@capacitor/android', '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', 'typescript', 'vite', 'vitest'];
     expect(Object.keys((pkg as { dependencies?: object }).dependencies ?? {})).toEqual([]);   // nothing but our own code ships to the browser
     expect(Object.keys((pkg as { devDependencies?: object }).devDependencies ?? {}).sort()).toEqual([...allowed].sort());
   });
 
-  // #110: `@capacitor/filesystem`/`@capacitor/share` exist only so `npx cap sync` registers their native
-  // Android code; the web bundle must never import either JS package (that would ship Capacitor's own
-  // wrapper code — and the web-only build's `dist/` output — to every non-APK player). `shareViaCapacitor`
-  // reads the plugins off the injected `Capacitor.Plugins` global instead, the same pattern `isNativeShell`
+  // #110/#699: `@capacitor/filesystem`/`@capacitor/share`/`@capacitor/app` exist only so `npx cap sync`
+  // registers their native Android code; the web bundle must never import any of the three (that would ship
+  // Capacitor's own wrapper code — and the web-only build's `dist/` output — to every non-APK player).
+  // `src/native.ts`'s `plugin()` reads them off the injected bridge instead, the same pattern `isNativeShell`
   // already uses for `@capacitor/core`. Proved red first: added `import '@capacitor/share'` to a scratch
   // file under `src/`, watched this fail, removed it.
-  it('src/ never imports @capacitor/filesystem or @capacitor/share (#110)', () => {
+  it('src/ never imports @capacitor/filesystem, @capacitor/share or @capacitor/app (#110, #699)', () => {
     for (const [path, src] of Object.entries(SOURCES)) {
       expect(src, `${path} must read the Capacitor plugin bridge, not import the plugin package`)
-        .not.toMatch(/\bimport\s*\(?[^;]*['"]@capacitor\/(filesystem|share)['"]/);
+        .not.toMatch(/\bimport\s*\(?[^;]*['"]@capacitor\/(filesystem|share|app)['"]/);
     }
+  });
+
+  // #699 item 1: `src/native.ts` is the one owner of the Capacitor bridge — every other module under `src/`
+  // reads it (presence, platform, a plugin) through `isNativeShell`/`plugin` there rather than touching
+  // `window.Capacitor`/`Capacitor.Plugins` itself, so a future change to how the bridge is detected or
+  // accessed has one place to make it. Proved red first: added a scratch `(window as
+  // {Capacitor?:unknown}).Capacitor` read to `src/pwa.ts`, watched this fail, removed it.
+  it('native.ts is the only file under src/ that reads window.Capacitor / Capacitor.Plugins (#699)', () => {
+    for (const [path, src] of Object.entries(SOURCES)) {
+      if (path === '/src/native.ts') continue;
+      expect(src, `${path} must go through native.ts's isNativeShell/plugin, not read the bridge itself`)
+        .not.toMatch(/window\.Capacitor|Capacitor\.Plugins/);
+    }
+    expect(SOURCES['/src/native.ts'], 'native.ts should still be the file doing the reading').toMatch(/\.Capacitor\b/);
   });
 
   // The `window.__sna` hooks are the e2e contract (CLAUDE.md); losing one breaks every test at runtime only.
