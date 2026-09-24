@@ -161,6 +161,46 @@ describe('the browserless simulation harness stubs the clock, the canvas and the
 
 
 /**
+ * #454: nothing holds a `scripts/*.d.mts` declaration to the `.mjs` it describes. `tsconfig.json`'s `include`
+ * does not cover `scripts/`, so `tsc --noEmit` never reads the `.mjs` sources — the `.d.mts` beside each one
+ * is the sole type source for every `tests/unit/*.test.ts` that imports it. Rename or delete a runtime export
+ * and leave the `.d.mts` alone, and `npx tsc --noEmit` stays green while a declaration keeps describing a
+ * function that no longer exists.
+ *
+ * A text check, like its neighbours: it compares export *names* only, never signatures, so a changed parameter
+ * list or return type still passes silently — say so here rather than let a green read as more than it is.
+ * The issue's proposed cheaper alternative — putting `scripts/` under a `checkJs` typecheck, which would also
+ * catch signatures — was tried first: it surfaces well over a hundred pre-existing errors across all five
+ * files (implicit `any` parameters, no `@types/node`, untyped GraphQL response shapes), none of them a name
+ * drift and all well outside a P3 rail's scope, so the text rail is what this fixes instead.
+ */
+describe('every scripts/*.d.mts names exactly the runtime exports of the .mjs beside it (#454)', () => {
+  const dir = new URL('../../scripts/', import.meta.url);
+  const declared = readdirSync(dir).filter((f) => f.endsWith('.d.mts'));
+
+  it('found more than one .d.mts, or the check below would pass on an empty set', () => {
+    expect(declared.length).toBeGreaterThan(1);
+  });
+
+  // `const`/`function` only — `export interface`/`export type` describe compile-time shapes with no runtime
+  // counterpart to compare them against, and are not part of this rail's claim.
+  const dtsNames = (src: string) => [...src.matchAll(/^export declare (?:const|function)\s+(\w+)/gm)].map((m) => m[1]);
+  const mjsNames = (src: string) => [...src.matchAll(/^export (?:async function|function|const)\s+(\w+)/gm)].map((m) => m[1]);
+
+  it.each(declared)('%s names the same exports as its .mjs, in both directions', (name) => {
+    const base = name.replace(/\.d\.mts$/, '');
+    const dts = readFileSync(new URL(name, dir), 'utf8');
+    const mjs = readFileSync(new URL(`${base}.mjs`, dir), 'utf8');
+    const declaredNames = dtsNames(dts);
+    const runtimeNames = mjsNames(mjs);
+    expect(declaredNames.length, `${name} declares no const/function — check the rail's own regex`).toBeGreaterThan(0);
+    expect(runtimeNames.length, `${base}.mjs exports no const/function — check the rail's own regex`).toBeGreaterThan(0);
+    expect([...declaredNames].sort(), `${name} is out of step with ${base}.mjs's actual exports`).toEqual([...runtimeNames].sort());
+  });
+});
+
+
+/**
  * #116 item 1: `build-sw.mjs`, `bundle-single.mjs` and `pwa-icons.mjs` each gated their CLI block on
  * `import.meta.url === \`file://${'$'}{process.argv[1]}\``, comparing a percent-encoded URL to a raw
  * filesystem path. The two disagree the moment the script's own path needs escaping — a space, `#`, anything
