@@ -753,6 +753,20 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     expect(load().name).toBe(long.slice(0, NAME_MAX));
   });
 
+  // #431/#424: cleanName() is the one clamp every write path shares, so a Restore code carrying a
+  // multi-codepoint grapheme cluster past NAME_MAX gets the same whole-cluster cut renameProfile does, not
+  // the weaker surrogate-pair-only protection this path had before #431 folded graphemeSafeSlice into
+  // cleanName. Proved red by reverting cleanName to a bare `.slice(0, NAME_MAX)`: the family emoji then
+  // splits mid-cluster and a dangling joiner survives into `d.name`.
+  it('a Restore code carrying a grapheme cluster past NAME_MAX is cut on a whole cluster, not mid-cluster', () => {
+    const family = '👨‍👩‍👧‍👦';
+    expect(family.length).toBe(11);
+    const long = family + family + family;
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION, name: long, coins: 0 }))).toBe(true);
+    expect(load().name).toBe(family);
+    expect(/[‍\ud800-\udbff]$/.test(load().name), 'no dangling joiner or lone surrogate at the end').toBe(false);
+  });
+
   it('every record*() writer, touchStreak() and recordDojo() survive a save corrupted in every field they touch', () => {
     expect(importSave(JSON.stringify({
       v: 1, name: 'Bad', progress: null, endless: null, sprint: 'nope', boss: [], memory: undefined, training: 42,
@@ -1836,6 +1850,70 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(load().name.length, 'the cap the wizard renders is the cap the store enforces').toBe(NAME_MAX);
       // The cut can land on a space, and a trailing space is not part of a name.
       expect(renameProfile('p1', 'Ada Bo Cassie Dee')).toEqual({ ok: true, name: 'Ada Bo Cassie' });
+    });
+
+    it('a truncation cut does not land inside a multi-codepoint grapheme cluster (#431 review, item 6)', () => {
+      save({ name: 'Ada', onboarded: true });
+      // A family emoji is one grapheme cluster built from four astral codepoints joined by ZWJ — 11 UTF-16
+      // code units. Three of them is 33 units, well past NAME_MAX (14): a plain `.slice(0, NAME_MAX)` cuts
+      // inside the second cluster, leaving a lone person emoji and a dangling ZWJ with no partner.
+      const family = '👨‍👩‍👧‍👦';
+      expect(family.length).toBe(11);
+      const r = renameProfile('p1', family + family + family);
+      // The second cluster does not fit in the 3 units left after the first, so only the first is kept
+      // whole — never a partial cluster.
+      expect(r).toEqual({ ok: true, name: family });
+      expect(load().name).toBe(family);
+      expect(/[‍\ud800-\udbff]$/.test(load().name), 'no dangling joiner or lone surrogate at the end').toBe(false);
+    });
+
+    it('a single grapheme cluster wider than NAME_MAX is kept whole, never refused as blank (#431 review)', () => {
+      save({ name: 'Ada', onboarded: true });
+      // A family emoji with a skin-tone modifier on every member is still one grapheme cluster — 19 UTF-16
+      // units, past NAME_MAX (14) on its own. Dropping it (the naive "does it fit?" answer) would leave
+      // graphemeSafeSlice returning '', which renameProfile would then report as `'blank'` — wrong, since
+      // the grown-up typed a real, non-blank name that simply does not fit the display cap.
+      const wideFamily = '👨🏻‍👩🏻‍👧🏻‍👦🏻';
+      expect(wideFamily.length).toBe(19);
+      expect(wideFamily.length).toBeGreaterThan(NAME_MAX);
+      const r = renameProfile('p1', wideFamily);
+      expect(r).toEqual({ ok: true, name: wideFamily });
+      expect(load().name).toBe(wideFamily);
+    });
+
+    it('falls back to a code-point-safe slice when Intl.Segmenter is unavailable or throws (#431 review)', () => {
+      save({ name: 'Ada', onboarded: true });
+      const family = '👨‍👩‍👧‍👦';
+      const name = family + family + family;
+
+      const intl = Intl as { Segmenter?: typeof Intl.Segmenter };
+      const originalSegmenter = intl.Segmenter;
+      // Simulating an older WebView with no Intl.Segmenter at all.
+      delete intl.Segmenter;
+      try {
+        const r = renameProfile('p1', name);
+        // The fallback is surrogate-pair-safe (plain `for...of` string iteration) but not cluster-safe, so
+        // it may still cut inside a ZWJ sequence — the documented, lesser protection this repository already
+        // shipped before this fix. What it must never do is leave a lone surrogate.
+        expect(r.ok).toBe(true);
+        expect((r as { ok: true; name: string }).name.length).toBe(NAME_MAX);
+        expect(/[\ud800-\udbff](?![\udc00-\udfff])/.test(load().name), 'no lone high surrogate').toBe(false);
+      } finally {
+        intl.Segmenter = originalSegmenter;
+      }
+
+      // A Segmenter that exists but throws on use (a non-conformant WebView) must fall through the same
+      // way, rather than crash the rename.
+      intl.Segmenter = vi.fn(() => {
+        throw new Error('non-conformant WebView');
+      }) as unknown as typeof Intl.Segmenter;
+      try {
+        const r2 = renameProfile('p1', name);
+        expect(r2.ok).toBe(true);
+        expect((r2 as { ok: true; name: string }).name.length).toBe(NAME_MAX);
+      } finally {
+        intl.Segmenter = originalSegmenter;
+      }
     });
 
     // #424 review (pr-test-analyzer): `slice` counts UTF-16 code units, and an emoji name is a supported case
