@@ -59,4 +59,16 @@ describe('wireBackButton (#699)', () => {
     expect(minimize).toHaveBeenCalledOnce();
     expect(history.back).not.toHaveBeenCalled();
   });
+
+  // silent-failure-hunter, round 1: a throw here runs from a native callback with nothing above it in the
+  // call stack to report it — a back press must degrade gracefully, never crash the app it is leaving.
+  it('a throwing minimize (or history.back) does not escape the registered listener', () => {
+    let onBack!: () => void;
+    const App = { addListener: (event: string, cb: () => void) => { if (event === 'backButton') onBack = cb; } };
+    const boom = () => { throw new Error('native call failed'); };
+    wireBackButton({ bridge: bridge({ App }), history: { state: null, back: vi.fn() }, minimize: boom });
+    expect(onBack).not.toThrow();
+    wireBackButton({ bridge: bridge({ App }), history: { state: { screen: 'play' }, back: boom }, minimize: vi.fn() });
+    expect(onBack).not.toThrow();
+  });
 });

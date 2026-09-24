@@ -11,7 +11,7 @@ import { load, profileIds, save } from './storage';
 import { initGameSpeed } from './game/speed';
 import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
-import { plugin, wireBackButton } from './native';
+import { plugin, wireBackButton, type AppPlugin } from './native';
 import type { YearInfo } from './curriculum';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
@@ -153,7 +153,9 @@ window.addEventListener('popstate', () => {
 // own back-press handling lives in the `@capacitor/app` plugin, and with no listener it quits from any
 // screen. Wired after the popstate listener above so a screen on the stack steps back through it exactly as
 // the browser's own back button does; the root (sky map, nothing on the stack) backgrounds the app instead.
-wireBackButton({ bridge: window, history, minimize: () => plugin<{ minimizeApp(): void }>('App')?.minimizeApp() });
+// `minimizeApp()` is a native Promise — caught here too, alongside `wireBackButton`'s own try/catch, so a
+// rejection never surfaces as an unhandled one from a native callback nothing else is watching.
+wireBackButton({ bridge: window, history, minimize: () => { plugin<AppPlugin>('App')?.minimizeApp().catch(() => {}); } });
 
 // ?reset=1 clears saved progress (used by tests).
 const params = new URLSearchParams(location.search);

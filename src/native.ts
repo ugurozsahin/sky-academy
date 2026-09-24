@@ -67,6 +67,11 @@ export function isNativeShell(w: Window & typeof globalThis = window): boolean {
  * A named plugin off the injected bridge (#110), or `undefined` when it has not registered — or there is no
  * bridge at all. `ui/certificate.ts`'s Filesystem/Share access and `wireBackButton`'s own App lookup both
  * read plugins through here rather than `Capacitor.Plugins` directly.
+ *
+ * `T` is asserted, not verified: the bridge's own plugin object is trusted to have the shape the caller
+ * names, the same way the old per-file casts this replaces did. Check `typeof x === 'function'` before
+ * calling a method on the result, as `wireBackButton` below does for `addListener` — a registered plugin
+ * with an unexpected shape is possible in principle, if unlikely with `@capacitor/*`'s own plugins.
  */
 export function plugin<T>(name: string, w: Window & typeof globalThis = window): T | undefined {
   try {
@@ -76,7 +81,12 @@ export function plugin<T>(name: string, w: Window & typeof globalThis = window):
   }
 }
 
-interface AppPlugin { addListener(event: 'backButton', cb: () => void): void }
+/** The one `@capacitor/app` plugin shape this project reads — both methods, so `main.ts` and
+ *  `wireBackButton` share a single view of it rather than each typing their own slice. */
+export interface AppPlugin {
+  addListener(event: 'backButton', cb: () => void): void;
+  minimizeApp(): Promise<void>;
+}
 
 /**
  * Registers the hardware/gesture back button on the Android APK (#699). `@capacitor/android` on its own
@@ -91,6 +101,11 @@ interface AppPlugin { addListener(event: 'backButton', cb: () => void): void }
  * `bridge`, `history` and `minimize` are all taken as arguments, so the three shapes below are proved in
  * Vitest without a device: no `App` plugin on the bridge (a browser, the PWA, or an APK that failed to sync
  * it) registers nothing; a screen on the stack calls `history.back()` once; the root calls `minimize()` once.
+ *
+ * The listener body is wrapped in its own `try`/`catch`: this runs from a native callback with nothing above
+ * it in the call stack to report a throw, and `minimize` is caller-supplied (`main.ts`'s own closure calls
+ * the real, Promise-returning `App.minimizeApp()`, whose rejection it also catches itself) — a back press
+ * must never crash the app it is trying to leave gracefully.
  */
 export function wireBackButton(env: {
   bridge: Window & typeof globalThis;
@@ -100,7 +115,11 @@ export function wireBackButton(env: {
   const app = plugin<AppPlugin>('App', env.bridge);
   if (!app || typeof app.addListener !== 'function') return;
   app.addListener('backButton', () => {
-    const screen = (env.history.state as { screen?: string } | null)?.screen;
-    if (screen) env.history.back(); else env.minimize();
+    try {
+      const screen = (env.history.state as { screen?: string } | null)?.screen;
+      if (screen) env.history.back(); else env.minimize();
+    } catch {
+      /* best-effort only — a back press must never crash the app */
+    }
   });
 }
