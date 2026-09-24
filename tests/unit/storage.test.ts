@@ -1730,24 +1730,24 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', avatar: 'blaze', onboarded: true });
 
-    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true, future: false });
+    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true, future: false, corrupt: false });
     expect(activeProfile(), 'reading a card is not a switch').toBe('p2');
     expect(load().name, 'and the session is still the child who was playing').toBe('Bo');
     expect(profileCards()).toEqual([
-      { id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true, future: false },
-      { id: 'p2', name: 'Bo', avatar: 'blaze', onboarded: true, future: false },
+      { id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true, future: false, corrupt: false },
+      { id: 'p2', name: 'Bo', avatar: 'blaze', onboarded: true, future: false, corrupt: false },
     ]);
   });
 
   it('profileCard is blank rather than throwing on a slot the picker cannot read (#20 slice 2)', () => {
     save({ name: 'Ada' });
-    expect(profileCard('p2'), 'an empty slot').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p2'), 'an empty slot').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: false, corrupt: false });
     localStorage.setItem(saveKeyFor('p3'), 'not json at all');
-    expect(profileCard('p3'), 'a blob that is not JSON').toEqual({ id: 'p3', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p3'), 'a blob that is not JSON').toEqual({ id: 'p3', name: '', avatar: null, onboarded: false, future: false, corrupt: false });
     localStorage.setItem(saveKeyFor('p4'), JSON.stringify(['an', 'array']));
-    expect(profileCard('p4'), 'JSON that is not an object').toEqual({ id: 'p4', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p4'), 'JSON that is not an object').toEqual({ id: 'p4', name: '', avatar: null, onboarded: false, future: false, corrupt: false });
     localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 3, name: 42, avatar: 7, onboarded: 'yes' }));
-    expect(profileCard('p2'), 'fields of the wrong type are dropped, not shown').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p2'), 'fields of the wrong type are dropped, not shown').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: false, corrupt: false });
   });
 
   it("a v2 save's card agrees with load() about whether that child has played (#20 slice 2)", () => {
@@ -1757,16 +1757,16 @@ describe('profiles: siblings on one device (#20)', () => {
     // empty (#380 review B3). The card and the migration must give the same answer about the same bytes.
     localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: 2, name: 'Ada', avatar: 'volt', coins: 30 }));
     expect(migrate({ v: 2, name: 'Ada', avatar: 'volt' }).onboarded, "the migration's own answer").toBe(true);
-    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true, future: false });
+    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true, future: false, corrupt: false });
 
     // And the other half of that rule: a v2 blob with no ninja chosen never played, so the card says so.
     localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 2, name: 'Bo' }));
     expect(migrate({ v: 2, name: 'Bo' }).onboarded).toBe(false);
-    expect(profileCard('p2')).toEqual({ id: 'p2', name: 'Bo', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p2')).toEqual({ id: 'p2', name: 'Bo', avatar: null, onboarded: false, future: false, corrupt: false });
 
     // A v3 blob still wins on its own field — `false` there means mid-wizard, whatever the avatar says (#67).
     localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 3, name: 'Cass', avatar: 'kai', onboarded: false }));
-    expect(profileCard('p3')).toEqual({ id: 'p3', name: 'Cass', avatar: 'kai', onboarded: false, future: false });
+    expect(profileCard('p3')).toEqual({ id: 'p3', name: 'Cass', avatar: 'kai', onboarded: false, future: false, corrupt: false });
   });
 
   it('a card is blank for a save this build cannot open, exactly as load() is (#20 slice 2)', () => {
@@ -1780,17 +1780,18 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(isFutureSave(future), 'the blob this is about').toBe(true);
     expect(migrate(future), "load()'s own answer is a fresh default").toMatchObject({ name: '', avatar: null, onboarded: false });
     expect(profileCard('p2'), 'so the card says the same thing the tap will give')
-      .toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: true });
+      .toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: true, corrupt: false });
 
     // The same for a `v` no build ever wrote — also refused by `isMigratable`, for a different reason (#232).
-    // Blank the same way, and `future: false`, because that one *is* recoverable: `load()` resets over it and
-    // writes resume, so a grown-up may take the slot back (#420 review B2).
+    // Blank the same way, and `future: false, corrupt: true`, because that one *is* recoverable: `load()`
+    // resets over it and writes resume, so a grown-up may take the slot back (#420 review B2) — but the row
+    // still has to say it does not know whether the ninja played, not that it never did (#431 review item 3).
     localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 'two', name: 'Cass', avatar: 'kai', onboarded: true }));
-    expect(profileCard('p3')).toEqual({ id: 'p3', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p3')).toEqual({ id: 'p3', name: '', avatar: null, onboarded: false, future: false, corrupt: true });
 
     // And the gate is a gate, not a blanket: the versions the ladder *can* walk are unaffected.
     localStorage.setItem(saveKeyFor('p4'), JSON.stringify({ v: 1, name: 'Dev', avatar: 'kai' }));
-    expect(profileCard('p4')).toEqual({ id: 'p4', name: 'Dev', avatar: 'kai', onboarded: true, future: false });
+    expect(profileCard('p4')).toEqual({ id: 'p4', name: 'Dev', avatar: 'kai', onboarded: true, future: false, corrupt: false });
   });
 
   it('the card and the migration derive onboarded from one rule, not two copies (#20 slice 2)', () => {
@@ -1811,7 +1812,7 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     // `addProfile` writes no save on purpose, so the new slot is empty: the card has to come from the index.
     expect(profileCards().map(c => c.id)).toEqual(['p1', 'p2']);
-    expect(profileCards()[1]).toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCards()[1]).toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: false, corrupt: false });
   });
   // ── #20 slice 3: rename and delete, the grown-ups screen's two controls ───────────────────────────────────
   describe('renameProfile (#20 slice 3)', () => {
@@ -1954,10 +1955,12 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(localStorage.getItem(saveKeyFor('p2')), '99 coins and all of it still there').toBe(future);
       expect(profileIds(), 'and the family still lists them').toEqual(['p1', 'p2']);
       // The card says which blank it is, so the row can stop asserting the wrong reason.
-      expect(profileCard('p2')).toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: true });
+      expect(profileCard('p2')).toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: true, corrupt: false });
       // An unreadable `v` is a different case and deliberately *not* protected: `load()` resets over it.
       localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 'banana', name: 'Bo' }));
       expect(profileCard('p2').future, 'not a newer save, just a broken one').toBe(false);
+      // But not a slot the row may call "has not played" either (#431 review item 3) — `corrupt` says so.
+      expect(profileCard('p2').corrupt, 'a real save this build cannot parse the version of').toBe(true);
       expect(deleteProfile('p2'), 'so a corrupt slot can still be taken back').toEqual({ ok: true, self: false });
     });
 

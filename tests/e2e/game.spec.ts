@@ -3240,6 +3240,40 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
   });
 
   /**
+   * #431 review item 3. A `v` no build ever wrote is a different blank than `future` — `load()` resets over
+   * it, so it is not a newer build's save the family must open elsewhere — but it used to draw exactly like
+   * an unplayed slot, and Remove reported success on a real name and coins the row had just claimed did not
+   * exist. Unlike `future`, Remove stays on offer here (`load()` would reset over the slot anyway); only the
+   * wording must stop claiming the ninja never played.
+   */
+  test('a save with an unreadable version says it cannot be read, not that the ninja never played, and stays removable', async ({ page }) => {
+    await page.addInitScript(({ index, ada, broken }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', broken);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      broken: JSON.stringify({ v: 'banana', name: 'Bo', avatar: 'blaze', coins: 500, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    const unreadable = page.locator('.p-prof[data-prof="p2"]');
+    await expect(unreadable).toContainText('Cannot be read on this device');
+    await expect(unreadable, 'never "has not played" about 500 coins this build could not parse the version of')
+      .not.toContainText('has not played');
+    await expect(unreadable, 'and never the "newer version" sentence — nothing else is waiting for this save').not.toContainText('newer version');
+    await expect(unreadable.locator('.p-prof-in'), 'no name to change').toHaveCount(0);
+    await expect(page.locator('button[data-del="p2"]'), 'unlike a future save, this slot can still be taken back').toHaveCount(1);
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.p-prof')).toHaveCount(1);
+  });
+
+  /**
    * #446. The row above withholds Remove on the *future* slot itself — 99 coins behind it — but that alone
    * still let a grown-up remove the *readable* sibling and strand the family: with p2 unreadable by this
    * build, taking p1 out leaves an index whose one remaining id resolves to a save this build cannot open,

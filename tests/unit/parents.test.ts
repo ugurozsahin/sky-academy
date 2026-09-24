@@ -136,7 +136,7 @@ describe('parent dashboard summary', () => {
  * offer a rename, and that every refusal the store can return has a sentence to show for it.
  */
 describe('ninjas on this device (#20 slice 3)', () => {
-  const card = (over: Partial<ProfileCard> = {}): ProfileCard => ({ id: 'p1', name: '', avatar: null, onboarded: false, future: false, ...over });
+  const card = (over: Partial<ProfileCard> = {}): ProfileCard => ({ id: 'p1', name: '', avatar: null, onboarded: false, future: false, corrupt: false, ...over });
 
   it('offers a rename exactly when there is a save behind the row', () => {
     expect(canRenameCard(card()), 'a slot ＋ created and nothing ever played').toBe(false);
@@ -167,6 +167,16 @@ describe('ninjas on this device (#20 slice 3)', () => {
       'the only sibling is unreadable by this build').toBe(false);
     expect(canRemoveCard(card({ onboarded: true }), [card({ id: 'p2', future: true }), card({ id: 'p3', onboarded: true })]),
       'one sibling unreadable, another readable — the family is not stranded').toBe(true);
+  });
+
+  /**
+   * `corrupt` (#431 review item 3) is a different blank than `future`: a `v` no build ever wrote, not a
+   * newer build's save. Nothing behind it is waiting to be reached from another device, so — unlike
+   * `future` — it does not withhold Remove; only the row's *wording* changes (`profileRow` below).
+   */
+  it('a corrupt slot stays removable, unlike a future one', () => {
+    expect(canRemoveCard(card({ corrupt: true }), [card({ id: 'p2' })]), 'a broken v, not a newer build’s save').toBe(true);
+    expect(canRenameCard(card({ corrupt: true })), 'still nothing readable to put a name to').toBe(false);
   });
 
   /**
