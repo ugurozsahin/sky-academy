@@ -169,9 +169,15 @@ export function check(body, writtenAt) {
 // `/private/tmp`, a `node_modules/.bin` shim) compared unequal here, the whole CLI block was skipped, and
 // Node exited 0 having done nothing: `--check` printed no verdict, the no-args form printed no stamp. Both
 // look like a pass. `realpathSync` resolves both sides properly; the `try`/`catch` falls back to the original
-// comparison only when a path cannot be resolved at all (a missing `argv[1]` must never throw here).
+// comparison only for ENOENT — a missing `argv[1]` must never throw here, and that is the one way this call
+// can legitimately fail. Anything else `realpathSync` throws (EACCES on some ancestor directory, ELOOP) is
+// left to propagate rather than swallowed into the same silent "not the entry point" verdict this fix exists
+// to close: a caught-and-ignored EACCES here would reopen the exact bug, just with a different trigger.
 const sameFile = (a, b) => {
-  try { return realpathSync(a) === realpathSync(b); } catch { return resolve(a) === b; }
+  try { return realpathSync(a) === realpathSync(b); } catch (e) {
+    if (e.code === 'ENOENT') return resolve(a) === b;
+    throw e;
+  }
 };
 if (process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url))) {
   const args = process.argv.slice(2);
