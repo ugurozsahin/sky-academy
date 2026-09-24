@@ -260,6 +260,44 @@ describe('save migration (#38)', () => {
     expect(migrate({ v: 2, avatar: null, onboarded: 'yes' as unknown }).onboarded).toBe(false);
   });
 
+  // #423 review item 4: `certs`/`duels` join the array check every other list field already gets at
+  // `sanitizeTypes`'s front door. A blob already at `SAVE_VERSION` skips the migration ladder's own
+  // `Array.isArray` filters (`MIGRATIONS[1]`/`MIGRATIONS[3]`, which run only on a blob older than current), so
+  // this was the one gap: a non-array `certs`/`duels` on an already-current blob used to reach `{...DEFAULT,
+  // ...s}` unfiltered, and only `certificates()`/`duelHistory()`'s own reader-side guard kept it from breaking.
+  it('a non-array certs or duels on an already-current save is dropped by sanitizeTypes, not just tolerated at the reader', () => {
+    const d = migrate({ v: SAVE_VERSION, certs: 'not an album' as unknown, duels: 'not a history' as unknown });
+    expect(d.certs).toEqual([]);
+    expect(d.duels).toEqual([]);
+  });
+
+  // pr-test-analyzer, #423 review: the test above only checks `migrate()`'s in-memory return. The actual bug
+  // was worse than that return alone shows — `load()` caches `migrate(parsed)`, and `save()`'s merge
+  // (`{...load(), ...patch}`) re-persists whatever that cache holds on the very next unrelated write, so a
+  // corrupt non-array `certs`/`duels` used to survive an ordinary `save({coins: ...})` and ride along in
+  // `localStorage` forever rather than being dropped once and forgotten. This proves the fix at that door.
+  it('a corrupt certs/duels on disk does not survive an unrelated save, once sanitizeTypes catches it', () => {
+    mem['sna:v1'] = JSON.stringify({ v: SAVE_VERSION, certs: 'not an album', duels: 'not a history' });
+    save({ coins: 5 });                                                    // an ordinary, unrelated write
+    const stored = JSON.parse(mem['sna:v1']);
+    expect(stored.certs).toEqual([]);
+    expect(stored.duels).toEqual([]);
+    expect(stored.coins).toBe(5);
+  });
+
+  // pr-test-analyzer, #423 review: `sanitizeTypes` runs on every blob `migrate()` sees, older ones included,
+  // strictly before `MIGRATIONS[1]`/`MIGRATIONS[3]` get their own turn at the same fields. The outcome happens
+  // to agree with the old ladder-step guard here — both want `[]` for a non-array — but nothing pinned that
+  // the new front-door check and the old per-step one do not fight each other on a blob that still has to
+  // climb the ladder, only that each alone gives the right answer on a current one.
+  it('a non-array certs or duels on an older save is still an empty list after climbing the migration ladder', () => {
+    const v1 = migrate({ v: 1, name: 'Ada', certs: 'not an album' as unknown });
+    expect(v1.v).toBe(SAVE_VERSION);
+    expect(v1.certs).toEqual([]);
+    const v3 = migrate({ v: 3, name: 'Ada', duels: 'not a history' as unknown });
+    expect(v3.duels).toEqual([]);
+  });
+
   it('falls back to a fresh default for corrupt or non-object data', () => {
     for (const bad of [null, undefined, 42, 'nonsense', [] as unknown]) {
       const d = migrate(bad);
@@ -514,6 +552,37 @@ describe('duel history (#16)', () => {
     expect(history.length).toBe(DUEL_CAP);
     expect(history.map(m => m.at), 'the newest DUEL_CAP rows, oldest 5 dropped — the same bias fileDuel has on write')
       .toEqual(Array.from({ length: DUEL_CAP }, (_, i) => DUEL_CAP + 4 - i));
+  });
+
+  // #423 review item 4: `at` is documented as "the list's order and its only identity", but nothing enforced
+  // it — `fileDuel` only ever prepends, so ordinary play kept the list newest-first for free, and a Restore or
+  // a hand-edited save carrying rows out of `at` order used to render in storage order under "Recent duels".
+  it('a hand-edited save with rows out of `at` order reads newest first regardless of storage order', () => {
+    save({ duels: [duel({ at: 3 }), duel({ at: 1 }), duel({ at: 5 }), duel({ at: 2 })] });
+    expect(duelHistory().map(m => m.at)).toEqual([5, 3, 2, 1]);
+  });
+
+  // pr-test-analyzer, #423 review: the sort's tie-break is unstated behaviour, not a rule this file wrote —
+  // `Array.prototype.sort`'s spec-guaranteed stability keeps equal-`at` rows in their storage order, which two
+  // matches recorded in the same millisecond (a scripted import, or a save merged from two devices) can
+  // produce. Pinned by an identifying field (`topic`), since two equal `at` values give no ordering to assert
+  // on directly — if `duelHistory()`'s sort ever stopped being stable this would go red without a hand-edited
+  // fixture needing to change.
+  it('rows tied on `at` keep their storage order — the sort is stable, not merely correct on distinct values', () => {
+    save({ duels: [duel({ at: 9, topic: 'first' }), duel({ at: 9, topic: 'second' }), duel({ at: 9, topic: 'third' })] });
+    expect(duelHistory().map(m => m.topic)).toEqual(['first', 'second', 'third']);
+  });
+
+  // The cap and the sort compose: capping on storage order alone (the old behaviour) could keep an
+  // actually-older row over an actually-newer one whenever the two disagree, the same silent, wrong-direction
+  // loss review item 6 above closed for a well-ordered save.
+  it('caps on the true newest `at`, not the newest by storage position, when the two disagree', () => {
+    const rows = [duel({ at: 0 }), ...Array.from({ length: DUEL_CAP }, (_, i) => duel({ at: i + 1 }))];
+    save({ duels: rows });
+    const history = duelHistory();
+    expect(history.length).toBe(DUEL_CAP);
+    expect(history.some(m => m.at === 0), 'at:0 is the oldest row and the true newest DUEL_CAP excludes it').toBe(false);
+    expect(history[0].at).toBe(DUEL_CAP);
   });
 
   // A save written before v4 has no duel history to preserve: those matches were never stored. An empty list

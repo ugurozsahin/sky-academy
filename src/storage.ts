@@ -63,6 +63,12 @@ export interface StoredCert {
  */
 export interface StoredDuel {
   at: number;             // epoch ms the match finished; the list's order and its only identity (see `fileDuel`)
+  // `topic` and `rounds` are stored and checked but read by no production code today (#423 review item 3):
+  // `duelHistoryHTML`/`duelHistoryLine` draw `title`, `year`, `winner` and the two scores alone. Kept anyway,
+  // deliberately: `topic` is the durable id `title` is not — a renamed topic keeps its id, which is what a
+  // future "play this topic again" or per-topic duel stats would need — and `rounds` is the only thing that
+  // tells a 6–4 out of 10 from a 6–4 out of 20, indistinguishable in the row today. Neither is `SaveData`'s
+  // `totalSlices` (written, unreadable in principle, later deleted): both have a stated future reader.
   topic: string;          // topic id the match was played on
   title: string;          // topic title as the duel screen showed it ("Number bonds")
   year: string;           // year *title* ("Year 1"), matching `StoredCert.year` — the id is not shown
@@ -851,7 +857,11 @@ function sanitizeTypes(s: RawSave): RawSave {
     const streakOk = isRecord(dj.streak) && typeof dj.streak!.last === 'string' && typeof dj.streak!.days === 'number';
     if (typeof dj.date !== 'string' || !isRecord(dj.progress) || !Array.isArray(dj.done) || !streakOk || typeof dj.total !== 'number') delete clean.dojo;
   }
-  for (const k of ['stickers', 'owned'] as const) {
+  // `certs`/`duels` join the same array check the other list fields get (#423 review item 4): each has its
+  // own `Array.isArray` guard at its reader (`certificates()`, `duelHistory()`), which is why a wrong-typed
+  // value here was never reachable — but every *other* array field is sanitized at this one front door
+  // instead of trusting its own reader, and a non-array here reached `{...DEFAULT, ...s}` unfiltered until now.
+  for (const k of ['stickers', 'owned', 'certs', 'duels'] as const) {
     if (k in clean && !Array.isArray(clean[k])) delete clean[k];
   }
   for (const k of ['coins', 'spent'] as const) {
@@ -1176,8 +1186,17 @@ export function fileDuel(list: StoredDuel[], d: StoredDuel, cap = DUEL_CAP): Sto
  * (#423 review item 6): `fileDuel` enforces `DUEL_CAP` going in, but a Restore or a hand-edited save can carry
  * more rows than that straight past it — 200 well-formed rows migrate and read back as 200, past the "last
  * few sessions" the docstring above argues for, until the next real match trims the list back down.
+ *
+ * Sorted by `at` descending, not just trusted to arrive that way (#423 review item 4): `fileDuel` only ever
+ * prepends, so ordinary play keeps the list newest-first for free, but `at` is documented as "the list's order
+ * and its only identity" while nothing enforced that — a Restore or a hand-edited save with rows out of `at`
+ * order used to render under "Recent duels" in whatever order it arrived in, and the cap above used to keep
+ * the first `DUEL_CAP` rows in storage order rather than the newest `DUEL_CAP` by `at`.
  */
-export function duelHistory(): StoredDuel[] { const d = load().duels; return Array.isArray(d) ? d.filter(isDuel).slice(0, DUEL_CAP) : []; }
+export function duelHistory(): StoredDuel[] {
+  const d = load().duels;
+  return Array.isArray(d) ? d.filter(isDuel).sort((a, b) => b.at - a.at).slice(0, DUEL_CAP) : [];
+}
 /** Record a finished match. Returns the history as it now stands. */
 export function recordDuel(d: StoredDuel): StoredDuel[] {
   const duels = fileDuel(duelHistory(), d);
