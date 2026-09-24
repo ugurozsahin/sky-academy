@@ -14,8 +14,10 @@ const VOWELS = ['a', 'e', 'i', 'o', 'u'];
 // "which sound does frog end with?", shows `fr_g` and marks `o` correct. Exported for that rail alone.
 export const CVC: [string, string][] = [['cat', '🐱'], ['dog', '🐶'], ['sun', '☀️'], ['pig', '🐷'], ['cup', '☕'], ['pen', '🖊️'], ['egg', '🥚'], ['map', '🗺️'], ['mug', '🍺'], ['net', '🥅'], ['tap', '🚰'], ['pot', '🍲'], ['pin', '📌'], ['rug', '🧶'], ['nut', '🥜'], ['cap', '🧢'], ['rat', '🐀'], ['pan', '🍳'],
   ['bus', '🚌'], ['hat', '🎩'], ['bed', '🛏️'], ['fox', '🦊'], ['bag', '👜'], ['hen', '🐔'], ['box', '📦'], ['jam', '🍯'], ['bat', '🦇'], ['web', '🕸️'], ['cow', '🐮'], ['leg', '🦵'], ['bug', '🐛'], ['van', '🚐'], ['zip', '🤐'], ['log', '🪵']];
-const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['moth', 'th', '🦋'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['coin', 'oi', '🪙'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
-const DIGRAPHS = ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh', 'qu', 'ck'];
+// Exported for the `y1-digraphs` reachable-spelling fixture (#445): the generator's own two-letter gap is
+// built from these two lists, so the fixture rebuilds the same frames from them rather than a second copy.
+export const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['moth', 'th', '🦋'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['coin', 'oi', '🪙'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
+export const DIGRAPHS = ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh', 'qu', 'ck'];
 
 /**
  * Sound Hunt bank: [grapheme, phoneme family, where the sound sits in the words, keyword words].
@@ -165,9 +167,9 @@ export const GAP_WORDS: ReadonlySet<string> = new Set([...Y1_CEW, ...Y2_CEW, ...
  * call sites — Reception's — consulted neither set. **One gap card is still outside both**: `y1Digraphs`
  * builds its own two-letter gap and calls `wordQ` directly, never `gapDecoys` (#445: a multi-character
  * pool entry passed to `gapDecoys` itself now throws rather than composing a spelling one character
- * longer than the card shows, but that guards a caller `y1Digraphs` isn't). Nothing in `AVOID` is
- * reachable through it today — driven over all three difficulties, 63 frames and 315 spellings, in the
- * review of #418 — and that is a fact about today's `DIGRAPHS`, not a property of the code.
+ * longer than the card shows, but that guards a caller `y1Digraphs` isn't). Nothing in `AVOID` is reachable
+ * through it today — pinned, not just claimed, by the `fixtures/y1-digraph-spellings.txt` rail (#445), the
+ * same technique #418 used for Reception's own gap cards.
  *
  * **The rule the split follows** (#324 item 3): a spelling is blocked *here* when the reason is that a child
  * must not see it, and in `GAP_WORDS` when the reason is that it is another right answer. `poos`, `pooh`,
