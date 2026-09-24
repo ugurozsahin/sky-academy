@@ -1943,25 +1943,43 @@ it('no @media (…max-height…) block narrows the five-frame slot or glyph rati
 // Round 2 review (#601): a plain, non-global `.match()` only ever inspects the FIRST `.tenframe`/`.tenframe
 // i` block in the file, so a later override — inside a media query, say — reinstates a fixed pixel size
 // while this rail stays green. That is exactly how the `--slot` height-gate entered the codebase for `.five`
-// in the first place, and it is why the sibling rail above this one reads every `@media (…max-height…)`
-// block rather than the first. `matchAll` here does the same for every declared occurrence of each selector.
-it('the ten-frame dot scales with its grid cell, never a fixed pixel size, in every declared block (#594)', () => {
+// in the first place.
+//
+// Round 3 review: fixing that by widening to `matchAll` on the same two exact-selector patterns was still
+// too narrow — it anchors on the bare selector text, so `.tenframe i.a`/`.tenframe i.b` (real selectors
+// `src/style.css` already declares right next to the bare one, and the only ones a filled dot actually
+// renders with — `src/ui/visuals.ts`'s `<i class="a">`/`<i class="b">`) sit outside its reach entirely. A
+// prefix match on every comma-separated selector in the sheet, not a fixed set of exact strings, is what
+// closes that: it reaches `.tenframe i.a`, `.tenframe i.b`, a future `.tenframe i:last-child`, and a future
+// `.tenframe, .something-else` grouped selector alike, the same way the sibling `@media` rail above searches
+// block *bodies* rather than anchoring on a selector at all.
+it('the ten-frame dot scales with its grid cell, never a fixed pixel size, on every selector that reaches it (#594)', () => {
   const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
-  const dotBlocks = [...bare.matchAll(/\.tenframe\s+i\s*\{([^}]*)\}/g)].map(m => m[1]);
-  expect(dotBlocks.length, '.tenframe i must exist (#594)').toBeGreaterThanOrEqual(1);
+  // Every innermost `selector { body }` pair in the sheet, one level of @media nesting included — the
+  // character class excludes braces, so a match cannot span the wrapper's own `{`, only reach in to the
+  // rule declared inside it. A selector list is comma-separated; each part is checked on its own so a
+  // grouped rule (`.tenframe, .foo { … }`) cannot hide one of its selectors from the check either.
+  const rules = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .flatMap(m => m[1].split(',').map(sel => ({ selector: sel.trim(), body: m[2] })));
+
+  const dotRule = (sel: string) => /^\.tenframe\s+i(?:[.:[]|$)/.test(sel);
+  const containerRule = (sel: string) => /^\.tenframe(?:[.:[]|$)/.test(sel);
+
+  const dotBlocks = rules.filter(r => dotRule(r.selector)).map(r => r.body);
+  expect(dotBlocks.length, '.tenframe i, .tenframe i.a or .tenframe i.b must exist (#594)').toBeGreaterThanOrEqual(1);
   for (const rule of dotBlocks) {
-    expect(rule, 'the dot must not carry a fixed pixel width in any declared block — that is the #594 overflow returning')
+    expect(rule, 'the dot must not carry a fixed pixel width on any selector that reaches it — that is the #594 overflow returning')
       .not.toMatch(/width:\s*[\d.]+px/);
-    expect(rule, 'the dot must not carry a fixed pixel height in any declared block — that is the #594 overflow returning')
+    expect(rule, 'the dot must not carry a fixed pixel height on any selector that reaches it — that is the #594 overflow returning')
       .not.toMatch(/height:\s*[\d.]+px/);
   }
 
-  const containerBlocks = [...bare.matchAll(/\.tenframe\s*\{([^}]*)\}/g)].map(m => m[1]);
+  const containerBlocks = rules.filter(r => containerRule(r.selector)).map(r => r.body);
   expect(containerBlocks.length, '.tenframe must exist (#594)').toBeGreaterThanOrEqual(1);
   for (const container of containerBlocks)
-    expect(container, ".tenframe's own width must not be a fixed pixel value in any declared block — a fixed container is the #594 overflow, even with a responsive dot inside it")
+    expect(container, ".tenframe's own width must not be a fixed pixel value on any selector that reaches it — a fixed container is the #594 overflow, even with a responsive dot inside it")
       .not.toMatch(/width:\s*[\d.]+px/);
 });
 
