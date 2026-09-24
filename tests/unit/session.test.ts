@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Session, repeatKey, starsForAccuracy, type SessionEvents } from '../../src/game/session';
-import { TOPICS, YEARS, topicById, topicsFor, type Question } from '../../src/curriculum';
+import { TOPICS, YEARS, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
@@ -538,6 +538,35 @@ describe('the previous answer carries no signal about the next (#390)', () => {
 });
 
 /**
+ * `repeatGiveUps` — the re-roll's own signal that it exhausted its five tries and still served a repeat
+ * (#453 item 4). The statistical rail near the bottom of this file asserts it at zero across every real,
+ * large topic; these two are the deterministic case either side of that: a topic with nowhere else to go
+ * bumps it every time, and a topic with anywhere else to go never bumps it at all.
+ */
+describe('repeatGiveUps — the re-roll give-up counter (#453 item 4)', () => {
+  const stuck: Topic = { id: 'test-stuck', title: 'test', icon: '🔧', subject: 'maths', year: 'year1', nc: '',
+    gen: () => ({ prompt: 'Which is bigger?', answer: 'cat', options: ['cat', 'dog'] }) };
+
+  it('bumps once per question when the topic has only one card to offer', () => {
+    const s = new Session({ mode: 'mission', year: Y1, topic: stuck, rng: rng(1) }, events());
+    s.start();
+    expect(s.repeatGiveUps).toBe(0);   // nothing asked yet to repeat against
+    for (let i = 0; i < 4; i++) s.nextQuestion();
+    expect(s.repeatGiveUps).toBe(4);   // every question after the first repeats the one before it
+  });
+
+  it('never bumps when the topic has more than one card to alternate between', () => {
+    let turn = 0;
+    const alternating: Topic = { id: 'test-alternating', title: 'test', icon: '🔧', subject: 'maths', year: 'year1', nc: '',
+      gen: () => ({ prompt: 'a', answer: turn++ % 2 === 0 ? '1' : '2', options: ['1', '2'] }) };
+    const s = new Session({ mode: 'mission', year: Y1, topic: alternating, rng: rng(1) }, events());
+    s.start();
+    for (let i = 0; i < 20; i++) s.nextQuestion();
+    expect(s.repeatGiveUps).toBe(0);
+  });
+});
+
+/**
  * #412 — the key must hold the question **wherever the question lives**.
  *
  * #390 widened the identity from `(prompt, answer)` to include the visual, which fixed the four topics whose
@@ -781,6 +810,7 @@ describe('the repeat key holds the whole question (#412)', () => {
       contents,
       answers,
       perAnswer: contents / answers,
+      giveUps: s.repeatGiveUps,
     };
   });
   /**
@@ -864,6 +894,17 @@ describe('the repeat key holds the whole question (#412)', () => {
     const s = bigEnough.find(x => x.id === id)!;
     expect(s.repeated, `served the same question back to back ${(100 * s.repeated).toFixed(3)}% of the time over ${s.contents} distinct cards`)
       .toBeLessThan(0.001);
+  });
+
+  /**
+   * The re-roll's own give-up counter (#453 item 4): on a topic with at least fifty distinct cards, five tries
+   * should always find a non-repeat, so `repeatGiveUps` staying at zero here is what makes "the key has
+   * collapsed" an assertable fact rather than something only a much rarer repeat (the rail above, `< 0.001`)
+   * would eventually hint at.
+   */
+  it.each(bigEnough.map(s => s.id))('%s: the re-roll never gives up over a driven session', (id) => {
+    const s = bigEnough.find(x => x.id === id)!;
+    expect(s.giveUps, `re-roll exhausted five tries and still served a repeat ${s.giveUps} time(s) over ${PAIRS} questions`).toBe(0);
   });
 
 });
