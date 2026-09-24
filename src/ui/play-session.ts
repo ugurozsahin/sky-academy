@@ -20,6 +20,7 @@ import { $, esc } from './dom';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
 import { hintText, promptHTML, promptMode, stageHTML, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
+import { createSolidSlot, type ArtFrame, type SolidArtState, type SolidState } from './solid';   // #684: the lazy three.js solid on a 3-D Shapes card
 
 /** The TNT bubble villain modes mix into a wave: it costs a life and never counts as a wrong answer (#48). */
 export const BOMB = '💣';
@@ -109,6 +110,12 @@ export interface PlaySession {
    * the button is never a no-op on a silent device (the #205 rule).
    */
   repeat(): boolean;
+  /** The rotating solid on the card (#684), for the `window.__sna.solid()` hook. */
+  solid(): SolidState | null;
+  /** The solid drawn inside a 3-D Shapes bubble, for the arena's `labelArt` (#684). */
+  bubbleArt(label: string, colour: string, phase: number): Readonly<ArtFrame> | null;
+  /** Which solids have a baked spin sheet, and how many bubble frames drew one — the `solidArt()` hook. */
+  solidArt(): SolidArtState | null;
   /** Stop the voice-capability subscription and any peek when the play screen is replaced. */
   dispose(): void;
 }
@@ -163,6 +170,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
   // #44: false only until Fredoka is usable (or the capped wait gives up). The first wave is held back that
   // long so its labels are measured and drawn in the real face; every wave after it spawns synchronously.
   let fontsReady = false; fontReady().then(() => { fontsReady = true; });
+  const solid = createSolidSlot(() => els.vis);   // #684: three loads on the first 3-D Shapes card, never before
   // Mission progress (#55): stage name + one segment per question (green = right, red = slip, pulsing = current) + a small "3/6".
   let segStage = 0; let segs: ('good' | 'bad' | '')[] = [];
   function drawStage(stage: number, index: number, total: number) {
@@ -273,6 +281,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         activeQuestion = q; readThrough = false;
         const peek = renderQuestion(q, false);
         els.vis.innerHTML = renderVisual(q.visual);
+        solid.show(q, session.currentTopic?.id);
         lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
         if (deps.tracing) { say(q.say ?? q.prompt); deps.startTrace(q); return; }
         const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
@@ -411,7 +420,10 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       if (!peekActive) showPeek(q, null);   // bubbles already up stay frozen while the child looks; nothing waits on it
       return true;
     },
-    dispose() { releasePeek(); stopWatchingVoice(); },
+    solid: () => solid.state(),
+    bubbleArt: (label, colour, phase) => solid.bubbleArt(label, colour, phase),
+    solidArt: () => solid.art(),
+    dispose() { releasePeek(); stopWatchingVoice(); solid.dispose(); },
   };
 }
 

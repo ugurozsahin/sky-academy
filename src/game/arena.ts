@@ -66,15 +66,18 @@ export interface ArenaOpts {
   onThrow?: () => void;                        // a projectile has just left the ninja's hand
   onLand?: () => void;                         // it has reached the bubble and popped it
   throwFor?: (b: Bubble) => boolean;           // false = pop this bubble instantly instead of throwing at it
+  /** One square cell of `img`, from `(sx, 0)`, to draw in place of a bubble's label, or null for the label (#684).
+   *  The object may be reused by the next call — draw it at once, never keep it. */
+  labelArt?: (label: string, color: string, phase: number) => { readonly img: CanvasImageSource; readonly sx: number; readonly size: number } | null;
 }
 export interface WaveOpts { labels: string[]; speed: number; wide?: boolean; gravity?: number; ordered?: string[] /* sequence labels that must be sliced in this order */ }
-const GOOD = '#66e07d', BAD = '#ff5f6d';
+export const GOOD = '#66e07d', BAD = '#ff5f6d';
 // #29 glow-underlay colours: compile-time constants, hoisted out of the per-frame draw so drawParticle/drawBubble
 // never rebuild an rgba() string (arena's #28 rule — no per-frame colour strings). hexA/hexToRgb are hoisted fns.
 const BOLT_HALO = hexA('#2ea8ff', 0.4), STAR_HALO = hexA('#ffd23a', 0.4);
 const GOOD_HALO = hexA(GOOD, 0.35), BAD_HALO = hexA(BAD, 0.35);
 
-const PALETTE = ['#ff5f6d', '#ffa726', '#ffd54f', '#66e07d', '#40c4ff', '#b388ff', '#ff7ac6', '#4dd0e1'];
+export const PALETTE = ['#ff5f6d', '#ffa726', '#ffd54f', '#66e07d', '#40c4ff', '#b388ff', '#ff7ac6', '#4dd0e1'];
 
 export class Arena {
   private ctx: CanvasRenderingContext2D;
@@ -100,6 +103,7 @@ export class Arena {
   private onThrow?: () => void; private onLand?: () => void;
   /** Which bubbles a tap throws a projectile at; anything else pops instantly, like a swipe (the TNT does — #48). */
   private throwFor?: (b: Bubble) => boolean;
+  private labelArt?: ArenaOpts['labelArt'];
   time = 0;
 
   constructor(public canvas: HTMLCanvasElement, private cb: ArenaCallbacks, opts: ArenaOpts = {}) {
@@ -108,7 +112,7 @@ export class Arena {
     if (opts.trailCore) this.trailCore = opts.trailCore;
     if (opts.fx) this.fx = opts.fx;
     this.onSwish = opts.onSwish; this.onThrow = opts.onThrow; this.onLand = opts.onLand;
-    this.throwFor = opts.throwFor;
+    this.throwFor = opts.throwFor; this.labelArt = opts.labelArt;
     this.resize();
     window.addEventListener('resize', this.resize);
     canvas.addEventListener('pointerdown', this.onDown);
@@ -515,15 +519,21 @@ export class Arena {
     // strings + a gradient object per bubble) and a shadowBlur are too slow on low-end devices (#28/#29).
     const g = glowSprite(b.color, b.r); c.drawImage(g, -g.width / 2, -g.height / 2);
     const body = bodySprite(b.color, b.r); c.drawImage(body, -body.width / 2, -body.height / 2);
-    // label — font size and line break fitted once at spawn (#28/#348), never in this per-frame path
-    const lines = b.lines; const fs = b.fontSize;
-    c.font = labelFont(fs);
-    c.textAlign = 'center'; c.textBaseline = 'middle';
-    const lh = fs * 1.02, top = 2 - (lines.length - 1) * lh / 2;   // the block of lines stays centred on the disc
-    c.lineJoin = 'round'; c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = 'rgba(20,20,40,.75)';
-    for (let i = 0; i < lines.length; i++) c.strokeText(lines[i], 0, top + i * lh);
-    c.fillStyle = '#fff';
-    for (let i = 0; i < lines.length; i++) c.fillText(lines[i], 0, top + i * lh);
+    // #684: a 3-D Shapes bubble draws its solid instead of the glyph, once the screen has baked one; the phase is
+    // offset by id so a wave does not turn in lock-step. Anything else, or a solid not baked yet, keeps its label.
+    const art = this.labelArt ? this.labelArt(b.label, b.color, now / 1000 + b.id * 0.37) : null;
+    if (art) { const s = b.r * 1.5; c.drawImage(art.img, art.sx, 0, art.size, art.size, -s / 2, -s / 2, s, s); }
+    else {
+      // label — font size and line break fitted once at spawn (#28/#348), never in this per-frame path
+      const lines = b.lines; const fs = b.fontSize;
+      c.font = labelFont(fs);
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      const lh = fs * 1.02, top = 2 - (lines.length - 1) * lh / 2;   // the block of lines stays centred on the disc
+      c.lineJoin = 'round'; c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = 'rgba(20,20,40,.75)';
+      for (let i = 0; i < lines.length; i++) c.strokeText(lines[i], 0, top + i * lh);
+      c.fillStyle = '#fff';
+      for (let i = 0; i < lines.length; i++) c.fillText(lines[i], 0, top + i * lh);
+    }
     if (b.mark) {                                    // ✓ / ✗ badge
       const col = b.mark === 'good' ? GOOD : BAD, br = b.r * 0.36, bx = b.r * 0.74, by = -b.r * 0.74;
       c.fillStyle = col; c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill();

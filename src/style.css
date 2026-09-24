@@ -1349,6 +1349,13 @@ img { -webkit-user-drag: none; }
   padding: 2px 14px;
   border-radius: 12px;
 }
+/*
+ * A rotating 3-D solid on a 3-D Shapes card (#684). One size, `--solid`, with a `vh` term so a phone held
+ * sideways gets a small solid rather than a card that eats the arena (the #328 budget); the canvas follows it
+ * exactly and `touch-action: none` so a swipe turns the solid instead of scrolling the page.
+ */
+.solid { --solid: clamp(72px, min(26vw, 15vh), 140px); margin: 2px 0; }
+.solid canvas { width: var(--solid); height: var(--solid); display: block; touch-action: none; cursor: grab; }
 .sentence, .strip { font-size: clamp(20px, 5vw, 28px); font-weight: 600; }
 .sentence .gap, .strip .gap { border-bottom: 3px solid var(--accent); text-decoration: none; }
 /* A repeating-pattern glyph strip (y2-patterns, #391), not language: reading it split across two lines breaks
