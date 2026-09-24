@@ -1780,13 +1780,24 @@ describe('profiles: siblings on one device (#20)', () => {
       const realSet = localStorage.setItem;
       (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
       try {
-        expect(renameProfile('p1', 'Ada Two'), "the session's own path").toEqual({ ok: false, why: 'store' });
+        // #431 review (pr-test-analyzer, round 2): the sibling call runs FIRST and its latch is checked
+        // before the session path ever runs, so this assertion can only be satisfied by the sibling path's
+        // own code — the earlier ordering let the session call's `save()`-driven latch (pre-existing, not
+        // new code) satisfy the sibling assertion on leftover state, which mutation-testing away both of the
+        // sibling path's own `writeFailed = true` lines failed to catch.
+        expect(isWriteFailing(), 'clean before either path has attempted a write').toBe(false);
         expect(renameProfile('p2', 'Bobby'), "the sibling's raw path").toEqual({ ok: false, why: 'store' });
         // #431 review item 5: the sibling's raw path used to return the reason and touch nothing else, so a
         // refused sibling rename left `parents.ts:35`'s sentence quiet — this asserts it latches on its own now.
-        expect(isWriteFailing(), "a thrown setItem on the sibling's raw path latches too").toBe(true);
+        expect(isWriteFailing(), "a thrown setItem on the sibling's raw path latches on its own").toBe(true);
+        expect(renameProfile('p1', 'Ada Two'), "the session's own path").toEqual({ ok: false, why: 'store' });
       } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, 'and nothing was written').toBe('Bo');
+      // A real write between the two halves, so the silent-drop half starts from the same clean state the
+      // throw half did — otherwise the latch the throw half correctly set would carry over and contaminate
+      // the silent-drop assertions the same way the original ordering did (#431 review, pr-test-analyzer).
+      save({});
+      expect(isWriteFailing(), 'a landed write clears the throw half before the silent-drop half begins').toBe(false);
       // A store that accepts the call and keeps nothing is the other half of "the write did not land" (#330),
       // and until #420 review B3 this block only ever tested the sibling path while its title claimed both.
       // The session path reported `ok`, `sfx.correct()` played, the heading and the map pill both changed
@@ -1795,8 +1806,9 @@ describe('profiles: siblings on one device (#20)', () => {
       (localStorage as unknown as { setItem: unknown }).setItem = () => { /* silently drops it */ };
       try {
         expect(renameProfile('p2', 'Bobby'), "the sibling's raw path").toEqual({ ok: false, why: 'store' });
-        // #431 review item 5: a silent drop (no throw, read-back disagrees) latches too, not only a throw.
-        expect(isWriteFailing(), "the sibling's raw path latches on a silent drop, not only a throw").toBe(true);
+        // #431 review item 5: a silent drop (no throw, read-back disagrees) latches too, not only a throw —
+        // and, going in clean above, this can only be the sibling path's own doing.
+        expect(isWriteFailing(), "the sibling's raw path latches on a silent drop, on its own, not only a throw").toBe(true);
         expect(renameProfile('p1', 'Ada Two'), "the session's own path — B3").toEqual({ ok: false, why: 'store' });
         // #431 review, silent-failure-hunter: `save()` sets `writeFailed = false` unconditionally whenever
         // `setItem` does not throw, so this session-path silent drop used to erase the `true` the sibling
