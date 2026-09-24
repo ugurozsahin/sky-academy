@@ -408,7 +408,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         // 'shown' opens the full-screen view with its own save hint — the reset above already cleared any
         // earlier message, so there is nothing left to show here.
       }
-      catch { if (scope.alive) certMsg('Could not make the certificate', true); }
+      catch (e) { console.error('certificate delivery failed', e); if (scope.alive) certMsg('Could not make the certificate', true); }
       b.disabled = false;
     });
   }
