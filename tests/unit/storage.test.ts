@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { activeProfile, addProfile, deleteProfile, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
+import { activeProfile, addProfile, deleteProfile, cleanName, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { duelHeadline, duelHistoryLine, type DuelResult } from '../../src/game/duel';
 import { carriedStreak } from '../../src/game/dojo';
@@ -609,6 +609,16 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     expect(typeof d.name).toBe('string');
     expect(() => esc(d.name)).not.toThrow();
     expect(() => d.name.trim()).not.toThrow();
+  });
+
+  // #424: a Restore code is a name a person freely typed, same as the wizard's field, and until this fix
+  // sanitizeTypes() only checked `typeof name`, never its length — so an over-length name walked straight
+  // past the guard #171 wrote for exactly this write path. Proved red by reverting the `cleanName(clean.name)`
+  // line: this then fails with a 400-character `d.name`, `renameProfile`'s own NAME_MAX test unaffected.
+  it('a Restore code cannot carry a name past NAME_MAX — sanitizeTypes() clamps, not just type-checks (#424)', () => {
+    const long = 'x'.repeat(400);
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION, name: long, coins: 0 }))).toBe(true);
+    expect(load().name).toBe(long.slice(0, NAME_MAX));
   });
 
   it('every record*() writer, touchStreak() and recordDojo() survive a save corrupted in every field they touch', () => {

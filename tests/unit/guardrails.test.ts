@@ -2104,6 +2104,18 @@ describe('the opening screen asks for a name where it can be seen (#110)', () =>
     expect(nameScreenBody, 'and the name input must re-check on every keystroke, or the button never enables (#110)')
       .toMatch(/#name[\s\S]*?addEventListener\('input'|addEventListener\('input'[\s\S]*?sync/);
   });
+
+  // #424: the wizard's own `save({ name: nameEl.value.trim() })` was the one write path with no length bound
+  // at all — `maxlength` is a browser courtesy a paste or an autofill walks past. `cleanName()` is the shared
+  // clamp `renameProfile` and Restore both apply; a bare `.trim()` here is the bug coming back. This is a
+  // text rail: it cannot see a `cleanName` that itself stopped truncating — `storage.test.ts`'s `#424` test
+  // covers that behaviourally.
+  it('the #go click handler saves through cleanName, not a bare .trim() (#424)', () => {
+    const go = nameScreenBody.match(/\$\('#go'\)\.addEventListener\('click',[\s\S]*?\}\);/)?.[0];
+    expect(go, "the #go click handler must exist in nameScreen's body").toBeTruthy();
+    expect(go, 'it must clamp through cleanName(), the one home of the NAME_MAX rule').toMatch(/cleanName\(nameEl\.value\)/);
+    expect(go, 'a bare .trim() with no cleanName call is the #424 bug').not.toMatch(/name:\s*nameEl\.value\.trim\(\)/);
+  });
 });
 
 

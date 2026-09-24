@@ -398,6 +398,12 @@ export function addProfile(): AddProfileResult {
  */
 export const NAME_MAX = 14;
 /**
+ * The one clamp every write path applies before a name reaches the store (#424) — `NAME_MAX` was the home of
+ * the number, but only `renameProfile` honoured it; the first-run wizard and Restore did not. The second
+ * `.trim()` matters: the cut can land on a trailing space.
+ */
+export const cleanName = (s: string) => s.trim().slice(0, NAME_MAX).trim();
+/**
  * Why a rename was refused, as a value the grown-ups screen can turn into a sentence (#20 slice 3, the
  * `AddProfileResult` shape). The accepted arm carries the name **as stored**, trimmed and truncated, because
  * that — not what was typed — is what the row must redraw with.
@@ -464,7 +470,7 @@ function storedName(id: ProfileId): string | null {
  */
 export function renameProfile(id: ProfileId, name: string): RenameProfileResult {
   if (!currentIndex().ids.includes(id)) return { ok: false, why: 'unknown' };
-  const next = name.trim().slice(0, NAME_MAX).trim();   // trimmed again: the cut can land on a space
+  const next = cleanName(name);
   if (!next) return { ok: false, why: 'blank' };
   if (id === sessionProfile()) {
     if (readOnly) return { ok: false, why: 'future' };
@@ -822,6 +828,11 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['name', 'year'] as const) {
     if (k in clean && typeof clean[k] !== 'string') delete clean[k];
   }
+  // #424: a Restore code is a name a person freely typed, exactly like the wizard's field below, and the
+  // `typeof` check above does not bound its length. Clamped here rather than left to `renameProfile` — a
+  // name that never goes through a rename (the common case: Restore a code and just play) must not carry an
+  // unbounded one into the store this check was meant to close.
+  if (typeof clean.name === 'string') clean.name = cleanName(clean.name);
   if ('avatar' in clean && clean.avatar !== null && typeof clean.avatar !== 'string') delete clean.avatar;
   if ('voice' in clean && clean.voice !== 'unknown' && clean.voice !== 'yes' && clean.voice !== 'no') delete clean.voice;
   for (const k of ['sound', 'speech', 'tutorialSeen', 'onboarded'] as const) {
