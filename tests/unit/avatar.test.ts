@@ -28,6 +28,12 @@ describe('canStart — the avatar screen lets a player through (#110)', () => {
     expect(canStart('volt', '😀')).toBe(true);
   });
 
+  it('a lone dangling surrogate is not a name (#424 review round 1)', () => {
+    // hasName used to check the raw input while the #go handler saved cleanName(nameEl.value) — a pasted
+    // or autofilled lone high surrogate read as non-empty here but stored as '', sailing past this check.
+    expect(canStart('volt', '\ud800')).toBe(false);
+  });
+
   it('a returning player arrives with both already set, so they are never blocked', () => {
     expect(canStart('sensei', 'Ada')).toBe(true);   // #change-av re-enters this screen with the save loaded
   });

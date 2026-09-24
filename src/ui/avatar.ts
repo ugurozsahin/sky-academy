@@ -5,8 +5,13 @@ import { cleanName, load, NAME_MAX, safeRecord, save, type TopicProgress } from 
 import { sfx, say } from '../audio';
 import { $, $$, esc, render } from './dom';
 
-/** A name with something in it. The trim is the point: a space-bar name used to sail through (#110). */
-export const hasName = (name: string) => name.trim().length >= 1;
+/**
+ * A name with something in it, once cleaned. Delegates to `cleanName` rather than its own `.trim()` (#424
+ * review round 1): a raw string that is only a dangling UTF-16 high surrogate used to read as non-empty here
+ * while `cleanName` stored it as `''`, letting the wizard's `#go` handler save a blank name despite this
+ * check appearing to require one (#110's own invariant). One shared predicate can't drift from the write.
+ */
+export const hasName = (name: string) => cleanName(name).length >= 1;
 
 /**
  * Both halves of #110 in one place, so the rule can be tested without a browser: `Let's go!` needs an

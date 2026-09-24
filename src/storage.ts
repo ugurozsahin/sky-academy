@@ -424,7 +424,7 @@ export const cleanName = (s: string) => {
  *   out of `'store'` (#420 review note 4): conflating them is what `readOnly`'s own paragraph forbids, because
  *   the remedies are opposites — this one needs the other device or an update, and `'store'` needs private
  *   browsing off or space freed. Neither ever fixes the other.
- * - `'blank'` — a name of only spaces. `hasName` is the wizard's identical rule (`avatar.ts`).
+ * - `'blank'` — a name of only spaces. `hasName` (`avatar.ts`) delegates to this same `cleanName`.
  * - `'store'` — the browser would not keep it, the same fault `STORE_HINT` describes on the picker.
  */
 export type RenameProfileResult = { ok: true; name: string } | { ok: false; why: 'unknown' | 'no-save' | 'future' | 'blank' | 'store' };
