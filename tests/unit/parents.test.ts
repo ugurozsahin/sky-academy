@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '../../src/game/parents';
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
-import { SAVE_VERSION, STICKER_IDS, type ProfileCard, type SaveData, type TopicProgress } from '../../src/storage';
+import { SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS } from '../../src/ui/parents';
 import { freshDojo } from '../../src/game/dojo';
 
@@ -136,7 +136,15 @@ describe('parent dashboard summary', () => {
  * offer a rename, and that every refusal the store can return has a sentence to show for it.
  */
 describe('ninjas on this device (#20 slice 3)', () => {
-  const card = (over: Partial<ProfileCard> = {}): ProfileCard => ({ id: 'p1', name: '', avatar: null, onboarded: false, future: false, corrupt: false, ...over });
+  // `over.state` picks the arm; everything else is a `'save'` arm's own fields, defaulted the way the flat
+  // shape used to (#431 review item 2 — the type moved from `{ future; corrupt }` booleans to a discriminated
+  // union, and this helper is the one place a test still builds a card by which fields it sets rather than
+  // which arm it means).
+  const card = (over: Partial<{ id: ProfileId; name: string; avatar: string | null; onboarded: boolean; state: ProfileCard['state'] }> = {}): ProfileCard => {
+    const id = over.id ?? 'p1';
+    if (over.state && over.state !== 'save') return { id, state: over.state };
+    return { id, state: 'save', name: over.name ?? '', avatar: over.avatar ?? null, onboarded: over.onboarded ?? false };
+  };
 
   it('offers a rename exactly when there is a save behind the row', () => {
     expect(canRenameCard(card()), 'a slot ＋ created and nothing ever played').toBe(false);
@@ -145,9 +153,10 @@ describe('ninjas on this device (#20 slice 3)', () => {
     expect(canRenameCard(card({ name: 'Ada' })), 'a name and no ninja is still a save').toBe(true);
     expect(canRenameCard(card({ name: '   ' })), 'spaces are not a name').toBe(false);
     // The arm the rail's "exactly when" was claiming and never feeding (#420 review round 2, note 2): a save
-    // this build cannot read has a name, and it is not one a rename may touch.
-    expect(canRenameCard(card({ onboarded: true, future: true })), 'a newer build wrote it, so there is nothing to change here').toBe(false);
-    expect(canRenameCard(card({ name: 'Bo', avatar: 'blaze', future: true })), 'name and ninja notwithstanding').toBe(false);
+    // this build cannot read has a name, and it is not one a rename may touch. The type itself now rules out
+    // a `future` card carrying a name or ninja to test "notwithstanding" (#431 review item 2) — the only
+    // arm `profileCard()` can ever return for a `future` slot has neither field to set.
+    expect(canRenameCard(card({ state: 'future' })), 'a newer build wrote it, so there is nothing to change here').toBe(false);
   });
 
   /**
@@ -159,13 +168,13 @@ describe('ninjas on this device (#20 slice 3)', () => {
   it('offers Remove for every ninja except the last one, except a save a newer build wrote, and except one whose removal would strand the family (#446)', () => {
     expect(canRemoveCard(card({ onboarded: true }), [card({ id: 'p2' })]), 'one of several, sibling readable').toBe(true);
     expect(canRemoveCard(card({ onboarded: true }), []), 'the only one — that is "Start again"').toBe(false);
-    expect(canRemoveCard(card({ future: true }), [card({ id: 'p2' })]), '99 coins this build cannot read are behind it').toBe(false);
+    expect(canRemoveCard(card({ state: 'future' }), [card({ id: 'p2' })]), '99 coins this build cannot read are behind it').toBe(false);
     expect(canRemoveCard(card(), [card({ id: 'p2' })]), 'an unplayed slot is removable: it is the only way the family gets it back').toBe(true);
     // #446: a readable profile with siblings, but every sibling is a `future` save — removing it would leave
     // nobody this build can open, so the button must not offer that.
-    expect(canRemoveCard(card({ onboarded: true }), [card({ id: 'p2', future: true })]),
+    expect(canRemoveCard(card({ onboarded: true }), [card({ id: 'p2', state: 'future' })]),
       'the only sibling is unreadable by this build').toBe(false);
-    expect(canRemoveCard(card({ onboarded: true }), [card({ id: 'p2', future: true }), card({ id: 'p3', onboarded: true })]),
+    expect(canRemoveCard(card({ onboarded: true }), [card({ id: 'p2', state: 'future' }), card({ id: 'p3', onboarded: true })]),
       'one sibling unreadable, another readable — the family is not stranded').toBe(true);
   });
 
@@ -175,8 +184,8 @@ describe('ninjas on this device (#20 slice 3)', () => {
    * `future` — it does not withhold Remove; only the row's *wording* changes (`profileRow` below).
    */
   it('a corrupt slot stays removable, unlike a future one', () => {
-    expect(canRemoveCard(card({ corrupt: true }), [card({ id: 'p2' })]), 'a broken v, not a newer build’s save').toBe(true);
-    expect(canRenameCard(card({ corrupt: true })), 'still nothing readable to put a name to').toBe(false);
+    expect(canRemoveCard(card({ state: 'corrupt' }), [card({ id: 'p2' })]), 'a broken v, not a newer build’s save').toBe(true);
+    expect(canRenameCard(card({ state: 'corrupt' })), 'still nothing readable to put a name to').toBe(false);
   });
 
   /**

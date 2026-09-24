@@ -2742,6 +2742,39 @@ test.describe('profile picker (#20 slice 2)', () => {
     await expect(page.locator('.home'), 'never the map with an empty profile (#67)').toHaveCount(0);
   });
 
+  /**
+   * #431 review item 2. The grown-ups list was fixed (#420/#431) to say *why* a sibling's card is blank —
+   * "Saved by a newer version" or "Cannot be read on this device" — rather than "Not started yet", but the
+   * picker one screen over kept the flat `{ future; corrupt }` fields it never checked and drew the same two
+   * states as an ordinary unplayed slot. A family could read "Not started yet" about a real save with real
+   * coins on it, on the one screen a pre-reader picks by. `ProfileCard` moving to a discriminated union makes
+   * reading `.onboarded`/`.name` without checking `.state` first a compile error, closing the picker's half of
+   * the gap the grown-ups half was already fixed for.
+   */
+  test("a newer-build or unreadable sibling's card says why on the picker too, not \"Not started yet\" (#431 review item 2)", async ({ page }) => {
+    await page.addInitScript(({ index, ada, future, corrupt }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', future);
+        localStorage.setItem('sna:v1:p3', corrupt);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2', 'p3'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      future: JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99, spent: 0, onboarded: true }),
+      corrupt: JSON.stringify({ v: 'banana', name: 'Cass', avatar: 'kai', coins: 500, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+
+    const newer = page.locator('.avatar-card[data-profile="p2"]'), unreadable = page.locator('.avatar-card[data-profile="p3"]');
+    await expect(newer).toContainText('Saved by a newer version');
+    await expect(newer, 'not the sentence an unplayed slot gets').not.toContainText('Not started yet');
+    await expect(unreadable).toContainText('Cannot be read on this device');
+    await expect(unreadable, 'never "has not played" about 500 coins this build could not parse the version of').not.toContainText('Not started yet');
+  });
+
   test('a fourth ninja is the last: the New ninja card goes when the device is full', async ({ page }) => {
     await seedSiblings(page);
     await page.goto('/');

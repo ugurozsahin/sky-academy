@@ -108,10 +108,15 @@ export function profilesScreen(go: (id: ProfileId) => void, onNew: (id: ProfileI
         // it different, on the one screen a pre-reader picks by the picture (#380 review B1). A portrait-less
         // card borrows the ＋ card's dashed figure, which `.new-ninja` already builds for exactly this
         // meaning, and stays tappable: it leads to the wizard, which is where that child belongs.
-        const a = avatarOrNull(c.avatar), name = cardName(c.name, i + 1); return `
+        const a = c.state === 'save' ? avatarOrNull(c.avatar) : null, name = cardName(c.state === 'save' ? c.name : '', i + 1); return `
         <button class="avatar-card${a ? '' : ' new-ninja'}" data-profile="${c.id}"${a ? ` style="--glow:${a.glow}"` : ''} role="listitem" aria-label="Play as ${esc(name)}">
           <span class="figure">${a ? `<img src="${a.img}" alt="" draggable="false">` : `<span class="plus" aria-hidden="true">＋</span>`}</span>
-          <b>${esc(name)}</b><small>${a && c.onboarded ? a.name : 'Not started yet'}</small>
+          <b>${esc(name)}</b><small>${
+            // `future`/`corrupt` used to fall through to "Not started yet" here — the same wrong-reason
+            // conflation #420/#431 fixed on the grown-ups row, one screen over, just not on this one
+            // (#431 review item 2). This screen has no rename/remove controls to withhold, only the label.
+            c.state === 'future' ? 'Saved by a newer version' : c.state === 'corrupt' ? 'Cannot be read on this device' : a && c.state === 'save' && c.onboarded ? a.name : 'Not started yet'
+          }</small>
         </button>`; }).join('')}
       ${room ? `
         <button class="avatar-card new-ninja" id="new-ninja" role="listitem" aria-label="Add a new ninja">
