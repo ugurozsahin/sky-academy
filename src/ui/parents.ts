@@ -283,10 +283,13 @@ function wireMove(redraw: () => void) {
     sfx.correct();
     redraw();
     // `msg` belongs to the dashboard that redraw() just threw away, so the confirmation goes on the new one.
+    // Same reason as `profMsg`'s `scroll` (#426): `redraw()`'s `render()` just scrolled to the top, and
+    // `#move-msg` sits a section below `#prof-msg`, further still from that top.
     const fresh = $('#move-msg');
     fresh.textContent = 'Restored — the progress below came from that code.';
     fresh.classList.remove('bad');
     fresh.hidden = false;
+    fresh.scrollIntoView({ block: 'center' });
   });
 }
 
@@ -337,16 +340,23 @@ export function parentsScreen(nav: Nav) {
 
     // #20 slice 3. Both controls redraw rather than patching the row: every number above came from the save
     // that was just renamed or removed, which is the same reason `wireMove`'s restore redraws.
-    const profMsg = (text: string, bad = false) => {
+    //
+    // `render()` ends every redraw at `scrollTo(0, 0)` (right for a screen *change*), which leaves this status
+    // line — well below the stats grid and topic tables — off screen exactly when it has something to say
+    // (#426). `scroll` defaults true because every call site but one follows a `drawDash()` that just did that;
+    // the rename failure below is the one exception, since it never redraws and the grown-up is already looking
+    // at the row that produced it.
+    const profMsg = (text: string, bad = false, scroll = true) => {
       const el = $('#prof-msg');
       el.textContent = text; el.classList.toggle('bad', bad); el.hidden = false;
+      if (scroll) el.scrollIntoView({ block: 'center' });
     };
     $$('button[data-rename]').forEach(b => b.addEventListener('click', () => {
       sfx.tap();
       const id = b.dataset.rename as ProfileId;
       const input = $<HTMLInputElement>(`input[data-name="${id}"]`);
       const r = renameProfile(id, input.value);
-      if (!r.ok) { sfx.wrong(); profMsg(RENAME_HINTS[r.why], true); return; }
+      if (!r.ok) { sfx.wrong(); profMsg(RENAME_HINTS[r.why], true, false); return; }
       sfx.correct();
       // The stored name, not what was typed: `renameProfile` trims and truncates, and the row has to redraw
       // with what the store is actually holding.
