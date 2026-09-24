@@ -196,6 +196,10 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.duel-end .unlock')).toHaveCount(0);
     await expect(page.locator('.duel-end .dojo-bonus')).toHaveCount(0);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).coins), 'the coins reached the save, not just the overlay').toBe(10);
+    // #355: a finished duel marks the daily streak, the same as every other finished game — coins are paid
+    // and the day is marked from the same write, so this pins both stayed true together.
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).streak.last), "the duel marked today's streak")
+      .toBe(new Date().toISOString().slice(0, 10));
     // The tally reached the topic Sensei ranks by, and not as a `play`: a duel earns no stars, so `plays` stays
     // 0 and `accuracy()` reads null for a duel-only topic. Read from the save rather than from the overlay —
     // the state hook would be green with `recordAccuracy()` never called.
