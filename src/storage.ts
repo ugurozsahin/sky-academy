@@ -1035,6 +1035,16 @@ export const CERT_CAP = 60;
  * the two fields that must stay out of this table.
  */
 type Fields<T> = { [K in keyof T]-?: (v: unknown) => v is T[K] };
+/**
+ * Runs a `Fields<T>` table against an object, in the one place that needs the unsafe cast this pattern relies
+ * on — nothing else ties `Object.keys(fields)` at runtime to `keyof T` at compile time. Safe only because
+ * every caller assigns its table directly to a `Fields<T>`-typed literal: TS's excess-property check then
+ * makes a missing *or* a stray key a compile error, so the literal cannot drift from `keyof T`. Building a
+ * table by spreading, `Object.assign`, or a function return would silently lose that guarantee — keep them
+ * as plain literals.
+ */
+const checkFields = <T>(fields: Fields<T>, x: Record<string, unknown>): boolean =>
+  (Object.keys(fields) as (keyof T)[]).every(k => fields[k](x[k as string]));
 const str = (v: unknown): v is string => typeof v === 'string';
 const fin = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const strOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
@@ -1059,8 +1069,7 @@ const CERT_FIELDS: Fields<CheckedCertFields> = {
 };
 const isCert = (c: unknown): c is StoredCert => {
   if (!c || typeof c !== 'object' || Array.isArray(c)) return false;
-  const x = c as Record<string, unknown>;
-  return (Object.keys(CERT_FIELDS) as (keyof CheckedCertFields)[]).every(k => CERT_FIELDS[k](x[k]));
+  return checkFields(CERT_FIELDS, c as Record<string, unknown>);
 };
 /**
  * File a certificate into the album (pure). One entry per mission (`c.id`) — replaying a mission does not earn
@@ -1103,8 +1112,7 @@ const DUEL_FIELDS: Fields<StoredDuel> = {
 };
 const isDuel = (d: unknown): d is StoredDuel => {
   if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
-  const x = d as Record<string, unknown>;
-  return (Object.keys(DUEL_FIELDS) as (keyof StoredDuel)[]).every(k => DUEL_FIELDS[k](x[k]));
+  return checkFields(DUEL_FIELDS, d as Record<string, unknown>);
 };
 /**
  * File a finished duel into the history (pure). **Every match is its own row**, which is the one way this

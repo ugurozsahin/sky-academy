@@ -349,12 +349,17 @@ describe('certificate album (#205)', () => {
     // which is exactly how these codes travel between devices (#64).
     const partial = { id: 'year1:y1-bonds', title: 'Number bonds' };
     const truncated = { id: 'year1:y1-add', title: 'Adding', name: 'Ada', year: 'Year 1', date: '2026-09-14', stars: 3 };
+    // `avatar: null` is a *valid* value (a child who has not picked an avatar), pinned here alongside the
+    // rejected ones — `avatar: str` instead of `avatar: strOrNull` would wrongly drop this and every other
+    // test in the file still passes, which is what makes it worth its own row rather than trusting `strOrNull`
+    // by inspection (pr-test-analyzer, #422 review).
+    const noAvatar = cert({ id: 'year1:y1-count', avatar: null });
     save({ certs: [
       'nonsense', null, 42, {}, partial, truncated, { ...cert(), stars: NaN },
       { ...cert(), avatar: 7 }, { ...cert(), avatar: undefined },   // #422: avatarById()'s fallback used to be
-      cert(),                                                       // the only thing catching these, silently
+      cert(), noAvatar,                                             // the only thing catching these, silently
     ] as unknown as StoredCert[] });
-    expect(certificates()).toEqual([cert()]);
+    expect(certificates()).toEqual([cert(), noAvatar]);
     save({ certs: 'not an album' as unknown as StoredCert[] });
     expect(certificates()).toEqual([]);
   });
