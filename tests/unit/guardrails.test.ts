@@ -820,6 +820,31 @@ describe('guard rails', () => {
     }
   });
 
+  // #453 item 2: `repeatKey` (`src/game/session.ts`) keys a `' · '`-separated `hint`/`listen` as a **set**,
+  // sorted rather than left in draw order, on the premise that the three generators building an *unordered*
+  // list (`y1-soundhunt`'s `listen`, `y1-mass`'s and `y2-temp`'s `hint`) are the only places the separator
+  // reaches a `Question`'s content fields. Nothing pinned that premise: the first generator writing an
+  // *ordered* `' · '` list — steps, a timetable, a sequence read aloud — would collapse two different
+  // questions onto one key in silence, since sorting an ordered list the same way an unordered one is sorted
+  // is exactly what makes them equal. This rail is the inventory: a fourth `hint`/`listen` line carrying the
+  // separator fails it, which is the point at which someone decides whether the list it carries is genuinely
+  // order-free before letting it stand.
+  it("' · ' reaches a hint/listen field only from the three generators contentList's premise names (#453 item 2)", () => {
+    // The exact three lines, not a count (PR #692 review round 1): a count plus "each file represented" lets a
+    // swap through — drop one of maths.ts's two known lines while adding an unrelated new one to the same
+    // file, and both the total and the per-file presence check stay exactly as they were. Pinning the lines
+    // themselves is what a swap cannot pass through unnoticed.
+    const hits = inDir('/src/curriculum/').flatMap(([file, src]) =>
+      code(src).split('\n')
+        .filter(line => /\b(?:hint|listen):/.test(line) && line.includes(' · '))
+        .map(line => `${file}: ${line.trim()}`));
+    expect(hits, "a new or changed ' · ' hint/listen line — check it is genuinely unordered before updating this list").toEqual([
+      "/src/curriculum/maths.ts: hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,",
+      "/src/curriculum/maths.ts: return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, hintIsData: true, say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });",
+      "/src/curriculum/writing.ts: return wordQ(rng, '🔊 Listen!', g, ds, { say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}` });",
+    ]);
+  });
+
   // #44: the FIRST wave must spawn behind the font gate. Canvas text bakes in whichever face is loaded when
   // fillText runs, and a bubble's label size is fitted once at spawn (#28) — so a wave launched before Fredoka
   // lands is measured against the fallback face and then changes shape in mid-air while a child reads it.
