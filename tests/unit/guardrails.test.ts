@@ -1874,10 +1874,13 @@ describe('the tablet layout rails (#107, #109)', () => {
 // complement #107 asks for by name, and it is the exhaustive half: it holds the *arithmetic* for every
 // `--slot` the stylesheet declares, at every viewport, for the two-group and take-away variants too.
 //
-// 0.801 is not a preference. Every emoji in `OBJECTS` advances 1.248 em (measured: all ten identical,
-// Noto Color Emoji's 2550/2048 design width), so a glyph is inside its slot only while
-// font-size <= slot / 1.248 = 0.801 * slot. A ratio above that is the bug returning, whatever it looks
-// like in the browser CI happens to have.
+// 0.801 is the exact-fit line, not the rail's bound. Every emoji in `OBJECTS` advances 1.248 em (measured:
+// all ten identical, Noto Color Emoji's 2550/2048 design width), so a glyph is inside its slot only while
+// font-size <= slot / 1.248 = 0.801 * slot — but #594 found the game shipping at 0.78, ~3% of headroom at
+// the `--slot` clamp's own 40px cap (the size a tablet in portrait sits at), against a font metric measured
+// from one face this game is not guaranteed to render with. 0.72 is the rail's bound so the margin cannot
+// silently drift back to that: it leaves at least ~10% in hand under the exact-fit line, whatever ratio a
+// future change picks below it.
 //
 // The stylesheet is read with readFileSync, not the `?raw` glob at the top of this file: Vite's css
 // plugin returns an empty string for CSS outside the browser, which would make this rail pass vacuously.
@@ -1900,8 +1903,8 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
     .toBe(objDecls);
   expect(objDecls, '--obj must be declared at least once (#107)').toBeGreaterThanOrEqual(1);
   for (const k of ratios)
-    expect(k, `an emoji advances 1.248em, so ${k} * slot paints outside the slot — #107 exactly`)
-      .toBeLessThanOrEqual(0.801);
+    expect(k, `0.801 is the exact-fit line for a 1.248em advance; ${k} leaves less than #594's ~10% margin`)
+      .toBeLessThanOrEqual(0.72);
 
   // The box half: if `.slot` goes back to its own viewport clamp, the single source of truth is gone and
   // the ratio above is measured against a width nothing else uses.
@@ -1909,6 +1912,22 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
   expect(slotWidth, 'the slot must take its width from --slot, so box and glyph cannot drift apart (#107)')
     .toBe('var(--slot)');
 });
+
+// #594: two text-matching rails lived here through six review rounds — one for the `@media (…max-height…)`
+// gate, one enumerating "every sizing property" a `.tenframe` selector could carry. Both kept losing to a
+// new CSS spelling every round (a compound selector, a shorthand, a logical property, case, a `calc()`
+// wrapper) because CSS has an unbounded number of ways to say "this is a fixed size", and grepping stylesheet
+// *text* for that claim cannot terminate. The reviewer's own conclusion, round 7: replace text-matching with
+// a rendered-geometry assertion — measure what the browser actually computed, which is insensitive to how
+// the CSS that produced it was spelled — or drop the text rail and lean on what already holds. Both text
+// rails are gone; what replaces them:
+//   - the `--obj` ratio bound above (still a real, mutation-tested arithmetic guarantee — a ratio is a
+//     number, not a spelling, so there's no unbounded set of ways to write it);
+//   - `tests/e2e/viewport.spec.ts`'s "the ten-frame shrinks to fit an unrealistically narrow card" and
+//     "the five-frame glyph is sized from --obj even inside a height gate" — real browser measurements of
+//     `.tenframe`'s and `.objs .obj`'s ACTUAL rendered size, which catches a fixed 140px/24px/16px/whatever
+//     future spelling produces one, because it is never fooled by how the fixed size was written, only by
+//     whether the element is genuinely, still, this many pixels wide.
 
   // #109: the grown-ups dashboard laid itself out 936 px wide inside an 800 px portrait tablet, at every
   // tablet size alike, because the width never came from the viewport. `.p-year-row span` carried
