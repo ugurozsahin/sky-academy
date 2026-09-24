@@ -1740,6 +1740,23 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).name).toBe('Ada');
     });
 
+    /**
+     * #431 review, item 1. The session path used to ask the `readOnly` latch, which only `load()` sets — so
+     * with no `load()` run yet this session (the order `reset()` in `beforeEach` leaves things: `sessionProfile()`
+     * resolves who is playing without reading their bytes), a newer-build save on the session's OWN slot fell
+     * through the stale `false` latch, reached `save()` (which itself sets `readOnly` too late for this
+     * function to see it), and answered `'store'` — sending a grown-up to turn off private browsing for a save
+     * that needs the other device instead, the exact conflation `RenameProfileResult`'s own doc forbids.
+     * `futureSaveIn(id)`, asked once against disk before either path, cannot go stale this way.
+     */
+    it("answers 'future' for the session's own profile even before this session has ever loaded it", () => {
+      const future = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Ada', coins: 99 });
+      localStorage.setItem(saveKeyFor('p1'), future);
+      expect(isReadOnlySave(), 'nothing has read this blob yet this session').toBe(false);
+      expect(renameProfile('p1', 'Bo')).toEqual({ ok: false, why: 'future' });
+      expect(localStorage.getItem(saveKeyFor('p1')), 'the other device still reads it').toBe(future);
+    });
+
     it('reports a store that will not keep the new name, on either path (#151, #330)', () => {
       save({ name: 'Ada', onboarded: true });
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
@@ -1750,6 +1767,9 @@ describe('profiles: siblings on one device (#20)', () => {
       try {
         expect(renameProfile('p1', 'Ada Two'), "the session's own path").toEqual({ ok: false, why: 'store' });
         expect(renameProfile('p2', 'Bobby'), "the sibling's raw path").toEqual({ ok: false, why: 'store' });
+        // #431 review item 5: the sibling's raw path used to return the reason and touch nothing else, so a
+        // refused sibling rename left `parents.ts:35`'s sentence quiet — this asserts it latches on its own now.
+        expect(isWriteFailing(), "a thrown setItem on the sibling's raw path latches too").toBe(true);
       } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, 'and nothing was written').toBe('Bo');
       // A store that accepts the call and keeps nothing is the other half of "the write did not land" (#330),
@@ -1760,6 +1780,8 @@ describe('profiles: siblings on one device (#20)', () => {
       (localStorage as unknown as { setItem: unknown }).setItem = () => { /* silently drops it */ };
       try {
         expect(renameProfile('p2', 'Bobby'), "the sibling's raw path").toEqual({ ok: false, why: 'store' });
+        // #431 review item 5: a silent drop (no throw, read-back disagrees) latches too, not only a throw.
+        expect(isWriteFailing(), "the sibling's raw path latches on a silent drop, not only a throw").toBe(true);
         expect(renameProfile('p1', 'Ada Two'), "the session's own path — B3").toEqual({ ok: false, why: 'store' });
       } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       // And the cache is put back, so nothing on screen shows a name the store refused.
@@ -1894,11 +1916,16 @@ describe('profiles: siblings on one device (#20)', () => {
       finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       expect(profileIds(), 'still a family of two').toEqual(['p1', 'p2']);
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "and Bo's save is untouched — the index is written first for exactly this").toBe('Bo');
+      // #431 review item 5: the index-write refusal used to return the reason and touch nothing else, so a
+      // refused delete left `parents.ts:35`'s sentence quiet, the same gap `addProfile`/`setActiveProfile`
+      // already closed on their own `writeIndex` calls.
+      expect(isWriteFailing(), 'a thrown setItem on the index write latches too').toBe(true);
       // The same for a store that accepts the call and keeps nothing.
       (localStorage as unknown as { setItem: unknown }).setItem = () => { /* silently drops it */ };
       try { expect(deleteProfile('p2')).toEqual({ ok: false, why: 'store' }); }
       finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name).toBe('Bo');
+      expect(isWriteFailing(), 'and on a silent drop, not only a throw').toBe(true);
     });
 
     it('a store that keeps the bytes deletes nothing, rather than promising it cannot be undone (#420 review B4)', () => {
@@ -1912,6 +1939,10 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "Bo's save is still there…").toBe('Bo');
       expect(profileIds(), '…so the index is put back and the family still sees them').toEqual(['p1', 'p2']);
       expect(activeProfile(), 'and nothing about the active profile moved').toBe('p1');
+      // #431 review item 5: `writeFailed` reflects the *last attempted write*, and here the rollback itself
+      // succeeded — the store kept the bytes, but every index write it was asked for landed — so the latch
+      // stays clear rather than reporting a fault that already healed.
+      expect(isWriteFailing(), 'the rollback write succeeded, so nothing is currently failing').toBe(false);
       // The two silent consequences the read-back exists to stop, both provable from the state above: the slot
       // stays occupied for `addProfile`'s probe, and a later lost index brings the child back with their save.
       expect(addProfile(), 'the slot is not quietly reusable either').toEqual({ ok: true, id: 'p3' });
@@ -1941,6 +1972,14 @@ describe('profiles: siblings on one device (#20)', () => {
       // The state the sentence has to describe, asserted rather than trusted.
       expect(JSON.parse(localStorage.getItem(INDEX)!), 'the rollback did not land').toEqual({ v: 1, active: 'p1', ids: ['p1'] });
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "and Bo's bytes are still there").toBe('Bo');
+      // #431 review item 5: the rollback write is the last one attempted, and it failed — `'orphaned'`'s own
+      // sentence already says the device is out of space, and now the latch agrees. `addProfile` itself
+      // refuses under a latched `writeFailed` (#380 round 5, B2), so — with the mocked store now put back to
+      // one that actually works — a genuine successful write is what a real device gives the family next
+      // (any ordinary save), and that is what clears it here, not the passage of time.
+      expect(isWriteFailing(), "the failed rollback latches, same as any other refused write").toBe(true);
+      save({});
+      expect(isWriteFailing(), 'a write that actually lands clears a stale latch, same as any other').toBe(false);
       // And it does not heal, which is the half the docstring used to get wrong: no route back to the slot.
       expect(deleteProfile('p2'), 'delisted, so the UI cannot reach it again').toEqual({ ok: false, why: 'unknown' });
       expect(addProfile(), "addProfile's probe skips the occupied slot for good").toEqual({ ok: true, id: 'p3' });
