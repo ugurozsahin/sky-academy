@@ -2093,6 +2093,79 @@ describe('profiles: siblings on one device (#20)', () => {
     });
 
     /**
+     * The race #431 review item 4 names: a second tab, still caching Bo, is unaware tab A just deleted them
+     * and runs its own ordinary `save()` — which writes straight to `saveKeyFor('p2')` with no check that the
+     * index still lists it. Simulated directly, since this session's own write path cannot reach a profile
+     * it no longer knows about; only a genuinely separate tab's module state can still think it is Bo's.
+     */
+    it("a tombstone survives a second tab resurrecting the deleted slot's bytes (#431 review, item 4)", () => {
+      twoChildren('p1');
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: false });
+      localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION, name: 'Bo', coins: 99, onboarded: true }));
+      // The resurrected bytes do not cap the family a ninja short...
+      expect(addProfile(), 'a tombstoned slot is free, whatever the resurrected bytes say').toEqual({ ok: true, id: 'p2' });
+      // ...and the next child does not inherit Bo's stale save.
+      expect(localStorage.getItem(saveKeyFor('p2')), "the leftover blob is wiped, not handed to the next ninja").toBeNull();
+    });
+
+    it("a lost index does not resurrect a profile a second tab wrote back after its delete (#431 review, item 4)", () => {
+      twoChildren('p1');
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: false });
+      localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION, name: 'Bo', coins: 99, onboarded: true }));
+      localStorage.removeItem('sna:profiles');
+      expect(profileIds(), "the tombstone outlives the index loss — the delete stays final").toEqual(['p1']);
+      // A profile added afterwards still lands on the freed, tombstoned slot rather than being pushed to p3.
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    });
+
+    it('a second tombstoned slot survives when addProfile reclaims a different one (#431 review, item 4)', () => {
+      save({ name: 'Ada', coins: 40, onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      save({ name: 'Bo', onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p3' });
+      save({ name: 'Cass', onboarded: true });
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: false });
+      expect(deleteProfile('p3')).toEqual({ ok: true, self: false });
+      // A second tab resurrects both deleted siblings' bytes.
+      localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION, name: 'Bo', onboarded: true }));
+      localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: SAVE_VERSION, name: 'Cass', onboarded: true }));
+      // addProfile reclaims the first free slot, p2, and this new child genuinely plays.
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      save({ name: 'Zed', onboarded: true });
+      // p3's tombstone survives p2's reuse: a lost index brings back p2 (a real save) but not p3.
+      localStorage.removeItem('sna:profiles');
+      expect(profileIds()).toEqual(['p1', 'p2']);
+    });
+
+    it('a corrupted tombstone record fails open — no crash, and no wrongly-protected slot either (#431 review, item 4)', () => {
+      twoChildren('p1');
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: false });
+      localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION, name: 'Bo', onboarded: true }));
+      localStorage.setItem('sna:profiles:tombstones', 'not json at all');
+      // A tombstone record nobody can parse reads as none at all (readIndex's own fail-open rule) — the
+      // resurrected slot is not freed by a record that cannot be trusted, only by `holdsSave()` genuinely
+      // saying so, so it stays occupied exactly as it would have before this fix existed.
+      expect(addProfile(), 'the corrupted record neither crashes nor wrongly protects the slot').toEqual({ ok: true, id: 'p3' });
+    });
+
+    it('a store that will not keep a cleared tombstone refuses the add, rather than hiding a live profile later (#431 review, item 4)', () => {
+      twoChildren('p1');
+      expect(deleteProfile('p2')).toEqual({ ok: true, self: false });
+      const realSet = localStorage.setItem;
+      // Only the tombstone write is refused — the index write a moment later must never be reached.
+      (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => {
+        if (k === 'sna:profiles:tombstones') throw new Error('quota');
+        realSet(k, v);
+      };
+      try {
+        expect(addProfile(), "a silently-surviving tombstone would hide p2 from index recovery forever — refused instead").toEqual({ ok: false, why: 'store' });
+      } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+      expect(profileIds(), 'the refused add changes nothing about who is listed').toEqual(['p1']);
+      expect(isWriteFailing()).toBe(true);
+    });
+
+    /**
      * **This reads the stored index, not `activeProfile()`, and that is the whole point of it** (#420 review
      * round 2, B1).
      *
