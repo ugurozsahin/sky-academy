@@ -2170,7 +2170,18 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
  * that read `unknown` as "not dirty, so an ordinary queue" could misclassify a conflicted push exactly as
  * this issue describes and stall on it. So the clause, and this rail, name both states.
  *
- * Prove it red: drop the `mergeable_state` clause, or either named state, from STEP 3's CI-wait sentence.
+ * `unknown` and `dirty` must stay **two different instructions** — recheck, versus merge `main` in now — and
+ * the first version of this rail could not tell that apart from a rewrite that collapsed them into one
+ * ("if it reads `unknown` or `dirty`, merge it in…"), because every token the rail checked for was still
+ * present (review of the PR opening #452: reached independently by two of the three review agents, by
+ * different means — a `dirty`/`unknown` swap and a collapsing rewrite). That rewrite passes every assertion
+ * above while reintroducing #452's own failure shape for `unknown`: merging on a state that is not
+ * necessarily a conflict at all. So this rail also anchors `unknown`'s own clause — the text between the
+ * `unknown` token and the `dirty` token — to its "recheck" instruction, and asserts that clause does **not**
+ * itself route to the merge recovery that belongs to `dirty` alone.
+ *
+ * Prove it red: drop the `mergeable_state` clause, or either named state, from STEP 3's CI-wait sentence; or
+ * collapse `unknown` and `dirty` into one shared instruction.
  */
 describe('STEP 3 tells a run what a missing CI run on a just-pushed head means (#452)', () => {
   it('checks mergeable_state and routes a dirty tree to the recovery STEP 2.5 already has, not a new one', () => {
@@ -2185,6 +2196,18 @@ describe('STEP 3 tells a run what a missing CI run on a just-pushed head means (
       .toMatch(/`unknown`/);
     expect(step3, 'and route to the same recovery §2 already has, not restate the merge-vs-rebase recipe here')
       .toMatch(/STEP 2\.5[\s\S]{0,20}does[\s\S]{0,20}\(`open-pr`\s+§2\)/);
+    // Isolate `unknown`'s own clause, not the whole paragraph: a collapsing rewrite that merges on either
+    // state still contains every token checked above, so only the text between the two tokens can tell it
+    // apart from the real fix.
+    const unknownAt = step3.indexOf('`unknown`');
+    const dirtyAt = step3.indexOf('`dirty`');
+    expect(unknownAt, 'unknown must be named before dirty, or this slice reads the wrong clause').toBeGreaterThan(-1);
+    expect(dirtyAt, 'and dirty must follow it').toBeGreaterThan(unknownAt);
+    const unknownClause = step3.slice(unknownAt, dirtyAt);
+    expect(unknownClause, "unknown's own clause must tell a run to recheck, not merge")
+      .toMatch(/recheck/i);
+    expect(unknownClause, "and unknown's own clause must not itself route to dirty's merge recovery")
+      .not.toMatch(/STEP 2\.5|open-pr`\s+§2/);
   });
 });
 
