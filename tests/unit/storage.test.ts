@@ -278,7 +278,6 @@ describe('save migration (#38)', () => {
   // `localStorage` forever rather than being dropped once and forgotten. This proves the fix at that door.
   it('a corrupt certs/duels on disk does not survive an unrelated save, once sanitizeTypes catches it', () => {
     mem['sna:v1'] = JSON.stringify({ v: SAVE_VERSION, certs: 'not an album', duels: 'not a history' });
-    reset();
     save({ coins: 5 });                                                    // an ordinary, unrelated write
     const stored = JSON.parse(mem['sna:v1']);
     expect(stored.certs).toEqual([]);
