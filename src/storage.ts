@@ -748,35 +748,41 @@ function futureSaveIn(id: ProfileId): boolean {
   return isFutureSave(parsed as RawSave);
 }
 /**
- * `future` tells "this slot is empty" apart from "this slot holds bytes this build must not touch" (#420
- * review B2). Both used to draw as the same blank card, so the grown-ups row said *"No name yet — this ninja
- * has not played"* about a sibling's newer save and offered to remove it. A card cannot show the name or the
- * ninja either way — they are fields this build cannot read — so the flag is what a screen needs in order to
- * stop asserting the wrong reason.
+ * A discriminated union, not a flat `{ future: boolean; corrupt: boolean }` (#431 review, item 2). The flat
+ * shape let a consumer read `.onboarded`/`.avatar`/`.name` on a blank card without ever checking `future` or
+ * `corrupt` first — `src/ui/profiles.ts`'s picker did exactly that, drawing a newer-build or unreadable slot
+ * as "Ninja 2 / Not started yet" and keeping it tappable, the same conflation the grown-ups row was fixed for
+ * in #420/#431 one screen over. With the fields only present on the `'save'` arm, that read is a compile
+ * error instead of a silent wrong label, and `canRenameCard` collapses to a state check rather than a
+ * negated flag.
  *
- * `corrupt` draws the same distinction for the other blank card `!isMigratable` returns: bytes with an
- * unreadable `v` (#431 review, item 3) — deliberately *not* `future`, since `load()` resets over them and a
- * delete is allowed to take the slot back. That is a different reason to be blank than "never played", and
- * without this the row said so anyway: *"Ninja 2 / Not started yet / No name yet — this ninja has not
- * played"* about a slot that in fact held a real name and coins this build simply could not parse the version
- * of.
+ * - `'empty'` — no save behind the slot at all: never written, or bytes this build cannot even parse as JSON.
+ * - `'future'` — the slot holds a save a **newer build** wrote. Neither the name nor the ninja can be shown —
+ *   they are fields this build cannot read — and a screen must say *why* it is blank rather than claiming the
+ *   ninja never played (#420 review B2).
+ * - `'corrupt'` — bytes with an unreadable `v` (#431 review, item 3): a real save this build cannot parse the
+ *   version of, deliberately *not* `'future'`, since `load()` resets over it and a delete is allowed to take
+ *   the slot back. A different reason to be blank than "never played" or "saved by a newer version".
+ * - `'save'` — a save this build can read; the only arm carrying `name`/`avatar`/`onboarded`.
  */
-export interface ProfileCard { id: ProfileId; name: string; avatar: string | null; onboarded: boolean; future: boolean; corrupt: boolean }
+export type ProfileCard =
+  | { id: ProfileId; state: 'empty' }
+  | { id: ProfileId; state: 'future' }
+  | { id: ProfileId; state: 'corrupt' }
+  | { id: ProfileId; state: 'save'; name: string; avatar: string | null; onboarded: boolean };
 export function profileCard(id: ProfileId): ProfileCard {
-  const blank: ProfileCard = { id, name: '', avatar: null, onboarded: false, future: false, corrupt: false };
   const raw = readItem(saveKeyFor(id));
-  if (!raw) return blank;
+  if (!raw) return { id, state: 'empty' };
   let parsed: unknown;
-  try { parsed = JSON.parse(raw); } catch { return blank; }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return blank;
+  try { parsed = JSON.parse(raw); } catch { return { id, state: 'empty' }; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { id, state: 'empty' };
   const s = parsed as RawSave;
   // the card agrees with load(), which refuses this blob: `future` for a newer build's save, `corrupt` for
   // everything else `!isMigratable` covers — a `v` no build ever wrote.
-  if (!isMigratable(s)) { const future = isFutureSave(s); return { ...blank, future, corrupt: !future }; }
+  if (!isMigratable(s)) return { id, state: isFutureSave(s) ? 'future' : 'corrupt' };
   return {
-    future: false,
-    corrupt: false,
     id,
+    state: 'save',
     name: typeof s.name === 'string' ? s.name : '',
     avatar: typeof s.avatar === 'string' ? s.avatar : null,
     onboarded: onboardedOf(s),

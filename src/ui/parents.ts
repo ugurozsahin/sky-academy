@@ -55,7 +55,8 @@ function saveNote(): string | null {
  *  has no name to change and `renameProfile` answers `'no-save'`; a slot holding a **newer build's** save has a
  *  name this build must not touch and it answers `'future'` (#420 review B2). The row says which, instead of
  *  offering a control that refuses. */
-export const canRenameCard = (c: ProfileCard) => !c.future && (c.onboarded || !!c.avatar || !!c.name.trim());
+export const canRenameCard = (c: ProfileCard): c is Extract<ProfileCard, { state: 'save' }> =>
+  c.state === 'save' && (c.onboarded || !!c.avatar || !!c.name.trim());
 /**
  * Whether a row offers "Remove" — every profile except the last one on the device, except a slot holding a save
  * a newer build wrote (#420 review B2), and except one whose removal would leave the device with no profile
@@ -71,10 +72,10 @@ export const canRenameCard = (c: ProfileCard) => !c.future && (c.onboarded || !!
  * `others.length === 0`, and the two questions share one answer once a second exclusion needs the same list.
  */
 export const canRemoveCard = (c: ProfileCard, others: ProfileCard[]) =>
-  others.length > 0 && !c.future && others.some(o => !o.future);
+  others.length > 0 && c.state !== 'future' && others.some(o => o.state !== 'future');
 /** What the card is called when the child has not typed a name yet. The slot number is what tells two unnamed
  *  rows apart — the picker's `cardName` rule (#380 review B1), the same words for the same reason. */
-const rowName = (c: ProfileCard, slot: number) => (c.name.trim() ? c.name : `Ninja ${slot}`);
+const rowName = (c: ProfileCard, slot: number) => (c.state === 'save' && c.name.trim() ? c.name : `Ninja ${slot}`);
 /** The sentence for `'future'`, shared by both tables and by the row itself, because all three are saying the
  *  same thing about the same bytes — and it is `saveNote()`'s remedy, not `'store'`'s: the other device, or an
  *  update to this one (#420 review note 4). */
@@ -115,19 +116,19 @@ export const DELETE_HINTS: Record<DeleteRefusal, string> = {
   stranded: 'Every other ninja on this device was saved by a newer version of the app, so removing this one would leave none this build can open. Open the game on the other device, or update this app, then come back to remove this ninja.',
 };
 function profileRow(c: ProfileCard, slot: number, others: ProfileCard[]): string {
-  const a = avatarOrNull(c.avatar);      // not `avatarById`: an unplayed slot is a state this list must draw (#380 review B1)
+  const a = c.state === 'save' ? avatarOrNull(c.avatar) : null;      // not `avatarById`: an unplayed slot is a state this list must draw (#380 review B1)
   const label = rowName(c, slot);
   return `
     <li class="p-prof" data-prof="${c.id}">
       <span class="p-prof-face"${a ? ` style="--glow:${a.glow}"` : ''}>${a ? `<img src="${a.img}" alt="" draggable="false">` : `<span class="plus" aria-hidden="true">＋</span>`}</span>
-      <span class="p-prof-who"><b>${esc(label)}</b><small>${c.future ? 'Saved by a newer version' : c.corrupt ? 'Cannot be read on this device' : a && c.onboarded ? esc(a.name) : 'Not started yet'}</small></span>
+      <span class="p-prof-who"><b>${esc(label)}</b><small>${c.state === 'future' ? 'Saved by a newer version' : c.state === 'corrupt' ? 'Cannot be read on this device' : a && c.state === 'save' && c.onboarded ? esc(a.name) : 'Not started yet'}</small></span>
       ${canRenameCard(c)
         ? `<input class="p-prof-in" data-name="${c.id}" type="text" maxlength="${NAME_MAX}" autocomplete="off" value="${esc(c.name)}" aria-label="Name for ${esc(label)}">
            <button class="btn" data-rename="${c.id}">Save name</button>`
         // Three different reasons, never the same sentence (#420 review B2, #431 review item 3): the row used
         // to say "has not played" about a sibling's newer save, or about a slot this build simply could not
         // parse the version of — bytes it could not read and had no business claiming anything about.
-        : `<span class="p-prof-wait">${c.future ? esc(FUTURE_SAY) : c.corrupt ? esc(CORRUPT_SAY) : 'No name yet — this ninja has not played.'}</span>`}
+        : `<span class="p-prof-wait">${c.state === 'future' ? esc(FUTURE_SAY) : c.state === 'corrupt' ? esc(CORRUPT_SAY) : 'No name yet — this ninja has not played.'}</span>`}
       ${canRemoveCard(c, others) ? `<button class="btn bad" data-del="${c.id}">Remove</button>` : ''}
     </li>`;
 }
