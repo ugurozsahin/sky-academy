@@ -1946,14 +1946,20 @@ it('no @media (…max-height…) block narrows the five-frame slot or glyph rati
 // in the first place.
 //
 // Round 3 review: fixing that by widening to `matchAll` on the same two exact-selector patterns was still
-// too narrow — it anchors on the bare selector text, so `.tenframe i.a`/`.tenframe i.b` (real selectors
+// too narrow — it anchored on the bare selector text, so `.tenframe i.a`/`.tenframe i.b` (real selectors
 // `src/style.css` already declares right next to the bare one, and the only ones a filled dot actually
-// renders with — `src/ui/visuals.ts`'s `<i class="a">`/`<i class="b">`) sit outside its reach entirely. A
-// prefix match on every comma-separated selector in the sheet, not a fixed set of exact strings, is what
-// closes that: it reaches `.tenframe i.a`, `.tenframe i.b`, a future `.tenframe i:last-child`, and a future
-// `.tenframe, .something-else` grouped selector alike, the same way the sibling `@media` rail above searches
-// block *bodies* rather than anchoring on a selector at all.
-it('the ten-frame dot scales with its grid cell, never a fixed pixel size, on every selector that reaches it (#594)', () => {
+// renders with — `src/ui/visuals.ts`'s `<i class="a">`/`<i class="b">`) sat outside its reach.
+//
+// Round 4 review: a prefix match on `^\.tenframe` was still selector-*shape* matching, which is the class
+// defect, not an instance of it — an ancestor-scoped override (`.objs.two .tenframe { … }`, the identical
+// pattern this sheet already uses for `.five` via `.objs.two .five`) doesn't start with `.tenframe`, so it
+// was still invisible; and the check only ever looked at `width:`/`height:`, missing that a fixed-px
+// `grid-template-columns` track on the container is the *actual* #594 mechanism (a `1fr` track turning
+// into a fixed one is what forces the grid wide, not the container's own `width`). The fix stops matching
+// on selector shape at all: any selector whose comma-separated parts *contain* `.tenframe` anywhere — the
+// same "search the body, not the selector" move the sibling `@media` rail above already makes — and scans
+// every matched body for every size-pinning property this bug can take, not just two.
+it('nothing that reaches the ten-frame pins a fixed pixel size, whatever selector or property it uses (#594)', () => {
   const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
@@ -1962,25 +1968,23 @@ it('the ten-frame dot scales with its grid cell, never a fixed pixel size, on ev
   // rule declared inside it. A selector list is comma-separated; each part is checked on its own so a
   // grouped rule (`.tenframe, .foo { … }`) cannot hide one of its selectors from the check either.
   const rules = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .flatMap(m => m[1].split(',').map(sel => ({ selector: sel.trim(), body: m[2] })));
+    .flatMap(m => m[1].split(',').map(sel => ({ selector: sel.trim(), body: m[2] })))
+    .filter(r => r.selector.includes('.tenframe'));
 
-  const dotRule = (sel: string) => /^\.tenframe\s+i(?:[.:[]|$)/.test(sel);
-  const containerRule = (sel: string) => /^\.tenframe(?:[.:[]|$)/.test(sel);
+  expect(rules.length, '.tenframe must be styled by at least one rule (#594)').toBeGreaterThanOrEqual(1);
 
-  const dotBlocks = rules.filter(r => dotRule(r.selector)).map(r => r.body);
-  expect(dotBlocks.length, '.tenframe i, .tenframe i.a or .tenframe i.b must exist (#594)').toBeGreaterThanOrEqual(1);
-  for (const rule of dotBlocks) {
-    expect(rule, 'the dot must not carry a fixed pixel width on any selector that reaches it — that is the #594 overflow returning')
-      .not.toMatch(/width:\s*[\d.]+px/);
-    expect(rule, 'the dot must not carry a fixed pixel height on any selector that reaches it — that is the #594 overflow returning')
-      .not.toMatch(/height:\s*[\d.]+px/);
+  // `(?<![\w-])` excludes `min-width:`/`max-width:`/`border-width:` — real properties this sheet uses
+  // elsewhere that a bare `width:` substring would otherwise misreport as the #594 shape returning.
+  const pinned = (body: string, prop: 'width' | 'height') => new RegExp(`(?<![\\w-])${prop}:\\s*[\\d.]+px`).test(body);
+  for (const { selector, body } of rules) {
+    expect(pinned(body, 'width'), `"${selector}" must not pin a fixed pixel width — that is the #594 overflow returning`).toBe(false);
+    expect(pinned(body, 'height'), `"${selector}" must not pin a fixed pixel height — that is the #594 overflow returning`).toBe(false);
+    // The container's actual #594 mechanism: a `1fr` grid track turning into a fixed-px one forces the
+    // whole grid wide regardless of what `width` says, which is why this checks the track list too.
+    if (/grid-template-columns\s*:/.test(body))
+      expect(body, `"${selector}" must not pin a fixed pixel grid track — that is the #594 overflow by another property`)
+        .not.toMatch(/grid-template-columns\s*:[^;]*px/);
   }
-
-  const containerBlocks = rules.filter(r => containerRule(r.selector)).map(r => r.body);
-  expect(containerBlocks.length, '.tenframe must exist (#594)').toBeGreaterThanOrEqual(1);
-  for (const container of containerBlocks)
-    expect(container, ".tenframe's own width must not be a fixed pixel value on any selector that reaches it — a fixed container is the #594 overflow, even with a responsive dot inside it")
-      .not.toMatch(/width:\s*[\d.]+px/);
 });
 
   // #109: the grown-ups dashboard laid itself out 936 px wide inside an 800 px portrait tablet, at every
