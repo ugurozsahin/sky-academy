@@ -79,6 +79,10 @@ const rowName = (c: ProfileCard, slot: number) => (c.name.trim() ? c.name : `Nin
  *  same thing about the same bytes — and it is `saveNote()`'s remedy, not `'store'`'s: the other device, or an
  *  update to this one (#420 review note 4). */
 const FUTURE_SAY = 'That ninja’s game was saved by a newer version of the app, so this one cannot change it or clear it. Open the game on the other device, or update this app.';
+/** The sentence for `corrupt` (#431 review, item 3) — a different blank than `FUTURE_SAY`'s: unlike a newer
+ *  build's save, nothing on another device is waiting for this one, so Remove is offered rather than refused
+ *  (`canRemoveCard` does not exclude it); the row just has to stop claiming the ninja never played. */
+const CORRUPT_SAY = 'This device cannot read the game saved here, so there is no way to tell whether this ninja has played — but it can still be removed.';
 /**
  * Every refusal `renameProfile` and `deleteProfile` can return, as the sentence a grown-up reads — a missing
  * case is otherwise a blank `role="status"` line.
@@ -116,14 +120,14 @@ function profileRow(c: ProfileCard, slot: number, others: ProfileCard[]): string
   return `
     <li class="p-prof" data-prof="${c.id}">
       <span class="p-prof-face"${a ? ` style="--glow:${a.glow}"` : ''}>${a ? `<img src="${a.img}" alt="" draggable="false">` : `<span class="plus" aria-hidden="true">＋</span>`}</span>
-      <span class="p-prof-who"><b>${esc(label)}</b><small>${c.future ? 'Saved by a newer version' : a && c.onboarded ? esc(a.name) : 'Not started yet'}</small></span>
+      <span class="p-prof-who"><b>${esc(label)}</b><small>${c.future ? 'Saved by a newer version' : c.corrupt ? 'Cannot be read on this device' : a && c.onboarded ? esc(a.name) : 'Not started yet'}</small></span>
       ${canRenameCard(c)
         ? `<input class="p-prof-in" data-name="${c.id}" type="text" maxlength="${NAME_MAX}" autocomplete="off" value="${esc(c.name)}" aria-label="Name for ${esc(label)}">
            <button class="btn" data-rename="${c.id}">Save name</button>`
-        // Two different reasons, never the same sentence (#420 review B2): the row used to say "has not
-        // played" about a sibling's newer save — bytes it could not read and had no business claiming
-        // anything about — and offered to destroy it.
-        : `<span class="p-prof-wait">${c.future ? esc(FUTURE_SAY) : 'No name yet — this ninja has not played.'}</span>`}
+        // Three different reasons, never the same sentence (#420 review B2, #431 review item 3): the row used
+        // to say "has not played" about a sibling's newer save, or about a slot this build simply could not
+        // parse the version of — bytes it could not read and had no business claiming anything about.
+        : `<span class="p-prof-wait">${c.future ? esc(FUTURE_SAY) : c.corrupt ? esc(CORRUPT_SAY) : 'No name yet — this ninja has not played.'}</span>`}
       ${canRemoveCard(c, others) ? `<button class="btn bad" data-del="${c.id}">Remove</button>` : ''}
     </li>`;
 }

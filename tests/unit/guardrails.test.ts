@@ -420,9 +420,10 @@ describe('guard rails', () => {
     const store = code(SOURCES['/src/storage.ts']);
     const card = store.slice(store.indexOf('export function profileCard('), store.indexOf('\n}', store.indexOf('export function profileCard(')));
     // The card still answers blank for every blob `migrate()` refuses — it now also says *which* refusal, so a
-    // screen can stop claiming "this ninja has not played" about bytes it could not read (#420 review B2). The
-    // gate is unchanged; only the shape of the blank card grew.
-    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.blank, future: isFutureSave\(s\) \};/);
+    // screen can stop claiming "this ninja has not played" about bytes it could not read (#420 review B2), and
+    // can tell a newer build's save apart from a `v` no build ever wrote (#431 review item 3). The gate is
+    // unchanged; only the shape of the blank card grew.
+    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) \{ const future = isFutureSave\(s\); return \{ \.\.\.blank, future, corrupt: !future \}; \}/);
     expect(store.slice(store.indexOf('function migrate(')), 'and that gate is still the one load() goes through').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.DEFAULT \};/);
     // `future` is the *narrower* question, not `!isMigratable` renamed: an unreadable `v` is deliberately not
     // protected — `load()` resets over it and writes resume — so only a genuinely newer save refuses a delete.

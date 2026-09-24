@@ -753,19 +753,29 @@ function futureSaveIn(id: ProfileId): boolean {
  * has not played"* about a sibling's newer save and offered to remove it. A card cannot show the name or the
  * ninja either way — they are fields this build cannot read — so the flag is what a screen needs in order to
  * stop asserting the wrong reason.
+ *
+ * `corrupt` draws the same distinction for the other blank card `!isMigratable` returns: bytes with an
+ * unreadable `v` (#431 review, item 3) — deliberately *not* `future`, since `load()` resets over them and a
+ * delete is allowed to take the slot back. That is a different reason to be blank than "never played", and
+ * without this the row said so anyway: *"Ninja 2 / Not started yet / No name yet — this ninja has not
+ * played"* about a slot that in fact held a real name and coins this build simply could not parse the version
+ * of.
  */
-export interface ProfileCard { id: ProfileId; name: string; avatar: string | null; onboarded: boolean; future: boolean }
+export interface ProfileCard { id: ProfileId; name: string; avatar: string | null; onboarded: boolean; future: boolean; corrupt: boolean }
 export function profileCard(id: ProfileId): ProfileCard {
-  const blank: ProfileCard = { id, name: '', avatar: null, onboarded: false, future: false };
+  const blank: ProfileCard = { id, name: '', avatar: null, onboarded: false, future: false, corrupt: false };
   const raw = readItem(saveKeyFor(id));
   if (!raw) return blank;
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { return blank; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return blank;
   const s = parsed as RawSave;
-  if (!isMigratable(s)) return { ...blank, future: isFutureSave(s) };   // the card agrees with load(), which refuses this blob
+  // the card agrees with load(), which refuses this blob: `future` for a newer build's save, `corrupt` for
+  // everything else `!isMigratable` covers — a `v` no build ever wrote.
+  if (!isMigratable(s)) { const future = isFutureSave(s); return { ...blank, future, corrupt: !future }; }
   return {
     future: false,
+    corrupt: false,
     id,
     name: typeof s.name === 'string' ? s.name : '',
     avatar: typeof s.avatar === 'string' ? s.avatar : null,
