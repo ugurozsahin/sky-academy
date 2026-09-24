@@ -3113,6 +3113,37 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
     await expect(page.locator('#change-av'), 'and so is the map, without a reload').toContainText('Ada Two');
   });
 
+  /**
+   * #431 review, "test coverage" section, last bullet: `renameProfile`'s success message is built from
+   * `r.name` — the name **as stored**, trimmed and truncated by `cleanName` — not from the input's raw value,
+   * because that is what the row redraws with. Every rename test above types a name with no leading or
+   * trailing space and well under `NAME_MAX`, so `r.name` and `input.value` are identical strings and
+   * swapping one for the other in `profMsg`'s call would still pass them.
+   *
+   * Two ways to pull them apart, both exercised here: padding with spaces (kept under `maxlength` so the
+   * browser's own fill pipeline never clips it), and a name past `NAME_MAX` set directly on the input's
+   * `.value` — `page.fill` goes through the same input pipeline as typing and is itself clipped at
+   * `maxlength`, so genuinely exceeding it needs the paste-equivalent `NAME_MAX`'s own docstring names as
+   * the way past a browser courtesy.
+   */
+  test('the rename confirmation names the stored name, not what was typed', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await page.fill('.p-prof-in[data-name="p1"]', '  Bobby  ');
+    await page.click('button[data-rename="p1"]');
+    await expect(page.locator('#prof-msg')).toHaveText('Renamed to Bobby.');
+    await expect(page.locator('.parents-dash')).toContainText('Bobby');
+
+    // Past NAME_MAX (14): trim then a 14-grapheme cut — 'Alexanderis The Great' → 'Alexanderis Th'.
+    await page.evaluate(() => {
+      const input = document.querySelector<HTMLInputElement>('.p-prof-in[data-name="p1"]')!;
+      input.value = '  Alexanderis The Great  ';
+    });
+    await page.click('button[data-rename="p1"]');
+    await expect(page.locator('#prof-msg')).toHaveText('Renamed to Alexanderis Th.');
+    await expect(page.locator('.parents-dash')).toContainText('Alexanderis Th');
+  });
+
   test('a blank name is refused, and the refusal says so rather than clearing the row', async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada');
     await openGrownUps(page);
