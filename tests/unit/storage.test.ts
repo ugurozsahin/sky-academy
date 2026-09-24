@@ -485,15 +485,35 @@ describe('duel history (#16)', () => {
     expect(duelHistory()).toEqual([duel()]);
   });
 
+  // #423 review item 7 (pr-test-analyzer): the boundary either side of the new check, pinned so a `>= 0` typo
+  // (`> 0`, rejecting a legitimate scoreless duel) or a tightened `at` (breaking the deliberate finite-only
+  // carve-out `StoredDuel`'s own docstring argues for) would fail here rather than surviving unnoticed.
+  it('a zero count is accepted, and a fractional/negative `at` is — deliberately — not', () => {
+    save({ duels: [duel({ scoreA: 0, scoreB: 0, rounds: 0 })] });
+    expect(duelHistory(), 'no rounds played yet is a real duel, not junk').toEqual([duel({ scoreA: 0, scoreB: 0, rounds: 0 })]);
+    save({ duels: [duel({ at: -1 })] });
+    expect(duelHistory(), '`at` stays on Number.isFinite, not the count rail').toEqual([duel({ at: -1 })]);
+    save({ duels: [duel({ at: 1.5 })] });
+    expect(duelHistory(), 'a fractional epoch is still a finite number').toEqual([duel({ at: 1.5 })]);
+  });
+
   // #423 review item 6: `fileDuel` enforces `DUEL_CAP` on every write, but a Restore or a hand-edited save
   // reaches the store by a different door and used to carry as many well-formed rows as it liked straight
   // past `duelHistory()` — 200 rows read back as 200, not "the last few sessions" the cap argues for.
-  it('a hand-edited save with more than DUEL_CAP well-formed rows is capped on read, not just on write', () => {
-    const rows = Array.from({ length: DUEL_CAP + 5 }, (_, i) => duel({ at: i }));
+  //
+  // Built newest-first, the order `fileDuel` and every legitimate Restore both keep (`StoredDuel.at`'s own
+  // docstring: "the list's order and its only identity") — and the test pins WHICH rows survive, not just how
+  // many (pr-test-analyzer, #423 review): an ascending fixture would pass a `.slice` that kept the wrong,
+  // oldest end just as easily as the right one, which is a silent, wrong-direction data loss on read.
+  it('a hand-edited save with more than DUEL_CAP well-formed rows is capped on read, keeping the newest', () => {
+    const rows = Array.from({ length: DUEL_CAP + 5 }, (_, i) => duel({ at: DUEL_CAP + 4 - i }));
     save({ duels: rows as unknown as StoredDuel[] });
     const stored = JSON.parse(mem['sna:v1']).duels as StoredDuel[];
     expect(stored.length, 'the save itself still holds every row — this is a read-time cap, not a rewrite').toBe(DUEL_CAP + 5);
-    expect(duelHistory().length).toBe(DUEL_CAP);
+    const history = duelHistory();
+    expect(history.length).toBe(DUEL_CAP);
+    expect(history.map(m => m.at), 'the newest DUEL_CAP rows, oldest 5 dropped — the same bias fileDuel has on write')
+      .toEqual(Array.from({ length: DUEL_CAP }, (_, i) => DUEL_CAP + 4 - i));
   });
 
   // A save written before v4 has no duel history to preserve: those matches were never stored. An empty list
