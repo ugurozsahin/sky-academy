@@ -1843,6 +1843,55 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(/[‍\ud800-\udbff]$/.test(load().name), 'no dangling joiner or lone surrogate at the end').toBe(false);
     });
 
+    it('a single grapheme cluster wider than NAME_MAX is kept whole, never refused as blank (#431 review)', () => {
+      save({ name: 'Ada', onboarded: true });
+      // A family emoji with a skin-tone modifier on every member is still one grapheme cluster — 19 UTF-16
+      // units, past NAME_MAX (14) on its own. Dropping it (the naive "does it fit?" answer) would leave
+      // graphemeSafeSlice returning '', which renameProfile would then report as `'blank'` — wrong, since
+      // the grown-up typed a real, non-blank name that simply does not fit the display cap.
+      const wideFamily = '👨🏻‍👩🏻‍👧🏻‍👦🏻';
+      expect(wideFamily.length).toBe(19);
+      expect(wideFamily.length).toBeGreaterThan(NAME_MAX);
+      const r = renameProfile('p1', wideFamily);
+      expect(r).toEqual({ ok: true, name: wideFamily });
+      expect(load().name).toBe(wideFamily);
+    });
+
+    it('falls back to a code-point-safe slice when Intl.Segmenter is unavailable or throws (#431 review)', () => {
+      save({ name: 'Ada', onboarded: true });
+      const family = '👨‍👩‍👧‍👦';
+      const name = family + family + family;
+
+      const intl = Intl as { Segmenter?: typeof Intl.Segmenter };
+      const originalSegmenter = intl.Segmenter;
+      // Simulating an older WebView with no Intl.Segmenter at all.
+      delete intl.Segmenter;
+      try {
+        const r = renameProfile('p1', name);
+        // The fallback is surrogate-pair-safe (plain `for...of` string iteration) but not cluster-safe, so
+        // it may still cut inside a ZWJ sequence — the documented, lesser protection this repository already
+        // shipped before this fix. What it must never do is leave a lone surrogate.
+        expect(r.ok).toBe(true);
+        expect((r as { ok: true; name: string }).name.length).toBe(NAME_MAX);
+        expect(/[\ud800-\udbff](?![\udc00-\udfff])/.test(load().name), 'no lone high surrogate').toBe(false);
+      } finally {
+        intl.Segmenter = originalSegmenter;
+      }
+
+      // A Segmenter that exists but throws on use (a non-conformant WebView) must fall through the same
+      // way, rather than crash the rename.
+      intl.Segmenter = vi.fn(() => {
+        throw new Error('non-conformant WebView');
+      }) as unknown as typeof Intl.Segmenter;
+      try {
+        const r2 = renameProfile('p1', name);
+        expect(r2.ok).toBe(true);
+        expect((r2 as { ok: true; name: string }).name.length).toBe(NAME_MAX);
+      } finally {
+        intl.Segmenter = originalSegmenter;
+      }
+    });
+
     it('refuses a slot that is not a profile of this device, and one with nothing to name', () => {
       save({ name: 'Ada', onboarded: true });
       expect(renameProfile('p3', 'Cass'), 'p3 is not in the index').toEqual({ ok: false, why: 'unknown' });

@@ -408,17 +408,25 @@ export function addProfile(): AddProfileResult {
  * cluster, which is the same partial protection this repository already shipped before this fix.
  */
 function graphemeSafeSlice(s: string, max: number): string {
-  const Segmenter = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
-  let out = '';
-  if (Segmenter) {
-    for (const { segment } of new Segmenter(undefined, { granularity: 'grapheme' }).segment(s)) {
-      if (out.length + segment.length > max) break;
-      out += segment;
+  if (typeof Intl.Segmenter === 'function') {
+    try {
+      let out = '';
+      for (const { segment } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s)) {
+        // A single cluster longer than `max` is kept whole rather than dropped: a rename must never be
+        // silently refused as `'blank'` for a name that is not blank, only too wide to fit the cap
+        // (silent-failure-hunter, #431 review) — this cap is a display safety net, not a hard limit.
+        if (out !== '' && out.length + segment.length > max) break;
+        out += segment;
+      }
+      return out;
+    } catch {
+      // A `Segmenter` that exists but throws on construction or iteration — an older or non-conformant
+      // WebView — falls through to the code-point walk below instead of crashing the rename (#431 review).
     }
-    return out;
   }
+  let out = '';
   for (const codePoint of s) {
-    if (out.length + codePoint.length > max) break;
+    if (out !== '' && out.length + codePoint.length > max) break;
     out += codePoint;
   }
   return out;
