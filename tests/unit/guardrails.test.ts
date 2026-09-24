@@ -189,10 +189,37 @@ describe('guard rails', () => {
   // which reads them off the injected `Capacitor.Plugins` bridge rather than importing either package, so
   // neither is a static or dynamic `import` anywhere in `src/` (checked below alongside the empty
   // `dependencies` list, since that only proves neither is a *runtime* dependency of the web build).
+  // #684 (owner, in session, 2026-09-24): `three` is the first runtime dependency — the 3-D solids on the
+  // 3-D Shapes cards are three.js primitives — and `@types/three` is its typings (three ships none). The
+  // spike measured the cost in its pull request; the owner decides on the issue whether it stays. Both
+  // lists are exact, so a second runtime dependency is still a red build until it is argued for here.
   it('dependencies match the allowlist below (CLAUDE.md explains the rule)', () => {
-    const allowed = ['@capacitor/android', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', 'typescript', 'vite', 'vitest'];
-    expect(Object.keys((pkg as { dependencies?: object }).dependencies ?? {})).toEqual([]);   // nothing but our own code ships to the browser
+    const allowed = ['@capacitor/android', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', '@types/three', 'typescript', 'vite', 'vitest'];
+    expect(Object.keys((pkg as { dependencies?: object }).dependencies ?? {})).toEqual(['three']);   // #684: the one thing that ships to the browser beside our own code
     expect(Object.keys((pkg as { devDependencies?: object }).devDependencies ?? {}).sort()).toEqual([...allowed].sort());
+  });
+
+  // #684: three.js is ~130 kB gzipped and does not tree-shake, so it must never reach the main chunk. Two
+  // properties keep it out, and a third keeps the single-file build honest:
+  //   1. exactly one module imports `three` — `src/game/solids.ts`;
+  //   2. that module is reached only through a dynamic `import()` (a `import type` is erased and is fine),
+  //      which is what makes Vite emit it as its own lazy chunk;
+  //   3. `solids.ts` imports nothing from `src/`, so its chunk is self-contained — `scripts/bundle-single.mjs`
+  //      inlines it as a data-URL module, which cannot reach back into the main chunk.
+  // Proved red: a static `import { SolidView } from '../game/solids'` in a scratch `src/` file fails (2);
+  // `import { Color } from 'three'` in `src/ui/solid.ts` fails (1); `import { $ } from '../ui/dom'` in
+  // solids.ts fails (3). Text rails, over `code()` (comments may name the ban): they see spellings, not the
+  // built output — the chunk sizes in the pull request body are the other half of the evidence.
+  it('three is imported by src/game/solids.ts alone, which is only ever loaded dynamically (#684)', () => {
+    const SOLIDS = '/src/game/solids.ts';
+    expect(SOURCES[SOLIDS], 'the module this rail is about must exist').toBeTruthy();
+    const threeImporters = Object.entries(SOURCES).filter(([, src]) => /\bfrom\s*['"]three['"]|\bimport\s*\(\s*['"]three['"]|\brequire\s*\(\s*['"]three['"]/.test(code(src))).map(([f]) => f);
+    expect(threeImporters).toEqual([SOLIDS]);
+    const staticSolids = Object.entries(SOURCES).filter(([f, src]) => f !== SOLIDS && /\bimport\s+(?!type\b)[^;()]*?\bfrom\s*['"][^'"]*\/solids['"]/.test(code(src))).map(([f]) => f);
+    expect(staticSolids, 'a static import of solids.ts pulls three into the main chunk').toEqual([]);
+    const dynamicSolids = Object.entries(SOURCES).filter(([f, src]) => f !== SOLIDS && /\bimport\s*\(\s*['"][^'"]*\/solids['"]\s*\)/.test(code(src))).map(([f]) => f);
+    expect(dynamicSolids, 'the one lazy loader').toEqual(['/src/ui/solid.ts']);
+    expect(code(SOURCES[SOLIDS]), 'solids.ts must not import from src/ — its chunk is inlined stand-alone by bundle-single.mjs').not.toMatch(/\bfrom\s*['"]\.{1,2}\//);
   });
 
   // #110: `@capacitor/filesystem`/`@capacitor/share` exist only so `npx cap sync` registers their native

@@ -12,6 +12,7 @@ import type { Memory } from '../game/memory';
 import type { Duel, DuelPlayer, DuelTally } from '../game/duel';
 import type { CertText } from './certificate';
 import type { TrailSkin } from '../game/shop';
+import type { SolidState } from './solid';
 
 /**
  * A live bubble as the e2e spec reads it (a subset of arena `Bubble`).
@@ -59,6 +60,8 @@ export interface PlayHooks {
   setSpeed(k: number): void;
   /** Test-only (#32): the effective outcome holds (ms) and the current speed multiplier. */
   timing(): { speed: number; hold: { correct: number; wrong: number; miss: number } };
+  /** The rotating solid on the card (#684): its name, frames drawn, whether WebGL came up — null when the question has none. */
+  solid(): SolidState | null;
 }
 
 /** A memory card as the e2e spec reads it (a subset of `Card`). */

@@ -353,6 +353,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     setSpeed: (k: number) => { setGameSpeed(k); },
     // #32: effective outcome holds (ms) and the current multiplier — the normal-speed rail asserts the base holds.
     timing: () => ({ speed: gameSpeed(), hold: { correct: scaled(HOLD.correct), wrong: scaled(HOLD.wrong), miss: scaled(HOLD.miss) } }),
+    // #684: the rotating solid on a 3-D Shapes card — name, frames drawn, WebGL up — so e2e can assert it rendered without reading pixels.
+    solid: () => playSession.solid(),
   };
   window.__sna = hooks;
   session.start();
