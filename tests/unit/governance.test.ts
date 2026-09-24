@@ -2180,8 +2180,18 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
  * `unknown` token and the `dirty` token — to its "recheck" instruction, and asserts that clause does **not**
  * itself route to the merge recovery that belongs to `dirty` alone.
  *
- * Prove it red: drop the `mergeable_state` clause, or either named state, from STEP 3's CI-wait sentence; or
- * collapse `unknown` and `dirty` into one shared instruction.
+ * Round 2 of the same review found the anchoring was still one-directional: `dirty`'s own clause was never
+ * isolated the way `unknown`'s was, so (a) a full semantic swap — `unknown` merges, `dirty` waits, with the
+ * "recheck"/routing tokens exchanged along with the meanings — passed, because each token still landed in
+ * the clause the checks expected; and (b) the STEP 2.5/`open-pr` §2 pointer was checked anywhere in `step3`,
+ * so placing it as inert filler near `dirty` while `dirty`'s own instruction said "wait" also passed. Both
+ * mutation-verified by hand and independently by two of the three review agents. So `dirtyClause` is now
+ * isolated the same way `unknownClause` is, the STEP 2.5/`open-pr` §2 match and the "merge it in" instruction
+ * are required **inside** it rather than anywhere in `step3`, and each clause is checked for not claiming the
+ * other's action — the same anchoring shape, run in both directions.
+ *
+ * Prove it red: drop the `mergeable_state` clause, or either named state, from STEP 3's CI-wait sentence;
+ * collapse `unknown` and `dirty` into one shared instruction; or swap which clause carries which action.
  */
 describe('STEP 3 tells a run what a missing CI run on a just-pushed head means (#452)', () => {
   it('checks mergeable_state and routes a dirty tree to the recovery STEP 2.5 already has, not a new one', () => {
@@ -2194,20 +2204,30 @@ describe('STEP 3 tells a run what a missing CI run on a just-pushed head means (
       .toMatch(/`dirty`/);
     expect(step3, 'and name the not-yet-computed state, or a run reads it as an ordinary slow queue and stalls')
       .toMatch(/`unknown`/);
-    expect(step3, 'and route to the same recovery §2 already has, not restate the merge-vs-rebase recipe here')
-      .toMatch(/STEP 2\.5[\s\S]{0,20}does[\s\S]{0,20}\(`open-pr`\s+§2\)/);
-    // Isolate `unknown`'s own clause, not the whole paragraph: a collapsing rewrite that merges on either
-    // state still contains every token checked above, so only the text between the two tokens can tell it
-    // apart from the real fix.
+    // Isolate each clause, not the whole paragraph: a rewrite that swaps or collapses the two states still
+    // contains every token checked above somewhere in `step3`, so only the text within each clause's own
+    // boundary can tell it apart from the real fix. `unknownClause` runs to the `dirty` token; `dirtyClause`
+    // runs to the next sentence boundary (the first `. ` after it — `STEP 2.5` itself has a period with no
+    // following space, so it does not end the slice early).
     const unknownAt = step3.indexOf('`unknown`');
     const dirtyAt = step3.indexOf('`dirty`');
     expect(unknownAt, 'unknown must be named before dirty, or this slice reads the wrong clause').toBeGreaterThan(-1);
     expect(dirtyAt, 'and dirty must follow it').toBeGreaterThan(unknownAt);
     const unknownClause = step3.slice(unknownAt, dirtyAt);
+    const dirtyEnd = step3.slice(dirtyAt).search(/\.\s/);
+    expect(dirtyEnd, "dirty's own clause must end in a real sentence boundary, or this slice runs unbounded")
+      .toBeGreaterThan(-1);
+    const dirtyClause = step3.slice(dirtyAt, dirtyAt + dirtyEnd + 1);
     expect(unknownClause, "unknown's own clause must tell a run to recheck, not merge")
       .toMatch(/recheck/i);
-    expect(unknownClause, "and unknown's own clause must not itself route to dirty's merge recovery")
-      .not.toMatch(/STEP 2\.5|open-pr`\s+§2/);
+    expect(unknownClause, "and unknown's own clause must not itself claim dirty's merge instruction")
+      .not.toContain('merge it in');
+    expect(dirtyClause, "dirty's own clause must contain its merge instruction, not merely gesture at recovery")
+      .toContain('merge it in');
+    expect(dirtyClause, "and dirty's own clause must route to the same recovery §2 already has, inside itself")
+      .toMatch(/STEP 2\.5[\s\S]{0,20}does[\s\S]{0,20}\(`open-pr`\s+§2\)/);
+    expect(dirtyClause, "and dirty's own clause must not itself claim unknown's wait-and-recheck instruction")
+      .not.toMatch(/recheck|has not finished computing/i);
   });
 });
 
