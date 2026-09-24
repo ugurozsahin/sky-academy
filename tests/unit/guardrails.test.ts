@@ -282,7 +282,7 @@ describe('guard rails', () => {
   // 2. Boot shows it only when siblings actually share the device. Nothing changes for today's players,
   //    which is the owner's decision at the top of #20, and `> 1` is the whole of it.
   // 3. The store is asked before the child is moved: a `go(...)` that did not wait for
-  //    `setActiveProfile` to return true would drop a child into a sibling's game on a store that refuses.
+  //    `setActiveProfile` to accept the switch would drop a child into a sibling's game on a store that refuses.
   // 4. Drawing a card never goes through `load()`/`save()` — those resolve and latch *this session's*
   //    profile, so reading a sibling's name through them would answer the wrong child or bind the session
   //    to them. `profileCard()` reads the slot key directly for that reason.

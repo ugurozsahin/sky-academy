@@ -293,10 +293,23 @@ function rereadProfile(id: ProfileId) {
   if (!writeFailed && !readOnly) cache = null;
 }
 /**
- * Switch the active profile. False when `id` is not one of this device's profiles, or when the index was not
- * kept: a switch the store refuses would put the child back on their sibling's game at the next launch, and
- * on a store that refuses this write the new profile could not be saved either. The caller says so rather
- * than the session pretending (the `buyItem`/`equipItem` rule, #151).
+ * The two ways a switch can be refused, told apart the same way `addProfile`'s `AddProfileResult` are
+ * (#401 item 5). `pickOutcome` used to get a bare `boolean` here and collapse both into the one sentence
+ * about the browser, which told a family whose card had simply gone stale (a second tab deleted the slot
+ * mid-render) that their browser could not save — the wrong fault for the wrong reason.
+ *
+ * - `'unknown'` — `id` is not one of this device's profiles any more. Only a second tab or a delete landing
+ *   between the picker drawing the card and the tap reaches this; nothing in this build offers a stale id on
+ *   purpose.
+ * - `'store'` — the index was not kept: a switch the store refuses would put the child back on their
+ *   sibling's game at the next launch, and on a store that refuses this write the new profile could not be
+ *   saved either.
+ *
+ * The caller says which, rather than the session pretending (the `buyItem`/`equipItem` rule, #151).
+ */
+export type SetActiveResult = { ok: true } | { ok: false; why: 'unknown' | 'store' };
+/**
+ * Switch the active profile. See `SetActiveResult` for what a refusal means.
  *
  * **Re-selecting the child who is already active is not a switch and writes nothing** (#380 review B1). It
  * used to: the index was rewritten with the value it already held, so on a store that refuses writes every
@@ -304,10 +317,10 @@ function rereadProfile(id: ProfileId) {
  * back control, the device that used to boot to the sky map and play unsaved could no longer reach the game
  * at all. Nothing needs persisting to hand a child back their own game, so nothing is attempted.
  *
- * **This session is unchanged on a false return; the store is not guaranteed to be.** `writeIndex` promises
- * only that it is not holding this index, not that the key is untouched — on a partially-working store the
+ * **This session is unchanged on a refusal; the store is not guaranteed to be.** `writeIndex` promises only
+ * that it is not holding this index, not that the key is untouched — on a partially-working store the
  * `setItem` may have landed and the read-back disagreed. Read its paragraph before relying on the stronger
- * reading; `false` did once say "nothing changes" outright, and that outlived the narrowing (#330 round 3, N5).
+ * reading; a refusal did once say "nothing changes" outright, and that outlived the narrowing (#330 round 3, N5).
  *
  * **Both arms end in `rereadProfile`, and that is the fix for a whole shape of bug rather than one path**
  * (#380 review round 5, B2). Round 4 taught the `idx.active === id` arm to keep a cached save the store has
@@ -318,12 +331,12 @@ function rereadProfile(id: ProfileId) {
  * whether the session changes child is `rereadProfile`'s question either way, asked of `cacheProfile` rather
  * than of the index.
  */
-export function setActiveProfile(id: ProfileId): boolean {
+export function setActiveProfile(id: ProfileId): SetActiveResult {
   const idx = currentIndex();
-  if (!idx.ids.includes(id)) return false;
-  if (idx.active !== id && !writeIndex({ ...idx, active: id })) { writeFailed = true; return false; }
+  if (!idx.ids.includes(id)) return { ok: false, why: 'unknown' };
+  if (idx.active !== id && !writeIndex({ ...idx, active: id })) { writeFailed = true; return { ok: false, why: 'store' }; }
   rereadProfile(id);
-  return true;
+  return { ok: true };
 }
 /**
  * The two ways adding a profile can be refused, told apart (#335 item 2). `null` carried both, and the picker

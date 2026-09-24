@@ -1,5 +1,5 @@
 import { avatarOrNull } from '../avatars';
-import { addProfile, MAX_PROFILES, profileCards, setActiveProfile, type AddProfileResult, type ProfileId } from '../storage';
+import { addProfile, MAX_PROFILES, profileCards, setActiveProfile, type AddProfileResult, type ProfileId, type SetActiveResult } from '../storage';
 import { sfx, say } from '../audio';
 import { $, $$, esc, render } from './dom';
 
@@ -29,7 +29,12 @@ const cardName = (name: string, slot: number) => (name.trim() ? name : `Ninja ${
  *  doing (#335 item 2), and a child cannot act on the other. */
 const FULL_HINT = `Four ninjas is the most one device can hold. 🥷`;
 const STORE_HINT = `This browser will not let the game save, so a new ninja cannot be added. 😕`;
-const SWITCH_HINT = `This browser will not let the game save, so it cannot swap ninja. 😕`;
+const SWITCH_STORE_HINT = `This browser will not let the game save, so it cannot swap ninja. 😕`;
+/** `pickOutcome`'s own stale-card refusal (#401 item 5) — a second tab moved or deleted this slot between the
+ *  picker drawing the card and the tap landing on it. Not the browser's fault, so not `SWITCH_STORE_HINT`'s
+ *  sentence: nothing a family does fixes a store that will not save, but this clears on its own once the
+ *  picker redraws. */
+const SWITCH_UNKNOWN_HINT = `That ninja is not on this device any more. 🥷`;
 /** `addProfile`'s own refusal union, read off it rather than written out a second time (#401 item 1). */
 type AddRefusal = Extract<AddProfileResult, { ok: false }>['why'];
 /** A `Record` rather than `addOutcome`'s old ternary (#401 item 2): `AddProfileResult['why']` gaining a third
@@ -38,6 +43,9 @@ type AddRefusal = Extract<AddProfileResult, { ok: false }>['why'];
  *  finite string-literal union, as it is today — widen it to plain `string` and `Record<AddRefusal, string>`
  *  stops requiring any particular keys at all (PR #590 review round 1, non-blocking). */
 const ADD_HINTS: Record<AddRefusal, string> = { full: FULL_HINT, store: STORE_HINT };
+/** `setActiveProfile`'s refusal union, the same shape as `ADD_HINTS` for the same reason (#401 item 5). */
+type SwitchRefusal = Extract<SetActiveResult, { ok: false }>['why'];
+const SWITCH_HINTS: Record<SwitchRefusal, string> = { unknown: SWITCH_UNKNOWN_HINT, store: SWITCH_STORE_HINT };
 
 /**
  * What a tap on a profile card comes to, as a value.
@@ -57,9 +65,15 @@ export type PickOutcome = { move: true; id: ProfileId } | { move: false; hint: s
  * more — though a caller determined to disagree still can, through a closure (`pickOutcome(idA, () =>
  * setActiveProfile(idB))` still compiles): the type does not rule that out, it just stops being the shortest
  * way to write the bug (PR #590 review round 1, non-blocking).
+ *
+ * The two refusals `setActiveProfile` can give are told apart here (#401 item 5), the same shape as
+ * `addOutcome` below: a stale card and a store that will not save are different faults, and only one of them
+ * is the family's to act on.
  */
-export const pickOutcome = (id: ProfileId, switchTo: (id: ProfileId) => boolean): PickOutcome =>
-  switchTo(id) ? { move: true, id } : { move: false, hint: SWITCH_HINT };
+export const pickOutcome = (id: ProfileId, switchTo: (id: ProfileId) => SetActiveResult): PickOutcome => {
+  const r = switchTo(id);
+  return r.ok ? { move: true, id } : { move: false, hint: SWITCH_HINTS[r.why] };
+};
 
 /**
  * The same for the "New ninja" card: `addProfile`'s two refusals become the two sentences the picker shows
