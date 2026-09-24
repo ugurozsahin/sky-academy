@@ -105,7 +105,7 @@ export const certWords = (c: CertInfo): CertText => certificateText(c);
  * hold up to `CERT_CAP` (60) entries.
  */
 export function certAlbumHTML(certs: StoredCert[]): string {
-  if (!certs.length) return '<p class="cert-empty">Win a mission (or finish Sensei training) to earn your first certificate — it will show up here.</p>';
+  if (!certs.length) return '<p class="cert-empty">Win a mission, finish Sensei training or win a Ninja Duel to earn your first certificate — it will show up here.</p>';
   const rows = certs.map(c => {
     const a = avatarById(c.avatar);
     const stars = '★'.repeat(Math.max(0, Math.min(3, c.stars))) + '☆'.repeat(3 - Math.max(0, Math.min(3, c.stars)));
