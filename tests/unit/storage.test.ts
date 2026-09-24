@@ -472,6 +472,30 @@ describe('duel history (#16)', () => {
     expect(duelHistory()).toEqual([]);
   });
 
+  // #423 review item 7: a score or a round count is type-correct and still nonsense once it goes negative or
+  // fractional — `scoreB: -5` or `rounds: 1.5` used to pass `isDuel`'s bare `Number.isFinite` check and reach
+  // `duelHistoryLine` as-is. `at` is a timestamp, not a count, so it stays on finiteness alone and is not
+  // part of this rail.
+  it('a duel row with a negative or fractional score or round count is rejected, not just a non-finite one', () => {
+    save({ duels: [
+      { ...duel(), scoreA: -1 }, { ...duel(), scoreB: -5 }, { ...duel(), rounds: -3 },
+      { ...duel(), scoreA: 2.5 }, { ...duel(), rounds: 9.9 },
+      duel(),
+    ] as unknown as StoredDuel[] });
+    expect(duelHistory()).toEqual([duel()]);
+  });
+
+  // #423 review item 6: `fileDuel` enforces `DUEL_CAP` on every write, but a Restore or a hand-edited save
+  // reaches the store by a different door and used to carry as many well-formed rows as it liked straight
+  // past `duelHistory()` — 200 rows read back as 200, not "the last few sessions" the cap argues for.
+  it('a hand-edited save with more than DUEL_CAP well-formed rows is capped on read, not just on write', () => {
+    const rows = Array.from({ length: DUEL_CAP + 5 }, (_, i) => duel({ at: i }));
+    save({ duels: rows as unknown as StoredDuel[] });
+    const stored = JSON.parse(mem['sna:v1']).duels as StoredDuel[];
+    expect(stored.length, 'the save itself still holds every row — this is a read-time cap, not a rewrite').toBe(DUEL_CAP + 5);
+    expect(duelHistory().length).toBe(DUEL_CAP);
+  });
+
   // A save written before v4 has no duel history to preserve: those matches were never stored. An empty list
   // is the truthful answer, and the v3 → v4 step is what makes it one rather than `undefined` reaching a
   // `.map()` on the rewards screen.

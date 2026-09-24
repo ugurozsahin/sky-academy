@@ -3,6 +3,9 @@ import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type 
 import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
 import { TOPICS, YEARS, type YearId } from './curriculum';
 import { AVATARS, VILLAIN } from './avatars';
+// Type-only plus one small runtime tuple, so this stays the mirror of the `type-only` imports duel.ts already
+// takes from here (#423 review item 1) — no runtime edge, since duel.ts's own import back is `import type`.
+import { DUEL_OUTCOMES, type DuelOutcome } from './game/duel';
 /**
  * A tally of questions answered for one topic — `hits` right of `tries` attempted — while it is still being
  * built, before `recordAccuracy()` folds it into `TopicProgress`'s own optional `hits?`/`tries?` below (the
@@ -63,7 +66,7 @@ export interface StoredDuel {
   topic: string;          // topic id the match was played on
   title: string;          // topic title as the duel screen showed it ("Number bonds")
   year: string;           // year *title* ("Year 1"), matching `StoredCert.year` — the id is not shown
-  winner: 'a' | 'b' | 'draw';
+  winner: DuelOutcome;
   scoreA: number; scoreB: number; rounds: number;
 }
 export interface SaveData {
@@ -1103,12 +1106,16 @@ export const DUEL_CAP = 20;
  * comment gives: a half-checked entry is worse than an unchecked one, because the junk it lets through then
  * gets compared, formatted and drawn as if it were real. `winner` is checked against the three values the
  * screen knows, because `duelHistoryLine()` branches on it and an unknown fourth would render as a match
- * nobody won. The two scores and `rounds` must be finite — `Infinity` from a hand-edited save formats as
- * "Infinity–0" in a row a child reads.
+ * nobody won — checked against `DUEL_OUTCOMES` rather than three hand-written literals, so a member added to
+ * or dropped from `DuelOutcome` cannot leave this guard silently admitting or rejecting the old set (#423
+ * review item 1). The two scores and `rounds` are counts, not just numbers (#423 review item 7): a negative
+ * or fractional value is type-correct and still nonsense — `scoreB: -5` or `rounds: 1.5` passed this guard
+ * before and rendered as-is. `at` stays on bare finiteness; it is a timestamp, not a count.
  */
-const isWinner = (v: unknown): v is StoredDuel['winner'] => v === 'a' || v === 'b' || v === 'draw';
+const isWinner = (v: unknown): v is DuelOutcome => (DUEL_OUTCOMES as readonly unknown[]).includes(v);
+const count = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
 const DUEL_FIELDS: Fields<StoredDuel> = {
-  at: fin, topic: str, title: str, year: str, winner: isWinner, scoreA: fin, scoreB: fin, rounds: fin,
+  at: fin, topic: str, title: str, year: str, winner: isWinner, scoreA: count, scoreB: count, rounds: count,
 };
 const isDuel = (d: unknown): d is StoredDuel => {
   if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
@@ -1124,8 +1131,13 @@ const isDuel = (d: unknown): d is StoredDuel => {
 export function fileDuel(list: StoredDuel[], d: StoredDuel, cap = DUEL_CAP): StoredDuel[] {
   return [d, ...list].slice(0, Math.max(0, cap));
 }
-/** Every duel played, most recent first. Tolerant of a hand-edited save. */
-export function duelHistory(): StoredDuel[] { const d = load().duels; return Array.isArray(d) ? d.filter(isDuel) : []; }
+/**
+ * Every duel played, most recent first. Tolerant of a hand-edited save, and capped the same as a fresh write
+ * (#423 review item 6): `fileDuel` enforces `DUEL_CAP` going in, but a Restore or a hand-edited save can carry
+ * more rows than that straight past it — 200 well-formed rows migrate and read back as 200, past the "last
+ * few sessions" the docstring above argues for, until the next real match trims the list back down.
+ */
+export function duelHistory(): StoredDuel[] { const d = load().duels; return Array.isArray(d) ? d.filter(isDuel).slice(0, DUEL_CAP) : []; }
 /** Record a finished match. Returns the history as it now stands. */
 export function recordDuel(d: StoredDuel): StoredDuel[] {
   const duels = fileDuel(duelHistory(), d);

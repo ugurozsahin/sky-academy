@@ -11,6 +11,17 @@ export type DuelPlayer = 'a' | 'b';
 /** The two seats, once — `src/ui/duel.ts`'s own `PLAYERS` imports this rather than repeating the literal, so a
  *  third seat or a rename cannot drift between the two files (#379 review, type-design-analyzer). */
 export const DUEL_PLAYERS = ['a', 'b'] as const satisfies readonly DuelPlayer[];
+/**
+ * Who a finished match went to, once (#423 review item 1) — `DuelResult.winner` here and `StoredDuel.winner`
+ * in `storage.ts` used to spell the same three values as two independent unions, tied only by the compiler
+ * catching a widened `DuelResult` at the one call site that assigns one into the other (`recordDuel`). That
+ * leaves `storage.ts`'s own runtime guard (`isWinner`) checking three hand-written literals against nothing:
+ * if this union ever gained or lost a member, the guard would keep admitting or rejecting the old set with no
+ * error at all. `DUEL_OUTCOMES` is what a checker there iterates instead, the same pairing `DUEL_PLAYERS`
+ * above already gives the two seats.
+ */
+export type DuelOutcome = DuelPlayer | 'draw';
+export const DUEL_OUTCOMES = ['a', 'b', 'draw'] as const satisfies readonly DuelOutcome[];
 export const DUEL_ROUNDS = 10;
 
 export interface DuelEvents {
@@ -35,7 +46,7 @@ export interface DuelEvents {
  * that way read as 10/28 to a parent about a child who won ten out of ten.
  */
 export type DuelTally = AnswerTally;
-export interface DuelResult { winner: DuelPlayer | 'draw'; scoreA: number; scoreB: number; rounds: number; tally: Record<DuelPlayer, DuelTally>; incomplete?: boolean }
+export interface DuelResult { winner: DuelOutcome; scoreA: number; scoreB: number; rounds: number; tally: Record<DuelPlayer, DuelTally>; incomplete?: boolean }
 export interface DuelOpts { topic: Topic; difficulty: Difficulty; rng?: () => number; rounds?: number }
 
 export class Duel {
@@ -157,7 +168,7 @@ export class Duel {
    * of them.
    */
   result(incomplete = false): DuelResult {
-    const winner: DuelPlayer | 'draw' = this.scoreA > this.scoreB ? 'a' : this.scoreB > this.scoreA ? 'b' : 'draw';
+    const winner: DuelOutcome = this.scoreA > this.scoreB ? 'a' : this.scoreB > this.scoreA ? 'b' : 'draw';
     // A snapshot, not the live counters: a `hit()` after the match ends returns 'ignored' and cannot move
     // them, but the result outlives this screen's rematch and must not be a window onto a restarted tally.
     const tally = { a: { ...this.tally.a }, b: { ...this.tally.b } };
