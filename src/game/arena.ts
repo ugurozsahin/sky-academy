@@ -882,8 +882,19 @@ export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: num
   return { r, waveT: T * 1000, batchSpan: perBatch * stagger, perBatch, batchGap, stagger, bubbles };
 }
 
-/** The smallest a bubble label is ever drawn: the shrink loop clamps to this and never steps below it. */
+/**
+ * The smallest a bubble label is ever drawn **when a wrap is available to try instead** — `fitLabel`'s own
+ * shrink loop clamps to this and never steps below it. `LABEL_HARD_MIN_FS` below is lower still, for the one
+ * case (#348) this floor cannot rescue: a label with no space or hyphen for `fitLabelLines` to break on.
+ */
 export const LABEL_MIN_FS = 10;
+/**
+ * The smallest an **unbreakable** label — no space or hyphen for `fitLabelLines` to wrap onto a second line —
+ * may shrink to, when it is still wider than its bubble at `LABEL_MIN_FS` (#348 owner decision, 2026-09-24).
+ * A label that has a break never reaches this: it always has the two-line attempt to try first, however that
+ * turns out, so `fitLabelLines` never shrinks a breakable label below `LABEL_MIN_FS`. See `fitLabelLines`.
+ */
+export const LABEL_HARD_MIN_FS = 8;
 /**
  * The smallest a label may be and still be *read* by a five-to-seven-year-old on a moving bubble (#348).
  *
@@ -922,14 +933,19 @@ export type LabelState = 'ok' | 'small' | 'overflow';
 /** A fitted bubble label: the lines to draw, the size they share, and how it came out (#348). */
 export interface LabelFit { fs: number; lines: string[]; state: LabelState }
 
+// Shared by `fitLabel` and `fitLabelLines`'s unbreakable-overflow branch (#348 review): shrink `fs` by 1
+// while still over budget, clamped so it never steps past `floor` — a bare `fs -= 1` used to step past a
+// fractional start and return 9.56 from a floor documented as the smallest size ever drawn (review note 1).
+// One loop, one clamp; only the floor passed in differs between the two callers.
+function shrinkToFit(label: string, r: number, measure: (font: string, text: string) => number, fs: number, floor: number): number {
+  while (measure(labelFont(fs), label) > r * LINE_BUDGET && fs > floor) fs = Math.max(floor, fs - 1);
+  return fs;
+}
+
 // Called once per bubble in spawnWave (#28) — `measure` sets the font and returns the text width — instead
 // of running the shrink loop in drawBubble every frame. Pure and canvas-free so it unit-tests directly.
 export function fitLabel(label: string, r: number, measure: (font: string, text: string) => number): number {
-  let fs = startFs(label, r);
-  // `fs` starts fractional, so a bare `fs -= 1` used to step *past* the bound and return 9.56 from a
-  // constant documented as the smallest size ever drawn. Clamp, so the floor is one (#348 review note 1).
-  while (measure(labelFont(fs), label) > r * LINE_BUDGET && fs > LABEL_MIN_FS) fs = Math.max(LABEL_MIN_FS, fs - 1);
-  return fs;
+  return shrinkToFit(label, r, measure, startFs(label, r), LABEL_MIN_FS);
 }
 
 /**
@@ -972,7 +988,14 @@ export function fitLabelLines(label: string, r: number, measure: (font: string, 
   const one: LabelFit = { fs: oneFs, lines: [label], state: state(oneFs, measure(labelFont(oneFs), label), LINE_BUDGET) };
   if (one.state === 'ok') return one;
   const split = splitLabel(label);
-  if (!split) return one;
+  if (!split) {
+    // No space or hyphen to wrap on — the only path down from here is smaller still, to LABEL_HARD_MIN_FS
+    // (#348 owner decision). A label that fits (or is merely 'small') at LABEL_MIN_FS stops right there; only
+    // one still wider than its bubble at that floor shrinks further.
+    if (one.state !== 'overflow') return one;
+    const fs = shrinkToFit(label, r, measure, oneFs, LABEL_HARD_MIN_FS);
+    return { fs, lines: [label], state: state(fs, measure(labelFont(fs), label), LINE_BUDGET) };
+  }
   const widest = (fs: number) => Math.max(measure(labelFont(fs), split[0]), measure(labelFont(fs), split[1]));
   // Seed from the *longer* line: the shorter one would start too big and the loop would only walk back down
   // to the same place, but a step of 1 from a larger start can overshoot it (#348 review note 5).
