@@ -1939,20 +1939,30 @@ it('no @media (…max-height…) block narrows the five-frame slot or glyph rati
 // dot has to scale with its cell instead of carrying its own px size, AND `.tenframe` itself has to be free
 // to shrink below 140px — a fixed-px container would reintroduce the exact same overflow even with a
 // perfectly responsive dot inside it.
-it('the ten-frame dot scales with its grid cell, never a fixed pixel size (#594)', () => {
+//
+// Round 2 review (#601): a plain, non-global `.match()` only ever inspects the FIRST `.tenframe`/`.tenframe
+// i` block in the file, so a later override — inside a media query, say — reinstates a fixed pixel size
+// while this rail stays green. That is exactly how the `--slot` height-gate entered the codebase for `.five`
+// in the first place, and it is why the sibling rail above this one reads every `@media (…max-height…)`
+// block rather than the first. `matchAll` here does the same for every declared occurrence of each selector.
+it('the ten-frame dot scales with its grid cell, never a fixed pixel size, in every declared block (#594)', () => {
   const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
-  const rule = bare.match(/\.tenframe\s+i\s*\{([^}]*)\}/)?.[1];
-  expect(rule, '.tenframe i must exist (#594)').toBeTruthy();
-  expect(rule, 'the dot must not carry a fixed pixel width — that is the #594 overflow returning')
-    .not.toMatch(/width:\s*[\d.]+px/);
-  expect(rule, 'the dot must not carry a fixed pixel height — that is the #594 overflow returning')
-    .not.toMatch(/height:\s*[\d.]+px/);
 
-  const container = bare.match(/\.tenframe\s*\{([^}]*)\}/)?.[1];
-  expect(container, '.tenframe must exist (#594)').toBeTruthy();
-  expect(container, ".tenframe's own width must not be a fixed pixel value — a fixed container is the #594 overflow, even with a responsive dot inside it")
-    .not.toMatch(/width:\s*[\d.]+px/);
+  const dotBlocks = [...bare.matchAll(/\.tenframe\s+i\s*\{([^}]*)\}/g)].map(m => m[1]);
+  expect(dotBlocks.length, '.tenframe i must exist (#594)').toBeGreaterThanOrEqual(1);
+  for (const rule of dotBlocks) {
+    expect(rule, 'the dot must not carry a fixed pixel width in any declared block — that is the #594 overflow returning')
+      .not.toMatch(/width:\s*[\d.]+px/);
+    expect(rule, 'the dot must not carry a fixed pixel height in any declared block — that is the #594 overflow returning')
+      .not.toMatch(/height:\s*[\d.]+px/);
+  }
+
+  const containerBlocks = [...bare.matchAll(/\.tenframe\s*\{([^}]*)\}/g)].map(m => m[1]);
+  expect(containerBlocks.length, '.tenframe must exist (#594)').toBeGreaterThanOrEqual(1);
+  for (const container of containerBlocks)
+    expect(container, ".tenframe's own width must not be a fixed pixel value in any declared block — a fixed container is the #594 overflow, even with a responsive dot inside it")
+      .not.toMatch(/width:\s*[\d.]+px/);
 });
 
   // #109: the grown-ups dashboard laid itself out 936 px wide inside an 800 px portrait tablet, at every
