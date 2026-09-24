@@ -349,10 +349,29 @@ describe('certificate album (#205)', () => {
     // which is exactly how these codes travel between devices (#64).
     const partial = { id: 'year1:y1-bonds', title: 'Number bonds' };
     const truncated = { id: 'year1:y1-add', title: 'Adding', name: 'Ada', year: 'Year 1', date: '2026-09-14', stars: 3 };
-    save({ certs: ['nonsense', null, 42, {}, partial, truncated, { ...cert(), stars: NaN }, cert()] as unknown as StoredCert[] });
-    expect(certificates()).toEqual([cert()]);
+    // `avatar: null` is a *valid* value (a child who has not picked an avatar), pinned here alongside the
+    // rejected ones — `avatar: str` instead of `avatar: strOrNull` would wrongly drop this and every other
+    // test in the file still passes, which is what makes it worth its own row rather than trusting `strOrNull`
+    // by inspection (pr-test-analyzer, #422 review).
+    const noAvatar = cert({ id: 'year1:y1-count', avatar: null });
+    save({ certs: [
+      'nonsense', null, 42, {}, partial, truncated, { ...cert(), stars: NaN },
+      { ...cert(), avatar: 7 }, { ...cert(), avatar: undefined },   // #422: avatarById()'s fallback used to be
+      cert(), noAvatar,                                             // the only thing catching these, silently
+    ] as unknown as StoredCert[] });
+    expect(certificates()).toEqual([cert(), noAvatar]);
     save({ certs: 'not an album' as unknown as StoredCert[] });
     expect(certificates()).toEqual([]);
+  });
+
+  // #422: pinning the deliberate half of the fix, not just the bug. `certKind()`'s own comment in
+  // `ui/certificate.ts` says why `training`/`duel` must stay out of this guard: rejecting a malformed flag
+  // would drop a certificate the child genuinely earned, which is worse than reading it as the wrong kind.
+  // A future "complete the table" pass that starts checking these two would make this red first.
+  it('a junk training/duel flag does not filter the certificate out', () => {
+    const junk = { ...cert(), training: 'yes', duel: 42 } as unknown as StoredCert;
+    save({ certs: [junk] });
+    expect(certificates()).toEqual([junk]);
   });
 
   // The bug a half-checked guard makes rather than prevents: `{ id, title }` passed the first version of
