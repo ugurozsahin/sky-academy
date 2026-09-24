@@ -2322,6 +2322,8 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#move-msg')).toContainText('Tap Restore again');   // never on one tap
     await page.click('#restore-go');
     await expect(page.locator('#move-msg')).toContainText('Restored');
+    // #426: the redraw this confirmation follows resets scroll to the top, and #move-msg sits well below it.
+    await expect(page.locator('#move-msg')).toBeInViewport({ ratio: 1 });
     await expect(page.locator('.p-extra')).toContainText('456 coins');
     await expect(page.locator('.isl-head small')).toContainText('Rye');
     expect(JSON.parse(await page.inputValue('#save-code')).coins).toBe(456);
@@ -3050,6 +3052,9 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
     await page.fill('.p-prof-in[data-name="p2"]', 'Bobby');
     await page.click('button[data-rename="p2"]');
     await expect(page.locator('#prof-msg')).toHaveText('Renamed to Bobby.');
+    // #426: the redraw this confirmation follows resets scroll to the top, and #prof-msg sits below the
+    // stats grid and topic tables — off screen exactly when it has something to say.
+    await expect(page.locator('#prof-msg')).toBeInViewport({ ratio: 1 });
     await expect(page.locator('.p-prof[data-prof="p2"] b'), 'the row redraws from the store').toHaveText('Bobby');
     await expect(page.locator('.parents-dash'), 'and the child playing is untouched — the heading is still theirs').toContainText('Ada');
 
@@ -3079,8 +3084,15 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
     await seedPlayer(page, 'volt', 'Ada');
     await openGrownUps(page);
     await page.fill('.p-prof-in[data-name="p1"]', '   ');
+    const beforeClick = await page.evaluate(() => window.scrollY);
     await page.click('button[data-rename="p1"]');
     await expect(page.locator('#prof-msg')).toHaveText('A ninja needs a name — type one in first.');
+    // #426: a refusal never redraws, so profMsg's scroll:false is the one deliberate exception to its
+    // default scroll-into-view — pinned by measuring the jump rather than asserting exact equality, since
+    // Playwright's own click-into-view already moves the page a little (measured: ~13px here) before this
+    // runs. `scrollIntoView({ block: 'center' })` firing moves it far past that (measured: ~370px).
+    const afterClick = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(afterClick - beforeClick), 'a refusal that never redraws must not jump the page to centre the message').toBeLessThan(50);
     await expect(page.locator('#prof-msg')).toHaveClass(/bad/);
     await expect(page.locator('.p-prof[data-prof="p1"] b')).toHaveText('Ada');
   });
