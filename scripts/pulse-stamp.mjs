@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -163,7 +163,23 @@ export function check(body, writtenAt) {
 // stop, inside the file itself.
 //
 // Import-safe: it runs only when this file is the entry point, so the unit rails import it untouched.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+//
+// #457: `resolve()` normalises `.`/`..` but does not resolve symlinks, while `import.meta.url` is always the
+// realpath — so a script reached through a symlinked directory (a Mac Desktop alias, `/tmp` on macOS being
+// `/private/tmp`, a `node_modules/.bin` shim) compared unequal here, the whole CLI block was skipped, and
+// Node exited 0 having done nothing: `--check` printed no verdict, the no-args form printed no stamp. Both
+// look like a pass. `realpathSync` resolves both sides properly; the `try`/`catch` falls back to the original
+// comparison only for ENOENT — a missing `argv[1]` must never throw here, and that is the one way this call
+// can legitimately fail. Anything else `realpathSync` throws (EACCES on some ancestor directory, ELOOP) is
+// left to propagate rather than swallowed into the same silent "not the entry point" verdict this fix exists
+// to close: a caught-and-ignored EACCES here would reopen the exact bug, just with a different trigger.
+const sameFile = (a, b) => {
+  try { return realpathSync(a) === realpathSync(b); } catch (e) {
+    if (e.code === 'ENOENT') return resolve(a) === b;
+    throw e;
+  }
+};
+if (process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url))) {
   const args = process.argv.slice(2);
   const cannot = (why) => { process.stderr.write(`pulse-stamp: ${why}\n`); process.exitCode = CANNOT_CHECK; };
   if (args.length === 0) {
@@ -180,11 +196,19 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       cannot(`cannot read ${args[1]}: ${e.message}`);
     }
     if (body !== undefined) {
-      const v = check(body, args[2]);
-      if (v.code === CANNOT_CHECK) cannot(v.reason);
-      else {
-        console.log(`${v.ok ? 'ok' : 'FINDING'} — ${v.reason}`);
-        process.exitCode = v.code;
+      // #457: an uncaught throw here would exit 1 — the same code FINDING uses — so a bug in the tool would
+      // read as a finding about the pulse rather than as the tool having failed to check it. Nothing today
+      // makes check() throw (PR #450 proved the three verdicts red-before-green), so this is structural
+      // hardening, not a reachable bug: route it to CANNOT_CHECK (exit 2) like every other way this CLI fails.
+      try {
+        const v = check(body, args[2]);
+        if (v.code === CANNOT_CHECK) cannot(v.reason);
+        else {
+          console.log(`${v.ok ? 'ok' : 'FINDING'} — ${v.reason}`);
+          process.exitCode = v.code;
+        }
+      } catch (e) {
+        cannot(`check() threw: ${e.message}`);
       }
     }
   }
