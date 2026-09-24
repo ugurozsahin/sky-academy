@@ -126,6 +126,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       onLand: () => { (sliceFx[fx] ?? sfx.slice)(); haptic('slice'); },
       // The TNT blows up under the finger — never chase it with a star, or it would burst twice and reward the hit.
       throwFor: b => b.label !== BOMB,
+      // #684: the rotating solid inside a 3-D Shapes bubble, tinted to the bubble's complement.
+      labelArt: (label, colour, phase) => playSession.bubbleArt(label, colour, phase),
     });
   }
 
@@ -355,6 +357,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     timing: () => ({ speed: gameSpeed(), hold: { correct: scaled(HOLD.correct), wrong: scaled(HOLD.wrong), miss: scaled(HOLD.miss) } }),
     // #684: the rotating solid on a 3-D Shapes card — name, frames drawn, WebGL up — so e2e can assert it rendered without reading pixels.
     solid: () => playSession.solid(),
+    solidArt: () => playSession.solidArt(),
   };
   window.__sna = hooks;
   session.start();

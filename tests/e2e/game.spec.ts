@@ -3343,16 +3343,16 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
   test('a Year 2 shapes card shows a rotating WebGL solid where the emoji was, and nothing else does', async ({ page }) => {
     test.setTimeout(90_000);
     await seedPlayer(page);
-    const chunks: string[] = [];   // the lazy chunk's requests: none until a 3-D card, exactly one then
+    const chunks: string[] = [];   // the lazy chunk's requests: one per screen, the first time a solid is wanted
     page.on('request', r => { if (/solids-.*\.js/.test(r.url())) chunks.push(r.url()); });
     await startTopic(page, 'year2', 'y2-shapes');
-    // Stage 1: "Which is a …?" has no visual, so no solid — and three has not been asked for.
+    // Stage 1: "Which is a …?" has no card visual, so no card solid — its bubbles carry the solids instead.
     expect(await page.evaluate(() => window.__sna.solid())).toBeNull();
     expect(await page.locator('#vis canvas').count()).toBe(0);
     const perStage = await page.evaluate(() => window.__sna.session.perStage);
     await answerAll(page, perStage);
     await expect(page.locator('.celebrate')).toBeVisible();
-    expect(chunks).toEqual([]);
+    expect(chunks, 'the bubbles of stage 1 already asked for three, once').toHaveLength(1);
     await page.evaluate(() => { (window.__sna.session as any).rng = () => 0.9; });
     await page.click('#next');
     await page.waitForFunction(() => window.__sna.state().stage === 2);
@@ -3360,7 +3360,7 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     await page.waitForFunction(() => (window.__sna.solid()?.frames ?? 0) > 5, null, { timeout: 20_000 });
     const solid = await page.evaluate(() => window.__sna.solid());
     expect(solid).toMatchObject({ name: 'cuboid', webgl: true, error: null });
-    expect(chunks, 'the three.js chunk, requested once, under the name the guard rail and bundle-single.mjs expect').toHaveLength(1);
+    expect(chunks, 'the card reuses the screen\'s one renderer: no second download, no second GL context').toHaveLength(1);
     // The canvas replaced the emoji card rather than sitting beside it, and it keeps drawing.
     expect(await page.locator('#vis .wordcard').count()).toBe(0);
     await expect(page.locator('#vis .solid canvas')).toBeVisible();
@@ -3409,6 +3409,34 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     expect(after).toEqual({ lost: true, attached: false, sna: 'undefined' });
   });
 
+  test('a "Which is a …?" wave spins a tinted solid inside every shape bubble, and keeps the arena at speed', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-shapes3d');   // Year 1, stage 1 = d1: every card is "Which is a …?", glyph bubbles
+    await waitForTarget(page);
+    const want = await page.evaluate(() => window.__sna.session.current!.options);
+    await page.waitForFunction(() => (window.__sna.solidArt()?.draws ?? 0) > 20, null, { timeout: 20_000 });
+    const art = await page.evaluate(() => window.__sna.solidArt()!);
+    expect(art.error).toBeNull();
+    const GLYPH: Record<string, string> = { '🎲': 'cube', '⚽': 'sphere', '🥫': 'cylinder', '🍦': 'cone', '🔺': 'pyramid', '🧱': 'cuboid' };
+    for (const g of want) expect(art.ready, `${g} has a baked spin sheet`).toContain(GLYPH[g]);
+    expect(await page.evaluate(() => window.__sna.solid())).toBeNull();   // no card solid on these questions
+    // Frames AND the arena clock, measured while the art bubbles fly (#73's lesson): the first cut of this drew
+    // 60 rAF frames a second while each took long enough that the arena clock ran at 0.4× — bubbles fell before
+    // a child could reach them. Bubble art is a `drawImage` per bubble, never a GL render.
+    const [fps, ratio, drew] = await page.evaluate(() => new Promise<[number, number, number]>(res => {
+      const a = window.__sna.arena!, t0 = a.time, w0 = performance.now(), d0 = window.__sna.solidArt()!.draws; let n = 0;
+      const tick = () => { n++; const el = performance.now() - w0;
+        if (el < 2000) requestAnimationFrame(tick); else res([n / (el / 1000), (a.time - t0) / (el / 1000), window.__sna.solidArt()!.draws - d0]); };
+      requestAnimationFrame(tick);
+    }));
+    console.log(`[#684 bubble art] fps=${fps.toFixed(1)} ratio=${ratio.toFixed(2)} art draws=${drew} ready=${art.ready.join(',')}`);
+    expect(fps).toBeGreaterThan(30);     // FPS_FLOOR in the rail above; the arena's own 60.4 clean
+    expect(ratio).toBeGreaterThan(0.8);  // and the arena clock keeps up with the wall clock
+    // Slicing still keys on the glyph label, art or not: the next wave is answered through the usual hook.
+    await waitForTarget(page);
+    expect(await answer(page)).toBe(true);
+  });
+
   test('a 2-D shapes card keeps its emoji and never loads three', async ({ page }) => {
     await seedPlayer(page);
     const chunks: string[] = [];
@@ -3416,6 +3444,7 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     await startTopic(page, 'year1', 'y1-shapes');
     await page.waitForFunction(() => window.__sna.bubbles().length > 0);
     expect(await page.evaluate(() => window.__sna.solid())).toBeNull();
+    expect(await page.evaluate(() => window.__sna.solidArt())).toBeNull();
     expect(await page.locator('#vis canvas').count()).toBe(0);
     expect(chunks).toEqual([]);
   });

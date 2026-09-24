@@ -8,10 +8,39 @@
 import {
   AmbientLight, BoxGeometry, Color, ConeGeometry, CylinderGeometry, DirectionalLight, EdgesGeometry, Group,
   LineBasicMaterial, LineSegments, Mesh, MeshLambertMaterial, PerspectiveCamera, Scene, SphereGeometry, WebGLRenderer,
-  type BufferGeometry,
+  WebGLRenderTarget, type BufferGeometry,
 } from 'three';
 
 export type SolidName = 'cube' | 'cuboid' | 'sphere' | 'cylinder' | 'cone' | 'pyramid';
+/** A white-lit spin sheet as straight-alpha sRGB pixels, `ImageData`'s shape without needing a DOM to build one. */
+export interface SpinSheet { width: number; height: number; data: Uint8ClampedArray }
+/**
+ * One `big`×`big` GL read-back (rows bottom-up, linear light) into a cell of `out` (rows top-down, sRGB, straight
+ * alpha), `big / 2` px square at column `x0` of a row `outWidth` px wide. Each output pixel is the mean of a 2×2
+ * block, averaged premultiplied so a transparent neighbour does not darken an edge — the anti-aliasing. Pure, so
+ * a unit test can hand it a buffer.
+ */
+export function downsampleInto(read: Uint8Array, big: number, out: Uint8ClampedArray, outWidth: number, x0: number): void {
+  const cell = big / 2, rowOut = outWidth * 4;
+  for (let y = 0; y < cell; y++) {
+    const r0 = (big - 1 - y * 2) * big * 4, r1 = (big - 2 - y * 2) * big * 4;
+    for (let x = 0; x < cell; x++) {
+      const i = x * 8, o = y * rowOut + (x0 + x) * 4;
+      const a = read[r0 + i + 3] + read[r0 + i + 7] + read[r1 + i + 3] + read[r1 + i + 7];
+      for (let ch = 0; ch < 3; ch++) {
+        const sum = read[r0 + i + ch] * read[r0 + i + 3] + read[r0 + i + 4 + ch] * read[r0 + i + 7]
+          + read[r1 + i + ch] * read[r1 + i + 3] + read[r1 + i + 4 + ch] * read[r1 + i + 7];
+        out[o + ch] = a ? TO_SRGB[Math.round(sum / a)] : 0;
+      }
+      out[o + 3] = a / 4;
+    }
+  }
+}
+/** A render target holds linear light; the screen shows sRGB. One table, built once, for the encoding. */
+const TO_SRGB = Uint8ClampedArray.from({ length: 256 }, (_, i) => {
+  const v = i / 255;
+  return Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055));
+});
 
 /** Each solid: its geometry, the palette token it is painted with, and whether its edges are drawn (polyhedra only). */
 const SOLIDS: Record<SolidName, { geo: () => BufferGeometry; tint: string; edges: boolean }> = {
@@ -31,6 +60,19 @@ const token = (name: string) => {
   const v = typeof getComputedStyle === 'function' ? getComputedStyle(document.documentElement).getPropertyValue(name).trim() : '';
   return new Color(v || '#ffffff');
 };
+
+/** One solid as a group: the body in `colour`, edge lines in `--ink` on the polyhedra, turned to face the camera. */
+function build(name: SolidName, colour: Color): Group {
+  const spec = SOLIDS[name];
+  const geo = spec.geo();
+  const group = new Group();
+  group.add(new Mesh(geo, new MeshLambertMaterial({ color: colour, flatShading: spec.edges })));
+  if (spec.edges) group.add(new LineSegments(new EdgesGeometry(geo), new LineBasicMaterial({ color: token('--ink') })));
+  if (name === 'pyramid') group.rotation.y = Math.PI / 4;   // a face towards the camera, not a corner
+  group.rotation.x = TILT;
+  return group;
+}
+const dispose = (g: Group) => g.traverse(o => { const m = o as Mesh; m.geometry?.dispose(); (m.material as { dispose?: () => void } | undefined)?.dispose?.(); });
 
 /**
  * One renderer, one canvas, one solid at a time. `show()` swaps the mesh; `hide()` parks the loop; `destroy()`
@@ -75,15 +117,41 @@ export class SolidView {
   }
   show(name: SolidName) {
     this.clearMesh();
-    const spec = SOLIDS[name];
-    const geo = spec.geo();
-    const group = new Group();
-    group.add(new Mesh(geo, new MeshLambertMaterial({ color: token(spec.tint), flatShading: spec.edges })));
-    if (spec.edges) group.add(new LineSegments(new EdgesGeometry(geo), new LineBasicMaterial({ color: token('--ink') })));
-    if (name === 'pyramid') group.rotation.y = Math.PI / 4;   // a face towards the camera, not a corner
-    group.rotation.x = TILT;
+    const group = build(name, token(SOLIDS[name].tint));
     this.mesh = group; this.name = name; this.scene.add(group);
     this.fit(); this.start();
+  }
+  /**
+   * A spin sheet for the bubbles (#684): `frames` views of `name`, a full turn apart, side by side, `cell` px
+   * tall, lit in white so the caller can tint it per bubble colour without another render. Returned as plain
+   * pixels, not a canvas: each view is drawn into an off-screen render target at twice the size and read back
+   * once, explicitly, then box-filtered down in JS (the anti-aliasing) and encoded to sRGB. The first cut copied
+   * the WebGL canvas into 2-D canvases instead, and every later copy out of those forced a GPU read-back — in
+   * Chromium's software GL it stalled the page outright. Nothing here touches the card's canvas or its size.
+   */
+  sheet(name: SolidName, frames: number, cell: number): SpinSheet {
+    const big = cell * 2;
+    const target = new WebGLRenderTarget(big, big);
+    const group = build(name, new Color(0xffffff));
+    const base = group.rotation.y;
+    const card = this.mesh; if (card) card.visible = false;
+    this.scene.add(group);
+    const camAspect = this.camera.aspect; this.camera.aspect = 1; this.camera.updateProjectionMatrix();
+    const read = new Uint8Array(big * big * 4);
+    const out = new Uint8ClampedArray(cell * frames * cell * 4);
+    this.renderer.setRenderTarget(target);
+    for (let f = 0; f < frames; f++) {
+      group.rotation.y = base + (f / frames) * Math.PI * 2;
+      this.renderer.clear();
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.readRenderTargetPixels(target, 0, 0, big, big, read);
+      downsampleInto(read, big, out, cell * frames, f * cell);
+    }
+    this.renderer.setRenderTarget(null);
+    this.camera.aspect = camAspect; this.camera.updateProjectionMatrix();
+    this.scene.remove(group); dispose(group); target.dispose();
+    if (card) card.visible = true;
+    return { width: cell * frames, height: cell, data: out };
   }
   hide() { this.stop(); this.clearMesh(); this.name = null; this.el.remove(); }
   destroy() {
@@ -97,8 +165,7 @@ export class SolidView {
   }
   private clearMesh() {
     if (!this.mesh) return;
-    this.mesh.traverse(o => { const m = o as Mesh; m.geometry?.dispose(); (m.material as { dispose?: () => void } | undefined)?.dispose?.(); });
-    this.scene.remove(this.mesh); this.mesh = null;
+    dispose(this.mesh); this.scene.remove(this.mesh); this.mesh = null;
   }
   /** The canvas is CSS-sized (`--solid` in style.css); the drawing buffer follows it at the device ratio. */
   private fit() {

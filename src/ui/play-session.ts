@@ -20,7 +20,7 @@ import { $, esc } from './dom';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
 import { hintText, promptHTML, promptMode, stageHTML, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
-import { createSolidSlot, type SolidState } from './solid';   // #684: the lazy three.js solid on a 3-D Shapes card
+import { createSolidSlot, type ArtFrame, type SolidArtState, type SolidState } from './solid';   // #684: the lazy three.js solid on a 3-D Shapes card
 
 /** The TNT bubble villain modes mix into a wave: it costs a life and never counts as a wrong answer (#48). */
 export const BOMB = '💣';
@@ -112,6 +112,10 @@ export interface PlaySession {
   repeat(): boolean;
   /** The rotating solid on the card (#684), for the `window.__sna.solid()` hook. */
   solid(): SolidState | null;
+  /** The solid drawn inside a 3-D Shapes bubble, for the arena's `labelArt` (#684). */
+  bubbleArt(label: string, colour: string, phase: number): Readonly<ArtFrame> | null;
+  /** Which solids have a baked spin sheet, and how many bubble frames drew one — the `solidArt()` hook. */
+  solidArt(): SolidArtState | null;
   /** Stop the voice-capability subscription and any peek when the play screen is replaced. */
   dispose(): void;
 }
@@ -417,6 +421,8 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       return true;
     },
     solid: () => solid.state(),
+    bubbleArt: (label, colour, phase) => solid.bubbleArt(label, colour, phase),
+    solidArt: () => solid.art(),
     dispose() { releasePeek(); stopWatchingVoice(); solid.dispose(); },
   };
 }
