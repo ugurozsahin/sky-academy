@@ -125,6 +125,21 @@ hourly case keeps advancing exactly as round 4 fixed it, and a genuinely dead ru
 own within 150 minutes rather than needing a human to notice `docs/WATCHDOG-PROMPT.md`'s stuck-`IN PROGRESS`
 finding and act on it.
 
+**Round 6 (PR #704 review, round 6): the entry stamp itself was still exempt from the re-read this decision
+otherwise requires everywhere else, and it is the one write most likely to collide with a live run — the
+ordinary hourly case, not a rare race.** The line read "Otherwise stamp `<UTC> — IN PROGRESS: reviewing #<n>`"
+with no compare in front of it: a run that reached STEP 1 with a PR to review while another's stamp was still
+live overwrote the whole body unconditionally — the erasure this decision exists to close, and with less trace
+than before it, since neither a stuck stamp nor an `- also reviewed:` line is left for the watchdog or a later
+run to see. STEP 1 now applies the same header test to the entry write: unchanged from this run's own stamp,
+or no other's live — write the `IN PROGRESS` stamp as before; another's live — append
+`- also reviewed: about to start #<n>` instead, the same append format every other write already uses, and
+write no header of its own. That last part carries the rest of the fix: a run that never wrote its
+own header has nothing to compare its own finish write against either, so the "header unchanged from this
+run's own stamp" branch simply never matches while someone else holds it, and the finish degrades to the
+append branch automatically — the same safe fallback every other write already had, with no new case to define
+for it.
+
 This is alternative 1 of the three #460 proposed: the pulse names who holds it, cheaply, without a lock, a
 label or a slowed cadence.
 
@@ -176,5 +191,9 @@ label or a slowed cadence.
   would still have its stamp erased by a concurrent `stopped: limit` write with no stamp of its own; nothing in
   this repository's history says that has happened, and the owner's instruction on finding one is "revisit it
   then," not to remove the age term pre-emptively.
+- **New in round 6:** an entry write that appends rather than replaces leaves the previous header's
+  `- also reviewed:` lines in place a little longer than before, since only a genuine replace ever prunes them
+  (round 6 review, note 3) — bounded by the same ~150-minute window as everything else here, not new growth,
+  just a slightly wider window in which it can happen.
 - `REVIEWER_PROMPT_BUDGET` is paid in `docs/REVIEWER-PROMPT.md` itself; the PR that lands this records the
   before/after byte count.
