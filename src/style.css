@@ -533,7 +533,7 @@ img { -webkit-user-drag: none; }
    out Player 2's name and score instead, including as that score changed.
    The bar is the one place that belongs to both players equally and holds nothing time-critical: it is static
    for the whole round, where a bubble is in flight. `start center` rather than centred, and inset 4px: the card
-   is covered and that is the accepted trade, but `.duel-q .hint` is not — five pool topics carry the values
+   is covered and that is the accepted trade, but `.duel-q .hint` is not — seven pool topics carry the values
    being compared there and NOWHERE else, so a hint swallowed whole is a round of "Which is fuller?" over two
    coloured bubbles. Measured across four viewports, centred hid it completely at 568x320; this hides at most a
    quarter of it, and none of either arena or either name pill. `q` is sized by the strip, which is taller than the toast at
@@ -577,7 +577,7 @@ img { -webkit-user-drag: none; }
 }
 .duel-q .prompt { font-size: clamp(22px, 5.5vw, 34px); margin: 2px 0; }
 .duel-q .vis-wrap:empty { display: none; }
-/* The strip is short, so the hint sits tight under the prompt — but it is never dropped: five pool topics
+/* The strip is short, so the hint sits tight under the prompt — but it is never dropped: seven pool topics
    carry the values being compared here and nowhere else on the card (#16 review). `display: block` is load
    bearing: the short-screen rule below (`@media (max-height: 640px)`) hides `.hint` outright to buy the play
    screen vertical space, and a landscape phone is exactly that band — which left "Which is fuller?" over two
@@ -1753,6 +1753,12 @@ img { -webkit-user-drag: none; }
 .p-move .btn { width: 100%; }
 .p-move-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--good); }
 .p-move-msg.bad { color: var(--bad); }
+/* #714: the 3-D setting — the island screen's `.tabs`/`.tab` pair reused as a three-way pick, nothing new drawn. */
+.p-three { display: flex; flex-direction: column; gap: 8px; }
+.p-three-say { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.p-three-pick { margin: 0; }
+.p-three-pick .tab { min-height: 44px; padding: 10px; }
+.p-three-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--bad); }
 
 /* ninjas on this device: rename and remove (#20 slice 3)
    The row is `.p-topic`'s shape — panel, hairline, 14px radius — with the face where the icon sits, so the

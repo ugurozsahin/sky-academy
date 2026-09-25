@@ -15,7 +15,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 
 // Every skill is one or the other; a new directory fails the test below until it is put in a list, so a
 // project skill cannot go unread here without anyone noticing.
-const OWN_SKILLS = ['add-guard-rail', 'add-topic', 'design-language', 'open-pr', 'qa-screenshot', 'review-pr'];
+const OWN_SKILLS = ['add-guard-rail', 'add-topic', 'design-language', 'open-pr', 'qa-screenshot', 'review-pr', 'three-art'];
 const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven-development', 'using-git-worktrees',
                          'verification-before-completion'];   // pinned upstream; they point at their own siblings
 
@@ -43,10 +43,15 @@ const PATH_IN_SPAN = pathPattern(DIRS, ROOT_FILES);
 // `docs/decisions/NNN-title.md`, not a file written at run time. Anchored on purpose (#261): a real path that
 // merely contains `NNN` or dots is still checked, and an elided path fails loudly rather than being skipped.
 const isLiteral = (p: string) => !/[*<>{}$]|(^|\/)NNN-[\w-]+\.md$|instructions-loaded\.log$/.test(p);
-// Named on purpose, to say they are gone or must not be used.
+// Named on purpose, to say they are gone, must not be used — or do not exist *yet*: the 3-D rules and skill
+// (#716) landed before the tree they govern, so that #714 and #715 build to a rule rather than before one. The
+// test below holds each still absent, so the pull request that creates a path has to drop its entry here, and
+// this rail goes back to checking the real path.
 const KNOWN_ABSENT: Record<string, string> = {
   'scripts/output/': 'named only to forbid it: qa-screenshot says never to save a screenshot there',
   'BACKLOG.md': 'retired (#218) — the decision records name it as history; no live instruction file may',
+  'src/three/sketchbook/': 'not yet: #715 creates it — drop this entry when it lands',
+  'scripts/sketch-gallery.mjs': 'not yet: #715 creates it — drop this entry when it lands',
 };
 
 /** The repo paths a document points at, from its code spans, as they would be looked up on disk. */

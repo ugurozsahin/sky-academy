@@ -249,3 +249,81 @@ describe('screenScope.toast is a no-op once the screen or its toast is gone (#41
     expect(() => scope.toast('Could not make the certificate', 'bad')).not.toThrow();
   });
 });
+
+// #478: `screenScope.toast` armed one hide timer per call with no way to tell "I am still the current toast"
+// from "a later toast has already taken over" — so a wrong-slice toast raised shortly before a wave ends had
+// its hide timer strip the drawn round's verdict that followed it, down to as little as 33ms of a 225ms hold
+// (measured on a real match, PR #428/#474 reviews). The fix is a generation counter: every `toast()` and
+// `clearToast()` call bumps it, and a hide only applies if its own generation is still current.
+//
+// This mock's `el` tracks `.show` for real (unlike #411's block above, whose `classList.remove` is a no-op) —
+// this class of bug is exactly about whether that class is still present when it should be.
+describe('screenScope.toast tokens its hide, so a later toast survives an earlier one\'s timer (#478)', () => {
+  let el: { textContent: string; className: string; classList: { remove: (c: string) => void } };
+  const shown = () => el.className.includes('show');
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    el = {
+      textContent: '', className: '',
+      classList: { remove(c) { el.className = el.className.split(' ').filter((x) => x !== c).join(' '); } },
+    };
+    (globalThis as any).document = { querySelector: (sel: string) => (sel === '#toast' ? el : null) };
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    delete (globalThis as any).document;
+  });
+
+  it('a second toast raised inside the first one\'s hold is not stripped by the first one\'s timer', () => {
+    const scope = screenScope();
+    scope.toast('Not quite, Kai!', 'bad', 225);      // the miss toast, armed for 225ms
+    vi.advanceTimersByTime(160);                       // the wrong slice lands 160ms before the wave ends (the
+                                                         // issue's own worst-case row)
+    scope.toast('Draw!', 'bad', 225);                  // the drawn round's verdict, raised over it
+    expect(shown(), 'the second toast is up the instant it is raised').toBe(true);
+    vi.advanceTimersByTime(65);                         // the FIRST toast's timer fires now (160 + 65 = 225ms)
+    expect(shown(), 'the first toast\'s stale timer must not strip the second toast\'s verdict').toBe(true);
+    expect(el.textContent, 'and the message on screen is still the second toast\'s').toBe('Draw!');
+    vi.advanceTimersByTime(160);                        // the second toast's own timer fires now (65 + 160 = 225ms)
+    expect(shown(), 'the second toast still hides on its own schedule').toBe(false);
+  });
+
+  it('the control case is unaffected: a lone toast still hides on schedule', () => {
+    const scope = screenScope();
+    scope.toast('Not quite, Kai!', 'bad', 225);
+    vi.advanceTimersByTime(224);
+    expect(shown()).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(shown()).toBe(false);
+  });
+
+  it('clearToast() invalidates an earlier toast()\'s pending hide, same as a fresh toast() would', () => {
+    const scope = screenScope();
+    scope.toast('Draw!', 'bad', 225);
+    vi.advanceTimersByTime(50);
+    scope.clearToast();                                 // duel.ts's onQuestion backstop: clear now, directly
+    expect(shown(), 'clearToast() hides it immediately').toBe(false);
+    el.className = 'toast show good';                    // the next question's own toast, raised after the clear
+    vi.advanceTimersByTime(175);                          // the FIRST toast's original timer fires now (50+175=225ms)
+    expect(shown(), 'the invalidated timer must not strip the next question\'s toast').toBe(true);
+  });
+
+  it('clearToast() is a no-op once the toast is already gone', () => {
+    (globalThis as any).document = { querySelector: () => null };
+    const scope = screenScope();
+    expect(() => scope.clearToast()).not.toThrow();
+  });
+
+  // pr-test-analyzer review: `toast()` has always guarded against a disposed screen's stale async caller
+  // reaching into the NEXT screen's `#toast` (#411) — Rematch/Islands tears this screen down and builds a
+  // new one with its own `#toast` while a long-lived handler is still resolving. `clearToast()` is new, so it
+  // needs the same guard: without it, a disposed screen's stale caller would clear whatever the next screen
+  // is currently showing.
+  it('clearToast() is also a no-op once the screen has been disposed, same as toast()', () => {
+    const scope = screenScope();
+    el.className = 'toast show good';   // the NEXT screen's toast, already up
+    scope.dispose();
+    scope.clearToast();
+    expect(shown(), 'a disposed screen must not clear a toast belonging to whatever screen replaced it').toBe(true);
+  });
+});

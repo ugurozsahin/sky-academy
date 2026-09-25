@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '../../src/game/parents';
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
-import { SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
-import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS } from '../../src/ui/parents';
+import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
+import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
 import { freshDojo } from '../../src/game/dojo';
+
+// minimal localStorage shim for node, same as tests/unit/storage.test.ts
+const mem: Record<string, string> = {};
+(globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
 
 const base: SaveData = {
   v: SAVE_VERSION, name: 'Test', avatar: 'kai', year: 'year1', sound: true, speech: true, voice: 'unknown',
@@ -201,5 +205,78 @@ describe('ninjas on this device (#20 slice 3)', () => {
     // "Start again", which is the control that asks for the typed word.
     expect(DELETE_HINTS.last).toContain('Start again');
     expect(DELETE_HINTS.last).toContain('RESET');
+  });
+
+  /**
+   * #447 item 3: the test above only checks each sentence is non-trivial, so `DELETE_HINTS.orphaned` could be
+   * set to `store`'s exact text ("nothing was removed" — a falsehood once something HAS been removed) or
+   * `RENAME_HINTS.future` to `store`'s ("the new name was not kept" instead of the other-device remedy) and
+   * still pass it. Two refusals sharing a sentence is fine only when they are the *same* refusal shared
+   * across both maps (`future`/`unknown` deliberately read the same in both) — never when the refusal differs.
+   */
+  it('no two different refusals share a sentence, only the same refusal across both maps (#447 item 3)', () => {
+    const all = [
+      ...Object.entries(RENAME_HINTS).map(([why, text]) => ({ why, text })),
+      ...Object.entries(DELETE_HINTS).map(([why, text]) => ({ why, text })),
+    ];
+    const ownerOf = new Map<string, string>();
+    for (const { why, text } of all) {
+      const owner = ownerOf.get(text);
+      if (owner === undefined) { ownerOf.set(text, why); continue; }
+      expect(why, `"${text}" is already ${owner}'s sentence`).toBe(owner);
+    }
+    // The two remedies #420 review round 2 (B2) and #446 say must never be conflated:
+    expect(DELETE_HINTS.orphaned, 'something WAS removed — never store\'s "nothing was removed"').not.toBe(DELETE_HINTS.store);
+    expect(RENAME_HINTS.future, 'the other-device remedy, never "the new name was not kept"').not.toBe(RENAME_HINTS.store);
+  });
+});
+
+/**
+ * #442 finding 4: the grown-ups screen is the one place `isWriteFailing()` is ever explained to a human, and
+ * its sentence used to enumerate `coins, stars and certificates` — dropping the fourth thing a `save()` under
+ * this latch can lose, a duel row `recordDuel` files with no other surface to show it was kept (unlike a
+ * certificate's 🎓 row, gated on `certSaved`/#470). Proved red by reverting the enumeration in `parents.ts` and
+ * watching this test fail on "duel results" going missing from the sentence.
+ */
+describe('the not-saving sentence names everything a refused write can lose', () => {
+  beforeEach(() => reset());
+
+  it('is null while saving is working, and names duel results alongside coins/stars/certificates once it fails', () => {
+    expect(isWriteFailing(), 'nothing has failed yet').toBe(false);
+    expect(saveNote()).toBeNull();
+
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try { save({ coins: 1 }); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(isWriteFailing(), 'the write just threw').toBe(true);
+
+    const note = saveNote();
+    expect(note, 'the grown-ups screen must explain the fault, not go quiet').not.toBeNull();
+    for (const thing of ['coins', 'stars', 'certificates', 'duel results'])
+      expect(note, `must still list ${thing} among what can be lost`).toContain(thing);
+  });
+
+  // pr-test-analyzer, reviewing this diff: `saveNote` was exported here for the first time specifically so it
+  // could be unit-tested directly, and its other branch — a newer-build save, #232's read-only latch — had
+  // never been exercised anywhere in the repo. Closing that while the function is already open for testing,
+  // same fixture shape as tests/unit/storage.test.ts's "leaves the newer blob on disk" case.
+  it('says a different thing for a newer-build save, and a save attempted under that latch never also sets the write-failure one', () => {
+    const key = saveKeyFor(activeProfile());
+    localStorage.setItem(key, JSON.stringify({ v: SAVE_VERSION + 1, name: 'Tablet', coins: 500 }));
+    load();
+    expect(isReadOnlySave(), 'the read-only latch must be set by loading a newer-build blob').toBe(true);
+
+    const note = saveNote();
+    expect(note, 'a newer-build save must not read as a plain write failure').not.toBeNull();
+    expect(note).toContain('newer version of the app');
+    expect(note, 'this is a different remedy — it must not also claim the write-failing wording').not.toContain('duel results');
+
+    // A save attempted under the read-only latch never reaches `setItem` at all (`save()`'s own comment: "not
+    // an attempted write, so it does not touch writeFailed either way", #232/#151), so the two latches this
+    // function distinguishes can never actually both be true from one `save()` call.
+    save({ coins: 1 });
+    expect(isWriteFailing(), 'a read-only save is never an attempted write, so this never latches from it').toBe(false);
+    expect(isReadOnlySave(), 'and the read-only latch is untouched by it').toBe(true);
+    expect(saveNote(), 'saveNote still reports the read-only reason').toContain('newer version of the app');
   });
 });

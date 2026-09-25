@@ -1705,9 +1705,10 @@ test.describe('Sky Ninja Academy', () => {
     await page.evaluate(() => history.back());
     await expect(page.locator('.island-screen')).toBeVisible();
     await startTopic(page, 'year1', 'y1-shapes');
-    // `y1-shapes` writes its hint on ~half its draws, so take the first drawn question that has one: a draw
-    // without it would make the control vacuous rather than red.
-    await page.waitForFunction(() => (document.querySelector('#hint') as HTMLElement).textContent !== '');
+    // `#hint` is never empty — `hintText()` falls back to an instruction line when the question writes none —
+    // so waiting for non-empty text resolves on the very first frame regardless of which branch was drawn.
+    // Name the text this control needs instead: `y1-shapes`' own instruction hint, "Slice the shape".
+    await page.waitForFunction(() => (document.querySelector('#hint') as HTMLElement).textContent === 'Slice the shape');
     const plain = await page.evaluate(() => {
       const el = document.querySelector('#hint') as HTMLElement;
       return {
@@ -1717,7 +1718,7 @@ test.describe('Sky Ninja Academy', () => {
       };
     });
     console.log(`[guard rail #328] landscape control: display=${plain.display} h=${plain.height} cardBottom=${plain.cardBottom} "${plain.text}"`);
-    expect(plain.text, 'the control drew a card with no hint, so it proves nothing').not.toBe('');
+    expect(plain.text, 'the wait resolves only on this exact instruction line').toBe('Slice the shape');
     expect(plain.own, "a generator's instruction hint must not be marked as data").toBe(false);
     expect(plain.display, 'the ordinary landscape card gave up a line it used to keep').toBe('none');
     expect(plain.height, 'the hidden line still took layout space').toBe(0);
@@ -2344,6 +2345,25 @@ test.describe('Sky Ninja Academy', () => {
     // back returns to the sky map
     await page.click('#back');
     await expect(page.locator('.map')).toBeVisible();
+  });
+
+  // #714: the 3-D setting is a device-wide choice on the grown-ups screen. Nothing in the game mounts behind it
+  // yet (the #684 spike predates the flag), so this pins the control and the stored value, not a 3-D effect.
+  test('For grown-ups: the 3-D pictures control stores its choice on the device (#714)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    const pick = page.locator('.p-three-pick .tab');
+    await expect(pick).toHaveCount(3);
+    await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'true');     // Auto, the default
+    await pick.nth(2).click();                                              // Off
+    await expect(pick.nth(2)).toHaveClass(/\bon\b/);
+    await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'false');
+    expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBe('off');
+    await page.reload();
+    await openGrownUps(page);
+    await expect(page.locator('.p-three-pick .tab').nth(2)).toHaveAttribute('aria-checked', 'true');
+    await page.locator('.p-three-pick .tab').nth(0).click();                // back to Auto: the slot is cleared, not written
+    expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBeNull();
   });
 
   // #64: reinstalling the APK wipes localStorage, so the grown-up needs a way to carry the save across.

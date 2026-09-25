@@ -291,6 +291,11 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('#score-a')).toHaveText('0');
     await expect(page.locator('#score-b')).toHaveText('0');
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 1, ended: false, scoreA: 0, scoreB: 0, coins: 0, dojoCoins: 0, taught: { hits: 0, tries: 0 } });
+    // #354 finding 2: `state().coins` above is the new screen's own local score, 0 regardless of whether the
+    // previous match's payout landed once or twice — `showResults()` has no re-entrancy guard of its own
+    // (unreachable today: it is only ever called once, from `onMatchEnd`), so nothing before this re-read the
+    // SAVE after a rematch started. Re-reading it here closes that: still the first match's 10, not 20.
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).coins), "the first match's payout landed once through the rematch route, not twice").toBe(10);
     await expectHandoverHeard(page);   // the rematch's line is not dropped into the old screen's cancel()
     expect(await page.evaluate(() => window.__said.indexOf('<cancel>')), 'the old screen was hushed first, then the line went out').toBeGreaterThanOrEqual(0);
     // Leaving tears the duel down: the hooks go with it and BOTH render loops stop (#73 — no arena may leak

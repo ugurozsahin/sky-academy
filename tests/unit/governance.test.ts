@@ -1379,6 +1379,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'open-pr': null,
     'qa-screenshot': null,
     'review-pr': null,
+    'three-art': null,
     'verification-before-completion': { ...SUPERPOWERS, path: 'skills/verification-before-completion' },
     'using-git-worktrees': { ...SUPERPOWERS, path: 'skills/using-git-worktrees' },
     'systematic-debugging': { ...SUPERPOWERS, path: 'skills/systematic-debugging' },
@@ -1624,6 +1625,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'open-pr': /^Open a pull request .*Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR/,
     'qa-screenshot': /^Bounded visual QA for a Sky Ninja Academy pull request\. Use when reviewing or verifying a player-visible change/,
     'review-pr': /^Review and QA another agent's pull request .*Use when acting as the reviewer for an open PR .*block it with REVIEW: CHANGES REQUESTED/,
+    'three-art': /^Build a 3-D object for Sky Ninja Academy in the avatars' toon style .*Use when an issue labelled 3d asks for a 3-D object/,
     'verification-before-completion': /^Use when about to claim work is complete, fixed, or passing, before committing or creating PRs/,
     'using-git-worktrees': /^Use when starting feature work that needs isolation/,
     'systematic-debugging': /^Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes/,
@@ -2794,6 +2796,21 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
     return entries.length ? entries : null;
   };
 
+  // A rule may land before the tree it governs: `.claude/rules/three.md` (#716) is scoped to the paths #714
+  // and #715 create, so the first object is built to the rule rather than before it. Each entry names the
+  // issue that creates the path and is held still absent — the pull request that creates it drops the entry,
+  // and this rail goes back to checking the real path. It is not a way to scope a rule to nothing: an entry
+  // whose path exists fails, and one no rule file declares any more fails below. Only a shape `exists()` can
+  // resolve once the path is real belongs here — a directory, a file, or a trailing `**` — never a glob inside
+  // a file name (`scripts/sketch-*.mjs`), which `exists()` reads as absent forever and so could never expire.
+  const FUTURE_PATHS: Record<string, string> = {
+    'sketchbook.html': '#715', 'tests/sketch/**': '#715',
+  };
+  const declaredPaths = (file: string): string[] => {
+    const front = /^---\n([\s\S]*?)\n---\n/.exec(readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8'));
+    return front ? pathsList(front[1]) ?? [] : [];
+  };
+
   it.each(ruleFiles)('%s has a paths: list, and every path matches something in the repo', (file) => {
     const text = readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8');
     const front = /^---\n([\s\S]*?)\n---\n/.exec(text);
@@ -2801,7 +2818,24 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
     const paths = pathsList(front![1]);
     expect(paths, `${file} needs a non-empty paths: list — an unconditional rule belongs in CLAUDE.md instead`)
       .not.toBeNull();
-    for (const p of paths!) expect(exists(p), `${file}'s path "${p}" matches nothing in the repo`).toBe(true);
+    for (const p of paths!) {
+      if (Object.prototype.hasOwnProperty.call(FUTURE_PATHS, p)) {   // never a prototype key such as `constructor`
+        expect(exists(p), `${file}'s path "${p}" exists now (${FUTURE_PATHS[p]} landed) — drop it from FUTURE_PATHS`)
+          .toBe(false);
+        continue;
+      }
+      expect(exists(p), `${file}'s path "${p}" matches nothing in the repo`).toBe(true);
+    }
+  });
+
+  it('every FUTURE_PATHS entry is still declared by a rule file, so the allowance cannot outlive its use', () => {
+    const declared = ruleFiles.flatMap(declaredPaths);
+    for (const p of Object.keys(FUTURE_PATHS)) {
+      expect(declared, `${p} is declared by no rule file any more — drop it from FUTURE_PATHS`).toContain(p);
+      // A glob inside a file name would never resolve once real (review of this rail), so it could never expire.
+      expect(p.replace(/\/\*\*$/, ''), `${p} is a shape exists() cannot resolve, so it would never be dropped`)
+        .not.toMatch(/[*?]/);
+    }
   });
 
   it('a comment or blank line between two paths: entries does not silently drop the entries after it', () => {
@@ -3030,14 +3064,14 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
 
   // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 9_495   // → 9,495: "metre" is restored to the British-English list (#513 review, round 12 — it was dropped to pay for the fourth-routine pointer, which was unrelated to it), and the budget drops to this tree's own size rather than keeping the 14 bytes of headroom that restoring it happened to fit inside;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them; → 9,518: #97 reduced to a pointer at its home (#145); → 9,509: the external-assets rule stopped naming its one exception and pointed at #479 instead
+  const CLAUDE_MD_BUDGET = 9_487   // → 9,487 (#716): the 3-D bullet — the binding style record, the `three.md` pointer and the `3d` gate — paid for by dropping the desktop/viewport parenthetical from the test-running bullet (its home is the `open-pr` skill §4), the ci.yml aside from the guard-rails bullet (`docs/ROUTINE-PROMPT.md` STEP 1 carries it), the GraphQL clause from the board bullet (the developer prompt's Context has it) and a shorter Env note; the budget drops to the tree's own size;   // → 9,495: "metre" is restored to the British-English list (#513 review, round 12 — it was dropped to pay for the fourth-routine pointer, which was unrelated to it), and the budget drops to this tree's own size rather than keeping the 14 bytes of headroom that restoring it happened to fit inside;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them; → 9,518: #97 reduced to a pointer at its home (#145); → 9,509: the external-assets rule stopped naming its one exception and pointed at #479 instead
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
   const ROUTINE_PROMPT_BUDGET = 21_699   // → 21,699: STEP 2.5 gains the #459 claim-comment clause (`Taking this block, session <url>`, read as a live claim under ~45 minutes old), paid for by trimming the STEP 5 example snapshot's parentheticals, its trailing "value observed" paragraph, and the Do NOT line's explanatory asides — a net reduction, not merely a wash, since none of the trimmed prose is pinned word for word elsewhere (pr-test-analyzer review of the PR opening #459 caught the Do NOT line's `.claude/` clause losing its `#342` cross-reference in that trim; restored, six bytes);   // → 21,763: the #452 clause also names `unknown` — GitHub has not finished computing `mergeable_state` right after a push, and a run that read that as "not dirty, so an ordinary queue" could misclassify a conflicted push and stall on it exactly as #452 describes (silent-failure-hunter review of the PR opening #452) — a genuine content addition, not paid for elsewhere;   // → 21,641: STEP 3 tells a run to check `mergeable_state` once no `CI` run appears for a just-pushed head, rather than wait on one that will never start (#452) — a genuine content addition, not paid for elsewhere, since the missing instruction was the whole finding;   // → 21,363: STEP 3 rule 1 gained `epic` and rule 3 generalised from the two heartbeat issues to every `: heartbeat` issue (#512), paid for in both; this lowering was made once before and lost in an earlier merge with main, which is why it is stated here again;   // → 21,412 (#466): STEP 3 restates §4 and enumerates what the skill adds, so the sweep and self-agent rules needed a pointer there or a run reading the step got a complete-looking account — paid for by shortening the review-gate clause and the WIP sentence, whose instructions both survive beside the cut words   // → 21,418: the pulse-stamp sentence in STEP 1 (#439), paid for in the cadence note, both bootstrap asides, the game description in the intro, the `watchdog` bullet and STEP 4's QA aside   // → 21,419: three bytes of headroom the #393 merge left unrecorded, taken back so the rail measures the file again rather than a stale number   // 40,949 → 31,022: docs/decisions/002; → 28,479: #161 to one sentence; → 23,155: reviewing moved to docs/REVIEWER-PROMPT.md (docs/decisions/003); → 23,087: `BACKLOG.md` retired (#218); → 21,533: #199/#200 reduced to a pointer at `CLAUDE.md`; → 21,532: `creator=` and its reason added (#215), STEP 3 wording tightened to pay for it; → 21,529: condition 4 made unambiguous (#145), paid for in conditions 1 and 2; → 21,527: STEP 2.5's author clause (#284), paid for in STEP 2.5 and the Context paragraph on API access; → 21,503: STEP 1's stated recovery when the pull cannot fast-forward (#132), paid for in the cadence note, the Context and records paragraphs, STEP 0 and STEP 5; → 21,436: the STEP 1 IN PROGRESS stamp (#314), paid for in STEP 1's nightly, board and fork lines, STEP 4's QA aside and the Context board paragraph; → 21,433: the `.claude/` clause in STEP 5's Do NOT line (#342), paid for in the freeze paragraph's restated ordering rule and CLAUDE.md pointer, the records paragraph's second "change both together", and the frozen-label aside; → 21,422: STEP 1's stamp carries `- query top pick: pending` and STEP 4 names the line's value for an empty run (#338), paid for in the Context API and board paragraphs, the artifact note, the frozen-label aside, STEP 4's QA list and STEP 5's create-then-fill clause — one first attempt hit STEP 2.5, which the #204 rail pins word for word, and was reverted. Restated from the merged file's real `wc -c` after #342 landed, not from either branch's arithmetic
   // —
 
-  const REVIEWER_PROMPT_BUDGET = 9_950   // → 9,954: STEP 1 gains waiting clause (c), a PR whose gate went green after its clear (#579), paid for in the fork pointer, the idle-pulse aside, two duplicated review-pr pointers, the branch-name restatement, a doubled "report and stop", and the snapshot aside. One first attempt also cut "a pull request this session opened or pushed to is never yours" as a copy of line 12 and was reverted: two rails require it inside the waiting definition itself (#516)   // → 9,949: STEP 1 gains waiting clause (c), a PR whose gate went green after its clear (#579), paid for in the third copy of the self-review bar (line 12 and the Do NOT line already carry it), the fork pointer, the idle-pulse aside, and two duplicated review-pr pointers;   // → 9,961: the waiting test also covers a merge rule you cannot satisfy (#516), paid for in rule 4's look-must-not-change clause, the cadence and bootstrap asides in the header, and STEP 0's re-run limit   // → 9,967: the waiting test is applied, not re-judged (#516), paid for by collapsing STEP 2's restatement of rule 3's clear-and-wait parenthetical and rule 3's second pointer at the same skill section, and by dropping "decorations" from rule 4's new-look list, which CLAUDE.md's copy of that list does not carry either   // → 9,968: a finding stops the suite running at all, not merely last (#499, owner 2026-09-22), paid for in rule 2 lead-in, the Do NOT line re-listing the four rules above it, and the commands the review-pr skill already owns   // → 9,976: STEP 2 reordered so the browser follows the agents (#499), paid for by reducing the mobile/desktop recording rule to a pointer at its home in `review-pr` §2   // → 9,988: the pulse-stamp sentence after STEP 1 (#439), paid for in the bootstrap aside, the cadence note, the game description in the intro, STEP 2's fork sentence and rule 1's re-run clause (which the `Do NOT:` line already carries verbatim)   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
+  const REVIEWER_PROMPT_BUDGET = 9_935   // → 9,935 (#460 round 6, PR #704 review, round 6): the entry stamp itself was exempt from the liveness re-read — "Every write but the stamp" — so any run finding a PR to review while another's stamp was still live overwrote the whole pulse unconditionally, the ordinary hourly overlap, not a rare race; the entry write now goes through the same test, appending `- also reviewed: about to start #<n>` and holding no header of its own when another's stamp is live, so its own finish write never matches "this run's own stamp" either and always appends too — no new case needed; paid for by dropping "— the trigger fires mid-review" from STEP 0's closing sentence, "say in the merge comment which it was" from rule 1, "Then " before STEP 1's `npm ci` clause, and the `scripts/board-sync.mjs`/`PRIORITIES` cross-reference from STEP 2's priority order, which already spells the order out literally   // → 9,937 (#460 round 5, PR #704 review, round 5, then a live owner session): the "no other's live" disjunct keeps its age term after all, on the owner's own instruction — raised from ~90 to ~150 minutes rather than dropped, so a genuinely dead run's stamp still recovers on its own instead of needing a human to act on a watchdog finding every time; paid for by dropping "else" from STEP 0's half-finished sentence, "open-ended" from its web-research clause, "safe because" from STEP 1's clone-safety aside, and ", for the developer routine" from the closing Do NOT line, none of them pinned   // → 9,941 (#460 round 5, PR #704 review, round 5): age dropped out of the "no other's live" disjunct entirely — no finite threshold is safe when rule 4 sets no depth limit on a review, so an `IN PROGRESS:` stamp that is not this run's own is always treated as live and only ever appended to, whatever its age; a header that is not an `IN PROGRESS:` stamp at all still replaces normally (round 4's shape check, unchanged); paid for by dropping the trailing "No health checks here." aside, which no test pinned   // → 9,938 (#460 round 4, PR #704 review): the liveness disjunct now checks the header is an `IN PROGRESS:` stamp, not only that it is recent — an age-only test read a completed finished-snapshot header as "live" for as long as it stayed under the threshold, growing the pulse forever under the routine's own ordinary single-session cadence, no concurrency required; paid for by dropping "once" from the worklog aside, "working" from the GitHub-access fallback, and "own" from the #199/#200 sentence   // → 9,940 (#460 round 3, PR #704 review): the `no other's live` disjunct gains an inline age threshold — `(under ~90min old)` — so a time-pressured run has a number to judge a stamp against in the file it actually reads, rather than only in the ADR's aside; paid for by dropping "(developer's)" from the closing health-checks aside and "the"/"one" from the cadence sentence   // → 9,943 (#460 round 2, PR #704 review): the header check generalises from the finished-snapshot write to every write but the stamp, closing the gap round 2 found in the nothing-waiting cheap exit and STEP 0's stopped:limit write (neither had a stamp of its own to compare against) and giving both a defined append payload, paid for by trimming the worklog/GitHub-access/footer tail (STEP 0's "replacing" also became "writing", since the check now applies there too)   // → 9,954: STEP 1 gains waiting clause (c), a PR whose gate went green after its clear (#579), paid for in the fork pointer, the idle-pulse aside, two duplicated review-pr pointers, the branch-name restatement, a doubled "report and stop", and the snapshot aside. One first attempt also cut "a pull request this session opened or pushed to is never yours" as a copy of line 12 and was reverted: two rails require it inside the waiting definition itself (#516)   // → 9,949: STEP 1 gains waiting clause (c), a PR whose gate went green after its clear (#579), paid for in the third copy of the self-review bar (line 12 and the Do NOT line already carry it), the fork pointer, the idle-pulse aside, and two duplicated review-pr pointers;   // → 9,961: the waiting test also covers a merge rule you cannot satisfy (#516), paid for in rule 4's look-must-not-change clause, the cadence and bootstrap asides in the header, and STEP 0's re-run limit   // → 9,967: the waiting test is applied, not re-judged (#516), paid for by collapsing STEP 2's restatement of rule 3's clear-and-wait parenthetical and rule 3's second pointer at the same skill section, and by dropping "decorations" from rule 4's new-look list, which CLAUDE.md's copy of that list does not carry either   // → 9,968: a finding stops the suite running at all, not merely last (#499, owner 2026-09-22), paid for in rule 2 lead-in, the Do NOT line re-listing the four rules above it, and the commands the review-pr skill already owns   // → 9,976: STEP 2 reordered so the browser follows the agents (#499), paid for by reducing the mobile/desktop recording rule to a pointer at its home in `review-pr` §2   // → 9,988: the pulse-stamp sentence after STEP 1 (#439), paid for in the bootstrap aside, the cadence note, the game description in the intro, STEP 2's fork sentence and rule 1's re-run clause (which the `Do NOT:` line already carries verbatim)   // 10,034 → 9,998 (#327/#320): the reviewer pulse and the `loosening` merge clause, paid for in the cadence aside, rule 1's check-runs detail (whose facts survive in `docs/decisions/002-routine-prompt-is-flow-only.md`, which `review-pr` §5 points at — §5 itself does not carry them, corrected in the PR #417 review), rule 2's "throws the work away", rule 3's why-not-a-formal-review clause and its restatement of STEP 1(b), and STEP 2's outlast-the-hour aside and fork sentence; → 9,992 (PR #417 review B3/note 2): the snapshot's shape and the `nothing waiting` count, paid for in rule 3's undraft aside, STEP 2's blocking-mechanism tail, the fork fail-closed sentence and two shortened clauses — one first attempt shortened STEP 2's priority order, which the #194 rail pins word for word, and was reverted; → 9,990 (#326): the one-review-one-context flow clause, paid for by dropping this line’s table of contents for `review-pr` §4 and shortening three clauses whose instruction survives
 
   it('CLAUDE.md stays at or under its budget', () => {
     const size = bytes('CLAUDE.md');
@@ -3325,6 +3359,82 @@ describe('the reviewer routine keeps a pulse, and something reads it (#327, #320
     expect(p, 'STEP 0 must no longer claim this routine has no heartbeat').not.toContain('This routine has no heartbeat issue');
     expect(p, 'and it must record a limit stop in the pulse, which is the run most likely to vanish')
       .toContain('stopped: limit');
+  });
+
+  // #460: two reviewer runs were live at once, and the older one's own finished-snapshot write would have
+  // erased the younger one's still-live `IN PROGRESS` stamp — the exact record the watchdog reads to tell a
+  // live run from a dead one. `docs/decisions/009-the-reviewer-pulse-says-who-holds-it.md` is the fix: every
+  // pulse replace, the entry stamp included since round 6, checks only the pulse's header line — never the
+  // whole body, which a whole-body compare fails on its own success case (#704 review): an append under a
+  // still-current header changes the body without changing the header it was appended under, so the header is
+  // what a replace must key off, and a replace must keep any such lines already there rather than discard
+  // them. Round 6 (#704 review) found the entry stamp itself still exempt — "Every write but the stamp" said
+  // so — which is the write two runs' ordinary overlapping review windows actually hit, not a rare race; it
+  // now goes through the same test and appends `- also reviewed: about to start #<n>` when another's stamp is
+  // live, rather than clobbering it. This file sits at zero budget headroom and gets trimmed almost every week
+  // (the `REVIEWER_PROMPT_BUDGET` history above), which is exactly how a clause like #579's clause (c) or
+  // #194's priority order earned a word-for-word pin — this one had none until round 6.
+  it('STEP 1 carries the #460 liveness re-read, word for word and before every unconditional write', () => {
+    const p = flat(doc('docs/REVIEWER-PROMPT.md'));
+    // Round 2 (PR #704 review): the header check now covers every write, including the two branches that fire
+    // before this run has ever stamped its own `IN PROGRESS` — the "nothing waiting" cheap exit and STEP 0's
+    // `stopped: limit` write. "no other's live" is what lets those two branches replace safely when nothing is
+    // live, without a stamp of their own to compare against. (Round 6 below closes the third such branch, the
+    // entry stamp, which round 2 did not yet cover.)
+    // Round 4 (PR #704 review): age alone read a completed finished-snapshot header as "live" for as long as
+    // it was merely recent, under the routine's own single-session hourly cadence — no concurrency at all.
+    // The comparison now also checks the header is an `IN PROGRESS:` stamp, not just that it is young, so a
+    // finished write of any shape never counts as "another's live" regardless of age.
+    // Round 5 (PR #704 review, round 5, then a live owner session the same day): the ~90-minute age threshold
+    // itself was too tight — rule 4 sets no depth limit on a review, and #460's own evidence records one
+    // spanning close to two hours, so a run genuinely still reviewing past 90 minutes is ordinary, not a bug.
+    // An automated fix first dropped age entirely; put to the owner directly, he chose to keep the recovery
+    // property and raise the number instead — 150 minutes, comfortably above the ~115-minute duration #460's
+    // evidence recorded, revisit if a real case is ever hit. A header that is not an `IN PROGRESS:` stamp at
+    // all still replaces normally — round 4's shape check, unchanged.
+    const LIVENESS = 'Every write, the entry stamp included, re-reads first '
+      + '(`docs/decisions/009-the-reviewer-pulse-says-who-holds-it.md`): header unchanged from this run\'s '
+      + 'stamp, or not an `IN PROGRESS:` stamp at all, or another\'s `IN PROGRESS:` stamp over ~150min old — '
+      + 'replace, keeping `- also reviewed:` lines; another\'s `IN PROGRESS:` stamp under ~150min old — append '
+      + '`- also reviewed: <note>`';
+    expect(p, 'the liveness clause must read exactly this, naming the ADR it points at, or a byte squeeze '
+      + 'could reword or drop it silently. If the wording changed on purpose, re-pin it here and say so')
+      .toContain(LIVENESS);
+    const clause = p.indexOf(LIVENESS);
+    expect(p.indexOf('nothing waiting'), 'the clause must precede the cheap-exit stop it also governs')
+      .toBeGreaterThan(clause);
+    expect(p.indexOf('very last thing you do'), 'and the finished-snapshot write it was written for')
+      .toBeGreaterThan(clause);
+    // Round 2's second gap: the append payload for a run with no verdict of its own — "nothing to review"
+    // reached before ever stamping, or a limit hit before any PR was reviewed — was previously undefined.
+    expect(p, 'the append payload for the cheap-exit case must be spelled out, not left to the run to invent')
+      .toContain('`nothing waiting (N open, 0 waiting)`, `stopped: limit — <what>`, or `about to start #<n>`');
+    // Round 6, note 2 (pr-test-analyzer): the payload for a run that actually reviewed something while
+    // another's stamp was live — the ADR's own worked example — sat unpinned beside its two neighbours above.
+    expect(p, 'the primary append payload — a real verdict, not just the two edge cases — must be pinned too')
+      .toContain('`#<n>: <verdict>` per PR');
+    // Round 6 (PR #704 review, round 6): the entry stamp itself was exempt from the re-read above — "but the
+    // stamp" said so in as many words — so any run that found a PR to review while another's stamp was still
+    // live overwrote the whole body unconditionally, the ordinary hourly case, not a rare race. The entry
+    // write now goes through the same test: it either stamps its own header (nothing else live) or appends
+    // `- also reviewed: about to start #<n>` and writes no header of its own, so its later finish write has
+    // nothing of its own to compare against and always takes the append branch too while someone else holds
+    // the header — the same safe fallback every other write already had.
+    expect(p, 'the exemption must be gone — this is the write finding 1 (PR #704, round 6) showed erasing a '
+      + 'live run every ordinary hour a second run finds a PR to review, not only on a rare race')
+      .not.toMatch(/Every write but the stamp/);
+    expect(p, 'the entry write must have its own append payload, not just the finished-snapshot one')
+      .toContain('`about to start #<n>`');
+    const entryIdx = p.indexOf('Otherwise, replacing stamps');
+    expect(entryIdx, 'the entry write must apply the replace/append test, not stamp unconditionally')
+      .toBeGreaterThan(clause);
+    expect(p.slice(entryIdx), 'and say the appending branch writes no header of its own')
+      .toMatch(/appending writes `- also reviewed: about to start #<n>` and holds no header of its own/);
+    // The ADR file itself must exist and be reachable from this pointer — `tests/unit/instructions.test.ts`
+    // checks every code-span path in every live instruction file resolves on disk, this only checks the one
+    // this test pins is spelled the same way in both places.
+    expect(existsSync(new URL('../../docs/decisions/009-the-reviewer-pulse-says-who-holds-it.md', import.meta.url)),
+      'the ADR this clause names must exist, or the pointer is dangling').toBe(true);
   });
 
   /**
@@ -3730,6 +3840,60 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     }
   };
 
+  /**
+   * #473: `loadBearing` drops a whole array element — `'guidance rather than'`, say — but every element here
+   * that carries its own `(?:a|b)` group has a second place to narrow, one level down, that no whole-element
+   * drop can see: `'rather than a (?:gate|bar)'` rewritten to `'rather than a bar'` is a different array
+   * element with the same length, and dropping the *element* never tries it. Reproduced against this file's
+   * own corpora before this rail existed: dropping `gate` from that group, `bar` from `'not a (?:gate|bar)'`,
+   * `es` from `merg(?:e|es|ed|ing)`, and `code under test` from the ADR002 blind-spot group all left every
+   * voice matched, with `loadBearing` itself still green, because none of those voices needed the branch that
+   * moved.
+   *
+   * So the same property as `loadBearing`, one level down: **narrow a term's own group by one branch, and
+   * some voice must stop matching.** `branchesOf` finds every `(?:a|b|…)` group in a term and returns one
+   * variant per branch removed; a term with no such group has nothing to narrow this way and yields nothing,
+   * which is why `loadBearing` above still owns whole-element removal.
+   *
+   * A character class is the same narrowing in a different spelling — `shares the fix['’]s blind spot`'s
+   * `['’]` is two single-character alternatives, not a `(?:a|b)` group, and pr-test-analyzer's review of this
+   * rail found the gap live: dropping the curly quote to leave `[']` passed every voice here. So the second
+   * loop below reads `[...]` the same way, one character at a time — `Array.from` rather than a plain split,
+   * so a multi-byte character like `’` narrows as one unit, not as the bytes it is made of.
+   */
+  const branchesOf = (term: string): string[] => {
+    const variants: string[] = [];
+    for (const m of term.matchAll(/\(\?:([^()]+)\)/g)) {
+      const alts = m[1].split('|');
+      if (alts.length < 2) continue;
+      for (let i = 0; i < alts.length; i++) {
+        const kept = `(?:${alts.filter((_, j) => j !== i).join('|')})`;
+        variants.push(term.slice(0, m.index) + kept + term.slice((m.index ?? 0) + m[0].length));
+      }
+    }
+    for (const m of term.matchAll(/\[([^\]]+)\]/g)) {
+      const chars = Array.from(m[1]);
+      if (chars.length < 2) continue;
+      for (let i = 0; i < chars.length; i++) {
+        const kept = `[${chars.filter((_, j) => j !== i).join('')}]`;
+        variants.push(term.slice(0, m.index) + kept + term.slice((m.index ?? 0) + m[0].length));
+      }
+    }
+    return variants;
+  };
+
+  const loadBearingBranches = (label: string, alternatives: readonly string[], voices: readonly string[],
+    build: (alts: readonly string[]) => RegExp) => {
+    for (const term of alternatives) {
+      for (const narrowedTerm of branchesOf(term)) {
+        const narrowed = build(alternatives.map((a) => (a === term ? narrowedTerm : a)));
+        expect(voices.some((v) => !narrowed.test(v)),
+          `${label}: narrowing "${term}" to "${narrowedTerm}" leaves every voice matched, so the branch is dead`)
+          .toBe(true);
+      }
+    }
+  };
+
   const PERMIT = Object.freeze(['may', 'can', 'could', 'are free to', 'is allowed to', 'welcome to', 'is fine',
     'nothing(?: here| in this file)? (?:stops|prevents)', 'no rule (?:stops|prevents)']);
   const ACTION = Object.freeze(['merg(?:e|es|ed|ing)', 'undraft(?:s|ed|ing)?', 'approv(?:e|es|ed|ing)',
@@ -3754,6 +3918,22 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     'A run could squash its own pull request when the three agents are quiet.',
     // Distance, on purpose: the gap bisected to 35 characters with every other voice still matched.
     'You may, once the three agents have all come back clean and CI is green on the head, merge it yourself.',
+    // #473: one voice per branch inside PERMIT's two grouped terms and ACTION's four conjugated terms, so
+    // narrowing a group internally — dropping "es" from `merg(?:e|es|ed|ing)`, say — is caught the same way
+    // dropping a whole term is.
+    'Nothing in this file stops you merging your own pull request once the agents are quiet.',
+    'Nothing prevents you merging your own pull request once the agents are quiet.',
+    'No rule stops you merging your own pull request once the agents are quiet.',
+    'Nothing stops a pull request that merges cleanly on its own before anyone reviews it.',
+    'Nothing stops a pull request that merged cleanly on its own before anyone reviewed it.',
+    'Nothing stops a bot that undrafts its own pull request once CI turns green.',
+    'Nothing stops a pull request that undrafted itself once CI turned green.',
+    'Nothing stops a reviewer bot that approves its own pull request once the checks pass.',
+    'Nothing stops a pull request that approved itself once the checks passed.',
+    'Nothing stops approving your own pull request once the agents are quiet.',
+    'Nothing stops a batch job that squashes your own pull request automatically.',
+    'Nothing stops a pull request that squashed itself once CI turned green.',
+    'Nothing stops squashing your own pull request once CI is green.',
   ]);
 
   const EXEMPTION_ALTERNATIVES = Object.freeze(['counsel of perfection', 'guidance rather than',
@@ -3773,6 +3953,9 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     'Reading the registry table is fine when driving it is slow.',
     'Skip the agents when the diff is under twenty lines.',
     'Skip the sweep on a one-line fix.',
+    // #473: the branch inside each of the two grouped terms the whole-element loop cannot reach.
+    'Treat the sweep as advice rather than a gate.',
+    'The sweep is not a bar to shipping quickly.',
   ]);
 
   /**
@@ -3850,10 +4033,11 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
 
     expect(stripped, '§4 must grant no time-, size- or effort-based way past the sweep or the agents')
       .not.toMatch(EXEMPTION);
-    expect(EXEMPTION_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(11);
+    expect(EXEMPTION_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(13);
     for (const voice of EXEMPTION_VOICES)
       expect(grants(`${section} ${voice}`), `the detector must catch: "${voice}"`).toMatch(EXEMPTION);
     loadBearing('EXEMPTION', EXEMPTION_ALTERNATIVES, EXEMPTION_VOICES, exemption);
+    loadBearingBranches('EXEMPTION', EXEMPTION_ALTERNATIVES, EXEMPTION_VOICES, exemption);
   });
 
   it('open-pr §4 grants no licence to merge your own pull request, however it is phrased', () => {
@@ -3862,7 +4046,7 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // a licence would be written — and §5's rail is scoped to `S(5)`, so it never looks here.
     expect(grants(section), 'no permission to merge, undraft, squash or approve may appear in this section')
       .not.toMatch(SELF_MERGE);
-    expect(SELF_MERGE_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(12);
+    expect(SELF_MERGE_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(25);
     for (const voice of SELF_MERGE_VOICES)
       expect(grants(`${section} ${voice}`), `the detector must catch: "${voice}"`).toMatch(SELF_MERGE);
     expect('You never review, mark or merge your own pull request.', 'a ban is not a licence')
@@ -3870,6 +4054,8 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
 
     loadBearing('SELF_MERGE permission', PERMIT, SELF_MERGE_VOICES, (alts) => selfMerge(alts));
     loadBearing('SELF_MERGE action', ACTION, SELF_MERGE_VOICES, (alts) => selfMerge(PERMIT, alts));
+    loadBearingBranches('SELF_MERGE permission', PERMIT, SELF_MERGE_VOICES, (alts) => selfMerge(alts));
+    loadBearingBranches('SELF_MERGE action', ACTION, SELF_MERGE_VOICES, (alts) => selfMerge(PERMIT, alts));
     // The gap is an alternative too: it bisected to 35 characters with every voice still matched.
     expect(SELF_MERGE_VOICES.some((v) => !selfMerge(PERMIT, ACTION, GAP - 20).test(v)),
       'no voice needs more than 60 characters between the permission and the action, so the gap is free to shrink')
@@ -3980,14 +4166,24 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       "A sweep that reads the same table the fix edits shares the fix's blind spot.",
       'Enumerate it by driving the real code, not by reading the lists.',
       'Enumerate the class before you push.',
+      // #473: the branch inside the blind-spot group and the two conjugations of "enumerate(?:s|d)?", which
+      // the whole-element loop below cannot reach.
+      'That is the blind spot of the code under test, not only of the author.',
+      'The rail enumerates the class before it runs.',
+      'The rail enumerated the class before this round.',
+      // pr-test-analyzer, reviewing this rail: `['’]` is a character class, not a `(?:a|b)` group, and
+      // narrowing it to `[']` (dropping the curly quote) passed every voice above — all of them use the
+      // straight quote. This is the curly-quote witness `branchesOf`'s character-class loop now needs.
+      "A sweep that reads the same table the fix edits shares the fix’s blind spot too.",
     ]);
-    expect(ADR002_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(6);
+    expect(ADR002_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(10);
     expect(p, 'the reasoning belongs in the skill, not in a second copy here').not.toMatch(adr002());
     for (const restatement of ADR002_VOICES)
       expect(`${p} ${restatement}`, `the detector must catch: "${restatement}"`).toMatch(adr002());
     // Round 2, B4: five of this detector's six alternatives were freely removable — it had neither a length
     // guard nor a reverse loop, while the docstring claimed both detectors had them.
     loadBearing('ADR002', ADR002_ALTERNATIVES, ADR002_VOICES, adr002);
+    loadBearingBranches('ADR002', ADR002_ALTERNATIVES, ADR002_VOICES, adr002);
     // And the other side, which is why a bare `blind spot` was refused: ordinary prose must not trip it.
     for (const innocent of ['A reviewer has a blind spot for their own prose.', 'The class of 2026.'])
       expect(innocent, `the detector must stay quiet on: "${innocent}"`).not.toMatch(adr002());
