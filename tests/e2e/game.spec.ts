@@ -8,6 +8,13 @@ import { expectFitsViewport } from './viewport';
 /** A context with nothing stored: the 3-D setting at its default, `auto` — the opt-out from `THREE_OFF`. */
 const NO_STORED_STATE = { cookies: [], origins: [] };   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
 
+// #748: the suite's game-speed multiplier, overridable so a CI trial can measure a candidate value without
+// editing this file. `Number('') || 4` would silently accept a typo'd override the same way #123's PW_PORT
+// review found for a port — an explicit, malformed PW_FAST is a loud startup error instead of a silent 4.
+const rawFast = process.env.PW_FAST;
+if (rawFast !== undefined && !/^\d+$/.test(rawFast)) throw new Error(`PW_FAST must be a plain integer, got "${rawFast}"`);
+export const FAST = rawFast ? Number(rawFast) : 4;
+
 declare global {
   interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
   interface Window { __spoken?: string[] }                          // #380 review B2: every line the engine was handed, in order
@@ -189,7 +196,7 @@ test.describe('Sky Ninja Academy', () => {
   // bubble flight time — so the suite runs in a fraction of real game time without touching the clock the
   // guard rails read. One test below overrides this to 1 to pin the holds to their curriculum values.
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => { window.__SNA_FAST = 4; });
+    await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
   });
 
   test('avatar selection is required, saved and shown on the home screen', async ({ page }) => {
@@ -2493,7 +2500,7 @@ test.describe('Sky Ninja Academy', () => {
 test.describe('a corrupted save does not brick the app (#95)', () => {
   // This describe block sits outside the main one (line 167), so it does not inherit its `beforeEach` — without
   // this, the full-mission test below ran at 1× speed instead of the suite's 4×, ~3x slower for no reason.
-  test.beforeEach(async ({ page }) => { await page.addInitScript(() => { window.__SNA_FAST = 4; }); });
+  test.beforeEach(async ({ page }) => { await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST); });
 
   test('guard rail: the map, an island, and the grown-ups dashboard all still render on a null-shaped save', async ({ page }) => {
     // pageerror only — an uncaught exception is the actual failure mode this rail guards (d.progress[id]

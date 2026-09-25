@@ -1,0 +1,86 @@
+# #748: a paired measurement of the e2e time-compression factor (PW_FAST, tests/e2e/game.spec.ts and
+# duel.spec.ts), never part of the ordinary pull-request or nightly runs. It exists to answer one question —
+# does raising the suite's default from 4 actually shorten CI's wall clock, or does the runner just reabsorb
+# the freed time — and #748 itself explains why a single run of either arm cannot answer it: the run-to-run
+# variance on an unchanged tree is 12% of the mean (σ = 59s on a 480s mean), so one run per arm cannot tell a
+# real 0–24% win from noise. Pairing both legs inside ONE job removes the between-runner variance (same
+# machine, same npm cache, same browser download, same CPU neighbours) that is most of that 12% — see #748's
+# comment for the numbers this design is built from.
+#
+# Deliberately its own workflow, on-demand only (`workflow_dispatch`), never folded into ci.yml: a
+# `workflow_dispatch` of the FULL matrix there runs five projects, and the mobile signal this trial needs
+# would arrive buried in four other legs' noise (#748's own instruction). This file runs `--project=mobile`
+# and nothing else, twice.
+name: E2E speed trial (#748)
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: 'PW_FAST value for the second leg (the baseline leg always runs unset, i.e. 4)'
+        required: false
+        default: '8'
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    # Two ~8-9 minute mobile legs plus setup; #754 raised the sibling ci.yml job to 45 for the same class of
+    # reason (a cancelled run reports nothing). This job reports nothing useful either if it is cut short
+    # mid-second-leg, so it gets the same headroom rather than the bare sum of two legs.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - name: Drop the apt sources we do not use (#85)
+        run: sudo rm -fv /etc/apt/sources.list.d/google-chrome*.list /etc/apt/sources.list.d/google-chrome*.sources
+      - run: npx playwright install --with-deps chromium
+      # Baseline leg: PW_FAST unset, so tests/e2e/game.spec.ts and duel.spec.ts both fall back to today's
+      # default of 4 (#748's own fallback, kept in step with those two files rather than restated here as a
+      # literal). Every test runs, including the #32 rail that pins the value — it is expected to pass here.
+      - name: 'Leg 1/2: baseline (PW_FAST unset, today''s default)'
+        id: baseline
+        run: |
+          start=$(date +%s)
+          npx playwright test --project=mobile --reporter=list
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+      # Candidate leg: the #32 rail (tests/e2e/game.spec.ts, "guard rail: 4x speeds the game, not the clock the
+      # rails read") asserts the speed BY VALUE and is meant to fail at any factor other than today's default —
+      # that is the rail doing its job, proved locally before this file was written (PW_FAST=8 -> Expected: 4,
+      # Received: 8), not a trial defect. `|| true` keeps that one expected red from failing this job, so the
+      # wall clock below still gets written even though this leg is not expected to be all-green; every other
+      # test in the suite is expected to stay green at any factor, so a second failure here is a real finding,
+      # not the known one.
+      - name: 'Leg 2/2: candidate (PW_FAST=${{ inputs.candidate }})'
+        id: candidate
+        env: { PW_FAST: '${{ inputs.candidate }}' }
+        run: |
+          start=$(date +%s)
+          npx playwright test --project=mobile --reporter=list || true
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+      - name: Paired result
+        env:
+          BASE_S: ${{ steps.baseline.outputs.seconds }}
+          CAND_S: ${{ steps.candidate.outputs.seconds }}
+          CANDIDATE: ${{ inputs.candidate }}
+        run: |
+          delta=$(( BASE_S - CAND_S ))
+          pct=$(awk -v b="$BASE_S" -v d="$delta" 'BEGIN { printf "%.1f", (d / b) * 100 }')
+          {
+            echo "### E2E speed trial (#748) — PW_FAST 4 vs $CANDIDATE, same job, same runner"
+            echo ""
+            echo "| leg | PW_FAST | wall clock |"
+            echo "| --- | ---: | ---: |"
+            echo "| baseline | 4 (unset) | ${BASE_S}s |"
+            echo "| candidate | $CANDIDATE | ${CAND_S}s |"
+            echo ""
+            echo "**Change: ${delta}s (${pct}%).** The candidate leg's own #32 guard-rail assertion is"
+            echo "expected to fail (it pins the factor by value, on purpose) — check this run's test summary"
+            echo "for any OTHER red before reading the number above as clean."
+            echo ""
+            echo "One paired run is one data point. #748's own variance table says a 20% effect needs ~6 runs"
+            echo "per arm to separate from noise at 80% power — treat a single run here as a first signal, not"
+            echo "the acceptance criterion's paired comparison on its own, and re-dispatch this workflow rather"
+            echo "than trusting one run if the number below is close to the threshold that would change the"
+            echo "default."
+          } >> "$GITHUB_STEP_SUMMARY"
