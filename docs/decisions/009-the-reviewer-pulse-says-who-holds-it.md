@@ -83,6 +83,20 @@ long-running stamp (rule 4 sets no depth limit on a review) against nothing, cou
 to cover the unstamped case. STEP 1 now reads "no other's live (under ~90min old)" inline, so the number a run
 has to judge a stamp against is in the file it actually follows at runtime, not only in this record.
 
+**Round 4 (PR #704 review): "no other's live" tested only the header's age, never its shape, so a completed
+finished-snapshot header read as "live" for as long as it was merely recent.** Trace the routine's own hourly
+cadence with a single reviewer session, no overlap at all: run k finishes idle, replaces the header with its
+`nothing waiting (N open, 0 waiting)` snapshot. Run k+1, an hour later, has stamped nothing of its own; the
+header is 60 minutes old, under the ~90-minute threshold, so the age-only test reads it as "another's live" and
+appends instead of replacing — even though the run that wrote it finished an hour ago and no longer exists. The
+header then only advances on whichever run happens to catch it stale enough, drifting up to ~2 hours out of
+date for the one reader (the watchdog) this mechanism exists to serve, while `- also reviewed:` lines
+accumulate forever — the exact unbounded growth this decision was written to prevent, caused by a false
+positive rather than genuine concurrency. STEP 1 now reads "no other's live `IN PROGRESS:` (under ~90min old)":
+the comparison is keyed on the header actually being an `IN PROGRESS:` stamp, not merely a recent one, so a
+finished write of any shape (`nothing waiting`, `stopped: limit`, or a finished snapshot) never counts as
+"another's live" regardless of its age.
+
 This is alternative 1 of the three #460 proposed: the pulse names who holds it, cheaply, without a lock, a
 label or a slowed cadence.
 
