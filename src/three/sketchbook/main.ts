@@ -7,6 +7,7 @@
  * Never imported by anything under `src/` outside this folder (a rail): the game does not know this page.
  */
 import { createStage, measure, type Measure } from '../stage';
+import type { Beat, Pose } from '../stage/motion';
 import { pickTier, readTierEnv, type Tier } from '../stage/tiers';
 import { avatarSrc, CATALOGUE, DEFAULT_VARIANT, find, paramsFor, variantsOf } from './catalogue';
 import { mountControls, mountList, type Model } from './controls';
@@ -27,6 +28,10 @@ export interface SketchHook {
   budget(): { declared: Measure; measured: Measure };
   /** A copy, never the live model — the sliders are bound to that one. */
   model(): Model;
+  /** Play a stage beat (#740); false under reduced motion. */
+  beat(kind: Beat): boolean;
+  /** The pose the last frame applied — REST once a beat has finished. */
+  pose(): Pose;
 }
 declare global { interface Window { __sketch: SketchHook } }
 
@@ -75,6 +80,7 @@ const controls = shot ? null : mountControls(model, CATALOGUE, {
   tier: () => draw(),
   beside: () => draw(),
   param: () => draw(),
+  beat: (b) => view.beat(b),
 });
 const refreshList = shot ? () => {} : mountList(document.getElementById('list')!, CATALOGUE, () => model.object, (name) => pick(name));
 
@@ -105,6 +111,8 @@ window.__sketch = {
   pixelRatio: () => view.pixelRatio,
   budget: () => ({ declared: find(model.object).budget, measured }),
   model: () => structuredClone(model),
+  beat: (kind) => view.beat(kind),
+  pose: () => view.pose,
 };
 draw();
 ready = true;

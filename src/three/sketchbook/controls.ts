@@ -9,6 +9,7 @@
  */
 import GUI from 'three/examples/jsm/libs/lil-gui.module.min.js';
 import type { ObjectSpec } from '../objects';
+import { BEATS, type Beat } from '../stage/motion';
 import type { Tier } from '../stage/tiers';
 import { variantsOf } from './catalogue';
 
@@ -19,6 +20,8 @@ export interface Handlers {
   tier(t: Tier): void;
   beside(on: boolean): void;
   param(key: string): void;
+  /** A beat button: play it on the shown object (#740). */
+  beat(b: Beat): void;
 }
 
 /** The tier names a grown-up would understand, the way the issue puts it. Exhaustive over `Tier`. */
@@ -39,6 +42,9 @@ export function mountControls(model: Model, entries: readonly ObjectSpec[], on: 
   let variantCtl = addVariant(initial);
   gui.add(model, 'tier', byLabel).name('tier').onChange((t: Tier) => on.tier(t));
   gui.add(model, 'beside').name('beside the avatar').onChange((b: boolean) => on.beside(b));
+  // #740: one button per stage beat. The folder sits above `params`, which `rebuild` destroys and re-adds last.
+  const beats = gui.addFolder('beats');
+  for (const b of BEATS) beats.add({ [b]: () => on.beat(b) }, b);
   let params = gui.addFolder('params');
 
   const rebuild = (o: ObjectSpec) => {

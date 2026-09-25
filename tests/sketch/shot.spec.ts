@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { shoot } from '../../scripts/sketch-shot.mjs';
 import { TIERS } from '../../src/three/stage/tiers';
+import { CATALOGUE, variantsOf } from '../../src/three/sketchbook/catalogue';
+
+/**
+ * The shot test renders every object × variant × tier, so its time grows with the catalogue: on CI's software
+ * GL a frame costs about 1.2 s (53.3 s for 44 frames on PR #738's run). A fixed 60 s ran out at 44 frames once
+ * PR #741 added the shadow and the gloss, so the limit follows the frame count, with room for a slow runner.
+ */
+export const SHOT_FRAMES = CATALOGUE.reduce((n, o) => n + variantsOf(o).length, 0) * Object.keys(TIERS).length;
+export const SHOT_MS_PER_FRAME = 3_000, SHOT_BASE_MS = 30_000;
 
 /**
  * #715: the sketchbook's tests, run as the `sketchbook` Playwright project against the same preview the game's
@@ -8,8 +17,10 @@ import { TIERS } from '../../src/three/stage/tiers';
  * pull-request leg does not pay for them. The first test IS the screenshot script (epic #713 decision 5).
  */
 test('every object × variant × tier renders a non-blank frame into docs/sketchbook (#715)', async ({ page, baseURL }) => {
+  test.setTimeout(SHOT_BASE_MS + SHOT_FRAMES * SHOT_MS_PER_FRAME);
   const { shots, blank, inks } = await shoot({ page, base: baseURL! });
   expect(shots.length, 'the placeholder alone is 3 variants × 2 tiers').toBeGreaterThanOrEqual(6);
+  expect(shots.length, 'the time limit is computed from the frames this test really shoots').toBe(SHOT_FRAMES);
   expect(blank, 'a blank frame means the stage drew nothing — the rig, the material or the outline is broken').toEqual([]);
   // Bounded from above too: a frame that is ALL ink means the background read is wrong (the corner sat on the
   // object, or the background stopped being flat), and the blank check could then never fire again.
@@ -38,6 +49,15 @@ test('the interactive page lists the objects, mounts the panel, honours a deep l
   const last = objects[objects.length - 1];
   await page.evaluate(([n]) => window.__sketch.show(n, 'default', 'high'), [last.name]);
   await expect(page.locator('.lil-gui select').first(), 'the panel names the object show() drew').toHaveValue(last.name);
+  // #740: a tap bounces the object and it comes back to rest; the panel's beats reach the same animator.
+  const tapped = (await page.locator('#stage canvas').boundingBox())!;
+  await page.mouse.click(tapped.x + tapped.width / 2, tapped.y + tapped.height / 2);
+  await page.waitForTimeout(250);
+  expect(await page.evaluate(() => window.__sketch.pose()), 'a tap starts a bounce').not.toEqual({ y: 0, sx: 1, sy: 1, rz: 0 });
+  await page.waitForFunction(() => { const p = window.__sketch.pose(); return p.y === 0 && p.sy === 1 && p.rz === 0; }, undefined, { timeout: 3000 });
+  await page.locator('.lil-gui button', { hasText: 'cheer' }).click();
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__sketch.pose()), 'the cheer button plays').not.toEqual({ y: 0, sx: 1, sy: 1, rz: 0 });
   // A drag on the canvas turns the object. Under reduced motion the idle turn is off, so the frame holds still
   // until the drag — without that, any two screenshots differ and the check proves nothing.
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -46,6 +66,7 @@ test('the interactive page lists the objects, mounts the panel, honours a deep l
   const canvas = page.locator('#stage canvas');
   const still = await canvas.screenshot();
   expect((await canvas.screenshot()).equals(still), 'reduced motion: no idle turn').toBe(true);
+  expect(await page.evaluate(() => window.__sketch.beat('bounce')), 'reduced motion: no beat plays').toBe(false);
   const box = (await canvas.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 150, box.y + box.height / 2, { steps: 6 }); await page.mouse.up();
