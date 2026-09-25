@@ -6,7 +6,7 @@ import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, DIGRAPHS, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
 import type { SentenceType } from '../../src/curriculum/writing';
-import { coinLabel, SHAPES_2D, SHAPES_3D, wordQ } from '../../src/curriculum/util';
+import { coinLabel, numQ, SHAPES_2D, SHAPES_3D, wordQ } from '../../src/curriculum/util';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
 import { digraphBlocked, digraphFrames, digraphSpellings } from './helpers/digraph-gaps';
@@ -2015,7 +2015,15 @@ describe('a hint is instruction text unless the generator says it is data (#328,
     for (const t of TOPICS) for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < DRAWS; i++) {
       const q = t.gen(d, r); cards++;
       if (q.hint) hinted.add(t.id);
-      if (q.hintIsData) { marked.add(t.id); flagged++; expect(q.hint, `${t.id} d${d}: hintIsData with no hint — "${q.prompt}"`).toBeTruthy(); }
+      if (q.hintIsData) {
+        marked.add(t.id); flagged++;
+        expect(q.hint, `${t.id} d${d}: hintIsData with no hint — "${q.prompt}"`).toBeTruthy();
+        // The reverse of the check below (#468 item 2): a topic already in `marked` because SOME of its
+        // draws carry values (e.g. `y2-length`'s `measureCompare` branch) would hide a sibling branch that
+        // sets `hintIsData` on a hint carrying none (`unitChoice`'s two-option restatement) — the topic-level
+        // `marked` set stays unchanged either way, so only a per-card check catches it.
+        expect(DATA_SHAPE.test(q.hint!), `${t.id} d${d}: hintIsData but the hint carries no values — "${q.hint}"`).toBe(true);
+      }
       if (q.hint && DATA_SHAPE.test(q.hint))
         expect(q.hintIsData, `${t.id} d${d}: "${q.hint}" carries the values but is not marked — landscape would hide it (#328)`).toBe(true);
     }
@@ -2203,6 +2211,43 @@ describe("numQ's decoy top-up never drops a bubble short (#462)", () => {
       const r = rng(id.length * 7 + d);
       for (let i = 0; i < 1500; i++) expect(topic.gen(d, r).options.length, `${id} d${d}`).toBe(4);
     }
+  });
+});
+
+describe('numQ forwards any Question field, not only say/visual/hint (#468 item 4)', () => {
+  /**
+   * No topic sets `hintIsData` (or another new field) on a `numQ` card today — the two existing
+   * `hintIsData: true` writers both go through `wordQ` — so this mechanism had no coverage, direct or
+   * indirect, until this rail: a future numeric measure card asking for it would have it silently dropped,
+   * with no compile error and no failing test, exactly as `wordQ`'s own `extra` passthrough already guards
+   * against for word cards.
+   */
+  it('carries hintIsData (and any other extra field) onto the returned Question', () => {
+    const r = rng(468);
+    const q = numQ(r, '4 m: how far to go?', 2, { min: 0, max: 10, hint: 'red: 4 m · blue: 2 m', hintIsData: true });
+    expect(q.hintIsData).toBe(true);
+    expect(q.hint).toBe('red: 4 m · blue: 2 m');
+  });
+  it('never leaks its own min/max/n/distractors config onto the returned Question', () => {
+    const r = rng(469);
+    const q = numQ(r, '2 + 2 = ?', 4, { min: 0, max: 10, n: 3, distractors: [3, 5] });
+    const leaked = q as unknown as Record<string, unknown>;
+    expect(leaked.min).toBeUndefined();
+    expect(leaked.max).toBeUndefined();
+    expect(leaked.n).toBeUndefined();
+    expect(leaked.distractors).toBeUndefined();
+  });
+  it('keeps its own prompt/answer/options even when opts carries a stale copy via a spread (silent-failure-hunter, #468 item 4)', () => {
+    // `Omit<Question, 'prompt' | 'answer' | 'options'>` only blocks those keys written into an object
+    // literal — TypeScript's excess-property check does not reach a `...spread`, which is exactly the
+    // shape several real call sites use (`numQ(rng, p, a, { min: 0, max: 20, ...q(p) })` in maths.ts). A
+    // stale spread-in `prompt`/`answer`/`options` must still lose to the function's own computed values.
+    const r = rng(470);
+    const stale = { prompt: 'WRONG PROMPT', answer: 'WRONG', options: ['WRONG'] };
+    const q = numQ(r, 'real prompt', 4, { min: 0, max: 10, ...stale } as Parameters<typeof numQ>[3]);
+    expect(q.prompt).toBe('real prompt');
+    expect(q.answer).toBe('4');
+    expect(q.options).not.toEqual(['WRONG']);
   });
 });
 
