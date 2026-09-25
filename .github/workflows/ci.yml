@@ -79,7 +79,16 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 45, raised from 30 on 2026-09-25 (#718) as a STOP-GAP, on the owner's decision in session. The nightly
+    # full-matrix job had grown 899s -> 1816s in eight days and crossed the old ceiling, so the 2026-09-25 run
+    # was cancelled 10 of 348 e2e tests short. A cancelled run reports NOTHING, which is worse than a slow one:
+    # this is the only full e2e check a merged tree ever gets, so the ceiling was hiding the whole check rather
+    # than catching a runaway job. Raising it buys back the report, it does not make the suite faster.
+    # **This number is meant to come back down.** #749 removes 22% of the mobile leg (ten tests that play a
+    # full mission to reach a post-win screen); #748 and #750 are the other two levers. When they land, lower
+    # this to whatever the measured job needs plus headroom — and never raise it again to make a slow suite
+    # fit, which is the shape `.claude/rules/guardrails.md`'s budget-rail rule refuses.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
         with:
