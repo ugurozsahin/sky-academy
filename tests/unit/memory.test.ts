@@ -113,6 +113,17 @@ describe('memory decks', () => {
   it('pickTheme falls back to a random theme of the year when the id is unknown', () => {
     expect(THEMES.year1!.map(t => t.id)).toContain(pickTheme('year1', rng(9), 'nope').id);
   });
+
+  // #461: `doubles` and `tables` are the only two themes whose faces are both plain numeric text — every
+  // other theme pairs a picture, a count or a word with a name, so the two faces already say which kind
+  // matches which. Named exhaustively rather than "the rest are false" (#526): a theme added later with no
+  // opinion either way is a silent `undefined`, caught here the moment its id is missing from either list.
+  it('only doubles and tables mark their hint as the sole statement of the matching rule', () => {
+    const dataThemes = new Set(['doubles', 'tables']);
+    for (const y of YEARS) for (const theme of THEMES[y.id] ?? []) {
+      expect(!!theme.hintIsData, `${y.id}/${theme.id}`).toBe(dataThemes.has(theme.id));
+    }
+  });
 });
 
 describe('memory game', () => {

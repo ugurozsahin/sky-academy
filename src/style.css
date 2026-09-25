@@ -1609,7 +1609,9 @@ img { -webkit-user-drag: none; }
    * shape", "Add -s or -es") as well as the four this screen writes itself — that is what buys the space,
    * and `tests/e2e/game.spec.ts`'s `y1-shapes` control is a hint-writing topic precisely so this line is a
    * claim the suite can fail. The duel screen's half of the same bug is `.duel-q .hint` above (#295);
-   * `memory.ts` is a third user of this selector and is out of scope here — see #461.
+   * `memory.ts` is a third user of this selector, marking its own `doubles`/`tables` themes `own` from a
+   * `Theme.hintIsData` flag of its own — the two decks whose faces are both plain numeric text, so nothing
+   * on the board says a child is hunting for an answer rather than, say, a bigger number (#461).
    */
   .hint.own {
     display: block;
