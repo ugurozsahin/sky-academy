@@ -54,17 +54,28 @@ export function numQ(rng: Rng, prompt: string, answer: number, opts: { min?: num
 }
 
 /**
+ * Whether an option set reads as "words" and should draw the bigger bubble (#369, #482): the longest label
+ * decides — one character short of "op" but as long as "cat" tips it wide. The single rule `wordQ` below and
+ * `waveOptsFor` (`src/ui/play-session.ts`) both call, so a card is never wide by one rule and narrow by the
+ * other depending on which of the two computed `q.wide` for it (#482: before this, `wordQ` used `> 2` and
+ * `waveOptsFor`'s own fallback used `> 3` — the same three-character label read differently depending on
+ * which generator wrote the card).
+ */
+export const wideFor = (options: readonly string[]): boolean => options.some(o => o.length > 2);
+
+/**
  * Build a word/symbol multiple-choice question.
  *
  * `wide` is read off the **whole option set**, never the answer alone (#369): `bubbleRadius` draws a wide
  * wave 1.25x bigger, so deriving it from the answer made the correct bubble systematically the larger one
  * wherever a card's options differ in length — on a two-option card (`yes`/`no`, `50p`/`1p`) size alone gave
  * the answer away. Width is a property of the card, which is what `Question['wide']` has always claimed
- * ("options are words → bigger bubbles"); `waveOptsFor` in `src/ui/play-session.ts` reads the same way.
+ * ("options are words → bigger bubbles"); `waveOptsFor` in `src/ui/play-session.ts` reads the same way,
+ * through the shared `wideFor` above.
  */
 export function wordQ(rng: Rng, prompt: string, answer: string, distractors: string[], extra: Partial<Question> = {}): Question {
   const ds = [...new Set(distractors.filter(d => d !== answer))].slice(0, 3);
-  return { prompt, answer, options: shuffle(rng, [answer, ...ds]), wide: [answer, ...ds].some(o => o.length > 2), ...extra };
+  return { prompt, answer, options: shuffle(rng, [answer, ...ds]), wide: wideFor([answer, ...ds]), ...extra };
 }
 
 export const NUM_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
