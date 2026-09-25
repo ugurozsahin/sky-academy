@@ -5,7 +5,7 @@
 // 2D context, spawns a wave and draws one frame, so the assertions are on the calls the canvas received.
 //
 // The stubs are hand-built rather than jsdom: jsdom is not a dependency of this project and `CLAUDE.md`'s
-// allowlist rail is the reason not to make it one for six tests. Only what `Arena` actually touches is
+// allowlist rail is the reason not to make it one for nine tests. Only what `Arena` actually touches is
 // faked, so a constructor that starts reaching for more of the DOM fails here loudly rather than silently.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Arena, type Bubble } from '../../src/game/arena';
@@ -162,5 +162,17 @@ describe('warnUnfitLabel says so out loud when a label does not fit (#348 / #495
   it('warns not at all for a wave of comfortable labels', () => {
     arenaWith(["9 o'clock", '£2', '50p']);
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  // #348 has a second call site: `reveal()` fits and warns for the "good answer" bubble it respawns when
+  // the wave never launched one. That call site is a separate deletion risk from `spawnWave`'s (above) and
+  // was still untested — reviewed independently by two agents on this PR.
+  it('warns once when reveal() respawns a "good answer" bubble that does not fit', () => {
+    const arena = new Arena(stubCanvas(ctx), { onHit: () => {}, onFall: () => {}, onWaveEnd: () => {} });
+    arenas.push(arena);
+    const label = 'this particular good answer will not fit any bubble either';
+    arena.reveal({ good: label });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain(label);
   });
 });
