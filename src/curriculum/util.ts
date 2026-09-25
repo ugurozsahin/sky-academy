@@ -29,8 +29,13 @@ export function nearby(rng: Rng, answer: number, count: number, min: number, max
 // mutate the "empty" default for the rest of the session with nothing to catch it.
 const EMPTY_SET: ReadonlySet<number> = Object.freeze(new Set<number>());
 
-/** Build a numeric multiple-choice question. */
-export function numQ(rng: Rng, prompt: string, answer: number, opts: { min?: number; max?: number; n?: number; say?: string; visual?: Question['visual']; hint?: string; distractors?: number[] } = {}): Question {
+/**
+ * Build a numeric multiple-choice question. `opts` mixes `numQ`'s own range/decoy controls with any other
+ * `Question` field (`hint`, `hintIsData`, `visual`, `say`…) — forwarded the same way `wordQ`'s `extra` is
+ * (#468 item 4): a hand-written field list here silently drops a new field a caller sets, with no compile
+ * error and no failing test, which is exactly the trap `wordQ` does not have.
+ */
+export function numQ(rng: Rng, prompt: string, answer: number, opts: { min?: number; max?: number; n?: number; distractors?: number[] } & Partial<Omit<Question, 'prompt' | 'answer' | 'options'>> = {}): Question {
   const n = opts.n ?? 3;
   const min = opts.min ?? 0, max = opts.max ?? Math.max(20, answer + 10);
   let ds = opts.distractors ? [...new Set(opts.distractors.filter(d => d !== answer && d >= min && d <= max))] : [];
@@ -39,7 +44,13 @@ export function numQ(rng: Rng, prompt: string, answer: number, opts: { min?: num
   // card one bubble short. Passing `ds` as its exclusion set means every value it returns is already new.
   if (ds.length < n) ds = ds.concat(nearby(rng, answer, n - ds.length, min, max, new Set(ds)));
   const options = shuffle(rng, [String(answer), ...ds.slice(0, n).map(String)]);
-  return { prompt, answer: String(answer), options, say: opts.say, visual: opts.visual, hint: opts.hint };
+  // `Omit<Question, 'prompt' | 'answer' | 'options'>` in the signature only blocks those three keys when a
+  // caller writes them into an object literal — TypeScript's excess-property check does not reach a spread
+  // (`...q(p)`, several call sites in maths.ts), so a `prompt`/`answer`/`options` arriving that way is typed
+  // clean and would otherwise override the values this function just computed. Stripped explicitly rather
+  // than trusted to the type (silent-failure-hunter, reviewing #468 item 4).
+  const { min: _min, max: _max, n: _n, distractors: _distractors, prompt: _prompt, answer: _answer, options: _options, ...extra } = opts as typeof opts & { prompt?: unknown; answer?: unknown; options?: unknown };
+  return { prompt, answer: String(answer), options, ...extra };
 }
 
 /**
