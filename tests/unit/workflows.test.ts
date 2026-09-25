@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { workflowFiles } from './helpers/sources';
 
@@ -95,22 +95,34 @@ describe('the e2e server proves it is serving the build on disk, not a leftover 
       if (glob !== undefined) throw new Error(`this rail only judges RegExp testMatch/testIgnore, not a glob string ('${glob}') — extend it before trusting its verdict here`);
       return list as RegExp[];
     };
-    const runsHere = (proj: ReturnType<typeof byName>) => {
+    const runsHere = (proj: ReturnType<typeof byName>, file: string) => {
       const ignore = asRegexes(proj?.testIgnore);
-      if (ignore.some((r) => r.test(filename))) return false;
+      if (ignore.some((r) => r.test(file))) return false;
       const match = asRegexes(proj?.testMatch);
-      return match.length ? match.some((r) => r.test(filename)) : true;   // no testMatch: Playwright's own "everything in testDir"
+      return match.length ? match.some((r) => r.test(file)) : true;   // no testMatch: Playwright's own "everything in testDir"
     };
 
     const setup = byName('setup');
     expect(setup, 'a `setup` project must exist to run the identity spec before every other project (#486)').toBeTruthy();
-    expect(runsHere(setup), '`setup`\'s own patterns must actually select the identity spec, or nothing runs it at all')
+    expect(runsHere(setup, filename), '`setup`\'s own patterns must actually select the identity spec, or nothing runs it at all')
       .toBe(true);
+    // pr-test-analyzer review of this PR: a widened (or dropped) `testMatch` would still pass the assertion
+    // above while quietly turning `setup` into a second full e2e leg every project now depends on — the exact
+    // per-night cost #116's tablet rail already guards its own narrow spec against, with nothing here yet
+    // doing the same for this one. Checked against the REAL spec files on disk, not a hard-coded guess at
+    // their names, so a future spec file is covered the moment it exists.
+    const specFiles = readdirSync(new URL('../../tests/e2e/', import.meta.url)).filter((f) => f.endsWith('.spec.ts') && f !== filename);
+    expect(specFiles.length, 'tests/e2e/ must still have other spec files, or this exclusivity check covers nothing')
+      .toBeGreaterThan(0);
+    for (const other of specFiles) {
+      expect(runsHere(setup, other), `'setup' must run the identity spec ONLY — it also selects '${other}', which ` +
+        'would make every project a second, unrestricted e2e leg deep (#486)').toBe(false);
+    }
 
     for (const name of ['mobile', 'desktop']) {
       const p = byName(name);
       expect(p, `'${name}' must still be declared`).toBeTruthy();
-      expect(runsHere(p), `'${name}' must no longer run the identity spec itself — 'setup' already does, and running it ` +
+      expect(runsHere(p, filename), `'${name}' must no longer run the identity spec itself — 'setup' already does, and running it ` +
         'twice is dead weight the nightly pays for every night (#486)').toBe(false);
       expect(p?.dependencies ?? [], `'${name}' must depend on 'setup', or nothing stops it starting before the identity ` +
         'check has run — exactly the #486 regression this project exists to close').toContain('setup');
