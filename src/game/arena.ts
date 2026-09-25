@@ -66,7 +66,7 @@ export interface ArenaOpts {
   onSwish?: () => void;
   onThrow?: () => void;                        // a projectile has just left the ninja's hand
   onLand?: () => void;                         // it has reached the bubble and popped it
-  throwFor?: (b: Bubble) => boolean;           // false = pop this bubble instantly instead of throwing at it
+  throwFor?: (b: Bubble) => boolean; isHazard?: (label: string) => boolean;   // throwFor false=pop instantly; #742: a hazard never enters a gentle relaunch set
   /** One square cell of `img`, from `(sx, 0)`, to draw in place of a bubble's label, or null for the label (#684).
    *  The object may be reused by the next call — draw it at once, never keep it. */
   labelArt?: (label: string, color: string, phase: number) => { readonly img: CanvasImageSource; readonly sx: number; readonly size: number } | null;
@@ -112,7 +112,7 @@ export class Arena {
   private onThrow?: () => void; private onLand?: () => void;
   /** Which bubbles a tap throws a projectile at; anything else pops instantly, like a swipe (the TNT does — #48). */
   private throwFor?: (b: Bubble) => boolean;
-  private labelArt?: ArenaOpts['labelArt'];
+  private labelArt?: ArenaOpts['labelArt']; private isHazard?: ArenaOpts['isHazard'];
   time = 0;
 
   constructor(public canvas: HTMLCanvasElement, private cb: ArenaCallbacks, opts: ArenaOpts = {}) {
@@ -121,7 +121,7 @@ export class Arena {
     if (opts.trailCore) this.trailCore = opts.trailCore;
     if (opts.fx) this.fx = opts.fx;
     this.onSwish = opts.onSwish; this.onThrow = opts.onThrow; this.onLand = opts.onLand;
-    this.throwFor = opts.throwFor; this.labelArt = opts.labelArt;
+    this.throwFor = opts.throwFor; this.labelArt = opts.labelArt; this.isHazard = opts.isHazard;
     this.resize();
     window.addEventListener('resize', this.resize);
     canvas.addEventListener('pointerdown', this.onDown);
@@ -411,7 +411,7 @@ export class Arena {
         }
         b.dead = true;
         const gentle = !seqRelaunch && this.gentleTarget === b.label && !this.gentleUsed;   // #742: deferred to wave-end below, not a miss yet
-        if (!b.hit) { if (gentle) this.gentleTargetFallen = b; else { this.cb.onFall(b); if (this.gentleTarget !== undefined && !this.gentleUsed && b.label !== this.gentleTarget) this.gentleDecoys.push(b); } }
+        if (!b.hit) { if (gentle) this.gentleTargetFallen = b; else { this.cb.onFall(b); if (this.gentleTarget !== undefined && !this.gentleUsed && b.label !== this.gentleTarget && !this.isHazard?.(b.label)) this.gentleDecoys.push(b); } }
         continue;
       }
       live++;

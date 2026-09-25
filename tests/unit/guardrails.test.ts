@@ -209,6 +209,17 @@ describe('guard rails', () => {
     expect(arena).toMatch(/if \(!b\.hit\) \{ if \(gentle\).*this\.cb\.onFall\(b\)/);
   });
 
+  // #742 review round 1 (pr-test-analyzer, silent-failure-hunter): tests/unit/sim.test.ts's own BOMB-vs-gentle
+  // regression test hand-duplicates play.ts's `isHazard` predicate rather than reading it — this pins play.ts's
+  // own wiring so a future edit that drops or mistypes it (leaving `throwFor` correct but `isHazard` stale)
+  // fails a rail here, not just silently un-tests a live bug's fix.
+  it('a TNT is wired as a hazard everywhere it is wired as unthrowable (#742)', () => {
+    const play = code(SOURCES['/src/ui/play.ts']);
+    expect(play).toMatch(/isHazard:\s*label\s*=>\s*label\s*===\s*BOMB/);
+    const arena = code(SOURCES['/src/game/arena.ts']);
+    expect(arena).toContain('!this.isHazard?.(b.label)) this.gentleDecoys.push(b)');
+  });
+
   // CLAUDE.md: no dependencies without reason (Capacitor is the documented exception). A new one now has
   // to be argued for in the PR that adds it, because this rail goes red until the list is updated too.
   // `@capacitor/filesystem`/`@capacitor/share` (#110) and `@capacitor/app` (#699) are that exception again:

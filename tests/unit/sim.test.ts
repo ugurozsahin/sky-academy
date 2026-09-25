@@ -992,6 +992,21 @@ describe('#700: a gentle year\'s answer bubble gets one free trip back up, not m
     expect(sim.all().filter(b => !b.dead && !b.launched).map(b => b.label), 'a bubble with a shot on the way is not a miss, and not a decoy candidate either').not.toContain('2');
   });
 
+  // review round 1 (pr-test-analyzer, silent-failure-hunter, independently): a Reception child playing a
+  // villain mode gets a wave with both `gentleTarget` and a `BOMB` bubble (#742 never gated on `villain`, and
+  // `villain` is never gated on year). Without `isHazard`, a bomb that falls un-hit is an ordinary decoy to
+  // `gentleDecoys` and can be revived — session.bomb() costs a life unconditionally, contradicting gentle's
+  // own contract. `isHazard`, wired from play.ts exactly as `throwFor` already identifies BOMB, keeps it out.
+  it('a TNT that falls un-hit is never part of the relaunch set (#742, real BOMB label + isHazard wiring)', () => {
+    for (let seed = 0; seed < 50; seed++) {
+      sim = createSim({ seed, arena: { isHazard: label => label === BOMB } });
+      sim.spawn({ labels: ['1', BOMB, '3'], speed: 2, gentleTarget: '1' });
+      for (const label of ['1', BOMB, '3']) forceDeparture(sim, label);
+      expect(sim.all().filter(b => !b.dead && !b.launched).map(b => b.label), `seed ${seed}: a bomb must never be revived`).not.toContain(BOMB);
+      sim.destroy();
+    }
+  });
+
   // `waveOptsFor` never sends both `ordered` and `gentleTarget` for the same label — a sequence question has
   // no `gentleTarget` at all (#700's own `!q.sequence` gate) — but the arena's own precedence is still worth
   // pinning directly, rather than trusting a caller invariant nothing here enforces (pr-test-analyzer review).
