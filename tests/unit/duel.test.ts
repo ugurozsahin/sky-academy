@@ -287,6 +287,9 @@ describe('duelCoins (#16 item 5: a match pays the device, not the winner)', () =
   it('pays nothing for a drawn round: a match nobody decided pays nothing at all', () => {
     expect(duelCoins(res(0, 0))).toBe(0);
     expect(duelCoins(res(4, 2))).toBe(6);            // four rounds drawn out of ten
+    // #354 finding 5: an all-draw match's overlay prints "+0 🪙" unconditionally, the same as every other
+    // results screen (`src/ui/screen.ts`) — nobody renders that overlay in these tests, but the zero-coin
+    // number above is that same intended shared behaviour, not a special case for duels.
   });
 
   it('does not pay a match-win bonus — the payout depends on the rounds, never on who won', () => {
@@ -296,10 +299,32 @@ describe('duelCoins (#16 item 5: a match pays the device, not the winner)', () =
     expect(duelCoins(res(5, 5))).toBe(duelCoins(res(10, 0)));
   });
 
-  it('cannot pay more than one coin per round of the match', () => {
-    for (let a = 0; a <= DUEL_ROUNDS; a++) for (let b = 0; a + b <= DUEL_ROUNDS; b++) {
-      expect(duelCoins(res(a, b))).toBeLessThanOrEqual(DUEL_ROUNDS);
-    }
+  // #354 findings 3–4: the old version of this test built its own `DuelResult` with a loop bound
+  // (`a + b <= DUEL_ROUNDS`) that already forces the sum it then re-checked — it never read `r.rounds` at all,
+  // so it died only to mutants the payout-rate test above already kills, and no test anywhere fed `duelCoins`
+  // a result the real scorer produced. A regression in `hit()`/`waveEnd()` that scored both seats on one round
+  // would have overpaid with every test in this file green. Driving a real short `Duel` ties the payout to its
+  // producer and makes the cap non-vacuous in the same stroke: below, every round in the first match is
+  // decided, so `scoreA + scoreB` reaches `result.rounds` exactly, and the cap and the tie coincide.
+  it('ties the payout to a real match: duelCoins(result) === the rounds actually won, capped by result.rounds', () => {
+    const played = (script: ('a' | 'b' | 'draw')[]): DuelResult => {
+      const ev = events();
+      const d = new Duel({ topic, difficulty: 1, rounds: script.length, rng: rng(21) }, ev);
+      d.start();
+      for (const step of script) {
+        if (step !== 'draw') d.hit(step, d.current!.answer);
+        d.waveEnd();
+      }
+      return ev.onMatchEnd.mock.calls[0][0];
+    };
+
+    const allDecided = played(['a', 'b', 'a', 'b']);
+    expect(duelCoins(allDecided)).toBe(allDecided.scoreA + allDecided.scoreB);
+    expect(duelCoins(allDecided)).toBe(allDecided.rounds);          // every round decided: hits the cap exactly
+
+    const mixed = played(['a', 'draw', 'b', 'a']);
+    expect(duelCoins(mixed)).toBe(mixed.scoreA + mixed.scoreB);
+    expect(duelCoins(mixed)).toBeLessThan(mixed.rounds);            // the drawn round paid nobody
   });
 });
 
