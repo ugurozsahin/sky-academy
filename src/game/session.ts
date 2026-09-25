@@ -149,7 +149,8 @@ const contentList = (s: string) => {
  * repository's list separator, and those three generators are the only places it reaches a `Question`'s content
  * fields — it is also in a dozen or so UI strings, which this never sees (round 3). Normalised in the key,
  * never on the card — what the child reads is unchanged. Nothing enforces that inventory; the rails answer it
- * from the other end by normalising over four separators, so a generator switching to one of them goes red.
+ * from the other end by normalising over five separators — the key's four plus `', '` — so a generator
+ * switching to one of them goes red.
  *
  * **`options` is read only when the generator says it is the question** (#451, `Question.optionsAreContent`).
  * #412 ruled out folding `options` in unconditionally, because they are shuffled and re-drawn per draw on the
@@ -185,8 +186,9 @@ const contentList = (s: string) => {
  *
  * Exported so the rails in `tests/unit/session.test.ts` can measure this key against the text a child reads
  * rather than against a copy of it, in both directions: different questions never share a key, and one
- * question never takes two. Those rails normalise lists over four separators against this one, deliberately,
- * so that narrowing `contentList` goes red (round 2, B2).
+ * question never takes two. Those rails normalise lists over five separators against this one's four,
+ * deliberately, so that narrowing `contentList` goes red once a generator actually uses the dropped
+ * separator, not on its own (round 2, B2; #465).
  */
 export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : '', q.optionsAreContent ? [...q.options].sort().join('\u0001') : ''].join('\u0000');
 
