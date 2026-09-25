@@ -55,7 +55,7 @@ Last, **stamp the pulse (#314)**: replace the `routine: heartbeat` body with `<U
 
 **Everything you post — a comment, an issue, a pull request body — follows the two rules in `CLAUDE.md`: it carries its own `Session:` line (#199) and states its point up front (#200).** A fix-push comment has the shape in `.claude/skills/open-pr/SKILL.md` §5.
 
-STEP 2.5 — FIX A STALLED BLOCK. **A run fixes a stalled block before it starts new work (#204).** Look for the single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`, with no new commit and no new comment on it in the last 30 minutes (a debounce). A `REVIEW:` comment counts only when GitHub marks it `author_association` OWNER/COLLABORATOR/MEMBER — `scripts/review-gate.mjs`'s `mayReview` set; anyone can post the marker (#284). If one exists, push a fix addressing the review's findings and comment `Pushed <sha>, addressing <what>` (#200's shape). The reviewer's next run sees a block with a commit newer than it. Never post `REVIEW: CLEARED` yourself or undraft it — clearing is a reviewer run's fresh review (`docs/REVIEWER-PROMPT.md` rule 3). **A branch `main` broke is merged, not rebased** — `open-pr` §2 (#585).
+STEP 2.5 — FIX A STALLED BLOCK. **Claim it (#459):** post `Taking this block, session <url>` before fixing — carries the #199 Session line. Such a comment under ~45 minutes old means another run already has it; move to the next stalled block, or STEP 3. **A run fixes a stalled block before it starts new work (#204).** Look for the single oldest open PR whose latest `REVIEW:` comment is an unaddressed `REVIEW: CHANGES REQUESTED`, with no new commit and no new comment on it in the last 30 minutes (a debounce). A `REVIEW:` comment counts only when GitHub marks it `author_association` OWNER/COLLABORATOR/MEMBER — `scripts/review-gate.mjs`'s `mayReview` set; anyone can post the marker (#284). If one exists, push a fix addressing the review's findings and comment `Pushed <sha>, addressing <what>` (#200's shape). The reviewer's next run sees a block with a commit newer than it. Never post `REVIEW: CLEARED` yourself or undraft it — clearing is a reviewer run's fresh review (`docs/REVIEWER-PROMPT.md` rule 3). **A branch `main` broke is merged, not rebased** — `open-pr` §2 (#585).
 
 STEP 3 — DEVELOP ONE ITEM, chosen by **the labels** (#94). There is no ordered list: pick the issue this query names — two runs reading the same repo state pick the same one.
 
@@ -135,16 +135,16 @@ The shape — one summary line, then the checks, then anything you decided not t
 ```
 2026-09-10T22:41Z — developed #98 (PR #101)
 
-- nightly: ok — 2026-09-10T08:08Z, head 455ba62, success (~14 h, inside 26 h)
-- watchdog pulse: ok — 2026-09-10T17:08Z (~5 h, inside ~14 h)
-- main: green · open PRs after this run: 2 (#99; #101, mine)
-- board: pulse 2026-09-10T22:30Z (11 min old, inside ~2 h) — in step, 59 cards
-- review queue: 1 waiting (#99, 3 h) — under the alarm
+- nightly: ok — 08:08Z, head 455ba62 (~14h, inside 26h)
+- watchdog pulse: ok — 17:08Z (~5h, inside ~14h)
+- main: green · open PRs: 2 (#99; #101, mine)
+- board: pulse 22:30Z (11min, inside ~2h) — in step, 59 cards
+- review queue: 1 waiting (#99, 3h) — under the alarm
 - query top pick: #98 (P1) — taken
-- second item: no — condition 2 failed (48 min into the run)
-- not done, and why: #63 (P1) is blocked by #72, which is open — skipped per STEP 3
+- second item: no — condition 2 failed (48min in)
+- not done, and why: #63 (P1) blocked by open #72 — skipped per STEP 3
 ```
 
-Every check STEP 1 makes gets a line with **the value observed**, not a verdict on its own: "nightly ok" with no timestamp is indistinguishable from a run that did not look. Anything a *future run must act on* is an issue, not a line here — a snapshot that is overwritten within the hour cannot carry a to-do. Report to the owner only for something noteworthy (a merge that changes play, a regression, a decision needed — list the open "Owner action" checkboxes).
+Every check STEP 1 makes gets a line with **the value observed**, never a bare verdict: "nightly ok" with no timestamp reads like a run that never looked. A future to-do is an issue, not a line here — this snapshot is overwritten within the hour. Report to the owner only for something noteworthy (a merge that changes play, a regression, a decision needed — list the open "Owner action" checkboxes).
 
-Do NOT: review or merge any pull request (that is the reviewer routine's), clear a review block or undraft a blocked PR; start work no open `routine-ok` issue asks for, re-impose a freeze the owner has lifted, ship a NEW look without the owner's approval (label the PR `owner-approval`; a change that must keep the existing look is the reviewer's to verify, not his to approve), add accounts/backend, add dependencies without need (the allowlist rail will fail), publish artifacts, re-run a CI job to "see if it passes this time" (read the failure), force-push, rewrite history, weaken a guard rail, change an issue's `priority:*` label to move it up the queue (the priorities are the owner's — propose a change on the issue and leave the label alone), set a card's Status or Priority on the board by hand (change the label or the PR state instead), or **write under `.claude/`** (a protected path; the hook denies it — #342, `.claude/rules/governance.md`). Reads are fine.
+Do NOT: review or merge any pull request (that's the reviewer routine's), clear a review block or undraft a blocked PR; start work no open `routine-ok` issue asks for, re-impose a lifted freeze, ship a NEW look without the owner's approval (label `owner-approval`; a look-must-not-change fix is the reviewer's to verify, not his), add accounts/backend, add dependencies without need (the allowlist rail fails), publish artifacts, re-run a CI job to see if it passes this time (read the failure), force-push, rewrite history, weaken a guard rail, move an issue up the queue by changing its `priority:*` label (propose it on the issue instead), set a card's Status or Priority by hand (change the label or PR state instead), or **write under `.claude/`** (a protected path the hook denies — #342, `.claude/rules/governance.md`). Reads are fine.
