@@ -83,5 +83,12 @@ export default defineConfig({
     { name: 'desktop', testIgnore: [/viewport\.spec\.ts/, /00-build-identity\.spec\.ts/], dependencies: ['setup'], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
     { name: 'tablet', testMatch: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 800, height: 1280 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
     { name: 'tablet-landscape', testMatch: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+    // #715: the sketchbook's one spec — the screenshot script — under its own `testDir`, so `mobile`,
+    // `desktop` and the tablets (all scoped to `tests/e2e`) never see it and the pull-request leg stays the
+    // suite it was. It runs on the nightly with every other project (#141's rail) and on a pull request
+    // only through ci.yml's sketch step, when the diff stays inside the sketchbook's paths. The `testIgnore`
+    // is the #116 rail's shape for a non-tablet project; with its own `testDir` it has nothing to ignore. It
+    // depends on `setup` like every other leg (#486): the identity spec proves the preview serves this dist/.
+    { name: 'sketchbook', testDir: 'tests/sketch', testIgnore: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 600, height: 600 }, deviceScaleFactor: 2 } },
   ],
 });

@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { BoxGeometry, Mesh } from 'three';   // #714: the budget meter's self-test below
 import { BUDGET_CEILING, defaultsOf, OBJECTS } from '../../src/three/objects';   // #714: the budget rail builds every registered object
 import { createStage, measure } from '../../src/three/stage';
+import { listFiles, precacheList } from '../../scripts/build-sw.mjs';   // #715: the sketchbook stays out of the precache
 
 /**
  * The Fredoka weight axis the app actually serves, `[lo, hi]`, read from the @font-face rules in
@@ -2729,6 +2730,33 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
     expect(out.map(e => `${e.from} → ${e.spec}`)).toEqual([]);
   });
 
+  // (c′, #715) The sketchbook is a developer page the game does not know: nothing under `src/` outside
+  // `src/three/sketchbook/` may import it, by any kind of edge. Proved red: `import '../three/sketchbook/main'`
+  // in a scratch `src/ui/` file fails; the fixture line keeps the reader honest about that path shape.
+  it('nothing outside src/three/sketchbook/ imports the sketchbook', () => {
+    const SKETCH = '/src/three/sketchbook/';
+    expect(edges('/src/ui/x.ts', "import '../three/sketchbook/main';")[0]).toMatchObject({ to: '/src/three/sketchbook/main', kind: 'static' });
+    const inbound = all.filter(e => !e.from.startsWith(SKETCH) && e.to.startsWith(SKETCH));
+    expect(inbound.map(e => `${e.from} → ${e.spec}`)).toEqual([]);
+    expect(inDir(SKETCH).length, 'the sketchbook folder must exist, or this holds nothing').toBeGreaterThan(3);
+  });
+
+  // (#715) The sketchbook spec is invisible to the game's projects only because ONE project declares its own
+  // `testDir`; the #116 and #123 rails read projects by the names `mobile|desktop|tablet` and never look at it.
+  // Two silent decays this holds: the `sketchbook` project loses `testDir` (it then runs the whole game suite
+  // nightly at 600×600 and the shot spec runs nowhere), or the spec is "tidied" into `tests/e2e/` (every
+  // pull request's mobile leg then screenshots into docs/sketchbook/).
+  it('the sketchbook project alone declares a testDir, tests/sketch, and holds the shot spec', () => {
+    const cfg = code(readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8'));
+    const parts = cfg.slice(cfg.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    const withDir = parts.filter(p => /\btestDir:/.test(p)).map(p => ({ name: p.match(/name:\s*'([^']+)'/)![1], dir: p.match(/testDir:\s*'([^']+)'/)?.[1] }));
+    expect(withDir).toEqual([{ name: 'sketchbook', dir: 'tests/sketch' }]);
+    const sketchSpecs = readdirSync(new URL('../../tests/sketch', import.meta.url)).filter(f => f.endsWith('.spec.ts'));
+    expect(sketchSpecs.length, 'tests/sketch must hold the shot spec').toBeGreaterThan(0);
+    for (const f of readdirSync(new URL('../../tests/e2e', import.meta.url)))
+      expect(readFileSync(new URL(`../../tests/e2e/${f}`, import.meta.url), 'utf8'), `${f} must not import the shot script — that would put the sketchbook on every mobile leg`).not.toMatch(/sketch-shot/);
+  });
+
   // (d) 250 lines is the cap, not the target (`.claude/rules/three.md`): split by part and assembly.
   it('no file under src/three/ is longer than 250 lines', () => {
     const files = inDir(THREE_DIR);
@@ -2816,6 +2844,25 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       expect(chunks.filter(c => c.three).map(c => c.name.replace(/-[\w-]+\.js$/, '')), 'the signature must find the three chunk, or it proves nothing').toEqual(['solids']);
       expect(chunks.find(c => c.name === entry)?.three, 'three.js code in the main chunk').toBe(false);
     }, 60_000);
+    // #715: the sketchbook is its own Vite build into `dist/sketchbook/` (vite.sketchbook.config.ts says why
+    // it is not a second input of the game's build). Three things keep it out of the game: the game's
+    // `index.html` references nothing of it, the service worker precaches nothing under its folder, and it
+    // does carry three.js of its own — asserted, so a broken sketchbook build cannot read as "nothing leaked".
+    it('the sketchbook builds beside the game and the game carries none of it', () => {
+      const out = mkdtempSync(join(tmpdir(), 'sna-sketch-'));
+      try {
+        const vite = (args: string[]) => execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build', ...args, '--logLevel', 'error'], { stdio: 'pipe' });
+        vite(['--outDir', out, '--emptyOutDir']);
+        vite(['-c', 'vite.sketchbook.config.ts', '--outDir', join(out, 'sketchbook'), '--emptyOutDir']);
+        const files = listFiles(out);
+        const sketch = files.filter(f => f.startsWith('sketchbook/'));
+        expect(sketch, 'the sketchbook must have built into dist/sketchbook/').toContain('sketchbook/sketchbook.html');
+        expect(sketch.some(f => f.endsWith('.js') && SIGNATURE.test(readFileSync(join(out, f), 'utf8'))), 'the sketchbook carries its own three.js').toBe(true);
+        expect(readFileSync(join(out, 'index.html'), 'utf8'), 'the game page references the sketchbook').not.toMatch(/sketchbook/);
+        expect(precacheList(files).filter(f => f.startsWith('sketchbook/')), 'the service worker would precache the sketchbook').toEqual([]);
+        expect(precacheList(files), 'and still precaches the game').toContain('index.html');
+      } finally { rmSync(out, { recursive: true, force: true }); }
+    }, 90_000);
     it('a VITE_THREE=off build has no three.js chunk at all', () => {
       const { entry, chunks } = build({ VITE_THREE: 'off' });
       expect(chunks.map(c => c.name), 'the kill switch must fold the import() away, leaving only the entry').toEqual([entry]);

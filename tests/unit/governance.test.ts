@@ -2803,9 +2803,7 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
   // whose path exists fails, and one no rule file declares any more fails below. Only a shape `exists()` can
   // resolve once the path is real belongs here — a directory, a file, or a trailing `**` — never a glob inside
   // a file name (`scripts/sketch-*.mjs`), which `exists()` reads as absent forever and so could never expire.
-  const FUTURE_PATHS: Record<string, string> = {
-    'sketchbook.html': '#715', 'tests/sketch/**': '#715',
-  };
+  const FUTURE_PATHS: Record<string, string> = {};   // empty since #715 landed: the next future path a rule declares goes here with its issue
   const declaredPaths = (file: string): string[] => {
     const front = /^---\n([\s\S]*?)\n---\n/.exec(readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8'));
     return front ? pathsList(front[1]) ?? [] : [];

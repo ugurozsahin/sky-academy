@@ -9,7 +9,7 @@ import { setThreeSetting, threeSetting, THREE_SETTINGS } from '../../src/storage
 import { BUDGET_CEILING, defaultsOf, defineObject, n, OBJECTS } from '../../src/three/objects';
 import { createStage, hullsOf, measure } from '../../src/three/stage';
 import { offsetAlongNormals, outline, outlineMaterial, OUTLINE_NAME, OUTLINE_WIDTH } from '../../src/three/stage/outline';
-import { CAMERA_FOV, createRig, resize } from '../../src/three/stage/rig';
+import { applyTier, CAMERA_FOV, createRig, resize, type TierTarget } from '../../src/three/stage/rig';
 import { LOW_TIER_CORES, LOW_TIER_MEMORY, pickTier, readTierEnv, TIERS } from '../../src/three/stage/tiers';
 import { gradientMap, tokenColour, toonMaterial, TONES } from '../../src/three/stage/toon';
 import { capable, MIN_DEVICE_MEMORY, parseSetting, probeWebgl2, queryOff, readEnv, resetProbe, threeEnabled, THREE_SETTING_KEY, type BrowserLike, type ThreeEnv } from '../../src/three/mount/enabled';
@@ -216,6 +216,21 @@ describe('rig — camera, lights and background', () => {
     resize(rig, { setSize } as any, 300.4, 150);
     expect(setSize).toHaveBeenCalledWith(300, 150, false);
     expect(rig.camera.aspect).toBeCloseTo(300.4 / 150);
+  });
+  // Round 2 of #715's review: the sketchbook set the pixel-ratio cap once, from a hardcoded `high`, so a low
+  // frame was never rendered at low's cost. `applyTier` is what construction and a tier change both call.
+  it('applyTier caps the pixel ratio and sets the shadow map for the tier, and can be applied again', () => {
+    const setPixelRatio = vi.fn();
+    const r: TierTarget = { setPixelRatio, shadowMap: { enabled: true } };
+    applyTier(r, 'low', 3);
+    expect(setPixelRatio).toHaveBeenLastCalledWith(TIERS.low.maxPixelRatio);
+    expect(r.shadowMap.enabled).toBe(false);
+    applyTier(r, 'high', 3);
+    expect(setPixelRatio).toHaveBeenLastCalledWith(TIERS.high.maxPixelRatio);
+    expect(r.shadowMap.enabled).toBe(true);
+    applyTier(r, 'high', 1);   // a 1× screen is never upscaled to the cap
+    expect(setPixelRatio).toHaveBeenLastCalledWith(1);
+    expect(TIERS.low.maxPixelRatio, 'the two caps differ, or the test above proves nothing').toBeLessThan(TIERS.high.maxPixelRatio);
   });
 });
 

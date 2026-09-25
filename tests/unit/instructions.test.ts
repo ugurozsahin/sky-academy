@@ -50,8 +50,6 @@ const isLiteral = (p: string) => !/[*<>{}$]|(^|\/)NNN-[\w-]+\.md$|instructions-l
 const KNOWN_ABSENT: Record<string, string> = {
   'scripts/output/': 'named only to forbid it: qa-screenshot says never to save a screenshot there',
   'BACKLOG.md': 'retired (#218) — the decision records name it as history; no live instruction file may',
-  'src/three/sketchbook/': 'not yet: #715 creates it — drop this entry when it lands',
-  'scripts/sketch-gallery.mjs': 'not yet: #715 creates it — drop this entry when it lands',
 };
 
 /** The repo paths a document points at, from its code spans, as they would be looked up on disk. */

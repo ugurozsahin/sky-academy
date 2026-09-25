@@ -8,8 +8,9 @@ Gated: this skill applies only to an issue labelled `3d` (`CLAUDE.md`), the way 
 to `new-ui`. The style itself lives in `docs/decisions/010-3d-art-is-the-avatars-style.md` — read it first and
 do not restate it here; this file is *how* to build to it. The folder structure, the feature flag and the rails
 are in `.claude/rules/three.md`. Where this file and either of those disagree, they win and this file is the
-bug. Until #714 lands the stage and #715 the sketchbook, the contracts below are what those children build to,
-not what exists.
+bug. The stage (#714) and the sketchbook (#715) exist; the contracts below are what they enforce. Write an
+object with `defineObject(...)` from `src/three/objects/index.ts` rather than annotating it `ObjectSpec<P>`:
+the schema is inferred from `params`, so a partial or misspelt variant is a compile error.
 
 ## 1. Where an object lives and what it exports
 

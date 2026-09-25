@@ -1,4 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { workflowFiles } from './helpers/sources';
 
@@ -127,7 +130,7 @@ describe('the e2e server proves it is serving the build on disk, not a leftover 
       expect(p?.dependencies ?? [], `'${name}' must depend on 'setup', or nothing stops it starting before the identity ` +
         'check has run — exactly the #486 regression this project exists to close').toContain('setup');
     }
-    for (const name of ['tablet', 'tablet-landscape']) {
+    for (const name of ['tablet', 'tablet-landscape', 'sketchbook']) {   // the sketchbook (#715) is a leg on the same preview
       expect(byName(name)?.dependencies ?? [], `'${name}' must depend on 'setup' too, the same as the other legs (#486)`)
         .toContain('setup');
     }
@@ -187,5 +190,103 @@ describe('no workflow pins an action major GitHub has deprecated for Node 20 (#1
       expect(w, `${f} must exist under .github/workflows/, or this rail checks the wrong directory`).toBeDefined();
       expect(w!.text, `${f} must still check out the repo`).toMatch(/actions\/checkout@v\d+/);
     }
+  });
+});
+
+
+/**
+ * #715 (epic #713 decision 5): the scope step now answers two questions — does the diff reach the game
+ * (`e2e`), and does it touch the sketchbook (`sketch`) — and the two must not be confused: a diff confined to
+ * `src/three/stage|objects|sketchbook/`, `sketchbook.html`, `tests/sketch/` or the two sketch scripts runs the
+ * sketchbook's one spec and not the game's e2e; `src/three/mount/` is the game's surface and stays a game
+ * path; a diff touching both runs both; a diff the step cannot read runs both. Rather than re-implement the
+ * shell in TypeScript and test the copy (#129's failure), this runs the step's REAL script with a `git` shim
+ * on PATH that prints the file list — the same text GitHub would feed it.
+ */
+describe('the scope step routes a diff to e2e, to the sketchbook, or to neither (#715)', () => {
+  const yml = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const lines = yml.split('\n');
+  const at = lines.findIndex(l => l.includes('id: scope'));
+  const runAt = lines.findIndex((l, i) => i > at && /^\s*run:\s*\|\s*$/.test(l));
+  expect(at, 'ci.yml must still have the scope step').toBeGreaterThan(-1);
+  expect(runAt, 'the scope step must be a `run: |` block').toBeGreaterThan(at);
+  const indent = /^\s*/.exec(lines[runAt + 1])![0].length;
+  let end = runAt + 1;
+  while (end < lines.length && (lines[end].trim() === '' || /^\s*/.exec(lines[end])![0].length >= indent)) end++;
+  const script = lines.slice(runAt + 1, end).map(l => l.slice(indent)).join('\n');
+
+  /** Run the step against `files` (or a git that fails), and read what it wrote to GITHUB_OUTPUT. */
+  const scope = (files: string[] | 'git-fails', event = 'pull_request') => {
+    const dir = mkdtempSync(join(tmpdir(), 'sna-scope-'));
+    try {
+      const shim = join(dir, 'git');
+      writeFileSync(shim, files === 'git-fails' ? '#!/bin/sh\necho "fatal: bad object" >&2\nexit 128\n' : `#!/bin/sh\nprintf '%s\\n' ${files.map(f => `'${f}'`).join(' ')}\n`);
+      chmodSync(shim, 0o755);
+      const out = join(dir, 'out'), summary = join(dir, 'summary');
+      writeFileSync(out, ''); writeFileSync(summary, '');
+      execFileSync('bash', ['-c', script], { stdio: 'pipe', env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, BASE: 'b', HEAD: 'h', EVENT: event, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: summary } });
+      const kv = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').filter(Boolean).map(l => l.split('=') as [string, string]));
+      return { e2e: kv.e2e, sketch: kv.sketch, summary: readFileSync(summary, 'utf8') };
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  };
+
+  it('the script was extracted whole, and the shim is what it calls', () => {
+    expect(script).toContain('GAME_PATHS=');
+    expect(script).toContain('SKETCH_PATHS=');
+    expect(script).toContain('git diff --name-only');
+  });
+  // One file per case where the claim is about that file: a two-file case proves only its union (silent-failure review).
+  it.each([
+    [['src/three/stage/toon.ts'], { e2e: 'false', sketch: 'true' }],
+    [['src/three/objects/index.ts'], { e2e: 'false', sketch: 'true' }],
+    [['src/three/sketchbook/main.ts'], { e2e: 'false', sketch: 'true' }],
+    [['sketchbook.html'], { e2e: 'false', sketch: 'true' }],
+    [['vite.sketchbook.config.ts'], { e2e: 'false', sketch: 'true' }],   // a `base:` change 404s the page under preview: the sketch spec is what catches it
+    [['tests/sketch/shot.spec.ts'], { e2e: 'false', sketch: 'true' }],
+    [['scripts/sketch-shot.mjs'], { e2e: 'false', sketch: 'true' }],      // one file each: a typo in one name inside SKETCH_PATHS must not hide behind the other
+    [['scripts/sketch-gallery.mjs'], { e2e: 'false', sketch: 'true' }],
+    [['src/ui/parents.ts'], { e2e: 'true', sketch: 'false' }],
+    [['src/three/mount/enabled.ts'], { e2e: 'true', sketch: 'false' }],   // the game's one surface into src/three/
+    [['playwright.config.ts'], { e2e: 'true', sketch: 'false' }],
+    [['package.json'], { e2e: 'true', sketch: 'false' }],
+    [['src/three/objects/index.ts', 'src/ui/play.ts'], { e2e: 'true', sketch: 'true' }],
+    [['docs/ROUTINE-PROMPT.md', 'CLAUDE.md'], { e2e: 'false', sketch: 'false' }],
+  ])('%j → %j', (files, want) => {
+    expect(scope(files)).toMatchObject(want);
+  });
+  it('a diff that cannot be read runs both; a non-pull-request event runs e2e and leaves the sketchbook to the full matrix', () => {
+    expect(scope('git-fails')).toMatchObject({ e2e: 'true', sketch: 'true' });
+    expect(scope(['src/three/stage/toon.ts'], 'schedule')).toMatchObject({ e2e: 'true', sketch: 'false' });
+  });
+  it('the summary says which files put the sketchbook in, and which the game', () => {
+    const r = scope(['src/three/objects/index.ts', 'src/ui/play.ts']);
+    const [e2e, sketch] = r.summary.split('### sketchbook');
+    expect(sketch, 'the sketchbook section names the sketchbook file').toMatch(/\*\*running\*\*[\s\S]*- src\/three\/objects\/index\.ts/);
+    expect(e2e).toMatch(/e2e: \*\*running\*\*[\s\S]*- src\/ui\/play\.ts/);
+    expect(e2e, 'a sketchbook file is not what puts e2e on').not.toMatch(/- src\/three\/objects/);
+    const only = scope(['src/three/stage/toon.ts']).summary;
+    expect(only).toMatch(/### e2e: \*\*skipped\*\*/);
+    expect(only).toMatch(/### sketchbook: \*\*running\*\*/);
+  });
+
+  // The output is consumed, or the whole routing above is decoration: the sketchbook step exists, runs on a
+  // pull request when the scope step says so, and the two browser-setup steps run for it too — delete the
+  // step and the tree would otherwise stay green with the spec running on the nightly alone (pr-test-analyzer).
+  it('a Sketchbook step consumes the sketch output, and the browser-setup steps read it as well', () => {
+    const stepOf = (needle: string) => {
+      const at = lines.findIndex(l => l.includes(needle));
+      expect(at, `ci.yml must have a step containing ${needle}`).toBeGreaterThan(-1);
+      let from = at; while (from >= 0 && !/^\s*- /.test(lines[from])) from--;
+      const dash = lines[from].indexOf('- '), sibling = new RegExp(`^\\s{${dash}}- `);
+      let to = from + 1; while (to < lines.length && !sibling.test(lines[to])) to++;
+      return lines.slice(from, to).join('\n');
+    };
+    const sketchStep = stepOf('playwright test --project=sketchbook');
+    expect(sketchStep).toMatch(/if:.*github\.event_name == 'pull_request'/);
+    expect(sketchStep).toMatch(/if:.*steps\.scope\.outputs\.sketch == 'true'/);
+    expect(sketchStep, 'one project, no ternary — the nightly carries it through the full matrix').toMatch(/run:\s*npx playwright test --project=sketchbook\s*$/m);
+    for (const needle of ['playwright install', 'sources.list.d/google-chrome'])
+      expect(stepOf(needle), `the ${needle} step must also run for a sketch-only pull request`).toMatch(/steps\.scope\.outputs\.sketch == 'true'/);
+    expect(lines.find(l => /playwright test \$\{\{/.test(l)), 'the full-matrix arm carries the sketchbook project').toMatch(/--project=sketchbook'/);
   });
 });

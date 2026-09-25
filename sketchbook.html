@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Sky Ninja Academy — sketchbook</title>
+  <!-- #715: the 3-D sketchbook (epic #713 decision 4). A developer page, built by vite.sketchbook.config.ts
+       into dist/sketchbook/ — never part of the game: nothing under src/ outside src/three/sketchbook/ may
+       import it (a rail), the game's service worker does not precache it (scripts/build-sw.mjs), and the
+       single-file build never sees it. Every 3-D object is built, varied and screenshotted here before it is
+       mounted in the game. -->
+</head>
+<body>
+  <aside id="list" aria-label="Objects"></aside>
+  <main id="stage" aria-label="Stage"></main>
+  <aside id="beside" hidden><img id="beside-img" alt="" draggable="false"></aside>
+  <script type="module" src="/src/three/sketchbook/main.ts"></script>
+</body>
+</html>
