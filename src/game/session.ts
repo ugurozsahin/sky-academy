@@ -93,6 +93,24 @@ const visualKey = (v: Visual): string => {
   return f ? f(v) : '';
 };
 /**
+ * The separators that unambiguously delimit a **list** in a `Question`'s content field, so the order within it
+ * is presentation. `' · '` is the one the three generators use; the other three are here because a generator
+ * switching to one of them would otherwise bring round 1's defect back in silence — measured at 1.2% for
+ * `' / '` with the whole suite green (round 4, note 3). None of them appears in any `hint` or `listen` today,
+ * so widening this is a no-op now and a closed hole later.
+ *
+ * `', '` is deliberately **not** here: four sentence topics carry prose commas in `hint`/`listen`, and sorting
+ * those could merge two genuinely different cards, which is the #390 defect rather than a cure for it. The
+ * oracle in `tests/unit/session.test.ts` does normalise it, which is the asymmetry round 2's B2 asked for — a
+ * coarser oracle can only produce a red, never hide one. What neither sees is a fifth separator nobody has
+ * thought of; that residue is real and is why the oracle stays wider than this list rather than importing it.
+ */
+const LIST_SEPARATORS = [' · ', ' | ', '; ', ' / '];
+const contentList = (s: string) => {
+  for (const sep of LIST_SEPARATORS) if (s.includes(sep)) return s.split(sep).sort().join(sep);
+  return s;
+};
+/**
  * The identity of a card, for "do not ask the same thing twice running" (#390, widened by #412).
  *
  * **`Session` only.** `nextQuestion` below is the one caller; `src/game/duel.ts` draws its cards with a bare
@@ -131,7 +149,8 @@ const visualKey = (v: Visual): string => {
  * repository's list separator, and those three generators are the only places it reaches a `Question`'s content
  * fields — it is also in a dozen or so UI strings, which this never sees (round 3). Normalised in the key,
  * never on the card — what the child reads is unchanged. Nothing enforces that inventory; the rails answer it
- * from the other end by normalising over four separators, so a generator switching to one of them goes red.
+ * from the other end by normalising over five separators — the key's four plus `', '` — so a generator
+ * switching to one of them goes red.
  *
  * **`options` is read only when the generator says it is the question** (#451, `Question.optionsAreContent`).
  * #412 ruled out folding `options` in unconditionally, because they are shuffled and re-drawn per draw on the
@@ -141,6 +160,7 @@ const visualKey = (v: Visual): string => {
  * than one comparison. `intervalCompare` sets `optionsAreContent` and the key then reads `options` as the sorted
  * set it is judged as — order is the per-draw shuffle, presentation rather than content, exactly `contentList`'s
  * distinction for `hint`/`listen` above.
+ *
  * **The one cost this widening carries, stated because a child pays it** (#412 review round 4). `hint` is
  * content on a tall screen and **not on the card at all on a short one**: `src/style.css`'s
  * `@media (max-height: 640px)` hides `.hint` until the answer is given, and a landscape phone is exactly that
@@ -166,27 +186,10 @@ const visualKey = (v: Visual): string => {
  *
  * Exported so the rails in `tests/unit/session.test.ts` can measure this key against the text a child reads
  * rather than against a copy of it, in both directions: different questions never share a key, and one
- * question never takes two. Those rails normalise lists over four separators against this one, deliberately,
- * so that narrowing `contentList` goes red (round 2, B2).
+ * question never takes two. Those rails normalise lists over five separators against this one's four,
+ * deliberately, so that narrowing `contentList` goes red once a generator actually uses the dropped
+ * separator, not on its own (round 2, B2; #465).
  */
-/**
- * The separators that unambiguously delimit a **list** in a `Question`'s content field, so the order within it
- * is presentation. `' · '` is the one the three generators use; the other three are here because a generator
- * switching to one of them would otherwise bring round 1's defect back in silence — measured at 1.2% for
- * `' / '` with the whole suite green (round 4, note 3). None of them appears in any `hint` or `listen` today,
- * so widening this is a no-op now and a closed hole later.
- *
- * `', '` is deliberately **not** here: four sentence topics carry prose commas in `hint`/`listen`, and sorting
- * those could merge two genuinely different cards, which is the #390 defect rather than a cure for it. The
- * oracle in `tests/unit/session.test.ts` does normalise it, which is the asymmetry round 2's B2 asked for — a
- * coarser oracle can only produce a red, never hide one. What neither sees is a fifth separator nobody has
- * thought of; that residue is real and is why the oracle stays wider than this list rather than importing it.
- */
-const LIST_SEPARATORS = [' · ', ' | ', '; ', ' / '];
-const contentList = (s: string) => {
-  for (const sep of LIST_SEPARATORS) if (s.includes(sep)) return s.split(sep).sort().join(sep);
-  return s;
-};
 export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : '', q.optionsAreContent ? [...q.options].sort().join('\u0001') : ''].join('\u0000');
 
 export class Session {

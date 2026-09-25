@@ -661,11 +661,12 @@ describe('the repeat key holds the whole question (#412)', () => {
    *
    * The field list is written from the `Question` contract rather than read off `repeatKey`, so it is the
    * requirement and the key is the thing under test. **The normalisation is deliberately wider than the key's**
-   * (round 2, B2): `contentList` knows only `' · '`, and round 2 showed that a copy of that one separator here
-   * asserts itself — change `soundQ`'s `listen` join to `', '` and round 1's defect returns at 1.2% with every
-   * rail green, because the oracle would fail to normalise it in exactly the same way. Four separators here
-   * against the key's one means a *narrowing* of `contentList`, including a generator switching separator, goes
-   * red on `two cards that ask the same thing never take two keys` below.
+   * (round 2, B2): `contentList` in `src/game/session.ts` knows four separators, and this oracle knows five —
+   * the same four plus `', '`. Narrowing the key's four goes red here only once a generator actually uses the
+   * dropped separator: change `soundQ`'s `listen` join to `', '` and round 1's defect returns at 1.2% with
+   * every rail green, because the oracle would fail to normalise it in exactly the same way, going red on
+   * `two cards that ask the same thing never take two keys` below. Narrowing on its own, with no generator
+   * using the dropped separator, is invisible to every rail here (#465).
    *
    * Being coarser than the key can only produce a red, never hide one, and the red is informative: it needs two
    * questions that are permutations of each other's list items, which is a card a child cannot tell apart by
