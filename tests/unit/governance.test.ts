@@ -4142,6 +4142,12 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // fixing it anyway — deleting this left the reachability instruction with no reason attached.
     expect(a, 'the cost of not applying the reachability test — inflating the diff to answer hardening nobody can reach')
       .toContain('Fixing everything they raise is how a ten-line pin');
+    // #744 round 1 (silent-failure-hunter): the assertion above pins only the identifying fragment —
+    // a rewrite could keep "ten-line pin" verbatim and replace the payoff clause after it with anything,
+    // and the check above still passed. The reason this matters — an inflated diff is indistinguishable
+    // from a legitimately large one — was unpinned.
+    expect(a, 'the payoff clause — an inflated diff looks exactly like one that had to be that big')
+      .toContain('a diff inflated that way looks exactly like a diff that had to be that big');
     // #498, round 3 note 6 restated: the same "gap and a result must never be written the same way"
     // rule the cannot-spawn line exists to serve was itself only pinned by its consequence
     // (`agents: cannot spawn (subagent)`), never by the rule sentence that names why.
@@ -4186,6 +4192,10 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // is not — was left as a bare consequence ("re-derived from scratch") with no owner named.
     expect(b, 'who re-derives an undocumented sweep next round, and that it is not free')
       .toMatch(/by you or by whoever supersedes you/);
+    // #744 round 1 (silent-failure-hunter): the regex above stops at "supersedes you" — the cost clause
+    // that makes the re-derivation matter (#466's four-round cost) was unpinned anywhere in the file.
+    expect(b, 'the cost that re-derivation carries, not only that someone has to do it')
+      .toMatch(/that re-derivation is most of\s+what a four-round pull request costs/);
 
     const body = bodyCheck();
     expect(body, 'the author-side claim must have a reader on the reviewer side')
