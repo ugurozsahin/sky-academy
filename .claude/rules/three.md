@@ -2,15 +2,17 @@
 paths:
   - "src/three/**"
   - "sketchbook.html"
+  - "vite.sketchbook.config.ts"
   - "tests/sketch/**"
+  - "scripts/sketch-shot.mjs"
+  - "scripts/sketch-gallery.mjs"
 ---
 
 # three.js 3-D (epic #713)
 
-Written before the tree exists (#716): #714 creates `src/three/` and #715 the sketchbook, and each drops its
-paths from the future-path allowances in `tests/unit/governance.test.ts` and `tests/unit/instructions.test.ts`
-as it lands. #715 also adds its scripts to the `paths:` above by name — the rail cannot resolve a glob such as
-`sketch-*.mjs` inside a file name, so none is declared here.
+Written before the tree existed (#716); #714 landed the tree, the flag and the rails, #715 the sketchbook. The
+scripts are listed above by name because the rail in `tests/unit/governance.test.ts` cannot resolve a glob
+inside a file name.
 
 - **Style**: `docs/decisions/010-3d-art-is-the-avatars-style.md` is binding; the `three-art` skill (gated
   to the `3d` label) is how an object is built to it.
@@ -23,14 +25,22 @@ as it lands. #715 also adds its scripts to the `paths:` above by name — the ra
     Its `enabled.ts` holds `threeEnabled()`; every mount point falls back to today's 2-D rendering.
   - `src/three/sketchbook/` — the sketchbook page (`sketchbook.html`, its own Vite input); never imported
     by anything under `src/`.
-- **Flag**: `threeEnabled()` = build-time `VITE_THREE` ∧ device capability ∧ parent setting ∧ not
-  `?three=off`. Quality tier is the stage's question, not the flag's. With the flag off the game is
-  pixel-identical to `main`; the mobile e2e runs with it off.
-- **Rails** (`tests/unit/guardrails.test.ts`, landed by #714): `three` imported only under `src/three/**`;
-  import direction as above; 250-line cap under `src/three/**`; the ratchet on existing files; no three.js
-  code in the main chunk; a `VITE_THREE=off` build has no three chunk; every registered object under its
-  declared budget at the `high` tier; no `Material` constructed under the objects tree — materials come
-  from the stage, which is what keeps every object in one style.
-- **Tests**: `npm run test:sketch` (the screenshot script as a Playwright project, #715) while a diff stays
-  inside the paths above; the game's e2e only when a diff reaches `src/ui` or `src/game`.
+- **Flag**: `threeEnabled()` = build-time `VITE_THREE` ∧ not `?three=off` ∧ the grown-ups' setting ∧ device
+  capability. Quality tier is the stage's question, not the flag's. With the flag off the game is
+  pixel-identical to `main`. Nothing mounts behind it yet — the #684 spike in `src/three/mount/solids.ts`
+  predates it and obeys only the build-time layer — so the mobile e2e sets nothing today; the pull request
+  that lands the first flag-gated mount gives the `mobile` project `?three=off` and one small spec the flag on
+  (epic decision 5).
+- **Rails** (`tests/unit/guardrails.test.ts`, landed by #714 and #715): `three` imported only under
+  `src/three/**`; import direction as above, resolved from the decoded specifier, not its spelling; 250-line
+  cap under `src/three/**`; the ratchet on existing files; no three.js code in the main chunk; a
+  `VITE_THREE=off` build has no three chunk; every registered object under its declared budget at the `high`
+  tier, defaults and every variant; no `Material` or `Light` constructed under the objects tree and no value
+  import of the stage from there — materials come from the stage, which is what keeps every object in one
+  style; the game carries nothing of the sketchbook (its own build, out of the precache, imported by nothing).
+- **Tests**: `npm run test:sketch` (the screenshot script as the `sketchbook` Playwright project, #715) is
+  what a pull request runs while its diff stays inside `src/three/stage|objects|sketchbook/`, `sketchbook.html`,
+  `vite.sketchbook.config.ts`, `tests/sketch/` and the two scripts above; a diff reaching `src/three/mount/`
+  or anything else under `src/` runs the game's e2e as before, and one touching both runs both. The routing
+  is `ci.yml`'s scope step, proved on its real script by `tests/unit/workflows.test.ts`.
 - **Files stay small**: 250 lines is the cap, not the target; split by part (geometry) and assembly.
