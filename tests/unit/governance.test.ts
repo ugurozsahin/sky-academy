@@ -4221,6 +4221,14 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // step 4") was.
     expect(body, "the marker's own misuse — claiming a class can't be enumerated when it plainly can")
       .toMatch(/on a class the code plainly can enumerate is the cheap exit taken/);
+
+    // #498: `section` (the whole of §3) was declared above and never read — the "s3/bodyCheck overlap
+    // area" this issue's body named as unswept is exactly the part of §3 outside the bullet()/
+    // bodyCheck() sub-windows, and its own budget-rail bullet had no pin of its own anywhere in this
+    // file (`bullet.length …`/`SIZES` etc. pin the *test's* budgets, never review-pr §3's rule that a
+    // budget in reviewed code may only fall).
+    expect(section, "review-pr §3's own budget-rail bullet — a reviewer's own rule, not only the author's")
+      .toMatch(/A budget number may only go down/);
   });
 
   it('the routine prompt points at the sweep from the step that restates §4', () => {
