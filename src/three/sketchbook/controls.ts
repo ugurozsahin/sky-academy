@@ -48,6 +48,9 @@ export function mountControls(model: Model, entries: readonly ObjectSpec[], on: 
     params = gui.addFolder('params');
     for (const [key, spec] of Object.entries(o.params))
       params.add(model.params, key, spec.min, spec.max, (spec.max - spec.min) / 100).onChange(() => on.param(key));
+    // `window.__sketch.show()` sets the object, tier and beside on the model directly; repaint them, or the panel
+    // goes on naming the placeholder beside a hammer (#717). `updateDisplay()` fires no handler.
+    for (const c of gui.controllers) c.updateDisplay();
   };
   rebuild(initial);
   return { rebuild, destroy: () => gui.destroy() };

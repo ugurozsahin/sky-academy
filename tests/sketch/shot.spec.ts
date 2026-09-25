@@ -34,6 +34,23 @@ test('the interactive page lists the objects, mounts the panel, honours a deep l
   // the controller): pick a variant through the same select lil-gui renders and watch the params follow.
   await page.locator('.lil-gui select').nth(1).selectOption('sharp');
   expect(await page.evaluate(() => window.__sketch.model())).toMatchObject({ variant: 'sharp', params: { size: 1.6, radius: 0.02 } });
+  // #717: `show()` sets the model behind the panel's back; the object field must follow, not keep naming the old one.
+  const last = objects[objects.length - 1];
+  await page.evaluate(([n]) => window.__sketch.show(n, 'default', 'high'), [last.name]);
+  await expect(page.locator('.lil-gui select').first(), 'the panel names the object show() drew').toHaveValue(last.name);
+  // A drag on the canvas turns the object. Under reduced motion the idle turn is off, so the frame holds still
+  // until the drag — without that, any two screenshots differ and the check proves nothing.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(`${baseURL}/sketchbook/sketchbook.html?object=${last.name}`);
+  await page.waitForFunction(() => window.__sketch?.ready === true);
+  const canvas = page.locator('#stage canvas');
+  const still = await canvas.screenshot();
+  expect((await canvas.screenshot()).equals(still), 'reduced motion: no idle turn').toBe(true);
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 150, box.y + box.height / 2, { steps: 6 }); await page.mouse.up();
+  expect((await canvas.screenshot()).equals(still), 'a drag turns what is drawn').toBe(false);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto(`${baseURL}/sketchbook/sketchbook.html?object=nope&variant=bogus&tier=x`);
   await page.waitForFunction(() => window.__sketch?.ready === true);
   expect(await page.evaluate(() => window.__sketch.model()), 'nonsense in the query falls to the defaults').toMatchObject({ object: 'placeholder', variant: 'default' });

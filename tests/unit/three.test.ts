@@ -271,8 +271,8 @@ describe('objects registry — the contract the first object builds to', () => {
     expect(() => n(3, 1, 2)).toThrow(/inside the range/);
     expect(defaultsOf({ a: n(1, 0, 2), b: n(5, 5, 9) })).toEqual({ a: 1, b: 5 });
   });
-  it('starts empty, under a ceiling the skill states', () => {
-    expect(OBJECTS).toEqual([]);
+  it('holds the style probe (#717), under a ceiling the skill states', () => {
+    expect(OBJECTS.map(o => o.name)).toEqual(['hammer']);
     expect(BUDGET_CEILING).toEqual({ triangles: 2000, drawCalls: 8 });
   });
   it('defineObject infers the schema, so a variant is a full parameter set at compile time and the spec comes back unchanged', () => {
