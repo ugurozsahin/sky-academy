@@ -1379,6 +1379,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'open-pr': null,
     'qa-screenshot': null,
     'review-pr': null,
+    'three-art': null,
     'verification-before-completion': { ...SUPERPOWERS, path: 'skills/verification-before-completion' },
     'using-git-worktrees': { ...SUPERPOWERS, path: 'skills/using-git-worktrees' },
     'systematic-debugging': { ...SUPERPOWERS, path: 'skills/systematic-debugging' },
@@ -1624,6 +1625,7 @@ describe('the vendored skills and agents are pinned, and the list is the allow-l
     'open-pr': /^Open a pull request .*Use when you have finished a piece of work on an issue and are about to branch, push and raise the PR/,
     'qa-screenshot': /^Bounded visual QA for a Sky Ninja Academy pull request\. Use when reviewing or verifying a player-visible change/,
     'review-pr': /^Review and QA another agent's pull request .*Use when acting as the reviewer for an open PR .*block it with REVIEW: CHANGES REQUESTED/,
+    'three-art': /^Build a 3-D object for Sky Ninja Academy in the avatars' toon style .*Use when an issue labelled 3d asks for a 3-D object/,
     'verification-before-completion': /^Use when about to claim work is complete, fixed, or passing, before committing or creating PRs/,
     'using-git-worktrees': /^Use when starting feature work that needs isolation/,
     'systematic-debugging': /^Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes/,
@@ -2794,6 +2796,21 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
     return entries.length ? entries : null;
   };
 
+  // A rule may land before the tree it governs: `.claude/rules/three.md` (#716) is scoped to the paths #714
+  // and #715 create, so the first object is built to the rule rather than before it. Each entry names the
+  // issue that creates the path and is held still absent — the pull request that creates it drops the entry,
+  // and this rail goes back to checking the real path. It is not a way to scope a rule to nothing: an entry
+  // whose path exists fails, and one no rule file declares any more fails below. Only a shape `exists()` can
+  // resolve once the path is real belongs here — a directory, a file, or a trailing `**` — never a glob inside
+  // a file name (`scripts/sketch-*.mjs`), which `exists()` reads as absent forever and so could never expire.
+  const FUTURE_PATHS: Record<string, string> = {
+    'src/three/**': '#714', 'sketchbook.html': '#715', 'tests/sketch/**': '#715',
+  };
+  const declaredPaths = (file: string): string[] => {
+    const front = /^---\n([\s\S]*?)\n---\n/.exec(readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8'));
+    return front ? pathsList(front[1]) ?? [] : [];
+  };
+
   it.each(ruleFiles)('%s has a paths: list, and every path matches something in the repo', (file) => {
     const text = readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8');
     const front = /^---\n([\s\S]*?)\n---\n/.exec(text);
@@ -2801,7 +2818,24 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
     const paths = pathsList(front![1]);
     expect(paths, `${file} needs a non-empty paths: list — an unconditional rule belongs in CLAUDE.md instead`)
       .not.toBeNull();
-    for (const p of paths!) expect(exists(p), `${file}'s path "${p}" matches nothing in the repo`).toBe(true);
+    for (const p of paths!) {
+      if (Object.prototype.hasOwnProperty.call(FUTURE_PATHS, p)) {   // never a prototype key such as `constructor`
+        expect(exists(p), `${file}'s path "${p}" exists now (${FUTURE_PATHS[p]} landed) — drop it from FUTURE_PATHS`)
+          .toBe(false);
+        continue;
+      }
+      expect(exists(p), `${file}'s path "${p}" matches nothing in the repo`).toBe(true);
+    }
+  });
+
+  it('every FUTURE_PATHS entry is still declared by a rule file, so the allowance cannot outlive its use', () => {
+    const declared = ruleFiles.flatMap(declaredPaths);
+    for (const p of Object.keys(FUTURE_PATHS)) {
+      expect(declared, `${p} is declared by no rule file any more — drop it from FUTURE_PATHS`).toContain(p);
+      // A glob inside a file name would never resolve once real (review of this rail), so it could never expire.
+      expect(p.replace(/\/\*\*$/, ''), `${p} is a shape exists() cannot resolve, so it would never be dropped`)
+        .not.toMatch(/[*?]/);
+    }
   });
 
   it('a comment or blank line between two paths: entries does not silently drop the entries after it', () => {
@@ -3030,7 +3064,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
 
   // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 9_495   // → 9,495: "metre" is restored to the British-English list (#513 review, round 12 — it was dropped to pay for the fourth-routine pointer, which was unrelated to it), and the budget drops to this tree's own size rather than keeping the 14 bytes of headroom that restoring it happened to fit inside;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them; → 9,518: #97 reduced to a pointer at its home (#145); → 9,509: the external-assets rule stopped naming its one exception and pointed at #479 instead
+  const CLAUDE_MD_BUDGET = 9_487   // → 9,487 (#716): the 3-D bullet — the binding style record, the `three.md` pointer and the `3d` gate — paid for by dropping the desktop/viewport parenthetical from the test-running bullet (its home is the `open-pr` skill §4), the ci.yml aside from the guard-rails bullet (`docs/ROUTINE-PROMPT.md` STEP 1 carries it), the GraphQL clause from the board bullet (the developer prompt's Context has it) and a shorter Env note; the budget drops to the tree's own size;   // → 9,495: "metre" is restored to the British-English list (#513 review, round 12 — it was dropped to pay for the fourth-routine pointer, which was unrelated to it), and the budget drops to this tree's own size rather than keeping the 14 bytes of headroom that restoring it happened to fit inside;    // 10,750 → 9,897: #161 reduced to one sentence; → 9,890: second-item condition 1 reworded (docs/decisions/003); → 9,870: `BACKLOG.md` retired (#218); → 9,868: the #215 and #153 rules added, narrative trimmed to pay for them; → 9,518: #97 reduced to a pointer at its home (#145); → 9,509: the external-assets rule stopped naming its one exception and pointed at #479 instead
   // (Each budget sits in its own paragraph on purpose: three pull requests in one day conflicted here, because
   // git treats edits to adjacent lines as one hunk.)
 
