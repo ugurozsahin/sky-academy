@@ -231,7 +231,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   // The results hold still pauses both arenas (`syncPaused()` reads `duel.ended` too); it just leaves the
   // overlay's own presentation timers alone, which is what `main` did before #301 and is the only behaviour
   // the game is over for.
-  const hold = (open: boolean, beats = true) => { holdOpen = open; if (beats) scope.holdTimers(open); syncPaused(); };
+  const hold = (open: boolean, beats = true) => { if (open === holdOpen) return; holdOpen = open; if (beats) scope.holdTimers(open); syncPaused(); };
 
   /**
    * What the finished match paid, or null until it is committed — the overlay draws from this (#375/#441).

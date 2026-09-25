@@ -39,9 +39,10 @@ export interface ScreenScope {
   dispose(): void;
 }
 
-/** One pending `later()`: the browser handle, what to run, and when it is due, so a hold can measure what is
- *  left of it. `due` is re-based on every re-arm, so it is always "due at" and never "was due at". */
-interface Beat { id: number; fn: () => void; due: number; }
+/** One pending `later()`: what to run, and either an armed timer's absolute due time or a held one's
+ *  remaining ms — never both, and never the wrong one under the other's name (#491). The `id` field is the
+ *  tell: only an armed beat has a live `setTimeout` handle to clear. */
+type Beat = { fn: () => void; id: number; dueAt: number } | { fn: () => void; left: number };
 
 /** Build the per-screen scaffolding. One `alive` flag + beat list backs `later`, `holdTimers`, `toast` and
  *  `dispose`. */
@@ -55,25 +56,27 @@ export function screenScope(): ScreenScope {
   // `performance.now()` and not `Date.now()`: this measures an interval, and a wall clock that a device
   // adjusts mid-pause would hand back a negative remainder or a minute-long one.
   const now = () => performance.now();
-  const arm = (b: Beat, ms: number) => {
-    b.due = now() + ms;
-    b.id = window.setTimeout(() => { beats.delete(b); if (alive) b.fn(); }, ms);
+  // Builds the armed shape; the `id` `setTimeout` returns is only known once `b` exists, so `b` is built with a
+  // placeholder and patched once — the closure below still needs to name `b` to remove itself from `beats`.
+  const arm = (fn: () => void, ms: number): Beat => {
+    const b = { fn, id: 0, dueAt: now() + ms };
+    b.id = window.setTimeout(() => { beats.delete(b); if (alive) fn(); }, ms);
+    return b;
   };
   const scope: ScreenScope = {
     get alive() { return alive; },
     later(fn, ms) {
-      const b: Beat = { id: 0, fn, due: 0 };
-      beats.add(b);
       // Armed frozen if the screen is already held — a beat scheduled from inside a held screen (a toast raised
       // by the overlay itself) must not be the one thing still running behind it.
-      if (held) b.due = ms; else arm(b, ms);
+      beats.add(held ? { fn, left: ms } : arm(fn, ms));
     },
     holdTimers(open) {
       if (open === held) return;
       held = open;
-      for (const b of beats) {
-        if (open) { clearTimeout(b.id); b.due = Math.max(0, b.due - now()); }   // `due` now holds the REMAINDER
-        else arm(b, b.due);
+      for (const b of [...beats]) {
+        beats.delete(b);
+        if ('id' in b) { clearTimeout(b.id); beats.add({ fn: b.fn, left: Math.max(0, b.dueAt - now()) }); }
+        else beats.add(arm(b.fn, b.left));
       }
     },
     toast(text, cls = '', ms = 1300) {
@@ -101,7 +104,7 @@ export function screenScope(): ScreenScope {
       document.querySelector<HTMLElement>('#toast')?.classList.remove('show');
     },
     // hush() also voids the voice probe (#65)
-    dispose() { alive = false; for (const b of beats) clearTimeout(b.id); beats.clear(); hush(); delete window.__sna; },
+    dispose() { alive = false; for (const b of beats) if ('id' in b) clearTimeout(b.id); beats.clear(); hush(); delete window.__sna; },
   };
   return scope;
 }
