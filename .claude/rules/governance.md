@@ -179,7 +179,8 @@ paths:
   request: holds the merge until the owner writes his marker — for a genuinely new look only); `loosening` (on
   a governance pull request that loosens a constraint: the same hold, #112); `later` (parked
   by the owner); `blocked` (cannot move until another issue or a decision lands — it is what puts a card in
-  the board's Blocked column, #87); `new-ui` (gates the `frontend-design` skill, #99); `watchdog` (opened by
+  the board's Blocked column, #87); `new-ui` (gates the `frontend-design` skill, #99); `3d` (gates the `three-art` skill the same way,
+  #713); `watchdog` (opened by
   the watchdog); `complexity:S`/`M`/`L`/`XL` (how big the work is, not how long it takes — the refiner sets it
   and splits `L` and `XL`, #512); `epic` (split into sub-issues: `docs/ROUTINE-PROMPT.md` STEP 3 rule 1 drops
   it, so a run takes the children and never the parent, and the parent's `- [ ] #<child>` lines are counted by
