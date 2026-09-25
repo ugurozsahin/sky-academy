@@ -39,7 +39,7 @@ inside a file name.
   import of the stage from there — materials come from the stage, which is what keeps every object in one
   style; the game carries nothing of the sketchbook (its own build, out of the precache, imported by nothing).
 - **Tests**: `npm run test:sketch` (the screenshot script as the `sketchbook` Playwright project, #715) is
-  what a pull request runs while its diff stays inside `src/three/stage|objects|sketchbook/`, `sketchbook.html`,
+  what a pull request runs while its diff stays inside `src/three/stage/`, `src/three/objects/`, `src/three/sketchbook/`, `sketchbook.html`,
   `vite.sketchbook.config.ts`, `tests/sketch/` and the two scripts above; a diff reaching `src/three/mount/`
   or anything else under `src/` runs the game's e2e as before, and one touching both runs both. The routing
   is `ci.yml`'s scope step, proved on its real script by `tests/unit/workflows.test.ts`.
