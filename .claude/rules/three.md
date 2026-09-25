@@ -30,9 +30,10 @@ inside a file name.
   pixel-identical to `main`, and **with the flag off there is no 3-D object anywhere — the game as it was
   before #684** (the owner, in session, 2026-09-25). The #684 spike (`src/three/mount/solids.ts`) obeys it:
   its loader in `src/ui/solid.ts` asks `threeEnabled()` before it downloads the chunk (#753), and every mount
-  after it does the same. The mobile e2e still runs with the setting on `auto`, which headless Chromium
-  passes, because the spike's solid tests need 3-D; the rebuilt mount moves them to a flag-on spec and gives
-  the `mobile` project `?three=off` (epic decision 5).
+  after it does the same. The game's e2e runs with 3-D off (epic decision 5): every game project starts
+  with the grown-ups' setting stored as `off` (`THREE_OFF` in `playwright.config.ts`, held by a rail in
+  `tests/unit/guardrails.test.ts`), and the one flag-on group, `3-D solids on the 3-D Shapes cards` in
+  `tests/e2e/game.spec.ts`, opts back to `auto` with `test.use`. A new 3-D mount's e2e joins that group.
 - **Rails** (`tests/unit/guardrails.test.ts`, landed by #714 and #715): `three` imported only under
   `src/three/**`; import direction as above, resolved from the decoded specifier, not its spelling; 250-line
   cap under `src/three/**`; the ratchet on existing files; no three.js code in the main chunk; a

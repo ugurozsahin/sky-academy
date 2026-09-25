@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { BoxGeometry, Mesh } from 'three';   // #714: the budget meter's self-test below
 import { BUDGET_CEILING, defaultsOf, OBJECTS } from '../../src/three/objects';   // #714: the budget rail builds every registered object
 import { createStage, measure } from '../../src/three/stage';
+import { THREE_SETTING_KEY } from '../../src/three/mount/enabled';   // #713 decision 5: the key the e2e projects preset
 import { listFiles, precacheList } from '../../scripts/build-sw.mjs';   // #715: the sketchbook stays out of the precache
 
 /**
@@ -2769,6 +2770,21 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
     expect(sketchSpecs.length, 'tests/sketch must hold the shot spec').toBeGreaterThan(0);
     for (const f of readdirSync(new URL('../../tests/e2e', import.meta.url)))
       expect(readFileSync(new URL(`../../tests/e2e/${f}`, import.meta.url), 'utf8'), `${f} must not import the shot script — that would put the sketchbook on every mobile leg`).not.toMatch(/sketch-shot/);
+  });
+
+  // #713 decision 5 and the owner's rule (2026-09-25): the game's e2e runs with 3-D off, stored the way a
+  // grown-up stores it. Every project that is not `setup` or `sketchbook` is a game project and must start from
+  // `THREE_OFF` — read from the projects, not a list here, so a new game project without it fails too. And the
+  // key it stores must be the key the game reads, or the setting would be stored and never seen.
+  it('every game e2e project starts with the grown-ups 3-D setting off (#713 decision 5)', () => {
+    const cfg = code(readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8'));
+    expect(cfg, 'THREE_KEY must be the key the game reads').toMatch(new RegExp(`THREE_KEY\\s*=\\s*'${THREE_SETTING_KEY}'`));
+    expect(cfg, 'THREE_OFF must store THREE_KEY as off').toMatch(/name:\s*THREE_KEY,\s*value:\s*'off'/);
+    const parts = cfg.slice(cfg.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    const named = parts.map(p => ({ name: p.match(/name:\s*'([^']+)'/)![1], body: p }));
+    const game = named.filter(p => p.name !== 'setup' && p.name !== 'sketchbook');
+    expect(game.map(p => p.name), 'the game projects the rail reads').toEqual(expect.arrayContaining(['mobile', 'desktop']));
+    for (const p of game) expect(p.body, `${p.name} must start with 3-D off`).toMatch(/storageState:\s*THREE_OFF\b/);
   });
 
   // (d) 250 lines is the cap, not the target (`.claude/rules/three.md`): split by part and assembly.

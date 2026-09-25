@@ -27,6 +27,16 @@ if (portOverride !== undefined && !/^\d+$/.test(portOverride)) {
 const port = portOverride ? Number(portOverride) :
   4200 + (parseInt(createHash('sha1').update(process.cwd()).digest('hex').slice(0, 4), 16) % 300);
 const baseURL = `http://localhost:${port}`;
+/**
+ * Epic #713 decision 5, and the owner's rule (2026-09-25): the game's e2e runs with 3-D off — the grown-ups'
+ * setting `sna:three` stored as `off`, exactly as a parent sets it — so every test checks the game as it was
+ * before #684, and none pays for software WebGL. The one flag-on group (`3-D solids …` in game.spec.ts) opts back
+ * to `auto` with `test.use(THREE_AUTO)`. `tests/unit/guardrails.test.ts` holds every game project to it.
+ */
+// The key through a constant, never a `name: '…'` literal: the #141 rail reads every such literal in this file
+// as a project name.
+const THREE_KEY = 'sna:three';   // `THREE_SETTING_KEY` in src/three/mount/enabled.ts; the rail checks they agree
+export const THREE_OFF = { cookies: [], origins: [{ origin: baseURL, localStorage: [{ name: THREE_KEY, value: 'off' }] }] };
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
@@ -79,10 +89,10 @@ export default defineConfig({
   // excludes that file (`testIgnore`) so it is not also run a second time as part of their own leg.
   projects: [
     { name: 'setup', testMatch: /00-build-identity\.spec\.ts/, testIgnore: /viewport\.spec\.ts/, use: { defaultBrowserType: 'chromium' } },
-    { name: 'mobile', testIgnore: [/viewport\.spec\.ts/, /00-build-identity\.spec\.ts/], dependencies: ['setup'], use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
-    { name: 'desktop', testIgnore: [/viewport\.spec\.ts/, /00-build-identity\.spec\.ts/], dependencies: ['setup'], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
-    { name: 'tablet', testMatch: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 800, height: 1280 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
-    { name: 'tablet-landscape', testMatch: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+    { name: 'mobile', testIgnore: [/viewport\.spec\.ts/, /00-build-identity\.spec\.ts/], dependencies: ['setup'], use: { storageState: THREE_OFF, ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
+    { name: 'desktop', testIgnore: [/viewport\.spec\.ts/, /00-build-identity\.spec\.ts/], dependencies: ['setup'], use: { storageState: THREE_OFF, ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
+    { name: 'tablet', testMatch: /viewport\.spec\.ts/, dependencies: ['setup'], use: { storageState: THREE_OFF, defaultBrowserType: 'chromium', viewport: { width: 800, height: 1280 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+    { name: 'tablet-landscape', testMatch: /viewport\.spec\.ts/, dependencies: ['setup'], use: { storageState: THREE_OFF, defaultBrowserType: 'chromium', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
     // #715: the sketchbook's one spec — the screenshot script — under its own `testDir`, so `mobile`,
     // `desktop` and the tablets (all scoped to `tests/e2e`) never see it and the pull-request leg stays the
     // suite it was. It runs on the nightly with every other project (#141's rail) and on a pull request

@@ -4,7 +4,9 @@ import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
-import { expectFitsViewport } from './viewport';   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
+import { expectFitsViewport } from './viewport';
+/** A context with nothing stored: the 3-D setting at its default, `auto` — the opt-out from `THREE_OFF`. */
+const NO_STORED_STATE = { cookies: [], origins: [] };   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
 
 declare global {
   interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
@@ -2347,23 +2349,27 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.map')).toBeVisible();
   });
 
-  // #714: the 3-D setting is a device-wide choice on the grown-ups screen. Nothing in the game mounts behind it
-  // yet (the #684 spike predates the flag), so this pins the control and the stored value, not a 3-D effect.
-  test('For grown-ups: the 3-D pictures control stores its choice on the device (#714)', async ({ page }) => {
-    await seedPlayer(page, 'volt', 'Ada');
-    await openGrownUps(page);
-    const pick = page.locator('.p-three-pick .tab');
-    await expect(pick).toHaveCount(3);
-    await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'true');     // Auto, the default
-    await pick.nth(2).click();                                              // Off
-    await expect(pick.nth(2)).toHaveClass(/\bon\b/);
-    await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'false');
-    expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBe('off');
-    await page.reload();
-    await openGrownUps(page);
-    await expect(page.locator('.p-three-pick .tab').nth(2)).toHaveAttribute('aria-checked', 'true');
-    await page.locator('.p-three-pick .tab').nth(0).click();                // back to Auto: the slot is cleared, not written
-    expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBeNull();
+  // #714: the 3-D setting is a device-wide choice on the grown-ups screen; the #684 solids obey it (#753). This
+  // pins the control and the stored value. It starts from the default, `auto`, so it opts out of the game
+  // projects' stored `off` (`THREE_OFF`, #713 decision 5).
+  test.describe(() => {
+    test.use({ storageState: NO_STORED_STATE });
+    test('For grown-ups: the 3-D pictures control stores its choice on the device (#714)', async ({ page }) => {
+      await seedPlayer(page, 'volt', 'Ada');
+      await openGrownUps(page);
+      const pick = page.locator('.p-three-pick .tab');
+      await expect(pick).toHaveCount(3);
+      await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'true');     // Auto, the default
+      await pick.nth(2).click();                                              // Off
+      await expect(pick.nth(2)).toHaveClass(/\bon\b/);
+      await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'false');
+      expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBe('off');
+      await page.reload();
+      await openGrownUps(page);
+      await expect(page.locator('.p-three-pick .tab').nth(2)).toHaveAttribute('aria-checked', 'true');
+      await page.locator('.p-three-pick .tab').nth(0).click();                // back to Auto: the slot is cleared, not written
+      expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBeNull();
+    });
   });
 
   // #64: reinstalling the APK wipes localStorage, so the grown-up needs a way to carry the save across.
@@ -3474,7 +3480,18 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
  * (the cuboid) at `rng() = 0.9`. Stage 1 is cleared with the real rng, then the session's rng is pinned before
  * "Next" so stage 2's first card is deterministic. `rng` is TS-private on `Session`, hence the cast.
  */
+// #713 decision 5: every game project starts with the grown-ups' 3-D setting stored as `off` (`THREE_OFF` in
+// playwright.config.ts). Proved here, outside any override, so a config that stops applying it fails loudly.
+test('the game projects start with 3-D off, as a grown-up would set it (#713 decision 5)', async ({ page }) => {
+  await page.goto('/');
+  expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBe('off');
+});
+
 test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
+  // The one flag-on group (#713 decision 5): the game projects start with 3-D off (`THREE_OFF` in
+  // playwright.config.ts); these tests are about the 3-D path, so they start from the default, `auto`, which
+  // headless Chromium passes (WebGL2, enough memory, no reduced motion).
+  test.use({ storageState: NO_STORED_STATE });
   test('a Year 2 shapes card shows a rotating WebGL solid where the emoji was, and nothing else does', async ({ page }) => {
     test.setTimeout(90_000);
     await seedPlayer(page);
