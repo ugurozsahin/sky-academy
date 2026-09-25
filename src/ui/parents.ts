@@ -35,9 +35,9 @@ function topicRow(s: TopicStat): string {
 /** One of #151's two distinguishable not-saving reasons, or null when saving is working normally. The wording
  *  differs because the remedy differs: a newer-device save needs the *other* device or an update; a browser
  *  that refuses to write needs private browsing turned off or storage space freed — neither fixes the other. */
-function saveNote(): string | null {
+export function saveNote(): string | null {
   if (isReadOnlySave()) return "This device is showing a save from a newer version of the app, so today's play is not being kept here. Open the game on the other device to add to it, or update this app to bring that save back.";
-  if (isWriteFailing()) return 'This device is not saving progress right now — coins, stars and certificates earned today may be lost when the game closes. Turning off private browsing, or freeing up storage space, usually fixes it.';
+  if (isWriteFailing()) return 'This device is not saving progress right now — coins, stars, certificates and duel results earned today may be lost when the game closes. Turning off private browsing, or freeing up storage space, usually fixes it.';
   return null;
 }
 /**
