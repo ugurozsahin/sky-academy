@@ -2626,10 +2626,15 @@ describe('docs/CURRICULUM.md\'s per-year headers match YEARS (#392)', () => {
 describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => {
   const THREE_DIR = '/src/three/', MOUNT_DIR = '/src/three/mount/', OBJECTS_DIR = '/src/three/objects/';
   interface Edge { from: string; spec: string; to: string; kind: 'static' | 'type' | 'dynamic' | 'require' }
+  /** What a string literal can hide — `\uXXXX`, `\u{…}`, `\xXX`, `\<char>` — undone, so the reader sees what TypeScript sees. */
+  const decode = (s: string) => s.replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|\\(.)/g,
+    (_, brace, u4, x2, ch) => brace ? String.fromCodePoint(parseInt(brace, 16)) : u4 ? String.fromCharCode(parseInt(u4, 16)) : x2 ? String.fromCharCode(parseInt(x2, 16)) : ch);
   /** Every literal import edge out of `path`: the specifier as written, and where it resolves to. */
   const edges = (path: string, src: string): Edge[] => {
     const c = code(src), out: Edge[] = [];
-    const to = (spec: string) => spec.startsWith('.') ? posix.resolve(posix.dirname(path), spec) : spec;
+    // Resolve the DECODED string, not the source text between the quotes: `'..\u002fthree\u002fstage'` is
+    // `../three/stage` to TypeScript (PR #710 round 3, the same class), so a literal's escapes are undone first.
+    const to = (raw: string) => { const spec = decode(raw); return spec.startsWith('.') ? posix.resolve(posix.dirname(path), spec) : spec; };
     for (const m of c.matchAll(/(typeof\s*)?\bimport\s*\(\s*['"`]([^'"`\n]+)['"`]\s*\)/g)) out.push({ from: path, spec: m[2], to: to(m[2]), kind: m[1] ? 'type' : 'dynamic' });   // `typeof import('x')` is a type position, erased like `import type`
     for (const m of c.matchAll(/\b(?:import|export)\s+(type\s+)?(?:[^;'"`(]*?\bfrom\s*)?['"`]([^'"`\n]+)['"`]/g)) out.push({ from: path, spec: m[2], to: to(m[2]), kind: m[1] ? 'type' : 'static' });
     for (const m of c.matchAll(/\brequire\s*\(\s*['"`]([^'"`\n]+)['"`]\s*\)/g)) out.push({ from: path, spec: m[1], to: to(m[1]), kind: 'require' });
@@ -2652,6 +2657,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       { from: '/src/game/f.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' },
     ]);
     expect(all.length, 'the reader must see the real tree').toBeGreaterThan(100);
+    expect(edges('/src/ui/x.ts', "import { a } from '..\\u002fthree\\u002fstage\\x2frig';")[0].to, 'escapes are decoded before resolving').toBe('/src/three/stage/rig');
   });
 
   // (a) Proved red: `import { Color } from 'three'` in a scratch `src/ui/x.ts` fails.
