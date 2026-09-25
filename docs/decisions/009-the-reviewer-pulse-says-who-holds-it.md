@@ -1,0 +1,87 @@
+# 009 — The reviewer pulse says who holds it, so a finish never erases a live run
+
+**Status:** accepted, routine session, 2026-09-25 (#460). Amends `docs/REVIEWER-PROMPT.md` STEP 1's pulse
+discipline; does not touch `docs/decisions/005-the-run-pulse-says-when-a-run-started.md`, which is why this is
+a record of its own rather than an amendment there
+(`docs/decisions/001-one-home-per-rule.md` §1).
+
+## Context
+
+`docs/decisions/005-the-run-pulse-says-when-a-run-started.md`'s reviewer amendment gave the reviewer routine
+a single-tenant pulse: STEP 1 stamps
+`<UTC> — IN PROGRESS: reviewing #<n>` on the way in and replaces it with the finished snapshot as the very
+last thing a run does. That assumed one run at a time. On 2026-09-21 two were live together for 1h55m (#460's
+evidence table: session `01ApUM…` blocked three pull requests between 13:20 and ~14:0x while session
+`01UkLc…` stamped its own `IN PROGRESS: reviewing #430` at 14:57, inside that window). The older run declined
+to write its own finished snapshot at all, because doing so — replacing the whole body, as STEP 1 says — would
+have erased the younger run's still-live stamp, and with it the watchdog's only way to tell a live run from a
+dead one for the next ~90 minutes.
+
+Nothing in STEP 1 told either run the other existed. A run only reads the pulse to decide whether to stop
+(nothing waiting) or stamp (something is); it never compares what it is about to write against what is already
+there. **The class is every unconditional pulse replace, not only the one #460's evidence table caught**: STEP
+1's "nothing waiting" cheap exit and STEP 0's `stopped: limit` write are the same shape — a run reaches one of
+them, reads nothing, and overwrites — so a run finishing idle or hitting a limit can erase a concurrent run's
+live stamp exactly as the finished-snapshot write could.
+
+## Decision
+
+**Every pulse replace but the `IN PROGRESS` stamp itself re-reads the body first.** The stamp is unchanged: it
+still always overwrites, because a fresh `IN PROGRESS` stamp is itself the "who holds it" signal a later run
+reads, and overwriting it with a newer one of the same shape loses nothing. What changes is every write that
+used to be able to destroy that signal — the finished snapshot, the "nothing waiting" stop, and the
+`stopped: limit` write, all three now covered by one clause in STEP 1 (STEP 0's own write already reads
+"replacing your pulse (STEP 1)", so it inherits the same discipline rather than needing its own copy): if the
+body a run reads back is not the one it itself stamped (a different, still-fresh `IN PROGRESS` line, or a
+finished snapshot newer than its own stamp), a second run is or was live, and this run does not replace the
+body. It appends its own note instead — `- also reviewed #<n>: <verdict>` per pull request reviewed, or one
+line otherwise — to the body it just read, leaving that body's stamp and content untouched. Otherwise — the
+body still reads exactly as this run left it — it replaces the whole body as before, unchanged from #005.
+
+A run at STEP 1 already reads the pulse before deciding whether to stop or stamp; that existing read is what
+now lets it "tell... that another reviewer run is live before it starts a pull request" (#460's acceptance
+criterion) — a fresh `IN PROGRESS` stamp under the ~90-minute watchdog window is exactly that tell, and this
+decision's only job is to stop the finished write from erasing it before the next run gets to see it.
+
+This is alternative 1 of the three #460 proposed: the pulse names who holds it, cheaply, without a lock, a
+label or a slowed cadence.
+
+## Considered and dropped
+
+- **Lease the pull request, not the routine** (#460's second alternative): before starting a pull request, a
+  run records a claim keyed on the PR number, and a second run skips a fresh claim. This also closes the
+  round-budget half of #460 (two runs blocking the same PR at different rounds) that the chosen fix does not
+  touch. Dropped for now, not because it is wrong: it is a second, independent mechanism (a claim per PR,
+  rather than a claim on the one shared pulse), and #460's own acceptance criterion only asks that a run "can
+  tell from the pulse that another reviewer run is live before it starts a pull request" — which the chosen
+  fix already gives it, at a third of the surface area. Worth its own issue if the round-budget collision
+  recurs.
+- **Slow the trigger to match the work** (`17 */2 * * *`): one line, no code. Dropped on #460's own reasoning,
+  unchanged here: it halves review throughput, the wrong direction while pull requests are open and waiting,
+  and it does not fix the underlying blindness — two runs 2h10m apart instead of 1h55m can still overlap on a
+  review that runs long, which #460's own evidence shows happens routinely.
+- **Qualify the never-append rule for every pulse, not just this one case.** Dropped: `heartbeatAppend` in
+  `.claude/hooks/github-write-guard.mjs` already permits any number of non-timestamped lines under one
+  timestamped summary line — the developer pulse's `- second item:`/`- query top pick:` lines are exactly
+  that shape. The `- also reviewed:` line above needs no hook change: it is not a second timestamped line, so
+  `heartbeatAppend`'s existing check (denies at two `SUMMARY_LINE` matches) never sees it. Writing a new rule
+  for it would duplicate one that already does the job.
+
+## Consequences
+
+- A run's finished write no longer risks erasing a second run's live stamp or its own finished snapshot; the
+  older run's results are preserved as `- also reviewed:` lines under the younger run's record instead of
+  vanishing.
+- The pulse can carry more than one run's results after an overlap, which is new: a reader (the watchdog, the
+  next run, the owner) sees every `- also reviewed:` line as well as the summary line, rather than only ever
+  the most recent writer's account.
+- Still open, inherited from #460: this does not prevent two runs from reviewing the *same* pull request
+  concurrently, only from destroying each other's pulse record when they do. The round-budget collision
+  (`review-pr` §7) is unchanged.
+- **Still open, new here:** a run that skips the re-read (or whose read is a stale/cached copy of its own
+  prior write) produces a body byte-identical to one that checked correctly — nothing attests that the
+  comparison happened, the same limit #460 itself names for its own claim comment ("not airtight"). This is a
+  prose discipline, not a lock; a genuinely airtight version would need the pulse issue itself to carry a
+  compare-and-swap primitive GitHub's API does not offer.
+- `REVIEWER_PROMPT_BUDGET` is paid in `docs/REVIEWER-PROMPT.md` itself; the PR that lands this records the
+  before/after byte count.
