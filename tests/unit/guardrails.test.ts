@@ -235,6 +235,22 @@ describe('guard rails', () => {
     }
   });
 
+  // #557 (#325 stage 1): src/game/ never imports src/ui/ — zero occurrences today, and that one-way
+  // dependency is why src/game/session.ts is testable without a browser and the sim harness (#142) works at
+  // all. Every later stage of #325 moves files around, and each could break it silently. Text rail, over
+  // code() (comments may name the ban): it sees spellings, not what a nested subfolder's own relative depth
+  // would resolve to, so it matches any number of leading `../` before `ui/`, not just one, and a Vite-root
+  // absolute specifier (`/src/ui/…`) alongside the relative form, though nothing in src/ uses that style
+  // today. It cannot see a path assembled at run time — `'../' + 'ui/' + name` — only a literal or template
+  // specifier. Proved red: added `import { $ } from '../ui/dom';` to a scratch file under src/game/, watched
+  // this fail, removed it.
+  it('no file in src/game/ imports from src/ui/ (#557)', () => {
+    for (const [path, src] of inDir('/src/game/')) {
+      expect(code(src), `${path} must not import from src/ui/ — src/game/ is the browser-free half of the split`)
+        .not.toMatch(/\b(?:from|import|require)\s*\(?\s*['"`](?:(?:\.\.\/)+ui\/|\/src\/ui\/)/);
+    }
+  });
+
   // #699 item 1: `src/native.ts` is the one owner of the Capacitor bridge — every other module under `src/`
   // reads it (presence, platform, a plugin) through `isNativeShell`/`plugin` there rather than touching
   // `window.Capacitor`/`Capacitor.Plugins` itself, so a future change to how the bridge is detected or
