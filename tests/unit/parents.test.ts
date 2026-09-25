@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '../../src/game/parents';
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
-import { isWriteFailing, reset, save, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
+import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
 import { freshDojo } from '../../src/game/dojo';
 
@@ -231,5 +231,29 @@ describe('the not-saving sentence names everything a refused write can lose', ()
     expect(note, 'the grown-ups screen must explain the fault, not go quiet').not.toBeNull();
     for (const thing of ['coins', 'stars', 'certificates', 'duel results'])
       expect(note, `must still list ${thing} among what can be lost`).toContain(thing);
+  });
+
+  // pr-test-analyzer, reviewing this diff: `saveNote` was exported here for the first time specifically so it
+  // could be unit-tested directly, and its other branch — a newer-build save, #232's read-only latch — had
+  // never been exercised anywhere in the repo. Closing that while the function is already open for testing,
+  // same fixture shape as tests/unit/storage.test.ts's "leaves the newer blob on disk" case.
+  it('says a different thing for a newer-build save, and a save attempted under that latch never also sets the write-failure one', () => {
+    const key = saveKeyFor(activeProfile());
+    localStorage.setItem(key, JSON.stringify({ v: SAVE_VERSION + 1, name: 'Tablet', coins: 500 }));
+    load();
+    expect(isReadOnlySave(), 'the read-only latch must be set by loading a newer-build blob').toBe(true);
+
+    const note = saveNote();
+    expect(note, 'a newer-build save must not read as a plain write failure').not.toBeNull();
+    expect(note).toContain('newer version of the app');
+    expect(note, 'this is a different remedy — it must not also claim the write-failing wording').not.toContain('duel results');
+
+    // A save attempted under the read-only latch never reaches `setItem` at all (`save()`'s own comment: "not
+    // an attempted write, so it does not touch writeFailed either way", #232/#151), so the two latches this
+    // function distinguishes can never actually both be true from one `save()` call.
+    save({ coins: 1 });
+    expect(isWriteFailing(), 'a read-only save is never an attempted write, so this never latches from it').toBe(false);
+    expect(isReadOnlySave(), 'and the read-only latch is untouched by it').toBe(true);
+    expect(saveNote(), 'saveNote still reports the read-only reason').toContain('newer version of the app');
   });
 });
