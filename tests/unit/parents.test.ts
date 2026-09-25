@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '../../src/game/parents';
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
-import { SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
-import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS } from '../../src/ui/parents';
+import { isWriteFailing, reset, save, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
+import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
 import { freshDojo } from '../../src/game/dojo';
+
+// minimal localStorage shim for node, same as tests/unit/storage.test.ts
+const mem: Record<string, string> = {};
+(globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
 
 const base: SaveData = {
   v: SAVE_VERSION, name: 'Test', avatar: 'kai', year: 'year1', sound: true, speech: true, voice: 'unknown',
@@ -201,5 +205,31 @@ describe('ninjas on this device (#20 slice 3)', () => {
     // "Start again", which is the control that asks for the typed word.
     expect(DELETE_HINTS.last).toContain('Start again');
     expect(DELETE_HINTS.last).toContain('RESET');
+  });
+});
+
+/**
+ * #442 finding 4: the grown-ups screen is the one place `isWriteFailing()` is ever explained to a human, and
+ * its sentence used to enumerate `coins, stars and certificates` — dropping the fourth thing a `save()` under
+ * this latch can lose, a duel row `recordDuel` files with no other surface to show it was kept (unlike a
+ * certificate's 🎓 row, gated on `certSaved`/#470). Proved red by reverting the enumeration in `parents.ts` and
+ * watching this test fail on "duel results" going missing from the sentence.
+ */
+describe('the not-saving sentence names everything a refused write can lose', () => {
+  beforeEach(() => reset());
+
+  it('is null while saving is working, and names duel results alongside coins/stars/certificates once it fails', () => {
+    expect(isWriteFailing(), 'nothing has failed yet').toBe(false);
+    expect(saveNote()).toBeNull();
+
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try { save({ coins: 1 }); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(isWriteFailing(), 'the write just threw').toBe(true);
+
+    const note = saveNote();
+    expect(note, 'the grown-ups screen must explain the fault, not go quiet').not.toBeNull();
+    for (const thing of ['coins', 'stars', 'certificates', 'duel results'])
+      expect(note, `must still list ${thing} among what can be lost`).toContain(thing);
   });
 });
