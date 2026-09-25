@@ -62,4 +62,31 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     expect(code(src)).toContain('const b = 2;');
     expect(code('ctx.shadowBlur = 4;'), 'a real use is not a comment and must stay readable').toContain('shadowBlur');
   });
+
+  // PR #710 round 7: a purely textual `/\/\*[\s\S]*?\*\//` strip cannot tell a real comment apart from the
+  // same two characters sitting inside two ordinary string literals, so it erased everything between them —
+  // a real `src/game/` import included — rather than only the comment the rail exists to see past.
+  it('code() does not let a string literal\'s own text open or close a comment (#710 round 7)', () => {
+    const src = "export const decoy1 = '/*';\nimport { $ } from '../ui/dom';\nexport const decoy2 = '*/';";
+    const stripped = code(src);
+    expect(stripped, 'a real import sitting between two decoy string literals must survive').toContain("import { $ } from '../ui/dom';");
+    expect(stripped, 'the code naming decoy1 must survive too').toContain('decoy1');
+    expect(stripped, 'and decoy2').toContain('decoy2');
+    // A genuine comment either side of the decoys must still be stripped as before.
+    const withRealComment = `/* a real comment mentioning shadowBlur */\n${src}`;
+    expect(code(withRealComment), 'a real comment must still be gone').not.toContain('shadowBlur');
+  });
+
+  it('code() skips a template literal\'s raw text, but still scans a comment inside its ${…} interpolation', () => {
+    // The template's own backticked body is not code — `/*` inside it is just characters, same as a
+    // single-quoted string — but an interpolation re-enters real code, where a comment is still a comment.
+    const src = 'const s = `look, a /* fake comment */ right here`;\nconst t = `${/* real */ 1}`;';
+    const stripped = code(src);
+    expect(stripped, 'text inside a template literal is not a comment and must survive').toContain('a /* fake comment */ right here');
+    expect(stripped, 'a comment inside a template interpolation is still a comment').not.toContain('real');
+    // Nesting: a `${…}` that contains its own object literal or template literal must not close early on
+    // the object's own `}`, or on the nested template's own backtick.
+    const nested = 'const u = `${ ({ a: 1, b: () => `${2}` }).a }`;\nimport { $ } from \'../ui/dom\';';
+    expect(code(nested), 'a nested {…}/`…` inside an interpolation must not end the template early').toContain("import { $ } from '../ui/dom';");
+  });
 });
