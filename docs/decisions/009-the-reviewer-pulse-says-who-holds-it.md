@@ -76,6 +76,13 @@ now lets it "tell... that another reviewer run is live before it starts a pull r
 criterion) — a fresh `IN PROGRESS` stamp under the ~90-minute watchdog window is exactly that tell, and this
 decision's only job is to stop the finished write from erasing it before the next run gets to see it.
 
+**Round 3 (PR #704 review): "no other's live" had no age threshold in `docs/REVIEWER-PROMPT.md` itself, only
+in this ADR's own aside above.** A run under STEP 0's own time pressure, comparing a genuinely live but
+long-running stamp (rule 4 sets no depth limit on a review) against nothing, could read it as dead and erase it
+— reproducing the very erasure this decision exists to close, through the disjunct round 2 added specifically
+to cover the unstamped case. STEP 1 now reads "no other's live (under ~90min old)" inline, so the number a run
+has to judge a stamp against is in the file it actually follows at runtime, not only in this record.
+
 This is alternative 1 of the three #460 proposed: the pulse names who holds it, cheaply, without a lock, a
 label or a slowed cadence.
 
