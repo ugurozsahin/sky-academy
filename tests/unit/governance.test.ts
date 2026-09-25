@@ -3554,16 +3554,17 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
   // a sentence from inside it and padding the dead zone before `s6()`'s own end anchor ('**Merge** — squash
   // into `main`') is invisible to the `min: 200` floor above, which only measures length. This pins `layer2`'s
   // own last sentence as the window's literal last content, the same fix, in this window's own home rather than
-  // folded into the #466 block that does not read this file's `layer2`.
+  // folded into the #466 block that does not read this file's `layer2`. Checked against `s6()` itself, not a
+  // second `slice()` call rebuilding `layer2` — `layer2` is `end: null`, so it is `s6()`'s own literal tail, and
+  // `attackEnd`/`bodyCheckEnd` below check their *section* (`s4()`/`s3()`) the same way, not `attack()`/`bodyCheck()`.
   const layer2End = '`docs/REVIEWER-PROMPT.md` STEP 2 already asks the first half of this '
     + '("still waiting?"); this is the other half (#326).';
   it('layer 2 ends where its own last sentence ends, not wherever §6 does', () => {
-    const layer2 = slice(s6(), 'layer 2', '**Re-read before you mark.**', null, 200);
     const count = (text: string, needle: string) => text.split(needle).length - 1;
-    expect(layer2.trim().endsWith(layer2End),
+    expect(s6().trim().endsWith(layer2End),
       'text appended after layer 2\'s own last sentence pads the floor above without tripping it')
       .toBe(true);
-    expect(count(layer2, layer2End),
+    expect(count(s6(), layer2End),
       'layer2End appears more than once — a duplicate pasted after filler would satisfy the endsWith check above '
       + 'while the filler still pads the size floor, the same gap PR #469 round 5 found for attack/bodyCheck')
       .toBe(1);
