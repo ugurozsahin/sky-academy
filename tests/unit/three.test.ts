@@ -3,7 +3,7 @@
  * stage's material factories in Node (three.js geometry and materials need no renderer), and the one key the
  * grown-ups screen writes and the mount reads without sharing a module.
  */
-import { BackSide, BoxGeometry, BufferGeometry, Color, HemisphereLight, InstancedMesh, LineSegments, Mesh, MeshToonMaterial, NearestFilter, Scene, SphereGeometry, Sprite } from 'three';
+import { BackSide, BoxGeometry, BufferGeometry, Color, HemisphereLight, InstancedMesh, LineSegments, Mesh, MeshBasicMaterial, MeshToonMaterial, NearestFilter, Scene, SphereGeometry, Sprite } from 'three';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setThreeSetting, threeSetting, THREE_SETTINGS } from '../../src/storage';
 import { BUDGET_CEILING, defaultsOf, defineObject, n, OBJECTS } from '../../src/three/objects';
@@ -246,6 +246,24 @@ describe('stage — the factories an object builds with', () => {
     expect(stage.outline(a).material).toBe(stage.outline(b).material);
     expect(hullsOf(a)).toHaveLength(1);
   });
+  // #717 only: the style probe renders the same object at several outline widths and tone counts so the owner
+  // can pick the stage's two constants. Omitted, both fall to the constants; one hull material per width.
+  it('toon and outline take an optional tone count and width for the style probe, defaulting to the constants (#717)', () => {
+    const stage = createStage('high', tokens);
+    expect(stage.toon('--accent').gradientMap).toBe(gradientMap(TONES));
+    expect(stage.toon('--accent', 2).gradientMap).toBe(gradientMap(2));
+    const a = new Mesh(new BoxGeometry(), stage.toon('--accent')), b = new Mesh(new BoxGeometry(), stage.toon('--accent'));
+    const c = new Mesh(new BoxGeometry(), stage.toon('--accent'));
+    const thick = stage.outline(a, 0.08);
+    expect(thick.material, 'the same width shares one hull material').toBe(stage.outline(b, 0.08).material);
+    expect(stage.outline(c).material, 'a different width is a different material').not.toBe(thick.material);
+    const shader = { uniforms: {} as Record<string, { value: unknown }>, vertexShader: '#include <begin_vertex>' };
+    (thick.material as MeshBasicMaterial).onBeforeCompile(shader as never, null as never);
+    expect(shader.uniforms.outlineWidth).toEqual({ value: 0.08 });
+    const plain = { uniforms: {} as Record<string, { value: unknown }>, vertexShader: '#include <begin_vertex>' };
+    (stage.outline(new Mesh(new BoxGeometry())).material as MeshBasicMaterial).onBeforeCompile(plain as never, null as never);
+    expect(plain.uniforms.outlineWidth).toEqual({ value: OUTLINE_WIDTH });
+  });
   it('measure counts triangles from the index and one draw call per material', () => {
     const stage = createStage('high', tokens);
     const root = new Mesh(new BoxGeometry(), stage.toon('--accent'));
@@ -271,8 +289,8 @@ describe('objects registry — the contract the first object builds to', () => {
     expect(() => n(3, 1, 2)).toThrow(/inside the range/);
     expect(defaultsOf({ a: n(1, 0, 2), b: n(5, 5, 9) })).toEqual({ a: 1, b: 5 });
   });
-  it('starts empty, under a ceiling the skill states', () => {
-    expect(OBJECTS).toEqual([]);
+  it('holds the style probe (#717), under a ceiling the skill states', () => {
+    expect(OBJECTS.map(o => o.name)).toEqual(['hammer']);
     expect(BUDGET_CEILING).toEqual({ triangles: 2000, drawCalls: 8 });
   });
   it('defineObject infers the schema, so a variant is a full parameter set at compile time and the spec comes back unchanged', () => {
