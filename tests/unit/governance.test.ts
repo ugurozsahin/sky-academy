@@ -3764,6 +3764,60 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     }
   };
 
+  /**
+   * #473: `loadBearing` drops a whole array element — `'guidance rather than'`, say — but every element here
+   * that carries its own `(?:a|b)` group has a second place to narrow, one level down, that no whole-element
+   * drop can see: `'rather than a (?:gate|bar)'` rewritten to `'rather than a bar'` is a different array
+   * element with the same length, and dropping the *element* never tries it. Reproduced against this file's
+   * own corpora before this rail existed: dropping `gate` from that group, `bar` from `'not a (?:gate|bar)'`,
+   * `es` from `merg(?:e|es|ed|ing)`, and `code under test` from the ADR002 blind-spot group all left every
+   * voice matched, with `loadBearing` itself still green, because none of those voices needed the branch that
+   * moved.
+   *
+   * So the same property as `loadBearing`, one level down: **narrow a term's own group by one branch, and
+   * some voice must stop matching.** `branchesOf` finds every `(?:a|b|…)` group in a term and returns one
+   * variant per branch removed; a term with no such group has nothing to narrow this way and yields nothing,
+   * which is why `loadBearing` above still owns whole-element removal.
+   *
+   * A character class is the same narrowing in a different spelling — `shares the fix['’]s blind spot`'s
+   * `['’]` is two single-character alternatives, not a `(?:a|b)` group, and pr-test-analyzer's review of this
+   * rail found the gap live: dropping the curly quote to leave `[']` passed every voice here. So the second
+   * loop below reads `[...]` the same way, one character at a time — `Array.from` rather than a plain split,
+   * so a multi-byte character like `’` narrows as one unit, not as the bytes it is made of.
+   */
+  const branchesOf = (term: string): string[] => {
+    const variants: string[] = [];
+    for (const m of term.matchAll(/\(\?:([^()]+)\)/g)) {
+      const alts = m[1].split('|');
+      if (alts.length < 2) continue;
+      for (let i = 0; i < alts.length; i++) {
+        const kept = `(?:${alts.filter((_, j) => j !== i).join('|')})`;
+        variants.push(term.slice(0, m.index) + kept + term.slice((m.index ?? 0) + m[0].length));
+      }
+    }
+    for (const m of term.matchAll(/\[([^\]]+)\]/g)) {
+      const chars = Array.from(m[1]);
+      if (chars.length < 2) continue;
+      for (let i = 0; i < chars.length; i++) {
+        const kept = `[${chars.filter((_, j) => j !== i).join('')}]`;
+        variants.push(term.slice(0, m.index) + kept + term.slice((m.index ?? 0) + m[0].length));
+      }
+    }
+    return variants;
+  };
+
+  const loadBearingBranches = (label: string, alternatives: readonly string[], voices: readonly string[],
+    build: (alts: readonly string[]) => RegExp) => {
+    for (const term of alternatives) {
+      for (const narrowedTerm of branchesOf(term)) {
+        const narrowed = build(alternatives.map((a) => (a === term ? narrowedTerm : a)));
+        expect(voices.some((v) => !narrowed.test(v)),
+          `${label}: narrowing "${term}" to "${narrowedTerm}" leaves every voice matched, so the branch is dead`)
+          .toBe(true);
+      }
+    }
+  };
+
   const PERMIT = Object.freeze(['may', 'can', 'could', 'are free to', 'is allowed to', 'welcome to', 'is fine',
     'nothing(?: here| in this file)? (?:stops|prevents)', 'no rule (?:stops|prevents)']);
   const ACTION = Object.freeze(['merg(?:e|es|ed|ing)', 'undraft(?:s|ed|ing)?', 'approv(?:e|es|ed|ing)',
@@ -3788,6 +3842,22 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     'A run could squash its own pull request when the three agents are quiet.',
     // Distance, on purpose: the gap bisected to 35 characters with every other voice still matched.
     'You may, once the three agents have all come back clean and CI is green on the head, merge it yourself.',
+    // #473: one voice per branch inside PERMIT's two grouped terms and ACTION's four conjugated terms, so
+    // narrowing a group internally — dropping "es" from `merg(?:e|es|ed|ing)`, say — is caught the same way
+    // dropping a whole term is.
+    'Nothing in this file stops you merging your own pull request once the agents are quiet.',
+    'Nothing prevents you merging your own pull request once the agents are quiet.',
+    'No rule stops you merging your own pull request once the agents are quiet.',
+    'Nothing stops a pull request that merges cleanly on its own before anyone reviews it.',
+    'Nothing stops a pull request that merged cleanly on its own before anyone reviewed it.',
+    'Nothing stops a bot that undrafts its own pull request once CI turns green.',
+    'Nothing stops a pull request that undrafted itself once CI turned green.',
+    'Nothing stops a reviewer bot that approves its own pull request once the checks pass.',
+    'Nothing stops a pull request that approved itself once the checks passed.',
+    'Nothing stops approving your own pull request once the agents are quiet.',
+    'Nothing stops a batch job that squashes your own pull request automatically.',
+    'Nothing stops a pull request that squashed itself once CI turned green.',
+    'Nothing stops squashing your own pull request once CI is green.',
   ]);
 
   const EXEMPTION_ALTERNATIVES = Object.freeze(['counsel of perfection', 'guidance rather than',
@@ -3807,6 +3877,9 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     'Reading the registry table is fine when driving it is slow.',
     'Skip the agents when the diff is under twenty lines.',
     'Skip the sweep on a one-line fix.',
+    // #473: the branch inside each of the two grouped terms the whole-element loop cannot reach.
+    'Treat the sweep as advice rather than a gate.',
+    'The sweep is not a bar to shipping quickly.',
   ]);
 
   /**
@@ -3884,10 +3957,11 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
 
     expect(stripped, '§4 must grant no time-, size- or effort-based way past the sweep or the agents')
       .not.toMatch(EXEMPTION);
-    expect(EXEMPTION_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(11);
+    expect(EXEMPTION_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(13);
     for (const voice of EXEMPTION_VOICES)
       expect(grants(`${section} ${voice}`), `the detector must catch: "${voice}"`).toMatch(EXEMPTION);
     loadBearing('EXEMPTION', EXEMPTION_ALTERNATIVES, EXEMPTION_VOICES, exemption);
+    loadBearingBranches('EXEMPTION', EXEMPTION_ALTERNATIVES, EXEMPTION_VOICES, exemption);
   });
 
   it('open-pr §4 grants no licence to merge your own pull request, however it is phrased', () => {
@@ -3896,7 +3970,7 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // a licence would be written — and §5's rail is scoped to `S(5)`, so it never looks here.
     expect(grants(section), 'no permission to merge, undraft, squash or approve may appear in this section')
       .not.toMatch(SELF_MERGE);
-    expect(SELF_MERGE_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(12);
+    expect(SELF_MERGE_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(25);
     for (const voice of SELF_MERGE_VOICES)
       expect(grants(`${section} ${voice}`), `the detector must catch: "${voice}"`).toMatch(SELF_MERGE);
     expect('You never review, mark or merge your own pull request.', 'a ban is not a licence')
@@ -3904,6 +3978,8 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
 
     loadBearing('SELF_MERGE permission', PERMIT, SELF_MERGE_VOICES, (alts) => selfMerge(alts));
     loadBearing('SELF_MERGE action', ACTION, SELF_MERGE_VOICES, (alts) => selfMerge(PERMIT, alts));
+    loadBearingBranches('SELF_MERGE permission', PERMIT, SELF_MERGE_VOICES, (alts) => selfMerge(alts));
+    loadBearingBranches('SELF_MERGE action', ACTION, SELF_MERGE_VOICES, (alts) => selfMerge(PERMIT, alts));
     // The gap is an alternative too: it bisected to 35 characters with every voice still matched.
     expect(SELF_MERGE_VOICES.some((v) => !selfMerge(PERMIT, ACTION, GAP - 20).test(v)),
       'no voice needs more than 60 characters between the permission and the action, so the gap is free to shrink')
@@ -4014,14 +4090,24 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       "A sweep that reads the same table the fix edits shares the fix's blind spot.",
       'Enumerate it by driving the real code, not by reading the lists.',
       'Enumerate the class before you push.',
+      // #473: the branch inside the blind-spot group and the two conjugations of "enumerate(?:s|d)?", which
+      // the whole-element loop below cannot reach.
+      'That is the blind spot of the code under test, not only of the author.',
+      'The rail enumerates the class before it runs.',
+      'The rail enumerated the class before this round.',
+      // pr-test-analyzer, reviewing this rail: `['’]` is a character class, not a `(?:a|b)` group, and
+      // narrowing it to `[']` (dropping the curly quote) passed every voice above — all of them use the
+      // straight quote. This is the curly-quote witness `branchesOf`'s character-class loop now needs.
+      "A sweep that reads the same table the fix edits shares the fix’s blind spot too.",
     ]);
-    expect(ADR002_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(6);
+    expect(ADR002_VOICES.length, 'an emptied corpus runs no assertions at all').toBe(10);
     expect(p, 'the reasoning belongs in the skill, not in a second copy here').not.toMatch(adr002());
     for (const restatement of ADR002_VOICES)
       expect(`${p} ${restatement}`, `the detector must catch: "${restatement}"`).toMatch(adr002());
     // Round 2, B4: five of this detector's six alternatives were freely removable — it had neither a length
     // guard nor a reverse loop, while the docstring claimed both detectors had them.
     loadBearing('ADR002', ADR002_ALTERNATIVES, ADR002_VOICES, adr002);
+    loadBearingBranches('ADR002', ADR002_ALTERNATIVES, ADR002_VOICES, adr002);
     // And the other side, which is why a bare `blind spot` was refused: ordinary prose must not trip it.
     for (const innocent of ['A reviewer has a blind spot for their own prose.', 'The class of 2026.'])
       expect(innocent, `the detector must stay quiet on: "${innocent}"`).not.toMatch(adr002());
