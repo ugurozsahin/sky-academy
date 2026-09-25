@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { shoot } from '../../scripts/sketch-shot.mjs';
 import { TIERS } from '../../src/three/stage/tiers';
+import { CATALOGUE, variantsOf } from '../../src/three/sketchbook/catalogue';
+
+/**
+ * The shot test renders every object × variant × tier, so its time grows with the catalogue: on CI's software
+ * GL a frame costs about 1.2 s (53.3 s for 44 frames on PR #738's run). A fixed 60 s ran out at 44 frames once
+ * PR #741 added the shadow and the gloss, so the limit follows the frame count, with room for a slow runner.
+ */
+export const SHOT_FRAMES = CATALOGUE.reduce((n, o) => n + variantsOf(o).length, 0) * Object.keys(TIERS).length;
+export const SHOT_MS_PER_FRAME = 3_000, SHOT_BASE_MS = 30_000;
 
 /**
  * #715: the sketchbook's tests, run as the `sketchbook` Playwright project against the same preview the game's
@@ -8,8 +17,10 @@ import { TIERS } from '../../src/three/stage/tiers';
  * pull-request leg does not pay for them. The first test IS the screenshot script (epic #713 decision 5).
  */
 test('every object × variant × tier renders a non-blank frame into docs/sketchbook (#715)', async ({ page, baseURL }) => {
+  test.setTimeout(SHOT_BASE_MS + SHOT_FRAMES * SHOT_MS_PER_FRAME);
   const { shots, blank, inks } = await shoot({ page, base: baseURL! });
   expect(shots.length, 'the placeholder alone is 3 variants × 2 tiers').toBeGreaterThanOrEqual(6);
+  expect(shots.length, 'the time limit is computed from the frames this test really shoots').toBe(SHOT_FRAMES);
   expect(blank, 'a blank frame means the stage drew nothing — the rig, the material or the outline is broken').toEqual([]);
   // Bounded from above too: a frame that is ALL ink means the background read is wrong (the corner sat on the
   // object, or the background stopped being flat), and the blank check could then never fire again.
