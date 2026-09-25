@@ -3,18 +3,7 @@ import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { workflowFiles } from './helpers/sources';
-
-const E2E_DIR = new URL('../../tests/e2e/', import.meta.url);
-/** Every `tests/e2e/*.spec.ts` file, name plus text — `readdirSync` throws rather than the vacuous []
- *  (`sources.ts`'s own rule, #417): a rail below asserting "at least one @smoke tag" must not pass because
- *  it read no files at all. `tests/sketch/` is a different `testDir` entirely (its own `sketchbook` project,
- *  not a dependency of `mobile`), so it is out of scope for a `--project=mobile` smoke run and not read here. */
-const e2eSpecFiles = (): { name: string; text: string }[] => {
-  const names = readdirSync(E2E_DIR).filter((f) => f.endsWith('.spec.ts'));
-  if (names.length === 0) throw new Error('no tests/e2e/*.spec.ts files found — the @smoke rail would pass vacuously');
-  return names.map((name) => ({ name, text: readFileSync(new URL(name, E2E_DIR), 'utf8') }));
-};
+import { e2eSpecFiles, workflowFiles } from './helpers/sources';
 
 /**
  * WORKFLOW RAILS (#321, split out of `guardrails.test.ts`) — everything that reads `.github/workflows/**`
@@ -331,6 +320,8 @@ describe('the @smoke e2e subset is non-empty and actually reachable by npm run t
     const out = execFileSync('npm', ['run', '--silent', 'test:e2e:smoke', '--', '--list'], {
       cwd: new URL('../../', import.meta.url),
       encoding: 'utf8',
+      timeout: 15_000,   // --list resolves in ~1s; a hang here (silent-failure-hunter, pr-test-analyzer,
+                          // PR #750 review) must fail loudly with a clear timeout, not stall the whole suite
     });
     const totalLine = out.match(/^Total:\s*(\d+)\s+tests?\s+in\s+(\d+)\s+files?/m);
     expect(totalLine, 'Playwright must report a "Total: N tests in M files" line, or nothing here can be trusted')
