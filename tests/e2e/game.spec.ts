@@ -2220,6 +2220,57 @@ test.describe('Sky Ninja Academy', () => {
     expect(rows[rows.length - 1].n, 'and the short row is the last one').toBe(cards % 4 || 4);
   });
 
+  /**
+   * #461: Memory Match's theme line matches `.duel-q .hint` and `#hint`'s `own` treatment (#295, #328) — a
+   * bare `.hint` is hidden on a landscape phone to buy card space, and `doubles`/`tables` mark themselves
+   * `own` because both faces are plain numeric text with nothing else on the board naming the operation
+   * that pairs them (`src/game/memory.ts`'s `hintIsData` comment).
+   *
+   * The control each time is `coins`, same year, same landscape phone: its faces are a coin and a value, so
+   * the two kinds are visibly different and the instruction is the ~40-topic case this rule buys space from.
+   *
+   * Both `doubles` (year1) and `tables` (year2) are covered, not just one (review round 1, note 2): they are
+   * structurally distinct exceptions — different hint text, different fact generation, 6 pairs against 8 —
+   * so `tables` marking `own` is a fact of its own, not something `doubles` passing can stand in for.
+   */
+  for (const { year, data, control } of [{ year: 'year1', data: 'doubles', control: 'coins' }, { year: 'year2', data: 'tables', control: 'coins' }] as const) {
+    test(`guard rail: a phone in landscape keeps the only statement of a ${data} board's matching rule (#461)`, async ({ page }) => {
+      const drawTheme = async (want: string) => {
+        let theme = '';
+        for (let tries = 0; tries < 60 && theme !== want; tries++) {
+          await page.click('#memory');
+          await expect(page.locator('.card').first()).toBeVisible();
+          theme = await page.evaluate(() => window.__sna.theme as string);
+          if (theme !== want) await page.click('#back');
+        }
+        expect(theme, `a ${want} board came up inside 60 draws`).toBe(want);
+      };
+      const readHint = () => page.evaluate(() => {
+        const el = document.querySelector('.memory .hint') as HTMLElement, r = el.getBoundingClientRect();
+        return { text: el.textContent ?? '', display: getComputedStyle(el).display, own: el.classList.contains('own'), height: r.height };
+      });
+
+      await seedPlayer(page, 'splash', 'Mia');
+      await page.click(`.island[data-year="${year}"]`);
+      await drawTheme(data);
+      await page.setViewportSize({ width: 844, height: 390 });
+      const seen = await readHint();
+      console.log(`[guard rail #461] ${data} landscape hint: display=${seen.display} h=${seen.height} own=${seen.own} "${seen.text}"`);
+      expect(seen.own, `${data} must mark its hint as the board's own matching rule`).toBe(true);
+      expect(seen.display, 'the short-screen rule hid the only statement of the matching rule').not.toBe('none');
+      expect(seen.height, 'the line is laid out, not collapsed to nothing').toBeGreaterThan(0);
+      await page.click('#back');
+
+      // The control: an ordinary instruction hint the board does not need to keep.
+      await drawTheme(control);
+      const plain = await readHint();
+      console.log(`[guard rail #461] ${control} landscape control: display=${plain.display} h=${plain.height} own=${plain.own} "${plain.text}"`);
+      expect(plain.own, 'an instruction hint must not be marked as the board\'s own').toBe(false);
+      expect(plain.display, 'the ordinary landscape board gave up its instruction line').toBe('none');
+      expect(plain.height, 'the hidden line still took layout space').toBe(0);
+    });
+  }
+
   // #138: the one test that still walks the whole cold start — avatar screen → intro (#67) → sky map → island
   // → play — so
   // the path every other test now seeds past keeps a test of its own, end to end and in order.

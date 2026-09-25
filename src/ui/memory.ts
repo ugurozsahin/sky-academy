@@ -38,7 +38,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     </div>
     <div class="qcard mem-head" id="qcard">
       <div class="qhead"><span class="pill">Memory Match</span><span class="ttl">${esc(o.year.title)} · ${esc(theme.title)}</span><button class="icon-btn speak" id="speak" aria-label="Hear the instructions">🔊</button></div>
-      <div class="hint">${esc(theme.hint)}</div>
+      <div class="hint${theme.hintIsData ? ' own' : ''}">${esc(theme.hint)}</div>
     </div>
     <div class="toast" id="toast" aria-live="polite"></div>
     <div class="cards" id="cards" style="--cols:${cols}" role="grid" aria-label="Memory cards">
