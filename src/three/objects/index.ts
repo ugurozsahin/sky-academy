@@ -5,9 +5,18 @@
  * it under its declared budget.
  */
 import { hammer } from './probe/hammer';
+import { cone } from './solids/cone';
+import { cube } from './solids/cube';
+import { cuboid } from './solids/cuboid';
+import { cylinder } from './solids/cylinder';
+import { pyramid } from './solids/pyramid';
+import { sphere } from './solids/sphere';
 import type { ObjectSpec } from './define';
 
 export * from './define';
 
 /** Every object the game or the sketchbook can build. Registered once, here. */
-export const OBJECTS: readonly ObjectSpec[] = [hammer];   // #717: the style probe, and after the owner's pick the sketchbook's reference piece
+export const OBJECTS: readonly ObjectSpec[] = [
+  hammer,   // #717: the style probe, now the sketchbook's reference piece
+  cube, cuboid, sphere, cylinder, cone, pyramid,   // #684: the 3-D Shapes solids, in `SHAPES_3D`'s own terms
+];
