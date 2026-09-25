@@ -3549,6 +3549,26 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
       .toMatch(/the wrong pull request, a stale head, and a finding whose evidence has evaporated/);
   });
 
+  // #493: `layer2` is bounded by `end: null`, the same open-tailed shape PR #469 round 4/5 found and fixed for
+  // `attack`/`bodyCheck` in the #466 block below — nothing pinned `layer2`'s own trailing sentence, so deleting
+  // a sentence from inside it and padding the dead zone before `s6()`'s own end anchor ('**Merge** — squash
+  // into `main`') is invisible to the `min: 200` floor above, which only measures length. This pins `layer2`'s
+  // own last sentence as the window's literal last content, the same fix, in this window's own home rather than
+  // folded into the #466 block that does not read this file's `layer2`.
+  const layer2End = '`docs/REVIEWER-PROMPT.md` STEP 2 already asks the first half of this '
+    + '("still waiting?"); this is the other half (#326).';
+  it('layer 2 ends where its own last sentence ends, not wherever §6 does', () => {
+    const layer2 = slice(s6(), 'layer 2', '**Re-read before you mark.**', null, 200);
+    const count = (text: string, needle: string) => text.split(needle).length - 1;
+    expect(layer2.trim().endsWith(layer2End),
+      'text appended after layer 2\'s own last sentence pads the floor above without tripping it')
+      .toBe(true);
+    expect(count(layer2, layer2End),
+      'layer2End appears more than once — a duplicate pasted after filler would satisfy the endsWith check above '
+      + 'while the filler still pads the size floor, the same gap PR #469 round 5 found for attack/bodyCheck')
+      .toBe(1);
+  });
+
   it('layer 3: the rule, the mechanism, all three reasons and the carve-out — inside §4', () => {
     const layer3 = slice(s4(), 'layer 3', '### Reviewing more than one: one review, one context',
       '**The delegation contract.**', 900);
