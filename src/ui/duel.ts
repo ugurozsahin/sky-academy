@@ -169,7 +169,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       // #375 round 1, B1: winning the LAST round settles the match here, ~1.45 s before `onMatchEnd` can fire
       // — `endWave` below and the `waveEnd` timer after it are both scope-bound, and `duel.ended` stays false
       // for the whole chain, so `#pause` is live and `dispose()` cancels whichever has not run. Commit now.
-      if (duel.onLastRound) commitOnce(duel.result());
+      if (duel.onLastRound) commitOrToast(duel.result());
       endWave(scaled(HOLD.won));
     },
     onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', scaled(HOLD.miss)); },
@@ -206,7 +206,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // removed the class before a frame painted and the verdict was never shown at all (#425 review). `HOLD.draw
     // + 100` so advancing does not ride on two equal timers firing in the order they happened to be queued.
     const drew = duel.settleDraw();
-    if (duel.onLastRound) commitOnce(duel.result());
+    if (duel.onLastRound) commitOrToast(duel.result());
     later(() => duel.waveEnd(), scaled(drew ? HOLD.draw + 100 : 450));
   };
   for (const p of PLAYERS) {
@@ -274,7 +274,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     if (!payout) throw new Error('Ninja Duel: the match was committed but its payout did not survive');
     return payout;
   };
-
+  const commitOrToast = (r: DuelResult) => { try { commitOnce(r); } catch (e) { console.error('duel commit failed', e); toast("Couldn't save the match", 'bad'); } };   // #508: a throw here must not block onRoundWon's/waveEnd's pacing code after it
   /**
    * Every write a finished match produces, committed the moment the match is settled (#375/#441).
    *

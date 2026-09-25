@@ -1239,6 +1239,42 @@ describe('guard rails', () => {
     expect(spec, 'the duel spec imports the constant').toContain("import { DUEL_TOAST_LONGEST } from '../../src/ui/duel'");
   });
 
+  // #508: `commitOnce` runs AHEAD of the pacing code that actually ends a duel round/wave (`endWave`, the
+  // `later(() => duel.waveEnd(), …)` after it) at its two early call sites — a throw from `commitMatch`'s
+  // load()/save() chain there must not also stop that pacing code from running, or a still-live match hangs
+  // forever with no overlay and no way out but the hardware back button. `commitOrToast` is the boundary;
+  // this rail is a text check that both early sites still go through it rather than the bare `commitOnce`,
+  // and that `commitOrToast` itself still catches rather than rethrowing. It cannot see a throw actually being
+  // swallowed at runtime (no jsdom here, `.claude/rules/guardrails.md`) — only that the shape is still there.
+  // duel.ts is at the #714 ratchet's line cap, which is why the fix below is one dense line, not several.
+  it('a throw from commitOnce at duel.ts\'s two early call sites cannot skip the pacing code after it (#508)', () => {
+    const src = SOURCES['/src/ui/duel.ts'] ?? '';
+    const body = code(src);
+    expect(body.length, 'duel.ts must be read, not a blank import').toBeGreaterThan(1000);
+    // The helper exists and does not let a throw escape.
+    const helper = /const commitOrToast = \(r: DuelResult\) => \{\s*try \{ commitOnce\(r\); \}\s*catch/.exec(body);
+    expect(helper, 'commitOrToast must try/catch commitOnce, not call it bare').not.toBeNull();
+    // Both early call sites (onRoundWon's, immediately before endWave; waveEnd's, immediately before the
+    // later() that arms duel.waveEnd()) go through the boundary, not the unguarded commitOnce.
+    expect(body, "onRoundWon's commit, right before endWave, must go through the boundary")
+      .toMatch(/if \(duel\.onLastRound\) commitOrToast\(duel\.result\(\)\);\s*endWave\(/);
+    expect(body, "waveEnd's commit, right before the later() that arms duel.waveEnd(), must go through the boundary")
+      .toMatch(/if \(duel\.onLastRound\) commitOrToast\(duel\.result\(\)\);\s*later\(\(\) => duel\.waveEnd\(\)/);
+    // onMatchEnd is deliberately exempt — it is the last of the three points and nothing runs after it that a
+    // throw could block, so it keeps calling commitOnce directly.
+    expect(body, 'onMatchEnd must still call commitOnce directly, not the boundary meant for the two early sites')
+      .toMatch(/onMatchEnd: r => \{ const p = commitOnce\(r\);/);
+    // The failure toast fits inside DUEL_TOAST_LONGEST like every other toast() in this file (#425) — checked
+    // again here directly, since the #425 rail above only scans literal toast( arguments and would not catch
+    // a call built from a variable.
+    const longest = /export const DUEL_TOAST_LONGEST = '([^']*)'/.exec(body)?.[1] ?? '';
+    expect(longest.length, 'DUEL_TOAST_LONGEST must be found').toBeGreaterThan(0);
+    const failToast = /catch \(e\) \{ console\.error\('duel commit failed', e\); toast\("([^"]*)"/.exec(body)?.[1] ?? '';
+    expect(failToast.length, 'the failure toast text must be found').toBeGreaterThan(0);
+    expect(failToast.length, `"${failToast}" is longer than DUEL_TOAST_LONGEST, so it would wrap and cost the arenas height (#425)`)
+      .toBeLessThanOrEqual(longest.length);
+  });
+
   /*
    * #436 round-1 review, B1 — `.cert-msg { color: var(--good); ... }` on its own is (0,1,0): one class. The
    * pre-existing `.modal p { margin: 4px 0 14px; color: var(--muted); ... }` is (0,1,1) — one class AND one
