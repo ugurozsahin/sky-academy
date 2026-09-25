@@ -490,8 +490,10 @@ describe('guard rails', () => {
     expect({ fn: from >= 0 && to > from }).toEqual({ fn: true });
     // Counting alone gave a new child a slot already holding a sibling's save, and onboarding merged over it.
     // `slotState(id) === 'empty'`, not `!holdsSave(id)`: the free-slot probe must also refuse a slot it can
-    // read but cannot parse, not only one it can read cleanly (#384 item 4).
-    expect(store.slice(from, to)).toMatch(/!idx\.ids\.includes\(id\) && slotState\(id\) === 'empty'/);
+    // read but cannot parse, not only one it can read cleanly (#384 item 4). `|| tombstoned.includes(id)`
+    // widens this on purpose (#431 review, item 4): a slot a delete has tombstoned is free even when a second
+    // tab's stale write leaves it looking like 'save'.
+    expect(store.slice(from, to)).toMatch(/!idx\.ids\.includes\(id\) && \(slotState\(id\) === 'empty' \|\| tombstoned\.includes\(id\)\)/);
   });
 
   // Incident 2026-09-06 (#27): the year union `'reception' | 'year1' | 'year2'` was retyped in four files
