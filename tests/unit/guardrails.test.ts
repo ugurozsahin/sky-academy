@@ -204,7 +204,9 @@ describe('guard rails', () => {
     expect(play).toMatch(/throwFor:\s*b\s*=>\s*b\.label\s*!==\s*BOMB/);
     const arena = code(SOURCES['/src/game/arena.ts']);
     expect(arena).toContain('this.throwFor ? this.throwFor(b) : true');   // the tap path consults it
-    expect(arena).toMatch(/if \(!b\.hit\) this\.cb\.onFall\(b\)/);      // a tapped bubble in flight is not a miss
+    // #742: the gentle-year branch sits inside the same `!b.hit` guard, so a tapped bubble in flight still
+    // never reaches onFall (nor becomes the deferred gentleTargetFallen) whichever path it takes.
+    expect(arena).toMatch(/if \(!b\.hit\) \{ if \(gentle\).*this\.cb\.onFall\(b\)/);
   });
 
   // CLAUDE.md: no dependencies without reason (Capacitor is the documented exception). A new one now has

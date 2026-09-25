@@ -1,5 +1,6 @@
 // Canvas arena: bubbles fly up from the bottom; the player taps or slices them.
 import { shuffle } from '../curriculum/util';   // uniform Fisher–Yates; `Math.random` is a valid Rng () => number (#42)
+import { gentleRelaunchSet } from './gentleRelaunch';   // #742: which bubbles a gentle relaunch brings back together
 import type { Rng } from '../curriculum/types';
 import { gameSpeed } from './speed';   // #32: test-only multiplier — divides flight time and stagger, never the clock
 export interface Bubble {
@@ -103,10 +104,8 @@ export class Arena {
   private strokeStale = false;                    // #331: a freeze happened since `lastPt` — the next move resumes the stroke, it does not continue it
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
   private orderedLabels: Set<string> = new Set();   // #591: this wave's required sequence labels — a re-launch candidate on fall, unlike a decoy
-  // #700: this wave's gentle-year single-relaunch target (a non-sequence question's answer), and whether
-  // its one free trip has already been spent — reset on every spawnWave, unlike `orderedLabels`' per-label
-  // `relaunches` count, because there is only ever one such label per wave and it gets exactly one trip.
-  private gentleTarget: string | undefined; private gentleUsed = false;
+  // #700: this wave's gentle-year single-relaunch target; #742 extends it — who it comes back WITH (gentleRelaunch.ts).
+  private gentleTarget: string | undefined; private gentleUsed = false; private gentleTargetFallen: Bubble | null = null; private gentleDecoys: Bubble[] = [];
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
   private pausedSince: number | null = null;       // #490: when the CURRENT pause began, so resuming can shift launchAt by its length
@@ -188,7 +187,7 @@ export class Arena {
     this.bubbles = []; this.shots = []; this.frozen = false;
     this.orderedWave = !!o.ordered?.length;         // #108: damp collisions so a sequence bubble is never stranded
     this.orderedLabels = new Set(o.ordered);        // #591: same set, for the fall re-launch below
-    this.gentleTarget = o.gentleTarget; this.gentleUsed = false;   // #700: a fresh single trip for this wave
+    this.gentleTarget = o.gentleTarget; this.gentleUsed = false; this.gentleTargetFallen = null; this.gentleDecoys = [];   // #700/#742: a fresh trip for this wave
     // #43: every number below — radius, air time, batching, each bubble's arc, colour and launch moment —
     // comes from the pure layoutWave() so it can be unit-tested without a canvas. All this method still does
     // is fit each label to the measured font (#28, needs the 2D context) and push the bubbles.
@@ -242,6 +241,7 @@ export class Arena {
     for (const b of this.bubbles) if (!b.dead) { b.dead = true; if (popColor && b.launched && !b.fade) this.burst(b.x, b.y, b.mark === 'good' ? GOOD : popColor, b.mark ? 14 : 6); }
     this.shots = [];                                // the question is over: a projectile still in the air is dropped (#48)
     this.frozen = false;
+    if (this.gentleTargetFallen) { this.cb.onFall(this.gentleTargetFallen); this.gentleTargetFallen = null; this.gentleDecoys = []; }   // #742: the round ended another way — report it now, don't drop it
     if (this.waveActive) { this.waveActive = false; this.cb.onWaveEnd(); }
   }
   /** Programmatic hit (tests / accessibility). */
@@ -403,17 +403,16 @@ export class Arena {
         // bubble launched into it, never by anything the child did — is re-launched rather than punished, up
         // to MAX_RELAUNCHES times. A decoy (not in `orderedLabels`) and an already-tapped bubble (`hit`, a shot
         // still on its way) fall through to the miss exactly as before.
-        // #700: a gentle year's non-sequence answer bubble gets the same free trip back up, but only once —
-        // `gentleUsed` rather than a counted `relaunches` budget, since there is exactly one such label per wave.
         const seqRelaunch = this.orderedLabels.has(b.label) && b.relaunches < MAX_RELAUNCHES;
-        const gentleRelaunch = !seqRelaunch && this.gentleTarget === b.label && !this.gentleUsed;
-        if (!b.hit && (seqRelaunch || gentleRelaunch)) {
-          if (seqRelaunch) b.relaunches++; else this.gentleUsed = true;
-          b.launched = false; b.launchAt = now + RELAUNCH_DELAY;
+        if (!b.hit && seqRelaunch) {
+          b.relaunches++; b.launched = false; b.launchAt = now + RELAUNCH_DELAY;
           b.x = b.ox; b.y = this.H + b.r; b.vx = b.ovx; b.vy = b.ovy;   // back on the launch line, its original arc — not a teleport into play
           live++; continue;
         }
-        b.dead = true; if (!b.hit) this.cb.onFall(b); continue;   // a tapped bubble with a shot on the way is not a miss
+        b.dead = true;
+        const gentle = !seqRelaunch && this.gentleTarget === b.label && !this.gentleUsed;   // #742: deferred to wave-end below, not a miss yet
+        if (!b.hit) { if (gentle) this.gentleTargetFallen = b; else { this.cb.onFall(b); if (this.gentleTarget !== undefined && !this.gentleUsed && b.label !== this.gentleTarget) this.gentleDecoys.push(b); } }
+        continue;
       }
       live++;
     }
@@ -422,7 +421,8 @@ export class Arena {
     // while nothing else can move it. `ordered` sequence waves bounce softly so a required label cannot be
     // knocked out of reach before its batch is up.
     if (!this.frozen) resolveCollisions(this.bubbles, { W: this.W, H: this.H, topInset: this.topInset }, this.orderedWave ? COLLIDE.damped : COLLIDE.bounce, this.clampCounts);
-    if (this.waveActive && live === 0) { this.waveActive = false; this.cb.onWaveEnd(); }
+    // #742: unless the answer fell un-hit this wave, in which case the free trip is a set (gentleRelaunch.ts).
+    if (this.waveActive && live === 0) { if (this.gentleTargetFallen) { this.gentleUsed = true; for (const b of gentleRelaunchSet(this.gentleTargetFallen, this.gentleDecoys, Math.random)) { b.dead = false; b.launched = false; b.launchAt = now + RELAUNCH_DELAY; b.x = b.ox; b.y = this.H + b.r; b.vx = b.ovx; b.vy = b.ovy; } this.gentleTargetFallen = null; this.gentleDecoys.length = 0; } else { this.waveActive = false; this.cb.onWaveEnd(); } }
     for (const s of this.shots) {                   // shots fly on even while the wave is frozen for the reveal
       if (s.t >= SHOT_FLIGHT) continue;             // already landed this frame; cull() takes it out below (#31)
       const p = shotPose(s.x0, s.y0, s.target.x, s.target.y, s.t += dt);

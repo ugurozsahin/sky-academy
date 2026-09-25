@@ -898,12 +898,49 @@ describe('#700: a gentle year\'s answer bubble gets one free trip back up, not m
     s.frame();
   }
 
-  it('relaunches the target once, then tallies the second fall as a miss', () => {
+  // #742: the answer bubble was the only one that ever came back, so a child who never guessed and just
+  // waited for the wave to fall could win by slicing whichever bubble returned. The free trip is still one
+  // label, one trip — but it now comes back inside a set with at least one decoy, decided once every
+  // bubble's fate for the wave is known (the point the wave would otherwise end), never as a lone tell.
+  it('does not resolve the target until the wave would otherwise end — other bubbles are still in the air', () => {
     sim = createSim({ seed: 11 });
     sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, gentleTarget: '1' });
+    forceDeparture(sim, '1');   // '2', '3', '4' are still queued or airborne
+    expect(sim.events.falls, 'the answer is not reported as a miss while its fate is still undecided').not.toContain('1');
+    expect(sim.drainWaveEnds(), 'nor is the wave over — a decision is still pending').toBe(0);
+    expect(sim.all().find(x => x.label === '1')!.dead, 'fallen, but not yet resolved either way').toBe(true);
+  });
 
+  it('relaunches the target together with at least one decoy once the wave would otherwise end', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, gentleTarget: '1' });
+    for (const label of ['1', '2', '3', '4']) forceDeparture(sim, label);   // every bubble falls un-hit
+
+    const revived = sim.all().filter(b => !b.dead && !b.launched);
+    expect(revived.map(b => b.label), 'the answer is always in the relaunched set').toContain('1');
+    expect(revived.length, 'the answer plus at least one decoy — never a lone tell').toBeGreaterThanOrEqual(2);
+    expect(revived.length, 'and never more than the answer plus the three decoys that fell').toBeLessThanOrEqual(4);
+    expect(sim.events.falls, 'the second departure only fires once the relaunched set itself falls again').not.toContain('1');
+  });
+
+  it('the relaunched set size varies run to run — a randomised size, not a fixed one', () => {
+    const sizes = new Set<number>();
+    for (let seed = 0; seed < 40; seed++) {
+      const s = createSim({ seed });
+      s.spawn({ labels: ['1', '2', '3', '4'], speed: 2, gentleTarget: '1' });
+      for (const label of ['1', '2', '3', '4']) forceDeparture(s, label);
+      sizes.add(s.all().filter(b => !b.dead && !b.launched).length);
+      s.destroy();
+    }
+    expect(sizes.size, 'at least two different set sizes across 40 seeds').toBeGreaterThan(1);
+    expect(Math.max(...sizes), 'the size can reach every decoy the wave had').toBe(4);
+  });
+
+  it('still relaunches the target alone when the wave has no decoy to bring with it', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1'], speed: 2, gentleTarget: '1' });   // nothing else on screen to keep live above zero
     forceDeparture(sim, '1');
-    expect(sim.events.falls, 'the first departure is a free trip, not a miss').not.toContain('1');
+    expect(sim.events.falls, 'the first departure is still a free trip, not a miss').not.toContain('1');
     const relaunched = sim.all().find(x => x.label === '1')!;
     expect(relaunched.dead, 'sent back up, not killed').toBe(false);
     expect(relaunched.launched, 'it waits below the floor, same as a sequence relaunch').toBe(false);
@@ -911,6 +948,20 @@ describe('#700: a gentle year\'s answer bubble gets one free trip back up, not m
     forceDeparture(sim, '1');
     expect(sim.events.falls, 'the second departure is the miss it is today').toContain('1');
     expect(sim.all().find(x => x.label === '1')!.dead).toBe(true);
+  });
+
+  // silent-failure-hunter review: the deferred decision only resolves inside update()'s live===0 branch — but
+  // a round can also end via a hit elsewhere (settle() → reveal() → clearWave(), on a real screen), before
+  // live ever reaches 0. Without this, the answer's own fall is neither reported as a miss nor ever relaunched.
+  it('reports the pending fall rather than dropping it when the round ends another way before it resolves', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, gentleTarget: '1' });
+    forceDeparture(sim, '1');   // '2', '3', '4' are still queued or airborne — the deferred decision is pending
+    expect(sim.events.falls).not.toContain('1');
+
+    sim.arena.clearWave();      // the round ends another way (a hit elsewhere, a screen teardown…)
+    expect(sim.events.falls, 'the pending fall must not be silently dropped').toContain('1');
+    expect(sim.drainWaveEnds()).toBe(1);
   });
 
   it('never relaunches without a gentleTarget — a non-gentle year\'s answer bubble falls on the first departure', () => {
@@ -927,6 +978,18 @@ describe('#700: a gentle year\'s answer bubble gets one free trip back up, not m
     forceDeparture(sim, '2');
     expect(sim.events.falls, 'a label that is not the gentleTarget is never re-launched').toContain('2');
     expect(sim.all().find(x => x.label === '2')!.dead).toBe(true);
+  });
+
+  it('a decoy already hit (a shot still in flight) crossing the bottom never joins the relaunch pool', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, gentleTarget: '1' });
+    advanceUntil(sim, () => { const b = sim!.all().find(x => x.label === '2'); return !!b && b.launched; }, '2 never launched');
+    sim.arena.hitLabel('2');   // a shot is thrown and still in flight — `2` is `hit` but not yet `dead`
+    const two = sim.all().find(x => x.label === '2')!;
+    two.y = sim.arena.H + two.r + 50; two.vy = 250;   // force it past the bottom before the shot lands
+    sim.frame();
+    for (const label of ['1', '3', '4']) forceDeparture(sim, label);
+    expect(sim.all().filter(b => !b.dead && !b.launched).map(b => b.label), 'a bubble with a shot on the way is not a miss, and not a decoy candidate either').not.toContain('2');
   });
 
   // `waveOptsFor` never sends both `ordered` and `gentleTarget` for the same label — a sequence question has
