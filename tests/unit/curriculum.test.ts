@@ -2249,6 +2249,12 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toMatch(/wordQ.*3 distractor candidates collapsed to 2 unique.*3 options/);
     warn.mockClear();
+    // Exactly 3 distinct, non-colliding candidates: nothing collapses, so this must stay silent. Without
+    // this case a `ds.length < 3` → `ds.length <= 3` mutant survives — every other case above has ds.length
+    // strictly below 3 either way, so none of them tell the two spellings apart (pr-test-analyzer review).
+    wordQ(r, 'Which shape?', 'square', ['circle', 'triangle', 'hexagon'], {});
+    expect(warn, 'exactly 3 unique, non-colliding decoys is not a collision').not.toHaveBeenCalled();
+    warn.mockClear();
     // writing.ts's punctuation cards deliberately pass the whole 3-mark universe including the answer
     // itself (`wordQ(rng, s, p, ['.', '?', '!'], …)`) and expect wordQ to filter it down to 2 real decoys —
     // by design, not a collision, since only 2 non-answer candidates were ever offered. Must stay silent.
