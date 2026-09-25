@@ -446,11 +446,12 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     // somewhere earlier — a sentence that mentions review agents in passing and then tells a run to fire
     // playwright immediately used to satisfy a bare indexOf ordering check (#500 round 1, B1).
     const agents = step2.indexOf('run the three vendored review agents on the diff');
-    // Either spelling of "run the suite" counts as the browser command, and the EARLIEST one is what
-    // matters — `npm run test:e2e` is CLAUDE.md's own documented alternative to `npx playwright test`, and a
-    // STEP 2 that warms the suite that way before the agents, then still says `playwright test` later to
-    // satisfy this anchor, reran the suite first exactly as before, just under its other name (#504).
-    const browser = step2.search(/playwright test|npm run test:e2e/);
+    // Any of these three spellings counts as the browser command, and the EARLIEST one is what matters —
+    // `npm run test:e2e` and `npm run test:all` (which runs it: package.json's own `test && build && test:e2e`)
+    // are both CLAUDE.md's own documented alternatives to `npx playwright test`, and a STEP 2 that warms the
+    // suite that way before the agents, then still says `playwright test` later to satisfy this anchor, reran
+    // the suite first exactly as before, just under another name (#504 round 1: test:e2e; round 2: test:all).
+    const browser = step2.search(/playwright test|npm run test:e2e|npm run test:all/);
     expect(agents, 'STEP 2 must tell a run to RUN the three vendored review agents on the diff, not merely mention agents in passing').toBeGreaterThan(-1);
     expect(browser, 'STEP 2 must still tell a run to run the suite before it merges — this is an ordering rail, not a deletion').toBeGreaterThan(-1);
     expect(browser, 'STEP 2 runs the suite before the agents again: about half of those runs are on a head the same review then invalidates (#499)')
@@ -477,10 +478,11 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     const parts = s2.split('```');
     const first = parts[1];
     expect(first, '§2 must still open with a runnable block').toBeTruthy();
-    // Either spelling of "run the suite" is a browser command here, not just "playwright" — `npm run
-    // test:e2e` is CLAUDE.md's own documented alternative, and it is exactly as much #499 restored (#504).
+    // Any of these three is a browser command here, not just "playwright" — `npm run test:e2e` and
+    // `npm run test:all` are both CLAUDE.md's own documented alternatives, and each is exactly as much #499
+    // restored (#504 round 1: test:e2e; round 2: test:all).
     expect(first, "§2's first block is what runs before the diff is read — it must be the seconds-long checks, not the suite (#499)")
-      .not.toMatch(/playwright|npm run test:e2e/);
+      .not.toMatch(/playwright|npm run test:e2e|npm run test:all/);
     expect(first, 'and it must still be the real cheap three, or the block has been gutted rather than reordered').toMatch(/npm test/);
     // Exactly two fenced command blocks, and the text BETWEEN them must be what governs the second one —
     // not merely "playwright" appearing somewhere later in §2. A §2 that puts the browser block straight
