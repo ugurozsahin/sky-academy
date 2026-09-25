@@ -2014,12 +2014,16 @@ describe('a hint is instruction text unless the generator says it is data (#328,
    * hint carrying a number that appears nowhere else on the card has nothing else to decide the card by, so
    * hiding it (an unmarked hint is hidden on a landscape phone, #328) makes the card unanswerable, whatever
    * shape the hint takes. The one false positive across the whole registry is "Slice the 3-D shape"
-   * (`y1-shapes3d`, `y2-shapes`) — the literal `3` in "3-D" — excluded by name rather than swept around.
+   * (`y1-shapes3d`, `y2-shapes`) — the literal `3` in "3-D" — excluded by its shape (`\d-D\b`), not by
+   * topic id: a future generator writing a genuine `<n>-D` measurement would need a different exclusion.
    */
   function carriesUnseenNumber(q: Question): boolean {
     const digits = (q.hint ?? '').replace(/\d-D\b/g, '').match(/\d+/g) ?? [];
     const elsewhere = `${q.prompt} ${q.options.join(' ')} ${q.visual ?? ''}`;
-    return digits.some(n => !elsewhere.includes(n));
+    // A plain substring check would call "12" seen because "112" is somewhere on the card — a real number,
+    // not the same one. Bound it on both sides so a hint's own value can only match itself (pr-test-analyzer
+    // review of this pull request, round 1).
+    return digits.some(n => !new RegExp(`(?<!\\d)${n}(?!\\d)`).test(elsewhere));
   }
 
   function sweep() {
