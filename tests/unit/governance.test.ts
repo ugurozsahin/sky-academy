@@ -4009,6 +4009,10 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/Enumerate it by driving the real code/);
     expect(s, 'and its prohibition, which is the half a softening drops first')
       .toMatch(/never by reading the lists the fix edits/);
+    // #498 (pr-test-analyzer): step 2's own instruction on *how* to drive the real code was
+    // unpinned, sitting between two sentences this issue's earlier round already pinned.
+    expect(s, 'step 2\'s concrete instruction, not only the ban on the shortcut either side of it')
+      .toMatch(/the shipped registry, the real generator, the real routes, with enough seeds to exhaust the draw/);
     expect(s, "and the reason it has to be driven: a derived rail shares the fix's blind spot")
       .toMatch(/shares the fix's blind spot/);
     expect(s, 'step 3 — the instruction, not only the worked example beside it')
@@ -4045,6 +4049,12 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/four blocking rounds/);
     expect(s, 'which is the whole point: the round cap cannot fix this, because no round was wrong')
       .toMatch(/Every one of those rounds was correct/);
+    // #498 (pr-test-analyzer): "correct" was pinned, but not the bar it was measured against, or
+    // what a round being correct actually means (one class member, not a wrong call reversed later).
+    expect(s, 'the bar those rounds were measured against, not only the verdict that they cleared it')
+      .toMatch(/met `review-pr` §7's bar/);
+    expect(s, 'what "correct" means here — a member of the class, not a call later reversed')
+      .toMatch(/how many members the class had/);
   });
 
   it('open-pr §4 concedes no exemption, in any of the voices one would be written in', () => {
