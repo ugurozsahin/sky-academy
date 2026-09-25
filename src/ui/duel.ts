@@ -169,7 +169,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       // #375 round 1, B1: winning the LAST round settles the match here, ~1.45 s before `onMatchEnd` can fire
       // — `endWave` below and the `waveEnd` timer after it are both scope-bound, and `duel.ended` stays false
       // for the whole chain, so `#pause` is live and `dispose()` cancels whichever has not run. Commit now.
-      if (duel.onLastRound) commitOrToast(duel.result());
+      if (duel.onLastRound) commitOnce(duel.result());
       endWave(scaled(HOLD.won));
     },
     onRoundMiss(player) { sfx.wrong(); toast(`Not quite, ${NAME[player]}!`, 'bad', scaled(HOLD.miss)); },
@@ -179,7 +179,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // Islands, or Android's hardware back — calls `scope.dispose()` and cancels the pending callback. When
     // every write lived inside it, a finished ten-round match paid the child nothing: no coins, no dojo move,
     // no accuracy, no certificate and no history row, with nothing to tell it from a match never played.
-    onMatchEnd: r => { const p = commitOnce(r); later(() => showResults(r, p), scaled(HOLD.won) + scaled(300)); },
+    onMatchEnd: r => { const p = commitOnce(r); if (p) later(() => showResults(r, p), scaled(HOLD.won) + scaled(300)); else hold(true, false); },
   });
 
   /** Freeze the wave while the winning answer is lit, then clear both arenas — each arena's onWaveEnd follows. */
@@ -206,7 +206,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // removed the class before a frame painted and the verdict was never shown at all (#425 review). `HOLD.draw
     // + 100` so advancing does not ride on two equal timers firing in the order they happened to be queued.
     const drew = duel.settleDraw();
-    if (duel.onLastRound) commitOrToast(duel.result());
+    if (duel.onLastRound) commitOnce(duel.result());
     later(() => duel.waveEnd(), scaled(drew ? HOLD.draw + 100 : 450));
   };
   for (const p of PLAYERS) {
@@ -255,26 +255,23 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
    * `waveEnd`'s ~450 ms) totalling ~1.45 s in which `duel.ended` is still false, so both arenas run, `#pause`
    * is live, and `cleanup()` → `scope.dispose()` cancels whichever timer has not fired yet.
    *
-   * **`onMatchEnd` is kept as the third caller knowing it never commits today** (#375 round 2, note 2). Every
-   * route to `Duel.end()` runs through `duel.waveEnd()`, whose only caller in `src/` is the `later()` directly
-   * below the `waveEnd` commit — so on a last round `payout` is always already set by the time it fires. It
-   * stays because the two early points are each guarded by `duel.onLastRound`, and a mutation to either guard
-   * would otherwise lose the payout entirely rather than merely commit it late. Do not read it as a live path.
+   * A `commitMatch` throw is caught here, not left to propagate (#508): every caller gets `null` back rather
+   * than an exception, `onMatchEnd`'s own `later()` included — the exact call `onRoundWon`'s/`waveEnd`'s own
+   * pacing code funnels back into once the match ends, so a throw reaching it uncaught reopened the same hang.
    *
    * Calling it early is safe because `Duel.result()` is final once the last round is settled — its own doc
    * has why nothing afterwards can move a field it reads.
    */
-  const commitOnce = (r: DuelResult): GameEndOutcome => {
-    // The flag is set BEFORE the call, not latched on its return (#375 round 2, note 3). `payout ??= …` would
-    // leave `payout` null if `commitMatch` threw partway through its load/save cycles, and the next commit
-    // point would then run the whole sequence again — double coins and a duplicate history row on top of the
-    // original failure. Committed-and-failed must read the same as committed.
-    if (!committed) { committed = true; payout = commitMatch(r); }
-    // Only reachable if a previous call threw: loud here beats a TypeError inside the overlay's destructure.
-    if (!payout) throw new Error('Ninja Duel: the match was committed but its payout did not survive');
+  const commitOnce = (r: DuelResult): GameEndOutcome | null => {
+    if (committed) return payout;
+    committed = true;
+    // The flag is set BEFORE commitMatch runs, not latched on its return (#375 round 2, note 3): a second
+    // caller must see `committed` true even if this attempt is about to fail, or it would re-run the whole
+    // sequence and double-pay. A throw is caught, not propagated (#508) — every caller gets `null` back.
+    try { payout = commitMatch(r); }
+    catch (e) { console.error('duel commit failed', r, e); toast("Couldn't save the match", 'bad'); }
     return payout;
   };
-  const commitOrToast = (r: DuelResult) => { try { commitOnce(r); } catch (e) { console.error('duel commit failed', e); toast("Couldn't save the match", 'bad'); } };   // #508: a throw here must not block onRoundWon's/waveEnd's pacing code after it
   /**
    * Every write a finished match produces, committed the moment the match is settled (#375/#441).
    *
