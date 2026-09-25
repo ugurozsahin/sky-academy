@@ -6,7 +6,7 @@ import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, DIGRAPHS, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
 import type { SentenceType } from '../../src/curriculum/writing';
-import { coinLabel, numQ, SHAPES_2D, SHAPES_3D, wordQ } from '../../src/curriculum/util';
+import { coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ } from '../../src/curriculum/util';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
 import { digraphBlocked, digraphFrames, digraphSpellings } from './helpers/digraph-gaps';
@@ -2188,6 +2188,33 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     expect(unexpectedlyBlind, 'these cells compare nothing and are not on the blind list — add them, with why').toEqual([]);
     expect(nowComparable, 'these cells now compare something — take them off the blind list').toEqual([]);
     expect(split, offenders.slice(0, 8).join('\n')).toBe(0);
+  });
+
+  /**
+   * The grouping check above can only speak where an option set recurs with two different answers — 49
+   * of 252 cells never do, `y1-coins` d3 among them (#482). This is the check of a different shape that
+   * issue promised: it pins the **intended** width against the table the design states ("options are
+   * words → bigger bubbles"), not against another drawn card, so it reaches every cell, blind ones
+   * included. It only holds because `wordQ` and `waveOptsFor` now share one rule (`wideFor`, #482) — before
+   * that, a card with `q.wide` set by `waveOptsFor`'s own `> 3` fallback but not by `wordQ`'s `> 2` would
+   * fail it, which is exactly the drift #482 closed. It also covers the two generators that hardcode
+   * `wide: true` (`y2Symmetry`'s yes/no card, `sentenceQ`'s word sequence): both currently agree with the
+   * table on every draw below, so this rail would go red the day either one stops.
+   */
+  it("every card's width matches the table the design states, blind cells included (#482)", () => {
+    let cards = 0;
+    const offenders: string[] = [];
+    for (const topic of BUBBLE_TOPICS) {
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        for (const q of draw(topic, d)) {
+          cards++;
+          const actual = widthOf(q), table = wideFor(q.options);
+          if (actual !== table) offenders.push(`${topic.id} d${d}: {${q.options.join(', ')}} is ${actual ? 'wide' : 'narrow'} on screen but the table says ${table ? 'wide' : 'narrow'}`);
+        }
+      }
+    }
+    expect(cards, 'the sweep drew nothing — this rail would pass vacuously').toBe(BUBBLE_TOPICS.length * 3 * DRAWS);
+    expect(offenders.slice(0, 8).join('\n'), `${offenders.length} card(s) disagree with the table`).toBe('');
   });
 
   it('wordQ widens on a long decoy, not only on a long answer', () => {

@@ -4,7 +4,6 @@
 // markup, overlays and test hooks. That object now lives here together with the small mutable state only it
 // touches — the outcome beat's `lastOutcome` / `revealUntil` / `waveId`, the mission segments, the font gate
 // and the previous life count — so play.ts keeps what the rest of the screen owns.
-//
 // This is wiring, not rules: every rule still comes from session.ts, modes.ts, hud.ts and the OUTCOME table
 // below, exactly as before the move. The pieces the screen builds *after* the session (the arena, the
 // `window.__sna` hooks) are read through the function-valued deps, so the order in play.ts is unchanged.
@@ -14,6 +13,7 @@ import type { Arena, WaveOpts } from '../game/arena';
 import type { DojoOutcome } from '../game/dojo';
 import { Session, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed';   // #32: test-only time compression
+import { wideFor } from '../curriculum/util';   // #482: the same wide-vs-narrow rule wordQ uses, not a second one
 import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
 import type { CertInfo } from './certificate';
 import { $, esc } from './dom';
@@ -39,7 +39,7 @@ export const BOMB = '💣';
  */
 export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, seqIndex: number, gentle?: boolean): WaveOpts {
   return {
-    labels: info.labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3),
+    labels: info.labels, speed: info.speed, wide: !!q.wide || wideFor(info.labels),
     ordered: q.sequence?.slice(seqIndex), gentleTarget: gentle && !q.sequence ? q.answer : undefined,
   };
 }
