@@ -1,7 +1,15 @@
-// The one module that imports three.js (#684). Reached only through `import()` from `src/ui/solid.ts`, so
-// Vite emits it as its own lazy chunk: the home screen and every non-3-D topic never download it. It imports
-// nothing from `src/` on purpose — `scripts/bundle-single.mjs` inlines this chunk as a self-contained data
-// URL, and a chunk that reached back into the main chunk could not be. A rail holds both properties.
+// The #684 spike's solids, moved here verbatim from `src/game/solids.ts` by #714 so that `three` is imported
+// under `src/three/` alone (`.claude/rules/three.md`). Reached only through `import()` from `src/ui/solid.ts`,
+// so Vite emits it as its own lazy chunk: the home screen and every non-3-D topic never download it. It
+// imports nothing from `src/` outside this tree on purpose — `scripts/bundle-single.mjs` inlines this chunk
+// as a self-contained data URL, and a chunk that reached back into the main chunk could not be. The rails
+// in `tests/unit/guardrails.test.ts` hold both properties.
+//
+// This is the spike's look, not the stage's: it builds its own Lambert materials and edge lines, and it is
+// not behind `threeEnabled()` (`./enabled.ts`), because it is on `main` today and #714 changes nothing a
+// child sees. #684 rebuilds the solids as stage objects through the sketchbook and mounts them behind the
+// flag; this file retires then. Until that, the build-time switch (`VITE_THREE=off`, read in `solid.ts`'s
+// loader) is the one layer of the flag that reaches it.
 //
 // Geometry is code, not files: every solid is a three.js primitive, coloured from the design-language tokens
 // read off `:root` at runtime (so no hex is written here and a palette change reaches the solids too).

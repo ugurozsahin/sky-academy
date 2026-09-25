@@ -50,10 +50,6 @@ const isLiteral = (p: string) => !/[*<>{}$]|(^|\/)NNN-[\w-]+\.md$|instructions-l
 const KNOWN_ABSENT: Record<string, string> = {
   'scripts/output/': 'named only to forbid it: qa-screenshot says never to save a screenshot there',
   'BACKLOG.md': 'retired (#218) — the decision records name it as history; no live instruction file may',
-  'src/three/': 'not yet: #714 creates it — drop this entry when it lands',
-  'src/three/stage/': 'not yet: #714 creates it — drop this entry when it lands',
-  'src/three/objects/': 'not yet: #714 creates it — drop this entry when it lands',
-  'src/three/mount/': 'not yet: #714 creates it — drop this entry when it lands',
   'src/three/sketchbook/': 'not yet: #715 creates it — drop this entry when it lands',
   'scripts/sketch-gallery.mjs': 'not yet: #715 creates it — drop this entry when it lands',
 };

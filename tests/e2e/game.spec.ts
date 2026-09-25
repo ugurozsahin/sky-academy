@@ -2347,6 +2347,25 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.map')).toBeVisible();
   });
 
+  // #714: the 3-D setting is a device-wide choice on the grown-ups screen. Nothing in the game mounts behind it
+  // yet (the #684 spike predates the flag), so this pins the control and the stored value, not a 3-D effect.
+  test('For grown-ups: the 3-D pictures control stores its choice on the device (#714)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    const pick = page.locator('.p-three-pick .tab');
+    await expect(pick).toHaveCount(3);
+    await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'true');     // Auto, the default
+    await pick.nth(2).click();                                              // Off
+    await expect(pick.nth(2)).toHaveClass(/\bon\b/);
+    await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'false');
+    expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBe('off');
+    await page.reload();
+    await openGrownUps(page);
+    await expect(page.locator('.p-three-pick .tab').nth(2)).toHaveAttribute('aria-checked', 'true');
+    await page.locator('.p-three-pick .tab').nth(0).click();                // back to Auto: the slot is cleared, not written
+    expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBeNull();
+  });
+
   // #64: reinstalling the APK wipes localStorage, so the grown-up needs a way to carry the save across.
   test('For grown-ups: the save code copies out and restores back (#64)', async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada');

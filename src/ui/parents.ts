@@ -1,6 +1,6 @@
 import { avatarOrNull } from '../avatars';
 import { TOPICS, YEARS } from '../curriculum';
-import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData } from '../storage';
+import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, setThreeSetting, STICKER_IDS, THREE_SETTINGS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
 import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
 import { $, $$, esc, render } from './dom';
@@ -155,7 +155,10 @@ function deleteConfirmHTML(name: string): string {
         </div>
       </div>`;
 }
-function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: readonly ProfileCard[] = profileCards()): string {
+/** The 3-D control's labels (#714). `Auto` is the default and the only one most grown-ups will ever see. */
+export const THREE_LABEL: Readonly<Record<ThreeSetting, string>> = { auto: 'Auto', on: 'On', off: 'Off' };
+
+function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: readonly ProfileCard[] = profileCards(), three: ThreeSetting = threeSetting()): string {
   const modeRows = sm.modes.map(m => `
     <tr><th scope="row">${esc(m.title)}</th><td>${m.endless}</td><td>${m.sprint}</td><td>${m.boss}</td><td>${m.memory}</td><td>${m.training}</td></tr>`).join('');
   const yearCards = sm.years.map(y => `
@@ -196,6 +199,14 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
     </table></div>
 
     ${profilesHtml(cards)}
+
+    <h3 class="p-h">3-D pictures</h3>
+    <div class="p-three">
+      <p class="p-three-say">Some shapes can be drawn as solid 3-D models. <b>Auto</b> turns them on when this device can manage it; <b>Off</b> keeps every picture flat.</p>
+      <div class="tabs p-three-pick" role="radiogroup" aria-label="3-D pictures">${THREE_SETTINGS.map(v =>
+        `<button class="tab${v === three ? ' on' : ''}" data-three="${v}" role="radio" aria-checked="${v === three}">${THREE_LABEL[v]}</button>`).join('')}</div>
+      <p class="p-three-msg" id="three-msg" role="status" hidden></p>
+    </div>
 
     <h3 class="p-h">Move to another device</h3>
     <div class="p-move">
@@ -339,6 +350,19 @@ export function parentsScreen(nav: Nav) {
     // never on the map with an empty profile (#115). "Undo" is the only way out of that state.
     $('#back').addEventListener('click', () => { sfx.tap(); if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else nav.map(); });
     wireMove(() => drawDash());
+    // #714: the 3-D setting. Patched in place rather than redrawn — nothing else on the screen reads it — and
+    // written through `src/storage.ts`; `src/three/mount/enabled.ts` reads it the next time a mount point asks.
+    // Painted from what the store holds after the write, never from the tap: a refused write (private mode, a
+    // full store) would otherwise show Off selected while the device stays on Auto (silent-failure review).
+    $$('button[data-three]').forEach(b => b.addEventListener('click', () => {
+      sfx.tap();
+      const stored = setThreeSetting(b.dataset.three as ThreeSetting);
+      const now = threeSetting();
+      $$('button[data-three]').forEach(o => { const on = o.dataset.three === now; o.classList.toggle('on', on); o.setAttribute('aria-checked', String(on)); });
+      const msg = $('#three-msg');
+      msg.hidden = stored;
+      if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so it stays on ${THREE_LABEL[now]}.`; }
+    }));
 
     const overlay = $('#reset-overlay');
     const closeOverlay = () => { overlay.hidden = true; overlay.innerHTML = ''; };

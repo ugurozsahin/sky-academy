@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { join, posix } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 import { stripHead } from '../../scripts/bundle-single.mjs';
@@ -8,6 +8,11 @@ import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins th
 import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
 import { SOURCES, inDir, code, workflow } from './helpers/sources';
 import { YEARS } from '../../src/curriculum/types';   // #392: the rail below holds docs/CURRICULUM.md's per-year headers to this table
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { BoxGeometry, Mesh } from 'three';   // #714: the budget meter's self-test below
+import { BUDGET_CEILING, defaultsOf, OBJECTS } from '../../src/three/objects';   // #714: the budget rail builds every registered object
+import { createStage, measure } from '../../src/three/stage';
 
 /**
  * The Fredoka weight axis the app actually serves, `[lo, hi]`, read from the @font-face rules in
@@ -199,28 +204,9 @@ describe('guard rails', () => {
     expect(Object.keys((pkg as { devDependencies?: object }).devDependencies ?? {}).sort()).toEqual([...allowed].sort());
   });
 
-  // #684: three.js is ~130 kB gzipped and does not tree-shake, so it must never reach the main chunk. Two
-  // properties keep it out, and a third keeps the single-file build honest:
-  //   1. exactly one module imports `three` — `src/game/solids.ts`;
-  //   2. that module is reached only through a dynamic `import()` (a `import type` is erased and is fine),
-  //      which is what makes Vite emit it as its own lazy chunk;
-  //   3. `solids.ts` imports nothing from `src/`, so its chunk is self-contained — `scripts/bundle-single.mjs`
-  //      inlines it as a data-URL module, which cannot reach back into the main chunk.
-  // Proved red: a static `import { SolidView } from '../game/solids'` in a scratch `src/` file fails (2);
-  // `import { Color } from 'three'` in `src/ui/solid.ts` fails (1); `import { $ } from '../ui/dom'` in
-  // solids.ts fails (3). Text rails, over `code()` (comments may name the ban): they see spellings, not the
-  // built output — the chunk sizes in the pull request body are the other half of the evidence.
-  it('three is imported by src/game/solids.ts alone, which is only ever loaded dynamically (#684)', () => {
-    const SOLIDS = '/src/game/solids.ts';
-    expect(SOURCES[SOLIDS], 'the module this rail is about must exist').toBeTruthy();
-    const threeImporters = Object.entries(SOURCES).filter(([, src]) => /\bfrom\s*['"]three['"]|\bimport\s*\(\s*['"]three['"]|\brequire\s*\(\s*['"]three['"]/.test(code(src))).map(([f]) => f);
-    expect(threeImporters).toEqual([SOLIDS]);
-    const staticSolids = Object.entries(SOURCES).filter(([f, src]) => f !== SOLIDS && /\bimport\s+(?!type\b)[^;()]*?\bfrom\s*['"][^'"]*\/solids['"]/.test(code(src))).map(([f]) => f);
-    expect(staticSolids, 'a static import of solids.ts pulls three into the main chunk').toEqual([]);
-    const dynamicSolids = Object.entries(SOURCES).filter(([f, src]) => f !== SOLIDS && /\bimport\s*\(\s*['"][^'"]*\/solids['"]\s*\)/.test(code(src))).map(([f]) => f);
-    expect(dynamicSolids, 'the one lazy loader').toEqual(['/src/ui/solid.ts']);
-    expect(code(SOURCES[SOLIDS]), 'solids.ts must not import from src/ — its chunk is inlined stand-alone by bundle-single.mjs').not.toMatch(/\bfrom\s*['"]\.{1,2}\//);
-  });
+  // #684/#714: where `three` may be imported, how it is reached and what the built chunks carry is the
+  // describe block at the end of this file — `three.js: the src/three/ tree, the flag and the bundle (#714)`.
+
 
   // #110/#699: `@capacitor/filesystem`/`@capacitor/share`/`@capacitor/app` exist only so `npx cap sync`
   // registers their native Android code; the web bundle must never import any of the three (that would ship
@@ -2628,4 +2614,163 @@ describe('docs/CURRICULUM.md\'s per-year headers match YEARS (#392)', () => {
         .toBe(year.lives);
     });
   }
+});
+
+/*
+ * #714 — three.js stays inside its own tree, behind the flag, and out of the main chunk (epic #713 decisions
+ * 2 and 3; `.claude/rules/three.md` is the rule's home). The module-graph rails read specifiers and RESOLVE
+ * them from the importing file's directory, the way the bundler does, rather than matching spellings — every
+ * spelling of a path is the same edge. The chunk rails run a real `vite build` twice, because the module
+ * graph is a claim about the source and the chunk is what a child's tablet downloads.
+ */
+describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => {
+  const THREE_DIR = '/src/three/', MOUNT_DIR = '/src/three/mount/', OBJECTS_DIR = '/src/three/objects/';
+  interface Edge { from: string; spec: string; to: string; kind: 'static' | 'type' | 'dynamic' | 'require' }
+  /** Every literal import edge out of `path`: the specifier as written, and where it resolves to. */
+  const edges = (path: string, src: string): Edge[] => {
+    const c = code(src), out: Edge[] = [];
+    const to = (spec: string) => spec.startsWith('.') ? posix.resolve(posix.dirname(path), spec) : spec;
+    for (const m of c.matchAll(/(typeof\s*)?\bimport\s*\(\s*['"`]([^'"`\n]+)['"`]\s*\)/g)) out.push({ from: path, spec: m[2], to: to(m[2]), kind: m[1] ? 'type' : 'dynamic' });   // `typeof import('x')` is a type position, erased like `import type`
+    for (const m of c.matchAll(/\b(?:import|export)\s+(type\s+)?(?:[^;'"`(]*?\bfrom\s*)?['"`]([^'"`\n]+)['"`]/g)) out.push({ from: path, spec: m[2], to: to(m[2]), kind: m[1] ? 'type' : 'static' });
+    for (const m of c.matchAll(/\brequire\s*\(\s*['"`]([^'"`\n]+)['"`]\s*\)/g)) out.push({ from: path, spec: m[1], to: to(m[1]), kind: 'require' });
+    // `import.meta.glob('../three/stage/*.ts')` is an import Vite resolves and bundles too (pr-test-analyzer).
+    for (const m of c.matchAll(/\bimport\.meta\.glob\s*\(\s*['"`]([^'"`\n]+)['"`]/g)) out.push({ from: path, spec: m[1], to: to(m[1]), kind: 'static' });
+    return out;
+  };
+  const all = Object.entries(SOURCES).flatMap(([p, s]) => edges(p, s));
+  const isThree = (spec: string) => spec === 'three' || spec.startsWith('three/');
+
+  it('the edge reader resolves every spelling of a path to one module, and sees the four kinds of import', () => {
+    const src = "import { a } from '../ui/dom'; import type { B } from './../ui/x'; import('../../src/ui/lazy'); export { c } from '/src/ui/abs'; const r = require('three'); type T = typeof import('./../ui/t'); const g = import.meta.glob('../three/stage/*.ts');";
+    expect(edges('/src/game/f.ts', src)).toEqual([
+      { from: '/src/game/f.ts', spec: '../../src/ui/lazy', to: '/src/ui/lazy', kind: 'dynamic' },
+      { from: '/src/game/f.ts', spec: './../ui/t', to: '/src/ui/t', kind: 'type' },
+      { from: '/src/game/f.ts', spec: '../ui/dom', to: '/src/ui/dom', kind: 'static' },
+      { from: '/src/game/f.ts', spec: './../ui/x', to: '/src/ui/x', kind: 'type' },
+      { from: '/src/game/f.ts', spec: '/src/ui/abs', to: '/src/ui/abs', kind: 'static' },
+      { from: '/src/game/f.ts', spec: 'three', to: 'three', kind: 'require' },
+      { from: '/src/game/f.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' },
+    ]);
+    expect(all.length, 'the reader must see the real tree').toBeGreaterThan(100);
+  });
+
+  // (a) Proved red: `import { Color } from 'three'` in a scratch `src/ui/x.ts` fails.
+  it('three is imported only under src/three/', () => {
+    const importers = [...new Set(all.filter(e => isThree(e.spec)).map(e => e.from))].sort();
+    expect(importers.length, 'nothing imports three at all — the rail would be vacuous').toBeGreaterThan(0);
+    expect(importers, 'the spike renderer is the one three importer the game reaches today').toContain('/src/three/mount/solids.ts');
+    expect(importers.filter(f => !f.startsWith(THREE_DIR)), 'three is imported outside src/three/').toEqual([]);
+  });
+
+  // (b) Proved red: a static `import { SolidView } from '../three/mount/solids'` in src/ui/solid.ts fails, and so
+  // does `import('../three/stage/rig')` from a scratch file under src/ui/.
+  it('src/ outside the tree reaches src/three/ only through src/three/mount/, and only by a dynamic import()', () => {
+    const inbound = all.filter(e => !e.from.startsWith(THREE_DIR) && e.to.startsWith(THREE_DIR) && e.kind !== 'type');
+    const bad = inbound.filter(e => e.kind !== 'dynamic' || !e.to.startsWith(MOUNT_DIR));
+    expect(bad, 'a static import pulls three into the main chunk; a reach past mount/ bypasses the flag').toEqual([]);
+    expect(inbound.map(e => `${e.from} → ${e.to}`), 'the one lazy loader today (#684)').toEqual(['/src/ui/solid.ts → /src/three/mount/solids']);
+  });
+
+  // (c) Proved red: `import { $ } from '../../ui/dom'` in src/three/stage/rig.ts fails. Stronger than the epic's
+  // "objects and stage never import src/ui or src/game" because scripts/bundle-single.mjs needs it: every module
+  // under src/three/ is reached lazily and becomes its own chunk, and a chunk that imports the main chunk cannot
+  // be inlined as a data URL. `import type` is erased and allowed.
+  it('nothing under src/three/ imports anything under src/ outside src/three/', () => {
+    const out = all.filter(e => e.from.startsWith(THREE_DIR) && e.to.startsWith('/src/') && !e.to.startsWith(THREE_DIR) && e.kind !== 'type');
+    expect(out.map(e => `${e.from} → ${e.spec}`)).toEqual([]);
+  });
+
+  // (d) 250 lines is the cap, not the target (`.claude/rules/three.md`): split by part and assembly.
+  it('no file under src/three/ is longer than 250 lines', () => {
+    const files = inDir(THREE_DIR);
+    expect(files.map(([f]) => f).sort()).toEqual(expect.arrayContaining(['/src/three/mount/enabled.ts', '/src/three/stage/rig.ts', '/src/three/objects/index.ts']));
+    for (const [f, src] of files) expect(src.split('\n').length, `${f} is over the 250-line cap`).toBeLessThanOrEqual(251);
+  });
+
+  // (e) The ratchet (epic #713 decision 3): the game's largest files, at their length the day this landed, and
+  // none may grow. A budget rail — a number here only ever goes DOWN (`.claude/rules/guardrails.md`). Every
+  // `src/` file of 300 lines or more on 2026-09-25, counted as `wc -l` counts, newlines.
+  const RATCHET: Record<string, number> = {
+    'src/style.css': 1878, 'src/storage.ts': 1511, 'src/game/arena.ts': 1102, 'src/curriculum/maths.ts': 993,
+    'src/curriculum/writing.ts': 701, 'src/ui/duel.ts': 508, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
+    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 365, 'src/ui/certificate.ts': 341, 'src/audio.ts': 311,
+  };
+  it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
+    const text = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');   // throws if the file moved: the table cannot rot
+    expect((text.match(/\n/g) ?? []).length).toBeLessThanOrEqual(cap);
+  });
+
+  // (h) The stage owns the look (decision record 010, Consequences): an object asks `stage.toon()` and
+  // `stage.outline()` and never constructs a material or a light. Text rail over the objects tree; `inDir`
+  // throws if the folder is missing, so an empty registry still reads its index.
+  const NEW_MATERIAL = /\bnew\s+\w*Material\b/, NEW_LIGHT = /\bnew\s+\w*Light\b/;
+  it('nothing under src/three/objects/ constructs a Material or a Light', () => {
+    // The folder holds only its index today, so the two patterns have never matched a real file: prove them on
+    // a fixture first, or a typo in either would go unnoticed until the first object lands (pr-test-analyzer).
+    expect('new MeshToonMaterial({})').toMatch(NEW_MATERIAL); expect('new DirectionalLight()').toMatch(NEW_LIGHT);
+    expect('stage.toon("--accent"); stage.outline(m); const light = 1;').not.toMatch(NEW_MATERIAL);
+    expect('stage.toon("--accent"); stage.outline(m); const light = 1;').not.toMatch(NEW_LIGHT);
+    for (const [f, src] of inDir(OBJECTS_DIR)) {
+      expect(code(src), `${f}: materials come from the stage`).not.toMatch(NEW_MATERIAL);
+      expect(code(src), `${f}: the rig has the only lights`).not.toMatch(NEW_LIGHT);
+    }
+    // And no back door: `toonMaterial(colour, 5)` or `outlineMaterial(ink, 0.2)` imported from the stage's own
+    // modules would let one object choose its own tone count or width. An object reaches the stage only
+    // through the `Stage` value `build` receives; a type import is all it may take from the folder.
+    const back = all.filter(e => e.from.startsWith(OBJECTS_DIR) && e.to.startsWith('/src/three/stage') && e.kind !== 'type');
+    expect(back.map(e => `${e.from} → ${e.spec}`), 'an object imports the stage as a value').toEqual([]);
+  });
+
+  // (i) Every registered object under its declared budget at the `high` tier (`three-art` §3), on a headless
+  // stage — three.js geometry and materials need no renderer. The meter is proved on a known mesh first, so
+  // an empty registry (today) cannot make the rail vacuous: a wrong meter fails here before any object lands.
+  it('the budget meter counts a box with its outline as 24 triangles and 2 draw calls', () => {
+    const stage = createStage('high', () => '#0d1226');
+    const box = new Mesh(new BoxGeometry(1, 1, 1), stage.toon('--accent'));
+    stage.outline(box);
+    expect(measure(box)).toEqual({ triangles: 24, drawCalls: 2 });
+  });
+  it.each(OBJECTS.map(o => [o.name, o] as const))('%s is built under its declared budget at the high tier, defaults and every variant', (_, o) => {
+    expect(o.budget.triangles).toBeLessThanOrEqual(BUDGET_CEILING.triangles);
+    expect(o.budget.drawCalls).toBeLessThanOrEqual(BUDGET_CEILING.drawCalls);
+    // The gallery renders every variant (`three-art` §4), so every variant is measured, not only the defaults —
+    // and each value must sit inside its parameter's range, which `n()` guards for the default alone.
+    for (const [name, p] of [['default', defaultsOf(o.params)] as const, ...Object.entries(o.variants)]) {
+      expect(Object.keys(p).sort(), `variant ${name} must be a full parameter set`).toEqual(Object.keys(o.params).sort());
+      for (const [k, v] of Object.entries(p)) expect(v >= o.params[k].min && v <= o.params[k].max, `${name}.${k} = ${v} is outside [${o.params[k].min}, ${o.params[k].max}]`).toBe(true);
+      const m = measure(o.build(p, createStage('high', () => '#0d1226')));
+      expect(m.triangles, `${name}: triangles`).toBeLessThanOrEqual(o.budget.triangles);
+      expect(m.drawCalls, `${name}: draw calls`).toBeLessThanOrEqual(o.budget.drawCalls);
+    }
+  });
+
+  // (f) and (g): the chunks. `__THREE__` is the global three.js's entry sets on load and `THREE.` prefixes its
+  // own warnings — hundreds of them in the library, none in this code base — so a chunk carrying either is a
+  // chunk carrying three. Built into a temp folder, never `dist/` (shared with the e2e preview, #136).
+  describe('the built chunks', () => {
+    const SIGNATURE = /__THREE__|\bTHREE\.[A-Z]\w+/;
+    // `--logLevel error`, not `silent`: Vite's CLI prints a build error through its logger and exits 1, so at
+    // `silent` a red run here would say only "Command failed" — in CI, where nobody can re-run it by hand.
+    const build = (env: Record<string, string>) => {
+      const out = mkdtempSync(join(tmpdir(), 'sna-three-'));
+      try {
+        execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--outDir', out, '--emptyOutDir', '--logLevel', 'error'], { env: { ...process.env, ...env }, stdio: 'pipe' });
+        const html = readFileSync(join(out, 'index.html'), 'utf8');
+        const entry = /<script[^>]*src="\/assets\/([^"]+\.js)"/.exec(html)?.[1];
+        const chunks = readdirSync(join(out, 'assets')).filter(f => f.endsWith('.js')).map(f => ({ name: f, three: SIGNATURE.test(readFileSync(join(out, 'assets', f), 'utf8')) }));
+        return { entry, chunks };
+      } finally { rmSync(out, { recursive: true, force: true }); }
+    };
+    it('the default build keeps three.js out of the main chunk, in exactly one lazy chunk', () => {
+      const { entry, chunks } = build({ VITE_THREE: '' });
+      expect(entry, 'index.html must load one entry script').toBeTruthy();
+      expect(chunks.filter(c => c.three).map(c => c.name.replace(/-[\w-]+\.js$/, '')), 'the signature must find the three chunk, or it proves nothing').toEqual(['solids']);
+      expect(chunks.find(c => c.name === entry)?.three, 'three.js code in the main chunk').toBe(false);
+    }, 60_000);
+    it('a VITE_THREE=off build has no three.js chunk at all', () => {
+      const { entry, chunks } = build({ VITE_THREE: 'off' });
+      expect(chunks.map(c => c.name), 'the kill switch must fold the import() away, leaving only the entry').toEqual([entry]);
+      expect(chunks[0].three).toBe(false);
+    }, 60_000);
+  });
 });

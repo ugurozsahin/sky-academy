@@ -160,6 +160,27 @@ interface ProfileIndex { v: 1; active: ProfileId; ids: readonly ProfileId[] }
 
 const isProfileId = (x: unknown): x is ProfileId => typeof x === 'string' && (PROFILE_IDS as readonly string[]).includes(x);
 const readItem = (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } };
+
+/* ─── 3-D: the grown-ups' setting (#714) ───────────────────────────────────────────────────────────────────
+ * Device-wide, not part of a profile's save: it answers "can this tablet manage 3-D", so it survives a profile
+ * switch and a `reset()`, and it is not in the save code. The key is spelt again in
+ * `src/three/mount/enabled.ts`, which reads it without importing this module (its chunk must reach back into
+ * nothing — the comment there says why; the type is imported from here); `tests/unit/three.test.ts` pins the two
+ * spellings equal. */
+export type ThreeSetting = 'auto' | 'on' | 'off';
+const THREE_KEY = 'sna:three';
+export const THREE_SETTINGS: readonly ThreeSetting[] = ['auto', 'on', 'off'];
+export function threeSetting(): ThreeSetting {
+  const raw = readItem(THREE_KEY);
+  return raw === 'on' || raw === 'off' ? raw : 'auto';
+}
+/** `auto` is the default, so it is stored as the absence of a value rather than a third spelling. Returns whether
+ *  the store now holds `v`: a refused write (private mode, quota) leaves the device on its previous answer, and
+ *  the control that asked must paint that answer, not the tap (silent-failure review of #714). */
+export function setThreeSetting(v: ThreeSetting): boolean {
+  try { if (v === 'auto') localStorage.removeItem(THREE_KEY); else localStorage.setItem(THREE_KEY, v); } catch { /* fall through to the read */ }
+  return threeSetting() === v;
+}
 /** The stored index, or null when there is none, it is not ours, or it is not self-consistent. Deliberately
  *  strict: our `v`, and `ids` must be distinct known slots containing `active`. */
 function readIndex(): ProfileIndex | null {
