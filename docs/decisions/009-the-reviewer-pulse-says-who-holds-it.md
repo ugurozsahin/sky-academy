@@ -97,26 +97,33 @@ the comparison is keyed on the header actually being an `IN PROGRESS:` stamp, no
 finished write of any shape (`nothing waiting`, `stopped: limit`, or a finished snapshot) never counts as
 "another's live" regardless of its age.
 
-**Round 5 (PR #704 review, round 5): the ~90-minute age threshold round 3 gave the shape check round 4 added is**
-**itself unsafe, because rule 4 sets no depth limit on a review and #460's own evidence records a real review**
-**spanning close to two hours.** A run genuinely still reviewing a pull request past 90 minutes is permitted
-behaviour, not a bug — and a second run reaching STEP 0's `stopped: limit` write before it has stamped anything
-of its own has no way to tell that apart from a stamp abandoned 90 minutes ago. Read literally, it erases the
-live run's header anyway, reproducing this decision's own opening failure through the one clause meant to close
-it. The number was borrowed from `docs/WATCHDOG-PROMPT.md`'s own threshold for *flagging* a stuck `IN PROGRESS`
-stamp as a finding for a human to look at — a use where a false positive costs nothing, since a person just
-checks and moves on. Reused here to decide whether to *overwrite shared state autonomously*, the same false
-positive is irreversible: the live run's header is gone before it ever gets to finish. No larger number closes
-this the same way a raise closed round 4's gap, because rule 4's "no time box on depth" means no finite age is
-ever provably safe — only a genuinely dead run's stamp should ever be treated as not-live, and age cannot tell
-the two apart. So age drops out of the comparison entirely: **an `IN PROGRESS:` stamp that is not this run's own
-is always treated as live, whatever its age**, and only ever appended to, never replaced. A header that is not
-an `IN PROGRESS:` stamp at all (round 4's shape check, unchanged) still replaces normally — the ordinary
-single-session hourly case keeps advancing exactly as round 4 fixed it. The cost, named plainly rather than
-argued away: a run that genuinely dies mid-review, with no clean shutdown, now leaves a stamp that no later
-write ever replaces — but `docs/WATCHDOG-PROMPT.md`'s own ~90-minute check already exists to surface exactly
-that shape as a finding for the owner, which is the same "report it, do not guess why it stopped" split the
-watchdog already draws for every other abnormal pulse shape it reads.
+**Round 5 (PR #704 review, round 5, then a live owner session the same day): the ~90-minute age threshold**
+**round 3 gave the shape check round 4 added is too tight, because rule 4 sets no depth limit on a review and**
+**#460's own evidence records a real review spanning close to two hours.** A run genuinely still reviewing a
+pull request past 90 minutes is permitted behaviour, not a bug — and a second run reaching STEP 0's
+`stopped: limit` write before it has stamped anything of its own has no way to tell that apart from a stamp
+abandoned 90 minutes ago. Read literally, it erases the live run's header anyway, reproducing this decision's
+own opening failure through the one clause meant to close it. The number was borrowed from
+`docs/WATCHDOG-PROMPT.md`'s own threshold for *flagging* a stuck `IN PROGRESS` stamp as a finding for a human to
+look at — a use where a false positive costs nothing, since a person just checks and moves on. Reused here to
+decide whether to *overwrite shared state autonomously*, the same false positive is irreversible: the live run's
+header is gone before it ever gets to finish.
+
+An automated review round's own first fix for this dropped age from the comparison entirely — treating another
+run's `IN PROGRESS:` stamp as always live, regardless of age, and only ever appended to — reasoning that no
+finite age is ever *provably* safe given rule 4's "no time box on depth." Put to the owner directly in the same
+session: that traded a rare, never-observed risk (a live review outlasting the threshold at the exact moment a
+second run hits `stopped: limit` with no stamp of its own) for a certain, common one — a run that genuinely dies
+mid-review, with no clean shutdown, would then leave a stamp nothing ever replaces again, requiring manual
+intervention every time rather than the ordinary hourly cadence eventually recovering on its own. The owner's
+call: keep the recovery property, raise the number instead of removing it — **150 minutes**, comfortably above
+the ~115-minute duration #460's evidence actually recorded, revisit if a real case is ever hit. So the
+comparison keeps an age term: **an `IN PROGRESS:` stamp that is not this run's own is live under ~150 minutes
+old** — append instead of replacing — **and no longer live past that** — replaces normally, the same as a
+header that is not an `IN PROGRESS:` stamp at all (round 4's shape check, unchanged). The ordinary single-session
+hourly case keeps advancing exactly as round 4 fixed it, and a genuinely dead run's stamp still recovers on its
+own within 150 minutes rather than needing a human to notice `docs/WATCHDOG-PROMPT.md`'s stuck-`IN PROGRESS`
+finding and act on it.
 
 This is alternative 1 of the three #460 proposed: the pulse names who holds it, cheaply, without a lock, a
 label or a slowed cadence.
@@ -163,10 +170,11 @@ label or a slowed cadence.
   comparison happened, the same limit #460 itself names for its own claim comment ("not airtight"). This is a
   prose discipline, not a lock; a genuinely airtight version would need the pulse issue itself to carry a
   compare-and-swap primitive GitHub's API does not offer.
-- **New in round 5:** a run that dies mid-review with no clean shutdown now leaves an `IN PROGRESS:` stamp that
-  no later reviewer run ever replaces — age no longer qualifies it for a takeover, on purpose, since no age
-  could safely tell that apart from a review still legitimately in progress. Recovery is `docs/WATCHDOG-PROMPT.md`'s
-  own ~90-minute stuck-`IN PROGRESS` check, which already exists to flag exactly this shape as a finding for the
-  owner — this decision no longer also tries to self-heal it, since a false positive there is what round 5 found.
+- **New in round 5:** the age threshold moved from ~90 to ~150 minutes, an owner call rather than a derivation —
+  chosen to sit comfortably above the ~115-minute duration #460's own evidence recorded, not from any proof
+  that 150 is itself safe against rule 4's "no time box on depth." A live review that ever ran longer than that
+  would still have its stamp erased by a concurrent `stopped: limit` write with no stamp of its own; nothing in
+  this repository's history says that has happened, and the owner's instruction on finding one is "revisit it
+  then," not to remove the age term pre-emptively.
 - `REVIEWER_PROMPT_BUDGET` is paid in `docs/REVIEWER-PROMPT.md` itself; the PR that lands this records the
   before/after byte count.
