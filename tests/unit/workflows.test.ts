@@ -86,9 +86,15 @@ describe('the e2e server proves it is serving the build on disk, not a leftover 
     const filename = '00-build-identity.spec.ts';
     const byName = (n: string) => cfg.projects?.find((proj) => proj.name === n);
     // This repository's own convention (every testMatch/testIgnore in the file today) is a bare RegExp or an
-    // array of them, never a glob string — so that is the only shape this helper has to judge correctly.
-    const asRegexes = (pattern: string | RegExp | (string | RegExp)[] | undefined) =>
-      (Array.isArray(pattern) ? pattern : pattern ? [pattern] : []).filter((p): p is RegExp => p instanceof RegExp);
+    // array of them, never a glob string — so that is the only shape this helper judges. A glob string would
+    // silently read as "no pattern" if merely filtered out (type-design-analyzer review of this PR), so an
+    // unexpected one throws instead of letting this rail's verdict pass on a shape it never actually checked.
+    const asRegexes = (pattern: string | RegExp | (string | RegExp)[] | undefined): RegExp[] => {
+      const list = Array.isArray(pattern) ? pattern : pattern ? [pattern] : [];
+      const glob = list.find((p): p is string => typeof p === 'string');
+      if (glob !== undefined) throw new Error(`this rail only judges RegExp testMatch/testIgnore, not a glob string ('${glob}') — extend it before trusting its verdict here`);
+      return list as RegExp[];
+    };
     const runsHere = (proj: ReturnType<typeof byName>) => {
       const ignore = asRegexes(proj?.testIgnore);
       if (ignore.some((r) => r.test(filename))) return false;
