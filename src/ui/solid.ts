@@ -1,15 +1,15 @@
 // The rotating 3-D solid on a 3-D Shapes question card (#684): which questions get one, and the one lazy
 // renderer per play screen that shows it. `three` itself lives behind a dynamic `import()` of
-// `src/game/solids.ts`, so this file — and the main chunk it is part of — never carries it; a guard rail in
-// `tests/unit/guardrails.test.ts` holds that line. The spike's cost and the owner's verdict are on the issue.
+// `src/three/mount/solids.ts`, so this file — and the main chunk it is part of — never carries it; the rails
+// in `tests/unit/guardrails.test.ts` hold that line. The spike's cost and the owner's verdict are on the issue.
 import type { Question } from '../curriculum';
 import { SHAPES_3D } from '../curriculum/util';
-import type { SolidName, SolidView, SpinSheet } from '../game/solids';
+import type { SolidName, SolidView, SpinSheet } from '../three/mount/solids';
 
 /** The two topics whose question side shows a real solid; every other topic keeps its emoji. */
 export const SOLID_TOPICS: ReadonlySet<string> = new Set(['y1-shapes3d', 'y2-shapes']);
 
-/** The solids `src/game/solids.ts` can build. `SHAPES_3D` (curriculum data, unchanged by #684) is checked
+/** The solids `src/three/mount/solids.ts` can build. `SHAPES_3D` (curriculum data, unchanged by #684) is checked
  *  against this list by `tests/unit/solid.test.ts`, so a new or respelt row there fails a test rather than
  *  throwing inside the renderer mid-mission. */
 export const SOLID_NAMES: readonly SolidName[] = ['cube', 'cuboid', 'sphere', 'cylinder', 'cone', 'pyramid'];
@@ -28,7 +28,7 @@ export function solidNameFor(q: Question, topicId: string | undefined): SolidNam
  * up. `error` says why not when it did not — a renderer that refused to start and a chunk that failed to
  * download both keep the emoji, but they are different bugs to chase (silent-failure review of the spike).
  */
-export interface SolidState { name: SolidName; frames: number; webgl: boolean; error: 'no-webgl' | 'load-failed' | null }
+export interface SolidState { name: SolidName; frames: number; webgl: boolean; error: 'no-webgl' | 'load-failed' | 'built-off' | null }
 /** What `window.__sna.solidArt()` reports: which solids have a baked spin sheet, and how many bubble frames drew one. */
 export interface SolidArtState { ready: SolidName[]; draws: number; error: SolidState['error'] }
 export interface SolidSlot {
@@ -45,7 +45,19 @@ export interface SolidSlot {
   art(): SolidArtState | null;
   dispose(): void;
 }
-type Loader = () => Promise<typeof import('../game/solids')>;
+type Loader = () => Promise<typeof import('../three/mount/solids')>;
+/**
+ * The default loader, and the build-time layer of the 3-D flag (#714): `VITE_THREE=off` makes the test below
+ * a constant, so Vite folds the `import()` away and the build has no three chunk at all — a rail builds both
+ * ways and checks. Read here as a literal `import.meta.env.VITE_THREE`, which is the only spelling Vite
+ * replaces; `src/three/mount/enabled.ts` reads the same variable for the runtime decision, and this spike
+ * is not behind that runtime decision (the comment at the top of `solids.ts` says why). Read inside the
+ * function, not at module level: Playwright's own loader evaluates this module in Node for a duel spec's
+ * constants, and Node has no `import.meta.env`.
+ */
+const loadSolids: Loader = () => import.meta.env.VITE_THREE === 'off'
+  ? Promise.reject(Object.assign(new Error('3-D is off in this build (VITE_THREE=off)'), { builtOff: true }))
+  : import('../three/mount/solids');
 /** The card element the view is mounted into — `#vis`, whose contents `renderVisual` rewrites per question. */
 type Host = Pick<HTMLElement, 'replaceChildren'>;
 /**
@@ -119,9 +131,9 @@ const tintSheet: Tint = (sheet, colour) => {
 const TINTED_MAX = 16;
 
 let warnedOnce = false;
-export function createSolidSlot(host: () => Host, loader: Loader = () => import('../game/solids'), tint: Tint = tintSheet): SolidSlot {
+export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, tint: Tint = tintSheet): SolidSlot {
   let view: SolidView | null = null;
-  let loading: Promise<typeof import('../game/solids')> | null = null;
+  let loading: Promise<typeof import('../three/mount/solids')> | null = null;
   let wanted: SolidName | null = null;   // the solid the card currently asks for; null once a plain question follows
   let error: SolidState['error'] = null;   // set once three could not be used — the emoji stays, the hook says why
   let disposed = false;
@@ -182,6 +194,7 @@ export function createSolidSlot(host: () => Host, loader: Loader = () => import(
   }
   function fail(kind: NonNullable<SolidState['error']>, e: unknown) {
     error = kind;
+    if (kind === 'built-off') return;   // a build choice, not a failure: the emoji is the design, nothing to warn about
     if (!warnedOnce) { warnedOnce = true; console.warn(`3-D solids: ${kind === 'no-webgl' ? 'WebGL renderer unavailable' : 'could not load three'}, keeping the emoji`, e); }
   }
   return {
@@ -207,7 +220,7 @@ export function createSolidSlot(host: () => Host, loader: Loader = () => import(
         catch (e) { fail('no-webgl', e); return; }
         if (wanted) mount(wanted);
         bake();
-      }, e => fail('load-failed', e));
+      }, e => fail((e as { builtOff?: boolean } | null)?.builtOff ? 'built-off' : 'load-failed', e));
     },
     state() {
       if (!wanted) return null;

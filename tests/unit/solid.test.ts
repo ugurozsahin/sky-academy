@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { complement, createSolidSlot, hasInk, SHEET, solidNameFor, SOLID_NAMES, SOLID_TOPICS } from '../../src/ui/solid';
-import { downsampleInto } from '../../src/game/solids';
+import { downsampleInto } from '../../src/three/mount/solids';
 import { GOOD, BAD, PALETTE } from '../../src/game/arena';
 import { SHAPES_3D } from '../../src/curriculum/util';
 import type { Question } from '../../src/curriculum';
@@ -130,6 +130,22 @@ describe('createSolidSlot — one lazy renderer per play screen (#684)', () => {
     expect(loader).toHaveBeenCalledTimes(1);
     expect(slot.state()).toMatchObject({ name: 'sphere', error: 'load-failed' });
     warn.mockRestore();
+  });
+  // #714: the build-time layer of the 3-D flag, on the default loader — the one `createSolidSlot` uses in the
+  // game. An off build is a choice, not a failure: the emoji stays, the hook says `built-off` (not `load-failed`,
+  // which a real chunk download failure produces), and nothing is warned.
+  it('a VITE_THREE=off build keeps the emoji, says built-off through the hook, and warns nothing', async () => {
+    vi.stubEnv('VITE_THREE', 'off');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const h = host();
+      const slot = createSolidSlot(() => h as never);
+      slot.show(word('🎲'), 'y2-shapes');
+      await settle();
+      expect(h.kids).toEqual(['wordcard']);
+      expect(slot.state()).toEqual({ name: 'cube', frames: 0, webgl: false, error: 'built-off' });
+      expect(warn).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); vi.unstubAllEnvs(); }
   });
   it('a bake that throws once is never retried — the doomed sheet() call stays doomed (#687 review)', async () => {
     const shown: string[] = [];

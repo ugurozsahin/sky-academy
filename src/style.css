@@ -1753,6 +1753,12 @@ img { -webkit-user-drag: none; }
 .p-move .btn { width: 100%; }
 .p-move-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--good); }
 .p-move-msg.bad { color: var(--bad); }
+/* #714: the 3-D setting — the island screen's `.tabs`/`.tab` pair reused as a three-way pick, nothing new drawn. */
+.p-three { display: flex; flex-direction: column; gap: 8px; }
+.p-three-say { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.p-three-pick { margin: 0; }
+.p-three-pick .tab { min-height: 44px; padding: 10px; }
+.p-three-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--bad); }
 
 /* ninjas on this device: rename and remove (#20 slice 3)
    The row is `.p-topic`'s shape — panel, hairline, 14px radius — with the face where the icon sits, so the

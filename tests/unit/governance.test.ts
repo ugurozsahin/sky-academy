@@ -2804,7 +2804,7 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
   // resolve once the path is real belongs here — a directory, a file, or a trailing `**` — never a glob inside
   // a file name (`scripts/sketch-*.mjs`), which `exists()` reads as absent forever and so could never expire.
   const FUTURE_PATHS: Record<string, string> = {
-    'src/three/**': '#714', 'sketchbook.html': '#715', 'tests/sketch/**': '#715',
+    'sketchbook.html': '#715', 'tests/sketch/**': '#715',
   };
   const declaredPaths = (file: string): string[] => {
     const front = /^---\n([\s\S]*?)\n---\n/.exec(readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8'));

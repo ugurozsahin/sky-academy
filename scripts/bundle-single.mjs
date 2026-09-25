@@ -52,7 +52,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   let css = readFileSync(join('dist/assets', assets.find(f => f.endsWith('.css'))), 'utf8');
   // #684: every other chunk is one the entry reaches by `import("./name.js")`, and a single page has no
   // `./name.js` beside it. Each is inlined as a data-URL module and the import rewritten to it. That only
-  // works for a chunk that imports nothing itself — a guard rail keeps `src/game/solids.ts` free of `src/`
+  // works for a chunk that imports nothing itself — a guard rail keeps every module under `src/three/` free of `src/`
   // imports so its chunk stays stand-alone — and this refuses loudly rather than emitting a page that
   // fails the first time a child opens a 3-D Shapes card.
   for (const chunk of assets.filter(f => f.endsWith('.js') && f !== entry)) {
