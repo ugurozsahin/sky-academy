@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 import { stripHead } from '../../scripts/bundle-single.mjs';
@@ -238,19 +238,21 @@ describe('guard rails', () => {
   // #557 (#325 stage 1): src/game/ never imports src/ui/ — zero occurrences today, and that one-way
   // dependency is why src/game/session.ts is testable without a browser and the sim harness (#142) works at
   // all. Every later stage of #325 moves files around, and each could break it silently. Text rail, over
-  // code() (comments may name the ban): it sees spellings, not what a nested subfolder's own relative depth
-  // would resolve to, so it matches any number of leading `../` before an optional `src/` before `ui/` — the
-  // `src/` is optional because a relative path can route back through a literal `src/` segment
-  // (`../../src/ui/dom`, which resolves to the same module as `../ui/dom`, and which an IDE's auto-import or
-  // a copy-pasted absolute-looking path readily produces) — and a Vite-root absolute specifier (`/src/ui/…`)
-  // alongside the relative form, though nothing in src/ uses that style today. It cannot see a path assembled
-  // at run time — `'../' + 'ui/' + name` — only a literal or template specifier. Proved red: added
-  // `import { $ } from '../ui/dom';` to a scratch file under src/game/, watched this fail, removed it; same
-  // for `import { $ } from '../../src/ui/dom';` (PR #710 review).
+  // code() (comments may name the ban): it reads every literal specifier and RESOLVES it the way the bundler
+  // would — `posix.resolve` from the importing file's own directory — before asking whether it lands under
+  // `/src/ui/`. Resolving, not spelling-matching, is what closes the class the first two rounds of PR #710
+  // patched one member at a time: `../ui/dom`, `../../src/ui/dom` (round 1), `./../ui/dom` (round 2), and
+  // `../../game/../ui/dom` all resolve to the same module, and so does any future spelling, since the module
+  // graph is what the rail is about. A Vite-root absolute specifier (`/src/ui/…`) is already resolved.
+  // It cannot see a path assembled at run time — `'../' + 'ui/' + name` — only a literal or template
+  // specifier. Proved red: added each of the four spellings above to a scratch file under src/game/, watched
+  // this fail on every one, removed it; a scratch `import { x } from '../curriculum/util'` stays green.
   it('no file in src/game/ imports from src/ui/ (#557)', () => {
+    const specifiers = (src: string) => [...code(src).matchAll(/\b(?:from|import|require)\s*\(?\s*['"`]([^'"`\n]+)['"`]/g)].map(m => m[1]);
     for (const [path, src] of inDir('/src/game/')) {
-      expect(code(src), `${path} must not import from src/ui/ — src/game/ is the browser-free half of the split`)
-        .not.toMatch(/\b(?:from|import|require)\s*\(?\s*['"`](?:(?:\.\.\/)+(?:src\/)?ui\/|\/src\/ui\/)/);
+      const resolved = specifiers(src).map(s => s.startsWith('.') ? posix.resolve(posix.dirname(path), s) : s);
+      expect(resolved.filter(s => s.startsWith('/src/ui/')), `${path} must not import from src/ui/ — src/game/ is the browser-free half of the split`)
+        .toEqual([]);
     }
   });
 
