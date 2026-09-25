@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { workflowFiles } from './helpers/sources';
 
@@ -72,28 +72,64 @@ describe('the e2e server proves it is serving the build on disk, not a leftover 
       .toMatch(/\)\.toBe\(local\)/);
   });
 
-  // Review of this PR (#187): the original version of this rail compared two string literals defined inside
-  // itself ('00-build-identity.spec.ts' against /viewport\.spec\.ts/) — true by construction, and green
-  // whatever `playwright.config.ts` actually declares. This reads the REAL `testIgnore`/`testMatch` patterns
-  // out of the config text and tests the real filename against them, the way the #116 tablet rail above does.
-  it('the identity spec is not excluded from either default project, by the config\'s ACTUAL patterns (#123)', () => {
+  // #486: at worker count >1 (#483) the identity spec sorting first no longer means it RUNS first — a
+  // second worker starts `game.spec.ts` in the same instant, so the one clear message it exists to print
+  // arrives alongside the fifty mysterious ones instead of before them. The fix is a `setup` project every
+  // other project `dependencies` on: nothing starts until it passes, at any worker count. This test replaces
+  // the old #123-era one, whose invariant it inverts — the identity spec used to have to run INSIDE
+  // `mobile`/`desktop`'s own leg; it must now run OUTSIDE it, exactly once, in `setup`. It reads the
+  // RESOLVED config object (the way the #483 rail above it does), not the source text, so a glob string or
+  // an array of patterns is judged the way Playwright itself would judge it, not the way one particular
+  // spelling of a regex would print.
+  it('the identity spec runs once, in a setup project every leg depends on, not inside the legs themselves (#486)', async () => {
+    const cfg = (await import('../../playwright.config')).default;
     const filename = '00-build-identity.spec.ts';
-    const parts = config.slice(config.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
-    expect(parts.length, 'playwright.config.ts must declare its projects, and be read from disk').toBeGreaterThanOrEqual(4);
-    const defaultProjects = parts.filter(p => /name:\s*'(mobile|desktop)'/.test(p));
-    expect(defaultProjects.length, 'both default projects must be found by name').toBe(2);
-    for (const p of defaultProjects) {
-      const name = p.match(/name:\s*'([^']+)'/)![1];
-      const ignore = p.match(/testIgnore:\s*\/([^/]+)\//);
-      if (ignore) {
-        expect(new RegExp(ignore[1]).test(filename), `'${name}''s real testIgnore (/${ignore[1]}/) must not exclude the identity spec`)
-          .toBe(false);
-      }
-      const match = p.match(/testMatch:\s*\/([^/]+)\//);
-      if (match) {
-        expect(new RegExp(match[1]).test(filename), `'${name}' declares testMatch — the identity spec must match it, or it never runs there`)
-          .toBe(true);
-      }
+    const byName = (n: string) => cfg.projects?.find((proj) => proj.name === n);
+    // This repository's own convention (every testMatch/testIgnore in the file today) is a bare RegExp or an
+    // array of them, never a glob string — so that is the only shape this helper judges. A glob string would
+    // silently read as "no pattern" if merely filtered out (type-design-analyzer review of this PR), so an
+    // unexpected one throws instead of letting this rail's verdict pass on a shape it never actually checked.
+    const asRegexes = (pattern: string | RegExp | (string | RegExp)[] | undefined): RegExp[] => {
+      const list = Array.isArray(pattern) ? pattern : pattern ? [pattern] : [];
+      const glob = list.find((p): p is string => typeof p === 'string');
+      if (glob !== undefined) throw new Error(`this rail only judges RegExp testMatch/testIgnore, not a glob string ('${glob}') — extend it before trusting its verdict here`);
+      return list as RegExp[];
+    };
+    const runsHere = (proj: ReturnType<typeof byName>, file: string) => {
+      const ignore = asRegexes(proj?.testIgnore);
+      if (ignore.some((r) => r.test(file))) return false;
+      const match = asRegexes(proj?.testMatch);
+      return match.length ? match.some((r) => r.test(file)) : true;   // no testMatch: Playwright's own "everything in testDir"
+    };
+
+    const setup = byName('setup');
+    expect(setup, 'a `setup` project must exist to run the identity spec before every other project (#486)').toBeTruthy();
+    expect(runsHere(setup, filename), '`setup`\'s own patterns must actually select the identity spec, or nothing runs it at all')
+      .toBe(true);
+    // pr-test-analyzer review of this PR: a widened (or dropped) `testMatch` would still pass the assertion
+    // above while quietly turning `setup` into a second full e2e leg every project now depends on — the exact
+    // per-night cost #116's tablet rail already guards its own narrow spec against, with nothing here yet
+    // doing the same for this one. Checked against the REAL spec files on disk, not a hard-coded guess at
+    // their names, so a future spec file is covered the moment it exists.
+    const specFiles = readdirSync(new URL('../../tests/e2e/', import.meta.url)).filter((f) => f.endsWith('.spec.ts') && f !== filename);
+    expect(specFiles.length, 'tests/e2e/ must still have other spec files, or this exclusivity check covers nothing')
+      .toBeGreaterThan(0);
+    for (const other of specFiles) {
+      expect(runsHere(setup, other), `'setup' must run the identity spec ONLY — it also selects '${other}', which ` +
+        'would make every project a second, unrestricted e2e leg deep (#486)').toBe(false);
+    }
+
+    for (const name of ['mobile', 'desktop']) {
+      const p = byName(name);
+      expect(p, `'${name}' must still be declared`).toBeTruthy();
+      expect(runsHere(p, filename), `'${name}' must no longer run the identity spec itself — 'setup' already does, and running it ` +
+        'twice is dead weight the nightly pays for every night (#486)').toBe(false);
+      expect(p?.dependencies ?? [], `'${name}' must depend on 'setup', or nothing stops it starting before the identity ` +
+        'check has run — exactly the #486 regression this project exists to close').toContain('setup');
+    }
+    for (const name of ['tablet', 'tablet-landscape']) {
+      expect(byName(name)?.dependencies ?? [], `'${name}' must depend on 'setup' too, the same as the other legs (#486)`)
+        .toContain('setup');
     }
   });
 });
