@@ -116,12 +116,16 @@ describe('memory decks', () => {
 
   // #461: `doubles` and `tables` are the only two themes whose faces are both plain numeric text — every
   // other theme pairs a picture, a count or a word with a name, so the two faces already say which kind
-  // matches which. Named exhaustively rather than "the rest are false" (#526): a theme added later with no
-  // opinion either way is a silent `undefined`, caught here the moment its id is missing from either list.
+  // matches which. `Theme.hintIsData` is a REQUIRED field precisely so a theme added later with no opinion
+  // either way fails to typecheck rather than defaulting to a silent `false` (#461 review round 1: an
+  // optional flag let a mutation add a tenth theme with none and pass this test unnoticed, since both sides
+  // — the flag and this literal set — read false together). This test is what a required field can't be:
+  // a check that today's NINE existing themes are classified as the issue says, not a guard against a new
+  // one shipping unclassified — `tsc` is that guard now.
   it('only doubles and tables mark their hint as the sole statement of the matching rule', () => {
     const dataThemes = new Set(['doubles', 'tables']);
     for (const y of YEARS) for (const theme of THEMES[y.id] ?? []) {
-      expect(!!theme.hintIsData, `${y.id}/${theme.id}`).toBe(dataThemes.has(theme.id));
+      expect(theme.hintIsData, `${y.id}/${theme.id}`).toBe(dataThemes.has(theme.id));
     }
   });
 });

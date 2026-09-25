@@ -1611,7 +1611,10 @@ img { -webkit-user-drag: none; }
    * claim the suite can fail. The duel screen's half of the same bug is `.duel-q .hint` above (#295);
    * `memory.ts` is a third user of this selector, marking its own `doubles`/`tables` themes `own` from a
    * `Theme.hintIsData` flag of its own — the two decks whose faces are both plain numeric text, so nothing
-   * on the board says a child is hunting for an answer rather than, say, a bigger number (#461).
+   * on the board says a child is hunting for an answer rather than, say, a bigger number. Its OTHER themes
+   * (`count`, `shapes`, `words`, `coins`) stay hidden here deliberately, not by omission: each pairs a
+   * picture, a count or a word with a name, so the two card faces already say which kind matches which
+   * without the line (#461).
    */
   .hint.own {
     display: block;

@@ -9,7 +9,13 @@ export interface Pair { a: Face; b: Face }
 // two faces already say "this kind matches that kind" without being told — but `doubles` shows `double 3`
 // beside `6` and `tables` shows `4 × 2` beside `8`: both faces are plain numeric text, so nothing on the
 // board itself says a child is hunting for an ANSWER rather than, say, a bigger number (#461).
-export interface Theme { id: string; title: string; hint: string; hintIsData?: boolean; pairs: (rng: Rng) => Pair[] }
+//
+// Required, not optional (#461 review round 1): an optional flag defaults every theme literal that omits it
+// to `undefined` — falsy, same as an explicit `false` — so a tenth theme added later with no opinion either
+// way compiles silently and ships with its matching rule gone in landscape, the exact regression this file
+// exists to close. A required field makes every theme literal state its answer, checked by `tsc` before any
+// test runs.
+export interface Theme { id: string; title: string; hint: string; hintIsData: boolean; pairs: (rng: Rng) => Pair[] }
 export interface Card { pair: number; face: Face; up: boolean; matched: boolean }
 export type FlipResult = 'ignored' | 'open' | 'match' | 'miss';
 
@@ -49,20 +55,20 @@ const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
 export const THEMES: Partial<Record<YearId, Theme[]>> = {
   reception: [
-    { id: 'count', title: 'Count & match', hint: 'Match each number to the same number of things', pairs: rng => { const e = pick(rng, OBJECTS); return shuffle(rng, [1, 2, 3, 4, 5, 6]).slice(0, 4).map(n => ({ a: txt(String(n), numberWord(n)), b: objs(n, e) })); } },
-    { id: 'shapes', title: 'Shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES_2D.slice(0, 4), 4) },
-    { id: 'words', title: 'Number words', hint: 'Match each number to its word', pairs: rng => words(rng, 1, 5, 4) },
+    { id: 'count', title: 'Count & match', hint: 'Match each number to the same number of things', hintIsData: false, pairs: rng => { const e = pick(rng, OBJECTS); return shuffle(rng, [1, 2, 3, 4, 5, 6]).slice(0, 4).map(n => ({ a: txt(String(n), numberWord(n)), b: objs(n, e) })); } },
+    { id: 'shapes', title: 'Shapes', hint: 'Match each shape to its name', hintIsData: false, pairs: rng => shapes(rng, SHAPES_2D.slice(0, 4), 4) },
+    { id: 'words', title: 'Number words', hint: 'Match each number to its word', hintIsData: false, pairs: rng => words(rng, 1, 5, 4) },
   ],
   year1: [
-    { id: 'words', title: 'Number words', hint: 'Match each number to its word', pairs: rng => words(rng, 1, 20, 6) },
-    { id: 'coins', title: 'Coins', hint: 'Match each coin to its value', pairs: rng => coins(rng, [1, 2, 5, 10, 20, 50], 6) },
-    { id: 'shapes', title: '2-D shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES_2D, 6) },
+    { id: 'words', title: 'Number words', hint: 'Match each number to its word', hintIsData: false, pairs: rng => words(rng, 1, 20, 6) },
+    { id: 'coins', title: 'Coins', hint: 'Match each coin to its value', hintIsData: false, pairs: rng => coins(rng, [1, 2, 5, 10, 20, 50], 6) },
+    { id: 'shapes', title: '2-D shapes', hint: 'Match each shape to its name', hintIsData: false, pairs: rng => shapes(rng, SHAPES_2D, 6) },
     { id: 'doubles', title: 'Doubles', hint: 'Match each double to its answer', hintIsData: true, pairs: rng => shuffle(rng, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).slice(0, 6).map(n => ({ a: txt(`double ${n}`, `double ${n}`, true), b: txt(String(n * 2), numberWord(n * 2)) })) },
   ],
   year2: [
-    { id: 'words', title: 'Number words', hint: 'Match each number to its word', pairs: rng => words(rng, 21, 99, 6) },
-    { id: 'coins', title: 'Coins', hint: 'Match each coin to its value', pairs: rng => coins(rng, [1, 2, 5, 10, 20, 50, 100, 200], 8) },
-    { id: 'shapes', title: '3-D shapes', hint: 'Match each shape to its name', pairs: rng => shapes(rng, SHAPES_3D, 6) },
+    { id: 'words', title: 'Number words', hint: 'Match each number to its word', hintIsData: false, pairs: rng => words(rng, 21, 99, 6) },
+    { id: 'coins', title: 'Coins', hint: 'Match each coin to its value', hintIsData: false, pairs: rng => coins(rng, [1, 2, 5, 10, 20, 50, 100, 200], 8) },
+    { id: 'shapes', title: '3-D shapes', hint: 'Match each shape to its name', hintIsData: false, pairs: rng => shapes(rng, SHAPES_3D, 6) },
     { id: 'tables', title: 'Times tables', hint: 'Match each times-table fact to its answer', hintIsData: true, pairs: rng => {
       const facts: [number, number][] = []; const seen = new Set<number>();
       for (let guard = 0; facts.length < 8 && guard < 80; guard++) { const t = pick(rng, [2, 5, 10]), k = ri(rng, 2, 10); if (!seen.has(t * k)) { seen.add(t * k); facts.push([t, k]); } }
