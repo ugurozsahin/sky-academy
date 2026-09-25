@@ -23,8 +23,15 @@ export interface ScreenScope {
    * not re-measure what is already frozen and lose the first freeze's remainder.
    */
   holdTimers(open: boolean): void;
-  /** Show the `#toast` message with an optional class, auto-hiding after `ms`. */
+  /** Show the `#toast` message with an optional class, auto-hiding after `ms`. Each call invalidates any
+   *  earlier call's pending auto-hide (#478), so two toasts raised inside one hold no longer race: the first
+   *  one's timer can no longer strip the second. */
   toast(text: string, cls?: string, ms?: number): void;
+  /** Clear `#toast` now and invalidate any pending auto-hide from an earlier `toast()` call — for a screen
+   *  that clears the element directly (a "no stale verdict on the next question" backstop) rather than
+   *  through another `toast()` call. Without this, that direct clear leaves the earlier call's timer armed,
+   *  and it still fires on whatever toast is showing by the time it does (#478). */
+  clearToast(): void;
   /** Whether the screen is still mounted (false once `dispose()` has run). */
   readonly alive: boolean;
   /** Tear down the shared scaffolding: stop pending timers, cancel speech, drop the `window.__sna` hooks.
@@ -41,6 +48,7 @@ interface Beat { id: number; fn: () => void; due: number; }
 export function screenScope(): ScreenScope {
   let alive = true;
   let held = false;
+  let toastGen = 0;   // #478: bumped by every toast()/clearToast() call, so a stale hide can tell it is stale
   // Kept as a set rather than an array because a beat is removed when it fires, and a screen that runs for ten
   // stages arms hundreds: the old array only ever grew, and a hold would have had to walk every dead handle.
   const beats = new Set<Beat>();
@@ -76,7 +84,21 @@ export function screenScope(): ScreenScope {
       const el = document.querySelector<HTMLElement>('#toast');
       if (!el) return;
       el.textContent = text; el.className = `toast show ${cls}`;
-      scope.later(() => el.classList.remove('show'), ms);
+      // #478: one shared element, one timer per call, and no generation check meant every PENDING timer
+      // stripped whatever was on screen when it fired — a second toast raised inside the first one's hold had
+      // its own display cut short by the first one's hide. `mine` pins the call this timer belongs to; if
+      // `toastGen` has moved on by the time it fires, a later call (or `clearToast()`) has already taken over
+      // and this hide is stale.
+      const mine = ++toastGen;
+      scope.later(() => { if (toastGen === mine) el.classList.remove('show'); }, ms);
+    },
+    clearToast() {
+      // Same #411 guard as `toast()`: a disposed screen's stale caller must not reach into the next screen's
+      // `#toast` — today's only caller (duel.ts's `onQuestion`) is synchronous and never fires post-dispose,
+      // but the guard belongs on the method, not on trusting every future caller to be.
+      if (!alive) return;
+      toastGen++;   // invalidates a pending hide even one armed before this call, same as a fresh toast() would
+      document.querySelector<HTMLElement>('#toast')?.classList.remove('show');
     },
     // hush() also voids the voice probe (#65)
     dispose() { alive = false; for (const b of beats) clearTimeout(b.id); beats.clear(); hush(); delete window.__sna; },

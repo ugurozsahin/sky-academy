@@ -82,7 +82,6 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
 
   const scope = screenScope(); const { later, toast } = scope;
   const overlay = $('#overlay'); const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
-  const toastEl = $('#toast');
   let waveId = 0; let holdOpen = false;
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
   let hintLine = '';
@@ -120,8 +119,12 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       // announces it and advances a hold later. Clearing here was tried as the whole fix and was worse than the
       // bug — `onRoundDraw` and `onQuestion` share a synchronous task on the draw path, so the class was added
       // and removed before the browser painted a frame and the verdict was never shown AT ALL: two children got
-      // `sfx.miss()` and nothing to read, on the outcome that most needs explaining (#425 review).
-      toastEl.classList.remove('show');
+      // `sfx.miss()` and nothing to read, on the outcome that most needs explaining (#425 review). Routed
+      // through `clearToast()` rather than the element directly (#478): a direct `classList.remove` here left
+      // an earlier `toast()` call's own hide timer still armed, and it fired into whatever the NEXT question's
+      // verdict was showing by the time it did — the same silent retraction this backstop exists to prevent,
+      // one question later.
+      scope.clearToast();
       const reveal = promptMode(q, canHear()) !== 'hear';
       speak.hidden = reveal;
       prompt.innerHTML = promptHTML(q, 0, reveal); $('#vis').innerHTML = renderVisual(q.visual);
