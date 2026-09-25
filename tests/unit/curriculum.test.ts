@@ -2195,11 +2195,19 @@ describe('a card\'s bubble width is derived from its options, never from its ans
    * of 252 cells never do, `y1-coins` d3 among them (#482). This is the check of a different shape that
    * issue promised: it pins the **intended** width against the table the design states ("options are
    * words → bigger bubbles"), not against another drawn card, so it reaches every cell, blind ones
-   * included. It only holds because `wordQ` and `waveOptsFor` now share one rule (`wideFor`, #482) — before
-   * that, a card with `q.wide` set by `waveOptsFor`'s own `> 3` fallback but not by `wordQ`'s `> 2` would
-   * fail it, which is exactly the drift #482 closed. It also covers the two generators that hardcode
-   * `wide: true` (`y2Symmetry`'s yes/no card, `sentenceQ`'s word sequence): both currently agree with the
-   * table on every draw below, so this rail would go red the day either one stops.
+   * included.
+   *
+   * **What it actually proves, honestly (pr-test-analyzer / silent-failure-hunter review of this pull
+   * request, both independently found the same gap):** for a `wordQ` card, `q.wide` is already
+   * `wideFor(options)` (`src/curriculum/util.ts`), so `!!q.wide || wideFor(info.labels)` short-circuits on
+   * the same value twice — this rail cannot catch `wideFor`'s threshold itself being wrong for those cards,
+   * or the two generators that hardcode `wide: true` (`y2Symmetry`'s yes/no card, `sentenceQ`'s word
+   * sequence) ever drifting from the table, because both happen to agree with it regardless. Where it DOES
+   * hold real weight is every card whose generator sets no `wide` at all — chiefly `numQ`, which never
+   * writes the field — where `waveOptsFor`'s fallback is the only thing deciding, and a threshold mismatch
+   * there is exactly what #482 found: reverting `waveOptsFor` to the old `> 3` fallback turns this red on
+   * `y1-skip` d3's `{91, 99, 100, 98}` (a `numQ` cell, "100" being the 3-character case `> 2` and `> 3`
+   * disagree on), which is the drift #482 closed and the reason this rail exists at all.
    */
   it("every card's width matches the table the design states, blind cells included (#482)", () => {
     let cards = 0;
@@ -2228,6 +2236,17 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     expect(wordQ(r, 'Which is more?', '1p', ['50p']).wide).toBe(true);
     // And a card whose options really are all short stays narrow, so nothing is widened wholesale.
     expect(wordQ(r, 'Which letter?', 'ox', ['ax', 'ex']).wide).toBe(false);
+  });
+
+  // `wideFor` is only ever exercised above through generator output — real cards never land exactly on
+  // the boundary by construction, so these pin the rule itself directly (pr-test-analyzer review of this
+  // pull request): two characters or fewer stays narrow, three or more goes wide, an empty set has nothing
+  // to be wide about, and one long label among short ones is enough.
+  it('wideFor: the shared boundary wordQ and waveOptsFor both read', () => {
+    expect(wideFor([])).toBe(false);
+    expect(wideFor(['a', 'be', 'ox'])).toBe(false);
+    expect(wideFor(['abc'])).toBe(true);
+    expect(wideFor(['ab', 'cd', 'efg'])).toBe(true);
   });
 });
 
