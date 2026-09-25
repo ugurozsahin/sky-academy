@@ -245,13 +245,26 @@ describe('guard rails', () => {
   // `../../game/../ui/dom` all resolve to the same module, and so does any future spelling, since the module
   // graph is what the rail is about. A Vite-root absolute specifier (`/src/ui/…`) is already resolved.
   // It cannot see a path assembled at run time — `'../' + 'ui/' + name` — only a literal or template
-  // specifier. Proved red: added each of the four spellings above to a scratch file under src/game/, watched
-  // this fail on every one, removed it; a scratch `import { x } from '../curriculum/util'` stays green.
+  // specifier. And it resolves the DECODED string, not the source text between the quotes (round 3): a
+  // specifier written `'..\u002fui\u002fdom'` is `../ui/dom` to TypeScript, so the escapes a string literal can
+  // carry — `\uXXXX`, `\u{…}`, `\xXX`, `\/` and the rest — are undone first. Proved red: added each of the four
+  // spellings above, then `'..\u002fui\u002fdom'` and `'..\x2fui\x2fdom'` (written with printf so the escape
+  // reaches the disk), to a scratch file under src/game/, watched this fail on every one, removed it; a
+  // scratch `import { x } from '../curriculum/util'` stays green. `../ui` bare (a barrel, none exists) is
+  // caught too — the resolved path is compared as a directory, not only as a prefix.
+  const decode = (s: string) => s.replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|\\(.)/g,
+    (_, brace, u4, x2, ch) => brace ? String.fromCodePoint(parseInt(brace, 16)) : u4 ? String.fromCharCode(parseInt(u4, 16)) : x2 ? String.fromCharCode(parseInt(x2, 16)) : ch);
+  it('the specifier decoder undoes what a string literal can hide', () => {
+    expect(decode('..\\u002fui\\u002fdom')).toBe('../ui/dom');
+    expect(decode('..\\x2fui\\x2fdom')).toBe('../ui/dom');
+    expect(decode('\\u{2e}./ui\\/dom')).toBe('../ui/dom');
+    expect(decode('../ui/dom')).toBe('../ui/dom');
+  });
   it('no file in src/game/ imports from src/ui/ (#557)', () => {
-    const specifiers = (src: string) => [...code(src).matchAll(/\b(?:from|import|require)\s*\(?\s*['"`]([^'"`\n]+)['"`]/g)].map(m => m[1]);
+    const specifiers = (src: string) => [...code(src).matchAll(/\b(?:from|import|require)\s*\(?\s*['"`]([^'"`\n]+)['"`]/g)].map(m => decode(m[1]));
     for (const [path, src] of inDir('/src/game/')) {
       const resolved = specifiers(src).map(s => s.startsWith('.') ? posix.resolve(posix.dirname(path), s) : s);
-      expect(resolved.filter(s => s.startsWith('/src/ui/')), `${path} must not import from src/ui/ — src/game/ is the browser-free half of the split`)
+      expect(resolved.filter(s => s === '/src/ui' || s.startsWith('/src/ui/')), `${path} must not import from src/ui/ — src/game/ is the browser-free half of the split`)
         .toEqual([]);
     }
   });
