@@ -26,17 +26,37 @@ live stamp exactly as the finished-snapshot write could.
 
 ## Decision
 
-**Every pulse replace but the `IN PROGRESS` stamp itself re-reads the body first.** The stamp is unchanged: it
-still always overwrites, because a fresh `IN PROGRESS` stamp is itself the "who holds it" signal a later run
-reads, and overwriting it with a newer one of the same shape loses nothing. What changes is every write that
-used to be able to destroy that signal — the finished snapshot, the "nothing waiting" stop, and the
-`stopped: limit` write, all three now covered by one clause in STEP 1 (STEP 0's own write already reads
-"replacing your pulse (STEP 1)", so it inherits the same discipline rather than needing its own copy): if the
-body a run reads back is not the one it itself stamped (a different, still-fresh `IN PROGRESS` line, or a
-finished snapshot newer than its own stamp), a second run is or was live, and this run does not replace the
-body. It appends its own note instead — `- also reviewed #<n>: <verdict>` per pull request reviewed, or one
-line otherwise — to the body it just read, leaving that body's stamp and content untouched. Otherwise — the
-body still reads exactly as this run left it — it replaces the whole body as before, unchanged from #005.
+**Every pulse replace but the `IN PROGRESS` stamp itself re-reads the pulse and compares only its header
+line** (the first, timestamped line) **against the stamp this run itself wrote — never the whole body.** The
+stamp is unchanged: it still always overwrites, because a fresh `IN PROGRESS` stamp is itself the "who holds
+it" signal a later run reads, and overwriting it with a newer one of the same shape loses nothing.
+
+Comparing the whole body, the first cut of this decision, does not survive its own success case. Run A stamps,
+run B stamps over it (the header always overwrites), A finishes first and — correctly, seeing B's header, not
+its own — appends `- also reviewed #<n>: <verdict>` under B's still-current header. That append changes the
+*body* but not the *header line*. When B then finishes and re-reads, a whole-body compare sees a body that is
+no longer byte-identical to what B wrote (A's line is now under it) and wrongly concludes a second run is
+live — B, the sole remaining holder, appends a note instead of its real finished snapshot, and the header is
+stuck reading `IN PROGRESS: reviewing #<n>` forever: a false stall the watchdog cannot tell from a dead run.
+Comparing headers instead of bodies fixes this directly, because an append never touches the header line it
+was appended under: B's re-read still shows its own header, so B correctly replaces — but the replace must
+*keep* the lines already appended beneath that header (A's note) rather than discard them, or the fix only
+moves the #460 erasure from "whichever run finishes second" to "whichever run finishes second under the
+now-corrected rule". So a replace, in full, is: write the new header line, then every `- also reviewed
+#<n>: <verdict>` line already under the old one, then this run's own `- #<n>: <verdict>` lines if any — all of
+them unstamped, so STEP 1's "a second timestamped line is refused" rule is untouched.
+
+If the header a run reads back is *not* the one it itself wrote (a different, still-fresh `IN PROGRESS` line,
+or a finished snapshot newer than its own stamp), a second run is or was live, and this run does not touch the
+existing body at all: it appends its own note — `- also reviewed #<n>: <verdict>` per pull request it
+reviewed — to the body it just read.
+
+**STEP 0's `stopped: limit` write is not a bare pointer at this discipline; it needs its own read.** The first
+cut of this decision left STEP 0 saying only that it "inherits" STEP 1's rule, while STEP 0's own text — "that
+is one API call... budget is running out mid-run, so the record must be cheap" — told a run under real
+pressure it could skip straight to a single overwrite, which is the exact erasure this decision exists to
+close, in the run most likely to coincide with a second live one. STEP 0 now reads "one read and write, no
+merge" instead, naming the header check as part of that one cheap step rather than an optional second one.
 
 A run at STEP 1 already reads the pulse before deciding whether to stop or stamp; that existing read is what
 now lets it "tell... that another reviewer run is live before it starts a pull request" (#460's acceptance
@@ -78,6 +98,11 @@ label or a slowed cadence.
 - Still open, inherited from #460: this does not prevent two runs from reviewing the *same* pull request
   concurrently, only from destroying each other's pulse record when they do. The round-budget collision
   (`review-pr` §7) is unchanged.
+- **Still open, new here:** `scripts/pulse-stamp.mjs` truncates to the minute, so two runs stamping in the same
+  UTC minute produce byte-identical headers — neither can then tell "unchanged because I still hold it" from
+  "identical by coincidence, someone else does now", and the header check silently takes the first reading.
+  Narrow (it needs two runs racing to the same minute, on top of #194's ordering already making them pick the
+  same PR), and not fixed here.
 - **Still open, new here:** a run that skips the re-read (or whose read is a stale/cached copy of its own
   prior write) produces a body byte-identical to one that checked correctly — nothing attests that the
   comparison happened, the same limit #460 itself names for its own claim comment ("not airtight"). This is a

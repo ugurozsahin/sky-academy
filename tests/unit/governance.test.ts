@@ -3330,15 +3330,18 @@ describe('the reviewer routine keeps a pulse, and something reads it (#327, #320
   // #460: two reviewer runs were live at once, and the older one's own finished-snapshot write would have
   // erased the younger one's still-live `IN PROGRESS` stamp — the exact record the watchdog reads to tell a
   // live run from a dead one. `docs/decisions/009-the-reviewer-pulse-says-who-holds-it.md` is the fix: every
-  // pulse replace but the stamp re-reads the body first and appends rather than replaces when a different run
-  // has since written it. This file sits at zero budget headroom and gets trimmed almost every week (the
-  // `REVIEWER_PROMPT_BUDGET` history above), which is exactly how a clause like #579's clause (c) or #194's
-  // priority order earned a word-for-word pin — this one had none until now.
+  // pulse replace but the stamp checks only the pulse's header line — never the whole body, which a whole-body
+  // compare fails on its own success case (#704 review): an append under a still-current header changes the
+  // body without changing the header it was appended under, so the header is what a replace must key off, and
+  // a replace must keep any such lines already there rather than discard them. This file sits at zero budget
+  // headroom and gets trimmed almost every week (the `REVIEWER_PROMPT_BUDGET` history above), which is exactly
+  // how a clause like #579's clause (c) or #194's priority order earned a word-for-word pin — this one had
+  // none until now.
   it('STEP 1 carries the #460 liveness re-read, word for word and before every unconditional replace', () => {
     const p = flat(doc('docs/REVIEWER-PROMPT.md'));
-    const LIVENESS = 'Every replace but the stamp re-reads the pulse first '
-      + '(`docs/decisions/009-the-reviewer-pulse-says-who-holds-it.md`): if it is not the body you last wrote, '
-      + 'a second run is live — append a note instead (`- also reviewed #<n>: <verdict>` per PR).';
+    const LIVENESS = 'Every replace but the stamp checks its header against the stamp you wrote '
+      + '(`docs/decisions/009-the-reviewer-pulse-says-who-holds-it.md`): same, replace and keep any '
+      + '`- also reviewed #<n>: <verdict>` lines beneath; changed, append one per PR instead.';
     expect(p, 'the liveness clause must read exactly this, naming the ADR it points at, or a byte squeeze '
       + 'could reword or drop it silently. If the wording changed on purpose, re-pin it here and say so')
       .toContain(LIVENESS);
