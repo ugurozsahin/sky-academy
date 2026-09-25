@@ -58,6 +58,19 @@ pressure it could skip straight to a single overwrite, which is the exact erasur
 close, in the run most likely to coincide with a second live one. STEP 0 now reads "one read and write, no
 merge" instead, naming the header check as part of that one cheap step rather than an optional second one.
 
+**Round 2 (PR #704 review): the check has nothing to compare against in either branch that fires before this
+run has stamped anything of its own.** Both STEP 1's "nothing waiting" cheap exit and STEP 0's `stopped: limit`
+write can happen before this run ever writes its own `IN PROGRESS` header — a run with an empty PR list, or one
+that hits a limit during setup, has no "stamp this run wrote" to compare the pulse's current header against.
+The first cut's wording only covered the finished-snapshot write, where that stamp always exists. The rule now
+reads: replace when the header is unchanged from this run's own stamp **or no other run's stamp is currently
+live** — the second disjunct is what lets an unstamped run tell "safe to write" from "another run holds this"
+without ever having stamped itself. The append payload for that case was also undefined before now: a run with
+no PR verdict to report had nothing to write under `- also reviewed:` line beneath a live stamp it found. STEP
+1 now names both shapes directly — `nothing waiting (N open, 0 waiting)` and `stopped: limit — <what>` — so
+`- also reviewed: nothing waiting (N open, 0 waiting)` or `- also reviewed: stopped: limit — <what>` is what
+either branch appends when a second run's stamp is live.
+
 A run at STEP 1 already reads the pulse before deciding whether to stop or stamp; that existing read is what
 now lets it "tell... that another reviewer run is live before it starts a pull request" (#460's acceptance
 criterion) — a fresh `IN PROGRESS` stamp under the ~90-minute watchdog window is exactly that tell, and this
