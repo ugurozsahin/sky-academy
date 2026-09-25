@@ -107,6 +107,26 @@ describe('guard rails', () => {
     ]);
   });
 
+  // #468 item 5: #430's correctness argument for `hintIsData` rests on "`setHint` (play-session.ts) and
+  // `showOutcome` (hud.ts) are the only writers of the play screen's `#hint` element" — true by inspection
+  // today, not by construction. A third writer anywhere in src/ui/ could show a data-carrying hint's raw
+  // values outside those two paths, or blank an instruction hint, with every other rail here still green.
+  // Scoped to `els.hint`, the play screen's element — a same-named local `hint` variable elsewhere
+  // (profiles.ts, avatar.ts, certificate.ts each build their own unrelated hint element) is not this rail's
+  // concern and does not match `els.hint`. This does not catch a write that reaches `els.hint` through an
+  // alias (a destructured `{ hint }` or a renamed reference), one split across more than one line, or a
+  // property other than `textContent`/`innerHTML` (`.innerText`, `insertAdjacentHTML`, `Object.assign`) —
+  // only a direct, single-line `els.hint.textContent`/`.innerHTML` access (silent-failure-hunter review of
+  // this pull request, round 1).
+  it('the play screen\'s #hint has exactly two writers: setHint and showOutcome (#468 item 5)', () => {
+    const writers = inDir('/src/ui/')
+      .flatMap(([f, s]) => code(s).split('\n').filter(l => /\bels\.hint\.(?:textContent|innerHTML)\s*\+?=[^=]/.test(l)).map(l => `${f}: ${l.trim()}`));
+    expect(writers, 'route a new hint write through setHint() or showOutcome(), never a direct assignment').toEqual([
+      '/src/ui/hud.ts: els.hint.innerHTML = outcomeHintHTML(kind, q.answer);',
+      '/src/ui/play-session.ts: els.hint.textContent = text;',
+    ]);
+  });
+
   // #365: a finished game reaches the save in ONE write. `recordDojo()` then `addCoins()` was two saves with
   // no rollback, and `save()` swallows a refused `setItem` (#151), so a store that took the first and refused
   // the second recorded the Daily Dojo challenge as done while its coins never landed — and `applyEvent()`
@@ -1334,10 +1354,30 @@ describe('guard rails', () => {
     expect(prProjects.length, 'a pull request runs ONE project — each extra one is a whole extra leg (#141)').toBe(1);
     expect(projects, `the PR project '${prProjects[0]}' must be declared in playwright.config.ts`).toContain(prProjects[0]);
 
-    // the nightly arm: every project, or a regression in the missing one is caught by nothing at all
+    // #486: `setup` exists only to be another project's `dependencies` entry (it runs the identity spec
+    // before everything else, at any worker count) — it is not a leg of its own, and Playwright runs it
+    // automatically whenever a project depending on it is selected, with no `--project=` flag of its own.
+    // Demanding one in the nightly arm would ask CI for a flag it never needs, so a project referenced by
+    // ANY other project's `dependencies` array is excluded from the "every project" loop below.
+    const depOnly = new Set([...code(cfg).matchAll(/dependencies:\s*\[([^\]]*)\]/g)]
+      .flatMap(m => [...m[1].matchAll(/'([^']+)'/g)].map(d => d[1])));
+
+    // the nightly arm: every LEG project, or a regression in the missing one is caught by nothing at all
     for (const p of projects) {
+      if (depOnly.has(p)) continue;
       expect(fullArm, `the nightly must run every declared project — '${p}' is missing (#141)`)
         .toContain(`--project=${p}`);
+    }
+    // and a dependency-only project must actually be reachable from every leg, in both arms — nothing else
+    // here checks that `dependencies` still names it once a leg is added, renamed or edited (#486).
+    const parts = code(cfg).slice(code(cfg).indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    for (const dep of depOnly) {
+      for (const part of parts) {
+        const name = part.match(/name:\s*'([^']+)'/)![1];
+        if (depOnly.has(name)) continue;
+        expect(part, `'${name}' must depend on '${dep}', or it can start running before '${dep}' has (#486)`)
+          .toMatch(new RegExp(`dependencies:\\s*\\[[^\\]]*'${dep}'`));
+      }
     }
     // and the step must stay off the push-to-main run, which is what makes the nightly the only full check.
     // #162: read from the e2e STEP, never from the file. Three steps carry that same `if:` — the apt
@@ -1390,8 +1430,11 @@ describe('guard rails', () => {
         expect(p, `'${name}' must run the viewport spec only — an unrestricted tablet leg is ~4 min a night (#116)`)
           .toMatch(/testMatch:\s*\/viewport\\\.spec\\\.ts\//);
       } else {
+        // #486: `mobile`/`desktop` now also exclude the identity spec (`setup` runs it instead), which makes
+        // `testIgnore` an array rather than a bare regex — the optional `[...` tolerates that without caring
+        // how many other patterns share the array, only that `/viewport\.spec\.ts/` is genuinely one of them.
         expect(p, `'${name}' must skip the viewport spec, so the pull-request leg stays the suite it was (#141)`)
-          .toMatch(/testIgnore:\s*\/viewport\\\.spec\\\.ts\//);
+          .toMatch(/testIgnore:\s*(?:\[[^\]]*)?\/viewport\\\.spec\\\.ts\//);
       }
     }
     const spec = readFileSync(new URL('../../tests/e2e/viewport.spec.ts', import.meta.url), 'utf8');

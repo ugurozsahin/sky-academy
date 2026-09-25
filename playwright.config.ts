@@ -70,16 +70,25 @@ export default defineConfig({
   // the very bill #119 is about; restricted to one small spec they are seconds. The patterns and the touch
   // flags are written out per project rather than hoisted into a shared const so the guard rail in
   // tests/unit/guardrails.test.ts reads what each project actually declares, not the name of a variable.
+  //
+  // #486: at worker count >1 (#483) `00-build-identity.spec.ts` sorting first no longer means it RUNS first —
+  // a second worker starts `game.spec.ts` in the same instant, so a wrong served build now prints its one
+  // clear message alongside the fifty mysterious ones it exists to prevent instead of before them. `setup` is
+  // Playwright's own answer: a project every other project `dependencies` on, which blocks them all until it
+  // passes, at any worker count. It runs the identity spec ONLY (`testMatch`), and every other project now
+  // excludes that file (`testIgnore`) so it is not also run a second time as part of their own leg.
   projects: [
-    { name: 'mobile', testIgnore: /viewport\.spec\.ts/, use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
-    { name: 'desktop', testIgnore: /viewport\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
-    { name: 'tablet', testMatch: /viewport\.spec\.ts/, use: { defaultBrowserType: 'chromium', viewport: { width: 800, height: 1280 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
-    { name: 'tablet-landscape', testMatch: /viewport\.spec\.ts/, use: { defaultBrowserType: 'chromium', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+    { name: 'setup', testMatch: /00-build-identity\.spec\.ts/, testIgnore: /viewport\.spec\.ts/, use: { defaultBrowserType: 'chromium' } },
+    { name: 'mobile', testIgnore: [/viewport\.spec\.ts/, /00-build-identity\.spec\.ts/], dependencies: ['setup'], use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
+    { name: 'desktop', testIgnore: [/viewport\.spec\.ts/, /00-build-identity\.spec\.ts/], dependencies: ['setup'], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
+    { name: 'tablet', testMatch: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 800, height: 1280 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+    { name: 'tablet-landscape', testMatch: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
     // #715: the sketchbook's one spec — the screenshot script — under its own `testDir`, so `mobile`,
     // `desktop` and the tablets (all scoped to `tests/e2e`) never see it and the pull-request leg stays the
     // suite it was. It runs on the nightly with every other project (#141's rail) and on a pull request
     // only through ci.yml's sketch step, when the diff stays inside the sketchbook's paths. The `testIgnore`
-    // is the #116 rail's shape for a non-tablet project; with its own `testDir` it has nothing to ignore.
-    { name: 'sketchbook', testDir: 'tests/sketch', testIgnore: /viewport\.spec\.ts/, use: { defaultBrowserType: 'chromium', viewport: { width: 600, height: 600 }, deviceScaleFactor: 2 } },
+    // is the #116 rail's shape for a non-tablet project; with its own `testDir` it has nothing to ignore. It
+    // depends on `setup` like every other leg (#486): the identity spec proves the preview serves this dist/.
+    { name: 'sketchbook', testDir: 'tests/sketch', testIgnore: /viewport\.spec\.ts/, dependencies: ['setup'], use: { defaultBrowserType: 'chromium', viewport: { width: 600, height: 600 }, deviceScaleFactor: 2 } },
   ],
 });
