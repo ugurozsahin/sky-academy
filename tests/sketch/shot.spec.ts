@@ -38,6 +38,15 @@ test('the interactive page lists the objects, mounts the panel, honours a deep l
   const last = objects[objects.length - 1];
   await page.evaluate(([n]) => window.__sketch.show(n, 'default', 'high'), [last.name]);
   await expect(page.locator('.lil-gui select').first(), 'the panel names the object show() drew').toHaveValue(last.name);
+  // #740: a tap bounces the object and it comes back to rest; the panel's beats reach the same animator.
+  const tapped = (await page.locator('#stage canvas').boundingBox())!;
+  await page.mouse.click(tapped.x + tapped.width / 2, tapped.y + tapped.height / 2);
+  await page.waitForTimeout(250);
+  expect(await page.evaluate(() => window.__sketch.pose()), 'a tap starts a bounce').not.toEqual({ y: 0, sx: 1, sy: 1, rz: 0 });
+  await page.waitForFunction(() => { const p = window.__sketch.pose(); return p.y === 0 && p.sy === 1 && p.rz === 0; }, undefined, { timeout: 3000 });
+  await page.locator('.lil-gui button', { hasText: 'cheer' }).click();
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__sketch.pose()), 'the cheer button plays').not.toEqual({ y: 0, sx: 1, sy: 1, rz: 0 });
   // A drag on the canvas turns the object. Under reduced motion the idle turn is off, so the frame holds still
   // until the drag — without that, any two screenshots differ and the check proves nothing.
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -46,6 +55,7 @@ test('the interactive page lists the objects, mounts the panel, honours a deep l
   const canvas = page.locator('#stage canvas');
   const still = await canvas.screenshot();
   expect((await canvas.screenshot()).equals(still), 'reduced motion: no idle turn').toBe(true);
+  expect(await page.evaluate(() => window.__sketch.beat('bounce')), 'reduced motion: no beat plays').toBe(false);
   const box = (await canvas.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 150, box.y + box.height / 2, { steps: 6 }); await page.mouse.up();
