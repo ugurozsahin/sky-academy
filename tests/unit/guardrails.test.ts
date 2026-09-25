@@ -239,15 +239,18 @@ describe('guard rails', () => {
   // dependency is why src/game/session.ts is testable without a browser and the sim harness (#142) works at
   // all. Every later stage of #325 moves files around, and each could break it silently. Text rail, over
   // code() (comments may name the ban): it sees spellings, not what a nested subfolder's own relative depth
-  // would resolve to, so it matches any number of leading `../` before `ui/`, not just one, and a Vite-root
-  // absolute specifier (`/src/ui/…`) alongside the relative form, though nothing in src/ uses that style
-  // today. It cannot see a path assembled at run time — `'../' + 'ui/' + name` — only a literal or template
-  // specifier. Proved red: added `import { $ } from '../ui/dom';` to a scratch file under src/game/, watched
-  // this fail, removed it.
+  // would resolve to, so it matches any number of leading `../` before an optional `src/` before `ui/` — the
+  // `src/` is optional because a relative path can route back through a literal `src/` segment
+  // (`../../src/ui/dom`, which resolves to the same module as `../ui/dom`, and which an IDE's auto-import or
+  // a copy-pasted absolute-looking path readily produces) — and a Vite-root absolute specifier (`/src/ui/…`)
+  // alongside the relative form, though nothing in src/ uses that style today. It cannot see a path assembled
+  // at run time — `'../' + 'ui/' + name` — only a literal or template specifier. Proved red: added
+  // `import { $ } from '../ui/dom';` to a scratch file under src/game/, watched this fail, removed it; same
+  // for `import { $ } from '../../src/ui/dom';` (PR #710 review).
   it('no file in src/game/ imports from src/ui/ (#557)', () => {
     for (const [path, src] of inDir('/src/game/')) {
       expect(code(src), `${path} must not import from src/ui/ — src/game/ is the browser-free half of the split`)
-        .not.toMatch(/\b(?:from|import|require)\s*\(?\s*['"`](?:(?:\.\.\/)+ui\/|\/src\/ui\/)/);
+        .not.toMatch(/\b(?:from|import|require)\s*\(?\s*['"`](?:(?:\.\.\/)+(?:src\/)?ui\/|\/src\/ui\/)/);
     }
   });
 
