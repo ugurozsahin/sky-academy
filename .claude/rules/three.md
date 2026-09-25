@@ -27,10 +27,12 @@ inside a file name.
     by anything under `src/`.
 - **Flag**: `threeEnabled()` = build-time `VITE_THREE` ∧ not `?three=off` ∧ the grown-ups' setting ∧ device
   capability. Quality tier is the stage's question, not the flag's. With the flag off the game is
-  pixel-identical to `main`. Nothing mounts behind it yet — the #684 spike in `src/three/mount/solids.ts`
-  predates it and obeys only the build-time layer — so the mobile e2e sets nothing today; the pull request
-  that lands the first flag-gated mount gives the `mobile` project `?three=off` and one small spec the flag on
-  (epic decision 5).
+  pixel-identical to `main`, and **with the flag off there is no 3-D object anywhere — the game as it was
+  before #684** (the owner, in session, 2026-09-25). The #684 spike (`src/three/mount/solids.ts`) obeys it:
+  its loader in `src/ui/solid.ts` asks `threeEnabled()` before it downloads the chunk (#753), and every mount
+  after it does the same. The mobile e2e still runs with the setting on `auto`, which headless Chromium
+  passes, because the spike's solid tests need 3-D; the rebuilt mount moves them to a flag-on spec and gives
+  the `mobile` project `?three=off` (epic decision 5).
 - **Rails** (`tests/unit/guardrails.test.ts`, landed by #714 and #715): `three` imported only under
   `src/three/**`; import direction as above, resolved from the decoded specifier, not its spelling; 250-line
   cap under `src/three/**`; the ratchet on existing files; no three.js code in the main chunk; a

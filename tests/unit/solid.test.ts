@@ -147,6 +147,24 @@ describe('createSolidSlot — one lazy renderer per play screen (#684)', () => {
       expect(warn).not.toHaveBeenCalled();
     } finally { warn.mockRestore(); vi.unstubAllEnvs(); }
   });
+  // The runtime layer (the owner, in session, 2026-09-25): with `threeEnabled()` false the solids chunk is never
+  // fetched and the emoji stays, exactly as before #684. Switched off the way a child's page is — `?three=off`,
+  // which answers before the device probe runs, so nothing is asked of the GPU and nothing is warned.
+  it('with the flag off the default loader keeps the emoji, says flag-off through the hook, and warns nothing', async () => {
+    vi.stubGlobal('location', { search: '?three=off' });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const h = host();
+      const slot = createSolidSlot(() => h as never);
+      slot.show(word('🎲', { options: ['🎲', '⚽'] }), 'y1-shapes3d');
+      // Two dynamic imports in a row (the flag's chunk, then the answer) take longer than one settle().
+      await vi.waitFor(() => expect(slot.state()?.error).toBe('flag-off'));
+      expect(h.kids).toEqual(['wordcard']);
+      expect(slot.state()).toEqual({ name: 'cube', frames: 0, webgl: false, error: 'flag-off' });
+      expect(slot.bubbleArt('🎲', '#ffb020', 0), 'no spinning solid in a bubble either').toBeNull();
+      expect(warn).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); vi.unstubAllGlobals(); }
+  });
   it('a bake that throws once is never retried — the doomed sheet() call stays doomed (#687 review)', async () => {
     const shown: string[] = [];
     const baked: string[] = [];
