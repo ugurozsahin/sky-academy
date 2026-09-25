@@ -4,8 +4,8 @@
  * (`docs/decisions/010-3d-art-is-the-avatars-style.md`, Consequences). Objects receive a `Stage`; they never
  * construct a material, a light or a renderer of their own.
  */
-import { Color, InstancedMesh, Mesh, type ColorRepresentation, type MeshBasicMaterial, type MeshToonMaterial, type Object3D } from 'three';
-import { outline, outlineMaterial, OUTLINE_NAME, OUTLINE_WIDTH } from './outline';
+import { Color, InstancedMesh, Mesh, type ColorRepresentation, type MeshToonMaterial, type Object3D } from 'three';
+import { outline, outlineMaterial, OUTLINE_NAME } from './outline';
 import { type Tier } from './tiers';
 import { tokenColour, toonMaterial, type TokenReader } from './toon';
 
@@ -13,24 +13,20 @@ export interface Stage {
   readonly tier: Tier;
   /** The outline's ink and the rig's background: `--ink`. */
   readonly ink: Color;
-  /** A cel-shaded material in `colour`: a design-language token (`'--accent'`), an avatar's `glow`, or any three.js colour.
-   *  `steps` is the style probe's alone (#717): it renders variants at 2 and 3 tones until the owner picks one. */
-  toon(colour: ColorRepresentation, steps?: number): MeshToonMaterial;
-  /** The inverted-hull outline for `mesh`, at the stage's one width; returns the hull, already a child of `mesh`.
-   *  `width` is the style probe's alone (#717), as `steps` above; omitted, it is `OUTLINE_WIDTH`. */
-  outline(mesh: Mesh, width?: number): Mesh;
+  /** A cel-shaded material in `colour`: a design-language token (`'--accent'`), an avatar's `glow`, or any three.js colour. */
+  toon(colour: ColorRepresentation): MeshToonMaterial;
+  /** The inverted-hull outline for `mesh`, at the stage's one width; returns the hull, already a child of `mesh`. */
+  outline(mesh: Mesh): Mesh;
 }
 
 export function createStage(tier: Tier, tokens: TokenReader): Stage {
   const ink = tokenColour('--ink', tokens);
-  // One material for every hull at a width: one draw-call state. A stage has one width outside the probe (#717).
-  const hulls = new Map<number, MeshBasicMaterial>();
-  const hull = (width: number) => hulls.get(width) ?? hulls.set(width, outlineMaterial(ink, width)).get(width)!;
+  const hull = outlineMaterial(ink);   // one material for every hull on the stage: one draw-call state, one width
   return {
     tier,
     ink,
-    toon: (colour, steps) => toonMaterial(typeof colour === 'string' && colour.startsWith('--') ? tokenColour(colour as `--${string}`, tokens) : colour, steps),
-    outline: (mesh, width = OUTLINE_WIDTH) => outline(mesh, hull(width)),
+    toon: (colour) => toonMaterial(typeof colour === 'string' && colour.startsWith('--') ? tokenColour(colour as `--${string}`, tokens) : colour),
+    outline: (mesh) => outline(mesh, hull),
   };
 }
 

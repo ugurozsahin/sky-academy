@@ -1,9 +1,11 @@
 /**
- * The style probe (#717, epic #713): Hammer Man's hammer, the one calibration object built in the sketchbook
- * beside its 2-D avatar (`public/avatars/hammer.webp`) so the owner can pick the stage's two open numbers —
- * the outline width and the tone count — from rendered variants. After his pick those become the constants in
- * `stage/outline.ts` and `stage/toon.ts`, the `outlineWidth`/`tones` params go, and the hammer stays as the
- * sketchbook's reference piece. Not a game object: nothing mounts it.
+ * Hammer Man's hammer (#717, epic #713): the sketchbook's reference piece, beside its 2-D avatar
+ * (`public/avatars/hammer.webp`). #717 was the style probe that picked the stage's two open numbers — the
+ * outline width and the tone count — from rendered variants; the owner picked B (medium line, three tones),
+ * which was already `OUTLINE_WIDTH`/`TONES`'s provisional value, so the constants in `stage/outline.ts` and
+ * `stage/toon.ts` are unchanged. The `outlineWidth`/`tones` params and the two unchosen variants are gone with
+ * the pick made; the hammer now builds like any other object, from the stage's own constants. Not a game
+ * object: nothing mounts it.
  *
  * Two parts by material, each merged into one mesh so the hull doubles two draw calls, not five
  * (`three-art` §3): the stone head with its collar, and the wood — shaft, pommel and the ridged grip.
@@ -11,7 +13,7 @@
 import { Group, LatheGeometry, Mesh, Vector2, type BufferGeometry } from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { defaultsOf, defineObject, n, type Params } from '../define';
+import { defineObject, n, type Params } from '../define';
 
 // Sampled from `public/avatars/hammer.webp` (the dominant lit tone of each area): the avatar an object belongs
 // to is one of the palette's two sources (decision record 010, item 3), and no design-language token is grey
@@ -27,15 +29,10 @@ const params = {
   shaftRadius: n(0.13, 0.09, 0.18),
   grips: n(4, 3, 5),
   tilt: n(0.4, 0, 0.8),
-  // The two numbers the probe exists to choose; the stage's provisional constants are the defaults.
-  tones: n(3, 2, 3),
-  outlineWidth: n(0.045, 0.02, 0.09),
 };
 type P = Params<typeof params>;
-/** A variant: the default shape, at one outline width and tone count — the probe varies nothing else. */
-const look = (outlineWidth: number, tones: number): P => ({ ...defaultsOf(params), outlineWidth, tones });
 
-const BURIED = 0.14;   // how far the collar reaches into the head: past `outlineWidth`'s maximum
+const BURIED = 0.14;   // how far the collar reaches into the head: past the stage's `OUTLINE_WIDTH`
 const RADIAL = 12;   // around every turned part: fewer shows facets in the toon bands, more costs the budget
 /** A turned part from its profile, `[radius, height]` from the bottom up; a radius of 0 closes a pole. */
 const lathe = (profile: readonly (readonly [number, number])[]) =>
@@ -71,17 +68,10 @@ export const hammer = defineObject({
   name: 'hammer',
   avatar: 'hammer',
   params,
-  variants: {
-    // A — thin line, three tones: the softest; the object carries its own shading.
-    'a-thin-3': look(0.025, 3),
-    // B — the stage's provisional values (#714), as a variant so the gallery names it.
-    'b-medium-3': look(0.045, 3),
-    // C — thick line, two tones: closest to the drawing's heavy ink and flat fields.
-    'c-thick-2': look(0.07, 2),
-  },
+  variants: {},   // the style probe's job is done (#717); the picked look is the only one now
   budget: { triangles: 1950, drawCalls: 4 },   // 1 800 at the defaults; 1 944 with the grip slider at its top
   build(p, stage) {
-    const tones = Math.round(p.tones), r = p.shaftRadius;
+    const r = p.shaftRadius;
     const bottom = -p.shaftLength / 2, top = p.shaftLength / 2, collarH = 0.24;
 
     // A chunky block with eased edges, lying across the top of the shaft; two segments: one gives hard normals the hull splits along.
@@ -94,9 +84,9 @@ export const hammer = defineObject({
     const hammer = new Group();
     for (const [geometry, colour] of [[stone, STONE], [timber, WOOD]] as const) {
       if (!geometry) throw new Error('hammer: a part failed to merge — its geometries disagree on attributes');
-      const mesh = new Mesh(geometry, stage.toon(colour, tones));
+      const mesh = new Mesh(geometry, stage.toon(colour));
       mesh.castShadow = true;
-      stage.outline(mesh, p.outlineWidth);
+      stage.outline(mesh);
       hammer.add(mesh);
     }
     // Centred on its own middle so the idle turn stays in frame, and turned three-quarters to the key light so
