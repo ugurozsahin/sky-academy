@@ -207,7 +207,8 @@ describe('the scope step routes a diff to e2e, to the sketchbook, or to neither 
     [['sketchbook.html'], { e2e: 'false', sketch: 'true' }],
     [['vite.sketchbook.config.ts'], { e2e: 'false', sketch: 'true' }],   // a `base:` change 404s the page under preview: the sketch spec is what catches it
     [['tests/sketch/shot.spec.ts'], { e2e: 'false', sketch: 'true' }],
-    [['scripts/sketch-shot.mjs', 'scripts/sketch-gallery.mjs'], { e2e: 'false', sketch: 'true' }],
+    [['scripts/sketch-shot.mjs'], { e2e: 'false', sketch: 'true' }],      // one file each: a typo in one name inside SKETCH_PATHS must not hide behind the other
+    [['scripts/sketch-gallery.mjs'], { e2e: 'false', sketch: 'true' }],
     [['src/ui/parents.ts'], { e2e: 'true', sketch: 'false' }],
     [['src/three/mount/enabled.ts'], { e2e: 'true', sketch: 'false' }],   // the game's one surface into src/three/
     [['playwright.config.ts'], { e2e: 'true', sketch: 'false' }],

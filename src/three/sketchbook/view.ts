@@ -4,8 +4,8 @@
  * caller here, as the decision record asks (item 7), not per object.
  */
 import type { Object3D } from 'three';
-import { createRenderer, createRig, resize, type Rig } from '../stage/rig';
-import { TIERS, type Tier } from '../stage/tiers';
+import { applyTier, createRenderer, createRig, resize, type Rig } from '../stage/rig';
+import type { Tier } from '../stage/tiers';
 import type { TokenReader } from '../stage/toon';
 
 export interface View {
@@ -16,15 +16,17 @@ export interface View {
   /** Frames drawn so far — the screenshot script waits for this to move before it looks. */
   readonly frames: number;
   readonly tier: Tier;
+  /** What the renderer draws at — `min(devicePixelRatio, the tier's cap)`, and it follows a tier change. */
+  readonly pixelRatio: number;
   dispose(): void;
 }
 
 export const IDLE_TURN = 0.4;   // rad/s — slow, the decision record's "nothing snaps"
 
-export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion: boolean, size = () => host.clientWidth || 512): View {
+export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion: boolean, initialTier: Tier, size = () => host.clientWidth || 512): View {
   const canvas = document.createElement('canvas');
   host.replaceChildren(canvas);
-  let tier: Tier = 'high';
+  let tier: Tier = initialTier;   // the model's real tier, never a hardcoded one: a `?tier=low` first frame is low (review of #715)
   // `--panel-2`, not `--ink`: the outline is ink, and ink on ink is invisible — the game draws its cards on a panel too.
   let rig: Rig = createRig({ aspect: 1, tier, background: tokens('--panel-2') });
   const renderer = createRenderer(canvas, tier);
@@ -52,13 +54,13 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
   return {
     get frames() { return frames; },
     get tier() { return tier; },
+    get pixelRatio() { return renderer.getPixelRatio(); },
     set(object, next) {
       if (shown) { rig.scene.remove(shown); release(shown); }
       if (next !== tier) {
         tier = next;
-        const fresh = createRig({ aspect: rig.camera.aspect, tier, background: tokens('--panel-2') });
-        rig = fresh;
-        renderer.shadowMap.enabled = TIERS[tier].shadows;
+        rig = createRig({ aspect: rig.camera.aspect, tier, background: tokens('--panel-2') });
+        applyTier(renderer, tier);   // pixel-ratio cap and shadow map both follow, not the shadow map alone
         fit();
       }
       shown = object;

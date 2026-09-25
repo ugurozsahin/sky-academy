@@ -22,6 +22,8 @@ export interface SketchHook {
   show(name: string, variant: string, tier: Tier, beside?: boolean): void;
   readonly frames: number;
   ink(): number;
+  /** The renderer's live pixel ratio — the sketch spec checks it follows the tier, not the construction default. */
+  pixelRatio(): number;
   budget(): { declared: Measure; measured: Measure };
   /** A copy, never the live model — the sliders are bound to that one. */
   model(): Model;
@@ -47,7 +49,7 @@ const model = modelFromQuery(q, pickTier(readTierEnv()));
 let measured: Measure = { triangles: 0, drawCalls: 0 };
 let ready = false;
 
-const view = createView(document.getElementById('stage')!, tokens, reduced);
+const view = createView(document.getElementById('stage')!, tokens, reduced, model.tier);
 const besideEl = document.getElementById('beside') as HTMLElement, besideImg = document.getElementById('beside-img') as HTMLImageElement;
 
 /** Rebuild the object from the model and put it on the stage. Everything visible flows through here. */
@@ -100,6 +102,7 @@ window.__sketch = {
   },
   get frames() { return view.frames; },
   ink: () => view.ink(),
+  pixelRatio: () => view.pixelRatio,
   budget: () => ({ declared: find(model.object).budget, measured }),
   model: () => structuredClone(model),
 };

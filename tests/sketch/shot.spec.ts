@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { shoot } from '../../scripts/sketch-shot.mjs';
+import { TIERS } from '../../src/three/stage/tiers';
 
 /**
  * #715: the sketchbook's tests, run as the `sketchbook` Playwright project against the same preview the game's
@@ -36,4 +37,51 @@ test('the interactive page lists the objects, mounts the panel, honours a deep l
   await page.goto(`${baseURL}/sketchbook/sketchbook.html?object=nope&variant=bogus&tier=x`);
   await page.waitForFunction(() => window.__sketch?.ready === true);
   expect(await page.evaluate(() => window.__sketch.model()), 'nonsense in the query falls to the defaults').toMatchObject({ object: 'placeholder', variant: 'default' });
+  // `show()` is the script's way in and must refuse a frame that would be filed under a name the object has not got.
+  await expect(page.evaluate(() => window.__sketch.show('nope', 'default', 'low'))).rejects.toThrow('no object named nope');
+  await expect(page.evaluate(() => window.__sketch.show('placeholder', 'bogus', 'low'))).rejects.toThrow('placeholder has no variant bogus');
+  await expect(page.evaluate(() => window.__sketch.show('placeholder', 'default', 'x' as never))).rejects.toThrow('no tier x');
+});
+
+// Round 2 of #715's review: the renderer's pixel ratio was set once from a hardcoded `high`, so a low-tier
+// frame was never drawn at low's cost. The project's deviceScaleFactor is 2: at high's cap, above low's.
+test('the pixel ratio follows the tier, from the first frame of a deep link and across a change', async ({ page, baseURL }) => {
+  await page.goto(`${baseURL}/sketchbook/sketchbook.html?tier=low`);
+  await page.waitForFunction(() => window.__sketch?.ready === true);
+  expect(await page.evaluate(() => devicePixelRatio), 'the project must run at or above both caps').toBeGreaterThanOrEqual(TIERS.high.maxPixelRatio);
+  expect(await page.evaluate(() => window.__sketch.pixelRatio()), 'a ?tier=low first frame').toBe(TIERS.low.maxPixelRatio);
+  await page.evaluate(() => window.__sketch.show('placeholder', 'default', 'high'));
+  expect(await page.evaluate(() => window.__sketch.pixelRatio())).toBe(TIERS.high.maxPixelRatio);
+  await page.evaluate(() => window.__sketch.show('placeholder', 'default', 'low'));
+  expect(await page.evaluate(() => window.__sketch.pixelRatio()), 'and back down').toBe(TIERS.low.maxPixelRatio);
+});
+
+// Round 2 of #715's review: only the first wait rethrew the page's own error; a stage that threw inside the
+// frame loop on a later shot surfaced as Playwright's "timeout exceeded". This stands in for that: after the
+// first `show()`, the frame counter the script reads freezes at the value it read last (the real loop keeps
+// running underneath, so freezing at the *current* count would race it) and, when asked, the page throws.
+const stallAfterShow = (page: import('@playwright/test').Page, throwToo: boolean) => page.addInitScript((throwToo) => {
+  let real: any, lastRead = 0, frozen: number | null = null;
+  Object.defineProperty(window, '__sketch', {
+    configurable: true,
+    get: () => real && new Proxy(real, { get(t, k) {
+      if (k === 'frames') { if (frozen !== null) return frozen; lastRead = t.frames; return lastRead; }
+      if (k === 'show') return (...a: unknown[]) => {
+        (t as any).show(...a); frozen = lastRead;
+        if (throwToo) setTimeout(() => { throw new Error('boom during a later shot'); });
+      };
+      return Reflect.get(t, k);
+    } }),
+    set: (v) => { real = v; },
+  });
+}, throwToo);
+
+test('a page error during a later shot is what shoot() throws, not the wait\'s own timeout', async ({ page, baseURL }) => {
+  await stallAfterShow(page, true);
+  await expect(shoot({ page, base: baseURL!, out: test.info().outputPath('shots'), readyMs: 1500 })).rejects.toThrow('boom during a later shot');
+});
+
+test('a frame loop that merely stalls still fails, as the wait\'s own timeout', async ({ page, baseURL }) => {
+  await stallAfterShow(page, false);
+  await expect(shoot({ page, base: baseURL!, out: test.info().outputPath('shots'), readyMs: 1500 })).rejects.toThrow(/[Tt]imeout/);
 });

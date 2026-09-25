@@ -20,27 +20,33 @@ export const READY_MS = 10_000;
 /**
  * Shoot every object × variant × tier on `page` against `base`. Returns what was written, what was blank, and
  * each frame's ink count (pixels off the background) so a caller can bound it from both sides.
- * A page error is rethrown with the page's own message — a stage that throws on its first draw would
- * otherwise surface only as a timeout on `ready`.
+ * A page error is rethrown with the page's own message, on the first wait AND on every shot's wait after it:
+ * a stage that throws inside the frame loop stops `frames` moving, and without this the caller would see only
+ * Playwright's "timeout exceeded" for the wait that followed (round 2 of #715's review). `readyMs` is the test's
+ * way to make that wait short.
  */
-export async function shoot({ page, base, out = OUT_DIR, tiers = TIERS }) {
+export async function shoot({ page, base, out = OUT_DIR, tiers = TIERS, readyMs = READY_MS }) {
   let pageError = null;
   page.on('pageerror', (e) => { pageError ??= e; });
+  /** Wait for `fn(arg)`; if it never comes, say what the page said rather than how long we waited. */
+  const waitFor = async (fn, arg) => {
+    try { await page.waitForFunction(fn, arg, { timeout: readyMs }); }
+    catch (e) { throw pageError ?? e; }
+  };
   await page.goto(`${base}${PAGE}`, { waitUntil: 'networkidle' });
   // `vite preview` answers a missing page with index.html and a 200 (SPA fallback), so a dist/ built by
   // `vite build` alone — bundle-single.mjs does that — would silently load the GAME here.
   const hasHook = await page.evaluate(() => typeof window.__sketch === 'object');
   if (!hasHook) throw new Error(`${base}${PAGE} has no window.__sketch — is dist/sketchbook/ built? (npm run build)`);
-  try { await page.waitForFunction(() => window.__sketch.ready === true, undefined, { timeout: READY_MS }); }
-  catch (e) { throw pageError ?? e; }
+  await waitFor(() => window.__sketch.ready === true, undefined);
   const objects = await page.evaluate(() => window.__sketch.objects());
   if (!objects.length) throw new Error('the sketchbook lists no objects — even the placeholder is missing');
   const shots = [], blank = [], inks = {};
   for (const o of objects) for (const variant of o.variants) for (const tier of tiers) {
     const before = await page.evaluate(() => window.__sketch.frames);
     await page.evaluate(([n, v, t]) => window.__sketch.show(n, v, t), [o.name, variant, tier]);
-    await page.waitForFunction((f) => window.__sketch.frames > f + 2, before, { timeout: READY_MS });   // two real frames after the swap
-    if (pageError) throw pageError;
+    await waitFor((f) => window.__sketch.frames > f + 2, before);   // two real frames after the swap
+    if (pageError) throw pageError;   // a frame that errored but still advanced the counter
     const ink = await page.evaluate(() => window.__sketch.ink());
     const file = join(out, o.name, `${variant}-${tier}.png`);
     mkdirSync(join(out, o.name), { recursive: true });

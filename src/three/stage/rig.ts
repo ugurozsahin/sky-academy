@@ -43,12 +43,25 @@ export function createRig(o: RigOptions): Rig {
   return { scene, camera, key, rim, fill };
 }
 
-/** The renderer for `canvas` at `tier`'s cost. Throws where WebGL is unavailable — the mount keeps its 2-D fallback. */
-export function createRenderer(canvas: HTMLCanvasElement, tier: Tier, pixelRatio = devicePixelRatio || 1): WebGLRenderer {
+/** The part of a renderer a tier change touches — what `applyTier` needs, so it is testable without WebGL. */
+export type TierTarget = Pick<WebGLRenderer, 'setPixelRatio'> & { shadowMap: { enabled: boolean } };
+
+/**
+ * Everything a tier decides about a live renderer: the pixel-ratio cap and the shadow map. Called at
+ * construction AND on every tier change — the sketchbook once set the cap at construction only, so a `low`
+ * frame rendered at `high`'s ratio and the gallery was sharper than a real low-tier tablet (review of #715).
+ * (Antialiasing is a context-creation option and cannot follow; a tier change keeps the renderer's.)
+ */
+export function applyTier(r: TierTarget, tier: Tier, pixelRatio = devicePixelRatio || 1): void {
   const spec = TIERS[tier];
-  const r = new WebGLRenderer({ canvas, antialias: spec.antialias, alpha: true, powerPreference: 'low-power' });
   r.setPixelRatio(Math.min(pixelRatio, spec.maxPixelRatio));
   r.shadowMap.enabled = spec.shadows;
+}
+
+/** The renderer for `canvas` at `tier`'s cost. Throws where WebGL is unavailable — the mount keeps its 2-D fallback. */
+export function createRenderer(canvas: HTMLCanvasElement, tier: Tier, pixelRatio = devicePixelRatio || 1): WebGLRenderer {
+  const r = new WebGLRenderer({ canvas, antialias: TIERS[tier].antialias, alpha: true, powerPreference: 'low-power' });
+  applyTier(r, tier, pixelRatio);
   return r;
 }
 

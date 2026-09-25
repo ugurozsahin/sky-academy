@@ -33,7 +33,10 @@ export function mountControls(model: Model, entries: readonly ObjectSpec[], on: 
   // handler included, and appending the new one at the end of the panel (type-design review of #715).
   const variants = gui.addFolder('variant');
   const addVariant = (o: ObjectSpec) => variants.add(model, 'variant', variantsOf(o)).name('variant').onChange((v: string) => on.variant(v));
-  let variantCtl = addVariant(entries[0]);
+  // Seeded from the model's object, not `entries[0]`: a deep link to the second object would otherwise get
+  // the placeholder's variants and sliders (type-design review, round 2 of #715).
+  const initial = entries.find(e => e.name === model.object) ?? entries[0];
+  let variantCtl = addVariant(initial);
   gui.add(model, 'tier', byLabel).name('tier').onChange((t: Tier) => on.tier(t));
   gui.add(model, 'beside').name('beside the avatar').onChange((b: boolean) => on.beside(b));
   let params = gui.addFolder('params');
@@ -46,7 +49,7 @@ export function mountControls(model: Model, entries: readonly ObjectSpec[], on: 
     for (const [key, spec] of Object.entries(o.params))
       params.add(model.params, key, spec.min, spec.max, (spec.max - spec.min) / 100).onChange(() => on.param(key));
   };
-  rebuild(entries[0]);
+  rebuild(initial);
   return { rebuild, destroy: () => gui.destroy() };
 }
 
