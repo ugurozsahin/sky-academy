@@ -4001,10 +4001,18 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/So before you push/);
     expect(s, 'step 1 — a class you cannot state in a sentence is an instance you have not recognised')
       .toMatch(/Say what the class is, in one sentence/);
+    // #498: unpinned inside step 1's own consequence clause — a rewrite could drop it and every
+    // assertion above still passed, because none of them reads past "in one sentence".
+    expect(s, "and step 1's own test for whether you are holding a class rather than an instance")
+      .toContain('what you are holding is an instance and you have not found the defect yet');
     expect(s, 'step 2 — reading the tables the fix edits is the method that produced the miss')
       .toMatch(/Enumerate it by driving the real code/);
     expect(s, 'and its prohibition, which is the half a softening drops first')
       .toMatch(/never by reading the lists the fix edits/);
+    // #498 (pr-test-analyzer): step 2's own instruction on *how* to drive the real code was
+    // unpinned, sitting between two sentences this issue's earlier round already pinned.
+    expect(s, 'step 2\'s concrete instruction, not only the ban on the shortcut either side of it')
+      .toMatch(/the shipped registry, the real generator, the real routes, with enough seeds to exhaust the draw/);
     expect(s, "and the reason it has to be driven: a derived rail shares the fix's blind spot")
       .toMatch(/shares the fix's blind spot/);
     expect(s, 'step 3 — the instruction, not only the worked example beside it')
@@ -4017,6 +4025,10 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/Put the size in the body/);
     expect(s, 'a count with no enumeration behind it must carry the method that produced it')
       .toMatch(/give the method and the seed count beside it/);
+    // #498: unpinned inside step 4 — the sentence that says *why* the method and seed count are
+    // owed, as opposed to the instruction above that merely asks for them.
+    expect(s, 'and the reason a total alone will not do — a number with no method behind it is unverifiable')
+      .toMatch(/a bare total reads as evidence and is not/);
   });
 
   it('open-pr §4: "cannot enumerate" is an answer with grounds, not an exemption with an excuse', () => {
@@ -4037,6 +4049,12 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/four blocking rounds/);
     expect(s, 'which is the whole point: the round cap cannot fix this, because no round was wrong')
       .toMatch(/Every one of those rounds was correct/);
+    // #498 (pr-test-analyzer): "correct" was pinned, but not the bar it was measured against, or
+    // what a round being correct actually means (one class member, not a wrong call reversed later).
+    expect(s, 'the bar those rounds were measured against, not only the verdict that they cleared it')
+      .toMatch(/met `review-pr` §7's bar/);
+    expect(s, 'what "correct" means here — a member of the class, not a call later reversed')
+      .toMatch(/how many members the class had/);
   });
 
   it('open-pr §4 concedes no exemption, in any of the voices one would be written in', () => {
@@ -4119,6 +4137,21 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toContain('That line is the whole of the evidence');
     expect(a, 'the equivalence the section states — an agent that never ran and one that found nothing must read the same')
       .toContain('an agent that never ran and an agent that found nothing produce the same silence');
+    // #498, round 7 (silent-failure-hunter): §4's reachability test names the disposition for a
+    // finding whose input the code cannot produce, but not why a run should stop there rather than
+    // fixing it anyway — deleting this left the reachability instruction with no reason attached.
+    expect(a, 'the cost of not applying the reachability test — inflating the diff to answer hardening nobody can reach')
+      .toContain('Fixing everything they raise is how a ten-line pin');
+    // #498, round 3 note 6 restated: the same "gap and a result must never be written the same way"
+    // rule the cannot-spawn line exists to serve was itself only pinned by its consequence
+    // (`agents: cannot spawn (subagent)`), never by the rule sentence that names why.
+    expect(a, "the rule the cannot-spawn spelling exists to serve, not only its consequence")
+      .toMatch(/a gap and a result must never be written the same way/);
+    // #498: the agents' own reasoning — forward from input to outcome, never backward to whether the
+    // input can occur — is what makes a finding "a note for the body" rather than "an edit to the
+    // diff"; only the disposition was pinned above, not the reasoning that justifies it.
+    expect(a, "why an unreachable finding is a note and not an edit — the agents reason forward, never backward")
+      .toMatch(/do not reason backwards to whether the input can occur/);
   });
 
   it('review-pr §3: a sweep is handed over as an issue, which is the only form a reviewer may create', () => {
@@ -4141,6 +4174,18 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/linked from your review comment/);
     expect(b, 'the cost it removes: today each round enumerates the class again from nothing')
       .toMatch(/re-derived from scratch next round/);
+    // #498, round 7 (pr-test-analyzer): the instruction to enumerate ("You enumerated a class to
+    // find it") and what the issue must actually hold ("the list itself, or the script that
+    // produces it") were both unpinned — a rewrite could gut the bullet down to its title shape and
+    // three labels and every assertion above still passed.
+    expect(b, 'the premise the bullet opens on — a sweep review already did the enumerating')
+      .toMatch(/every topic, every spelling, every route/);
+    expect(b, 'the content requirement itself, or a sweep issue could carry labels and a title but no list')
+      .toMatch(/the list itself, or the script that produces it/);
+    // #498: the reason a sweep belongs in an issue rather than a comment — who re-derives it if it
+    // is not — was left as a bare consequence ("re-derived from scratch") with no owner named.
+    expect(b, 'who re-derives an undocumented sweep next round, and that it is not free')
+      .toMatch(/by you or by whoever supersedes you/);
 
     const body = bodyCheck();
     expect(body, 'the author-side claim must have a reader on the reviewer side')
@@ -4165,6 +4210,25 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/no look change/);
     expect(body, 'including how that one is settled, which is the part that makes it cheap')
       .toMatch(/CSS diff of the build output/);
+    // #498, round 7 (silent-failure-hunter): the instruction for weighing a sweep claim — ask for
+    // the method first — was itself unpinned, though the three exits it ranks (marker/count/silence)
+    // were. A rewrite could drop the instruction and keep the ranking, leaving nothing that tells a
+    // reviewer what to do with a bare count.
+    expect(body, 'the instruction the ranking above serves — a count is not self-weighing')
+      .toMatch(/Ask for the method before you weigh it/);
+    // #498: the other cheap exit the same sentence names — `SWEEP: NOT ENUMERABLE` on a class that
+    // plainly can be enumerated — was unpinned; only its sibling ("says nothing... has not done
+    // step 4") was.
+    expect(body, "the marker's own misuse — claiming a class can't be enumerated when it plainly can")
+      .toMatch(/on a class the code plainly can enumerate is the cheap exit taken/);
+
+    // #498: `section` (the whole of §3) was declared above and never read — the "s3/bodyCheck overlap
+    // area" this issue's body named as unswept is exactly the part of §3 outside the bullet()/
+    // bodyCheck() sub-windows, and its own budget-rail bullet had no pin of its own anywhere in this
+    // file (`bullet.length …`/`SIZES` etc. pin the *test's* budgets, never review-pr §3's rule that a
+    // budget in reviewed code may only fall).
+    expect(section, "review-pr §3's own budget-rail bullet — a reviewer's own rule, not only the author's")
+      .toMatch(/A budget number may only go down/);
   });
 
   it('the routine prompt points at the sweep from the step that restates §4', () => {
