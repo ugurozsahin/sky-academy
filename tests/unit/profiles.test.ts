@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addOutcome, pickOutcome } from '../../src/ui/profiles';
-import type { AddProfileResult } from '../../src/storage';
+import type { AddProfileResult, SetActiveResult } from '../../src/storage';
 
 /**
  * #20 slice 2 — the two decisions behind "Who is playing?", tested as values.
@@ -12,22 +12,39 @@ import type { AddProfileResult } from '../../src/storage';
  * one fails here.
  */
 describe('pickOutcome (#20 slice 2 — tapping a sibling\'s card)', () => {
+  const ok: SetActiveResult = { ok: true };
+  const unknown: SetActiveResult = { ok: false, why: 'unknown' };
+  const store: SetActiveResult = { ok: false, why: 'store' };
+
   it('moves the child, with the id to move them to, only when the store accepted the switch', () => {
-    expect(pickOutcome('p2', true)).toEqual({ move: true, id: 'p2' });
+    expect(pickOutcome('p2', () => ok)).toEqual({ move: true, id: 'p2' });
   });
 
   it('refuses with a reason when the store did not, and carries no id to move anyone with', () => {
-    const o = pickOutcome('p2', false);
+    const o = pickOutcome('p2', () => store);
     expect(o.move).toBe(false);
     expect(o).not.toHaveProperty('id');            // the caller cannot move a child off a refusal, even by mistake
     expect(o.move === false && o.hint).toContain('will not let the game save');
   });
 
+  it('tells the two refusals apart, the same as addOutcome does (#401 item 5)', () => {
+    const hintOf = (r: SetActiveResult) => { const o = pickOutcome('p2', () => r); return o.move ? null : o.hint; };
+    expect(hintOf(unknown)).toContain('not on this device any more');
+    expect(hintOf(store)).toContain('will not let the game save');
+    expect(hintOf(unknown), 'a stale card is not the browser\'s fault, and should not read as one').not.toBe(hintOf(store));
+  });
+
   it('the store\'s answer is the only thing that decides — the id never overrides it', () => {
     for (const id of ['p1', 'p2', 'p3', 'p4'] as const) {
-      expect(pickOutcome(id, true)).toEqual({ move: true, id });
-      expect(pickOutcome(id, false).move).toBe(false);
+      expect(pickOutcome(id, () => ok)).toEqual({ move: true, id });
+      expect(pickOutcome(id, () => store).move).toBe(false);
     }
+  });
+
+  it('asks the committer for this card\'s own id, never a different one (#401 item 3)', () => {
+    const seen: string[] = [];
+    pickOutcome('p3', id => { seen.push(id); return ok; });
+    expect(seen).toEqual(['p3']);          // one call, and it is the id the caller tapped — nothing else to pass it
   });
 });
 

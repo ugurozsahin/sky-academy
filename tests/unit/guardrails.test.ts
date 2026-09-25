@@ -189,10 +189,37 @@ describe('guard rails', () => {
   // `src/native.ts`'s `plugin()`, which reads all three off the injected bridge rather than importing any of
   // them, so none is a static or dynamic `import` anywhere in `src/` (checked below alongside the empty
   // `dependencies` list, since that only proves neither is a *runtime* dependency of the web build).
+  // #684 (owner, in session, 2026-09-24): `three` is the first runtime dependency — the 3-D solids on the
+  // 3-D Shapes cards are three.js primitives — and `@types/three` is its typings (three ships none). The
+  // spike measured the cost in its pull request; the owner decides on the issue whether it stays. Both
+  // lists are exact, so a second runtime dependency is still a red build until it is argued for here.
   it('dependencies match the allowlist below (CLAUDE.md explains the rule)', () => {
-    const allowed = ['@capacitor/android', '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', 'typescript', 'vite', 'vitest'];
-    expect(Object.keys((pkg as { dependencies?: object }).dependencies ?? {})).toEqual([]);   // nothing but our own code ships to the browser
+    const allowed = ['@capacitor/android', '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', '@types/three', 'typescript', 'vite', 'vitest'];
+    expect(Object.keys((pkg as { dependencies?: object }).dependencies ?? {})).toEqual(['three']);   // #684: the one thing that ships to the browser beside our own code
     expect(Object.keys((pkg as { devDependencies?: object }).devDependencies ?? {}).sort()).toEqual([...allowed].sort());
+  });
+
+  // #684: three.js is ~130 kB gzipped and does not tree-shake, so it must never reach the main chunk. Two
+  // properties keep it out, and a third keeps the single-file build honest:
+  //   1. exactly one module imports `three` — `src/game/solids.ts`;
+  //   2. that module is reached only through a dynamic `import()` (a `import type` is erased and is fine),
+  //      which is what makes Vite emit it as its own lazy chunk;
+  //   3. `solids.ts` imports nothing from `src/`, so its chunk is self-contained — `scripts/bundle-single.mjs`
+  //      inlines it as a data-URL module, which cannot reach back into the main chunk.
+  // Proved red: a static `import { SolidView } from '../game/solids'` in a scratch `src/` file fails (2);
+  // `import { Color } from 'three'` in `src/ui/solid.ts` fails (1); `import { $ } from '../ui/dom'` in
+  // solids.ts fails (3). Text rails, over `code()` (comments may name the ban): they see spellings, not the
+  // built output — the chunk sizes in the pull request body are the other half of the evidence.
+  it('three is imported by src/game/solids.ts alone, which is only ever loaded dynamically (#684)', () => {
+    const SOLIDS = '/src/game/solids.ts';
+    expect(SOURCES[SOLIDS], 'the module this rail is about must exist').toBeTruthy();
+    const threeImporters = Object.entries(SOURCES).filter(([, src]) => /\bfrom\s*['"]three['"]|\bimport\s*\(\s*['"]three['"]|\brequire\s*\(\s*['"]three['"]/.test(code(src))).map(([f]) => f);
+    expect(threeImporters).toEqual([SOLIDS]);
+    const staticSolids = Object.entries(SOURCES).filter(([f, src]) => f !== SOLIDS && /\bimport\s+(?!type\b)[^;()]*?\bfrom\s*['"][^'"]*\/solids['"]/.test(code(src))).map(([f]) => f);
+    expect(staticSolids, 'a static import of solids.ts pulls three into the main chunk').toEqual([]);
+    const dynamicSolids = Object.entries(SOURCES).filter(([f, src]) => f !== SOLIDS && /\bimport\s*\(\s*['"][^'"]*\/solids['"]\s*\)/.test(code(src))).map(([f]) => f);
+    expect(dynamicSolids, 'the one lazy loader').toEqual(['/src/ui/solid.ts']);
+    expect(code(SOURCES[SOLIDS]), 'solids.ts must not import from src/ — its chunk is inlined stand-alone by bundle-single.mjs').not.toMatch(/\bfrom\s*['"]\.{1,2}\//);
   });
 
   // #110/#699: `@capacitor/filesystem`/`@capacitor/share`/`@capacitor/app` exist only so `npx cap sync`
@@ -296,7 +323,7 @@ describe('guard rails', () => {
   // 2. Boot shows it only when siblings actually share the device. Nothing changes for today's players,
   //    which is the owner's decision at the top of #20, and `> 1` is the whole of it.
   // 3. The store is asked before the child is moved: a `go(...)` that did not wait for
-  //    `setActiveProfile` to return true would drop a child into a sibling's game on a store that refuses.
+  //    `setActiveProfile` to accept the switch would drop a child into a sibling's game on a store that refuses.
   // 4. Drawing a card never goes through `load()`/`save()` — those resolve and latch *this session's*
   //    profile, so reading a sibling's name through them would answer the wrong child or bind the session
   //    to them. `profileCard()` reads the slot key directly for that reason.
@@ -320,13 +347,19 @@ describe('guard rails', () => {
   // only on the accepted arm — so falling out of the refusal is a type error, caught by `tsc`, not a rail.
   it('the picker moves a child only once the store has accepted the switch (#20 slice 2)', () => {
     const pick = code(SOURCES['/src/ui/profiles.ts']);
-    expect(pick, "the store is asked, and its answer is the decision's only input").toMatch(/pickOutcome\(id, setActiveProfile\(id\)\)/);
+    expect(pick, "the store is asked, and its answer is the decision's only input").toMatch(/pickOutcome\(c\.id, setActiveProfile\)/);
     expect(pick.match(/\bgo\(/g) ?? [], 'one call site for go(), inside the guarded handler').toHaveLength(1);
     expect(pick, 'and the child is moved with the id off the accepted arm').toMatch(/go\(o\.id\)/);
     expect(pick, 'the same shape for "New ninja": onboarding starts on the added profile').toMatch(/onNew\(o\.id\)/);
     // Both refusals are told apart on screen (#335 item 2): a picker that shows one sentence for both tells a
-    // child with four siblings that their browser is broken, or the reverse.
-    expect(pick).toMatch(/why === 'full'/);
+    // child with four siblings that their browser is broken, or the reverse. A `Record`, not the ternary this
+    // used to pin (#401 item 2): a third refusal reason missing from it is a `tsc` error here, not a silent
+    // fallback to one of the two sentences a rail this shallow could not have told apart either.
+    // The call site, not the declaration (PR #590 review round 1): `Record<AddRefusal, string>` alone matches
+    // anywhere in the file, so a revert of `addOutcome` back to the ternary left the now-dead `ADD_HINTS`
+    // declaration sitting unused beside it and this rail green throughout — reproduced and confirmed by two
+    // independent reviewers. Pinning `hint: ADD_HINTS[r.why]` reads the use, not a type sitting nearby.
+    expect(pick).toMatch(/hint: ADD_HINTS\[r\.why\]/);
     // And both are read aloud, not only printed — `.claude/rules/style.md`, "read-aloud everywhere" (B6).
     // Two halves, because this rail can only ever hold one of them. It reads `refuse`'s *definition*, and
     // deleting both calls left `tsc` clean and 1436/1436 green while a refused tap did nothing at all — no
@@ -428,9 +461,10 @@ describe('guard rails', () => {
     const store = code(SOURCES['/src/storage.ts']);
     const card = store.slice(store.indexOf('export function profileCard('), store.indexOf('\n}', store.indexOf('export function profileCard(')));
     // The card still answers blank for every blob `migrate()` refuses — it now also says *which* refusal, so a
-    // screen can stop claiming "this ninja has not played" about bytes it could not read (#420 review B2). The
-    // gate is unchanged; only the shape of the blank card grew.
-    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.blank, future: isFutureSave\(s\) \};/);
+    // screen can stop claiming "this ninja has not played" about bytes it could not read (#420 review B2), and
+    // can tell a newer build's save apart from a `v` no build ever wrote (#431 review item 3). The gate is
+    // unchanged; only the shape of the blank card grew.
+    expect(card, 'the card applies the same gate migrate() does').toMatch(/if \(!isMigratable\(s\)\) return \{ id, state: isFutureSave\(s\) \? 'future' : 'corrupt' \};/);
     expect(store.slice(store.indexOf('function migrate(')), 'and that gate is still the one load() goes through').toMatch(/if \(!isMigratable\(s\)\) return \{ \.\.\.DEFAULT \};/);
     // `future` is the *narrower* question, not `!isMigratable` renamed: an unreadable `v` is deliberately not
     // protected — `load()` resets over it and writes resume — so only a genuinely newer save refuses a delete.
@@ -825,6 +859,31 @@ describe('guard rails', () => {
       const files = Object.entries(SOURCES).filter(([, s]) => code(s).includes(glyph)).map(([f]) => f);
       expect(files, `${glyph} should live only in curriculum/util.ts`).toEqual(['/src/curriculum/util.ts']);
     }
+  });
+
+  // #453 item 2: `repeatKey` (`src/game/session.ts`) keys a `' · '`-separated `hint`/`listen` as a **set**,
+  // sorted rather than left in draw order, on the premise that the three generators building an *unordered*
+  // list (`y1-soundhunt`'s `listen`, `y1-mass`'s and `y2-temp`'s `hint`) are the only places the separator
+  // reaches a `Question`'s content fields. Nothing pinned that premise: the first generator writing an
+  // *ordered* `' · '` list — steps, a timetable, a sequence read aloud — would collapse two different
+  // questions onto one key in silence, since sorting an ordered list the same way an unordered one is sorted
+  // is exactly what makes them equal. This rail is the inventory: a fourth `hint`/`listen` line carrying the
+  // separator fails it, which is the point at which someone decides whether the list it carries is genuinely
+  // order-free before letting it stand.
+  it("' · ' reaches a hint/listen field only from the three generators contentList's premise names (#453 item 2)", () => {
+    // The exact three lines, not a count (PR #692 review round 1): a count plus "each file represented" lets a
+    // swap through — drop one of maths.ts's two known lines while adding an unrelated new one to the same
+    // file, and both the total and the per-file presence check stay exactly as they were. Pinning the lines
+    // themselves is what a swap cannot pass through unnoticed.
+    const hits = inDir('/src/curriculum/').flatMap(([file, src]) =>
+      code(src).split('\n')
+        .filter(line => /\b(?:hint|listen):/.test(line) && line.includes(' · '))
+        .map(line => `${file}: ${line.trim()}`));
+    expect(hits, "a new or changed ' · ' hint/listen line — check it is genuinely unordered before updating this list").toEqual([
+      "/src/curriculum/maths.ts: hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,",
+      "/src/curriculum/maths.ts: return wordQ(rng, `Which was ${warmer ? 'warmer' : 'colder'}?`, first ? ca : cb, [first ? cb : ca], { hint: `${ca}: ${a}°C · ${cb}: ${b}°C`, hintIsData: true, say: `${ca} was ${a} degrees. ${cb} was ${b} degrees. Which was ${warmer ? 'warmer' : 'colder'}?` });",
+      "/src/curriculum/writing.ts: return wordQ(rng, '🔊 Listen!', g, ds, { say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}` });",
+    ]);
   });
 
   // #44: the FIRST wave must spawn behind the font gate. Canvas text bakes in whichever face is loaded when
@@ -1882,10 +1941,13 @@ describe('the tablet layout rails (#107, #109)', () => {
 // complement #107 asks for by name, and it is the exhaustive half: it holds the *arithmetic* for every
 // `--slot` the stylesheet declares, at every viewport, for the two-group and take-away variants too.
 //
-// 0.801 is not a preference. Every emoji in `OBJECTS` advances 1.248 em (measured: all ten identical,
-// Noto Color Emoji's 2550/2048 design width), so a glyph is inside its slot only while
-// font-size <= slot / 1.248 = 0.801 * slot. A ratio above that is the bug returning, whatever it looks
-// like in the browser CI happens to have.
+// 0.801 is the exact-fit line, not the rail's bound. Every emoji in `OBJECTS` advances 1.248 em (measured:
+// all ten identical, Noto Color Emoji's 2550/2048 design width), so a glyph is inside its slot only while
+// font-size <= slot / 1.248 = 0.801 * slot — but #594 found the game shipping at 0.78, ~3% of headroom at
+// the `--slot` clamp's own 40px cap (the size a tablet in portrait sits at), against a font metric measured
+// from one face this game is not guaranteed to render with. 0.72 is the rail's bound so the margin cannot
+// silently drift back to that: it leaves at least ~10% in hand under the exact-fit line, whatever ratio a
+// future change picks below it.
 //
 // The stylesheet is read with readFileSync, not the `?raw` glob at the top of this file: Vite's css
 // plugin returns an empty string for CSS outside the browser, which would make this rail pass vacuously.
@@ -1908,8 +1970,8 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
     .toBe(objDecls);
   expect(objDecls, '--obj must be declared at least once (#107)').toBeGreaterThanOrEqual(1);
   for (const k of ratios)
-    expect(k, `an emoji advances 1.248em, so ${k} * slot paints outside the slot — #107 exactly`)
-      .toBeLessThanOrEqual(0.801);
+    expect(k, `0.801 is the exact-fit line for a 1.248em advance; ${k} leaves less than #594's ~10% margin`)
+      .toBeLessThanOrEqual(0.72);
 
   // The box half: if `.slot` goes back to its own viewport clamp, the single source of truth is gone and
   // the ratio above is measured against a width nothing else uses.
@@ -1917,6 +1979,22 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
   expect(slotWidth, 'the slot must take its width from --slot, so box and glyph cannot drift apart (#107)')
     .toBe('var(--slot)');
 });
+
+// #594: two text-matching rails lived here through six review rounds — one for the `@media (…max-height…)`
+// gate, one enumerating "every sizing property" a `.tenframe` selector could carry. Both kept losing to a
+// new CSS spelling every round (a compound selector, a shorthand, a logical property, case, a `calc()`
+// wrapper) because CSS has an unbounded number of ways to say "this is a fixed size", and grepping stylesheet
+// *text* for that claim cannot terminate. The reviewer's own conclusion, round 7: replace text-matching with
+// a rendered-geometry assertion — measure what the browser actually computed, which is insensitive to how
+// the CSS that produced it was spelled — or drop the text rail and lean on what already holds. Both text
+// rails are gone; what replaces them:
+//   - the `--obj` ratio bound above (still a real, mutation-tested arithmetic guarantee — a ratio is a
+//     number, not a spelling, so there's no unbounded set of ways to write it);
+//   - `tests/e2e/viewport.spec.ts`'s "the ten-frame shrinks to fit an unrealistically narrow card" and
+//     "the five-frame glyph is sized from --obj even inside a height gate" — real browser measurements of
+//     `.tenframe`'s and `.objs .obj`'s ACTUAL rendered size, which catches a fixed 140px/24px/16px/whatever
+//     future spelling produces one, because it is never fooled by how the fixed size was written, only by
+//     whether the element is genuinely, still, this many pixels wide.
 
   // #109: the grown-ups dashboard laid itself out 936 px wide inside an 800 px portrait tablet, at every
   // tablet size alike, because the width never came from the viewport. `.p-year-row span` carried
@@ -2111,6 +2189,18 @@ describe('the opening screen asks for a name where it can be seen (#110)', () =>
       .toMatch(/canStart\(/);
     expect(nameScreenBody, 'and the name input must re-check on every keystroke, or the button never enables (#110)')
       .toMatch(/#name[\s\S]*?addEventListener\('input'|addEventListener\('input'[\s\S]*?sync/);
+  });
+
+  // #424: the wizard's own `save({ name: nameEl.value.trim() })` was the one write path with no length bound
+  // at all — `maxlength` is a browser courtesy a paste or an autofill walks past. `cleanName()` is the shared
+  // clamp `renameProfile` and Restore both apply; a bare `.trim()` here is the bug coming back. This is a
+  // text rail: it cannot see a `cleanName` that itself stopped truncating — `storage.test.ts`'s `#424` test
+  // covers that behaviourally.
+  it('the #go click handler saves through cleanName, not a bare .trim() (#424)', () => {
+    const go = nameScreenBody.match(/\$\('#go'\)\.addEventListener\('click',[\s\S]*?\}\);/)?.[0];
+    expect(go, "the #go click handler must exist in nameScreen's body").toBeTruthy();
+    expect(go, 'it must clamp through cleanName(), the one home of the NAME_MAX rule').toMatch(/cleanName\(nameEl\.value\)/);
+    expect(go, 'a bare .trim() with no cleanName call is the #424 bug').not.toMatch(/name:\s*nameEl\.value\.trim\(\)/);
   });
 });
 

@@ -1483,6 +1483,51 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
 
+  test('a viewport resize mid-trace rebuilds the mask instead of scoring against a stale one (#592)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-trace');
+    const word = (await state(page)).answer as string;
+    expect(word.length).toBeGreaterThanOrEqual(2);
+    await page.evaluate((n) => window.__sna.tracer.autoTrace([...Array(n).keys()]), word.length - 1);
+    let r = await page.evaluate(() => window.__sna.tracer.result());
+    expect(r.pass).toBe(false); expect(r.coverage).toBeGreaterThan(0.3);
+    const beforeWidth = await page.evaluate(() => window.__sna.tracer.canvas.width);
+    const size = page.viewportSize()!;
+    await page.setViewportSize({ width: size.height, height: size.width });   // simulate a rotation
+    await page.waitForFunction((w) => window.__sna.tracer.canvas.width !== w, beforeWidth);
+    // the mask rebuild is also what clears the stale progress — scoring it against the new box instead
+    // of resetting it would silently carry a coverage figure computed for a canvas that no longer exists
+    r = await page.evaluate(() => window.__sna.tracer.result());
+    expect(r.coverage).toBe(0);
+    expect(await page.evaluate(() => window.__sna.tracer.strokes)).toBe(0);
+    expect(await answer(page)).toBe(true);          // a fresh trace against the rebuilt mask still passes
+    await expect(page.locator('.toast.good')).toBeVisible();
+  });
+
+  // pr-test-analyzer (#592 review): the two prior tests both drive the tracer through autoTrace(), which never
+  // touches `drawing`/`last` — so nothing exercised the actual reported trigger, a finger still down when the
+  // tablet rotates. This drives it with a real held pointer instead.
+  test('a real stroke held down through a rotation does not resume against the rebuilt mask (#592)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-trace');
+    await expect(page.locator('#trace')).toBeVisible();
+    const box = (await page.locator('#trace').boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();                                                  // finger still down…
+    expect(await page.evaluate(() => window.__sna.tracer.strokes)).toBe(1);
+    const size = page.viewportSize()!;
+    await page.setViewportSize({ width: size.height, height: size.width });   // …when the tablet rotates
+    await page.waitForFunction(() => window.__sna.tracer.strokes === 0);      // setup() reset the in-progress stroke
+    const newBox = (await page.locator('#trace').boundingBox())!;
+    await page.mouse.move(newBox.x + 10, newBox.y + 10);        // the same held pointer's next move, now over the new box
+    await page.mouse.up();
+    // a stray move/up from the pre-rotation drag must be a no-op — not a stroke painted against the rebuilt mask
+    expect(await page.evaluate(() => window.__sna.tracer.strokes)).toBe(0);
+    expect(await page.evaluate(() => window.__sna.tracer.result().coverage)).toBe(0);
+    expect(await answer(page)).toBe(true);                      // the rebuilt mask is still usable afterwards
+    await expect(page.locator('.toast.good')).toBeVisible();
+  });
+
   test('back button steps back one screen: play → island → sky map (Android/browser history)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
@@ -2277,6 +2322,8 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#move-msg')).toContainText('Tap Restore again');   // never on one tap
     await page.click('#restore-go');
     await expect(page.locator('#move-msg')).toContainText('Restored');
+    // #426: the redraw this confirmation follows resets scroll to the top, and #move-msg sits well below it.
+    await expect(page.locator('#move-msg')).toBeInViewport({ ratio: 1 });
     await expect(page.locator('.p-extra')).toContainText('456 coins');
     await expect(page.locator('.isl-head small')).toContainText('Rye');
     expect(JSON.parse(await page.inputValue('#save-code')).coins).toBe(456);
@@ -2695,6 +2742,39 @@ test.describe('profile picker (#20 slice 2)', () => {
     await expect(page.locator('.home'), 'never the map with an empty profile (#67)').toHaveCount(0);
   });
 
+  /**
+   * #431 review item 2. The grown-ups list was fixed (#420/#431) to say *why* a sibling's card is blank —
+   * "Saved by a newer version" or "Cannot be read on this device" — rather than "Not started yet", but the
+   * picker one screen over kept the flat `{ future; corrupt }` fields it never checked and drew the same two
+   * states as an ordinary unplayed slot. A family could read "Not started yet" about a real save with real
+   * coins on it, on the one screen a pre-reader picks by. `ProfileCard` moving to a discriminated union makes
+   * reading `.onboarded`/`.name` without checking `.state` first a compile error, closing the picker's half of
+   * the gap the grown-ups half was already fixed for.
+   */
+  test("a newer-build or unreadable sibling's card says why on the picker too, not \"Not started yet\" (#431 review item 2)", async ({ page }) => {
+    await page.addInitScript(({ index, ada, future, corrupt }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', future);
+        localStorage.setItem('sna:v1:p3', corrupt);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2', 'p3'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      future: JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99, spent: 0, onboarded: true }),
+      corrupt: JSON.stringify({ v: 'banana', name: 'Cass', avatar: 'kai', coins: 500, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+
+    const newer = page.locator('.avatar-card[data-profile="p2"]'), unreadable = page.locator('.avatar-card[data-profile="p3"]');
+    await expect(newer).toContainText('Saved by a newer version');
+    await expect(newer, 'not the sentence an unplayed slot gets').not.toContainText('Not started yet');
+    await expect(unreadable).toContainText('Cannot be read on this device');
+    await expect(unreadable, 'never "has not played" about 500 coins this build could not parse the version of').not.toContainText('Not started yet');
+  });
+
   test('a fourth ninja is the last: the New ninja card goes when the device is full', async ({ page }) => {
     await seedSiblings(page);
     await page.goto('/');
@@ -3005,6 +3085,9 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
     await page.fill('.p-prof-in[data-name="p2"]', 'Bobby');
     await page.click('button[data-rename="p2"]');
     await expect(page.locator('#prof-msg')).toHaveText('Renamed to Bobby.');
+    // #426: the redraw this confirmation follows resets scroll to the top, and #prof-msg sits below the
+    // stats grid and topic tables — off screen exactly when it has something to say.
+    await expect(page.locator('#prof-msg')).toBeInViewport({ ratio: 1 });
     await expect(page.locator('.p-prof[data-prof="p2"] b'), 'the row redraws from the store').toHaveText('Bobby');
     await expect(page.locator('.parents-dash'), 'and the child playing is untouched — the heading is still theirs').toContainText('Ada');
 
@@ -3030,12 +3113,50 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
     await expect(page.locator('#change-av'), 'and so is the map, without a reload').toContainText('Ada Two');
   });
 
+  /**
+   * #431 review, "test coverage" section, last bullet: `renameProfile`'s success message is built from
+   * `r.name` — the name **as stored**, trimmed and truncated by `cleanName` — not from the input's raw value,
+   * because that is what the row redraws with. Every rename test above types a name with no leading or
+   * trailing space and well under `NAME_MAX`, so `r.name` and `input.value` are identical strings and
+   * swapping one for the other in `profMsg`'s call would still pass them.
+   *
+   * Two ways to pull them apart, both exercised here: padding with spaces (kept under `maxlength` so the
+   * browser's own fill pipeline never clips it), and a name past `NAME_MAX` set directly on the input's
+   * `.value` — `page.fill` goes through the same input pipeline as typing and is itself clipped at
+   * `maxlength`, so genuinely exceeding it needs the paste-equivalent `NAME_MAX`'s own docstring names as
+   * the way past a browser courtesy.
+   */
+  test('the rename confirmation names the stored name, not what was typed', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await page.fill('.p-prof-in[data-name="p1"]', '  Bobby  ');
+    await page.click('button[data-rename="p1"]');
+    await expect(page.locator('#prof-msg')).toHaveText('Renamed to Bobby.');
+    await expect(page.locator('.parents-dash')).toContainText('Bobby');
+
+    // Past NAME_MAX (14): trim then a 14-grapheme cut — 'Alexanderis The Great' → 'Alexanderis Th'.
+    await page.evaluate(() => {
+      const input = document.querySelector<HTMLInputElement>('.p-prof-in[data-name="p1"]')!;
+      input.value = '  Alexanderis The Great  ';
+    });
+    await page.click('button[data-rename="p1"]');
+    await expect(page.locator('#prof-msg')).toHaveText('Renamed to Alexanderis Th.');
+    await expect(page.locator('.parents-dash')).toContainText('Alexanderis Th');
+  });
+
   test('a blank name is refused, and the refusal says so rather than clearing the row', async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada');
     await openGrownUps(page);
     await page.fill('.p-prof-in[data-name="p1"]', '   ');
+    const beforeClick = await page.evaluate(() => window.scrollY);
     await page.click('button[data-rename="p1"]');
     await expect(page.locator('#prof-msg')).toHaveText('A ninja needs a name — type one in first.');
+    // #426: a refusal never redraws, so profMsg's scroll:false is the one deliberate exception to its
+    // default scroll-into-view — pinned by measuring the jump rather than asserting exact equality, since
+    // Playwright's own click-into-view already moves the page a little (measured: ~13px here) before this
+    // runs. `scrollIntoView({ block: 'center' })` firing moves it far past that (measured: ~370px).
+    const afterClick = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(afterClick - beforeClick), 'a refusal that never redraws must not jump the page to centre the message').toBeLessThan(50);
     await expect(page.locator('#prof-msg')).toHaveClass(/bad/);
     await expect(page.locator('.p-prof[data-prof="p1"] b')).toHaveText('Ada');
   });
@@ -3183,6 +3304,40 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
   });
 
   /**
+   * #431 review item 3. A `v` no build ever wrote is a different blank than `future` — `load()` resets over
+   * it, so it is not a newer build's save the family must open elsewhere — but it used to draw exactly like
+   * an unplayed slot, and Remove reported success on a real name and coins the row had just claimed did not
+   * exist. Unlike `future`, Remove stays on offer here (`load()` would reset over the slot anyway); only the
+   * wording must stop claiming the ninja never played.
+   */
+  test('a save with an unreadable version says it cannot be read, not that the ninja never played, and stays removable', async ({ page }) => {
+    await page.addInitScript(({ index, ada, broken }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', broken);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      broken: JSON.stringify({ v: 'banana', name: 'Bo', avatar: 'blaze', coins: 500, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await page.click('.avatar-card[data-profile="p1"]');
+    await openGrownUps(page);
+    const unreadable = page.locator('.p-prof[data-prof="p2"]');
+    await expect(unreadable).toContainText('Cannot be read on this device');
+    await expect(unreadable, 'never "has not played" about 500 coins this build could not parse the version of')
+      .not.toContainText('has not played');
+    await expect(unreadable, 'and never the "newer version" sentence — nothing else is waiting for this save').not.toContainText('newer version');
+    await expect(unreadable.locator('.p-prof-in'), 'no name to change').toHaveCount(0);
+    await expect(page.locator('button[data-del="p2"]'), 'unlike a future save, this slot can still be taken back').toHaveCount(1);
+    await page.click('button[data-del="p2"]');
+    await page.click('#prof-go');
+    await expect(page.locator('.p-prof')).toHaveCount(1);
+  });
+
+  /**
    * #446. The row above withholds Remove on the *future* slot itself — 99 coins behind it — but that alone
    * still let a grown-up remove the *readable* sibling and strand the family: with p2 unreadable by this
    * build, taking p1 out leaves an index whose one remaining id resolves to a save this build cannot open,
@@ -3236,5 +3391,125 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
     await page.goto('/');
     await expect(page.locator('.profile-screen'), 'back to a one-profile device').toHaveCount(0);
     await expect(page.locator('#change-av')).toContainText('Ada');
+  });
+});
+
+/**
+ * #684 — a real, rotating 3-D solid on the question side of the two 3-D Shapes topics, rendered by three.js
+ * from a lazy chunk. The `solid()` hook reports name / frames / WebGL so the tests never read pixels.
+ *
+ * The draw is pinned, not sampled (the #278 rule): at d1 both generators only ever ask "Which is a …?" — no
+ * visual — and from d2 `y2Shapes` reaches its counting card when `rng() < 0.4` is false, picking `SHAPES_3D[5]`
+ * (the cuboid) at `rng() = 0.9`. Stage 1 is cleared with the real rng, then the session's rng is pinned before
+ * "Next" so stage 2's first card is deterministic. `rng` is TS-private on `Session`, hence the cast.
+ */
+test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
+  test('a Year 2 shapes card shows a rotating WebGL solid where the emoji was, and nothing else does', async ({ page }) => {
+    test.setTimeout(90_000);
+    await seedPlayer(page);
+    const chunks: string[] = [];   // the lazy chunk's requests: one per screen, the first time a solid is wanted
+    page.on('request', r => { if (/solids-.*\.js/.test(r.url())) chunks.push(r.url()); });
+    await startTopic(page, 'year2', 'y2-shapes');
+    // Stage 1: "Which is a …?" has no card visual, so no card solid — its bubbles carry the solids instead.
+    expect(await page.evaluate(() => window.__sna.solid())).toBeNull();
+    expect(await page.locator('#vis canvas').count()).toBe(0);
+    const perStage = await page.evaluate(() => window.__sna.session.perStage);
+    await answerAll(page, perStage);
+    await expect(page.locator('.celebrate')).toBeVisible();
+    expect(chunks, 'the bubbles of stage 1 already asked for three, once').toHaveLength(1);
+    await page.evaluate(() => { (window.__sna.session as any).rng = () => 0.9; });
+    await page.click('#next');
+    await page.waitForFunction(() => window.__sna.state().stage === 2);
+    expect(await state(page)).toMatchObject({ prompt: 'How many flat faces has a cuboid?' });
+    await page.waitForFunction(() => (window.__sna.solid()?.frames ?? 0) > 5, null, { timeout: 20_000 });
+    const solid = await page.evaluate(() => window.__sna.solid());
+    expect(solid).toMatchObject({ name: 'cuboid', webgl: true, error: null });
+    expect(chunks, 'the card reuses the screen\'s one renderer: no second download, no second GL context').toHaveLength(1);
+    // The canvas replaced the emoji card rather than sitting beside it, and it keeps drawing.
+    expect(await page.locator('#vis .wordcard').count()).toBe(0);
+    await expect(page.locator('#vis .solid canvas')).toBeVisible();
+    await page.waitForFunction(f => (window.__sna.solid()?.frames ?? 0) > f + 5, solid!.frames);
+    // Layout: the card with a solid still leaves the arena most of the phone, and the bubbles are not shrunk —
+    // a bubble's radius comes from its label, never from the card above it.
+    await waitForTarget(page);
+    const m = await page.evaluate(() => ({
+      card: (document.querySelector('.qcard') as HTMLElement).getBoundingClientRect().bottom,
+      H: window.innerHeight, r: Math.max(...window.__sna.bubbles().map(b => b.r)),
+    }));
+    console.log(`[#684 layout] card bottom=${m.card.toFixed(0)} of ${m.H}, bubble r=${m.r}`);
+    expect(m.card).toBeLessThanOrEqual(m.H * 0.5);
+    expect(m.r).toBeGreaterThanOrEqual(30);
+    // A drag turns the solid and is NOT a tap on the card (which reads the question again); a plain tap still is.
+    const box = (await page.locator('#vis .solid canvas').boundingBox())!;
+    const spun = await page.evaluate(() => window.__sna.solid()!.frames);
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2); await page.mouse.down();
+    for (let i = 1; i <= 5; i++) await page.mouse.move(box.x + box.width * (0.3 + 0.08 * i), box.y + box.height / 2);
+    await page.mouse.up();
+    expect(await page.evaluate(() => document.querySelector('.qcard')!.classList.contains('pulse'))).toBe(false);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    expect(await page.evaluate(() => document.querySelector('.qcard')!.classList.contains('pulse'))).toBe(true);
+    expect(await page.evaluate(() => window.__sna.solid()!.frames)).toBeGreaterThan(spun);
+  });
+
+  test('guard rail: leaving the play screen releases the solid\'s WebGL context with the arena', async ({ page }) => {
+    test.setTimeout(90_000);
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-shapes');
+    const perStage = await page.evaluate(() => window.__sna.session.perStage);
+    await answerAll(page, perStage);
+    await page.evaluate(() => { (window.__sna.session as any).rng = () => 0.9; });
+    await page.click('#next');
+    await page.waitForFunction(() => (window.__sna.solid()?.frames ?? 0) > 5, null, { timeout: 20_000 });
+    // A GL context per play screen would hit the browser's context cap after a few play → back → play round
+    // trips (the #73 teardown incident, one canvas over). `destroy()` forces the context lost; the canvas is
+    // kept by hand so the loss can be read after the screen is gone.
+    await page.evaluate(() => { (window as any).__deadSolid = document.querySelector('#vis .solid canvas'); history.back(); });
+    await expect(page.locator('.island-screen')).toBeVisible();
+    const after = await page.evaluate(() => {
+      const c = (window as any).__deadSolid as HTMLCanvasElement;
+      const gl = c.getContext('webgl2') ?? c.getContext('webgl');
+      return { lost: gl ? gl.isContextLost() : 'no context', attached: document.contains(c), sna: typeof window.__sna };
+    });
+    expect(after).toEqual({ lost: true, attached: false, sna: 'undefined' });
+  });
+
+  test('a "Which is a …?" wave spins a tinted solid inside every shape bubble, and keeps the arena at speed', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-shapes3d');   // Year 1, stage 1 = d1: every card is "Which is a …?", glyph bubbles
+    await waitForTarget(page);
+    const want = await page.evaluate(() => window.__sna.session.current!.options);
+    await page.waitForFunction(() => (window.__sna.solidArt()?.draws ?? 0) > 20, null, { timeout: 20_000 });
+    const art = await page.evaluate(() => window.__sna.solidArt()!);
+    expect(art.error).toBeNull();
+    const GLYPH: Record<string, string> = { '🎲': 'cube', '⚽': 'sphere', '🥫': 'cylinder', '🍦': 'cone', '🔺': 'pyramid', '🧱': 'cuboid' };
+    for (const g of want) expect(art.ready, `${g} has a baked spin sheet`).toContain(GLYPH[g]);
+    expect(await page.evaluate(() => window.__sna.solid())).toBeNull();   // no card solid on these questions
+    // Frames AND the arena clock, measured while the art bubbles fly (#73's lesson): the first cut of this drew
+    // 60 rAF frames a second while each took long enough that the arena clock ran at 0.4× — bubbles fell before
+    // a child could reach them. Bubble art is a `drawImage` per bubble, never a GL render.
+    const [fps, ratio, drew] = await page.evaluate(() => new Promise<[number, number, number]>(res => {
+      const a = window.__sna.arena!, t0 = a.time, w0 = performance.now(), d0 = window.__sna.solidArt()!.draws; let n = 0;
+      const tick = () => { n++; const el = performance.now() - w0;
+        if (el < 2000) requestAnimationFrame(tick); else res([n / (el / 1000), (a.time - t0) / (el / 1000), window.__sna.solidArt()!.draws - d0]); };
+      requestAnimationFrame(tick);
+    }));
+    console.log(`[#684 bubble art] fps=${fps.toFixed(1)} ratio=${ratio.toFixed(2)} art draws=${drew} ready=${art.ready.join(',')}`);
+    expect(fps).toBeGreaterThan(30);     // FPS_FLOOR in the rail above; the arena's own 60.4 clean
+    expect(ratio).toBeGreaterThan(0.8);  // and the arena clock keeps up with the wall clock
+    // Slicing still keys on the glyph label, art or not: the next wave is answered through the usual hook.
+    await waitForTarget(page);
+    expect(await answer(page)).toBe(true);
+  });
+
+  test('a 2-D shapes card keeps its emoji and never loads three', async ({ page }) => {
+    await seedPlayer(page);
+    const chunks: string[] = [];
+    page.on('request', r => { if (/solids-.*\.js/.test(r.url())) chunks.push(r.url()); });
+    await startTopic(page, 'year1', 'y1-shapes');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 0);
+    expect(await page.evaluate(() => window.__sna.solid())).toBeNull();
+    expect(await page.evaluate(() => window.__sna.solidArt())).toBeNull();
+    expect(await page.locator('#vis canvas').count()).toBe(0);
+    expect(chunks).toEqual([]);
   });
 });

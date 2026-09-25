@@ -14,8 +14,10 @@ const VOWELS = ['a', 'e', 'i', 'o', 'u'];
 // "which sound does frog end with?", shows `fr_g` and marks `o` correct. Exported for that rail alone.
 export const CVC: [string, string][] = [['cat', '🐱'], ['dog', '🐶'], ['sun', '☀️'], ['pig', '🐷'], ['cup', '☕'], ['pen', '🖊️'], ['egg', '🥚'], ['map', '🗺️'], ['mug', '🍺'], ['net', '🥅'], ['tap', '🚰'], ['pot', '🍲'], ['pin', '📌'], ['rug', '🧶'], ['nut', '🥜'], ['cap', '🧢'], ['rat', '🐀'], ['pan', '🍳'],
   ['bus', '🚌'], ['hat', '🎩'], ['bed', '🛏️'], ['fox', '🦊'], ['bag', '👜'], ['hen', '🐔'], ['box', '📦'], ['jam', '🍯'], ['bat', '🦇'], ['web', '🕸️'], ['cow', '🐮'], ['leg', '🦵'], ['bug', '🐛'], ['van', '🚐'], ['zip', '🤐'], ['log', '🪵']];
-const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['moth', 'th', '🦋'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['coin', 'oi', '🪙'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
-const DIGRAPHS = ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh', 'qu', 'ck'];
+// Exported for the `y1-digraphs` reachable-spelling fixture (#445): the generator's own two-letter gap is
+// built from these two lists, so the fixture rebuilds the same frames from them rather than a second copy.
+export const DIGRAPH_WORDS: [string, string, string][] = [['ship', 'sh', '🚢'], ['fish', 'sh', '🐟'], ['chip', 'ch', '🍟'], ['chick', 'ch', '🐤'], ['moth', 'th', '🦋'], ['bath', 'th', '🛁'], ['ring', 'ng', '💍'], ['king', 'ng', '👑'], ['rain', 'ai', '🌧️'], ['boat', 'oa', '⛵'], ['moon', 'oo', '🌙'], ['tree', 'ee', '🌳'], ['coin', 'oi', '🪙'], ['cow', 'ow', '🐮'], ['star', 'ar', '⭐'], ['fork', 'or', '🍴'], ['bee', 'ee', '🐝'], ['sheep', 'ee', '🐑'], ['snail', 'ai', '🐌'], ['goat', 'oa', '🐐'], ['shark', 'ar', '🦈'], ['whale', 'wh', '🐋']];
+export const DIGRAPHS = ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh', 'qu', 'ck'];
 
 /**
  * Sound Hunt bank: [grapheme, phoneme family, where the sound sits in the words, keyword words].
@@ -163,10 +165,11 @@ export const GAP_WORDS: ReadonlySet<string> = new Set([...Y1_CEW, ...Y2_CEW, ...
  * function: here, for the generators that draw decoys through `gapLetters`, and in `gapDecoys` below,
  * which every `gapQ` card passes through. Until #418 only this one existed, and the three `r-sounds`
  * call sites — Reception's — consulted neither set. **One gap card is still outside both**: `y1Digraphs`
- * builds its own two-letter gap and calls `wordQ` directly, and a multi-character pool entry would pass
- * `gapDecoys` unfiltered anyway. Nothing in `AVOID` is reachable through it today — driven over all
- * three difficulties, 63 frames and 315 spellings, in the review of #418 — and that is a fact about
- * today's `DIGRAPHS`, not a property of the code.
+ * builds its own two-letter gap and calls `wordQ` directly, never `gapDecoys` (#445: a multi-character
+ * pool entry passed to `gapDecoys` itself now throws rather than composing a spelling one character
+ * longer than the card shows, but that guards a caller `y1Digraphs` isn't). Nothing in `AVOID` is reachable
+ * through it today — pinned, not just claimed, by the `fixtures/y1-digraph-spellings.txt` rail (#445), the
+ * same technique #418 used for Reception's own gap cards.
  *
  * **The rule the split follows** (#324 item 3): a spelling is blocked *here* when the reason is that a child
  * must not see it, and in `GAP_WORDS` when the reason is that it is another right answer. `poos`, `pooh`,
@@ -321,14 +324,21 @@ const y2Sentence = sentGen(Y2_SENTS, Y2_DECOYS, [2, 3, 3], 1);
  * and `tests/unit/curriculum.test.ts` measures the floor at index 1 as well as 0 and 2.
  *
  * `idx` outside the word is a caller bug, not a card: the filter would test a spelling no card can show, so
- * it throws rather than silently passing the pool through.
+ * it throws rather than silently passing the pool through. A pool entry longer than one character is the
+ * same class of bug — it would compose a spelling one character longer than the card shows and consult
+ * `AVOID` about something no card can produce — so that throws too, rather than passing unfiltered (#445).
+ *
+ * Deduped (#445): every live pool is distinct today, so this changes nothing a card shows, but `gapQ`'s
+ * `decoys.length < 3` floor counts entries **before** `wordQ` dedupes its own final three, so a pool with a
+ * repeat would otherwise pass a floor that no longer describes what actually reaches the card.
  */
 export const gapDecoys = (word: string, idx: number, pool: string[]): string[] => {
   const lower = word.toLowerCase();
   if (idx < 0 || idx >= lower.length) throw new RangeError(`gap index ${idx} is outside "${word}"`);
+  if (pool.some(l => l.length !== 1)) throw new RangeError(`gapDecoys pool for "${word}" has a non-single-character entry`);
   const ans = lower[idx];
-  return pool.filter(l => l.toLowerCase() !== ans
-    && !AVOID.has(lower.slice(0, idx) + l.toLowerCase() + lower.slice(idx + 1)));
+  return [...new Set(pool.filter(l => l.toLowerCase() !== ans
+    && !AVOID.has(lower.slice(0, idx) + l.toLowerCase() + lower.slice(idx + 1))))];
 };
 
 function gapQ(rng: Rng, word: string, idx: number, distractPool: string[], emoji?: string, say?: string) {

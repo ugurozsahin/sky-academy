@@ -8,6 +8,45 @@ const base = { name: 'Ada', avatar: AVATARS[0], year: 'Year 1', title: 'Number B
 const storedCert = (o: Partial<StoredCert> = {}): StoredCert =>
   ({ id: 'year1:number-bonds', name: 'Ada', avatar: AVATARS[0].id, year: 'Year 1', title: 'Number Bonds', stars: 3, score: 340, correct: 30, attempts: 30, date: '2026-09-06', ...o });
 
+/**
+ * `certToStored()` itself, directly (#409 item 1). Every existing unit test reaches it only through the
+ * date-agreement suite below, which reads `stored.date` and nothing else — so deleting `duel: c.duel` from the
+ * function left all 1485 unit tests green when #409 was filed; only one line of the mobile e2e caught it. These
+ * pin the whole object it builds, not one field of it.
+ */
+describe('certToStored() (#409 item 1)', () => {
+  it('carries every field a stored certificate needs, read off the drawn CertInfo', () => {
+    const stored = certToStored({ ...base, stars: 2, score: 6, correct: 5, attempts: 6 }, { id: 'year1:number-bonds' });
+    expect(stored).toEqual({
+      id: 'year1:number-bonds', name: 'Ada', avatar: AVATARS[0].id, year: 'Year 1', title: 'Number Bonds',
+      stars: 2, score: 6, correct: 5, attempts: 6, date: '2026-09-06',
+    });
+  });
+  it('files the duel flag — the field the round-1 review of #397 caught missing once already', () => {
+    const stored = certToStored({ ...base, duel: true }, { id: 'year1:duel' });
+    expect(stored.duel).toBe(true);
+    expect(stored.training).toBeUndefined();
+  });
+  it('files the training (Sensei) flag the same way', () => {
+    const stored = certToStored({ ...base, training: true }, { id: 'year1:sensei' });
+    expect(stored.training).toBe(true);
+    expect(stored.duel).toBeUndefined();
+  });
+  it("takes the avatar id off the resolved Avatar the certificate actually carries (#397 round 2, B1) — not a second, independent parameter that could disagree with it", () => {
+    const stored = certToStored({ ...base, avatar: AVATARS[1] }, { id: 'year1:number-bonds' });
+    expect(stored.avatar).toBe(AVATARS[1].id);
+  });
+  it('round-trips every field through certFromStored without loss', () => {
+    const cert = { ...base, duel: true, stars: 2, score: 6, correct: 5, attempts: 6 };
+    const back = certFromStored(certToStored(cert, { id: 'year1:duel' }));
+    expect(back).toMatchObject({
+      name: cert.name, year: cert.year, title: cert.title, stars: cert.stars,
+      score: cert.score, correct: cert.correct, attempts: cert.attempts, duel: true, training: undefined,
+    });
+    expect(back.avatar.id).toBe(cert.avatar.id);
+  });
+});
+
 describe('certAlbumHTML ("My certificates", #110)', () => {
   it('shows an empty-state hint, with no cert-list, when nothing has been earned', () => {
     const h = certAlbumHTML([]);

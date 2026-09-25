@@ -177,9 +177,9 @@ test.describe('tablet viewports (#116)', () => {
   });
 
   /**
-   * #107, fixed: the five-frame now has one size, `--slot`, and the glyph is `calc(var(--slot) * 0.78)`.
-   * This measures the two rendered boxes rather than reading the CSS, so it stays true whatever units a
-   * later change lands on.
+   * #107, fixed: the five-frame has one size, `--slot`, and the glyph is `calc(var(--slot) * 0.7)` (#594
+   * widened the margin — see `src/style.css`). This measures the two rendered boxes rather than reading
+   * the CSS, so it stays true whatever units a later change lands on.
    *
    * One correction to what the `test.fixme` here used to say, because it would have sent the fix to the
    * wrong place: it recorded "the arithmetic alone does not produce a visible overflow at any viewport CI
@@ -199,19 +199,109 @@ test.describe('tablet viewports (#116)', () => {
   });
 
   /**
-   * The same containment in the band the bug was actually reported from (#107). `@media (max-height: 640px)`
-   * is a separate set of rules, and it was the worst offender of the lot — a tablet held in landscape lands
-   * here, so a check that only ever runs at 1280x800 would have left the real spill in place.
+   * The two-group layout (`r-add`/`r-sub`) gets its own smaller `--slot` clamp (`.objs.two .five`), which
+   * the single-group test above never exercises — #348's evidence table measured the two-group case as the
+   * worse of the two (9.95px outside the slot, against 4.97px for one group) before #107's fix, so it earns
+   * its own real-device check rather than relying on the arithmetic rail alone.
    */
-  test('objects stay inside their slots on a short screen too (#107)', async ({ page }) => {
+  test('two-group objects stay inside their five-frame slots (#107)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-add');
+    await expect(page.locator('.objs.two .slot .obj').first()).toBeVisible();
+    expect(await outsideItsBox(page, '.objs.two .slot', '.obj'),
+      'an object painted outside its two-group five-frame slot (#107)').toEqual([]);
+  });
+
+  /**
+   * The same containment in the band the original bug was reported from (#107), plus the two real tablet
+   * sizes #594 was actually filed from — 800x1280 portrait and 1024x768 landscape, neither of which is
+   * `max-height: 640px` or shorter. #594 removed the height-gated `--slot` override entirely, so at 844x390
+   * `--slot` now comes from the base clamp's own floor rather than a media-query pin — this does not pin
+   * that number (a later clamp tweak is free to move it), only that the rendered slot is a real, positive
+   * width and that nothing painted outside it, which is what an overflow can actually violate.
+   */
+  for (const [w, h] of [[844, 390], [800, 1280], [1024, 768]] as const)
+    test(`objects stay inside their slots at ${w}x${h} (#107, #594)`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await seedPlayer(page);
+      await startTopic(page, 'reception', 'r-count');
+      await expect(page.locator('.objs .slot .obj').first()).toBeVisible();
+      const slotWidth = await page.locator('.objs .slot').first().evaluate(el => el.getBoundingClientRect().width);
+      expect(slotWidth, 'the slot must render at a real, positive width — a 0 slot would pass containment vacuously')
+        .toBeGreaterThan(0);
+      expect(await outsideItsBox(page, '.objs .slot', '.obj'),
+        `an object painted outside its five-frame slot at ${w}x${h} (#107, #594)`).toEqual([]);
+    });
+
+  /**
+   * #594, corrected after review, seven times over. Rounds 1–2 found that neither `expectFitsViewport`
+   * (blind inside `.play`'s `overflow: hidden`) nor a `.qcard`-vs-`.tenframe` rect comparison (`.qcard` is
+   * never narrower than `.tenframe`'s own 140px at any viewport this game supports, down to its narrowest
+   * tested phone) can observe an overflow that never actually happens at a real, reachable size. Rounds
+   * 2–6 tried to guard the CSS instead, as unit-level text-matching over `src/style.css` — and lost to a
+   * new spelling of "this is a fixed size" every round (a bare selector, `.tenframe i.a`/`.b`, an
+   * ancestor-scoped override, `grid-template-columns`, `min-width`, the `grid-template` shorthand — round
+   * 7 then found `calc()` defeats even the properties the rail did enumerate). CSS has an unbounded number
+   * of ways to say "fixed", so grepping stylesheet text for that claim cannot terminate; round 7's own
+   * conclusion, taken here: measure what the browser actually renders instead.
+   *
+   * This test does not rely on a real device ever reaching a narrow enough card — none does. It forces one
+   * directly, far narrower than `.tenframe`'s natural 140px, and checks that the rendered box actually
+   * shrinks. That is insensitive to how the responsive rule is spelled — `min(140px, 100%)`, a future
+   * `clamp()`, whatever — because it is never fooled by the CSS text, only by the pixel width a real
+   * browser computed from it. A regression to *any* fixed size, however written, fails this the same way:
+   * the box stops shrinking when its container does.
+   */
+  test('the ten-frame shrinks to fit an unrealistically narrow card (#594)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-bonds');
+    await expect(page.locator('.tenframe i').first()).toBeVisible();
+
+    const naturalWidth = await page.locator('.tenframe').first().evaluate(el => el.getBoundingClientRect().width);
+    expect(naturalWidth, 'the ten-frame must render at a real width before the card is narrowed').toBeGreaterThan(100);
+
+    const shrunk = await page.evaluate(() => {
+      const qcard = document.querySelector('.qcard') as HTMLElement;
+      qcard.style.width = '60px';
+      qcard.style.maxWidth = '60px';
+      const frame = document.querySelector('.tenframe')!.getBoundingClientRect();
+      const dot = document.querySelector('.tenframe i')!.getBoundingClientRect();
+      return { frameWidth: frame.width, dotWidth: dot.width };
+    });
+
+    expect(shrunk.frameWidth, 'the ten-frame must actually shrink when its card does — a fixed pixel width, however spelled, would not')
+      .toBeLessThan(naturalWidth * 0.9);
+    expect(shrunk.frameWidth, 'and it must not collapse to nothing — a 0 width would make the shrink assertion pass vacuously')
+      .toBeGreaterThan(0);
+    expect(shrunk.dotWidth, "each dot must follow its cell down too — a fixed-size dot in a shrunk grid is the #594 overflow on the other half of the fix")
+      .toBeLessThan(20);
+    expect(shrunk.dotWidth, 'and the dot must still render at a real width, not collapse to nothing')
+      .toBeGreaterThan(0);
+  });
+
+  /**
+   * #594 round 6/7's last named gap: the `@media (max-height: 640px)` guard rail could only ever check
+   * whether the stylesheet *text* re-declared `--slot`/`--obj` — it had no way to notice a direct, literal
+   * `font-size` on `.objs .obj` inside that same block, which bypasses the `--obj` chain entirely and was
+   * confirmed, by mutation, to slip straight past it. This measures the rendered outcome instead: at the
+   * height-gated band, `.objs .obj`'s actual computed font-size must still equal `.slot`'s actual rendered
+   * width times the #107/#594 ratio (0.7) — the whole point of routing the glyph through `--obj` in the
+   * first place. A literal font-size, at any value, breaks that equality and fails this regardless of what
+   * it was spelled as.
+   */
+  test('the object glyph font-size still tracks --obj inside the short-screen height gate (#107, #594)', async ({ page }) => {
     await page.setViewportSize({ width: 844, height: 390 });
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-count');
     await expect(page.locator('.objs .slot .obj').first()).toBeVisible();
-    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.five')!).getPropertyValue('--slot').trim()),
-      'the short-screen block must still set --slot, or this test is measuring the default (#107)').toBe('24px');
-    expect(await outsideItsBox(page, '.objs .slot', '.obj'),
-      'an object painted outside its five-frame slot on a short screen (#107)').toEqual([]);
+
+    const [slotWidth, objFontSize] = await Promise.all([
+      page.locator('.objs .slot').first().evaluate(el => el.getBoundingClientRect().width),
+      page.locator('.objs .obj').first().evaluate(el => parseFloat(getComputedStyle(el).fontSize)),
+    ]);
+    expect(slotWidth, 'the slot must render at a real width, or the ratio below is measured against nothing').toBeGreaterThan(0);
+    expect(Math.abs(objFontSize - slotWidth * 0.7), 'the glyph font-size must equal --slot * 0.7 — a literal font-size (any value) breaks this even if it happens to fit')
+      .toBeLessThan(2);
   });
 
   /**
@@ -475,6 +565,10 @@ test.describe('tablet viewports (#116)', () => {
         .toBeGreaterThanOrEqual(target - ISLAND_TOLERANCE);
       expect(total, `island content height at ${w}x${h}: expected close to ${target}px, not still the old ~1200px stack (#563)`)
         .toBeLessThanOrEqual(target + ISLAND_TOLERANCE);
+    });
+  }
+
+  /**
    * #564 (#18 group B): rewards and shop, measured on a seeded save with progress, stickers, certificates
    * and duels — not a fresh one, which is the narrowest either screen ever is and would pass this
    * vacuously (#109's own reasoning for `seedProgress`, above). The per-element breakdown on the issue
@@ -566,6 +660,8 @@ test.describe('tablet viewports (#116)', () => {
     expect(total, "the phone island's own scroll height must stay the old stacked value, not shrink to the tablet grid's (#563)")
       .toBeGreaterThan(1500);
   });
+
+  /**
    * The other half of the acceptance criterion, same as `.mode-grid`'s #563 precedent: a phone stays a
    * single-column stack. `display: contents` on `.rewards-cols` should make the wrapper invisible to layout
    * below 900px, so this is the only place that is proven rather than assumed from the CSS rule alone
@@ -581,7 +677,18 @@ test.describe('tablet viewports (#116)', () => {
     expect(display, '.rewards-cols on a phone: must stay `contents`, not switch to the ≥900px grid (#564)').toBe('contents');
   });
 
-  const SHOP_TOLERANCE = 20;
+  // #618: ±20 was tuned against one dev machine's Chromium and never actually ran in CI before this
+  // spec's first nightly (viewport.spec.ts is tablet-only, #116, which a pull request never runs, #81/#96) —
+  // it broke on that very first run, both tablet and tablet-landscape, both landing on the identical 1175px
+  // at 1024x768 (30px over target, the same overage in both projects, so a deterministic render difference
+  // rather than noise). Reproduced locally with matching per-card geometry: 12 trail cards keep their 2-row
+  // layout (no column-count regression, which would swing by a whole ~200px row, not 30), and the 3
+  // "Coming soon" placeholders' blurb text sits right at a line-wrap boundary — a few px of font-metric
+  // difference between Chromium builds (CI downloads its own; this repo's dev/cloud machines pin an older
+  // cached one, #618's body has both version numbers) is enough to wrap one of them onto an extra line.
+  // 40 keeps that one-line margin in hand while staying far short of the ~150-200px a real reflow regression
+  // would need to hide behind it.
+  const SHOP_TOLERANCE = 40;
   // Real, measured: 1130px at 1280x800, 1145px at 1024x768 — matches the issue's own audit. `.shop-grid`
   // already reflows (`repeat(auto-fill, minmax(140px, 1fr))`); the remainder is the Slice trails grid's real
   // item count needing two rows, which is content rather than a stacking bug, so there is nothing group-B

@@ -193,6 +193,9 @@ export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
   correct = 0; attempts = 0; stageCorrect = 0; stageAttempts = 0; stageStars: number[] = [];
   current: Question | null = null; currentTopic: Topic | null = null; seqIndex = 0; waiting = false; ended = false; questionsAsked = 0;
+  /** Bumped whenever the re-roll below exhausts its five tries and still serves a repeat — the collapsed-key
+   *  signal #453 item 4 asks for, exposed the way `questionsAsked` is rather than only logged. */
+  repeatGiveUps = 0;
   byTopic: Record<string, AnswerTally> = {};   // per-topic tally (pool modes feed Sensei's weakest-topic ranking)
   timeLeft: number;                                     // ms, sprint only (0 otherwise)
   bossHp: number; readonly bossMax: number;             // boss only (0 otherwise)
@@ -250,6 +253,7 @@ export class Session {
       // avoid immediate repeats — of the whole card, not merely of its answer (#390)
       const prev = this.current && repeatKey(this.current);
       for (let i = 0; i < 5 && prev && repeatKey(q) === prev; i++) q = topic.gen(this.difficulty, this.rng);
+      if (prev && repeatKey(q) === prev) this.repeatGiveUps++;   // the key space collapsed even after five tries (#453 item 4)
     } catch (e) {
       // #444: a generator that refuses to draw (a floor rail like #433's tripped by a future curriculum
       // edit) must not leave the screen frozen mid-question — nothing else ever calls `nextQuestion()`

@@ -211,3 +211,41 @@ describe('screenScope beats freeze under a hold (#301)', () => {
     expect(fired).toEqual(['advance']);
   });
 });
+
+// #411: a certificate-delivery handler is `async` and long-lived (font load, canvas encode, a share sheet, a
+// native filesystem round trip), so it can still be resolving after Rematch/Islands has torn this screen down
+// and built the next one — which has its own, different `#toast`. `toast()` used to reach for `#toast` with no
+// null check at all, so either the missing element or the disposed screen threw a `TypeError` inside an
+// unawaited async handler, silently swallowing whatever the toast was trying to report.
+describe('screenScope.toast is a no-op once the screen or its toast is gone (#411)', () => {
+  let el: { textContent: string; className: string; classList: { remove: (c: string) => void } };
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    el = { textContent: '', className: '', classList: { remove: () => {} } };
+    (globalThis as any).document = { querySelector: (sel: string) => (sel === '#toast' ? el : null) };
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    delete (globalThis as any).document;
+  });
+
+  it('writes the message and class into #toast while the screen is alive and #toast exists', () => {
+    const scope = screenScope();
+    scope.toast('Certificate saved!', 'good');
+    expect(el.textContent).toBe('Certificate saved!');
+    expect(el.className).toBe('toast show good');
+  });
+
+  it('does not throw, and writes nothing, once the screen has been disposed', () => {
+    const scope = screenScope();
+    scope.dispose();
+    expect(() => scope.toast('Could not make the certificate', 'bad')).not.toThrow();
+    expect(el.textContent).toBe('');
+  });
+
+  it('does not throw when #toast itself is missing, even while the screen is still alive', () => {
+    (globalThis as any).document = { querySelector: () => null };
+    const scope = screenScope();
+    expect(() => scope.toast('Could not make the certificate', 'bad')).not.toThrow();
+  });
+});

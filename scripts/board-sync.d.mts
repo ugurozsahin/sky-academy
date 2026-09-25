@@ -1,3 +1,6 @@
+export declare const OWNER: string;
+export declare const REPO: string;
+export declare const PROJECT_NUMBER: number;
 export declare const STATUS: Readonly<{
   DONE: 'Done'; OWNER: 'Owner action'; REVIEW: 'In review'; PROGRESS: 'In progress';
   BLOCKED: 'Blocked'; READY: 'Ready'; BACKLOG: 'Backlog';

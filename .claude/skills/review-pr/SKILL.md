@@ -266,6 +266,62 @@ state at once on 2026-09-22 — #492, #503 and #502 — across at least nine rev
 diff, each concluded "no blocking finding in the diff itself", and each posted nothing. "Left for a developer
 run" names no recipient. If a rule really does stop you acting, say which rule and what would unstop it.
 
+**Clause (c) asks you to finish a pull request, not to review it again (#579).** STEP 1's third waiting clause
+catches one that was already cleared and became mergeable afterwards — the owner's marker landing after the
+clear, most often.
+
+**It has a verdict, and (c) says so itself rather than inferring it from the gate.** That is load-bearing: a green
+`review-gate` means *not blocked*, never *reviewed*, because
+`scripts/review-gate.mjs`'s `blockState()` has nothing to report on a pull request nobody has commented on —
+so a brand-new one, CI green and unlabelled, reads `success` before anyone has read a line of it. Clause (c)
+therefore requires the newest `REVIEW:` verdict to be a `REVIEW: CLEARED`. Without that condition this
+paragraph would be an instruction to **merge an unreviewed diff**: (c) would match the new pull request, "finish
+it" would apply, and §5's four rules check CI, blocks, drafts and labels — not whether anyone read the change.
+PR #583 was in exactly that state while this was being written: non-draft, gate green, zero comments (#580
+review). Watchdog check 11 carries the same condition for the same reason; it was written first and this is it
+back-ported to the clause that needed it more. **Re-reviewing it is the wrong act and the loop is real**: a run that
+cannot merge it must, by §6's own rule, end in one of the two marks, so it would block a pull request it had
+itself cleared, every hour, for as long as the thing it cannot do stays undone.
+
+**First, though: has a commit landed since that clear?** Compare the `REVIEW: CLEARED` comment's `created_at`
+with the newest commit on the branch. If the commit is newer, or they share a timestamp, **this is clause (a) in substance however well it
+matches (c)'s wording, and it takes the ordinary full review** — the diff, the agents, the suite, a fresh mark.
+Never the finish-path.
+
+That order matters because nothing else enforces it. `scripts/review-gate.mjs`'s `blockState()` takes
+`{draft, labels, comments}` and **no commit information at all**, so it compares `REVIEW:` and `OWNER:`
+timestamps against each other and never against the branch. A push re-runs it on the new head against unchanged
+comments, so a stale `REVIEW: CLEARED` keeps the gate green over a commit nobody has read — and (c)'s three
+conditions, which is where the clause stops, contain no term about commits. Clause (a) does: *no `REVIEW:`
+verdict newer than its newest commit*. Both clauses match such a pull request, and without this paragraph a run
+has no textual reason to take the slower one — the wording around (c) pushes the other way, since it frames the
+thing as already decided (#580 review).
+
+So under (c), once that check says no commit has landed since the clear:
+
+- **Merge it if the four rules let you.** That is the whole point of the clause, and it is the ordinary case. **Take the commit check again immediately before you merge, not only once at the start of the pass.** §5's four rules are real wall-clock steps — a CI lookup, a status read, label checks — and a commit can land inside them. Nothing downstream would tell you: `blockState()` sees no commits, the draft flag does not move, and the newest verdict is still the old clear, so every signal you would reach for reads exactly as it did before. STEP 1 asks for the same re-check on the waiting test itself, and that one watches only for a new `REVIEW:` comment — which a commit does not produce (#580 review).
+- **If a rule bars the merge and the branch is fine — `loosening` is the owner's however he voted — record it
+  in your pulse by number with the one-line reason and leave it.** Not a new review, not a new mark, and not a
+  fresh block: the verdict already there is still the truth about the diff, and nothing about the diff
+  changed. Your pulse is where a run says "I saw this and it is not mine to move".
+- **If the branch itself stopped being mergeable — a conflict, a red check — block it, naming what you found.**
+  That is not re-judging the diff; it is a new fact about the branch, and `main` moving is how it usually
+  arrives, hours after the clear and with no commit on the pull request to mark it. A conflict "is what your
+  verdict says" (#516), and the block is the only thing that routes the work anywhere: it marks the pull
+  request a draft, so clause (c) stops matching and this stops repeating, and its newest `REVIEW:` comment
+  becomes an unaddressed `REVIEW: CHANGES REQUESTED`, which is exactly what `docs/ROUTINE-PROMPT.md` STEP 2.5
+  looks for. A developer run then pushes the merge from `main` and the ordinary (b) path takes it from there.
+  **Without this the chain has no end**: the reviewer cannot push, STEP 2.5 never sees a cleared pull request,
+  and a conflicted one sits until a human notices. #568 sat that way on 2026-09-23, cleared at 09:48Z and
+  conflicted at 12:53Z by the merge of #577 (#579).
+- **A `REVIEW:` mark under (c) is for the merge, for a branch that stopped being mergeable, or for something
+  you actually found in the diff this run** — never because clause (c) listed the pull request.
+
+Two things follow that are easy to get backwards. A pull request under (c) is not evidence the reviewer is
+behind, so it does not belong in any "nobody is reviewing" count. And the watchdog's check 11 exists for the
+case where even this fails — it is keyed on the repository's own state rather than on anything a reviewer
+believes, which is why it is a backstop and not a duplicate of this rule.
+
 **A pull request you may not merge is still one you review.** `docs/REVIEWER-PROMPT.md` rule 4 bars the merge;
 it says nothing about the review, and the two are different acts. This bites hardest on exactly the class that
 can least afford it: a `loosening` governance pull request stays the owner's to merge even after he approves,

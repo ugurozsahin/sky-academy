@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { activeProfile, addProfile, deleteProfile, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
+import { activeProfile, addProfile, deleteProfile, cleanName, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { duelHeadline, duelHistoryLine, type DuelResult } from '../../src/game/duel';
 import { carriedStreak } from '../../src/game/dojo';
@@ -260,6 +260,44 @@ describe('save migration (#38)', () => {
     expect(migrate({ v: 2, avatar: null, onboarded: 'yes' as unknown }).onboarded).toBe(false);
   });
 
+  // #423 review item 4: `certs`/`duels` join the array check every other list field already gets at
+  // `sanitizeTypes`'s front door. A blob already at `SAVE_VERSION` skips the migration ladder's own
+  // `Array.isArray` filters (`MIGRATIONS[1]`/`MIGRATIONS[3]`, which run only on a blob older than current), so
+  // this was the one gap: a non-array `certs`/`duels` on an already-current blob used to reach `{...DEFAULT,
+  // ...s}` unfiltered, and only `certificates()`/`duelHistory()`'s own reader-side guard kept it from breaking.
+  it('a non-array certs or duels on an already-current save is dropped by sanitizeTypes, not just tolerated at the reader', () => {
+    const d = migrate({ v: SAVE_VERSION, certs: 'not an album' as unknown, duels: 'not a history' as unknown });
+    expect(d.certs).toEqual([]);
+    expect(d.duels).toEqual([]);
+  });
+
+  // pr-test-analyzer, #423 review: the test above only checks `migrate()`'s in-memory return. The actual bug
+  // was worse than that return alone shows — `load()` caches `migrate(parsed)`, and `save()`'s merge
+  // (`{...load(), ...patch}`) re-persists whatever that cache holds on the very next unrelated write, so a
+  // corrupt non-array `certs`/`duels` used to survive an ordinary `save({coins: ...})` and ride along in
+  // `localStorage` forever rather than being dropped once and forgotten. This proves the fix at that door.
+  it('a corrupt certs/duels on disk does not survive an unrelated save, once sanitizeTypes catches it', () => {
+    mem['sna:v1'] = JSON.stringify({ v: SAVE_VERSION, certs: 'not an album', duels: 'not a history' });
+    save({ coins: 5 });                                                    // an ordinary, unrelated write
+    const stored = JSON.parse(mem['sna:v1']);
+    expect(stored.certs).toEqual([]);
+    expect(stored.duels).toEqual([]);
+    expect(stored.coins).toBe(5);
+  });
+
+  // pr-test-analyzer, #423 review: `sanitizeTypes` runs on every blob `migrate()` sees, older ones included,
+  // strictly before `MIGRATIONS[1]`/`MIGRATIONS[3]` get their own turn at the same fields. The outcome happens
+  // to agree with the old ladder-step guard here — both want `[]` for a non-array — but nothing pinned that
+  // the new front-door check and the old per-step one do not fight each other on a blob that still has to
+  // climb the ladder, only that each alone gives the right answer on a current one.
+  it('a non-array certs or duels on an older save is still an empty list after climbing the migration ladder', () => {
+    const v1 = migrate({ v: 1, name: 'Ada', certs: 'not an album' as unknown });
+    expect(v1.v).toBe(SAVE_VERSION);
+    expect(v1.certs).toEqual([]);
+    const v3 = migrate({ v: 3, name: 'Ada', duels: 'not a history' as unknown });
+    expect(v3.duels).toEqual([]);
+  });
+
   it('falls back to a fresh default for corrupt or non-object data', () => {
     for (const bad of [null, undefined, 42, 'nonsense', [] as unknown]) {
       const d = migrate(bad);
@@ -349,10 +387,43 @@ describe('certificate album (#205)', () => {
     // which is exactly how these codes travel between devices (#64).
     const partial = { id: 'year1:y1-bonds', title: 'Number bonds' };
     const truncated = { id: 'year1:y1-add', title: 'Adding', name: 'Ada', year: 'Year 1', date: '2026-09-14', stars: 3 };
-    save({ certs: ['nonsense', null, 42, {}, partial, truncated, { ...cert(), stars: NaN }, cert()] as unknown as StoredCert[] });
-    expect(certificates()).toEqual([cert()]);
+    // `avatar: null` is a *valid* value (a child who has not picked an avatar), pinned here alongside the
+    // rejected ones — `avatar: str` instead of `avatar: strOrNull` would wrongly drop this and every other
+    // test in the file still passes, which is what makes it worth its own row rather than trusting `strOrNull`
+    // by inspection (pr-test-analyzer, #422 review).
+    const noAvatar = cert({ id: 'year1:y1-count', avatar: null });
+    // One bad-type value per field `isCert` checks, mirroring `isDuel`'s own per-field rows (#611): the
+    // `partial`/`truncated` fixtures above omit several keys at once, so an earlier missing-key rejection fires
+    // before any single field's own type check gets a chance to matter — `stars`/`avatar` were the only two
+    // fields with a row of their own, so a checker for any of the other seven could be silently dropped or
+    // swapped for the wrong type. `true` is the bad value for every one of them, deliberately, not `42` or a
+    // string: `str`'s and `fin`'s two families check each other's valid type (`name: 42` is a `fin`-valid
+    // number, `score: 'high'` is a `str`-valid string), so a value only one family would reject leaves a
+    // `str`↔`fin` transposition between fields invisible — a boolean is rejected by both (silent-failure-hunter,
+    // #611 review). `fin` is also the identical function behind `score`/`correct`/`attempts`/`stars`, so a
+    // transposition among only those four changes no type TypeScript sees either — the same reason each still
+    // gets its own row rather than trusting one to stand for the rest.
+    save({ certs: [
+      'nonsense', null, 42, {}, partial, truncated, { ...cert(), stars: NaN },
+      { ...cert(), avatar: 7 }, { ...cert(), avatar: undefined },   // #422: avatarById()'s fallback used to be
+      { ...cert(), name: true }, { ...cert(), year: true }, { ...cert(), title: true },
+      { ...cert(), score: true }, { ...cert(), correct: true }, { ...cert(), attempts: true },
+      { ...cert(), date: true },                                    // #611: the other seven fields `isCert`
+      cert(), noAvatar,                                             // type-checks, each isolated in turn
+    ] as unknown as StoredCert[] });
+    expect(certificates()).toEqual([cert(), noAvatar]);
     save({ certs: 'not an album' as unknown as StoredCert[] });
     expect(certificates()).toEqual([]);
+  });
+
+  // #422: pinning the deliberate half of the fix, not just the bug. `certKind()`'s own comment in
+  // `ui/certificate.ts` says why `training`/`duel` must stay out of this guard: rejecting a malformed flag
+  // would drop a certificate the child genuinely earned, which is worse than reading it as the wrong kind.
+  // A future "complete the table" pass that starts checking these two would make this red first.
+  it('a junk training/duel flag does not filter the certificate out', () => {
+    const junk = { ...cert(), training: 'yes', duel: 42 } as unknown as StoredCert;
+    save({ certs: [junk] });
+    expect(certificates()).toEqual([junk]);
   });
 
   // The bug a half-checked guard makes rather than prevents: `{ id, title }` passed the first version of
@@ -451,6 +522,81 @@ describe('duel history (#16)', () => {
     expect(duelHistory()).toEqual([duel()]);
     save({ duels: 'not a history' as unknown as StoredDuel[] });
     expect(duelHistory()).toEqual([]);
+  });
+
+  // #423 review item 7: a score or a round count is type-correct and still nonsense once it goes negative or
+  // fractional — `scoreB: -5` or `rounds: 1.5` used to pass `isDuel`'s bare `Number.isFinite` check and reach
+  // `duelHistoryLine` as-is. `at` is a timestamp, not a count, so it stays on finiteness alone and is not
+  // part of this rail.
+  it('a duel row with a negative or fractional score or round count is rejected, not just a non-finite one', () => {
+    save({ duels: [
+      { ...duel(), scoreA: -1 }, { ...duel(), scoreB: -5 }, { ...duel(), rounds: -3 },
+      { ...duel(), scoreA: 2.5 }, { ...duel(), rounds: 9.9 },
+      duel(),
+    ] as unknown as StoredDuel[] });
+    expect(duelHistory()).toEqual([duel()]);
+  });
+
+  // #423 review item 7 (pr-test-analyzer): the boundary either side of the new check, pinned so a `>= 0` typo
+  // (`> 0`, rejecting a legitimate scoreless duel) or a tightened `at` (breaking the deliberate finite-only
+  // carve-out `StoredDuel`'s own docstring argues for) would fail here rather than surviving unnoticed.
+  it('a zero count is accepted, and a fractional/negative `at` is — deliberately — not', () => {
+    save({ duels: [duel({ scoreA: 0, scoreB: 0, rounds: 0 })] });
+    expect(duelHistory(), 'no rounds played yet is a real duel, not junk').toEqual([duel({ scoreA: 0, scoreB: 0, rounds: 0 })]);
+    save({ duels: [duel({ at: -1 })] });
+    expect(duelHistory(), '`at` stays on Number.isFinite, not the count rail').toEqual([duel({ at: -1 })]);
+    save({ duels: [duel({ at: 1.5 })] });
+    expect(duelHistory(), 'a fractional epoch is still a finite number').toEqual([duel({ at: 1.5 })]);
+  });
+
+  // #423 review item 6: `fileDuel` enforces `DUEL_CAP` on every write, but a Restore or a hand-edited save
+  // reaches the store by a different door and used to carry as many well-formed rows as it liked straight
+  // past `duelHistory()` — 200 rows read back as 200, not "the last few sessions" the cap argues for.
+  //
+  // Built newest-first, the order `fileDuel` and every legitimate Restore both keep (`StoredDuel.at`'s own
+  // docstring: "the list's order and its only identity") — and the test pins WHICH rows survive, not just how
+  // many (pr-test-analyzer, #423 review): an ascending fixture would pass a `.slice` that kept the wrong,
+  // oldest end just as easily as the right one, which is a silent, wrong-direction data loss on read.
+  it('a hand-edited save with more than DUEL_CAP well-formed rows is capped on read, keeping the newest', () => {
+    const rows = Array.from({ length: DUEL_CAP + 5 }, (_, i) => duel({ at: DUEL_CAP + 4 - i }));
+    save({ duels: rows as unknown as StoredDuel[] });
+    const stored = JSON.parse(mem['sna:v1']).duels as StoredDuel[];
+    expect(stored.length, 'the save itself still holds every row — this is a read-time cap, not a rewrite').toBe(DUEL_CAP + 5);
+    const history = duelHistory();
+    expect(history.length).toBe(DUEL_CAP);
+    expect(history.map(m => m.at), 'the newest DUEL_CAP rows, oldest 5 dropped — the same bias fileDuel has on write')
+      .toEqual(Array.from({ length: DUEL_CAP }, (_, i) => DUEL_CAP + 4 - i));
+  });
+
+  // #423 review item 4: `at` is documented as "the list's order and its only identity", but nothing enforced
+  // it — `fileDuel` only ever prepends, so ordinary play kept the list newest-first for free, and a Restore or
+  // a hand-edited save carrying rows out of `at` order used to render in storage order under "Recent duels".
+  it('a hand-edited save with rows out of `at` order reads newest first regardless of storage order', () => {
+    save({ duels: [duel({ at: 3 }), duel({ at: 1 }), duel({ at: 5 }), duel({ at: 2 })] });
+    expect(duelHistory().map(m => m.at)).toEqual([5, 3, 2, 1]);
+  });
+
+  // pr-test-analyzer, #423 review: the sort's tie-break is unstated behaviour, not a rule this file wrote —
+  // `Array.prototype.sort`'s spec-guaranteed stability keeps equal-`at` rows in their storage order, which two
+  // matches recorded in the same millisecond (a scripted import, or a save merged from two devices) can
+  // produce. Pinned by an identifying field (`topic`), since two equal `at` values give no ordering to assert
+  // on directly — if `duelHistory()`'s sort ever stopped being stable this would go red without a hand-edited
+  // fixture needing to change.
+  it('rows tied on `at` keep their storage order — the sort is stable, not merely correct on distinct values', () => {
+    save({ duels: [duel({ at: 9, topic: 'first' }), duel({ at: 9, topic: 'second' }), duel({ at: 9, topic: 'third' })] });
+    expect(duelHistory().map(m => m.topic)).toEqual(['first', 'second', 'third']);
+  });
+
+  // The cap and the sort compose: capping on storage order alone (the old behaviour) could keep an
+  // actually-older row over an actually-newer one whenever the two disagree, the same silent, wrong-direction
+  // loss review item 6 above closed for a well-ordered save.
+  it('caps on the true newest `at`, not the newest by storage position, when the two disagree', () => {
+    const rows = [duel({ at: 0 }), ...Array.from({ length: DUEL_CAP }, (_, i) => duel({ at: i + 1 }))];
+    save({ duels: rows });
+    const history = duelHistory();
+    expect(history.length).toBe(DUEL_CAP);
+    expect(history.some(m => m.at === 0), 'at:0 is the oldest row and the true newest DUEL_CAP excludes it').toBe(false);
+    expect(history[0].at).toBe(DUEL_CAP);
   });
 
   // A save written before v4 has no duel history to preserve: those matches were never stored. An empty list
@@ -609,6 +755,30 @@ describe('a corrupted save is normalised at the door, not just at two readers (#
     expect(typeof d.name).toBe('string');
     expect(() => esc(d.name)).not.toThrow();
     expect(() => d.name.trim()).not.toThrow();
+  });
+
+  // #424: a Restore code is a name a person freely typed, same as the wizard's field, and until this fix
+  // sanitizeTypes() only checked `typeof name`, never its length — so an over-length name walked straight
+  // past the guard #171 wrote for exactly this write path. Proved red by reverting the `cleanName(clean.name)`
+  // line: this then fails with a 400-character `d.name`, `renameProfile`'s own NAME_MAX test unaffected.
+  it('a Restore code cannot carry a name past NAME_MAX — sanitizeTypes() clamps, not just type-checks (#424)', () => {
+    const long = 'x'.repeat(400);
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION, name: long, coins: 0 }))).toBe(true);
+    expect(load().name).toBe(long.slice(0, NAME_MAX));
+  });
+
+  // #431/#424: cleanName() is the one clamp every write path shares, so a Restore code carrying a
+  // multi-codepoint grapheme cluster past NAME_MAX gets the same whole-cluster cut renameProfile does, not
+  // the weaker surrogate-pair-only protection this path had before #431 folded graphemeSafeSlice into
+  // cleanName. Proved red by reverting cleanName to a bare `.slice(0, NAME_MAX)`: the family emoji then
+  // splits mid-cluster and a dangling joiner survives into `d.name`.
+  it('a Restore code carrying a grapheme cluster past NAME_MAX is cut on a whole cluster, not mid-cluster', () => {
+    const family = '👨‍👩‍👧‍👦';
+    expect(family.length).toBe(11);
+    const long = family + family + family;
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION, name: long, coins: 0 }))).toBe(true);
+    expect(load().name).toBe(family);
+    expect(/[‍\ud800-\udbff]$/.test(load().name), 'no dangling joiner or lone surrogate at the end').toBe(false);
   });
 
   it('every record*() writer, touchStreak() and recordDojo() survive a save corrupted in every field they touch', () => {
@@ -967,7 +1137,7 @@ describe('profiles: siblings on one device (#20)', () => {
     reset();
     for (const id of PROFILE_IDS) localStorage.removeItem(saveKeyFor(id));
     localStorage.removeItem(INDEX);
-    expect(setActiveProfile('p1'), 'the teardown checks its own switch').toBe(true);   // clears the session's profile
+    expect(setActiveProfile('p1'), 'the teardown checks its own switch').toEqual({ ok: true });   // clears the session's profile
     localStorage.removeItem(INDEX);  // ...and a one-profile device stores no index
   };
   it('the teardown leaves no cached blob and no latch, whatever the test before it did', () => {
@@ -1027,14 +1197,14 @@ describe('profiles: siblings on one device (#20)', () => {
 
     save({ name: 'Bo' }); addCoins(5); recordTopic('r-count', 1, 10);
 
-    expect(setActiveProfile('p1')).toBe(true);
+    expect(setActiveProfile('p1')).toEqual({ ok: true });
     expect(load().name).toBe('Ada');
     expect(load().coins).toBe(50);
     expect(load().progress['y1-bonds']).toMatchObject({ stars: 3, best: 90 });
     expect(load().progress['r-count'], "the sibling's progress is not here").toBeUndefined();
     expect(certificates().map(c => c.id)).toEqual(['year1:y1-bonds']);
 
-    expect(setActiveProfile('p2')).toBe(true);
+    expect(setActiveProfile('p2')).toEqual({ ok: true });
     expect(load().name).toBe('Bo');
     expect(load().coins).toBe(5);
     expect(certificates(), "and Ada's certificate is not in Bo's album").toEqual([]);
@@ -1058,10 +1228,10 @@ describe('profiles: siblings on one device (#20)', () => {
     // of the owner's four slots had their key derivation held by nothing, and what that hides is the
     // feature's headline failure — two children silently sharing one save (#330 round 3, item 2).
     const NAMES = [['p1', 'Ada'], ['p2', 'Bo'], ['p3', 'Cass'], ['p4', 'Dee']] as const;
-    for (const [id, name] of NAMES) { expect(setActiveProfile(id), id).toBe(true); save({ name }); }
+    for (const [id, name] of NAMES) { expect(setActiveProfile(id), id).toEqual({ ok: true }); save({ name }); }
     for (const [id, name] of NAMES) {
       expect(JSON.parse(localStorage.getItem(saveKeyFor(id))!).name, `${id} has a key of its own`).toBe(name);
-      expect(setActiveProfile(id), id).toBe(true);
+      expect(setActiveProfile(id), id).toEqual({ ok: true });
       expect(load().name, `${id} reads back its own child`).toBe(name);
     }
     expect(new Set(NAMES.map(([id]) => saveKeyFor(id))).size, 'four slots, four keys').toBe(MAX_PROFILES);
@@ -1113,7 +1283,7 @@ describe('profiles: siblings on one device (#20)', () => {
 
   it('switching to a profile that does not exist changes nothing', () => {
     save({ name: 'Ada' });
-    expect(setActiveProfile('p2')).toBe(false);
+    expect(setActiveProfile('p2'), 'a stale card, not a store fault (#401 item 5)').toEqual({ ok: false, why: 'unknown' });
     // Nothing written, not merely nothing visible (#330 review, item 1's coda): writing the index *before*
     // the membership check left 80/80 green, because `readIndex` then rejects the bogus index it just wrote.
     expect(localStorage.getItem(INDEX), 'the refusal does not write an index on the way out').toBeNull();
@@ -1128,7 +1298,7 @@ describe('profiles: siblings on one device (#20)', () => {
     const realSet = localStorage.setItem;
     (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
     try {
-      expect(setActiveProfile('p1'), 'an unpersisted switch is reported, not pretended').toBe(false);
+      expect(setActiveProfile('p1'), 'an unpersisted switch is reported, not pretended').toEqual({ ok: false, why: 'store' });
       expect(addProfile(), 'and no profile is added either').toEqual({ ok: false, why: 'store' });
     } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
     expect(activeProfile(), 'still Bo, which is what the next launch will also read').toBe('p2');
@@ -1154,9 +1324,9 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(stored('p1'), 'and profile 1 is left exactly as it was').toMatchObject({ name: 'Ada', coins: 7 });
 
     // and it reads back through a real switch, not through the cache the import just filled
-    expect(setActiveProfile('p1')).toBe(true);
+    expect(setActiveProfile('p1')).toEqual({ ok: true });
     expect(load().coins).toBe(7);
-    expect(setActiveProfile('p2')).toBe(true);
+    expect(setActiveProfile('p2')).toEqual({ ok: true });
     expect(load().coins).toBe(99);
   });
 
@@ -1190,7 +1360,7 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "the sibling's save lands on disk").toBe('Bo');
     expect(localStorage.getItem(saveKeyFor('p1')), "while profile 1's newer blob is byte-for-byte untouched").toBe(newer);
 
-    expect(setActiveProfile('p1')).toBe(true);
+    expect(setActiveProfile('p1')).toEqual({ ok: true });
     load();
     expect(isReadOnlySave(), 'and switching back re-arms it against the blob it protects').toBe(true);
   });
@@ -1262,7 +1432,7 @@ describe('profiles: siblings on one device (#20)', () => {
     // Not a throw: a store that takes the call and drops this one key. The catch alone never saw this, so
     // addProfile() reported a profile the next read knew nothing about and the new child onboarded over Ada.
     (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => { if (k !== INDEX) realSet.call(localStorage, k, v); };
-    let added: ReturnType<typeof addProfile>, switched: boolean;
+    let added: ReturnType<typeof addProfile>, switched: ReturnType<typeof setActiveProfile>;
     try { added = addProfile(); switched = setActiveProfile('p1'); }
     finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
 
@@ -1273,7 +1443,7 @@ describe('profiles: siblings on one device (#20)', () => {
     // p1 is the only profile and already the active one, so this is not a switch at all: it persists nothing,
     // and a store that keeps nothing therefore has nothing to refuse (#380 review B1). It read `false` here
     // until that review, which is the bug — see the three tests below for what that cost a child.
-    expect(switched, 'and re-entering the child already active is not a switch the store can refuse').toBe(true);
+    expect(switched, 'and re-entering the child already active is not a switch the store can refuse').toEqual({ ok: true });
     expect(activeProfile(), 'the child on the device is still the one who was playing').toBe('p1');
     expect(profileIds()).toEqual(['p1']);
     expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!)).toMatchObject({ name: 'Ada', coins: 30 });
@@ -1283,15 +1453,15 @@ describe('profiles: siblings on one device (#20)', () => {
     save({ name: 'Ada', coins: 30 });
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', coins: 3 });
-    expect(setActiveProfile('p1')).toBe(true);
+    expect(setActiveProfile('p1')).toEqual({ ok: true });
 
     const realSet = localStorage.setItem;
     // A genuine switch this time (p1 → p2), refused the read-back way rather than by a throw.
     (localStorage as unknown as { setItem: unknown }).setItem = (k: string, v: string) => { if (k !== INDEX) realSet.call(localStorage, k, v); };
-    let switched: boolean;
+    let switched: ReturnType<typeof setActiveProfile>;
     try { switched = setActiveProfile('p2'); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
 
-    expect(switched, 'the index kept p1 active, so this is refused').toBe(false);
+    expect(switched, 'the index kept p1 active, so this is refused').toEqual({ ok: false, why: 'store' });
     expect(isWriteFailing()).toBe(true);
     expect(activeProfile(), 'and the store really did keep the old value').toBe('p1');
   });
@@ -1311,8 +1481,8 @@ describe('profiles: siblings on one device (#20)', () => {
     const realSet = localStorage.setItem;
     (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
     try {
-      expect(setActiveProfile('p1'), 'a real switch still needs the index kept, and is still refused').toBe(false);
-      expect(setActiveProfile('p2'), 'but their own card hands them back their own game').toBe(true);
+      expect(setActiveProfile('p1'), 'a real switch still needs the index kept, and is still refused').toEqual({ ok: false, why: 'store' });
+      expect(setActiveProfile('p2'), 'but their own card hands them back their own game').toEqual({ ok: true });
     } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
     expect(activeProfile(), 'and it is still the child the next launch will read').toBe('p2');
     expect(load().name, "their save, not the sibling's").toBe('Bo');
@@ -1325,7 +1495,7 @@ describe('profiles: siblings on one device (#20)', () => {
     try {
       save({ coins: 3 });
       expect(isWriteFailing(), 'the write just threw').toBe(true);
-      expect(setActiveProfile('p1')).toBe(true);
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
       // `leaveProfile()` would clear it here, and the grown-ups screen would stop saying the device is not
       // saving — a real fault forgotten every time a child tapped their own card.
       expect(isWriteFailing(), 'the same child, the same blob, so the same fault').toBe(true);
@@ -1347,7 +1517,7 @@ describe('profiles: siblings on one device (#20)', () => {
     try {
       save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 7 });
       expect(isWriteFailing(), 'nothing this session reached disk').toBe(true);
-      expect(setActiveProfile('p1'), 'their own card, on a device with one profile').toBe(true);
+      expect(setActiveProfile('p1'), 'their own card, on a device with one profile').toEqual({ ok: true });
       expect(load(), 'their name, their ninja and their coins are still on the screen')
         .toMatchObject({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 7 });
     } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
@@ -1359,7 +1529,7 @@ describe('profiles: siblings on one device (#20)', () => {
     localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: 99, name: 'Ada', coins: 4 }));
     save({ coins: 15 });
     expect(isReadOnlySave(), 'the blob on disk is newer than this build').toBe(true);
-    expect(setActiveProfile('p1'), 'their own card').toBe(true);
+    expect(setActiveProfile('p1'), 'their own card').toEqual({ ok: true });
     expect(load().coins, 'the session keeps the coins it is holding, unwritable as they are').toBe(15);
     expect(isReadOnlySave(), 'and goes on refusing to overwrite the newer blob').toBe(true);
   });
@@ -1370,7 +1540,7 @@ describe('profiles: siblings on one device (#20)', () => {
     save({ name: 'Bo' });
     // Another tab switches the device back to Ada. This session never saw it and is still cached on Bo.
     localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }));
-    expect(setActiveProfile('p1'), 'already active in the store, so there is nothing to persist').toBe(true);
+    expect(setActiveProfile('p1'), 'already active in the store, so there is nothing to persist').toEqual({ ok: true });
     expect(load().name, 'but the session re-resolves rather than playing on as the sibling it cached').toBe('Ada');
   });
 
@@ -1393,7 +1563,7 @@ describe('profiles: siblings on one device (#20)', () => {
     save({ name: 'Ada', avatar: 'volt', onboarded: true, coins: 10 });
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo' });
-    expect(setActiveProfile('p1'), 'Ada is the child holding the device').toBe(true);
+    expect(setActiveProfile('p1'), 'Ada is the child holding the device').toEqual({ ok: true });
     expect(load().coins).toBe(10);
     // Another tab moves the device to Bo, so Ada's own card now *does* have an index to write back — the arm
     // round 4 left alone. The index is the session's business only through `cacheProfile`, and that still says
@@ -1403,7 +1573,7 @@ describe('profiles: siblings on one device (#20)', () => {
     try {
       save({ coins: 42 });
       expect(isWriteFailing(), 'the save blob is over the cap and was refused').toBe(true);
-      expect(setActiveProfile('p1'), 'her own card, and this time the index is written and kept').toBe(true);
+      expect(setActiveProfile('p1'), 'her own card, and this time the index is written and kept').toEqual({ ok: true });
       expect(activeProfile(), 'the switch really did persist, so the next launch opens on her').toBe('p1');
       expect(load().coins, 'the coins the child is playing on, not the last that reached disk').toBe(42);
       expect(isWriteFailing(), 'and the device goes on saying it is not saving').toBe(true);
@@ -1489,12 +1659,12 @@ describe('profiles: siblings on one device (#20)', () => {
 
   it("a switch clears the failed-write flag the other profile's write set (#151)", () => {
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
-    expect(setActiveProfile('p1')).toBe(true);
+    expect(setActiveProfile('p1')).toEqual({ ok: true });
     const realSet = localStorage.setItem;
     (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
     try { save({ coins: 1 }); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
     expect(isWriteFailing()).toBe(true);
-    expect(setActiveProfile('p2')).toBe(true);
+    expect(setActiveProfile('p2')).toEqual({ ok: true });
     expect(isWriteFailing(), "the refused write was the other child's, and this session has attempted none").toBe(false);
   });
 
@@ -1514,12 +1684,12 @@ describe('profiles: siblings on one device (#20)', () => {
   it('setActiveProfile latches writeFailed on a refused switch (#384 item 2)', () => {
     save({ name: 'Ada' });
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
-    expect(setActiveProfile('p1')).toBe(true);
+    expect(setActiveProfile('p1')).toEqual({ ok: true });
     const realSet = localStorage.setItem;
     (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
-    let ok: boolean;
-    try { ok = setActiveProfile('p2'); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
-    expect(ok, "the switch is refused, so this session is still Ada's").toBe(false);
+    let result: ReturnType<typeof setActiveProfile>;
+    try { result = setActiveProfile('p2'); } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(result, "the switch is refused, so this session is still Ada's").toEqual({ ok: false, why: 'store' });
     expect(isWriteFailing()).toBe(true);
   });
 
@@ -1529,7 +1699,7 @@ describe('profiles: siblings on one device (#20)', () => {
     reset();
     expect(activeProfile(), 'still the sibling who asked to start again').toBe('p2');
     expect(load().name).toBe('');
-    expect(setActiveProfile('p1')).toBe(true);
+    expect(setActiveProfile('p1')).toEqual({ ok: true });
     expect(load().name, "the other child's game is not part of it").toBe('Ada');
     expect(load().coins).toBe(30);
   });
@@ -1574,24 +1744,24 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', avatar: 'blaze', onboarded: true });
 
-    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true, future: false });
+    expect(profileCard('p1')).toEqual({ id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true });
     expect(activeProfile(), 'reading a card is not a switch').toBe('p2');
     expect(load().name, 'and the session is still the child who was playing').toBe('Bo');
     expect(profileCards()).toEqual([
-      { id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true, future: false },
-      { id: 'p2', name: 'Bo', avatar: 'blaze', onboarded: true, future: false },
+      { id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true },
+      { id: 'p2', state: 'save', name: 'Bo', avatar: 'blaze', onboarded: true },
     ]);
   });
 
   it('profileCard is blank rather than throwing on a slot the picker cannot read (#20 slice 2)', () => {
     save({ name: 'Ada' });
-    expect(profileCard('p2'), 'an empty slot').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p2'), 'an empty slot').toEqual({ id: 'p2', state: 'empty' });
     localStorage.setItem(saveKeyFor('p3'), 'not json at all');
-    expect(profileCard('p3'), 'a blob that is not JSON').toEqual({ id: 'p3', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p3'), 'a blob that is not JSON').toEqual({ id: 'p3', state: 'empty' });
     localStorage.setItem(saveKeyFor('p4'), JSON.stringify(['an', 'array']));
-    expect(profileCard('p4'), 'JSON that is not an object').toEqual({ id: 'p4', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p4'), 'JSON that is not an object').toEqual({ id: 'p4', state: 'empty' });
     localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 3, name: 42, avatar: 7, onboarded: 'yes' }));
-    expect(profileCard('p2'), 'fields of the wrong type are dropped, not shown').toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p2'), 'fields of the wrong type are dropped, not shown').toEqual({ id: 'p2', state: 'save', name: '', avatar: null, onboarded: false });
   });
 
   it("a v2 save's card agrees with load() about whether that child has played (#20 slice 2)", () => {
@@ -1601,16 +1771,16 @@ describe('profiles: siblings on one device (#20)', () => {
     // empty (#380 review B3). The card and the migration must give the same answer about the same bytes.
     localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: 2, name: 'Ada', avatar: 'volt', coins: 30 }));
     expect(migrate({ v: 2, name: 'Ada', avatar: 'volt' }).onboarded, "the migration's own answer").toBe(true);
-    expect(profileCard('p1')).toEqual({ id: 'p1', name: 'Ada', avatar: 'volt', onboarded: true, future: false });
+    expect(profileCard('p1')).toEqual({ id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true });
 
     // And the other half of that rule: a v2 blob with no ninja chosen never played, so the card says so.
     localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 2, name: 'Bo' }));
     expect(migrate({ v: 2, name: 'Bo' }).onboarded).toBe(false);
-    expect(profileCard('p2')).toEqual({ id: 'p2', name: 'Bo', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p2')).toEqual({ id: 'p2', state: 'save', name: 'Bo', avatar: null, onboarded: false });
 
     // A v3 blob still wins on its own field — `false` there means mid-wizard, whatever the avatar says (#67).
     localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 3, name: 'Cass', avatar: 'kai', onboarded: false }));
-    expect(profileCard('p3')).toEqual({ id: 'p3', name: 'Cass', avatar: 'kai', onboarded: false, future: false });
+    expect(profileCard('p3')).toEqual({ id: 'p3', state: 'save', name: 'Cass', avatar: 'kai', onboarded: false });
   });
 
   it('a card is blank for a save this build cannot open, exactly as load() is (#20 slice 2)', () => {
@@ -1624,17 +1794,18 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(isFutureSave(future), 'the blob this is about').toBe(true);
     expect(migrate(future), "load()'s own answer is a fresh default").toMatchObject({ name: '', avatar: null, onboarded: false });
     expect(profileCard('p2'), 'so the card says the same thing the tap will give')
-      .toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: true });
+      .toEqual({ id: 'p2', state: 'future' });
 
     // The same for a `v` no build ever wrote — also refused by `isMigratable`, for a different reason (#232).
-    // Blank the same way, and `future: false`, because that one *is* recoverable: `load()` resets over it and
-    // writes resume, so a grown-up may take the slot back (#420 review B2).
+    // A different arm, because that one *is* recoverable: `load()` resets over it and writes resume, so a
+    // grown-up may take the slot back (#420 review B2) — but the row still has to say it does not know
+    // whether the ninja played, not that it never did (#431 review item 3).
     localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 'two', name: 'Cass', avatar: 'kai', onboarded: true }));
-    expect(profileCard('p3')).toEqual({ id: 'p3', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCard('p3')).toEqual({ id: 'p3', state: 'corrupt' });
 
     // And the gate is a gate, not a blanket: the versions the ladder *can* walk are unaffected.
     localStorage.setItem(saveKeyFor('p4'), JSON.stringify({ v: 1, name: 'Dev', avatar: 'kai' }));
-    expect(profileCard('p4')).toEqual({ id: 'p4', name: 'Dev', avatar: 'kai', onboarded: true, future: false });
+    expect(profileCard('p4')).toEqual({ id: 'p4', state: 'save', name: 'Dev', avatar: 'kai', onboarded: true });
   });
 
   it('the card and the migration derive onboarded from one rule, not two copies (#20 slice 2)', () => {
@@ -1655,7 +1826,7 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     // `addProfile` writes no save on purpose, so the new slot is empty: the card has to come from the index.
     expect(profileCards().map(c => c.id)).toEqual(['p1', 'p2']);
-    expect(profileCards()[1]).toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: false });
+    expect(profileCards()[1]).toEqual({ id: 'p2', state: 'empty' });
   });
   // ── #20 slice 3: rename and delete, the grown-ups screen's two controls ───────────────────────────────────
   describe('renameProfile (#20 slice 3)', () => {
@@ -1670,7 +1841,7 @@ describe('profiles: siblings on one device (#20)', () => {
     it("renames a sibling's slot without touching this session or migrating their blob", () => {
       save({ name: 'Ada', coins: 40, onboarded: true });
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
-      expect(setActiveProfile('p1')).toBe(true);
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
       // A v1 blob — older than this build — written straight into the sibling's slot.
       localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 1, name: 'Bo', avatar: 'blaze', coins: 7 }));
       expect(renameProfile('p2', 'Bobby')).toEqual({ ok: true, name: 'Bobby' });
@@ -1696,11 +1867,87 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(renameProfile('p1', 'Ada Bo Cassie Dee')).toEqual({ ok: true, name: 'Ada Bo Cassie' });
     });
 
+    it('a truncation cut does not land inside a multi-codepoint grapheme cluster (#431 review, item 6)', () => {
+      save({ name: 'Ada', onboarded: true });
+      // A family emoji is one grapheme cluster built from four astral codepoints joined by ZWJ — 11 UTF-16
+      // code units. Three of them is 33 units, well past NAME_MAX (14): a plain `.slice(0, NAME_MAX)` cuts
+      // inside the second cluster, leaving a lone person emoji and a dangling ZWJ with no partner.
+      const family = '👨‍👩‍👧‍👦';
+      expect(family.length).toBe(11);
+      const r = renameProfile('p1', family + family + family);
+      // The second cluster does not fit in the 3 units left after the first, so only the first is kept
+      // whole — never a partial cluster.
+      expect(r).toEqual({ ok: true, name: family });
+      expect(load().name).toBe(family);
+      expect(/[‍\ud800-\udbff]$/.test(load().name), 'no dangling joiner or lone surrogate at the end').toBe(false);
+    });
+
+    it('a single grapheme cluster wider than NAME_MAX is kept whole, never refused as blank (#431 review)', () => {
+      save({ name: 'Ada', onboarded: true });
+      // A family emoji with a skin-tone modifier on every member is still one grapheme cluster — 19 UTF-16
+      // units, past NAME_MAX (14) on its own. Dropping it (the naive "does it fit?" answer) would leave
+      // graphemeSafeSlice returning '', which renameProfile would then report as `'blank'` — wrong, since
+      // the grown-up typed a real, non-blank name that simply does not fit the display cap.
+      const wideFamily = '👨🏻‍👩🏻‍👧🏻‍👦🏻';
+      expect(wideFamily.length).toBe(19);
+      expect(wideFamily.length).toBeGreaterThan(NAME_MAX);
+      const r = renameProfile('p1', wideFamily);
+      expect(r).toEqual({ ok: true, name: wideFamily });
+      expect(load().name).toBe(wideFamily);
+    });
+
+    it('falls back to a code-point-safe slice when Intl.Segmenter is unavailable or throws (#431 review)', () => {
+      save({ name: 'Ada', onboarded: true });
+      const family = '👨‍👩‍👧‍👦';
+      const name = family + family + family;
+
+      const intl = Intl as { Segmenter?: typeof Intl.Segmenter };
+      const originalSegmenter = intl.Segmenter;
+      // Simulating an older WebView with no Intl.Segmenter at all.
+      delete intl.Segmenter;
+      try {
+        const r = renameProfile('p1', name);
+        // The fallback is surrogate-pair-safe (plain `for...of` string iteration) but not cluster-safe, so
+        // it may still cut inside a ZWJ sequence — the documented, lesser protection this repository already
+        // shipped before this fix. What it must never do is leave a lone surrogate.
+        expect(r.ok).toBe(true);
+        expect((r as { ok: true; name: string }).name.length).toBe(NAME_MAX);
+        expect(/[\ud800-\udbff](?![\udc00-\udfff])/.test(load().name), 'no lone high surrogate').toBe(false);
+      } finally {
+        intl.Segmenter = originalSegmenter;
+      }
+
+      // A Segmenter that exists but throws on use (a non-conformant WebView) must fall through the same
+      // way, rather than crash the rename.
+      intl.Segmenter = vi.fn(() => {
+        throw new Error('non-conformant WebView');
+      }) as unknown as typeof Intl.Segmenter;
+      try {
+        const r2 = renameProfile('p1', name);
+        expect(r2.ok).toBe(true);
+        expect((r2 as { ok: true; name: string }).name.length).toBe(NAME_MAX);
+      } finally {
+        intl.Segmenter = originalSegmenter;
+      }
+    });
+
+    // #424 review (pr-test-analyzer): `slice` counts UTF-16 code units, and an emoji name is a supported case
+    // (avatar.test.ts's `canStart('volt', '😀')`) — a cut landing inside its surrogate pair used to leave a
+    // dangling high surrogate, which renders as a broken glyph everywhere a name is drawn. Proved red by
+    // reverting `cleanName` to a bare `slice(0, NAME_MAX)`: this then stores a lone `'\ud83e'`.
+    it('a truncation that lands inside an emoji drops the whole character, not half of it', () => {
+      save({ name: 'Ada', onboarded: true });
+      const long = 'x'.repeat(NAME_MAX - 1) + '🤖' + 'yyyy';   // the cut falls between 🤖's two code units
+      const r = renameProfile('p1', long);
+      expect(r).toEqual({ ok: true, name: 'x'.repeat(NAME_MAX - 1) });
+      expect(load().name).not.toMatch(/[\ud800-\udbff]$/);
+    });
+
     it('refuses a slot that is not a profile of this device, and one with nothing to name', () => {
       save({ name: 'Ada', onboarded: true });
       expect(renameProfile('p3', 'Cass'), 'p3 is not in the index').toEqual({ ok: false, why: 'unknown' });
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
-      expect(setActiveProfile('p1')).toBe(true);
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
       expect(renameProfile('p2', 'Bo'), 'listed, but addProfile writes no save').toEqual({ ok: false, why: 'no-save' });
       expect(localStorage.getItem(saveKeyFor('p2')), 'and it does not invent one').toBeNull();
       localStorage.setItem(saveKeyFor('p2'), 'not json at all');
@@ -1711,7 +1958,7 @@ describe('profiles: siblings on one device (#20)', () => {
     it("refuses a sibling's save from a newer build rather than stamping a name onto it (#232)", () => {
       save({ name: 'Ada', onboarded: true });
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
-      expect(setActiveProfile('p1')).toBe(true);
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
       const future = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', coins: 99 });
       localStorage.setItem(saveKeyFor('p2'), future);
       expect(renameProfile('p2', 'Bobby'), "and it says why, not 'has not played' (#420 review B2)").toEqual({ ok: false, why: 'future' });
@@ -1722,11 +1969,27 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(localStorage.getItem(saveKeyFor('p2')), '99 coins and all of it still there').toBe(future);
       expect(profileIds(), 'and the family still lists them').toEqual(['p1', 'p2']);
       // The card says which blank it is, so the row can stop asserting the wrong reason.
-      expect(profileCard('p2')).toEqual({ id: 'p2', name: '', avatar: null, onboarded: false, future: true });
+      expect(profileCard('p2')).toEqual({ id: 'p2', state: 'future' });
       // An unreadable `v` is a different case and deliberately *not* protected: `load()` resets over it.
       localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 'banana', name: 'Bo' }));
-      expect(profileCard('p2').future, 'not a newer save, just a broken one').toBe(false);
+      // But not a slot the row may call "has not played" either (#431 review item 3) — the `corrupt` arm says so.
+      expect(profileCard('p2'), 'not a newer save, just a broken one — a different arm, not `future`').toEqual({ id: 'p2', state: 'corrupt' });
       expect(deleteProfile('p2'), 'so a corrupt slot can still be taken back').toEqual({ ok: true, self: false });
+    });
+
+    /**
+     * #431 review, type-design-analyzer: hoisting `futureSaveIn(id)` above the `next`/blank check (item 1)
+     * changes which refusal wins when both apply — previously `'blank'` ran first for both paths, now
+     * `'future'` does. Deliberate: a slot this build cannot touch at all is refused on that alone, whatever
+     * was typed. Unreachable through the screen itself — `canRenameCard` never offers the input on a `future`
+     * row — so this only pins the direct call.
+     */
+    it("answers 'future' rather than 'blank' for an empty name on a slot this build cannot touch", () => {
+      save({ name: 'Ada', onboarded: true });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
+      localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', coins: 99 }));
+      expect(renameProfile('p2', '   ')).toEqual({ ok: false, why: 'future' });
     });
 
     it("refuses while the session's own save is read-only, with the remedy that fault has (#232, #420 note 4)", () => {
@@ -1740,18 +2003,49 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p1'))!).name).toBe('Ada');
     });
 
+    /**
+     * #431 review, item 1. The session path used to ask the `readOnly` latch, which only `load()` sets — so
+     * with no `load()` run yet this session (the order `reset()` in `beforeEach` leaves things: `sessionProfile()`
+     * resolves who is playing without reading their bytes), a newer-build save on the session's OWN slot fell
+     * through the stale `false` latch, reached `save()` (which itself sets `readOnly` too late for this
+     * function to see it), and answered `'store'` — sending a grown-up to turn off private browsing for a save
+     * that needs the other device instead, the exact conflation `RenameProfileResult`'s own doc forbids.
+     * `futureSaveIn(id)`, asked once against disk before either path, cannot go stale this way.
+     */
+    it("answers 'future' for the session's own profile even before this session has ever loaded it", () => {
+      const future = JSON.stringify({ v: SAVE_VERSION + 1, name: 'Ada', coins: 99 });
+      localStorage.setItem(saveKeyFor('p1'), future);
+      expect(isReadOnlySave(), 'nothing has read this blob yet this session').toBe(false);
+      expect(renameProfile('p1', 'Bo')).toEqual({ ok: false, why: 'future' });
+      expect(localStorage.getItem(saveKeyFor('p1')), 'the other device still reads it').toBe(future);
+    });
+
     it('reports a store that will not keep the new name, on either path (#151, #330)', () => {
       save({ name: 'Ada', onboarded: true });
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
       save({ name: 'Bo', onboarded: true });          // p2 is now the session's, with a save of its own
-      expect(setActiveProfile('p1')).toBe(true);
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
       const realSet = localStorage.setItem;
       (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
       try {
-        expect(renameProfile('p1', 'Ada Two'), "the session's own path").toEqual({ ok: false, why: 'store' });
+        // #431 review (pr-test-analyzer, round 2): the sibling call runs FIRST and its latch is checked
+        // before the session path ever runs, so this assertion can only be satisfied by the sibling path's
+        // own code — the earlier ordering let the session call's `save()`-driven latch (pre-existing, not
+        // new code) satisfy the sibling assertion on leftover state, which mutation-testing away both of the
+        // sibling path's own `writeFailed = true` lines failed to catch.
+        expect(isWriteFailing(), 'clean before either path has attempted a write').toBe(false);
         expect(renameProfile('p2', 'Bobby'), "the sibling's raw path").toEqual({ ok: false, why: 'store' });
+        // #431 review item 5: the sibling's raw path used to return the reason and touch nothing else, so a
+        // refused sibling rename left `parents.ts:35`'s sentence quiet — this asserts it latches on its own now.
+        expect(isWriteFailing(), "a thrown setItem on the sibling's raw path latches on its own").toBe(true);
+        expect(renameProfile('p1', 'Ada Two'), "the session's own path").toEqual({ ok: false, why: 'store' });
       } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, 'and nothing was written').toBe('Bo');
+      // A real write between the two halves, so the silent-drop half starts from the same clean state the
+      // throw half did — otherwise the latch the throw half correctly set would carry over and contaminate
+      // the silent-drop assertions the same way the original ordering did (#431 review, pr-test-analyzer).
+      save({});
+      expect(isWriteFailing(), 'a landed write clears the throw half before the silent-drop half begins').toBe(false);
       // A store that accepts the call and keeps nothing is the other half of "the write did not land" (#330),
       // and until #420 review B3 this block only ever tested the sibling path while its title claimed both.
       // The session path reported `ok`, `sfx.correct()` played, the heading and the map pill both changed
@@ -1760,7 +2054,14 @@ describe('profiles: siblings on one device (#20)', () => {
       (localStorage as unknown as { setItem: unknown }).setItem = () => { /* silently drops it */ };
       try {
         expect(renameProfile('p2', 'Bobby'), "the sibling's raw path").toEqual({ ok: false, why: 'store' });
+        // #431 review item 5: a silent drop (no throw, read-back disagrees) latches too, not only a throw —
+        // and, going in clean above, this can only be the sibling path's own doing.
+        expect(isWriteFailing(), "the sibling's raw path latches on a silent drop, on its own, not only a throw").toBe(true);
         expect(renameProfile('p1', 'Ada Two'), "the session's own path — B3").toEqual({ ok: false, why: 'store' });
+        // #431 review, silent-failure-hunter: `save()` sets `writeFailed = false` unconditionally whenever
+        // `setItem` does not throw, so this session-path silent drop used to erase the `true` the sibling
+        // path had just latched above — even though this write failed too. It must still read `true` here.
+        expect(isWriteFailing(), "a silent drop on the session's own path latches too, and does not erase a sibling's").toBe(true);
       } finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       // And the cache is put back, so nothing on screen shows a name the store refused.
       expect(load().name, 'the session still reads the name that is actually stored').toBe('Ada');
@@ -1789,7 +2090,7 @@ describe('profiles: siblings on one device (#20)', () => {
       save({ name: 'Ada', coins: 40, onboarded: true });
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
       save({ name: 'Bo', coins: 7, onboarded: true });
-      expect(setActiveProfile(active)).toBe(true);
+      expect(setActiveProfile(active)).toEqual({ ok: true });
       expect(load().name).toBe(active === 'p1' ? 'Ada' : 'Bo');
     };
 
@@ -1825,7 +2126,7 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
       save({ name: 'Bo', coins: 7, onboarded: true });
       expect(addProfile(), 'p3 is created and deliberately never played').toEqual({ ok: true, id: 'p3' });
-      expect(setActiveProfile('p2')).toBe(true);
+      expect(setActiveProfile('p2')).toEqual({ ok: true });
       expect(load().name).toBe('Bo');
       expect(holdsNoSave('p3'), 'the fixture the recovery path cannot stand in for').toBe(true);
 
@@ -1870,7 +2171,7 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(localStorage.getItem(saveKeyFor('p2')), "and Bo's bytes are exactly as they were").toBe(future);
 
       // A third, readable sibling is enough: the family is not stranded as long as one slot survives.
-      expect(setActiveProfile('p1')).toBe(true);
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
       // addProfile() switches the session onto the new slot, so this session is now p3's, not p1's.
       expect(addProfile(), 'p3 is created and deliberately never played').toEqual({ ok: true, id: 'p3' });
       expect(deleteProfile('p1'), 'p3 is empty but readable — an unplayed slot is not a future save').toEqual({ ok: true, self: false });
@@ -1894,11 +2195,16 @@ describe('profiles: siblings on one device (#20)', () => {
       finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       expect(profileIds(), 'still a family of two').toEqual(['p1', 'p2']);
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "and Bo's save is untouched — the index is written first for exactly this").toBe('Bo');
+      // #431 review item 5: the index-write refusal used to return the reason and touch nothing else, so a
+      // refused delete left `parents.ts:35`'s sentence quiet, the same gap `addProfile`/`setActiveProfile`
+      // already closed on their own `writeIndex` calls.
+      expect(isWriteFailing(), 'a thrown setItem on the index write latches too').toBe(true);
       // The same for a store that accepts the call and keeps nothing.
       (localStorage as unknown as { setItem: unknown }).setItem = () => { /* silently drops it */ };
       try { expect(deleteProfile('p2')).toEqual({ ok: false, why: 'store' }); }
       finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name).toBe('Bo');
+      expect(isWriteFailing(), 'and on a silent drop, not only a throw').toBe(true);
     });
 
     it('a store that keeps the bytes deletes nothing, rather than promising it cannot be undone (#420 review B4)', () => {
@@ -1912,12 +2218,16 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "Bo's save is still there…").toBe('Bo');
       expect(profileIds(), '…so the index is put back and the family still sees them').toEqual(['p1', 'p2']);
       expect(activeProfile(), 'and nothing about the active profile moved').toBe('p1');
+      // #431 review item 5: `writeFailed` reflects the *last attempted write*, and here the rollback itself
+      // succeeded — the store kept the bytes, but every index write it was asked for landed — so the latch
+      // stays clear rather than reporting a fault that already healed.
+      expect(isWriteFailing(), 'the rollback write succeeded, so nothing is currently failing').toBe(false);
       // The two silent consequences the read-back exists to stop, both provable from the state above: the slot
       // stays occupied for `addProfile`'s probe, and a later lost index brings the child back with their save.
       expect(addProfile(), 'the slot is not quietly reusable either').toEqual({ ok: true, id: 'p3' });
       localStorage.removeItem('sna:profiles');
       expect(profileIds(), 'a rebuilt index finds Bo exactly where they were').toContain('p2');
-      expect(profileCard('p2').name).toBe('Bo');
+      expect(profileCard('p2')).toMatchObject({ state: 'save', name: 'Bo' });
     });
 
     /**
@@ -1941,6 +2251,18 @@ describe('profiles: siblings on one device (#20)', () => {
       // The state the sentence has to describe, asserted rather than trusted.
       expect(JSON.parse(localStorage.getItem(INDEX)!), 'the rollback did not land').toEqual({ v: 1, active: 'p1', ids: ['p1'] });
       expect(JSON.parse(localStorage.getItem(saveKeyFor('p2'))!).name, "and Bo's bytes are still there").toBe('Bo');
+      // #431 review item 5: the rollback write is the last one attempted, and it failed — `'orphaned'`'s own
+      // sentence already says the device is out of space, and now the latch agrees. `addProfile` itself
+      // refuses under a latched `writeFailed` (#380 round 5, B2), so — with the mocked store now put back to
+      // one that actually works — a genuine successful write is what a real device gives the family next
+      // (any ordinary save), and that is what clears it here, not the passage of time.
+      expect(isWriteFailing(), "the failed rollback latches, same as any other refused write").toBe(true);
+      // The composition with `addProfile`'s own precheck (pr-test-analyzer, #431 review): a latch this
+      // function set is exactly the kind `addProfile` already refuses under (#380 round 5, B2), store back to
+      // working or not — it does not re-check the store itself, only the flag.
+      expect(addProfile(), "addProfile refuses on the stale latch before it ever probes a slot").toEqual({ ok: false, why: 'store' });
+      save({});
+      expect(isWriteFailing(), 'a write that actually lands clears a stale latch, same as any other').toBe(false);
       // And it does not heal, which is the half the docstring used to get wrong: no route back to the slot.
       expect(deleteProfile('p2'), 'delisted, so the UI cannot reach it again').toEqual({ ok: false, why: 'unknown' });
       expect(addProfile(), "addProfile's probe skips the occupied slot for good").toEqual({ ok: true, id: 'p3' });
@@ -1955,7 +2277,7 @@ describe('profiles: siblings on one device (#20)', () => {
       save({ name: 'Bo', coins: 7, onboarded: true });
       expect(addProfile()).toEqual({ ok: true, id: 'p3' });
       save({ name: 'Cass', coins: 3, onboarded: true });
-      expect(setActiveProfile('p1')).toBe(true);
+      expect(setActiveProfile('p1')).toEqual({ ok: true });
       expect(load().name, 'this session is Ada').toBe('Ada');
       localStorage.setItem('sna:profiles', JSON.stringify({ v: 1, active: 'p2', ids: ['p1', 'p2', 'p3'] }));
       expect(deleteProfile('p2')).toEqual({ ok: true, self: false });

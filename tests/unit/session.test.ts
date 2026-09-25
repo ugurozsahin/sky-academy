@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Session, repeatKey, starsForAccuracy, type SessionEvents } from '../../src/game/session';
-import { TOPICS, YEARS, topicById, topicsFor, type Question } from '../../src/curriculum';
+import { TOPICS, YEARS, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
@@ -538,6 +538,35 @@ describe('the previous answer carries no signal about the next (#390)', () => {
 });
 
 /**
+ * `repeatGiveUps` — the re-roll's own signal that it exhausted its five tries and still served a repeat
+ * (#453 item 4). The statistical rail near the bottom of this file asserts it at zero across every real,
+ * large topic; these two are the deterministic case either side of that: a topic with nowhere else to go
+ * bumps it every time, and a topic with anywhere else to go never bumps it at all.
+ */
+describe('repeatGiveUps — the re-roll give-up counter (#453 item 4)', () => {
+  const stuck: Topic = { id: 'test-stuck', title: 'test', icon: '🔧', subject: 'maths', year: 'year1', nc: '',
+    gen: () => ({ prompt: 'Which is bigger?', answer: 'cat', options: ['cat', 'dog'] }) };
+
+  it('bumps once per question when the topic has only one card to offer', () => {
+    const s = new Session({ mode: 'mission', year: Y1, topic: stuck, rng: rng(1) }, events());
+    s.start();
+    expect(s.repeatGiveUps).toBe(0);   // nothing asked yet to repeat against
+    for (let i = 0; i < 4; i++) s.nextQuestion();
+    expect(s.repeatGiveUps).toBe(4);   // every question after the first repeats the one before it
+  });
+
+  it('never bumps when the topic has more than one card to alternate between', () => {
+    let turn = 0;
+    const alternating: Topic = { id: 'test-alternating', title: 'test', icon: '🔧', subject: 'maths', year: 'year1', nc: '',
+      gen: () => ({ prompt: 'a', answer: turn++ % 2 === 0 ? '1' : '2', options: ['1', '2'] }) };
+    const s = new Session({ mode: 'mission', year: Y1, topic: alternating, rng: rng(1) }, events());
+    s.start();
+    for (let i = 0; i < 20; i++) s.nextQuestion();
+    expect(s.repeatGiveUps).toBe(0);
+  });
+});
+
+/**
  * #412 — the key must hold the question **wherever the question lives**.
  *
  * #390 widened the identity from `(prompt, answer)` to include the visual, which fixed the four topics whose
@@ -781,6 +810,7 @@ describe('the repeat key holds the whole question (#412)', () => {
       contents,
       answers,
       perAnswer: contents / answers,
+      giveUps: s.repeatGiveUps,
     };
   });
   /**
@@ -799,14 +829,23 @@ describe('the repeat key holds the whole question (#412)', () => {
    */
   const measurable = stats.filter(s => s.perAnswer >= 4 && s.answers >= 2 && s.baseline * PAIRS >= 30);
 
-  it('the measurable set holds the topics this defect was found on', () => {
-    const ids = measurable.map(s => s.id);
-    expect(ids.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(10);
-    // The two extremes of the issue's own table: the listening topics, where the key *was* the answer, and a
-    // measurement topic, where the values live in `hint`. If either drops out of this set, the set is wrong.
-    // `y2-punct` is here because it, and the sound-hunt pair, scrape in at exactly 4.00 cards per answer
-    // (round 2, N2) — it is the one that would otherwise drop out of this rail in silence.
-    for (const id of ['r-soundhunt', 'y1-soundhunt', 'y2-punct', 'y1-mass', 'y2-temp']) expect(ids).toContain(id);
+  /**
+   * Pinned exactly, not just counted (#453 item 3). A bare `toBeGreaterThanOrEqual` cannot tell "the right ten"
+   * from "ten, three of them swapped out" — several topics could drop out of this set together, in silence,
+   * as long as as many others happened to cross the threshold the same run. Listing the set exactly is the same
+   * discipline PR #692 already applies to the `' · '` hint/listen inventory: a topic joining or leaving is a
+   * deliberate edit to this list, not a number that still happens to clear a floor.
+   */
+  const MEASURABLE_TOPICS = [
+    'r-soundhunt', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-soundhunt',
+    'y1-spelling', 'y1-sub', 'y2-balance', 'y2-capacity', 'y2-compare', 'y2-inverse', 'y2-length', 'y2-mass',
+    'y2-oddeven', 'y2-punct', 'y2-pv', 'y2-spelling', 'y2-stats', 'y2-temp', 'y2-three',
+  ];
+  it('the measurable set is exactly these topics, not just this many (#453 item 3)', () => {
+    // The two extremes of the issue's own table are in this list: the listening topics, where the key *was* the
+    // answer, and a measurement topic, where the values live in `hint`. `y2-punct` scrapes in at exactly 4.00
+    // cards per answer (round 2, N2) — the one that would otherwise drop out of this rail in silence.
+    expect(measurable.map(s => s.id).sort()).toEqual([...MEASURABLE_TOPICS].sort());
   });
 
   it.each(measurable.map(s => s.id))('%s: a driven session repeats an answer about as often as the generator does', (id) => {
@@ -839,10 +878,16 @@ describe('the repeat key holds the whole question (#412)', () => {
    * was this comment's own overclaim.
    */
   const bigEnough = stats.filter(s => s.contents >= 50);
-  it('the big-topic set is not empty, and holds the topics B1 was measured on', () => {
-    const ids = bigEnough.map(s => s.id);
-    expect(ids.length, 'nothing discovered — the rail below would run no cases').toBeGreaterThanOrEqual(20);
-    for (const id of ['r-soundhunt', 'y1-soundhunt']) expect(ids).toContain(id);
+  /** Pinned exactly, for the same reason as `MEASURABLE_TOPICS` above (#453 item 3): a count cannot distinguish
+   *  "these twenty-eight" from "twenty-eight, several of them not the ones B1 was measured on". */
+  const BIG_ENOUGH_TOPICS = [
+    'r-soundhunt', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
+    'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-sub', 'y2-add', 'y2-balance', 'y2-capacity', 'y2-compare',
+    'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats',
+    'y2-sub', 'y2-temp', 'y2-three',
+  ];
+  it('the big-topic set is exactly these topics, not just this many (#453 item 3)', () => {
+    expect(bigEnough.map(s => s.id).sort()).toEqual([...BIG_ENOUGH_TOPICS].sort());
   });
 
   it.each(bigEnough.map(s => s.id))('%s: a driven session never serves the same question twice running', (id) => {
@@ -850,6 +895,18 @@ describe('the repeat key holds the whole question (#412)', () => {
     expect(s.repeated, `served the same question back to back ${(100 * s.repeated).toFixed(3)}% of the time over ${s.contents} distinct cards`)
       .toBeLessThan(0.001);
   });
+
+  /**
+   * The re-roll's own give-up counter (#453 item 4): on a topic with at least fifty distinct cards, five tries
+   * should always find a non-repeat, so `repeatGiveUps` staying at zero here is what makes "the key has
+   * collapsed" an assertable fact rather than something only a much rarer repeat (the rail above, `< 0.001`)
+   * would eventually hint at.
+   */
+  it.each(bigEnough.map(s => s.id))('%s: the re-roll never gives up over a driven session', (id) => {
+    const s = bigEnough.find(x => x.id === id)!;
+    expect(s.giveUps, `re-roll exhausted five tries and still served a repeat ${s.giveUps} time(s) over ${PAIRS} questions`).toBe(0);
+  });
+
 });
 
 describe('starsForAccuracy — the one three-star bar (#397 review round 2, B2)', () => {
@@ -866,8 +923,12 @@ describe('starsForAccuracy — the one three-star bar (#397 review round 2, B2)'
     expect(starsForAccuracy(0)).toBe(1);         // never zero stars: one is the floor
   });
   it('is what a mission stage actually awards, not a second copy of it', () => {
-    // Drives a real stage and checks the stage star is this function applied to the stage accuracy. If
-    // `Session` ever stops calling it, this goes red — the guarantee the old comment claimed and did not have.
+    // Drives a real stage and checks the stage star is this function applied to the stage accuracy — at this
+    // one accuracy, `Session`'s own star and a fresh call to the bar must agree. **Not** a guarantee that
+    // `Session` still calls `starsForAccuracy` at all (#409 item 3): replacing the call in `session.ts` with
+    // the identical inline ternary leaves this green too, because the two sides of the `toBe` would then
+    // compute the same number by two independent routes rather than share one. Catching a lost call would need
+    // a spy on the module's own export, not a value comparison — a different test than this one.
     const ev = events();
     const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: rng(7) }, ev);
     s.start();

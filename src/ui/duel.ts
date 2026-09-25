@@ -5,15 +5,15 @@
 // `Duel` scorer (src/game/duel.ts) owns the rules — first correct slice wins the round, a wrong slice costs
 // nothing, best of DUEL_ROUNDS — and this file only wires two `Arena`s, the strip, the match-end overlay and
 // the `window.__sna` hooks the e2e drives it through. A finished match pays coins into the one shared save
-// (item 5's coins and stickers), tells the Daily Dojo what the device answered and teaches Sensei what Player 1
-// found hard on this topic, files a certificate when Player 1 wins, and records the match itself in the duel
-// history the rewards screen lists.
+// (item 5's coins and stickers), marks the daily streak (#355), tells the Daily Dojo what the device answered
+// and teaches Sensei what Player 1 found hard on this topic, files a certificate when Player 1 wins, and
+// records the match itself in the duel history the rewards screen lists.
 import { avatarById, SENSEI } from '../avatars';
 import { topicsFor, type Question, type YearInfo } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { Duel, DUEL_PLAYERS, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCertificate, duelHeadline, duelHistoryLine, duelPool, duelStars, seededRng, spokenQuestion, type DuelPlayer, type DuelResult, type DuelTally } from '../game/duel';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
-import { isReadOnlySave, isWriteFailing, load, recordAccuracy, recordCert, recordDuel, recordGameEnd, type GameEndOutcome, type StoredDuel } from '../storage';
+import { isReadOnlySave, isWriteFailing, load, recordAccuracy, recordCert, recordDuel, recordGameEnd, touchStreak, type GameEndOutcome, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
 import { canHear, haptic, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
@@ -306,6 +306,11 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd(duelDojoEvent(r, topic.subject), paid);
     dojoPaid = dojo.coins;
+    // #355 (owner decision, 2026-09-24): a finished duel marks the daily streak, the same as every other
+    // finished game (`play.ts`, `memory.ts`) — ten real questions answered at the same coin rate is real
+    // practice, whichever seat took the round. `touchStreak()` is idempotent within a day, so a rematch on
+    // the same day costs nothing extra.
+    touchStreak();
     cert = duelCert(r);
     // Reset with `cert`, not left to the caller (#470 review, type-design-analyzer): `certSaved` must never
     // outlive the `cert` it describes, and pinning that to `commitOnce`'s single-invocation guarantee alone
@@ -408,7 +413,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         // 'shown' opens the full-screen view with its own save hint — the reset above already cleared any
         // earlier message, so there is nothing left to show here.
       }
-      catch { if (scope.alive) certMsg('Could not make the certificate', true); }
+      catch (e) { console.error('certificate delivery failed', e); if (scope.alive) certMsg('Could not make the certificate', true); }
       b.disabled = false;
     });
   }

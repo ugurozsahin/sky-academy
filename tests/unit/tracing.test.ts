@@ -69,10 +69,29 @@ describe('markPoint / paintStroke — the pixel accounting behind Tracer.result(
 
   it('claims the brush disc, not the square it scans — a stroke that only grazes a letter does not cover it', () => {
     const g = newGrid(), t = newTally();
-    markPoint(g, t, ...at(11, 8), 4);   // r = 2, so the 9x9 scan reaches both bars but the disc reaches neither
+    // r = 2, claimR2 = 4.8, tol = 3: the 7x7 scan just reaches the second bar's near edge (dx=3) but the
+    // claim disc (radius ~2.19) rejects it — the two are tied together (#592), so this margin is as tight
+    // as the scan itself, not a leftover square the disc happens to fall short of.
+    markPoint(g, t, ...at(11, 8), 4);
     expect(t.insidePts).toBe(1);        // it did land on the glyph…
     expect(t.glyphHits).toEqual([0, 0]);                                     // …without covering a single cell
     expect([...g.covered].some(Boolean)).toBe(false);
+  });
+
+  it('#592: a point a full brush-width off the glyph no longer counts as "inside" it', () => {
+    // An isolated single-cell glyph, so only distance to it matters — no neighbouring letter to confuse the
+    // read. brush 4 -> r = 2; the old tol (r*2 = 4) reached a point 4 grid-cells away and called it "inside",
+    // which is what let a stroke a full brush-width clear of the letter dodge OUTSIDE_MAX. The new tol (3,
+    // tied to the claim disc) does not.
+    const mw = 40, mh = 20;
+    const mask = new Uint8Array(mw * mh); mask[10 * mw + 20] = 1;
+    const g: TraceGrid = { mask, covered: new Uint8Array(mw * mh), mw, mh };
+    const t = newTally();
+    markPoint(g, t, ...at(24, 10), 4);                       // dx = 4 from the glyph cell: now outside
+    expect([t.insidePts, t.outsidePts]).toEqual([0, 1]);
+    const t2 = newTally();
+    markPoint(g, t2, ...at(23, 10), 4);                      // dx = 3: still reaches it
+    expect([t2.insidePts, t2.outsidePts]).toEqual([1, 0]);
   });
 
   it('fails the trace when only one letter of the word is covered, and passes when both are (#43)', () => {

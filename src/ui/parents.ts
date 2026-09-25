@@ -55,7 +55,8 @@ function saveNote(): string | null {
  *  has no name to change and `renameProfile` answers `'no-save'`; a slot holding a **newer build's** save has a
  *  name this build must not touch and it answers `'future'` (#420 review B2). The row says which, instead of
  *  offering a control that refuses. */
-export const canRenameCard = (c: ProfileCard) => !c.future && (c.onboarded || !!c.avatar || !!c.name.trim());
+export const canRenameCard = (c: ProfileCard): c is Extract<ProfileCard, { state: 'save' }> =>
+  c.state === 'save' && (c.onboarded || !!c.avatar || !!c.name.trim());
 /**
  * Whether a row offers "Remove" — every profile except the last one on the device, except a slot holding a save
  * a newer build wrote (#420 review B2), and except one whose removal would leave the device with no profile
@@ -71,14 +72,18 @@ export const canRenameCard = (c: ProfileCard) => !c.future && (c.onboarded || !!
  * `others.length === 0`, and the two questions share one answer once a second exclusion needs the same list.
  */
 export const canRemoveCard = (c: ProfileCard, others: ProfileCard[]) =>
-  others.length > 0 && !c.future && others.some(o => !o.future);
+  others.length > 0 && c.state !== 'future' && others.some(o => o.state !== 'future');
 /** What the card is called when the child has not typed a name yet. The slot number is what tells two unnamed
  *  rows apart — the picker's `cardName` rule (#380 review B1), the same words for the same reason. */
-const rowName = (c: ProfileCard, slot: number) => (c.name.trim() ? c.name : `Ninja ${slot}`);
+const rowName = (c: ProfileCard, slot: number) => (c.state === 'save' && c.name.trim() ? c.name : `Ninja ${slot}`);
 /** The sentence for `'future'`, shared by both tables and by the row itself, because all three are saying the
  *  same thing about the same bytes — and it is `saveNote()`'s remedy, not `'store'`'s: the other device, or an
  *  update to this one (#420 review note 4). */
 const FUTURE_SAY = 'That ninja’s game was saved by a newer version of the app, so this one cannot change it or clear it. Open the game on the other device, or update this app.';
+/** The sentence for `corrupt` (#431 review, item 3) — a different blank than `FUTURE_SAY`'s: unlike a newer
+ *  build's save, nothing on another device is waiting for this one, so Remove is offered rather than refused
+ *  (`canRemoveCard` does not exclude it); the row just has to stop claiming the ninja never played. */
+const CORRUPT_SAY = 'This device cannot read the game saved here, so there is no way to tell whether this ninja has played — but it can still be removed.';
 /**
  * Every refusal `renameProfile` and `deleteProfile` can return, as the sentence a grown-up reads — a missing
  * case is otherwise a blank `role="status"` line.
@@ -111,19 +116,19 @@ export const DELETE_HINTS: Record<DeleteRefusal, string> = {
   stranded: 'Every other ninja on this device was saved by a newer version of the app, so removing this one would leave none this build can open. Open the game on the other device, or update this app, then come back to remove this ninja.',
 };
 function profileRow(c: ProfileCard, slot: number, others: ProfileCard[]): string {
-  const a = avatarOrNull(c.avatar);      // not `avatarById`: an unplayed slot is a state this list must draw (#380 review B1)
+  const a = c.state === 'save' ? avatarOrNull(c.avatar) : null;      // not `avatarById`: an unplayed slot is a state this list must draw (#380 review B1)
   const label = rowName(c, slot);
   return `
     <li class="p-prof" data-prof="${c.id}">
       <span class="p-prof-face"${a ? ` style="--glow:${a.glow}"` : ''}>${a ? `<img src="${a.img}" alt="" draggable="false">` : `<span class="plus" aria-hidden="true">＋</span>`}</span>
-      <span class="p-prof-who"><b>${esc(label)}</b><small>${c.future ? 'Saved by a newer version' : a && c.onboarded ? esc(a.name) : 'Not started yet'}</small></span>
+      <span class="p-prof-who"><b>${esc(label)}</b><small>${c.state === 'future' ? 'Saved by a newer version' : c.state === 'corrupt' ? 'Cannot be read on this device' : a && c.state === 'save' && c.onboarded ? esc(a.name) : 'Not started yet'}</small></span>
       ${canRenameCard(c)
         ? `<input class="p-prof-in" data-name="${c.id}" type="text" maxlength="${NAME_MAX}" autocomplete="off" value="${esc(c.name)}" aria-label="Name for ${esc(label)}">
            <button class="btn" data-rename="${c.id}">Save name</button>`
-        // Two different reasons, never the same sentence (#420 review B2): the row used to say "has not
-        // played" about a sibling's newer save — bytes it could not read and had no business claiming
-        // anything about — and offered to destroy it.
-        : `<span class="p-prof-wait">${c.future ? esc(FUTURE_SAY) : 'No name yet — this ninja has not played.'}</span>`}
+        // Three different reasons, never the same sentence (#420 review B2, #431 review item 3): the row used
+        // to say "has not played" about a sibling's newer save, or about a slot this build simply could not
+        // parse the version of — bytes it could not read and had no business claiming anything about.
+        : `<span class="p-prof-wait">${c.state === 'future' ? esc(FUTURE_SAY) : c.state === 'corrupt' ? esc(CORRUPT_SAY) : 'No name yet — this ninja has not played.'}</span>`}
       ${canRemoveCard(c, others) ? `<button class="btn bad" data-del="${c.id}">Remove</button>` : ''}
     </li>`;
 }
@@ -283,10 +288,13 @@ function wireMove(redraw: () => void) {
     sfx.correct();
     redraw();
     // `msg` belongs to the dashboard that redraw() just threw away, so the confirmation goes on the new one.
+    // Same reason as `profMsg`'s `scroll` (#426): `redraw()`'s `render()` just scrolled to the top, and
+    // `#move-msg` sits a section below `#prof-msg`, further still from that top.
     const fresh = $('#move-msg');
     fresh.textContent = 'Restored — the progress below came from that code.';
     fresh.classList.remove('bad');
     fresh.hidden = false;
+    fresh.scrollIntoView({ block: 'center' });
   });
 }
 
@@ -337,16 +345,23 @@ export function parentsScreen(nav: Nav) {
 
     // #20 slice 3. Both controls redraw rather than patching the row: every number above came from the save
     // that was just renamed or removed, which is the same reason `wireMove`'s restore redraws.
-    const profMsg = (text: string, bad = false) => {
+    //
+    // `render()` ends every redraw at `scrollTo(0, 0)` (right for a screen *change*), which leaves this status
+    // line — well below the stats grid and topic tables — off screen exactly when it has something to say
+    // (#426). `scroll` defaults true because every call site but one follows a `drawDash()` that just did that;
+    // the rename failure below is the one exception, since it never redraws and the grown-up is already looking
+    // at the row that produced it.
+    const profMsg = (text: string, bad = false, scroll = true) => {
       const el = $('#prof-msg');
       el.textContent = text; el.classList.toggle('bad', bad); el.hidden = false;
+      if (scroll) el.scrollIntoView({ block: 'center' });
     };
     $$('button[data-rename]').forEach(b => b.addEventListener('click', () => {
       sfx.tap();
       const id = b.dataset.rename as ProfileId;
       const input = $<HTMLInputElement>(`input[data-name="${id}"]`);
       const r = renameProfile(id, input.value);
-      if (!r.ok) { sfx.wrong(); profMsg(RENAME_HINTS[r.why], true); return; }
+      if (!r.ok) { sfx.wrong(); profMsg(RENAME_HINTS[r.why], true, false); return; }
       sfx.correct();
       // The stored name, not what was typed: `renameProfile` trims and truncates, and the row has to redraw
       // with what the store is actually holding.

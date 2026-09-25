@@ -12,6 +12,11 @@ export interface Bubble {
   lines: string[];
   labelState: LabelState;   // #348: `small` or `overflow` says this bubble's label did not fit readably
   mark?: 'good' | 'bad'; markAt?: number; fade?: boolean;   // outcome reveal: spotlighted (✓/✗) or faded out
+  // #591: the arc this bubble launched on, kept so a re-launch (below) starts it exactly as it first went up
+  // rather than from wherever a collision had carried it — `x`/`vx`/`vy` drift from spawn during flight, `g`
+  // never does (nothing but `resolveCollisions` and gravity touch a bubble's motion, and neither reassigns it).
+  ox: number; ovx: number; ovy: number;
+  relaunches: number;   // how many times a required sequence label has already been sent back up (max 3)
 }
 /** A bubble the player can still slice or tap: launched, and not already resolved by a hit, a miss, or the
  *  outcome fade (#304). Both screens' `window.__sna.bubbles()` hooks and the sim harness's `live()` spelled
@@ -32,6 +37,12 @@ export type FxKind = Element | 'master';   // `master` draws from all of ELEMENT
 const FX_PARTICLE: Record<FxKind, PKind> = { fire: 'ember', water: 'drop', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'crystal', light: 'star', shadow: 'smoke', blade: 'slash', robot: 'pixel', master: 'star' };
 export const FX_COLORS: Record<FxKind, string[]> ={ fire: ['#ff7a1a', '#ffd23a', '#ff3b1a'], water: ['#3ec9ff', '#9fe6ff', '#1a7fff'], electric: ['#2ea8ff', '#ffffff', '#9fe6ff'], earth: ['#a0622a', '#7ddc3a', '#6b4220'], wind: ['#7fe8c8', '#c8ffe9', '#5fcf5a'], ice: ['#9fe6ff', '#ffffff', '#5bb8e8'], light: ['#ffd23a', '#ffffff', '#ffb020'], shadow: ['#a855ff', '#5a2aa0', '#2a1050'], blade: ['#ffffff', '#ff3b5c', '#d8dce8'], robot: ['#ff5252', '#ffffff', '#9aa5cf'], master: ['#ffd87a', '#ffffff', '#ffb020'] };
 const MAX_PARTICLES = 250;   // #29: safety cap so a pathological burst can never grow the per-frame draw loop unbounded
+// #591: how long a re-launched sequence bubble waits below the floor before it rises again — long enough to
+// read as the word coming back up, not a flicker, short enough that the child is not left waiting on it.
+const RELAUNCH_DELAY = 300;
+// #591: a required sequence label gets this many free trips back up before a departure is finally a miss —
+// "the first three departures", the owner's own words on the issue.
+const MAX_RELAUNCHES = 3;
 // A tap throws the ninja's own projectile (#48): it flies from the bottom of the arena to the bubble and pops
 // it on arrival. Score, lives and the outcome reveal are all settled at the tap — only the pop waits for the
 // landing, so the flight is decoration and never changes what the child earned.
@@ -55,15 +66,18 @@ export interface ArenaOpts {
   onThrow?: () => void;                        // a projectile has just left the ninja's hand
   onLand?: () => void;                         // it has reached the bubble and popped it
   throwFor?: (b: Bubble) => boolean;           // false = pop this bubble instantly instead of throwing at it
+  /** One square cell of `img`, from `(sx, 0)`, to draw in place of a bubble's label, or null for the label (#684).
+   *  The object may be reused by the next call — draw it at once, never keep it. */
+  labelArt?: (label: string, color: string, phase: number) => { readonly img: CanvasImageSource; readonly sx: number; readonly size: number } | null;
 }
 export interface WaveOpts { labels: string[]; speed: number; wide?: boolean; gravity?: number; ordered?: string[] /* sequence labels that must be sliced in this order */ }
-const GOOD = '#66e07d', BAD = '#ff5f6d';
+export const GOOD = '#66e07d', BAD = '#ff5f6d';
 // #29 glow-underlay colours: compile-time constants, hoisted out of the per-frame draw so drawParticle/drawBubble
 // never rebuild an rgba() string (arena's #28 rule — no per-frame colour strings). hexA/hexToRgb are hoisted fns.
 const BOLT_HALO = hexA('#2ea8ff', 0.4), STAR_HALO = hexA('#ffd23a', 0.4);
 const GOOD_HALO = hexA(GOOD, 0.35), BAD_HALO = hexA(BAD, 0.35);
 
-const PALETTE = ['#ff5f6d', '#ffa726', '#ffd54f', '#66e07d', '#40c4ff', '#b388ff', '#ff7ac6', '#4dd0e1'];
+export const PALETTE = ['#ff5f6d', '#ffa726', '#ffd54f', '#66e07d', '#40c4ff', '#b388ff', '#ff7ac6', '#4dd0e1'];
 
 export class Arena {
   private ctx: CanvasRenderingContext2D;
@@ -82,12 +96,14 @@ export class Arena {
   private activeId: number | null = null;         // the pointer that is down on THIS canvas, null = no stroke (#16: two arenas share one window)
   private strokeStale = false;                    // #331: a freeze happened since `lastPt` — the next move resumes the stroke, it does not continue it
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
+  private orderedLabels: Set<string> = new Set();   // #591: this wave's required sequence labels — a re-launch candidate on fall, unlike a decoy
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
   private pausedSince: number | null = null;       // #490: when the CURRENT pause began, so resuming can shift launchAt by its length
   private onThrow?: () => void; private onLand?: () => void;
   /** Which bubbles a tap throws a projectile at; anything else pops instantly, like a swipe (the TNT does — #48). */
   private throwFor?: (b: Bubble) => boolean;
+  private labelArt?: ArenaOpts['labelArt'];
   time = 0;
 
   constructor(public canvas: HTMLCanvasElement, private cb: ArenaCallbacks, opts: ArenaOpts = {}) {
@@ -96,7 +112,7 @@ export class Arena {
     if (opts.trailCore) this.trailCore = opts.trailCore;
     if (opts.fx) this.fx = opts.fx;
     this.onSwish = opts.onSwish; this.onThrow = opts.onThrow; this.onLand = opts.onLand;
-    this.throwFor = opts.throwFor;
+    this.throwFor = opts.throwFor; this.labelArt = opts.labelArt;
     this.resize();
     window.addEventListener('resize', this.resize);
     canvas.addEventListener('pointerdown', this.onDown);
@@ -161,6 +177,7 @@ export class Arena {
   spawnWave(o: WaveOpts, shared?: { rng: Rng; now: number }) {
     this.bubbles = []; this.shots = []; this.frozen = false;
     this.orderedWave = !!o.ordered?.length;         // #108: damp collisions so a sequence bubble is never stranded
+    this.orderedLabels = new Set(o.ordered);        // #591: same set, for the fall re-launch below
     // #43: every number below — radius, air time, batching, each bubble's arc, colour and launch moment —
     // comes from the pure layoutWave() so it can be unit-tested without a canvas. All this method still does
     // is fit each label to the measured font (#28, needs the 2D context) and push the bubbles.
@@ -169,7 +186,7 @@ export class Arena {
     for (const p of plan.bubbles) {
       const fit = fitLabelLines(p.label, plan.r, (font, text) => { this.ctx.font = font; return this.ctx.measureText(text).width; });   // #28: fit once here, not every frame
       warnUnfitLabel(p.label, plan.r, fit);
-      this.bubbles.push({ id: this.nextId++, label: p.label, x: p.x, y: this.H + plan.r, vx: p.vx, vy: p.vy, g: p.g, r: plan.r, launchAt: p.launchAt, launched: false, hit: false, dead: false, color: p.color, wobble: p.wobble, fontSize: fit.fs, lines: fit.lines, labelState: fit.state });
+      this.bubbles.push({ id: this.nextId++, label: p.label, x: p.x, y: this.H + plan.r, vx: p.vx, vy: p.vy, g: p.g, r: plan.r, launchAt: p.launchAt, launched: false, hit: false, dead: false, color: p.color, wobble: p.wobble, fontSize: fit.fs, lines: fit.lines, labelState: fit.state, ox: p.x, ovx: p.vx, ovy: p.vy, relaunches: 0 });
     }
     this.waveActive = true;
   }
@@ -206,7 +223,7 @@ export class Arena {
       if (bad && Math.hypot(bad.x - x, bad.y - y) < 2.2 * r) x = bad.x < this.W / 2 ? Math.min(this.W - r - 8, bad.x + 2.4 * r) : Math.max(r + 8, bad.x - 2.4 * r);   // don't sit on the ✗ bubble
       const fit = fitLabelLines(o.good, r, (font, text) => { this.ctx.font = font; return this.ctx.measureText(text).width; });
       warnUnfitLabel(o.good, r, fit);
-      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now, fontSize: fit.fs, lines: fit.lines, labelState: fit.state });
+      this.bubbles.push({ id: this.nextId++, label: o.good, x, y, vx: 0, vy: 0, g: this.g, r, launchAt: now, launched: true, hit: true, dead: false, color: GOOD, wobble: 0, mark: 'good', markAt: now, fontSize: fit.fs, lines: fit.lines, labelState: fit.state, ox: x, ovx: 0, ovy: 0, relaunches: 0 });
     }
   }
   /** Remove remaining bubbles (with a gentle fade) — used when the question is over. */
@@ -370,7 +387,18 @@ export class Arena {
       if (this.frozen) { live++; b.wobble += dt * 3; continue; }        // outcome reveal: everything holds still
       if (!b.launched) { if (now >= b.launchAt) b.launched = true; else { live++; continue; } }
       b.vy += b.g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.wobble += dt * 3;
-      if (b.y - b.r > this.H + 10 && b.vy > 0) { b.dead = true; if (!b.hit) this.cb.onFall(b); continue; }   // a tapped bubble with a shot on the way is not a miss
+      if (b.y - b.r > this.H + 10 && b.vy > 0) {
+        // #591: a required sequence bubble that leaves the arena un-hit — most often knocked down by a later
+        // bubble launched into it, never by anything the child did — is re-launched rather than punished, up
+        // to MAX_RELAUNCHES times. A decoy (not in `orderedLabels`) and an already-tapped bubble (`hit`, a shot
+        // still on its way) fall through to the miss exactly as before.
+        if (!b.hit && this.orderedLabels.has(b.label) && b.relaunches < MAX_RELAUNCHES) {
+          b.relaunches++; b.launched = false; b.launchAt = now + RELAUNCH_DELAY;
+          b.x = b.ox; b.y = this.H + b.r; b.vx = b.ovx; b.vy = b.ovy;   // back on the launch line, its original arc — not a teleport into play
+          live++; continue;
+        }
+        b.dead = true; if (!b.hit) this.cb.onFall(b); continue;   // a tapped bubble with a shot on the way is not a miss
+      }
       live++;
     }
     // #108: bubbles collide with each other. Skipped while `frozen` — the outcome reveal holds everything
@@ -491,15 +519,21 @@ export class Arena {
     // strings + a gradient object per bubble) and a shadowBlur are too slow on low-end devices (#28/#29).
     const g = glowSprite(b.color, b.r); c.drawImage(g, -g.width / 2, -g.height / 2);
     const body = bodySprite(b.color, b.r); c.drawImage(body, -body.width / 2, -body.height / 2);
-    // label — font size and line break fitted once at spawn (#28/#348), never in this per-frame path
-    const lines = b.lines; const fs = b.fontSize;
-    c.font = labelFont(fs);
-    c.textAlign = 'center'; c.textBaseline = 'middle';
-    const lh = fs * 1.02, top = 2 - (lines.length - 1) * lh / 2;   // the block of lines stays centred on the disc
-    c.lineJoin = 'round'; c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = 'rgba(20,20,40,.75)';
-    for (let i = 0; i < lines.length; i++) c.strokeText(lines[i], 0, top + i * lh);
-    c.fillStyle = '#fff';
-    for (let i = 0; i < lines.length; i++) c.fillText(lines[i], 0, top + i * lh);
+    // #684: a 3-D Shapes bubble draws its solid instead of the glyph, once the screen has baked one; the phase is
+    // offset by id so a wave does not turn in lock-step. Anything else, or a solid not baked yet, keeps its label.
+    const art = this.labelArt ? this.labelArt(b.label, b.color, now / 1000 + b.id * 0.37) : null;
+    if (art) { const s = b.r * 1.5; c.drawImage(art.img, art.sx, 0, art.size, art.size, -s / 2, -s / 2, s, s); }
+    else {
+      // label — font size and line break fitted once at spawn (#28/#348), never in this per-frame path
+      const lines = b.lines; const fs = b.fontSize;
+      c.font = labelFont(fs);
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      const lh = fs * 1.02, top = 2 - (lines.length - 1) * lh / 2;   // the block of lines stays centred on the disc
+      c.lineJoin = 'round'; c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = 'rgba(20,20,40,.75)';
+      for (let i = 0; i < lines.length; i++) c.strokeText(lines[i], 0, top + i * lh);
+      c.fillStyle = '#fff';
+      for (let i = 0; i < lines.length; i++) c.fillText(lines[i], 0, top + i * lh);
+    }
     if (b.mark) {                                    // ✓ / ✗ badge
       const col = b.mark === 'good' ? GOOD : BAD, br = b.r * 0.36, bx = b.r * 0.74, by = -b.r * 0.74;
       c.fillStyle = col; c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill();
@@ -631,7 +665,7 @@ export interface ArenaBox { W: number; H: number }
  * does not scale — the label's font size was fitted to it once at spawn (#28), and a bubble that changed
  * size mid-flight would re-open that.
  */
-export function reanchorBubble(b: { x: number; y: number; vx: number; vy: number; g: number; r: number }, from: ArenaBox, to: ArenaBox) {
+export function reanchorBubble(b: { x: number; y: number; vx: number; vy: number; g: number; r: number; ox?: number; ovx?: number; ovy?: number }, from: ArenaBox, to: ArenaBox) {
   const sx = to.W / from.W, sy = to.H / from.H;
   const risen = (from.H + b.r) - b.y;                      // height above the launch line, which may be negative on the way out
   b.y = to.H + b.r - risen * sy;
@@ -642,6 +676,12 @@ export function reanchorBubble(b: { x: number; y: number; vx: number; vy: number
   // putting x below `b.r` — `bubbleRadius` caps r at 64, so that needs a viewport under 128 CSS px.
   b.x = Math.min(to.W - b.r, Math.max(b.r, b.x * sx));
   b.vx *= sx;
+  // #591: a bubble mid-relaunch-wait remembers its spawn arc in ox/ovx/ovy so a re-launch is not left running
+  // an arc sized for a box that no longer exists — optional here (a plain `Collidable` in a test has none) so
+  // only a real `Bubble` carries the extra work.
+  if (b.ox !== undefined) b.ox = Math.min(to.W - b.r, Math.max(b.r, b.ox * sx));
+  if (b.ovx !== undefined) b.ovx *= sx;
+  if (b.ovy !== undefined) b.ovy *= sy;
 }
 /** The arena's shape, as much of it as the wave layout depends on. */
 export interface WaveGeom { W: number; H: number; topInset: number }
@@ -852,8 +892,19 @@ export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: num
   return { r, waveT: T * 1000, batchSpan: perBatch * stagger, perBatch, batchGap, stagger, bubbles };
 }
 
-/** The smallest a bubble label is ever drawn: the shrink loop clamps to this and never steps below it. */
+/**
+ * The smallest a bubble label is ever drawn **when a wrap is available to try instead** — `fitLabel`'s own
+ * shrink loop clamps to this and never steps below it. `LABEL_HARD_MIN_FS` below is lower still, for the one
+ * case (#348) this floor cannot rescue: a label with no space or hyphen for `fitLabelLines` to break on.
+ */
 export const LABEL_MIN_FS = 10;
+/**
+ * The smallest an **unbreakable** label — no space or hyphen for `fitLabelLines` to wrap onto a second line —
+ * may shrink to, when it is still wider than its bubble at `LABEL_MIN_FS` (#348 owner decision, 2026-09-24).
+ * A label that has a break never reaches this: it always has the two-line attempt to try first, however that
+ * turns out, so `fitLabelLines` never shrinks a breakable label below `LABEL_MIN_FS`. See `fitLabelLines`.
+ */
+export const LABEL_HARD_MIN_FS = 8;
 /**
  * The smallest a label may be and still be *read* by a five-to-seven-year-old on a moving bubble (#348).
  *
@@ -892,14 +943,19 @@ export type LabelState = 'ok' | 'small' | 'overflow';
 /** A fitted bubble label: the lines to draw, the size they share, and how it came out (#348). */
 export interface LabelFit { fs: number; lines: string[]; state: LabelState }
 
+// Shared by `fitLabel` and `fitLabelLines`'s unbreakable-overflow branch (#348 review): shrink `fs` by 1
+// while still over budget, clamped so it never steps past `floor` — a bare `fs -= 1` used to step past a
+// fractional start and return 9.56 from a floor documented as the smallest size ever drawn (review note 1).
+// One loop, one clamp; only the floor passed in differs between the two callers.
+function shrinkToFit(label: string, r: number, measure: (font: string, text: string) => number, fs: number, floor: number): number {
+  while (measure(labelFont(fs), label) > r * LINE_BUDGET && fs > floor) fs = Math.max(floor, fs - 1);
+  return fs;
+}
+
 // Called once per bubble in spawnWave (#28) — `measure` sets the font and returns the text width — instead
 // of running the shrink loop in drawBubble every frame. Pure and canvas-free so it unit-tests directly.
 export function fitLabel(label: string, r: number, measure: (font: string, text: string) => number): number {
-  let fs = startFs(label, r);
-  // `fs` starts fractional, so a bare `fs -= 1` used to step *past* the bound and return 9.56 from a
-  // constant documented as the smallest size ever drawn. Clamp, so the floor is one (#348 review note 1).
-  while (measure(labelFont(fs), label) > r * LINE_BUDGET && fs > LABEL_MIN_FS) fs = Math.max(LABEL_MIN_FS, fs - 1);
-  return fs;
+  return shrinkToFit(label, r, measure, startFs(label, r), LABEL_MIN_FS);
 }
 
 /**
@@ -942,7 +998,14 @@ export function fitLabelLines(label: string, r: number, measure: (font: string, 
   const one: LabelFit = { fs: oneFs, lines: [label], state: state(oneFs, measure(labelFont(oneFs), label), LINE_BUDGET) };
   if (one.state === 'ok') return one;
   const split = splitLabel(label);
-  if (!split) return one;
+  if (!split) {
+    // No space or hyphen to wrap on — the only path down from here is smaller still, to LABEL_HARD_MIN_FS
+    // (#348 owner decision). A label that fits (or is merely 'small') at LABEL_MIN_FS stops right there; only
+    // one still wider than its bubble at that floor shrinks further.
+    if (one.state !== 'overflow') return one;
+    const fs = shrinkToFit(label, r, measure, oneFs, LABEL_HARD_MIN_FS);
+    return { fs, lines: [label], state: state(fs, measure(labelFont(fs), label), LINE_BUDGET) };
+  }
   const widest = (fs: number) => Math.max(measure(labelFont(fs), split[0]), measure(labelFont(fs), split[1]));
   // Seed from the *longer* line: the shorter one would start too big and the loop would only walk back down
   // to the same place, but a step of 1 from a larger start can overshoot it (#348 review note 5).

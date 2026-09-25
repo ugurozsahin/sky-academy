@@ -44,8 +44,25 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   execSync('node scripts/build-sw.mjs', { stdio: 'inherit' });
   const html = readFileSync('dist/index.html', 'utf8');
   const assets = readdirSync('dist/assets');
-  let js = readFileSync(join('dist/assets', assets.find(f => f.endsWith('.js'))), 'utf8');
+  // The entry is the script `index.html` loads, not "the first .js in the folder": since #684 the build
+  // also emits a lazy chunk (`solids-*.js`, three.js) that `readdirSync`'s order could put first.
+  const entry = html.match(/<script[^>]*src="\/assets\/([^"]+\.js)"/)?.[1];
+  if (!entry || !assets.includes(entry)) throw new Error(`dist/index.html does not load a script under dist/assets/ (found: ${entry})`);
+  let js = readFileSync(join('dist/assets', entry), 'utf8');
   let css = readFileSync(join('dist/assets', assets.find(f => f.endsWith('.css'))), 'utf8');
+  // #684: every other chunk is one the entry reaches by `import("./name.js")`, and a single page has no
+  // `./name.js` beside it. Each is inlined as a data-URL module and the import rewritten to it. That only
+  // works for a chunk that imports nothing itself — a guard rail keeps `src/game/solids.ts` free of `src/`
+  // imports so its chunk stays stand-alone — and this refuses loudly rather than emitting a page that
+  // fails the first time a child opens a 3-D Shapes card.
+  for (const chunk of assets.filter(f => f.endsWith('.js') && f !== entry)) {
+    const src = readFileSync(join('dist/assets', chunk), 'utf8');
+    // Any relative import — `from "./x"`, `import("./x")`, a bare side-effect `import "./x"`, either quote.
+    if (/\b(?:from|import)\s*\(?\s*['"]\.{1,2}\//.test(src)) throw new Error(`${chunk} imports another chunk; it cannot be inlined as a data URL`);
+    const ref = `import("./${chunk}")`;
+    if (!js.includes(ref)) throw new Error(`${chunk} is not reached from ${entry} by ${ref}`);
+    js = js.split(ref).join(`import("data:text/javascript;base64,${Buffer.from(src).toString('base64')}")`);
+  }
   // #479: Fredoka is self-hosted now, so the stylesheet's `url(/fonts/…)` points at a path that does not
   // exist beside a single page on somebody else's origin. Inline the woff2 the same way the avatars above
   // are inlined into the JS. Before this the page referenced fonts.googleapis.com and worked anywhere;

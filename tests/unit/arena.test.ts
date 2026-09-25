@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type ClampCounts, type Collidable, compact, dealOrdered, LABEL_MIN_FS, LABEL_READABLE_FS, WRAP_STACK, fitLabel, fitLabelLines, labelFont, splitLabel, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
+import { COLLIDE, SHOT_FLIGHT, SHOT_STYLE, type ClampCounts, type Collidable, compact, dealOrdered, LABEL_HARD_MIN_FS, LABEL_MIN_FS, LABEL_READABLE_FS, WRAP_STACK, fitLabel, fitLabelLines, labelFont, splitLabel, layoutWave, reanchorBubble, resolveCollisions, segCircle, shotPose } from '../../src/game/arena';
 import { ALL_AVATARS } from '../../src/avatars';
 import { TOPICS, type Difficulty } from '../../src/curriculum';
 import { waveOptsFor } from '../../src/ui/play-session';
@@ -152,6 +152,55 @@ describe('splitLabel / fitLabelLines — a label #348 squeezed wraps; one it did
     }
   });
 
+  describe('LABEL_HARD_MIN_FS — only an unbreakable overflow ever reaches it (#348 owner decision, 2026-09-24)', () => {
+    // r = 26 (layoutWave's own floor) makes 'twelve' (6 chars) start at 0.5r = 13, above LABEL_MIN_FS, so the
+    // ordinary shrink loop has somewhere to walk down from; the budget is r * LINE_BUDGET = 45.5. A width
+    // that only drops under that budget once fs steps below a threshold makes the shrink loop walk all the
+    // way down rather than stopping on its first try — proves the floor is *reached*, not just available.
+    const R2 = 26;
+    const stepAt = (threshold: number) => (font: string) => sizeOf(font) > threshold ? 50 : 40;
+
+    it('an unbreakable label still too wide at LABEL_MIN_FS shrinks past it, down to where it fits', () => {
+      expect(splitLabel('twelve')).toBeNull();   // no space or hyphen — the case this floor exists for
+      const fit = fitLabelLines('twelve', R2, stepAt(9));
+      expect(fit.lines).toEqual(['twelve']);
+      expect(fit.fs).toBe(9);
+      expect(fit.fs).toBeLessThan(LABEL_MIN_FS);
+      expect(fit.fs).toBeGreaterThanOrEqual(LABEL_HARD_MIN_FS);
+      expect(fit.state).toBe('small');   // fits inside the bubble now, but fs=9 is still under LABEL_READABLE_FS
+    });
+
+    it('walks an unbreakable label all the way to LABEL_HARD_MIN_FS when nothing fits sooner', () => {
+      const fit = fitLabelLines('twelve', R2, stepAt(LABEL_HARD_MIN_FS));
+      expect(fit.fs).toBe(LABEL_HARD_MIN_FS);
+      expect(fit.state).toBe('small');
+    });
+
+    it('leaves an unbreakable label that still overflows at LABEL_HARD_MIN_FS clamped there, not lower', () => {
+      const fit = fitLabelLines('twelve', R2, () => 9999);
+      expect(fit.fs).toBe(LABEL_HARD_MIN_FS);
+      expect(fit.state).toBe('overflow');
+    });
+
+    it('leaves an unbreakable label already fitting at LABEL_MIN_FS untouched — the floor is never reached', () => {
+      // Fits comfortably one line at r = 41.4 (see the '£2' test above), so `fitLabel` never even touches
+      // LABEL_MIN_FS; this pins that the new branch cannot be entered to make it smaller than it needs.
+      const fit = fitLabelLines('twelve', 41.4, measure);
+      expect(fit.state).toBe('ok');
+      expect(fit.fs).toBeGreaterThan(LABEL_MIN_FS);
+    });
+
+    it('never takes a breakable label below LABEL_MIN_FS, even when neither line count fits — #348 review', () => {
+      // 'a three-quarter turn' has both a space and a hyphen (`splitLabel` above proves it), and with every
+      // width forced to 9999 neither one line nor two can ever fit — exactly the shape that must still stop
+      // at LABEL_MIN_FS rather than borrow the unbreakable label's lower floor.
+      expect(splitLabel('a three-quarter turn')).not.toBeNull();
+      const fit = fitLabelLines('a three-quarter turn', 41.4, () => 9999);
+      expect(fit.state).toBe('overflow');
+      expect(fit.fs).toBe(LABEL_MIN_FS);
+    });
+  });
+
   it('keeps two lines inside the disc vertically, at every radius — review note 3', () => {
     const labels = ['£1 and 50p', 'quarter past 12', 'a three-quarter turn', 'twenty-five', 'yes no', '£2', 'an anti-clockwise turn'];
     for (const r of [26, 33.1, 41.4, 57.3]) {
@@ -241,28 +290,29 @@ describe('every option label the curriculum can generate — the #348 sweep (def
   const key = (topicId: string, label: string) => `${topicId}\t${label}`;
 
   /**
-   * Labels the sweep already knows overflow at this radius, whatever the wrap does with them — every one is
-   * a single word or run with no space or hyphen for `splitLabel` to break on, so `fitLabelLines` has only
-   * `fitLabel`'s one-line shrink to offer, and that stops at `LABEL_MIN_FS` whether or not it fits. Fixing
+   * Labels the sweep already knows overflow at this radius, whatever `fitLabelLines` does with them. Fixing
    * any of these needs a decision the sweep itself cannot make — shorten the word, grow the bubble for long
    * single-word answers, or thin the decoy count that pushes `n` past the crowding threshold — so they stay
    * a named, checked exception rather than either failing the build today or being silently swallowed.
    * Asserted in both directions below, the same discipline `NO_REPEATED_SET` (`curriculum.test.ts`) uses, so
    * a fix that lands quietly is caught as a stale entry rather than left to rot as false cover.
+   *
+   * **Nine of the original twelve dropped here** (#348 owner decision, 2026-09-24: an unbreakable label —
+   * no space or hyphen for `splitLabel` to offer `fitLabelLines` a wrap — that still overflows at
+   * `LABEL_MIN_FS` may shrink to `LABEL_HARD_MIN_FS` instead of spilling out). Measured against this sweep's
+   * own calibration, that floor rescues nine; three do not move, for two different reasons documented where
+   * each sits below — not the "the set is empty" the issue's acceptance criterion assumed before anyone
+   * measured which of the twelve are actually unbreakable.
    */
   const KNOWN_OVERFLOW = new Set([
-    'y1-sentence\taeroplane?',
+    // Has a space `splitLabel` finds (`["a three-", "quarter turn"]`) — breakable, so `fitLabelLines` never
+    // takes it below `LABEL_MIN_FS` (#348: only an *unbreakable* overflow gets the lower floor), and its own
+    // wrap still doesn't fit at that floor.
     'y2-position\ta three-quarter turn',
-    'y2-sentence\tEverybody',
-    'y2-sentence\tbeautifully.',
-    'y2-sentence\tcolourful',
-    'y2-sentence\tfinished.',
-    'y2-sentence\toverslept.',
-    'y2-sentence\tpictures.',
+    // Unbreakable, but still wider than its bubble even at `LABEL_HARD_MIN_FS` — the new floor narrows the
+    // gap it does not close.
     'y2-sentence\tsandcastle.',
-    'y2-sentence\tsunflowers.',
-    'y2-sentencetype\texclamation',
-    'y2-stats\tstrawberries',
+    'y2-sentence\tbeautifully.',
   ]);
 
   /**
@@ -615,6 +665,23 @@ describe('re-anchoring a wave when the arena is resized (#146)', () => {
     const b = airborne(300);
     reanchorBubble(b, PORTRAIT, LANDSCAPE);
     expect(b.r).toBe(33);
+  });
+
+  // #591 review (silent-failure-hunter): a required sequence bubble remembers its spawn arc in ox/ovx/ovy so a
+  // later re-launch is not left running whatever a collision did to x/vx/vy. That memory has to move with a
+  // resize exactly as the live x/vx/vy above do — otherwise a relaunch after a rotation resets the bubble to
+  // an arc sized for a box that no longer exists, which can be off-screen or too short to ever come back up.
+  it('rescales a bubble\'s remembered spawn arc (ox/ovx/ovy) the same way it rescales the live one', () => {
+    const b = { ...airborne(300, PORTRAIT, { vy: 120, g: 180, x: 195 }), ox: 195, ovx: 8, ovy: -400 };
+    reanchorBubble(b, PORTRAIT, LANDSCAPE);
+    expect(b.ox, 'ox scales by the same width ratio as x').toBeCloseTo(195 * (LANDSCAPE.W / PORTRAIT.W), 6);
+    expect(b.ovx, 'ovx scales by the same width ratio as vx').toBeCloseTo(8 * (LANDSCAPE.W / PORTRAIT.W), 6);
+    expect(b.ovy, 'ovy scales by the same height ratio as vy').toBeCloseTo(-400 * (LANDSCAPE.H / PORTRAIT.H), 6);
+  });
+
+  it('leaves ox/ovx/ovy alone when they are absent — a plain Collidable has none', () => {
+    const b = airborne(300);   // no ox/ovx/ovy at all, the shape every other test in this file uses
+    expect(() => reanchorBubble(b, PORTRAIT, LANDSCAPE)).not.toThrow();
   });
 });
 

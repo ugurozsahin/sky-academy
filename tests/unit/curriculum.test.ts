@@ -1,13 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
+import type { Topic } from '../../src/curriculum';
 import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, R_LETTERS_P2, R_LETTERS_ALL, CVC, DIGRAPHS, medialIsGenuine, finalIsGenuine, HOMOPHONES, HOMOPHONE_SETS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/writing';
 import type { SentenceType } from '../../src/curriculum/writing';
 import { coinLabel, SHAPES_2D, SHAPES_3D, wordQ } from '../../src/curriculum/util';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
+import { digraphBlocked, digraphFrames, digraphSpellings } from './helpers/digraph-gaps';
 
 // Deterministic RNG (mulberry32)
 function rng(seed: number) {
@@ -462,9 +464,16 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // are phase 2B and never in the d1 pool — and the guard meant to catch exactly that checked the wrong
     // pool and passed (review of #418). No spelling was left unpinned; the claim was what was wrong.
     const R_POOL = (i: number) => (i === 0 ? R_LETTERS_P2 : i === 1 ? ['a', 'e', 'i', 'o', 'u'] : R_LETTERS_ALL);
+    // #445: `R_POOL(i)` containing `l` is not enough — it only says the *letter* is drawable at that index,
+    // not that the *stem* is ever offered at that index at all. `cow@2` used to sit in this table: `k`/`c` are
+    // both in `R_LETTERS_ALL`, so the row passed, but `finalIsGenuine('cow')` is false, so `receptionGapFrames`
+    // never builds a `cow@2` frame and no card can ever ask it — the row proved `cok`/`coc` unreachable rather
+    // than reachable, the opposite of what every other row here claims. `known` is the same reachable-frame set
+    // `it('7. …')` below builds, so a row here can only claim a stem the generator actually draws.
+    const known = new Set(receptionGapFrames().map(f => `${f.word}@${f.idx}`));
     for (const [w, i, l] of [['cup', 2, 'm'], ['cup', 2, 'n'], ['pot', 2, 'o'], ['pan', 2, 'p'], ['pan', 2, 'k'],
-      ['bus', 2, 'm'], ['jam', 2, 'p'], ['bug', 2, 'm'], ['van', 2, 'g'], ['put', 2, 's'],
-      ['pig', 0, 'n'], ['hen', 1, 'u'], ['cow', 2, 'k'], ['cow', 2, 'c'],
+      ['bus', 2, 'm'], ['jam', 2, 'p'], ['bug', 2, 'm'], ['van', 2, 'g'],
+      ['pig', 0, 'n'], ['hen', 1, 'u'],
       // #443: the fifth sweep, and this stem was reachable through the whole fourth (#418/#419) — `le_`
       // offered `z`, a slur, to a Reception card.
       ['leg', 2, 'z']] as [string, number, string][]) {
@@ -472,8 +481,21 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
       const gap = `${w.slice(0, i)}_${w.slice(i + 1)}`;
       expect(AVOID.has(filled), `${gap}: ${l} spells ${filled}, which belongs in AVOID`).toBe(true);
       expect(R_POOL(i), `${l} is not in the pool index ${i} draws from, so this row is vacuous`).toContain(l);
+      expect(known, `${w}@${i} is not a frame the generator ever draws, so this row proves nothing`).toContain(`${w}@${i}`);
       expect(gapDecoys(w, i, R_POOL(i)), `${gap} may never offer ${l} — it spells ${filled}`).not.toContain(l);
     }
+    // `cow@2` (`finalIsGenuine('cow')` is false) is not one of the rows above for exactly that reason: no
+    // frame ever offers it, so `cok`/`coc` are unreachable today. They stay in `AVOID` regardless (`writing.ts`'s
+    // own comment: the exact-homophone-of-`cock` rule, the same one `hore` is on), pinned as unreachable rather
+    // than claimed reachable (#445). Both halves are asserted, not just one: unreachable-and-gone-from-AVOID
+    // would be as silent a drift as unreachable-and-claimed-reachable was.
+    expect(known.has('cow@2'), 'cow@2 has become reachable — move it into the reachable table above').toBe(false);
+    expect(AVOID.has('cok') && AVOID.has('coc'), 'cok/coc left AVOID — cow@2 is unreachable, but this is the only place that said so').toBe(true);
+    // `put@2` is not in the table above either: `put` is not in `CVC` at all, so no Reception frame ever offers
+    // it — `put_2_s` (spelling `pus`) already has its own row in the Y1/Y2 word-list table above, which is the
+    // table that actually reaches it (#445).
+    expect(CVC.some(([w]) => w === 'put'), 'put has joined CVC — pus is now reachable and belongs in the table above').toBe(false);
+    expect(AVOID.has('pus'), 'pus left AVOID — it is still checked in the Y1/Y2 word-list table above').toBe(true);
     // The floor, at every index the generator gaps — including 1, whose pool is five letters and whose real
     // margin is one blocked letter. The first version looped `[0, 2]`, so it measured every pool except the
     // one the comment it was checking was false about (review of #418, B3).
@@ -506,13 +528,27 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // `y1-digraphs`, which the hand-written list also omitted: it gaps TWO characters (`tr__`) and builds its
     // card without `gapQ`, so it goes through neither filter. That is recorded at `writing.ts`'s `gapDecoys`
     // and is not this sweep's shape — but it is found here rather than forgotten.
-    const drawn = TOPICS.map(t => ({ id: t.id, q: t.gen(1, rng(t.id.length + 3)) }));
+    // #445: one draw at d1 used to decide membership outright — measured over 200 draws per difficulty,
+    // `y1-spelling`/`y2-spelling`/`y1-days` only gap ~50-85% of the time at d2/d3, and only d1 happens to gap
+    // unconditionally today. A future gap topic that gapped only at d2/d3, or probabilistically even at d1,
+    // would drop out of this sweep with nothing red — #418's own failure mode, behind a better-looking
+    // derivation. `drawsOver` checks every difficulty across five fixed seeds, which narrows that gap by
+    // three orders of difficulty and several draws rather than closing it outright: a topic gapping at well
+    // under the rates measured above, on every one of those fifteen fixed draws, would still pass through
+    // silently — the same failure mode this sweep exists to catch, just far less likely to hit it unnoticed.
+    const drawsOver = (t: Topic, pred: (q: Question) => boolean) => {
+      for (const d of [1, 2, 3] as Difficulty[]) for (let seed = 0; seed < 5; seed++) {
+        const q = t.gen(d, rng(t.id.length * 11 + d * 7 + seed));
+        if (!q.sequence && pred(q)) return true;
+      }
+      return false;
+    };
     // A letter gap is a single `_` INSIDE a word — no space beside it — whose options are single letters.
     // Without both halves a sentence card (`_ cat is black.`, options are words) reads as one.
     const isLetterGap = (q: Question) => /(^|\S)_(\S|$)/.test(q.prompt) && !q.prompt.includes('__')
       && q.options.every(o => /^[a-z]$/i.test(String(o)));
-    const GAP_TOPICS = drawn.filter(({ q }) => !q.sequence && isLetterGap(q)).map(({ id }) => id);
-    const MULTI_GAP = drawn.filter(({ q }) => !q.sequence && q.prompt.includes('__')).map(({ id }) => id);
+    const GAP_TOPICS = TOPICS.filter(t => drawsOver(t, isLetterGap)).map(t => t.id);
+    const MULTI_GAP = TOPICS.filter(t => drawsOver(t, q => q.prompt.includes('__'))).map(t => t.id);
     expect(GAP_TOPICS, 'the gap topics must be found, not named').toEqual(
       expect.arrayContaining(['y1-spelling', 'y2-spelling', 'y1-days', 'r-sounds']));
     expect(MULTI_GAP, 'y1-digraphs gaps two characters and is outside both filters — see writing.ts')
@@ -596,6 +632,12 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // it. Every card the real topic draws must be one of them.
     const frames = receptionGapFrames();
     const known = new Set(frames.map(f => `${f.word}@${f.idx}`));
+    // #445: `set.has(filled)` below only proves a drawn option is *somewhere* in the whole reachable fixture —
+    // it would pass just as well if `pig@0`'s card offered a decoy that only `hen@1`'s frame actually owns, an
+    // error `gapQ` cannot make today (each card's decoys come from its own `gapDecoys` call) but that this loop
+    // could not have caught either way. `frameByKey` lets each drawn card be checked against **its own**
+    // frame's pool — `gapDecoys(frame.word, frame.idx, frame.pool)` — rather than the union of all of them.
+    const frameByKey = new Map(frames.map(f => [`${f.word}@${f.idx}`, f]));
     const t = gen('r-sounds');
     let seen = 0;
     for (const d of [1, 2, 3] as Difficulty[]) {
@@ -604,13 +646,20 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
         const q = t.gen(d, r);
         const idx = q.prompt.indexOf('_');
         const word = q.prompt.slice(0, idx) + q.answer + q.prompt.slice(idx + 1);
+        const key = `${word}@${idx}`;
         expect(known, `the real generator drew ${q.prompt} (${word}@${idx}), which the frames do not carry`)
-          .toContain(`${word}@${idx}`);
+          .toContain(key);
         seen++;
-        // …and every option it really offers is in the reviewed set.
+        // this frame's own decoys — pinned, not just present somewhere in the reachable set (#445).
+        const frame = frameByKey.get(key)!;
+        const ownDecoys = new Set(gapDecoys(frame.word, frame.idx, frame.pool)
+          .map(l => (frame.word.slice(0, frame.idx) + l + frame.word.slice(frame.idx + 1)).toLowerCase()));
+        // …and every option it really offers is in the reviewed set, and in this exact frame's own pool.
         for (const o of q.options) {
           const filled = (q.prompt.slice(0, idx) + o + q.prompt.slice(idx + 1)).toLowerCase();
           expect(set.has(filled), `r-sounds: ${q.prompt} — option ${o} spells ${filled}, which is not in the fixture`).toBe(true);
+          if (filled !== frame.word.toLowerCase())
+            expect(ownDecoys, `r-sounds: ${q.prompt} — option ${o} spells ${filled}, which is not among ${frame.word}@${frame.idx}'s own decoys`).toContain(filled);
         }
       }
     }
@@ -618,10 +667,70 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
 
     // And the filter is doing something: the set it keeps off a card is non-empty and disjoint from the set
     // above. Without this, emptying `AVOID` would only shrink the fixture and could be "fixed" by updating it.
+    // #445: pinned to the whole reachable set, not `toBeGreaterThan(8)` — a margin of two (or three, against
+    // today's eleven) against a number nobody reads is the same "arbitrary-reading floor" shape the fixture
+    // above exists to replace. A new one lands here named, in a diff a person reads, same as the fixture.
     const blocked = receptionBlocked();
-    expect(blocked.length, 'AVOID reaches no Reception card, so the filter is off').toBeGreaterThan(8);
+    expect(blocked).toEqual(['bum', 'cum', 'cun', 'hun', 'jap', 'lez', 'nig', 'pak', 'pap', 'poo', 'vag']);
     for (const w of blocked)
       expect(set.has(w), `${w} is blocked and also in the reviewed set — one of the two is wrong`).toBe(false);
+  });
+
+  /**
+   * #445's last remaining bonus item. `y1Digraphs` is the one gap card the #418 sweep found and could not
+   * close: it composes its own two-letter gap and calls `wordQ` directly, so neither `gapLetters` nor
+   * `gapDecoys` — and no rail that reads either — ever sees its cards. Until now that half was prose in
+   * `writing.ts`'s `AVOID` docstring ("nothing reachable today"), asserted nowhere. Same technique as test 7:
+   * pin the whole reachable set in a fixture, so a `DIGRAPH_WORDS` or `DIGRAPHS` change that makes a new
+   * spelling reachable arrives named, in a diff a person reads, rather than waiting for the next sweep's eye.
+   *
+   * Prove it red: add a word to `DIGRAPH_WORDS`, or a grapheme to `DIGRAPHS`.
+   */
+  it('8. every spelling a y1-digraphs card can show has been looked at (#445)', () => {
+    const expected = readFileSync(new URL('./fixtures/y1-digraph-spellings.txt', import.meta.url), 'utf8')
+      .split('\n').map(l => l.trim()).filter(Boolean);
+    expect(expected.length, 'the fixture is empty or unreadable, which would make this rail vacuous').toBeGreaterThan(200);
+    const actual = digraphSpellings();
+    const set = new Set(expected);
+    const added = actual.filter(w => !set.has(w));
+    const gone = expected.filter(w => !actual.includes(w));
+    expect(added, 'a y1-digraphs card can now show spellings nobody has looked at — read them, decide, then '
+      + 'update fixtures/y1-digraph-spellings.txt in the same commit').toEqual([]);
+    expect(gone, 'spellings are no longer reachable; if that was the intent, update the fixture').toEqual([]);
+
+    // The helper rebuilds the generator's frames from the same DIGRAPH_WORDS/DIGRAPHS the real generator
+    // reads, so it can drift from the generator and take this green with it. Every card the real topic draws
+    // must be one of them, and every option it offers must be that frame's own decoy — not merely present
+    // somewhere in the union of all frames' reachable spellings (the same distinction #445 drew for test 7).
+    const frames = digraphFrames();
+    const frameByWord = new Map(frames.map(f => [f.word, f]));
+    const t = gen('y1-digraphs');
+    let seen = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(445 + d);
+      for (let i = 0; i < 400; i++) {
+        const q = t.gen(d, r);
+        expect(q.prompt, 'every y1-digraphs card gaps exactly one two-letter digraph').toMatch(/__/);
+        const word = q.prompt.replace('__', q.answer);
+        const frame = frameByWord.get(word);
+        expect(frame, `the real generator drew ${q.prompt} (${word}), which the frames do not carry`).toBeDefined();
+        seen++;
+        const ownDecoys = new Set(DIGRAPHS.filter(x => x !== frame!.dg));
+        for (const o of q.options) {
+          const filled = q.prompt.replace('__', o);
+          expect(set.has(filled), `y1-digraphs: ${q.prompt} — option ${o} spells ${filled}, which is not in the fixture`).toBe(true);
+          expect(AVOID.has(filled), `y1-digraphs: ${q.prompt} — option ${o} spells ${filled}, which no card may show`).toBe(false);
+          if (o !== q.answer) expect(ownDecoys, `y1-digraphs: ${q.prompt} — option ${o} is not among ${word}'s own decoys`).toContain(o);
+        }
+      }
+    }
+    expect(seen, 'no cards drawn, so the drift check above proved nothing').toBeGreaterThan(1000);
+
+    // And named, not just proved empty in passing: if a future word or digraph makes a spelling in `AVOID`
+    // reachable, this fails with the exact spelling rather than staying green because nobody wrote a row for
+    // it — the same shape test 7 holds Reception to, one call below instead of an exact array (nothing is
+    // blocked today, so there is no list to pin yet).
+    expect(digraphBlocked(), 'a y1-digraphs card can now show a spelling AVOID exists to stop').toEqual([]);
   });
 
   it('6. capacity compares what a container holds, never how full it is', () => {
