@@ -204,7 +204,20 @@ describe('guard rails', () => {
     expect(play).toMatch(/throwFor:\s*b\s*=>\s*b\.label\s*!==\s*BOMB/);
     const arena = code(SOURCES['/src/game/arena.ts']);
     expect(arena).toContain('this.throwFor ? this.throwFor(b) : true');   // the tap path consults it
-    expect(arena).toMatch(/if \(!b\.hit\) this\.cb\.onFall\(b\)/);      // a tapped bubble in flight is not a miss
+    // #742: the gentle-year branch sits inside the same `!b.hit` guard, so a tapped bubble in flight still
+    // never reaches onFall (nor becomes the deferred gentleTargetFallen) whichever path it takes.
+    expect(arena).toMatch(/if \(!b\.hit\) \{ if \(gentle\).*this\.cb\.onFall\(b\)/);
+  });
+
+  // #742 review round 1 (pr-test-analyzer, silent-failure-hunter): tests/unit/sim.test.ts's own BOMB-vs-gentle
+  // regression test hand-duplicates play.ts's `isHazard` predicate rather than reading it — this pins play.ts's
+  // own wiring so a future edit that drops or mistypes it (leaving `throwFor` correct but `isHazard` stale)
+  // fails a rail here, not just silently un-tests a live bug's fix.
+  it('a TNT is wired as a hazard everywhere it is wired as unthrowable (#742)', () => {
+    const play = code(SOURCES['/src/ui/play.ts']);
+    expect(play).toMatch(/isHazard:\s*label\s*=>\s*label\s*===\s*BOMB/);
+    const arena = code(SOURCES['/src/game/arena.ts']);
+    expect(arena).toContain('!this.isHazard?.(b.label)) this.gentleDecoys.push(b)');
   });
 
   // CLAUDE.md: no dependencies without reason (Capacitor is the documented exception). A new one now has
@@ -2718,7 +2731,8 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
     const inbound = all.filter(e => !e.from.startsWith(THREE_DIR) && e.to.startsWith(THREE_DIR) && e.kind !== 'type');
     const bad = inbound.filter(e => e.kind !== 'dynamic' || !e.to.startsWith(MOUNT_DIR));
     expect(bad, 'a static import pulls three into the main chunk; a reach past mount/ bypasses the flag').toEqual([]);
-    expect(inbound.map(e => `${e.from} → ${e.to}`), 'the one lazy loader today (#684)').toEqual(['/src/ui/solid.ts → /src/three/mount/solids']);
+    // #684: the loader asks the flag (`enabled`, a small chunk with no three.js) before it downloads the solids.
+    expect(inbound.map(e => `${e.from} → ${e.to}`).sort(), 'the one lazy loader today (#684), and the flag it asks first').toEqual(['/src/ui/solid.ts → /src/three/mount/enabled', '/src/ui/solid.ts → /src/three/mount/solids']);
   });
 
   // (c) Proved red: `import { $ } from '../../ui/dom'` in src/three/stage/rig.ts fails. Stronger than the epic's

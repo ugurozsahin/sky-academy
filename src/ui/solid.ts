@@ -28,7 +28,7 @@ export function solidNameFor(q: Question, topicId: string | undefined): SolidNam
  * up. `error` says why not when it did not — a renderer that refused to start and a chunk that failed to
  * download both keep the emoji, but they are different bugs to chase (silent-failure review of the spike).
  */
-export interface SolidState { name: SolidName; frames: number; webgl: boolean; error: 'no-webgl' | 'load-failed' | 'built-off' | null }
+export interface SolidState { name: SolidName; frames: number; webgl: boolean; error: 'no-webgl' | 'load-failed' | 'built-off' | 'flag-off' | null }
 /** What `window.__sna.solidArt()` reports: which solids have a baked spin sheet, and how many bubble frames drew one. */
 export interface SolidArtState { ready: SolidName[]; draws: number; error: SolidState['error'] }
 export interface SolidSlot {
@@ -47,17 +47,22 @@ export interface SolidSlot {
 }
 type Loader = () => Promise<typeof import('../three/mount/solids')>;
 /**
- * The default loader, and the build-time layer of the 3-D flag (#714): `VITE_THREE=off` makes the test below
- * a constant, so Vite folds the `import()` away and the build has no three chunk at all — a rail builds both
+ * The default loader, and both layers of the 3-D flag. Build time (#714): `VITE_THREE=off` makes the test below
+ * a constant, so Vite folds the `import()`s away and the build has no three chunk at all — a rail builds both
  * ways and checks. Read here as a literal `import.meta.env.VITE_THREE`, which is the only spelling Vite
- * replaces; `src/three/mount/enabled.ts` reads the same variable for the runtime decision, and this spike
- * is not behind that runtime decision (the comment at the top of `solids.ts` says why). Read inside the
- * function, not at module level: Playwright's own loader evaluates this module in Node for a duel spec's
- * constants, and Node has no `import.meta.env`.
+ * replaces, and inside the function, not at module level: Playwright's own loader evaluates this module in
+ * Node for a duel spec's constants, and Node has no `import.meta.env`.
+ *
+ * Run time (the owner, in session, 2026-09-25: "with the flag off I want no 3-D objects at all — back to how it
+ * was"): `threeEnabled()` — the grown-ups' setting, `?three=off`, the device gate — is asked first, from its own
+ * small chunk that carries no three.js. Off, the solids chunk is never downloaded and the rejection keeps the
+ * emoji on the card and in the bubbles, exactly as before #684.
  */
 const loadSolids: Loader = () => import.meta.env.VITE_THREE === 'off'
   ? Promise.reject(Object.assign(new Error('3-D is off in this build (VITE_THREE=off)'), { builtOff: true }))
-  : import('../three/mount/solids');
+  : import('../three/mount/enabled').then(({ threeEnabled }) => threeEnabled()
+    ? import('../three/mount/solids')
+    : Promise.reject(Object.assign(new Error('3-D is off here (threeEnabled() is false)'), { flagOff: true })));
 /** The card element the view is mounted into — `#vis`, whose contents `renderVisual` rewrites per question. */
 type Host = Pick<HTMLElement, 'replaceChildren'>;
 /**
@@ -194,7 +199,7 @@ export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, t
   }
   function fail(kind: NonNullable<SolidState['error']>, e: unknown) {
     error = kind;
-    if (kind === 'built-off') return;   // a build choice, not a failure: the emoji is the design, nothing to warn about
+    if (kind === 'built-off' || kind === 'flag-off') return;   // a choice, not a failure: the emoji is the design, nothing to warn about
     if (!warnedOnce) { warnedOnce = true; console.warn(`3-D solids: ${kind === 'no-webgl' ? 'WebGL renderer unavailable' : 'could not load three'}, keeping the emoji`, e); }
   }
   return {
@@ -220,7 +225,10 @@ export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, t
         catch (e) { fail('no-webgl', e); return; }
         if (wanted) mount(wanted);
         bake();
-      }, e => fail((e as { builtOff?: boolean } | null)?.builtOff ? 'built-off' : 'load-failed', e));
+      }, e => {
+        const off = e as { builtOff?: boolean; flagOff?: boolean } | null;
+        fail(off?.builtOff ? 'built-off' : off?.flagOff ? 'flag-off' : 'load-failed', e);
+      });
     },
     state() {
       if (!wanted) return null;

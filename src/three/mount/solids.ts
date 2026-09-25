@@ -5,11 +5,11 @@
 // as a self-contained data URL, and a chunk that reached back into the main chunk could not be. The rails
 // in `tests/unit/guardrails.test.ts` hold both properties.
 //
-// This is the spike's look, not the stage's: it builds its own Lambert materials and edge lines, and it is
-// not behind `threeEnabled()` (`./enabled.ts`), because it is on `main` today and #714 changes nothing a
-// child sees. #684 rebuilds the solids as stage objects through the sketchbook and mounts them behind the
-// flag; this file retires then. Until that, the build-time switch (`VITE_THREE=off`, read in `solid.ts`'s
-// loader) is the one layer of the flag that reaches it.
+// This is the spike's look, not the stage's: it builds its own Lambert materials and edge lines. It is behind
+// both layers of the flag — `src/ui/solid.ts`'s loader asks `threeEnabled()` (`./enabled.ts`) before it
+// downloads this chunk, and `VITE_THREE=off` removes it from the build — so with the flag off a child sees the
+// emoji, as before #684. #684 rebuilds the solids as stage objects (`src/three/objects/solids/`) and mounts
+// them in place of this file, which retires then.
 //
 // Geometry is code, not files: every solid is a three.js primitive, coloured from the design-language tokens
 // read off `:root` at runtime (so no hex is written here and a palette change reaches the solids too).
