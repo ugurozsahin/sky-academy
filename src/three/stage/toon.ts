@@ -1,11 +1,11 @@
 /**
  * Cel shading (decision record 010, item 2): every object's material is a `MeshToonMaterial` over one shared
  * gradient map, built here and nowhere else — the objects tree constructs no material of its own (a rail).
- * `TONES` is provisional until the style probe (#717) picks two or three from rendered variants.
+ * `TONES` is three: the owner's pick from the style probe's rendered variants (#717).
  */
 import { Color, DataTexture, MeshToonMaterial, NearestFilter, RedFormat, type ColorRepresentation } from 'three';
 
-/** Tone steps in the gradient map. Provisional (#717). */
+/** Tone steps in the gradient map. Chosen by the owner from the style probe: variant B (#717, PR #734). */
 export const TONES = 3;
 
 const maps = new Map<number, DataTexture>();

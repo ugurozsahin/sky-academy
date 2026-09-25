@@ -6,7 +6,7 @@
  */
 import { BackSide, Mesh, MeshBasicMaterial, type ColorRepresentation, type WebGLProgramParametersWithUniforms } from 'three';
 
-/** Hull offset along the normal, in scene units. Provisional (#717). */
+/** Hull offset along the normal, in scene units. Chosen by the owner from the style probe: variant B (#717, PR #734). */
 export const OUTLINE_WIDTH = 0.045;
 export const OUTLINE_NAME = 'outline';
 
