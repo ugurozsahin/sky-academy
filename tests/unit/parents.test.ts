@@ -206,6 +206,29 @@ describe('ninjas on this device (#20 slice 3)', () => {
     expect(DELETE_HINTS.last).toContain('Start again');
     expect(DELETE_HINTS.last).toContain('RESET');
   });
+
+  /**
+   * #447 item 3: the test above only checks each sentence is non-trivial, so `DELETE_HINTS.orphaned` could be
+   * set to `store`'s exact text ("nothing was removed" — a falsehood once something HAS been removed) or
+   * `RENAME_HINTS.future` to `store`'s ("the new name was not kept" instead of the other-device remedy) and
+   * still pass it. Two refusals sharing a sentence is fine only when they are the *same* refusal shared
+   * across both maps (`future`/`unknown` deliberately read the same in both) — never when the refusal differs.
+   */
+  it('no two different refusals share a sentence, only the same refusal across both maps (#447 item 3)', () => {
+    const all = [
+      ...Object.entries(RENAME_HINTS).map(([why, text]) => ({ why, text })),
+      ...Object.entries(DELETE_HINTS).map(([why, text]) => ({ why, text })),
+    ];
+    const ownerOf = new Map<string, string>();
+    for (const { why, text } of all) {
+      const owner = ownerOf.get(text);
+      if (owner === undefined) { ownerOf.set(text, why); continue; }
+      expect(why, `"${text}" is already ${owner}'s sentence`).toBe(owner);
+    }
+    // The two remedies #420 review round 2 (B2) and #446 say must never be conflated:
+    expect(DELETE_HINTS.orphaned, 'something WAS removed — never store\'s "nothing was removed"').not.toBe(DELETE_HINTS.store);
+    expect(RENAME_HINTS.future, 'the other-device remedy, never "the new name was not kept"').not.toBe(RENAME_HINTS.store);
+  });
 });
 
 /**

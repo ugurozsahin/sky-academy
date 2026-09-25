@@ -1858,6 +1858,22 @@ describe('profiles: siblings on one device (#20)', () => {
       expect(activeProfile()).toBe('p1');
     });
 
+    // #447 item 1: every rename test above establishes `sessionProfile() === activeProfile()` first, so
+    // `if (id === sessionProfile())` and the wrong `if (id === activeProfile())` answer identically and a
+    // mutation between them survives the whole suite. This one pulls them apart first, the same way the
+    // #380 review's "a second tab that moved the index" tests do (line 1542).
+    it("asks which profile this session is playing, not which the index calls active (#447 item 1)", () => {
+      save({ name: 'Ada' });                                 // this session latches to p1
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });  // index active -> p2; the switch unlatches the session
+      save({ name: 'Bo' });                                  // resolves fresh to p2 -> the session latches to p2 (Bo)
+      // A second tab now moves the device back to Ada. This session never saw it and stays latched to p2 (Bo).
+      localStorage.setItem(INDEX, JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }));
+      expect(renameProfile('p1', 'Adaline'), 'p1 is a sibling to this session, not who it is playing').toEqual({ ok: true, name: 'Adaline' });
+      expect(load().name, "this session's own save (Bo) is untouched by a sibling's rename").toBe('Bo');
+      expect(renameProfile('p2', 'Bobby'), 'renaming who this session actually is').toEqual({ ok: true, name: 'Bobby' });
+      expect(load().name, "and this time it is this session's own save that moved").toBe('Bobby');
+    });
+
     it('trims, truncates to NAME_MAX, and refuses a name of only spaces', () => {
       save({ name: 'Ada', onboarded: true });
       expect(renameProfile('p1', '   ')).toEqual({ ok: false, why: 'blank' });
@@ -2109,6 +2125,23 @@ describe('profiles: siblings on one device (#20)', () => {
       // The freed slot is genuinely reusable — `addProfile` probes `holdsSave`, so leftover bytes would cap
       // the family below four for good (#335 item 1).
       expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+    });
+
+    // #447 item 2: every delete test above either removes the active profile (`active` must move) or removes
+    // a profile that already was not active while only two siblings exist, where `rest[0]` and the untouched
+    // `idx.active` happen to be the same id. Three siblings, deleting neither the active one nor the one that
+    // would land in `rest[0]`, tells `idx.active === id ? rest[0] : idx.active` apart from the wrong
+    // `rest[0]` unconditionally.
+    it("leaves the active id alone when the profile removed was not it (#447 item 2)", () => {
+      save({ name: 'Ada' });
+      expect(addProfile()).toEqual({ ok: true, id: 'p2' });
+      save({ name: 'Bo' });
+      expect(addProfile()).toEqual({ ok: true, id: 'p3' });
+      save({ name: 'Cass' });
+      expect(setActiveProfile('p2'), 'Bo is holding the device').toEqual({ ok: true });
+      expect(deleteProfile('p3'), "removing Cass's slot, not Bo's").toEqual({ ok: true, self: false });
+      expect(JSON.parse(localStorage.getItem(INDEX)!).active, 'p2 was already active and stays so — p3 leaving must not move it').toBe('p2');
+      expect(activeProfile()).toBe('p2');
     });
 
     /**
