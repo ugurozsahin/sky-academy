@@ -890,6 +890,58 @@ describe('#591: a required sequence bubble knocked out of the arena is re-launch
   });
 });
 
+describe('#700: a gentle year\'s answer bubble gets one free trip back up, not more', () => {
+  function forceDeparture(s: Sim, label: string) {
+    advanceUntil(s, () => { const b = s.all().find(x => x.label === label); return !!b && b.launched && !b.dead; }, `${label} never (re)launched`);
+    const b = s.all().find(x => x.label === label)!;
+    b.y = s.arena.H + b.r + 50; b.vy = 250;
+    s.frame();
+  }
+
+  it('relaunches the target once, then tallies the second fall as a miss', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, gentleTarget: '1' });
+
+    forceDeparture(sim, '1');
+    expect(sim.events.falls, 'the first departure is a free trip, not a miss').not.toContain('1');
+    const relaunched = sim.all().find(x => x.label === '1')!;
+    expect(relaunched.dead, 'sent back up, not killed').toBe(false);
+    expect(relaunched.launched, 'it waits below the floor, same as a sequence relaunch').toBe(false);
+
+    forceDeparture(sim, '1');
+    expect(sim.events.falls, 'the second departure is the miss it is today').toContain('1');
+    expect(sim.all().find(x => x.label === '1')!.dead).toBe(true);
+  });
+
+  it('never relaunches without a gentleTarget — a non-gentle year\'s answer bubble falls on the first departure', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2 });   // no gentleTarget: Year 1 / Year 2's own wave shape
+    forceDeparture(sim, '1');
+    expect(sim.events.falls, 'no gentleTarget means no free trip').toContain('1');
+    expect(sim.all().find(x => x.label === '1')!.dead).toBe(true);
+  });
+
+  it('leaves every other bubble unaffected — no free trips beyond the one named label', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, gentleTarget: '1' });
+    forceDeparture(sim, '2');
+    expect(sim.events.falls, 'a label that is not the gentleTarget is never re-launched').toContain('2');
+    expect(sim.all().find(x => x.label === '2')!.dead).toBe(true);
+  });
+
+  // `waveOptsFor` never sends both `ordered` and `gentleTarget` for the same label — a sequence question has
+  // no `gentleTarget` at all (#700's own `!q.sequence` gate) — but the arena's own precedence is still worth
+  // pinning directly, rather than trusting a caller invariant nothing here enforces (pr-test-analyzer review).
+  it('a label that is somehow both a sequence target AND the gentleTarget takes the counted sequence relaunch, not the one-shot gentle path', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, ordered: ['1'], gentleTarget: '1' });
+
+    forceDeparture(sim, '1');
+    expect(sim.events.falls).not.toContain('1');
+    expect(sim.all().find(x => x.label === '1')!.relaunches, 'the sequence counter moved — precedence went to seqRelaunch, not the gentle one-shot').toBe(1);
+  });
+});
+
 describe('#142: the arena drives the whole mission stage machine', () => {
   it('advances questions and stages, tops up lives, records stars, and ends once', () => {
     // No `lives` override: `YEARS[1].lives` is what the top-up below is capped by, and the scenario's numbers

@@ -97,8 +97,9 @@ export interface YearInfo {
   perStage: number;       // questions per stage
   lives: number;
   gentle: boolean;        // missed bubbles don't cost a life
-  speeds: number[];       // bubble speed per stage (1 slow … 3 fast); length = number of stages
+  speeds: number[];       // bubble speed per stage (0 gentle-float … 3 fast); length = number of stages
   diffs: Difficulty[];    // generator difficulty per stage
+  sprintStars: { threeStar: number; twoStar: number };   // Ninja Sprint correct-answer thresholds for this year (#700)
 }
 export const STAGE_NAMES = ['Apprentice', 'Warrior', 'Master', 'Grandmaster', 'Legend'];
 
@@ -109,7 +110,7 @@ const ART_YEAR1 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' 
 const ART_YEAR2 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M14 38h92l-18 28H32z' fill='%233a2a4a'/%3E%3Cpath d='M26 46l22 12 14-9 14 11 18-15' stroke='%23261a34' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='38' rx='48' ry='9' fill='%237a5ad6'/%3E%3Cellipse cx='60' cy='35' rx='44' ry='6' fill='%23a98cff'/%3E%3Cpath d='M44 34V14h32v20' fill='%232a1f4a'/%3E%3Cpath d='M38 14h44l-4-6H42z' fill='%23ff3b5c'/%3E%3Cpath d='M48 34V20h8v14zM64 34V20h8v14z' fill='%23ffe07a'/%3E%3Ccircle cx='24' cy='30' r='4' fill='%233ec9ff'/%3E%3Ccircle cx='98' cy='28' r='5' fill='%23ffd54f'/%3E%3C/svg%3E";
 
 export const YEARS: YearInfo[] = [
-  { id: 'reception', title: 'Reception', short: 'R', age: 'Ages 4–5', blurb: 'First steps · counting, sounds & letters', art: ART_RECEPTION, tint: '#66c25a55', maxAnswer: 30, perStage: 5, lives: 4, gentle: true, speeds: [1, 1, 1, 2, 2], diffs: [1, 1, 2, 2, 3] },
-  { id: 'year1', title: 'Year 1', short: 'Y1', age: 'Ages 5–6', blurb: 'Number bonds, adding, phonics & spelling', art: ART_YEAR1, tint: '#59b0b855', maxAnswer: 120, perStage: 6, lives: 3, gentle: false, speeds: [1, 2, 2, 3, 3], diffs: [1, 2, 2, 3, 3] },
-  { id: 'year2', title: 'Year 2', short: 'Y2', age: 'Ages 6–7', blurb: 'Times tables, money, time & tricky words', art: ART_YEAR2, tint: '#7a5ad655', maxAnswer: 130, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3] },
+  { id: 'reception', title: 'Reception', short: 'R', age: 'Ages 4–5', blurb: 'First steps · counting, sounds & letters', art: ART_RECEPTION, tint: '#66c25a55', maxAnswer: 30, perStage: 5, lives: 4, gentle: true, speeds: [0, 0, 0, 1, 1], diffs: [1, 1, 2, 2, 3], sprintStars: { threeStar: 8, twoStar: 4 } },
+  { id: 'year1', title: 'Year 1', short: 'Y1', age: 'Ages 5–6', blurb: 'Number bonds, adding, phonics & spelling', art: ART_YEAR1, tint: '#59b0b855', maxAnswer: 120, perStage: 6, lives: 3, gentle: false, speeds: [1, 2, 2, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
+  { id: 'year2', title: 'Year 2', short: 'Y2', age: 'Ages 6–7', blurb: 'Times tables, money, time & tricky words', art: ART_YEAR2, tint: '#7a5ad655', maxAnswer: 130, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
 ];

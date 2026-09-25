@@ -70,7 +70,13 @@ export interface ArenaOpts {
    *  The object may be reused by the next call — draw it at once, never keep it. */
   labelArt?: (label: string, color: string, phase: number) => { readonly img: CanvasImageSource; readonly sx: number; readonly size: number } | null;
 }
-export interface WaveOpts { labels: string[]; speed: number; wide?: boolean; gravity?: number; ordered?: string[] /* sequence labels that must be sliced in this order */ }
+export interface WaveOpts {
+  labels: string[]; speed: number; wide?: boolean; gravity?: number;
+  ordered?: string[];   // sequence labels that must be sliced in this order
+  // #700: a non-sequence question's correct-answer label, for a gentle year only — it gets one free trip
+  // back up if it falls unhit, the same idea as `ordered` above but for a single label and a single trip.
+  gentleTarget?: string;
+}
 export const GOOD = '#66e07d', BAD = '#ff5f6d';
 // #29 glow-underlay colours: compile-time constants, hoisted out of the per-frame draw so drawParticle/drawBubble
 // never rebuild an rgba() string (arena's #28 rule — no per-frame colour strings). hexA/hexToRgb are hoisted fns.
@@ -97,6 +103,10 @@ export class Arena {
   private strokeStale = false;                    // #331: a freeze happened since `lastPt` — the next move resumes the stroke, it does not continue it
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
   private orderedLabels: Set<string> = new Set();   // #591: this wave's required sequence labels — a re-launch candidate on fall, unlike a decoy
+  // #700: this wave's gentle-year single-relaunch target (a non-sequence question's answer), and whether
+  // its one free trip has already been spent — reset on every spawnWave, unlike `orderedLabels`' per-label
+  // `relaunches` count, because there is only ever one such label per wave and it gets exactly one trip.
+  private gentleTarget: string | undefined; private gentleUsed = false;
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
   paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
   private pausedSince: number | null = null;       // #490: when the CURRENT pause began, so resuming can shift launchAt by its length
@@ -178,6 +188,7 @@ export class Arena {
     this.bubbles = []; this.shots = []; this.frozen = false;
     this.orderedWave = !!o.ordered?.length;         // #108: damp collisions so a sequence bubble is never stranded
     this.orderedLabels = new Set(o.ordered);        // #591: same set, for the fall re-launch below
+    this.gentleTarget = o.gentleTarget; this.gentleUsed = false;   // #700: a fresh single trip for this wave
     // #43: every number below — radius, air time, batching, each bubble's arc, colour and launch moment —
     // comes from the pure layoutWave() so it can be unit-tested without a canvas. All this method still does
     // is fit each label to the measured font (#28, needs the 2D context) and push the bubbles.
@@ -392,8 +403,13 @@ export class Arena {
         // bubble launched into it, never by anything the child did — is re-launched rather than punished, up
         // to MAX_RELAUNCHES times. A decoy (not in `orderedLabels`) and an already-tapped bubble (`hit`, a shot
         // still on its way) fall through to the miss exactly as before.
-        if (!b.hit && this.orderedLabels.has(b.label) && b.relaunches < MAX_RELAUNCHES) {
-          b.relaunches++; b.launched = false; b.launchAt = now + RELAUNCH_DELAY;
+        // #700: a gentle year's non-sequence answer bubble gets the same free trip back up, but only once —
+        // `gentleUsed` rather than a counted `relaunches` budget, since there is exactly one such label per wave.
+        const seqRelaunch = this.orderedLabels.has(b.label) && b.relaunches < MAX_RELAUNCHES;
+        const gentleRelaunch = !seqRelaunch && this.gentleTarget === b.label && !this.gentleUsed;
+        if (!b.hit && (seqRelaunch || gentleRelaunch)) {
+          if (seqRelaunch) b.relaunches++; else this.gentleUsed = true;
+          b.launched = false; b.launchAt = now + RELAUNCH_DELAY;
           b.x = b.ox; b.y = this.H + b.r; b.vx = b.ovx; b.vy = b.ovy;   // back on the launch line, its original arc — not a teleport into play
           live++; continue;
         }
@@ -856,10 +872,10 @@ export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: num
   const n = o.labels.length;
   let r = Math.max(26, bubbleRadius(W, H, !!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
   r = Math.min(r, ((W - 16) / 3 - 10) / 2);                                    // at least three always fit across
-  const T = (o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4) / speedK;        // seconds in the air
+  const T = (o.speed === 0 ? 7.5 : o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
   const apexMin = topInset + r + 10;
   const usable = H - apexMin - r;
-  const stagger = (o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260) / speedK;
+  const stagger = (o.speed === 0 ? 500 : o.speed === 1 ? 420 : o.speed === 2 ? 330 : 260) / speedK;
   // Long waves (a 7-word sentence plus decoys) launch in batches that fit across the width,
   // so bubbles never pile up on top of each other; each batch goes up as the previous one comes down.
   // A sequence must be sliced in order, so at most 4 bubbles ride each flight even on a wide screen:
