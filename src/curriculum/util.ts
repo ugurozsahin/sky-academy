@@ -74,7 +74,17 @@ export const wideFor = (options: readonly string[]): boolean => options.some(o =
  * through the shared `wideFor` above.
  */
 export function wordQ(rng: Rng, prompt: string, answer: string, distractors: string[], extra: Partial<Question> = {}): Question {
-  const ds = [...new Set(distractors.filter(d => d !== answer))].slice(0, 3);
+  const withoutAnswer = distractors.filter(d => d !== answer);
+  const ds = [...new Set(withoutAnswer)].slice(0, 3);
+  // #515: a duplicate among the caller's own candidates can drop the deduped set below 3 with nothing else
+  // catching it — the card then ships short a bubble and no signal anywhere. Warn only when the caller had
+  // at least 3 candidates left *after* the answer is removed, so a generator that deliberately hands wordQ
+  // the whole small universe of options including the answer itself (e.g. the three sentence-punctuation
+  // marks in writing.ts, where only 2 ever remain once the answer is filtered) never trips this — that is
+  // by design, not a collision, and #379's recordAccuracy clamp makes the same "well-formed input never
+  // warns" guarantee.
+  if (ds.length < 3 && withoutAnswer.length >= 3)
+    console.warn(`wordQ("${prompt}"): ${withoutAnswer.length} distractor candidates collapsed to ${ds.length} unique after de-duplication — the card ships ${ds.length + 1} option${ds.length === 0 ? '' : 's'}.`);
   return { prompt, answer, options: shuffle(rng, [answer, ...ds]), wide: wideFor([answer, ...ds]), ...extra };
 }
 
