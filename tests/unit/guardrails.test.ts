@@ -101,6 +101,23 @@ describe('guard rails', () => {
     ]);
   });
 
+  // #468 item 5: #430's correctness argument for `hintIsData` rests on "`setHint` (play-session.ts) and
+  // `showOutcome` (hud.ts) are the only writers of the play screen's `#hint` element" — true by inspection
+  // today, not by construction. A third writer anywhere in src/ui/ could show a data-carrying hint's raw
+  // values outside those two paths, or blank an instruction hint, with every other rail here still green.
+  // Scoped to `els.hint`, the play screen's element — a same-named local `hint` variable elsewhere
+  // (profiles.ts, avatar.ts, certificate.ts each build their own unrelated hint element) is not this rail's
+  // concern and does not match `els.hint`. This does not catch a write that reaches `els.hint` through an
+  // alias (a destructured `{ hint }` or a renamed reference), only a direct `els.hint.` access.
+  it('the play screen\'s #hint has exactly two writers: setHint and showOutcome (#468 item 5)', () => {
+    const writers = inDir('/src/ui/')
+      .flatMap(([f, s]) => code(s).split('\n').filter(l => /\bels\.hint\.(?:textContent|innerHTML)\s*=[^=]/.test(l)).map(l => `${f}: ${l.trim()}`));
+    expect(writers, 'route a new hint write through setHint() or showOutcome(), never a direct assignment').toEqual([
+      '/src/ui/hud.ts: els.hint.innerHTML = outcomeHintHTML(kind, q.answer);',
+      '/src/ui/play-session.ts: els.hint.textContent = text;',
+    ]);
+  });
+
   // #365: a finished game reaches the save in ONE write. `recordDojo()` then `addCoins()` was two saves with
   // no rollback, and `save()` swallows a refused `setItem` (#151), so a store that took the first and refused
   // the second recorded the Daily Dojo challenge as done while its coins never landed — and `applyEvent()`

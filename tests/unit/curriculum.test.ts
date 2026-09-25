@@ -2007,6 +2007,20 @@ describe('a hint is instruction text unless the generator says it is data (#328,
   /** The shape both data-carrying generators write: `<thing>: <number><unit>`, joined by ` · `. */
   const DATA_SHAPE = /^[^:·]+: ?-?\d+ ?(cm|m|g|kg|ml|l|°C) · /;
   const EXPECTED = ['y1-capacity', 'y1-length', 'y1-mass', 'y2-capacity', 'y2-length', 'y2-mass', 'y2-temp'];
+  /**
+   * #468 item 1: `DATA_SHAPE` only recognises today's two generators' literal `<thing>: <n><unit> · ` form,
+   * so a future data-carrying hint written in any other shape (prose, `p`/`£`, a spelled-out unit, `, `
+   * instead of ` · `) would ship unmarked and pass every existing check. This is the general fallback: a
+   * hint carrying a number that appears nowhere else on the card has nothing else to decide the card by, so
+   * hiding it (an unmarked hint is hidden on a landscape phone, #328) makes the card unanswerable, whatever
+   * shape the hint takes. The one false positive across the whole registry is "Slice the 3-D shape"
+   * (`y1-shapes3d`, `y2-shapes`) — the literal `3` in "3-D" — excluded by name rather than swept around.
+   */
+  function carriesUnseenNumber(q: Question): boolean {
+    const digits = (q.hint ?? '').replace(/\d-D\b/g, '').match(/\d+/g) ?? [];
+    const elsewhere = `${q.prompt} ${q.options.join(' ')} ${q.visual ?? ''}`;
+    return digits.some(n => !elsewhere.includes(n));
+  }
 
   function sweep() {
     const r = rng(328);
@@ -2026,6 +2040,8 @@ describe('a hint is instruction text unless the generator says it is data (#328,
       }
       if (q.hint && DATA_SHAPE.test(q.hint))
         expect(q.hintIsData, `${t.id} d${d}: "${q.hint}" carries the values but is not marked — landscape would hide it (#328)`).toBe(true);
+      if (q.hint && !q.hintIsData)
+        expect(carriesUnseenNumber(q), `${t.id} d${d}: "${q.hint}" carries a value found nowhere else on the card but is not marked (#468 item 1)`).toBe(false);
     }
     return { marked, hinted, cards, flagged };
   }
