@@ -3572,6 +3572,35 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     expect(await answer(page)).toBe(true);
   });
 
+  // The owner, in session, 2026-09-25: "with the flag off I want no 3-D objects at all — back to how it was".
+  // Switched off the way a grown-up does it (the Parents screen's setting, `sna:three`), a 3-D Shapes mission is
+  // the pre-#684 game: emoji in the bubbles, the emoji word card, and the three chunk never downloaded.
+  test('with 3-D switched off by a grown-up, the 3-D Shapes bubbles and card keep their emoji and never load three', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.addInitScript(() => localStorage.setItem('sna:three', 'off'));
+    await seedPlayer(page);
+    const chunks: string[] = [];
+    page.on('request', r => { if (/solids-.*\.js/.test(r.url())) chunks.push(r.url()); });
+    await startTopic(page, 'year2', 'y2-shapes');
+    // Stage 1's bubbles are shapes: with the flag on they would spin solids; off, the slot says why not.
+    await page.waitForFunction(() => window.__sna.solidArt()?.error === 'flag-off', null, { timeout: 10_000 });
+    expect(await page.evaluate(() => window.__sna.solidArt())).toEqual({ ready: [], draws: 0, error: 'flag-off' });
+    const perStage = await page.evaluate(() => window.__sna.session.perStage);
+    await answerAll(page, perStage);
+    await expect(page.locator('.celebrate')).toBeVisible();
+    await page.evaluate(() => { (window.__sna.session as any).rng = () => 0.9; });
+    await page.click('#next');
+    await page.waitForFunction(() => window.__sna.state().stage === 2);
+    expect(await state(page)).toMatchObject({ prompt: 'How many flat faces has a cuboid?' });
+    // The card is the emoji word card, as before #684 — no canvas in its place.
+    await expect(page.locator('#vis .wordcard')).toBeVisible();
+    expect(await page.locator('#vis canvas').count()).toBe(0);
+    expect(await page.evaluate(() => window.__sna.solid())).toMatchObject({ name: 'cuboid', webgl: false, error: 'flag-off' });
+    expect(chunks, 'the three chunk is never downloaded with the flag off').toEqual([]);
+    // With no solid to wait on, the wave may not have launched the right bubble yet: poll until it can be hit.
+    await expect.poll(() => answer(page), { timeout: 15_000 }).toBe(true);
+  });
+
   test('a 2-D shapes card keeps its emoji and never loads three', async ({ page }) => {
     await seedPlayer(page);
     const chunks: string[] = [];

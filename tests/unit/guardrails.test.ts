@@ -2731,7 +2731,8 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
     const inbound = all.filter(e => !e.from.startsWith(THREE_DIR) && e.to.startsWith(THREE_DIR) && e.kind !== 'type');
     const bad = inbound.filter(e => e.kind !== 'dynamic' || !e.to.startsWith(MOUNT_DIR));
     expect(bad, 'a static import pulls three into the main chunk; a reach past mount/ bypasses the flag').toEqual([]);
-    expect(inbound.map(e => `${e.from} → ${e.to}`), 'the one lazy loader today (#684)').toEqual(['/src/ui/solid.ts → /src/three/mount/solids']);
+    // #684: the loader asks the flag (`enabled`, a small chunk with no three.js) before it downloads the solids.
+    expect(inbound.map(e => `${e.from} → ${e.to}`).sort(), 'the one lazy loader today (#684), and the flag it asks first').toEqual(['/src/ui/solid.ts → /src/three/mount/enabled', '/src/ui/solid.ts → /src/three/mount/solids']);
   });
 
   // (c) Proved red: `import { $ } from '../../ui/dom'` in src/three/stage/rig.ts fails. Stronger than the epic's
