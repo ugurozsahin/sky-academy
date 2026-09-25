@@ -928,6 +928,18 @@ describe('#700: a gentle year\'s answer bubble gets one free trip back up, not m
     expect(sim.events.falls, 'a label that is not the gentleTarget is never re-launched').toContain('2');
     expect(sim.all().find(x => x.label === '2')!.dead).toBe(true);
   });
+
+  // `waveOptsFor` never sends both `ordered` and `gentleTarget` for the same label — a sequence question has
+  // no `gentleTarget` at all (#700's own `!q.sequence` gate) — but the arena's own precedence is still worth
+  // pinning directly, rather than trusting a caller invariant nothing here enforces (pr-test-analyzer review).
+  it('a label that is somehow both a sequence target AND the gentleTarget takes the counted sequence relaunch, not the one-shot gentle path', () => {
+    sim = createSim({ seed: 11 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2, ordered: ['1'], gentleTarget: '1' });
+
+    forceDeparture(sim, '1');
+    expect(sim.events.falls).not.toContain('1');
+    expect(sim.all().find(x => x.label === '1')!.relaunches, 'the sequence counter moved — precedence went to seqRelaunch, not the gentle one-shot').toBe(1);
+  });
 });
 
 describe('#142: the arena drives the whole mission stage machine', () => {

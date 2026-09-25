@@ -112,6 +112,22 @@ describe('waveOptsFor: the spawn-options bridge to tests/unit/sim.test.ts (#126)
     expect(waveOptsFor(q({ sequence }), { labels: sequence, speed: 1 }, 1).ordered).toEqual(['two', 'three']);
     expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, 0).ordered).toBeUndefined();
   });
+
+  describe('gentleTarget (#700): the one label a gentle year gets a free relaunch on', () => {
+    it('is the answer, for a gentle non-sequence question', () => {
+      expect(waveOptsFor(q({ answer: 'a' }), { labels: ['a', 'b'], speed: 1 }, 0, true).gentleTarget).toBe('a');
+    });
+    it('is undefined for a gentle SEQUENCE question — the sequence relaunch already covers it', () => {
+      const sequence = ['one', 'two'];
+      expect(waveOptsFor(q({ sequence }), { labels: sequence, speed: 1 }, 0, true).gentleTarget).toBeUndefined();
+    });
+    it('is undefined when the year is not gentle, whatever the question', () => {
+      expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, 0, false).gentleTarget).toBeUndefined();
+    });
+    it('is undefined when `gentle` is omitted — every pre-#700 call site stays unaffected', () => {
+      expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, 0).gentleTarget).toBeUndefined();
+    });
+  });
 });
 
 describe('the no-voice sentence peek (#65)', () => {

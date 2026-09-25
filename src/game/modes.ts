@@ -85,7 +85,7 @@ export const MODES: Record<Mode, ModeSpec> = {
     difficulty: c => c.questionsAsked < 5 ? 1 : c.questionsAsked < 12 ? 2 : 3,
     speed: c => eased(c, c.year.speeds[1] ?? 2),   // steady pace: the clock is the pressure
     basePoints: () => 10,
-    stars: c => c.correct >= c.year.sprintStars[0] ? 3 : c.correct >= c.year.sprintStars[1] ? 2 : c.correct >= 1 ? 1 : 0,
+    stars: c => c.correct >= c.year.sprintStars.threeStar ? 3 : c.correct >= c.year.sprintStars.twoStar ? 2 : c.correct >= 1 ? 1 : 0,
     coins: c => baseCoins(c) + c.stars * 5,
   },
   boss: {

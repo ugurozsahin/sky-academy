@@ -79,14 +79,14 @@ describe('mode table', () => {
   });
   it('Ninja Sprint reads its star thresholds off the year, not a hardcoded 12/6 (#700)', () => {
     const R = YEARS.find(y => y.id === 'reception')!;
-    expect(R.sprintStars).toEqual([8, 4]);
+    expect(R.sprintStars).toEqual({ threeStar: 8, twoStar: 4 });
     expect(MODES.sprint.stars(endCtx({ year: R, correct: 8 }))).toBe(3);
     expect(MODES.sprint.stars(endCtx({ year: R, correct: 7 }))).toBe(2);
     expect(MODES.sprint.stars(endCtx({ year: R, correct: 4 }))).toBe(2);
     expect(MODES.sprint.stars(endCtx({ year: R, correct: 3 }))).toBe(1);
     // Year 1 / Year 2 keep the thresholds every mode already tested above against `Y1` (12/6, unchanged).
-    expect(Y1.sprintStars).toEqual([12, 6]);
-    expect(YEARS.find(y => y.id === 'year2')!.sprintStars).toEqual([12, 6]);
+    expect(Y1.sprintStars).toEqual({ threeStar: 12, twoStar: 6 });
+    expect(YEARS.find(y => y.id === 'year2')!.sprintStars).toEqual({ threeStar: 12, twoStar: 6 });
   });
 });
 
@@ -106,6 +106,14 @@ describe('Reception\'s gentle-float tuning (#700)', () => {
     expect(MODES.mission.speed(ctx({ year: R, stage: 1, slow: true }))).toBe(0);
     // Stages 4-5 sit at speed 1 — a sequence there eases one step further, to the gentle-float 0.
     expect(MODES.mission.speed(ctx({ year: R, stage: 4, sequence: true }))).toBe(0);
+  });
+
+  it('the same floor fix reaches Sprint and Boss, not only Mission — both read Reception\'s speeds[1]/[2], now 0', () => {
+    expect(R.speeds[1]).toBe(0);
+    expect(MODES.sprint.speed(ctx({ year: R, sequence: true }))).toBe(0);
+    expect(MODES.sprint.speed(ctx({ year: R, slow: true }))).toBe(0);
+    expect(MODES.boss.speed(ctx({ year: R, enraged: false, sequence: true }))).toBe(0);
+    expect(MODES.boss.speed(ctx({ year: R, enraged: true, sequence: true }))).toBe(0);
   });
 });
 
