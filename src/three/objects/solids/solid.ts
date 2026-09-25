@@ -3,7 +3,8 @@
  * curriculum asks a child to count faces, edges and vertices ("identify and describe the properties of 3-D
  * shapes"), and the style asks for chibi volumes with eased edges (decision record 010, item 4) — so each solid
  * keeps its faces flat, and one toon tone each, and rounds only its edges and corners. `bevel` is how far: the
- * one question these variants leave to the owner (`crisp` reads as geometry, `chunky` as a toy).
+ * owner picked the default, 0.1, from crisp (0.04), default and chunky (0.22) in session on 2026-09-25 (#684),
+ * and the other two are gone.
  *
  * Colours are the spike's design-language tokens (`src/three/mount/solids.ts`), so no hex is written here.
  */
@@ -18,7 +19,6 @@ export const TILT = 0.42;
 const RADIAL = 32;   // around a turned solid: fewer shows facets in the toon bands on a curved side
 
 const params = { size: n(1.5, 1, 2), bevel: n(0.1, 0.02, 0.3) };
-const VARIANTS = { crisp: { size: 1.5, bevel: 0.04 }, chunky: { size: 1.5, bevel: 0.22 } };
 
 /** A shape's geometry at `size` (its largest extent, roughly) with edges eased by `bevel`. */
 export type Shape = (size: number, bevel: number) => BufferGeometry;
@@ -32,7 +32,7 @@ export function solid(name: string, colour: `--${string}`, shape: Shape, budget:
     name,
     avatar: 'kai',   // a solid belongs to no character; the sketchbook shows it beside the player's own
     params,
-    variants: VARIANTS,
+    variants: {},   // the owner's pick is the defaults; the sliders still reach the range for a later look
     budget,
     build(p, stage) {
       const mesh = new Mesh(shape(p.size, Math.min(p.bevel, p.size / 4)), stage.toon(colour));
