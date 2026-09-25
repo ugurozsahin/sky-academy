@@ -11,11 +11,14 @@ import { load, profileIds, save } from './storage';
 import { initGameSpeed } from './game/speed';
 import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
+import { plugin, wireBackButton, type AppPlugin } from './native';
 import type { YearInfo } from './curriculum';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
-// Each screen below the map pushes a history entry, so the Android back button (and the browser's) steps
-// back one screen — play → island → map — instead of leaving the app (#53).
+// Each screen below the map pushes a history entry, so the browser's back button steps back one screen —
+// play → island → map — instead of leaving the app (#53). The Android APK's hardware/gesture back button
+// reads this same stack too, via `wireBackButton` at the bottom of this file (#699) — `@capacitor/android`
+// has no back-press handling of its own to piggyback on.
 let year: YearInfo | null = null; let fromPop = false;
 const enter = (screen: string) => {
   if (fromPop) { fromPop = false; return; }                                   // re-rendering after a pop: the entry already exists
@@ -145,6 +148,14 @@ window.addEventListener('popstate', () => {
   // it is inert as far as the wizard is concerned; only the map (or wherever `nav.map()` sends it next) is.
   if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro' && !load().onboarded) { fromPop = false; leave(); renderIntro(); } else if (s === 'onboard-name' && !load().onboarded) { fromPop = false; leave(); renderName(); } else if (s === 'play' || s === 'memory' || s === 'duel' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
 });
+
+// #699: on the Android APK, the hardware/gesture back button otherwise finishes the activity — Capacitor's
+// own back-press handling lives in the `@capacitor/app` plugin, and with no listener it quits from any
+// screen. Wired after the popstate listener above so a screen on the stack steps back through it exactly as
+// the browser's own back button does; the root (sky map, nothing on the stack) backgrounds the app instead.
+// `minimizeApp()` is a native Promise — caught here too, alongside `wireBackButton`'s own try/catch, so a
+// rejection never surfaces as an unhandled one from a native callback nothing else is watching.
+wireBackButton({ bridge: window, history, minimize: () => { plugin<AppPlugin>('App')?.minimizeApp().catch(() => {}); } });
 
 // ?reset=1 clears saved progress (used by tests).
 const params = new URLSearchParams(location.search);

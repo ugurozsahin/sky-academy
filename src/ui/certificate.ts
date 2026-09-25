@@ -2,7 +2,10 @@
 // (Web Share with files, e.g. iOS/Android) or downloaded. No DOM beyond the canvas; text is built by a pure helper.
 import { avatarById, type Avatar } from '../avatars';
 import { esc } from './dom';
+import { isNativeShell, plugin } from '../native';
 import type { StoredCert } from '../storage';
+
+export { isNativeShell };
 
 // `date` is required, not defaulted (#410): the printed certificate and the album row it files alongside must
 // read one fixed instant, decided once by the caller that earned it — a live `new Date()` default here would
@@ -206,71 +209,17 @@ export function certRoute(caps: { canShareFiles: boolean; claudeSave: boolean; c
 }
 
 /**
- * Are we inside the Android APK's Capacitor WebView? (#205)
- *
- * Capacitor injects a `Capacitor` global into the WebView, so this needs no import and no dependency —
- * `@capacitor/core` stays a devDependency of the build, never of the bundle.
- *
- * **One rule, on the answer rather than on which accessor exists.** An earlier version asked
- * `isNativePlatform()` and otherwise read `cap.platform`, described as "the older spelling". That was
- * simply wrong: the bridge this repository actually ships
- * (`node_modules/@capacitor/android/capacitor/src/main/assets/native-bridge.js`) sets `cap.getPlatform`
- * and `cap.isNativePlatform` and **no `cap.platform` at all**, so the fallback guarded a shape Capacitor
- * never produces, and a bump that renamed `isNativePlatform` would have restored the silent no-op the
- * comment claimed to prevent. Worse, `isNativePlatform: () => undefined` — a bridge mid-startup — took
- * the *first* branch and returned `undefined` from a function declared `boolean`.
- *
- * So: collect whatever the bridge answers, and treat native as the default unless something says
- * otherwise. The asymmetry is deliberate and is the same one the `catch` below argues for — a browser
- * wrongly shown the full-screen view has seen its certificate; a WebView wrongly sent to `<a download>`
- * has a button that does nothing, which is the bug.
- */
-export function isNativeShell(w: Window & typeof globalThis = window): boolean {
-  try {
-    // The read is inside the `try` too: a getter-based polyfill — exactly the case the catch describes —
-    // used to throw straight past this function and toast "Could not make the certificate" for one that
-    // had drawn perfectly.
-    const cap = (w as { Capacitor?: { isNativePlatform?: () => unknown; getPlatform?: () => unknown; platform?: unknown } }).Capacitor;
-    if (!cap) return false;
-    const answers = [
-      typeof cap.isNativePlatform === 'function' ? cap.isNativePlatform() : undefined,
-      typeof cap.getPlatform === 'function' ? cap.getPlatform() : undefined,
-      cap.platform,                        // not in the shipped bridge; kept only for other embeddings
-    ];
-    // A definite YES wins outright, and it has to: the two accessors CAN disagree, and the shipped bridge
-    // can only ever disagree in one direction. `isNativePlatform` is a hard-coded `() => true` in a file
-    // that is injected on native only, while `getPlatform()` re-derives from `win.androidBridge` on every
-    // call and answers 'web' whenever that interface is not on the window *at that moment* — Capacitor's
-    // own code treats this as reachable, guarding `if (getPlatformId(win) === 'android')` before it
-    // installs `postToNative`. So `[true, 'web']` is the half-started Android shell, and a veto rule read
-    // it as a browser: the swallowed `<a download>` on exactly the runtime this exists for. It also made
-    // the function absurd — a bridge SAYING it is native scored lower than one saying nothing at all.
-    if (answers.some(a => a === true || (typeof a === 'string' && a !== 'web'))) return true;
-    return !answers.some(a => a === false || a === 'web');
-  } catch {
-    return true;
-  }
-}
-
-/**
- * The Capacitor `Filesystem`/`Share` plugins (#110), read off the same injected global `isNativeShell` above
- * already reads — no import, so a web build that never runs inside the APK never bundles them. Both plugins
- * register themselves onto `Capacitor.Plugins` under their class name; this only asks whether they answered.
+ * The Capacitor `Filesystem`/`Share` plugins (#110), read off the same injected bridge `isNativeShell`
+ * (`../native`) already reads — no import, so a web build that never runs inside the APK never bundles them.
+ * Both plugins register themselves onto the bridge under their class name; this only asks whether they
+ * answered.
  */
 interface CapFilesystem { writeFile(o: { path: string; data: string; directory: string }): Promise<{ uri: string }> }
 interface CapShare { share(o: { url?: string; title?: string; dialogTitle?: string }): Promise<void> }
 
-function capPlugins(w: Window & typeof globalThis = window): { Filesystem?: CapFilesystem; Share?: CapShare } | null {
-  try {
-    const cap = (w as { Capacitor?: { Plugins?: { Filesystem?: CapFilesystem; Share?: CapShare } } }).Capacitor;
-    return cap?.Plugins ?? null;
-  } catch { return null; }
-}
-
 /** Are both plugins this route needs actually on the bridge? (pure capability check, no I/O) */
 export function hasCapacitorShare(w: Window & typeof globalThis = window): boolean {
-  const p = capPlugins(w);
-  return !!p?.Filesystem && !!p?.Share;
+  return !!plugin<CapFilesystem>('Filesystem', w) && !!plugin<CapShare>('Share', w);
 }
 
 /**
@@ -283,13 +232,14 @@ export function hasCapacitorShare(w: Window & typeof globalThis = window): boole
  * full-screen view, never to `<a download>`, for the same reason `certRoute` never chooses it here.
  */
 async function shareViaCapacitor(c: HTMLCanvasElement, filename: string): Promise<boolean> {
-  const plugins = capPlugins();
-  if (!plugins?.Filesystem || !plugins?.Share) return false;
+  const Filesystem = plugin<CapFilesystem>('Filesystem');
+  const Share = plugin<CapShare>('Share');
+  if (!Filesystem || !Share) return false;
   try {
     const dataUrl = c.toDataURL('image/png');
     const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-    const { uri } = await plugins.Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
-    await plugins.Share.share({ url: uri, title: 'Sky Ninja Academy certificate', dialogTitle: 'Share your certificate' });
+    const { uri } = await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+    await Share.share({ url: uri, title: 'Sky Ninja Academy certificate', dialogTitle: 'Share your certificate' });
     return true;
   } catch { return false; }
 }

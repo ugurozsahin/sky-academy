@@ -22,12 +22,12 @@ const manifest = JSON.parse(readFileSync(new URL('../../public/manifest.webmanif
 const docWith = (link: boolean) => ({ querySelector: (s: string) => (link && s === MANIFEST_SELECTOR ? {} : null) } as RegisterEnv['doc']);
 
 function make(link: boolean, protocol: string, hostname: string, register?: () => Promise<unknown>,
-              win: RegisterEnv['win'] = {}): RegisterEnv {
+              nativeShell = false): RegisterEnv {
   return {
     doc: docWith(link),
     nav: register ? { serviceWorker: { register } as unknown as RegisterEnv['nav']['serviceWorker'] } : {},
     loc: { protocol, hostname } as RegisterEnv['loc'],
-    win,
+    nativeShell,
   };
 }
 
@@ -65,19 +65,13 @@ describe('service worker registration (#15)', () => {
   // The APK embeds `dist/` (capacitor.config.ts `webDir: 'dist'`) and serves it from `https://localhost`, so
   // every other gate here passes and the worker would register inside the app — where it gains nothing and
   // risks serving the previous release after an update, because that origin never changes. (Review of #214.)
+  // `isNativeShell` itself — including the half-built-bridge/throwing-getter case — is `../native`'s own
+  // module now (#699); this only proves `registerServiceWorker` gates on whatever it answers.
   it('does not register inside the Android shell, where every byte is already local', async () => {
     const register = vi.fn().mockResolvedValue({});
-    const env = make(true, 'https:', 'localhost', register, { Capacitor: { isNativePlatform: () => true } });
+    const env = make(true, 'https:', 'localhost', register, true);
     expect(await registerServiceWorker(env)).toBe('native-shell');
     expect(register, 'the APK must not register a worker').not.toHaveBeenCalled();
-  });
-
-  it('reads the bridge without calling through it, so a half-built Capacitor cannot throw', async () => {
-    const register = vi.fn().mockResolvedValue({});
-    const boom = { get isNativePlatform() { throw new Error('bridge not ready'); } };
-    await expect(registerServiceWorker(make(true, 'https:', 'localhost', register, { Capacitor: boom })))
-      .resolves.toBe('native-shell');
-    expect(register).not.toHaveBeenCalled();
   });
 
   it('reports a browser with no service worker support rather than throwing', async () => {
