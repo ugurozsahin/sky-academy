@@ -266,6 +266,11 @@ describe('guard rails', () => {
   // only matched a `\n`-terminated pair, so a bare `\<CR>` with no following `\n` — itself a complete, valid
   // continuation — fell through to the `\(.)` fallback, which JS regex `.` cannot match either, since `.`
   // excludes every line terminator; the pair survived undecoded and `posix.resolve` read it as a path segment).
+  // `posix.resolve` is POSIX-only — it never treats `\` as a separator — but TypeScript's own resolver does,
+  // on every host OS, so a decoded specifier has its backslashes normalised to `/` before resolving (round 6:
+  // `..\ui\dom` decodes to a real, single-backslash string via decode()'s own `\(.)` fallback — decode() was
+  // never the bug — then glued onto the importing directory as one opaque segment instead of climbing out of
+  // it, the same "resolve like the compiler does" gap rounds 1-3 closed for `/`-separated spellings).
   const decode = (s: string) => s.replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|\\(?:\r\n|\r|\n|\u2028|\u2029)|\\(.)/g,
     (_, brace, u4, x2, ch) => brace ? String.fromCodePoint(parseInt(brace, 16)) : u4 ? String.fromCharCode(parseInt(u4, 16)) : x2 ? String.fromCharCode(parseInt(x2, 16)) : ch ?? '');
   it('the specifier decoder undoes what a string literal can hide', () => {
@@ -285,7 +290,7 @@ describe('guard rails', () => {
     // specifier split across lines that way is still captured whole and reaches decode() above.
     const specifiers = (src: string) => [...code(src).matchAll(/\b(?:from|import|require)\s*\(?\s*['"`]((?:\\\r?\n|[^'"`\n])+)['"`]/g)].map(m => decode(m[1]));
     for (const [path, src] of inDir('/src/game/')) {
-      const resolved = specifiers(src).map(s => s.startsWith('.') ? posix.resolve(posix.dirname(path), s) : s);
+      const resolved = specifiers(src).map(s => s.startsWith('.') ? posix.resolve(posix.dirname(path), s.replace(/\\/g, '/')) : s);
       expect(resolved.filter(s => s === '/src/ui' || s.startsWith('/src/ui/')), `${path} must not import from src/ui/ — src/game/ is the browser-free half of the split`)
         .toEqual([]);
     }
