@@ -28,7 +28,11 @@ export function solidNameFor(q: Question, topicId: string | undefined): SolidNam
  * up. `error` says why not when it did not — a renderer that refused to start and a chunk that failed to
  * download both keep the emoji, but they are different bugs to chase (silent-failure review of the spike).
  */
-export interface SolidState { name: SolidName; frames: number; webgl: boolean; error: 'no-webgl' | 'load-failed' | 'built-off' | 'flag-off' | null }
+export interface SolidState {
+  name: SolidName; frames: number; webgl: boolean; error: 'no-webgl' | 'load-failed' | 'built-off' | 'flag-off' | null;
+  /** The last beat the card's solid played (#740): `pop` as it arrives, `cheer` on a right answer. Absent without a view. */
+  beat?: NonNullable<SolidView['state']>['beat'];
+}
 /** What `window.__sna.solidArt()` reports: which solids have a baked spin sheet, and how many bubble frames drew one. */
 export interface SolidArtState { ready: SolidName[]; draws: number; error: SolidState['error'] }
 export interface SolidSlot {
@@ -43,6 +47,8 @@ export interface SolidSlot {
    */
   bubbleArt(label: string, colour: string, phase: number): Readonly<ArtFrame> | null;
   art(): SolidArtState | null;
+  /** The child answered right: the card's solid cheers (#740). Does nothing when no solid is on the card. */
+  cheer(): void;
   dispose(): void;
 }
 type Loader = () => Promise<typeof import('../three/mount/solids')>;
@@ -250,6 +256,7 @@ export function createSolidSlot(host: () => Host, loader: Loader = loadSolids, t
       if (!view && !error && !sheets.size) return null;
       return { ready: [...sheets.keys()].map(g => NAME_BY_GLYPH.get(g)!).sort(), draws, error };
     },
+    cheer() { if (view && wanted) view.beat('cheer'); },
     dispose() {
       disposed = true; wanted = null; topic = undefined; sheets.clear();
       for (const m of tinted.values()) for (const t of m.values()) (t.img as { close?: () => void } | null)?.close?.();

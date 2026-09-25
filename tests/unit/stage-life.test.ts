@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { contactShadow, footprint, SHADOW_OPACITY, shadowScale } from '../../src/three/stage/ground';
 import { BEAT_SECONDS, BEATS, beatPose, HOP, idleBob, REST } from '../../src/three/stage/motion';
 import { addGloss, GLOSS_EDGE, toonMaterial } from '../../src/three/stage/toon';
+import { createStand } from '../../src/three/stage/stand';
 
 describe('the stage brings objects to life (#740)', () => {
   it.each(BEATS)('%s starts and ends at rest, keeps its volume, and never jumps between frames', (beat) => {
@@ -54,5 +55,32 @@ describe('the stage brings objects to life (#740)', () => {
     expect(shadowScale(1, 0, HOP)).toBe(1);
     expect(shadowScale(1, HOP, HOP)).toBe(0.5);
     expect(shadowScale(1, HOP * 4, HOP), 'never below half').toBe(0.5);
+  });
+});
+
+describe('the stand: where the sketchbook and the game card show an object (#684, #740)', () => {
+  it('stands an object on its base, beats it, lands it at rest, and keeps it still without motion', () => {
+    const stand = createStand('#0d1226');
+    const box = new Mesh(new BoxGeometry(1, 2, 1));
+    box.position.y = 0.3;   // its bottom at -0.7
+    stand.set(box);
+    stand.update(0, true);
+    expect(stand.group.position.y, 'the holder sits at the base, the idle bob aside').toBeCloseTo(-0.7, 1);
+    expect(stand.shadow.visible).toBe(true);
+    expect(stand.lastBeat).toBeNull();
+    stand.beat('bounce', 1000);
+    stand.update(1000 + BEAT_SECONDS.bounce * 450, true);
+    expect(stand.pose, 'mid-bounce').not.toBe(REST);
+    expect(stand.lastBeat).toBe('bounce');
+    stand.update(1000 + BEAT_SECONDS.bounce * 1000 + 1, true);
+    expect(stand.pose, 'landed').toBe(REST);
+    stand.beat('cheer', 5000);
+    stand.update(5200, false);
+    expect(stand.pose, 'without motion no beat plays').toBe(REST);
+    expect(stand.group.position.y, 'and no bob either').toBeCloseTo(-0.7, 6);
+    stand.set(null);
+    expect(stand.shadow.visible, 'nothing shown, no shadow').toBe(false);
+    stand.beat('pop', 6000);
+    expect(stand.lastBeat, 'nothing shown, nothing to beat').toBe('cheer');
   });
 });

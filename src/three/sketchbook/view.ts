@@ -4,9 +4,9 @@
  * `prefers-reduced-motion` through the rig's caller here, as the decision record asks (item 7), not per object:
  * under it nothing turns, bobs or beats.
  */
-import { Group, type Object3D } from 'three';
-import { contactShadow, footprint, shadowScale } from '../stage/ground';
-import { beatPose, HOP, idleBob, REST, type Beat, type Pose } from '../stage/motion';
+import type { Object3D } from 'three';
+import type { Beat, Pose } from '../stage/motion';
+import { createStand } from '../stage/stand';
 import { applyTier, createRenderer, createRig, resize, type Rig } from '../stage/rig';
 import type { Tier } from '../stage/tiers';
 import type { TokenReader } from '../stage/toon';
@@ -52,14 +52,12 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
   const renderer = createRenderer(canvas, tier);
   let shown: Object3D | null = null;
   let frames = 0, raf = 0, last = 0;
-  // The object stands in a holder whose origin is its base, so a beat squashes it onto the ground; the shadow
-  // stays on the ground under it. Both move to a new scene when a tier change rebuilds the rig.
-  const stand = new Group(), shadow = contactShadow(tokens('--ink'));
-  let base = 0, radius = 0, pose: Pose = REST;
-  let playing: { kind: Beat; start: number } | null = null;
-  const place = () => rig.scene.add(stand, shadow);
+  // The stage's stand (#740): the object on its base, the shadow under it, the beats. It moves to a new scene
+  // when a tier change rebuilds the rig.
+  const stand = createStand(tokens('--ink'));
+  const place = () => rig.scene.add(stand.group, stand.shadow);
   place();
-  const beat = (kind: Beat) => { if (reducedMotion || !shown) return false; playing = { kind, start: performance.now() }; return true; };
+  const beat = (kind: Beat) => { if (reducedMotion || !shown) return false; stand.beat(kind, performance.now()); return true; };
   // A finger or mouse turns the object; the idle turn waits while it is held, so the two never fight. A press
   // that barely moves is a tap, and a tap bounces it (#740).
   let held: { id: number; x: number; y: number; moved: number } | null = null;
@@ -89,13 +87,7 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
     raf = requestAnimationFrame(tick);
     const dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
     if (shown && !reducedMotion && !held) shown.rotation.y += IDLE_TURN * dt;
-    const elapsed = playing ? (t - playing.start) / 1000 : 0;
-    pose = playing ? beatPose(playing.kind, elapsed) : REST;
-    if (playing && pose === REST && elapsed > 0) playing = null;
-    const lift = pose.y + (reducedMotion ? 0 : idleBob(t / 1000));
-    stand.position.y = base + lift; stand.scale.set(pose.sx, pose.sy, pose.sx); stand.rotation.z = pose.rz;
-    shadow.position.y = base + 0.002;
-    shadow.scale.setScalar(shadowScale(radius, Math.max(0, lift), HOP));
+    stand.update(t, !reducedMotion);
     renderer.render(rig.scene, rig.camera); frames++;
   };
   const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null;
@@ -107,10 +99,10 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
     get frames() { return frames; },
     get tier() { return tier; },
     get pixelRatio() { return renderer.getPixelRatio(); },
-    get pose() { return pose; },
+    get pose(): Pose { return stand.pose; },
     beat,
     set(object, next) {
-      if (shown) { stand.remove(shown); release(shown); }
+      if (shown) release(shown);
       if (next !== tier) {
         tier = next;
         rig = createRig({ aspect: rig.camera.aspect, tier, background: tokens('--panel-2') });
@@ -118,12 +110,8 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
         applyTier(renderer, tier);   // pixel-ratio cap and shadow map both follow, not the shadow map alone
         fit();
       }
-      playing = null; pose = REST;
-      stand.position.set(0, 0, 0); stand.scale.set(1, 1, 1); stand.rotation.set(0, 0, 0);
-      ({ base, radius } = footprint(object));   // measured at rest, before it moves into the holder
-      object.position.y -= base;
+      stand.set(object);
       shown = object;
-      stand.add(object);
     },
     ink() {
       renderer.render(rig.scene, rig.camera);
@@ -140,7 +128,7 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
     dispose() {
       cancelAnimationFrame(raf); ro?.disconnect();
       if (shown) release(shown);
-      release(shadow);
+      stand.dispose();
       renderer.dispose(); renderer.forceContextLoss();
     },
   };
