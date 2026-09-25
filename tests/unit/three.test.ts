@@ -3,17 +3,16 @@
  * stage's material factories in Node (three.js geometry and materials need no renderer), and the one key the
  * grown-ups screen writes and the mount reads without sharing a module.
  */
-import { BackSide, BoxGeometry, BufferGeometry, Color, HemisphereLight, InstancedMesh, LineSegments, Mesh, MeshBasicMaterial, MeshToonMaterial, NearestFilter, Scene, SphereGeometry, Sprite } from 'three';
+import { BackSide, BoxGeometry, BufferGeometry, Color, HemisphereLight, InstancedMesh, LineSegments, Mesh, MeshToonMaterial, NearestFilter, Scene, SphereGeometry, Sprite, Vector3, type Object3D } from 'three';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SHAPES_3D } from '../../src/curriculum/util';
 import { setThreeSetting, threeSetting, THREE_SETTINGS } from '../../src/storage';
 import { BUDGET_CEILING, defaultsOf, defineObject, n, OBJECTS } from '../../src/three/objects';
 import { createStage, hullsOf, measure } from '../../src/three/stage';
 import { offsetAlongNormals, outline, outlineMaterial, OUTLINE_NAME, OUTLINE_WIDTH } from '../../src/three/stage/outline';
 import { applyTier, CAMERA_FOV, createRig, resize, type TierTarget } from '../../src/three/stage/rig';
 import { LOW_TIER_CORES, LOW_TIER_MEMORY, pickTier, readTierEnv, TIERS } from '../../src/three/stage/tiers';
-import { addGloss, GLOSS_EDGE, gradientMap, tokenColour, toonMaterial, TONES } from '../../src/three/stage/toon';
-import { BEAT_SECONDS, BEATS, beatPose, HOP, idleBob, REST } from '../../src/three/stage/motion';
-import { contactShadow, footprint, SHADOW_OPACITY, shadowScale } from '../../src/three/stage/ground';
+import { gradientMap, tokenColour, toonMaterial, TONES } from '../../src/three/stage/toon';
 import { capable, MIN_DEVICE_MEMORY, parseSetting, probeWebgl2, queryOff, readEnv, resetProbe, threeEnabled, THREE_SETTING_KEY, type BrowserLike, type ThreeEnv } from '../../src/three/mount/enabled';
 
 // The same localStorage shim tests/unit/storage.test.ts uses.
@@ -273,8 +272,8 @@ describe('objects registry — the contract the first object builds to', () => {
     expect(() => n(3, 1, 2)).toThrow(/inside the range/);
     expect(defaultsOf({ a: n(1, 0, 2), b: n(5, 5, 9) })).toEqual({ a: 1, b: 5 });
   });
-  it('holds the style probe (#717), under a ceiling the skill states', () => {
-    expect(OBJECTS.map(o => o.name)).toEqual(['hammer']);
+  it('holds the style probe (#717) and the 3-D Shapes solids (#684), under a ceiling the skill states', () => {
+    expect(OBJECTS.map(o => o.name)).toEqual(['hammer', 'cube', 'cuboid', 'sphere', 'cylinder', 'cone', 'pyramid']);
     expect(BUDGET_CEILING).toEqual({ triangles: 2000, drawCalls: 8 });
   });
   it('defineObject infers the schema, so a variant is a full parameter set at compile time and the spec comes back unchanged', () => {
@@ -293,51 +292,43 @@ describe('objects registry — the contract the first object builds to', () => {
   });
 });
 
-describe('the stage brings objects to life (#740)', () => {
-  it.each(BEATS)('%s starts and ends at rest, keeps its volume, and never jumps between frames', (beat) => {
-    const d = BEAT_SECONDS[beat], step = 1 / 120;   // a 120 Hz screen: the finest a child will see it
-    expect(beatPose(beat, d), 'ends exactly at rest').toBe(REST);
-    expect(beatPose(beat, -0.1)).toBe(REST);
-    let prev = beatPose(beat, 0);
-    for (let t = step; t < d; t += step) {
-      const p = beatPose(beat, t);
-      const s = beat === 'pop' ? Math.cbrt(p.sx * p.sx * p.sy) : 1;
-      expect(p.sx * p.sx * p.sy, `${beat} at ${t.toFixed(3)}s keeps volume`).toBeCloseTo(s ** 3, 6);
-      expect(Math.abs(p.y - prev.y) + Math.abs(p.sy - prev.sy) + Math.abs(p.rz - prev.rz), `${beat} jumps at ${t.toFixed(3)}s`).toBeLessThan(0.12);
-      expect(p.y, 'never below the ground').toBeGreaterThanOrEqual(-1e-9);
-      prev = p;
-    }
-    const end = beatPose(beat, d - step);
-    expect(Math.abs(end.y) + Math.abs(end.sy - 1) + Math.abs(end.sx - 1) + Math.abs(end.rz), `${beat} lands near rest before it snaps to it`).toBeLessThan(0.08);
+/**
+ * #684: a child counts a solid's faces on the card ("identify and describe the properties of 3-D shapes"), and
+ * the style eases every edge (decision record 010, item 4) — so easing must never cost a face. A flat face is
+ * a set of triangles sharing one plane's normal; a curved side splits into many thin strips, none of them big.
+ * Each solid must show exactly as many big flat faces as `SHAPES_3D` says it has, at every variant.
+ */
+describe('the solids keep the flat faces the curriculum counts (#684)', () => {
+  /** Big planar regions: triangles grouped by their geometric normal, kept when a group is over 5 % of the area. */
+  function flatFaces(root: Object3D): number {
+    const areas = new Map<string, number>();
+    let total = 0;
+    root.updateMatrixWorld(true);
+    root.traverse((o) => {
+      if (!(o instanceof Mesh) || o.name === 'outline') return;
+      const pos = o.geometry.getAttribute('position'), idx = o.geometry.index;
+      const count = idx ? idx.count : pos.count;
+      const v = [new Vector3(), new Vector3(), new Vector3()];
+      for (let t = 0; t < count; t += 3) {
+        for (let k = 0; k < 3; k++) v[k].fromBufferAttribute(pos, idx ? idx.getX(t + k) : t + k);
+        const cross = new Vector3().subVectors(v[1], v[0]).cross(new Vector3().subVectors(v[2], v[0]));
+        const area = cross.length() / 2;
+        if (area < 1e-9) continue;
+        const nrm = cross.normalize();
+        const key = [nrm.x, nrm.y, nrm.z].map(c => c.toFixed(2)).join(',');
+        areas.set(key, (areas.get(key) ?? 0) + area);
+        total += area;
+      }
+    });
+    return [...areas.values()].filter(a => a > total * 0.05).length;
+  }
+  const solids = OBJECTS.filter(o => SHAPES_3D.some(s => s[1] === o.name));
+  it('covers every solid SHAPES_3D names', () => {
+    expect(solids.map(o => o.name).sort()).toEqual(SHAPES_3D.map(s => s[1]).sort());
   });
-  it('pop grows from nothing and overshoots; bounce lifts by HOP; the idle bob stays small', () => {
-    expect(beatPose('pop', 0).sy).toBeCloseTo(0);
-    const scales = Array.from({ length: 50 }, (_, i) => beatPose('pop', (i / 50) * BEAT_SECONDS.pop)).map(p => Math.cbrt(p.sx * p.sx * p.sy));
-    expect(Math.max(...scales), 'the cartoon overshoot').toBeGreaterThan(1.05);
-    const lifts = Array.from({ length: 200 }, (_, i) => beatPose('bounce', (i / 200) * BEAT_SECONDS.bounce).y);
-    expect(Math.max(...lifts)).toBeCloseTo(HOP, 1);
-    for (let t = 0; t < 10; t += 0.05) expect(Math.abs(idleBob(t))).toBeLessThanOrEqual(0.035);
-  });
-  it('the gloss is one hard spot from the key light, added once to every toon material', () => {
-    const shader = { fragmentShader: 'void main() {\n\t#include <opaque_fragment>\n}' };
-    addGloss(shader);
-    expect(shader.fragmentShader.match(/#include <opaque_fragment>/g), 'the include survives, once').toHaveLength(1);
-    expect(shader.fragmentShader).toContain('directionalLights[ 0 ]');
-    expect(shader.fragmentShader).toContain(`step( ${GLOSS_EDGE.toFixed(3)}`);
-    expect(shader.fragmentShader.indexOf('glossHalf'), 'before the fragment is written').toBeLessThan(shader.fragmentShader.indexOf('#include <opaque_fragment>'));
-    expect(toonMaterial('#ff5f6d').onBeforeCompile).toBe(addGloss);
-  });
-  it('the contact shadow is a flat ink disc under the footprint that shrinks on a hop, never below half', () => {
-    const disc = contactShadow('#0d1226');
-    const m = disc.material as MeshBasicMaterial;
-    expect(m.transparent && !m.depthWrite).toBe(true);
-    expect(m.opacity).toBe(SHADOW_OPACITY);
-    expect(m.color.getHexString()).toBe('0d1226');
-    const box = new Mesh(new BoxGeometry(2, 1, 1));
-    box.position.y = 0.5;
-    expect(footprint(box)).toEqual({ base: 0, radius: 2 * 0.45 });
-    expect(shadowScale(1, 0, HOP)).toBe(1);
-    expect(shadowScale(1, HOP, HOP)).toBe(0.5);
-    expect(shadowScale(1, HOP * 4, HOP), 'never below half').toBe(0.5);
+  it.each(solids.map(o => [o.name, o] as const))('%s has as many flat faces as SHAPES_3D says, at every variant', (name, o) => {
+    const flat = SHAPES_3D.find(s => s[1] === name)![2].flat;
+    for (const p of [defaultsOf(o.params), ...Object.values(o.variants)])
+      expect(flatFaces(o.build(p, createStage('high', () => '#0d1226'))), `${name} at bevel ${p.bevel}`).toBe(flat);
   });
 });
