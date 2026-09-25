@@ -22,6 +22,17 @@ export interface View {
 }
 
 export const IDLE_TURN = 0.4;   // rad/s — slow, the decision record's "nothing snaps"
+/** Radians per CSS pixel of drag, and how far a drag may tip the object towards or away from the camera. */
+export const DRAG_TURN = 0.012, MAX_TIP = 0.9;
+
+/**
+ * A drag's turn (#717, the owner in session: "rotate it by touch"): sideways spins it, up and down tips it,
+ * clamped so the object never flips over and hides the side the look pass is judged on. Pure, for a test.
+ */
+export function dragTurn(rot: { x: number; y: number }, dx: number, dy: number): void {
+  rot.y += dx * DRAG_TURN;
+  rot.x = Math.max(-MAX_TIP, Math.min(MAX_TIP, rot.x + dy * DRAG_TURN));
+}
 
 export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion: boolean, initialTier: Tier, size = () => host.clientWidth || 512): View {
   const canvas = document.createElement('canvas');
@@ -32,6 +43,17 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
   const renderer = createRenderer(canvas, tier);
   let shown: Object3D | null = null;
   let frames = 0, raf = 0, last = 0;
+  // A finger or mouse turns the object; the idle turn waits while it is held, so the two never fight.
+  let held: { id: number; x: number; y: number } | null = null;
+  canvas.style.touchAction = 'none';   // a drag on the canvas turns the object instead of scrolling the page
+  canvas.addEventListener('pointerdown', (e) => { held = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!held || e.pointerId !== held.id || !shown) return;
+    dragTurn(shown.rotation, e.clientX - held.x, e.clientY - held.y);
+    held.x = e.clientX; held.y = e.clientY;
+  });
+  const letGo = (e: PointerEvent) => { if (held?.id === e.pointerId) held = null; };
+  canvas.addEventListener('pointerup', letGo); canvas.addEventListener('pointercancel', letGo);
 
   const fit = () => { const px = size(); resize(rig, renderer, px, px); };
   const release = (o: Object3D) => o.traverse(x => {
@@ -43,7 +65,7 @@ export function createView(host: HTMLElement, tokens: TokenReader, reducedMotion
   const tick = (t: number) => {
     raf = requestAnimationFrame(tick);
     const dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
-    if (shown && !reducedMotion) shown.rotation.y += IDLE_TURN * dt;
+    if (shown && !reducedMotion && !held) shown.rotation.y += IDLE_TURN * dt;
     renderer.render(rig.scene, rig.camera); frames++;
   };
   const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null;

@@ -12,6 +12,7 @@ import { createStage, measure } from '../../src/three/stage';
 import { avatarSrc, CATALOGUE, DEFAULT_VARIANT, find, paramsFor, variantsOf } from '../../src/three/sketchbook/catalogue';
 import { placeholder } from '../../src/three/sketchbook/placeholder';
 import { TIER_LABEL } from '../../src/three/sketchbook/controls';
+import { DRAG_TURN, dragTurn, MAX_TIP } from '../../src/three/sketchbook/view';
 
 const root = new URL('../../', import.meta.url);
 const tokens = (name: string) => ({ '--ink': '#0d1226', '--accent-2': '#3ec9ff' } as Record<string, string>)[name] ?? '';
@@ -60,6 +61,20 @@ describe('the sketchbook lights the stage with the game\'s own palette', () => {
     const sketch = tokensOf(readFileSync(new URL('src/three/sketchbook/sketchbook.css', root), 'utf8'));
     expect(Object.keys(sketch).length, 'the sketchbook must declare tokens at all').toBeGreaterThan(5);
     for (const [name, value] of Object.entries(sketch)) expect({ name, value }, `${name} drifted from src/style.css`).toEqual({ name, value: game[name] });
+  });
+});
+
+describe('a drag turns the object (#717)', () => {
+  it('spins with a sideways drag, tips with an upright one, and never tips past MAX_TIP', () => {
+    const rot = { x: 0, y: 0 };
+    dragTurn(rot, 50, 0);
+    expect(rot).toEqual({ x: 0, y: 50 * DRAG_TURN });
+    dragTurn(rot, 0, 20);
+    expect(rot.x).toBeCloseTo(20 * DRAG_TURN);
+    dragTurn(rot, 0, 10_000);
+    expect(rot.x, 'clamped: the object never flips over').toBe(MAX_TIP);
+    dragTurn(rot, 0, -20_000);
+    expect(rot.x).toBe(-MAX_TIP);
   });
 });
 
