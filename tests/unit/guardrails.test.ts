@@ -204,7 +204,20 @@ describe('guard rails', () => {
     expect(play).toMatch(/throwFor:\s*b\s*=>\s*b\.label\s*!==\s*BOMB/);
     const arena = code(SOURCES['/src/game/arena.ts']);
     expect(arena).toContain('this.throwFor ? this.throwFor(b) : true');   // the tap path consults it
-    expect(arena).toMatch(/if \(!b\.hit\) this\.cb\.onFall\(b\)/);      // a tapped bubble in flight is not a miss
+    // #742: the gentle-year branch sits inside the same `!b.hit` guard, so a tapped bubble in flight still
+    // never reaches onFall (nor becomes the deferred gentleTargetFallen) whichever path it takes.
+    expect(arena).toMatch(/if \(!b\.hit\) \{ if \(gentle\).*this\.cb\.onFall\(b\)/);
+  });
+
+  // #742 review round 1 (pr-test-analyzer, silent-failure-hunter): tests/unit/sim.test.ts's own BOMB-vs-gentle
+  // regression test hand-duplicates play.ts's `isHazard` predicate rather than reading it — this pins play.ts's
+  // own wiring so a future edit that drops or mistypes it (leaving `throwFor` correct but `isHazard` stale)
+  // fails a rail here, not just silently un-tests a live bug's fix.
+  it('a TNT is wired as a hazard everywhere it is wired as unthrowable (#742)', () => {
+    const play = code(SOURCES['/src/ui/play.ts']);
+    expect(play).toMatch(/isHazard:\s*label\s*=>\s*label\s*===\s*BOMB/);
+    const arena = code(SOURCES['/src/game/arena.ts']);
+    expect(arena).toContain('!this.isHazard?.(b.label)) this.gentleDecoys.push(b)');
   });
 
   // CLAUDE.md: no dependencies without reason (Capacitor is the documented exception). A new one now has
