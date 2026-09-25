@@ -33,9 +33,15 @@ export const BOMB = '💣';
  * because the one scenario using it happens to ask a question where `q.wide` is also true. `labels` is
  * `info.labels` before any villain-mode TNT bubble is mixed in — `onQuestion` below does that itself, since
  * it is specific to the real screen and no scenario exercises it here.
+ * `gentle` (#700) — the year's `gentle` flag — is passed separately rather than read off a `year` this
+ * function otherwise has no reason to take: it only ever affects a non-sequence question's single
+ * `gentleTarget`, so a scenario that does not care about it can go on calling this with three arguments.
  */
-export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, seqIndex: number): WaveOpts {
-  return { labels: info.labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3), ordered: q.sequence?.slice(seqIndex) };
+export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, seqIndex: number, gentle?: boolean): WaveOpts {
+  return {
+    labels: info.labels, speed: info.speed, wide: !!q.wide || info.labels.some(l => l.length > 3),
+    ordered: q.sequence?.slice(seqIndex), gentleTarget: gentle && !q.sequence ? q.answer : undefined,
+  };
 }
 
 /**
@@ -285,7 +291,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
         if (deps.tracing) { say(q.say ?? q.prompt); deps.startTrace(q); return; }
         const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
-        const waveOpts = waveOptsFor(q, info, session.seqIndex);
+        const waveOpts = waveOptsFor(q, info, session.seqIndex, opts.year.gentle);
         const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
         // #138: a spawn can be queued — behind the tutorial hold, or behind the font gate — and the session
         // can move on while it waits, so it must check that its own question is still the one on screen.

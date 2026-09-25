@@ -449,7 +449,7 @@ describe('layoutWave — the wave the arena is about to spawn (#43)', () => {
   const PHONE = { W: 390, H: 844, topInset: 120 };
   const TABLET = { W: 820, H: 1180, topInset: 300 };
   const NARROW = { W: 240, H: 400, topInset: 60 };
-  const AIR_TIME = { 1: 5.6, 2: 4.4, 3: 3.4 } as const;
+  const AIR_TIME = { 0: 7.5, 1: 5.6, 2: 4.4, 3: 3.4 } as const;   // 0 is Reception's gentle float (#700)
   const labels = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1));
   const plan = (o: object, geom = PHONE, speedK = 1, now = 0, seed = 1) =>
     layoutWave({ speed: 2, labels: labels(6), ...o } as never, geom, speedK, now, seeded(seed));
@@ -475,7 +475,7 @@ describe('layoutWave — the wave the arena is about to spawn (#43)', () => {
   });
 
   it('flies each bubble to an apex below the question card and back down in the wave time', () => {
-    for (const speed of [1, 2, 3] as const) for (let seed = 1; seed <= 20; seed++) {
+    for (const speed of [0, 1, 2, 3] as const) for (let seed = 1; seed <= 20; seed++) {
       const p = plan({ speed, labels: labels(5) }, PHONE, 1, 0, seed);
       const T = AIR_TIME[speed];
       expect(p.waveT).toBeCloseTo(T * 1000, 6);
@@ -486,6 +486,12 @@ describe('layoutWave — the wave the arena is about to spawn (#43)', () => {
         expect(apexY, 'always rises clear of the bottom edge').toBeLessThanOrEqual(PHONE.H - p.r);
       }
     }
+  });
+
+  it('speed 0 is Reception\'s gentle float: ~7.5s in the air, ~500ms stagger (#700)', () => {
+    const p = plan({ speed: 0, labels: labels(5) }, PHONE, 1, 0, 3);
+    expect(p.waveT).toBeCloseTo(7.5 * 1000, 6);
+    expect(p.stagger).toBeCloseTo(500, 6);
   });
 
   it('batches a long wave so a row always fits across the width, and three always fit', () => {

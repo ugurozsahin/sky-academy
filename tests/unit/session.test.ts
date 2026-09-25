@@ -371,6 +371,20 @@ describe('boss battle', () => {
     const r = ev.onEnd.mock.calls[0][0];
     expect(r.won).toBe(false); expect(r.stars).toBe(0); expect(r.coins).toBe(1); expect(s.bossHp).toBe(4);
   });
+  it('a gentle year\'s boss never heals — a slip still costs a life, but never gives HP back (#700)', () => {
+    const ev = events();
+    const s = new Session({ mode: 'boss', year: R, pool: topicsFor('reception').filter(t => t.input !== 'tracing'), rng: rng(31) }, ev);
+    s.start();
+    const before = s.bossHp;
+    expect(s.hit(wrongOf(s))).toBe('wrong');
+    expect(s.bossHp, 'a gentle year never heals the boss').toBe(before);
+    expect(ev.onBoss).not.toHaveBeenCalled();
+    expect(s.lives).toBe(R.lives - 1);                       // wrong slices still cost a life — gentle only spares a miss
+    s.advance();
+    s.fall(s.current!.sequence ? s.current!.sequence[0] : s.current!.answer);
+    expect(s.bossHp, 'a fall does not heal a gentle boss either').toBe(before);
+    expect(s.lives, 'gentle: the miss itself costs no life').toBe(R.lives - 1);
+  });
 });
 
 describe('rewards', () => {

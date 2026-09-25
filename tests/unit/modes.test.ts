@@ -5,7 +5,7 @@ import { YEARS } from '../../src/curriculum';
 const Y1 = YEARS[1];
 const ALL: Mode[] = ['mission', 'endless', 'sprint', 'boss'];
 const ctx = (o: Partial<ModeCtx> = {}): ModeCtx => ({ year: Y1, stage: 1, questionsAsked: 0, sequence: false, slow: false, enraged: false, ...o });
-const endCtx = (o: Partial<EndCtx> = {}): EndCtx => ({ won: false, score: 0, correct: 0, accuracy: 0, stageStarsTotal: 0, stages: 5, stars: 0, ...o });
+const endCtx = (o: Partial<EndCtx> = {}): EndCtx => ({ won: false, score: 0, correct: 0, accuracy: 0, stageStarsTotal: 0, stages: 5, stars: 0, year: Y1, ...o });
 
 describe('mode table', () => {
   it('every mode has an entry whose id matches its key', () => {
@@ -76,6 +76,36 @@ describe('mode table', () => {
     const e = endCtx({ won: true, correct: 30, stageStarsTotal: 15, stages: 5 });
     expect(MODES.mission.stars(e)).toBe(3);                                      // round(15 / 5)
     expect(MODES.mission.coins({ ...e, stars: 3 })).toBe(30 + 15 * 5 + 20);
+  });
+  it('Ninja Sprint reads its star thresholds off the year, not a hardcoded 12/6 (#700)', () => {
+    const R = YEARS.find(y => y.id === 'reception')!;
+    expect(R.sprintStars).toEqual([8, 4]);
+    expect(MODES.sprint.stars(endCtx({ year: R, correct: 8 }))).toBe(3);
+    expect(MODES.sprint.stars(endCtx({ year: R, correct: 7 }))).toBe(2);
+    expect(MODES.sprint.stars(endCtx({ year: R, correct: 4 }))).toBe(2);
+    expect(MODES.sprint.stars(endCtx({ year: R, correct: 3 }))).toBe(1);
+    // Year 1 / Year 2 keep the thresholds every mode already tested above against `Y1` (12/6, unchanged).
+    expect(Y1.sprintStars).toEqual([12, 6]);
+    expect(YEARS.find(y => y.id === 'year2')!.sprintStars).toEqual([12, 6]);
+  });
+});
+
+describe('Reception\'s gentle-float tuning (#700)', () => {
+  const R = YEARS.find(y => y.id === 'reception')!;
+
+  it('speeds are [0,0,0,1,1] — the whole island one step slower, stages 4-5 at today\'s slowest', () => {
+    expect(R.speeds).toEqual([0, 0, 0, 1, 1]);
+    for (const stage of [1, 2, 3]) expect(MODES.mission.speed(ctx({ year: R, stage }))).toBe(0);
+    for (const stage of [4, 5]) expect(MODES.mission.speed(ctx({ year: R, stage }))).toBe(1);
+  });
+
+  it('a sequence/slow question at Reception\'s own gentlest is never faster than the plain one beside it', () => {
+    // Stages 1-3 sit at speed 0, already the gentlest step there is — a sequence there must stay at 0, not
+    // bounce up to 1 for want of a floor that still assumed 1 was the slowest speed in the game (#700).
+    expect(MODES.mission.speed(ctx({ year: R, stage: 1, sequence: true }))).toBe(0);
+    expect(MODES.mission.speed(ctx({ year: R, stage: 1, slow: true }))).toBe(0);
+    // Stages 4-5 sit at speed 1 — a sequence there eases one step further, to the gentle-float 0.
+    expect(MODES.mission.speed(ctx({ year: R, stage: 4, sequence: true }))).toBe(0);
   });
 });
 

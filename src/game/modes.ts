@@ -23,6 +23,7 @@ export interface EndCtx {
   stageStarsTotal: number;  // sum of mission stage stars (0 for continuous modes)
   stages: number;           // mission stage count
   stars: number;            // the end-stars just computed (coins read it back)
+  year: YearInfo;           // Ninja Sprint reads its year-aware star thresholds off this (#700)
 }
 
 export interface ModeSpec {
@@ -49,7 +50,10 @@ export interface ModeSpec {
 // about Year 2 d3). One helper so the two flags always ease by the same amount, in every mode that eases
 // at all. Sky Storm is not one of them: its speed ramps on questions answered rather than on the year,
 // and it clamps for `gentle` years instead — `sequence` has never eased there either.
-const eased = (c: ModeCtx, s: number) => c.sequence || c.slow ? Math.max(1, s - 1) : s;
+// The floor is 1 for Year 1/Year 2, whose slowest table entry is 1 — but Reception's gentle-float 0 (#700)
+// is slower still, so a gentle year's floor drops to 0 or a sequence/slow question at Reception's own
+// floor would ease to a FASTER flight than the plain question beside it, the opposite of what easing means.
+const eased = (c: ModeCtx, s: number) => c.sequence || c.slow ? Math.max(c.year.gentle ? 0 : 1, s - 1) : s;
 
 // Endless and Boss share the same "ramp on questions answered" points curve.
 const rampPoints = (c: ModeCtx) => 10 + Math.min(20, Math.floor(c.questionsAsked / 5) * 5);
@@ -81,7 +85,7 @@ export const MODES: Record<Mode, ModeSpec> = {
     difficulty: c => c.questionsAsked < 5 ? 1 : c.questionsAsked < 12 ? 2 : 3,
     speed: c => eased(c, c.year.speeds[1] ?? 2),   // steady pace: the clock is the pressure
     basePoints: () => 10,
-    stars: c => c.correct >= 12 ? 3 : c.correct >= 6 ? 2 : c.correct >= 1 ? 1 : 0,
+    stars: c => c.correct >= c.year.sprintStars[0] ? 3 : c.correct >= c.year.sprintStars[1] ? 2 : c.correct >= 1 ? 1 : 0,
     coins: c => baseCoins(c) + c.stars * 5,
   },
   boss: {

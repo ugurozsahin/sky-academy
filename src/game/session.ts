@@ -216,7 +216,7 @@ export class Session {
   get enraged() { return this.spec.boss && this.bossHp > 0 && this.bossHp <= 3; }
   /** A slip lets the boss recover one HP (never above max). */
   private bossHeal() {
-    if (!this.spec.boss || this.ended) return;
+    if (!this.spec.boss || this.ended || this.o.year.gentle) return;   // a gentle year's boss never heals (#700): the fight ends on HP or lives, not a slip
     this.bossHp = Math.min(this.bossMax, this.bossHp + 1); this.ev.onBoss?.(this.bossHp, this.bossMax, 'heal');
   }
   /** Sprint clock: advance by `ms`. Emits onTime when the displayed second changes; ends the run at zero. */
@@ -365,7 +365,7 @@ export class Session {
     const total = stageStars.reduce((s, x) => s + x, 0);
     const acc = this.attempts ? this.correct / this.attempts : 0;
     // End-stars and coins come from the mode's own rules in modes.ts (coins reads back the stars just computed).
-    const end = { won: safeWon, score: this.score, correct: this.correct, accuracy: acc, stageStarsTotal: total, stages: this.stages, stars: 0 };
+    const end = { won: safeWon, score: this.score, correct: this.correct, accuracy: acc, stageStarsTotal: total, stages: this.stages, stars: 0, year: this.o.year };
     const stars = this.spec.stars(end);
     const coins = this.spec.coins({ ...end, stars });
     return { mode: this.o.mode, won: safeWon, score: this.score, stars, stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins, incomplete };
