@@ -258,16 +258,24 @@ describe('guard rails', () => {
   // reaches the disk), to a scratch file under src/game/, watched this fail on every one, removed it; a
   // scratch `import { x } from '../curriculum/util'` stays green. `../ui` bare (a barrel, none exists) is
   // caught too — the resolved path is compared as a directory, not only as a prefix.
-  const decode = (s: string) => s.replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|\\(.)/g,
-    (_, brace, u4, x2, ch) => brace ? String.fromCodePoint(parseInt(brace, 16)) : u4 ? String.fromCharCode(parseInt(u4, 16)) : x2 ? String.fromCharCode(parseInt(x2, 16)) : ch);
+  // A backslash immediately before a real newline is JS's line-continuation escape — it vanishes from the
+  // decoded string, the same as any other `\<char>` escape decode() already undoes (PR #710 round 4: the
+  // specifier-capture regex below excluded `\n` outright, so a specifier split across a continuation line
+  // never reached decode() at all — this is that gap's other half, decode() itself swallowing the pair).
+  const decode = (s: string) => s.replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|\\\r?\n|\\(.)/g,
+    (_, brace, u4, x2, ch) => brace ? String.fromCodePoint(parseInt(brace, 16)) : u4 ? String.fromCharCode(parseInt(u4, 16)) : x2 ? String.fromCharCode(parseInt(x2, 16)) : ch ?? '');
   it('the specifier decoder undoes what a string literal can hide', () => {
     expect(decode('..\\u002fui\\u002fdom')).toBe('../ui/dom');
     expect(decode('..\\x2fui\\x2fdom')).toBe('../ui/dom');
     expect(decode('\\u{2e}./ui\\/dom')).toBe('../ui/dom');
     expect(decode('../ui/dom')).toBe('../ui/dom');
+    expect(decode('../\\\nui/dom')).toBe('../ui/dom');
   });
   it('no file in src/game/ imports from src/ui/ (#557)', () => {
-    const specifiers = (src: string) => [...code(src).matchAll(/\b(?:from|import|require)\s*\(?\s*['"`]([^'"`\n]+)['"`]/g)].map(m => decode(m[1]));
+    // The capture group excludes a bare `\n` (an unterminated string is a syntax error, not a specifier to
+    // chase past) but admits a `\` immediately followed by one — JS's line-continuation escape — so a
+    // specifier split across lines that way is still captured whole and reaches decode() above.
+    const specifiers = (src: string) => [...code(src).matchAll(/\b(?:from|import|require)\s*\(?\s*['"`]((?:\\\r?\n|[^'"`\n])+)['"`]/g)].map(m => decode(m[1]));
     for (const [path, src] of inDir('/src/game/')) {
       const resolved = specifiers(src).map(s => s.startsWith('.') ? posix.resolve(posix.dirname(path), s) : s);
       expect(resolved.filter(s => s === '/src/ui' || s.startsWith('/src/ui/')), `${path} must not import from src/ui/ — src/game/ is the browser-free half of the split`)
