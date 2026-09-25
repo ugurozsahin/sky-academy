@@ -66,8 +66,8 @@ export function promptHTML(q: Question, done: number, reveal = false): string {
 }
 
 /**
- * The small line under the prompt (#16 review). It is the question's own `hint` whenever it has one — for five
- * of the duel pool's topics (`measureCompare()`: length, mass, capacity, temperature) the values being compared
+ * The small line under the prompt (#16 review). It is the question's own `hint` whenever it has one — for seven
+ * of the duel pool's topics (`measureCompare()` and `y2Temp`'s comparison branch) the values being compared
  * live in `hint` and nowhere else on the card, so a card without this line asks "Which is fuller?" over two
  * coloured bubbles and cannot be answered without read-aloud (#65). Only when there is no hint does it fall
  * back to telling the child what to do.
