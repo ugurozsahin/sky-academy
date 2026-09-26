@@ -4,6 +4,81 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
+ * Shared repo-file readers (#536). `doc()`, `unitsOf()` and `unitWith()` used to be redefined per describe
+ * block — seven, four and two copies respectively, each hand-copied rather than reused — which is how a
+ * block ends up asserting against subtly different text than its neighbour without anyone noticing. One
+ * definition of each, here; a block whose comparison genuinely needs different splitting rules (the #516 and
+ * #520 blocks below) names its own variant instead of reusing this name for different behaviour.
+ */
+const REPO_ROOT = new URL('../../', import.meta.url);
+const doc = (name: string) => readFileSync(new URL(name, REPO_ROOT), 'utf8');
+
+/**
+ * A document's units: paragraphs, and each `- `/`1. `-style list item inside one, split out on its own. Two
+ * assumptions this makes, neither wrong for the documents it collapses onto today, both invisible to a
+ * document that breaks them rather than checked (the rail below covers the second; see its own comment for
+ * why not the first):
+ *   1. Every list marker sits at column 0. An indented or nested bullet is absorbed into the unit above it
+ *      rather than split out, which makes that unit larger than its author intended.
+ *   2. No fenced code block contains a line that looks like a list marker. A fence holding `- foo` would be
+ *      split mid-fence.
+ */
+const unitsOf = (text: string) =>
+  text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=(?:- |\d+\. ))/)).map((u) => u.trim());
+/** Refuses on anything but exactly one match: a first-match helper reads a decoy and reports health. */
+const unitWith = (text: string, needle: string) => {
+  const hits = unitsOf(text).filter((u) => u.includes(needle));
+  if (hits.length !== 1) throw new Error(`${hits.length} units contain ${JSON.stringify(needle)}, want 1`);
+  return hits[0];
+};
+
+/**
+ * unitsOf()'s second assumption, checked rather than remembered (#536): neither document it collapses onto
+ * below has a fenced code block containing a line that looks like a list marker, or a fence left unclosed
+ * (which would hide everything after it from this same check). A self-test proves the detector itself can
+ * fail before trusting it against real content — `.claude/rules/guardrails.md` has no fences at all today, so
+ * the per-document check alone would never exercise it. The first assumption (every list marker sits at
+ * column 0) is not railed the same way: `.claude/rules/guardrails.md` (its YAML frontmatter's `paths:` list)
+ * and `.claude/skills/review-pr/SKILL.md` (a nested sub-bullet in §3) both already carry legitimate indented
+ * lists outside any pinned unit, so a blanket "no indented marker anywhere" check would fail on content that
+ * isn't actually broken today. What already guards it: `unitWith()`'s exactly-one-match refusal above, and
+ * the `it.each(CLAIMS)` exact-equality checks below, both of which go red the moment an indentation change
+ * shifts a pinned unit's boundary.
+ */
+describe("unitsOf()'s fenced-code assumption holds for the documents it collapses onto (#536)", () => {
+  const DOCS = ['.claude/rules/guardrails.md', '.claude/skills/review-pr/SKILL.md'];
+  // An odd count means some fence was opened and never closed — the regex below then silently sees zero
+  // fences (`[\s\S]*?` never finds a second `` ``` ``), so a list-marker line inside it would pass unseen.
+  const hasUnbalancedFence = (text: string) => (text.match(/```/g) ?? []).length % 2 !== 0;
+  const listMarkerInFence = (text: string) =>
+    (text.match(/```[\s\S]*?```/g) ?? []).some((fence) => /\n(?:- |\d+\. )/.test(fence));
+
+  // Self-test, decoupled from what either document happens to contain today: `guardrails.md` currently has
+  // no fences at all, so `it.each(DOCS)` below never exercises the detector for that file — this proves the
+  // detector itself can catch a violation, so the rail is not vacuous even where a document currently has
+  // nothing to catch.
+  it('the detector catches a list-marker-shaped line inside a fenced block, and only that', () => {
+    expect(listMarkerInFence('```\nfoo\n- bar\n```'), 'a dash-prefixed line inside a fence must be caught')
+      .toBe(true);
+    expect(listMarkerInFence('```\nfoo\n1. bar\n```'), 'a numbered line inside a fence must be caught')
+      .toBe(true);
+    expect(listMarkerInFence('```\nfoo\nbar\n```'), 'an ordinary fence must not be flagged').toBe(false);
+    expect(listMarkerInFence('- bar\n\n```\nfoo\n```'), 'a marker outside the fence must not be flagged')
+      .toBe(false);
+    expect(hasUnbalancedFence('```\nfoo\n```'), 'a closed fence must not be flagged unbalanced').toBe(false);
+    expect(hasUnbalancedFence('```\nfoo'), 'an opened, never-closed fence must be flagged').toBe(true);
+  });
+
+  it.each(DOCS)('%s has no unclosed fence and no list-marker-shaped line inside one', (name) => {
+    const text = doc(name);
+    expect(hasUnbalancedFence(text), 'an unclosed fence hides everything after it from this rail entirely')
+      .toBe(false);
+    expect(listMarkerInFence(text), 'a fenced "- foo" line would be split mid-fence by unitsOf(), corrupting '
+      + 'the unit either side of it').toBe(false);
+  });
+});
+
+/**
  * GOVERNANCE AND INSTRUCTION RAILS (#321, split out of `guardrails.test.ts`) — the rails that read
  * `CLAUDE.md`, the routine prompts under `docs/`, the skills and agents vendored into `.claude/`, and the
  * records a run leaves. Every rail here is **unchanged**: #321 asked for a mechanical move and nothing else,
@@ -34,7 +109,6 @@ import { describe, expect, it } from 'vitest';
  * rail going red on such a change is it working, not it objecting.)
  */
 describe('the code-health freeze is over, in both process files (2026-09-10)', () => {
-  const doc = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
   const FILES = ['CLAUDE.md', 'docs/ROUTINE-PROMPT.md'];
 
   it.each(FILES)('%s records the lift, and that it cannot re-arm', (name) => {
@@ -2638,13 +2712,15 @@ describe('a developer run may take a second item — the rule, in its home (#177
   // phrase cannot turn a rule that is still stated into a red build.
   const flat = (s: string) =>
     s.replace(/[*_`]/g, '').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ');
-  const doc = (name: string) => flat(readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8'));
+  // The one call site that needs the flattened form (#536): an explicit wrapper around the shared doc(),
+  // not a re-implementation of the file read.
+  const flatDoc = (name: string) => flat(doc(name));
   // One home (docs/decisions/001, #145): the developer prompt carries the rule, `CLAUDE.md` points at it. Plain
   // `it`s on purpose (#291): `it.each([])` runs nothing and stays green, so a list here is one edit from no rail.
   const HOME = 'docs/ROUTINE-PROMPT.md';
 
   it('the developer prompt carries the rule, and its four conditions', () => {
-    const text = doc(HOME);
+    const text = flatDoc(HOME);
     expect(text.length, 'a vacuous rail is worse than none').toBeGreaterThan(500);
     expect(text, 'the file must state the permission itself')
       .toMatch(/a developer run may take a second item/i);
@@ -2672,7 +2748,7 @@ describe('a developer run may take a second item — the rule, in its home (#177
   });
 
   it('the developer prompt keeps it a condition rather than a quota', () => {
-    const text = doc(HOME);
+    const text = flatDoc(HOME);
     expect(text, 'the self-limiting property is the point, and it has to be stated')
       .toMatch(/condition, not a quota/i);
     // The rewrite that keeps the words and loses the property. #177 rules it out by name.
@@ -2681,12 +2757,12 @@ describe('a developer run may take a second item — the rule, in its home (#177
   });
 
   it('the developer prompt says condition 1 is not "no open pull requests at all"', () => {
-    expect(doc(HOME), 'the misreading that makes the rule never fire has to be closed off in the text')
+    expect(flatDoc(HOME), 'the misreading that makes the rule never fire has to be closed off in the text')
       .toMatch(/not "no open pull requests at all"/i);
   });
 
   it('the developer prompt forbids one pull request closing two issues', () => {
-    expect(doc(HOME), 'two items are two pull requests, or one going bad holds the other')
+    expect(flatDoc(HOME), 'two items are two pull requests, or one going bad holds the other')
       .toMatch(/never one pull request closing two issues/i);
   });
 
@@ -2735,8 +2811,8 @@ describe('a developer run may take a second item — the rule, in its home (#177
   // the record it lands in, so the routine's own file has to name the new home rather than the worklog.
   it('the routine records whether it took one, in the heartbeat snapshot', () => {
     const raw = readFileSync(new URL('../../docs/ROUTINE-PROMPT.md', import.meta.url), 'utf8');
-    expect(doc('docs/ROUTINE-PROMPT.md'), 'STEP 3 must ask for the line').toMatch(/- second item:/);
-    expect(doc('docs/ROUTINE-PROMPT.md'), 'and name which condition failed when none was taken')
+    expect(flatDoc('docs/ROUTINE-PROMPT.md'), 'STEP 3 must ask for the line').toMatch(/- second item:/);
+    expect(flatDoc('docs/ROUTINE-PROMPT.md'), 'and name which condition failed when none was taken')
       .toMatch(/which of the four conditions failed/i);
     // Read raw here on purpose: the point is a line of the snapshot block, and `flat()` joins the lines.
     expect(raw, 'and STEP 5 example snapshot must show the line itself').toMatch(/^- second item: /m);
@@ -3327,7 +3403,6 @@ describe('a pull that cannot fast-forward has a stated recovery, not an improvis
  * 3; or put the `loosening` clause back to "held the same way".
  */
 describe('the reviewer routine keeps a pulse, and something reads it (#327, #320)', () => {
-  const doc = (name: string) => readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
   const flat = (s: string) => s.replace(/\s+/g, ' ');
   const PULSE = 'reviewer: heartbeat';
 
@@ -4249,8 +4324,6 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
  * reviewer prompt's "never re-judge it" clause out of the waiting definition.
  */
 describe('a review that ran ends in a mark, whatever else is true of the branch (#516)', () => {
-  const root = new URL('../../', import.meta.url);
-  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
   const section6 = () => {
     const s = doc('.claude/skills/review-pr/SKILL.md');
     return s.slice(s.indexOf('## 6. '), s.indexOf('## 7. '));
@@ -4381,8 +4454,11 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
       if (b < 0 || b < a) throw new Error(`§6 must still carry "${REGION_TO}" after them`);
       return s6.slice(a, b);
     };
+    // Named apart from the shared unitsOf() (#536): this section is bold-led bullets only (`- **…`), not the
+    // `- `/`1. ` list-item shape the shared helper splits on, so reusing that name here for different
+    // behaviour would recreate the exact drift #536 exists to close.
     /** Paragraphs, and each `- **…` bullet inside one — the shape §6 is written in. */
-    const unitsOf = (text: string) =>
+    const boldBulletUnitsOf = (text: string) =>
       text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=- \*\*)/)).map((u) => u.trim()).filter(Boolean);
 
     const PINS: Array<{ what: string; unit: string }> = [
@@ -4399,12 +4475,12 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
     ];
 
     it.each(PINS)('§6 still reads, word for word: $what', ({ unit }) => {
-      expect(unitsOf(region()),
+      expect(boldBulletUnitsOf(region()),
         'if §6 was reworded on purpose, re-pin it here deliberately and say so in the commit').toContain(unit);
     });
 
     it('the table covers every unit of the region, so a new one cannot arrive unpinned', () => {
-      const units = unitsOf(region());
+      const units = boldBulletUnitsOf(region());
       expect(units.length, 'the region must split into its units, or every row above asserts nothing')
         .toBeGreaterThanOrEqual(10);
       const pinned = new Set(PINS.map((p) => p.unit));
@@ -4565,15 +4641,15 @@ describe('a review that ran ends in a mark, whatever else is true of the branch 
  * from either file; set `package.json`'s `license` to something else.
  */
 describe('the licence grants the code and reserves the art, in both files (#520)', () => {
-  const root = new URL('../../', import.meta.url);
-  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
   const norm = (text: string) => text.replace(/\s+/g, ' ').trim();
 
   // Paragraph units, matched by equality rather than substring — the shape PR #527 already uses in this
   // file for `guardrails.md`/`review-pr` §7 (see the #526 block below). A sentence quoted inside a longer
   // wrapping paragraph is a different unit than the paragraph that is only that sentence, so a wrapper that
   // frames the pinned words as superseded cannot pass (PR #521 round 6, B1).
-  const unitsOf = (text: string) => text.split(/\n\n+/).map(norm);
+  // Named apart from the shared unitsOf() (#536): this comparison wants whole paragraphs only, normalised,
+  // never split on a list item — the LICENSE/README carve-outs it reads are prose, not lists.
+  const paragraphUnitsOf = (text: string) => text.split(/\n\n+/).map(norm);
 
   // A bounded slice between two literal anchors, refusing rather than defaulting when either is missing —
   // an unbounded or silently-widened slice is exactly how #148 and PR #513 round 2's B1 hid a gutted
@@ -4591,7 +4667,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
   // a fresh paragraph, leaving the pinned list itself untouched, is a second unit mentioning the same
   // directory and fails here before anything downstream reads its words.
   const onlyUnitMentioning = (section: string, needle: string) => {
-    const hits = unitsOf(section).filter((u) => u.includes(needle));
+    const hits = paragraphUnitsOf(section).filter((u) => u.includes(needle));
     if (hits.length !== 1) {
       throw new Error(`${hits.length} units in this section mention ${JSON.stringify(needle)}, want exactly 1`);
     }
@@ -4641,7 +4717,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     expect(l.indexOf('WHAT THIS LICENCE DOES NOT COVER'), 'and the carve-out section itself must follow it')
       .toBeGreaterThan(gi);
     const section = between(l, 'WHAT THIS LICENCE DOES NOT COVER', 'THIRD-PARTY COMPONENTS');
-    const units = unitsOf(section);
+    const units = paragraphUnitsOf(section);
     expect(units, 'the carve-out sentence must read exactly as the owner settled it (whitespace aside) — '
       + 'see the doc-comment above for why this is a whole-paragraph pin rather than a substring or a '
       + 'negation detector').toContain(LICENSE_CARVEOUT);
@@ -4659,7 +4735,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     const section = r.slice(r.lastIndexOf('## Licence'));
     expect(section.length, 'README must carry a Licence section — it is where a reader actually looks')
       .toBeGreaterThan(200);
-    expect(unitsOf(section), 'the README\'s Licence section must carry the pinned carve-out paragraph '
+    expect(paragraphUnitsOf(section), 'the README\'s Licence section must carry the pinned carve-out paragraph '
       + 'verbatim (whitespace aside) — a rewrite that changes the words has to change this test too, on '
       + 'purpose').toContain(README_CARVEOUT);
     for (const dir of ['public/avatars/', 'public/icons/']) {
@@ -4680,7 +4756,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
     const l = doc('LICENSE');
     expect(l.indexOf('THIRD-PARTY COMPONENTS'), 'the section itself must exist').toBeGreaterThan(-1);
     const section = l.slice(l.indexOf('THIRD-PARTY COMPONENTS'));
-    const units = unitsOf(section);
+    const units = paragraphUnitsOf(section);
     expect(units, 'LICENSE must name Fredoka\'s SIL OFL notice verbatim, as its own paragraph')
       .toContain(LICENSE_FREDOKA);
     expect(units, 'LICENSE must name the vendored skill\'s Apache-2.0 notice verbatim, as its own paragraph')
@@ -4690,7 +4766,7 @@ describe('the licence grants the code and reserves the art, in both files (#520)
   it('README acknowledges both third-party licences, since neither was this project\'s to choose', () => {
     const r = doc('README.md');
     const section = r.slice(r.lastIndexOf('## Licence'));
-    expect(unitsOf(section), 'README must name both third-party notices verbatim, in their one paragraph')
+    expect(paragraphUnitsOf(section), 'README must name both third-party notices verbatim, in their one paragraph')
       .toContain(README_THIRDPARTY);
   });
 });
@@ -4715,9 +4791,6 @@ describe('the licence grants the code and reserves the art, in both files (#520)
  * Prove it red: drop the population sentence from either file; add "where practical" to either.
  */
 describe('a class fix names the population it covers (#526)', () => {
-  const root = new URL('../../', import.meta.url);
-  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
-
   /**
    * Round 1, B1–B6 — and the finding is the shape of this PR's own rule, one level down: a rail meant to
    * stop a fix claiming "fixed as a class" without naming its population did not name its own.
@@ -4738,14 +4811,10 @@ describe('a class fix names the population it covers (#526)', () => {
    * **The ceiling, stated rather than implied**, the same as #512's: a contradicting sentence added as its
    * OWN new unit, beside an untouched pin, still passes, and nothing mechanical can see it. Human review is
    * the backstop there — which is how all six of these were found.
+   *
+   * (`unitsOf`/`unitWith` here used to be their own copy, identical to #512's below — #536 collapsed both to
+   * the shared definition at the top of the file.)
    */
-  const unitsOf = (text: string) =>
-    text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=(?:- |\d+\. ))/)).map((u) => u.trim());
-  const unitWith = (text: string, needle: string) => {
-    const hits = unitsOf(text).filter((u) => u.includes(needle));
-    if (hits.length !== 1) throw new Error(`${hits.length} units contain ${JSON.stringify(needle)}, want 1`);
-    return hits[0];
-  };
 
   const CLAIMS: Array<{ what: string; file: string; unit: string }> = [
     { what: "the author's obligation, whole",
@@ -4840,18 +4909,8 @@ describe('a class fix names the population it covers (#526)', () => {
  * Prove it red: change any word inside any pinned unit.
  */
 describe('the refiner shapes the backlog behind a gate it cannot skip (#512)', () => {
-  const root = new URL('../../', import.meta.url);
-  const doc = (name: string) => readFileSync(new URL(name, root), 'utf8');
-
-  /** A document's units: paragraphs, and each list item inside one. */
-  const unitsOf = (text: string) =>
-    text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=(?:- |\d+\. ))/)).map((u) => u.trim());
-  /** Refuses on anything but exactly one match: a first-match helper reads a decoy and reports health. */
-  const unitWith = (text: string, needle: string) => {
-    const hits = unitsOf(text).filter((u) => u.includes(needle));
-    if (hits.length !== 1) throw new Error(`${hits.length} units contain ${JSON.stringify(needle)}, want 1`);
-    return hits[0];
-  };
+  // (`unitsOf`/`unitWith` here used to be their own copy, identical to #526's above — #536 collapsed both to
+  // the shared definition at the top of the file.)
 
   const CLAIMS: Array<{ what: string; file: string; unit: string }> = [
     { what: "the refiner develops nothing and never touches a pull request",
