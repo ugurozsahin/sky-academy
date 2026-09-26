@@ -193,6 +193,67 @@ describe('no workflow pins an action major GitHub has deprecated for Node 20 (#1
   });
 });
 
+/**
+ * #765: the #147 rail above (`CI drops the Google Chrome apt source before installing browsers`) reads
+ * `ci.yml` by name, so it never saw `.github/workflows/e2e-speed-trial.yml` land with its own copy of the same
+ * two steps. Generalised here to every workflow file that installs Playwright browsers at all, rather than
+ * hand-copying the check per file — the same #111 lesson (a flat per-file list drifts the moment a new
+ * workflow file is added) applied to this incident instead.
+ *
+ * Prove it red: swap the order of the two steps in e2e-speed-trial.yml (install before the apt-source drop)
+ * and this rail fails; put them back and it passes.
+ */
+describe('every workflow file that installs Playwright browsers drops the Google Chrome apt source first (#147, #765)', () => {
+  // Comments are stripped first, same reason as the #147 rail above: a workflow's own comment can name the
+  // very step it is missing (#129).
+  const withInstall = workflowFiles()
+    .map(({ name, text }) => ({ name, steps: text.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n') }))
+    .filter(({ steps }) => steps.includes('playwright install'));
+
+  it('at least one workflow file installs Playwright browsers, or this rail checks nothing (#765)', () => {
+    expect(withInstall.length).toBeGreaterThan(0);
+  });
+
+  for (const { name, steps } of withInstall) {
+    it(`${name} drops the google-chrome apt source before installing browsers (#765)`, () => {
+      const install = steps.indexOf('playwright install');
+      const drop = steps.indexOf('sources.list.d/google-chrome');
+      expect(install, `${name} must still install the browsers`).toBeGreaterThan(-1);
+      expect(drop, `${name} must delete the google-chrome apt source before installing browsers (#147)`).toBeGreaterThan(-1);
+      expect(drop < install, `${name}: the deletion must run BEFORE the install, or apt-get update still reads it (#147)`)
+        .toBe(true);
+    });
+  }
+});
+
+/**
+ * #765: `tests/e2e/game.spec.ts` and `tests/e2e/duel.spec.ts` each carry their own copy of the `PW_FAST`
+ * validation (module scope is not shared between the two files), so nothing stopped one file's regex or error
+ * message drifting from the other's — e.g. one accepting `PW_FAST=8.5` while the other rejects it. Pinned as
+ * byte-identical rather than merged into a shared helper: `type-design-analyzer` found the duplication itself
+ * sound when #765 was filed, so this only pins the two copies together.
+ *
+ * Prove it red: edit either file's validation line (the regex or the thrown message) without the other, and
+ * this rail fails; make them match again and it passes.
+ */
+describe('the two PW_FAST validation blocks stay identical between game.spec.ts and duel.spec.ts (#765)', () => {
+  const files = e2eSpecFiles();
+
+  const validationBlock = (name: string) => {
+    const f = files.find((f) => f.name === name);
+    expect(f, `${name} must exist under tests/e2e/`).toBeTruthy();
+    const at = f!.text.indexOf('const rawFast = process.env.PW_FAST;');
+    expect(at, `${name} must still carry the PW_FAST validation block`).toBeGreaterThan(-1);
+    const end = f!.text.indexOf('\n', f!.text.indexOf('\n', at) + 1);
+    expect(end, `${name}'s PW_FAST validation block must span two lines`).toBeGreaterThan(at);
+    return f!.text.slice(at, end);
+  };
+
+  it('game.spec.ts and duel.spec.ts validate PW_FAST with byte-identical code', () => {
+    expect(validationBlock('duel.spec.ts')).toBe(validationBlock('game.spec.ts'));
+  });
+});
+
 
 /**
  * #715 (epic #713 decision 5): the scope step now answers two questions — does the diff reach the game
