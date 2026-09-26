@@ -19,11 +19,13 @@ const WORKFLOWS = new URL('../../../.github/workflows/', import.meta.url);
 export const workflow = (name: 'ci.yml' | 'review-gate.yml' | 'android.yml') =>
   readFileSync(new URL(name, WORKFLOWS), 'utf8');
 
-/** Every workflow file, for the rails that must hold across all of them rather than one by name. */
-export const workflowFiles = (): { name: string; text: string }[] => {
-  const names = readdirSync(WORKFLOWS).filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
+/** Every workflow file, for the rails that must hold across all of them rather than one by name. `dir` is
+ *  the directory to read, real workflows by default — a test points it at a fixture directory with no
+ *  `.yml`/`.yaml` files to prove the vacuity guard actually fires, rather than only reading it in prose (#680). */
+export const workflowFiles = (dir: URL = WORKFLOWS): { name: string; text: string }[] => {
+  const names = readdirSync(dir).filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
   if (names.length === 0) throw new Error('no workflow files found — every workflow rail would pass vacuously');
-  return names.map((name) => ({ name, text: readFileSync(new URL(name, WORKFLOWS), 'utf8') }));
+  return names.map((name) => ({ name, text: readFileSync(new URL(name, dir), 'utf8') }));
 };
 
 const E2E = new URL('../../../tests/e2e/', import.meta.url);
