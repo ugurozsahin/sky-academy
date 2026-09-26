@@ -4148,6 +4148,12 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // fixing it anyway — deleting this left the reachability instruction with no reason attached.
     expect(a, 'the cost of not applying the reachability test — inflating the diff to answer hardening nobody can reach')
       .toContain('Fixing everything they raise is how a ten-line pin');
+    // #744 round 4 (pr-test-analyzer): the two assertions flanking this clause pin "ten-line pin" and
+    // the payoff clause after it, but the quantified example sitting between them — the number itself —
+    // was pinned by neither. A rewrite could keep both flanking fragments verbatim and swap the middle
+    // for anything ("turns into thorough, deeply-tested code worth celebrating") and both checks still passed.
+    expect(a, 'the quantified example between the two flanking pins, or a rewrite can gut the middle and pass both')
+      .toContain('becomes 276 lines (#292)');
     // #744 round 1 (silent-failure-hunter): the assertion above pins only the identifying fragment —
     // a rewrite could keep "ten-line pin" verbatim and replace the payoff clause after it with anything,
     // and the check above still passed. The reason this matters — an inflated diff is indistinguishable
@@ -4202,6 +4208,11 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // find it") and what the issue must actually hold ("the list itself, or the script that
     // produces it") were both unpinned — a rewrite could gut the bullet down to its title shape and
     // three labels and every assertion above still passed.
+    // #744 round 4 (pr-test-analyzer): the assertion below only pins the illustrative list, never the
+    // premise itself — that the enumerating already happened during the sweep review. A rewrite could
+    // invert it ("You have not yet enumerated a class to find it") and this check still passed.
+    expect(b, 'the premise itself — a sweep review already did the enumerating, not that it remains to be done')
+      .toMatch(/You enumerated a\s+class to find it/);
     expect(b, 'the premise the bullet opens on — a sweep review already did the enumerating')
       .toMatch(/every topic, every spelling, every route/);
     expect(b, 'the content requirement itself, or a sweep issue could carry labels and a title but no list')
