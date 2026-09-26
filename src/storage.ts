@@ -1033,8 +1033,8 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['stickers', 'owned', 'certs', 'duels'] as const) {
     if (k in clean && !Array.isArray(clean[k])) delete clean[k];
   }
-  for (const k of ['coins', 'spent'] as const) {
-    if (k in clean && typeof clean[k] !== 'number') delete clean[k];
+  for (const k of ['coins', 'spent'] as const) {   // #777: reject non-finite/negative too — capDigits only bounds the top
+    if (k in clean && (typeof clean[k] !== 'number' || !Number.isFinite(clean[k] as number) || (clean[k] as number) < 0)) delete clean[k];
   }
   // #171 review: the object/array/number branches above missed every primitive-typed field — `name` most of
   // all, since it is the one field a person freely types into the Restore box. `nameScreen()`'s `esc(d.name)`
