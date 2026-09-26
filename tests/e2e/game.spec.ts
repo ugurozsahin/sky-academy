@@ -855,11 +855,17 @@ test.describe('Sky Ninja Academy', () => {
     // #50: the 🎓 button always delivers — it never silently does nothing.
     await page.evaluate(() => { (navigator as any).canShare = () => false; });   // exercise the non-share routes deterministically (headless can't complete a real Web Share)
     // (a) artifact viewer WITH the downloads grant → the save prompt
+    // A deliberate delay in the fake `save`, not an instant resolve (#603, the same gap #409 item 2 named for
+    // the duel path): a `toBeEnabled()` taken only after `page.click()` returns would pass whether or not the
+    // handler ever disabled the button, since Playwright's auto-retry polls past a synchronous flip either way.
     await page.evaluate(() => {
       (window as any).__saved = null;
-      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; return { status: 'saved' }; } } : null };
+      (window as any).claude = { use: async (n: string) => n === 'downloads' ? { save: async (r: any) => { (window as any).__saved = r.filename; await new Promise(res => setTimeout(res, 60)); return { status: 'saved' }; } } : null };
     });
     await page.click('#cert');
+    // Disabled for the length of the delivery — `play.ts`'s own synchronous `b.disabled = true`, checked while
+    // the fake `save` above is still mid-flight.
+    await expect(page.locator('#cert')).toBeDisabled();
     await expect(page.locator('#cert')).toBeEnabled();
     await expect(page.locator('#toast')).toContainText('saved');
     expect(await page.evaluate(() => (window as any).__saved)).toMatch(/^sky-ninja-certificate-.*\.png$/);
