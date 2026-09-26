@@ -4,7 +4,7 @@
 import { buyItem, coinBalance, equipItem, wallet } from '../storage';
 import { canBuy, equippedItem, KIND_LABEL, SHOP_ITEMS, type ItemKind } from '../game/shop';
 import { sfx, say } from '../audio';
-import { $, $$, render } from './dom';
+import { $, $$, capDigits, render } from './dom';
 import type { Nav } from './home';
 
 const KINDS: ItemKind[] = ['trail', 'bubble', 'decor', 'costume'];
@@ -26,7 +26,7 @@ export function shopScreen(nav: Nav) {
   }).join('');
   render(`
   <section class="screen home shop">
-    <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Ninja Shop</b><small>Spend your coins on new looks — stickers stay yours</small></div><span class="coin-pill" id="balance" aria-label="${bal} coins to spend">🪙 <b>${bal}</b></span></div>
+    <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Ninja Shop</b><small>Spend your coins on new looks — stickers stay yours</small></div><span class="coin-pill" id="balance" aria-label="${bal} coins to spend">🪙 <b>${capDigits(bal)}</b></span></div>
     ${sections}
   </section>`, 'bg-sky');
   $('#back').addEventListener('click', () => { sfx.tap(); nav.up(); });

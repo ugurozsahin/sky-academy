@@ -3078,11 +3078,13 @@ test.describe('profile picker (#20 slice 2)', () => {
    * 388 against 360 (28px off) — a child on a small phone saw the read-aloud button sliced by the screen edge,
    * with horizontal scroll on every screen the shared topbar appears on. The empty-purse case at 360px happened
    * to fit on `main` (344/360), so both purses are checked at both widths rather than assuming one implies the
-   * other.
+   * other. A five-figure purse (#510) is checked too — `capDigits()` caps the pill's digits at "9999+" so a
+   * lifetime total that outgrows four figures never reopens this same overflow.
    */
-  test('the topbar fits a 320px and a 360px phone, empty purse and a four-figure one with a streak (#414)', async ({ page }) => {
+  test('the topbar fits a 320px and a 360px phone, empty/four-figure/five-figure purses with a streak (#414, #510)', async ({ page }) => {
     for (const [w, h] of [[320, 568], [360, 640]] as const) {
-      for (const purse of [{ coins: 40, days: 0 }, { coins: 1250, days: 12 }]) {
+      // #510: a five-figure purse — `capDigits()` caps the pill's digits at "9999+" so this stays bounded.
+      for (const purse of [{ coins: 40, days: 0 }, { coins: 1250, days: 12 }, { coins: 12345, days: 12 }]) {
         await page.addInitScript(save => {
           localStorage.removeItem('sna:v1');
           localStorage.setItem('sna:v1', save);
@@ -3112,6 +3114,10 @@ test.describe('profile picker (#20 slice 2)', () => {
         const heroName = await page.locator('.hero b').boundingBox();
         expect(heroName!.width, `${w}x${h}, ${purse.coins} coins/${purse.days}-day streak: the ninja's name has vanished, not just truncated`)
           .toBeGreaterThan(0);
+        // #510: a five-figure purse must not reopen the topbar overflow — the pill's digits are capped, not
+        // whatever `coins` happens to be, so the string itself never grows past a bounded width.
+        expect(await page.locator('.coin-pill b').textContent(), `${purse.coins} coins: the pill must show the real balance under four figures and a bounded "9999+" over it`)
+          .toBe(purse.coins > 9999 ? '9999+' : String(purse.coins));
         await expectFitsViewport(page, `sky map at ${w}x${h}, ${purse.coins} coins/${purse.days}-day streak`);
       }
     }

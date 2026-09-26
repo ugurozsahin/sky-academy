@@ -688,7 +688,7 @@ img { -webkit-user-drag: none; }
   font-weight: 700;
   color: #ffd87a;
 }
-.coin-pill b { font-size: 16px; } .coin-pill .streak { color: #ff8a4c; font-size: 13px; }
+.coin-pill b { font-size: 16px; } .coin-pill .streak { color: #ff8a4c; font-size: 13px; } /* #510: capDigits() caps at "9999+" past four figures (src/ui/dom.ts). */
 /* #414 round 2: this rule has to come after the base `.coin-pill` above — same specificity, so whichever is
  * later in the file wins, and a copy inside the narrow-phone media query at `.hero` (further up the file)
  * would lose to this one regardless of the viewport. The topbar's own narrow-phone shrink (`.hero`, same

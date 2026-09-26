@@ -8,7 +8,7 @@ import { MODES } from '../game/modes';
 import { weakestTopics } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS } from '../game/dojo';
 import { duelHistoryHTML } from './duel';
-import { $, $$, render, stars } from './dom';
+import { $, $$, capDigits, render, stars } from './dom';
 
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
 export type Nav = {
@@ -24,7 +24,7 @@ function topbar(nav: Nav, rerender: () => void) {
     <header class="topbar">
       <button class="hero" id="change-av" aria-label="Change ninja" style="--glow:${av.glow}"><span class="portrait sm"><img src="${av.img}" alt="" style="--focus:${av.focus}"></span><span><b>${d.name || 'Ninja'}</b><small>${av.name} · ${av.element}</small></span></button>
       <div class="settings">
-        <button class="coin-pill" id="rewards" aria-label="Rewards: ${coinBalance()} coins">🪙 <b>${coinBalance()}</b>${d.streak.days > 1 ? ` <span class="streak">🔥${d.streak.days}</span>` : ''}</button>
+        <button class="coin-pill" id="rewards" aria-label="Rewards: ${coinBalance()} coins">🪙 <b>${capDigits(coinBalance())}</b>${d.streak.days > 1 ? ` <span class="streak">🔥${d.streak.days}</span>` : ''}</button>
         <button class="icon-btn" id="snd" aria-label="Sound ${d.sound ? 'on' : 'off'}">${d.sound ? '🔊' : '🔇'}</button>
         <button class="icon-btn" id="spk" aria-label="Read aloud ${d.speech ? 'on' : 'off'}">${d.speech ? '🗣️' : '🤐'}</button>
       </div>
