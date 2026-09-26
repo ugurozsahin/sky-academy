@@ -898,6 +898,77 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   /**
+   * #605 (#411/#604 follow-up): `duel.spec.ts:321`'s guard rail proves a certificate that *resolves* after its
+   * screen tears down is dropped, not written into the new one — but that one only exercises the *successful*
+   * outcome, never `play.ts`'s own `catch (e) { console.error('certificate delivery failed', e); toast(...) }`.
+   * That catch turns out to be reachable from exactly one place: `deliverCertificate()`'s own
+   * `if (!blob) throw ...` when `HTMLCanvasElement#toBlob` hands back `null` — every other failure inside it
+   * (`saveViaClaude`'s `dl.save()` rejecting, `nav.share()` rejecting) is already caught internally and turned
+   * into a returned outcome, never a rejected promise (`src/ui/certificate.ts`). So the held gate here is on
+   * `toBlob`, not on a stubbed `claude.use('downloads')` save as the duel guard rail uses — that route can
+   * never make `deliverCertificate` reject, whatever it resolves or rejects with, and a test built on it would
+   * pass green without ever exercising this catch block at all.
+   *
+   * Landing on `#home` afterwards (the island screen, no `#toast` at all) would make the "not written into the
+   * next screen" half of this pass whether or not `screenScope.toast()`'s `if (!alive) return` guard actually
+   * fires — `document.querySelector('#toast')` finds nothing there regardless. `#again` (Rematch) is the real
+   * collision `toast()`'s own comment names ("Rematch/Islands tore this screen down and built the next one"):
+   * it mounts a *fresh* mission screen with its *own* `#toast` at the same id, which the disposed handler's
+   * `document.querySelector('#toast')` would find and write into if the alive guard were missing. Proved red
+   * first: with `if (!alive) return;` in `src/ui/screen.ts`'s `toast()` mutated to `if (false) return;`, this
+   * test fails — `#toast` on the new mission screen picks up class `show` and the stale "Could not make the
+   * certificate" text; reverted, it passes clean again.
+   */
+  test('guard rail: a mission certificate that fails to encode after the results screen tears down is dropped, not thrown or written into the next one (#605)', async ({ page }) => {
+    test.setTimeout(150_000);
+    // #32: the new mission's first wave is held behind the tutorial demo (tutorialSeen stays false —
+    // winMission() never runs a real onHit to set it), and at the suite's default 8× speed that hold
+    // compresses to ~225ms — not a real window to land #pause inside before a bubble could spawn and fall,
+    // raising a genuine "Missed!" toast that would be indistinguishable from a stale write landing (pr-test-
+    // analyzer review). Forced to real speed so the hold #pause below relies on is an actual hold.
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    // The win is the precondition here, not the claim (#749) — winMission() reaches the results screen with an
+    // earned certificate without playing twenty-five real questions for it.
+    await winMission(page);
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    await expect(results.locator('#cert')).toBeVisible();
+    // Hold `toBlob`'s callback open so the test controls exactly when `deliverCertificate()` settles, rather
+    // than racing the real timing — the same shape `duel.spec.ts:321`'s guard rail uses for its own gate.
+    // Released with `null`, the one input that makes `deliverCertificate()` genuinely reject (see above).
+    await page.evaluate(() => {
+      let release: () => void;
+      (window as any).__blobGate = new Promise<void>(r => { release = r; });
+      (window as any).__releaseBlobGate = () => release!();
+      const proto = HTMLCanvasElement.prototype as unknown as { toBlob: (cb: BlobCallback, type?: string, quality?: number) => void };
+      proto.toBlob = function (cb: BlobCallback) { (window as any).__blobGate.then(() => cb(null)); };
+    });
+    await page.click('#cert');   // deliverCertificate is now suspended inside its own toBlob await
+    await page.click('#again');  // cleanup() disposes the old scope (alive → false), then replay() mounts a fresh mission with its own #toast at the same id
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);   // the new mission is fully mounted, its own #toast in the DOM
+    // Paused so the new mission's own gameplay cannot raise a real "Missed!"/"Not quite!" toast of its own
+    // while this test is watching #toast — that would be noise indistinguishable from a stale write landing.
+    await page.click('#pause');
+    await expect(page.locator('#resume')).toBeVisible();
+    const errors: string[] = [];
+    const consoleErrors: string[] = [];
+    page.on('pageerror', e => errors.push(e.message));
+    page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+    await page.evaluate(() => (window as any).__releaseBlobGate());
+    await page.waitForTimeout(200);
+    expect(errors, "a torn-down mission's certificate failure must not throw once it finally settles").toEqual([]);
+    expect(consoleErrors.some(t => t.includes('certificate delivery failed')), 'the failure is still logged — the disposed scope drops the toast it would have shown, not the diagnostic').toBe(true);
+    // The NEW mission's own #toast, not the old screen's (that element is gone with it) — this is the element
+    // a missing alive guard would write the stale outcome into, per the class this rail is proving closed.
+    const toast = page.locator('#toast');
+    await expect(toast, "the disposed screen's toast() call must not reach into the new mission screen's own #toast").not.toHaveClass(/show/);
+    expect(await toast.textContent(), 'and must leave no stale text behind for the next toast to inherit').toBe('');
+  });
+
+  /**
    * #470: `recordCert()`'s own `save()` swallows a refused `setItem` (#151) and the 🎓 row used to be drawn
    * from the in-memory certificate regardless, offering a keepsake the album does not actually hold. Same
    * shape as the Ninja Duel case (`tests/e2e/duel.spec.ts`), the other of the two `recordCert()` call sites.
