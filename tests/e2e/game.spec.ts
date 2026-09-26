@@ -1187,6 +1187,21 @@ test.describe('Sky Ninja Academy', () => {
     expect(await page.evaluate(() => window.__sna.state().trail)).toEqual({ color: '#ffd23a', core: '#fff6c4' });
   });
 
+  // #510 round 2 review: every render of the same uncapped lifetime/balance number gets the same "9999+"
+  // cap, not just the topbar's own coin-pill — the shop's balance pill, the Rewards screen's earned-coins
+  // tile and the shop button's "spend" label all show the identical number in the identical failure shape.
+  test('a five-figure balance shows "9999+" everywhere the coin count renders, not just the topbar (#510)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 12345, spent: 0 });
+    await page.click('#rewards');
+    await expect(page.locator('.rewards')).toBeVisible();
+    await expect(page.locator('#rewards b')).toHaveText('9999+');                       // topbar pill
+    await expect(page.locator('.reward-stats b').first()).toHaveText('🪙 9999+');       // "coins earned" tile
+    await expect(page.locator('.shop-btn small')).toHaveText('spend 🪙 9999+');          // shop button label
+    await page.click('#shop');
+    await expect(page.locator('.shop')).toBeVisible();
+    await expect(page.locator('#balance b')).toHaveText('9999+');                       // shop's own balance pill
+  });
+
   test('ninja shop: a bought element trail overrides the avatar\'s own effect, not just its colour (#69)', async ({ page }) => {
     const water = itemById('trail-water')!;                                       // volt (the default seed avatar) is electric, not water
     await seedPlayer(page, 'volt', 'Ada', { coins: water.price, spent: 0 });

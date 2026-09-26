@@ -197,9 +197,9 @@ export function rewardsScreen(nav: Nav) {
   <section class="screen home rewards">
     ${tb.html}
     <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Ninja Rewards</b><small>Earn coins for a fast start — the rest of the album comes from playing</small></div></div>
-    <button class="btn primary shop-btn" id="shop">🛍️ Ninja Shop <small>spend 🪙 ${coinBalance()}</small></button>
+    <button class="btn primary shop-btn" id="shop">🛍️ Ninja Shop <small>spend 🪙 ${capDigits(coinBalance())}</small></button>
     <div class="reward-stats">
-      <div><b>🪙 ${d.coins}</b><small>coins earned</small></div>
+      <div><b>🪙 ${capDigits(d.coins)}</b><small>coins earned</small></div>
       <div><b>🔥 ${d.streak.days}</b><small>day streak</small></div>
       <div><b>${d.stickers.length}/${STICKER_IDS.length}</b><small>stickers</small></div>
     </div>
