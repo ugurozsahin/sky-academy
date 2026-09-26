@@ -47,6 +47,8 @@ const MAX_RELAUNCHES = 3;
 // A tap throws the ninja's own projectile (#48): it flies from the bottom of the arena to the bubble and pops
 // it on arrival. Score, lives and the outcome reveal are all settled at the tap — only the pop waits for the
 // landing, so the flight is decoration and never changes what the child earned.
+/** One finger's own swipe (#561), keyed by `pointerId`; `stale` is #331's freeze flag, now per finger. */
+interface Stroke { lastPt: { x: number; y: number }; moved: number; stale: boolean }
 export interface Shot { target: Bubble; x0: number; y0: number; x: number; y: number; t: number; fx: FxKind; emit: number }
 export const SHOT_FLIGHT = 0.15;   // seconds in the air
 type ShotStyle = 'shuriken' | 'fireball' | 'orb' | 'bolt' | 'rock' | 'leaf' | 'shard' | 'star' | 'laser';
@@ -99,9 +101,8 @@ export class Arena {
   // through, which is a real extension, not a one-line fix, and out of this pull request's scope.
   clampCounts: ClampCounts = { left: 0, right: 0, ceiling: 0 };
   private trail: { x: number; y: number; t: number }[] = [];
-  private downPos = { x: 0, y: 0 }; private lastPt = { x: 0, y: 0 }; private moved = 0;
-  private activeId: number | null = null;         // the pointer that is down on THIS canvas, null = no stroke (#16: two arenas share one window)
-  private strokeStale = false;                    // #331: a freeze happened since `lastPt` — the next move resumes the stroke, it does not continue it
+  private strokes: Map<number, Stroke> = new Map();   // #561: one Stroke per pointer (#16: two arenas share one window)
+  private mostRecentId: number | null = null;          // which stroke the shared visual trail/swish/fx follows — every stroke still hit-tests
   private raf = 0; private last = 0; private nextId = 1; private waveActive = false; private g = 600; private orderedWave = false;
   private orderedLabels: Set<string> = new Set();   // #591: this wave's required sequence labels — a re-launch candidate on fall, unlike a decoy
   // #700: this wave's gentle-year single-relaunch target; #742 extends it — who it comes back WITH (gentleRelaunch.ts).
@@ -164,9 +165,8 @@ export class Arena {
     // The question card moves too, and its measured bottom is what bounds the next wave's apex
     // (`play-session.ts` re-measures on the next question; this keeps the one in between in the box).
     this.topInset = Math.min(this.topInset * sy, to.H * 0.5);
-    this.strokeStale = true;   // #331's rule, at the other boundary that invalidates coordinates: `lastPt` is
-                                // in the OLD box and nothing above rescales it, so the next move must re-seat
-                                // the anchor rather than draw from a point that no longer means anything (#463)
+    for (const s of this.strokes.values()) s.stale = true;   // #331/#463: every stroke's `lastPt` is in the OLD,
+    // unrescaled box, so each one's next move must re-seat its anchor rather than draw from a stale point
   }
 
   /** Bubble radius scales with viewport; words get wider bubbles. */
@@ -289,20 +289,19 @@ export class Arena {
   // precisely the failure mode to close off, not repeat.
   private stalls() { return this.paused || this.frozen; }
   private onDown = (e: PointerEvent) => {
-    this.activeId = e.pointerId; this.moved = 0; this.downPos = this.pos(e); this.lastPt = this.downPos;
-    this.trail = [{ ...this.downPos, t: performance.now() }];
+    const p = this.pos(e), stale = this.stalls();
+    this.strokes.set(e.pointerId, { lastPt: p, moved: 0, stale });
+    this.mostRecentId = e.pointerId;                 // #561: the newest finger is the one the visual trail follows
+    this.trail = [{ ...p, t: performance.now() }];
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-    if (this.stalls()) { this.strokeStale = true; return; }   // #464: a press during the outcome hold is a real
-    // intent, not nothing — record it as this canvas's stroke so `onMove` can pick it up, but stale, so the first
-    // move after the freeze arms it (same #331 contract) rather than cashing in the bubble under the finger right now,
-    // which belongs to the wave that is about to clear.
-    this.strokeStale = false;                       // #331: a stroke that starts here spans no freeze — never skip its first segment
-    const b = this.bubbleAt(this.downPos.x, this.downPos.y);
+    if (stale) return;   // #464: a press during the freeze is real intent — record it, but stale, so the first move after it arms (#331)
+    const b = this.bubbleAt(p.x, p.y);
     if (b) this.hitBubble(b, false);
   };
   private onMove = (e: PointerEvent) => {
-    if (this.activeId === null || this.stalls()) { if (this.activeId === e.pointerId) this.strokeStale = true; return; }
-    if (e.pointerId !== this.activeId) return;      // a second finger's drift is not this stroke (#16: the move half of the rule below)
+    const s = this.strokes.get(e.pointerId);         // #561: this pointer's own entry, or none if foreign/already lifted
+    if (!s) return;
+    if (this.stalls()) { s.stale = true; return; }
     const p = this.pos(e);
     // #331: a freeze is not a pause mid-stroke, it is a gap in the game. A finger that never lifts kept
     // `lastPt` from before the outcome hold, and a wave ending is reveal() → clearWave() → the next
@@ -310,29 +309,30 @@ export class Arena {
     // across the new wave, the right answer among it. Re-seating `lastPt` during the freeze is not enough
     // (the finger may have drifted, and a perfectly still one sends no move at all): the first move after a
     // freeze RESUMES the stroke, seating a fresh start point and slicing nothing. The stroke itself lives on.
-    if (this.strokeStale) { this.strokeStale = false; this.lastPt = p; this.trail = [{ ...p, t: performance.now() }]; return; }
+    if (s.stale) { s.stale = false; s.lastPt = p; if (e.pointerId === this.mostRecentId) this.trail = [{ ...p, t: performance.now() }]; return; }
     // Hit-test against the last pointer position, not the visual trail: the trail fades after 280ms,
     // so a finger that pauses mid-stroke (or slow pointer events) must not lose its slice segment.
-    const prev = this.lastPt;
-    const d = Math.hypot(p.x - prev.x, p.y - prev.y); this.moved += d; if (d < 2) return;
-    this.lastPt = p;
-    this.trail.push({ ...p, t: performance.now() });
-    if (this.trail.length > 24) this.trail.shift();
-    if (this.moved > 40 && this.trail.length % 6 === 0) this.onSwish?.();
-    if (++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);
+    const prev = s.lastPt;
+    const d = Math.hypot(p.x - prev.x, p.y - prev.y); s.moved += d; if (d < 2) return;
+    s.lastPt = p;
+    if (e.pointerId === this.mostRecentId) {         // #561: only the most recent stroke draws — the shared trail, its swish, its wake
+      this.trail.push({ ...p, t: performance.now() });
+      if (this.trail.length > 24) this.trail.shift();
+      if (s.moved > 40 && this.trail.length % 6 === 0) this.onSwish?.();
+      if (++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);
+    }
     for (const b of this.bubbles) { if (this.frozen) break; if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true); }
   };
-  // `pointerup`/`pointercancel` arrive on the window, so every arena on the page hears every finger lift. Only
-  // the pointer that went down on this canvas may end its stroke, and only it may extend it: in Ninja Duel
-  // (#16) two arenas share the window, and Player 2's tap used to cut Player 1's swipe mid-stroke; a second
-  // finger resting on the same canvas re-seats the trail (the newest finger owns the stroke), so the first
-  // finger's next move must not be hit-tested from that point (PR #295 review). One finger, one id, in play.
-  // One stroke per canvas is a policy with a known edge: a newer finger takes over, so when IT lifts the older
-  // finger's continuing swipe is orphaned until it touches again — a stroke per pointer would serve both
-  // orderings, and is a follow-up under #16.
+  // `pointerup`/`pointercancel` are WINDOW listeners, so every arena hears every lift; only the pointer that
+  // went down on this canvas has an entry to remove (#16, PR #295's foreign-lift rule). #561's own Stroke per
+  // pointer closes PR #295's named follow-up: no single stroke is left for a second finger to take and strand.
   private onUp = (e: PointerEvent) => {
-    if (this.activeId !== null && e.pointerId !== this.activeId) return;
-    this.activeId = null;
+    this.strokes.delete(e.pointerId);
+    if (this.mostRecentId !== e.pointerId) return;
+    const remaining = [...this.strokes.keys()];      // hand the trail to another still-down finger, else null for the next onDown
+    this.mostRecentId = remaining.length ? remaining[remaining.length - 1] : null;
+    const s = this.mostRecentId !== null && this.strokes.get(this.mostRecentId);
+    if (s) this.trail = [{ ...s.lastPt, t: performance.now() }];   // else it ages out (#446): no pointer to hand off to
   };
   private bubbleAt(x: number, y: number) {
     let best: Bubble | null = null, bd = Infinity;
@@ -369,10 +369,10 @@ export class Arena {
     let dt = (now - this.last) / 1000; this.last = now;
     if (dt > 0.5) dt = 0.016;                       // tab was hidden: don't jump
     dt = Math.min(dt, 0.1);
-    // #331: the home of the rule. A freeze lasting at least one frame stales the stroke whichever field caused
-    // it and whoever set it — `paused` is assigned from the play screen and has no entry point of its own — so
-    // a finger held perfectly still through the outcome hold, sending no pointermove at all, is caught here.
-    if (this.stalls()) this.strokeStale = true;
+    // #331: the home of the rule. A freeze lasting at least one frame stales every live stroke (#561: one per
+    // pointer), whichever field caused it — `paused` is assigned from the play screen with no entry point of
+    // its own — so a finger held perfectly still, sending no pointermove at all, is caught here.
+    if (this.stalls()) for (const s of this.strokes.values()) s.stale = true;
     // #490: `update()` below is skipped entirely while `paused`, so nothing launches DURING a pause — but
     // nothing used to shift `launchAt` either, so every bubble whose moment passed behind the overlay became
     // due all at once on the resumed frame. `paused` is assigned from the play screen with no entry point of
