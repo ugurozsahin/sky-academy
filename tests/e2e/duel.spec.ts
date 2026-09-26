@@ -11,6 +11,12 @@ import { DUEL_TOAST_LONGEST } from '../../src/ui/duel';
 // the round. Driven through the duel screen's own `window.__sna` hooks, which name the player every call is for.
 declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number; __said: string[]; __deadArenas: { time: number }[]; __seedMiss: boolean } }
 
+// #748: same override as game.spec.ts's FAST — kept as its own constant here since the two files don't share
+// module scope, so a CI trial can pass one PW_FAST and have both suites honour it identically.
+const rawFast = process.env.PW_FAST;
+if (rawFast !== undefined && !/^\d+$/.test(rawFast)) throw new Error(`PW_FAST must be a plain integer, got "${rawFast}"`);
+const FAST = rawFast ? Number(rawFast) : 4;
+
 /**
  * A speech engine that records what it was asked to say, and when it was cancelled, in order (#16 review). It
  * also models the drop `src/audio.ts` documents: a `speak()` in the same task as a `cancel()` is recorded as
@@ -64,7 +70,7 @@ async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins
     localStorage.setItem('sna:v1', JSON.stringify(d));
   }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }), dojoByDate, coins });
   if (opts?.refuseWrites) await refuseWrites(page);   // after the seed above, so only the match's own writes are refused
-  await page.addInitScript(() => { window.__SNA_FAST = 4; });
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
   await recordingEngine(page);
   await page.goto('/');
   await expect(page.locator('.home')).toBeVisible();
@@ -1162,7 +1168,7 @@ test.describe('Ninja Duel', () => {
    */
   test('a won match earned under a newer-build save offers no certificate row (#470 review round 1)', async ({ page }) => {
     await page.addInitScript(v => localStorage.setItem('sna:v1', v), JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99 }));
-    await page.addInitScript(() => { window.__SNA_FAST = 4; });
+    await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
     await recordingEngine(page);
     await page.goto('/');
     // The future blob is unreadable, so `load()` latches read-only and hands back `DEFAULT` — onboarded: false —

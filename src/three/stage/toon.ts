@@ -1,11 +1,11 @@
 /**
  * Cel shading (decision record 010, item 2): every object's material is a `MeshToonMaterial` over one shared
  * gradient map, built here and nowhere else — the objects tree constructs no material of its own (a rail).
- * `TONES` is provisional until the style probe (#717) picks two or three from rendered variants.
+ * `TONES` is three: the owner's pick from the style probe's rendered variants (#717).
  */
 import { Color, DataTexture, MeshToonMaterial, NearestFilter, RedFormat, type ColorRepresentation } from 'three';
 
-/** Tone steps in the gradient map. Provisional (#717). */
+/** Tone steps in the gradient map. Chosen by the owner from the style probe: variant B (#717, PR #734). */
 export const TONES = 3;
 
 const maps = new Map<number, DataTexture>();
@@ -27,9 +27,27 @@ export function gradientMap(steps = TONES): DataTexture {
   return map;
 }
 
-/** A flat, saturated toon material in `colour`. No roughness, metalness or environment map exists on it to set. */
+/**
+ * The gloss point (decision record 010, item 5; #740): the avatars' one hard white highlight. `MeshToonMaterial`
+ * has no specular term, so the fragment shader gets one: a Blinn–Phong half-vector with the key light (the rig's
+ * first directional light: the rig adds it first, and three.js's stable sort puts shadow casters — the key alone — first), cut
+ * hard by a threshold, so it is a spot, not a lobe. `GLOSS_EDGE` is the cosine it starts at: closer to 1, smaller.
+ */
+export const GLOSS_EDGE = 0.985;
+export const GLOSS_STRENGTH = 0.85;
+export function addGloss(shader: { fragmentShader: string }): void {
+  shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `#if NUM_DIR_LIGHTS > 0
+	{ vec3 glossHalf = normalize( directionalLights[ 0 ].direction + normalize( vViewPosition ) );
+	  outgoingLight = mix( outgoingLight, vec3( 1.0 ), ${GLOSS_STRENGTH.toFixed(3)} * step( ${GLOSS_EDGE.toFixed(3)}, dot( normal, glossHalf ) ) ); }
+	#endif
+	#include <opaque_fragment>`);
+}
+
+/** A flat, saturated toon material in `colour`, with the gloss point. No roughness, metalness or environment map exists on it to set. */
 export function toonMaterial(colour: ColorRepresentation, steps = TONES): MeshToonMaterial {
-  return new MeshToonMaterial({ color: new Color(colour), gradientMap: gradientMap(steps) });
+  const m = new MeshToonMaterial({ color: new Color(colour), gradientMap: gradientMap(steps) });
+  m.onBeforeCompile = addGloss;
+  return m;
 }
 
 /** How a token is read: `--ink` → its computed value on `:root`. Injected so Node can hand the stage a table. */

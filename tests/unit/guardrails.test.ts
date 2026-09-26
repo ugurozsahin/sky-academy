@@ -13,6 +13,8 @@ import { tmpdir } from 'node:os';
 import { BoxGeometry, Mesh } from 'three';   // #714: the budget meter's self-test below
 import { BUDGET_CEILING, defaultsOf, OBJECTS } from '../../src/three/objects';   // #714: the budget rail builds every registered object
 import { createStage, measure } from '../../src/three/stage';
+import { THREE_SETTING_KEY } from '../../src/three/mount/enabled';   // #713 decision 5: the key the e2e projects preset
+import { listFiles, precacheList } from '../../scripts/build-sw.mjs';   // #715: the sketchbook stays out of the precache
 
 /**
  * The Fredoka weight axis the app actually serves, `[lo, hi]`, read from the @font-face rules in
@@ -203,7 +205,20 @@ describe('guard rails', () => {
     expect(play).toMatch(/throwFor:\s*b\s*=>\s*b\.label\s*!==\s*BOMB/);
     const arena = code(SOURCES['/src/game/arena.ts']);
     expect(arena).toContain('this.throwFor ? this.throwFor(b) : true');   // the tap path consults it
-    expect(arena).toMatch(/if \(!b\.hit\) this\.cb\.onFall\(b\)/);      // a tapped bubble in flight is not a miss
+    // #742: the gentle-year branch sits inside the same `!b.hit` guard, so a tapped bubble in flight still
+    // never reaches onFall (nor becomes the deferred gentleTargetFallen) whichever path it takes.
+    expect(arena).toMatch(/if \(!b\.hit\) \{ if \(gentle\).*this\.cb\.onFall\(b\)/);
+  });
+
+  // #742 review round 1 (pr-test-analyzer, silent-failure-hunter): tests/unit/sim.test.ts's own BOMB-vs-gentle
+  // regression test hand-duplicates play.ts's `isHazard` predicate rather than reading it — this pins play.ts's
+  // own wiring so a future edit that drops or mistypes it (leaving `throwFor` correct but `isHazard` stale)
+  // fails a rail here, not just silently un-tests a live bug's fix.
+  it('a TNT is wired as a hazard everywhere it is wired as unthrowable (#742)', () => {
+    const play = code(SOURCES['/src/ui/play.ts']);
+    expect(play).toMatch(/isHazard:\s*label\s*=>\s*label\s*===\s*BOMB/);
+    const arena = code(SOURCES['/src/game/arena.ts']);
+    expect(arena).toContain('!this.isHazard?.(b.label)) this.gentleDecoys.push(b)');
   });
 
   // CLAUDE.md: no dependencies without reason (Capacitor is the documented exception). A new one now has
@@ -1280,6 +1295,46 @@ describe('guard rails', () => {
     expect(spec, 'the duel spec imports the constant').toContain("import { DUEL_TOAST_LONGEST } from '../../src/ui/duel'");
   });
 
+  // #508: a `commitMatch` throw must not hang a finished duel, at ANY of the three commit points — round 1
+  // of this fix caught it only at the two early call sites (`onRoundWon`, `waveEnd`) and left `onMatchEnd`'s
+  // own bare call reachable with `committed=true, payout=null` on the very same last round: `waveEnd`'s
+  // `later(() => duel.waveEnd(), …)` runs `Duel.end()` synchronously, which fires `onMatchEnd` before that
+  // `later()` call even returns, so a throw caught early still resurfaced one beat later at the third point
+  // and skipped `showResults`. The catch now lives INSIDE `commitOnce` itself, so all three callers are safe
+  // by construction rather than each needing its own wrapper. This rail is a text check that the shape is
+  // still there — it cannot see a throw actually being swallowed at runtime (no jsdom here,
+  // `.claude/rules/guardrails.md`). duel.ts is at the #714 ratchet's line cap, hence the dense lines.
+  it('a throw from commitOnce cannot hang a duel at any of its three commit points (#508)', () => {
+    const src = SOURCES['/src/ui/duel.ts'] ?? '';
+    const body = code(src);
+    expect(body.length, 'duel.ts must be read, not a blank import').toBeGreaterThan(1000);
+    // commitOnce itself catches and returns null on failure, rather than throwing or trusting a caller-side
+    // wrapper (round 1's commitOrToast, which left onMatchEnd's bare call unprotected).
+    expect(body, 'commitOnce must return GameEndOutcome | null, not GameEndOutcome — a caller must be able to see failure')
+      .toMatch(/const commitOnce = \(r: DuelResult\): GameEndOutcome \| null => \{/);
+    expect(body, 'commitOnce must try/catch commitMatch itself, not leave it to a wrapper')
+      .toMatch(/try \{ payout = commitMatch\(r\); \}\s*catch \(e\) \{/);
+    // All three call sites go through the one function — nothing calls commitMatch directly, and nothing
+    // still routes through the retired commitOrToast wrapper.
+    expect(body, 'onRoundWon, right before endWave, must call commitOnce').toMatch(/if \(duel\.onLastRound\) commitOnce\(duel\.result\(\)\);\s*endWave\(/);
+    expect(body, 'waveEnd, right before the later() that arms duel.waveEnd(), must call commitOnce').toMatch(/if \(duel\.onLastRound\) commitOnce\(duel\.result\(\)\);\s*later\(\(\) => duel\.waveEnd\(\)/);
+    expect(body, 'the retired commitOrToast wrapper must not come back').not.toMatch(/commitOrToast/);
+    // onMatchEnd reads commitOnce's return rather than trusting it non-null: a failed commit skips showResults
+    // (there is no real payout to show) and falls back to pausing the arenas directly, so the match still
+    // visibly stops rather than sitting live with only the toast as feedback.
+    expect(body, 'onMatchEnd must branch on a possibly-null commit result, not assume it succeeded')
+      .toMatch(/onMatchEnd: r => \{ const p = commitOnce\(r\); if \(p\) later\(\(\) => showResults\(r, p\), [\s\S]+?\); else hold\(true, false\); \}/);
+    // The failure toast fits inside DUEL_TOAST_LONGEST like every other toast() in this file (#425) — checked
+    // again here directly, since the #425 rail above only scans literal toast( arguments and would not catch
+    // a call built from a variable.
+    const longest = /export const DUEL_TOAST_LONGEST = '([^']*)'/.exec(body)?.[1] ?? '';
+    expect(longest.length, 'DUEL_TOAST_LONGEST must be found').toBeGreaterThan(0);
+    const failToast = /catch \(e\) \{ console\.error\('duel commit failed', r, e\); toast\("([^"]*)"/.exec(body)?.[1] ?? '';
+    expect(failToast.length, 'the failure toast text must be found').toBeGreaterThan(0);
+    expect(failToast.length, `"${failToast}" is longer than DUEL_TOAST_LONGEST, so it would wrap and cost the arenas height (#425)`)
+      .toBeLessThanOrEqual(longest.length);
+  });
+
   /*
    * #436 round-1 review, B1 — `.cert-msg { color: var(--good); ... }` on its own is (0,1,0): one class. The
    * pre-existing `.modal p { margin: 4px 0 14px; color: var(--muted); ... }` is (0,1,1) — one class AND one
@@ -1408,10 +1463,30 @@ describe('guard rails', () => {
     expect(prProjects.length, 'a pull request runs ONE project — each extra one is a whole extra leg (#141)').toBe(1);
     expect(projects, `the PR project '${prProjects[0]}' must be declared in playwright.config.ts`).toContain(prProjects[0]);
 
-    // the nightly arm: every project, or a regression in the missing one is caught by nothing at all
+    // #486: `setup` exists only to be another project's `dependencies` entry (it runs the identity spec
+    // before everything else, at any worker count) — it is not a leg of its own, and Playwright runs it
+    // automatically whenever a project depending on it is selected, with no `--project=` flag of its own.
+    // Demanding one in the nightly arm would ask CI for a flag it never needs, so a project referenced by
+    // ANY other project's `dependencies` array is excluded from the "every project" loop below.
+    const depOnly = new Set([...code(cfg).matchAll(/dependencies:\s*\[([^\]]*)\]/g)]
+      .flatMap(m => [...m[1].matchAll(/'([^']+)'/g)].map(d => d[1])));
+
+    // the nightly arm: every LEG project, or a regression in the missing one is caught by nothing at all
     for (const p of projects) {
+      if (depOnly.has(p)) continue;
       expect(fullArm, `the nightly must run every declared project — '${p}' is missing (#141)`)
         .toContain(`--project=${p}`);
+    }
+    // and a dependency-only project must actually be reachable from every leg, in both arms — nothing else
+    // here checks that `dependencies` still names it once a leg is added, renamed or edited (#486).
+    const parts = code(cfg).slice(code(cfg).indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    for (const dep of depOnly) {
+      for (const part of parts) {
+        const name = part.match(/name:\s*'([^']+)'/)![1];
+        if (depOnly.has(name)) continue;
+        expect(part, `'${name}' must depend on '${dep}', or it can start running before '${dep}' has (#486)`)
+          .toMatch(new RegExp(`dependencies:\\s*\\[[^\\]]*'${dep}'`));
+      }
     }
     // and the step must stay off the push-to-main run, which is what makes the nightly the only full check.
     // #162: read from the e2e STEP, never from the file. Three steps carry that same `if:` — the apt
@@ -1464,8 +1539,11 @@ describe('guard rails', () => {
         expect(p, `'${name}' must run the viewport spec only — an unrestricted tablet leg is ~4 min a night (#116)`)
           .toMatch(/testMatch:\s*\/viewport\\\.spec\\\.ts\//);
       } else {
+        // #486: `mobile`/`desktop` now also exclude the identity spec (`setup` runs it instead), which makes
+        // `testIgnore` an array rather than a bare regex — the optional `[...` tolerates that without caring
+        // how many other patterns share the array, only that `/viewport\.spec\.ts/` is genuinely one of them.
         expect(p, `'${name}' must skip the viewport spec, so the pull-request leg stays the suite it was (#141)`)
-          .toMatch(/testIgnore:\s*\/viewport\\\.spec\\\.ts\//);
+          .toMatch(/testIgnore:\s*(?:\[[^\]]*)?\/viewport\\\.spec\\\.ts\//);
       }
     }
     const spec = readFileSync(new URL('../../tests/e2e/viewport.spec.ts', import.meta.url), 'utf8');
@@ -2749,7 +2827,8 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
     const inbound = all.filter(e => !e.from.startsWith(THREE_DIR) && e.to.startsWith(THREE_DIR) && e.kind !== 'type');
     const bad = inbound.filter(e => e.kind !== 'dynamic' || !e.to.startsWith(MOUNT_DIR));
     expect(bad, 'a static import pulls three into the main chunk; a reach past mount/ bypasses the flag').toEqual([]);
-    expect(inbound.map(e => `${e.from} → ${e.to}`), 'the one lazy loader today (#684)').toEqual(['/src/ui/solid.ts → /src/three/mount/solids']);
+    // #684: the loader asks the flag (`enabled`, a small chunk with no three.js) before it downloads the solids.
+    expect(inbound.map(e => `${e.from} → ${e.to}`).sort(), 'the one lazy loader today (#684), and the flag it asks first').toEqual(['/src/ui/solid.ts → /src/three/mount/enabled', '/src/ui/solid.ts → /src/three/mount/solids']);
   });
 
   // (c) Proved red: `import { $ } from '../../ui/dom'` in src/three/stage/rig.ts fails. Stronger than the epic's
@@ -2759,6 +2838,48 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   it('nothing under src/three/ imports anything under src/ outside src/three/', () => {
     const out = all.filter(e => e.from.startsWith(THREE_DIR) && e.to.startsWith('/src/') && !e.to.startsWith(THREE_DIR) && e.kind !== 'type');
     expect(out.map(e => `${e.from} → ${e.spec}`)).toEqual([]);
+  });
+
+  // (c′, #715) The sketchbook is a developer page the game does not know: nothing under `src/` outside
+  // `src/three/sketchbook/` may import it, by any kind of edge. Proved red: `import '../three/sketchbook/main'`
+  // in a scratch `src/ui/` file fails; the fixture line keeps the reader honest about that path shape.
+  it('nothing outside src/three/sketchbook/ imports the sketchbook', () => {
+    const SKETCH = '/src/three/sketchbook/';
+    expect(edges('/src/ui/x.ts', "import '../three/sketchbook/main';")[0]).toMatchObject({ to: '/src/three/sketchbook/main', kind: 'static' });
+    const inbound = all.filter(e => !e.from.startsWith(SKETCH) && e.to.startsWith(SKETCH));
+    expect(inbound.map(e => `${e.from} → ${e.spec}`)).toEqual([]);
+    expect(inDir(SKETCH).length, 'the sketchbook folder must exist, or this holds nothing').toBeGreaterThan(3);
+  });
+
+  // (#715) The sketchbook spec is invisible to the game's projects only because ONE project declares its own
+  // `testDir`; the #116 and #123 rails read projects by the names `mobile|desktop|tablet` and never look at it.
+  // Two silent decays this holds: the `sketchbook` project loses `testDir` (it then runs the whole game suite
+  // nightly at 600×600 and the shot spec runs nowhere), or the spec is "tidied" into `tests/e2e/` (every
+  // pull request's mobile leg then screenshots into docs/sketchbook/).
+  it('the sketchbook project alone declares a testDir, tests/sketch, and holds the shot spec', () => {
+    const cfg = code(readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8'));
+    const parts = cfg.slice(cfg.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    const withDir = parts.filter(p => /\btestDir:/.test(p)).map(p => ({ name: p.match(/name:\s*'([^']+)'/)![1], dir: p.match(/testDir:\s*'([^']+)'/)?.[1] }));
+    expect(withDir).toEqual([{ name: 'sketchbook', dir: 'tests/sketch' }]);
+    const sketchSpecs = readdirSync(new URL('../../tests/sketch', import.meta.url)).filter(f => f.endsWith('.spec.ts'));
+    expect(sketchSpecs.length, 'tests/sketch must hold the shot spec').toBeGreaterThan(0);
+    for (const f of readdirSync(new URL('../../tests/e2e', import.meta.url)))
+      expect(readFileSync(new URL(`../../tests/e2e/${f}`, import.meta.url), 'utf8'), `${f} must not import the shot script — that would put the sketchbook on every mobile leg`).not.toMatch(/sketch-shot/);
+  });
+
+  // #713 decision 5 and the owner's rule (2026-09-25): the game's e2e runs with 3-D off, stored the way a
+  // grown-up stores it. Every project that is not `setup` or `sketchbook` is a game project and must start from
+  // `THREE_OFF` — read from the projects, not a list here, so a new game project without it fails too. And the
+  // key it stores must be the key the game reads, or the setting would be stored and never seen.
+  it('every game e2e project starts with the grown-ups 3-D setting off (#713 decision 5)', () => {
+    const cfg = code(readFileSync(new URL('../../playwright.config.ts', import.meta.url), 'utf8'));
+    expect(cfg, 'THREE_KEY must be the key the game reads').toMatch(new RegExp(`THREE_KEY\\s*=\\s*'${THREE_SETTING_KEY}'`));
+    expect(cfg, 'THREE_OFF must store THREE_KEY as off').toMatch(/name:\s*THREE_KEY,\s*value:\s*'off'/);
+    const parts = cfg.slice(cfg.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
+    const named = parts.map(p => ({ name: p.match(/name:\s*'([^']+)'/)![1], body: p }));
+    const game = named.filter(p => p.name !== 'setup' && p.name !== 'sketchbook');
+    expect(game.map(p => p.name), 'the game projects the rail reads').toEqual(expect.arrayContaining(['mobile', 'desktop']));
+    for (const p of game) expect(p.body, `${p.name} must start with 3-D off`).toMatch(/storageState:\s*THREE_OFF\b/);
   });
 
   // (d) 250 lines is the cap, not the target (`.claude/rules/three.md`): split by part and assembly.
@@ -2848,6 +2969,25 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       expect(chunks.filter(c => c.three).map(c => c.name.replace(/-[\w-]+\.js$/, '')), 'the signature must find the three chunk, or it proves nothing').toEqual(['solids']);
       expect(chunks.find(c => c.name === entry)?.three, 'three.js code in the main chunk').toBe(false);
     }, 60_000);
+    // #715: the sketchbook is its own Vite build into `dist/sketchbook/` (vite.sketchbook.config.ts says why
+    // it is not a second input of the game's build). Three things keep it out of the game: the game's
+    // `index.html` references nothing of it, the service worker precaches nothing under its folder, and it
+    // does carry three.js of its own — asserted, so a broken sketchbook build cannot read as "nothing leaked".
+    it('the sketchbook builds beside the game and the game carries none of it', () => {
+      const out = mkdtempSync(join(tmpdir(), 'sna-sketch-'));
+      try {
+        const vite = (args: string[]) => execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build', ...args, '--logLevel', 'error'], { stdio: 'pipe' });
+        vite(['--outDir', out, '--emptyOutDir']);
+        vite(['-c', 'vite.sketchbook.config.ts', '--outDir', join(out, 'sketchbook'), '--emptyOutDir']);
+        const files = listFiles(out);
+        const sketch = files.filter(f => f.startsWith('sketchbook/'));
+        expect(sketch, 'the sketchbook must have built into dist/sketchbook/').toContain('sketchbook/sketchbook.html');
+        expect(sketch.some(f => f.endsWith('.js') && SIGNATURE.test(readFileSync(join(out, f), 'utf8'))), 'the sketchbook carries its own three.js').toBe(true);
+        expect(readFileSync(join(out, 'index.html'), 'utf8'), 'the game page references the sketchbook').not.toMatch(/sketchbook/);
+        expect(precacheList(files).filter(f => f.startsWith('sketchbook/')), 'the service worker would precache the sketchbook').toEqual([]);
+        expect(precacheList(files), 'and still precaches the game').toContain('index.html');
+      } finally { rmSync(out, { recursive: true, force: true }); }
+    }, 90_000);
     it('a VITE_THREE=off build has no three.js chunk at all', () => {
       const { entry, chunks } = build({ VITE_THREE: 'off' });
       expect(chunks.map(c => c.name), 'the kill switch must fold the import() away, leaving only the entry').toEqual([entry]);

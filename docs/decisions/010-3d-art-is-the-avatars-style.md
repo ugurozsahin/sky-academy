@@ -55,7 +55,8 @@ first pointed at, and they are rejected because they would not sit beside the av
 - The style is cheap: toon shading and an inverted hull cost less than PBR, which is why the `low` tier can
   keep the full look and only drop shadow and bloom.
 - The style probe (#717) is where the two open numbers — outline width, tone count — are chosen by the owner
-  from rendered variants beside the avatar art. Until it lands, objects use the stage's provisional values.
+  from rendered variants beside the avatar art. It landed on 2026-09-25: the owner picked variant B, an outline
+  width of 0.045 scene units and three tones (PR #734). Those are the stage's constants.
 - A pull request that adds a 3-D object states, item by item, how it meets 1–7; the reviewer checks the
   screenshots against the avatar the object belongs to. The `three-art` skill has the checklist.
 

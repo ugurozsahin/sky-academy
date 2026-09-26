@@ -31,13 +31,14 @@ describe('solidNameFor — which question shows a rotating solid (#684)', () => 
 describe('createSolidSlot — one lazy renderer per play screen (#684)', () => {
   // No DOM in the unit suite (vitest runs in plain Node here): the slot only ever calls `replaceChildren` on
   // the host it is given, so a fake host and a fake element are the whole contract, and `three` never loads.
-  type Fake = { el: object; shown: string[]; hidden: number; destroyed: number; frames: number; show(n: string): void; hide(): void; destroy(): void; readonly state: { name: string; frames: number; webgl: boolean; error: null } | null };
+  type Fake = { el: object; shown: string[]; beats: string[]; hidden: number; destroyed: number; frames: number; show(n: string): void; beat(k: string): void; hide(): void; destroy(): void; readonly state: { name: string; frames: number; webgl: boolean; error: null } | null };
   const fakeModule = (fail = false) => {
     const views: Fake[] = [];
     class SolidView implements Fake {
-      el = { tag: 'solid' }; shown: string[] = []; hidden = 0; destroyed = 0; frames = 0;
+      el = { tag: 'solid' }; shown: string[] = []; beats: string[] = []; hidden = 0; destroyed = 0; frames = 0;
       constructor() { if (fail) throw new Error('no WebGL'); views.push(this); }
       show(n: string) { this.shown.push(n); this.frames++; }
+      beat(k: string) { this.beats.push(k); }
       hide() { this.hidden++; }
       destroy() { this.destroyed++; }
       get state() { const name = this.shown.at(-1); return name ? { name, frames: this.frames, webgl: true, error: null } : null; }
@@ -47,6 +48,22 @@ describe('createSolidSlot — one lazy renderer per play screen (#684)', () => {
   /** A stand-in for `#vis`: `kids` is what the card currently holds — the emoji word card until a view replaces it. */
   const host = () => ({ kids: ['wordcard'] as unknown[], replaceChildren(...n: unknown[]) { this.kids = n; } });
   const settle = async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); };
+
+  // #740 on the card: a right answer cheers the solid shown — and only a solid that is shown.
+  it('cheer plays on the card solid only: nothing before one loads, nothing on a question without one', async () => {
+    const { views, mod } = fakeModule();
+    const h = host();
+    const slot = createSolidSlot(() => h as never, async () => mod as never);
+    expect(() => slot.cheer(), 'no view yet: nothing to cheer, and no throw').not.toThrow();
+    slot.show(word('🎲'), 'y2-shapes');
+    await settle();
+    slot.cheer();
+    expect(views[0].beats).toEqual(['cheer']);
+    slot.show(word('🍎'), 'y2-shapes');   // not a solid: the card shows the emoji again
+    await settle();
+    slot.cheer();
+    expect(views[0].beats, 'no solid on the card, no cheer').toEqual(['cheer']);
+  });
 
   it('loads the module once, mounts the view into the host, and reuses it for the next solid', async () => {
     const { views, mod } = fakeModule();
@@ -146,6 +163,24 @@ describe('createSolidSlot — one lazy renderer per play screen (#684)', () => {
       expect(slot.state()).toEqual({ name: 'cube', frames: 0, webgl: false, error: 'built-off' });
       expect(warn).not.toHaveBeenCalled();
     } finally { warn.mockRestore(); vi.unstubAllEnvs(); }
+  });
+  // The runtime layer (the owner, in session, 2026-09-25): with `threeEnabled()` false the solids chunk is never
+  // fetched and the emoji stays, exactly as before #684. Switched off the way a child's page is — `?three=off`,
+  // which answers before the device probe runs, so nothing is asked of the GPU and nothing is warned.
+  it('with the flag off the default loader keeps the emoji, says flag-off through the hook, and warns nothing', async () => {
+    vi.stubGlobal('location', { search: '?three=off' });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const h = host();
+      const slot = createSolidSlot(() => h as never);
+      slot.show(word('🎲', { options: ['🎲', '⚽'] }), 'y1-shapes3d');
+      // Two dynamic imports in a row (the flag's chunk, then the answer) take longer than one settle().
+      await vi.waitFor(() => expect(slot.state()?.error).toBe('flag-off'));
+      expect(h.kids).toEqual(['wordcard']);
+      expect(slot.state()).toEqual({ name: 'cube', frames: 0, webgl: false, error: 'flag-off' });
+      expect(slot.bubbleArt('🎲', '#ffb020', 0), 'no spinning solid in a bubble either').toBeNull();
+      expect(warn).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); vi.unstubAllGlobals(); }
   });
   it('a bake that throws once is never retried — the doomed sheet() call stays doomed (#687 review)', async () => {
     const shown: string[] = [];

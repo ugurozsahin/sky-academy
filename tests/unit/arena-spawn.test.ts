@@ -5,9 +5,9 @@
 // 2D context, spawns a wave and draws one frame, so the assertions are on the calls the canvas received.
 //
 // The stubs are hand-built rather than jsdom: jsdom is not a dependency of this project and `CLAUDE.md`'s
-// allowlist rail is the reason not to make it one for four tests. Only what `Arena` actually touches is
+// allowlist rail is the reason not to make it one for nine tests. Only what `Arena` actually touches is
 // faked, so a constructor that starts reaching for more of the DOM fails here loudly rather than silently.
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Arena, type Bubble } from '../../src/game/arena';
 
 /** The per-character factor #348 measured for Fredoka bold (`a three-quarter turn`, 109.6px at fs 9.6). */
@@ -137,5 +137,42 @@ describe('drawBubble puts every fitted line on the canvas (#348 / PR #467 B2)', 
     drawOnce(arena);
     expect(texts.length).toBeGreaterThan(0);
     for (const t of texts) expect(t.y).toBe(2);
+  });
+});
+
+describe('warnUnfitLabel says so out loud when a label does not fit (#348 / #495)', () => {
+  // #495: the fitted lines and state reach the bubble (tested above) but nothing pinned the diagnostic
+  // itself — `warnUnfitLabel`'s call site could be deleted, moved above the `state === 'ok'` guard, or
+  // passed the wrong fit, and the suite stayed green throughout. These two tests read `console.warn`
+  // directly, so they catch a call site removed as well as a guard inverted the wrong way.
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => { warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {}); });
+  afterEach(() => { warnSpy.mockRestore(); });
+
+  it('warns once for a label that does not fit its bubble', () => {
+    // A label this repo's tests have never spawned before (#348's own dedupe is keyed on label+radius+state,
+    // so reusing 'a three-quarter turn' here would silently inherit an earlier test's warning).
+    const label = 'a whole entire year and then a bit more besides';
+    arenaWith([label, '£2', '50p']);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain(label);
+  });
+
+  it('warns not at all for a wave of comfortable labels', () => {
+    arenaWith(["9 o'clock", '£2', '50p']);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  // #348 has a second call site: `reveal()` fits and warns for the "good answer" bubble it respawns when
+  // the wave never launched one. That call site is a separate deletion risk from `spawnWave`'s (above) and
+  // was still untested — reviewed independently by two agents on this PR.
+  it('warns once when reveal() respawns a "good answer" bubble that does not fit', () => {
+    const arena = new Arena(stubCanvas(ctx), { onHit: () => {}, onFall: () => {}, onWaveEnd: () => {} });
+    arenas.push(arena);
+    const label = 'this particular good answer will not fit any bubble either';
+    arena.reveal({ good: label });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain(label);
   });
 });

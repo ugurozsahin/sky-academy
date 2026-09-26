@@ -17,7 +17,7 @@ import { join } from 'node:path';
  * own contents (`sna-<12 hex>`, `dist/sw.js`) — it changes whenever any precached file differs in name, size
  * or bytes, so two builds with the same cache name are the same build for every purpose this check needs.
  */
-test('the e2e server is serving the build on disk here, not a leftover from another checkout (#123)', async ({ page, baseURL }) => {
+test('the e2e server is serving the build on disk here, not a leftover from another checkout (#123)', { tag: '@smoke' }, async ({ page, baseURL }) => {
   const distSwPath = join(process.cwd(), 'dist', 'sw.js');
   let localSw: string;
   try {

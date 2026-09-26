@@ -1,0 +1,31 @@
+/* #715: the sketchbook page. A developer page, not the game — but the stage reads the design-language tokens
+   off `:root`, so the palette below is the game's (`src/style.css` `:root`, pinned equal by a unit test): an
+   object approved here is lit and inked exactly as it will be in the game. */
+:root {
+  --ink: #0d1226;
+  --panel: rgba(16, 22, 48, .78);
+  --panel-2: rgba(28, 36, 74, .9);
+  --line: rgba(255,255,255,.12);
+  --text: #f4f6ff;
+  --muted: #9aa5cf;
+  --accent: #ffb020;
+  --accent-2: #3ec9ff;
+  --good: #66e07d;
+  --bad: #ff5f6d;
+  --glow: #3ec9ff;
+}
+html, body { margin: 0; height: 100%; background: var(--ink); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
+body { display: grid; grid-template-columns: 180px 1fr auto; gap: 16px; padding: 16px; box-sizing: border-box; min-height: 100%; }
+#list { display: flex; flex-direction: column; gap: 6px; }
+#list button { text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: inherit; cursor: pointer; }
+#list button.on { background: var(--panel-2); color: var(--text); border-color: var(--glow); }
+#stage { width: min(512px, 100%); aspect-ratio: 1; justify-self: center; align-self: start; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); }
+#stage canvas { display: block; width: 100%; height: 100%; }
+#beside { align-self: start; width: 220px; }
+#beside img { width: 100%; height: auto; display: block; }
+/* `?shot=1`: the canvas alone, at a fixed size, for the screenshot script. */
+body.shot { display: block; padding: 0; }
+body.shot #list, body.shot .lil-gui { display: none; }
+body.shot #stage { width: 512px; border: 0; border-radius: 0; }
+body.shot #beside { display: none; }
+@media (max-width: 800px) { body { grid-template-columns: 1fr; } #list { flex-direction: row; flex-wrap: wrap; } }

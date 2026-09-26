@@ -2,15 +2,17 @@
 paths:
   - "src/three/**"
   - "sketchbook.html"
+  - "vite.sketchbook.config.ts"
   - "tests/sketch/**"
+  - "scripts/sketch-shot.mjs"
+  - "scripts/sketch-gallery.mjs"
 ---
 
 # three.js 3-D (epic #713)
 
-Written before the tree exists (#716): #714 creates `src/three/` and #715 the sketchbook, and each drops its
-paths from the future-path allowances in `tests/unit/governance.test.ts` and `tests/unit/instructions.test.ts`
-as it lands. #715 also adds its scripts to the `paths:` above by name — the rail cannot resolve a glob such as
-`sketch-*.mjs` inside a file name, so none is declared here.
+Written before the tree existed (#716); #714 landed the tree, the flag and the rails, #715 the sketchbook. The
+scripts are listed above by name because the rail in `tests/unit/governance.test.ts` cannot resolve a glob
+inside a file name.
 
 - **Style**: `docs/decisions/010-3d-art-is-the-avatars-style.md` is binding; the `three-art` skill (gated
   to the `3d` label) is how an object is built to it.
@@ -23,14 +25,25 @@ as it lands. #715 also adds its scripts to the `paths:` above by name — the ra
     Its `enabled.ts` holds `threeEnabled()`; every mount point falls back to today's 2-D rendering.
   - `src/three/sketchbook/` — the sketchbook page (`sketchbook.html`, its own Vite input); never imported
     by anything under `src/`.
-- **Flag**: `threeEnabled()` = build-time `VITE_THREE` ∧ device capability ∧ parent setting ∧ not
-  `?three=off`. Quality tier is the stage's question, not the flag's. With the flag off the game is
-  pixel-identical to `main`; the mobile e2e runs with it off.
-- **Rails** (`tests/unit/guardrails.test.ts`, landed by #714): `three` imported only under `src/three/**`;
-  import direction as above; 250-line cap under `src/three/**`; the ratchet on existing files; no three.js
-  code in the main chunk; a `VITE_THREE=off` build has no three chunk; every registered object under its
-  declared budget at the `high` tier; no `Material` constructed under the objects tree — materials come
-  from the stage, which is what keeps every object in one style.
-- **Tests**: `npm run test:sketch` (the screenshot script as a Playwright project, #715) while a diff stays
-  inside the paths above; the game's e2e only when a diff reaches `src/ui` or `src/game`.
+- **Flag**: `threeEnabled()` = build-time `VITE_THREE` ∧ not `?three=off` ∧ the grown-ups' setting ∧ device
+  capability. Quality tier is the stage's question, not the flag's. With the flag off the game is
+  pixel-identical to `main`, and **with the flag off there is no 3-D object anywhere — the game as it was
+  before #684** (the owner, in session, 2026-09-25). The #684 spike (`src/three/mount/solids.ts`) obeys it:
+  its loader in `src/ui/solid.ts` asks `threeEnabled()` before it downloads the chunk (#753), and every mount
+  after it does the same. The game's e2e runs with 3-D off (epic decision 5): every game project starts
+  with the grown-ups' setting stored as `off` (`THREE_OFF` in `playwright.config.ts`, held by a rail in
+  `tests/unit/guardrails.test.ts`), and the one flag-on group, `3-D solids on the 3-D Shapes cards` in
+  `tests/e2e/game.spec.ts`, opts back to `auto` with `test.use`. A new 3-D mount's e2e joins that group.
+- **Rails** (`tests/unit/guardrails.test.ts`, landed by #714 and #715): `three` imported only under
+  `src/three/**`; import direction as above, resolved from the decoded specifier, not its spelling; 250-line
+  cap under `src/three/**`; the ratchet on existing files; no three.js code in the main chunk; a
+  `VITE_THREE=off` build has no three chunk; every registered object under its declared budget at the `high`
+  tier, defaults and every variant; no `Material` or `Light` constructed under the objects tree and no value
+  import of the stage from there — materials come from the stage, which is what keeps every object in one
+  style; the game carries nothing of the sketchbook (its own build, out of the precache, imported by nothing).
+- **Tests**: `npm run test:sketch` (the screenshot script as the `sketchbook` Playwright project, #715) is
+  what a pull request runs while its diff stays inside `src/three/stage/`, `src/three/objects/`, `src/three/sketchbook/`, `sketchbook.html`,
+  `vite.sketchbook.config.ts`, `tests/sketch/` and the two scripts above; a diff reaching `src/three/mount/`
+  or anything else under `src/` runs the game's e2e as before, and one touching both runs both. The routing
+  is `ci.yml`'s scope step, proved on its real script by `tests/unit/workflows.test.ts`.
 - **Files stay small**: 250 lines is the cap, not the target; split by part (geometry) and assembly.

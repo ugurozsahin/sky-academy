@@ -93,12 +93,19 @@ describe('waveOptsFor: the spawn-options bridge to tests/unit/sim.test.ts (#126)
     expect(waveOptsFor(q({ wide: true }), { labels: ['a', 'b'], speed: 2 }, 0).wide).toBe(true);
   });
 
-  it('is wide when any label is longer than three characters, even if the question does not say so', () => {
+  it('is wide when any label is longer than two characters, even if the question does not say so (#482)', () => {
     expect(waveOptsFor(q(), { labels: ['a', 'blaze'], speed: 2 }, 0).wide).toBe(true);
   });
 
-  it('is not wide when the question says nothing and every label is short', () => {
-    expect(waveOptsFor(q(), { labels: ['a', 'bee', 'cat'], speed: 2 }, 0).wide).toBe(false);
+  // #482: this fallback used to read `> 3`, one character stricter than `wordQ`'s own `> 2` — a three-letter
+  // label like 'cat' was wide by wordQ's count and narrow by this screen's, depending only on which generator
+  // wrote the card. Both now go through the shared `wideFor`, so 'bee'/'cat' (three characters) are wide here.
+  it('is wide once any label reaches three characters, the same boundary wordQ uses', () => {
+    expect(waveOptsFor(q(), { labels: ['a', 'bee', 'cat'], speed: 2 }, 0).wide).toBe(true);
+  });
+
+  it('is not wide when the question says nothing and every label is two characters or fewer', () => {
+    expect(waveOptsFor(q(), { labels: ['a', 'be', 'ox'], speed: 2 }, 0).wide).toBe(false);
   });
 
   it('carries the labels and speed straight from info, untouched', () => {

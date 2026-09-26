@@ -125,7 +125,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       onThrow: () => sfx.whoosh(),
       onLand: () => { (sliceFx[fx] ?? sfx.slice)(); haptic('slice'); },
       // The TNT blows up under the finger — never chase it with a star, or it would burst twice and reward the hit.
-      throwFor: b => b.label !== BOMB,
+      throwFor: b => b.label !== BOMB, isHazard: label => label === BOMB,   // #742: TNT never re-enters play as a "free chance"
       // #684: the rotating solid inside a 3-D Shapes bubble, tinted to the bubble's complement.
       labelArt: (label, colour, phase) => playSession.bubbleArt(label, colour, phase),
     });

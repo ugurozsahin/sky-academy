@@ -4,7 +4,16 @@ import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
-import { expectFitsViewport } from './viewport';   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
+import { expectFitsViewport } from './viewport';
+/** A context with nothing stored: the 3-D setting at its default, `auto` — the opt-out from `THREE_OFF`. */
+const NO_STORED_STATE = { cookies: [], origins: [] };   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
+
+// #748: the suite's game-speed multiplier, overridable so a CI trial can measure a candidate value without
+// editing this file. `Number('') || 4` would silently accept a typo'd override the same way #123's PW_PORT
+// review found for a port — an explicit, malformed PW_FAST is a loud startup error instead of a silent 4.
+const rawFast = process.env.PW_FAST;
+if (rawFast !== undefined && !/^\d+$/.test(rawFast)) throw new Error(`PW_FAST must be a plain integer, got "${rawFast}"`);
+export const FAST = rawFast ? Number(rawFast) : 4;
 
 declare global {
   interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
@@ -187,7 +196,7 @@ test.describe('Sky Ninja Academy', () => {
   // bubble flight time — so the suite runs in a fraction of real game time without touching the clock the
   // guard rails read. One test below overrides this to 1 to pin the holds to their curriculum values.
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => { window.__SNA_FAST = 4; });
+    await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
   });
 
   test('avatar selection is required, saved and shown on the home screen', async ({ page }) => {
@@ -468,7 +477,7 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
-  test('real swipe slices the correct bubble and scores', async ({ page }) => {
+  test('real swipe slices the correct bubble and scores', { tag: '@smoke' }, async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
     await swipeAnswer(page);
@@ -1457,7 +1466,7 @@ test.describe('Sky Ninja Academy', () => {
     await waitForTarget(page);
   });
 
-  test('letter tracing passes when the glyph is covered', async ({ page }) => {
+  test('letter tracing passes when the glyph is covered', { tag: '@smoke' }, async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-trace');
     await expect(page.locator('#trace')).toBeVisible();
@@ -2347,27 +2356,31 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.map')).toBeVisible();
   });
 
-  // #714: the 3-D setting is a device-wide choice on the grown-ups screen. Nothing in the game mounts behind it
-  // yet (the #684 spike predates the flag), so this pins the control and the stored value, not a 3-D effect.
-  test('For grown-ups: the 3-D pictures control stores its choice on the device (#714)', async ({ page }) => {
-    await seedPlayer(page, 'volt', 'Ada');
-    await openGrownUps(page);
-    const pick = page.locator('.p-three-pick .tab');
-    await expect(pick).toHaveCount(3);
-    await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'true');     // Auto, the default
-    await pick.nth(2).click();                                              // Off
-    await expect(pick.nth(2)).toHaveClass(/\bon\b/);
-    await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'false');
-    expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBe('off');
-    await page.reload();
-    await openGrownUps(page);
-    await expect(page.locator('.p-three-pick .tab').nth(2)).toHaveAttribute('aria-checked', 'true');
-    await page.locator('.p-three-pick .tab').nth(0).click();                // back to Auto: the slot is cleared, not written
-    expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBeNull();
+  // #714: the 3-D setting is a device-wide choice on the grown-ups screen; the #684 solids obey it (#753). This
+  // pins the control and the stored value. It starts from the default, `auto`, so it opts out of the game
+  // projects' stored `off` (`THREE_OFF`, #713 decision 5).
+  test.describe(() => {
+    test.use({ storageState: NO_STORED_STATE });
+    test('For grown-ups: the 3-D pictures control stores its choice on the device (#714)', async ({ page }) => {
+      await seedPlayer(page, 'volt', 'Ada');
+      await openGrownUps(page);
+      const pick = page.locator('.p-three-pick .tab');
+      await expect(pick).toHaveCount(3);
+      await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'true');     // Auto, the default
+      await pick.nth(2).click();                                              // Off
+      await expect(pick.nth(2)).toHaveClass(/\bon\b/);
+      await expect(pick.nth(0)).toHaveAttribute('aria-checked', 'false');
+      expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBe('off');
+      await page.reload();
+      await openGrownUps(page);
+      await expect(page.locator('.p-three-pick .tab').nth(2)).toHaveAttribute('aria-checked', 'true');
+      await page.locator('.p-three-pick .tab').nth(0).click();                // back to Auto: the slot is cleared, not written
+      expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBeNull();
+    });
   });
 
   // #64: reinstalling the APK wipes localStorage, so the grown-up needs a way to carry the save across.
-  test('For grown-ups: the save code copies out and restores back (#64)', async ({ page }) => {
+  test('For grown-ups: the save code copies out and restores back (#64)', { tag: '@smoke' }, async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada');
     await openGrownUps(page);
 
@@ -2487,7 +2500,7 @@ test.describe('Sky Ninja Academy', () => {
 test.describe('a corrupted save does not brick the app (#95)', () => {
   // This describe block sits outside the main one (line 167), so it does not inherit its `beforeEach` — without
   // this, the full-mission test below ran at 1× speed instead of the suite's 4×, ~3x slower for no reason.
-  test.beforeEach(async ({ page }) => { await page.addInitScript(() => { window.__SNA_FAST = 4; }); });
+  test.beforeEach(async ({ page }) => { await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST); });
 
   test('guard rail: the map, an island, and the grown-ups dashboard all still render on a null-shaped save', async ({ page }) => {
     // pageerror only — an uncaught exception is the actual failure mode this rail guards (d.progress[id]
@@ -3474,7 +3487,18 @@ test.describe('ninjas on this device (#20 slice 3)', () => {
  * (the cuboid) at `rng() = 0.9`. Stage 1 is cleared with the real rng, then the session's rng is pinned before
  * "Next" so stage 2's first card is deterministic. `rng` is TS-private on `Session`, hence the cast.
  */
+// #713 decision 5: every game project starts with the grown-ups' 3-D setting stored as `off` (`THREE_OFF` in
+// playwright.config.ts). Proved here, outside any override, so a config that stops applying it fails loudly.
+test('the game projects start with 3-D off, as a grown-up would set it (#713 decision 5)', async ({ page }) => {
+  await page.goto('/');
+  expect(await page.evaluate(() => localStorage.getItem('sna:three'))).toBe('off');
+});
+
 test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
+  // The one flag-on group (#713 decision 5): the game projects start with 3-D off (`THREE_OFF` in
+  // playwright.config.ts); these tests are about the 3-D path, so they start from the default, `auto`, which
+  // headless Chromium passes (WebGL2, enough memory, no reduced motion).
+  test.use({ storageState: NO_STORED_STATE });
   test('a Year 2 shapes card shows a rotating WebGL solid where the emoji was, and nothing else does', async ({ page }) => {
     test.setTimeout(90_000);
     await seedPlayer(page);
@@ -3494,7 +3518,7 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     expect(await state(page)).toMatchObject({ prompt: 'How many flat faces has a cuboid?' });
     await page.waitForFunction(() => (window.__sna.solid()?.frames ?? 0) > 5, null, { timeout: 20_000 });
     const solid = await page.evaluate(() => window.__sna.solid());
-    expect(solid).toMatchObject({ name: 'cuboid', webgl: true, error: null });
+    expect(solid).toMatchObject({ name: 'cuboid', webgl: true, error: null, beat: 'pop' });   // #740: it pops in
     expect(chunks, 'the card reuses the screen\'s one renderer: no second download, no second GL context').toHaveLength(1);
     // The canvas replaced the emoji card rather than sitting beside it, and it keeps drawing.
     expect(await page.locator('#vis .wordcard').count()).toBe(0);
@@ -3520,6 +3544,9 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     expect(await page.evaluate(() => document.querySelector('.qcard')!.classList.contains('pulse'))).toBe(true);
     expect(await page.evaluate(() => window.__sna.solid()!.frames)).toBeGreaterThan(spun);
+    // #740: a right answer cheers the card's solid. Answered and read in one step, before the next question can
+    // swap the card and pop a new solid in.
+    expect(await page.evaluate(() => { const hit = window.__sna.answer(); return { hit, beat: window.__sna.solid()?.beat }; })).toEqual({ hit: true, beat: 'cheer' });
   });
 
   test('guard rail: leaving the play screen releases the solid\'s WebGL context with the arena', async ({ page }) => {
@@ -3570,6 +3597,35 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     // Slicing still keys on the glyph label, art or not: the next wave is answered through the usual hook.
     await waitForTarget(page);
     expect(await answer(page)).toBe(true);
+  });
+
+  // The owner, in session, 2026-09-25: "with the flag off I want no 3-D objects at all — back to how it was".
+  // Switched off the way a grown-up does it (the Parents screen's setting, `sna:three`), a 3-D Shapes mission is
+  // the pre-#684 game: emoji in the bubbles, the emoji word card, and the three chunk never downloaded.
+  test('with 3-D switched off by a grown-up, the 3-D Shapes bubbles and card keep their emoji and never load three', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.addInitScript(() => localStorage.setItem('sna:three', 'off'));
+    await seedPlayer(page);
+    const chunks: string[] = [];
+    page.on('request', r => { if (/solids-.*\.js/.test(r.url())) chunks.push(r.url()); });
+    await startTopic(page, 'year2', 'y2-shapes');
+    // Stage 1's bubbles are shapes: with the flag on they would spin solids; off, the slot says why not.
+    await page.waitForFunction(() => window.__sna.solidArt()?.error === 'flag-off', null, { timeout: 10_000 });
+    expect(await page.evaluate(() => window.__sna.solidArt())).toEqual({ ready: [], draws: 0, error: 'flag-off' });
+    const perStage = await page.evaluate(() => window.__sna.session.perStage);
+    await answerAll(page, perStage);
+    await expect(page.locator('.celebrate')).toBeVisible();
+    await page.evaluate(() => { (window.__sna.session as any).rng = () => 0.9; });
+    await page.click('#next');
+    await page.waitForFunction(() => window.__sna.state().stage === 2);
+    expect(await state(page)).toMatchObject({ prompt: 'How many flat faces has a cuboid?' });
+    // The card is the emoji word card, as before #684 — no canvas in its place.
+    await expect(page.locator('#vis .wordcard')).toBeVisible();
+    expect(await page.locator('#vis canvas').count()).toBe(0);
+    expect(await page.evaluate(() => window.__sna.solid())).toMatchObject({ name: 'cuboid', webgl: false, error: 'flag-off' });
+    expect(chunks, 'the three chunk is never downloaded with the flag off').toEqual([]);
+    // With no solid to wait on, the wave may not have launched the right bubble yet: poll until it can be hit.
+    await expect.poll(() => answer(page), { timeout: 15_000 }).toBe(true);
   });
 
   test('a 2-D shapes card keeps its emoji and never loads three', async ({ page }) => {

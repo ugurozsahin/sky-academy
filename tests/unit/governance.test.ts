@@ -446,7 +446,12 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     // somewhere earlier — a sentence that mentions review agents in passing and then tells a run to fire
     // playwright immediately used to satisfy a bare indexOf ordering check (#500 round 1, B1).
     const agents = step2.indexOf('run the three vendored review agents on the diff');
-    const browser = step2.indexOf('playwright test');
+    // Any of these three spellings counts as the browser command, and the EARLIEST one is what matters —
+    // `npm run test:e2e` and `npm run test:all` (which runs it: package.json's own `test && build && test:e2e`)
+    // are both CLAUDE.md's own documented alternatives to `npx playwright test`, and a STEP 2 that warms the
+    // suite that way before the agents, then still says `playwright test` later to satisfy this anchor, reran
+    // the suite first exactly as before, just under another name (#504 round 1: test:e2e; round 2: test:all).
+    const browser = step2.search(/playwright test|npm run test:e2e|npm run test:all/);
     expect(agents, 'STEP 2 must tell a run to RUN the three vendored review agents on the diff, not merely mention agents in passing').toBeGreaterThan(-1);
     expect(browser, 'STEP 2 must still tell a run to run the suite before it merges — this is an ordering rail, not a deletion').toBeGreaterThan(-1);
     expect(browser, 'STEP 2 runs the suite before the agents again: about half of those runs are on a head the same review then invalidates (#499)')
@@ -473,8 +478,11 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     const parts = s2.split('```');
     const first = parts[1];
     expect(first, '§2 must still open with a runnable block').toBeTruthy();
+    // Any of these three is a browser command here, not just "playwright" — `npm run test:e2e` and
+    // `npm run test:all` are both CLAUDE.md's own documented alternatives, and each is exactly as much #499
+    // restored (#504 round 1: test:e2e; round 2: test:all).
     expect(first, "§2's first block is what runs before the diff is read — it must be the seconds-long checks, not the suite (#499)")
-      .not.toMatch(/playwright/);
+      .not.toMatch(/playwright|npm run test:e2e|npm run test:all/);
     expect(first, 'and it must still be the real cheap three, or the block has been gutted rather than reordered').toMatch(/npm test/);
     // Exactly two fenced command blocks, and the text BETWEEN them must be what governs the second one —
     // not merely "playwright" appearing somewhere later in §2. A §2 that puts the browser block straight
@@ -2803,9 +2811,7 @@ describe('.claude/rules/ files are path-scoped, and every path is real (#101)', 
   // whose path exists fails, and one no rule file declares any more fails below. Only a shape `exists()` can
   // resolve once the path is real belongs here — a directory, a file, or a trailing `**` — never a glob inside
   // a file name (`scripts/sketch-*.mjs`), which `exists()` reads as absent forever and so could never expire.
-  const FUTURE_PATHS: Record<string, string> = {
-    'sketchbook.html': '#715', 'tests/sketch/**': '#715',
-  };
+  const FUTURE_PATHS: Record<string, string> = {};   // empty since #715 landed: the next future path a rule declares goes here with its issue
   const declaredPaths = (file: string): string[] => {
     const front = /^---\n([\s\S]*?)\n---\n/.exec(readFileSync(new URL(`.claude/rules/${file}`, root), 'utf8'));
     return front ? pathsList(front[1]) ?? [] : [];
@@ -3549,6 +3555,27 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
     expect(layer2, 'and a finding whose evidence moved has to go').toMatch(/drop the finding/);
     expect(layer2, 'the reason: the three ways a summarised context gets a mark wrong')
       .toMatch(/the wrong pull request, a stale head, and a finding whose evidence has evaporated/);
+  });
+
+  // #493: `layer2` is bounded by `end: null`, the same open-tailed shape PR #469 round 4/5 found and fixed for
+  // `attack`/`bodyCheck` in the #466 block below — nothing pinned `layer2`'s own trailing sentence, so deleting
+  // a sentence from inside it and padding the dead zone before `s6()`'s own end anchor ('**Merge** — squash
+  // into `main`') is invisible to the `min: 200` floor above, which only measures length. This pins `layer2`'s
+  // own last sentence as the window's literal last content, the same fix, in this window's own home rather than
+  // folded into the #466 block that does not read this file's `layer2`. Checked against `s6()` itself, not a
+  // second `slice()` call rebuilding `layer2` — `layer2` is `end: null`, so it is `s6()`'s own literal tail, and
+  // `attackEnd`/`bodyCheckEnd` below check their *section* (`s4()`/`s3()`) the same way, not `attack()`/`bodyCheck()`.
+  const layer2End = '`docs/REVIEWER-PROMPT.md` STEP 2 already asks the first half of this '
+    + '("still waiting?"); this is the other half (#326).';
+  it('layer 2 ends where its own last sentence ends, not wherever §6 does', () => {
+    const count = (text: string, needle: string) => text.split(needle).length - 1;
+    expect(s6().trim().endsWith(layer2End),
+      'text appended after layer 2\'s own last sentence pads the floor above without tripping it')
+      .toBe(true);
+    expect(count(s6(), layer2End),
+      'layer2End appears more than once — a duplicate pasted after filler would satisfy the endsWith check above '
+      + 'while the filler still pads the size floor, the same gap PR #469 round 5 found for attack/bodyCheck')
+      .toBe(1);
   });
 
   it('layer 3: the rule, the mechanism, all three reasons and the carve-out — inside §4', () => {

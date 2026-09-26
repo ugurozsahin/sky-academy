@@ -27,9 +27,13 @@ export function listFiles(dir, readdir = readdirSync) {
   return walk('').sort();
 }
 
-/** The precache list: everything the build emitted, minus the worker itself. */
+/** #715: the sketchbook is built into this folder under `dist/` by vite.sketchbook.config.ts. A developer
+ *  page with its own copy of three.js — never the child's to download offline. */
+const SKETCHBOOK = 'sketchbook/';
+
+/** The precache list: everything the build emitted, minus the worker itself and the sketchbook. */
 export function precacheList(files) {
-  return files.filter(f => !EXCLUDE.has(f)).sort();
+  return files.filter(f => !EXCLUDE.has(f) && !f.startsWith(SKETCHBOOK)).sort();
 }
 
 /**

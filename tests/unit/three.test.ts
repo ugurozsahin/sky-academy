@@ -3,13 +3,14 @@
  * stage's material factories in Node (three.js geometry and materials need no renderer), and the one key the
  * grown-ups screen writes and the mount reads without sharing a module.
  */
-import { BackSide, BoxGeometry, BufferGeometry, Color, HemisphereLight, InstancedMesh, LineSegments, Mesh, MeshToonMaterial, NearestFilter, Scene, SphereGeometry, Sprite } from 'three';
+import { BackSide, BoxGeometry, BufferGeometry, Color, HemisphereLight, InstancedMesh, LineSegments, Mesh, MeshToonMaterial, NearestFilter, Scene, SphereGeometry, Sprite, Vector3, type Object3D } from 'three';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SHAPES_3D } from '../../src/curriculum/util';
 import { setThreeSetting, threeSetting, THREE_SETTINGS } from '../../src/storage';
 import { BUDGET_CEILING, defaultsOf, defineObject, n, OBJECTS } from '../../src/three/objects';
 import { createStage, hullsOf, measure } from '../../src/three/stage';
 import { offsetAlongNormals, outline, outlineMaterial, OUTLINE_NAME, OUTLINE_WIDTH } from '../../src/three/stage/outline';
-import { CAMERA_FOV, createRig, resize } from '../../src/three/stage/rig';
+import { applyTier, CAMERA_FOV, createRig, resize, type TierTarget } from '../../src/three/stage/rig';
 import { LOW_TIER_CORES, LOW_TIER_MEMORY, pickTier, readTierEnv, TIERS } from '../../src/three/stage/tiers';
 import { gradientMap, tokenColour, toonMaterial, TONES } from '../../src/three/stage/toon';
 import { capable, MIN_DEVICE_MEMORY, parseSetting, probeWebgl2, queryOff, readEnv, resetProbe, threeEnabled, THREE_SETTING_KEY, type BrowserLike, type ThreeEnv } from '../../src/three/mount/enabled';
@@ -217,6 +218,21 @@ describe('rig — camera, lights and background', () => {
     expect(setSize).toHaveBeenCalledWith(300, 150, false);
     expect(rig.camera.aspect).toBeCloseTo(300.4 / 150);
   });
+  // Round 2 of #715's review: the sketchbook set the pixel-ratio cap once, from a hardcoded `high`, so a low
+  // frame was never rendered at low's cost. `applyTier` is what construction and a tier change both call.
+  it('applyTier caps the pixel ratio and sets the shadow map for the tier, and can be applied again', () => {
+    const setPixelRatio = vi.fn();
+    const r: TierTarget = { setPixelRatio, shadowMap: { enabled: true } };
+    applyTier(r, 'low', 3);
+    expect(setPixelRatio).toHaveBeenLastCalledWith(TIERS.low.maxPixelRatio);
+    expect(r.shadowMap.enabled).toBe(false);
+    applyTier(r, 'high', 3);
+    expect(setPixelRatio).toHaveBeenLastCalledWith(TIERS.high.maxPixelRatio);
+    expect(r.shadowMap.enabled).toBe(true);
+    applyTier(r, 'high', 1);   // a 1× screen is never upscaled to the cap
+    expect(setPixelRatio).toHaveBeenLastCalledWith(1);
+    expect(TIERS.low.maxPixelRatio, 'the two caps differ, or the test above proves nothing').toBeLessThan(TIERS.high.maxPixelRatio);
+  });
 });
 
 describe('stage — the factories an object builds with', () => {
@@ -256,8 +272,8 @@ describe('objects registry — the contract the first object builds to', () => {
     expect(() => n(3, 1, 2)).toThrow(/inside the range/);
     expect(defaultsOf({ a: n(1, 0, 2), b: n(5, 5, 9) })).toEqual({ a: 1, b: 5 });
   });
-  it('starts empty, under a ceiling the skill states', () => {
-    expect(OBJECTS).toEqual([]);
+  it('holds the style probe (#717) and the 3-D Shapes solids (#684), under a ceiling the skill states', () => {
+    expect(OBJECTS.map(o => o.name)).toEqual(['hammer', 'cube', 'cuboid', 'sphere', 'cylinder', 'cone', 'pyramid']);
     expect(BUDGET_CEILING).toEqual({ triangles: 2000, drawCalls: 8 });
   });
   it('defineObject infers the schema, so a variant is a full parameter set at compile time and the spec comes back unchanged', () => {
@@ -273,5 +289,46 @@ describe('objects registry — the contract the first object builds to', () => {
     expect(measure(spec.build(defaultsOf(spec.params), stage))).toEqual({ triangles: 12, drawCalls: 1 });
     // @ts-expect-error — a partial variant does not type-check through defineObject
     defineObject({ name: 'x', avatar: 'kai', params: { a: n(1, 0, 2), b: n(1, 0, 2) }, variants: { half: { a: 1 } }, budget: { triangles: 0, drawCalls: 0 }, build: () => new Scene() });
+  });
+});
+
+/**
+ * #684: a child counts a solid's faces on the card ("identify and describe the properties of 3-D shapes"), and
+ * the style eases every edge (decision record 010, item 4) — so easing must never cost a face. A flat face is
+ * a set of triangles sharing one plane's normal; a curved side splits into many thin strips, none of them big.
+ * Each solid must show exactly as many big flat faces as `SHAPES_3D` says it has, at every variant.
+ */
+describe('the solids keep the flat faces the curriculum counts (#684)', () => {
+  /** Big planar regions: triangles grouped by their geometric normal, kept when a group is over 5 % of the area. */
+  function flatFaces(root: Object3D): number {
+    const areas = new Map<string, number>();
+    let total = 0;
+    root.updateMatrixWorld(true);
+    root.traverse((o) => {
+      if (!(o instanceof Mesh) || o.name === 'outline') return;
+      const pos = o.geometry.getAttribute('position'), idx = o.geometry.index;
+      const count = idx ? idx.count : pos.count;
+      const v = [new Vector3(), new Vector3(), new Vector3()];
+      for (let t = 0; t < count; t += 3) {
+        for (let k = 0; k < 3; k++) v[k].fromBufferAttribute(pos, idx ? idx.getX(t + k) : t + k);
+        const cross = new Vector3().subVectors(v[1], v[0]).cross(new Vector3().subVectors(v[2], v[0]));
+        const area = cross.length() / 2;
+        if (area < 1e-9) continue;
+        const nrm = cross.normalize();
+        const key = [nrm.x, nrm.y, nrm.z].map(c => c.toFixed(2)).join(',');
+        areas.set(key, (areas.get(key) ?? 0) + area);
+        total += area;
+      }
+    });
+    return [...areas.values()].filter(a => a > total * 0.05).length;
+  }
+  const solids = OBJECTS.filter(o => SHAPES_3D.some(s => s[1] === o.name));
+  it('covers every solid SHAPES_3D names', () => {
+    expect(solids.map(o => o.name).sort()).toEqual(SHAPES_3D.map(s => s[1]).sort());
+  });
+  it.each(solids.map(o => [o.name, o] as const))('%s has as many flat faces as SHAPES_3D says, at every variant', (name, o) => {
+    const flat = SHAPES_3D.find(s => s[1] === name)![2].flat;
+    for (const p of [defaultsOf(o.params), ...Object.values(o.variants)])
+      expect(flatFaces(o.build(p, createStage('high', () => '#0d1226'))), `${name} at bevel ${p.bevel}`).toBe(flat);
   });
 });

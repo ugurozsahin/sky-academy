@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { workflowFiles } from './helpers/sources';
+import { e2eSpecFiles, workflowFiles } from './helpers/sources';
 
 /**
  * WORKFLOW RAILS (#321, split out of `guardrails.test.ts`) — everything that reads `.github/workflows/**`
@@ -72,28 +75,64 @@ describe('the e2e server proves it is serving the build on disk, not a leftover 
       .toMatch(/\)\.toBe\(local\)/);
   });
 
-  // Review of this PR (#187): the original version of this rail compared two string literals defined inside
-  // itself ('00-build-identity.spec.ts' against /viewport\.spec\.ts/) — true by construction, and green
-  // whatever `playwright.config.ts` actually declares. This reads the REAL `testIgnore`/`testMatch` patterns
-  // out of the config text and tests the real filename against them, the way the #116 tablet rail above does.
-  it('the identity spec is not excluded from either default project, by the config\'s ACTUAL patterns (#123)', () => {
+  // #486: at worker count >1 (#483) the identity spec sorting first no longer means it RUNS first — a
+  // second worker starts `game.spec.ts` in the same instant, so the one clear message it exists to print
+  // arrives alongside the fifty mysterious ones instead of before them. The fix is a `setup` project every
+  // other project `dependencies` on: nothing starts until it passes, at any worker count. This test replaces
+  // the old #123-era one, whose invariant it inverts — the identity spec used to have to run INSIDE
+  // `mobile`/`desktop`'s own leg; it must now run OUTSIDE it, exactly once, in `setup`. It reads the
+  // RESOLVED config object (the way the #483 rail above it does), not the source text, so a glob string or
+  // an array of patterns is judged the way Playwright itself would judge it, not the way one particular
+  // spelling of a regex would print.
+  it('the identity spec runs once, in a setup project every leg depends on, not inside the legs themselves (#486)', async () => {
+    const cfg = (await import('../../playwright.config')).default;
     const filename = '00-build-identity.spec.ts';
-    const parts = config.slice(config.indexOf('projects:')).split(/(?=\{\s*name:\s*')/).filter(p => /^\{\s*name:\s*'/.test(p));
-    expect(parts.length, 'playwright.config.ts must declare its projects, and be read from disk').toBeGreaterThanOrEqual(4);
-    const defaultProjects = parts.filter(p => /name:\s*'(mobile|desktop)'/.test(p));
-    expect(defaultProjects.length, 'both default projects must be found by name').toBe(2);
-    for (const p of defaultProjects) {
-      const name = p.match(/name:\s*'([^']+)'/)![1];
-      const ignore = p.match(/testIgnore:\s*\/([^/]+)\//);
-      if (ignore) {
-        expect(new RegExp(ignore[1]).test(filename), `'${name}''s real testIgnore (/${ignore[1]}/) must not exclude the identity spec`)
-          .toBe(false);
-      }
-      const match = p.match(/testMatch:\s*\/([^/]+)\//);
-      if (match) {
-        expect(new RegExp(match[1]).test(filename), `'${name}' declares testMatch — the identity spec must match it, or it never runs there`)
-          .toBe(true);
-      }
+    const byName = (n: string) => cfg.projects?.find((proj) => proj.name === n);
+    // This repository's own convention (every testMatch/testIgnore in the file today) is a bare RegExp or an
+    // array of them, never a glob string — so that is the only shape this helper judges. A glob string would
+    // silently read as "no pattern" if merely filtered out (type-design-analyzer review of this PR), so an
+    // unexpected one throws instead of letting this rail's verdict pass on a shape it never actually checked.
+    const asRegexes = (pattern: string | RegExp | (string | RegExp)[] | undefined): RegExp[] => {
+      const list = Array.isArray(pattern) ? pattern : pattern ? [pattern] : [];
+      const glob = list.find((p): p is string => typeof p === 'string');
+      if (glob !== undefined) throw new Error(`this rail only judges RegExp testMatch/testIgnore, not a glob string ('${glob}') — extend it before trusting its verdict here`);
+      return list as RegExp[];
+    };
+    const runsHere = (proj: ReturnType<typeof byName>, file: string) => {
+      const ignore = asRegexes(proj?.testIgnore);
+      if (ignore.some((r) => r.test(file))) return false;
+      const match = asRegexes(proj?.testMatch);
+      return match.length ? match.some((r) => r.test(file)) : true;   // no testMatch: Playwright's own "everything in testDir"
+    };
+
+    const setup = byName('setup');
+    expect(setup, 'a `setup` project must exist to run the identity spec before every other project (#486)').toBeTruthy();
+    expect(runsHere(setup, filename), '`setup`\'s own patterns must actually select the identity spec, or nothing runs it at all')
+      .toBe(true);
+    // pr-test-analyzer review of this PR: a widened (or dropped) `testMatch` would still pass the assertion
+    // above while quietly turning `setup` into a second full e2e leg every project now depends on — the exact
+    // per-night cost #116's tablet rail already guards its own narrow spec against, with nothing here yet
+    // doing the same for this one. Checked against the REAL spec files on disk, not a hard-coded guess at
+    // their names, so a future spec file is covered the moment it exists.
+    const specFiles = readdirSync(new URL('../../tests/e2e/', import.meta.url)).filter((f) => f.endsWith('.spec.ts') && f !== filename);
+    expect(specFiles.length, 'tests/e2e/ must still have other spec files, or this exclusivity check covers nothing')
+      .toBeGreaterThan(0);
+    for (const other of specFiles) {
+      expect(runsHere(setup, other), `'setup' must run the identity spec ONLY — it also selects '${other}', which ` +
+        'would make every project a second, unrestricted e2e leg deep (#486)').toBe(false);
+    }
+
+    for (const name of ['mobile', 'desktop']) {
+      const p = byName(name);
+      expect(p, `'${name}' must still be declared`).toBeTruthy();
+      expect(runsHere(p, filename), `'${name}' must no longer run the identity spec itself — 'setup' already does, and running it ` +
+        'twice is dead weight the nightly pays for every night (#486)').toBe(false);
+      expect(p?.dependencies ?? [], `'${name}' must depend on 'setup', or nothing stops it starting before the identity ` +
+        'check has run — exactly the #486 regression this project exists to close').toContain('setup');
+    }
+    for (const name of ['tablet', 'tablet-landscape', 'sketchbook']) {   // the sketchbook (#715) is a leg on the same preview
+      expect(byName(name)?.dependencies ?? [], `'${name}' must depend on 'setup' too, the same as the other legs (#486)`)
+        .toContain('setup');
     }
   });
 });
@@ -151,5 +190,155 @@ describe('no workflow pins an action major GitHub has deprecated for Node 20 (#1
       expect(w, `${f} must exist under .github/workflows/, or this rail checks the wrong directory`).toBeDefined();
       expect(w!.text, `${f} must still check out the repo`).toMatch(/actions\/checkout@v\d+/);
     }
+  });
+});
+
+
+/**
+ * #715 (epic #713 decision 5): the scope step now answers two questions — does the diff reach the game
+ * (`e2e`), and does it touch the sketchbook (`sketch`) — and the two must not be confused: a diff confined to
+ * `src/three/stage|objects|sketchbook/`, `sketchbook.html`, `tests/sketch/` or the two sketch scripts runs the
+ * sketchbook's one spec and not the game's e2e; `src/three/mount/` is the game's surface and stays a game
+ * path; a diff touching both runs both; a diff the step cannot read runs both. Rather than re-implement the
+ * shell in TypeScript and test the copy (#129's failure), this runs the step's REAL script with a `git` shim
+ * on PATH that prints the file list — the same text GitHub would feed it.
+ */
+describe('the scope step routes a diff to e2e, to the sketchbook, or to neither (#715)', () => {
+  const yml = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const lines = yml.split('\n');
+  const at = lines.findIndex(l => l.includes('id: scope'));
+  const runAt = lines.findIndex((l, i) => i > at && /^\s*run:\s*\|\s*$/.test(l));
+  expect(at, 'ci.yml must still have the scope step').toBeGreaterThan(-1);
+  expect(runAt, 'the scope step must be a `run: |` block').toBeGreaterThan(at);
+  const indent = /^\s*/.exec(lines[runAt + 1])![0].length;
+  let end = runAt + 1;
+  while (end < lines.length && (lines[end].trim() === '' || /^\s*/.exec(lines[end])![0].length >= indent)) end++;
+  const script = lines.slice(runAt + 1, end).map(l => l.slice(indent)).join('\n');
+
+  /** Run the step against `files` (or a git that fails), and read what it wrote to GITHUB_OUTPUT. */
+  const scope = (files: string[] | 'git-fails', event = 'pull_request') => {
+    const dir = mkdtempSync(join(tmpdir(), 'sna-scope-'));
+    try {
+      const shim = join(dir, 'git');
+      writeFileSync(shim, files === 'git-fails' ? '#!/bin/sh\necho "fatal: bad object" >&2\nexit 128\n' : `#!/bin/sh\nprintf '%s\\n' ${files.map(f => `'${f}'`).join(' ')}\n`);
+      chmodSync(shim, 0o755);
+      const out = join(dir, 'out'), summary = join(dir, 'summary');
+      writeFileSync(out, ''); writeFileSync(summary, '');
+      execFileSync('bash', ['-c', script], { stdio: 'pipe', env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, BASE: 'b', HEAD: 'h', EVENT: event, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: summary } });
+      const kv = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').filter(Boolean).map(l => l.split('=') as [string, string]));
+      return { e2e: kv.e2e, sketch: kv.sketch, summary: readFileSync(summary, 'utf8') };
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  };
+
+  it('the script was extracted whole, and the shim is what it calls', () => {
+    expect(script).toContain('GAME_PATHS=');
+    expect(script).toContain('SKETCH_PATHS=');
+    expect(script).toContain('git diff --name-only');
+  });
+  // One file per case where the claim is about that file: a two-file case proves only its union (silent-failure review).
+  it.each([
+    [['src/three/stage/toon.ts'], { e2e: 'false', sketch: 'true' }],
+    [['src/three/objects/index.ts'], { e2e: 'false', sketch: 'true' }],
+    [['src/three/sketchbook/main.ts'], { e2e: 'false', sketch: 'true' }],
+    [['sketchbook.html'], { e2e: 'false', sketch: 'true' }],
+    [['vite.sketchbook.config.ts'], { e2e: 'false', sketch: 'true' }],   // a `base:` change 404s the page under preview: the sketch spec is what catches it
+    [['tests/sketch/shot.spec.ts'], { e2e: 'false', sketch: 'true' }],
+    [['scripts/sketch-shot.mjs'], { e2e: 'false', sketch: 'true' }],      // one file each: a typo in one name inside SKETCH_PATHS must not hide behind the other
+    [['scripts/sketch-gallery.mjs'], { e2e: 'false', sketch: 'true' }],
+    [['src/ui/parents.ts'], { e2e: 'true', sketch: 'false' }],
+    [['src/three/mount/enabled.ts'], { e2e: 'true', sketch: 'false' }],   // the game's one surface into src/three/
+    [['playwright.config.ts'], { e2e: 'true', sketch: 'false' }],
+    [['package.json'], { e2e: 'true', sketch: 'false' }],
+    [['src/three/objects/index.ts', 'src/ui/play.ts'], { e2e: 'true', sketch: 'true' }],
+    [['docs/ROUTINE-PROMPT.md', 'CLAUDE.md'], { e2e: 'false', sketch: 'false' }],
+  ])('%j → %j', (files, want) => {
+    expect(scope(files)).toMatchObject(want);
+  });
+  it('a diff that cannot be read runs both; a non-pull-request event runs e2e and leaves the sketchbook to the full matrix', () => {
+    expect(scope('git-fails')).toMatchObject({ e2e: 'true', sketch: 'true' });
+    expect(scope(['src/three/stage/toon.ts'], 'schedule')).toMatchObject({ e2e: 'true', sketch: 'false' });
+  });
+  it('the summary says which files put the sketchbook in, and which the game', () => {
+    const r = scope(['src/three/objects/index.ts', 'src/ui/play.ts']);
+    const [e2e, sketch] = r.summary.split('### sketchbook');
+    expect(sketch, 'the sketchbook section names the sketchbook file').toMatch(/\*\*running\*\*[\s\S]*- src\/three\/objects\/index\.ts/);
+    expect(e2e).toMatch(/e2e: \*\*running\*\*[\s\S]*- src\/ui\/play\.ts/);
+    expect(e2e, 'a sketchbook file is not what puts e2e on').not.toMatch(/- src\/three\/objects/);
+    const only = scope(['src/three/stage/toon.ts']).summary;
+    expect(only).toMatch(/### e2e: \*\*skipped\*\*/);
+    expect(only).toMatch(/### sketchbook: \*\*running\*\*/);
+  });
+
+  // The output is consumed, or the whole routing above is decoration: the sketchbook step exists, runs on a
+  // pull request when the scope step says so, and the two browser-setup steps run for it too — delete the
+  // step and the tree would otherwise stay green with the spec running on the nightly alone (pr-test-analyzer).
+  it('a Sketchbook step consumes the sketch output, and the browser-setup steps read it as well', () => {
+    const stepOf = (needle: string) => {
+      const at = lines.findIndex(l => l.includes(needle));
+      expect(at, `ci.yml must have a step containing ${needle}`).toBeGreaterThan(-1);
+      let from = at; while (from >= 0 && !/^\s*- /.test(lines[from])) from--;
+      const dash = lines[from].indexOf('- '), sibling = new RegExp(`^\\s{${dash}}- `);
+      let to = from + 1; while (to < lines.length && !sibling.test(lines[to])) to++;
+      return lines.slice(from, to).join('\n');
+    };
+    const sketchStep = stepOf('playwright test --project=sketchbook');
+    expect(sketchStep).toMatch(/if:.*github\.event_name == 'pull_request'/);
+    expect(sketchStep).toMatch(/if:.*steps\.scope\.outputs\.sketch == 'true'/);
+    expect(sketchStep, 'one project, no ternary — the nightly carries it through the full matrix').toMatch(/run:\s*npx playwright test --project=sketchbook\s*$/m);
+    for (const needle of ['playwright install', 'sources.list.d/google-chrome'])
+      expect(stepOf(needle), `the ${needle} step must also run for a sketch-only pull request`).toMatch(/steps\.scope\.outputs\.sketch == 'true'/);
+    expect(lines.find(l => /playwright test \$\{\{/.test(l)), 'the full-matrix arm carries the sketchbook project').toMatch(/--project=sketchbook'/);
+  });
+});
+
+/**
+ * #750: a `@smoke` subset for a fast pre-push signal. The class this rail guards against is #750's own
+ * naming of it — a `--grep` that matches nothing exits 0 with `0 passed`, which reads exactly like a pass.
+ * `--list` resolves the real config (projects, `dependencies`, `testIgnore`) without launching a browser or
+ * the webServer (proven below by wall-clock: it returns in about a second), so this asks Playwright itself
+ * what `npm run test:e2e:smoke` would run rather than re-implementing its project-resolution rules against a
+ * `@smoke` grep of the source text, which would drift the moment `playwright.config.ts` does.
+ */
+describe('the @smoke e2e subset is non-empty and actually reachable by npm run test:e2e:smoke (#750)', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+
+  it('package.json carries the exact script #750 specifies', () => {
+    expect(pkg.scripts['test:e2e:smoke']).toBe('playwright test --project=mobile --grep @smoke');
+  });
+
+  it('at least one test file under tests/e2e/ carries the @smoke tag', () => {
+    const files = e2eSpecFiles();
+    const tagged = files.filter((f) => /\{\s*tag:\s*['"]@smoke['"]\s*\}/.test(f.text));
+    expect(tagged.length, 'no file tags a test @smoke — the sweep this rail exists to check never ran')
+      .toBeGreaterThan(0);
+  });
+
+  // #750's own acceptance criterion: the script must resolve to a non-empty, non-erroring list. Run through
+  // `npm run` (not `npx playwright` directly) so a rewrite of the script string above is what this exercises,
+  // not a hand-typed duplicate of it.
+  it('npm run test:e2e:smoke resolves to a non-empty list of real tests, every one from tests/e2e/', () => {
+    const out = execFileSync('npm', ['run', '--silent', 'test:e2e:smoke', '--', '--list'], {
+      cwd: new URL('../../', import.meta.url),
+      encoding: 'utf8',
+      timeout: 15_000,   // --list resolves in ~1s; a hang here (silent-failure-hunter, pr-test-analyzer,
+                          // PR #750 review) must fail loudly with a clear timeout, not stall the whole suite
+    });
+    const totalLine = out.match(/^Total:\s*(\d+)\s+tests?\s+in\s+(\d+)\s+files?/m);
+    expect(totalLine, 'Playwright must report a "Total: N tests in M files" line, or nothing here can be trusted')
+      .toBeTruthy();
+    const [, testCount, fileCount] = totalLine!;
+    // The exact failure #750 names: `--grep` matching nothing still exits 0 and still prints a Total line —
+    // "Total: 0 tests in 0 files" — so the count itself, not merely the exit code, is the check.
+    expect(Number(testCount), 'a @smoke grep that matches nothing is the silent-pass shape #750 exists to catch')
+      .toBeGreaterThan(0);
+    expect(Number(fileCount)).toBeGreaterThan(0);
+    // Every listed test must come from a file `--project=mobile`'s own dependency graph (`setup` + `mobile`
+    // itself) would run — i.e. not `viewport.spec.ts`, the one tests/e2e file both `testIgnore` (mobile's
+    // own list already includes it; `setup`'s `testMatch` is 00-build-identity.spec.ts only, which excludes
+    // it too). `tests/sketch/**` is a different testDir and never appears in tests/e2e/ output at all.
+    const specFiles = [...out.matchAll(/›\s([\w.-]+\.spec\.ts):\d+:\d+/g)].map((m) => m[1]);
+    expect(specFiles.length).toBeGreaterThan(0);
+    expect(specFiles, 'viewport.spec.ts only runs under the tablet projects, never under mobile/setup')
+      .not.toContain('viewport.spec.ts');
   });
 });
