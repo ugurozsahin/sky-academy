@@ -3628,6 +3628,31 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
       .toMatch(/This caps nothing\. Reviewing many pull requests is the point of the routine/);
   });
 
+  // #744 round 6 (pr-test-analyzer/silent-failure-hunter): `open-pr` §4 carries the same retry-and-name rule
+  // for its own reader (the author, quoting the agents in a pull request body), pinned above at line 4102 as
+  // `attack()`. This section's own copy — the reviewer running the same three agents on someone else's diff,
+  // quoting them in a review comment instead — sat unpinned: the one phrase the two paragraphs share was
+  // asserted only against `attack()`, never against this section's own text, so a rewrite here could drop
+  // every other clause of it and nothing in this file would notice.
+  it("§4 opens with the reviewer's own retry-and-name rule for the three agents, not only open-pr's copy of it", () => {
+    const intro = slice(s4(), 's4 intro', 'Run `pr-test-analyzer`, `silent-failure-hunter` and `type-design-analyzer`',
+      '### Reviewing more than one: one review, one context', 300);
+    expect(intro, 'the reviewer must quote what each agent found, not just run them')
+      .toMatch(/quote what each found in your comment/);
+    expect(intro, 'and a clean run is recorded the same way as a dirty one, never omitted')
+      .toContain('"nothing" included');
+    expect(intro, 'the retry instruction word itself, not only the reason for it')
+      .toMatch(/first minutes of a session, retry/);
+    expect(intro, 'the reason to retry — the roster registers after the skill list does (#180)')
+      .toMatch(/agent roster registers later than the skill list/);
+    expect(intro, 'and the instruction for the case retrying does not fix')
+      .toMatch(/still unavailable, say so by name/);
+    expect(intro, 'the equivalence the whole paragraph exists to close')
+      .toContain('An agent that never ran and an agent that found nothing produce the same silence');
+    expect(intro, 'and the consequence of collapsing that equivalence — a review claiming cover it never had')
+      .toContain('is how a review claims cover it did not have');
+  });
+
   it('the reviewer prompt routes a run to it from STEP 2, and does not restate it', () => {
     const p = flatten(prompt());
     const step2 = slice(p, 'STEP 2', 'STEP 2 — REVIEW & QA', 'Four things make a PR unmergeable', 1500);
