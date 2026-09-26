@@ -3511,7 +3511,7 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     expect(await state(page)).toMatchObject({ prompt: 'How many flat faces has a cuboid?' });
     await page.waitForFunction(() => (window.__sna.solid()?.frames ?? 0) > 5, null, { timeout: 20_000 });
     const solid = await page.evaluate(() => window.__sna.solid());
-    expect(solid).toMatchObject({ name: 'cuboid', webgl: true, error: null });
+    expect(solid).toMatchObject({ name: 'cuboid', webgl: true, error: null, beat: 'pop' });   // #740: it pops in
     expect(chunks, 'the card reuses the screen\'s one renderer: no second download, no second GL context').toHaveLength(1);
     // The canvas replaced the emoji card rather than sitting beside it, and it keeps drawing.
     expect(await page.locator('#vis .wordcard').count()).toBe(0);
@@ -3537,6 +3537,9 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     expect(await page.evaluate(() => document.querySelector('.qcard')!.classList.contains('pulse'))).toBe(true);
     expect(await page.evaluate(() => window.__sna.solid()!.frames)).toBeGreaterThan(spun);
+    // #740: a right answer cheers the card's solid. Answered and read in one step, before the next question can
+    // swap the card and pop a new solid in.
+    expect(await page.evaluate(() => { const hit = window.__sna.answer(); return { hit, beat: window.__sna.solid()?.beat }; })).toEqual({ hit: true, beat: 'cheer' });
   });
 
   test('guard rail: leaving the play screen releases the solid\'s WebGL context with the arena', async ({ page }) => {

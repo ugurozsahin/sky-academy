@@ -337,7 +337,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       }
     },
     onCorrect(q, points, combo) {
-      sfx.correct(); els.score.textContent = String(session.score);
+      sfx.correct(); els.score.textContent = String(session.score); solid.cheer();   // #740: the card's solid cheers
       const c = cheerLine(deps.av); deps.toast(combo >= 3 ? `${c} Combo ×${combo}` : c, 'good', scaled(hold.correct) + 300);
       const arena = deps.arena();
       if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, `+${points}`, deps.av.glow);
