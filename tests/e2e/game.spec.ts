@@ -2911,19 +2911,30 @@ test.describe('profile picker (#20 slice 2)', () => {
    * protects those bytes, so switching onto one costs nothing.
    */
   test('tapping a corrupt card asks first, and only switches once the family confirms (#681)', async ({ page }) => {
-    await page.addInitScript(({ index, ada, corrupt }) => {
+    await page.addInitScript(({ index, ada, corrupt, future }) => {
       if (!localStorage.getItem('sna:profiles')) {
         localStorage.setItem('sna:v1', ada);
         localStorage.setItem('sna:v1:p2', corrupt);
+        localStorage.setItem('sna:v1:p3', future);
         localStorage.setItem('sna:profiles', index);
       }
     }, {
-      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2', 'p3'] }),
       ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
       corrupt: JSON.stringify({ v: 'banana', name: 'Cass', avatar: 'kai', coins: 500, spent: 0, onboarded: true }),
+      future: JSON.stringify({ v: SAVE_VERSION + 1, name: 'Bo', avatar: 'blaze', coins: 99, spent: 0, onboarded: true }),
     });
     await page.goto('/');
     await expect(page.locator('.profile-screen')).toBeVisible();
+
+    // A `future` card gets no gate at all: `readOnly` already protects those bytes (the session runs on
+    // defaults, same as `load()` does for any blob it refuses to touch), so the tap switches straight through
+    // with no modal, exactly as it did before this fix.
+    await page.click('.avatar-card[data-profile="p3"]');
+    await expect(page.locator('.prof-modal'), 'a future card is never gated — nothing is lost switching onto one').toHaveCount(0);
+    await expect(page.locator('.choose-ninja-screen'), 'a newer-build save reads as unonboarded here too, so it opens the wizard').toBeVisible();
+    await page.goto('/');
+    await expect(page.locator('.profile-screen'), 'more than one profile: the picker comes first, same as any other launch').toBeVisible();
 
     await page.click('.avatar-card[data-profile="p2"]');
     // Still the picker, not the map — the tap opens a question, not a game, and it names the slot the same
@@ -2937,7 +2948,7 @@ test.describe('profile picker (#20 slice 2)', () => {
     await expect(page.locator('.prof-modal')).toHaveCount(0);
     await expect(page.locator('.profile-screen'), 'cancelling leaves the family on the picker').toBeVisible();
     await page.goto('/');
-    await expect(page.locator('.profile-screen'), 'two profiles: the picker comes first, same as any other launch').toBeVisible();
+    await expect(page.locator('.profile-screen'), 'more than one profile: the picker comes first, same as any other launch').toBeVisible();
     await page.click('.avatar-card[data-profile="p1"]');
     await expect(page.locator('#change-av'), 'cancelling left Ada the active profile').toContainText('Ada');
 
