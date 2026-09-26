@@ -1221,25 +1221,33 @@ describe('a pointer that did not go down on this canvas cannot end its stroke (#
     sim.pointer('pointermove', { x: b.x + b.r + 20, y: b.y, pointerId: 1 });   // the segment crosses the bubble
     expect(sim.take('hits'), 'the swipe crossed a bubble after the foreign lift').toEqual([{ label: b.label, viaSwipe: true }]);
   });
-  it('a second finger down on the same canvas takes the stroke over; the first finger\'s move slices nothing', () => {
-    // PR #295 review, round 2: `onDown` re-seats the trail at the second finger, and `onMove` used to accept the
-    // first finger's next move from there — a segment neither finger drew, awarded as a slice.
+  it('two fingers down on the same canvas each keep their own stroke; neither interrupts the other (#561)', () => {
+    // #561 gave every pointer its own Stroke instead of one shared activeId, closing the "known edge" PR #295's
+    // review left for a follow-up: a second finger down used to TAKE OVER the whole canvas's stroke (re-seating
+    // the trail at itself and making the first finger's next move hit-test from a point neither finger drew),
+    // and once the newer finger lifted the older one stayed orphaned until it touched again. Neither happens
+    // now — both strokes are live and independent from the moment the second finger goes down.
     sim = createSim({ seed: 7 });
-    const live = frozenWave(sim); const b = live.reduce((r, x) => (x.x > r.x ? x : r), live[0]);   // the rightmost bubble
-    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 1 });
-    sim.pointer('pointerdown', { x: b.x, y: b.y + b.r + 30, pointerId: 2 });     // rests just below it: no tap hit
+    const live = frozenWave(sim);
+    const left = live.reduce((r, x) => (x.x < r.x ? x : r), live[0]);    // the leftmost bubble
+    const right = live.reduce((r, x) => (x.x > r.x ? x : r), live[0]);   // the rightmost bubble
+    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 1 });                              // finger 1 starts in an empty corner
+    sim.pointer('pointerdown', { x: right.x, y: right.y + right.r + 30, pointerId: 2 });   // finger 2 rests below the right bubble: no tap hit
     expect(sim.take('hits'), 'the resting finger touched nothing').toEqual([]);
-    sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 1 });     // finger 1 is now the foreign one
-    expect(sim.take('hits'), 'a segment neither finger drew must not slice').toEqual([]);
-    sim.pointer('pointermove', { x: b.x, y: b.y - b.r - 30, pointerId: 2 });     // the finger that owns the stroke does
-    expect(sim.take('hits')).toEqual([{ label: b.label, viaSwipe: true }]);
-    // The older finger lifting changes nothing for the owner: the takeover is complete, not shared.
+    sim.pointer('pointermove', { x: left.x - left.r - 20, y: left.y, pointerId: 1 });
+    sim.pointer('pointermove', { x: left.x + left.r + 20, y: left.y, pointerId: 1 });   // finger 1's own swipe, through the left bubble alone
+    expect(sim.take('hits'), 'finger 1 slices while finger 2 is still down, resting elsewhere').toEqual([{ label: left.label, viaSwipe: true }]);
+    sim.pointer('pointermove', { x: right.x, y: right.y - right.r - 30, pointerId: 2 });
+    sim.pointer('pointermove', { x: right.x, y: right.y + right.r + 20, pointerId: 2 });   // finger 2's own swipe, straight down through the right bubble
+    expect(sim.take('hits'), "finger 2 slices too — finger 1's stroke never took it over").toEqual([{ label: right.label, viaSwipe: true }]);
+    // The newer finger (2) lifting first is exactly the orphaned-finger ordering the old single-activeId
+    // policy failed: finger 1's stroke must still be the one it always was, not `null`.
     const [c] = sim.live();
-    sim.pointer('pointerup', { x: 5, y: 5, pointerId: 1 });
-    sim.pointer('pointermove', { x: c.x, y: c.y - c.r - 30, pointerId: 2 });   // along the clear lane above the row
-    sim.take('hits');
-    sim.pointer('pointermove', { x: c.x, y: c.y + c.r + 20, pointerId: 2 });   // straight down through c alone
-    expect(sim.take('hits'), 'the owning finger keeps slicing after the older one lifts').toEqual([{ label: c.label, viaSwipe: true }]);
+    sim.pointer('pointerup', { x: right.x, y: right.y + right.r + 20, pointerId: 2 });
+    sim.pointer('pointermove', { x: c.x - c.r - 20, y: c.y, pointerId: 1 });
+    sim.pointer('pointermove', { x: c.x + c.r + 20, y: c.y, pointerId: 1 });   // finger 1's next swipe, through a fresh bubble alone
+    expect(sim.take('hits'), 'finger 1 is not orphaned by the newer finger lifting — one stroke per pointer, not one per canvas')
+      .toEqual([{ label: c.label, viaSwipe: true }]);
   });
   it('pointercancel follows the same rule: a foreign one is ignored, the stroke\'s own one ends it', () => {
     sim = createSim({ seed: 7 });
@@ -1315,6 +1323,25 @@ describe('a stroke held through a freeze does not draw a line through time (#331
     pinnedRow(sim);
     sim.pointer('pointermove', { x: sim.arena.W - 2, y: lane, pointerId: 1 });
     expect(sim.take('hits'), 'the still finger\'s first twitch sliced the next wave').toEqual([]);
+  });
+
+  it('a second, non-most-recent finger is caught by the same frame poll (#561)', () => {
+    // #561 replaced the one shared `strokeStale` flag with a per-pointer `stale`, staled here by iterating
+    // every live `Stroke`. `mostRecentId` only decides which stroke draws the visual trail — the OLDER finger,
+    // down first and never the most-recent one, must be staled by the freeze exactly like the first-finger case
+    // above, or its own first twitch after the hold draws its own line through time.
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: 2, y: lane, pointerId: 1 });                // down first: not the most-recent finger
+    sim.pointer('pointerdown', { x: sim.arena.W - 2, y: lane, pointerId: 2 });  // down second: the most-recent one
+    sim.take('hits');
+    sim.arena.reveal({ good: row[0].label });
+    sim.advance(1300);                                               // the outcome hold, neither finger moves
+    sim.arena.clearWave();
+    pinnedRow(sim);
+    sim.pointer('pointermove', { x: 40, y: lane, pointerId: 1 });    // finger 1's first twitch after the hold
+    expect(sim.take('hits'), 'the older, non-most-recent finger must be staled by the freeze too').toEqual([]);
   });
 
   it('the same is true of a pause: the finger keeps its stroke, not its old position', () => {
@@ -1424,6 +1451,23 @@ describe('a stroke held through a resize does not slice from a point the old box
 
     sim.pointer('pointermove', { x: 2, y: lane, pointerId: 1 });
     expect(sim.take('hits'), 'the still finger\'s first twitch after the resize sliced the row').toEqual([]);
+  });
+
+  it('a second, non-most-recent finger is caught by the same reanchor (#561)', () => {
+    // #561's reanchor now stales every live Stroke, not one shared flag — the OLDER finger, down first and
+    // never the most-recent one (that only decides which stroke draws the visual trail), must be re-seated by
+    // a resize exactly like the first-finger case above.
+    sim = createSim({ seed: 7 });
+    const row = pinnedRow(sim);
+    const lane = row[0].y;
+    sim.pointer('pointerdown', { x: sim.arena.W - 2, y: lane, pointerId: 1 });   // down first: not the most-recent finger
+    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 2 });                    // down second: the most-recent one, well clear of the row
+    sim.take('hits');
+
+    halveBox(sim);
+
+    sim.pointer('pointermove', { x: 2, y: lane, pointerId: 1 });                 // finger 1's first twitch after the resize
+    expect(sim.take('hits'), 'the older, non-most-recent finger must be re-seated by the resize too').toEqual([]);
   });
 
   it('the stroke itself survives a resize: the next real swipe still slices', () => {
