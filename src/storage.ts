@@ -1247,7 +1247,7 @@ export function evaluateStickers(d: SaveData): string[] {
  * rail in `tests/unit/guardrails.test.ts` keeps `src/ui/` off both halves of the old pair. Kept for a caller
  * that pays coins with no finished game behind them, and used by `tests/unit/shop.test.ts` to seed a purse. */
 export function addCoins(n: number): string[] {
-  const d = load(); const coins = d.coins + Math.max(0, n);
+  const d = load(); const coins = d.coins + Math.max(0, Number.isFinite(n) ? n : 0);   // save() never sanitizes like migrate() does, and Math.max(0, NaN) is NaN (#797)
   const unlocked = evaluateStickers({ ...d, coins }); const fresh = unlocked.filter(id => !d.stickers.includes(id));
   save({ coins, stickers: unlocked });
   return fresh;
@@ -1425,7 +1425,7 @@ export function recordGameEnd(e: DojoEvent, gameCoins: number, now = new Date())
   // The clamp guards the game's own figure alone. Clamping the SUM would let a negative `gameCoins` cancel a
   // bonus the child earned rather than being refused on its own (round 2, note 2) — unreachable with today's
   // non-negative inputs, which is why it is a shape question rather than a bug.
-  const total = d.coins + Math.max(0, gameCoins) + dojo.coins;
+  const total = d.coins + Math.max(0, Number.isFinite(gameCoins) ? gameCoins : 0) + dojo.coins;   // same #797 guard as addCoins()
   // The dojo's new state goes into the sticker evaluation too, so that an achievement reading dojo progress
   // WOULD see the day this game just moved — the old order gave it that (`addCoins`'s `load()` ran after
   // `recordDojo`'s `save()`) and a single `load()` would otherwise quietly lose it. Nothing reads it today:
