@@ -26,6 +26,19 @@ export const workflowFiles = (): { name: string; text: string }[] => {
   return names.map((name) => ({ name, text: readFileSync(new URL(name, WORKFLOWS), 'utf8') }));
 };
 
+const E2E = new URL('../../../tests/e2e/', import.meta.url);
+
+/** Every `tests/e2e/*.spec.ts` file, for a rail that must hold across all of them (#750). Same vacuity guard
+ *  as `workflowFiles` above, kept as its own function rather than a parameterised one: the two directories
+ *  read different extensions and neither has a second caller yet, so a shared signature would be guessing at
+ *  a shape nothing has asked for. `tests/sketch/` is a different `testDir` (its own `sketchbook` project) and
+ *  deliberately not read here. */
+export const e2eSpecFiles = (): { name: string; text: string }[] => {
+  const names = readdirSync(E2E).filter((f) => f.endsWith('.spec.ts'));
+  if (names.length === 0) throw new Error('no tests/e2e/*.spec.ts files found — the @smoke rail would pass vacuously');
+  return names.map((name) => ({ name, text: readFileSync(new URL(name, E2E), 'utf8') }));
+};
+
 /** The `src/` modules under `dir`. Throws rather than returning `[]`: a directory spelled wrongly — a leading
  *  slash dropped, a folder renamed — is the shape that makes a rail green for ever. */
 export const inDir = (dir: string): [string, string][] => {

@@ -470,7 +470,7 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
-  test('real swipe slices the correct bubble and scores', async ({ page }) => {
+  test('real swipe slices the correct bubble and scores', { tag: '@smoke' }, async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
     await swipeAnswer(page);
@@ -1459,7 +1459,7 @@ test.describe('Sky Ninja Academy', () => {
     await waitForTarget(page);
   });
 
-  test('letter tracing passes when the glyph is covered', async ({ page }) => {
+  test('letter tracing passes when the glyph is covered', { tag: '@smoke' }, async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-trace');
     await expect(page.locator('#trace')).toBeVisible();
@@ -2373,7 +2373,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   // #64: reinstalling the APK wipes localStorage, so the grown-up needs a way to carry the save across.
-  test('For grown-ups: the save code copies out and restores back (#64)', async ({ page }) => {
+  test('For grown-ups: the save code copies out and restores back (#64)', { tag: '@smoke' }, async ({ page }) => {
     await seedPlayer(page, 'volt', 'Ada');
     await openGrownUps(page);
 

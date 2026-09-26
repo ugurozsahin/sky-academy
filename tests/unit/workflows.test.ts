@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { workflowFiles } from './helpers/sources';
+import { e2eSpecFiles, workflowFiles } from './helpers/sources';
 
 /**
  * WORKFLOW RAILS (#321, split out of `guardrails.test.ts`) — everything that reads `.github/workflows/**`
@@ -288,5 +288,57 @@ describe('the scope step routes a diff to e2e, to the sketchbook, or to neither 
     for (const needle of ['playwright install', 'sources.list.d/google-chrome'])
       expect(stepOf(needle), `the ${needle} step must also run for a sketch-only pull request`).toMatch(/steps\.scope\.outputs\.sketch == 'true'/);
     expect(lines.find(l => /playwright test \$\{\{/.test(l)), 'the full-matrix arm carries the sketchbook project').toMatch(/--project=sketchbook'/);
+  });
+});
+
+/**
+ * #750: a `@smoke` subset for a fast pre-push signal. The class this rail guards against is #750's own
+ * naming of it — a `--grep` that matches nothing exits 0 with `0 passed`, which reads exactly like a pass.
+ * `--list` resolves the real config (projects, `dependencies`, `testIgnore`) without launching a browser or
+ * the webServer (proven below by wall-clock: it returns in about a second), so this asks Playwright itself
+ * what `npm run test:e2e:smoke` would run rather than re-implementing its project-resolution rules against a
+ * `@smoke` grep of the source text, which would drift the moment `playwright.config.ts` does.
+ */
+describe('the @smoke e2e subset is non-empty and actually reachable by npm run test:e2e:smoke (#750)', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+
+  it('package.json carries the exact script #750 specifies', () => {
+    expect(pkg.scripts['test:e2e:smoke']).toBe('playwright test --project=mobile --grep @smoke');
+  });
+
+  it('at least one test file under tests/e2e/ carries the @smoke tag', () => {
+    const files = e2eSpecFiles();
+    const tagged = files.filter((f) => /\{\s*tag:\s*['"]@smoke['"]\s*\}/.test(f.text));
+    expect(tagged.length, 'no file tags a test @smoke — the sweep this rail exists to check never ran')
+      .toBeGreaterThan(0);
+  });
+
+  // #750's own acceptance criterion: the script must resolve to a non-empty, non-erroring list. Run through
+  // `npm run` (not `npx playwright` directly) so a rewrite of the script string above is what this exercises,
+  // not a hand-typed duplicate of it.
+  it('npm run test:e2e:smoke resolves to a non-empty list of real tests, every one from tests/e2e/', () => {
+    const out = execFileSync('npm', ['run', '--silent', 'test:e2e:smoke', '--', '--list'], {
+      cwd: new URL('../../', import.meta.url),
+      encoding: 'utf8',
+      timeout: 15_000,   // --list resolves in ~1s; a hang here (silent-failure-hunter, pr-test-analyzer,
+                          // PR #750 review) must fail loudly with a clear timeout, not stall the whole suite
+    });
+    const totalLine = out.match(/^Total:\s*(\d+)\s+tests?\s+in\s+(\d+)\s+files?/m);
+    expect(totalLine, 'Playwright must report a "Total: N tests in M files" line, or nothing here can be trusted')
+      .toBeTruthy();
+    const [, testCount, fileCount] = totalLine!;
+    // The exact failure #750 names: `--grep` matching nothing still exits 0 and still prints a Total line —
+    // "Total: 0 tests in 0 files" — so the count itself, not merely the exit code, is the check.
+    expect(Number(testCount), 'a @smoke grep that matches nothing is the silent-pass shape #750 exists to catch')
+      .toBeGreaterThan(0);
+    expect(Number(fileCount)).toBeGreaterThan(0);
+    // Every listed test must come from a file `--project=mobile`'s own dependency graph (`setup` + `mobile`
+    // itself) would run — i.e. not `viewport.spec.ts`, the one tests/e2e file both `testIgnore` (mobile's
+    // own list already includes it; `setup`'s `testMatch` is 00-build-identity.spec.ts only, which excludes
+    // it too). `tests/sketch/**` is a different testDir and never appears in tests/e2e/ output at all.
+    const specFiles = [...out.matchAll(/›\s([\w.-]+\.spec\.ts):\d+:\d+/g)].map((m) => m[1]);
+    expect(specFiles.length).toBeGreaterThan(0);
+    expect(specFiles, 'viewport.spec.ts only runs under the tablet projects, never under mobile/setup')
+      .not.toContain('viewport.spec.ts');
   });
 });

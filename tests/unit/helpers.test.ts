@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { code, inDir, SOURCES, workflow, workflowFiles } from './helpers/sources';
+import { code, e2eSpecFiles, inDir, SOURCES, workflow, workflowFiles } from './helpers/sources';
 
 /**
  * The readers four rail files share (#321). Until the split each of them was a `const` at the top of one
@@ -53,6 +53,17 @@ describe('the shared rail readers cannot go blind (#321)', () => {
       expect(text.length, `${name} read as empty`).toBeGreaterThan(100);
     }
     expect(found.map((w) => w.name), 'ci.yml is read by name elsewhere, so it must be in here too').toContain('ci.yml');
+  });
+
+  it('e2eSpecFiles() finds every e2e spec, and is loud rather than empty if it finds none (#750)', () => {
+    const found = e2eSpecFiles();
+    expect(found.length, 'tests/e2e/ has several spec files; zero means the directory moved').toBeGreaterThanOrEqual(3);
+    for (const { name, text } of found) {
+      expect(name).toMatch(/\.spec\.ts$/);
+      expect(text.length, `${name} read as empty`).toBeGreaterThan(100);
+    }
+    for (const name of ['00-build-identity.spec.ts', 'game.spec.ts', 'viewport.spec.ts'])
+      expect(found.map((f) => f.name), `${name} is read by name or excluded by name elsewhere`).toContain(name);
   });
 
   it('code() strips comments and leaves the code, so a comment naming a ban does not trip it', () => {
