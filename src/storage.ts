@@ -450,7 +450,7 @@ export type AddProfileResult = { ok: true; id: ProfileId } | { ok: false; why: '
  * "New ninja" took the playing child's name, ninja and coins with no hint, no sound and nothing spoken. It
  * also cleared the latch, so `parents.ts`'s "this device is not saving progress" — the one place a grown-up
  * could have learnt why — went quiet. A profile the store cannot save is one it cannot hand a child, so the
- * honest answer is `'store'`, checked **before** the index write so the refusal changes nothing at all.
+ * honest answer is `'store'`, checked **before** the index write — but only while `cache !== null` (#587).
  *
  * `readOnly` (#232) deliberately does not refuse: the store there is writable and the new child's save will
  * land: it is *this* child's blob that comes from a future version, and `save()` never writes it back, so the
@@ -477,7 +477,7 @@ export function addProfile(): AddProfileResult {
   const tombstoned = readTombstones();
   const free = PROFILE_IDS.find(id => !idx.ids.includes(id) && (slotState(id) === 'empty' || tombstoned.includes(id)));
   if (!free) return { ok: false, why: 'full' };
-  if (writeFailed) return { ok: false, why: 'store' };
+  if (writeFailed && cache !== null) return { ok: false, why: 'store' };
   // Cleared **before** the index write, so a refusal here changes nothing at all — the same discipline as the
   // `writeFailed` precheck just above. Unlike the stray bytes a `removeItem` below also clears, a surviving
   // tombstone entry has no benign fallback: the next time the index is lost, `defaultIndex()` would skip this
