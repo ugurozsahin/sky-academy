@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import ts from 'typescript';
 import pkg from '../../package.json';
 import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
@@ -258,54 +259,89 @@ describe('guard rails', () => {
 
   // #557 (#325 stage 1): src/game/ never imports src/ui/ — zero occurrences today, and that one-way
   // dependency is why src/game/session.ts is testable without a browser and the sim harness (#142) works at
-  // all. Every later stage of #325 moves files around, and each could break it silently. Text rail, over
-  // code() (comments may name the ban): it reads every literal specifier and RESOLVES it the way the bundler
-  // would — `posix.resolve` from the importing file's own directory — before asking whether it lands under
-  // `/src/ui/`. Resolving, not spelling-matching, is what closes the class the first two rounds of PR #710
-  // patched one member at a time: `../ui/dom`, `../../src/ui/dom` (round 1), `./../ui/dom` (round 2), and
-  // `../../game/../ui/dom` all resolve to the same module, and so does any future spelling, since the module
-  // graph is what the rail is about. A Vite-root absolute specifier (`/src/ui/…`) is already resolved.
-  // It cannot see a path assembled at run time — `'../' + 'ui/' + name` — only a literal or template
-  // specifier. And it resolves the DECODED string, not the source text between the quotes (round 3): a
-  // specifier written `'..\u002fui\u002fdom'` is `../ui/dom` to TypeScript, so the escapes a string literal can
-  // carry — `\uXXXX`, `\u{…}`, `\xXX`, `\/` and the rest — are undone first. Proved red: added each of the four
-  // spellings above, then `'..\u002fui\u002fdom'` and `'..\x2fui\x2fdom'` (written with printf so the escape
-  // reaches the disk), to a scratch file under src/game/, watched this fail on every one, removed it; a
-  // scratch `import { x } from '../curriculum/util'` stays green. `../ui` bare (a barrel, none exists) is
-  // caught too — the resolved path is compared as a directory, not only as a prefix.
-  // A backslash immediately before a line terminator is JS's line-continuation escape — it vanishes from the
-  // decoded string, the same as any other `\<char>` escape decode() already undoes (PR #710 round 4: the
-  // specifier-capture regex below excluded `\n` outright, so a specifier split across a continuation line
-  // never reached decode() at all — this is that gap's other half, decode() itself swallowing the pair).
-  // ECMAScript's LineTerminatorSequence is `\r\n`, a bare `\r`, a bare `\n`, U+2028 or U+2029 (round 5: `\r?\n`
-  // only matched a `\n`-terminated pair, so a bare `\<CR>` with no following `\n` — itself a complete, valid
-  // continuation — fell through to the `\(.)` fallback, which JS regex `.` cannot match either, since `.`
-  // excludes every line terminator; the pair survived undecoded and `posix.resolve` read it as a path segment).
-  // `posix.resolve` is POSIX-only — it never treats `\` as a separator — but TypeScript's own resolver does,
-  // on every host OS, so a decoded specifier has its backslashes normalised to `/` before resolving (round 6:
-  // `..\ui\dom` decodes to a real, single-backslash string via decode()'s own `\(.)` fallback — decode() was
-  // never the bug — then glued onto the importing directory as one opaque segment instead of climbing out of
-  // it, the same "resolve like the compiler does" gap rounds 1-3 closed for `/`-separated spellings).
-  const decode = (s: string) => s.replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|\\(?:\r\n|\r|\n|\u2028|\u2029)|\\(.)/g,
-    (_, brace, u4, x2, ch) => brace ? String.fromCodePoint(parseInt(brace, 16)) : u4 ? String.fromCharCode(parseInt(u4, 16)) : x2 ? String.fromCharCode(parseInt(x2, 16)) : ch ?? '');
-  it('the specifier decoder undoes what a string literal can hide', () => {
-    expect(decode('..\\u002fui\\u002fdom')).toBe('../ui/dom');
-    expect(decode('..\\x2fui\\x2fdom')).toBe('../ui/dom');
-    expect(decode('\\u{2e}./ui\\/dom')).toBe('../ui/dom');
-    expect(decode('../ui/dom')).toBe('../ui/dom');
-    expect(decode('../\\\nui/dom')).toBe('../ui/dom');
-    expect(decode('../\\\rui/dom')).toBe('../ui/dom');
-    expect(decode('../\\\r\nui/dom')).toBe('../ui/dom');
-    expect(decode('../\\\u2028ui/dom')).toBe('../ui/dom');
-    expect(decode('../\\\u2029ui/dom')).toBe('../ui/dom');
+  // all. Every later stage of #325 moves files around, and each could break it silently.
+  //
+  // Round 8 rewrite: rounds 1-7 of PR #710 grew a hand-rolled specifier-capture regex, an escape decoder and
+  // a comment-stripper one lexical case at a time — a line continuation, a bare CR, a backslash separator, a
+  // `/*`/`*/` pair split across two string literals — and round 8 found an eighth: a regex literal like
+  // `/a\/*/` fakes a comment-open to the character scanner and can erase the rest of the file, while the
+  // capture regex's `\(?` only unwrapped one layer of parens, missing a legal `import(('../ui/dom'))`. Each
+  // round closed the case it found, never the class (`.claude/rules/guardrails.md`'s rule on this) — there
+  // was always a round 9, because a scanner told to skip strings, templates, comments and now regex literals
+  // is re-deriving the ECMAScript grammar one production at a time. TypeScript already has that grammar:
+  // `ts.createSourceFile` (already a dependency, already used this way by `british.test.ts`'s `tsStrings()`)
+  // parses the file for real, so a real comment, a real regex literal and a real string literal are never
+  // confused with one another, and the decoded specifier text is exactly what `tsc` itself would resolve —
+  // closing rounds 3-8 (escapes, both line-continuation forms, the backslash separator, both comment-erasure
+  // bugs, the double-paren gap) by construction, not by one more hand-rolled case.
+  //
+  // The set this rail extracts, named per the guard-rails rule on fixing a class rather than an instance:
+  // every `import … from '…'` / `export … from '…'` whose specifier is a string or plain template, every
+  // `import(…)`/`require(…)` call whose (arbitrarily parenthesised) argument is one, and an
+  // `import … = require('…')` external module reference — nothing else counts as an import, so a comment or
+  // a `/…/` regex literal that merely looks like one is never mistaken for a specifier. It still cannot see
+  // a path assembled at run time — `'../' + 'ui/' + name` — only a literal or template specifier, same as
+  // before.
+  //
+  // Only the directory-separator normalisation survives from the old pipeline: `posix.resolve` is POSIX-only
+  // and never treats `\` as a separator, but TypeScript's own resolver does on every host OS (round 6), so a
+  // decoded specifier still has its backslashes turned to `/` before resolving.
+  function importSpecifiers(path: string, src: string): string[] {
+    const sf = ts.createSourceFile(path, src, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
+    const out: string[] = [];
+    const specifierOf = (e: ts.Expression): string | null => {
+      let expr = e;
+      while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
+      return ts.isStringLiteralLike(expr) ? expr.text : null;
+    };
+    const visit = (n: ts.Node) => {
+      if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier) {
+        const s = specifierOf(n.moduleSpecifier as ts.Expression);
+        if (s !== null) out.push(s);
+      } else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference)) {
+        const s = specifierOf(n.moduleReference.expression);
+        if (s !== null) out.push(s);
+      } else if (ts.isCallExpression(n)) {
+        const isDynamicImport = n.expression.kind === ts.SyntaxKind.ImportKeyword;
+        const isRequire = ts.isIdentifier(n.expression) && n.expression.text === 'require';
+        if ((isDynamicImport || isRequire) && n.arguments.length > 0) {
+          const s = specifierOf(n.arguments[0]);
+          if (s !== null) out.push(s);
+        }
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(sf);
+    return out;
+  }
+  it('the specifier extractor finds every reachable import form and none it should not', () => {
+    // Rounds 1-6's spellings: relative variants, escapes, both line-continuation forms, the backslash
+    // separator — all decoded exactly as TypeScript decodes a string literal, no hand-rolled decode().
+    expect(importSpecifiers('x.ts', "import { a } from '../ui/dom';")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "import { a } from '../../src/ui/dom';")).toEqual(['../../src/ui/dom']);
+    expect(importSpecifiers('x.ts', "import { a } from '..\\u002fui\\u002fdom';")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "import { a } from '../\\\nui/dom';")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "import { a } from '../\\\rui/dom';")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "import { a } from '..\\\\ui\\\\dom';")).toEqual(['..\\ui\\dom']);
+    // Round 7: a real import sitting between two decoy string literals that each hold half a comment delimiter.
+    expect(importSpecifiers('x.ts', "const a = '/*'; import { $ } from '../ui/dom'; const b = '*/';")).toEqual(['../ui/dom']);
+    // Round 8 finding 1: a regex literal faking a comment-open no longer erases anything — it is a real regex
+    // node to the parser, not text a comment-stripper has to out-guess.
+    expect(importSpecifiers('x.ts', "const r = /a\\/*/; import { $ } from '../ui/dom'; /** trailing */")).toEqual(['../ui/dom']);
+    // Round 8 finding 2: any depth of wrapping parens on a dynamic import is unwrapped, not just one.
+    expect(importSpecifiers('x.ts', "function load() { return import(('../ui/dom')); }")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "function load() { return import((('../ui/dom'))); }")).toEqual(['../ui/dom']);
+    // require() and export ... from both count; a genuinely commented-out import does not — it is trivia,
+    // not a node the AST walk ever visits.
+    expect(importSpecifiers('x.ts', "const { a } = require('../ui/dom');")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "export { a } from '../ui/dom';")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "// import { a } from '../ui/dom';")).toEqual([]);
+    // A path assembled at run time is invisible, as it always was — only a literal or template specifier.
+    expect(importSpecifiers('x.ts', "import(dir + '/dom');")).toEqual([]);
   });
   it('no file in src/game/ imports from src/ui/ (#557)', () => {
-    // The capture group excludes a bare `\n` (an unterminated string is a syntax error, not a specifier to
-    // chase past) but admits a `\` immediately followed by one — JS's line-continuation escape — so a
-    // specifier split across lines that way is still captured whole and reaches decode() above.
-    const specifiers = (src: string) => [...code(src).matchAll(/\b(?:from|import|require)\s*\(?\s*['"`]((?:\\\r?\n|[^'"`\n])+)['"`]/g)].map(m => decode(m[1]));
     for (const [path, src] of inDir('/src/game/')) {
-      const resolved = specifiers(src).map(s => s.startsWith('.') ? posix.resolve(posix.dirname(path), s.replace(/\\/g, '/')) : s);
+      const resolved = importSpecifiers(path, src).map(s => s.startsWith('.') ? posix.resolve(posix.dirname(path), s.replace(/\\/g, '/')) : s);
       expect(resolved.filter(s => s === '/src/ui' || s.startsWith('/src/ui/')), `${path} must not import from src/ui/ — src/game/ is the browser-free half of the split`)
         .toEqual([]);
     }
