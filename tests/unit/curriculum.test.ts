@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import type { Topic } from '../../src/curriculum';
 import { turnEnd, TEMP_GAP } from '../../src/curriculum/maths';
@@ -2236,6 +2236,34 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     expect(wordQ(r, 'Which is more?', '1p', ['50p']).wide).toBe(true);
     // And a card whose options really are all short stays narrow, so nothing is widened wholesale.
     expect(wordQ(r, 'Which letter?', 'ox', ['ax', 'ex']).wide).toBe(false);
+  });
+
+  it('wordQ warns when a duplicate collapses the deduped set below 3, but never for the answer-in-the-universe idiom (#515)', () => {
+    const r = rng(515);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Three genuine, non-answer candidates offered, but two of them collide — after de-dup only 2 survive,
+    // so the card ships 3 options (answer + 2) with nothing else catching it. This is the exact shape PR
+    // #511 fixed by hand for y1Words/y2Words/y2Money: a caller believing it handed over 3 distinct decoys.
+    const q = wordQ(r, 'Which shape?', 'square', ['circle', 'circle', 'triangle'], {});
+    expect(q.options.length).toBe(3);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/wordQ.*3 distractor candidates collapsed to 2 unique.*3 options/);
+    warn.mockClear();
+    // Exactly 3 distinct, non-colliding candidates: nothing collapses, so this must stay silent. Without
+    // this case a `ds.length < 3` → `ds.length <= 3` mutant survives — every other case above has ds.length
+    // strictly below 3 either way, so none of them tell the two spellings apart (pr-test-analyzer review).
+    wordQ(r, 'Which shape?', 'square', ['circle', 'triangle', 'hexagon'], {});
+    expect(warn, 'exactly 3 unique, non-colliding decoys is not a collision').not.toHaveBeenCalled();
+    warn.mockClear();
+    // writing.ts's punctuation cards deliberately pass the whole 3-mark universe including the answer
+    // itself (`wordQ(rng, s, p, ['.', '?', '!'], …)`) and expect wordQ to filter it down to 2 real decoys —
+    // by design, not a collision, since only 2 non-answer candidates were ever offered. Must stay silent.
+    wordQ(r, 'Full stop or question mark?', '.', ['.', '?', '!']);
+    // And an ordinary caller with fewer than 3 decoys to begin with is the same non-collision shape.
+    wordQ(r, 'Which is more?', '1p', ['50p']);
+    wordQ(r, 'Which letter?', 'ox', ['ax', 'ex']);
+    expect(warn, 'neither the answer-in-the-universe idiom nor an ordinary short call must trip this').not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   // `wideFor` is only ever exercised above through generator output — real cards never land exactly on
