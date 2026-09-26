@@ -728,9 +728,9 @@ export const COLLIDE = {
   // limit on what a bounce may add — it was a global speed limit on the wave, and `layoutWave` launches
   // faster than it. `|v0| = 4h/T` with `T = base / speedK`, so launch speed grows with arena height and with
   // `speedK`: an 800x1180 tablet at stage 3 already launches at 931 px/s and was throttled from the first
-  // frame two bubbles were airborne, and at the `__SNA_FAST = 4` the e2e suite runs at, a phone wave cleared
-  // in 23 frames instead of 50 with an apex of 688 in a 760-high arena — bubbles that barely left the launch
-  // line. #138 made `speedK` a pure time compression ("same apex, same landing x, less time") and a fixed
+  // frame two bubbles were airborne, and at `__SNA_FAST = 4` (pre-#748; now 8), a phone wave cleared in 23
+  // frames instead of 50 with an apex of 688 in a 760-high arena — bubbles that barely left the launch line.
+  // #138 made `speedK` a pure time compression ("same apex, same landing x, less time") and a fixed
   // px/s number silently undid it. A constant cannot be right when the quantity it bounds is a function of
   // `H` and `speedK`; the bound belongs on the impulse, relative to the pair it acts on. See `capToPair`.
   /** Separation passes per frame. Six, not one: a three-body pile needs more than a single sweep to come

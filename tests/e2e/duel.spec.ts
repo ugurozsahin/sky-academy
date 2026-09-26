@@ -698,12 +698,14 @@ test.describe('Ninja Duel', () => {
     // flying at a question neither had been shown.
     await startDuel(page);
     // Real game speed for this one, the way its play-screen twin in `game.spec.ts` opts out with
-    // `__SNA_FAST = 1`: a compressed hold is not a hold anybody can press pause inside. `startDuel` boots at
-    // `__SNA_FAST = 4`, which leaves ~362ms between the winning slice and the round advancing for a
-    // `page.evaluate` round trip AND a real `page.click`. It measured 67-113ms of that budget and passed six
-    // times out of six — but `playwright.config.ts` sets `retries: 0`, and a two-core runner with two workers
-    // has far less headroom than this machine (PR #474 review, note 6). `setSpeed` is read by `scaled()` at
-    // the moment each beat is armed, so taking it to 1 here gives the hold below its full length.
+    // `__SNA_FAST = 1`: a compressed hold is not a hold anybody can press pause inside. At the time this was
+    // written `startDuel` booted at `__SNA_FAST = 4`, which left ~362ms between the winning slice and the
+    // round advancing for a `page.evaluate` round trip AND a real `page.click` — it measured 67-113ms of that
+    // budget and passed six times out of six, but `playwright.config.ts` sets `retries: 0`, and a two-core
+    // runner with two workers has far less headroom than this machine (PR #474 review, note 6). #748 raised
+    // the suite's default to 8×, which halves that budget again (~181ms) — the override below matters even
+    // more now, not less. `setSpeed` is read by `scaled()` at the moment each beat is armed, so taking it to
+    // 1 here gives the hold below its full length.
     await page.evaluate(() => window.__sna.setSpeed(1));
     await winRound(page, 'a');
     const before = await page.evaluate(() => window.__sna.state());

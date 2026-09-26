@@ -786,9 +786,10 @@ describe('bubbles collide instead of passing through each other (#108)', () => {
     // speedK. The first cut capped every live bubble at a fixed 900 px/s, so:
     //   * an 800x1180 tablet at stage 3 launches at 931 and was throttled from the first frame — a real
     //     child on a real device, and the tablet is what the Android APK targets;
-    //   * at __SNA_FAST = 4, which the WHOLE e2e suite runs at, a phone stage-3 wave cleared in 23 frames
-    //     instead of 50 with an apex of 688 in a 760-high arena. The e2e passed 52/52 anyway, because
-    //     nothing there asserts apex and a faster wave only makes the waiting tests quicker.
+    //   * at __SNA_FAST = 4 (the WHOLE e2e suite's default at the time; #748 raised it to 8), a phone
+    //     stage-3 wave cleared in 23 frames instead of 50 with an apex of 688 in a 760-high arena. The e2e
+    //     passed 52/52 anyway, because nothing there asserts apex and a faster wave only makes the waiting
+    //     tests quicker.
     // Driven from the real layoutWave so the numbers cannot drift back to a regime the bug cannot reach.
     const flight = (W: number, H: number, speedK: number, stage: 1 | 2 | 3, collide: boolean) => {
       const geom = { W, H, topInset: 120 };
@@ -808,7 +809,7 @@ describe('bubbles collide instead of passing through each other (#108)', () => {
     const cases: [string, number, number, number, 1 | 2 | 3][] = [
       ['phone 390x760 @1x stage 3', 390, 760, 1, 3],
       ['tablet 800x1180 @1x stage 3', 800, 1180, 1, 3],   // |v0| = 931: over the old 900 cap at ordinary speed
-      ['phone @4x stage 1', 390, 760, 4, 1],              // the e2e suite's own speed
+      ['phone @4x stage 1', 390, 760, 4, 1],              // the e2e suite's old default (#748 raised it to 8)
       ['phone @4x stage 3', 390, 760, 4, 3],              // was 23 frames instead of 50, apex 688 of 760
       ['tablet @4x stage 3', 800, 1180, 4, 3],
     ];
