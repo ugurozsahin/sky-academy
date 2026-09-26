@@ -379,6 +379,12 @@ describe("ci.yml's test-job timeout-minutes is a budget, not a bare number (#758
   const branchNameAt = jobs.indexOf('\n  branch-name:');
 
   it('the `test` job still exists, bounding the slice this whole describe block reads', () => {
+    // silent-failure-hunter review of this rail: `ci.indexOf('\njobs:')` feeds `.slice()` two lines up with no
+    // guard of its own — a missing/moved `jobs:` key would still fail below (`jobs` could not then contain
+    // `\n  test:` either), but on the wrong assertion's message, pointing a maintainer at "the test job" when
+    // the real cause is the anchor above it never being found at all.
+    expect(ci.indexOf('\njobs:'), 'ci.yml must have a top-level `jobs:` key, or every slice below reads nothing')
+      .toBeGreaterThan(0);
     expect(jobs.indexOf('\n  test:'), 'the `test` job must exist').toBeGreaterThan(0);
     expect(branchNameAt, "the `branch-name` job must still exist, to bound the `test` job's own slice")
       .toBeGreaterThan(0);
@@ -391,7 +397,16 @@ describe("ci.yml's test-job timeout-minutes is a budget, not a bare number (#758
   // plain `toMatch`/`toContain` against the raw YAML text.
   const flatComment = (t: string) => t.replace(/\n\s*#\s?/g, ' ').replace(/\s+/g, ' ').trim();
 
+  // pr-test-analyzer review of this rail: reading the phrase checks below off `testJob` whole would search the
+  // job's ~200 lines of steps too — every unrelated `#96`/`#483`/`#715` step comment in there — so a phrase
+  // could keep matching by accident even if the stop-gap comment itself were deleted (or a plausible future
+  // step comment could make `#749` match for an unrelated reason). Narrowed to the comment block that actually
+  // sits above `timeout-minutes:`, nowhere else in the job.
+  const timeoutAt = testJob.indexOf('timeout-minutes:');
+
   it('the ceiling has not been raised past the #754 stop-gap value of 45', () => {
+    expect(timeoutAt, "the test job's `timeout-minutes:` line must exist, to bound the comment block above it")
+      .toBeGreaterThan(0);
     const m = /timeout-minutes:\s*(\d+)/.exec(testJob);
     expect(m, "the test job's timeout-minutes must be a readable number, or this rail proves nothing").toBeTruthy();
     // A ceiling on the ceiling: a future reduction (#749/#748/#750 landing) passes, a future raise fails —
@@ -402,7 +417,7 @@ describe("ci.yml's test-job timeout-minutes is a budget, not a bare number (#758
   });
 
   it("the stop-gap comment keeps its reason: names the fix, says the number comes back down, and bans raising it to fit a slow suite", () => {
-    const comment = flatComment(testJob);
+    const comment = flatComment(testJob.slice(0, timeoutAt));
     expect(comment, 'must name #749 as (part of) the fix, so a future author has somewhere to look before raising the number')
       .toContain('#749');
     expect(comment, 'must say the number is meant to come back down, not merely that it is raisable')
