@@ -1249,6 +1249,21 @@ describe('a pointer that did not go down on this canvas cannot end its stroke (#
     expect(sim.take('hits'), 'finger 1 is not orphaned by the newer finger lifting — one stroke per pointer, not one per canvas')
       .toEqual([{ label: c.label, viaSwipe: true }]);
   });
+  it('a trail handoff on lift starts fresh at the surviving finger, not a jump from the lifted one\'s last point (#561 review)', () => {
+    // Review round 1's finding: `onUp` hands `mostRecentId` to a still-down pointer but used to leave `trail`
+    // untouched — the lifted finger's own leftover points stayed in the array, so the surviving finger's next
+    // move drew one connected line jumping from wherever the lifted finger was to wherever the survivor now is.
+    sim = createSim({ seed: 7 });
+    const trailXY = () => (sim!.arena as unknown as { trail: { x: number; y: number }[] }).trail.map(({ x, y }) => ({ x, y }));
+    sim.pointer('pointerdown', { x: 5, y: 5, pointerId: 1 });
+    sim.pointer('pointermove', { x: 50, y: 50, pointerId: 1 });
+    sim.pointer('pointerdown', { x: 200, y: 200, pointerId: 2 });   // finger 2 down: takes the visual trail (not the stroke)
+    sim.pointer('pointermove', { x: 210, y: 210, pointerId: 2 });
+    sim.pointer('pointerup', { x: 210, y: 210, pointerId: 2 });     // finger 2 lifts: trail hands back to finger 1
+    sim.pointer('pointermove', { x: 60, y: 500, pointerId: 1 });    // finger 1's own next move
+    expect(trailXY(), 'the trail must start fresh at finger 1, not carry finger 2\'s leftover points')
+      .toEqual([{ x: 50, y: 50 }, { x: 60, y: 500 }]);
+  });
   it('pointercancel follows the same rule: a foreign one is ignored, the stroke\'s own one ends it', () => {
     sim = createSim({ seed: 7 });
     const [b] = frozenWave(sim);

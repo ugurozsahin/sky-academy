@@ -47,8 +47,7 @@ const MAX_RELAUNCHES = 3;
 // A tap throws the ninja's own projectile (#48): it flies from the bottom of the arena to the bubble and pops
 // it on arrival. Score, lives and the outcome reveal are all settled at the tap — only the pop waits for the
 // landing, so the flight is decoration and never changes what the child earned.
-/** One finger's own swipe (#561), keyed by `pointerId` — `onDown` adds, `onMove`/`onUp` touch only their own.
- *  `stale` is #331's freeze flag, now per finger. */
+/** One finger's own swipe (#561), keyed by `pointerId`; `stale` is #331's freeze flag, now per finger. */
 interface Stroke { lastPt: { x: number; y: number }; moved: number; stale: boolean }
 export interface Shot { target: Bubble; x0: number; y0: number; x: number; y: number; t: number; fx: FxKind; emit: number }
 export const SHOT_FLIGHT = 0.15;   // seconds in the air
@@ -295,8 +294,7 @@ export class Arena {
     this.mostRecentId = e.pointerId;                 // #561: the newest finger is the one the visual trail follows
     this.trail = [{ ...p, t: performance.now() }];
     try { this.canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-    if (stale) return;   // #464: a press during the freeze is real intent — record the stroke, but stale, so the
-                          // first move after it arms rather than cashing in the bubble under the finger now (#331)
+    if (stale) return;   // #464: a press during the freeze is real intent — record it, but stale, so the first move after it arms (#331)
     const b = this.bubbleAt(p.x, p.y);
     if (b) this.hitBubble(b, false);
   };
@@ -333,6 +331,8 @@ export class Arena {
     if (this.mostRecentId !== e.pointerId) return;
     const remaining = [...this.strokes.keys()];      // hand the trail to another still-down finger, else null for the next onDown
     this.mostRecentId = remaining.length ? remaining[remaining.length - 1] : null;
+    const s = this.mostRecentId !== null && this.strokes.get(this.mostRecentId);
+    if (s) this.trail = [{ ...s.lastPt, t: performance.now() }];   // else it ages out (#446): no pointer to hand off to
   };
   private bubbleAt(x: number, y: number) {
     let best: Bubble | null = null, bd = Infinity;
