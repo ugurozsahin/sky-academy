@@ -63,6 +63,14 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     expect(() => workflowFiles(empty), 'zero .yml/.yaml files must throw, not return []').toThrow(/pass vacuously/);
   });
 
+  // pr-test-analyzer review of #680: the empty fixture above proves the throw fires, but a filter narrowed to
+  // match only `.yml` — silently dropping `.yaml` — would also pass it, since it has neither extension to miss.
+  // This fixture holds only a `.yaml` file, so that regression has something to find.
+  it('workflowFiles(dir) still finds a .yaml-only directory, not just .yml (#680)', () => {
+    const yamlOnly = new URL('./helpers/fixtures/yaml-only/', import.meta.url);
+    expect(workflowFiles(yamlOnly).map((w) => w.name)).toEqual(['one.yaml']);
+  });
+
   it('e2eSpecFiles() finds every e2e spec, and is loud rather than empty if it finds none (#750)', () => {
     const found = e2eSpecFiles();
     expect(found.length, 'tests/e2e/ has several spec files; zero means the directory moved').toBeGreaterThanOrEqual(3);
