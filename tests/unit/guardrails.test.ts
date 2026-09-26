@@ -289,6 +289,11 @@ describe('guard rails', () => {
   // `require.resolve(…)` property-access callee; `require('x').y(…)` and every other property off the result
   // of a call stay out of scope, since only the callee identifier itself is checked.
   //
+  // Round 10: a type-position `import('…')` (`typeof import('../ui/dom')`, `import('../ui/dom').SomeType`) is
+  // not a `CallExpression` — it is a `ts.ImportTypeNode` — so the walk never inspected it, yet `tsc` genuinely
+  // resolves and type-checks the reference (this repo already writes the idiom, `src/ui/solid.ts`). Extended
+  // to also visit `ImportTypeNode`, reading its `argument` (a `LiteralTypeNode` wrapping the string literal).
+  //
   // Only the directory-separator normalisation survives from the old pipeline: `posix.resolve` is POSIX-only
   // and never treats `\` as a separator, but TypeScript's own resolver does on every host OS (round 6), so a
   // decoded specifier still has its backslashes turned to `/` before resolving.
@@ -317,6 +322,9 @@ describe('guard rails', () => {
           const s = specifierOf(n.arguments[0]);
           if (s !== null) out.push(s);
         }
+      } else if (ts.isImportTypeNode(n)) {
+        const arg = n.argument;
+        if (ts.isLiteralTypeNode(arg) && ts.isStringLiteralLike(arg.literal)) out.push(arg.literal.text);
       }
       ts.forEachChild(n, visit);
     };
@@ -351,6 +359,10 @@ describe('guard rails', () => {
     expect(importSpecifiers('x.ts', "// import { a } from '../ui/dom';")).toEqual([]);
     // A path assembled at run time is invisible, as it always was — only a literal or template specifier.
     expect(importSpecifiers('x.ts', "import(dir + '/dom');")).toEqual([]);
+    // Round 10: a type-position import is a real, tsc-resolved reference — not a CallExpression, but an
+    // ImportTypeNode — and this repo already writes the idiom (src/ui/solid.ts's `typeof import(...)`).
+    expect(importSpecifiers('x.ts', "type Loader = () => Promise<typeof import('../ui/dom')>;")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "type Foo = import('../ui/dom').SomeType;")).toEqual(['../ui/dom']);
   });
   it('no file in src/game/ imports from src/ui/ (#557)', () => {
     for (const [path, src] of inDir('/src/game/')) {
