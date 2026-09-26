@@ -1247,7 +1247,7 @@ export function evaluateStickers(d: SaveData): string[] {
  * rail in `tests/unit/guardrails.test.ts` keeps `src/ui/` off both halves of the old pair. Kept for a caller
  * that pays coins with no finished game behind them, and used by `tests/unit/shop.test.ts` to seed a purse. */
 export function addCoins(n: number): string[] {
-  const d = load(); const coins = d.coins + Math.max(0, Number.isFinite(n) ? n : 0);   // save() never sanitizes like migrate() does, and Math.max(0, NaN) is NaN (#797)
+  if (!Number.isFinite(n)) console.warn(`addCoins(${n}): non-finite amount — ignored`); const d = load(); const coins = d.coins + Math.max(0, Number.isFinite(n) ? n : 0);   // save() never sanitizes like migrate() does, and Math.max(0, NaN) is NaN (#797)
   const unlocked = evaluateStickers({ ...d, coins }); const fresh = unlocked.filter(id => !d.stickers.includes(id));
   save({ coins, stickers: unlocked });
   return fresh;
@@ -1416,8 +1416,8 @@ export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[] }
  * report, exactly as before — this closes the *inconsistency*, not the refusal (#151 stands).
  */
 export function recordGameEnd(e: DojoEvent, gameCoins: number, now = new Date()): GameEndOutcome {
-  const d = load();
-  const dojo = applyEvent(d.dojo, e, today(now));
+  if (!Number.isFinite(gameCoins)) console.warn(`recordGameEnd: non-finite gameCoins (${gameCoins}) — ignored`);   // same #797 guard as addCoins()
+  const d = load(); const dojo = applyEvent(d.dojo, e, today(now));
   // `gameCoins`, not `coins`: every call site on `main` read `addCoins(paid + dojo.coins)`, so a maintainer
   // with that muscle memory would write `recordGameEnd(e, r.coins + dojo.coins)` and be paid the bonus twice,
   // with no type error and no test to catch it (round 2, note 4). The bonus is this function's to add.

@@ -99,8 +99,11 @@ describe('rewards storage', () => {
   // ever does.
   it('a non-finite amount never reaches the saved balance (#797)', () => {
     save({ coins: 40, stickers: [STICKER_IDS[0]] });   // past the first threshold and already owned, so a real 0 crosses nothing new
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(addCoins(NaN)).toEqual([]);
     expect(load().coins, 'the balance is untouched, not NaN').toBe(40);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
   it('tutorial flag defaults to unseen and survives old saves without the field', () => {
     expect(load().tutorialSeen).toBe(false);
@@ -2648,10 +2651,18 @@ describe('a finished game is persisted in one write, or not at all (#365)', () =
   // `gameCoins` must not reach the saved total, and — since this is the one write a finished game gets (#365)
   // — the dojo progress in the same call must still land rather than being dropped alongside the bad figure.
   it('a non-finite gameCoins never reaches the saved balance, and the dojo half of the write still lands (#797)', () => {
+    // Pinned to a bonus-paying date (the same BONUS_DAY as the sticker test above) rather than `new Date()`:
+    // `memoryWin` only pays a dojo bonus on 68/400 dates, and on the rest `out.dojo.coins` is 0 — which would
+    // let this test pass even if the dojo addend were dropped from `total` entirely, not just the NaN term.
+    const BONUS_DAY = new Date('2026-01-13T12:00:00Z');
     save({ coins: 4 });
-    const out = recordGameEnd(memoryWin, NaN);
-    expect(disked().coins, 'the game\'s own NaN contributed nothing, only the dojo bonus (if any) landed')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const out = recordGameEnd(memoryWin, NaN, BONUS_DAY);
+    expect(out.dojo.coins, 'the fixture must actually earn a bonus, or this test proves nothing').toBeGreaterThan(0);
+    expect(disked().coins, 'the game\'s own NaN contributed nothing, only the dojo bonus landed')
       .toBe(4 + out.dojo.coins);
     expect(disked().dojo.date, 'the dojo state still landed').toBe(out.dojo.state.date);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
 });
