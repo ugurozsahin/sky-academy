@@ -9,7 +9,7 @@
 // and it imports nothing from `src/` outside this tree — `scripts/bundle-single.mjs` inlines the chunk as a
 // self-contained data URL, which a chunk reaching back into the main chunk could not be. The six solids are
 // imported one by one, not through the objects registry, so the sketchbook's hammer never ships in the game.
-import { WebGLRenderTarget, type Mesh, type MeshToonMaterial, type Object3D } from 'three';
+import { WebGLRenderTarget, type Camera, type Mesh, type MeshToonMaterial, type Object3D, type PerspectiveCamera, type Scene, type WebGLRenderer } from 'three';
 import { defaultsOf, type ObjectSpec } from '../objects/define';
 import { cone } from '../objects/solids/cone';
 import { cube } from '../objects/solids/cube';
@@ -75,6 +75,40 @@ const dispose = (root: Object3D) => root.traverse((o) => {
   const m = o as Mesh; m.geometry?.dispose();
   const mat = m.material; (Array.isArray(mat) ? mat : mat ? [mat] : []).forEach(x => x.dispose());
 });
+
+/**
+ * The GL side of `SolidView.sheet()`, pulled out so a throwing renderer can prove the restore without a real
+ * WebGL context (#764). The `try` starts before the first state-mutating statement — hiding the card, adding
+ * `solid` to the scene, squaring the camera — not just around the render loop: a throw from any of those, not
+ * only from `render()` itself, used to leave the card and shadow hidden and the camera aspect stuck at 1 for
+ * every frame after, since the visible card's own `tick()` keeps rendering into the same renderer and camera.
+ */
+export function renderSheet(
+  env: { renderer: Pick<WebGLRenderer, 'setRenderTarget' | 'clear' | 'render' | 'readRenderTargetPixels'>; scene: Scene; camera: Camera & Pick<PerspectiveCamera, 'aspect' | 'updateProjectionMatrix'>; card: Pick<Object3D, 'visible'>; shadow: Pick<Object3D, 'visible'>; hadObject: boolean },
+  target: WebGLRenderTarget, solid: Object3D, plan: { base: number; frames: number; big: number; cell: number }, read: Uint8Array, out: Uint8ClampedArray,
+): void {
+  const { renderer, scene, camera, card, shadow } = env;
+  const { base, frames, big, cell } = plan;
+  const camAspect = camera.aspect;
+  try {
+    card.visible = false; shadow.visible = false;
+    scene.add(solid);
+    camera.aspect = 1; camera.updateProjectionMatrix();
+    renderer.setRenderTarget(target);
+    for (let f = 0; f < frames; f++) {
+      solid.rotation.y = base + (f / frames) * Math.PI * 2;
+      renderer.clear();
+      renderer.render(scene, camera);
+      renderer.readRenderTargetPixels(target, 0, 0, big, big, read);
+      downsampleInto(read, big, out, cell * frames, f * cell);
+    }
+  } finally {
+    renderer.setRenderTarget(null);
+    camera.aspect = camAspect; camera.updateProjectionMatrix();
+    scene.remove(solid); dispose(solid); target.dispose();
+    card.visible = true; shadow.visible = env.hadObject;
+  }
+}
 
 /**
  * One renderer, one canvas, one solid at a time. `show()` swaps the solid; `hide()` parks the loop; `destroy()`
@@ -146,29 +180,10 @@ export class SolidView {
     whiten(solid);
     const base = solid.rotation.y;
     const { group: card, shadow } = this.stand;
-    card.visible = false; shadow.visible = false;
-    this.rig.scene.add(solid);
-    const camera = this.rig.camera, camAspect = camera.aspect;
-    camera.aspect = 1; camera.updateProjectionMatrix();
     const read = new Uint8Array(big * big * 4);
     const out = new Uint8ClampedArray(cell * frames * cell * 4);
-    // A throw partway through the loop (render, read-back, or the target allocation above) must still restore
-    // the renderer's shared state — the visible card's own tick() keeps rendering into it every frame after.
-    try {
-      this.renderer.setRenderTarget(target);
-      for (let f = 0; f < frames; f++) {
-        solid.rotation.y = base + (f / frames) * Math.PI * 2;
-        this.renderer.clear();
-        this.renderer.render(this.rig.scene, camera);
-        this.renderer.readRenderTargetPixels(target, 0, 0, big, big, read);
-        downsampleInto(read, big, out, cell * frames, f * cell);
-      }
-    } finally {
-      this.renderer.setRenderTarget(null);
-      camera.aspect = camAspect; camera.updateProjectionMatrix();
-      this.rig.scene.remove(solid); dispose(solid); target.dispose();
-      card.visible = true; shadow.visible = !!this.object;
-    }
+    renderSheet({ renderer: this.renderer, scene: this.rig.scene, camera: this.rig.camera, card, shadow, hadObject: !!this.object },
+      target, solid, { base, frames, big, cell }, read, out);
     return { width: cell * frames, height: cell, data: out };
   }
   hide() { this.stop(); this.clear(); this.name = null; this.el.remove(); }

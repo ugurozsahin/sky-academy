@@ -12,9 +12,23 @@ export const SHADOW_OPACITY = 0.3;
 /** How much of the object's footprint the disc covers: a little under, so it reads as contact, not a plate. */
 export const SHADOW_SPREAD = 0.45;
 
-/** Where `object` stands and how wide: the bottom of its bounding box and the larger of its two ground extents. */
+/**
+ * Where `object` stands and how wide: the bottom of its bounding box and the larger of its two ground extents.
+ * An object with no mesh geometry gives `Box3` an empty box (`min=+Inf, max=-Inf`) rather than a real extent, and
+ * a mesh with a genuinely non-finite vertex fares no better: `Box3.setFromObject()` carries the box through the
+ * object's `matrixWorld` (`Box3.applyMatrix4`), whose affine row multiplies the infinite coordinate by an exact
+ * `0` on the way to a homogeneous divide — `0 * Infinity` is `NaN`, and it poisons every axis, not just the
+ * offending one. `min.y` alone catches both shapes. Every registered solid always has real, finite geometry, but
+ * a future malformed `ObjectSpec` would otherwise stand at `Infinity` (or NaN) with nothing thrown, the silent
+ * kind of bug this stage exists to avoid (#764).
+ */
 export function footprint(object: Object3D): { base: number; radius: number } {
-  const box = new Box3().setFromObject(object), size = box.getSize(new Vector3());
+  const box = new Box3().setFromObject(object);
+  if (!Number.isFinite(box.min.y)) {
+    console.warn('footprint(): object has no measurable geometry; standing it at the origin instead of Infinity');
+    return { base: 0, radius: 0 };
+  }
+  const size = box.getSize(new Vector3());
   return { base: box.min.y, radius: Math.max(size.x, size.z) * SHADOW_SPREAD };
 }
 

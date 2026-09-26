@@ -1,6 +1,7 @@
+import { Object3D, PerspectiveCamera, Scene, WebGLRenderTarget } from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { complement, createSolidSlot, hasInk, SHEET, solidNameFor, SOLID_NAMES, SOLID_TOPICS } from '../../src/ui/solid';
-import { downsampleInto } from '../../src/three/mount/solids';
+import { downsampleInto, renderSheet } from '../../src/three/mount/solids';
 import { GOOD, BAD, PALETTE } from '../../src/game/arena';
 import { SHAPES_3D } from '../../src/curriculum/util';
 import type { Question } from '../../src/curriculum';
@@ -384,6 +385,64 @@ describe('bubble art — the rotating solid inside a "Which is a …?" bubble (#
     expect(slot.bubbleArt('🎲', '#40c4ff', 0)).toBeNull();
     expect(slot.art()).toMatchObject({ ready: [], error: 'no-webgl' });
     warn.mockRestore();
+  });
+});
+
+describe('renderSheet — the GL side of sheet(), restores state even when the renderer throws (#764)', () => {
+  const stage = (hadObject: boolean) => ({
+    scene: new Scene(),
+    camera: Object.assign(new PerspectiveCamera(), { aspect: 1.75 }),
+    card: { visible: false },
+    shadow: { visible: false },
+    hadObject,
+  });
+  const fakeRenderer = (render: () => void = () => {}) => ({
+    setRenderTarget: vi.fn(), clear: vi.fn(), render: vi.fn(render), readRenderTargetPixels: vi.fn(),
+  });
+
+  it('renders every frame, restores the card, shadow and aspect, and leaves the scene clean', () => {
+    const renderer = fakeRenderer();
+    const s = stage(true);
+    const solid = new Object3D();
+    const target = new WebGLRenderTarget(2, 2);
+    const read = new Uint8Array(2 * 2 * 4), out = new Uint8ClampedArray(1 * 3 * 1 * 4);
+    renderSheet({ renderer, ...s }, target, solid, { base: 0, frames: 3, big: 2, cell: 1 }, read, out);
+    expect(renderer.render).toHaveBeenCalledTimes(3);
+    expect(renderer.setRenderTarget).toHaveBeenNthCalledWith(1, target);
+    expect(renderer.setRenderTarget).toHaveBeenLastCalledWith(null);
+    expect(s.camera.aspect, 'the square-for-the-shot aspect is put back').toBe(1.75);
+    expect(s.card.visible).toBe(true);
+    expect(s.shadow.visible, 'a solid was already showing before the bake').toBe(true);
+    expect(s.scene.children).not.toContain(solid);
+  });
+
+  it('a throw from render() partway through the loop still restores the card, shadow and aspect', () => {
+    let calls = 0;
+    const renderer = fakeRenderer(() => { calls++; if (calls === 2) throw new Error('GL context lost'); });
+    const s = stage(false);   // nothing was showing before the bake
+    const solid = new Object3D();
+    const target = new WebGLRenderTarget(2, 2);
+    expect(() => renderSheet({ renderer, ...s }, target, solid, { base: 0, frames: 4, big: 2, cell: 1 }, new Uint8Array(16), new Uint8ClampedArray(16)))
+      .toThrow('GL context lost');
+    expect(calls, 'stopped at the throw, not the full frame count').toBe(2);
+    expect(s.camera.aspect).toBe(1.75);
+    expect(s.card.visible).toBe(true);
+    expect(s.shadow.visible, 'nothing was showing before, so nothing shows now').toBe(false);
+    expect(s.scene.children, 'the render target and the baked solid are still cleaned up').not.toContain(solid);
+  });
+
+  it('a throw before the render loop starts — adding the solid to the scene — still restores card, shadow and aspect', () => {
+    const renderer = fakeRenderer();
+    const s = stage(true);
+    s.scene.add = () => { throw new Error('cannot add'); };
+    const solid = new Object3D();
+    const target = new WebGLRenderTarget(2, 2);
+    expect(() => renderSheet({ renderer, ...s }, target, solid, { base: 0, frames: 1, big: 2, cell: 1 }, new Uint8Array(16), new Uint8ClampedArray(4)))
+      .toThrow('cannot add');
+    expect(renderer.render, 'never reached the render loop').not.toHaveBeenCalled();
+    expect(s.camera.aspect).toBe(1.75);
+    expect(s.card.visible).toBe(true);
+    expect(s.shadow.visible).toBe(true);
   });
 });
 

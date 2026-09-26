@@ -2,8 +2,8 @@
  * #740: the stage's motion beats, contact shadow and gloss spot. Its own file, apart from `three.test.ts`, so
  * this and the solids (#684) never edit the same lines.
  */
-import { BoxGeometry, Mesh, type MeshBasicMaterial } from 'three';
-import { describe, expect, it } from 'vitest';
+import { BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, Mesh, Object3D, type MeshBasicMaterial } from 'three';
+import { describe, expect, it, vi } from 'vitest';
 import { contactShadow, footprint, SHADOW_OPACITY, shadowScale } from '../../src/three/stage/ground';
 import { BEAT_SECONDS, BEATS, beatPose, HOP, idleBob, REST } from '../../src/three/stage/motion';
 import { addGloss, GLOSS_EDGE, toonMaterial } from '../../src/three/stage/toon';
@@ -56,6 +56,29 @@ describe('the stage brings objects to life (#740)', () => {
     expect(shadowScale(1, HOP, HOP)).toBe(0.5);
     expect(shadowScale(1, HOP * 4, HOP), 'never below half').toBe(0.5);
   });
+  it('an object with no mesh geometry stands at the origin instead of Infinity, and says so once (#764)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const empty = new Group();   // Box3().setFromObject() on this is min=+Inf, max=-Inf: no geometry to measure
+      expect(footprint(empty)).toEqual({ base: 0, radius: 0 });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toMatch(/no measurable geometry/);
+    } finally { warn.mockRestore(); }
+  });
+  // A different shape of degenerate box from the empty-Group case above: real, present geometry, but with one
+  // non-finite vertex. `Box3.setFromObject()` still catches it — carrying the box through the mesh's identity
+  // `matrixWorld` multiplies the infinite coordinate by an exact 0 on the projective-divide row, which is NaN,
+  // and NaN spreads to every axis of the transformed box, not just the one the bad vertex is on.
+  it('a mesh with one non-finite vertex also stands at the origin, not at Infinity (#764)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const geom = new BufferGeometry();
+      geom.setAttribute('position', new Float32BufferAttribute([Infinity, 0, 0, 0, 1, 0, 0, 0, 1], 3));
+      const bad = new Mesh(geom);
+      expect(footprint(bad)).toEqual({ base: 0, radius: 0 });
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally { warn.mockRestore(); }
+  });
 });
 
 describe('the stand: where the sketchbook and the game card show an object (#684, #740)', () => {
@@ -82,5 +105,15 @@ describe('the stand: where the sketchbook and the game card show an object (#684
     expect(stand.shadow.visible, 'nothing shown, no shadow').toBe(false);
     stand.beat('pop', 6000);
     expect(stand.lastBeat, 'nothing shown, nothing to beat').toBe('cheer');
+  });
+  it('an object with no mesh geometry is stood at the origin, not Infinity (#764)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const stand = createStand('#0d1226');
+      stand.set(new Object3D());   // no geometry anywhere under it
+      stand.update(0, true);
+      expect(Number.isFinite(stand.group.position.y), 'never Infinity').toBe(true);
+      expect(stand.group.position.y).toBeCloseTo(0, 6);
+    } finally { warn.mockRestore(); }
   });
 });
