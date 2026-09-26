@@ -2019,6 +2019,55 @@ describe('guard rails', () => {
     expect(check9, 'and a run stuck at null must be bounded, as check 1 bounds it — a permanent queue is a dead quota')
       .toMatch(/45 minutes/);
   });
+
+  // #755: check 1's stuck-run bound is hand-copied from ci.yml's `test` job ceiling rather than derived from
+  // it, and the two had already drifted once — PR #754 raised the job's own `timeout-minutes` from 30 to 45
+  // without check 1's prose following, so a healthy 46-minute nightly read as stuck to the watchdog. This
+  // reads both numbers from their real sources and ties them together, rather than re-typing either.
+  it("check 1's stuck-run bound tracks ci.yml's actual test-job ceiling, with real margin above it (#755)", () => {
+    const ci = workflow('ci.yml');
+    const jobs = ci.slice(ci.indexOf('\njobs:'));
+    expect(jobs.length, 'the jobs block must be read, not an empty slice').toBeGreaterThan(100);
+    // Sliced to the `test` job alone: `branch-name` carries its own, unrelated `timeout-minutes: 5`, and a
+    // whole-file search would let this rail read either one depending on which came first in the file.
+    // The end anchor is checked for `-1` before it is used: `String.slice(start, -1)` does not throw on a
+    // missing terminator, it silently runs almost to the end of `jobs` instead — which would still read the
+    // `test` job's own `timeout-minutes` correctly today, so a vacuity guard on length alone would not catch
+    // a `branch-name` rename, only a genuinely wrong number would (pr-test-analyzer review of this rail).
+    const testEnd = jobs.indexOf('\n  branch-name:');
+    expect(testEnd, "the `branch-name` job must still exist, to bound the `test` job's own slice").toBeGreaterThan(0);
+    const testJob = jobs.slice(jobs.indexOf('\n  test:'), testEnd);
+    expect(testJob.length, "the `test` job must be read, not an empty slice").toBeGreaterThan(100);
+    const ceiling = Number(/timeout-minutes:\s*(\d+)/.exec(testJob)?.[1]);
+    expect(ceiling, "the test job's own timeout-minutes must be a readable number, or this rail proves nothing")
+      .toBeGreaterThan(0);
+
+    const text = readFileSync(new URL('../../docs/WATCHDOG-PROMPT.md', import.meta.url), 'utf8');
+    const checks = text.slice(text.indexOf('\n## The checks'));
+    const section = checks.slice(0, checks.indexOf('\n## ', 1));
+    const at = section.indexOf('1. **Is `main` green?**');
+    expect(at, 'check 1 must exist, in the checks a run performs').toBeGreaterThan(0);
+    // Same guard as `testEnd` above: an unbound `-1` here would silently swallow every later check into
+    // `check1` and still happen to pass today, since nothing later in the document also reads `timeout-minutes`.
+    const check1End = section.indexOf('\n2. **Did the nightly run', at);
+    expect(check1End, 'check 2 must still exist, to bound check 1\'s own slice').toBeGreaterThan(at);
+    const check1 = section.slice(at, check1End);
+    expect(check1.length, 'check 1 must be read, not an empty slice').toBeGreaterThan(200);
+
+    expect(check1, `check 1 must quote the test job's real ceiling (${ceiling}), not a stale copy of an earlier one`)
+      .toContain('`timeout-minutes` is ' + ceiling);
+
+    const stuck = /after ~(\d+) minutes is stuck/.exec(check1);
+    expect(stuck, 'check 1 must state a numeric stuck bound').toBeTruthy();
+    expect(Number(stuck![1]), 'the stuck bound must sit above the ceiling with real margin, not coincide with it — '
+      + 'a bound equal to the ceiling gives GitHub itself no room to report a cancellation before the watchdog fires')
+      .toBeGreaterThan(ceiling);
+
+    const finding = /Past (\d+) minutes it is a finding/.exec(check1);
+    expect(finding, 'check 1 must restate the same bound as the point past which it is a finding').toBeTruthy();
+    expect(Number(finding![1]), 'the two numbers inside check 1 must agree with each other')
+      .toBe(Number(stuck![1]));
+  });
 });
 
 
