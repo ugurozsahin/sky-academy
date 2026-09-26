@@ -160,6 +160,29 @@ async function nextWaveWithBomb(page: Page) {
     .some((b: any) => b.label === '💣' && b.vy < 0 && b.y > 80 && b.y < window.innerHeight - 40), null, { timeout: 15000 });
 }
 
+/**
+ * Skip a staged mission straight to the start of `stage`, without playing the stages before it — for a test
+ * whose subject is that later stage's own content, not the stages leading up to it (#749). Calls the same
+ * `nextStage()` the "Next" button calls on a real stage-clear, directly through the hook, so the arena/HUD
+ * update exactly as they do after any other `nextQuestion()` — no bespoke render path to keep in sync.
+ *
+ * Never reaches for a stage the mission cannot have (`target` must be `<= session.stages`), and never used
+ * where the skipped stages' stars/coins matter: `nextStage()` advances the stage counter without recording
+ * any star for the stage it skips past, so a mission ended after this has an incomplete `stageStars` — fine
+ * for a test that only reads the *next* stage's own content, wrong for one that reads the mission's result.
+ */
+async function skipToStage(page: Page, stage: number) {
+  // `nextStage()` ends the mission instead of advancing once `stage >= stages`, so a `target` past the
+  // mission's own stage count would make this loop exit on `s.ended` having never reached `target` — asserted
+  // here, rather than left to surface later as a generic "no card ever appeared" timeout downstream.
+  const landed = await page.evaluate((target) => {
+    const s = window.__sna.session;
+    while (s.stage < target && !s.ended) s.nextStage();
+    return { stage: s.stage, ended: s.ended };
+  }, stage);
+  expect(landed, `skipToStage(${stage}) must land on that stage, not end the mission first`).toEqual({ stage, ended: false });
+}
+
 /** Answer the current question via the hook and wait for the next one (a sequence question needs one slice per letter). */
 async function solveCurrent(page: Page) {
   const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
@@ -574,18 +597,18 @@ test.describe('Sky Ninja Academy', () => {
 
   // #137 "5. Smaller, same family": the block diagram (d3) never rendered in a browser at all — the e2e rail
   // above stops at d2, and unit tests cannot see CSS layout. Year 2's `diffs` array (`src/curriculum/types.ts`)
-  // is `[1, 2, 2, 3, 3]`, so difficulty 3 is not reached until stage 4 — three whole stages must be played
-  // first, which is why this is its own test rather than an extension of the one above.
+  // is `[1, 2, 2, 3, 3]`, so difficulty 3 is not reached until stage 4 — reached here via `skipToStage`
+  // rather than played (#749), which is why this is its own test rather than an extension of the one above.
   test('statistics: the block diagram reaches the card without overflowing a narrow viewport (#137)', async ({ page }) => {
     test.setTimeout(240_000);
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-stats');
     const perStage = await page.evaluate(() => window.__sna.session.perStage as number);
-    for (let stage = 1; stage < 4; stage++) {
-      await answerAll(page, perStage);
-      await expect(page.locator('.celebrate')).toBeVisible();
-      await page.click('#next');
-    }
+    // #749: stage 4 is the subject, not stages 1-3 — nobody here reads a star, a coin or the mission result,
+    // so playing three whole stages for real bought nothing but render time. `skipToStage` reaches the same
+    // stage 4 through the hook `nextStage()` already exposes.
+    await skipToStage(page, 4);
+    await waitForTarget(page);
     // Every question from here is difficulty 3: `y2Stats`'s `kind` is a pure function of `d`
     // (`src/curriculum/maths.ts`), so every one of this stage's questions is a block diagram — nothing here
     // depends on which survey or which `ask` was rolled. What *is* random is each row's count (`ri(rng, 1, 9)`
@@ -1756,6 +1779,10 @@ test.describe('Sky Ninja Academy', () => {
    * The sample is the reviewer's own, the tallest cards they measured, and the budget is a BUDGET: it only
    * ever goes down (`.claude/rules/guardrails.md`). Do not raise it to make a build pass — a card that
    * needs more room in landscape is the bug this rail is for.
+   *
+   * #749: this test's length is the six topics' own `startTopic()` navigations, not a mission played to a
+   * win — it never answers a single question, so there is no play to remove. Six is the sample the budget
+   * above needs; a shorter sweep would just measure fewer of the tallest cards.
    */
   test('guard rail: no play card eats the landscape arena, on any of the tallest topics (#328)', async ({ page }) => {
     const CARD_BUDGET = 330;   // measured worst on this tree: y2-symmetry at 321 of 390. The regression: 337.
