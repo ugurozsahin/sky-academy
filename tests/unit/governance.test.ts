@@ -4182,6 +4182,11 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // edit obligation, regardless of reachability" and every existing assertion here still passed.
     expect(a, 'the bridging clause that makes the disposition conditional on reachability, not unconditional')
       .toContain('so a finding whose input the code cannot produce is');
+    // #744 round 5 (pr-test-analyzer): the reason to retry an unavailable agent was pinned above
+    // ("roster registers later than the skill list"), but the instruction word itself, "retry", was
+    // not — a rewrite could swap it for "treat that as final" and every existing assertion still passed.
+    expect(a, 'the instruction itself, not only the reason for it — a rewrite could swap "retry" for "treat that as final" and pass')
+      .toMatch(/session,\s+retry\b/);
   });
 
   it('review-pr §3: a sweep is handed over as an issue, which is the only form a reviewer may create', () => {
@@ -4225,6 +4230,16 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // that makes the re-derivation matter (#466's four-round cost) was unpinned anywhere in the file.
     expect(b, 'the cost that re-derivation carries, not only that someone has to do it')
       .toMatch(/that re-derivation is most of\s+what a four-round pull request costs/);
+    // #744 round 5 (pr-test-analyzer, highest severity): the premise the whole consequence hangs on —
+    // that the sweep was left undocumented — was pinned by nothing. A rewrite could invert it ("A sweep
+    // landed as its own issue is re-derived from scratch next round…") and every assertion above still
+    // passed, since all three fire only on text after this premise.
+    expect(b, 'the premise itself — an undocumented sweep, not a documented one — or the whole sentence can invert')
+      .toMatch(/described only in a comment/);
+    // #744 round 5 (pr-test-analyzer, minor): the labels were pinned above, but not the reason they
+    // matter — that they let the developer query find the issue at all, not merely that it carries them.
+    expect(b, 'the reason the labels matter — so the developer query can reach it, not merely that it carries them')
+      .toMatch(/developer query can reach it/);
 
     const body = bodyCheck();
     expect(body, 'the author-side claim must have a reader on the reviewer side')
