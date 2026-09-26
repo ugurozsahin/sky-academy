@@ -8,7 +8,7 @@
 // allowlist rail is the reason not to make it one for nine tests. Only what `Arena` actually touches is
 // faked, so a constructor that starts reaching for more of the DOM fails here loudly rather than silently.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Arena, type Bubble } from '../../src/game/arena';
+import { Arena, warnUnfitLabel, type Bubble, type LabelFit } from '../../src/game/arena';
 
 /** The per-character factor #348 measured for Fredoka bold (`a three-quarter turn`, 109.6px at fs 9.6). */
 const PER_CHAR = 0.571;
@@ -174,5 +174,28 @@ describe('warnUnfitLabel says so out loud when a label does not fit (#348 / #495
     arena.reveal({ good: label });
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0][0]).toContain(label);
+  });
+
+  // #739: the dedupe key is `label|radius|state` (arena.ts:1046) so the same label re-arms the warning at a
+  // different radius or a different fit state — portrait vs. landscape, or "now small" vs. "now overflowing".
+  // Simplifying the key to `label` alone leaves the whole suite green (nothing else exercises re-arming), so
+  // these call `warnUnfitLabel` directly rather than through a wave, which lets each case hold every other
+  // input fixed and vary only the one field the key is claimed to carry.
+  it.each([
+    ['a different radius, same state', 40, 41, 'small', 'small'] as const,
+    ['a different fit state, same (rounded) radius', 40, 40, 'small', 'overflow'] as const,
+  ])('warns again for the same label at %s (#739)', (_case, r1, r2, state1, state2) => {
+    const label = `warnUnfitLabel re-arm probe: ${_case}`;
+    warnUnfitLabel(label, r1, { fs: 10, lines: ['a'], state: state1 });
+    warnUnfitLabel(label, r2, { fs: 10, lines: ['a'], state: state2 });
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not warn again for the same label at the same rounded radius and state', () => {
+    const label = 'warnUnfitLabel re-arm probe: identical key twice';
+    const fit: LabelFit = { fs: 10, lines: ['a'], state: 'small' };
+    warnUnfitLabel(label, 40.3, fit);   // rounds to the same key as 40.4 below (#739's own dedupe)
+    warnUnfitLabel(label, 40.4, fit);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });
