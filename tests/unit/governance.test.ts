@@ -4169,6 +4169,13 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // diff"; only the disposition was pinned above, not the reasoning that justifies it.
     expect(a, "why an unreachable finding is a note and not an edit — the agents reason forward, never backward")
       .toMatch(/do not reason backwards to whether the input can occur/);
+    // #744 round 3 (silent-failure-hunter/pr-test-analyzer): three assertions touch this paragraph, but
+    // none pinned the bridging clause joining "do not reason backwards…" to "a note for the body, not
+    // an edit to the diff" — the clause that makes the note-not-edit disposition conditional on
+    // reachability rather than unconditional. A rewrite could invert the rule to "no finding is ever an
+    // edit obligation, regardless of reachability" and every existing assertion here still passed.
+    expect(a, 'the bridging clause that makes the disposition conditional on reachability, not unconditional')
+      .toContain('so a finding whose input the code cannot produce is');
   });
 
   it('review-pr §3: a sweep is handed over as an issue, which is the only form a reviewer may create', () => {
@@ -4256,6 +4263,12 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // budget in reviewed code may only fall).
     expect(section, "review-pr §3's own budget-rail bullet — a reviewer's own rule, not only the author's")
       .toMatch(/A budget number may only go down/);
+    // #744 round 3 (silent-failure-hunter): the rule above stops at its headline. The enforcement
+    // clause after it — a budget raised to make a build pass is itself the finding, no "but there was
+    // a good reason" exception survives it — was unpinned anywhere in this file, and this was the one
+    // window (`section`) with no other assertion to backstop it.
+    expect(section, 'the enforcement clause — a budget raised to make a build pass is the finding, no exception')
+      .toContain('One raised to make a build pass is the finding');
   });
 
   it('the routine prompt points at the sweep from the step that restates §4', () => {
