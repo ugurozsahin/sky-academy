@@ -74,7 +74,7 @@ function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
     commitResult: () => ({
       newBest: false,
       dojo: { state: { date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 }, completed: [], setDone: false, coins: 0, multiplier: 1 },
-      fresh: [], streak: 1, cert: null, certSaved: false,
+      fresh: [], streak: 1, cert: null, certSaved: false, dojoSaved: true,
     }),
     showResults() {},
     ...over,
@@ -445,7 +445,7 @@ describe('onEnd commits the payout before the results overlay is ever scheduled 
     const payout = {
       newBest: false,
       dojo: { state: { date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 }, completed: [], setDone: false, coins: 0, multiplier: 1 },
-      fresh: [], streak: 1, cert: null, certSaved: false,
+      fresh: [], streak: 1, cert: null, certSaved: false, dojoSaved: true,
     };
     const deps: PlaySessionDeps = {
       training: false, tracing: false, villain: false, av: AVATARS[0],
@@ -498,7 +498,7 @@ describe('onEnd commits the payout before the results overlay is ever scheduled 
     const payout = {
       newBest: false,
       dojo: { state: { date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 }, completed: [], setDone: false, coins: 0, multiplier: 1 },
-      fresh: [], streak: 1, cert: null, certSaved: false,
+      fresh: [], streak: 1, cert: null, certSaved: false, dojoSaved: true,
     };
     const deps: PlaySessionDeps = {
       training: false, tracing: false, villain: false, av: AVATARS[0],

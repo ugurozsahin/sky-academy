@@ -1204,6 +1204,36 @@ test.describe('Ninja Duel', () => {
     expect(png, 'the match itself still earned one — only the album is missing it').toMatch(/^data:image\/png;base64,/);
   });
 
+  /**
+   * #518: `recordGameEnd()`'s own `save()` swallows a refused `setItem` (#151) the same way `recordCert()`'s
+   * does (#470 above) — and the Dojo rows and sticker cards were drawn from the in-memory `dojo`/`fresh` outcome
+   * regardless, offering a keepsake the album does not actually hold. Reuses #398's worst-case seed (two dojo
+   * rows, two stickers, a certificate) so a refusal has everything to withhold, not just one row — the same
+   * shape as the mission-side case in `tests/e2e/game.spec.ts`.
+   */
+  test('a won match on a refusing store shows no Dojo row and no sticker card either, and the album stays untouched (#518)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('short'), 25, { refuseWrites: true });
+    expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
+    for (let r = 1; r <= 10; r++) {
+      await page.waitForFunction(r => window.__sna.state().round === r, r);
+      await winRound(page, 'a');   // Player 1 takes every round, same worst-case shape #398 already drives
+    }
+    await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.duel-end h2')).toHaveText('Player 1 wins!');
+    await expect(page.locator('.duel-end .dojo-bonus'), 'a refused write earns no Dojo row, whatever the day\'s challenges finished').toHaveCount(0);
+    await expect(page.locator('.duel-end .unlock'), 'a refused write earns no sticker card, whatever coins crossed a threshold').toHaveCount(0);
+    await expect(page.locator('.duel-end #cert'), 'the certificate row stays gated the same way (#470)').toHaveCount(0);
+    // The seeded save from before `refuseWrites` took hold is the untouched proof: still the day-short dojo
+    // state and the starting 25 coins — nothing this match earned reached it.
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(stored.coins, 'nothing this match paid reached the store').toBe(25);
+    expect(stored.dojo.done.length, 'the seeded two-of-three, not the three a real win would finish').toBe(2);
+    expect(stored.stickers ?? [], 'no sticker reached the album').toEqual([]);
+    // What was EARNED is unaffected by the store refusing it — the window hooks answer the match's own result,
+    // the same distinction #470 already draws for the certificate.
+    expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ ended: true, scoreA: 10, scoreB: 0 });
+  });
+
   test('a finished match moves the day\'s Daily Dojo challenge and pays its bonus into the same save (#16 item 5)', async ({ page }) => {
     // The day's volume challenge one answer short and its other two already done, so a single decided round
     // finishes both the challenge and the day's set — on every date, not on the four days in five where the

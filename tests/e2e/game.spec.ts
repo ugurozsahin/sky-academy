@@ -929,14 +929,55 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results).toBeVisible();
     await expect(results.locator('.medal')).toHaveText('🥇');   // the mission was genuinely won, certificate path reached
     await expect(results.locator('#cert'), 'a read-only latch earns no row, whatever was won').toHaveCount(0);
+    // #518: the same read-only latch that withholds the certificate row also withholds these — starting from
+    // `DEFAULT` (coins: 0), this mission's own 120 coins still cross all three sticker thresholds regardless.
+    await expect(results.locator('.unlock'), 'a read-only latch earns no sticker card either').toHaveCount(0);
+    await expect(results.locator('.dojo-bonus'), 'a read-only latch earns no Dojo row either').toHaveCount(0);
     // The stored blob is the untouched future save this build must never overwrite — not `Bo`'s bytes rewritten
-    // as `Ada`'s session, and no `certs` key added to it.
+    // as `Ada`'s session, and no `certs`/`stickers` key added to it.
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
     expect(stored.name, 'the newer-build blob on disk must survive this session untouched').toBe('Bo');
     expect(stored.certs, 'nothing reached the store').toBeUndefined();
+    expect(stored.stickers, 'nothing reached the store').toBeUndefined();
     // What was EARNED this session is unaffected — the `certificate()` hook answers the mission's own result.
     const png = await page.evaluate(() => window.__sna.certificate());
     expect(png, 'the mission itself still earned one — only the album is missing it').toMatch(/^data:image\/png;base64,/);
+  });
+
+  /**
+   * #518: `recordGameEnd()`'s own `save()` swallows a refused `setItem` (#151) the same way `recordCert()`'s
+   * does (#470 above) — and the Dojo rows and sticker cards were drawn from the in-memory `dojo`/`fresh` outcome
+   * regardless, offering a keepsake the album does not actually hold. Reuses the same full-mission scenario as
+   * "a full mission (5 stages) ends with results..." above (120 coins → three coin stickers, deterministically),
+   * so a refusal has a genuine, non-empty case to withhold rather than an already-empty one.
+   */
+  test('a won mission on a refusing store shows no Dojo row and no sticker card either (#518)', async ({ page }) => {
+    test.setTimeout(150_000);
+    await page.addInitScript(save => {
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({ v: 1, name: 'Ada', avatar: 'terra' }));
+    await refuseWrites(page);   // after the seed above, so only the running mission's own writes are refused
+    await page.goto('/');
+    await expect(page.locator('.home')).toBeVisible();
+    await startTopic(page, 'reception', 'r-count');
+    const stages = await page.evaluate(() => window.__sna.session.stages);
+    for (let stage = 1; stage <= stages; stage++) {
+      await answerAll(page, 5);
+      const modal = page.locator('.celebrate');
+      await expect(modal).toBeVisible();
+      await page.click('#next');
+    }
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    await expect(results.locator('.medal')).toHaveText('🥇');   // the mission was genuinely won, same 120-coin scenario
+    await expect(results.locator('.unlock'), 'a refused write earns no sticker card, whatever coins crossed a threshold').toHaveCount(0);
+    await expect(results.locator('.dojo-bonus'), 'a refused write earns no Dojo row, whatever the day\'s challenges finished').toHaveCount(0);
+    await expect(results.locator('#cert'), 'the certificate row stays gated the same way (#470)').toHaveCount(0);
+    // The seeded save from before `refuseWrites` took hold has no `stickers`/`dojo` keys at all — proving the
+    // album is genuinely untouched rather than merely not re-read.
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(stored.stickers ?? [], 'nothing reached the store').toEqual([]);
+    expect(stored.dojo, 'nothing reached the store').toBeUndefined();
   });
 
   /**
@@ -2162,6 +2203,42 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.speech')).toContainText('Mia');
     await page.click('#home');
     await expect(page.locator('#memory small')).toContainText('boards 1');
+  });
+
+  /**
+   * #518: `recordGameEnd()`'s own `save()` swallows a refused `setItem` (#151) the same way `recordCert()`'s
+   * does (#470, the mission/duel cases above) — and Memory Match's own results modal drew the Dojo rows and
+   * sticker cards from the in-memory `dojo`/`fresh` outcome regardless. This is the third `recordGameEnd()`
+   * call site in the repo (`src/ui/memory.ts`, which also defines `dojoRowsHTML` — `play.ts`/`duel.ts` import
+   * it from here), found by a reviewer sweep of this PR's own defect class rather than named in the issue.
+   */
+  test('Memory Match on a refusing store shows no sticker card either (#518)', async ({ page }) => {
+    // Not `seedPlayer()` (#518 review): it calls `page.goto()` itself, so a `refuseWrites()` after it would
+    // register too late for this navigation — the same ordering `refuseWrites`'s own doc comment requires.
+    await page.addInitScript(save => {
+      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
+    }, JSON.stringify({ v: 1, name: 'Mia', avatar: 'splash', coins: 10 }));   // +23 for this board crosses the 30-coin threshold
+    await refuseWrites(page);   // after the seed above, so only this board's own writes are refused
+    await page.goto('/');
+    await expect(page.locator('.home')).toBeVisible();
+    await page.click('.island[data-year="reception"]');
+    await page.click('#memory');
+    await expect(page.locator('.memory')).toBeVisible();
+    const cards = await page.evaluate(() => window.__sna.cards() as { pair: number; matched: boolean }[]);
+    for (let i = 0; i < cards.length; i++) {
+      if (await page.evaluate((k) => window.__sna.cards()[k].matched, i)) continue;
+      const mate = cards.findIndex((c, k) => k !== i && c.pair === cards[i].pair);
+      await page.waitForFunction(() => !window.__sna.state().waiting);
+      expect(await page.evaluate((k) => window.__sna.flip(k), i)).toBe(true);
+      expect(await page.evaluate((k) => window.__sna.flip(k), mate)).toBe(true);
+    }
+    const results = page.locator('.results');
+    await expect(results.locator('h2')).toHaveText('All pairs found!');
+    await expect(results.locator('.coin-gain')).toContainText('+23');
+    await expect(results.locator('.unlock'), 'a refused write earns no sticker card, whatever coins crossed a threshold').toHaveCount(0);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
+    expect(stored.coins, 'nothing this board paid reached the store').toBe(10);
+    expect(stored.stickers ?? [], 'no sticker reached the album').toEqual([]);
   });
 
   /**

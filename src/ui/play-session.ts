@@ -53,7 +53,7 @@ export interface ResultPayout {
   newBest: boolean; dojo: DojoOutcome; fresh: string[]; streak: number; cert: CertInfo | null;
   /** Whether `cert`'s write actually reached the store (#470) — see `play.ts`'s `commitResult()`. `cert`
    *  itself stays what was earned regardless; only this says whether the album kept it. */
-  certSaved: boolean;
+  certSaved: boolean; dojoSaved: boolean;   // dojoSaved: same shape, for recordGameEnd()'s write instead (#518)
 }
 
 /** The HUD elements the callbacks write to — play.ts owns them and passes its own `els` straight in. */
