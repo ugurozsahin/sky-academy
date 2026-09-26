@@ -1050,7 +1050,7 @@ test.describe('Ninja Duel', () => {
     await page.waitForFunction(() => window.__sna.state().round === 2, undefined, { timeout: 30_000 });
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 2, scoreA: 0, scoreB: 0, decided: false, ended: false });
     // The both-arenas gate: one advance per round, not one per arena. Advancing twice would show round 3 within
-    // a frame or two of round 2; round 2's wave is in the air for well over 300 ms even at 4×.
+    // a frame or two of round 2; round 2's wave is in the air for well over 300 ms even at 8× (#748).
     await page.waitForTimeout(300);
     expect(await page.evaluate(() => window.__sna.state().round), 'one wave end per arena, one advance per round').toBe(2);
     await page.click('#pause');

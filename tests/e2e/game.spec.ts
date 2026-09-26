@@ -1406,7 +1406,7 @@ test.describe('Sky Ninja Academy', () => {
     const held = await page.evaluate(() => window.__sna.bubbles().map(b => b.label));
     await page.click('#pause');
     await expect(page.locator('#resume')).toBeVisible();
-    await page.waitForTimeout(1500);                                          // twice the peek at 4×: it would have expired
+    await page.waitForTimeout(1500);                                          // #748: four times the peek at 8×: it would have expired
     await expect(page.locator('.prompt'), 'a child who pauses mid-look keeps the sentence').toHaveText(sentence);
     expect(await page.evaluate(() => window.__sna.arena!.paused)).toBe(true);
     expect(await page.evaluate(() => window.__sna.bubbles().map(b => b.label)), 'nothing launches under the overlay').toEqual(held);
