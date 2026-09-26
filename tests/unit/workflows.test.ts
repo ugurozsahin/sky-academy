@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { e2eSpecFiles, workflowFiles } from './helpers/sources';
+import { e2eSpecFiles, workflow, workflowFiles } from './helpers/sources';
 
 /**
  * WORKFLOW RAILS (#321, split out of `guardrails.test.ts`) — everything that reads `.github/workflows/**`
@@ -358,4 +358,62 @@ describe('the @smoke e2e subset is non-empty and actually reachable by npm run t
     expect(specFiles, 'viewport.spec.ts only runs under the tablet projects, never under mobile/setup')
       .not.toContain('viewport.spec.ts');
   });
+});
+
+/**
+ * #758: PR #754 raised the `test` job's `timeout-minutes` from 30 to 45 as a stop-gap for the nightly
+ * full-matrix job outgrowing the old ceiling (#718 — a cancelled run reports nothing, which hid the whole
+ * check rather than catching a runaway job), and left a comment beside the number promising it comes back
+ * down once #749/#748/#750 shrink the suite. Nothing enforced either half of that promise: `grep -rn
+ * "timeout-minutes" tests/` returned nothing before this rail, so the number could drift up again, or the
+ * comment explaining why it is 45 could be deleted, both with the whole suite green. This is the same shape
+ * as the byte budgets this repository already rails elsewhere: a number that may only go down, with a ledger
+ * comment beside it saying what paid for the last move.
+ */
+describe("ci.yml's test-job timeout-minutes is a budget, not a bare number (#758)", () => {
+  const ci = workflow('ci.yml');
+  const jobs = ci.slice(ci.indexOf('\njobs:'));
+  // Bounded the same way as the #755 rail in guardrails.test.ts: `branch-name` is the next job after `test`,
+  // and the end anchor is checked for `-1` before it is used to slice, so a renamed neighbour job fails loudly
+  // here rather than silently widening the read scope to include it.
+  const branchNameAt = jobs.indexOf('\n  branch-name:');
+
+  it('the `test` job still exists, bounding the slice this whole describe block reads', () => {
+    expect(jobs.indexOf('\n  test:'), 'the `test` job must exist').toBeGreaterThan(0);
+    expect(branchNameAt, "the `branch-name` job must still exist, to bound the `test` job's own slice")
+      .toBeGreaterThan(0);
+  });
+
+  const testJob = jobs.slice(jobs.indexOf('\n  test:'), branchNameAt);
+  // The comment wraps across several `# `-prefixed lines, so a pinned sentence can straddle a line break —
+  // this joins them the way `flatten()` does for Markdown prose elsewhere in this repository's rails, with the
+  // comment marker treated as whitespace too, or a sentence broken across two `#` lines would never match a
+  // plain `toMatch`/`toContain` against the raw YAML text.
+  const flatComment = (t: string) => t.replace(/\n\s*#\s?/g, ' ').replace(/\s+/g, ' ').trim();
+
+  it('the ceiling has not been raised past the #754 stop-gap value of 45', () => {
+    const m = /timeout-minutes:\s*(\d+)/.exec(testJob);
+    expect(m, "the test job's timeout-minutes must be a readable number, or this rail proves nothing").toBeTruthy();
+    // A ceiling on the ceiling: a future reduction (#749/#748/#750 landing) passes, a future raise fails —
+    // same direction as `ROUTINE_PROMPT_BUDGET` and the longest-line rails in governance.test.ts.
+    expect(Number(m![1]), 'this ceiling may only go down from the #754 stop-gap value — raising it to make a '
+      + "slow suite fit is exactly what .claude/rules/guardrails.md's budget-rail rule refuses")
+      .toBeLessThanOrEqual(45);
+  });
+
+  it("the stop-gap comment keeps its reason: names the fix, says the number comes back down, and bans raising it to fit a slow suite", () => {
+    const comment = flatComment(testJob);
+    expect(comment, 'must name #749 as (part of) the fix, so a future author has somewhere to look before raising the number')
+      .toContain('#749');
+    expect(comment, 'must say the number is meant to come back down, not merely that it is raisable')
+      .toMatch(/meant to come back down/);
+    expect(comment, 'must ban raising it again to make a slow suite fit — the one sentence standing between '
+      + 'this number and an ordinary raise-to-pass')
+      .toMatch(/never raise it again to make a slow suite fit/);
+  });
+
+  // What this deliberately does not do (#758's own scope): it does not touch the `sketchbook` job's own
+  // `timeout-minutes: 5`, which has never been near its limit and carries no such promise to keep, and it does
+  // not lower the number itself — that waits for #749/#748/#750 to land and a measured job duration to lower
+  // it to, per #758's stated intent.
 });
