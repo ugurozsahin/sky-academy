@@ -392,6 +392,21 @@ describe('every navigation script walks the wizard through flow-onboard.mjs, not
     expect(callPick, 'pickNinja() must run before #name is filled').toBeLessThan(fillName);
   });
 
+  // #576: onboard() is the function thirteen of the sixteen flow-*.mjs/dbg*.mjs scripts actually call, but the
+  // two checks above only reach inside pickNinja()/enterName() — a reordered or mistyped onboard() body would
+  // pass both and still break every caller.
+  it("onboard() calls enterName(), then waits for '.intro-card', then clicks #intro-go", () => {
+    const body = functionBody('onboard');
+    const callEnter = body.indexOf('enterName(');
+    const waitIntro = body.indexOf("waitForSelector('.intro-card')");
+    const clickGo = body.indexOf("click('#intro-go')");
+    expect(callEnter, 'onboard() does not call enterName()').toBeGreaterThan(-1);
+    expect(waitIntro, "onboard() never waits for '.intro-card'").toBeGreaterThan(-1);
+    expect(clickGo, 'onboard() never clicks #intro-go').toBeGreaterThan(-1);
+    expect(callEnter, 'enterName() must run before .intro-card is awaited').toBeLessThan(waitIntro);
+    expect(waitIntro, '.intro-card must be awaited before #intro-go is clicked').toBeLessThan(clickGo);
+  });
+
   // flow-onboard.mjs's selectors are hardcoded against the real screens in src/ui/avatar.ts; nothing else
   // ties the two together, since the QA scripts never run in CI (`.claude/rules/e2e.md`) and `tests/e2e/game.
   // spec.ts`'s own `pickAvatar()` is an independent copy of the same ids that would not fail if these ids did.
