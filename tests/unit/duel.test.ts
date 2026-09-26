@@ -234,8 +234,8 @@ describe('Duel (#16 item 1: pure scorer, no UI)', () => {
 });
 
 // #16 items 2–4: the pure helpers the duel screen leans on — which topics a duel may use, and the match line.
-import { DUEL_HANDOVER, duelCoins, duelHeadline, duelPool, spokenQuestion, type DuelResult } from '../../src/game/duel';
-import { topicsFor, YEARS } from '../../src/curriculum';
+import { DUEL_HANDOVER, DUEL_POOL_DRAWS, duelCoins, duelHeadline, duelPool, spokenQuestion, type DuelResult } from '../../src/game/duel';
+import { TOPICS, topicsFor, YEARS, type Difficulty, type Topic } from '../../src/curriculum';
 
 describe('duelPool (#16 item 4: which topics a duel is played on)', () => {
   it('drops tracing topics and sequence topics, keeps plain bubble topics, for every year and difficulty', () => {
@@ -261,6 +261,34 @@ describe('duelPool (#16 item 4: which topics a duel is played on)', () => {
     expect(pool.map(t => t.id)).toEqual(['y1-add']);
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('y1-boom'), expect.any(Error));
     spy.mockRestore();
+  });
+});
+
+/**
+ * #562: `duelPool()` now excludes on `Topic.sequenceFrom` alone, not by sampling — this is the rail that keeps
+ * that flag honest, both ways. It samples the same `DUEL_POOL_DRAWS` seeded draws `duelPool()`'s own throw-check
+ * uses. Proved red by deleting `sequenceFrom` from any topic below that ever sets `.sequence` (`y1-order`,
+ * `r-build`, `y1-spelling`…): the topic keeps drawing sequence questions, nothing pins it any more. Proved red
+ * the other way by raising any topic's `sequenceFrom` past where it actually starts (say `y1-order` to 2): the
+ * threshold no longer has a sample backing it at 1.
+ */
+describe("every topic's sequenceFrom flag is checked against what its generator actually draws (#562)", () => {
+  const drawsSequence = (t: Topic, diff: Difficulty) => {
+    for (let seed = 1; seed <= DUEL_POOL_DRAWS; seed++) {
+      try { if (t.gen(diff, seededRng(seed)).sequence) return true; } catch { /* duelPool()'s own concern, not this rail's */ }
+    }
+    return false;
+  };
+  it('never under-claims: a sampled sequence draw always has a flag that says so', () => {
+    for (const t of TOPICS) for (const diff of [1, 2, 3] as const)
+      if (drawsSequence(t, diff))
+        expect(t.sequenceFrom !== undefined && diff >= t.sequenceFrom,
+          `${t.id} at d${diff} draws .sequence but sequenceFrom does not say so`).toBe(true);
+  });
+  it("never over-claims: sequenceFrom is never set past where sampling first finds a sequence draw", () => {
+    for (const t of TOPICS) if (t.sequenceFrom !== undefined)
+      expect(drawsSequence(t, t.sequenceFrom),
+        `${t.id}'s sequenceFrom (${t.sequenceFrom}) is set past where its generator actually starts sequencing`).toBe(true);
   });
 });
 
