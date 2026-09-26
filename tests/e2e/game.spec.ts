@@ -172,10 +172,15 @@ async function nextWaveWithBomb(page: Page) {
  * for a test that only reads the *next* stage's own content, wrong for one that reads the mission's result.
  */
 async function skipToStage(page: Page, stage: number) {
-  await page.evaluate((target) => {
+  // `nextStage()` ends the mission instead of advancing once `stage >= stages`, so a `target` past the
+  // mission's own stage count would make this loop exit on `s.ended` having never reached `target` — asserted
+  // here, rather than left to surface later as a generic "no card ever appeared" timeout downstream.
+  const landed = await page.evaluate((target) => {
     const s = window.__sna.session;
     while (s.stage < target && !s.ended) s.nextStage();
+    return { stage: s.stage, ended: s.ended };
   }, stage);
+  expect(landed, `skipToStage(${stage}) must land on that stage, not end the mission first`).toEqual({ stage, ended: false });
 }
 
 /** Answer the current question via the hook and wait for the next one (a sequence question needs one slice per letter). */
@@ -590,8 +595,8 @@ test.describe('Sky Ninja Academy', () => {
 
   // #137 "5. Smaller, same family": the block diagram (d3) never rendered in a browser at all — the e2e rail
   // above stops at d2, and unit tests cannot see CSS layout. Year 2's `diffs` array (`src/curriculum/types.ts`)
-  // is `[1, 2, 2, 3, 3]`, so difficulty 3 is not reached until stage 4 — three whole stages must be played
-  // first, which is why this is its own test rather than an extension of the one above.
+  // is `[1, 2, 2, 3, 3]`, so difficulty 3 is not reached until stage 4 — reached here via `skipToStage`
+  // rather than played (#749), which is why this is its own test rather than an extension of the one above.
   test('statistics: the block diagram reaches the card without overflowing a narrow viewport (#137)', async ({ page }) => {
     test.setTimeout(240_000);
     await seedPlayer(page);
