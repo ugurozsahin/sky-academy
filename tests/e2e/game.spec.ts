@@ -183,6 +183,24 @@ async function skipToStage(page: Page, stage: number) {
   expect(landed, `skipToStage(${stage}) must land on that stage, not end the mission first`).toEqual({ stage, ended: false });
 }
 
+/**
+ * Skip every stage via `nextStage()` and end the mission with a win — the precondition for a test whose claim
+ * is about what happens to an already-won mission (a certificate/store test, a corrupted-save writer), not
+ * about how the mission was played (#749). Unlike `skipToStage()` above, this is safe exactly where that one
+ * is not: `stars`/`coins` are still genuine, `won`-gated numbers (`modes.ts`'s `stars`/`coins` read `c.won`,
+ * not how many questions were answered) — only ever the minimum tier, since `Math.max(1, …)` floors an
+ * unplayed run's star count at 1 rather than 0, and mission mode's own `+20` win bonus never depends on
+ * `correct` at all. A test that needs a *specific*, played-for-real medal still has to play for it.
+ */
+async function winMission(page: Page) {
+  const ended = await page.evaluate(() => {
+    const s = window.__sna.session;
+    while (!s.ended) s.nextStage();
+    return s.ended;
+  });
+  expect(ended, 'winMission() must end the mission').toBe(true);
+}
+
 /** Answer the current question via the hook and wait for the next one (a sequence question needs one slice per letter). */
 async function solveCurrent(page: Page) {
   const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
@@ -885,16 +903,12 @@ test.describe('Sky Ninja Academy', () => {
     await page.goto('/');
     await expect(page.locator('.home')).toBeVisible();
     await startTopic(page, 'reception', 'r-count');
-    const stages = await page.evaluate(() => window.__sna.session.stages);
-    for (let stage = 1; stage <= stages; stage++) {
-      await answerAll(page, 5);
-      const modal = page.locator('.celebrate');
-      await expect(modal).toBeVisible();
-      await page.click('#next');
-    }
+    // The win is the precondition here, not the claim (#749) — skip every stage via winMission() rather than
+    // play twenty-five real questions to reach it.
+    await winMission(page);
     const results = page.locator('.results');
     await expect(results).toBeVisible();
-    await expect(results.locator('.medal')).toHaveText('🥇');   // the mission was genuinely won, certificate path reached
+    await expect(results.locator('.medal')).toHaveText('🥉');   // any win reaches the cert path — skipping every stage still only earns the minimum tier (modes.ts's own floor for an unplayed run)
     await expect(results.locator('#cert'), 'a refused write earns no row, whatever was won').toHaveCount(0);
     // The seeded save from before `refuseWrites` took hold has no `certs` key at all — proving the album is
     // genuinely untouched rather than merely not re-read.
@@ -929,16 +943,12 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#intro-go');
     await expect(page.locator('.home')).toBeVisible();
     await startTopic(page, 'reception', 'r-count');
-    const stages = await page.evaluate(() => window.__sna.session.stages);
-    for (let stage = 1; stage <= stages; stage++) {
-      await answerAll(page, 5);
-      const modal = page.locator('.celebrate');
-      await expect(modal).toBeVisible();
-      await page.click('#next');
-    }
+    // The win is the precondition here, not the claim (#749) — skip every stage via winMission() rather than
+    // play twenty-five real questions to reach it.
+    await winMission(page);
     const results = page.locator('.results');
     await expect(results).toBeVisible();
-    await expect(results.locator('.medal')).toHaveText('🥇');   // the mission was genuinely won, certificate path reached
+    await expect(results.locator('.medal')).toHaveText('🥉');   // any win reaches the cert path — skipping every stage still only earns the minimum tier (modes.ts's own floor for an unplayed run)
     await expect(results.locator('#cert'), 'a read-only latch earns no row, whatever was won').toHaveCount(0);
     // The stored blob is the untouched future save this build must never overwrite — not `Bo`'s bytes rewritten
     // as `Ada`'s session, and no `certs` key added to it.
@@ -978,6 +988,10 @@ test.describe('Sky Ninja Academy', () => {
     const stages = await page.evaluate(() => window.__sna.session.stages);
     const perStage = await page.evaluate(() => window.__sna.session.perStage as number);
     expect(stages).toBe(5);
+    // Not shortened (#749): unlike the two cert/store tests above, this one asserts an exact stars: 3 reached
+    // the save — that number is only genuine when every stage, not just the last, was actually played to a
+    // perfect clear (`session.ts`'s `stageStarsTotal` only ever counts a stage `advance()` actually cleared).
+    // `winMission()`/`skipToStage()` would leave 4 of the 5 stages uncounted and sink this to the minimum tier.
     for (let stage = 1; stage < stages; stage++) {
       await answerAll(page, perStage);
       await expect(page.locator('.celebrate')).toBeVisible();
@@ -2640,13 +2654,10 @@ test.describe('a corrupted save does not brick the app (#95)', () => {
       streak: null, dojo: null,
     });
     await startTopic(page, 'reception', 'r-count');   // matches the known-fast full-mission path above (line 400)
-    const stages = await page.evaluate(() => window.__sna.session.stages);
-    const perStage = await page.evaluate(() => window.__sna.session.perStage);
-    for (let stage = 1; stage <= stages; stage++) {
-      await answerAll(page, perStage);
-      await expect(page.locator('.celebrate')).toBeVisible();
-      await page.click('#next');
-    }
+    // The round trip under test is the writers (recordTopic()/recordAccuracy() etc.) not throwing on a
+    // corrupted save when a mission ends — not how the mission was played to get there (#749). winMission()
+    // reaches `end(true)` the same way, running the exact same write path.
+    await winMission(page);
     await expect(page.locator('.results')).toBeVisible();
     expect(failed, `while playing a full mission${failed.length ? ':\n  ' + failed.join('\n  ') : ''}`).toEqual([]);
 
