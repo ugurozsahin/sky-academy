@@ -277,11 +277,17 @@ describe('guard rails', () => {
   //
   // The set this rail extracts, named per the guard-rails rule on fixing a class rather than an instance:
   // every `import … from '…'` / `export … from '…'` whose specifier is a string or plain template, every
-  // `import(…)`/`require(…)` call whose (arbitrarily parenthesised) argument is one, and an
-  // `import … = require('…')` external module reference — nothing else counts as an import, so a comment or
-  // a `/…/` regex literal that merely looks like one is never mistaken for a specifier. It still cannot see
-  // a path assembled at run time — `'../' + 'ui/' + name` — only a literal or template specifier, same as
+  // `import(…)`/`require(…)`/`require.resolve(…)` call whose (arbitrarily parenthesised) argument is one, and
+  // an `import … = require('…')` external module reference — nothing else counts as an import, so a comment
+  // or a `/…/` regex literal that merely looks like one is never mistaken for a specifier. It still cannot
+  // see a path assembled at run time — `'../' + 'ui/' + name` — only a literal or template specifier, same as
   // before.
+  //
+  // Round 9: `isRequire` matched only a bare `require` identifier callee, so `require.resolve('../ui/dom')` —
+  // a real, type-checking call in this program (`@types/node`'s ambient `require` is visible wherever a test
+  // file imports from `node:*`, `src/game/` included) — was invisible to the rail. Extended to also match a
+  // `require.resolve(…)` property-access callee; `require('x').y(…)` and every other property off the result
+  // of a call stay out of scope, since only the callee identifier itself is checked.
   //
   // Only the directory-separator normalisation survives from the old pipeline: `posix.resolve` is POSIX-only
   // and never treats `\` as a separator, but TypeScript's own resolver does on every host OS (round 6), so a
@@ -304,7 +310,10 @@ describe('guard rails', () => {
       } else if (ts.isCallExpression(n)) {
         const isDynamicImport = n.expression.kind === ts.SyntaxKind.ImportKeyword;
         const isRequire = ts.isIdentifier(n.expression) && n.expression.text === 'require';
-        if ((isDynamicImport || isRequire) && n.arguments.length > 0) {
+        const isRequireResolve = ts.isPropertyAccessExpression(n.expression) &&
+          ts.isIdentifier(n.expression.expression) && n.expression.expression.text === 'require' &&
+          n.expression.name.text === 'resolve';
+        if ((isDynamicImport || isRequire || isRequireResolve) && n.arguments.length > 0) {
           const s = specifierOf(n.arguments[0]);
           if (s !== null) out.push(s);
         }
@@ -334,6 +343,10 @@ describe('guard rails', () => {
     // require() and export ... from both count; a genuinely commented-out import does not — it is trivia,
     // not a node the AST walk ever visits.
     expect(importSpecifiers('x.ts', "const { a } = require('../ui/dom');")).toEqual(['../ui/dom']);
+    // Round 9: require.resolve(...) is a require-shaped call too, but a same-named property access off any
+    // other identifier is not — only a receiver whose own text is exactly `require` counts.
+    expect(importSpecifiers('x.ts', "const p = require.resolve('../ui/dom');")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "const p = myRequire.resolve('../ui/dom');")).toEqual([]);
     expect(importSpecifiers('x.ts', "export { a } from '../ui/dom';")).toEqual(['../ui/dom']);
     expect(importSpecifiers('x.ts', "// import { a } from '../ui/dom';")).toEqual([]);
     // A path assembled at run time is invisible, as it always was — only a literal or template specifier.
