@@ -2742,7 +2742,18 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
     const out: Edge[] = [];
     const to = (spec: string) => spec.startsWith('.') ? posix.resolve(posix.dirname(path), spec) : spec;
     const push = (spec: string, kind: Edge['kind']) => out.push({ from: path, spec, to: to(spec), kind });
-    const specText = (n: ts.Node | undefined): string | null => (n && ts.isStringLiteralLike(n)) ? n.text : null;
+    // A template literal with a substitution (`` `../objects/${name}.ts` ``) can't be resolved exactly, but a
+    // per-name dynamic loader written that way is a realistic pattern in exactly the area this rail polices
+    // (review finding #1 on PR #799) — dropping it silently would un-police it entirely. Its static pieces
+    // still say enough to trip a boundary check, so each substitution is replaced with a placeholder rather
+    // than the edge vanishing: `` `../three/${x}` `` becomes `../three/${…}`, which still resolves to
+    // somewhere under `/src/three/`.
+    const specText = (n: ts.Node | undefined): string | null => {
+      if (!n) return null;
+      if (ts.isStringLiteralLike(n)) return n.text;
+      if (ts.isTemplateExpression(n)) return n.head.text + n.templateSpans.map((s) => '${…}' + s.literal.text).join('');
+      return null;
+    };
     // `ts.isImportCall` isn't in this TypeScript version's public .d.ts, so this stands in for it — matching the
     // internal function exactly (checked against installed typescript@5.9.3), including `import.defer('x')`
     // (the deferred-module-evaluation call form), not just plain `import('x')` (type-design-analyzer review).
@@ -2848,6 +2859,23 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   it('import x = require(\'x\') counts as require, even though it is never a CallExpression (#736 review)', () => {
     expect(edges('/src/ui/x.ts', "import rig = require('../three/stage/rig');"))
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
+  });
+
+  // #799 review, finding 1: a per-name dynamic loader (`import(\`../objects/${name}.ts\`)`) is a realistic
+  // pattern in exactly the area this rail polices, and a template literal with a substitution must still
+  // produce an edge whose `to` lands under the tree — not vanish, the way it silently did before this fix.
+  it.each([
+    ['a dynamic import() with a template-literal specifier', (spec: string) => `import(${spec});`, 'dynamic'],
+    ['a require() with a template-literal specifier', (spec: string) => `const r = require(${spec});`, 'require'],
+  ] as const)('%s still produces an edge under the tree, not silently nothing (#736 review)', (_case, wrap, kind) => {
+    const result = edges('/src/ui/x.ts', wrap('`../three/${x}`'));
+    expect(result).toEqual([{ from: '/src/ui/x.ts', spec: '../three/${…}', to: '/src/three/${…}', kind }]);
+    expect(result[0].to.startsWith('/src/three/'), 'the boundary check must still be able to catch it').toBe(true);
+  });
+
+  it('export type { X } from \'x\' counts as type, the same as a whole-clause import type (#736 review)', () => {
+    expect(edges('/src/ui/x.ts', "export type { X } from '../three/stage/rig';"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'type' }]);
   });
 
   // (a) Proved red: `import { Color } from 'three'` in a scratch `src/ui/x.ts` fails.
