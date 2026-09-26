@@ -1,5 +1,8 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { join, posix, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';   // #557: the compile-time half of the src/game/ -> src/ui/ rail asks tsc, never a regex
+import { build } from 'vite';   // #557: the runtime half asks the bundler that actually ships this app
 import { describe, expect, it } from 'vitest';
 import pkg from '../../package.json';
 import { stripHead } from '../../scripts/bundle-single.mjs';
@@ -2938,5 +2941,186 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       expect(chunks.map(c => c.name), 'the kill switch must fold the import() away, leaving only the entry').toEqual([entry]);
       expect(chunks[0].three).toBe(false);
     }, 60_000);
+  });
+});
+
+describe('the one-way dependency from src/game/ to src/ui/ (#557, #325 stage 1)', () => {
+  // `src/game/` must not depend on `src/ui/`. That one direction is why `src/game/session.ts` is testable
+  // without a browser and why the sim harness (#142) works at all; every later stage of #325 moves files
+  // between directories and could break it silently.
+  //
+  // **This rail does not read source text and does not enumerate syntax.** PR #710 tried that and ran twelve
+  // `REVIEW: CHANGES REQUESTED` rounds — a regex, then a character scanner, then a comment-stripper, then a
+  // TypeScript AST walk — and no round was wrong: each found a real, verified bypass of the round before,
+  // because a hand-built extractor over an open-ended syntax surface has no termination condition. The owner
+  // settled the approach on #557 (2026-09-26): ask the two tools that already resolve every form, and take
+  // the union of their answers.
+  //
+  //   1. **`ts.createProgram`** — a program *is* the transitive closure of every file `tsc` had to load, so
+  //      each compile-time form is covered by construction whatever its spelling. It closes #710's rounds 1-8
+  //      (every text-level escape: a path up past `src/` and back down, a leading `./`, a `/` escape, a
+  //      backslash line-continuation, a backslash separator, a `/*` inside a string, a regex literal faking a
+  //      comment-open) because a program never sees text; round 10 (`typeof import(...)`, a `ts.ImportTypeNode`
+  //      rather than a call); round 12 (`/// <reference path=... />`); and a type-only import, which is a real
+  //      compile-time edge — nothing ships, but the file still cannot move on its own, which is what #325 needs.
+  //   2. **Vite's own build** — the bundler that actually ships this app, so its module graph is by definition
+  //      the set that reaches the browser. It closes round 11 (`import(('../ui/dom') as any)`, `<any>'...'`,
+  //      `'...' as const`), where the type widens to `any`, `tsc` resolves nothing at all, and the emitted code
+  //      still imports the module.
+  //
+  // Neither alone is sufficient, and that is the whole reason for the union: (1) sees what is erased before
+  // emit, (2) sees what the type system cannot resolve. Both directions are proved red below, one case per
+  // round, alongside two controls proving the pair is not simply always red.
+  //
+  // **Out of scope, stated rather than patched.** `require('../ui/dom')` and `require.resolve('../ui/dom')` are
+  // invisible to both oracles, and correctly so: this is an ESM browser build, `require` is not defined at
+  // runtime and Rollup does not follow it, so neither creates a dependency — they are dead code that throws.
+  // The only way to catch a path-shaped *string* no tool resolves is to match text, which is the trap that
+  // cost #710 twelve rounds. Both are pinned below as deliberately-green cases so the scope is visible: the
+  // day this project gains CommonJS interop, those tests go red and this paragraph gets rewritten rather than
+  // quietly outliving the truth.
+  const REPO = fileURLToPath(new URL('../../', import.meta.url));
+
+  // The compile-time oracle must ask the same question the real build asks, so its options are the repo's own
+  // tsconfig, read from disk. It throws rather than falling back to defaults: a rail guessing at
+  // `moduleResolution` is a rail answering about a project that does not exist.
+  const TS_OPTIONS = (() => {
+    const found = ts.findConfigFile(REPO, ts.sys.fileExists, 'tsconfig.json');
+    if (!found) throw new Error('#557: tsconfig.json not found — the compile-time oracle would be guessing');
+    const { config, error } = ts.readConfigFile(found, ts.sys.readFile);
+    if (error) throw new Error(`#557: tsconfig.json unreadable — ${ts.flattenDiagnosticMessageText(error.messageText, ' ')}`);
+    return { ...ts.parseJsonConfigFileContent(config, ts.sys, REPO).options, noEmit: true };
+  })();
+
+  /** The `.ts` files directly under `<root>/src/game`. Throws rather than returning `[]`, the same guarantee
+   *  `inDir` gives the text rails: a renamed directory must be a red rail, not a permanently green one. */
+  const gameRoots = (root: string): string[] => {
+    const dir = join(root, 'src', 'game');
+    if (!existsSync(dir)) throw new Error(`#557: ${dir} does not exist — both oracles would answer about nothing`);
+    const files = readdirSync(dir).filter((f) => f.endsWith('.ts')).map((f) => join(dir, f));
+    if (files.length === 0) throw new Error(`#557: no .ts files in ${dir} — the rail would pass vacuously`);
+    return files;
+  };
+
+  /** Both oracles are compared against the real path, not the given one. Rollup resolves module ids through
+   *  symlinks, so on macOS a root under `/var/...` comes back as `/private/var/...` and a plain `relative()`
+   *  answers `../../../private/var/...` — which starts with neither `src/ui/` nor anything else recognisable,
+   *  and the edge vanishes silently. Round 11's three cases are the only ones the compiler oracle cannot also
+   *  see, so they were the ones that caught this; a rail with fewer red proofs would have shipped it. A virtual
+   *  id (Vite's `\0vite/preload-helper.js`) is not a file, so `realpathSync` throws and the id is kept as-is —
+   *  it is not under `src/ui/` either way. */
+  const real = (p: string): string => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+
+  const uiEdges = (base: string, files: Iterable<string>): string[] =>
+    [...files]
+      .map((f) => relative(base, real(f)).split(sep).join('/'))
+      .filter((p) => p.startsWith('src/ui/'));
+
+  /** Oracle 1: everything `tsc` had to load to compile `src/game/`. */
+  const compilerEdges = (root: string): string[] =>
+    uiEdges(real(root), ts.createProgram(gameRoots(root), TS_OPTIONS).getSourceFiles().map((f) => f.fileName));
+
+  /** Oracle 2: everything Rollup parsed building `src/game/`. `configFile: false` is faithful only while the
+   *  project has no Vite config of its own — the test below holds that, and names this line if one appears. */
+  const bundlerEdges = async (root: string): Promise<string[]> => {
+    const parsed = new Set<string>();
+    await build({
+      root,
+      configFile: false,
+      logLevel: 'silent',
+      build: { write: false, minify: false, target: 'esnext', rollupOptions: { input: gameRoots(root) } },
+      plugins: [{ name: 'sna-557-collect', moduleParsed(info) { parsed.add(info.id); } }],
+    });
+    return uiEdges(real(root), parsed);
+  };
+
+  /** A build that cannot resolve a specifier at all counts as a violation, not as an inconclusive run: #710's
+   *  round 6 (`'..\\ui\\dom'`) is resolvable to `tsc` and a hard error to Rollup, and either way the tree is
+   *  not clean. The message is carried through so a failure caused by something else entirely says so. */
+  const edges = async (root: string) => {
+    const compiler = compilerEdges(root);
+    try {
+      return { compiler, bundler: await bundlerEdges(root), bundlerError: null as string | null };
+    } catch (e) {
+      return { compiler, bundler: [] as string[], bundlerError: String((e as Error).message ?? e) };
+    }
+  };
+
+  const violates = (r: { compiler: string[]; bundler: string[]; bundlerError: string | null }) =>
+    r.compiler.length > 0 || r.bundler.length > 0 || r.bundlerError !== null;
+
+  it('holds on the tree as it stands (#557)', async () => {
+    const result = await edges(REPO);
+    expect(result.bundlerError).toBeNull();
+    expect(result.compiler).toEqual([]);
+    expect(result.bundler).toEqual([]);
+  });
+
+  it('the bundler oracle still matches the real build: this project has no Vite config (#557)', () => {
+    // `bundlerEdges` passes `configFile: false`. The app is built by `vite build` with no config file at all,
+    // so plain Rollup resolution is exactly what ships. The moment a `vite.config.*` appears — an alias, a
+    // plugin that rewrites specifiers — that stops being true and `bundlerEdges` has to load it instead.
+    expect(readdirSync(REPO).filter((f) => /^vite\.config\.(ts|js|mjs|cjs|mts|cts)$/.test(f))).toEqual([]);
+  });
+
+  // One fixture per case: a two-directory tree with a clean sibling in `src/game/`, so a green result is a
+  // real answer about a real pair of directories rather than an empty scan. The probe never touches this
+  // repository's own `src/`.
+  const fixture = (probe: string): string => {
+    const dir = mkdtempSync(join(tmpdir(), 'sna-557-'));
+    mkdirSync(join(dir, 'src', 'game'), { recursive: true });
+    mkdirSync(join(dir, 'src', 'ui'), { recursive: true });
+    writeFileSync(join(dir, 'src', 'ui', 'dom.ts'), 'export const dom = 1;\n');
+    writeFileSync(join(dir, 'src', 'game', 'session.ts'), 'export const clean = 1;\n');
+    writeFileSync(join(dir, 'src', 'game', 'probe.ts'), probe);
+    return dir;
+  };
+
+  const withFixture = async (probe: string) => {
+    const dir = fixture(probe);
+    try {
+      return await edges(dir);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  const TAIL = '\nexport const a = d;\n';
+  const CAUGHT: [string, string][] = [
+    ["round 1: a path up past src/ and back down", `import * as d from '../../src/ui/dom';${TAIL}`],
+    ["round 2: a leading ./ before the ../ run", `import * as d from './../ui/dom';${TAIL}`],
+    ["round 3: a \\u002f escape in the specifier", String.raw`import * as d from '../ui/dom';` + TAIL],
+    ["round 4: a backslash line-continuation inside the specifier", `import * as d from '../\\\nui/dom';${TAIL}`],
+    ["round 5: a bare carriage-return line-continuation", `import * as d from '../\\\rui/dom';${TAIL}`],
+    ["round 6: backslash path separators", String.raw`import * as d from '..\\ui\\dom';` + TAIL],
+    ["round 7: a /* sequence inside a string literal", `const s = "/*"; import * as d from '../ui/dom';\nexport const a = [s, d];\n`],
+    ["round 8: a regex literal faking a comment-open", String.raw`const r = /a\/*/; import * as d from '../ui/dom';` + '\nexport const a = [r, d];\n'],
+    ["round 10: a type-position import (ts.ImportTypeNode)", `export type T = typeof import('../ui/dom');\nexport const a = 1;\n`],
+    ["round 11a: a dynamic import wrapped in `as any`", `export const f = () => import(('../ui/dom') as any);\n`],
+    ["round 11b: a dynamic import wrapped in an angle-bracket assertion", `export const f = () => import(<any>'../ui/dom');\n`],
+    ["round 11c: a dynamic import wrapped in `as const`", `export const f = () => import('../ui/dom' as const);\n`],
+    ["round 12: a triple-slash reference directive", `/// <reference path="../ui/dom.ts" />\nexport const a = 1;\n`],
+    ["a type-only import, erased before emit but still a compile-time edge", `import type { dom } from '../ui/dom';\nexport const a: typeof dom | null = null;\n`],
+  ];
+
+  it.each(CAUGHT)('goes red on %s (#557)', async (_case, probe) => {
+    expect(violates(await withFixture(probe))).toBe(true);
+  });
+
+  const GREEN: [string, string][] = [
+    ['a file with no dependency on src/ui/ at all', 'export const a = 1;\n'],
+    ['an import that is only in a comment', `// import * as d from '../ui/dom';\nexport const a = 1;\n`],
+    ['require.resolve, which loads nothing (out of scope, see the note above)', `export const p = require.resolve('../ui/dom');\n`],
+    ['require, which this ESM build never defines (out of scope, see the note above)', `export const m = require('../ui/dom');\n`],
+  ];
+
+  it.each(GREEN)('stays green on %s (#557)', async (_case, probe) => {
+    expect(violates(await withFixture(probe))).toBe(false);
   });
 });
