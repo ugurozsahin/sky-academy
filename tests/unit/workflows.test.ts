@@ -272,15 +272,15 @@ describe('the scope step routes a diff to e2e, to the sketchbook, or to neither 
   // The output is consumed, or the whole routing above is decoration: the sketchbook step exists, runs on a
   // pull request when the scope step says so, and the two browser-setup steps run for it too — delete the
   // step and the tree would otherwise stay green with the spec running on the nightly alone (pr-test-analyzer).
+  const stepOf = (needle: string) => {
+    const at = lines.findIndex(l => l.includes(needle));
+    expect(at, `ci.yml must have a step containing ${needle}`).toBeGreaterThan(-1);
+    let from = at; while (from >= 0 && !/^\s*- /.test(lines[from])) from--;
+    const dash = lines[from].indexOf('- '), sibling = new RegExp(`^\\s{${dash}}- `);
+    let to = from + 1; while (to < lines.length && !sibling.test(lines[to])) to++;
+    return lines.slice(from, to).join('\n');
+  };
   it('a Sketchbook step consumes the sketch output, and the browser-setup steps read it as well', () => {
-    const stepOf = (needle: string) => {
-      const at = lines.findIndex(l => l.includes(needle));
-      expect(at, `ci.yml must have a step containing ${needle}`).toBeGreaterThan(-1);
-      let from = at; while (from >= 0 && !/^\s*- /.test(lines[from])) from--;
-      const dash = lines[from].indexOf('- '), sibling = new RegExp(`^\\s{${dash}}- `);
-      let to = from + 1; while (to < lines.length && !sibling.test(lines[to])) to++;
-      return lines.slice(from, to).join('\n');
-    };
     const sketchStep = stepOf('playwright test --project=sketchbook');
     expect(sketchStep).toMatch(/if:.*github\.event_name == 'pull_request'/);
     expect(sketchStep).toMatch(/if:.*steps\.scope\.outputs\.sketch == 'true'/);
@@ -288,6 +288,19 @@ describe('the scope step routes a diff to e2e, to the sketchbook, or to neither 
     for (const needle of ['playwright install', 'sources.list.d/google-chrome'])
       expect(stepOf(needle), `the ${needle} step must also run for a sketch-only pull request`).toMatch(/steps\.scope\.outputs\.sketch == 'true'/);
     expect(lines.find(l => /playwright test \$\{\{/.test(l)), 'the full-matrix arm carries the sketchbook project').toMatch(/--project=sketchbook'/);
+  });
+
+  // #600: a syntax error under tests/e2e/ was invisible to every pull request whose OWN diff did not touch
+  // it — tablet/tablet-landscape are the only projects that load viewport.spec.ts, and they run nightly only.
+  // Delete this step, or re-gate it on the scope output, and the tree stays green with a broken spec file
+  // undetected until the nightly (pr-test-analyzer).
+  it('an e2e-spec-parse step runs on every pull request, gated on nothing but the event, across all four projects (#600)', () => {
+    const step = stepOf('playwright test --list');
+    expect(step).toMatch(/if:\s*github\.event_name == 'pull_request'\s*$/m);
+    expect(step, 'must not be re-gated on the scope step — the point is to catch a break the diff never touches')
+      .not.toMatch(/steps\.scope\.outputs/);
+    for (const project of ['mobile', 'desktop', 'tablet', 'tablet-landscape'])
+      expect(step, `must still list the ${project} project`).toContain(`--project=${project}`);
   });
 });
 
