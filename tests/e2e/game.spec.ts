@@ -729,7 +729,13 @@ test.describe('Sky Ninja Academy', () => {
 
   test('a full mission (5 stages) ends with results, medal, coins, a sticker and saved stars', async ({ page }) => {
     test.setTimeout(150_000);
-    await seedPlayer(page, 'terra');
+    // #544: seeded with an avatar id `avatarById` cannot resolve, rather than a real one — this mission
+    // already pays for a full playthrough, so the regression rides along on it instead of a second one
+    // (#749 is about there being too many of those already). `avatarById` is total, so the drawn
+    // certificate falls back to the default ninja (Volt); before the fix, the *album* row kept the raw,
+    // unresolvable id (a second, independent read of the save) while the *drawn* keepsake showed the
+    // fallback — two different signatures for the same certificate.
+    await seedPlayer(page, 'not-a-real-ninja-id');
     await startTopic(page, 'reception', 'r-count');
     const stages = await page.evaluate(() => window.__sna.session.stages);
     expect(stages).toBe(5);
@@ -808,11 +814,12 @@ test.describe('Sky Ninja Academy', () => {
     // that only files on a successful save cannot hide behind the two that work.
     const album = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs);
     expect(album).toHaveLength(1);
-    // `name` and `avatar` are the two fields `fileCertificate()` reads from the save rather than copying from
-    // `CertInfo`, so they are the wiring nothing else checks: with `avatar` dropped, every certificate a child
-    // has earned silently redraws with the default ninja's face, because `avatarById` is total by design.
-    // Both come from this test's own seed — `seedPlayer(page, 'terra')`, whose `name` default is 'Ada'.
-    expect(album[0]).toMatchObject({ id: 'reception:r-count', year: 'Reception', training: false, name: 'Ada', avatar: 'terra' });
+    // `name` and `avatar` are the two fields the caller supplies to `certToStored()` rather than copying out
+    // of `CertInfo` (#544) — the wiring nothing else checks. This test's seeded avatar id does not resolve, so
+    // `avatar: 'volt'` here is the fallback `avatarById` draws, not the raw seed — proving the album row is a
+    // narrowing of the same resolved `CertInfo` the certificate below is drawn from, never a second, independent
+    // read of the save that could disagree with it. `name` comes from this test's own seed default, 'Ada'.
+    expect(album[0]).toMatchObject({ id: 'reception:r-count', year: 'Reception', training: false, name: 'Ada', avatar: 'volt' });
     expect(album[0].stars).toBeGreaterThan(0);
     expect(album[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     // The drawn day and the stored day are one value now, not two reads of the clock a UTC/local split apart
@@ -820,6 +827,10 @@ test.describe('Sky Ninja Academy', () => {
     const words = await page.evaluate(() => window.__sna.certWords());
     const longDate = new Date(`${album[0].date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
     expect(words!.date, 'the album entry and the keepsake agree about the day').toBe(longDate);
+    // #544: the drawn keepsake must name the same ninja the album row says earned it — the fallback Volt,
+    // not the default's element name doubling as a coincidence. Before the fix this still passed (the drawn
+    // side was always correct); it is the assertion above, on the *album* side, that used to fail.
+    expect(words!.signed, "the fallback ninja `avatarById` draws for an unresolvable id, matching the album").toContain('Volt');
 
     // #50: the 🎓 button always delivers — it never silently does nothing.
     await page.evaluate(() => { (navigator as any).canShare = () => false; });   // exercise the non-share routes deterministically (headless can't complete a real Web Share)

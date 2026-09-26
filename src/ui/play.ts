@@ -7,7 +7,7 @@ import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-
 import { Tracer } from '../game/tracing';
 import {
   isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd,
-  recordSprint, recordTopic, recordTraining, save, today, touchStreak, wallet,
+  recordSprint, recordTopic, recordTraining, save, touchStreak, wallet,
 } from '../storage';
 import { equippedItem } from '../game/shop';
 import { canHear, haptic, say, sfx, sliceFx } from '../audio';
@@ -18,7 +18,7 @@ import { BOMB, createPlaySession, type ResultPayout } from './play-session';   /
 import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
 import { resultMedal, resultHeading } from './results';
 import { dojoRowsHTML } from './memory';
-import { certWords, drawCertificate, deliverCertificate, type CertInfo } from './certificate';
+import { certToStored, certWords, drawCertificate, deliverCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
 export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
@@ -278,18 +278,13 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
    * a device where pressing that button does nothing at all, and the child who most needs the certificate
    * kept is the one it silently failed for.
    *
-   * The stored day comes from `c.date` (#410), not a fresh `today()` — this can run a beat after `certInfo()`
-   * built `c`, and the same certificate is drawn later still, whenever the child presses the button. Reading
-   * the clock again here would give the stored album row and the printed keepsake two different instants to
-   * take their day from, on top of the UTC-vs-local split `certificate.ts`'s `displayDay()` now closes.
+   * Routed through `certToStored()` (#544), the same helper `duel.ts` uses: every stored field, avatar
+   * included, is narrowed from the one `CertInfo` (`c`) `certInfo()` already built and `drawCertificate()`
+   * will later draw — never a second, independent read of the raw profile — so the album row and the printed
+   * keepsake can never disagree about which ninja earned it or which day it was earned on.
    */
   function fileCertificate(c: CertInfo): boolean {
-    recordCert({
-      id: `${o.year.id}:${training ? 'sensei' : o.topic?.id ?? 'mission'}`,
-      name: c.name, avatar: d.avatar, year: c.year, title: c.title,
-      stars: c.stars, score: c.score, correct: c.correct, attempts: c.attempts,
-      date: today(c.date), training: c.training,
-    });
+    recordCert(certToStored(c, { id: `${o.year.id}:${training ? 'sensei' : o.topic?.id ?? 'mission'}` }));
     // Both refusal paths (#470 review round 1): `isWriteFailing()` alone missed a write `save()` skipped
     // deliberately under `isReadOnlySave()`'s latch (#232) — the row was offered though the album never got it.
     return !isWriteFailing() && !isReadOnlySave();
