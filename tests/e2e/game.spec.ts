@@ -2904,6 +2904,53 @@ test.describe('profile picker (#20 slice 2)', () => {
     await expect(unreadable, 'never "has not played" about 500 coins this build could not parse the version of').not.toContainText('Not started yet');
   });
 
+  /**
+   * #681: a corrupt slot is writable, just unreadable, so tapping straight onto it and playing loses whatever
+   * was there the moment the very next ordinary save() runs — no confirmation, no distinguishing sentence
+   * beyond the label the test above already covers. `future` gets no such gate here: `readOnly` already
+   * protects those bytes, so switching onto one costs nothing.
+   */
+  test('tapping a corrupt card asks first, and only switches once the family confirms (#681)', async ({ page }) => {
+    await page.addInitScript(({ index, ada, corrupt }) => {
+      if (!localStorage.getItem('sna:profiles')) {
+        localStorage.setItem('sna:v1', ada);
+        localStorage.setItem('sna:v1:p2', corrupt);
+        localStorage.setItem('sna:profiles', index);
+      }
+    }, {
+      index: JSON.stringify({ v: 1, active: 'p1', ids: ['p1', 'p2'] }),
+      ada: JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins: 40, spent: 0, onboarded: true }),
+      corrupt: JSON.stringify({ v: 'banana', name: 'Cass', avatar: 'kai', coins: 500, spent: 0, onboarded: true }),
+    });
+    await page.goto('/');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+
+    await page.click('.avatar-card[data-profile="p2"]');
+    // Still the picker, not the map — the tap opens a question, not a game, and it names the slot the same
+    // way the card itself does ("Ninja 2": no name survives an unreadable `v`).
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.prof-modal h2')).toHaveText('Play as Ninja 2?');
+    await expect(page.locator('.prof-modal')).toContainText('This device cannot read the game saved here');
+
+    // Cancel: no switch happened at all — the index still names Ada active on the next launch.
+    await page.click('#corrupt-cancel');
+    await expect(page.locator('.prof-modal')).toHaveCount(0);
+    await expect(page.locator('.profile-screen'), 'cancelling leaves the family on the picker').toBeVisible();
+    await page.goto('/');
+    await expect(page.locator('.profile-screen'), 'two profiles: the picker comes first, same as any other launch').toBeVisible();
+    await page.click('.avatar-card[data-profile="p1"]');
+    await expect(page.locator('#change-av'), 'cancelling left Ada the active profile').toContainText('Ada');
+
+    // Confirm: the switch goes through, landing on the wizard — a corrupt blob reads as unonboarded, the same
+    // as any other unplayed slot (#380 review B1), never a game built on unknown state.
+    await page.click('#who');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await page.click('.avatar-card[data-profile="p2"]');
+    await page.click('#corrupt-go');
+    await expect(page.locator('.choose-ninja-screen')).toBeVisible();
+    await expect(page.locator('.home'), 'never a game screen straight off an unreadable save').toHaveCount(0);
+  });
+
   test('a fourth ninja is the last: the New ninja card goes when the device is full', async ({ page }) => {
     await seedSiblings(page);
     await page.goto('/');

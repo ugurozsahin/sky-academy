@@ -35,6 +35,24 @@ const SWITCH_STORE_HINT = `This browser will not let the game save, so it cannot
  *  sentence: nothing a family does fixes a store that will not save, but this clears on its own once the
  *  picker redraws. */
 const SWITCH_UNKNOWN_HINT = `That ninja is not on this device any more. 🥷`;
+/**
+ * The one question a tap on a `corrupt` card asks before it switches (#681). `setActiveProfile` does not
+ * refuse a corrupt slot — the bytes are writable, just unreadable — so without this a tap silently starts a
+ * fresh game over them, and the very next ordinary `save()` (no special action, just play) overwrites the
+ * corrupt blob for good. `future` gets no such gate: that slot's `readOnly` latch (`storage.ts`) already keeps
+ * `save()` from writing back, so nothing is lost by switching onto it without asking.
+ */
+function corruptConfirmHTML(name: string): string {
+  return `
+      <div class="modal reset-modal prof-modal">
+        <h2>Play as ${esc(name)}?</h2>
+        <p>This device cannot read the game saved here, so there is no way to know what is on it. Playing now starts fresh, and the next save replaces it for good.</p>
+        <div class="reset-actions">
+          <button class="btn" id="corrupt-cancel">Cancel</button>
+          <button class="btn bad" id="corrupt-go">Play anyway</button>
+        </div>
+      </div>`;
+}
 /** `addProfile`'s own refusal union, read off it rather than written out a second time (#401 item 1). */
 type AddRefusal = Extract<AddProfileResult, { ok: false }>['why'];
 /** A `Record` rather than `addOutcome`'s old ternary (#401 item 2): `AddProfileResult['why']` gaining a third
@@ -125,6 +143,7 @@ export function profilesScreen(go: (id: ProfileId) => void, onNew: (id: ProfileI
         </button>` : ''}
     </div>
     <p class="name-hint" id="who-hint" aria-live="polite"></p>
+    <div class="overlay" id="profile-overlay" hidden></div>
   </section>`, 'bg-sky');
   ($('#who-heading') as HTMLElement).focus();   // the launch screen announces itself, as the wizard steps do (#67 a11y)
   say('Who is playing?');
@@ -133,6 +152,13 @@ export function profilesScreen(go: (id: ProfileId) => void, onNew: (id: ProfileI
   // (`avatar.ts`'s `SENSEI_LINES.locked`): these sentences are the only thing standing between a pre-reader
   // and a screen that looks broken, and `.claude/rules/style.md` is "read-aloud everywhere" (#380 review B6).
   const refuse = (text: string) => { sfx.wrong(); hint.textContent = text; say(text); };
+  const overlay = $('#profile-overlay');
+  const closeOverlay = () => { overlay.hidden = true; overlay.innerHTML = ''; };
+  const commit = (c: { id: ProfileId }) => {
+    const o = pickOutcome(c.id, setActiveProfile);
+    if (!o.move) return refuse(o.hint);
+    sfx.correct(); go(o.id);
+  };
   // A lookup against `cards`, not `b.dataset.profile as ProfileId` (#401 item 1): `data-profile` stays on the
   // button for e2e's own selectors, but the id the handler acts on now comes off the matching `ProfileCard`
   // rather than the DOM string, the one unchecked widening into `ProfileId` in the codebase gone with it. By
@@ -142,9 +168,16 @@ export function profilesScreen(go: (id: ProfileId) => void, onNew: (id: ProfileI
   $$('.avatar-card[data-profile]').forEach(b => b.addEventListener('click', () => {
     const c = cards.find(c => c.id === b.dataset.profile);
     if (!c) return;                 // cannot happen — every such button was drawn from `cards` above
-    const o = pickOutcome(c.id, setActiveProfile);
-    if (!o.move) return refuse(o.hint);
-    sfx.correct(); go(o.id);
+    // A corrupt slot is writable, just unreadable, so switching onto it and playing loses whatever is there for
+    // good the moment the next ordinary `save()` runs — unlike `future`, which `readOnly` protects (#681).
+    if (c.state === 'corrupt') {
+      overlay.hidden = false;
+      overlay.innerHTML = corruptConfirmHTML(cardName('', cards.findIndex(x => x.id === c.id) + 1));
+      $('#corrupt-cancel').addEventListener('click', () => { sfx.tap(); closeOverlay(); });
+      $('#corrupt-go').addEventListener('click', () => { closeOverlay(); commit(c); });
+      return;
+    }
+    commit(c);
   }));
   const newBtn = $('#new-ninja') as HTMLElement | null;
   newBtn?.addEventListener('click', () => {
