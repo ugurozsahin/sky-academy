@@ -246,10 +246,15 @@ jobs:
       # they run nightly only (#72), so #598 sat on `main` for hours before a routine happened to notice. This
       # runs unconditionally on every pull request, never gated on the scope step above: the whole point is to
       # catch a spec file already broken by an earlier, unrelated merge. `--list` only resolves and parses the
-      # files; it needs no browser binary and opens nothing, so it costs no install and no server.
+      # files; it needs no browser binary and opens nothing, so it costs no install and no server. No
+      # `--project=` filter (round-1 review, #600): a named subset is exactly the shape that hid #598 in the
+      # first place — a project added later with its own restricted testMatch would again be the only place a
+      # spec file loads, invisible to a filtered list the same way it was invisible to filtered PR-time
+      # projects. Every declared project costs the same near-zero parse either way, so naming any of them buys
+      # nothing and risks drift.
       - name: e2e spec files parse (#600)
         if: github.event_name == 'pull_request'
-        run: npx playwright test --list --project=mobile --project=desktop --project=tablet --project=tablet-landscape
+        run: npx playwright test --list
       - if: failure() && github.event_name != 'push'
         uses: actions/upload-artifact@v6
         with:

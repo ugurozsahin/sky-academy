@@ -293,14 +293,18 @@ describe('the scope step routes a diff to e2e, to the sketchbook, or to neither 
   // #600: a syntax error under tests/e2e/ was invisible to every pull request whose OWN diff did not touch
   // it — tablet/tablet-landscape are the only projects that load viewport.spec.ts, and they run nightly only.
   // Delete this step, or re-gate it on the scope output, and the tree stays green with a broken spec file
-  // undetected until the nightly (pr-test-analyzer).
-  it('an e2e-spec-parse step runs on every pull request, gated on nothing but the event, across all four projects (#600)', () => {
+  // undetected until the nightly (pr-test-analyzer). Round 1 (a real reviewer, not this repo's own agents)
+  // found the first version of this rail pinned a hand-typed four-project list, the same shape that hid #598
+  // in the first place: a project added later with its own restricted testMatch would again be invisible,
+  // both to the CI step it pinned as correct and to this rail's own literal strings. The fix drops the
+  // `--project=` filter from the step entirely — every declared project parses at the same near-zero cost —
+  // so this rail instead pins that no filter exists to drift back in, rather than pinning today's list of them.
+  it('an e2e-spec-parse step runs on every pull request, gated on nothing but the event, with no --project filter to go stale (#600)', () => {
     const step = stepOf('playwright test --list');
     expect(step).toMatch(/if:\s*github\.event_name == 'pull_request'\s*$/m);
     expect(step, 'must not be re-gated on the scope step — the point is to catch a break the diff never touches')
       .not.toMatch(/steps\.scope\.outputs/);
-    for (const project of ['mobile', 'desktop', 'tablet', 'tablet-landscape'])
-      expect(step, `must still list the ${project} project`).toContain(`--project=${project}`);
+    expect(step, 'must carry no --project filter — a named subset is the shape that hid #598').not.toMatch(/--project=/);
   });
 });
 
