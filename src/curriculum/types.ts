@@ -82,6 +82,7 @@ export interface Topic {
   year: YearId;
   nc: string;             // curriculum reference (short)
   input?: 'bubbles' | 'tracing';   // how the child answers (default bubbles); named apart from Session.Mode (#45)
+  sequenceFrom?: Difficulty;   // draws a `Question.sequence` from this difficulty up — the truth `duelPool()` reads (#562)
   gen: Generator;
 }
 

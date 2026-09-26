@@ -188,20 +188,20 @@ export class Duel {
 
 /**
  * The topics a duel can be played on (#16 item 4): bubble topics only — no tracing (nothing to slice) and no
- * sequence questions (spelling, sentences, Order Up), where "first correct slice" has no meaning. A topic is
- * sampled with a few seeded draws at the given difficulty: some generators mix a sequence branch in at a
- * higher difficulty (Tricky Words at 3, say), so one draw is not a verdict — `DUEL_POOL_DRAWS` are.
+ * sequence questions (spelling, sentences, Order Up), where "first correct slice" has no meaning.
+ * `Topic.sequenceFrom` is the truth for that (#562); the 8 seeded draws below are now only a throw-detection
+ * rail, proved against the flag by `tests/unit/duel.test.ts` sampling every topic and difficulty.
  */
 export const DUEL_POOL_DRAWS = 8;
 export function duelPool(topics: Topic[], difficulty: Difficulty = 1): Topic[] {
   return topics.filter(t => {
-    if (t.input === 'tracing') return false;
+    if (t.input === 'tracing' || (t.sequenceFrom !== undefined && difficulty >= t.sequenceFrom)) return false;
     try {
-      for (let seed = 1; seed <= DUEL_POOL_DRAWS; seed++) if (t.gen(difficulty, seededRng(seed)).sequence) return false;
+      for (let seed = 1; seed <= DUEL_POOL_DRAWS; seed++) t.gen(difficulty, seededRng(seed));
     } catch (e) {
       // #444: a generator that throws (the same floor rail #433 can trip on a future curriculum edit) must
       // not stop Ninja Duel opening at all for the whole year — a topic that cannot be drawn safely is
-      // exactly as duel-unable as one that draws a sequence question, so it is excluded the same way.
+      // excluded the same way a sequence-flagged one is.
       console.error(`Sky Ninja Academy: "${t.id}" question generator threw while building the duel pool`, e);
       return false;
     }
