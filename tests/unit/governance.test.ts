@@ -4331,7 +4331,6 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
   });
 
   it('review-pr §3: a sweep is handed over as an issue, which is the only form a reviewer may create', () => {
-    const section = s3();
     const b = bullet();
     expect(b, 'a commit is the one form a reviewer cannot use').toMatch(/as an issue, not a commit/);
     expect(b, "and the rule says so in the reviewer's own terms, not only by implication")
@@ -4374,6 +4373,53 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/no look change/);
     expect(body, 'including how that one is settled, which is the part that makes it cheap')
       .toMatch(/CSS diff of the build output/);
+  });
+
+  /**
+   * Whole-unit-set completeness for the rest of §3 (#746, following #498's settled approach: pin the
+   * window's whole unit set by equality, so completeness is a property of the assertion rather than of how
+   * hard someone read). `bullet()`/`bodyCheck()` above already cover the section's last two bullets by their
+   * own word-for-word assertions; this closes the part before them — the opening line, the three top-level
+   * "attack it" bullets (one, `Mutate`, carrying its own two nested guards as part of its one unit), and the
+   * budget-rail bullet immediately before `bullet()`'s own start anchor, which had no pin of any kind until
+   * now. A rewrite of any of these five turns its row red; an addition with no row turns the coverage check
+   * red, which is what a one-off `.toMatch()` pin (PR #744, seven rounds, closed unmerged) never gave.
+   */
+  describe('review-pr §3: the pre-sweep window, unit for unit (#746)', () => {
+    const REGION_FROM = '## 3. Attack the change, do not confirm it';
+    const REGION_TO = '- **A finding that came from a sweep leaves the sweep behind';
+    const region = () => slice(reviewPr(), 's3 pre-sweep region', REGION_FROM, REGION_TO, STRUCTURAL);
+
+    // Named apart from the shared unitsOf() (#536) and from the §6 block's own copy: this window is the same
+    // bold-led-bullet shape, but the two describe blocks are independent scopes over different documents, and
+    // a cross-block import for one four-line splitter is not worth the coupling.
+    /** Paragraphs, and each top-level `- **…` bullet inside one — a nested `  - **…` stays part of its parent. */
+    const boldBulletUnitsOf = (text: string) =>
+      text.split(/\n\n+/).flatMap((p) => p.split(/\n(?=- \*\*)/)).map((u) => u.trim()).filter(Boolean);
+
+    const PINS: Array<{ what: string; unit: string }> = [
+      { what: "the section opens by naming what a review is for", unit: "The reviews that missed something here all read the diff for whether it works. Read it for how it fails." },
+      { what: "mutate the code and watch the test go red, plus its two guards", unit: "- **Mutate the code and watch the test go red.** This is the whole job. Restore the bug the pull request fixes\n  and confirm the new rail fails; then break each *part* of the fix in turn. A rail that stays green under a\n  mutation is a rail that is not holding that property, whatever its name says.\n  - **Read the count of tests that ran, not the exit status.** A mistyped `-t` filter matches nothing, exits\n    **0**, and prints `177 skipped` — which scrolls past as a pass and turns every mutation after it into\n    evidence of nothing.\n  - **Restore the tree before you run anything else.** A mutation left behind makes every later green in that\n    checkout meaningless, including the one you are about to quote in your review." },
+      { what: "suspect a test that cannot fail", unit: "- **Suspect a test that cannot fail.** Work out, algebraically, whether the assertion is an identity. A test\n  named for a property is not evidence that the property is pinned — and a pull request body that *claims* a\n  property is covered is a claim to check, not to quote." },
+      { what: "check the guard rail's reach", unit: "- **Check the guard rail's reach.** Rails here are text and DOM checks. Ask which spellings and which screens\n  this one actually sees, and which plausible rewrite walks straight past it." },
+      { what: "a budget number may only go down", unit: "- **A budget number may only go down.** One raised to make a build pass is the finding." },
+    ];
+
+    it.each(PINS)('§3 still reads, word for word: $what', ({ unit }) => {
+      expect(boldBulletUnitsOf(region()),
+        'if §3 was reworded on purpose, re-pin it here deliberately and say so in the commit').toContain(unit);
+    });
+
+    it('the table covers every unit of the region, so a new one cannot arrive unpinned', () => {
+      const units = boldBulletUnitsOf(region());
+      expect(units.length, 'the region must split into its units, or every row above asserts nothing').toBe(5);
+      const pinned = new Set(PINS.map((p) => p.unit));
+      expect(units.filter((u) => !pinned.has(u)),
+        'every unit between the §3 heading and the sweep bullet must have a row — an unpinned one is exactly '
+        + 'the gap #746 was filed to close').toEqual([]);
+      expect(new Set(PINS.map((p) => p.unit)).size, 'two rows must not pin the same unit').toBe(PINS.length);
+      expect(new Set(PINS.map((p) => p.what)).size, 'two rows must not claim the same thing').toBe(PINS.length);
+    });
   });
 
   it('the routine prompt points at the sweep from the step that restates §4', () => {
