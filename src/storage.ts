@@ -1141,16 +1141,16 @@ export function recordTopic(topicId: string, stars: number, score: number) {
  * `AnswerTally` rather than two positional numbers a caller could pass in the wrong order (#379) — the two
  * call sites (`ui/play.ts`, `ui/duel.ts`) already build one before this. Clamped to `0 <= hits <= tries`:
  * `accuracy()` divides `hits/tries`, and an out-of-range write is a topic Sensei can rank above 100%.
- *
  * **Warns when the clamp actually changes the value** (review finding, #379) — the same shape `ui/visuals.ts`'s
  * chart clamps and `arena.ts`'s label-fit warning already use: silently repairing a malformed tally would trade
  * one silent failure (an accuracy over 100%) for another (evidence of the bug that produced it, gone without a
  * trace). Both real producers (`session.ts`'s `tally()`, `duel.ts`'s `hit()`) build a well-formed tally today,
  * so this should never fire in play; `Number.isFinite` catches a `NaN` the same way, rather than letting it
- * through a clamp that cannot bound it.
+ * through a clamp that cannot bound it. `tries` is validated the same way too (#582): non-finite or negative warns and writes nothing; exactly 0 stays a silent no-op.
  */
 export function recordAccuracy(topicId: string, t: AnswerTally) {
-  if (t.tries <= 0) return;
+  if (t.tries === 0) return;
+  if (!Number.isFinite(t.tries) || t.tries < 0) { console.warn(`recordAccuracy("${topicId}"): invalid tries (${t.tries}) — ignored`); return; }
   const hits = Number.isFinite(t.hits) ? Math.min(Math.max(t.hits, 0), t.tries) : 0;
   if (hits !== t.hits) console.warn(`recordAccuracy("${topicId}"): tally out of range (hits=${t.hits}, tries=${t.tries}) — clamped to ${hits}`);
   const p = load().progress[topicId] ?? { stars: 0, best: 0, plays: 0 };

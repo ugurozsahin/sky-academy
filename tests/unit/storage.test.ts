@@ -146,6 +146,21 @@ describe('rewards storage', () => {
     for (const call of warn.mock.calls) expect(call[0]).toContain('tally out of range');
     warn.mockRestore();
   });
+  it('recordAccuracy refuses a non-finite or negative tries — a corrupted value must never reach storage (#582)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordAccuracy('y1-nan', { hits: 2, tries: NaN });
+    expect(load().progress['y1-nan'], 'a NaN tries must never be written').toBeUndefined();
+    recordAccuracy('y1-inf', { hits: 2, tries: Infinity });
+    expect(load().progress['y1-inf'], 'an Infinity tries must never be written').toBeUndefined();
+    recordAccuracy('y1-neg', { hits: 2, tries: -3 });
+    expect(load().progress['y1-neg'], 'a negative tries must never be written').toBeUndefined();
+    expect(warn, 'each malformed tries must leave a trace').toHaveBeenCalledTimes(3);
+    for (const call of warn.mock.calls) expect(call[0]).toContain('invalid tries');
+    warn.mockRestore();
+    // A rejected call must not half-write: a well-formed call for the same topic afterwards starts clean.
+    recordAccuracy('y1-nan', { hits: 2, tries: 4 });
+    expect(load().progress['y1-nan']).toEqual({ stars: 0, best: 0, plays: 0, hits: 2, tries: 4 });
+  });
   it('streak counts consecutive days only', () => {
     expect(touchStreak(new Date('2026-09-05T10:00:00Z'))).toBe(1);
     expect(touchStreak(new Date('2026-09-05T20:00:00Z'))).toBe(1);   // same day
