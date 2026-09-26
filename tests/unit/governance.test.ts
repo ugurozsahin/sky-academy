@@ -4053,6 +4053,12 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // what a round being correct actually means (one class member, not a wrong call reversed later).
     expect(s, 'the bar those rounds were measured against, not only the verdict that they cleared it')
       .toMatch(/met `review-pr` §7's bar/);
+    // #744 round 2 (silent-failure-hunter/pr-test-analyzer): the two fragments either side of this
+    // clause were pinned, but the clause itself — the actual thesis, that the round cap mechanism is
+    // not what stopped these rounds — was not. A rewrite could keep both pinned fragments and replace
+    // this clause with its opposite and every assertion here would still pass.
+    expect(s, 'the thesis itself — the round cap is not the mechanism that stopped these rounds')
+      .toMatch(/so nothing in the round cap could stop them/);
     expect(s, 'what "correct" means here — a member of the class, not a call later reversed')
       .toMatch(/how many members the class had/);
   });
@@ -4153,6 +4159,11 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // (`agents: cannot spawn (subagent)`), never by the rule sentence that names why.
     expect(a, "the rule the cannot-spawn spelling exists to serve, not only its consequence")
       .toMatch(/a gap and a result must never be written the same way/);
+    // #744 round 2 (silent-failure-hunter): the rule itself was pinned above, but not the reason the
+    // exact spelling matters — that "say so in your own words" would make a gap and a result read the
+    // same. A rewrite could keep the rule verbatim and drop this reasoning with nothing going red.
+    expect(a, 'why the exact spelling matters — free wording would make a gap and a result indistinguishable')
+      .toMatch(/"say so in your own words" leaves them indistinguishable/);
     // #498: the agents' own reasoning — forward from input to outcome, never backward to whether the
     // input can occur — is what makes a finding "a note for the body" rather than "an edit to the
     // diff"; only the disposition was pinned above, not the reasoning that justifies it.
@@ -4226,6 +4237,12 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // reviewer what to do with a bare count.
     expect(body, 'the instruction the ranking above serves — a count is not self-weighing')
       .toMatch(/Ask for the method before you weigh it/);
+    // #744 round 2 (silent-failure-hunter/pr-test-analyzer): the instruction was pinned, but not the
+    // rule that follows it — a sweep count gets no special leniency, judged by the same bar as
+    // everything else. `§7's bar` is pinned once elsewhere, on a different sentence in sweep(), and
+    // "like anything else" was unpinned anywhere in this file.
+    expect(body, "a sweep claim gets no special leniency — it is weighed by the reviewer's own bar")
+      .toMatch(/weigh it by §7's bar like anything else/);
     // #498: the other cheap exit the same sentence names — `SWEEP: NOT ENUMERABLE` on a class that
     // plainly can be enumerated — was unpinned; only its sibling ("says nothing... has not done
     // step 4") was.
