@@ -17,7 +17,7 @@ export default async function run(p) {
       ],
     }));
   });
-  await p.reload({ waitUntil: 'networkidle' });
+  await p.goto(p.url().split('?')[0], { waitUntil: 'domcontentloaded' });   // drop ?reset=1 so the seeded save survives
   await p.waitForSelector('.home');
   await p.click('#rewards');
   await p.waitForSelector('.cert-row:not(.duel-row)');
