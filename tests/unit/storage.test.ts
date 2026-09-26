@@ -1701,6 +1701,30 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(isWriteFailing(), 'the refusal now latches on its own').toBe(true);
   });
 
+  it('a single-profile household retries addProfile once the store recovers, with no sibling to heal it (#587)', () => {
+    // No `save()` here: this household has never played, so `cache` is still null and there are no unsaved
+    // coins the precheck above needs to protect — unlike the "New ninja" test above, which plays first.
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try { expect(addProfile()).toEqual({ ok: false, why: 'store' }); }
+    finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(isWriteFailing(), 'latched by the refused attempt itself').toBe(true);
+    expect(addProfile(), 'the store recovered and there is nothing cached to lose').toEqual({ ok: true, id: 'p2' });
+  });
+
+  it('...but a household with unsaved coins stays refused even once the store recovers (#587)', () => {
+    // Same shape as the recovery test above, except `save()` first — `cache` now holds Ada's coins, which is
+    // exactly what the precheck exists to protect (#380 round 5, B2), so recovery must not retry through it.
+    save({ name: 'Ada', coins: 10 });
+    const realSet = localStorage.setItem;
+    (localStorage as unknown as { setItem: unknown }).setItem = () => { throw new Error('quota'); };
+    try { expect(addProfile()).toEqual({ ok: false, why: 'store' }); }
+    finally { (localStorage as unknown as { setItem: unknown }).setItem = realSet; }
+    expect(isWriteFailing()).toBe(true);
+    expect(addProfile(), 'the store recovered, but Ada is still holding unsaved coins').toEqual({ ok: false, why: 'store' });
+    expect(load(), 'her game is still the one on screen').toMatchObject({ name: 'Ada', coins: 10 });
+  });
+
   it('setActiveProfile latches writeFailed on a refused switch (#384 item 2)', () => {
     save({ name: 'Ada' });
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
