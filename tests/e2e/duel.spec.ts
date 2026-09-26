@@ -15,7 +15,7 @@ declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number; __sai
 // module scope, so a CI trial can pass one PW_FAST and have both suites honour it identically.
 const rawFast = process.env.PW_FAST;
 if (rawFast !== undefined && !/^\d+$/.test(rawFast)) throw new Error(`PW_FAST must be a plain integer, got "${rawFast}"`);
-const FAST = rawFast ? Number(rawFast) : 4;
+const FAST = rawFast ? Number(rawFast) : 8;
 
 /**
  * A speech engine that records what it was asked to say, and when it was cancelled, in order (#16 review). It
@@ -698,12 +698,14 @@ test.describe('Ninja Duel', () => {
     // flying at a question neither had been shown.
     await startDuel(page);
     // Real game speed for this one, the way its play-screen twin in `game.spec.ts` opts out with
-    // `__SNA_FAST = 1`: a compressed hold is not a hold anybody can press pause inside. `startDuel` boots at
-    // `__SNA_FAST = 4`, which leaves ~362ms between the winning slice and the round advancing for a
-    // `page.evaluate` round trip AND a real `page.click`. It measured 67-113ms of that budget and passed six
-    // times out of six — but `playwright.config.ts` sets `retries: 0`, and a two-core runner with two workers
-    // has far less headroom than this machine (PR #474 review, note 6). `setSpeed` is read by `scaled()` at
-    // the moment each beat is armed, so taking it to 1 here gives the hold below its full length.
+    // `__SNA_FAST = 1`: a compressed hold is not a hold anybody can press pause inside. At the time this was
+    // written `startDuel` booted at `__SNA_FAST = 4`, which left ~362ms between the winning slice and the
+    // round advancing for a `page.evaluate` round trip AND a real `page.click` — it measured 67-113ms of that
+    // budget and passed six times out of six, but `playwright.config.ts` sets `retries: 0`, and a two-core
+    // runner with two workers has far less headroom than this machine (PR #474 review, note 6). #748 raised
+    // the suite's default to 8×, which halves that budget again (~181ms) — the override below matters even
+    // more now, not less. `setSpeed` is read by `scaled()` at the moment each beat is armed, so taking it to
+    // 1 here gives the hold below its full length.
     await page.evaluate(() => window.__sna.setSpeed(1));
     await winRound(page, 'a');
     const before = await page.evaluate(() => window.__sna.state());
@@ -1050,7 +1052,7 @@ test.describe('Ninja Duel', () => {
     await page.waitForFunction(() => window.__sna.state().round === 2, undefined, { timeout: 30_000 });
     expect(await page.evaluate(() => window.__sna.state())).toMatchObject({ round: 2, scoreA: 0, scoreB: 0, decided: false, ended: false });
     // The both-arenas gate: one advance per round, not one per arena. Advancing twice would show round 3 within
-    // a frame or two of round 2; round 2's wave is in the air for well over 300 ms even at 4×.
+    // a frame or two of round 2; round 2's wave is in the air for well over 300 ms even at 8× (#748).
     await page.waitForTimeout(300);
     expect(await page.evaluate(() => window.__sna.state().round), 'one wave end per arena, one advance per round').toBe(2);
     await page.click('#pause');
