@@ -2030,7 +2030,13 @@ describe('guard rails', () => {
     expect(jobs.length, 'the jobs block must be read, not an empty slice').toBeGreaterThan(100);
     // Sliced to the `test` job alone: `branch-name` carries its own, unrelated `timeout-minutes: 5`, and a
     // whole-file search would let this rail read either one depending on which came first in the file.
-    const testJob = jobs.slice(jobs.indexOf('\n  test:'), jobs.indexOf('\n  branch-name:'));
+    // The end anchor is checked for `-1` before it is used: `String.slice(start, -1)` does not throw on a
+    // missing terminator, it silently runs almost to the end of `jobs` instead — which would still read the
+    // `test` job's own `timeout-minutes` correctly today, so a vacuity guard on length alone would not catch
+    // a `branch-name` rename, only a genuinely wrong number would (pr-test-analyzer review of this rail).
+    const testEnd = jobs.indexOf('\n  branch-name:');
+    expect(testEnd, "the `branch-name` job must still exist, to bound the `test` job's own slice").toBeGreaterThan(0);
+    const testJob = jobs.slice(jobs.indexOf('\n  test:'), testEnd);
     expect(testJob.length, "the `test` job must be read, not an empty slice").toBeGreaterThan(100);
     const ceiling = Number(/timeout-minutes:\s*(\d+)/.exec(testJob)?.[1]);
     expect(ceiling, "the test job's own timeout-minutes must be a readable number, or this rail proves nothing")
@@ -2041,7 +2047,11 @@ describe('guard rails', () => {
     const section = checks.slice(0, checks.indexOf('\n## ', 1));
     const at = section.indexOf('1. **Is `main` green?**');
     expect(at, 'check 1 must exist, in the checks a run performs').toBeGreaterThan(0);
-    const check1 = section.slice(at, section.indexOf('\n2. **Did the nightly run', at));
+    // Same guard as `testEnd` above: an unbound `-1` here would silently swallow every later check into
+    // `check1` and still happen to pass today, since nothing later in the document also reads `timeout-minutes`.
+    const check1End = section.indexOf('\n2. **Did the nightly run', at);
+    expect(check1End, 'check 2 must still exist, to bound check 1\'s own slice').toBeGreaterThan(at);
+    const check1 = section.slice(at, check1End);
     expect(check1.length, 'check 1 must be read, not an empty slice').toBeGreaterThan(200);
 
     expect(check1, `check 1 must quote the test job's real ceiling (${ceiling}), not a stale copy of an earlier one`)
