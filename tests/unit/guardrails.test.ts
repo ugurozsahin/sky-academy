@@ -302,7 +302,21 @@ describe('guard rails', () => {
     const out: string[] = [];
     const specifierOf = (e: ts.Expression): string | null => {
       let expr = e;
-      while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
+      for (;;) {
+        if (ts.isParenthesizedExpression(expr)) { expr = expr.expression; continue; }
+        if (ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr) || ts.isTypeAssertionExpression(expr)) {
+          expr = expr.expression;
+          continue;
+        }
+        if (ts.isNonNullExpression(expr)) { expr = expr.expression; continue; }
+        // The comma operator's value is its right operand -- plain JS, not a TS "outer
+        // expression", so it needs its own branch alongside the TS-specific wrappers above.
+        if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.CommaToken) {
+          expr = expr.right;
+          continue;
+        }
+        break;
+      }
       return ts.isStringLiteralLike(expr) ? expr.text : null;
     };
     const visit = (n: ts.Node) => {
@@ -363,6 +377,23 @@ describe('guard rails', () => {
     // ImportTypeNode — and this repo already writes the idiom (src/ui/solid.ts's `typeof import(...)`).
     expect(importSpecifiers('x.ts', "type Loader = () => Promise<typeof import('../ui/dom')>;")).toEqual(['../ui/dom']);
     expect(importSpecifiers('x.ts', "type Foo = import('../ui/dom').SomeType;")).toEqual(['../ui/dom']);
+    // Round 11: specifierOf only unwrapped parens, so any other no-op wrapper around a call
+    // argument's specifier -- one that changes nothing about what tsc/esbuild resolves -- made
+    // it return null instead of the literal. Every member of that class, reachable inside
+    // src/game/ today via a dynamic import() or require(...) argument:
+    expect(importSpecifiers('x.ts', "import(('../ui/dom') as any);")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "import('../ui/dom' as const);")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "import(<any>'../ui/dom');")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "import('../ui/dom'!);")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "import('../ui/dom' satisfies string);")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "require(('../ui/dom') as any);")).toEqual(['../ui/dom']);
+    // The comma operator's value is its right operand -- plain JS, not TS-specific, so it is not
+    // one of TS's own "outer expression" kinds and needs its own branch.
+    expect(importSpecifiers('x.ts', "import((0, '../ui/dom'));")).toEqual(['../ui/dom']);
+    // import x = require(...) and a plain-template specifier were already reachable through the
+    // existing branches (isImportEqualsDeclaration, isStringLiteralLike) but had no test of their own.
+    expect(importSpecifiers('x.ts', "import x = require('../ui/dom');")).toEqual(['../ui/dom']);
+    expect(importSpecifiers('x.ts', "const p = require(`../ui/dom`);")).toEqual(['../ui/dom']);
   });
   it('no file in src/game/ imports from src/ui/ (#557)', () => {
     for (const [path, src] of inDir('/src/game/')) {
