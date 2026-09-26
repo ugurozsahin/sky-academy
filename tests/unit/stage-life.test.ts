@@ -79,6 +79,18 @@ describe('the stage brings objects to life (#740)', () => {
       expect(warn).toHaveBeenCalledTimes(1);
     } finally { warn.mockRestore(); }
   });
+  // A third shape, found in review (#807): real geometry, no bad vertex, but a non-finite position — a
+  // translation is added, not multiplied against the other coordinates, so it only ever moves the axis it's on.
+  // min.y stayed finite here while min.x/max.x went to Infinity; a min.y-only guard let this one through.
+  it('an object standing at a non-finite position on one axis alone also stands at the origin (#764 review)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const bad = new Mesh(new BoxGeometry(1, 1, 1));
+      bad.position.set(Infinity, 0, 0);
+      expect(footprint(bad)).toEqual({ base: 0, radius: 0 });
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally { warn.mockRestore(); }
+  });
 });
 
 describe('the stand: where the sketchbook and the game card show an object (#684, #740)', () => {
