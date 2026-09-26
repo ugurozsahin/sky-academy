@@ -96,7 +96,7 @@ describe('mission session', () => {
     // repeat" retry loop from ever firing here — without it, a real `y1-add` draw that happened to repeat
     // would burn an extra `gen()` call on the retry and make the throw land one `nextQuestion()` early,
     // failing this test somewhere that doesn't point at the retry loop at all.
-    const flaky = { ...good, gen: (d: Parameters<typeof good.gen>[0], r: Parameters<typeof good.gen>[1]) => { calls++; if (calls > 2) throw new Error('boom'); return { ...good.gen(d, r), hint: `call-${calls}` }; } };
+    const flaky = { ...good, gen: (d: Parameters<typeof good.gen>[0], r: Parameters<typeof good.gen>[1]) => { calls++; if (calls > 2) throw new Error('boom'); return { ...good.gen(d, r), hint: `call-${calls}`, hintIsData: false }; } };
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const s = new Session({ mode: 'mission', year: Y1, topic: flaky, rng: rng(1) }, ev);
     s.start();
@@ -763,7 +763,7 @@ describe('the repeat key holds the whole question (#412)', () => {
     for (const t of playable) {
       const q = t.gen(D1, rng(3));
       const base = repeatKey(q);
-      const presentation: Partial<Question>[] = [
+      const presentation: Partial<Omit<Question, 'hint' | 'hintIsData'>>[] = [
         { say: 'spoken some other way entirely' },
         { options: [...q.options].reverse() },
         { wide: !q.wide }, { peek: !q.peek }, { slow: !q.slow },

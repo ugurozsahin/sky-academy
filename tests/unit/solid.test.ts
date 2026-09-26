@@ -5,7 +5,7 @@ import { GOOD, BAD, PALETTE } from '../../src/game/arena';
 import { SHAPES_3D } from '../../src/curriculum/util';
 import type { Question } from '../../src/curriculum';
 
-const word = (text: string, extra: Partial<Question> = {}): Question =>
+const word = (text: string, extra: Partial<Omit<Question, 'hint' | 'hintIsData'>> = {}): Question =>
   ({ prompt: 'What is this shape?', answer: 'cube', options: ['cube', 'cone'], visual: { type: 'word', text }, ...extra });
 
 describe('solidNameFor — which question shows a rotating solid (#684)', () => {

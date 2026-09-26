@@ -48,7 +48,7 @@ const SENTENCE = 'The cat sat on the mat';
 const sentenceQ = (): Question => ({
   prompt: 'Build the sentence', say: `Build the sentence: ${SENTENCE}`, answer: SENTENCE, sequence: SENTENCE.split(' '),
   options: [...SENTENCE.split(' '), 'dog', 'hat'], wide: true, visual: { type: 'word', text: '🐱' },
-  hint: 'Listen, then slice the words in order', listen: SENTENCE, peek: true,
+  hint: 'Listen, then slice the words in order', hintIsData: false, listen: SENTENCE, peek: true,
 });
 const soundHuntQ = (): Question => ({ prompt: '🔊 Listen!', say: 'Listen: sun, sock, sad', answer: 's', options: ['s', 'a', 't', 'p'], listen: 'sun · sock · sad' });
 
@@ -87,7 +87,7 @@ function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
 const settle = () => vi.advanceTimersByTimeAsync(0);
 
 describe('waveOptsFor: the spawn-options bridge to tests/unit/sim.test.ts (#126)', () => {
-  const q = (extra: Partial<Question> = {}): Question => ({ prompt: 'p', answer: 'a', options: ['a', 'b'], ...extra });
+  const q = (extra: Partial<Omit<Question, 'hint' | 'hintIsData'>> = {}): Question => ({ prompt: 'p', answer: 'a', options: ['a', 'b'], ...extra });
 
   it('is wide when the question itself says so, whatever the label lengths', () => {
     expect(waveOptsFor(q({ wide: true }), { labels: ['a', 'b'], speed: 2 }, 0).wide).toBe(true);
@@ -251,7 +251,7 @@ describe('the no-voice sentence peek (#65)', () => {
 
   it('the spelling fallback shows the word to copy AND the place in it', async () => {
     save({ voice: 'no' });
-    const spell = (): Question => ({ prompt: '🐱  Spell it!', answer: 'cat', sequence: ['c', 'a', 't'], options: ['c', 'a', 't', 'p'], listen: 'cat', hint: 'Slice the letters in order' });
+    const spell = (): Question => ({ prompt: '🐱  Spell it!', answer: 'cat', sequence: ['c', 'a', 't'], options: ['c', 'a', 't', 'p'], listen: 'cat', hint: 'Slice the letters in order', hintIsData: false });
     const { els, arena, ps } = build(spell);
     ps.session.start(); await settle();
     expect(arena.paused, 'no peek for a spelling: the word stays').toBe(false);
@@ -353,7 +353,7 @@ describe('the line under the prompt says whose it is (#328)', () => {
    * control the first version of the fix was missing: it is what separates `hintIsData` from `!!q.hint`,
    * and it is red against the latter.
    */
-  const instructionQ = (): Question => ({ prompt: 'Which is the circle?', answer: '⭕', options: ['⭕', '🔺'], hint: 'Slice the shape' });
+  const instructionQ = (): Question => ({ prompt: 'Which is the circle?', answer: '⭕', options: ['⭕', '🔺'], hint: 'Slice the shape', hintIsData: false });
   const plainQ = (): Question => ({ prompt: '3 + 4', answer: '7', options: ['7', '8'] });
 
   it("marks the question's own hint, so the short-screen rule cannot hide the only values on the card", async () => {

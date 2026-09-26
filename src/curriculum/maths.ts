@@ -125,8 +125,8 @@ const rOddEven: Generator = (d, rng) => {
   const n = ri(rng, 1, d === 1 ? 6 : 10);
   const even = n % 2 === 0;
   const visual = { type: 'objects', emoji: pick(rng, OBJECTS), n } as const;
-  if (d === 3) return wordQ(rng, `${n} — odd or even?`, even ? 'even' : 'odd', ['odd', 'even'], { visual, hint: 'Put them in twos', say: `Is ${n} odd or even?` });
-  return wordQ(rng, 'Can they all find a partner?', even ? 'yes' : 'no', ['yes', 'no'], { visual, hint: 'Put them in twos', say: `There are ${n}. Can they all find a partner?` });
+  if (d === 3) return wordQ(rng, `${n} — odd or even?`, even ? 'even' : 'odd', ['odd', 'even'], { visual, hint: 'Put them in twos', hintIsData: false, say: `Is ${n} odd or even?` });
+  return wordQ(rng, 'Can they all find a partner?', even ? 'yes' : 'no', ['yes', 'no'], { visual, hint: 'Put them in twos', hintIsData: false, say: `There are ${n}. Can they all find a partner?` });
 };
 
 // ---------- Year 1 ----------
@@ -190,7 +190,7 @@ const y1Words: Generator = (d, rng) => {
   // candidate so a boundary this tight never runs the pool short; unreachable in the middle of the range,
   // where the first four already give three or more.
   const ds = shuffle(rng, [n - 1, n + 1, n + 2, n - 2, n - 3, n + 3].filter(x => x >= 0 && x <= 20)).slice(0, 3).map(numberWord);
-  return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which word says ${n}?`, hint: 'Slice the word' });
+  return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which word says ${n}?`, hint: 'Slice the word', hintIsData: false });
 };
 const y1Half: Generator = (d, rng) => {
   const quarter = d >= 2 && rng() < 0.5;
@@ -292,7 +292,7 @@ const y2Compare: Generator = (d, rng) => {
   const max = d === 1 ? 20 : 100;
   const a = ri(rng, 0, max), b = d === 3 && rng() < 0.2 ? a : ri(rng, 0, max);
   const ans = a < b ? '<' : a > b ? '>' : '=';
-  return wordQ(rng, `${a} ? ${b}`, ans, ['<', '>', '='], { say: `${a} compared with ${b}. Less than, greater than, or equal?`, hint: 'Slice the correct sign' });
+  return wordQ(rng, `${a} ? ${b}`, ans, ['<', '>', '='], { say: `${a} compared with ${b}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
 };
 const y2Add: Generator = (d, rng) => {
   let a: number, b: number;
@@ -415,7 +415,7 @@ function orderQ(rng: Rng, max: number, count: number): Question {
   while (set.size < count && guard++ < 100) set.add(ri(rng, 0, max));
   const nums = [...set]; const sorted = nums.slice().sort((a, b) => a - b).map(String);
   const shown = shuffle(rng, sorted);
-  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(','), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first' };
+  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(','), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first', hintIsData: false };
 }
 const rOrder: Generator = (d, rng) => orderQ(rng, d === 1 ? 5 : 10, 3);
 const y1Order: Generator = (d, rng) => orderQ(rng, d === 1 ? 10 : 20, d === 3 ? 4 : 3);
@@ -433,7 +433,7 @@ const y2Line: Generator = (d, rng) => { const step = d === 1 ? 1 : d === 2 ? pic
 /** Shapes (Y1 2-D, Y2 3-D) — properties and recognition. Tables live in util.ts (SHAPES_2D/SHAPES_3D). */
 const y1Shapes: Generator = (d, rng) => {
   const [g, name, sides] = pick(rng, SHAPES_2D);
-  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES_2D.filter(x => x[1] !== name)).slice(0, 3).map(x => x[0]), { hint: 'Slice the shape' });
+  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES_2D.filter(x => x[1] !== name)).slice(0, 3).map(x => x[0]), { hint: 'Slice the shape', hintIsData: false });
   if (sides === 0) return y1Shapes(d, rng);
   return numQ(rng, `How many sides has a ${name}?`, sides, { min: 0, max: 8, visual: { type: 'word', text: g }, distractors: [sides + 1, sides - 1, sides + 2] });
 };
@@ -447,7 +447,7 @@ function name3dQ(rng: Rng, from: readonly (readonly [string, string, ...unknown[
   const decoys = SHAPES_3D.filter(x => x[1] !== name && !(SAME_SOLID.has(x[1]) && SAME_SOLID.has(name)));
   const three = shuffle(rng, decoys).slice(0, 3);
   return glyphIsAnswer
-    ? wordQ(rng, `Which is a ${name}?`, g, three.map(x => x[0]), { hint: 'Slice the 3-D shape' })
+    ? wordQ(rng, `Which is a ${name}?`, g, three.map(x => x[0]), { hint: 'Slice the 3-D shape', hintIsData: false })
     : wordQ(rng, 'What is this shape?', name, three.map(x => x[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?' });
 }
 /** Year 1: "recognise and name common 3-D shapes (cuboids including cubes, pyramids and spheres)" — names only. */
@@ -470,7 +470,7 @@ const y2Shapes: Generator = (d, rng) => {
 function balanceQ(rng: Rng, left: string, right: string, answer: number, max: number, extra: { say?: string; distractors?: number[]; pans?: [string, string] } = {}): Question {
   const p = `${left} = ${right}`;
   const [pl, pr] = extra.pans ?? [left, right];
-  return numQ(rng, p, answer, { min: 0, max, visual: { type: 'scales', left: pl, right: pr }, say: extra.say ?? `Balance the scales! ${symSay(p)}`, hint: 'Make both sides the same', distractors: extra.distractors });
+  return numQ(rng, p, answer, { min: 0, max, visual: { type: 'scales', left: pl, right: pr }, say: extra.say ?? `Balance the scales! ${symSay(p)}`, hint: 'Make both sides the same', hintIsData: false, distractors: extra.distractors });
 }
 const rBalance: Generator = (d, rng) => {
   const emoji = pick(rng, OBJECTS);
@@ -540,7 +540,7 @@ const HOLDS: [string, string, string, string] = ['more', 'less', 'most', 'least'
 function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string): Question {
   const [thing, unit] = pick(rng, things);
   return wordQ(rng, `Best unit for a ${thing}?`, unit, [unit === small ? large : small], {
-    say: `Would you ${verb} a ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`,
+    say: `Would you ${verb} a ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`, hintIsData: false,
   });
 }
 
@@ -687,7 +687,7 @@ const y2Stats: Generator = (d, rng) => {
   if (ask === 'total') {
     const total = counts.reduce((a, b) => a + b, 0);
     return numQ(rng, `How many children altogether?`, total, {
-      visual, hint: `Add up the ${chart}`, say: `Look at the ${chart}. How many children are there altogether?`,
+      visual, hint: `Add up the ${chart}`, hintIsData: false, say: `Look at the ${chart}. How many children are there altogether?`,
     });
   }
   if (ask === 'more') {
@@ -706,7 +706,7 @@ const y2Stats: Generator = (d, rng) => {
   const k = ri(rng, 0, survey.rows.length - 1);
   const [icon] = survey.rows[k];
   return numQ(rng, `How many chose ${icon}?`, counts[k], {
-    visual, hint: `Read the ${chart}`, say: `Look at the ${chart}. How many children chose this one?`,
+    visual, hint: `Read the ${chart}`, hintIsData: false, say: `Look at the ${chart}. How many children chose this one?`,
   });
 };
 
@@ -787,16 +787,16 @@ const y1Position: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) {                                              // name the way an arrow points
     const [word, arrow] = pick(rng, DIRS);
-    return wordQ(rng, `Which way does ${arrow} point?`, word, DIRS.map(x => x[0]).filter(w => w !== word), { say: 'Which way does the arrow point? Up, down, left or right?', hint: 'Slice the word' });
+    return wordQ(rng, `Which way does ${arrow} point?`, word, DIRS.map(x => x[0]).filter(w => w !== word), { say: 'Which way does the arrow point? Up, down, left or right?', hint: 'Slice the word', hintIsData: false });
   }
   if (kind === 1) {                                              // pick the arrow for a direction
     const [word, arrow] = pick(rng, DIRS);
-    return wordQ(rng, `Which arrow points ${word}?`, arrow, ARROWS.filter(a => a !== arrow), { say: `Which arrow points ${word}?`, hint: 'Slice the arrow' });
+    return wordQ(rng, `Which arrow points ${word}?`, arrow, ARROWS.filter(a => a !== arrow), { say: `Which arrow points ${word}?`, hint: 'Slice the arrow', hintIsData: false });
   }
   const [name, steps] = pick(rng, d === 3 ? TURNS_ALL : TURNS_Y1);   // where do you face after a turn?
   const cw = rng() < 0.5, start = ri(rng, 0, 3), end = turnEnd(start, steps, cw);
   return wordQ(rng, `Face ${DIRS[start][1]}, then ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way now?`, DIRS[end][1], ARROWS.filter(a => a !== DIRS[end][1]), {
-    say: `You are facing ${DIRS[start][0]}. Make ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way are you facing now?`, hint: 'Slice the arrow',
+    say: `You are facing ${DIRS[start][0]}. Make ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way are you facing now?`, hint: 'Slice the arrow', hintIsData: false,
   });
 };
 
@@ -806,17 +806,17 @@ const y2Position: Generator = (d, rng) => {
     const [name, steps] = pick(rng, TURNS_ALL);
     const cw = rng() < 0.5, start = ri(rng, 0, 3), end = turnEnd(start, steps, cw);
     return wordQ(rng, `Face ${DIRS[start][1]}, then ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way now?`, DIRS[end][1], ARROWS.filter(a => a !== DIRS[end][1]), {
-      say: `You are facing ${DIRS[start][0]}. Turn ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way are you facing now?`, hint: 'Slice the arrow',
+      say: `You are facing ${DIRS[start][0]}. Turn ${name} ${cw ? 'clockwise' : 'anti-clockwise'}. Which way are you facing now?`, hint: 'Slice the arrow', hintIsData: false,
     });
   }
   if (kind === 1) {                                              // rotation as right angles
     const [name, steps] = pick(rng, TURNS_ALL);
     if (rng() < 0.5) return numQ(rng, `${cap(name)} = how many right angles?`, steps, { min: 0, max: 8, say: `How many right angles are the same as ${name}?`, distractors: [steps + 1, steps - 1, steps + 2] });
-    return wordQ(rng, `${steps} right angle${steps === 1 ? '' : 's'} = ?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), { say: `Which turn is the same as ${steps} right angle${steps === 1 ? '' : 's'}?`, hint: 'Slice the turn' });
+    return wordQ(rng, `${steps} right angle${steps === 1 ? '' : 's'} = ?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), { say: `Which turn is the same as ${steps} right angle${steps === 1 ? '' : 's'}?`, hint: 'Slice the turn', hintIsData: false });
   }
   const cw = rng() < 0.5, steps = pick(rng, [1, 2, 3]), start = ri(rng, 0, 3), end = turnEnd(start, steps, cw), name = TURNS_ALL[steps - 1][0];
   return wordQ(rng, `Face ${DIRS[start][1]}, turn ${cw ? 'clockwise' : 'anti-clockwise'} to face ${DIRS[end][1]}. Which turn?`, name, TURNS_ALL.filter(t => t[0] !== name).map(t => t[0]), {
-    say: `You turn ${cw ? 'clockwise' : 'anti-clockwise'} from ${DIRS[start][0]} to ${DIRS[end][0]}. Which turn was it?`, hint: 'Slice the turn',
+    say: `You turn ${cw ? 'clockwise' : 'anti-clockwise'} from ${DIRS[start][0]} to ${DIRS[end][0]}. Which turn was it?`, hint: 'Slice the turn', hintIsData: false,
   });
 };
 
@@ -868,11 +868,11 @@ const y2Symmetry: Generator = (d, rng) => {
     return wordQ(rng, 'Is the dotted line a line of symmetry?', yes ? 'yes' : 'no', [yes ? 'no' : 'yes'], {
       visual: { type: 'symmetry', grid }, wide: true,
       say: 'Look at the dotted line. Are the two halves the same? Say yes or no.',
-      hint: 'Do both halves match?',
+      hint: 'Do both halves match?', hintIsData: false,
     });
   }
   return wordQ(rng, 'Which letter has a vertical line of symmetry?', pick(rng, SYM_LETTERS), shuffle(rng, ASYM_LETTERS).slice(0, 3), {
-    say: 'Which letter looks the same folded down the middle?', hint: 'Fold it down the middle',
+    say: 'Which letter looks the same folded down the middle?', hint: 'Fold it down the middle', hintIsData: false,
   });
 };
 
@@ -919,7 +919,7 @@ const y2Patterns: Generator = (d, rng) => {
   return wordQ(rng, last ? 'What comes next?' : 'Which one is missing?', answer, decoys, {
     visual: { type: 'strip', text: seq.map((o, i) => i === gap ? '_' : o).join(' ') },
     say: last ? 'Look at the pattern. What comes next?' : 'Look at the pattern. Which one is missing?',
-    hint: last ? 'Slice what comes next' : 'Slice the missing one',
+    hint: last ? 'Slice what comes next' : 'Slice the missing one', hintIsData: false,
   });
 };
 
