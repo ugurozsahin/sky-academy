@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillAnswer } from '../../src/ui/dom';
+import { capDigits, fillAnswer } from '../../src/ui/dom';
 
 const plain = (s: string) => s.replace(/<[^>]+>/g, '');
 describe('fillAnswer (outcome card)', () => {
@@ -17,5 +17,16 @@ describe('fillAnswer (outcome card)', () => {
   it('leaves question sentences alone and escapes html', () => {
     for (const p of ['How many?', 'One more than 3?', 'Change from £1 for 5p?', 'Which is a cone?']) expect(fillAnswer(p, '4')).toBe(p);
     expect(fillAnswer('9 ? 13', '<')).toContain('&lt;');
+  });
+});
+
+describe('capDigits (the topbar coin pill has a bounded width regardless of balance, #510)', () => {
+  it('shows the real number up to four figures, and caps at "9999+" past it', () => {
+    expect(capDigits(0)).toBe('0');
+    expect(capDigits(40)).toBe('40');
+    expect(capDigits(1250)).toBe('1250');
+    expect(capDigits(9999)).toBe('9999');
+    expect(capDigits(10000)).toBe('9999+');
+    expect(capDigits(12345)).toBe('9999+');
   });
 });
