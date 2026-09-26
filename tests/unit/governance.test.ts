@@ -787,19 +787,24 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
    * same-class defect must contain; it caps nothing. Its two obligations are pinned as whole clauses, and the
    * author's half in `open-pr` §5 with them, since an alternative the fix-push never answers is the #710 shape.
    *
-   * Prove it red: delete the paragraph; drop either obligation; or drop the sentence from `open-pr` §5.
+   * Prove it red: delete the paragraph; drop either obligation; or drop the sentence from `open-pr` §5; or put a
+   * hedge at the end of any pinned sentence, or after it (review round 2).
    */
   it('a block on a third defect of one class names a structural alternative and accounts for any already named (#761)', () => {
     const skill = read('.claude/skills/review-pr/SKILL.md');
     const start = skill.indexOf('\n## 7. '), end = skill.indexOf('\n## ', start + 1);
     expect(start, 'the review-pr skill has lost its §7').toBeGreaterThan(-1);
     const s7 = flat(skill.slice(start, end === -1 ? undefined : end));
-    expect(s7, 'the trigger: a third defect of one class').toContain('When the defect is the third of one class, the block names the approach');
+    // Whole sentences, each to its closing period (review round 2): a pin that stops mid-sentence lets a hedge
+    // sit at the seam — "the block names the approach, except when …, not only the case" kept the old prefix.
+    expect(s7, 'the trigger: a third defect of one class')
+      .toContain('**When the defect is the third of one class, the block names the approach, not only the case (#761).**');
     expect(s7, 'obligation 1: name the alternative, or rule it out with a reason')
       .toContain('Name a structural alternative that would close the class, or say plainly that none exists and why.');
     expect(s7, 'obligation 2: account for an alternative already on the thread')
       .toContain('account for any alternative already named on the thread: taken, refused with a reason, or unanswered.');
-    expect(s7, 'and it is not a cap — ADR 004 stays as it is').toContain('None of this caps the rounds or lowers the bar');
+    expect(s7, 'and it is not a cap — ADR 004 stays as it is')
+      .toContain('None of this caps the rounds or lowers the bar. It changes what such a block has to contain.');
 
     const pr = read('.claude/skills/open-pr/SKILL.md');
     const s5At = pr.indexOf('\n## 5. '), s6At = pr.indexOf('\n## 6. ');
@@ -808,8 +813,37 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     const s5 = flat(pr.slice(s5At, s6At));
     // The duplicated `REVIEW: CLEARED` this PR's first head shipped (review round 1): one closing prohibition.
     expect(s5.match(/`REVIEW: CLEARED`/g)?.length, 'the fix-push paragraph names `REVIEW: CLEARED` once').toBe(1);
-    expect(s5, 'the author answers the named alternative in the fix-push comment')
-      .toContain('When the block names a structural alternative for a class of defect (`review-pr` §7), say whether you took it or why not');
+    expect(s5, 'the author answers the named alternative in the fix-push comment, and patching only the next case is not an answer')
+      .toContain('When the block names a structural alternative for a class of defect (`review-pr` §7), say whether you '
+        + 'took it or why not; patching only the next case leaves it unanswered.');
+
+    // Negative pins over the two paragraphs, for what a whole-sentence pin cannot see: a new sentence appended
+    // after a pinned one ("… has to contain. A fourth same-class round passes automatically."). A list of
+    // spellings, not a proof, like the #305 rail's ESCAPES above: a novel wording walks past it.
+    const para = (text: string, from: string) => {
+      const at = text.indexOf(from);
+      expect(at, `lost the paragraph opening "${from}"`).toBeGreaterThan(-1);
+      const stop = text.indexOf('\n\n', at);
+      return flat(text.slice(at, stop === -1 ? undefined : stop));
+    };
+    const clause = para(skill, '**When the defect is the third of one class');
+    const fixPush = para(pr, 'If a reviewer later asks for changes');
+    const HEDGES = [
+      /\bexcept\b/i, /\bunless\b/i, /\bneed not\b/i, /\boptional(ly)?\b/i, /\bwhen convenient\b/i,
+      /\bat your discretion\b/i, /\bif you (like|prefer|would rather)\b/i, /\bautomatic(ally)? pass/i,
+      /\bpass(es)? automatically\b/i,
+      /\bmay (skip|ignore|omit)\b/i, /\bdoes not (have|need) to\b/i,
+    ];
+    // And structure, which no spelling list gives: the clause ends on its no-cap sentence, and the §5 sentence
+    // runs straight into the closing prohibition, so nothing can be appended to either unseen.
+    expect(clause.trimEnd().endsWith('None of this caps the rounds or lowers the bar. It changes what such a block has to contain.'),
+      'the #761 clause must end on its no-cap sentence — anything after it is an appended exception').toBe(true);
+    expect(fixPush, 'the §5 sentence runs straight into the closing prohibition')
+      .toContain('patching only the next case leaves it unanswered. Never close with `REVIEW: CLEARED` —');
+    for (const hedge of HEDGES) {
+      expect(clause, `the #761 clause carries a hedge that gives it back: ${hedge}`).not.toMatch(hedge);
+      expect(fixPush, `the fix-push paragraph carries a hedge that gives the answer back: ${hedge}`).not.toMatch(hedge);
+    }
   });
 
   /**
