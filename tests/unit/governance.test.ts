@@ -3488,6 +3488,13 @@ describe('the reviewer routine keeps a pulse, and something reads it (#327, #320
     // request already records one such squeeze being attempted and reverted.
     expect(p, 'STEP 1 must tell the run to send the title with every write, or the hook never sees this pulse')
       .toMatch(/send its title with every write/);
+    // #680 item 3: "create it if missing" and "never close" are pinned whole, alongside the title clause
+    // already checked above, so deleting any one of the three from this sentence goes red — proven by
+    // removing each separately and watching this suite pass at 206 either way beforehand.
+    expect(p, 'the whole bootstrap clause must survive together, or a byte squeeze can silently drop '
+      + '"create it if missing" or "never close" and leave the pulse never created, or never left open')
+      .toContain('the issue titled `reviewer: heartbeat` — create it if missing, send its title with every '
+        + 'write, never close, replace rather than append.');
     // PR #417 review, B3: "one line per PR and its verdict" is a body `heartbeatAppend` refuses — SUMMARY_LINE
     // counts every timestamped line and denies at two. A run that timestamps each one has its LAST write
     // refused, the pulse keeps the `IN PROGRESS` stamp, and 90 minutes later the watchdog reports a dead run
@@ -3606,6 +3613,11 @@ describe('the reviewer routine keeps a pulse, and something reads it (#327, #320
       .toMatch(/nothing waiting.{0,120}(healthy|cheap exit)/i);
     expect(w, 'and the developer-only lines must not be demanded of a reviewer pulse')
       .toMatch(/- second item:.{0,200}not a finding/i);
+    // #680 item 5: pinned whole, so dropping either number — or detaching them from "the numbers are the
+    // same" — goes red rather than leaving the reviewer pulse's staleness bar undocumented drift from check 3's.
+    expect(w, 'the reviewer cadence must reuse check 3\'s own numbers, spelled out, not just its name')
+      .toContain('so the numbers are the same: ~3 hours for a stale snapshot, ~90 minutes for a stamp still '
+        + 'reading `IN PROGRESS`');
   });
 
   // #320: rule 4 said a `loosening` PR is "held the same way" as `owner-approval` — true up to approval and

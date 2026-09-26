@@ -55,6 +55,14 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     expect(found.map((w) => w.name), 'ci.yml is read by name elsewhere, so it must be in here too').toContain('ci.yml');
   });
 
+  // #680 item 4: deleting the `names.length === 0` throw left every rail reading `workflowFiles()` green,
+  // because nothing ever calls it against a directory with no `.yml`/`.yaml` files in it — the vacuity guard
+  // was proven only in prose. `dir` lets this test point at a real, empty fixture directory instead.
+  it('workflowFiles(dir) is loud on a real directory with no workflow files, not just in theory (#680)', () => {
+    const empty = new URL('./helpers/fixtures/no-workflows/', import.meta.url);
+    expect(() => workflowFiles(empty), 'zero .yml/.yaml files must throw, not return []').toThrow(/pass vacuously/);
+  });
+
   it('e2eSpecFiles() finds every e2e spec, and is loud rather than empty if it finds none (#750)', () => {
     const found = e2eSpecFiles();
     expect(found.length, 'tests/e2e/ has several spec files; zero means the directory moved').toBeGreaterThanOrEqual(3);
