@@ -2,7 +2,7 @@
 import { avatarById, cheerLine, praiseLine } from '../avatars';
 import type { YearInfo } from '../curriculum';
 import { gridFor, Memory, pickTheme, type Face } from '../game/memory';
-import { load, recordGameEnd, recordMemory, touchStreak } from '../storage';
+import { isReadOnlySave, isWriteFailing, load, recordGameEnd, recordMemory, touchStreak } from '../storage';
 import { say, sfx } from '../audio';
 import { $, $$, esc, render } from './dom';
 import { resultsModal, screenScope, stickersHTML } from './screen';
@@ -80,13 +80,13 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
     const boards = recordMemory(o.year.id);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd({ mode: 'memory', won: true, correct: game.pairs.length, attempts: game.moves, bestCombo: 0, stars: game.stars, score: game.score }, game.coins);
-    const streak = touchStreak();
-    return { boards, dojo, fresh, streak };
+    const dojoSaved = !isWriteFailing() && !isReadOnlySave(); const streak = touchStreak();   // #518: read before this write overwrites the flag
+    return { boards, dojo, fresh, streak, dojoSaved };
   }
   function finish(payout: ReturnType<typeof commit>) {
-    const { boards, dojo, fresh, streak } = payout;
-    const stickerHTML = stickersHTML(fresh);
-    if (fresh.length) later(() => sfx.stage(), 600);
+    const { boards, dojo, fresh, streak, dojoSaved } = payout;
+    const stickerHTML = dojoSaved ? stickersHTML(fresh) : '';   // #518: no keepsake for a refused write, same shape as certSaved (#470)
+    if (dojoSaved && fresh.length) later(() => sfx.stage(), 600);
     sfx.stage();
     const headline = praiseLine(av, d.name); say(headline);
     const medal = game.stars === 3 ? '🥇' : game.stars === 2 ? '🥈' : '🥉';
@@ -97,7 +97,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
       stats: `<div><b>${game.score}</b><small>score</small></div><div><b>${game.moves}</b><small>turns</small></div><div><b>${boards}</b><small>boards</small></div>`,
       coins: game.coins,
       pills: streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : '',
-      dojoRows: dojoRowsHTML(dojo), stickerHTML,
+      dojoRows: dojoSaved ? dojoRowsHTML(dojo) : '', stickerHTML,
     });
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });

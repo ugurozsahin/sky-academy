@@ -104,6 +104,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
    *  answer about regardless of storage, same as before #470. Only the 🎓 row — which promises a keepsake
    *  kept in the album — reads this too, so a refused write is never offered as one. */
   let certSaved = false;
+  let dojoSaved = false;   // same shape as certSaved, for recordGameEnd()'s write instead (#518)
   const waveDone: Record<DuelPlayer, boolean> = { a: true, b: true };
   const arenas = {} as Record<DuelPlayer, Arena>;
 
@@ -306,6 +307,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd(duelDojoEvent(r, topic.subject), paid);
     dojoPaid = dojo.coins;
+    dojoSaved = !isWriteFailing() && !isReadOnlySave();   // #518: read before touchStreak() below overwrites the flag
     // #355 (owner decision, 2026-09-24): a finished duel marks the daily streak, the same as every other
     // finished game (`play.ts`, `memory.ts`) — ten real questions answered at the same coin rate is real
     // practice, whichever seat took the round. `touchStreak()` is idempotent within a day, so a rematch on
@@ -343,7 +345,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   /** Draws what `commitMatch()` already wrote — this runs on a timer the child can outrun, and writes nothing. */
   function showResults(r: DuelResult, { dojo, fresh }: GameEndOutcome) {
     hold(true, false);   // terminal: the beats below (the jingle, the certificate toasts) must still run — see `hold`
-    if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138: the unlock jingle after the headline, not over it
+    if (dojoSaved && (fresh.length || dojo.completed.length)) later(() => sfx.stage(), scaled(600));   // #138/#518: no jingle either, for a refused write
     // #444 review (PR #502 round 2), B1: an incomplete match has no winner worth announcing — `duelHeadline()`
     // would read a scoreline nobody decided as if the match had run its course. Everything already earned
     // (the coins/dojo/Sensei writes above) still shows; only the winner framing and the certificate are withheld.
@@ -368,8 +370,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
           <h2>${r.incomplete ? 'Match ended early' : r.winner === 'draw' ? 'A draw!' : `${esc(NAME[r.winner])} wins!`}</h2>
           <div class="statgrid duel-final"><div><b>${r.scoreA}</b><small>${NAME.a}</small></div><div><b>${r.rounds}</b><small>rounds</small></div><div><b>${r.scoreB}</b><small>${NAME.b}</small></div></div>
           <div class="coin-row"><span class="coin-gain">+${paid} 🪙</span></div>
-          ${dojoRowsHTML(dojo)}
-          ${stickersHTML(fresh)}
+          ${dojoSaved ? dojoRowsHTML(dojo) : ''}
+          ${dojoSaved ? stickersHTML(fresh) : ''}
           ${earned ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this duel">🎓 Certificate</button></div><p class="cert-msg" id="cert-msg" role="status" hidden></p>' : ''}
         </div>
         <div class="row nav"><button class="btn primary big" id="again">Rematch ⚔️</button><button class="btn big" id="home">Islands</button></div>

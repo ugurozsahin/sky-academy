@@ -215,23 +215,23 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       stars: r.stars, score: r.score, training,
       mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'),
     }, r.coins);
-    const streak = touchStreak();
+    const dojoSaved = !isWriteFailing() && !isReadOnlySave(); const streak = touchStreak();   // #518: read before this write overwrites the flag
     const cert = certInfo(r); lastCert = cert;
     // #205: filed when it is *earned*, not when the button works. `certSaved` (#470) is read the instant
     // after that write, per `isWriteFailing()`'s own contract of reflecting only the last attempt — a refusal
     // is not offered to the child as a keepsake the album does not actually hold. `cert` itself stays what
     // was earned regardless: the `certificate()` hook below still answers that, same as before #470.
     const certSaved = cert ? fileCertificate(cert) : false;
-    return { newBest, dojo, fresh, streak, cert, certSaved };
+    return { newBest, dojo, fresh, streak, cert, certSaved, dojoSaved };
   }
   function showResults(r: SessionResult, payout: ResultPayout) {
     // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
     // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
     // certificate toasts' own auto-hide) belong to this overlay rather than to the held game, so they still run.
     playSession.hold(true, false);
-    const { newBest, dojo, fresh, streak, cert, certSaved } = payout;
-    const stickerHTML = stickersHTML(fresh);
-    if (fresh.length || dojo.completed.length) later(() => sfx.stage(), scaled(600));   // #138
+    const { newBest, dojo, fresh, streak, cert, certSaved, dojoSaved } = payout;
+    const stickerHTML = dojoSaved ? stickersHTML(fresh) : '';   // #518: no keepsake for a refused write, same shape as certSaved
+    if (dojoSaved && (fresh.length || dojo.completed.length)) later(() => sfx.stage(), scaled(600));   // #138
     const medal = resultMedal(r);
     // #522: a generator throw ends the session through the same `won: false` path as a genuine loss, but it
     // is not one — `r.incomplete` withholds the win/loss framing (never a certificate either: `certInfo`
@@ -255,7 +255,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     els.overlay.innerHTML = resultsHTML({
       mode: r.mode, won: r.won, training, incomplete: r.incomplete, glow: speaker.glow, img: speaker.img, name: speaker.name,
       headline, medal, heading, starCount: r.stars, score: r.score, correct: r.correct, attempts: r.attempts,
-      bestCombo: r.bestCombo, coins: r.coins, newBest, streak, dojoRows: dojoRowsHTML(dojo), stickerHTML, cert: !!earned,
+      bestCombo: r.bestCombo, coins: r.coins, newBest, streak, dojoRows: dojoSaved ? dojoRowsHTML(dojo) : '', stickerHTML, cert: !!earned,
     });
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
