@@ -915,6 +915,12 @@ test.describe('Sky Ninja Academy', () => {
    */
   test('guard rail: a mission certificate that fails to encode after the results screen tears down is dropped, not thrown or written into the next one (#605)', async ({ page }) => {
     test.setTimeout(150_000);
+    // #32: the new mission's first wave is held behind the tutorial demo (tutorialSeen stays false —
+    // winMission() never runs a real onHit to set it), and at the suite's default 8× speed that hold
+    // compresses to ~225ms — not a real window to land #pause inside before a bubble could spawn and fall,
+    // raising a genuine "Missed!" toast that would be indistinguishable from a stale write landing (pr-test-
+    // analyzer review). Forced to real speed so the hold #pause below relies on is an actual hold.
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-count');
     // The win is the precondition here, not the claim (#749) — winMission() reaches the results screen with an
