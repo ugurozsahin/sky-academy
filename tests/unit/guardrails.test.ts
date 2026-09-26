@@ -3,7 +3,7 @@ import { join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';   // #557: the compile-time half of the src/game/ -> src/ui/ rail asks tsc, never a regex
 import { build } from 'vite';   // #557: the runtime half asks the bundler that actually ships this app
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import pkg from '../../package.json';
 import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
@@ -11,6 +11,8 @@ import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins th
 import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
 import { SOURCES, inDir, code, workflow } from './helpers/sources';
 import { YEARS } from '../../src/curriculum/types';   // #392: the rail below holds docs/CURRICULUM.md's per-year headers to this table
+import { TOPICS } from '../../src/curriculum';   // #766: the registry the wordQ-collision sweep below iterates
+import type { Difficulty } from '../../src/curriculum/types';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { BoxGeometry, Mesh } from 'three';   // #714: the budget meter's self-test below
@@ -3288,5 +3290,39 @@ describe('the one-way dependency from src/game/ to src/ui/ (#557, #325 stage 1)'
 
   it.each(GREEN)('stays green on %s (#557)', async (_case, probe) => {
     expect(violates(await withFixture(probe))).toBe(false);
+  });
+});
+
+/**
+ * #766: #515's `wordQ` collision warning (`ds.length < 3 && withoutAnswer.length >= 3` in
+ * `src/curriculum/util.ts`) had no CI-wide enforcement — the PR that added it verified by hand that no live
+ * generator trips it (`npm test 2>&1 | grep -i "wordQ("`), so a future call site reintroducing the collision
+ * would only warn in whatever session's console happens to run that code path, green the whole way. This
+ * spies on `console.warn` while drawing every registered topic's generator, at every difficulty, over a fixed
+ * set of seeds, and fails if it is ever called — turning that manual grep into a rail.
+ */
+describe('every registered topic stays silent on wordQ\'s #515 collision warning (#766)', () => {
+  // Deterministic RNG (mulberry32) — the same generator curriculum.test.ts uses, kept local rather than
+  // shared: this file has no other seeded-draw test to share it with, and importing a test helper across
+  // `tests/unit/*.test.ts` files for one four-line function is not worth the coupling.
+  function rng(seed: number) {
+    return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  const SEEDS = [1, 2, 3, 4, 5];
+  const DRAWS_PER_SEED = 100;
+
+  it('draws every topic at every difficulty over five seeds with zero wordQ warnings', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    for (const topic of TOPICS) {
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        for (const seed of SEEDS) {
+          const r = rng(topic.id.length * 100000 + d * 1000 + seed);
+          for (let i = 0; i < DRAWS_PER_SEED; i++) topic.gen(d, r);
+        }
+      }
+    }
+    expect(warn, "a live generator tripped wordQ's #515 collision warning — #766 exists to make this red, "
+      + "not a console line one session happens to be watching when it fires").not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

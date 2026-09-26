@@ -2249,6 +2249,14 @@ describe('a card\'s bubble width is derived from its options, never from its ans
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toMatch(/wordQ.*3 distractor candidates collapsed to 2 unique.*3 options/);
     warn.mockClear();
+    // A double collision: three genuine candidates all collapse to one unique value (#766). No case above
+    // exercises ds.length === 1 — every one either has ds.length === 2 or stays uncollapsed at 3 — so a
+    // `ds.length < 3` → `ds.length === 2` mutant survives green without this one (reproduced: mutating
+    // util.ts to `=== 2` still passed the full suite before this case existed).
+    wordQ(r, 'Which is bigger?', 'x', ['b', 'b', 'b'], {});
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/wordQ.*3 distractor candidates collapsed to 1 unique.*2 options/);
+    warn.mockClear();
     // Exactly 3 distinct, non-colliding candidates: nothing collapses, so this must stay silent. Without
     // this case a `ds.length < 3` → `ds.length <= 3` mutant survives — every other case above has ds.length
     // strictly below 3 either way, so none of them tell the two spellings apart (pr-test-analyzer review).
