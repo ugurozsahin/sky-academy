@@ -2727,20 +2727,68 @@ describe('docs/CURRICULUM.md\'s per-year headers match YEARS (#392)', () => {
 describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => {
   const THREE_DIR = '/src/three/', MOUNT_DIR = '/src/three/mount/', OBJECTS_DIR = '/src/three/objects/';
   interface Edge { from: string; spec: string; to: string; kind: 'static' | 'type' | 'dynamic' | 'require' }
-  /** What a string literal can hide — `\uXXXX`, `\u{…}`, `\xXX`, `\<char>` — undone, so the reader sees what TypeScript sees. */
-  const decode = (s: string) => s.replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|\\(.)/g,
-    (_, brace, u4, x2, ch) => brace ? String.fromCodePoint(parseInt(brace, 16)) : u4 ? String.fromCharCode(parseInt(u4, 16)) : x2 ? String.fromCharCode(parseInt(x2, 16)) : ch);
-  /** Every literal import edge out of `path`: the specifier as written, and where it resolves to. */
+  /** Every literal import edge out of `path`, read from the TypeScript AST rather than a hand-written regex plus
+   *  a hand-written decode() (#736). A parsed string literal's `.text` is already what tsc/Vite themselves
+   *  decode it to -- a unicode escape, a hex escape, a backslash line-continuation, a bare carriage-return line
+   *  terminator -- so there is no decode step of our own left to drift from theirs (PR #710's rounds 3-6 were
+   *  each a spelling the old decode() had not yet been taught, one round at a time). Parsing straight from `src`
+   *  also means a `/*`/`//` inside a string literal can never be mistaken for a comment the way `code()`'s
+   *  textual stripping can (#736's round-7 finding; `code()` itself is #780's separate, still-open scope for its
+   *  other call sites). A plain `import('x')` used as a *type* (with or without `typeof`) is always `kind:
+   *  'type'` here -- nothing ships either way, so `import type { B } from './x'`, `type T = typeof
+   *  import('./x')` and `let v: import('./x').T` all count the same, which the old regex's `typeof`-only check
+   *  did not. */
   const edges = (path: string, src: string): Edge[] => {
-    const c = code(src), out: Edge[] = [];
-    // Resolve the DECODED string, not the source text between the quotes: `'..\u002fthree\u002fstage'` is
-    // `../three/stage` to TypeScript (PR #710 round 3, the same class), so a literal's escapes are undone first.
-    const to = (raw: string) => { const spec = decode(raw); return spec.startsWith('.') ? posix.resolve(posix.dirname(path), spec) : spec; };
-    for (const m of c.matchAll(/(typeof\s*)?\bimport\s*\(\s*['"`]([^'"`\n]+)['"`]\s*\)/g)) out.push({ from: path, spec: m[2], to: to(m[2]), kind: m[1] ? 'type' : 'dynamic' });   // `typeof import('x')` is a type position, erased like `import type`
-    for (const m of c.matchAll(/\b(?:import|export)\s+(type\s+)?(?:[^;'"`(]*?\bfrom\s*)?['"`]([^'"`\n]+)['"`]/g)) out.push({ from: path, spec: m[2], to: to(m[2]), kind: m[1] ? 'type' : 'static' });
-    for (const m of c.matchAll(/\brequire\s*\(\s*['"`]([^'"`\n]+)['"`]\s*\)/g)) out.push({ from: path, spec: m[1], to: to(m[1]), kind: 'require' });
-    // `import.meta.glob('../three/stage/*.ts')` is an import Vite resolves and bundles too (pr-test-analyzer).
-    for (const m of c.matchAll(/\bimport\.meta\.glob\s*\(\s*['"`]([^'"`\n]+)['"`]/g)) out.push({ from: path, spec: m[1], to: to(m[1]), kind: 'static' });
+    const out: Edge[] = [];
+    const to = (spec: string) => spec.startsWith('.') ? posix.resolve(posix.dirname(path), spec) : spec;
+    const push = (spec: string, kind: Edge['kind']) => out.push({ from: path, spec, to: to(spec), kind });
+    const specText = (n: ts.Node | undefined): string | null => (n && ts.isStringLiteralLike(n)) ? n.text : null;
+    // `ts.isImportCall` isn't in this TypeScript version's public .d.ts, so this stands in for it — matching the
+    // internal function exactly (checked against installed typescript@5.9.3), including `import.defer('x')`
+    // (the deferred-module-evaluation call form), not just plain `import('x')` (type-design-analyzer review).
+    const isDynamicImportTarget = (e: ts.Expression): boolean =>
+      e.kind === ts.SyntaxKind.ImportKeyword ||
+      (ts.isMetaProperty(e) && e.keywordToken === ts.SyntaxKind.ImportKeyword && e.name.text === 'defer');
+    const isRequireCallee = (e: ts.Expression): boolean =>
+      (ts.isIdentifier(e) && e.text === 'require') || (ts.isPropertyAccessExpression(e) && e.name.text === 'require');
+    const visit = (node: ts.Node): void => {
+      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
+        const text = specText(node.moduleSpecifier);
+        const typeOnly = ts.isImportDeclaration(node) ? !!node.importClause?.isTypeOnly : !!node.isTypeOnly;
+        if (text !== null) push(text, typeOnly ? 'type' : 'static');
+      } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
+        // `typeof import('x')` and a bare `import('x')` type reference both land here; either way nothing ships.
+        const text = specText(node.argument.literal);
+        if (text !== null) push(text, 'type');
+      } else if (ts.isCallExpression(node) && isDynamicImportTarget(node.expression)) {
+        const text = specText(node.arguments[0]);
+        if (text !== null) push(text, 'dynamic');
+      } else if (ts.isCallExpression(node) && isRequireCallee(node.expression)) {
+        // Bare `require('x')` and `obj.require('x')` alike — the old regex matched the literal substring
+        // `require(` wherever it sat, so an AST-based reader that only recognised a bare identifier callee
+        // would silently drop `obj.require('x')` that the old code caught (silent-failure-hunter review).
+        const text = specText(node.arguments[0]);
+        if (text !== null) push(text, 'require');
+      } else if (ts.isExternalModuleReference(node)) {
+        // `import x = require('x')` never parses as a CallExpression at all — its whole
+        // `require('x')` is its own ExternalModuleReference node, holding the string literal directly
+        // (silent-failure-hunter review; unreachable on this ESM-only project's real `src/` today since
+        // `tsconfig.json`'s `module: ESNext` and the absent `@types/node` both already fail it, but the old
+        // regex matched it by text and the walker should not need that gate to also be correct).
+        const text = specText(node.expression);
+        if (text !== null) push(text, 'require');
+      } else if (
+        ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'glob' && ts.isMetaProperty(node.expression.expression) &&
+        node.expression.expression.keywordToken === ts.SyntaxKind.ImportKeyword
+      ) {
+        // `import.meta.glob('../three/stage/*.ts')` is an import Vite resolves and bundles too (pr-test-analyzer).
+        const text = specText(node.arguments[0]);
+        if (text !== null) push(text, 'static');
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(ts.createSourceFile(path, src, ts.ScriptTarget.Latest, true));
     return out;
   };
   const all = Object.entries(SOURCES).flatMap(([p, s]) => edges(p, s));
@@ -2748,17 +2796,58 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
 
   it('the edge reader resolves every spelling of a path to one module, and sees the four kinds of import', () => {
     const src = "import { a } from '../ui/dom'; import type { B } from './../ui/x'; import('../../src/ui/lazy'); export { c } from '/src/ui/abs'; const r = require('three'); type T = typeof import('./../ui/t'); const g = import.meta.glob('../three/stage/*.ts');";
+    // Source order, not the grouped-by-kind order the old four-regex-passes version produced: a single AST walk
+    // yields edges in the order they occur in the file.
     expect(edges('/src/game/f.ts', src)).toEqual([
-      { from: '/src/game/f.ts', spec: '../../src/ui/lazy', to: '/src/ui/lazy', kind: 'dynamic' },
-      { from: '/src/game/f.ts', spec: './../ui/t', to: '/src/ui/t', kind: 'type' },
       { from: '/src/game/f.ts', spec: '../ui/dom', to: '/src/ui/dom', kind: 'static' },
       { from: '/src/game/f.ts', spec: './../ui/x', to: '/src/ui/x', kind: 'type' },
+      { from: '/src/game/f.ts', spec: '../../src/ui/lazy', to: '/src/ui/lazy', kind: 'dynamic' },
       { from: '/src/game/f.ts', spec: '/src/ui/abs', to: '/src/ui/abs', kind: 'static' },
       { from: '/src/game/f.ts', spec: 'three', to: 'three', kind: 'require' },
+      { from: '/src/game/f.ts', spec: './../ui/t', to: '/src/ui/t', kind: 'type' },
       { from: '/src/game/f.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' },
     ]);
     expect(all.length, 'the reader must see the real tree').toBeGreaterThan(100);
-    expect(edges('/src/ui/x.ts', "import { a } from '..\\u002fthree\\u002fstage\\x2frig';")[0].to, 'escapes are decoded before resolving').toBe('/src/three/stage/rig');
+  });
+
+  // #736: every spelling PR #710 found for the #557 rail, proved here for #714's reader too — each is a real
+  // TypeScript escape or line-terminator form the parser itself decodes, not a case our own decode() had to be
+  // taught one round at a time.
+  const ESCAPES: [string, string][] = [
+    ['a \\uXXXX escape', "import { a } from '..\\u002fthree\\u002fstage\\u002frig';"],
+    ['a \\xXX escape', "import { a } from '..\\x2fthree\\x2fstage\\x2frig';"],
+    ['a backslash line-continuation inside the specifier', "import { a } from '..\\\n/three/stage/rig';"],
+    ['a bare carriage-return line-continuation', "import { a } from '..\\\r/three/stage/rig';"],
+  ];
+  it.each(ESCAPES)('decodes %s the same way tsc does', (_case, src) => {
+    expect(edges('/src/ui/x.ts', src)).toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'static' }]);
+  });
+
+  it('a /* ... */ pair split across two string literals never swallows the real import between them (#736 round 7)', () => {
+    // The old code() comment-stripper is textual: `/\*[\s\S]*?\*\//` matches from the '/*' inside the first
+    // literal to the '*/' inside the second, erasing the real import statement that sits between them.
+    const src = "const s = '/*'; import { a } from '../three/stage/rig'; const t = '*/';";
+    expect(edges('/src/ui/x.ts', src)).toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'static' }]);
+  });
+
+  it('a bare import(\'x\') used as a type counts as type, with or without typeof (#736)', () => {
+    expect(edges('/src/ui/x.ts', "type T = import('../three/stage/rig').Rig; export const a = 1;"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'type' }]);
+  });
+
+  it('import.defer(\'x\') counts as dynamic, the same as plain import(\'x\') (#736 review)', () => {
+    expect(edges('/src/ui/x.ts', "import.defer('../three/stage/rig');"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'dynamic' }]);
+  });
+
+  it('obj.require(\'x\') counts as require, not just a bare require(\'x\') (#736 review)', () => {
+    expect(edges('/src/ui/x.ts', "window.require('../three/stage/rig');"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
+  });
+
+  it('import x = require(\'x\') counts as require, even though it is never a CallExpression (#736 review)', () => {
+    expect(edges('/src/ui/x.ts', "import rig = require('../three/stage/rig');"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
   });
 
   // (a) Proved red: `import { Color } from 'three'` in a scratch `src/ui/x.ts` fails.
