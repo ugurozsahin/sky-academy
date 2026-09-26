@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { e2eSpecFiles, workflow, workflowFiles } from './helpers/sources';
+import { code, e2eSpecFiles, workflow, workflowFiles } from './helpers/sources';
 
 /**
  * WORKFLOW RAILS (#321, split out of `guardrails.test.ts`) — everything that reads `.github/workflows/**`
@@ -201,7 +201,14 @@ describe('no workflow pins an action major GitHub has deprecated for Node 20 (#1
  * workflow file is added) applied to this incident instead.
  *
  * Prove it red: swap the order of the two steps in e2e-speed-trial.yml (install before the apt-source drop)
- * and this rail fails; put them back and it passes.
+ * and this rail fails; put them back and it passes. Also prove it red on a *second* install step with no drop
+ * of its own: a two-job fixture where job A correctly drops-then-installs and job B installs with no drop
+ * anywhere before it — `.indexOf()` on a single first-occurrence pair would lock onto job A's (correct) pair
+ * and pass regardless of job B, which is exactly the vacuous-pass shape a `silent-failure-hunter` review of
+ * this rail found before it ever reached a human reviewer. Every install is walked in file order instead,
+ * each requiring its own drop that has not already been used to justify an earlier install (`cursor` below) —
+ * still a whole-file text check rather than a real per-job parse (this file's rails are documented as exactly
+ * that, `.claude/rules/guardrails.md`), but no longer one that a second, undropped install can hide behind.
  */
 describe('every workflow file that installs Playwright browsers drops the Google Chrome apt source first (#147, #765)', () => {
   // Comments are stripped first, same reason as the #147 rail above: a workflow's own comment can name the
@@ -210,18 +217,30 @@ describe('every workflow file that installs Playwright browsers drops the Google
     .map(({ name, text }) => ({ name, steps: text.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n') }))
     .filter(({ steps }) => steps.includes('playwright install'));
 
+  const allIndicesOf = (haystack: string, needle: string): number[] => {
+    const at: number[] = [];
+    for (let i = haystack.indexOf(needle); i !== -1; i = haystack.indexOf(needle, i + 1)) at.push(i);
+    return at;
+  };
+
   it('at least one workflow file installs Playwright browsers, or this rail checks nothing (#765)', () => {
     expect(withInstall.length).toBeGreaterThan(0);
   });
 
   for (const { name, steps } of withInstall) {
-    it(`${name} drops the google-chrome apt source before installing browsers (#765)`, () => {
-      const install = steps.indexOf('playwright install');
-      const drop = steps.indexOf('sources.list.d/google-chrome');
-      expect(install, `${name} must still install the browsers`).toBeGreaterThan(-1);
-      expect(drop, `${name} must delete the google-chrome apt source before installing browsers (#147)`).toBeGreaterThan(-1);
-      expect(drop < install, `${name}: the deletion must run BEFORE the install, or apt-get update still reads it (#147)`)
-        .toBe(true);
+    it(`${name} drops the google-chrome apt source before every 'playwright install' step (#147, #765)`, () => {
+      const installs = allIndicesOf(steps, 'playwright install');
+      const drops = allIndicesOf(steps, 'sources.list.d/google-chrome');
+      expect(installs.length, `${name} must still install the browsers`).toBeGreaterThan(0);
+      expect(drops.length, `${name} must delete the google-chrome apt source before installing browsers (#147)`).toBeGreaterThan(0);
+      let cursor = -1;
+      for (const install of installs) {
+        expect(drops.some((drop) => drop > cursor && drop < install),
+          `${name}: the install at offset ${install} has no apt-source drop of its own between it and the ` +
+          'previous install — a drop already used to justify an earlier install does not count twice (#147)')
+          .toBe(true);
+        cursor = install;
+      }
     });
   }
 });
@@ -235,9 +254,13 @@ describe('every workflow file that installs Playwright browsers drops the Google
  *
  * Prove it red: edit either file's validation line (the regex or the thrown message) without the other, and
  * this rail fails; make them match again and it passes.
+ *
+ * Comments are stripped first, the same #129 reason the apt-source rail above already strips them: a comment
+ * quoting this exact line (as both files' own surrounding prose already comes close to doing) must not let
+ * `indexOf` lock onto the comment instead of the real declaration.
  */
 describe('the two PW_FAST validation blocks stay identical between game.spec.ts and duel.spec.ts (#765)', () => {
-  const files = e2eSpecFiles();
+  const files = e2eSpecFiles().map(({ name, text }) => ({ name, text: code(text) }));
 
   const validationBlock = (name: string) => {
     const f = files.find((f) => f.name === name);
