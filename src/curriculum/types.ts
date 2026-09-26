@@ -32,7 +32,7 @@ export type Visual =
   // every other `sentence` producer writes real English and nothing here should have to opt out (#391).
   | { type: 'strip'; text: string };
 
-export interface Question {
+interface QuestionCore {
   prompt: string;         // shown on the question card ("7 + 5 = ?")
   say?: string;           // spoken form (Web Speech), defaults to prompt
   answer: string;         // correct option OR, for 'sequence', the letters joined
@@ -48,24 +48,34 @@ export interface Question {
   optionsAreContent?: boolean;
   sequence?: string[];    // slice these in order (spelling); options = sequence letters + decoys
   visual?: Visual;
-  hint?: string;          // small instruction text under the prompt
-  /**
-   * `hint` is the values the card is answered from, not the instruction line above — they appear there and
-   * nowhere else (no `visual`, nothing in the prompt, the options being the *things* compared rather than
-   * their sizes). Two generators set it, `measureCompare()` and `y2Temp`'s comparison branch, which is seven
-   * topics; the other 40 hint-writing topics are chrome ("Slice the shape") and must not set it.
-   *
-   * It exists because a short screen reclaims `.hint` (`@media (max-height: 640px)`), which is a fair trade
-   * for an instruction and takes a measure card's only readable content away — #328, and #65's rule that
-   * every card stays usable without read-aloud. `src/ui/play-session.ts` marks the element `own` from this,
-   * so only these cards keep the line on a phone held sideways.
-   */
-  hintIsData?: boolean;
   wide?: boolean;         // options are words → bigger bubbles
   listen?: string;        // spoken-only question: shown on the card instead of `prompt` when read-aloud is off
   peek?: boolean;         // no-voice sequence: show `listen` briefly, then hide it before the bubbles launch (#65)
   slow?: boolean;         // several mental steps: one speed step slower, like a sequence — in every mode but Sky Storm. Opt-in per generator (`slowAtD3`), not year-wide (#297)
 }
+
+/**
+ * `hint` requires `hintIsData` alongside it, not two independent optionals (#707, closing the same pattern
+ * `Theme.hintIsData` in `src/game/memory.ts` already holds `Theme` to): the moment a generator sets `hint` it
+ * must also say whether that text is the values the card is answered from (`true`) or an instruction line
+ * ("Slice the shape", `false`) — a required sibling that `tsc` enforces on any hint-carrying literal, rather
+ * than an easy-to-forget optional that silently reads as `false`. Two generators set it `true` today,
+ * `measureCompare()` and `y2Temp`'s comparison branch (seven topics between them); every other hint-writing
+ * topic is chrome and states `false`.
+ *
+ * The implication runs one way only: `hintIsData` with no `hint` stays legal (`src/ui/play-session.ts`'s
+ * `!!q.hint && !!q.hintIsData` reads a flag alone as no opinion, and `tests/unit/play-session.test.ts` holds
+ * that fallback to a real case, not a mistake to close off) — only a hint-carrying literal with no stated
+ * `hintIsData` is the gap this closes.
+ *
+ * It exists because a short screen reclaims `.hint` (`@media (max-height: 640px)`), which is a fair trade
+ * for an instruction and takes a measure card's only readable content away — #328, and #65's rule that
+ * every card stays usable without read-aloud. `src/ui/play-session.ts` marks the element `own` from this,
+ * so only these cards keep the line on a phone held sideways.
+ */
+export type HintOpt = { hint: string; hintIsData: boolean } | { hint?: undefined; hintIsData?: boolean };
+
+export type Question = QuestionCore & HintOpt;
 
 export type Difficulty = 1 | 2 | 3;
 export type Generator = (d: Difficulty, rng: Rng) => Question;

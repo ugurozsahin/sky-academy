@@ -1,4 +1,4 @@
-import type { Question, Rng } from './types';
+import type { HintOpt, Question, Rng } from './types';
 
 export const ri = (rng: Rng, min: number, max: number) => min + Math.floor(rng() * (max - min + 1));
 export const pick = <T>(rng: Rng, arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
@@ -35,7 +35,7 @@ const EMPTY_SET: ReadonlySet<number> = Object.freeze(new Set<number>());
  * (#468 item 4): a hand-written field list here silently drops a new field a caller sets, with no compile
  * error and no failing test, which is exactly the trap `wordQ` does not have.
  */
-export function numQ(rng: Rng, prompt: string, answer: number, opts: { min?: number; max?: number; n?: number; distractors?: number[] } & Partial<Omit<Question, 'prompt' | 'answer' | 'options'>> = {}): Question {
+export function numQ(rng: Rng, prompt: string, answer: number, opts: { min?: number; max?: number; n?: number; distractors?: number[] } & Partial<Omit<Question, 'prompt' | 'answer' | 'options' | 'hint' | 'hintIsData'>> & HintOpt = {}): Question {
   const n = opts.n ?? 3;
   const min = opts.min ?? 0, max = opts.max ?? Math.max(20, answer + 10);
   let ds = opts.distractors ? [...new Set(opts.distractors.filter(d => d !== answer && d >= min && d <= max))] : [];
@@ -73,7 +73,7 @@ export const wideFor = (options: readonly string[]): boolean => options.some(o =
  * ("options are words → bigger bubbles"); `waveOptsFor` in `src/ui/play-session.ts` reads the same way,
  * through the shared `wideFor` above.
  */
-export function wordQ(rng: Rng, prompt: string, answer: string, distractors: string[], extra: Partial<Question> = {}): Question {
+export function wordQ(rng: Rng, prompt: string, answer: string, distractors: string[], extra: Partial<Omit<Question, 'hint' | 'hintIsData'>> & HintOpt = {}): Question {
   const withoutAnswer = distractors.filter(d => d !== answer);
   const ds = [...new Set(withoutAnswer)].slice(0, 3);
   // #515: a duplicate among the caller's own candidates can drop the deduped set below 3 with nothing else
