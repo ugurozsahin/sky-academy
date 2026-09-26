@@ -781,6 +781,33 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
   });
 
   /**
+   * #761 — §7 bounds how often a reviewer may block, and nothing asked whether the approach is what keeps
+   * failing. PR #710 took eight blocks, five of them one class (lexing an import specifier over raw text), while
+   * the structural alternative named at round 3 went unanswered. The clause changes what a block on a third
+   * same-class defect must contain; it caps nothing. Its two obligations are pinned as whole clauses, and the
+   * author's half in `open-pr` §5 with them, since an alternative the fix-push never answers is the #710 shape.
+   *
+   * Prove it red: delete the paragraph; drop either obligation; or drop the sentence from `open-pr` §5.
+   */
+  it('a block on a third defect of one class names a structural alternative and accounts for any already named (#761)', () => {
+    const skill = read('.claude/skills/review-pr/SKILL.md');
+    const start = skill.indexOf('\n## 7. '), end = skill.indexOf('\n## ', start + 1);
+    expect(start, 'the review-pr skill has lost its §7').toBeGreaterThan(-1);
+    const s7 = flat(skill.slice(start, end === -1 ? undefined : end));
+    expect(s7, 'the trigger: a third defect of one class').toContain('When the defect is the third of one class, the block names the approach');
+    expect(s7, 'obligation 1: name the alternative, or rule it out with a reason')
+      .toContain('Name a structural alternative that would close the class, or say plainly that none exists and why.');
+    expect(s7, 'obligation 2: account for an alternative already on the thread')
+      .toContain('account for any alternative already named on the thread: taken, refused with a reason, or unanswered.');
+    expect(s7, 'and it is not a cap — ADR 004 stays as it is').toContain('None of this caps the rounds or lowers the bar');
+
+    const pr = read('.claude/skills/open-pr/SKILL.md');
+    const s5 = flat(pr.slice(pr.indexOf('\n## 5. '), pr.indexOf('\n## 6. ')));
+    expect(s5, 'the author answers the named alternative in the fix-push comment')
+      .toContain('When the block names a structural alternative for a class of defect (`review-pr` §7), say whether you took it or why not');
+  });
+
+  /**
    * #310 — the cap in §7 is only ever reached by a reviewer who goes looking for it.
    *
    * `docs/REVIEWER-PROMPT.md` is what a reviewer run actually reads first, and its rule 4 ended "while a PR

@@ -390,6 +390,18 @@ a genuine defect by the bar above blocks again and says in its opening line that
 and why the finding meets that bar. Whatever you drop goes into an issue linked from the comment — it is
 queued, not lost.
 
+**When the defect is the third of one class, the block names the approach, not only the case (#761).** Pull
+request #710 was blocked eight times, and each block met the bar above: rounds 4 to 8 were five real defects,
+all one class (lexing an import specifier over raw text). Round 3 had named the structural alternative, asking
+the TypeScript compiler what the specifier resolves to, and nobody answered it through the five rounds that
+followed. The round count cannot see this, because eight unrelated defects would be a healthy review of a messy
+change. So when you block on a defect of the same class as two earlier ones on this pull request (you are
+usually already writing "the same shape as rounds …"), the block must do two more things. **Name a structural
+alternative that would close the class, or say plainly that none exists and why.** And **account for any
+alternative already named on the thread: taken, refused with a reason, or unanswered.** An unanswered one is
+what this is for. The author's fix-push comment then answers that alternative, not only the case it patched
+(`open-pr` §5). None of this caps the rounds or lowers the bar. It changes what such a block has to contain.
+
 A reviewer who reaches the third round has usually already found the real answer: the pull request is trying
 to do too much. Say that instead. "Reduce this to X; the rest is issue #n" is a better review than a seventh
 shape.
