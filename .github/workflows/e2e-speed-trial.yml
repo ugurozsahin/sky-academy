@@ -1,0 +1,95 @@
+# #748: a paired measurement of the e2e time-compression factor (PW_FAST, tests/e2e/game.spec.ts and
+# duel.spec.ts), never part of the ordinary pull-request or nightly runs. It exists to answer one question —
+# does raising the suite's default from 4 actually shorten CI's wall clock, or does the runner just reabsorb
+# the freed time — and #748 itself explains why a single run of either arm cannot answer it: the run-to-run
+# variance on an unchanged tree is 12% of the mean (σ = 59s on a 480s mean), so one run per arm cannot tell a
+# real 0–24% win from noise. Pairing both legs inside ONE job removes the between-runner variance (same
+# machine, same npm cache, same browser download, same CPU neighbours) that is most of that 12% — see #748's
+# comment for the numbers this design is built from.
+#
+# Deliberately its own workflow, on-demand only (`workflow_dispatch`), never folded into ci.yml: a
+# `workflow_dispatch` of the FULL matrix there runs five projects, and the mobile signal this trial needs
+# would arrive buried in four other legs' noise (#748's own instruction). This file runs `--project=mobile`
+# and nothing else, twice.
+name: E2E speed trial (#748)
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: 'PW_FAST value for the second leg (the baseline leg always runs unset, i.e. 4)'
+        required: false
+        default: '8'
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    # Two ~8-9 minute mobile legs plus setup; #754 raised the sibling ci.yml job to 45 for the same class of
+    # reason (a cancelled run reports nothing). This job reports nothing useful either if it is cut short
+    # mid-second-leg, so it gets the same headroom rather than the bare sum of two legs.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - name: Drop the apt sources we do not use (#85)
+        run: sudo rm -fv /etc/apt/sources.list.d/google-chrome*.list /etc/apt/sources.list.d/google-chrome*.sources
+      - run: npx playwright install --with-deps chromium
+      # Baseline leg: PW_FAST unset, so tests/e2e/game.spec.ts and duel.spec.ts both fall back to today's
+      # default of 4 (#748's own fallback, kept in step with those two files rather than restated here as a
+      # literal). The #32 rail is excluded here too, to match the candidate leg below exactly test-for-test —
+      # without this the two legs would not be measuring the same suite, only the same project name. It would
+      # pass at this leg's factor regardless; excluding it costs nothing and keeps the comparison honest.
+      - name: 'Leg 1/2: baseline (PW_FAST unset, today''s default)'
+        id: baseline
+        run: |
+          start=$(date +%s)
+          npx playwright test --project=mobile --reporter=list \
+            --grep-invert "4× speeds the game, not the clock the rails read"
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+      # Candidate leg: the #32 rail (tests/e2e/game.spec.ts, "guard rail: 4x speeds the game, not the clock the
+      # rails read") asserts the speed BY VALUE and is meant to fail at any factor other than today's default —
+      # that is the rail doing its job, proved locally before this file was written (PW_FAST=8 -> Expected: 4,
+      # Received: 8), not a trial defect. Excluded here by name rather than swallowed with `|| true`: a blanket
+      # `|| true` was tried first and review caught that it also swallows any OTHER, unrelated failure the
+      # candidate factor introduces — indistinguishable in the job's own reported outcome from the one expected
+      # red, with nothing but a comment telling a human to go re-read the raw log. `--grep-invert` removes the
+      # one test known in advance to fail by design, so every test that DOES run here is expected to stay green
+      # at any factor and the step's own exit code is trustworthy: a real regression now fails this leg and the
+      # job goes red, rather than being absorbed alongside the expected exclusion.
+      - name: 'Leg 2/2: candidate (PW_FAST=${{ inputs.candidate }})'
+        id: candidate
+        env: { PW_FAST: '${{ inputs.candidate }}' }
+        run: |
+          start=$(date +%s)
+          npx playwright test --project=mobile --reporter=list \
+            --grep-invert "4× speeds the game, not the clock the rails read"
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+      - name: Paired result
+        env:
+          BASE_S: ${{ steps.baseline.outputs.seconds }}
+          CAND_S: ${{ steps.candidate.outputs.seconds }}
+          CANDIDATE: ${{ inputs.candidate }}
+        run: |
+          delta=$(( BASE_S - CAND_S ))
+          pct=$(awk -v b="$BASE_S" -v d="$delta" 'BEGIN { printf "%.1f", (d / b) * 100 }')
+          {
+            echo "### E2E speed trial (#748) — PW_FAST 4 vs $CANDIDATE, same job, same runner"
+            echo ""
+            echo "| leg | PW_FAST | wall clock |"
+            echo "| --- | ---: | ---: |"
+            echo "| baseline | 4 (unset) | ${BASE_S}s |"
+            echo "| candidate | $CANDIDATE | ${CAND_S}s |"
+            echo ""
+            echo "**Change: ${delta}s (${pct}%).** Both legs ran the full mobile project (minus the #32"
+            echo "guard rail, excluded by name from the candidate leg since it pins the factor by value and"
+            echo "is expected to fail there on purpose) and both had to pass for this step to run at all — so"
+            echo "a real regression at the candidate factor would have failed the job before this summary was"
+            echo "written, not shown up as a caveat here."
+            echo ""
+            echo "One paired run is one data point. #748's own variance table says a 20% effect needs ~6 runs"
+            echo "per arm to separate from noise at 80% power — treat a single run here as a first signal, not"
+            echo "the acceptance criterion's paired comparison on its own, and re-dispatch this workflow rather"
+            echo "than trusting one run if the number below is close to the threshold that would change the"
+            echo "default."
+          } >> "$GITHUB_STEP_SUMMARY"
