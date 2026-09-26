@@ -97,7 +97,7 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
       stats: `<div><b>${game.score}</b><small>score</small></div><div><b>${game.moves}</b><small>turns</small></div><div><b>${boards}</b><small>boards</small></div>`,
       coins: game.coins,
       pills: streak > 1 ? `<span class="streak-pill">🔥 ${streak}-day streak</span>` : '',
-      dojoRows: dojoRowsHTML(dojo), stickerHTML,
+      dojoRows: dojoSaved ? dojoRowsHTML(dojo) : '', stickerHTML,
     });
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });

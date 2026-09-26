@@ -3,6 +3,7 @@ import { TOPICS } from '../../src/curriculum';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
+import { dailyChallenges } from '../../src/game/dojo';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 import { expectFitsViewport } from './viewport';
 /** A context with nothing stored: the 3-D setting at its default, `auto` — the opt-out from `THREE_OFF`. */
@@ -18,6 +19,7 @@ export const FAST = rawFast ? Number(rawFast) : 8;
 declare global {
   interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
   interface Window { __spoken?: string[] }                          // #380 review B2: every line the engine was handed, in order
+  interface Window { __seedMiss?: boolean }                         // #518: true when a dojo seed keyed by date missed the page's own day
 }
 
 // The live screen sets `__sna` to PlayHooks or MemoryHooks; a given test knows which, so the spec views it as
@@ -2210,17 +2212,39 @@ test.describe('Sky Ninja Academy', () => {
    * does (#470, the mission/duel cases above) — and Memory Match's own results modal drew the Dojo rows and
    * sticker cards from the in-memory `dojo`/`fresh` outcome regardless. This is the third `recordGameEnd()`
    * call site in the repo (`src/ui/memory.ts`, which also defines `dojoRowsHTML` — `play.ts`/`duel.ts` import
-   * it from here), found by a reviewer sweep of this PR's own defect class rather than named in the issue.
+   * it from here), found by a reviewer sweep of this PR's own defect class rather than named in the issue —
+   * `memory.ts`'s own gate on `dojoRowsHTML()` was missing outright (the sticker gate alone was there),
+   * unlike the two call sites the issue actually named. This case asserts `.dojo-bonus` too, not only
+   * `.unlock`, and forces it reachable: Memory Match can only ever move the `volume` group's challenge
+   * (`correct: game.pairs.length`) or `memory1` under `mode`, and which of the three volume ids or six mode
+   * ids the day draws is the date's business — seeded here the same `dojoSeeds()`-style way `duel.spec.ts`
+   * uses for the identical reason, so the day's mode/focus challenges are already done and only the volume
+   * one (completable by every date, whichever id it is) is left for this board to finish.
    */
-  test('Memory Match on a refusing store shows no sticker card either (#518)', async ({ page }) => {
+  test('Memory Match on a refusing store shows no Dojo row and no sticker card either (#518)', async ({ page }) => {
+    const dojoByDate: Record<string, unknown> = {};
+    for (const offset of [0, 1]) {                         // today and tomorrow: the page's clock decides which
+      const dt = new Date(); dt.setUTCDate(dt.getUTCDate() + offset);
+      const date = dt.toISOString().slice(0, 10);
+      const others = dailyChallenges(date).filter(c => c.group !== 'volume');
+      const progress: Record<string, number> = Object.fromEntries(others.map(c => [c.id, c.goal]));
+      progress.correct15 = 11; progress.correct20 = 16; progress.correct25 = 21;   // this board's 4 pairs clears whichever id the day draws
+      dojoByDate[date] = { date, progress, done: others.map(c => c.id), setDone: false, streak: { last: '', days: 0 }, total: others.length };
+    }
     // Not `seedPlayer()` (#518 review): it calls `page.goto()` itself, so a `refuseWrites()` after it would
     // register too late for this navigation — the same ordering `refuseWrites`'s own doc comment requires.
-    await page.addInitScript(save => {
-      if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', save);
-    }, JSON.stringify({ v: 1, name: 'Mia', avatar: 'splash', coins: 10 }));   // +23 for this board crosses the 30-coin threshold
+    await page.addInitScript(({ save, dojoByDate }) => {
+      window.__seedMiss = false;
+      if (localStorage.getItem('sna:v1')) return;
+      const d = JSON.parse(save) as Record<string, unknown>;
+      const seed = dojoByDate[new Date().toISOString().slice(0, 10)];
+      if (seed) d.dojo = seed; else window.__seedMiss = true;
+      localStorage.setItem('sna:v1', JSON.stringify(d));
+    }, { save: JSON.stringify({ v: 1, name: 'Mia', avatar: 'splash', coins: 10 }), dojoByDate });   // +23 for this board crosses the 30-coin threshold
     await refuseWrites(page);   // after the seed above, so only this board's own writes are refused
     await page.goto('/');
     await expect(page.locator('.home')).toBeVisible();
+    expect(await page.evaluate(() => window.__seedMiss), "the dojo seed matched the page's own date").toBe(false);
     await page.click('.island[data-year="reception"]');
     await page.click('#memory');
     await expect(page.locator('.memory')).toBeVisible();
@@ -2236,6 +2260,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('h2')).toHaveText('All pairs found!');
     await expect(results.locator('.coin-gain')).toContainText('+23');
     await expect(results.locator('.unlock'), 'a refused write earns no sticker card, whatever coins crossed a threshold').toHaveCount(0);
+    await expect(results.locator('.dojo-bonus'), 'a refused write earns no Dojo row, whatever the day\'s challenges finished').toHaveCount(0);
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!));
     expect(stored.coins, 'nothing this board paid reached the store').toBe(10);
     expect(stored.stickers ?? [], 'no sticker reached the album').toEqual([]);
