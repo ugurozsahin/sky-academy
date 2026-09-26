@@ -524,7 +524,13 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     if (seen.has(name)) return false;
     seen.add(name);
     const cmd = scripts[name];
-    if (!cmd) return false;
+    // A `npm run <ref>` naming a script that does not exist is a dangling reference, never an ordinary
+    // script this walk simply hasn't reached — the only names checked from outside are real keys of
+    // `scripts` (`Object.keys`), so `undefined` here can only come from a stale/renamed reference inside
+    // some other script's own command. Silently returning `false` would let a real path to `playwright test`
+    // go unrecognised with nothing red to catch it — exactly the class #762 exists to close, just moved from
+    // a missing regex alternative to a broken reference.
+    if (cmd === undefined) throw new Error(`no such script "${name}" in package.json — a dangling "npm run ${name}" reference`);
     if (cmd.includes('playwright test')) return true;
     return [...cmd.matchAll(/npm run ([\w:.-]+)/g)].some(([, ref]) => runsPlaywright(scripts, ref, seen));
   };
@@ -541,8 +547,16 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     // `npm run <name>` spelling — `test:sketch` is a live instance of the gap this closes: it runs playwright
     // test (via `--project=sketchbook`), but the three-spelling list above never knew its name.
     for (const name of Object.keys(pkgScripts)) {
-      if (!runsPlaywright(pkgScripts, name)) continue;
-      expect(BROWSER_COMMAND_REGEX.test(`npm run ${name}`), `npm run ${name} ("${pkgScripts[name]}") must be recognised as a browser command`).toBe(true);
+      const matches = BROWSER_COMMAND_REGEX.test(`npm run ${name}`);
+      if (runsPlaywright(pkgScripts, name)) {
+        expect(matches, `npm run ${name} ("${pkgScripts[name]}") must be recognised as a browser command`).toBe(true);
+      } else {
+        // The converse matters as much as the positive case: a regex broadened by accident (matching on
+        // "test" rather than "playwright test", say) would pass the loop above outright, so a script that
+        // does NOT run playwright — `dev`, `build`, `preview`, `sketch`, `sketch:shot`, the vitest `test` —
+        // must stay unrecognised under its own spelling too.
+        expect(matches, `npm run ${name} ("${pkgScripts[name]}") must NOT be recognised as a browser command`).toBe(false);
+      }
     }
     // Proof it is derivation, not memorisation, that makes the loop above pass: a script under a name no
     // hand-enumerated list here ever mentioned is picked up with no edit to this test, added to a scratch
