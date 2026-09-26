@@ -13,7 +13,7 @@ const NO_STORED_STATE = { cookies: [], origins: [] };   // #380 review round 5, 
 // review found for a port — an explicit, malformed PW_FAST is a loud startup error instead of a silent 4.
 const rawFast = process.env.PW_FAST;
 if (rawFast !== undefined && !/^\d+$/.test(rawFast)) throw new Error(`PW_FAST must be a plain integer, got "${rawFast}"`);
-export const FAST = rawFast ? Number(rawFast) : 4;
+export const FAST = rawFast ? Number(rawFast) : 8;
 
 declare global {
   interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
@@ -191,10 +191,12 @@ const refuseWrites = (page: Page) => page.addInitScript(() => {
 });
 
 test.describe('Sky Ninja Academy', () => {
-  // #32: run the whole suite at 4× game speed. The app reads `window.__SNA_FAST` at boot (src/game/speed.ts)
-  // and divides only the scheduled waits — outcome holds, the inter-question gap, the launch stagger and the
-  // bubble flight time — so the suite runs in a fraction of real game time without touching the clock the
-  // guard rails read. One test below overrides this to 1 to pin the holds to their curriculum values.
+  // #32: run the whole suite at 8× game speed (#748 raised it from 4× once a paired CI trial, run four
+  // times, showed a consistent 7-10% wall-clock win with no regressions). The app reads `window.__SNA_FAST`
+  // at boot (src/game/speed.ts) and divides only the scheduled waits — outcome holds, the inter-question
+  // gap, the launch stagger and the bubble flight time — so the suite runs in a fraction of real game time
+  // without touching the clock the guard rails read. One test below overrides this to 1 to pin the holds to
+  // their curriculum values.
   test.beforeEach(async ({ page }) => {
     await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
   });
@@ -1265,7 +1267,7 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   test('long sentences launch in batches that fit across the screen, never on top of each other', async ({ page }) => {
-    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // #32: samples flight every 400 ms over 2.4 s — tuned to real pacing; at 4× it would land on a miss-reveal freeze or a respawn, not free flight
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // #32: samples flight every 400 ms over 2.4 s — tuned to real pacing; at the suite's compressed speed it would land on a miss-reveal freeze or a respawn, not free flight
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-sentence');
     await page.waitForFunction(() => window.__sna.arena.bubbles.length >= 5);
@@ -1845,27 +1847,28 @@ test.describe('Sky Ninja Academy', () => {
       + 'only thing hiding the score float that finishes inside it').toBeGreaterThanOrEqual(0.9);
   });
 
-  // #32: the suite runs at 4× (the beforeEach above), which compresses the outcome holds. This one test forces
+  // #32: the suite runs at 8× (the beforeEach above), which compresses the outcome holds. This one test forces
   // speed 1 and asserts the holds are the curriculum values the owner asked for (correct 1000, wrong 1800,
   // miss 1500). Without it the fast suite verifies nothing about the holds, and the day someone changes a
   // constant nobody would notice (the reason the issue asks for a normal-speed test).
   test('guard rail: outcome holds are the curriculum values at speed 1 (#32)', async ({ page }) => {
-    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // overrides the suite's 4× for this test only
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // overrides the suite's 8× for this test only
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
     expect(await page.evaluate(() => window.__sna.timing()))
       .toEqual({ speed: 1, hold: { correct: 1000, wrong: 1800, miss: 1500 } });
   });
 
-  // #32: prove the multiplier speeds the GAME, not the clock a rail reads. At 4× the holds compress
-  // (timing().speed === 4), but the arena clock must still track the wall clock (ratio ~1) and the loop must
+  // #32: prove the multiplier speeds the GAME, not the clock a rail reads. At 8× the holds compress
+  // (timing().speed === 8), but the arena clock must still track the wall clock (ratio ~1) and the loop must
   // still render real frames. A multiplier that scaled `dt`/`Arena.time` instead would push the ratio towards
-  // 4 and pass the "renders at speed" rail on nonsense — the trap the acceptance criteria name explicitly.
-  test('guard rail: 4× speeds the game, not the clock the rails read (#32)', async ({ page }) => {
+  // 8 and pass the "renders at speed" rail on nonsense — the trap the acceptance criteria name explicitly.
+  // #748 raised this pin from 4 to 8: a stale value here would silently stop testing the live default.
+  test('guard rail: 8× speeds the game, not the clock the rails read (#32)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
     await page.waitForFunction(() => (window.__sna?.bubbles().length ?? 0) > 0);
-    expect(await page.evaluate(() => window.__sna.timing().speed)).toBe(4);
+    expect(await page.evaluate(() => window.__sna.timing().speed)).toBe(8);
     const [fps, ratio] = await page.evaluate(() => new Promise<[number, number]>(res => {
       const a = window.__sna.arena!, t0 = a.time, w0 = performance.now();
       let frames = 0;
@@ -1873,10 +1876,10 @@ test.describe('Sky Ninja Academy', () => {
         if (el < 2000) requestAnimationFrame(tick); else res([frames / (el / 1000), (a.time - t0) / (el / 1000)]); };
       requestAnimationFrame(tick);
     }));
-    console.log(`[guard rail] fast=4 fps=${fps.toFixed(1)} ratio=${ratio.toFixed(2)}`);
+    console.log(`[guard rail] fast=8 fps=${fps.toFixed(1)} ratio=${ratio.toFixed(2)}`);
     expect(fps).toBeGreaterThan(FPS_FLOOR);   // the loop still renders real frames
     expect(ratio).toBeGreaterThan(0.8);       // the arena clock still tracks wall time...
-    expect(ratio).toBeLessThan(1.5);          // ...and is NOT sped up 4× — the clock the rails read is untouched
+    expect(ratio).toBeLessThan(1.5);          // ...and is NOT sped up 8× — the clock the rails read is untouched
   });
 
   // #138: a wave's spawn is deferred twice — behind the first-play tutorial hold, then behind a rAF — and the
@@ -1889,7 +1892,7 @@ test.describe('Sky Ninja Academy', () => {
   // race that caught it, and the rail asserts the wave is still held before it does anything, so it cannot
   // pass by arriving late and testing nothing.
   test('guard rail: a superseded wave never replaces the live one (#138)', async ({ page }) => {
-    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // overrides the suite's 4× for this test only
+    await page.addInitScript(() => { window.__SNA_FAST = 1; });   // overrides the suite's 8× for this test only
     await seedPlayer(page);                                       // a fresh save: tutorialSeen is false, so the first wave IS held
     await startTopic(page, 'year1', 'y1-add');
     await expect(page.locator('#tutorial')).toBeVisible();
@@ -2499,7 +2502,7 @@ test.describe('Sky Ninja Academy', () => {
  */
 test.describe('a corrupted save does not brick the app (#95)', () => {
   // This describe block sits outside the main one (line 167), so it does not inherit its `beforeEach` — without
-  // this, the full-mission test below ran at 1× speed instead of the suite's 4×, ~3x slower for no reason.
+  // this, the full-mission test below ran at 1× speed instead of the suite's 8×, several times slower for no reason.
   test.beforeEach(async ({ page }) => { await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST); });
 
   test('guard rail: the map, an island, and the grown-ups dashboard all still render on a null-shaped save', async ({ page }) => {

@@ -31,7 +31,7 @@ npm run test:all   # unit + build + e2e
 ```
 
 The e2e suite drives a real browser through whole sessions across four viewport projects — a phone, a
-desktop, and a tablet in both orientations. It runs at 4× speed through a test hook rather than by waiting,
+desktop, and a tablet in both orientations. It runs at 8× speed through a test hook rather than by waiting,
 and it does not retry: a flake here is a race worth fixing.
 
 ## Building for a phone

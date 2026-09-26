@@ -15,7 +15,7 @@ declare global { interface Window { __sna: DuelHooks; __SNA_FAST?: number; __sai
 // module scope, so a CI trial can pass one PW_FAST and have both suites honour it identically.
 const rawFast = process.env.PW_FAST;
 if (rawFast !== undefined && !/^\d+$/.test(rawFast)) throw new Error(`PW_FAST must be a plain integer, got "${rawFast}"`);
-const FAST = rawFast ? Number(rawFast) : 4;
+const FAST = rawFast ? Number(rawFast) : 8;
 
 /**
  * A speech engine that records what it was asked to say, and when it was cancelled, in order (#16 review). It

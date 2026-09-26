@@ -40,7 +40,7 @@ export const THREE_OFF = { cookies: [], origins: [{ origin: baseURL, localStorag
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
-  retries: 0,   // #32: the suite now runs at 4× (tests/e2e set window.__SNA_FAST), so a flake is a real race to fix, not to silently retry
+  retries: 0,   // #32: the suite now runs at 8× (tests/e2e set window.__SNA_FAST), so a flake is a real race to fix, not to silently retry
   // #483. Playwright's default parallelises across FILES only: the tests inside one file are a single
   // sequential chain on one worker. 97 of this project's 104 mobile tests live in tests/e2e/game.spec.ts, so
   // the whole e2e step was as long as that one chain no matter how many workers the runner offered — CI's
