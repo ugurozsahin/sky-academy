@@ -512,6 +512,45 @@ describe('STEP 2 orders PRs by priority too, not just by age (#194)', () => {
 describe('the browser runs after the agents, not before them (#499)', () => {
   const root = new URL('../../', import.meta.url);
 
+  /**
+   * #762 — the three spellings below (`playwright test`, `npm run test:e2e`, `npm run test:all`) used to be a
+   * hand-enumerated OR-list, extended one spelling at a time only after a reviewer noticed the previous list
+   * still missed one (#500 round 1, #504 rounds 1 and 2). Derived from package.json instead: a script counts
+   * if its own command invokes `playwright test`, directly or by running another script that does (`npm run
+   * test:all` reaches `playwright test` only via `npm run test:e2e`), so a fifth spelling is recognised the
+   * moment the script exists rather than needing a fourth manual entry.
+   */
+  const runsPlaywright = (scripts: Record<string, string>, name: string, seen = new Set<string>()): boolean => {
+    if (seen.has(name)) return false;
+    seen.add(name);
+    const cmd = scripts[name];
+    if (!cmd) return false;
+    if (cmd.includes('playwright test')) return true;
+    return [...cmd.matchAll(/npm run ([\w:.-]+)/g)].some(([, ref]) => runsPlaywright(scripts, ref, seen));
+  };
+  const browserCommandRegex = (scripts: Record<string, string>) => new RegExp(
+    ['playwright test', ...Object.keys(scripts).filter((name) => runsPlaywright(scripts, name)).map((name) => `npm run ${name}`)]
+      .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|'),
+  );
+  const pkgScripts = (JSON.parse(doc('package.json')) as { scripts: Record<string, string> }).scripts;
+  const BROWSER_COMMAND_REGEX = browserCommandRegex(pkgScripts);
+
+  it("the browser-command regex derives its spellings from package.json, not a hand-enumerated list (#762)", () => {
+    // Every script package.json actually runs playwright test through today is recognised under its own
+    // `npm run <name>` spelling — `test:sketch` is a live instance of the gap this closes: it runs playwright
+    // test (via `--project=sketchbook`), but the three-spelling list above never knew its name.
+    for (const name of Object.keys(pkgScripts)) {
+      if (!runsPlaywright(pkgScripts, name)) continue;
+      expect(BROWSER_COMMAND_REGEX.test(`npm run ${name}`), `npm run ${name} ("${pkgScripts[name]}") must be recognised as a browser command`).toBe(true);
+    }
+    // Proof it is derivation, not memorisation, that makes the loop above pass: a script under a name no
+    // hand-enumerated list here ever mentioned is picked up with no edit to this test, added to a scratch
+    // copy of the scripts object rather than to package.json itself.
+    const scratch = { ...pkgScripts, 'test:e2e:regress': 'playwright test --project=regress' };
+    expect(browserCommandRegex(scratch).test('npm run test:e2e:regress')).toBe(true);
+  });
+
   it('the reviewer prompt puts the agents before the browser in STEP 2', () => {
     const text = readFileSync(new URL('docs/REVIEWER-PROMPT.md', root), 'utf8');
     const step2 = text.slice(text.indexOf('STEP 2 — REVIEW'), text.indexOf('Four things make a PR unmergeable'));
@@ -520,12 +559,13 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     // somewhere earlier — a sentence that mentions review agents in passing and then tells a run to fire
     // playwright immediately used to satisfy a bare indexOf ordering check (#500 round 1, B1).
     const agents = step2.indexOf('run the three vendored review agents on the diff');
-    // Any of these three spellings counts as the browser command, and the EARLIEST one is what matters —
-    // `npm run test:e2e` and `npm run test:all` (which runs it: package.json's own `test && build && test:e2e`)
-    // are both CLAUDE.md's own documented alternatives to `npx playwright test`, and a STEP 2 that warms the
-    // suite that way before the agents, then still says `playwright test` later to satisfy this anchor, reran
-    // the suite first exactly as before, just under another name (#504 round 1: test:e2e; round 2: test:all).
-    const browser = step2.search(/playwright test|npm run test:e2e|npm run test:all/);
+    // Any package.json script that runs playwright test counts as the browser command (derived above, #762),
+    // and the EARLIEST one is what matters — `npm run test:e2e` and `npm run test:all` (which runs it via
+    // package.json's own `test && build && test:e2e`) are both CLAUDE.md's own documented alternatives to
+    // `npx playwright test`, and a STEP 2 that warms the suite that way before the agents, then still says
+    // `playwright test` later to satisfy this anchor, reran the suite first exactly as before, just under
+    // another name (#504 round 1: test:e2e; round 2: test:all).
+    const browser = step2.search(BROWSER_COMMAND_REGEX);
     expect(agents, 'STEP 2 must tell a run to RUN the three vendored review agents on the diff, not merely mention agents in passing').toBeGreaterThan(-1);
     expect(browser, 'STEP 2 must still tell a run to run the suite before it merges — this is an ordering rail, not a deletion').toBeGreaterThan(-1);
     expect(browser, 'STEP 2 runs the suite before the agents again: about half of those runs are on a head the same review then invalidates (#499)')
@@ -552,11 +592,11 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     const parts = s2.split('```');
     const first = parts[1];
     expect(first, '§2 must still open with a runnable block').toBeTruthy();
-    // Any of these three is a browser command here, not just "playwright" — `npm run test:e2e` and
-    // `npm run test:all` are both CLAUDE.md's own documented alternatives, and each is exactly as much #499
-    // restored (#504 round 1: test:e2e; round 2: test:all).
+    // Any package.json script that runs playwright test is a browser command here, not just "playwright" —
+    // `npm run test:e2e` and `npm run test:all` are both CLAUDE.md's own documented alternatives, and each is
+    // exactly as much #499 restored (#504 round 1: test:e2e; round 2: test:all).
     expect(first, "§2's first block is what runs before the diff is read — it must be the seconds-long checks, not the suite (#499)")
-      .not.toMatch(/playwright|npm run test:e2e|npm run test:all/);
+      .not.toMatch(new RegExp(`playwright|${BROWSER_COMMAND_REGEX.source}`));
     expect(first, 'and it must still be the real cheap three, or the block has been gutted rather than reordered').toMatch(/npm test/);
     // Exactly two fenced command blocks, and the text BETWEEN them must be what governs the second one —
     // not merely "playwright" appearing somewhere later in §2. A §2 that puts the browser block straight
