@@ -313,6 +313,18 @@ describe('save migration (#38)', () => {
     expect(v3.duels).toEqual([]);
   });
 
+  // #777: a plain `typeof` check let `NaN`, `Infinity` and any negative coins/spent through — `capDigits`
+  // (`ui/dom.ts`) only bounds the top of the range, so `NaN` printed literally and a large negative number
+  // overflowed past the cap the same way #510 closed on the other side of zero. Rejected at the same door
+  // every other field goes through, falling back to `DEFAULT`'s `0` exactly as a missing field already does.
+  it('a non-finite or negative coins/spent is rejected by sanitizeTypes, not passed through to the display cap (#777)', () => {
+    expect(migrate({ v: SAVE_VERSION, coins: NaN }).coins, 'NaN must never survive to print literally').toBe(0);
+    expect(migrate({ v: SAVE_VERSION, coins: -123456789012 }).coins, 'a negative purse must not overflow the cap').toBe(0);
+    expect(migrate({ v: SAVE_VERSION, spent: Infinity }).spent).toBe(0);
+    expect(migrate({ v: SAVE_VERSION, coins: 42 }).coins, 'a genuinely valid value is untouched').toBe(42);
+    expect(migrate({ v: SAVE_VERSION, coins: 'lots' as unknown }).coins, 'an outright wrong type is still rejected').toBe(0);
+  });
+
   it('falls back to a fresh default for corrupt or non-object data', () => {
     for (const bad of [null, undefined, 42, 'nonsense', [] as unknown]) {
       const d = migrate(bad);
