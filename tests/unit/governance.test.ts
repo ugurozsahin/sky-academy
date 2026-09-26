@@ -802,7 +802,12 @@ describe('a block its reviewer leaves unanswered is superseded by a fresh review
     expect(s7, 'and it is not a cap — ADR 004 stays as it is').toContain('None of this caps the rounds or lowers the bar');
 
     const pr = read('.claude/skills/open-pr/SKILL.md');
-    const s5 = flat(pr.slice(pr.indexOf('\n## 5. '), pr.indexOf('\n## 6. ')));
+    const s5At = pr.indexOf('\n## 5. '), s6At = pr.indexOf('\n## 6. ');
+    expect(s5At, 'the open-pr skill has lost its §5').toBeGreaterThan(-1);
+    expect(s6At, 'the open-pr skill has lost its §6, which ends §5').toBeGreaterThan(s5At);
+    const s5 = flat(pr.slice(s5At, s6At));
+    // The duplicated `REVIEW: CLEARED` this PR's first head shipped (review round 1): one closing prohibition.
+    expect(s5.match(/`REVIEW: CLEARED`/g)?.length, 'the fix-push paragraph names `REVIEW: CLEARED` once').toBe(1);
     expect(s5, 'the author answers the named alternative in the fix-push comment')
       .toContain('When the block names a structural alternative for a class of defect (`review-pr` §7), say whether you took it or why not');
   });

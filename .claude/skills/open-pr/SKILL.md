@@ -255,7 +255,7 @@ review it answers (#200): open `Pushed <sha>, addressing <what>`, resolve each b
 reviewer's own numbering so it is easy to match them up, state the tests you ran, and close `Ready for
 re-review`. When the block names a structural alternative for a class of defect (`review-pr` §7), say whether
 you took it or why not; patching only the next case leaves it unanswered. Never close with
-`REVIEW: CLEARED`, never `REVIEW: CLEARED` — that mark stays the reviewer's, whatever you just fixed. End with your
+`REVIEW: CLEARED` — that mark stays the reviewer's, whatever you just fixed. End with your
 session URL (#199), the same as everything else you post here. The reviewer routine's next run
 sees the fix: it looks at blocked pull requests with a commit newer than the block. **Pushing a fix does not
 clear a review, and you never undraft to get past one** — not even your own block on someone else's work.
