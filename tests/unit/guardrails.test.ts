@@ -3097,7 +3097,11 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
     'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 365, 'src/ui/certificate.ts': 341, 'src/audio.ts': 311,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
-    const text = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');   // throws if the file moved: the table cannot rot
+    // src/style.css split into src/styles/*.css (#558): the entry itself is now a 12-line @import shim, so a
+    // plain readFileSync here would pass vacuously forever — the exact "budget rail checks nothing" failure
+    // this ratchet exists to prevent, on the one entry a literal-string sweep for readFileSync('src/style.css')
+    // calls could not reach (review of PR #828). styleCss() reads what the entry actually bundles instead.
+    const text = file === 'src/style.css' ? styleCss() : readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');   // throws if the file moved: the table cannot rot
     expect((text.match(/\n/g) ?? []).length).toBeLessThanOrEqual(cap);
   });
 
