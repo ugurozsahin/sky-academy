@@ -630,7 +630,7 @@ test.describe('Sky Ninja Academy', () => {
     await skipToStage(page, 4);
     await waitForTarget(page);
     // Every question from here is difficulty 3: `y2Stats`'s `kind` is a pure function of `d`
-    // (`src/curriculum/maths.ts`), so every one of this stage's questions is a block diagram — nothing here
+    // (`src/curriculum/year2.ts`), so every one of this stage's questions is a block diagram — nothing here
     // depends on which survey or which `ask` was rolled. What *is* random is each row's count (`ri(rng, 1, 9)`
     // per row, capped at 10 by the unit rail in `tests/unit/curriculum.test.ts`), which is exactly the input
     // the CSS in `src/style.css` (`.chart .blk`, `clamp(14px, 4.4vw, 20px)` each) has never been checked

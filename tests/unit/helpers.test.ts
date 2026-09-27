@@ -16,7 +16,7 @@ describe('the shared rail readers cannot go blind (#321)', () => {
   it('SOURCES really reads src/, and reads the files the rails name', () => {
     const paths = Object.keys(SOURCES);
     expect(paths.length, 'an empty glob makes every src/ rail pass vacuously').toBeGreaterThan(20);
-    for (const named of ['/src/game/arena.ts', '/src/ui/play.ts', '/src/curriculum/maths.ts', '/src/storage.ts'])
+    for (const named of ['/src/game/arena.ts', '/src/ui/play.ts', '/src/curriculum/util.ts', '/src/storage.ts'])
       expect(paths, `${named} is read by name in a rail, so the glob must reach it`).toContain(named);
     // A glob that resolves but returns empty strings is the same failure wearing a passing shape.
     // Every entry, not a slice: blanking everything *except* the first five left this 4/4 green

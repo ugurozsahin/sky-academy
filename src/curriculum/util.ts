@@ -1,4 +1,4 @@
-import type { HintOpt, Question, Rng } from './types';
+import type { Difficulty, Generator, HintOpt, Question, Rng } from './types';
 
 export const ri = (rng: Rng, min: number, max: number) => min + Math.floor(rng() * (max - min + 1));
 export const pick = <T>(rng: Rng, arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
@@ -160,3 +160,386 @@ export const SAME_SOLID = new Set(['cube', 'cuboid']);
 export function symSay(s: string): string {
   return s.replace(/×/g, ' times ').replace(/÷/g, ' divided by ').replace(/\+/g, ' plus ').replace(/[−-]/g, ' minus ').replace(/=/g, ' equals ').replace(/\?/g, ' what').replace(/\s+/g, ' ').trim();
 }
+
+// ---------- Generators shared across two or more years (#325 stage 4) ----------
+// The curriculum is split reception.ts/year1.ts/year2.ts by year; a helper used by more than one of them
+// stays here rather than being duplicated or making one year file import from another.
+
+/** A spoken form that reads the symbols aloud, for any numeric prompt. Year 1, Year 2. */
+export const q = (prompt: string) => ({ prompt, say: symSay(prompt) });
+
+/** Order Up: slice the numbers from smallest to biggest (sequence mode with numbers). Reception, Y1, Y2. */
+export function orderQ(rng: Rng, max: number, count: number): Question {
+  const set = new Set<number>(); let guard = 0;
+  while (set.size < count && guard++ < 100) set.add(ri(rng, 0, max));
+  const nums = [...set]; const sorted = nums.slice().sort((a, b) => a - b).map(String);
+  const shown = shuffle(rng, sorted);
+  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(','), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first', hintIsData: false };
+}
+
+/** Number line: one label is hidden. Year 1, Year 2. */
+export function lineQ(rng: Rng, from: number, step: number, len: number): Question {
+  const to = from + step * (len - 1);
+  const idx = ri(rng, 1, len - 1); const mark = from + step * idx;
+  return numQ(rng, 'Which number is hidden?', mark, { min: 0, max: 120, visual: { type: 'numberline', from, to, mark, step }, say: `Which number is hidden on the number line?`, distractors: [mark + step, mark - step, mark + 1] });
+}
+
+/**
+ * Naming a 3-D shape, either direction: pick the glyph from the name, or the name from the glyph.
+ * Decoys come from the whole table so there are always three, but never from the cube/cuboid pair, which
+ * `SAME_SOLID` holds apart — "Which is a cuboid?" with a cube on the card has two defensible answers.
+ * Year 1, Year 2.
+ */
+export function name3dQ(rng: Rng, from: readonly (readonly [string, string, ...unknown[]])[], glyphIsAnswer: boolean): Question {
+  const [g, name] = pick(rng, from);
+  const decoys = SHAPES_3D.filter(x => x[1] !== name && !(SAME_SOLID.has(x[1]) && SAME_SOLID.has(name)));
+  const three = shuffle(rng, decoys).slice(0, 3);
+  return glyphIsAnswer
+    ? wordQ(rng, `Which is a ${name}?`, g, three.map(x => x[0]), { hint: 'Slice the 3-D shape', hintIsData: false })
+    : wordQ(rng, 'What is this shape?', name, three.map(x => x[1]), { visual: { type: 'word', text: g }, say: 'What is this shape called?' });
+}
+
+/** Balance the Scales: both pans must weigh the same — find the number that makes them equal (= as balance). Reception, Y1, Y2. */
+export function balanceQ(rng: Rng, left: string, right: string, answer: number, max: number, extra: { say?: string; distractors?: number[]; pans?: [string, string] } = {}): Question {
+  const p = `${left} = ${right}`;
+  const [pl, pr] = extra.pans ?? [left, right];
+  return numQ(rng, p, answer, { min: 0, max, visual: { type: 'scales', left: pl, right: pr }, say: extra.say ?? `Balance the scales! ${symSay(p)}`, hint: 'Make both sides the same', hintIsData: false, distractors: extra.distractors });
+}
+
+// ---------- Measurement — shared Year 1 / Year 2 (#8, #298) ----------
+const COLOURS = ['red', 'blue', 'green', 'yellow', 'purple'];
+export const UNIT_WORD: Record<string, string> = { cm: 'centimetres', m: 'metres', g: 'grams', kg: 'kilograms', ml: 'millilitres', l: 'litres' };
+
+function uniqVals(rng: Rng, n: number, lo: number, hi: number): number[] {
+  const s = new Set<number>(); let guard = 0;
+  while (s.size < n && guard++ < 200) s.add(ri(rng, lo, hi));
+  return [...s];
+}
+/**
+ * Slice the coloured thing that is the biggest/smallest by a measured value (d1 = 2 things comparative, d2/3 = 3
+ * things superlative). `verb` is what the thing does with its value: a pencil *is* 12 cm, a jug *holds* 300 ml
+ * (#296 — "fuller" is relative to the container, so 300 ml in a jug may be less full than 200 ml in a cup; the NC
+ * vocabulary for the container is "holds more / holds less").
+ */
+export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: string, forms: [string, string, string, string], lo: number, hi: number, verb = 'is'): Question {
+  const n = d === 1 ? 2 : 3;                                   // forms = [compBig, compSmall, superBig, superSmall]
+  const cols = shuffle(rng, COLOURS).slice(0, n);
+  const vals = uniqVals(rng, n, lo, hi);
+  const big = rng() < 0.5;
+  const idx = vals.indexOf(big ? Math.max(...vals) : Math.min(...vals));
+  const adj = n === 2 ? (big ? forms[0] : forms[1]) : (big ? forms[2] : forms[3]);
+  const spoken = cols.map((c, i) => `the ${c} ${noun} ${verb} ${vals[i]} ${UNIT_WORD[unit]}`).join(', ');
+  return wordQ(rng, n === 2 ? `Which ${verb} ${adj}?` : `Which ${verb} the ${adj}?`, cols[idx], cols.filter((_, i) => i !== idx), {
+    // The options are the colours, so this hint is the only place the sizes being compared appear — it is
+    // data, not the instruction line `hint` usually carries, and the play screen must keep it on a short
+    // screen (#328). `unitChoice` below deliberately does NOT set it: there the units are the bubbles.
+    hint: cols.map((c, i) => `${c} ${noun}: ${vals[i]} ${unit}`).join(' · '), hintIsData: true,
+    say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`,
+  });
+}
+export const HOLDS: [string, string, string, string] = ['more', 'less', 'most', 'least'];
+/** "Best unit" question: measure a familiar object in the smaller or larger standard unit. */
+export function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string): Question {
+  const [thing, unit] = pick(rng, things);
+  return wordQ(rng, `Best unit for a ${thing}?`, unit, [unit === small ? large : small], {
+    say: `Would you ${verb} a ${thing} in ${UNIT_WORD[small]} or ${UNIT_WORD[large]}?`, hint: `${UNIT_WORD[small]} (${small}) or ${UNIT_WORD[large]} (${large})?`, hintIsData: false,
+  });
+}
+
+/**
+ * Add or subtract two measures **in one unit**, every value inside Year 2's range of 100 (#298). Converting
+ * between units is Year 3 non-statutory at the earliest, so the pair never crosses cm/m, g/kg or ml/l, and
+ * the ranges keep the answer *and* its decoys ≤ 100: `a + b ≤ 90` and `a − b ≥ 20`, so `answer ± 10` lands
+ * inside the range either way. The third decoy is the other operation — the mistake the question is about.
+ *
+ * Two invariants the bounds below carry, both pinned in `tests/unit/curriculum.test.ts` because neither is
+ * visible in the ranges at a glance: `b ≥ 10`, without which the other-operation decoy collides with
+ * `answer − 10` and `wordQ` silently dedupes the card down to three options; and `b ≤ 34`, above which
+ * `ri(rng, b + 20, 90 - b)` inverts and hands back values below its own minimum.
+ */
+export function measureSum(rng: Rng, unit: string, verb: [string, string]): Question {
+  const b = ri(rng, 10, 30), a = ri(rng, b + 20, 90 - b), add = rng() < 0.5;
+  const ans = add ? a + b : a - b;
+  const word = UNIT_WORD[unit];
+  return wordQ(rng, `${a} ${unit} ${add ? '+' : '−'} ${b} ${unit} = ?`, `${ans} ${unit}`,
+    [`${ans + 10} ${unit}`, `${ans - 10} ${unit}`, `${add ? a - b : a + b} ${unit}`],
+    { say: `${a} ${word} ${add ? 'plus' : 'take away'} ${b} ${word}. ${add ? verb[0] : verb[1]}` });
+}
+
+/**
+ * `max` caps the decoys at the year's range too — a `30p` bubble on a Year 1 card is the same overreach as a
+ * `30p` answer. The first four decoys are the long-standing ones and are all `y2-money` ever uses; the rest
+ * only come into play when the cap bites hard enough to leave fewer than three (a 20p total loses `+1`, `+5`
+ * and `+10` at once). Year 1 (`y1-coins`), Year 2 (`y2-money`).
+ *
+ * Both guards below are unreachable through every caller today (#361) — `total` never exceeds `max` and the
+ * pool always yields three survivors — so this is insurance against a future caller, not railed behaviour: a
+ * card `max` can't actually satisfy is a wrong-range answer bubble, and one three decoys can't fill is the
+ * one-bubble card #35's shape-table bug already showed this project.
+ */
+export function unitQ(rng: Rng, total: number, coins: number[], max = Infinity): Question {
+  if (total > max) throw new Error(`unitQ: total ${total}p exceeds its own max ${max}p`);
+  const pool = [total + 1, total - 1, total + 5, total + 10, total - 5, total + 2, total - 2];
+  const ok = (x: number) => x > 0 && x !== total && x <= max;
+  const first = pool.slice(0, 4).filter(ok);
+  const ds = shuffle(rng, first.length >= 3 ? first : pool.filter(ok)).slice(0, 3);
+  if (ds.length < 3) throw new Error(`unitQ: only ${ds.length} decoy(s) available for total ${total}p (max ${max}p)`);
+  return wordQ(rng, 'How much money?', `${total}p`, ds.map(x => `${x}p`), { visual: { type: 'coins', coins }, say: 'How many pence altogether?' });
+}
+
+// ---------- Position & direction — shared Year 1 / Year 2 (#8 Phase 2) ----------
+// Four compass directions in clockwise order, each with its arrow; a turn moves that many quarter-steps round the ring.
+export const DIRS: [string, string][] = [['up', '⬆️'], ['right', '➡️'], ['down', '⬇️'], ['left', '⬅️']];
+export const ARROWS = DIRS.map(d => d[1]);
+export const TURNS_ALL: [string, number][] = [['a quarter turn', 1], ['a half turn', 2], ['a three-quarter turn', 3], ['a whole turn', 4]];
+/** Direction faced after turning `steps` quarter-turns clockwise (or anti-clockwise) from `start` (indices into DIRS). */
+export const turnEnd = (start: number, steps: number, clockwise: boolean): number => (((start + (clockwise ? steps : -steps)) % 4) + 4) % 4;
+
+// ---------- Spelling & phonics — shared across years (writing topics, #14/#296/#324/#418/#443/#445) ----------
+export const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
+export const VOWELS = ['a', 'e', 'i', 'o', 'u'];
+
+// Phonics word bank: [word, emoji]. The first block is spellable with phase 2 letters alone, which is what
+// Reception stage 1 draws from (#14) — it is listed first only for reading; nothing depends on the order.
+//
+// EVERY ENTRY MUST BE EXACTLY THREE LETTERS, and a rail in tests/unit/curriculum.test.ts holds it there.
+// `rLetterSound` addresses the sounds by fixed index — 2 for the final sound, 1 for the medial — so a
+// four-letter word here does not merely read oddly, it ships a WRONG ANSWER: `frog` at difficulty 2 asks
+// "which sound does frog end with?", shows `fr_g` and marks `o` correct. Exported for that rail alone.
+// Also used by Year 1's `y1-trace` (d3).
+export const CVC: [string, string][] = [['cat', '🐱'], ['dog', '🐶'], ['sun', '☀️'], ['pig', '🐷'], ['cup', '☕'], ['pen', '🖊️'], ['egg', '🥚'], ['map', '🗺️'], ['mug', '🍺'], ['net', '🥅'], ['tap', '🚰'], ['pot', '🍲'], ['pin', '📌'], ['rug', '🧶'], ['nut', '🥜'], ['cap', '🧢'], ['rat', '🐀'], ['pan', '🍳'],
+  ['bus', '🚌'], ['hat', '🎩'], ['bed', '🛏️'], ['fox', '🦊'], ['bag', '👜'], ['hen', '🐔'], ['box', '📦'], ['jam', '🍯'], ['bat', '🦇'], ['web', '🕸️'], ['cow', '🐮'], ['leg', '🦵'], ['bug', '🐛'], ['van', '🚐'], ['zip', '🤐'], ['log', '🪵']];
+/** Digraphs Reception's `finalIsGenuine` checks a word's last two letters against, and Year 1's `y1-digraphs` gaps. */
+export const DIGRAPHS = ['sh', 'ch', 'th', 'ng', 'ai', 'oa', 'oo', 'ee', 'oi', 'ow', 'ar', 'or', 'wh', 'qu', 'ck'];
+
+/**
+ * Sound Hunt bank: [grapheme, phoneme family, where the sound sits in the words, keyword words].
+ * Phase 2/3 (Reception) and phase 5 (Year 1) follow the Letters and Sounds / Little Wandle order.
+ * The phoneme family keeps sound-alike graphemes (c/k, ai/ay/a-e, ee/ea …) out of each other's bubbles: by ear they are the same sound.
+ */
+export type Sound = [string, string, 'start' | 'middle' | 'end', string[]];
+export const PHASE2: Sound[] = [
+  ['s', 's', 'start', ['sun', 'sock', 'sad', 'sit']], ['a', 'a', 'start', ['apple', 'ant', 'add', 'axe']], ['t', 't', 'start', ['tap', 'tin', 'top', 'ten']], ['p', 'p', 'start', ['pan', 'pig', 'pen', 'pot']],
+  ['i', 'i', 'start', ['ink', 'insect', 'igloo', 'it']], ['n', 'n', 'start', ['net', 'nap', 'nut', 'nod']], ['m', 'm', 'start', ['man', 'map', 'mud', 'mop']], ['d', 'd', 'start', ['dog', 'dig', 'dad', 'duck']],
+  ['g', 'g', 'start', ['goat', 'gap', 'get', 'gum']], ['o', 'o', 'start', ['on', 'orange', 'octopus', 'off']], ['c', 'k', 'start', ['cat', 'cup', 'cot', 'can']], ['k', 'k', 'start', ['kit', 'kick', 'kid', 'king']],
+  ['e', 'e', 'start', ['egg', 'elbow', 'end', 'elephant']], ['u', 'u', 'start', ['up', 'umbrella', 'under', 'us']], ['r', 'r', 'start', ['rat', 'run', 'red', 'rug']],
+];
+export const PHASE2B: Sound[] = [   // the remaining single-letter sounds (phase 2 set 5, phase 3 letters)
+  ['h', 'h', 'start', ['hat', 'hen', 'hop', 'hug']], ['b', 'b', 'start', ['bat', 'bed', 'bus', 'big']], ['f', 'f', 'start', ['fan', 'fox', 'fin', 'fun']], ['l', 'l', 'start', ['leg', 'lip', 'log', 'lot']],
+  ['j', 'j', 'start', ['jam', 'jet', 'jug', 'jog']], ['v', 'v', 'start', ['van', 'vet', 'vest', 'visit']], ['w', 'w', 'start', ['wet', 'web', 'win', 'wig']], ['x', 'ks', 'end', ['fox', 'box', 'six', 'mix']],
+  ['y', 'y', 'start', ['yes', 'yak', 'yum', 'yell']], ['z', 'z', 'start', ['zip', 'zebra', 'zoo', 'zoom']], ['qu', 'kw', 'start', ['queen', 'quick', 'quilt', 'quiz']],
+];
+export const PHASE3: Sound[] = [
+  ['ch', 'ch', 'start', ['chip', 'chop', 'chin', 'chick']], ['sh', 'sh', 'start', ['ship', 'shop', 'shell', 'shut']], ['th', 'th', 'start', ['thin', 'thick', 'think', 'thumb']], ['ng', 'ng', 'end', ['ring', 'king', 'song', 'long']],
+  ['ai', 'ai', 'middle', ['rain', 'tail', 'paint', 'snail']], ['ee', 'ee', 'middle', ['feet', 'sheep', 'green', 'keep']], ['igh', 'igh', 'middle', ['night', 'light', 'fight', 'tight']], ['oa', 'oa', 'middle', ['boat', 'goat', 'coat', 'road']],
+  ['oo', 'oo', 'middle', ['moon', 'spoon', 'food', 'boot']], ['ar', 'ar', 'middle', ['park', 'farm', 'card', 'dark']], ['or', 'or', 'middle', ['fork', 'corn', 'storm', 'sort']], ['ur', 'ur', 'middle', ['burn', 'turn', 'hurt', 'curl']],
+  ['ow', 'ow', 'end', ['cow', 'how', 'now', 'wow']], ['oi', 'oi', 'middle', ['coin', 'boil', 'join', 'soil']], ['ear', 'ear', 'end', ['near', 'dear', 'fear', 'hear']], ['air', 'air', 'end', ['hair', 'fair', 'chair', 'pair']], ['er', 'ur', 'end', ['hammer', 'ladder', 'letter', 'dinner']],
+];
+export const PHASE5: Sound[] = [
+  ['ay', 'ai', 'end', ['day', 'play', 'say', 'tray']], ['ou', 'ow', 'middle', ['out', 'cloud', 'shout', 'loud']], ['ie', 'igh', 'end', ['pie', 'tie', 'lie', 'die']], ['ea', 'ee', 'middle', ['leaf', 'beach', 'meat', 'seat']],
+  ['oy', 'oi', 'end', ['boy', 'toy', 'joy', 'enjoy']], ['ir', 'ur', 'middle', ['girl', 'bird', 'shirt', 'dirt']], ['ue', 'oo', 'end', ['blue', 'glue', 'clue', 'true']], ['aw', 'or', 'end', ['saw', 'paw', 'claw', 'draw']],
+  ['wh', 'w', 'start', ['when', 'whale', 'wheel', 'whisk']], ['ph', 'f', 'start', ['phone', 'photo', 'phonics', 'phrase']], ['ew', 'oo', 'end', ['new', 'chew', 'few', 'grew']], ['oe', 'oa', 'end', ['toe', 'hoe', 'tiptoe', 'doe']], ['au', 'or', 'start', ['autumn', 'August', 'author', 'auburn']],
+];
+export const SPLIT: Sound[] = [   // split digraphs (phase 5)
+  ['a-e', 'ai', 'middle', ['cake', 'make', 'lake', 'gate']], ['i-e', 'igh', 'middle', ['bike', 'kite', 'time', 'line']], ['o-e', 'oa', 'middle', ['bone', 'home', 'nose', 'rope']], ['u-e', 'oo', 'middle', ['cube', 'tube', 'June', 'flute']],
+];
+const LETTER_SOUNDS = [...PHASE2, ...PHASE2B];
+
+/** Sound Hunt: three keyword words are spoken (never shown); slice the grapheme for the sound they share. Reception, Year 1. */
+export function soundQ(rng: Rng, pool: Sound[], distractPool: Sound[], decoys: number): Question {
+  const [g, ph, pos, words] = pick(rng, pool);
+  const ws = shuffle(rng, words).slice(0, 3);
+  const ds = shuffle(rng, distractPool.filter(s => s[1] !== ph)).slice(0, decoys).map(s => s[0]);
+  const where = pos === 'start' ? 'start with' : pos === 'end' ? 'end with' : 'have in the middle';
+  return wordQ(rng, '🔊 Listen!', g, ds, { say: `Listen: ${ws.join(', ')}. Which sound do they ${where}?`, listen: ws.join(' · '), hint: `Slice the sound at the ${pos}`, hintIsData: false });
+}
+
+export const Y1_CEW = ['the', 'a', 'do', 'to', 'today', 'of', 'said', 'says', 'are', 'were', 'was', 'is', 'his', 'has', 'you', 'your', 'they', 'be', 'he', 'me', 'she', 'we', 'no', 'go', 'so', 'by', 'my', 'here', 'there', 'where', 'love', 'come', 'some', 'one', 'once', 'ask', 'friend', 'school', 'put', 'push', 'pull', 'full', 'house', 'our'];
+export const Y2_CEW = ['door', 'floor', 'poor', 'because', 'find', 'kind', 'mind', 'behind', 'child', 'children', 'wild', 'climb', 'most', 'only', 'both', 'old', 'cold', 'gold', 'hold', 'told', 'every', 'everybody', 'even', 'great', 'break', 'steak', 'pretty', 'beautiful', 'after', 'fast', 'last', 'past', 'father', 'class', 'grass', 'pass', 'plant', 'path', 'bath', 'hour', 'move', 'prove', 'improve', 'sure', 'sugar', 'eye', 'could', 'should', 'would', 'who', 'whole', 'any', 'many', 'clothes', 'busy', 'people', 'water', 'again', 'half', 'money', 'parents'];
+/** Days of the week. Year 1's `y1-days`/`y1-months` and part of the shared `GAP_WORDS` set below. */
+export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/**
+ * The words a gap in a list word can spell, so that none of them is offered as a decoy (#296). Mostly everyday
+ * words a KS1 child meets that are not on either exception-word list — the rhyme families the lists sit in
+ * (`_old` is bold, fold and sold as well as cold, gold, hold, told) and the short words a single letter turns
+ * one list word into (`p_t`, `_ull`, `h_s`). The last batch is wider than that: a decoy is a second right
+ * answer whenever it spells *any* real word, not only one the child has been taught, so the sweep of all 489
+ * drawable gaps (review of PR #303) put its remaining hits here too, KS1 vocabulary or not. Read by
+ * `gapLetters` only.
+ */
+const EVERYDAY = ['I', 'it', 'in', 'if', 'is', 'as', 'at', 'an', 'am', 'on', 'or', 'ox', 'up', 'us', 'we', 'he', 'me', 'be', 'hi', 'my', 'by', 'oh', 'ah',
+  'the', 'and', 'but', 'not', 'for', 'get', 'got', 'had', 'ham', 'hat', 'hay', 'him', 'hit', 'hop', 'hot', 'how', 'hug', 'hut', 'her', 'hen', 'hid', 'sad', 'sat', 'set', 'sit', 'sun', 'sum', 'saw', 'say', 'sea', 'see', 'sew', 'six', 'sky', 'shy', 'she', 'try', 'toy', 'top', 'tap', 'ten', 'tea', 'too', 'two', 'now', 'new', 'net', 'nut', 'nod', 'nap', 'gas', 'was', 'wax', 'win', 'wet', 'web', 'wig', 'why', 'way', 'wow', 'yes', 'yet', 'you', 'yak', 'zip', 'zoo',
+  'bad', 'bag', 'bat', 'bed', 'bee', 'beg', 'bet', 'big', 'bin', 'bit', 'box', 'boy', 'bud', 'bug', 'bun', 'bus', 'bye', 'cab', 'can', 'cap', 'car', 'cat', 'cod', 'cog', 'cot', 'cow', 'cry', 'cub', 'cup', 'cut', 'dad', 'day', 'den', 'did', 'dig', 'dim', 'dip', 'dog', 'dot', 'dry', 'dug', 'ear', 'eat', 'egg', 'elf', 'end', 'eye', 'fan', 'far', 'fat', 'fed', 'fig', 'fin', 'fit', 'fix', 'fly', 'fog', 'fox', 'fun', 'fur', 'gap', 'god', 'gum', 'gun', 'gut', 'guy', 'gym',
+  'jam', 'jar', 'jet', 'jog', 'joy', 'jug', 'key', 'kid', 'kit', 'lap', 'law', 'lay', 'led', 'leg', 'let', 'lid', 'lip', 'lit', 'log', 'low', 'mad', 'man', 'map', 'mat', 'may', 'men', 'met', 'mix', 'mop', 'mud', 'mug', 'mum', 'oil', 'old', 'one', 'our', 'out', 'owl', 'own', 'pad', 'pan', 'pat', 'paw', 'pay', 'pea', 'peg', 'pen', 'pet', 'pie', 'pig', 'pin', 'pit', 'pop', 'pot', 'pub', 'pup', 'put', 'rag', 'ran', 'rat', 'raw', 'red', 'rib', 'rid', 'rim', 'rip', 'rob', 'rod', 'rot', 'row', 'rub', 'rug', 'run', 'van', 'vet',
+  'ace', 'add', 'age', 'ago', 'aid', 'aim', 'air', 'ant', 'ape', 'arm', 'art', 'ash', 'ask', 'ate', 'axe', 'ill', 'ink', 'inn', 'its', 'ice', 'odd', 'off', 'all',
+  'bull', 'dull', 'full', 'gull', 'hull', 'pull', 'bold', 'fold', 'sold', 'bill', 'fill', 'hill', 'mill', 'pill', 'till', 'will', 'ball', 'call', 'fall', 'hall', 'tall', 'wall', 'bell', 'fell', 'sell', 'tell', 'well', 'yell', 'doll', 'poll', 'roll', 'toll', 'bush', 'hush', 'rush', 'push', 'posh', 'dish', 'fish', 'wish', 'cash', 'dash', 'rash', 'wash', 'bash', 'mash',
+  'came', 'game', 'name', 'same', 'tame', 'home', 'dome', 'bone', 'cone', 'tone', 'zone', 'done', 'none', 'gone', 'live', 'give', 'dive', 'five', 'hive', 'hire', 'fire', 'wire', 'wore', 'more', 'sore', 'tore', 'bore', 'core', 'mere', 'here', 'sail', 'said', 'paid', 'maid', 'raid', 'laid', 'main', 'pain', 'rain', 'gain',
+  'mouse', 'louse', 'horse', 'hoard', 'board', 'ward', 'word', 'cord', 'ford', 'bind', 'wind', 'mild', 'mind', 'kind', 'find', 'wild', 'child', 'most', 'post', 'host', 'cost', 'lost', 'both', 'moth', 'bath', 'path', 'past', 'fast', 'last', 'mast', 'vast', 'east', 'best', 'nest', 'rest', 'test', 'vest', 'west', 'pest', 'grass', 'glass', 'class', 'brass', 'pass', 'mass', 'bass', 'lass', 'plant', 'slant', 'grant', 'chant',
+  'seat', 'meat', 'heat', 'beat', 'neat', 'peat', 'feat', 'great', 'greet', 'treat', 'steam', 'stead', 'steal', 'break', 'bread', 'breed', 'dear', 'hear', 'near', 'fear', 'gear', 'tear', 'wear', 'year', 'bear', 'pear', 'move', 'prove', 'grove', 'drove', 'stove', 'hour', 'sour', 'tour', 'four', 'pour', 'your', 'hole', 'pole', 'mole', 'role', 'sole', 'whole', 'poor', 'door', 'moor', 'floor', 'flour', 'penny', 'funny', 'sunny', 'bunny', 'money', 'honey', 'many', 'any', 'busy', 'easy', 'even', 'ever', 'oven', 'over', 'open', 'only', 'ugly', 'holy', 'tidy', 'lady', 'baby', 'body', 'copy', 'city', 'pity', 'duty', 'tiny',
+  'talk', 'walk', 'chalk', 'stalk', 'told', 'hold', 'gold', 'golf', 'cold', 'colt', 'hurt', 'hurl', 'curl', 'girl', 'fool', 'tool', 'pool', 'cool', 'wool', 'half', 'calf', 'hail', 'pale', 'sale', 'tale', 'male', 'gale', 'kale', 'bake', 'cake', 'lake', 'make', 'rake', 'take', 'wake', 'like', 'bike', 'hike', 'pike', 'time', 'lime', 'mime', 'ride', 'hide', 'side', 'tide', 'wide', 'wipe', 'ripe', 'pipe', 'rope', 'hope', 'cope', 'nope', 'note', 'vote', 'tote', 'rote', 'cute', 'mute', 'tube', 'cube',
+  'these', 'those', 'where', 'there', 'their', 'while', 'white', 'write', 'right', 'light', 'night', 'sight', 'tight', 'fight', 'might', 'could', 'would', 'should', 'mould', 'sugar', 'super', 'sure', 'pure', 'cure', 'lure', 'water', 'later', 'again', 'people', 'parent', 'father', 'rather', 'gather', 'lather', 'mother', 'other', 'bother', 'brother', 'after', 'often', 'every', 'eyes', 'weeks', 'clothes', 'cloth', 'children', 'climb', 'crime', 'prime', 'improve',
+  // Added for review of PR #303: the list words' own neighbours (them/then, days/ways/pays, king, good …) and a wider batch.
+  'them', 'then', 'days', 'ways', 'pays', 'king', 'good', 'fine', 'mine', 'must', 'held', 'hood', 'toad', 'list', 'war', 'comb', 'dove', 'bays', 'rays', 'lays', 'wag', 'lose', 'hare', 'hero', 'herd', 'tie', 'hip', 'ark', 'mint', 'mist', 'flood', 'fist', 'bury', 'halt', 'than', 'that', 'this', 'thin', 'they', 'tray', 'stay', 'play', 'pray', 'sway', 'away', 'jays', 'kind', 'find', 'bind', 'mind', 'wind', 'dust', 'just', 'rust', 'nest', 'vest', 'pest', 'hold', 'fold', 'bold', 'cold', 'gold', 'sold', 'told', 'hole', 'food', 'mood', 'wood', 'hoof', 'roof', 'boot', 'foot', 'root', 'hoot', 'loot', 'soot', 'toot', 'road', 'load', 'last', 'lost', 'mast', 'vast', 'fast', 'past', 'east', 'west', 'was', 'wax', 'way', 'warm', 'warn', 'ward', 'come', 'cone', 'code', 'cope', 'core', 'cove', 'cake', 'love', 'live', 'move', 'loud', 'the', 'tea', 'top', 'toy', 'tub', 'two', 'try', 'are', 'arm', 'art', 'ace', 'ale', 'ape', 'axe', 'ago', 'aim', 'air', 'his', 'has', 'hit', 'hid', 'him', 'hum', 'hut', 'hug', 'had', 'hat', 'ham', 'hay', 'hen', 'hey', 'hop', 'hot', 'how', 'you', 'yes', 'yet', 'yak', 'yam', 'one', 'ode', 'ore', 'owe', 'own', 'owl', 'once', 'only', 'open', 'oven', 'over', 'ask', 'ash', 'aunt', 'ant', 'and', 'any', 'put', 'pit', 'pat', 'pet', 'pot', 'pun', 'pup', 'pub', 'pug', 'push', 'posh', 'pull', 'pill', 'poll', 'pall', 'pale', 'pole', 'pile', 'full', 'fall', 'fell', 'fill', 'fuel', 'furl', 'fool', 'foal', 'foul', 'fowl', 'house', 'mouse', 'louse', 'horse', 'home', 'hose', 'hope', 'hour', 'sour', 'four', 'pour', 'tour', 'your', 'door', 'poor', 'moor', 'doors', 'floor', 'flour', 'fire', 'five', 'ford', 'fork', 'form', 'kilt', 'mild', 'mile', 'milk', 'mill', 'miss', 'wild', 'wile', 'will', 'wine', 'wing', 'wink', 'wipe', 'wire', 'wise', 'wish', 'with', 'child', 'chill', 'chips', 'chime', 'climb', 'class', 'clash', 'most', 'moss', 'moth', 'mode', 'mole', 'more', 'oily', 'holy', 'both', 'bath', 'bosh', 'bots', 'boss', 'old', 'odd', 'colt', 'cord', 'corn', 'cost', 'cosy', 'golf', 'goat', 'goal', 'gods', 'hoop', 'tolls', 'toll', 'tool', 'tone', 'every', 'event', 'ever', 'even', 'eve', 'great', 'greet', 'grate', 'grade', 'grape', 'break', 'bread', 'breed', 'beak', 'brake', 'steak', 'stack', 'stalk', 'steal', 'steam', 'steep', 'steer', 'stem', 'step', 'pretty', 'petty', 'party', 'beautiful', 'after', 'alter', 'fact', 'post', 'part', 'path', 'pats', 'bats', 'bash', 'bass', 'baths', 'hours', 'sore', 'soar', 'prove', 'improve', 'sure', 'sugar', 'eye', 'dye', 'bye', 'could', 'would', 'should', 'cloud', 'who', 'why', 'whom', 'whole', 'whale', 'while', 'white', 'many', 'mean', 'main', 'busy', 'bush', 'people', 'water', 'again', 'half', 'calf', 'hall', 'hate', 'have', 'money', 'monkey', 'honey', 'parents', 'parent', 'present', 'pardon', 'tin', 'toe', 'tip', 'tug', 'hog', 'lot', 'tow', 'ton', 'tot', 'hub', 'arc', 'lord', 'hind', 'lots', 'asp', 'cast', 'file', 'fort', 'mice', 'hone',
+  // From a sweep of every residual candidate on the review head: the real words left (sand, world, speak, plait …).
+  // `puss` and `poop` were in this batch until the review of #324: both are crudities, so they belong in
+  // `AVOID` below, not here. They were blocking their stems already, but as words rather than as spellings.
+  'skid', 'slid', 'sand', 'sags', 'ore', 'ale', 'awe', 'ware', 'herb', 'hers', 'gush', 'lush', 'mush', 'lull', 'pulp', 'oar', 'doom', 'fund', 'fond', 'mend', 'mink', 'weld', 'moat', 'cola', 'creak', 'sneak', 'speak', 'fact', 'lash', 'pant', 'claws', 'grams', 'grabs', 'grasp', 'pads', 'pals', 'pans', 'paws', 'pats', 'plait', 'plane', 'plank', 'plans', 'surf', 'ewe', 'world', 'wound', 'whose', 'mane', 'halo',
+  // Second review of PR #303: the systematic hole was the list words' own plurals and `-er`/`-ed` forms
+  // (`cla_s` offered `p` for claps, `fin_` offered `s` for fins), so this batch is the full sweep of all 489
+  // drawable gaps rather than another guess at which families were missed.
+  'claps', 'clams', 'clans', 'clasp', 'clays', 'clothed', 'fins', 'fink', 'grans', 'gross', 'groat', 'fatter', 'bather', 'hays', 'mays', 'saws', 'sans', 'sass', 'theme', 'thee', 'eves', 'aye', 'tee', 'lest', 'mosh',
+  'wafer', 'wager', 'wader', 'waver', 'wad', 'wan', 'wilt', 'wily', 'woo', 'wove', 'cater', 'eater', 'hater', 'patents', 'probe', 'prone', 'prose', 'freak', 'bream', 'bust', 'buss', 'buoy', 'bate', 'pate', 'rind', 'lobe', 'lone', 'lope', 'mini', 'mins', 'kink', 'kine', 'kins',
+  'moot', 'mope', 'mote', 'rouse', 'douse', 'souse', 'holt', 'aster', 'clime', 'dour', 'bur', 'boor', 'cole', 'cote', 'coney', 'evert'];
+/**
+ * The words a spelling gap is checked against: both exception-word lists, the days, the CVC bank and the
+ * everyday words above (#296). Exported for the rail that walks every word and index in both lists.
+ */
+export const GAP_WORDS: ReadonlySet<string> = new Set([...Y1_CEW, ...Y2_CEW, ...DAYS, ...CVC.map(([w]) => w), ...EVERYDAY].map(w => w.toLowerCase()));
+/**
+ * **Reachable and deliberately left** (#418 asks for this stated rather than assumed, the way the comment
+ * above `gapLetters` records `hag`, `cur` and `rut`). These are spellings a gap card can show and that two
+ * sweeps have now considered and kept:
+ *
+ *   `pee`, `wee` — ordinary Reception vocabulary; blocking them is the filter reaching past its subject.
+ *   `bog`, `nog`, `sus` — ordinary words a KS1 child reads as the marsh, the drink and the adjective.
+ *   `pis`, `hoor`, `ho`, `hos`, `pish`, `ars` — non-words, and none an exact homophone of an `AVOID` member,
+ *   which is the line `hore` and `cok` are on the other side of. `ho` in particular cannot be closed without
+ *   a rule that reads oddly for Reception (`do`, `to`, `no`, `go`, `so`, `he` all reach it).
+ *   `fux` — the fifth sweep's other find (#443), on `f_x`. A leetspeak rendering of a swear word rather than
+ *   a spelling; `hore` and `cok`'s exact-homophone rule does not reach it, because nothing in `AVOID` is
+ *   spelt `fux`.
+ *   `les` — the fifth sweep's third find, on `le_`. An ordinary name, the way `ho` is an ordinary word.
+ *
+ * The point of writing them down is that the next sweep reads which were decided instead of re-finding them
+ * by eye — the fourth sweep of this kind found four spellings the third had not listed.
+ */
+export const AVOID: ReadonlySet<string> = new Set(['whore', 'piss', 'fart', 'ass', 'arse', 'shit', 'crap', 'cock', 'dick',
+  // Second review of PR #303: `poo_` offered `f`. A slur, a crudity or an insult is filtered here rather than
+  // added to the lists above, so that `GAP_WORDS` stays a list of words the game is happy to *show*.
+  'poof', 'gays', 'lust', 'pus', 'tush', 'coke', 'yob',
+  // #324 item 1: that round closed `f` on `poo_` and checked no other letter on the same stem, so `poon` — a
+  // sexual slur — was still on a Year 2 child's bubbles two rounds after a review had gone hunting for it.
+  // `poos`/`pooh` move here from `EVERYDAY` under the rule above; they were blocked, but as words rather than
+  // as spellings a card may not show.
+  'poon', 'poot', 'pood', 'poos', 'pooh', 'paps', 'pud',
+  // Review of #324: `poop` and `puss` were still in `EVERYDAY`, so the two stems the audit had just closed were
+  // each one curriculum prune away from reopening. Moved here so `poo_` is uniform and `pu__`/`p_ss` are pinned.
+  'poop', 'puss',
+  // #418: `r-sounds` passed its letter pool to `gapQ` raw, so Reception — ages 4 and 5 — was the one island
+  // no `AVOID` entry reached. `cu_` offered `m`, `ja_` offered `p`. Filtering moved into `gapQ` in the same
+  // change; these are the spellings that sweep found and that a card must not show whichever generator built
+  // it. `poo` and `pap` are the `poo_`/`paps` standards one letter shorter — #324 closed those and this stem
+  // was reachable the whole time.
+  'cum', 'jap', 'vag', 'poo', 'bum', 'pap',
+  // #419: `p_ove` offered `o` on a Year 2 card two reviews after a sweep reported the family clean, and
+  // `h_re` offered `o` on a Year 1 one. `hore` is not a dictionary word and is here anyway, which is the
+  // rule `pud` and `paps` already follow: what is blocked is the spelling a card can **show**, not an entry
+  // in a dictionary — and it is an exact homophone of this set's first member.
+  'poove', 'hore',
+  // #416: `poo_` (from `poor`) still offered `v`, spelling `poov` — the clipped form of the slur `poove`
+  // above. Found by driving the real generator 300,000 times rather than re-reading the stem: `poove` had
+  // already been closed by #419, but `poov` sits on the same stem one letter short, the same way `poon`
+  // sat one letter past `poof` in #324 item 1.
+  'poov',
+  // Review of #418: four more, found by driving the registry rather than by re-reading the list — which is
+  // the whole lesson. `cun` is on `cu_`, the same three letters as the `cum` above it: the stem was audited
+  // and the audit stopped one letter short, exactly as #324 did on `poo_`. `cok`/`coc` follow the `hore`
+  // rule — an exact homophone of a member of this set (`cock`), blocked for what a card would show.
+  'nig', 'pak', 'hun', 'cun', 'cok', 'coc',
+  // #443: `le_` offered `z` on a Reception card, and the fifth sweep is what found it — the fourth
+  // (#418/#419) had already closed `cu_` and `ja_` without reaching this stem. A slur, by the same rule
+  // `poon` and `hore` are here under.
+  'lez']);
+export function gapLetters(word: string, idx: number): string[] {
+  const lower = word.toLowerCase();
+  return LETTERS.filter(l => { const w = lower.slice(0, idx) + l + lower.slice(idx + 1); return l !== lower[idx] && !GAP_WORDS.has(w) && !AVOID.has(w); });
+}
+
+/**
+ * The letters a gap card may really offer: the pool, less the answer, less any letter that would spell an
+ * `AVOID` word in this gap (#418).
+ *
+ * **Here rather than at the call sites.** `gapLetters` filters `AVOID` too, but only three of the six `gapQ`
+ * call sites go through it: `rLetterSound` passes `rLetters(d)` and `VOWELS` raw, so every rail #296, #303 and
+ * #324 built was blind to Reception's cards and `cu_` offered `m`. Filtering where the card is built covers
+ * all six and every future one, and makes the unscoped sentence above `AVOID` true instead of narrowing it.
+ * **Pool depth is a constraint on exactly one frame.** `gapQ` needs 3. The start- and end-sound cards pass 13
+ * to 23 letters and the `gapLetters` sites 15, but the middle-sound card passes `VOWELS` — **5** — so it has
+ * 4 after the answer is removed and 3 once one is blocked. `hen` is there now: `h_n` loses `u` to `hun`, and
+ * has no spare. An earlier version of this comment said the thinnest pool was 15, which was false of the one
+ * card it mattered for (review of #418). `gapQ` throws below 3 rather than quietly shipping a 3-option card,
+ * and `tests/unit/curriculum.test.ts` measures the floor at index 1 as well as 0 and 2.
+ *
+ * `idx` outside the word is a caller bug, not a card: the filter would test a spelling no card can show, so
+ * it throws rather than silently passing the pool through. A pool entry longer than one character is the
+ * same class of bug — it would compose a spelling one character longer than the card shows and consult
+ * `AVOID` about something no card can produce — so that throws too, rather than passing unfiltered (#445).
+ *
+ * Deduped (#445): every live pool is distinct today, so this changes nothing a card shows, but `gapQ`'s
+ * `decoys.length < 3` floor counts entries **before** `wordQ` dedupes its own final three, so a pool with a
+ * repeat would otherwise pass a floor that no longer describes what actually reaches the card.
+ */
+export const gapDecoys = (word: string, idx: number, pool: string[]): string[] => {
+  const lower = word.toLowerCase();
+  if (idx < 0 || idx >= lower.length) throw new RangeError(`gap index ${idx} is outside "${word}"`);
+  if (pool.some(l => l.length !== 1)) throw new RangeError(`gapDecoys pool for "${word}" has a non-single-character entry`);
+  const ans = lower[idx];
+  return [...new Set(pool.filter(l => l.toLowerCase() !== ans
+    && !AVOID.has(lower.slice(0, idx) + l.toLowerCase() + lower.slice(idx + 1))))];
+};
+
+/** Missing-letter question: show word with a gap, options are letters. Reception, Year 1, Year 2. */
+export function gapQ(rng: Rng, word: string, idx: number, distractPool: string[], emoji?: string, say?: string): Question {
+  const ans = word[idx];
+  const shown = word.slice(0, idx) + '_' + word.slice(idx + 1);
+  const decoys = gapDecoys(word, idx, distractPool);
+  // A card with two decoys takes the child's guess from 1-in-4 to 1-in-3 and says nothing. The middle-sound
+  // frame has no spare (see `gapDecoys`), so this is one blocked letter away rather than hypothetical.
+  if (decoys.length < 3) throw new RangeError(`"${word}" gap ${idx} leaves only ${decoys.length} decoys`);
+  const ds = shuffle(rng, decoys).slice(0, 3);
+  return wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown, emoji }, say: say ?? `Which letter is missing from ${word}?`, hint: 'Slice the missing letter', hintIsData: false });
+}
+
+/** Spelling by slicing letters in order (sequence question). Reception, Year 1, Year 2. */
+// `from` is the letter pool the decoys are drawn from (#14). It defaults to the whole alphabet, which is
+// right for Year 1/2 spelling; Reception passes its phase pool, because a decoy the child has not been
+// taught is the same fault as an answer they have not been taught.
+export function spellQ(rng: Rng, word: string, hintEmoji?: string, decoys = 3, from: string[] = LETTERS): Question {
+  const letters = word.split('');
+  const pool = from.filter(l => !letters.includes(l));
+  const uniq = [...new Set(letters)];
+  // A repeated letter shrinks `uniq` below `letters.length`, and that used to shrink the total tile count
+  // with it: "egg" (e, g, g — two unique letters) dealt two fewer tiles than a same-length word with none
+  // repeated, so the tile count alone gave the answer away every time it was drawn (#481 — the same shape
+  // as #369 one channel over: there it was bubble size, here it is bubble count). Topping the decoy count
+  // up by the letters lost to repetition keeps the total (word length + decoys) the same for every word at
+  // a difficulty, whatever it repeats.
+  const repeated = letters.length - uniq.length;
+  const need = Math.max(1, Math.min(decoys + repeated, 10 - uniq.length));
+  const ds = shuffle(rng, pool).slice(0, need);
+  return { prompt: hintEmoji ? `${hintEmoji}  Spell it!` : `Spell: ${word}`, say: `Spell the word ${word}`, answer: word, sequence: letters, options: shuffle(rng, [...uniq, ...ds]), visual: { type: 'word', text: word.replace(/./g, '_ ').trim(), emoji: hintEmoji }, hint: 'Slice the letters in order', hintIsData: false, listen: word };
+}
+
+/**
+ * Story Sentences: slice the words in order to build a sentence (sequence question with word bubbles).
+ * `show` = the sentence is printed on the card (reading + word order); otherwise only spoken (listen, remember, build).
+ * Reception, Year 1, Year 2.
+ */
+export function sentenceQ(rng: Rng, sentence: string, emoji: string, decoyPool: string[], decoys: number, show: boolean): Question {
+  const words = sentence.split(' ');
+  const bare = (w: string) => w.toLowerCase().replace(/[.!?,]/g, '');
+  const used = new Set(words.map(bare));
+  const ds = shuffle(rng, decoyPool.filter(w => !used.has(bare(w)))).slice(0, Math.min(decoys, 10 - words.length));
+  return { prompt: 'Build the sentence', say: `Build the sentence: ${sentence}`, answer: sentence, sequence: words, options: shuffle(rng, [...words, ...ds]), wide: true,
+    visual: show ? { type: 'sentence', text: sentence } : { type: 'word', text: emoji }, hint: show ? 'Slice the words in order' : 'Listen, then slice the words in order', hintIsData: false,
+    listen: show ? undefined : sentence, peek: !show };
+}
+export type Sent = [string, string];   // [sentence, picture]
+export const sentGen = (banks: Sent[][], decoyPool: string[], decoys: [number, number, number], showUntil: number): Generator => (d, rng) => {
+  const [s, e] = pick(rng, banks[d - 1]);
+  return sentenceQ(rng, s, e, decoyPool, decoys[d - 1], d <= showUntil);
+};
+
+/** Fix the Sentence's punctuation bank — Year 1's capital-letter/full-stop-question-mark-exclamation cards and Year 2's. */
+export const PUNCT_SENTS: [string, string][] = [['I like apples', '.'], ['Where is my hat', '?'], ['What a great day', '!'], ['The dog ran home', '.'], ['Can you jump high', '?'], ['We went to the park', '.'], ['Is it raining', '?'], ['Look at that', '!'], ['My cat is black', '.'], ['How old are you', '?'], ['Stop', '!'], ['Do you like pizza', '?']];

@@ -1,4 +1,5 @@
-import { AVOID, DIGRAPHS, DIGRAPH_WORDS } from '../../../src/curriculum/writing';
+import { AVOID, DIGRAPHS } from '../../../src/curriculum/util';
+import { DIGRAPH_WORDS } from '../../../src/curriculum/year1';
 
 /**
  * Every `y1-digraphs` gap card, rebuilt from the same inputs `y1Digraphs` uses (#445).

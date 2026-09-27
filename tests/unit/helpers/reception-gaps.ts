@@ -1,5 +1,5 @@
-import { AVOID, CVC, finalIsGenuine, gapDecoys, medialIsGenuine, R_LETTERS_ALL, R_LETTERS_P2 }
-  from '../../../src/curriculum/writing';
+import { AVOID, CVC, gapDecoys } from '../../../src/curriculum/util';
+import { finalIsGenuine, medialIsGenuine, R_LETTERS_ALL, R_LETTERS_P2 } from '../../../src/curriculum/reception';
 
 /**
  * Every Reception gap card, rebuilt from the same inputs `rLetterSound` uses (#418 review).
