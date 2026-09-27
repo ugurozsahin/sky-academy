@@ -82,6 +82,14 @@ describe('the shared rail readers cannot go blind (#321)', () => {
       expect(found.map((f) => f.name), `${name} is read by name or excluded by name elsewhere`).toContain(name);
   });
 
+  // #794, the same gap #680 closed for workflowFiles(): the empty fixture proves the throw actually fires
+  // against a real directory with no `.spec.ts` files, not just in prose — deleting the `names.length === 0`
+  // throw left every rail reading `e2eSpecFiles()` green, because nothing ever called it against one.
+  it('e2eSpecFiles(dir) is loud on a real directory with no e2e specs, not just in theory (#794)', () => {
+    const empty = new URL('./helpers/fixtures/no-e2e-specs/', import.meta.url);
+    expect(() => e2eSpecFiles(empty), 'zero .spec.ts files must throw, not return []').toThrow(/pass vacuously/);
+  });
+
   it('code() strips comments and leaves the code, so a comment naming a ban does not trip it', () => {
     const src = 'const a = 1; // shadowBlur\n/* shadowBlur */\nconst b = 2;';
     expect(code(src), 'the comment naming the banned token must be gone').not.toContain('shadowBlur');
