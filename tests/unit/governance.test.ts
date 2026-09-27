@@ -3388,6 +3388,64 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
   });
 });
 
+/**
+ * #625 (#323 item 2): the byte budgets just above measure total size, not shape, so paying for an addition by
+ * compressing a whole new paragraph into one line was rewarded rather than caught — a byte budget cannot tell
+ * a paragraph that wrapped normally from one squeezed onto a single line. Before this rail the longest lines
+ * in the three files ran to 1,036 (CLAUDE.md), 3,960 (docs/ROUTINE-PROMPT.md) and 2,812 chars
+ * (docs/REVIEWER-PROMPT.md) — several paragraphs' worth of prose apiece, each one line as far as a byte count
+ * or an editor's line-wrap is concerned. `docs/decisions/011-instruction-files-are-measured-by-structure.md`
+ * has why a byte budget alone is not enough.
+ *
+ * One longest-line cap per budgeted instruction file, beside its byte budget above, ratcheting DOWN only —
+ * exactly the `play.ts`/`home.ts`/`style.css` "long lines" idiom in `guardrails.test.ts` (#36), which these
+ * three files had no equivalent of. Lower a cap when a long line is split up; never raise one to make a red
+ * build green.
+ *
+ * What this does not catch: a file that grows a second, third or fourth long line under the existing cap —
+ * only the single longest line in each file is measured, so a paragraph merely as long as today's worst one
+ * is invisible to this rail. That is the same gap the byte budgets above already leave for total size, not a
+ * new one this rail introduces.
+ *
+ * Prove it red: join any two adjacent lines in one of the three files with a single space and watch its cap
+ * fail; split them back apart and it passes again.
+ */
+describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md longest-line budgets only ever go down (#625)', () => {
+  const root = new URL('../../', import.meta.url);
+  const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
+  const longestLine = (text: string) => Math.max(...text.split('\n').map((l) => l.length));
+
+  // The three figures below are this PR's own landing lengths, exactly — never raise any of them to make a
+  // red build green.
+  const CLAUDE_MD_LONGEST_LINE = 1_036;
+  const ROUTINE_PROMPT_LONGEST_LINE = 3_960;
+  const REVIEWER_PROMPT_LONGEST_LINE = 2_812;
+
+  it('CLAUDE.md has no line longer than its budget', () => {
+    const text = read('CLAUDE.md');
+    expect(text.length, 'CLAUDE.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
+    const longest = longestLine(text);
+    expect(longest, `CLAUDE.md's longest line grew to ${longest} chars — split the paragraph up, `
+      + 'rather than raising this budget').toBeLessThanOrEqual(CLAUDE_MD_LONGEST_LINE);
+  });
+
+  it('docs/ROUTINE-PROMPT.md has no line longer than its budget', () => {
+    const text = read('docs/ROUTINE-PROMPT.md');
+    expect(text.length, 'docs/ROUTINE-PROMPT.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
+    const longest = longestLine(text);
+    expect(longest, `docs/ROUTINE-PROMPT.md's longest line grew to ${longest} chars — split the paragraph up, `
+      + 'rather than raising this budget').toBeLessThanOrEqual(ROUTINE_PROMPT_LONGEST_LINE);
+  });
+
+  it('docs/REVIEWER-PROMPT.md has no line longer than its budget', () => {
+    const text = read('docs/REVIEWER-PROMPT.md');
+    expect(text.length, 'docs/REVIEWER-PROMPT.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
+    const longest = longestLine(text);
+    expect(longest, `docs/REVIEWER-PROMPT.md's longest line grew to ${longest} chars — split the paragraph up, `
+      + 'rather than raising this budget').toBeLessThanOrEqual(REVIEWER_PROMPT_LONGEST_LINE);
+  });
+});
+
 
 /**
  * docs/decisions/003-two-routines.md — one routine develops, another reviews (owner, in session, 2026-09-19).
