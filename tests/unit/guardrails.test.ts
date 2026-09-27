@@ -748,9 +748,9 @@ describe('guard rails', () => {
     expect(SOURCES['/src/curriculum/index.ts'], 'yearById was unused').not.toContain('yearById');
     expect(code(SOURCES['/src/ui/dom.ts']), 'dom.wait was unused').not.toMatch(/export\s+(?:const|function)\s+wait\b/);
     expect(code(SOURCES['/src/storage.ts']), 'SaveData.totalSlices was never read').not.toContain('totalSlices');
-    const arena = code(SOURCES['/src/game/arena.ts']);
-    const from = arena.indexOf('interface Bubble');
-    const iface = arena.slice(from, arena.indexOf('}', from));
+    const bubbles = code(SOURCES['/src/game/bubbles.ts']);   // #559: Bubble moved out of arena.ts
+    const from = bubbles.indexOf('interface Bubble');
+    const iface = bubbles.slice(from, bubbles.indexOf('}', from));
     expect(iface, 'Bubble.scale was always 1').not.toContain('scale');
   });
 
@@ -1310,24 +1310,30 @@ describe('guard rails', () => {
   });
 
   it('the wave layout draws only from the rng it is given (#43)', () => {
-    const src = code(SOURCES['/src/game/arena.ts'] ?? '');
-    expect(src.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
+    // #559 split layoutWave's/dealOrdered's own definitions out of arena.ts into bubbles.ts; the one call
+    // site (Arena's spawnWave) stayed behind, so the two halves of this rail now read two files.
+    const bubbles = code(SOURCES['/src/game/bubbles.ts'] ?? '');
+    expect(bubbles.length, 'bubbles.ts must be read, not a blank import').toBeGreaterThan(1000);
     for (const fn of ['layoutWave', 'dealOrdered']) {
-      const start = src.indexOf(`export function ${fn}(`);
+      const start = bubbles.indexOf(`export function ${fn}(`);
       expect(start, `${fn} must stay an exported, unit-testable function`).toBeGreaterThan(-1);
-      const next = src.indexOf('\nexport ', start + 1);
-      const body = src.slice(start, next === -1 ? src.length : next);
+      const next = bubbles.indexOf('\nexport ', start + 1);
+      const body = bubbles.slice(start, next === -1 ? bubbles.length : next);
       expect(body, `${fn} must take its randomness as an argument`).toContain('rng: Rng');
       expect(body, `${fn} must draw from rng(), never Math.random — a hidden draw cannot be seeded`).not.toContain('Math.random');
     }
-    // the seam only pays if the game still goes through it: one definition, one call, and spawnWave
-    // hands over the real clock and the real RNG rather than layoutWave reaching for them itself.
-    expect(src.split('layoutWave(').length - 1, 'layoutWave has one call site: spawnWave').toBe(2);
+    // the seam only pays if the game still goes through it: one definition, never calling itself…
+    expect(bubbles.split('layoutWave(').length - 1, 'layoutWave is defined once and does not recurse').toBe(1);
+    const arena = code(SOURCES['/src/game/arena.ts'] ?? '');
+    expect(arena.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
+    // …and one call, from spawnWave, which hands over the real clock and the real RNG rather than
+    // layoutWave reaching for them itself.
+    expect(arena.split('layoutWave(').length - 1, 'layoutWave has one call site: spawnWave').toBe(1);
     // #389 widened the last of these rather than weakening it: spawnWave now hands over the caller's draw and
     // clock origin when a duel gives it one (both halves must pose the same wave), and its own otherwise. The
     // claim is unchanged — layoutWave never reaches for a clock or a global RNG itself — so this pins both
     // arms, where it used to pin the one that existed. The `??` spelling is what keeps ordinary play impure.
-    expect(src, 'spawnWave passes the speed multiplier, the clock and the RNG in')
+    expect(arena, 'spawnWave passes the speed multiplier, the clock and the RNG in')
       .toContain('gameSpeed(), shared?.now ?? performance.now(), shared?.rng ?? Math.random');
   });
 
@@ -1668,10 +1674,10 @@ describe('guard rails', () => {
   });
 
   it('fast mode compresses time only — the drift scales with it and no beat is left in real time (#138)', () => {
-    const arena = code(SOURCES['/src/game/arena.ts'] ?? '');
-    expect(arena.length, 'arena.ts must be read, not a blank import').toBeGreaterThan(1000);
+    const bubbles = code(SOURCES['/src/game/bubbles.ts'] ?? '');   // #559: layoutWave moved out of arena.ts
+    expect(bubbles.length, 'bubbles.ts must be read, not a blank import').toBeGreaterThan(1000);
     // the one place a horizontal velocity is handed to a bubble: it must carry the speed multiplier
-    const vx = /const vx = ([^;]+);/.exec(arena)?.[1];
+    const vx = /const vx = ([^;]+);/.exec(bubbles)?.[1];
     expect(vx, 'layoutWave must still compute a vx').toBeTruthy();
     expect(vx, 'vx is px/second, so it scales with the speed multiplier or the arc is not the real one (#138)')
       .toContain('speedK');
@@ -3154,9 +3160,18 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // (e) The ratchet (epic #713 decision 3): the game's largest files, at their length the day this landed, and
   // none may grow. A budget rail — a number here only ever goes DOWN (`.claude/rules/guardrails.md`). Every
   // `src/` file of 300 lines or more on 2026-09-25, counted as `wc -l` counts, newlines.
+  //
+  // #559 split `src/game/arena.ts` into `arena.ts` (the `Arena` class, the one public seam) plus
+  // `bubbles.ts`, `slicing.ts` and `particles.ts` (the data model, the pure layout/collision/label-fit maths
+  // and the effects tables). `readFileSync` throws if a path here moves, but not if a path simply shrinks —
+  // PR #828's review found exactly that on this same table for `src/style.css` (#558): a cap left at the
+  // pre-split size reads the new, smaller file and can never fail again, budgeting nothing. So `arena.ts`'s
+  // own cap is lowered to its real post-split size rather than left at 1102, and `bubbles.ts` — the one new
+  // file at or past the 300-line bar this table is scoped to — joins it rather than going unbudgeted;
+  // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
-    'src/style.css': 1878, 'src/storage.ts': 1511, 'src/game/arena.ts': 1102, 'src/curriculum/year2.ts': 799,
-    'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 508, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
+    'src/style.css': 1878, 'src/storage.ts': 1511, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
+    'src/curriculum/year2.ts': 799, 'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 508, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
     'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 365, 'src/ui/certificate.ts': 341, 'src/audio.ts': 311,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
