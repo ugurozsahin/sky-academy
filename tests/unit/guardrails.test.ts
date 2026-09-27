@@ -3397,16 +3397,20 @@ describe('every registered topic stays silent on wordQ\'s #515 collision warning
   const DRAWS_PER_SEED = 100;
   const DIFFICULTIES: Difficulty[] = [1, 2, 3];
 
+  // #812: seeded by the topic's own index rather than `topic.id.length` — up to 17 topics share an
+  // `id.length` (every 8-character id, say), which had them all draw from the same 5 raw seed values rather
+  // than 5 independently-chosen streams per topic. The index is unique per topic by construction. Shared with
+  // the regression test below it, rather than inlined in the draw loop only, so a reversion back to
+  // `topic.id.length` shows up there too instead of only in a loop no assertion reads the seed of.
+  const seedFor = (topicIndex: number, d: Difficulty, seed: number): number => topicIndex * 100000 + d * 1000 + seed;
+
   it('draws every topic at every difficulty over five seeds with zero wordQ warnings', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      // #812: seeded by the topic's own index rather than `topic.id.length` — up to 17 topics share an
-      // `id.length` (every 8-character id, say), which had them all draw from the same 5 raw seed values
-      // rather than 5 independently-chosen streams per topic. The index is unique per topic by construction.
       for (const [i, topic] of TOPICS.entries()) {
         for (const d of DIFFICULTIES) {
           for (const seed of SEEDS) {
-            const r = rng(i * 100000 + d * 1000 + seed);
+            const r = rng(seedFor(i, d, seed));
             for (let draw = 0; draw < DRAWS_PER_SEED; draw++) topic.gen(d, r);
           }
         }
@@ -3418,6 +3422,20 @@ describe('every registered topic stays silent on wordQ\'s #515 collision warning
       // assertion) can't leave `console.warn` mocked as a no-op for the rest of this file's run.
       warn.mockRestore();
     }
+  });
+
+  // #812 (pr-test-analyzer review): the id.length-keyed seed this replaced was a real collision, not a
+  // hypothetical one — the live registry has several groups of topics sharing an id.length (15 share
+  // length 11 today). Proves the replacement directly against that registry rather than a fake: two topics
+  // whose ids happen to be the same length must still get different seeds at the same (difficulty, seed).
+  it('topics sharing an id.length still draw from independent seed streams (#812)', () => {
+    const byLen = new Map<number, number[]>();
+    TOPICS.forEach((t, i) => byLen.set(t.id.length, [...(byLen.get(t.id.length) ?? []), i]));
+    const colliding = [...byLen.values()].find((idxs) => idxs.length > 1);
+    expect(colliding, 'expected the registry to contain an id.length shared by 2+ topics — if this ever stops '
+      + 'holding, the bug this test regresses has nothing left to prove itself against').toBeDefined();
+    const seedsAtDifficulty1Seed1 = colliding!.map((i) => seedFor(i, 1, 1));
+    expect(new Set(seedsAtDifficulty1Seed1).size, 'same-length-id topics must not share a seed').toBe(seedsAtDifficulty1Seed1.length);
   });
 
   // #812: guards the "kept local rather than shared" decision above — without this, the mulberry32 body here
