@@ -561,11 +561,28 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     // And collection-time safety, not just the assertion above: walking the same fixture must not throw.
     expect(() => runsPlaywright(scratch, 'oops')).not.toThrow();
   });
+  // pr-test-analyzer review of this fix: a dangling reference must not silently hide a real path to
+  // `playwright test` sitting right beside it in the same script's command — `.some()` tries every reference in
+  // order, and the old `throw` would have crashed collection before ever reaching the real one.
+  it('a dangling reference beside a real path to playwright test in the same script does not hide it (#806 review)', () => {
+    const scratch = { ...pkgScripts, mixed: 'npm run this-script-does-not-exist; npm run test:e2e' };
+    expect(runsPlaywright(scratch, 'mixed'), 'the dangling reference tried first must not stop the real one after it from being found').toBe(true);
+  });
   it('a sibling script that only shares a recognised command\'s name as a prefix is not falsely recognised (#806)', () => {
     const scratch = { ...pkgScripts, 'test:e2e:report': 'node scripts/e2e-report.mjs' };
     expect(runsPlaywright(scratch, 'test:e2e:report'), 'this script never runs playwright itself').toBe(false);
     expect(browserCommandRegex(scratch).test('npm run test:e2e:report'),
       'the recognised "npm run test:e2e" must not substring-match inside this unrelated, longer sibling name').toBe(false);
+  });
+  // pr-test-analyzer review of this fix: the harder, more diagnostic case — a sibling that DOES run playwright
+  // itself must be recognised via its OWN longer alternative, not merely happen to `.test()` true because a
+  // shorter alternative substring-matches into it for the wrong reason (which a regression dropping the
+  // lookahead would still pass, undetected, if this were the only case checked).
+  it('a sibling that also runs playwright matches via its own longer alternative, not by a shorter one substring-matching into it (#806 review)', () => {
+    const scratch = { ...pkgScripts, 'test:e2e:report': 'playwright test --reporter=json' };
+    expect(runsPlaywright(scratch, 'test:e2e:report'), 'this sibling does run playwright, under its own name').toBe(true);
+    const match = browserCommandRegex(scratch).exec('before npm run test:e2e:report after')?.[0];
+    expect(match, 'must match the whole longer alternative, never stop at the shorter "npm run test:e2e" prefix').toBe('npm run test:e2e:report');
   });
 
   it("the browser-command regex derives its spellings from package.json, not a hand-enumerated list (#762)", () => {
