@@ -520,27 +520,53 @@ describe('the browser runs after the agents, not before them (#499)', () => {
    * test:all` reaches `playwright test` only via `npm run test:e2e`), so a fifth spelling is recognised the
    * moment the script exists rather than needing a fourth manual entry.
    */
+  const nestedRefs = (cmd: string): string[] => [...cmd.matchAll(/npm run ([\w:.-]+)/g)].map(([, ref]) => ref);
   const runsPlaywright = (scripts: Record<string, string>, name: string, seen = new Set<string>()): boolean => {
     if (seen.has(name)) return false;
     seen.add(name);
     const cmd = scripts[name];
-    // A `npm run <ref>` naming a script that does not exist is a dangling reference, never an ordinary
-    // script this walk simply hasn't reached — the only names checked from outside are real keys of
-    // `scripts` (`Object.keys`), so `undefined` here can only come from a stale/renamed reference inside
-    // some other script's own command. Silently returning `false` would let a real path to `playwright test`
-    // go unrecognised with nothing red to catch it — exactly the class #762 exists to close, just moved from
-    // a missing regex alternative to a broken reference.
-    if (cmd === undefined) throw new Error(`no such script "${name}" in package.json — a dangling "npm run ${name}" reference`);
+    // #806: a dangling reference used to throw here, at collection time (this is called while `describe`'s own
+    // callback runs, before any `it()` body) — a stale reference in a script wholly unrelated to #762 would
+    // crash this file's ENTIRE collection, not fail one clearly-labelled assertion. The dedicated `it()` below
+    // asserts there are none, by name, so the same defect is now a scoped, actionable test failure instead.
+    // Returning `false` here just means this path recurses no further — the same as any name with no route to
+    // `playwright test`.
+    if (cmd === undefined) return false;
     if (cmd.includes('playwright test')) return true;
-    return [...cmd.matchAll(/npm run ([\w:.-]+)/g)].some(([, ref]) => runsPlaywright(scripts, ref, seen));
+    return nestedRefs(cmd).some((ref) => runsPlaywright(scripts, ref, seen));
   };
+  // #806: no anchors meant a shorter recognised alternative could substring-match inside a longer, unrelated
+  // sibling name — `[\w:]` after each alternative is this project's own namespacing convention (colon-joined
+  // segments; no script here uses `.`/`-` inside its name), so a match can no longer be immediately followed
+  // by another name character.
   const browserCommandRegex = (scripts: Record<string, string>) => new RegExp(
     ['playwright test', ...Object.keys(scripts).filter((name) => runsPlaywright(scripts, name)).map((name) => `npm run ${name}`)]
       .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .map((s) => `${s}(?![\\w:])`)
       .join('|'),
   );
   const pkgScripts = (JSON.parse(doc('package.json')) as { scripts: Record<string, string> }).scripts;
   const BROWSER_COMMAND_REGEX = browserCommandRegex(pkgScripts);
+
+  it('every npm run <name> reference inside a script points at a script package.json actually defines (#806)', () => {
+    const dangling = Object.entries(pkgScripts).flatMap(([from, cmd]) =>
+      nestedRefs(cmd).filter((ref) => !(ref in pkgScripts)).map((ref) => `${from} -> npm run ${ref}`));
+    expect(dangling, 'a dangling internal reference would make a real path to playwright test go unrecognised, silently (#762)').toEqual([]);
+  });
+  it('the dangling-reference check above would actually catch one, proved on a fixture rather than only asserted (#806)', () => {
+    const scratch = { ...pkgScripts, oops: 'npm run this-script-does-not-exist' };
+    const dangling = Object.entries(scratch).flatMap(([from, cmd]) =>
+      nestedRefs(cmd).filter((ref) => !(ref in scratch)).map((ref) => `${from} -> npm run ${ref}`));
+    expect(dangling).toEqual(['oops -> npm run this-script-does-not-exist']);
+    // And collection-time safety, not just the assertion above: walking the same fixture must not throw.
+    expect(() => runsPlaywright(scratch, 'oops')).not.toThrow();
+  });
+  it('a sibling script that only shares a recognised command\'s name as a prefix is not falsely recognised (#806)', () => {
+    const scratch = { ...pkgScripts, 'test:e2e:report': 'node scripts/e2e-report.mjs' };
+    expect(runsPlaywright(scratch, 'test:e2e:report'), 'this script never runs playwright itself').toBe(false);
+    expect(browserCommandRegex(scratch).test('npm run test:e2e:report'),
+      'the recognised "npm run test:e2e" must not substring-match inside this unrelated, longer sibling name').toBe(false);
+  });
 
   it("the browser-command regex derives its spellings from package.json, not a hand-enumerated list (#762)", () => {
     // Every script package.json actually runs playwright test through today is recognised under its own
