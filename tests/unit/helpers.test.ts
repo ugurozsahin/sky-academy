@@ -89,4 +89,25 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     expect(code(src)).toContain('const b = 2;');
     expect(code('ctx.shadowBlur = 4;'), 'a real use is not a comment and must stay readable').toContain('shadowBlur');
   });
+
+  // #775/#780: a `/*` inside a regex literal is not a real comment open. The old textual scan read it as one
+  // and erased everything up to the *next* literal `*/` — here, a real import and a real trailing comment.
+  it('code() does not read a regex literal\'s own /* as opening a real comment (#775/#780)', () => {
+    const src = "const r = /a\\/*/; import { $ } from '../ui/dom'; /** trailing */";
+    const out = code(src);
+    expect(out, "the regex literal itself must survive untouched").toContain('/a\\/*/');
+    expect(out, 'the real import sitting after the regex literal must not be erased').toContain("import { $ } from '../ui/dom';");
+    expect(out, 'the real trailing comment must still be stripped').not.toContain('trailing');
+  });
+
+  // The fix must not start reading division as a regex literal, nor lose a `/` inside a path string to a
+  // bogus regex-literal scan that then swallows part of a real comment sitting later on the same line.
+  it('code() still tells a regex literal apart from division, and from a `/` inside a string (#775/#780)', () => {
+    expect(code('const x = width / 2;'), 'division must stay division, not a regex literal').toBe('const x = width / 2;');
+    expect(code("str.replace(/foo/g, 'bar');"), 'a real regex literal must survive untouched')
+      .toBe("str.replace(/foo/g, 'bar');");
+    const src = "import { gentleRelaunchSet } from './gentleRelaunch';   // #742: real comment\n";
+    expect(code(src), "a `/` inside the import path must not eat part of the trailing // comment")
+      .not.toContain('#742');
+  });
 });

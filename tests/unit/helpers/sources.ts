@@ -52,4 +52,62 @@ export const inDir = (dir: string): [string, string][] => {
 // Comments may name the very thing a rail bans, so rails strip them first. Crude on purpose: a `//` inside
 // a string literal would blank the rest of that line — no such line exists in src/, and a rail that reads
 // slightly less is safer than one that goes red on prose.
-export const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ' ');
+//
+// One thing it does track: a `/` that opens a regex literal is never read as opening a comment (#775/#780).
+// A textual `/\*...\*\// ` scan has no notion of a regex literal, so `/a\/*/` — a real regex, `/a\//` with a
+// `*` quantifier trailing it — reads as `/*` opening a comment that only closes at the *next* literal `*/`
+// anywhere later in the file, silently erasing everything between, imports included. The fix stays a single
+// character scan, not a real parser: a `/` is read as a regex literal's own opening delimiter, not a
+// division, when the last significant (non-whitespace) character before it isn't the kind of character a
+// value ends in — an identifier/number character or a closing `)`/`]` — the standard heuristic. A regex body
+// then runs to its own closing `/` (honouring a `[...]` character class, where an unescaped `/` doesn't end
+// it), never past a semicolon, a quote or a line end: those can only mean this wasn't a regex literal after
+// all — a `/` inside a string such as `'./gentleRelaunch'` — so the scan gives up and leaves the `/` as an
+// ordinary character rather than risk swallowing a real comment sitting further along the same line.
+export const code = (src: string): string => {
+  let out = '';
+  let prevSignificant = '';
+  const endsAValue = /[\w$)\]]/;
+  for (let i = 0; i < src.length; ) {
+    const ch = src[i];
+    const next = src[i + 1];
+    if (ch === '/' && next === '/') {
+      while (i < src.length && src[i] !== '\n') i++;
+      out += ' ';
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      i = Math.min(i + 2, src.length);
+      out += ' ';
+      continue;
+    }
+    if (ch === '/' && !endsAValue.test(prevSignificant)) {
+      let j = i + 1;
+      let inClass = false;
+      let closed = false;
+      let abandoned = false;
+      while (j < src.length) {
+        const c = src[j];
+        if (c === '\\') { j += 2; continue; }
+        if (c === '\n' || c === ';' || c === "'" || c === '"' || c === '`') { abandoned = true; break; }
+        if (c === '[') inClass = true;
+        else if (c === ']') inClass = false;
+        else if (c === '/' && !inClass) { closed = true; j++; break; }
+        j++;
+      }
+      if (closed && !abandoned) {
+        while (j < src.length && /[a-z]/i.test(src[j])) j++;
+        out += src.slice(i, j);
+        prevSignificant = '/';
+        i = j;
+        continue;
+      }
+    }
+    out += ch;
+    if (!/\s/.test(ch)) prevSignificant = ch;
+    i++;
+  }
+  return out;
+};
