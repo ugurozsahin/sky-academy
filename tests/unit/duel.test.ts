@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Duel, DUEL_ROUNDS, duelEarnsCertificate, duelStars, seededRng } from '../../src/game/duel';
-import { layoutWave } from '../../src/game/arena';
+import { layoutWave, type WaveOpts } from '../../src/game/arena';
 import { topicById } from '../../src/curriculum';
 import { hintText, promptHTML, promptMode } from '../../src/ui/hud';
 import { esc } from '../../src/ui/dom';
@@ -815,15 +815,19 @@ describe('duelStars (#16 item 5: what a duel certificate may claim)', () => {
  * at a different moment on each side, so the match was decided by whichever shuffle dealt it early rather
  * than by who was quicker. `src/ui/duel.ts` spawned each arena from `Math.random` and its own
  * `performance.now()`, and `layoutWave` draws the launch order, the arcs, the colours and the wobble from
- * that rng — the launch order being the one that decides matches. At speed 1 a slot is 420 ms and a whole
- * batch is over four seconds.
+ * that rng — the launch order being the one that decides matches. At speed 1 a slot is 420 ms, and a
+ * four-option duel wave is one batch on either half's real geometry, so the worst-case head start is the last
+ * of the four slots: 1.26 s (#400 — the "over four seconds" this comment used to claim was a fixture that did
+ * not match the screen, not the production geometry below).
  *
  * These test the production seam, not a restatement of `layoutWave`'s purity (`arena.test.ts` has that): the
  * real exported `seededRng`, one generator per half off one round seed, exactly as the screen builds them.
  */
 describe('a duel lays both halves out from one draw (#389)', () => {
-  const HALF = { W: 195, H: 760, topInset: 8 };       // one side of a 390-wide phone split down the middle
-  const OPTS = { speed: 1, labels: ['12', '9', '14', '11'] } as never;
+  // One player's half, portrait (#388's stacked fallback, the mobile e2e project's own viewport): 390 wide,
+  // topInset 8, `--arena-w`/grid rows leave 317.5 tall (measured on the running game, #400).
+  const HALF = { W: 390, H: 317.5, topInset: 8 };
+  const OPTS = { speed: 1, labels: ['12', '9', '14', '11'] } as WaveOpts;
   const answer = (p: ReturnType<typeof layoutWave>) => p.bubbles.findIndex(b => b.label === '12');
 
   it('two generators off one seed deal the identical wave, launch order included', () => {
@@ -847,7 +851,9 @@ describe('a duel lays both halves out from one draw (#389)', () => {
   it('the plan is shared only while the geometry is — a half a different size is a different wave', () => {
     const a = layoutWave(OPTS, HALF, 1, 1000, seededRng(7));
     const b = layoutWave(OPTS, { ...HALF, H: HALF.H - 40 }, 1, 1000, seededRng(7));
-    expect(b, 'which is what the rail on both halves topInset and canvas size is for').not.toEqual(a);
+    // Nothing in source pins the two halves' W/H/topInset equal — that is `tests/e2e/duel.spec.ts`'s job
+    // (#400); this only pins that `layoutWave` itself would notice if they ever drifted apart.
+    expect(b, 'a half a different size is a different wave').not.toEqual(a);
   });
 
   it('and `now` has to be shared too: the same seed a millisecond apart is a different timetable', () => {

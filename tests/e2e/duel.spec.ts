@@ -117,10 +117,10 @@ async function winRound(page: Page, p: 'a' | 'b') {
 test.describe('Ninja Duel', () => {
   /**
    * guard rail (#389), found in play by the owner and his child. Each arena used to lay its own wave out from
-   * `Math.random` and its own `performance.now()`, so the answer took a different slot in each side's launch
-   * queue: at speed 1 one slot is 420 ms and a whole batch is over four seconds, and a four-option question
-   * on a half-width arena batches at three — so the answer landing in batch 0 for one player and batch 1 for
-   * the other was an ordinary draw. The match measured the shuffle rather than who was quicker.
+   * `Math.random` and its own `performance.now()`, so the answer took a different launch slot on each side: a
+   * four-option duel wave is one batch (#400 — `perBatch` covers all four options on both halves' geometry),
+   * so the difference was up to the last of the four slots, 1.26 s at speed 1 — decisive for a five-year-old,
+   * and the match measured the shuffle rather than who was quicker.
    *
    * Every field compared here is fixed at spawn. `x`, `y` and `wobble` are deliberately not: all three are
    * advanced every frame (`arena.ts` — `b.x += b.vx * dt`, `b.wobble += dt * 3`), and the two arenas run
@@ -128,24 +128,50 @@ test.describe('Ninja Duel', () => {
    * project caught exactly that on `wobble`, drifting by 0.0024 rad between the halves while the seeded
    * draw behind it was identical. `vx` and `g` carry the arc instead, and the *initial* wobble is held by
    * the deep-equality check in `tests/unit/duel.test.ts`, where no clock is running.
+   * ("Fixed at spawn" is a claim about `layoutWave`'s plan, not a guarantee every field here can never move:
+   * `vx` is nudged by collision resolution and `launchAt` by `rush()`. Neither is reachable at the moment this
+   * captures — no bubble has landed and no slice has happened yet — so it holds here; `retries: 0` (#32) means
+   * a future case that captures later would need to re-check it rather than lean on this comment.)
+   *
+   * #400: the source rail this behavioural rail backs up pins the spawn statement's spelling, so a constant
+   * seed or a draw hoisted out of the per-round closure survives it (both reproduced against `3ec1a01`,
+   * `docs`/the issue has the transcripts). Neither re-spelling can survive comparing round 2's wave against
+   * round 1's: a constant seed still redraws a fresh `now` every round (`performance.now()` moves on), and a
+   * hoisted draw freezes `now` at the match's start, so by round 2 every `launchAt` is already in the past —
+   * both leave round 2 with an absolute launch timetable that is NOT round 1's, which is what the second half
+   * of this test asserts, indifferent to how the statement drawing them is spelled.
    */
-  test('guard rail: the two halves pose the identical wave — same order, same moments, same arcs (#389)', async ({ page }) => {
+  test('guard rail: the two halves pose the identical wave — same order, same moments, same arcs, fresh each round (#389/#400)', async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
     await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
     // Read off `arenas`, already on the hooks contract, rather than `bubbles()`: that one reports only the
     // bubbles in flight *now* and drops every field fixed at spawn, which is exactly what has to be compared.
-    const wave = await page.evaluate(() => {
+    const captureWave = () => page.evaluate(() => {
       const spawned = (p: 'a' | 'b') => window.__sna.arenas[p].bubbles.map(b =>
         ({ label: b.label, launchAt: b.launchAt, r: b.r, vx: b.vx, g: b.g, color: b.color }));
       return { a: spawned('a'), b: spawned('b'), answer: window.__sna.state().answer };
     });
-    expect(wave.a.length, 'a real wave was captured, so the comparison below is not two empty lists').toBeGreaterThan(1);
-    expect(wave.b, 'both halves are dealt from one seed and one clock origin').toEqual(wave.a);
+    const round1 = await captureWave();
+    expect(round1.a.length, 'a real wave was captured, so the comparison below is not two empty lists').toBeGreaterThan(1);
+    expect(round1.b, 'both halves are dealt from one seed and one clock origin').toEqual(round1.a);
     // Named on its own: the launch timetable is the half of it the children actually felt.
-    expect(wave.b.map(b => [b.label, b.launchAt]), 'the answer rises at the same moment on both sides')
-      .toEqual(wave.a.map(b => [b.label, b.launchAt]));
-    expect(wave.a.map(b => b.label), 'and the answer is in the wave, so the rows above are not agreeing about its absence')
-      .toContain(wave.answer);
+    expect(round1.b.map(b => [b.label, b.launchAt]), 'the answer rises at the same moment on both sides')
+      .toEqual(round1.a.map(b => [b.label, b.launchAt]));
+    expect(round1.a.map(b => b.label), 'and the answer is in the wave, so the rows above are not agreeing about its absence')
+      .toContain(round1.answer);
+    // Win round 1 and let round 2's wave spawn, then run the same shared-halves check again — and check it
+    // against round 1's own timetable. A re-spelling of the spawn statement that still passes the source
+    // rail (a constant seed, or the draw hoisted out of the per-round closure) leaves the two halves matching
+    // EACH OTHER here too, which is why a source-only rail cannot tell the difference; only round 2 disagreeing
+    // with round 1 does.
+    await winRound(page, 'a');
+    await page.waitForFunction(() => window.__sna.state().round === 2);
+    await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
+    const round2 = await captureWave();
+    expect(round2.b, 'round 2 is shared between the halves too').toEqual(round2.a);
+    expect(round2.a.map(b => b.launchAt),
+      'round 2 draws its own seed and clock origin — a constant seed or a hoisted draw would repeat round 1\'s launch timetable exactly (#400)')
+      .not.toEqual(round1.a.map(b => b.launchAt));
   });
 
   test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', async ({ page }) => {

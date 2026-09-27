@@ -1161,9 +1161,23 @@ describe('guard rails', () => {
    * up. The plausible edits are all small: dropping `now` back to each arena's own clock, hoisting one
    * generator out of the loop (stateful, so the second half gets the first's leftovers), or letting the two
    * halves' geometry drift, which is what `layoutWave` reads.
+   *
+   * #400 — two further edits survived this rail as first written: a CONSTANT seed (`const seed = 1234, at =
+   * performance.now();` — the old regex allowed anything between `const seed =` and `performance.now()`, a
+   * literal included), and the whole statement HOISTED out of `onQuestion` to run once per match instead of
+   * once per round (`lastIndexOf` searched the entire file backward with no floor, so a seed drawn anywhere
+   * above the loop satisfied it). Neither is caught here without a behavioural check too — `tests/e2e/duel.spec.ts`'s
+   * "fresh each round" case is that check, comparing round 2's timetable against round 1's — but both are worth
+   * closing at the cheap layer as well, so the mistake is red on `npm test` and not only on the slower e2e.
    */
-  it('the duel spawns both halves from one draw, one clock origin and equal geometry (#389)', () => {
-    const duel = code(SOURCES['/src/ui/duel.ts']);
+  it('the duel spawns both halves from one draw, one clock origin and equal geometry (#389/#400)', () => {
+    // #400: the anti-vacuity convention the #425 rail below this one uses (`?? ''` plus a length assertion) —
+    // a bare `SOURCES[...]` read here would pass vacuously on a blank import, matching nothing.
+    const duelSrc = SOURCES['/src/ui/duel.ts'] ?? '';
+    expect(duelSrc.length, 'duel.ts must be read, not a blank import').toBeGreaterThan(1000);
+    const duel = code(duelSrc);
+    const handlerFrom = duel.indexOf('onQuestion(q, info) {');
+    expect({ handler: handlerFrom >= 0 }).toEqual({ handler: true });
     const from = duel.indexOf('for (const p of PLAYERS) { arenas[p].topInset');
     expect({ loop: from >= 0 }).toEqual({ loop: true });
     const spawn = duel.slice(from, duel.indexOf('\n', from));
@@ -1175,8 +1189,15 @@ describe('guard rails', () => {
     expect(spawn, 'and the same topInset, in the same statement').toMatch(/arenas\[p\]\.topInset = 8;/);
     // The seed and the clock origin are drawn once, above the loop. Inside it they would be per-arena again,
     // which is exactly the defect: `performance.now()` moves between the two calls.
-    const draw = duel.slice(duel.lastIndexOf('const seed', from), from);
+    const seedAt = duel.lastIndexOf('const seed', from);
+    // #400: bounded to `onQuestion`'s own body, not the whole file above the loop — the search that let a
+    // draw hoisted out to `duelScreen`'s own body (run once per match) still count as "before either half".
+    expect(seedAt, 'the seed and clock origin are drawn inside onQuestion, once per round — not hoisted above it').toBeGreaterThan(handlerFrom);
+    const draw = duel.slice(seedAt, from);
     expect(draw, 'one seed and one `now` for the round, drawn before either half').toMatch(/const seed = .*performance\.now\(\)/);
+    // #400: the old regex above only required `performance.now()` to appear somewhere after `const seed =`,
+    // so a constant replacing the draw itself (`const seed = 1234, at = performance.now();`) still matched.
+    expect(draw, 'the seed itself is a fresh draw, not a constant — Math.random has to appear too').toMatch(/Math\.random/);
     expect(spawn, 'so neither of them is re-drawn per arena').not.toMatch(/performance\.now\(\)|Math\.random/);
     // And the seam they ride: `spawnWave`'s shared draw is optional, so every wave outside the duel keeps
     // `Math.random` and the live clock — a seeded arena in ordinary play would repeat itself (#389).

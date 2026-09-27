@@ -124,13 +124,13 @@ export class Arena {
   radius(wide: boolean) { return bubbleRadius(this.W, this.H, wide); }
 
   /**
-   * `shared` is how two arenas put up **the same wave** — the Ninja Duel's two halves (#389). Both of
+   * `shared` is how two arenas put up **the same wave** — the Ninja Duel's two halves (#389). Two of
    * `layoutWave`'s impure inputs have to come from the caller for that, not just the draw: the two calls run
    * in one loop but `performance.now()` still moves between them, and `now` is the origin every `launchAt` is
    * measured from. Each caller passes its *own* generator off one seed rather than one shared generator —
    * an `Rng` is stateful, so a single instance handed to both calls would deal the second arena the first's
-   * leftovers, which is the bug with extra steps.
-   *
+   * leftovers, which is the bug with extra steps. `gameSpeed()` is a *third* impure input, read fresh below
+   * for each call — safe only because both calls sit in the caller's one synchronous loop (#400).
    * Left out, every wave outside the duel keeps `Math.random` and the live clock: a seeded arena in ordinary
    * play would put the same wave up twice (#389's "deliberately does not do").
    */
