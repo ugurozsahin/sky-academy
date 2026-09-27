@@ -162,7 +162,9 @@ const collectSpans = (node: ts.Node, sourceFile: ts.SourceFile, src: string, int
 // this is reachable only if a future edit to `collectSpans` breaks that guarantee, and a broken guarantee
 // must corrupt loudly (`stripTrivia(src, from, to)` with `from > to` would otherwise silently return `''`,
 // dropping or re-emitting source text with no error) rather than the way #816 already treats an unterminated
-// comment. Exported for that one test; no other caller needs it.
+// comment. Exported for that one test; no other caller needs it — `spans` must already be left-to-right
+// and non-overlapping (`collectSpans`'s own contract), and the guard below is what enforces that on a
+// caller's behalf rather than trusting it silently.
 export const assemble = (src: string, spans: Span[]): string => {
   let out = '';
   let pos = 0;
