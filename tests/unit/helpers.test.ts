@@ -247,6 +247,29 @@ describe('the shared rail readers cannot go blind (#321)', () => {
       .toBe('const a = 1;   const b = 2;');
   });
 
+  // pr-test-analyzer review of #827: an unterminated string, regex or template literal is a different failure
+  // mode from the #816 case above — the real TypeScript parser recovers from each with a token, never a
+  // trivia gap, so `stripTrivia`'s own unterminated-`/*` throw never engages, and this reader is silent either
+  // way. No real src/*.ts file can hit any of the three (tsc rejects all of them, the same reason #816's own
+  // throw is unreachable from real source), so the bar here is only "does not corrupt output", not "throws" —
+  // and it does not: an unterminated string or regex recovers to end-of-line, so a real comment further down
+  // the file is still found and stripped past it; an unterminated template literal recovers to end-of-*file*
+  // (a template literal can hold a real newline), so nothing after it — including a real trailing comment —
+  // is reachable at all, and it survives unstripped. A false negative either way, the same safe direction
+  // #816's own backslash-run edge already takes, never a false positive that drops real code.
+  it('code() does not corrupt output on an unterminated string, regex or template literal (#827)', () => {
+    const trailing = 'const b = 1; // real trailing\n';
+    expect(code(`const a = 'never closed /* not a real comment */\n${trailing}`),
+      'an unterminated string recovers to end-of-line, so the real trailing comment past it is still stripped')
+      .not.toContain('real trailing');
+    expect(code(`const a = /never closed /* not a real comment */\n${trailing}`),
+      'an unterminated regex recovers to end-of-line too, so the real trailing comment is still stripped')
+      .not.toContain('real trailing');
+    expect(code(`const a = \`never closed /* not a real comment */\n${trailing}`),
+      'an unterminated template recovers only at EOF, so nothing past it — the real comment included — is reachable')
+      .toContain('real trailing');
+  });
+
   // #827: a /*-shaped substring sitting inside an ordinary string literal is not a real comment open, but the
   // scan above has no notion of string boundaries — it only ever tracks escape pairs and regex-adjacent
   // slashes, never a quote. `tests/unit/governance.test.ts` itself has exactly this shape in a plain string:
