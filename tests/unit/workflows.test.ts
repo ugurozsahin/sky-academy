@@ -275,6 +275,17 @@ describe('every workflow file that installs Playwright browsers drops the Google
       .every((install) => allIndicesOf(twoJobs, 'sources.list.d/google-chrome').some((drop) => drop < install));
     expect(singleDropReusedWouldWronglyPass, 'the fixture must actually exercise the gap the cursor logic closes')
       .toBe(true);
+
+    // silent-failure-hunter review of this PR: the red assertion above alone can't tell "correctly caught job
+    // b" apart from "detects nothing, ever" — an always-`false` stub of `dropsBeforeEveryInstall` passes it
+    // too. Giving job b its own drop must flip the result to `true`, which only the real cursor walk does.
+    const twoJobsFixed = twoJobs.replace(
+      '  b:\n    steps:\n      - run: npx playwright install --with-deps chromium\n',
+      '  b:\n    steps:\n      - run: sudo rm -fv /etc/apt/sources.list.d/google-chrome*.list\n' +
+        '      - run: npx playwright install --with-deps chromium\n',
+    );
+    expect(dropsBeforeEveryInstall(twoJobsFixed), 'job b now has its own drop — the real rail must go green here')
+      .toBe(true);
   });
 });
 
