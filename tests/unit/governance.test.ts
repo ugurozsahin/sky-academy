@@ -535,14 +535,14 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     if (cmd.includes('playwright test')) return true;
     return nestedRefs(cmd).some((ref) => runsPlaywright(scripts, ref, seen));
   };
-  // #806: no anchors meant a shorter recognised alternative could substring-match inside a longer, unrelated
-  // sibling name — `[\w:]` after each alternative is this project's own namespacing convention (colon-joined
-  // segments; no script here uses `.`/`-` inside its name), so a match can no longer be immediately followed
-  // by another name character.
+  // #806/#821: no anchors meant a shorter recognised alternative could substring-match inside a longer,
+  // unrelated sibling name. The lookahead's character class must cover the same script-name characters
+  // `nestedRefs` above recognises (`[\w:.-]`) rather than only `[\w:]` — this project's naming convention
+  // happens to be colon-joined today, but a future `.`/`-` name must not reopen the #762/#806 collision.
   const browserCommandRegex = (scripts: Record<string, string>) => new RegExp(
     ['playwright test', ...Object.keys(scripts).filter((name) => runsPlaywright(scripts, name)).map((name) => `npm run ${name}`)]
       .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-      .map((s) => `${s}(?![\\w:])`)
+      .map((s) => `${s}(?![\\w:.-])`)
       .join('|'),
   );
   const pkgScripts = (JSON.parse(doc('package.json')) as { scripts: Record<string, string> }).scripts;
@@ -583,6 +583,33 @@ describe('the browser runs after the agents, not before them (#499)', () => {
     expect(runsPlaywright(scratch, 'test:e2e:report'), 'this sibling does run playwright, under its own name').toBe(true);
     const match = browserCommandRegex(scratch).exec('before npm run test:e2e:report after')?.[0];
     expect(match, 'must match the whole longer alternative, never stop at the shorter "npm run test:e2e" prefix').toBe('npm run test:e2e:report');
+  });
+  // #821: the same #806 collision, but joined by a hyphen or dot rather than a colon — `nestedRefs` above
+  // already recognises `.`/`-` inside a script name (`[\w:.-]`), so the lookahead must reject a name character
+  // from that same class, not only `[\w:]`, or a future hyphen/dot-joined sibling reopens the collision #806
+  // closed for colon-joined ones. Both separators are covered — `[\w:.-]` treats them identically, but a test
+  // proving only one of them would prove less than this describe block's own name claims.
+  it.each([
+    ['hyphen', 'test:e2e-visual'],
+    ['dot', 'test:e2e.visual'],
+  ])('a sibling script that only shares a recognised command\'s name as a prefix, joined by a %s, is not falsely recognised (#821)', (_sep, name) => {
+    const scratch = { ...pkgScripts, [name]: 'node scripts/visual-report.mjs' };
+    expect(runsPlaywright(scratch, name), 'this script never runs playwright itself').toBe(false);
+    expect(browserCommandRegex(scratch).test(`npm run ${name}`),
+      'the recognised "npm run test:e2e" must not substring-match inside this unrelated, longer sibling name').toBe(false);
+  });
+  // pr-test-analyzer review of the #821 fix: the existing #806-review "harder" case above (a sibling that DOES
+  // run playwright, matched via its own longer alternative) is colon-joined, so it never exercised the part of
+  // the character class #821 actually widened — the boundary character there (`:`) was already excluded by the
+  // pre-#821 `[\w:]`. A regression narrowing the lookahead back to `[\w:]` would still pass that test undetected.
+  it.each([
+    ['hyphen', 'test:e2e-report'],
+    ['dot', 'test:e2e.report'],
+  ])('a sibling that also runs playwright matches via its own longer alternative, joined by a %s, not by a shorter one substring-matching into it (#821)', (_sep, name) => {
+    const scratch = { ...pkgScripts, [name]: 'playwright test --reporter=json' };
+    expect(runsPlaywright(scratch, name), 'this sibling does run playwright, under its own name').toBe(true);
+    const match = browserCommandRegex(scratch).exec(`before npm run ${name} after`)?.[0];
+    expect(match, 'must match the whole longer alternative, never stop at the shorter "npm run test:e2e" prefix').toBe(`npm run ${name}`);
   });
 
   it("the browser-command regex derives its spellings from package.json, not a hand-enumerated list (#762)", () => {
@@ -2165,6 +2192,27 @@ const slice = (text: string, label: string, start: string, end: string | null, m
   if (body.trim().length < min)
     throw new Error(`${label}: ${body.trim().length} characters of body, under the floor of ${min} — the rule was gutted, so every assertion on it would be vacuous`);
   return body;
+};
+
+/**
+ * Every window bounded by `end: null` (`slice()`'s own docstring: "an open-tailed window's floor gets
+ * monotonically easier to clear as text is appended after it") needs the same second check: its own last
+ * sentence pinned as the literal last content of the text it was sliced from, with an exactly-once guard so a
+ * duplicate pasted after filler cannot satisfy `endsWith` while the filler still pads the size floor above
+ * (PR #469 rounds 4/5, for `attack`/`bodyCheck`; #493, for `layer2`; #732, for `r4`). One helper, not a fourth
+ * hand-copy of the same six lines (#732 review comment 5838092508) — `haystack` is the text the open-tailed
+ * window was sliced *from* (its section, not the window itself, since `end: null` makes the window that
+ * section's own literal tail and the two checks are equivalent).
+ */
+const pinnedEnd = (haystack: string, tail: string, label: string) => {
+  const count = (text: string, needle: string) => text.split(needle).length - 1;
+  expect(haystack.trim().endsWith(tail),
+    `text appended after ${label}'s own last sentence pads the floor above without tripping it`)
+    .toBe(true);
+  expect(count(haystack, tail),
+    `${label}End appears more than once — a duplicate pasted after filler would satisfy the endsWith check `
+    + 'above while the filler still pads the size floor')
+    .toBe(1);
 };
 
 /**
@@ -3780,6 +3828,9 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
     '## 5. Four things make a pull request unmergeable', 2500);
   const s6 = () => slice(flatten(skill()), '§6 above the Merge rule', '## 6. Then decide, and make the decision visible',
     '**Merge** — squash into `main`', 600);   // 1,156 today: a backstop under the two layer floors, not a byte budget
+  // Lifted out of "the delegation contract, rule by rule" below (#732) so the r4-end pin test can read the same
+  // slice without re-deriving it — `rule()` there still calls `contract()` rather than holding its own copy.
+  const contract = () => slice(s4(), 'the delegation contract', '**The delegation contract.**', 'This caps nothing', 1500);  // 2,604 today
 
   it('layer 1: a finding goes somewhere that outlives the context that found it', () => {
     const layer1 = slice(s6(), 'layer 1', '**Write each finding when you confirm it, not at the end.**',
@@ -3812,14 +3863,7 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
   const layer2End = '`docs/REVIEWER-PROMPT.md` STEP 2 already asks the first half of this '
     + '("still waiting?"); this is the other half (#326).';
   it('layer 2 ends where its own last sentence ends, not wherever §6 does', () => {
-    const count = (text: string, needle: string) => text.split(needle).length - 1;
-    expect(s6().trim().endsWith(layer2End),
-      'text appended after layer 2\'s own last sentence pads the floor above without tripping it')
-      .toBe(true);
-    expect(count(s6(), layer2End),
-      'layer2End appears more than once — a duplicate pasted after filler would satisfy the endsWith check above '
-      + 'while the filler still pads the size floor, the same gap PR #469 round 5 found for attack/bodyCheck')
-      .toBe(1);
+    pinnedEnd(s6(), layer2End, 'layer2');
   });
 
   it('layer 3: the rule, the mechanism, all three reasons and the carve-out — inside §4', () => {
@@ -3847,9 +3891,8 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
    * asserted on its operative half, not on its title.
    */
   it('the delegation contract, rule by rule', () => {
-    const contract = slice(s4(), 'the delegation contract', '**The delegation contract.**', 'This caps nothing', 1500);  // 2,604 today
     const rule = (n: number, start: string, end: string | null, min: number) =>
-      slice(contract, `contract rule ${n}`, start, end, min);
+      slice(contract(), `contract rule ${n}`, start, end, min);
 
     const r1 = rule(1, '1. **The parent alone marks, merges and comments; a subagent posts nothing to GitHub**',
       "2. **§4's three agents are the parent's", 300);
@@ -3878,6 +3921,19 @@ describe('a reviewer run does not hold two diffs at once (#326)', () => {
 
     expect(s4(), 'and the section must still say plainly that none of this caps throughput')
       .toMatch(/This caps nothing\. Reviewing many pull requests is the point of the routine/);
+  });
+
+  // #732: `r4` is `rule(4, '4. **What comes back**', null, 300)` — the same open-tailed shape PR #469
+  // round 4/5 fixed for `attack`/`bodyCheck` and #493 fixed for `layer2`, and nothing pinned `r4`'s own
+  // trailing sentence, so deleting a sentence from inside it and padding the dead zone before `contract()`'s
+  // own end anchor ('This caps nothing') is invisible to the `min: 300` floor above. Checked against
+  // `contract()` itself, not a second `slice()` call rebuilding `r4` — `r4` is `end: null`, so it is
+  // `contract()`'s own literal tail, and `attackEnd`/`bodyCheckEnd` check their *section* (`s4()`/`s3()`) the
+  // same way, not `attack()`/`bodyCheck()`.
+  const r4End = "Pass down what a fresh context cannot know, too: §1's gate needs which pull requests this run "
+    + "opened or pushed to (usually none), and a subagent has none of the parent's action history to answer it from.";
+  it('rule 4 ends where its own last sentence ends, not wherever the contract does', () => {
+    pinnedEnd(contract(), r4End, 'r4');
   });
 
   it('the reviewer prompt routes a run to it from STEP 2, and does not restate it', () => {
@@ -4029,25 +4085,10 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // delete a sentence from inside the rule, append dead-zone filler before the section's true end, then
     // append a SECOND copy of `attackEnd`/`bodyCheckEnd` after the filler — the text still literally ends
     // with the pinned sentence, so round 4's check alone cannot see the pad between the real rule and the
-    // duplicate. The exactly-once guard below is the same one `slice()` already applies to every `start`/`end`
-    // anchor it takes (line ~1828), extended to this open-tailed pin the same way.
-    const count = (text: string, needle: string) => text.split(needle).length - 1;
-    expect(s4().trim().endsWith(attackEnd),
-      'text appended after "attack it yourself"\'s own last sentence pads the floor above without tripping it — '
-      + 'the PR #469 round 4 reproduction')
-      .toBe(true);
-    expect(count(s4(), attackEnd),
-      'attackEnd appears more than once — a duplicate pasted after filler would satisfy the endsWith check above '
-      + 'while the filler still pads the size floor, the PR #469 round 5 reproduction')
-      .toBe(1);
-    expect(s3().trim().endsWith(bodyCheckEnd),
-      'text appended after the body-check bullet\'s own last sentence pads the floor above without tripping it — '
-      + 'the PR #469 round 4 reproduction')
-      .toBe(true);
-    expect(count(s3(), bodyCheckEnd),
-      'bodyCheckEnd appears more than once — a duplicate pasted after filler would satisfy the endsWith check '
-      + 'above while the filler still pads the size floor, the PR #469 round 5 reproduction')
-      .toBe(1);
+    // duplicate. `pinnedEnd()`'s exactly-once guard is the same one `slice()` already applies to every
+    // `start`/`end` anchor it takes (line ~1828), extended to this open-tailed pin the same way.
+    pinnedEnd(s4(), attackEnd, 'attack');
+    pinnedEnd(s3(), bodyCheckEnd, 'bodyCheck');
   });
 
   /**
@@ -5521,8 +5562,8 @@ describe('a rail that enumerates the routine prompts covers all of them (#512, r
     .filter((run) => PROMPTS.filter((p) => run.includes(`'${p}'`)).length >= 2);
 
   it('both populations are read from disk, and neither is empty', () => {
-    expect(PROMPTS, 'a routine prompt that stopped matching docs/*-PROMPT.md would shrink this rail to '
-      + 'nothing without failing it').toContain('docs/REFINER-PROMPT.md');
+    expect(PROMPTS, 'a routine prompt file that stopped ending in -PROMPT.md under docs/ would shrink this '
+      + 'rail to nothing without failing it').toContain('docs/REFINER-PROMPT.md');
     expect(PROMPTS.length, 'four routines develop, review, watch and refine').toBeGreaterThanOrEqual(4);
     expect(SOURCES, 'the file this rail lives in must be among the files it scans').toContain(
       'tests/unit/governance.test.ts');

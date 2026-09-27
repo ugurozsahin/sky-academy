@@ -5,11 +5,11 @@ description: Add or change a curriculum topic (question generator) in Sky Ninja 
 # Add a topic
 
 1. Check `docs/CURRICULUM.md` for the NC objective and the difficulty convention (d1 intro · d2 expectation · d3 stretch).
-2. Write a pure generator in `src/curriculum/maths.ts` or `writing.ts`:
+2. Write a pure generator in the topic's year file — `src/curriculum/reception.ts`, `year1.ts` or `year2.ts` — or `util.ts` if the generator is shared across years:
    `const yXName: Generator = (d, rng) => numQ(rng, prompt, answer, { min, max, visual?, say?, distractors? })` — or `wordQ(rng, prompt, answer, distractors, { visual?, say?, hint? })`.
    - Use `ri/pick/shuffle` from `util.ts`; never `Math.random` directly (tests seed `rng`).
    - `say` = spoken form for non-readers; `visual` types are in `types.ts` (objects, tenframe, dots, array, coins, clock, fraction, word, sentence).
-   - Spelling-in-order questions: return `sequence` (see `spellQ` in writing.ts). Tracing topics: `mode: 'tracing'`, `answer` = text to trace.
+   - Spelling-in-order questions: return `sequence` (see `spellQ` in `util.ts`). Tracing topics: `mode: 'tracing'`, `answer` = text to trace.
 3. Register in the `*_TOPICS` array: `{ id: 'y1-foo', title, icon, subject, year, nc, gen }`. Ids are `r-`, `y1-`, `y2-` prefixed and unique.
 4. Run `npm test` — the generic suite checks answer∈options, uniqueness, arithmetic correctness, ranges and variety for every topic × difficulty automatically. Add a targeted test in `tests/unit/curriculum.test.ts` only for a rule the generic suite can't infer.
 5. If the topic needs a new visual, add a case to `src/ui/visuals.ts` + CSS in `style.css`, then `npm run test:e2e`.

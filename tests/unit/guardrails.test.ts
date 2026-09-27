@@ -2829,6 +2829,11 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       const u = unwrapRequireCallee(e);
       return (ts.isIdentifier(u) && u.text === 'require') || (ts.isPropertyAccessExpression(u) && u.name.text === 'require');
     };
+    // #803/#820 unwrap a parenthesized *callee* and a parenthesized *array argument* to import.meta.glob; #829
+    // widens this to the dynamic-import and require branches' own call argument — `import(('x'))`/`require(('x'))`
+    // are both valid, compiling shapes (a bundler/minifier can add or preserve stray parens around either), and
+    // specText() has no ParenthesizedExpression case, so an unwrapped argument silently produced no edge at all.
+    const unwrapParens = (e: ts.Expression): ts.Expression => ts.isParenthesizedExpression(e) ? unwrapParens(e.expression) : e;
     // #803 (PR #799 review): `import { type A } from 'x'` has no whole-clause `isTypeOnly`, but when every named
     // binding is individually `type`-qualified nothing ships either way — the same "erased before emit" test the
     // clause-level flag already applies. A default binding (`import Foo, { type A } from 'x'`) is a value import
@@ -2856,13 +2861,15 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         const text = specText(node.argument.literal);
         if (text !== null) push(text, 'type');
       } else if (ts.isCallExpression(node) && isDynamicImportTarget(node.expression)) {
-        const text = specText(node.arguments[0]);
+        const arg0 = node.arguments[0];
+        const text = specText(arg0 ? unwrapParens(arg0) : undefined);
         if (text !== null) push(text, 'dynamic');
       } else if (ts.isCallExpression(node) && isRequireCallee(node.expression)) {
         // Bare `require('x')` and `obj.require('x')` alike — the old regex matched the literal substring
         // `require(` wherever it sat, so an AST-based reader that only recognised a bare identifier callee
         // would silently drop `obj.require('x')` that the old code caught (silent-failure-hunter review).
-        const text = specText(node.arguments[0]);
+        const arg0 = node.arguments[0];
+        const text = specText(arg0 ? unwrapParens(arg0) : undefined);
         if (text !== null) push(text, 'require');
       } else if (ts.isExternalModuleReference(node)) {
         // `import x = require('x')` never parses as a CallExpression at all — its whole
@@ -2870,7 +2877,10 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         // (silent-failure-hunter review; unreachable on this ESM-only project's real `src/` today since
         // `tsconfig.json`'s `module: ESNext` and the absent `@types/node` both already fail it, but the old
         // regex matched it by text and the walker should not need that gate to also be correct).
-        const text = specText(node.expression);
+        // #837: unwrap a parenthesized argument here too, for the same reason #829 does it on the other two
+        // branches — `import x = require(('x'))` is a real, parseable AST shape (a ParenthesizedExpression
+        // wrapping the string literal), even though it too fails this project's own `tsc --noEmit` gate.
+        const text = specText(unwrapParens(node.expression));
         if (text !== null) push(text, 'require');
       } else if (
         ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
@@ -2883,7 +2893,6 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         // #820: `import.meta.glob((['...']))` — the array wrapped in its own parentheses — used to fall through
         // to the non-array branch, silently dropping every element inside; unwrap parens first, mirroring
         // `unwrapRequireCallee`'s own paren-unwrapping above.
-        const unwrapParens = (e: ts.Expression): ts.Expression => ts.isParenthesizedExpression(e) ? unwrapParens(e.expression) : e;
         const arg0 = node.arguments[0];
         const arg = arg0 ? unwrapParens(arg0) : undefined;
         if (arg && ts.isArrayLiteralExpression(arg)) {
@@ -2963,6 +2972,24 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
   });
 
+  // #837: the ExternalModuleReference branch read node.expression straight into specText() with no
+  // paren-unwrapping, unlike the other two branches #829 fixed — a paren-wrapped argument here
+  // (`import x = require(('x'))`) is a real, parseable AST shape (confirmed via the bare TypeScript parser)
+  // even though it cannot appear in this project's own compiling `src/` tree, the same reasoning #829 already
+  // applies to the sibling moduleSpecifier case.
+  it('import x = require((\'x\')) still counts as require, paren-wrapped and all (#837)', () => {
+    expect(edges('/src/ui/x.ts', "import rig = require(('../three/stage/rig'));"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
+  });
+
+  // pr-test-analyzer (#837 review): unwrapParens is recursive, so a doubly-parenthesized argument here
+  // (two extra layers, not just #837's one) already works too — a coverage gap in the tests, not a second
+  // defect, the same shape PR #825 pinned for import.meta.glob's own recursive unwrap. Pinned here.
+  it('import x = require(((\'x\'))) — two extra layers of parens — still counts as require', () => {
+    expect(edges('/src/ui/x.ts', "import rig = require(((('../three/stage/rig'))));"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
+  });
+
   // #803 (PR #799 review): a parenthesized or comma-expression require callee is a real minifier/bundler output
   // shape, not a syntax trick — `isRequireCallee` only unwrapped a bare identifier or property access before this.
   // The doubly-nested and paren-wrapped-comma cases prove `unwrapRequireCallee`'s loop/recursion actually
@@ -2976,6 +3003,18 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   ])('%s still counts as require, not silently nothing (#803)', (_case, src) => {
     expect(edges('/src/ui/x.ts', src))
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
+  });
+
+  // #829: the paren-unwrapping #820 gave import.meta.glob's own argument never reached the dynamic-import or
+  // require branches, which read node.arguments[0] with no ParenthesizedExpression handling at all — a
+  // paren-wrapped call argument is fully valid, compiling JS/TS (a bundler/minifier routinely adds or preserves
+  // stray parens around one), so `import(('x'))`/`require(('x'))` silently produced no edge whatsoever.
+  it.each([
+    ['a dynamic import() whose argument is wrapped in its own parens', "import(('../three/stage/rig'));", 'dynamic'],
+    ['a require() whose argument is wrapped in its own parens', "require(('../three/stage/rig'));", 'require'],
+  ] as const)('%s still produces its edge, not silently nothing (#829)', (_case, src, kind) => {
+    expect(edges('/src/ui/x.ts', src))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind }]);
   });
 
   // #799 review, finding 1: a per-name dynamic loader (`import(\`../objects/${name}.ts\`)`) is a realistic
@@ -3170,9 +3209,9 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // file at or past the 300-line bar this table is scoped to — joins it rather than going unbudgeted;
   // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
-    'src/style.css': 1878, 'src/storage.ts': 1511, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
-    'src/curriculum/year2.ts': 799, 'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 508, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
-    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 365, 'src/ui/certificate.ts': 341, 'src/audio.ts': 311,
+    'src/style.css': 1870, 'src/storage.ts': 1511, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
+    'src/curriculum/year2.ts': 799, 'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
+    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 360, 'src/ui/certificate.ts': 341, 'src/audio.ts': 311,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
     // src/style.css split into src/styles/*.css (#558): the entry itself is now a 12-line @import shim, so a
