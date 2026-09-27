@@ -485,6 +485,20 @@ describe('the @smoke e2e subset is non-empty and actually reachable by npm run t
     expect(specFiles.length).toBeGreaterThan(0);
     expect(specFiles, 'viewport.spec.ts only runs under the tablet projects, never under mobile/setup')
       .not.toContain('viewport.spec.ts');
+    // #854: since #751 this subset is ALL the e2e a pull request's CI runs, so the paths it walks are pinned by
+    // title, read from Playwright's own list. Untagging one of these, or renaming it, turns this red rather than
+    // quietly narrowing what every pull request is checked on.
+    for (const [path, title] of [
+      ['build identity', 'the e2e server is serving the build on disk here'],
+      ['one slice round', 'real swipe slices the correct bubble and scores'],
+      ['tracing', 'letter tracing passes when the glyph is covered'],
+      ['save code', 'For grown-ups: the save code copies out and restores back'],
+      ['onboarding', 'avatar selection is required, saved and shown on the home screen'],
+      ['a wrong answer', 'wrong slice loses a life and shows the answer; correct then continues'],
+      ['a won mission', 'a full mission (5 stages) ends with results, medal, coins, a sticker and saved stars'],
+      ['a duel match', 'both players see the same question, the first correct slice takes the round'],
+    ]) expect(out, `the @smoke subset must still walk ${path} (#854)`).toContain(title);
+    expect(Number(testCount), 'the eight paths above, one test each (#854)').toBe(8);
   });
 });
 

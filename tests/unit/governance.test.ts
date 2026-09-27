@@ -2415,7 +2415,7 @@ describe('the open-pr skill keeps the rules that were paid for (#180)', () => {
       .toContain('**Run the full mobile project yourself when any of these holds**');
     expect(S(4), 'condition 1: e2e tests and their config, which CI no longer runs before the merge')
       .toContain('the diff adds or changes anything under `tests/e2e/` or `playwright.config.*`');
-    expect(S(4), 'condition 2: the play loop').toContain('the diff touches the loop every mission goes through: `src/game/` or `src/ui/play*.ts`');
+    expect(S(4), 'condition 2: any game code, not only the play loop (#854)').toContain('the diff touches anything under `src/`, `index.html` or `public/`, since the smoke subset walks only eight paths through the game (#854)');
     expect(S(4), 'condition 3: viewport').toContain('the change is viewport-sensitive, and then desktop as well');
   });
 

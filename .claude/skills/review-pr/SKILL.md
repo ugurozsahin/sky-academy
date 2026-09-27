@@ -54,7 +54,7 @@ npx playwright test --project=desktop        # when the diff could behave differ
 
 Take screenshots too if the change is player-visible.
 
-**Since #751, CI's e2e on a pull request is the four-test mobile `@smoke` subset, so this run is the only
+**Since #751, CI's e2e on a pull request is the eight-test mobile `@smoke` subset, so this run is the only
 full-mobile e2e a pull request's tree gets before it lands.** CI's green on the head tells you the smoke tests
 passed, never that the project did: do not let it stand in for this run.
 

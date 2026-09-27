@@ -146,7 +146,7 @@ npx playwright test --project=mobile         # the full project, under the condi
 npx playwright test --project=desktop        # when the change could behave differently by viewport
 ```
 
-A pull request's CI runs e2e as the **mobile `@smoke` subset only** (#751: four tests, about ten seconds) and
+A pull request's CI runs e2e as the **mobile `@smoke` subset only** (#751, #854: eight tests, about half a minute) and
 **only when the diff can reach the game** (#176) — `src/`, `index.html`, `public/`, `tests/e2e/`,
 `playwright.config.*`, `package*.json`, `ci.yml`. Unit tests and the build always run. The full mobile project
 runs on `main` every night, and the reviewer runs it once more before a merge (`review-pr` §2).
@@ -155,8 +155,9 @@ runs on `main` every night, and the reviewer runs it once more before a merge (`
 default:
 
 - the diff adds or changes anything under `tests/e2e/` or `playwright.config.*`, since CI runs none of it
-  before the merge beyond the four smoke tests;
-- the diff touches the loop every mission goes through: `src/game/` or `src/ui/play*.ts`;
+  before the merge beyond the eight smoke tests;
+- the diff touches anything under `src/`, `index.html` or `public/`, since the smoke subset walks only eight
+  paths through the game (#854);
 - the change is viewport-sensitive, and then desktop as well (below).
 
 Two consequences worth stating, because both have cost a day here:

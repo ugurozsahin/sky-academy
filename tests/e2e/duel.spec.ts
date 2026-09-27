@@ -148,7 +148,7 @@ test.describe('Ninja Duel', () => {
       .toContain(wave.answer);
   });
 
-  test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', async ({ page }) => {
+  test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', { tag: '@smoke' }, async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
     expect(await page.evaluate(() => window.__seedMiss), 'the page landed on a day dojoSeeds() did not build').toBe(false);
     await expect(page.locator('#round')).toHaveText('Round 1 of 10');
