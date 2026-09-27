@@ -33,12 +33,30 @@ const SRC = new URL('../../../src/', import.meta.url);
 /** `src/style.css` is an entry point of `@import` lines into `src/styles/*.css` (#558) — this reads the
  *  entry and every file it imports, concatenated in import order, so a rail asking what the stylesheet
  *  says sees the same text Vite bundles rather than one split-out file. `root` is the directory holding
- *  `style.css`, real `src/` by default — a test points it at a fixture with no `@import` lines to prove the
- *  vacuity guard actually fires, the same shape `workflowFiles`/`e2eSpecFiles` use for theirs. */
+ *  `style.css`, real `src/` by default — a test points it at a fixture with no `@import` lines, a
+ *  duplicated one, or an orphaned file, to prove each guard below actually fires, the same shape
+ *  `workflowFiles`/`e2eSpecFiles` use for theirs.
+ *
+ *  Two failures a bare `@import`-graph walk would miss silently (`pr-test-analyzer`/`silent-failure-hunter`
+ *  review, #558): the same file imported twice, which would double that section's rules in what this
+ *  returns without ever showing up as "the stylesheet read empty"; and a file added under `src/styles/`
+ *  that nothing imports, which Vite would never bundle either — so a rail asking "is the whole stylesheet
+ *  here" must not silently pass on less than the real `src/styles/` directory. Both are guarded here rather
+ *  than left to be caught (or not) by whatever floor a caller happens to assert on the result. */
 export const styleCss = (root: URL = SRC): string => {
   const entry = readFileSync(new URL('style.css', root), 'utf8');
   const imports = [...entry.matchAll(/@import\s+['"](\.\/[^'"]+)['"];/g)].map((m) => m[1]);
   if (imports.length === 0) throw new Error('src/style.css has no @import lines — check it still splits into src/styles/*.css');
+  const seen = new Set<string>();
+  for (const rel of imports) {
+    if (seen.has(rel)) throw new Error(`src/style.css imports ${rel} more than once — Vite would bundle its rules twice`);
+    seen.add(rel);
+  }
+  const named = new Set(imports.map((rel) => rel.split('/').pop()));
+  const onDisk = readdirSync(new URL('styles/', root)).filter((f) => f.endsWith('.css'));
+  const orphaned = onDisk.filter((f) => !named.has(f));
+  if (orphaned.length > 0)
+    throw new Error(`src/styles/ holds file(s) no @import in src/style.css names, so Vite never bundles them: ${orphaned.join(', ')}`);
   return imports.map((rel) => readFileSync(new URL(rel, root), 'utf8')).join('');
 };
 

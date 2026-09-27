@@ -93,16 +93,64 @@ describe('the shared rail readers cannot go blind (#321)', () => {
   it('styleCss() reads src/style.css\'s imports, not one split-out file (#558)', () => {
     const css = styleCss();
     expect(css.length, 'the stylesheet split into src/styles/*.css must not read as empty or one file').toBeGreaterThan(10_000);
-    // One marker from the first section (base.css, unnamed) and one from the last (shop.css) — proves the
-    // whole import chain is read, not just the entry or the first file it names.
     expect(css, 'base.css\'s Fredoka @font-face must survive the split').toMatch(/@font-face/);
     expect(css, 'shop.css\'s .shop-btn rule must survive the split').toContain('.shop-btn');
+  });
+
+  // pr-test-analyzer review of #558: the two markers above only prove the first and last file in the import
+  // chain survive — nothing checked the ten files between them, so any one of those going empty or duplicated
+  // would still clear every rail's length floor unnoticed. Each section's own pre-existing heading comment is
+  // a marker already unique to it; checking all twelve, by position, catches a section emptied (its heading
+  // vanishes), duplicated (its heading's second `indexOf` would sit before the next section's) or reordered
+  // (a later heading's index would not be the greater one) — not just "the total is long enough".
+  it('styleCss() carries every section\'s own heading, once each, in the file\'s original order (#558)', () => {
+    const css = styleCss();
+    const headings = [
+      '/* Sky Ninja Academy — twilight sky theme. Mobile-first, desktop-friendly. */',  // base.css
+      '/* ---------- backgrounds ---------- */',
+      '/* ---------- shared components ---------- */',
+      '/* ---------- avatar screen ---------- */',
+      '/* ---------- home ---------- */',
+      '/* ---------- rewards ---------- */',
+      '/* ---------- daily dojo ---------- */',
+      '/* ---------- play ---------- */',
+      '/* ---------- memory match ---------- */',
+      '/* overlays */',
+      '/* Grown-ups gate + parent dashboard (#9) */',
+      '/* ---------- shop (#6) ---------- */',
+    ];
+    let last = -1;
+    for (const heading of headings) {
+      const at = css.indexOf(heading);
+      expect(at, `"${heading}" must appear, and only after the previous section's own heading`).toBeGreaterThan(last);
+      expect(css.lastIndexOf(heading), `"${heading}" must appear exactly once`).toBe(at);
+      last = at;
+    }
   });
 
   it('styleCss(root) is loud on a real entry file with no @import lines, not just in theory (#558)', () => {
     const noImports = new URL('./helpers/fixtures/no-style-imports/', import.meta.url);
     expect(() => styleCss(noImports), 'an entry with no @import lines must throw, not read as the whole stylesheet')
       .toThrow(/no @import lines/);
+  });
+
+  // silent-failure-hunter review of #558: a bare `@import`-graph walk would double a section's rules with no
+  // error if the entry imports the same file twice — the vacuity guard above only fires on zero imports, not
+  // on a repeated one.
+  it('styleCss(root) is loud on a real entry file that @imports the same file twice (#558)', () => {
+    const dup = new URL('./helpers/fixtures/style-with-duplicate-import/', import.meta.url);
+    expect(() => styleCss(dup), 'the same @import twice must throw, not silently double that section')
+      .toThrow(/more than once/);
+  });
+
+  // silent-failure-hunter review of #558: a file added under src/styles/ that nothing @imports would never
+  // reach Vite's bundle either, but a reader that only walks the @import graph has no way to notice it is
+  // missing something real on disk — the same "loud on a real directory" shape workflowFiles()/e2eSpecFiles()
+  // already use, applied to the file this one is never handed by name.
+  it('styleCss(root) is loud on a real src/styles/ directory holding a file nothing @imports (#558)', () => {
+    const orphan = new URL('./helpers/fixtures/style-with-orphan/', import.meta.url);
+    expect(() => styleCss(orphan), 'a file on disk with no @import naming it must throw, not read as complete')
+      .toThrow(/orphan\.css/);
   });
 
   it('code() strips comments and leaves the code, so a comment naming a ban does not trip it', () => {
