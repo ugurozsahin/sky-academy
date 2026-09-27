@@ -4251,7 +4251,7 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     // "correct" and the citation without breaking the match.
     expect(s, 'which is the whole point: the round cap cannot fix this, because no round was wrong — and the '
       + 'exhaustiveness claim that follows is pinned too, not just the sentence introducing it')
-      .toMatch(/correct\*\* and met `review-pr` §7's bar, so nothing in the round cap could stop them: the round count was simply how many members the class had \(#466\)\./);
+      .toMatch(/Every one of those rounds was correct\*\* and met `review-pr` §7's bar, so nothing in the round cap could stop them: the round count was simply how many members the class had \(#466\)\./);
   });
 
   it('open-pr §4 concedes no exemption, in any of the voices one would be written in', () => {
