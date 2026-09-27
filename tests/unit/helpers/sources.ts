@@ -106,6 +106,10 @@ export const inDir = (dir: string): [string, string][] => {
 // unreachable from any syntactically valid TypeScript: a literal only closes at a delimiter preceded by an
 // even backslash run, so 3+ raw backslashes can never sit directly against a real comment opener in code that
 // compiles. Left as a documented edge rather than special-cased.
+//
+// A `/*` with no closing `*/` before EOF throws rather than silently swallowing everything after it to a
+// single space (#816) — no real src/*.ts file can contain one (tsc rejects it), but a hand-written test
+// fixture that is not valid TypeScript could, and this reader is applied to non-source text too.
 export const code = (src: string): string => {
   let out = '';
   let i = 0;
@@ -124,7 +128,8 @@ export const code = (src: string): string => {
     if (ch === '/' && src[i + 1] === '*') {
       i += 2;
       while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++;
-      i = Math.min(i + 2, src.length);
+      if (i >= src.length) throw new Error('unterminated /* comment — check for a missing closing */');
+      i += 2;
       out += ' ';
       continue;
     }

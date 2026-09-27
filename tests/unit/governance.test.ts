@@ -5535,8 +5535,8 @@ describe('a rail that enumerates the routine prompts covers all of them (#512, r
     .filter((run) => PROMPTS.filter((p) => run.includes(`'${p}'`)).length >= 2);
 
   it('both populations are read from disk, and neither is empty', () => {
-    expect(PROMPTS, 'a routine prompt that stopped matching docs/*-PROMPT.md would shrink this rail to '
-      + 'nothing without failing it').toContain('docs/REFINER-PROMPT.md');
+    expect(PROMPTS, 'a routine prompt file that stopped ending in -PROMPT.md under docs/ would shrink this '
+      + 'rail to nothing without failing it').toContain('docs/REFINER-PROMPT.md');
     expect(PROMPTS.length, 'four routines develop, review, watch and refine').toBeGreaterThanOrEqual(4);
     expect(SOURCES, 'the file this rail lives in must be among the files it scans').toContain(
       'tests/unit/governance.test.ts');

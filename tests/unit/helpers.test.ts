@@ -223,4 +223,19 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     expect(code(line), 'three backslashes against a real // must leave the comment unstripped, output unchanged')
       .toBe(line);
   });
+
+  // #816: an unterminated /* used to swallow everything after it to a single space, no error — the same
+  // vacuous-pass shape inDir()/workflowFiles()/e2eSpecFiles()/styleCss() already fail loudly on. No real
+  // src/*.ts file can hit this (tsc rejects an unterminated block comment), but code() is also applied to
+  // non-source text (e.g. governance.test.ts's own local `code` shadow over free-text it() bodies), where a
+  // hand-written fixture could.
+  it('code() throws on an unterminated /* comment instead of silently swallowing to EOF (#816)', () => {
+    // Built by concatenation, not a literal `/*`, so this file's own raw source (which scripts.test.ts's
+    // Playwright-import rail scans with code() too, #142) never contains an actually-unterminated comment.
+    const unterminated = 'const a = 1; ' + '/*' + ' never closed';
+    expect(() => code(unterminated), 'a missing closing */ must be loud, not silent')
+      .toThrow(/unterminated \/\* comment/);
+    expect(code('const a = 1; /* closed */ const b = 2;'), 'a properly closed comment must still be stripped')
+      .toBe('const a = 1;   const b = 2;');
+  });
 });
