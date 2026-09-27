@@ -3208,9 +3208,9 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // file at or past the 300-line bar this table is scoped to — joins it rather than going unbudgeted;
   // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
-    'src/style.css': 1878, 'src/storage.ts': 1511, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521, 'src/curriculum/maths.ts': 993,
-    'src/curriculum/writing.ts': 701, 'src/ui/duel.ts': 508, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
-    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 365, 'src/ui/certificate.ts': 341, 'src/audio.ts': 311,
+    'src/style.css': 1870, 'src/storage.ts': 1511, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521, 'src/curriculum/maths.ts': 993,
+    'src/curriculum/writing.ts': 701, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
+    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 360, 'src/ui/certificate.ts': 341, 'src/audio.ts': 311,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
     // src/style.css split into src/styles/*.css (#558): the entry itself is now a 12-line @import shim, so a
