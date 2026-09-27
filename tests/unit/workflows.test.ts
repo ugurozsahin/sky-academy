@@ -223,26 +223,59 @@ describe('every workflow file that installs Playwright browsers drops the Google
     return at;
   };
 
+  // Extracted so the #809 fixture test below walks the exact same logic the per-file rail runs, rather than a
+  // second hand-written copy that could drift from it.
+  const dropsBeforeEveryInstall = (steps: string): boolean => {
+    const installs = allIndicesOf(steps, 'playwright install');
+    const drops = allIndicesOf(steps, 'sources.list.d/google-chrome');
+    if (drops.length === 0) return false;
+    let cursor = -1;
+    for (const install of installs) {
+      if (!drops.some((drop) => drop > cursor && drop < install)) return false;
+      cursor = install;
+    }
+    return true;
+  };
+
   it('at least one workflow file installs Playwright browsers, or this rail checks nothing (#765)', () => {
     expect(withInstall.length).toBeGreaterThan(0);
   });
 
   for (const { name, steps } of withInstall) {
     it(`${name} drops the google-chrome apt source before every 'playwright install' step (#147, #765)`, () => {
-      const installs = allIndicesOf(steps, 'playwright install');
-      const drops = allIndicesOf(steps, 'sources.list.d/google-chrome');
-      expect(installs.length, `${name} must still install the browsers`).toBeGreaterThan(0);
-      expect(drops.length, `${name} must delete the google-chrome apt source before installing browsers (#147)`).toBeGreaterThan(0);
-      let cursor = -1;
-      for (const install of installs) {
-        expect(drops.some((drop) => drop > cursor && drop < install),
-          `${name}: the install at offset ${install} has no apt-source drop of its own between it and the ` +
-          'previous install — a drop already used to justify an earlier install does not count twice (#147)')
-          .toBe(true);
-        cursor = install;
-      }
+      expect(dropsBeforeEveryInstall(steps),
+        `${name}: some 'playwright install' step has no apt-source drop of its own since the previous install — ` +
+        'a drop already used to justify an earlier install does not count twice (#147)').toBe(true);
     });
   }
+
+  // #809: against today's two real files (one install, one drop, each) the cursor walk above is
+  // indistinguishable from the weaker "a drop exists somewhere in the file" check it replaced — a regression
+  // that reverted it to a single first-occurrence check would pass this suite today, silently. Proved here
+  // instead, against a synthetic two-job fixture: job a drops then installs (correct); job b installs with no
+  // drop of its own anywhere before it.
+  it('the cursor walk catches a second install with no drop of its own, which a single-drop check would miss (#809)', () => {
+    const twoJobs =
+      'jobs:\n' +
+      '  a:\n' +
+      '    steps:\n' +
+      '      - run: sudo rm -fv /etc/apt/sources.list.d/google-chrome*.list\n' +
+      '      - run: npx playwright install --with-deps chromium\n' +
+      '  b:\n' +
+      '    steps:\n' +
+      '      - run: npx playwright install --with-deps chromium\n';
+
+    expect(dropsBeforeEveryInstall(twoJobs), 'job b has no drop of its own — the real rail must go red here')
+      .toBe(false);
+
+    // The weaker check this rail replaced: "a drop exists somewhere before this install", with no cursor
+    // stopping one drop being reused to justify every later install. It would wrongly pass this same fixture,
+    // which is what makes the fixture worth having rather than only reasoning about it in prose.
+    const singleDropReusedWouldWronglyPass = allIndicesOf(twoJobs, 'playwright install')
+      .every((install) => allIndicesOf(twoJobs, 'sources.list.d/google-chrome').some((drop) => drop < install));
+    expect(singleDropReusedWouldWronglyPass, 'the fixture must actually exercise the gap the cursor logic closes')
+      .toBe(true);
+  });
 });
 
 /**
