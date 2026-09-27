@@ -2832,12 +2832,17 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       return !!bindings && ts.isNamedImports(bindings) && bindings.elements.length > 0 &&
         bindings.elements.every((el) => el.isTypeOnly);
     };
+    // #820: the export-side twin of namedBindingsAllTypeOnly above — `export { type A } from 'x'` has no
+    // whole-clause `isTypeOnly` either, and was still being read at clause granularity after #803 taught the
+    // import side this same lesson.
+    const namedExportsAllTypeOnly = (clause: ts.NamedExportBindings | undefined): boolean =>
+      !!clause && ts.isNamedExports(clause) && clause.elements.length > 0 && clause.elements.every((el) => el.isTypeOnly);
     const visit = (node: ts.Node): void => {
       if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
         const text = specText(node.moduleSpecifier);
         const typeOnly = ts.isImportDeclaration(node)
           ? !!node.importClause?.isTypeOnly || namedBindingsAllTypeOnly(node.importClause)
-          : !!node.isTypeOnly;
+          : !!node.isTypeOnly || namedExportsAllTypeOnly(node.exportClause);
         if (text !== null) push(text, typeOnly ? 'type' : 'static');
       } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
         // `typeof import('x')` and a bare `import('x')` type reference both land here; either way nothing ships.
@@ -2868,7 +2873,12 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         // `import.meta.glob('../three/stage/*.ts')` is an import Vite resolves and bundles too (pr-test-analyzer).
         // #803: the array-pattern form (`import.meta.glob([...])`, ordinary Vite usage) is walked element by
         // element rather than dropped whole — a single non-array argument keeps the old single-edge behaviour.
-        const arg = node.arguments[0];
+        // #820: `import.meta.glob((['...']))` — the array wrapped in its own parentheses — used to fall through
+        // to the non-array branch, silently dropping every element inside; unwrap parens first, mirroring
+        // `unwrapRequireCallee`'s own paren-unwrapping above.
+        const unwrapParens = (e: ts.Expression): ts.Expression => ts.isParenthesizedExpression(e) ? unwrapParens(e.expression) : e;
+        const arg0 = node.arguments[0];
+        const arg = arg0 ? unwrapParens(arg0) : undefined;
         if (arg && ts.isArrayLiteralExpression(arg)) {
           for (const el of arg.elements) {
             const text = specText(el);
@@ -3010,6 +3020,28 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   it('a non-literal element inside the array is dropped, not thrown or falsely resolved (#803 review)', () => {
     expect(edges('/src/ui/x.ts', "import.meta.glob([DYNAMIC, '../three/objects/*.ts']);"))
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/objects/*.ts', to: '/src/three/objects/*.ts', kind: 'static' }]);
+  });
+
+  // #820 (review of #818/#803): the export-side twin of the #803 named-binding case above — no whole-clause
+  // isTypeOnly, but every named binding is individually type-qualified, so nothing ships either way.
+  it('export { type A } from \'x\' counts as type when every named binding is individually type-only (#820)', () => {
+    expect(edges('/src/ui/x.ts', "export { type A } from '../three/stage/rig';"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'type' }]);
+  });
+  it('export { type A, b } from \'x\' still counts as static — b is a real value binding (#820)', () => {
+    expect(edges('/src/ui/x.ts', "export { type A, b } from '../three/stage/rig';"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'static' }]);
+  });
+
+  // #820 (review of #818/#803): the array-pattern form wrapped in its own extra parentheses used to fall
+  // through to the non-array branch, silently dropping every element inside — the same class #803 fixed for
+  // the bare (unparenthesized) array.
+  it('import.meta.glob(([...])) — the array wrapped in its own parens — still produces one edge per element (#820)', () => {
+    expect(edges('/src/ui/x.ts', "import.meta.glob((['../three/stage/*.ts', '../three/objects/*.ts']));"))
+      .toEqual([
+        { from: '/src/ui/x.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' },
+        { from: '/src/ui/x.ts', spec: '../three/objects/*.ts', to: '/src/three/objects/*.ts', kind: 'static' },
+      ]);
   });
 
   // (a) Proved red: `import { Color } from 'three'` in a scratch `src/ui/x.ts` fails.
