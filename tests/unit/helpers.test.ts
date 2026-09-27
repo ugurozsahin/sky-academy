@@ -146,4 +146,18 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     expect(code('const stats = {\n  ratio: count-- / total, // ratio note\n};'), 'a real comment straight after count-- / total must still be stripped')
       .not.toContain('ratio note');
   });
+
+  // #816: the documented safe-direction edge — an odd (3+) backslash run immediately before a real comment
+  // opener reads the last backslash as escaping the opener's own slash, so the comment survives unstripped.
+  // Unreachable from any compiling TypeScript (a literal only closes on an even backslash run), so this is a
+  // pin on the documented no-op behaviour rather than a regression test for a real bug, matching this file's
+  // own pattern of a companion test beside every documented `code()` nuance.
+  it('code() leaves an odd (3+) backslash run before a real comment opener unstripped (#816)', () => {
+    const block = '\\\\\\/* kept */ realCode();';
+    expect(code(block), 'three backslashes against a real /* must leave the comment unstripped, output unchanged')
+      .toBe(block);
+    const line = '\\\\\\// kept\nrealCode();';
+    expect(code(line), 'three backslashes against a real // must leave the comment unstripped, output unchanged')
+      .toBe(line);
+  });
 });
