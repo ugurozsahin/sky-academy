@@ -125,7 +125,7 @@ export const inDir = (dir: string): [string, string][] => {
 // pop on their own closing quote; an interpolation frame opens on an unescaped `${`, counts `{`/`}` it meets
 // itself (a nested object literal's braces included) to find *its own* matching `}`, and pops there, so `{`
 // and `}` belonging to a nested string are never counted — those sit inside that string's own frame instead.
-type Frame = { kind: 'string'; quote: string } | { kind: 'template' } | { kind: 'interp'; depth: number };
+type Frame = { kind: 'string'; quote: "'" | '"' } | { kind: 'template' } | { kind: 'interp'; depth: number };
 export const code = (src: string): string => {
   let out = '';
   let i = 0;
