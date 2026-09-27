@@ -3402,17 +3402,17 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
  * three files had no equivalent of. Lower a cap when a long line is split up; never raise one to make a red
  * build green.
  *
- * What this does not catch: a file that grows a second, third or fourth long line under the existing cap —
- * only the single longest line in each file is measured, so a paragraph merely as long as today's worst one
- * is invisible to this rail. That is the same gap the byte budgets above already leave for total size, not a
- * new one this rail introduces.
+ * What this does not catch: only the single longest line in each file is measured, so a brand-new squeezed
+ * paragraph — the #625 abuse case this rail exists for — passes silently as long as it stays under today's
+ * worst offender, whether that is a second long line beside the existing one or the first squeeze a file has
+ * ever had. Catching that in general, not just a new record, would need the `play.ts`/`home.ts`/`style.css`
+ * count-over-a-threshold idiom instead of a single max — #625's acceptance criterion asked for a max, not a
+ * count, so that is future work, not a gap this rail was meant to close.
  *
  * Prove it red: join any two adjacent lines in one of the three files with a single space and watch its cap
  * fail; split them back apart and it passes again.
  */
 describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md longest-line budgets only ever go down (#625)', () => {
-  const root = new URL('../../', import.meta.url);
-  const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
   const longestLine = (text: string) => Math.max(...text.split('\n').map((l) => l.length));
 
   // The three figures below are this PR's own landing lengths, exactly — never raise any of them to make a
@@ -3422,7 +3422,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md longest-
   const REVIEWER_PROMPT_LONGEST_LINE = 2_812;
 
   it('CLAUDE.md has no line longer than its budget', () => {
-    const text = read('CLAUDE.md');
+    const text = doc('CLAUDE.md');
     expect(text.length, 'CLAUDE.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
     const longest = longestLine(text);
     expect(longest, `CLAUDE.md's longest line grew to ${longest} chars — split the paragraph up, `
@@ -3430,7 +3430,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md longest-
   });
 
   it('docs/ROUTINE-PROMPT.md has no line longer than its budget', () => {
-    const text = read('docs/ROUTINE-PROMPT.md');
+    const text = doc('docs/ROUTINE-PROMPT.md');
     expect(text.length, 'docs/ROUTINE-PROMPT.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
     const longest = longestLine(text);
     expect(longest, `docs/ROUTINE-PROMPT.md's longest line grew to ${longest} chars — split the paragraph up, `
@@ -3438,7 +3438,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md longest-
   });
 
   it('docs/REVIEWER-PROMPT.md has no line longer than its budget', () => {
-    const text = read('docs/REVIEWER-PROMPT.md');
+    const text = doc('docs/REVIEWER-PROMPT.md');
     expect(text.length, 'docs/REVIEWER-PROMPT.md must be read from disk, or this rail checks nothing').toBeGreaterThan(1_000);
     const longest = longestLine(text);
     expect(longest, `docs/REVIEWER-PROMPT.md's longest line grew to ${longest} chars — split the paragraph up, `
