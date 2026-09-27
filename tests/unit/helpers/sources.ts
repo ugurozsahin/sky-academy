@@ -165,11 +165,20 @@ const collectSpans = (node: ts.Node, sourceFile: ts.SourceFile, src: string, int
 // comment. Exported for that one test; no other caller needs it — `spans` must already be left-to-right
 // and non-overlapping (`collectSpans`'s own contract), and the guard below is what enforces that on a
 // caller's behalf rather than trusting it silently.
+//
+// Two different-shaped violations, both checked (silent-failure-hunter review of this diff, #844): a span
+// starting before the previous one ended (`span.start < pos`) is the one the comment above already argues
+// for, but a span whose own `end` is before its own `start` slips past that check untouched — `pos` is not
+// yet corrupted when this span is reached, so `span.start < pos` can still be false, and `src.slice(start,
+// end)` with `end < start` then silently returns `''` while `pos` is set *backwards*, so the *next* span's
+// `stripTrivia(pos, next.start)` re-reads and duplicates a stretch of source already emitted — the same
+// silent corruption this guard exists to rule out, reached by a different malformed span.
 export const assemble = (src: string, spans: Span[]): string => {
   let out = '';
   let pos = 0;
   for (const span of spans) {
-    if (span.start < pos) throw new Error(`code(): span starts at ${span.start}, before the previous span ended at ${pos} — collectSpans must be broken`);
+    if (span.start < pos || span.end < span.start)
+      throw new Error(`code(): span [${span.start}, ${span.end}) is out of order after the previous span ended at ${pos} — collectSpans must be broken`);
     out += stripTrivia(src, pos, span.start);
     out += span.comment ? ' ' : src.slice(span.start, span.end);
     pos = span.end;

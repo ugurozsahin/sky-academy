@@ -367,8 +367,12 @@ describe('the shared rail readers cannot go blind (#321)', () => {
   // nothing between the opening `/` and end-of-line is a second unescaped `/`.
   it('code() does not corrupt output on a genuinely unterminated regex literal (#827/#844)', () => {
     const src = 'const a = /never closed\nconst b = 1; // real trailing\n';
-    expect(code(src), 'an unterminated regex recovers to end-of-line, so the real trailing comment past it is still stripped')
+    const out = code(src);
+    expect(out, 'an unterminated regex recovers to end-of-line, so the real trailing comment past it is still stripped')
       .not.toContain('real trailing');
+    expect(out, 'the unterminated regex\'s own text must survive, not be dropped along with the comment')
+      .toContain('never closed');
+    expect(out, 'the real statement past the unterminated regex must survive too').toContain('const b = 1;');
   });
 
   // #844 finding 2: a template literal nested inside another template's `${...}` interpolation — named by
@@ -419,11 +423,31 @@ describe('the shared rail readers cannot go blind (#321)', () => {
       { start: 6, end: 12, comment: false },
       { start: 0, end: 5, comment: false },
     ]), 'a span starting before the previous one ended must be loud, not silently corrupt the output')
-      .toThrow(/span starts at 0, before the previous span ended at 12/);
+      .toThrow(/span \[0, 5\) is out of order after the previous span ended at 12/);
     expect(assemble(src, [
       { start: 0, end: 5, comment: false },
       { start: 6, end: 12, comment: false },
     ]), 'a correctly-ordered span list must assemble exactly as code() itself would')
       .toBe(src);
+  });
+
+  // silent-failure-hunter review of the #844 fix above: the `span.start < pos` guard alone lets a
+  // differently-shaped malformed span through untouched — one whose own `end` is before its own `start`.
+  // `pos` is not yet corrupted when such a span is reached, so `span.start < pos` can still be false; without
+  // this second check, `src.slice(span.start, span.end)` would silently return `''` for `end < start`
+  // (dropping that span's text), and `pos` would then be set *backwards* to that `end`, so the *next* span's
+  // `stripTrivia(pos, next.start)` would re-read and duplicate a stretch of source already emitted — the
+  // exact silent-corruption shape this guard exists to rule out, reached by a different malformed span.
+  // Reproduced directly before this test existed: the three-span list below produced
+  // `'const a = 1; const bonst b = 2; const c = 3;'` with no exception, under a guard that only checked
+  // `span.start < pos`.
+  it('assemble() throws on a span whose own end is before its own start, not just an out-of-order one (#844)', () => {
+    const src = 'const a = 1; const b = 2; const c = 3;';
+    expect(() => assemble(src, [
+      { start: 6, end: 12, comment: false },
+      { start: 20, end: 14, comment: false },
+      { start: 27, end: 33, comment: false },
+    ]), 'a span with end before its own start must be loud, not silently drop text and corrupt everything after it')
+      .toThrow(/span \[20, 14\) is out of order after the previous span ended at 12/);
   });
 });
