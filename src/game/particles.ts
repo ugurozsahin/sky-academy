@@ -2,7 +2,6 @@
 // shapes/maths a burst, a swish or a thrown star draws from. `Arena` still owns the particle array itself and
 // the drawing methods — those read too much per-frame state (the trail, the fx skin, the canvas) to move.
 import { hexA } from './bubbles';
-import type { Bubble } from './bubbles';
 
 type PKind = 'dot' | 'ring' | 'shard' | 'text' | 'ember' | 'drop' | 'bolt' | 'rock' | 'leaf' | 'crystal' | 'star' | 'smoke' | 'pixel' | 'slash';
 export interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; size: number; kind: PKind; text?: string; rot?: number }
@@ -12,17 +11,25 @@ export interface Particle { x: number; y: number; vx: number; vy: number; life: 
 export const ELEMENTS = ['fire', 'water', 'electric', 'earth', 'wind', 'ice', 'light', 'shadow', 'blade', 'robot'] as const;
 export type Element = typeof ELEMENTS[number];
 export type FxKind = Element | 'master';   // `master` draws from all of ELEMENTS
-export const FX_PARTICLE: Record<FxKind, PKind> = { fire: 'ember', water: 'drop', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'crystal', light: 'star', shadow: 'smoke', blade: 'slash', robot: 'pixel', master: 'star' };
-export const FX_COLORS: Record<FxKind, string[]> ={ fire: ['#ff7a1a', '#ffd23a', '#ff3b1a'], water: ['#3ec9ff', '#9fe6ff', '#1a7fff'], electric: ['#2ea8ff', '#ffffff', '#9fe6ff'], earth: ['#a0622a', '#7ddc3a', '#6b4220'], wind: ['#7fe8c8', '#c8ffe9', '#5fcf5a'], ice: ['#9fe6ff', '#ffffff', '#5bb8e8'], light: ['#ffd23a', '#ffffff', '#ffb020'], shadow: ['#a855ff', '#5a2aa0', '#2a1050'], blade: ['#ffffff', '#ff3b5c', '#d8dce8'], robot: ['#ff5252', '#ffffff', '#9aa5cf'], master: ['#ffd87a', '#ffffff', '#ffb020'] };
+// #559 review: these three tables are shared, mutable-by-default `Record`s reached from anywhere that imports
+// this module — `Readonly` catches `FX_PARTICLE.fire = 'star'` at compile time rather than letting it corrupt
+// the one shared lookup for every `Arena` instance, the same guarantee `COLLIDE` (bubbles.ts) already carries.
+export const FX_PARTICLE: Readonly<Record<FxKind, PKind>> = { fire: 'ember', water: 'drop', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'crystal', light: 'star', shadow: 'smoke', blade: 'slash', robot: 'pixel', master: 'star' };
+export const FX_COLORS: Readonly<Record<FxKind, string[]>> ={ fire: ['#ff7a1a', '#ffd23a', '#ff3b1a'], water: ['#3ec9ff', '#9fe6ff', '#1a7fff'], electric: ['#2ea8ff', '#ffffff', '#9fe6ff'], earth: ['#a0622a', '#7ddc3a', '#6b4220'], wind: ['#7fe8c8', '#c8ffe9', '#5fcf5a'], ice: ['#9fe6ff', '#ffffff', '#5bb8e8'], light: ['#ffd23a', '#ffffff', '#ffb020'], shadow: ['#a855ff', '#5a2aa0', '#2a1050'], blade: ['#ffffff', '#ff3b5c', '#d8dce8'], robot: ['#ff5252', '#ffffff', '#9aa5cf'], master: ['#ffd87a', '#ffffff', '#ffb020'] };
 export const MAX_PARTICLES = 250;   // #29: safety cap so a pathological burst can never grow the per-frame draw loop unbounded
 
 // A tap throws the ninja's own projectile (#48): it flies from the bottom of the arena to the bubble and pops
 // it on arrival. Score, lives and the outcome reveal are all settled at the tap — only the pop waits for the
 // landing, so the flight is decoration and never changes what the child earned.
-export interface Shot { target: Bubble; x0: number; y0: number; x: number; y: number; t: number; fx: FxKind; emit: number }
+/** What a shot actually touches on its target (#559 review): `shotPose`/`landShot` read `x`/`y`/`color`/
+ *  `dead`/`mark`, never a label or a font size, so `target` is this narrow shape rather than the full
+ *  `Bubble` — the same "only what this cares about" cut `Collidable` (bubbles.ts) already makes for
+ *  collision. A real `Bubble` satisfies it structurally; `arena.ts`'s `throwAt` passes one in unchanged. */
+export interface ShotTarget { x: number; y: number; color: string; dead: boolean; mark?: 'good' | 'bad' }
+export interface Shot { target: ShotTarget; x0: number; y0: number; x: number; y: number; t: number; fx: FxKind; emit: number }
 export const SHOT_FLIGHT = 0.15;   // seconds in the air
 type ShotStyle = 'shuriken' | 'fireball' | 'orb' | 'bolt' | 'rock' | 'leaf' | 'shard' | 'star' | 'laser';
-export const SHOT_STYLE: Record<FxKind, ShotStyle> = { blade: 'shuriken', shadow: 'shuriken', master: 'shuriken', fire: 'fireball', water: 'orb', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'shard', light: 'star', robot: 'laser' };
+export const SHOT_STYLE: Readonly<Record<FxKind, ShotStyle>> = { blade: 'shuriken', shadow: 'shuriken', master: 'shuriken', fire: 'fireball', water: 'orb', electric: 'bolt', earth: 'rock', wind: 'leaf', ice: 'shard', light: 'star', robot: 'laser' };
 /** Where a shot is `t` seconds after the throw: a straight line to the target's current spot, a touch faster as it goes. */
 export function shotPose(x0: number, y0: number, tx: number, ty: number, t: number) {
   const k = Math.min(1, Math.max(0, t / SHOT_FLIGHT)); const e = k * (0.7 + 0.3 * k);

@@ -513,8 +513,8 @@ export function bodySprite(color: string, r: number): HTMLCanvasElement {
 
 // Shared colour helpers (#29/#28): every sprite gradient and every halo underlay goes through these instead
 // of building an rgba() string or a lighten/darken by hand at each call site. `particles.ts` imports `hexA`
-// for its own halo constants — `Shot`'s `target: Bubble` is the other direction of that same dependency, so
-// the colour helpers live on this side of it to avoid a cycle between the two files.
+// for its own halo constants, which is why they live on this side rather than the other — a dependency the
+// other way would cycle the two files.
 export function hexToRgb(h: string) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 export function hexA(h: string, a: number) { const [r, g, b] = hexToRgb(h); return `rgba(${r},${g},${b},${a})`; }
 export function lighten(h: string, k: number) { const [r, g, b] = hexToRgb(h); return `rgb(${r + (255 - r) * k | 0},${g + (255 - g) * k | 0},${b + (255 - b) * k | 0})`; }
