@@ -2811,12 +2811,33 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
     const isDynamicImportTarget = (e: ts.Expression): boolean =>
       e.kind === ts.SyntaxKind.ImportKeyword ||
       (ts.isMetaProperty(e) && e.keywordToken === ts.SyntaxKind.ImportKeyword && e.name.text === 'defer');
-    const isRequireCallee = (e: ts.Expression): boolean =>
-      (ts.isIdentifier(e) && e.text === 'require') || (ts.isPropertyAccessExpression(e) && e.name.text === 'require');
+    // #803 (PR #799 review): `(require)('x')` and `(0, require)('x')` are real minifier/bundler output shapes —
+    // unwrap a parenthesized callee, and a comma-expression's right-hand side, before testing its shape.
+    const unwrapRequireCallee = (e: ts.Expression): ts.Expression => {
+      while (ts.isParenthesizedExpression(e)) e = e.expression;
+      if (ts.isBinaryExpression(e) && e.operatorToken.kind === ts.SyntaxKind.CommaToken) return unwrapRequireCallee(e.right);
+      return e;
+    };
+    const isRequireCallee = (e: ts.Expression): boolean => {
+      const u = unwrapRequireCallee(e);
+      return (ts.isIdentifier(u) && u.text === 'require') || (ts.isPropertyAccessExpression(u) && u.name.text === 'require');
+    };
+    // #803 (PR #799 review): `import { type A } from 'x'` has no whole-clause `isTypeOnly`, but when every named
+    // binding is individually `type`-qualified nothing ships either way — the same "erased before emit" test the
+    // clause-level flag already applies. A default binding (`import Foo, { type A } from 'x'`) is a value import
+    // regardless, so it never qualifies.
+    const namedBindingsAllTypeOnly = (clause: ts.ImportClause | undefined): boolean => {
+      if (!clause || clause.isTypeOnly || clause.name) return false;
+      const bindings = clause.namedBindings;
+      return !!bindings && ts.isNamedImports(bindings) && bindings.elements.length > 0 &&
+        bindings.elements.every((el) => el.isTypeOnly);
+    };
     const visit = (node: ts.Node): void => {
       if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
         const text = specText(node.moduleSpecifier);
-        const typeOnly = ts.isImportDeclaration(node) ? !!node.importClause?.isTypeOnly : !!node.isTypeOnly;
+        const typeOnly = ts.isImportDeclaration(node)
+          ? !!node.importClause?.isTypeOnly || namedBindingsAllTypeOnly(node.importClause)
+          : !!node.isTypeOnly;
         if (text !== null) push(text, typeOnly ? 'type' : 'static');
       } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
         // `typeof import('x')` and a bare `import('x')` type reference both land here; either way nothing ships.
@@ -2845,8 +2866,18 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         node.expression.expression.keywordToken === ts.SyntaxKind.ImportKeyword
       ) {
         // `import.meta.glob('../three/stage/*.ts')` is an import Vite resolves and bundles too (pr-test-analyzer).
-        const text = specText(node.arguments[0]);
-        if (text !== null) push(text, 'static');
+        // #803: the array-pattern form (`import.meta.glob([...])`, ordinary Vite usage) is walked element by
+        // element rather than dropped whole — a single non-array argument keeps the old single-edge behaviour.
+        const arg = node.arguments[0];
+        if (arg && ts.isArrayLiteralExpression(arg)) {
+          for (const el of arg.elements) {
+            const text = specText(el);
+            if (text !== null) push(text, 'static');
+          }
+        } else {
+          const text = specText(arg);
+          if (text !== null) push(text, 'static');
+        }
       }
       ts.forEachChild(node, visit);
     };
@@ -2912,6 +2943,16 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
   });
 
+  // #803 (PR #799 review): a parenthesized or comma-expression require callee is a real minifier/bundler output
+  // shape, not a syntax trick — `isRequireCallee` only unwrapped a bare identifier or property access before this.
+  it.each([
+    ['a parenthesized require callee', "const r = (require)('../three/stage/rig');"],
+    ['a comma-expression require callee', "const r = (0, require)('../three/stage/rig');"],
+  ])('%s still counts as require, not silently nothing (#803)', (_case, src) => {
+    expect(edges('/src/ui/x.ts', src))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
+  });
+
   // #799 review, finding 1: a per-name dynamic loader (`import(\`../objects/${name}.ts\`)`) is a realistic
   // pattern in exactly the area this rail polices, and a template literal with a substitution must still
   // produce an edge whose `to` lands under the tree — not vanish, the way it silently did before this fix.
@@ -2927,6 +2968,33 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   it('export type { X } from \'x\' counts as type, the same as a whole-clause import type (#736 review)', () => {
     expect(edges('/src/ui/x.ts', "export type { X } from '../three/stage/rig';"))
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'type' }]);
+  });
+
+  // #803 (PR #799 review): a whole-clause `isTypeOnly` flag misses the case where every *named binding* is
+  // individually `type`-qualified — nothing ships either way, so that import is really type-only too, even
+  // though TypeScript's own `ImportClause.isTypeOnly` stays false for it.
+  it('import { type A } from \'x\' counts as type when every named binding is individually type-only (#803)', () => {
+    expect(edges('/src/ui/x.ts', "import { type A } from '../three/stage/rig';"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'type' }]);
+  });
+  it('import { type A, B } from \'x\' still counts as static — B is a real value binding (#803)', () => {
+    expect(edges('/src/ui/x.ts', "import { type A, B } from '../three/stage/rig';"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'static' }]);
+  });
+  it('import Foo, { type A } from \'x\' still counts as static — the default binding is a value import (#803)', () => {
+    expect(edges('/src/ui/x.ts', "import Foo, { type A } from '../three/stage/rig';"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'static' }]);
+  });
+
+  // #803 (PR #799 review): `specText()` only recognised a string/template argument, so an array-form glob
+  // pattern (`import.meta.glob([...])`, ordinary Vite usage — this repo already has one in british.test.ts)
+  // produced zero edges rather than one per element, silently un-policing every path inside the array.
+  it('import.meta.glob([...]) with an array-literal pattern still produces one edge per element (#803)', () => {
+    expect(edges('/src/ui/x.ts', "import.meta.glob(['../three/stage/*.ts', '../three/objects/*.ts']);"))
+      .toEqual([
+        { from: '/src/ui/x.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' },
+        { from: '/src/ui/x.ts', spec: '../three/objects/*.ts', to: '/src/three/objects/*.ts', kind: 'static' },
+      ]);
   });
 
   // (a) Proved red: `import { Color } from 'three'` in a scratch `src/ui/x.ts` fails.
