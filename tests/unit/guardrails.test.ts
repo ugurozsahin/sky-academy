@@ -3043,6 +3043,14 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         { from: '/src/ui/x.ts', spec: '../three/objects/*.ts', to: '/src/three/objects/*.ts', kind: 'static' },
       ]);
   });
+  // pr-test-analyzer review of this fix: unwrapParens runs unconditionally on the glob argument, so it also
+  // fixes a single string wrapped in its own parens — `specText()` doesn't recognise a ParenthesizedExpression,
+  // so this was silently dropped before this fix too, the same class as the array case above, just not the
+  // one #820 named.
+  it('import.meta.glob((\'x\')) — a single string wrapped in its own parens — still produces its edge (#820)', () => {
+    expect(edges('/src/ui/x.ts', "import.meta.glob(('../three/stage/*.ts'));"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' }]);
+  });
 
   // (a) Proved red: `import { Color } from 'three'` in a scratch `src/ui/x.ts` fails.
   it('three is imported only under src/three/', () => {
