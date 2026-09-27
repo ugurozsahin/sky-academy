@@ -343,8 +343,6 @@ export const PHASE5: Sound[] = [
 export const SPLIT: Sound[] = [   // split digraphs (phase 5)
   ['a-e', 'ai', 'middle', ['cake', 'make', 'lake', 'gate']], ['i-e', 'igh', 'middle', ['bike', 'kite', 'time', 'line']], ['o-e', 'oa', 'middle', ['bone', 'home', 'nose', 'rope']], ['u-e', 'oo', 'middle', ['cube', 'tube', 'June', 'flute']],
 ];
-const LETTER_SOUNDS = [...PHASE2, ...PHASE2B];
-
 /** Sound Hunt: three keyword words are spoken (never shown); slice the grapheme for the sound they share. Reception, Year 1. */
 export function soundQ(rng: Rng, pool: Sound[], distractPool: Sound[], decoys: number): Question {
   const [g, ph, pos, words] = pick(rng, pool);

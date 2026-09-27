@@ -157,7 +157,7 @@ const rWords = (d: 1 | 2 | 3) => { const pool = rLetters(d); return CVC.filter((
 export const medialIsGenuine = (w: string) => VOWELS.includes(w[1]);
 /**
  * #135: a word's last letter is a genuine final sound unless it forms a digraph with the letter before it
- * (`cow` ends in `ow`, not `w` — `DIGRAPHS` already lists `ow` as one unit), or `LETTER_SOUNDS` itself
+ * (`cow` ends in `ow`, not `w` — `DIGRAPHS` already lists `ow` as one unit), or `PHASE2`/`PHASE2B` itself
  * documents that letter's end-position sound as a blend distinct from the letter (`x`, in phase 2B, is `ks`
  * at the end of `fox`/`box` — the only such entry). Mechanical, not a word list, so a future `CVC` addition
  * with the same shape is caught without touching this function.

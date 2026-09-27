@@ -3156,7 +3156,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // `src/` file of 300 lines or more on 2026-09-25, counted as `wc -l` counts, newlines.
   const RATCHET: Record<string, number> = {
     'src/style.css': 1878, 'src/storage.ts': 1511, 'src/game/arena.ts': 1102, 'src/curriculum/year2.ts': 799,
-    'src/curriculum/util.ts': 545, 'src/ui/duel.ts': 508, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
+    'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 508, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
     'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 365, 'src/ui/certificate.ts': 341, 'src/audio.ts': 311,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
