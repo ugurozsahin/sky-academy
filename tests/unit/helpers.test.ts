@@ -243,4 +243,62 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     expect(code('const a = 1; /* closed */ const b = 2;'), 'a properly closed comment must still be stripped')
       .toBe('const a = 1;   const b = 2;');
   });
+
+  // #827: a /*-shaped substring sitting inside an ordinary string literal is not a real comment open, but the
+  // scan above has no notion of string boundaries — it only ever tracks escape pairs and regex-adjacent
+  // slashes, never a quote. `tests/unit/governance.test.ts` itself has exactly this shape in a plain string:
+  // 'docs' + '/' + '*' + '-PROMPT.md' reads as `/*`. Built by concatenation here for the same #836 reason the
+  // test above already gives — so this file's own raw text never contains the shape it is pinning.
+  it('code() does not read a /*-shaped substring inside a string literal as opening a real comment (#827)', () => {
+    const glob = 'docs' + '/' + '*' + '-PROMPT.md';
+    const src = `const msg = 'the ${glob} rail'; realCode(); /* real comment */`;
+    const out = code(src);
+    expect(out, 'the string literal must survive untouched').toContain(`'the ${glob} rail'`);
+    expect(out, 'the real code after the string must not be swallowed').toContain('realCode();');
+    expect(out, 'the real trailing comment must still be stripped').not.toContain('real comment');
+  });
+
+  // The exact shape the finding was filed against: no closing */ anywhere later in the file either, which
+  // #816's throw above used to (wrongly) treat as a real unterminated comment.
+  it('code() does not throw on a /*-shaped substring inside a string with no */ anywhere in the file (#827)', () => {
+    const glob = 'docs' + '/' + '*' + '-PROMPT.md';
+    const src = `const msg = 'the ${glob} rail';`;
+    expect(() => code(src), 'a string is not a comment, however it is spelled, so this must not throw').not.toThrow();
+    expect(code(src)).toBe(src);
+  });
+
+  // A comment that is genuinely inside a string on both sides of a real quote must still be left alone, and a
+  // quote character escaped inside a string must not be read as closing it early.
+  it('code() leaves a string containing a quote-escaped apostrophe and a `/` untouched', () => {
+    const src = "const msg = 'it\\'s a path: a/b'; // real comment\n";
+    expect(code(src), 'the escaped apostrophe must not end the string early, and the string must survive')
+      .toContain("'it\\'s a path: a/b'");
+    expect(code(src), 'the real trailing comment must still be stripped').not.toContain('real comment');
+  });
+
+  // #827: a template literal's `${...}` is real code, not string content — `src/ui/profiles.ts`'s render has a
+  // genuine `//` comment inside one (naming `avatarById` to explain why it is *not* used, the same
+  // banned-token-in-a-comment shape the very first test above pins). Treating the whole backtick span as
+  // opaque text, the naive fix for the bug above, stops stripping that real comment.
+  it('code() strips a real comment sitting inside a template literal\'s `${...}` interpolation (#827)', () => {
+    const src = 'const html = `<div>${list.map((x) => {\n'
+      + '  // avatarById: not the real name, just naming the shape\n'
+      + '  return x;\n'
+      + '})}</div>`;';
+    const out = code(src);
+    expect(out, 'the comment inside the interpolation must be stripped like any other comment')
+      .not.toContain('avatarById');
+    expect(out, 'the real code either side of the comment, inside the interpolation, must survive')
+      .toContain('return x;');
+    expect(out, 'the template literal text outside the interpolation must survive')
+      .toContain('<div>${');
+  });
+
+  // A nested object literal inside `${...}` has its own `{`/`}`, which must not be mistaken for the
+  // interpolation's own closing brace, and a nested string inside it must not leak its own braces either.
+  it('code() finds the interpolation\'s own closing brace past a nested object literal and a nested string (#827)', () => {
+    const src = "const html = `${fn({ a: 1, s: '{not a close}' })} after`;";
+    expect(code(src), 'nested braces and a brace-shaped string inside the interpolation must not end it early')
+      .toBe(src);
+  });
 });

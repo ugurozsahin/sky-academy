@@ -110,14 +110,69 @@ export const inDir = (dir: string): [string, string][] => {
 // A `/*` with no closing `*/` before EOF throws rather than silently swallowing everything after it to a
 // single space (#816) — no real src/*.ts file can contain one (tsc rejects it), but a hand-written test
 // fixture that is not valid TypeScript could, and this reader is applied to non-source text too.
+//
+// A string literal is tracked as one span, entered at an unescaped `'`/`"`/`` ` `` and left at the next
+// unescaped matching quote (#827): while inside one, a `/*`- or `//`-shaped substring is copied through like
+// any other character rather than read as a comment opener. Without this, a plain string containing that
+// shape — 'docs' + '/' + '*' + '-PROMPT.md' is the real instance this was filed against — is misread as
+// opening a comment that swallows everything up to the *next* literal `*/` anywhere later in the file, or
+// throws the #816 error above when none exists, though the string was never a comment at all.
+//
+// A template literal's `${...}` interpolation *is* re-entered as ordinary code, unlike a regex literal's span
+// above — src/**/*.ts genuinely has real `//` comments inside one (`src/ui/profiles.ts`'s `cardName` render is
+// one), so treating the whole backtick-to-backtick run as opaque text would stop stripping a real comment
+// rather than only avoiding a false one. A stack tracks nesting: a string/template push their own frame and
+// pop on their own closing quote; an interpolation frame opens on an unescaped `${`, counts `{`/`}` it meets
+// itself (a nested object literal's braces included) to find *its own* matching `}`, and pops there, so `{`
+// and `}` belonging to a nested string are never counted — those sit inside that string's own frame instead.
+type Frame = { kind: 'string'; quote: string } | { kind: 'template' } | { kind: 'interp'; depth: number };
 export const code = (src: string): string => {
   let out = '';
   let i = 0;
+  const stack: Frame[] = [];
   while (i < src.length) {
     const ch = src[i];
     if (ch === '\\' && i + 1 < src.length) {
       out += src[i] + src[i + 1];
       i += 2;
+      continue;
+    }
+    const top = stack[stack.length - 1];
+    if (top?.kind === 'string') {
+      out += ch;
+      i++;
+      if (ch === top.quote) stack.pop();
+      continue;
+    }
+    if (top?.kind === 'template') {
+      if (ch === '`') stack.pop();
+      else if (ch === '$' && src[i + 1] === '{') {
+        stack.push({ kind: 'interp', depth: 1 });
+        out += '${';
+        i += 2;
+        continue;
+      }
+      out += ch;
+      i++;
+      continue;
+    }
+    if (top?.kind === 'interp' && (ch === '{' || ch === '}')) {
+      top.depth += ch === '{' ? 1 : -1;
+      out += ch;
+      i++;
+      if (top.depth === 0) stack.pop();
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      stack.push({ kind: 'string', quote: ch });
+      out += ch;
+      i++;
+      continue;
+    }
+    if (ch === '`') {
+      stack.push({ kind: 'template' });
+      out += ch;
+      i++;
       continue;
     }
     if (ch === '/' && src[i + 1] === '/') {
