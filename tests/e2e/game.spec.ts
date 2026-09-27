@@ -3416,6 +3416,7 @@ test.describe('profile picker (#20 slice 2)', () => {
         await expect(page.locator('.home.map')).toBeVisible();
         await page.click('#rewards'); await page.click('#shop');
         await expect(page.locator('.shop')).toBeVisible();
+        await expect(page.locator('#back')).toBeVisible();
         const back = await page.locator('#back').boundingBox();
         expect(back!.x, `${w}x${h}, ${coins} coins: the back button's left edge is off-screen`).toBeGreaterThanOrEqual(0);
         expect(back!.width, `${w}x${h}, ${coins} coins: the back button is squeezed under the 44px touch floor`).toBeGreaterThanOrEqual(44);
