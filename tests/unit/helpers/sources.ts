@@ -53,60 +53,44 @@ export const inDir = (dir: string): [string, string][] => {
 // a string literal would blank the rest of that line — no such line exists in src/, and a rail that reads
 // slightly less is safer than one that goes red on prose.
 //
-// One thing it does track: a `/` that opens a regex literal is never read as opening a comment (#775/#780).
-// A textual `/\*...\*\// ` scan has no notion of a regex literal, so `/a\/*/` — a real regex, `/a\//` with a
-// `*` quantifier trailing it — reads as `/*` opening a comment that only closes at the *next* literal `*/`
-// anywhere later in the file, silently erasing everything between, imports included. The fix stays a single
-// character scan, not a real parser: a `/` is read as a regex literal's own opening delimiter, not a
-// division, when the last significant (non-whitespace) character before it isn't the kind of character a
-// value ends in — an identifier/number character or a closing `)`/`]` — the standard heuristic. A regex body
-// then runs to its own closing `/` (honouring a `[...]` character class, where an unescaped `/` doesn't end
-// it), never past a semicolon, a quote or a line end: those can only mean this wasn't a regex literal after
-// all — a `/` inside a string such as `'./gentleRelaunch'` — so the scan gives up and leaves the `/` as an
-// ordinary character rather than risk swallowing a real comment sitting further along the same line.
+// One thing it does track now: an *escaped* slash is never read as opening a comment (#775/#780). A textual
+// `/\*...\*\// ` scan has no notion of escaping, so a regex literal's own `\/` — an escaped slash, standing
+// for a literal "/" in whatever the regex matches — reads as a bare `/` the moment it is followed by `*` or
+// another `/`. `/a\/*/` (a real regex: `/a\//` with a `*` quantifier on the escaped slash) is misread as `/*`
+// opening a comment that only closes at the *next* literal `*/` anywhere later in the file, silently erasing
+// everything between, imports included; the same misreading happens to `\//` at a regex's own end — several
+// existing test files spell exactly that (`/^\.claude\/skills\//`, `/^icons\//`), the reason this fix changes
+// their own `code()` output too. Rather than try to tell a regex literal from division — division needs
+// knowing the previous *token*, not character, and still cannot be told from every other regex-carrying
+// context, and got two independently-confirmed regressions during review (a keyword-preceded regex misread as
+// division; a real `//` comment straight after a postfix `++`/`--` misread as a regex read that swallowed
+// part of it) — this scan does not try to identify a regex literal as a span at all. It only ever consumes an
+// escaped character as one atomic unit alongside its backslash, the same pairing real escape semantics use
+// (an even run of backslashes cancels out, leaving the next character unescaped) — so a comment's own opening
+// `/*` or `//`, never itself escaped, is always still seen, while a regex literal's internal `\/` never is.
 export const code = (src: string): string => {
   let out = '';
-  let prevSignificant = '';
-  const endsAValue = /[\w$)\]]/;
-  for (let i = 0; i < src.length; ) {
+  let i = 0;
+  while (i < src.length) {
     const ch = src[i];
-    const next = src[i + 1];
-    if (ch === '/' && next === '/') {
+    if (ch === '\\' && i + 1 < src.length) {
+      out += src[i] + src[i + 1];
+      i += 2;
+      continue;
+    }
+    if (ch === '/' && src[i + 1] === '/') {
       while (i < src.length && src[i] !== '\n') i++;
       out += ' ';
       continue;
     }
-    if (ch === '/' && next === '*') {
+    if (ch === '/' && src[i + 1] === '*') {
       i += 2;
       while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++;
       i = Math.min(i + 2, src.length);
       out += ' ';
       continue;
     }
-    if (ch === '/' && !endsAValue.test(prevSignificant)) {
-      let j = i + 1;
-      let inClass = false;
-      let closed = false;
-      let abandoned = false;
-      while (j < src.length) {
-        const c = src[j];
-        if (c === '\\') { j += 2; continue; }
-        if (c === '\n' || c === ';' || c === "'" || c === '"' || c === '`') { abandoned = true; break; }
-        if (c === '[') inClass = true;
-        else if (c === ']') inClass = false;
-        else if (c === '/' && !inClass) { closed = true; j++; break; }
-        j++;
-      }
-      if (closed && !abandoned) {
-        while (j < src.length && /[a-z]/i.test(src[j])) j++;
-        out += src.slice(i, j);
-        prevSignificant = '/';
-        i = j;
-        continue;
-      }
-    }
     out += ch;
-    if (!/\s/.test(ch)) prevSignificant = ch;
     i++;
   }
   return out;

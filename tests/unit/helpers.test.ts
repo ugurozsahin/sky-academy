@@ -90,9 +90,10 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     expect(code('ctx.shadowBlur = 4;'), 'a real use is not a comment and must stay readable').toContain('shadowBlur');
   });
 
-  // #775/#780: a `/*` inside a regex literal is not a real comment open. The old textual scan read it as one
-  // and erased everything up to the *next* literal `*/` — here, a real import and a real trailing comment.
-  it('code() does not read a regex literal\'s own /* as opening a real comment (#775/#780)', () => {
+  // #775/#780: an escaped slash inside a regex literal is not a real comment open. The old textual scan had no
+  // notion of escaping, so `/a\/*/`'s own `\/*` read as `/*` opening a comment, erasing everything up to the
+  // *next* literal `*/` — here, a real import and a real trailing comment.
+  it('code() does not read a regex literal\'s own escaped /* as opening a real comment (#775/#780)', () => {
     const src = "const r = /a\\/*/; import { $ } from '../ui/dom'; /** trailing */";
     const out = code(src);
     expect(out, "the regex literal itself must survive untouched").toContain('/a\\/*/');
@@ -100,14 +101,41 @@ describe('the shared rail readers cannot go blind (#321)', () => {
     expect(out, 'the real trailing comment must still be stripped').not.toContain('trailing');
   });
 
-  // The fix must not start reading division as a regex literal, nor lose a `/` inside a path string to a
-  // bogus regex-literal scan that then swallows part of a real comment sitting later on the same line.
-  it('code() still tells a regex literal apart from division, and from a `/` inside a string (#775/#780)', () => {
-    expect(code('const x = width / 2;'), 'division must stay division, not a regex literal').toBe('const x = width / 2;');
+  // The same misreading happens to an escaped slash at a regex's own *end* (`\//`), not just before a `*` —
+  // and this repository already has that shape today, in the very files these rails read: `governance.test.ts`
+  // and `guardrails.test.ts` both call `.replace(/^\.claude\/skills\//, ...)`-style patterns, `pwa.test.ts` and
+  // `sw.test.ts` each have `/^icons\//`/`/^\//`. Found only once this fix's own `code()` output was diffed
+  // against the old implementation's across every test file, not just src/ — the four real instances are why
+  // this is a repository-proven case, not a constructed one.
+  it('code() does not read an escaped slash at a regex literal\'s own end as opening a real comment (#775/#780)', () => {
+    const src = "path.replace(/^\\.claude\\/skills\\//, ''); realCode();";
+    expect(code(src), 'the real code after the regex literal must survive, not be swallowed as a comment')
+      .toBe(src);
+  });
+
+  // Division and an ordinary regex literal (no escapes) are untouched by this fix either way, and a `/` inside
+  // a string must not make a real trailing comment vanish.
+  it('code() leaves plain division and plain regex literals alone, and does not lose a comment to a `/` in a string (#775/#780)', () => {
+    expect(code('const x = width / 2;'), 'division must stay exactly as written').toBe('const x = width / 2;');
     expect(code("str.replace(/foo/g, 'bar');"), 'a real regex literal must survive untouched')
       .toBe("str.replace(/foo/g, 'bar');");
     const src = "import { gentleRelaunchSet } from './gentleRelaunch';   // #742: real comment\n";
     expect(code(src), "a `/` inside the import path must not eat part of the trailing // comment")
       .not.toContain('#742');
+  });
+
+  // pr-test-analyzer and silent-failure-hunter review, independently, of an earlier version of this fix that
+  // tried to tell a regex literal from division by its preceding token: a regex right after a keyword
+  // (`return`, `typeof`, `case`…) still ends in a word character, so a single-previous-character heuristic
+  // misreads it as division and reopens the #775/#780 class through a different door; a real `//` comment
+  // straight after a postfix `++`/`--` was misread as a regex read that swallowed part of it. The final design
+  // in this file sidesteps both — it never tries to identify a regex literal as a span, only ever treats an
+  // escaped character as one atomic unit — so these are regression tests for a design this file no longer
+  // uses, kept because both are real inputs a naive "is this a regex?" fix could plausibly get wrong again.
+  it('code() is unaffected by a keyword before a regex literal, or a postfix operator before a real comment (#775/#780)', () => {
+    expect(code("return /foo\\/*bar/.test(x); realCode();"), 'a regex right after a keyword must not trip anything')
+      .toBe("return /foo\\/*bar/.test(x); realCode();");
+    expect(code('const stats = {\n  ratio: count-- / total, // ratio note\n};'), 'a real comment straight after count-- / total must still be stripped')
+      .not.toContain('ratio note');
   });
 });
