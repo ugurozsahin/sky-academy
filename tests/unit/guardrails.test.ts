@@ -2880,8 +2880,11 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         const arg0 = node.arguments[0];
         const arg = arg0 ? unwrapParens(arg0) : undefined;
         if (arg && ts.isArrayLiteralExpression(arg)) {
+          // review of PR #825: unwrap each element too, not just the top-level argument — a paren-wrapped
+          // element inside the array previously fell through specText's ParenthesizedExpression blind spot
+          // and silently dropped its edge, the unsafe direction for this rail (a real value import could hide).
           for (const el of arg.elements) {
-            const text = specText(el);
+            const text = specText(unwrapParens(el));
             if (text !== null) push(text, 'static');
           }
         } else {
@@ -3049,6 +3052,25 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // one #820 named.
   it('import.meta.glob((\'x\')) — a single string wrapped in its own parens — still produces its edge (#820)', () => {
     expect(edges('/src/ui/x.ts', "import.meta.glob(('../three/stage/*.ts'));"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' }]);
+  });
+  // review of PR #825 (blocking): unwrapParens was applied only to the top-level glob argument, never to an
+  // individual array *element* once that argument is confirmed to be an array literal — so a paren-wrapped
+  // element inside the array silently dropped its edge entirely, the unsafe direction (a real value import
+  // could hide from the boundary rail this way), unlike the two #820-named gaps which only ever pushed an
+  // edge toward 'static'.
+  it('a paren-wrapped element inside the array still produces its edge, not silently dropped (PR #825 review)', () => {
+    expect(edges('/src/ui/x.ts', "import.meta.glob(['../three/stage/*.ts', ('../three/objects/*.ts')]);"))
+      .toEqual([
+        { from: '/src/ui/x.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' },
+        { from: '/src/ui/x.ts', spec: '../three/objects/*.ts', to: '/src/three/objects/*.ts', kind: 'static' },
+      ]);
+  });
+  // pr-test-analyzer (PR #825 review): unwrapParens is recursive, so a *doubly*-parenthesized top-level
+  // argument (two extra layers, not just #820's one) already worked before this fix too — a coverage gap in
+  // the tests, not a second defect. Pinned here.
+  it('import.meta.glob((((["..."])))) — two extra layers of parens — still produces its edge', () => {
+    expect(edges('/src/ui/x.ts', "import.meta.glob(((['../three/stage/*.ts'])));"))
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' }]);
   });
 
