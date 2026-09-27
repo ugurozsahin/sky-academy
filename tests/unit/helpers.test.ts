@@ -230,10 +230,15 @@ describe('the shared rail readers cannot go blind (#321)', () => {
   // non-source text (e.g. governance.test.ts's own local `code` shadow over free-text it() bodies), where a
   // hand-written fixture could.
   it('code() throws on an unterminated /* comment instead of silently swallowing to EOF (#816)', () => {
-    // Built by concatenation, not a literal `/*`, so this file's own raw source (which scripts.test.ts's
-    // Playwright-import rail scans with code() too, #142) never contains an actually-unterminated comment.
+    // Built by concatenation, not a literal slash-star, so this file's own raw source (which scripts.test.ts's
+    // Playwright-import rail scans with code() too, #142) never contains an actually-unterminated comment —
+    // and the assertion message below is worded without a literal star-slash for the same reason (#836): that
+    // substring would otherwise sit right next to the split-apart opener above, so if an earlier, unrelated
+    // slash-star-shaped substring anywhere else in this file's raw text were ever left dangling open by the
+    // time the scanner reaches here, this message's own star-slash could close it "by coincidence" rather
+    // than by construction.
     const unterminated = 'const a = 1; ' + '/*' + ' never closed';
-    expect(() => code(unterminated), 'a missing closing */ must be loud, not silent')
+    expect(() => code(unterminated), 'a missing closing block comment must be loud, not silent')
       .toThrow(/unterminated \/\* comment/);
     expect(code('const a = 1; /* closed */ const b = 2;'), 'a properly closed comment must still be stripped')
       .toBe('const a = 1;   const b = 2;');
