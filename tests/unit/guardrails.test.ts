@@ -2981,6 +2981,14 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
   });
 
+  // pr-test-analyzer (#837 review): unwrapParens is recursive, so a doubly-parenthesized argument here
+  // (two extra layers, not just #837's one) already works too — a coverage gap in the tests, not a second
+  // defect, the same shape PR #825 pinned for import.meta.glob's own recursive unwrap. Pinned here.
+  it('import x = require(((\'x\'))) — two extra layers of parens — still counts as require', () => {
+    expect(edges('/src/ui/x.ts', "import rig = require(((('../three/stage/rig'))));"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
+  });
+
   // #803 (PR #799 review): a parenthesized or comma-expression require callee is a real minifier/bundler output
   // shape, not a syntax trick — `isRequireCallee` only unwrapped a bare identifier or property access before this.
   // The doubly-nested and paren-wrapped-comma cases prove `unwrapRequireCallee`'s loop/recursion actually
