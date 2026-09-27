@@ -3363,7 +3363,7 @@ describe('CLAUDE.md, docs/ROUTINE-PROMPT.md and docs/REVIEWER-PROMPT.md byte bud
 
   // The three figures below are this PR's own landing sizes, exactly — never raise either to make a red build
   // green.
-  const CLAUDE_MD_BUDGET = 9_444   // → 9,444 (#624): the guard-rails bullet gains a pointer at
+  const CLAUDE_MD_BUDGET = 9_438   // → 9,438 (#855): the Stack line says "smoke on a PR", paying back the byte #751's "mobile smoke" added after #850 had already lowered this budget, the two PRs green apart and red together;   // → 9,444 (#624): the guard-rails bullet gains a pointer at
     // `docs/decisions/011-instruction-files-are-measured-by-structure.md` (why a byte budget alone rewards a long
     // line), paid for by dropping the freeze bullet's now-redundant "highest first, oldest within a priority —
     // with no blanket bar on features" clause (the priority-label rule's home is `.claude/rules/governance.md`,
