@@ -1,0 +1,215 @@
+/* overlays */
+.overlay[hidden], [hidden] { display: none !important; }
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  background: #05081acc;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 5;
+  padding: 16px;
+  animation: fade .25s;
+}
+@keyframes fade { from { opacity: 0; } }
+.modal {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  margin: auto;
+  padding: 22px 18px;
+  border-radius: 26px;
+  background: linear-gradient(180deg, #1c2450, #10163a);
+  border: 1px solid var(--line);
+  text-align: center;
+  box-shadow: 0 30px 60px #000a;
+  animation: pop .35s cubic-bezier(.2, 1.4, .4, 1);
+}
+@keyframes pop { from { transform: scale(.7); opacity: 0; } }
+/* #436: the certificate outcome, reported inside the results modal next to the 🎓 button rather than through
+   the shared `#toast` (which the overlay this modal lives in sits above and so covers).
+   `.modal .cert-msg`, not the bare class (round-1 review, B1): `.modal p` below is (0,1,1) — one class AND one
+   element selector — which beats a bare one-class `.cert-msg` regardless of source order, so the success/
+   neutral colour and margin were silently coming from `.modal p` instead. Two classes, (0,2,0), wins outright. */
+.modal .cert-msg { margin: 4px 0 0; text-align: center; font-size: 14px; font-weight: 700; color: var(--good); }
+.modal .cert-msg.bad { color: var(--bad); }
+/* certificate full-screen fallback (artifact viewer with no downloads grant) */
+.cert-view {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px calc(16px + var(--sar, 0px)) calc(16px + var(--sab, 0px)) calc(16px + var(--sal, 0px));
+  background: #05081aee;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fade .25s;
+}
+.cert-view-img {
+  max-width: 100%;
+  max-height: 72vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px #000b;
+  -webkit-touch-callout: default;
+  user-select: none;
+  cursor: zoom-in;
+  transition: transform .2s ease;
+  touch-action: manipulation;
+}
+/* #110: tap-to-zoom on the certificate view (album "View" and the results-screen delivery view alike). */
+.cert-view.zoomed { overflow: auto; }
+.cert-view-img.zoomed { max-height: none; transform: scale(1.6); cursor: zoom-out; }
+.cert-view-hint { margin: 0; color: #dff3ff; font-weight: 700; text-align: center; text-shadow: 0 2px 8px #000a; }
+/* #398: a results modal taller than the viewport (two dojo rows, a sticker unlock, a certificate button) used
+   to push Play again/Rematch and Islands off the bottom with nothing on screen saying there was more below —
+   `.overlay`'s own `overflow-y: auto` scrolled the WHOLE modal, hero art and all, which reads as a finished
+   screen rather than one with a hidden tail. The modal is capped to the space `.overlay` actually has (its
+   grid row stretches to fill it, so `100%` here is definite). Scoped to `.results` — the pause and stage-clear
+   modals are always short enough to fit.
+   #398 round 2, B1: `.row.nav` used to be `position: sticky` on the LAST child of the scrolling element
+   itself, so its stuck box held a fixed on-screen band for most of the scroll range — reordering DOM only
+   changed which *other* element's static position fell inside that band, it never stopped the overlap.
+   `.row.nav` is now a flex sibling OUTSIDE the scrolling region (`.scroll` is the only thing that scrolls),
+   so nothing can ever be positioned underneath it: the overlap is structurally impossible, not just moved.
+   #398 round 3, B1: `.scroll` itself declared no `position`, so `.results .ko`'s `position: absolute` skipped
+   past it to `.modal.results` (the nearest ancestor that IS positioned) instead of scrolling with the hero
+   art it decorates — a Boss Battle win's K.O. stamp stayed pinned to the modal's corner while `.hero-big`
+   scrolled away underneath it. `.scroll` is the containing block it needs to be now. */
+.modal.results { max-height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+.modal.results .scroll { position: relative; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+.modal.results .row.nav {
+  flex: 0 0 auto;
+  margin: 14px -18px -22px;
+  padding: 12px 18px calc(22px + var(--sab, 0px));
+  background: linear-gradient(0deg, #10163a 60%, transparent);
+}
+.modal h2 { margin: 12px 0 6px; font-size: 28px; } .modal p { margin: 4px 0 14px; color: var(--muted); font-weight: 600; }
+/* #398 round 1, B2: a flex column's default `align-items: stretch` widened this from its ~200px image to the
+   modal's full content width, which pushed `.speech` — positioned at `left: 68%` of ITS OWN box — off the
+   right edge of the phone on anything but the shortest headline. `align-self` opts this one item back out;
+   everything else in `.modal.results` is already full-width by design (a grid, a flex row, or plain text
+   centred by `.modal`'s own `text-align`), so nothing else needs it. */
+.hero-big { position: relative; display: inline-block; align-self: center; margin-top: 4px; }
+.hero-big img {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 22px var(--glow)) drop-shadow(0 12px 16px #000a);
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.hero-big.sad img { filter: grayscale(.4) drop-shadow(0 12px 16px #000a); animation: none; }
+.hero-big.sensei img { animation: none; }   /* the Master stands still */
+@keyframes bounce { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
+.speech {
+  position: absolute;
+  left: 68%;
+  top: 0;
+  min-width: 150px;
+  max-width: 200px;
+  background: #fff;
+  color: #1a1a2a;
+  padding: 10px 12px;
+  border-radius: 16px;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  box-shadow: 0 8px 20px #0006;
+  animation: pop .5s .2s both cubic-bezier(.2, 1.4, .4, 1);
+}
+.speech::after { content: ""; position: absolute; left: -8px; bottom: 12px; border: 8px solid transparent; border-right-color: #fff; border-left: 0; }
+.big-stars .stars { font-size: 40px; letter-spacing: 6px; text-shadow: 0 0 20px #ffb02088; }
+.medal { font-size: 56px; margin-top: -8px; }
+.statgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 16px; }
+.statgrid div {
+  background: #ffffff10;
+  border-radius: 14px;
+  padding: 10px 4px;
+}
+.statgrid b {
+  display: block;
+  font-size: 22px;
+}
+.statgrid small {
+  color: var(--muted);
+  font-weight: 600;
+}
+.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: 26px; }
+.confetti i {
+  position: absolute;
+  top: -12px;
+  left: calc(var(--x) * 1%);
+  width: 8px;
+  height: 14px;
+  background: var(--c);
+  border-radius: 2px;
+  animation: conf var(--d) calc(var(--i) * -.13s) linear infinite;
+  opacity: .9;
+}
+@media (prefers-reduced-motion: reduce) { .confetti i, .hero-big img, .isl-art, .bg-sky::after, .villain img, .results .ko img, .timer, #stage .segs i.cur { animation: none; } }
+@keyframes conf { to { transform: translateY(520px) rotate(720deg); } }
+
+@media (min-width: 720px) {
+  .qcard { margin-top: 10px; }
+  .prompt { font-size: 44px; }
+  .hero-big img { width: 200px; height: 220px; }
+}
+@media (max-height: 640px) {
+  .qcard {
+    padding: 6px 12px 8px;
+  }
+  .prompt {
+    font-size: 26px;
+    margin: 2px 0;
+  }
+  .hint {
+    display: none;
+  }
+  /*
+   * …except a line the card is *answered from*. `play-session.ts` marks that one `own` (#328), from the
+   * generator's own `hintIsData` flag: seven topics — `y1-length`, `y1-mass`, `y1-capacity`, `y2-length`,
+   * `y2-mass`, `y2-capacity`, `y2-temp` — put the values being compared in `hint` and nowhere else on the
+   * card, so hiding it on a phone held sideways leaves "Which holds more?" over two coloured bubbles that
+   * cannot be told apart (#65: every card usable without read-aloud).
+   *
+   * Every OTHER hint stays hidden here, including the ~40 generator-written instruction lines ("Slice the
+   * shape", "Add -s or -es") as well as the four this screen writes itself — that is what buys the space,
+   * and `tests/e2e/game.spec.ts`'s `y1-shapes` control is a hint-writing topic precisely so this line is a
+   * claim the suite can fail. The duel screen's half of the same bug is `.duel-q .hint` above (#295);
+   * `memory.ts` is a third user of this selector, marking its own `doubles`/`tables` themes `own` from a
+   * `Theme.hintIsData` flag of its own — the two decks whose faces are both plain numeric text, so nothing
+   * on the board says a child is hunting for an answer rather than, say, a bigger number. Its OTHER themes
+   * (`count`, `shapes`, `words`, `coins`) stay hidden here deliberately, not by omission: each pairs a
+   * picture, a count or a word with a name, so the two card faces already say which kind matches which
+   * without the line (#461).
+   */
+  .hint.own {
+    display: block;
+  }
+  .qcard.good .hint, .qcard.bad .hint {
+    display: block;
+  }
+  /*
+   * #107 used to pin `--slot` to 24px here, height-gated. #594 found the gate itself was the bug: a real
+   * tablet in landscape (1024×768) is taller than this query's 640px band, so a height-gated `--slot`
+   * override never reached the device the spill was reported from. The margin now lives in `.five`'s own
+   * `--obj` ratio (above, unconditional at every height); this block still trims spacing to buy room on a
+   * short screen, just never the glyph-safety sizing.
+   */
+  .five {
+    gap: 2px;
+    padding: 2px;
+  }
+  .vis.objs, .objs .grp {
+    gap: 2px;
+  }
+  .vis {
+    margin: 2px 0;
+  }
+}
+

@@ -9,7 +9,7 @@ import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
-import { SOURCES, inDir, code, workflow } from './helpers/sources';
+import { SOURCES, inDir, code, workflow, styleCss } from './helpers/sources';
 import { YEARS } from '../../src/curriculum/types';   // #392: the rail below holds docs/CURRICULUM.md's per-year headers to this table
 import { TOPICS } from '../../src/curriculum';   // #766: the registry the wordQ-collision sweep below iterates
 import type { Difficulty } from '../../src/curriculum/types';
@@ -31,7 +31,7 @@ import { listFiles, precacheList } from '../../scripts/build-sw.mjs';   // #715:
  * it, not quietly hand them a permissive range in which every weight is legal.
  */
 function servedWeightRange(): [number, number] {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const css = styleCss();
   if (css.length < 5000) throw new Error('style.css must be read from disk, not a blank ?raw import');
   const faces = css.split('@font-face').slice(1);
   if (faces.length < 2) throw new Error('src/style.css must declare Fredoka with @font-face (#479)');
@@ -872,7 +872,7 @@ describe('guard rails', () => {
   // with fs; the length guard makes that a real check, not a vacuous empty read. CSS has no HTML-template
   // floor, so the floor is 0. Ratchets DOWN only — never raise it to go green.
   it('style.css long lines keep shrinking (#36 budget)', () => {
-    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    const css = styleCss();
     expect(css.length, 'style.css must be read from disk, not a blank ?raw import').toBeGreaterThan(1000);
     const over = css.split('\n').filter(l => l.length > 180).length;
     expect(over, 'wrap a long line or move it out — never raise this budget').toBeLessThanOrEqual(0);
@@ -952,7 +952,7 @@ describe('guard rails', () => {
   // test reads green. The fallback STACK in `--font` is untouched by this: those are names, not fetches.
   it('no face is fetched from a third party (#479)', () => {
     const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
-    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    const css = styleCss();
     expect(html.length, 'index.html must be read from disk').toBeGreaterThan(500);
     expect(css.length, 'style.css must be read from disk').toBeGreaterThan(5000);
     // NOT `code()`. That helper strips `//` to end of line as a JS line comment, and every URL this rail
@@ -1139,7 +1139,7 @@ describe('guard rails', () => {
   // 800 is the value that is always wrong — 700 exists, and the one 900 left is on a ✕ that Fredoka has no
   // glyph for, so it falls through to the system stack where 900 is a real designed weight.
   it('no stylesheet rule asks Fredoka for a weight it does not have (#44)', () => {
-    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    const css = styleCss();
     expect(css.length, 'style.css must be read from disk, not a blank import').toBeGreaterThan(5000);
     expect(css).toContain('--font: "Fredoka"');                          // the stack these weights resolve in
     expect([...css.matchAll(/font-weight:\s*800/g)].length,
@@ -1294,7 +1294,7 @@ describe('guard rails', () => {
    * nothing failed — it just wasn't green. `.modal .cert-msg`, two classes, (0,2,0), wins outright.
    */
   it('.cert-msg is qualified enough to beat .modal p, not a bare class a higher-specificity rule can silently win against (#436 review, B1)', () => {
-    const raw = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    const raw = styleCss();
     expect(raw.length, 'style.css must be read from disk, not a blank import').toBeGreaterThan(5000);
     // Comments stripped (`code()`): this rule's own explanatory comment names the bare selector in prose, which
     // would otherwise trip the last assertion below on the very sentence describing why it must not appear.
@@ -2093,7 +2093,7 @@ describe('the tablet layout rails (#107, #109)', () => {
 // plugin returns an empty string for CSS outside the browser, which would make this rail pass vacuously.
 // The length assertion below is what proves it did not.
 it('the five-frame glyph is sized from its slot, never from the viewport (#107)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const css = styleCss();
   expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');   // comments may quote the very units the rail bans
 
@@ -2147,7 +2147,7 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
   //   - the three-up desktop grid does not start at the 600 px breakpoint, or a ~800 px portrait tablet
   //     takes a layout drawn for 1280 px and there is nowhere for the cards to go.
   it('the dashboard year cards can shrink, and do not take the desktop grid on a tablet (#109)', () => {
-    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+    const css = styleCss();
     expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
     const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');   // comments quote the very declaration the rail bans
 
@@ -2188,7 +2188,7 @@ it('the five-frame glyph is sized from its slot, never from the viewport (#107)'
  * is what proves it read real content, the same idiom as the #107/#109 rails above.
  */
 describe('the chart visual\'s CSS structure cannot go missing without a red test (#137)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const css = styleCss();
   it('the base grid, the row, the block and the key rules all exist', () => {
     expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
     const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
@@ -2253,7 +2253,7 @@ describe('the chart visual\'s CSS structure cannot go missing without a red test
  * outside a browser, and the length assertion is what proves this read real content.
  */
 describe('the symmetry visual\'s CSS structure cannot go missing without a red test (#299)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const css = styleCss();
 
   it('a coloured square and an empty one cannot render the same, and the fold line stays visible', () => {
     expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
@@ -2533,7 +2533,7 @@ describe('`<a download>` stays reachable from one guarded place in the certifica
  * arrive without anyone deciding to make one.
  */
 describe('the landscape screen width cannot silently return to the phone column (#18)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const css = styleCss();
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
   it('a wide-viewport media query widens .screen, and excludes .play and .memory', () => {
@@ -2567,7 +2567,7 @@ describe('the landscape screen width cannot silently return to the phone column 
  * covers the arena's own ≥900 px widening) stays at exactly 600 px.
  */
 describe('the tracing pad cannot silently return to the phone column, and the fix cannot silently reach the arena (#18)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const css = styleCss();
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
   it('a wide-viewport media query widens .play.tracing .hud and .trace-wrap to close to 880px, not merely past 560px', () => {
@@ -2604,7 +2604,7 @@ describe('the tracing pad cannot silently return to the phone column, and the fi
  * is excluded by selector, not merely by accident of specificity.
  */
 describe('the bubble arena cannot silently return to the phone column, and the fix cannot silently reach duel or tracing (#18)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const css = styleCss();
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
   it('a wide-viewport media query widens --arena-w on the single-player arena to close to 880px, not merely past 600px', () => {
@@ -2658,7 +2658,7 @@ describe('the bubble arena cannot silently return to the phone column, and the f
  * with no browser at all, and they are the only check left for `.cert-view`.
  */
 it('every CSS custom property style.css reads with var() is declared somewhere — in the stylesheet or a .ts inline style (#399)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const css = styleCss();
   expect(css.length, 'style.css must be read from disk as text, or this rail checks nothing').toBeGreaterThan(10_000);
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
@@ -2692,7 +2692,7 @@ it('every CSS custom property style.css reads with var() is declared somewhere �
  * pull-request-time check.
  */
 describe('.hud and the duel screen use --sal/--sar too, not just a fixed number (#399)', () => {
-  const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8');
+  const css = styleCss();
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
   it('.hud pads left/right by --sal/--sar, not a bare 12px — the tracing pad inherits it, nested inside', () => {

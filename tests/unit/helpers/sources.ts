@@ -28,6 +28,20 @@ export const workflowFiles = (dir: URL = WORKFLOWS): { name: string; text: strin
   return names.map((name) => ({ name, text: readFileSync(new URL(name, dir), 'utf8') }));
 };
 
+const SRC = new URL('../../../src/', import.meta.url);
+
+/** `src/style.css` is an entry point of `@import` lines into `src/styles/*.css` (#558) — this reads the
+ *  entry and every file it imports, concatenated in import order, so a rail asking what the stylesheet
+ *  says sees the same text Vite bundles rather than one split-out file. `root` is the directory holding
+ *  `style.css`, real `src/` by default — a test points it at a fixture with no `@import` lines to prove the
+ *  vacuity guard actually fires, the same shape `workflowFiles`/`e2eSpecFiles` use for theirs. */
+export const styleCss = (root: URL = SRC): string => {
+  const entry = readFileSync(new URL('style.css', root), 'utf8');
+  const imports = [...entry.matchAll(/@import\s+['"](\.\/[^'"]+)['"];/g)].map((m) => m[1]);
+  if (imports.length === 0) throw new Error('src/style.css has no @import lines — check it still splits into src/styles/*.css');
+  return imports.map((rel) => readFileSync(new URL(rel, root), 'utf8')).join('');
+};
+
 const E2E = new URL('../../../tests/e2e/', import.meta.url);
 
 /** Every `tests/e2e/*.spec.ts` file, for a rail that must hold across all of them (#750). Same vacuity guard

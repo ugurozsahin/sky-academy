@@ -1,0 +1,182 @@
+/* Grown-ups gate + parent dashboard (#9) */
+.foot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+/* #20 slice 2 (#380 review round 5, B1): the sky map's two whole-device controls — "For grown-ups" and "Who is
+ * playing?" — side by side, wrapping to two lines rather than overflowing on a narrow phone. 👥 was a fourth
+ * `.icon-btn` on the topbar, and that row was already full to the pixel: the new button hung 7.6px off a
+ * 390×844 iPhone and every screen the shared topbar appears on gained horizontal scroll. The space could not
+ * come out of the buttons — `design-language` §4 puts the floor for a tappable control at 44px — so the control
+ * moved to the row that already holds the other one, and both of them meet that floor now. */
+.foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.foot-link {
+  color: var(--muted); font-size: 12px; font-weight: 700; padding: 6px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+  min-height: 44px; display: inline-flex; align-items: center;
+}
+.foot-link:active { transform: scale(.96); }
+
+.gate {
+  margin-top: 22px;
+  padding: 24px 16px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.gate-q { margin: 0; font-size: 20px; font-weight: 600; }
+.gate-q b { font-size: 26px; color: var(--accent); }
+.gate-input {
+  width: 150px;
+  font-size: 24px;
+  text-align: center;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-family: inherit;
+}
+.gate-msg { margin: 0; color: var(--bad); font-weight: 700; }
+
+.parents-dash { margin-bottom: 24px; }
+.p-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 14px; }
+.p-stats div { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 6px; text-align: center; }
+.p-stats b { display: block; font-size: 22px; } .p-stats small { color: var(--muted); font-weight: 600; }
+.p-extra { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; font-weight: 700; color: #dfe6ff; }
+.p-extra span { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+.p-h { margin: 20px 0 8px; font-size: 16px; }
+.p-years { display: grid; gap: 10px; }
+.p-year { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+.p-year-head { display: flex; justify-content: space-between; align-items: baseline; } .p-year-head small { color: var(--muted); font-weight: 600; }
+.p-year-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+/*
+ * #109: this used to be `min-width: 130px`, which a flex item cannot shrink below. That one declaration set
+ * the whole `.p-year` card's min-content width to 300 px, and a grid track of `1fr` is `minmax(auto, 1fr)` —
+ * it never goes under min-content — so `repeat(3, 1fr)` came out 3x300 px however narrow the screen was and
+ * the page grew a horizontal scrollbar. `flex-basis` keeps the same 130 px preferred width wherever there is
+ * room for it, and `min-width: 0` lets the label shrink instead of the page.
+ */
+.p-year-row span {
+  flex: 0 1 130px;
+  min-width: 0;
+}
+.p-year-row .isl-bar {
+  flex: 1;
+  margin-top: 0;
+}
+.p-topics { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.p-topic { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+.p-topic .ic { font-size: 22px; } .p-topic-t { flex: 1; min-width: 0; } .p-topic-t b { display: block; } .p-topic-t small { color: var(--muted); font-weight: 600; }
+.p-acc { font-weight: 700; font-size: 18px; }
+.p-empty { color: var(--muted); font-weight: 600; }
+/*
+ * #109 asked whether this nested horizontal scroller is what makes the page scroll badly on a tablet.
+ * Measured: it is not one there. The table is 768/736/778 px wide at 800x1280, 768x1024 and 810x1080 and
+ * fits its wrapper at every one, so nothing inside it scrolls and nothing can capture a vertical drag; the
+ * phone (377 px of table in 358 px) is the only place it is a scroller at all. So `touch-action: pan-y`,
+ * which the issue floats, is not applied: the one viewport it would affect is the one that needs the
+ * sideways drag, and taking it away would put the Sensei column out of reach — hiding content rather than
+ * reflowing it. `overscroll-behavior-x` is the part that is safe everywhere: `html, body` already set
+ * `overscroll-behavior: none`, and this stops the table's own scroll chaining out of it at either end.
+ */
+.p-table-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
+.p-table { width: 100%; border-collapse: collapse; font-weight: 600; }
+.p-table th, .p-table td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line); }
+.p-table thead th { color: var(--muted); font-size: 13px; }
+.p-table tbody th { text-align: left; }
+/* #18 group C: capped so a tablet's wider `.screen` can't stretch a sentence into one long line — 155
+ * characters measured uncapped on a 1280px landscape window, against the issue's own ~75-char bar. */
+.p-note { margin-top: 16px; color: var(--muted); font-size: 12px; font-weight: 600; text-align: center; max-width: 60ch; margin-left: auto; margin-right: auto; }
+/* move to another device (#64) */
+.p-move { display: flex; flex-direction: column; gap: 8px; }
+.p-move-say { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.p-code {
+  width: 100%; box-sizing: border-box; resize: vertical; padding: 10px;
+  border-radius: 12px; border: 1px solid var(--line); background: #0e1330; color: #cfd8ff;
+  font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.4;
+  max-height: 240px; /* #18 group C: `#save-code` sizes to its own content in JS; this caps a pathologically
+                         large save so it scrolls internally rather than growing without bound. */
+}
+.p-move .btn { width: 100%; }
+.p-move-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--good); }
+.p-move-msg.bad { color: var(--bad); }
+/* #714: the 3-D setting — the island screen's `.tabs`/`.tab` pair reused as a three-way pick, nothing new drawn. */
+.p-three { display: flex; flex-direction: column; gap: 8px; }
+.p-three-say { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.p-three-pick { margin: 0; }
+.p-three-pick .tab { min-height: 44px; padding: 10px; }
+.p-three-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--bad); }
+
+/* ninjas on this device: rename and remove (#20 slice 3)
+   The row is `.p-topic`'s shape — panel, hairline, 14px radius — with the face where the icon sits, so the
+   section reads as another list on a screen full of them rather than a new component (`design-language` §5).
+   It wraps rather than shrinking: the input, "Save name" and "Remove" cannot all sit beside a face and a name
+   on a 320px phone without one of them going under 44px, and a tap target is the thing that must not give
+   (#414's lesson on the topbar). `min-width` on the input is what makes the wrap happen instead of a 40px
+   box. */
+.p-profs { display: flex; flex-direction: column; gap: 10px; }
+.p-profs-say { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.p-prof-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.p-prof {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px;
+}
+.p-prof-face {
+  flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 50%; background: #0e1330; border: 1px solid var(--line);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--glow, var(--line)) 60%, transparent);
+}
+.p-prof-face img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.p-prof-face .plus { font-size: 20px; color: var(--muted); }
+.p-prof-who { flex: 1 1 8ch; min-width: 0; }
+.p-prof-who b { display: block; overflow-wrap: anywhere; }
+.p-prof-who small { color: var(--muted); font-weight: 600; }
+.p-prof-in {
+  flex: 1 1 9ch; min-width: 9ch; box-sizing: border-box; min-height: 44px; padding: 8px 10px;
+  border-radius: 12px; border: 1px solid var(--line); background: #0e1330; color: #cfd8ff;
+  font: inherit; font-size: 15px;
+}
+.p-prof-wait { flex: 1 1 100%; color: var(--muted); font-size: 12px; font-weight: 600; }
+.p-prof .btn { flex: 0 0 auto; min-height: 44px; padding: 8px 14px; font-size: 14px; }
+.p-prof-msg { margin: 0; font-size: 13px; font-weight: 700; color: var(--good); }
+.p-prof-msg.bad { color: var(--bad); }
+
+/* "Start again" — a guarded full reset (#115) */
+/* The dashboard is the one screen under `.overlay` that scrolls taller than one viewport (personal bests,
+   move-to-another-device, this section all add up), so `.overlay`'s `position: absolute` — sized to `#app`,
+   which grows with the page — would centre the modal on the whole document rather than what is on screen.
+   Fixed, scoped to this overlay only: play/memory never scroll past one viewport, so their behaviour is
+   unchanged; this one now centres on the viewport wherever the grown-up has scrolled to. */
+#reset-overlay { position: fixed; }
+.p-reset { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; text-align: center; }
+/* #18 group C: same cap as `.p-note` — 102 characters measured uncapped on a 1280px landscape window. */
+.p-reset-say { margin: 0 auto; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.45; max-width: 60ch; }
+.btn.bad { background: linear-gradient(180deg, #ff8a80, #ff5f6d); color: #2a0a0a; border-color: #ffb4bb; text-shadow: 0 1px 0 #fff5; }
+.reset-modal p { text-align: left; line-height: 1.45; }
+.reset-label { display: block; margin: 4px 0 8px; font-weight: 700; text-align: left; }
+.reset-input { width: 100%; box-sizing: border-box; }
+.reset-actions { display: flex; gap: 10px; margin-top: 6px; }
+.reset-actions .btn { flex: 1; }
+
+/*
+ * #109: there used to be one breakpoint here, at 600 px, and it went straight to the layout drawn for a
+ * 1280 px desktop. A portrait tablet is ~800 px wide, so it took the four-up stat row and the three-up year
+ * grid inside a `.screen` capped at 820 px, and the cards had nowhere to go.
+ *
+ * Two tiers instead. 600-899 px is the portrait tablet: stats stay two-up (386 px tiles at 800 px, rather
+ * than four 186 px ones) and the year cards go two-up. The desktop grid waits for 900 px, which 1280x800
+ * clears, so that layout is the one it always was.
+ */
+@media (min-width: 600px) { .p-years { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 900px) { .p-stats { grid-template-columns: repeat(4, 1fr); } .p-years { grid-template-columns: repeat(3, 1fr); } }
+

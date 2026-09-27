@@ -1,0 +1,2 @@
+/* a fixture with real CSS but no @import lines — proves styleCss()'s vacuity guard actually fires (#558) */
+body { margin: 0; }

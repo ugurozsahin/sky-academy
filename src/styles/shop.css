@@ -1,0 +1,45 @@
+/* ---------- shop (#6) ---------- */
+.shop-btn { width: 100%; margin-top: 12px; flex-direction: column; gap: 0; } .shop-btn small { font-size: 13px; font-weight: 600; opacity: .8; }
+.shop h3 { margin: 16px 0 8px; font-size: 16px; color: #dfe6ff; } .shop .isl-head .coin-pill { margin-left: auto; height: 38px; }
+/* #769: `.icon-btn` never had #414's `flex-shrink: 0` outside `.settings`; the shop's `.isl-head` also carries a `.coin-pill` competing for width. */
+@media (max-width: 400px) {
+  .shop .isl-head .icon-btn { flex-shrink: 0; }
+  .shop .isl-head > div { min-width: 0; }
+  .shop .isl-head b, .shop .isl-head small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.shop .item {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px 8px; border-radius: 18px; background: var(--panel); border: 2px solid var(--line); text-align: center;
+}
+.shop .item .icon { font-size: 34px; line-height: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.shop .item b {
+  font-size: 15px;
+  margin-top: 2px;
+}
+.shop .item small {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  min-height: 30px;
+}
+.shop .item .btn {
+  padding: 12px 18px;
+  min-height: 44px;
+  font-size: 16px;
+  margin-top: auto;   /* pins the action to the bottom, so it lines up across a row whatever the blurb's line count */
+}
+.shop .item .pill.on {
+  background: #1a3b2a;
+  border-color: #40e0a066;
+  color: #a8ffd8;
+  margin-top: auto;
+}
+.shop .item.on { border-color: #40e0a0; box-shadow: inset 0 0 30px #40e0a022; } .shop .item.poor { opacity: .75; } .shop .item.soon { border-style: dashed; opacity: .7; }
+.shop .swatch {
+  width: 30px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--c), var(--k), var(--c));
+  box-shadow: 0 0 10px var(--c);
+}

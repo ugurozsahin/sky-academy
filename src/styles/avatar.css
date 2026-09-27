@@ -1,0 +1,97 @@
+/* ---------- avatar screen ---------- */
+.brand { text-align: center; margin: 8px 0 18px; }
+.brand .kanji { font-size: 44px; color: var(--accent-2); text-shadow: 0 0 24px var(--accent-2); }
+.brand h1 { margin: 2px 0 6px; font-size: 40px; line-height: .95; letter-spacing: .01em; text-shadow: 0 4px 0 #0007, 0 0 30px #3ec9ff55; }
+.brand h1 span { color: var(--accent); }
+.brand .tag { margin: 0; color: var(--muted); font-weight: 600; }
+.avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.avatar-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 8px 6px 8px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 2px solid var(--line);
+  transition: transform .15s, border-color .15s, box-shadow .15s;
+}
+.avatar-card b { font-size: 17px; margin-top: 4px; }
+.figure { display: block; width: 100%; aspect-ratio: 1; position: relative; }
+.figure::before {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 2%;
+  height: 16%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, var(--glow) 0%, transparent 70%);
+  opacity: .55;
+  filter: blur(4px);
+}
+.figure img { position: relative; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 10px #0009); transition: transform .2s; }
+.avatar-card.sel .figure img { transform: scale(1.08) translateY(-3px); filter: drop-shadow(0 0 16px var(--glow)) drop-shadow(0 8px 12px #000a); }
+.avatar-card small { color: var(--muted); font-weight: 600; font-size: 12px; line-height: 1.1; }
+.avatar-card.locked { border-style: dashed; opacity: .85; } .avatar-card.locked .figure img { filter: grayscale(.9) brightness(.55) drop-shadow(0 6px 10px #0009); }
+.avatar-card.locked .figure::before { opacity: .2; } .avatar-card.locked small { color: var(--accent); }
+.avatar-card .lock { position: absolute; right: 6%; bottom: 6%; font-size: 26px; filter: drop-shadow(0 4px 6px #000a); }
+.avatar-card.shake { animation: shake .35s; } @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.avatar-card.sel {
+  border-color: var(--glow);
+  box-shadow: 0 0 0 1px var(--glow), 0 12px 34px #0008, inset 0 0 40px color-mix(in srgb, var(--glow) 18%, transparent);
+  transform: translateY(-4px) scale(1.03);
+}
+/* #20 slice 2: the "New ninja" card on the "Who is playing?" picker. The only thing the picker adds to the
+ * ninja-choice screen's classes: an empty slot has no portrait, so the figure holds a `+` instead of an <img>.
+ * Dashed, like `.locked`, because both mean "not a ninja yet"; sized off the figure's own box with a clamp so
+ * it tracks the card rather than needing a breakpoint of its own (`design-language` §2). */
+.avatar-card.new-ninja { border-style: dashed; }
+.avatar-card.new-ninja .figure { display: grid; place-items: center; }
+.avatar-card.new-ninja .figure::before { opacity: .18; background: radial-gradient(ellipse at center, var(--accent-2) 0%, transparent 70%); }
+.avatar-card.new-ninja .plus { position: relative; font-size: clamp(38px, 12vw, 58px); line-height: 1; color: var(--accent-2); text-shadow: 0 4px 10px #000a; }
+/* #380 review B5: the way out of the picker when it was opened from the 👥 button. The ＋ card adds a profile
+ * for good and nothing deletes one until slice 3, so "commit to a child" must not be the only exit. The
+ * topbar's own `.icon-btn` rather than a new button; absolute so it does not push the brand off centre, and
+ * only rendered when the caller passes a way back — at launch there is none. */
+.profile-screen { position: relative; }
+.profile-screen #back { position: absolute; top: calc(16px + var(--sat)); left: calc(16px + var(--sal)); z-index: 2; }
+/*
+ * #110: the name row sits *above* the avatar grid. Below it, the grid is `repeat(auto-fill, minmax(104px, 1fr))`
+ * — the wider and taller the screen, the further down "Your name" went, and on a tablet it was past the fold
+ * behind all eleven cards. Above the grid it is on screen at first paint at every viewport, and the margin is
+ * the header's spacing rather than the old gap between the grid and the button.
+ */
+.name-row { display: flex; align-items: center; gap: 12px; margin: 0 auto 8px; max-width: 420px; }
+.name-row span { color: var(--muted); font-weight: 600; }
+.name-row input { flex: 1; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--line); background: #0b1030; color: var(--text); font-size: 18px; outline: none; }
+.name-row input:focus { border-color: var(--accent-2); }
+/* The empty-name nudge (#110). `min-height` holds the line's space when it clears, so the grid never jumps. */
+.name-hint { max-width: 420px; margin: 0 auto 14px; min-height: 18px; color: var(--muted); font-weight: 600; font-size: 13px; text-align: center; }
+/* runway below the sticky Continue/Let's go! button so the last card row (Bolt/Master) is never left under it — #51 */
+.avatar-screen { padding-bottom: calc(84px + var(--sab)); scroll-padding-bottom: calc(84px + var(--sab)); }
+.avatar-screen #go, .avatar-screen #next { display: flex; margin: 0 auto; position: sticky; bottom: calc(12px + var(--sab)); z-index: 2; box-shadow: 0 10px 30px #000a; }
+.change-avatar #change-save { display: flex; margin: 20px auto 0; }
+
+/* The name step's chosen-ninja reminder (#67 wizard split): a small figure, not the full avatar-card treatment. */
+.name-preview { max-width: 420px; margin: 0 auto 16px; text-align: center; }
+.name-preview .figure { width: clamp(72px, 22vw, 104px); margin: 0 auto 6px; }
+.name-preview b { display: block; color: var(--text); font-weight: 700; }
+
+/*
+ * First-run wizard progress (#67): a small dot rail, decorative only — the "Step X of N" text lives in the
+ * element's own aria-label (`wizardProgress()`, src/ui/avatar.ts), never duplicated as visible copy.
+ */
+.wizard-progress { display: flex; gap: 8px; justify-content: center; margin: 0 0 14px; }
+.wizard-progress .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.wizard-progress .dot.active { background: var(--accent); box-shadow: 0 0 0 4px rgba(255, 176, 32, .22); }
+
+/* Wizard introduction step (#67): one card, centred, nothing else competing for a first-run child's attention. */
+.intro-screen { display: flex; align-items: center; justify-content: center; min-height: calc(100 * var(--vh, 1vh)); padding: 24px; }
+.intro-card { max-width: 420px; width: 100%; padding: clamp(20px, 5vw, 32px); border-radius: var(--radius); background: var(--panel); }
+.intro-card { border: 1px solid var(--line); text-align: center; }
+.intro-card .figure { width: clamp(96px, 30vw, 160px); margin: 0 auto 14px; }
+.intro-card h1 { margin: 0 0 12px; font-size: clamp(24px, 6vw, 32px); outline: none; }
+.intro-card .intro-text { margin: 0 0 22px; color: var(--text); font-size: 17px; line-height: 1.5; }
+.intro-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+

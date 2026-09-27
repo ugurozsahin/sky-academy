@@ -1,0 +1,93 @@
+/* ---------- backgrounds ---------- */
+.bg-sky, .bg-play { position: relative; isolation: isolate; }
+.bg-sky::before, .bg-play::before {
+  content: ""; position: fixed; inset: 0; z-index: -2;
+  background:
+    radial-gradient(1200px 600px at 50% 120%, #ff8a4c33, transparent 60%),
+    radial-gradient(900px 500px at 10% -10%, #3ec9ff2b, transparent 60%),
+    radial-gradient(700px 400px at 100% 20%, #b388ff22, transparent 60%),
+    linear-gradient(180deg, #0b1030 0%, #1a2352 45%, #3a3d7a 75%, #7a4a6a 100%);
+}
+.bg-sky::after, .bg-play::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .8;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%, #fff 60%, transparent), radial-gradient(1px 1px at 30% 8%, #fff 60%, transparent),
+    radial-gradient(1.5px 1.5px at 55% 22%, #fff 60%, transparent), radial-gradient(1px 1px at 72% 12%, #fff 60%, transparent),
+    radial-gradient(2px 2px at 88% 28%, #ffe9a8 60%, transparent), radial-gradient(1px 1px at 42% 34%, #fff 60%, transparent),
+    radial-gradient(1.5px 1.5px at 18% 44%, #fff 60%, transparent), radial-gradient(1px 1px at 64% 42%, #fff 60%, transparent),
+    radial-gradient(1px 1px at 8% 66%, #fff 60%, transparent), radial-gradient(1.5px 1.5px at 92% 58%, #fff 60%, transparent),
+    radial-gradient(160px 60px at 20% 78%, #ffffff14, transparent 70%), radial-gradient(220px 70px at 75% 70%, #ffffff12, transparent 70%),
+    radial-gradient(260px 80px at 45% 92%, #ffd9b81a, transparent 70%);
+}
+/* Only the menus drift: animating `background-position` on 13 gradients is not compositor-accelerated, and
+   over the play canvas it ate ~80 % of the frame budget (measured 0.17× real time on a 1280 px screen,
+   0.67× on a phone; 0.88× / 0.98× without it). See review issue #30. */
+.bg-sky::after { animation: drift 40s linear infinite alternate; }
+@keyframes drift { from { background-position: 0 0; } to { background-position: 40px 10px; } }
+
+/* #399: the horizontal 16px was a fixed value, so a landscape phone with the notch on either side padded
+   its content the same 16px whatever the real inset was. `.play`/`.duel-screen` override this whole rule to
+   `padding: 0` (below) and are unaffected — their own left/right inset handling is #399's own next slice,
+   not this one, since the arena's centring is pinned by `tests/e2e/duel.spec.ts` and moving it needs a
+   decision this rail cannot make for itself. `.screen.memory` only overrides `padding-top` (memory match,
+   below), so it DOES pick up the new left/right values here — correctly: it is an ordinary DOM screen with
+   no arena or centring pinned against it, so there is no reason to hold it back with the arena screens. */
+.screen {
+  max-width: 820px; margin: 0 auto;
+  padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(24px + var(--sab)) calc(16px + var(--sal));
+}
+/*
+ * #18 group A, the DOM-screen cap. 820 px is a phone column, and a tablet held in landscape was given it
+ * whole: the slice-1 audit measured 460 px of a 1280 px window empty (36 %) on the map, the island, both
+ * onboarding steps, rewards, shop and the grown-ups dashboard. Nothing overflowed — what landscape cost was
+ * space.
+ *
+ * 900 px is the breakpoint the dashboard grids already turn on (`.p-stats`/`.p-years` below), so this reuses
+ * it rather than inventing a fifth width: a portrait tablet is ~800 px and stays on the phone column, which
+ * the audit found clean. `100% - 40px` keeps a gutter at 1024x768, where 1180 px is never reached, so the
+ * column never runs to the bezel.
+ *
+ * `.play` and `.memory` are excluded deliberately. They carry `.screen` too, but their widths are the arena
+ * cap and the card grid — `--arena-w` (600 px) and `.cards` (520 px) — which the owner gated behind
+ * `owner-approval` because widening them changes how the game looks and how far a thumb travels mid-wave.
+ * This rule moves only the screens made of DOM, whose criterion is "stops wasting a third of the window".
+ */
+@media (min-width: 900px) {
+  .screen:not(.play):not(.memory) { max-width: min(1180px, 100% - 40px); }
+}
+
+/*
+ * #18 group A, the tracing pad — the second of group A's two look-changing caps. `--arena-w` (600 px) still
+ * gates the bubble arena and is untouched: a tracing screen renders no `#arena` canvas at all (`play.ts`'s
+ * `tracing ? '' : '<canvas id="arena">'`), so `.hud`'s own `max-width: var(--arena-w)` was only ever
+ * borrowed here, not load-bearing for gameplay. Widening it for `.tracing` alone cannot affect bubble speed
+ * or spawn spread, which is what kept the arena's own cap out of this pull request. Still `owner-approval`:
+ * a wider tracing pad is a bigger canvas and bigger letters, which is a look change like the arena's.
+ */
+@media (min-width: 900px) {
+  .play.tracing .hud, .play.tracing .trace-wrap { max-width: min(880px, 100% - 40px); }
+}
+
+/*
+ * #18 group A, the bubble arena — the last of group A's three look-changing caps, and the one the owner's
+ * 11:54Z pick called "the sharpest": 600 px left 680 px empty (53%) on a 1280 px window, more than either
+ * of the other two. Same value and the same breakpoint as the DOM-screen cap and the tracing pad, chosen
+ * for the same reason: 900 px reuses the dashboard's own breakpoint rather than a fifth number, and
+ * `min(880px, 100% - 40px)` matches the tracing pad exactly, so the two canvases the child moves between
+ * (arena, tracing pad) end up the same width rather than two different "wide" numbers with no reason to
+ * differ.
+ *
+ * `--arena-w` is redeclared on `.play`, not on `#arena`/`.hud` directly, because `#388`'s duel layout reads
+ * the SAME variable for its own, unrelated width maths (`.duel-half`'s `max-width: var(--arena-w)` in
+ * portrait, `.play.duel-screen`'s `max-width: calc(var(--arena-w) * 2)` in landscape) — widening the
+ * variable under `.play.duel-screen` would silently double the change into a fixed layout the owner has
+ * not been asked about. `:not(.duel-screen)` keeps this to the single-player arena only, and `:not(.tracing)`
+ * is belt-and-braces: the tracing pad's own rule above already overrides `.hud`'s max-width directly and
+ * wins on specificity regardless of what `--arena-w` holds, but a screen with no `#arena` canvas has no
+ * reason to carry the variable at all. Widening changes how far a thumb travels mid-wave, which is why this
+ * is still `owner-approval` like the tracing pad, not "stops wasting the width" like the DOM-screen cap.
+ */
+@media (min-width: 900px) {
+  .play:not(.tracing):not(.duel-screen) { --arena-w: min(880px, 100% - 40px); }
+}
+

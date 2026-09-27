@@ -1,0 +1,136 @@
+/* ---------- rewards ---------- */
+.coin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #3b2f10, #2a2008);
+  border: 1px solid #ffb02066;
+  font-weight: 700;
+  color: #ffd87a;
+}
+.coin-pill b { font-size: 16px; } .coin-pill .streak { color: #ff8a4c; font-size: 13px; } /* #510: capDigits() caps at "9999+" past four figures (src/ui/dom.ts). */
+/* #414 round 2: this rule has to come after the base `.coin-pill` above — same specificity, so whichever is
+ * later in the file wins, and a copy inside the narrow-phone media query at `.hero` (further up the file)
+ * would lose to this one regardless of the viewport. The topbar's own narrow-phone shrink (`.hero`, same
+ * issue) needs a few px back from the coin pill to give the ninja's name a non-zero floor instead of 0×0. */
+@media (max-width: 400px) { .coin-pill { padding: 0 6px; } }
+.reward-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.reward-stats div { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 6px; text-align: center; }
+.reward-stats b { display: block; font-size: 22px; } .reward-stats small { color: var(--muted); font-weight: 600; }
+/* #18 group C: same 60ch cap as the other empty-state/note text — 81 characters measured uncapped on a
+ * 1280px landscape window ("the rest of the album is earned by playing..."). */
+.next-sticker {
+  margin: 12px auto;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  color: #dfe6ff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 60ch;
+}
+.album { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.sticker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 6px;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  text-align: center;
+}
+.sticker b { font-size: 15px; margin-top: 4px; } .sticker small { color: var(--muted); font-weight: 600; font-size: 12px; }
+.sticker .isl-bar { align-self: stretch; margin-top: 2px; }   /* #114: achievement progress — stretches past the card's centred children */
+.sticker:not(.got) .figure img { filter: brightness(0) opacity(.35); } .sticker:not(.got) .figure::before { opacity: .15; }
+.sticker.got { border-color: var(--glow); box-shadow: inset 0 0 30px color-mix(in srgb, var(--glow) 16%, transparent); }
+/*
+ * #564 (#18 group B): below 900px "My certificates" and "Recent duels" stay exactly as they were — `display:
+ * contents` makes the wrapper invisible to layout, so each `.rewards-col` is still two direct flow children
+ * of `.rewards` (unchanged stacking, same as `.mode-grid`'s #563 precedent). At ≥900px (the breakpoint
+ * `.screen`/`.p-stats`/`.p-years`/`.mode-grid` already use) the two lists sit side by side instead: stacked,
+ * a seeded save's certificates and duels ran the rewards screen to 1475/1518px, well past one 1280×800/
+ * 1024×768 window. Two lists read differently side by side than stacked, so the pull request that adds this
+ * rule carries `owner-approval`.
+ */
+.rewards-cols { display: contents; }
+@media (min-width: 900px) {
+  .rewards-cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-items: start; }
+}
+/* "My certificates" (#110): a row per earned certificate, next to the sticker album — and, since #16, the
+   "Recent duels" list below it, which reuses these rules (see `duelHistoryHTML`). The empty states share this
+   rule but not a class name: `.cert-empty` means "no certificates" to the album's own e2e. */
+/* #18 group C: `max-width` + centred margins cap the sentence at a readable width instead of letting a
+ * tablet's wider `.screen` stretch it edge to edge — 96 (`.cert-empty`) and, by the same rule, any future
+ * `.duel-empty` copy this long. */
+.cert-empty, .duel-empty {
+  margin: 12px auto 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-weight: 600;
+  text-align: center;
+  max-width: 60ch;
+}
+.cert-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.cert-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+}
+.cert-ava {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--glow) 20%, transparent);
+  box-shadow: inset 0 0 0 2px var(--glow);
+}
+.cert-ava img { width: 30px; height: 30px; object-fit: contain; }
+.cert-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.cert-info b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cert-info small { color: var(--muted); font-weight: 600; font-size: 12px; }
+.cert-stars { flex: none; color: var(--accent); font-size: 15px; }
+.cert-open { flex: none; min-height: 44px; padding: 0 14px; font-size: 14px; }
+/* "Recent duels" (#16): the certificate row reused, with the scoreline where the stars sit and no View button
+   (a duel has nothing to redraw). `--glow` is set here because `.cert-ava` reads it for the disc's tint and
+   ring, and no avatar supplies one on this row. It does not prevent a breakage — `:root` declares `--glow`
+   and custom properties inherit, so without this line the ring still renders, in `:root`'s blue (#415 review,
+   note 2, which corrected an earlier claim here that it would vanish). It buys the amber that matches the
+   row's ⚔️ instead of a blue that matches nothing on it. */
+.duel-ava { --glow: var(--accent); font-size: 22px; line-height: 1; }
+.duel-line { flex: none; font-weight: 700; font-size: 14px; color: var(--muted); white-space: nowrap; }
+.coin-row { display: flex; justify-content: center; gap: 10px; margin: -6px 0 12px; flex-wrap: wrap; }
+.coin-gain { font-size: 22px; font-weight: 700; color: #ffd87a; text-shadow: 0 0 14px #ffb02088; }
+.streak-pill { align-self: center; padding: 4px 10px; border-radius: 999px; background: #3b1a22; border: 1px solid #ff8a4c66; color: #ffb090; font-weight: 700; font-size: 14px; }
+.best-pill { align-self: center; padding: 4px 10px; border-radius: 999px; background: #1a3b2a; border: 1px solid #40e0a066; color: #a8ffd8; font-weight: 700; font-size: 14px; }
+.unlock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto 8px;
+  padding: 4px 12px 4px 6px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, #2a2008, #1a1f44);
+  border: 1px solid #ffb02088;
+  box-shadow: 0 0 24px #ffb02044;
+  max-width: 300px;
+  text-align: left;
+  animation: pop .5s .3s both cubic-bezier(.2, 1.4, .4, 1);
+}
+.unlock .figure { width: 52px; flex: none; } .unlock b { display: block; color: #ffd87a; } .unlock small { color: var(--muted); font-weight: 600; }

@@ -1,0 +1,66 @@
+/* ---------- shared components ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  font-size: 17px;
+  transition: transform .12s, filter .12s;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+}
+.btn:active { transform: scale(.96); }
+.btn.primary { background: linear-gradient(180deg, #ffc44d, #ff9a1f); color: #2a1600; border-color: #ffd98a; text-shadow: 0 1px 0 #fff5; }
+.btn.cert { background: linear-gradient(180deg, #2a3b6a, #1a1f44); border-color: #b388ff88; color: #e0c8ff; } .btn.cert:disabled { opacity: .6; }
+.btn.big { padding: 16px 30px; font-size: 20px; }
+.btn:disabled { opacity: .45; filter: grayscale(.6); pointer-events: none; }
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-btn:active { transform: scale(.94); }
+.pill {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: #ffffff1a;
+  border: 1px solid var(--line);
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: #dfe6ff;
+}
+.stars { color: var(--accent); letter-spacing: 1px; font-size: 16px; }
+.stars i { font-style: normal; color: #ffffff2e; }
+.row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+
+.portrait {
+  display: inline-block;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 30%, #2b3670, #0d1226);
+  box-shadow: 0 0 0 3px #0d1226, 0 0 0 6px var(--glow), 0 10px 30px #0008, 0 0 28px var(--glow);
+}
+.portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% calc(var(--focus, .3) * 100%);
+  transform: scale(2.1);
+  transform-origin: 50% calc(var(--focus, .3) * 100%);
+}
+.portrait.sm { width: 54px; height: 54px; box-shadow: 0 0 0 2px #0d1226, 0 0 0 4px var(--glow), 0 0 16px var(--glow); }
+

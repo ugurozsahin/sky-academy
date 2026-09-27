@@ -13,6 +13,7 @@ import { avatarSrc, CATALOGUE, DEFAULT_VARIANT, find, paramsFor, variantsOf } fr
 import { placeholder } from '../../src/three/sketchbook/placeholder';
 import { TIER_LABEL } from '../../src/three/sketchbook/controls';
 import { DRAG_TURN, dragTurn, MAX_TIP } from '../../src/three/sketchbook/view';
+import { styleCss } from './helpers/sources';
 
 const root = new URL('../../', import.meta.url);
 const tokens = (name: string) => ({ '--ink': '#0d1226', '--accent-2': '#3ec9ff' } as Record<string, string>)[name] ?? '';
@@ -57,7 +58,7 @@ describe('the placeholder honours the object contract it exists to exercise', ()
 describe('the sketchbook lights the stage with the game\'s own palette', () => {
   const tokensOf = (css: string) => Object.fromEntries([...(/:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(m => [m[1], m[2].trim()]));
   it('sketchbook.css declares the same :root colour tokens as src/style.css, value for value', () => {
-    const game = tokensOf(readFileSync(new URL('src/style.css', root), 'utf8'));
+    const game = tokensOf(styleCss());
     const sketch = tokensOf(readFileSync(new URL('src/three/sketchbook/sketchbook.css', root), 'utf8'));
     expect(Object.keys(sketch).length, 'the sketchbook must declare tokens at all').toBeGreaterThan(5);
     for (const [name, value] of Object.entries(sketch)) expect({ name, value }, `${name} drifted from src/style.css`).toEqual({ name, value: game[name] });

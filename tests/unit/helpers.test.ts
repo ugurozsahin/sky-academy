@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { code, e2eSpecFiles, inDir, SOURCES, workflow, workflowFiles } from './helpers/sources';
+import { code, e2eSpecFiles, inDir, SOURCES, styleCss, workflow, workflowFiles } from './helpers/sources';
 
 /**
  * The readers four rail files share (#321). Until the split each of them was a `const` at the top of one
@@ -88,6 +88,21 @@ describe('the shared rail readers cannot go blind (#321)', () => {
   it('e2eSpecFiles(dir) is loud on a real directory with no e2e specs, not just in theory (#794)', () => {
     const empty = new URL('./helpers/fixtures/no-e2e-specs/', import.meta.url);
     expect(() => e2eSpecFiles(empty), 'zero .spec.ts files must throw, not return []').toThrow(/pass vacuously/);
+  });
+
+  it('styleCss() reads src/style.css\'s imports, not one split-out file (#558)', () => {
+    const css = styleCss();
+    expect(css.length, 'the stylesheet split into src/styles/*.css must not read as empty or one file').toBeGreaterThan(10_000);
+    // One marker from the first section (base.css, unnamed) and one from the last (shop.css) — proves the
+    // whole import chain is read, not just the entry or the first file it names.
+    expect(css, 'base.css\'s Fredoka @font-face must survive the split').toMatch(/@font-face/);
+    expect(css, 'shop.css\'s .shop-btn rule must survive the split').toContain('.shop-btn');
+  });
+
+  it('styleCss(root) is loud on a real entry file with no @import lines, not just in theory (#558)', () => {
+    const noImports = new URL('./helpers/fixtures/no-style-imports/', import.meta.url);
+    expect(() => styleCss(noImports), 'an entry with no @import lines must throw, not read as the whole stylesheet')
+      .toThrow(/no @import lines/);
   });
 
   it('code() strips comments and leaves the code, so a comment naming a ban does not trip it', () => {

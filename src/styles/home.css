@@ -1,0 +1,370 @@
+/* ---------- home ---------- */
+.islands.big { grid-template-columns: 1fr; gap: 14px; }
+.islands.big .island { flex-direction: row; align-items: center; text-align: left; padding: 14px 16px 14px 150px; min-height: 124px; gap: 10px; }
+.islands.big .isl-art { left: 12px; top: 50%; width: 130px; height: 84px; transform: translateY(-50%); }
+@keyframes hoverBig { 0%, 100% { transform: translateY(-50%); } 50% { transform: translateY(calc(-50% - 6px)); } }
+.islands.big .isl-art { animation-name: hoverBig; }
+.isl-text { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.isl-text small { color: var(--muted); font-weight: 600; font-size: 13px; line-height: 1.2; }
+.isl-bar { display: block; height: 8px; border-radius: 999px; background: #ffffff18; overflow: hidden; margin-top: 4px; }
+.isl-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffb020, #ffd54f); box-shadow: 0 0 10px #ffb02088; }
+.islands.big .isl-stars { margin-top: 0; }
+.isl-go {
+  align-self: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffc44d, #ff9a1f);
+  color: #2a1600;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px #0006;
+}
+/* Per-year border tint + island art come from YearInfo (--tint / .isl-art background), set inline in home.ts — no per-index rules, so a new year needs no CSS. */
+.isl-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px 14px 12px 12px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  min-height: 92px;
+}
+.isl-head .isl-art { position: static; width: 96px; height: 64px; transform: none; animation: none; flex: none; }
+.isl-head b { display: block; font-size: 22px; } .isl-head small { color: var(--muted); font-weight: 600; }
+@media (min-width: 720px) {
+  .islands.big {
+    grid-template-columns: repeat(var(--cols, 3), 1fr);
+  }
+  .islands.big .island {
+    flex-direction: column;
+    text-align: center;
+    padding: 100px 14px 16px;
+  }
+  .islands.big .isl-art {
+    left: 50%;
+    top: 10px;
+    transform: translateX(-50%);
+    animation-name: hover;
+  }
+  .isl-text {
+    align-items: center;
+    width: 100%;
+  }
+  .isl-bar {
+    width: 100%;
+  }
+}
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hero { display: flex; align-items: center; gap: 12px; padding: 6px 12px 6px 6px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); text-align: left; }
+.hero b { display: block; font-size: 17px; } .hero small { color: var(--muted); }
+.settings { display: flex; gap: 8px; }
+/* #414: on a narrow phone (320/360px) the settled coin pill + two icon buttons leave `.hero` no room, and it
+ * cannot shrink below its text's intrinsic width by default. Below 400px `.hero` is allowed to give: its text
+ * column gets `min-width: 0` and both lines ellipsise rather than pushing the row off the right edge. The
+ * element line is the one that actually runs long ("Electric Ninja"), so in practice it is what truncates —
+ * the child's own name is short enough to survive whole at every measured width.
+ * `.hero`'s `min-width: 0` alone splits the shrink pressure across BOTH its children — the fixed-size portrait
+ * too, since a flex item with `overflow: hidden` already has an automatic minimum of 0. `flex-shrink: 0` on the
+ * portrait pins it at 54px so the text column absorbs all of it, which is what the ellipsis rules are for
+ * (round 1 review, B1: unpinned, the portrait rendered at 12px instead of 54 at 320×568 with a big purse).
+ * Once `.hero` hit its own floor (round 2), the remaining deficit moved onto `.settings`: `.icon-btn` has no
+ * `flex-shrink: 0` of its own, so `#snd`/`#spk` shrank to ~41.5px — under the 44px touch floor — at exactly
+ * the two "four-figure purse" scenarios this rule is meant to survive (round 3 review, B1). Pinning them here
+ * keeps the coin pill (which has room to give via its own padding rule below) as the one thing in `.settings`
+ * that still absorbs any further squeeze. */
+@media (max-width: 400px) {
+  .topbar { gap: 8px; }
+  .hero { min-width: 0; gap: 8px; padding: 6px 8px 6px 6px; }
+  .hero .portrait { flex-shrink: 0; }
+  .hero > span:last-child { min-width: 24px; overflow: hidden; }
+  .hero b, .hero small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .settings { gap: 4px; }
+  .settings .icon-btn { flex-shrink: 0; }
+}
+.section-title { margin: 22px 4px 10px; font-size: 20px; color: #dfe6ff; }
+.islands { display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: 12px; }
+.island {
+  position: relative;
+  padding: 78px 8px 12px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 2px solid var(--tint, var(--line));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  transition: transform .15s, border-color .15s;
+}
+.island b { font-size: 18px; } .island small { color: var(--muted); font-weight: 600; } .isl-stars { margin-top: 6px; color: var(--accent); font-weight: 700; font-size: 14px; }
+.island.sel { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 12px 30px #0008, inset 0 0 40px #ffb02022; }
+.isl-art {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 120px;
+  height: 68px;
+  transform: translateX(-50%);
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  animation: hover 4s ease-in-out infinite;
+}
+/* Hover stagger is set inline (animation-delay from the island index in home.ts). */
+@keyframes hover { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -5px); } }
+.tabs { display: flex; gap: 8px; margin: 18px 0 10px; }
+.tab { flex: 1; padding: 12px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); font-weight: 700; font-size: 17px; color: var(--muted); }
+.tab.on { background: linear-gradient(180deg, #2f3d84, #1f2a63); color: #fff; border-color: #6d7fd6; }
+.topics { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.topic {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px;
+  min-height: 112px;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  text-align: left;
+  transition: transform .12s, border-color .12s;
+}
+.topic:active { transform: scale(.97); } .topic:hover { border-color: #6d7fd6; }
+.topic .ic { font-size: 28px; line-height: 1; } .topic b { font-size: 16px; line-height: 1.15; }
+.topic .pill { position: absolute; top: 10px; right: 10px; }
+.mode-btn {
+  width: 100%;
+  margin-top: 18px;
+  padding: 10px 16px 10px 10px;
+  justify-content: flex-start;
+  gap: 14px;
+  border-radius: 20px;
+  background: linear-gradient(90deg, #3b1a22, #1a1f44);
+  border: 1px solid #ff3b5c66;
+  box-shadow: 0 0 30px #ff3b5c33, 0 8px 24px #0008;
+}
+.mode-btn img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  object-position: 50% 20%;
+  transform: scale(1.6);
+  transform-origin: 50% 30%;
+  border-radius: 50%;
+  background: #0d1226;
+  box-shadow: 0 0 0 3px #ff3b5c;
+}
+.mode-btn .vport { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex: none; background: #0d1226; box-shadow: 0 0 0 3px #ff3b5c; }
+.mode-btn span { text-align: left; } .mode-btn b { display: block; font-size: 20px; } .mode-btn small { color: var(--muted); }
+.mode-btn.train { margin-top: 18px; background: linear-gradient(90deg, #3b2e1a, #1a2a44); border-color: #ffb74d66; box-shadow: 0 0 30px #ffb74d33, 0 8px 24px #0008; }
+.mode-btn.train .vport, .mode-btn.train img { box-shadow: 0 0 0 3px #ffb74d; }
+.mode-btn.train + .mode-btn { margin-top: 10px; }
+.mode-btn.sprint { margin-top: 10px; background: linear-gradient(90deg, #1a3b2a, #1a2a44); border-color: #40e0a066; box-shadow: 0 0 30px #40e0a033, 0 8px 24px #0008; }
+.mode-btn.sprint .vport { box-shadow: 0 0 0 3px #40e0a0; } .mode-btn .vport.emoji { display: grid; place-items: center; font-size: 34px; }
+.mode-btn.boss { margin-top: 10px; background: linear-gradient(90deg, #3b1a3b, #2a1a44); border-color: #b388ff66; box-shadow: 0 0 30px #b388ff33, 0 8px 24px #0008; }
+.mode-btn.boss .vport, .mode-btn.boss img { box-shadow: 0 0 0 3px #b388ff; }
+.mode-btn.memory { margin-top: 10px; background: linear-gradient(90deg, #1a2a44, #2a3b1a); border-color: #3ec9ff66; box-shadow: 0 0 30px #3ec9ff33, 0 8px 24px #0008; }
+.mode-btn.memory .vport { box-shadow: 0 0 0 3px #3ec9ff; }
+.mode-btn.duel { margin-top: 10px; background: linear-gradient(90deg, #3b1a2a, #1a2a44); border-color: #ff5f6d66; box-shadow: 0 0 30px #ff5f6d33, 0 8px 24px #0008; }
+.mode-btn.duel .vport { box-shadow: 0 0 0 3px var(--bad); }
+/*
+ * #563 (#18 group B): below 900px the five mode buttons stay exactly as they were — `display: contents`
+ * makes the wrapper invisible to layout, so each `.mode-btn` is still a direct flow child of `.island-screen`,
+ * stacked by its own `margin-top` above. At ≥900px (the breakpoint `.screen`/`.p-stats`/`.p-years` already
+ * use) they move into a 3-column grid instead: stacked full-width they ran 566px tall, more than half an
+ * 800px-tall 1280×800 window and the reason the island needed two viewports of scroll (#18's 2026-09-22
+ * 14:02Z comment). Five cards read as a group either way; a grid reads differently from a stack, so the
+ * pull request that adds this rule carries `owner-approval`.
+ *
+ * `.island-screen .mode-grid .mode-btn` (three classes) rather than `.mode-grid .mode-btn` (two) — the
+ * per-mode rules above (`.mode-btn.train` etc.) are also two classes, so a two-class override would only
+ * win by being declared later in the file, a tie a future edit could silently flip back to a 10-18px
+ * margin-top at ≥900px with no error (silent-failure-hunter, #563 review). Three classes wins by
+ * specificity instead, regardless of source order.
+ */
+.mode-grid { display: contents; }
+@media (min-width: 900px) {
+  .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+  .island-screen .mode-grid .mode-btn { width: auto; margin-top: 0; }
+}
+/* Ninja Duel (#16, #388): the play shell split into two arenas, one per player, with the shared question card
+   between them. Each half is its own canvas (its own pointer input). The screen class is `.duel-screen`, never
+   bare `.duel` — the island's mode button carries that (#63).
+
+   LANDSCAPE is the layout the duel is played in (#388, owner and child at play): the halves sit side by side —
+   Player 1 left, Player 2 right — each the FULL height, with the card in a bar across the top, centred over the
+   divider so it reads the same way for two children sitting at the long edge. Stacked halves gave each player
+   half the height, and `layoutWave` spends a bubble radius twice over out of whatever it is handed
+   (`usable = H - (topInset + r + 10) - r`), so on a phone the whole flight happened in about 270px.
+
+   PORTRAIT keeps the stacked layout as a fallback, Player 1 on the bottom half — the child holding the phone —
+   and Player 2 on top. It is a fallback, not a second design: the card carries a `.duel-rotate` nudge, shown in
+   portrait only, where there is height to spare for it. A rotate GATE was rejected — it makes the mode
+   unreachable on a device whose orientation is locked.
+
+   The layout is a grid rather than a flex column so the DOM order (Player 2, card, Player 1 — kept as it was)
+   and the visual order can differ per orientation without moving anything in `duel.ts`. */
+.duel-screen {
+  display: grid; justify-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: 'b' 'q' 'a';
+}
+.duel-half { position: relative; min-height: 0; min-width: 0; width: 100%; max-width: var(--arena-w); }
+.duel-half.a { grid-area: a; } .duel-half.b { grid-area: b; }
+/* The toast is laid into the question bar's own grid area, over the card and never over an arena.
+   It fades with `opacity: 0` and is never removed, so as a grid item of its own it opened a THIRD implicit row
+   and took 32px off both arenas on every duel — hence the overlay. But overlaying it at the foot of the screen
+   put a 90%-opaque slab (`#0d1226e6`) over ONE player's live bubbles and not the other's: `onRoundMiss` leaves
+   the round running (`duel.ts`'s "a wrong slice; the round continues") and still toasts for 900ms, so in
+   portrait it covered 13,650px² of Player 1's arena and 0 of Player 2's — the two halves made unequal for the
+   child who just erred, in the one mode whose whole rule is that they are identical (#389). Sideways it blotted
+   out Player 2's name and score instead, including as that score changed.
+   The bar is the one place that belongs to both players equally and holds nothing time-critical: it is static
+   for the whole round, where a bubble is in flight. `start center` rather than centred, and inset 4px: the card
+   is covered and that is the accepted trade, but `.duel-q .hint` is not — seven pool topics carry the values
+   being compared there and NOWHERE else, so a hint swallowed whole is a round of "Which is fuller?" over two
+   coloured bubbles. Measured across four viewports, centred hid it completely at 568x320; this hides at most a
+   quarter of it, and none of either arena or either name pill. `q` is sized by the strip, which is taller than the toast at
+   every viewport, so this still costs no layout — the 32px stays won. `pointer-events: none` remains load
+   bearing for the same reason it was: a slice must reach the canvas.
+   `.duel-screen` no longer needs `position: relative` for this — a grid item is placed by the grid — so it is
+   gone, and `#overlay`'s `position: absolute; inset: 0` now resolves against `#app` instead. Measured as no
+   visible change (`#app` is `position: relative` and `min-height: calc(var(--vh) * 100)`, so the overlay still
+   covers the screen exactly), but it is a dependency the next person to touch `#app` would not otherwise see. */
+.duel-screen > .toast {
+  grid-area: q; place-self: start center; margin-top: 4px; z-index: 3; pointer-events: none;
+}
+/* The duel's toast fades in PLACE — no slide. The shared `.toast` enters from `translateY(-6px)`, and aligned to
+   the top of the bar that start position is 6px above it, which in portrait is inside Player 2's arena: for the
+   200ms of the fade the panel really is over one child's bubbles, the very thing this placement exists to end.
+   Reversing the slide only moves the problem, because the safe direction is not the same in both orientations —
+   sideways the arenas are BELOW the bar, so a downward entry lands on them instead. Nothing keeps a 6px slide
+   inside a bar it is aligned to the edge of, so the motion goes and the fade stays. */
+.duel-screen > .toast { transform: none; }
+
+.duel-arena { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+/* The divider is drawn, never a BORDER (#388/#389). With `box-sizing: border-box` a 1px border on half B took
+   1px off Player 2's canvas and not Player 1's, so the two arenas had different geometry — and `layoutWave`
+   derives `r`, `g` and `vx` from geometry, so the halves produced different arcs from the same seed. That is
+   exactly the silent failure #389's issue predicted for its shared-seed fix, and it broke that rail here. A
+   pseudo-element costs no layout, so both halves stay identical to the pixel. */
+.duel-half.b::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: var(--line); pointer-events: none; z-index: 1;
+}
+.duel-tag {
+  position: absolute; left: 10px; display: flex; align-items: center; gap: 8px; padding: 4px 10px;
+  border-radius: 999px; background: var(--panel); border: 1px solid var(--line); pointer-events: none; font-size: 13px; color: var(--muted);
+}
+.duel-half.b .duel-tag { top: calc(8px + var(--sat)); } .duel-half.a .duel-tag { bottom: 8px; }
+.duel-score { font-size: clamp(18px, 5vw, 24px); font-weight: 700; color: var(--text); text-shadow: 0 2px 0 #0006; }
+.duel-strip { grid-area: q; width: 100%; max-width: 560px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; z-index: 2; }
+.duel-q {
+  flex: 1; min-width: 0; text-align: center; padding: 6px 8px; border-radius: 16px;
+  background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px #0006; cursor: pointer;
+}
+.duel-q .prompt { font-size: clamp(22px, 5.5vw, 34px); margin: 2px 0; }
+.duel-q .vis-wrap:empty { display: none; }
+/* The strip is short, so the hint sits tight under the prompt — but it is never dropped: seven pool topics
+   carry the values being compared here and nowhere else on the card (#16 review). `display: block` is load
+   bearing: the short-screen rule below (`@media (max-height: 640px)`) hides `.hint` outright to buy the play
+   screen vertical space, and a landscape phone is exactly that band — which left "Which is fuller?" over two
+   coloured bubbles again. The play screen's own half of that is #328, not this pull request's. */
+.duel-q .hint { display: block; font-size: clamp(12px, 3vw, 15px); line-height: 1.25; margin-top: 2px; }
+@media (max-height: 640px) { .duel-q .hint { font-size: 12px; margin-top: 0; } }
+/* Portrait only — the landscape branch below hides it, so it costs nothing where height is scarce. */
+.duel-rotate { font-size: clamp(11px, 2.8vw, 13px); font-weight: 700; color: var(--muted); margin-top: 4px; }
+/* The card's visual gets a HEIGHT BUDGET, in both orientations (#388). The visuals are sized in CSS and the
+   `max-height: 640px` band does not shrink them — `.clock` is a fixed 120px square, `.frac` 110px, `.dots` 100px
+   — and nothing bounded the card, so what the two arenas got depended on which question the draw dealt.
+   160px clears everything the pool can build: 132px was tried first and CUT the bottom row off a twelve-star
+   counting card (`y2-fractions`, "count the stars") on every tablet in portrait, where `--slot` reaches its 40px
+   maximum. `overflow-y: clip`, never `overflow: hidden`, is the backstop — see the rule itself for why the axis
+   matters. `tests/e2e/duel.spec.ts` pins this against every card the three duel pools can actually deal,
+   rendered through the app's own `renderVisual()`, AND against one deliberately taller than any of them. */
+.duel-q { --duel-vis: 160px; }
+/* `overflow-y: clip`, never `overflow: hidden` — it bounds the axis that needs bounding and leaves the other
+   alone. `hidden` clips BOTH axes, and each loss landed on the answer: sideways-on it cut the `?` clean off a
+   number line at 320px wide (24px of it, 4px at 360px) where the prompt is "Which number is hidden?", and it is
+   `hidden` on x that did it — on `main` the line simply spilled past the card and stayed readable. With `clip`,
+   `overflow-x: visible` survives beside it; beside `hidden` it would compute to `auto` and make a scroll
+   container, which is worse again. 160px, not 132px: `--slot` reaches its 40px maximum on any portrait screen
+   past ~556px wide, so twelve stars are 152px there and 132px cut the bottom row in half — on every tablet in
+   portrait, for `y2-fractions`, whose prompt is `1/4 of 12 = ?` and whose hint is "count the stars". Count what
+   was drawn and you get 10. That is the wrong-count failure this budget exists to prevent, introduced by the
+   budget itself. */
+.duel-q .vis-wrap { max-height: var(--duel-vis); overflow-y: clip; }
+/* #388: side by side, question across the top. `--arena-w` now caps the PAIR, not each half: with the cap on
+   the half, a screen wider than two arenas leaves both of them at the outer edges and the card stranded over
+   the gap between them. Capping the grid keeps the divider under the centre of the card at every width. */
+@media (orientation: landscape) {
+  /* `.play.duel-screen`, not `.duel-screen`: `.play { max-width: none }` is a single class too and sits LATER in
+     this file, so a one-class selector here loses the tie and the cap would silently do nothing. */
+  .play.duel-screen {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: 'q q' 'a b';
+    max-width: calc(var(--arena-w) * 2); margin-inline: auto;
+    /* #399: insets the PAIR, not each half — padding on this one box shrinks both `1fr` columns by the same
+       share of whatever is left after --sal/--sar come off, so the divider stays exactly where the two equal
+       columns meet (`tests/e2e/duel.spec.ts`'s "the card is centred over the divider" is a check against that
+       meeting point, never against the viewport's own centre, so unequal --sal/--sar cannot fail it) — the
+       fix the issue itself asked for over padding each `.duel-half` on its own, which would not. */
+    padding-left: var(--sal); padding-right: var(--sar);
+  }
+  .duel-half { max-width: none; }
+  /* Height is the scarce axis now and width is not, so the bar spends width to buy height back: it takes the
+     pair's full width instead of the portrait card's 560px, and the card lays its pieces out in a ROW — round
+     pill, prompt, visual, hint on one line — rather than stacking them. Stacked in a 560px card the bar took
+     177px of a 390px-tall phone (whatever the question put in `.vis-wrap`), which handed each arena 213px and
+     gave most of the fix straight back. */
+  .duel-strip { max-width: none; padding: 4px 10px; }
+  .duel-q { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; }
+  .duel-q .prompt, .duel-q .hint { margin: 0; }
+  /* A SHORT landscape screen is the one band with no height to spare, so the budget tightens and the visual is
+     scaled into it: a clock question took 165px of a 390px screen (42%) and left each child 193px — WORSE than
+     the 213px that made the stacked layout unplayable. `zoom`, not `transform: scale()`, because only `zoom`
+     shrinks the LAYOUT box, which is the whole point; a transform would shrink the picture and leave the bar
+     just as tall. The factor is what makes the pool's tallest visual, the 120px clock, fit the budget.
+     A tall landscape screen restores the base budget and scales nothing — see below. */
+  .duel-q { --duel-vis: 100px; }
+  .duel-q .vis-wrap { display: flex; justify-content: center; }
+  /* KNOWN TRADE, measured rather than assumed (raised as a note on PR #394's round-2 review). `zoom` scales the
+     painted result while viewport units still resolve against the unzoomed viewport, so it walks through
+     `--slot`'s `clamp(22px, …)` floor — which #107 set as a measured minimum for something a child has to COUNT.
+     A five-frame star renders at 11.6px on a landscape phone. The alternative was tried and measured: exempting
+     `.vis.objs` from the zoom gets 18.7px, but the bar then needs 176px and each arena drops to 214px, which
+     breaks the bound above. On a 390px-tall screen both cannot be had, and which one gives is a legibility
+     judgement for the owner rather than one to settle in a stylesheet. Nothing is CROPPED either way — the budget
+     fits the tallest visual at both bands and `tests/e2e/duel.spec.ts` pins that. */
+  .duel-q .vis { margin: 0; zoom: 0.62; }
+  /* The bar is a row, so anything that does not fit across it WRAPS, and every wrapped line is height taken off
+     both arenas. At 844px a 34px prompt will not sit beside the pool's longest hint and a visual, so on a short
+     landscape screen the prompt gives up a few points — the same trade the `max-height: 640px` rule above already
+     makes for the hint. Restored at full size on a tall landscape screen below. */
+  .duel-q .prompt { font-size: clamp(18px, 3.4vw, 26px); }
+  /* Sideways the divider runs down the middle instead of across it — still drawn, still no layout cost. */
+  .duel-half.b::after { inset: 0 auto 0 0; width: 1px; height: auto; }
+  /* Both halves are full height now, so both name tags sit at the foot of their own half, clear of the bar. */
+  .duel-half.b .duel-tag, .duel-half.a .duel-tag { top: auto; bottom: 8px; }
+  .duel-rotate { display: none; }
+}
+/* Only a SHORT landscape screen is actually short of height, and a clock question is one where reading the face
+   IS the question — so a landscape tablet pays nothing for the rule above: above 700px tall the visuals keep
+   their full size. The 390px-tall phone band is the one that has to shrink them. */
+@media (orientation: landscape) and (min-height: 700px) {
+  /* The base budget again, restated only to override the short band's 100px above — the cascade reaches both
+     rules on a tall landscape screen and the later one wins. Nothing is scaled here: a clock question is one
+     where reading the face IS the question, and a tablet has the height to show it whole. */
+  .duel-q { --duel-vis: 160px; }
+  .duel-q .vis { zoom: 1; }
+  .duel-q .prompt { font-size: clamp(22px, 5.5vw, 34px); }
+}
+.duel-final { grid-template-columns: repeat(3, 1fr); }
+.foot { margin-top: 26px; text-align: center; color: #6c78a8; font-size: 12px; font-weight: 600; }
+
