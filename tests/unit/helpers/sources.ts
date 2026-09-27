@@ -67,6 +67,13 @@ export const inDir = (dir: string): [string, string][] => {
 // escaped character as one atomic unit alongside its backslash, the same pairing real escape semantics use
 // (an even run of backslashes cancels out, leaving the next character unescaped) — so a comment's own opening
 // `/*` or `//`, never itself escaped, is always still seen, while a regex literal's internal `\/` never is.
+//
+// One shape this pairing gets "wrong" on purpose: an odd (3+) run of literal backslashes immediately before a
+// real `/*`/`//` reads the last one as escaping the comment's own slash, so the comment survives unstripped
+// (#816). That is the safe direction for a guard rail — a false-positive red, not a false-negative pass — and
+// unreachable from any syntactically valid TypeScript: a literal only closes at a delimiter preceded by an
+// even backslash run, so 3+ raw backslashes can never sit directly against a real comment opener in code that
+// compiles. Left as a documented edge rather than special-cased.
 export const code = (src: string): string => {
   let out = '';
   let i = 0;
