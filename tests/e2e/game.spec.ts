@@ -3397,6 +3397,39 @@ test.describe('profile picker (#20 slice 2)', () => {
     }
   });
 
+  /**
+   * guard rail (#769): the same #414 shape, on the shop's own `.isl-head` row — the one `.isl-head` screen with
+   * a third row-mate (`.coin-pill`) competing for width, so the back button shrank below its 44px floor on
+   * 320/360px phones with a four/five-figure balance where the other `.isl-head` screens (icon + text only)
+   * were never at risk.
+   */
+  test('the shop back button keeps its 44px floor at 320px and 360px with a four- and five-figure balance (#769)', async ({ page }) => {
+    test.slow();   // four navigations, each waiting on the blocked Google Fonts stylesheet in the sandbox (#69's own note)
+    for (const [w, h] of [[320, 568], [360, 640]] as const) {
+      for (const coins of [1250, 12345]) {
+        await page.addInitScript(save => {
+          localStorage.removeItem('sna:v1');
+          localStorage.setItem('sna:v1', save);
+        }, JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', coins, spent: 0, onboarded: true }));
+        await page.setViewportSize({ width: w, height: h });
+        await page.goto('/');
+        await expect(page.locator('.home.map')).toBeVisible();
+        await page.click('#rewards'); await page.click('#shop');
+        await expect(page.locator('.shop')).toBeVisible();
+        const back = await page.locator('#back').boundingBox();
+        expect(back!.x, `${w}x${h}, ${coins} coins: the back button's left edge is off-screen`).toBeGreaterThanOrEqual(0);
+        expect(back!.width, `${w}x${h}, ${coins} coins: the back button is squeezed under the 44px touch floor`).toBeGreaterThanOrEqual(44);
+        expect(back!.height, 'and its height (design-language §4 touch floor)').toBeGreaterThanOrEqual(44);
+        await expect(page.locator('#balance b')).toHaveText(coins > 9999 ? '9999+' : String(coins));
+        await expectFitsViewport(page, `shop at ${w}x${h}, ${coins} coins`);
+        // main.ts's history.state survives a reload the same way it survives a relaunch (its own comment) — pop
+        // back to the map so the next iteration's `page.goto('/')` lands on `.home.map`, not the screen this one leaves open.
+        await page.click('#back'); await expect(page.locator('.rewards')).toBeVisible();
+        await page.click('#back'); await expect(page.locator('.home.map')).toBeVisible();
+      }
+    }
+  });
+
   /** Record every line handed to the engine, so a test can assert a sentence was *spoken* and not only printed. */
   const captureSpeech = (page: Page) => page.addInitScript(() => {
     window.__spoken = [];

@@ -1826,26 +1826,18 @@ img { -webkit-user-drag: none; }
 /* ---------- shop (#6) ---------- */
 .shop-btn { width: 100%; margin-top: 12px; flex-direction: column; gap: 0; } .shop-btn small { font-size: 13px; font-weight: 600; opacity: .8; }
 .shop h3 { margin: 16px 0 8px; font-size: 16px; color: #dfe6ff; } .shop .isl-head .coin-pill { margin-left: auto; height: 38px; }
+/* #769: `.icon-btn` never had #414's `flex-shrink: 0` outside `.settings`; the shop's `.isl-head` also carries a `.coin-pill` competing for width. */
+@media (max-width: 400px) {
+  .shop .isl-head .icon-btn { flex-shrink: 0; }
+  .shop .isl-head > div { min-width: 0; }
+  .shop .isl-head b, .shop .isl-head small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 .shop .item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 8px;
-  border-radius: 18px;
-  background: var(--panel);
-  border: 2px solid var(--line);
-  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px 8px; border-radius: 18px; background: var(--panel); border: 2px solid var(--line); text-align: center;
 }
-.shop .item .icon {
-  font-size: 34px;
-  line-height: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
+.shop .item .icon { font-size: 34px; line-height: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .shop .item b {
   font-size: 15px;
   margin-top: 2px;
