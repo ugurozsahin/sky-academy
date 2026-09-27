@@ -234,7 +234,7 @@ jobs:
       #
       # #751 (owner-approved loosening, epic #540): the pull-request arm runs the mobile project's `@smoke` subset
       # (#750: build identity, one slice round, one tracing round, one save-code round trip; #854 added onboarding,
-      # a wrong answer losing a life, a full five-stage mission and a duel match: 8 tests, ~30 s), not
+      # a wrong answer losing a life, a full five-stage mission and a duel dealing both arenas: 8 tests, ~30 s), not
       # the whole project. Measured 2026-09-25, the mobile leg's median was 511 s of a job whose other steps take
       # ~75 s, so a pull request's CI goes from about ten minutes to about two. What replaces the coverage this
       # gives up, in the order it runs: the developer's own full-mobile run under `open-pr` §4's conditions, the
