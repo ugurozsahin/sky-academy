@@ -2945,9 +2945,14 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
 
   // #803 (PR #799 review): a parenthesized or comma-expression require callee is a real minifier/bundler output
   // shape, not a syntax trick — `isRequireCallee` only unwrapped a bare identifier or property access before this.
+  // The doubly-nested and paren-wrapped-comma cases prove `unwrapRequireCallee`'s loop/recursion actually
+  // repeats rather than only stripping one layer (pr-test-analyzer review of this fix): a version that unwrapped
+  // exactly once would still pass the first two rows but fail the last two.
   it.each([
     ['a parenthesized require callee', "const r = (require)('../three/stage/rig');"],
     ['a comma-expression require callee', "const r = (0, require)('../three/stage/rig');"],
+    ['a doubly-parenthesized require callee', "const r = ((require))('../three/stage/rig');"],
+    ['a parenthesized comma-expression require callee', "const r = ((0, require))('../three/stage/rig');"],
   ])('%s still counts as require, not silently nothing (#803)', (_case, src) => {
     expect(edges('/src/ui/x.ts', src))
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
@@ -2995,6 +3000,16 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         { from: '/src/ui/x.ts', spec: '../three/stage/*.ts', to: '/src/three/stage/*.ts', kind: 'static' },
         { from: '/src/ui/x.ts', spec: '../three/objects/*.ts', to: '/src/three/objects/*.ts', kind: 'static' },
       ]);
+  });
+  // silent-failure-hunter review of this fix: a non-literal array element (a spread, a bare identifier) has no
+  // text to build a placeholder from, unlike a template-literal substitution — and it is unreachable on this
+  // project's own real `src/` today, the same bar the #736 `require`-callee unreachability note above already
+  // applies: Vite's own `import.meta.glob` only accepts literal string patterns, so a build with a non-literal
+  // element already fails before this reader ever sees it. Proved here rather than only asserted: the literal
+  // element beside it still produces its edge, and the non-literal one is dropped, not thrown or mis-resolved.
+  it('a non-literal element inside the array is dropped, not thrown or falsely resolved (#803 review)', () => {
+    expect(edges('/src/ui/x.ts', "import.meta.glob([DYNAMIC, '../three/objects/*.ts']);"))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/objects/*.ts', to: '/src/three/objects/*.ts', kind: 'static' }]);
   });
 
   // (a) Proved red: `import { Color } from 'three'` in a scratch `src/ui/x.ts` fails.
