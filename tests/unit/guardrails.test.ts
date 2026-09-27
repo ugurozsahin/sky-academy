@@ -2828,6 +2828,11 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
       const u = unwrapRequireCallee(e);
       return (ts.isIdentifier(u) && u.text === 'require') || (ts.isPropertyAccessExpression(u) && u.name.text === 'require');
     };
+    // #803/#820 unwrap a parenthesized *callee* and a parenthesized *array argument* to import.meta.glob; #829
+    // widens this to the dynamic-import and require branches' own call argument — `import(('x'))`/`require(('x'))`
+    // are both valid, compiling shapes (a bundler/minifier can add or preserve stray parens around either), and
+    // specText() has no ParenthesizedExpression case, so an unwrapped argument silently produced no edge at all.
+    const unwrapParens = (e: ts.Expression): ts.Expression => ts.isParenthesizedExpression(e) ? unwrapParens(e.expression) : e;
     // #803 (PR #799 review): `import { type A } from 'x'` has no whole-clause `isTypeOnly`, but when every named
     // binding is individually `type`-qualified nothing ships either way — the same "erased before emit" test the
     // clause-level flag already applies. A default binding (`import Foo, { type A } from 'x'`) is a value import
@@ -2855,13 +2860,15 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         const text = specText(node.argument.literal);
         if (text !== null) push(text, 'type');
       } else if (ts.isCallExpression(node) && isDynamicImportTarget(node.expression)) {
-        const text = specText(node.arguments[0]);
+        const arg0 = node.arguments[0];
+        const text = specText(arg0 ? unwrapParens(arg0) : undefined);
         if (text !== null) push(text, 'dynamic');
       } else if (ts.isCallExpression(node) && isRequireCallee(node.expression)) {
         // Bare `require('x')` and `obj.require('x')` alike — the old regex matched the literal substring
         // `require(` wherever it sat, so an AST-based reader that only recognised a bare identifier callee
         // would silently drop `obj.require('x')` that the old code caught (silent-failure-hunter review).
-        const text = specText(node.arguments[0]);
+        const arg0 = node.arguments[0];
+        const text = specText(arg0 ? unwrapParens(arg0) : undefined);
         if (text !== null) push(text, 'require');
       } else if (ts.isExternalModuleReference(node)) {
         // `import x = require('x')` never parses as a CallExpression at all — its whole
@@ -2882,7 +2889,6 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
         // #820: `import.meta.glob((['...']))` — the array wrapped in its own parentheses — used to fall through
         // to the non-array branch, silently dropping every element inside; unwrap parens first, mirroring
         // `unwrapRequireCallee`'s own paren-unwrapping above.
-        const unwrapParens = (e: ts.Expression): ts.Expression => ts.isParenthesizedExpression(e) ? unwrapParens(e.expression) : e;
         const arg0 = node.arguments[0];
         const arg = arg0 ? unwrapParens(arg0) : undefined;
         if (arg && ts.isArrayLiteralExpression(arg)) {
@@ -2975,6 +2981,18 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   ])('%s still counts as require, not silently nothing (#803)', (_case, src) => {
     expect(edges('/src/ui/x.ts', src))
       .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind: 'require' }]);
+  });
+
+  // #829: the paren-unwrapping #820 gave import.meta.glob's own argument never reached the dynamic-import or
+  // require branches, which read node.arguments[0] with no ParenthesizedExpression handling at all — a
+  // paren-wrapped call argument is fully valid, compiling JS/TS (a bundler/minifier routinely adds or preserves
+  // stray parens around one), so `import(('x'))`/`require(('x'))` silently produced no edge whatsoever.
+  it.each([
+    ['a dynamic import() whose argument is wrapped in its own parens', "import(('../three/stage/rig'));", 'dynamic'],
+    ['a require() whose argument is wrapped in its own parens', "require(('../three/stage/rig'));", 'require'],
+  ] as const)('%s still produces its edge, not silently nothing (#829)', (_case, src, kind) => {
+    expect(edges('/src/ui/x.ts', src))
+      .toEqual([{ from: '/src/ui/x.ts', spec: '../three/stage/rig', to: '/src/three/stage/rig', kind }]);
   });
 
   // #799 review, finding 1: a per-name dynamic loader (`import(\`../objects/${name}.ts\`)`) is a realistic
