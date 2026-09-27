@@ -1,6 +1,6 @@
 # The gate for every change. A pull request gets unit tests + guard rails and the build ALWAYS, and e2e on
-# the MOBILE project only (#81) and only when the diff can actually reach the game (#96). A push to main
-# gets the LIGHT run — that tree already passed e2e on its own PR minutes earlier, so main only re-checks
+# the MOBILE project's @smoke subset only (#81, #751) and only when the diff can actually reach the game (#96).
+# A push to main gets the LIGHT run — that tree already passed smoke e2e on its own PR, so main only re-checks
 # what a merge can break cheaply (types, unit, build). The FULL matrix — every project — runs against main
 # once a night, which is what catches two PRs that were green apart and broken together, and is now also the
 # only place a desktop-only regression is caught. Clearing a review block (undrafting a PR) re-runs the
@@ -231,9 +231,18 @@ jobs:
       # The pull-request arm stays at one project: putting a tablet on it is more metered minutes per pull
       # request, and that is #74's open decision, not a run's to take. The #81 rail holds both halves —
       # every declared project in the full arm, exactly one in the pull-request arm.
-      - name: End-to-end (${{ github.event_name == 'pull_request' && 'mobile' || 'full matrix' }})
+      #
+      # #751 (owner-approved loosening, epic #540): the pull-request arm runs the mobile project's `@smoke` subset
+      # (#750: build identity, one slice round, one tracing round, one save-code round trip; 4 tests, ~10 s), not
+      # the whole project. Measured 2026-09-25, the mobile leg's median was 511 s of a job whose other steps take
+      # ~75 s, so a pull request's CI goes from about ten minutes to about two. What replaces the coverage this
+      # gives up, in the order it runs: the developer's own full-mobile run under `open-pr` §4's conditions, the
+      # reviewer's full-mobile guarantor run before a merge (`review-pr` §2), and this file's nightly, which is
+      # untouched and still runs every project in full. The #141 rail in tests/unit/guardrails.test.ts holds the
+      # pull-request arm to exactly `--project=mobile --grep @smoke` and keeps `--grep` out of the nightly arm.
+      - name: End-to-end (${{ github.event_name == 'pull_request' && 'mobile @smoke' || 'full matrix' }})
         if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
-        run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile' || '--project=mobile --project=desktop --project=tablet --project=tablet-landscape --project=sketchbook' }}
+        run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile --grep @smoke' || '--project=mobile --project=desktop --project=tablet --project=tablet-landscape --project=sketchbook' }}
       # #715: a pull request whose diff touches the sketchbook runs its one spec — the screenshot script — as its
       # own step, on top of e2e when the diff also reaches the game and instead of it when it does not. Seconds,
       # not minutes: one page, a handful of frames. The nightly needs no step of its own: the full matrix above

@@ -40,7 +40,7 @@ pull requests: 51 blocking rounds against 45 merges, so **about half of all revi
 replaced within the hour** — and it is the third run of the same suite on that tree, after the author's own
 pre-push run and CI's.
 
-You are not flying blind in the meantime. That head's e2e result is already known: a pull request reaches you
+You are not flying blind in the meantime. That head's smoke e2e result is already known: a pull request reaches you
 "Ready for review" only once CI was green on it (`docs/ROUTINE-PROMPT.md` STEP 3), §5's first unmergeable
 condition makes you read that run anyway, and CI tests `refs/pull/N/merge` — the head merged with `main` —
 which is a better tree to have evidence about than the bare branch you checked out.
@@ -53,6 +53,10 @@ npx playwright test --project=desktop        # when the diff could behave differ
 ```
 
 Take screenshots too if the change is player-visible.
+
+**Since #751, CI's e2e on a pull request is the four-test mobile `@smoke` subset, so this run is the only
+full-mobile e2e a pull request's tree gets before it lands.** CI's green on the head tells you the smoke tests
+passed, never that the project did: do not let it stand in for this run.
 
 Three cases where your run is the **only** e2e evidence that will ever exist for this tree, so a merge without
 it is a merge on nothing: CI's e2e step was **skipped** by the path filter (#176); the change is

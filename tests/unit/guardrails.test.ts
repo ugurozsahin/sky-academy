@@ -1411,12 +1411,23 @@ describe('guard rails', () => {
     expect(line, 'ci.yml must still have an e2e step').toBeTruthy();
     expect(line, 'the e2e command must branch on the event, not run one fixed matrix')
       .toContain("github.event_name == 'pull_request'");
-    const [prArm, fullArm] = [...line!.matchAll(/'((?:--project=[\w-]+\s*)+)'/g)].map(m => m[1].trim());
+    // #751: an arm may end in one `--grep @tag`, so the pull-request arm's smoke filter is read as part of it.
+    const [prArm, fullArm] = [...line!.matchAll(/'((?:--project=[\w-]+\s*)+(?:--grep\s+@[\w-]+)?)'/g)].map(m => m[1].trim());
     expect(prArm, 'the pull-request arm must be a quoted --project list').toBeTruthy();
     expect(fullArm, 'the full-matrix arm must be a quoted --project list').toBeTruthy();
 
+    // #751: the pull-request arm is the @smoke subset, spelled exactly as the `test:e2e:smoke` script a developer
+    // runs — the one the #750 rail in workflows.test.ts proves resolves to real tests — so CI cannot drift onto
+    // a grep that matches nothing, or a different subset from the one §4 of `open-pr` asks for. The nightly
+    // arm never filters: it is the one full check a merged tree gets, and a grep there would quietly end it.
+    expect(prArm, 'a pull request runs the mobile @smoke subset (#751)').toMatch(/ --grep @smoke$/);
+    const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+    expect(`playwright test ${prArm}`, 'the CI smoke arm and `npm run test:e2e:smoke` are one command (#751)')
+      .toBe(pkg.scripts['test:e2e:smoke']);
+    expect(fullArm, 'the nightly arm runs every test, never a --grep subset (#751)').not.toContain('--grep');
+
     // the PR arm: exactly one project, and one that really exists
-    const prProjects = prArm.split(/\s+/).map(a => a.replace('--project=', ''));
+    const prProjects = prArm.split(/\s+/).filter(a => a.startsWith('--project=')).map(a => a.replace('--project=', ''));
     expect(prProjects.length, 'a pull request runs ONE project — each extra one is a whole extra leg (#141)').toBe(1);
     expect(projects, `the PR project '${prProjects[0]}' must be declared in playwright.config.ts`).toContain(prProjects[0]);
 

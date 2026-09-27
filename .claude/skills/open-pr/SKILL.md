@@ -141,13 +141,23 @@ the body — not the list.
 ```
 npx tsc --noEmit
 npm test
-npm run build && npx playwright test --project=mobile
+npm run build && npm run test:e2e:smoke
+npx playwright test --project=mobile         # the full project, under the conditions below
 npx playwright test --project=desktop        # when the change could behave differently by viewport
 ```
 
-A pull request runs e2e on **mobile only** (#141) and **only when the diff can reach the game** (#176) —
-`src/`, `index.html`, `public/`, `tests/e2e/`, `playwright.config.*`, `package*.json`, `ci.yml`. Unit tests and
-the build always run.
+A pull request's CI runs e2e as the **mobile `@smoke` subset only** (#751: four tests, about ten seconds) and
+**only when the diff can reach the game** (#176) — `src/`, `index.html`, `public/`, `tests/e2e/`,
+`playwright.config.*`, `package*.json`, `ci.yml`. Unit tests and the build always run. The full mobile project
+runs on `main` every night, and the reviewer runs it once more before a merge (`review-pr` §2).
+
+**Run the full mobile project yourself when any of these holds**, because the condition is the point, not the
+default:
+
+- the diff adds or changes anything under `tests/e2e/` or `playwright.config.*`, since CI runs none of it
+  before the merge beyond the four smoke tests;
+- the diff touches the loop every mission goes through: `src/game/` or `src/ui/play*.ts`;
+- the change is viewport-sensitive, and then desktop as well (below).
 
 Two consequences worth stating, because both have cost a day here:
 
@@ -159,8 +169,10 @@ Two consequences worth stating, because both have cost a day here:
 Run the suite here rather than pushing again to see a result: Actions minutes are metered, #119 is open, and
 the spending limit is deliberately closed.
 
-Say what you actually ran. Never write "mobile + desktop" over a mobile-only pass, and if the browsers are
-unavailable write **"e2e not run (env)"** — that exact phrase, so a pass and a non-run are never the same mark.
+Say what you actually ran. A smoke-only pass is written **"e2e smoke only"**: that exact phrase, never
+"mobile", which means the full mobile project ran. Never write "mobile + desktop" over a mobile-only pass, and
+if the browsers are unavailable write **"e2e not run (env)"**: that exact phrase, so a pass and a non-run are
+never the same mark.
 
 **That marker records a gap; it does not close one.** On the Mac-side VM a scheduled run uses, Playwright
 browsers cannot be downloaded at all, so the two rules above resolve to: write the marker and ship with no

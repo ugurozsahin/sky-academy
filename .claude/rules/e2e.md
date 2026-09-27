@@ -8,7 +8,8 @@ paths:
 
 - `tsc` and Vitest cannot see this directory at all — `npx playwright test --list` is the compile check for
   files here, not `npm test`.
-- Mobile is the default project a pull request is judged on (#81); desktop runs on the nightly. Add
+- A pull request's CI runs the mobile `@smoke` subset only (#751); the full mobile project is the author's under
+  `open-pr` §4's conditions and the reviewer's before a merge, and desktop runs on the nightly. Add
   `--project=desktop` yourself when a change could behave differently by viewport.
 - A pull request runs e2e at all only when its diff can reach the game (#96): `src/`, `index.html`, `public/`,
   `tests/e2e/`, `playwright.config.*`, `package*.json`, `ci.yml`. Everything else gets a `CI` check with the
