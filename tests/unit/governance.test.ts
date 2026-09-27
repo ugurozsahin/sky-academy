@@ -4244,8 +4244,14 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/It is an answer, not an exemption/);
     expect(s, 'the incident that bought this — and that every one of those rounds was correct')
       .toMatch(/four blocking rounds/);
-    expect(s, 'which is the whole point: the round cap cannot fix this, because no round was wrong')
-      .toMatch(/Every one of those rounds was correct/);
+    // #771: the plain `/Every one of those rounds was correct/` pin this replaced left the exhaustiveness
+    // claim after it — "the round count was simply how many members the class had (#466)" — completely
+    // unpinned, so a rewrite could insert "not" before "simply" (or otherwise soften the clause) without
+    // touching any existing match. Anchored through its own full stop, so nothing can be inserted between
+    // "correct" and the citation without breaking the match.
+    expect(s, 'which is the whole point: the round cap cannot fix this, because no round was wrong — and the '
+      + 'exhaustiveness claim that follows is pinned too, not just the sentence introducing it')
+      .toMatch(/correct\*\* and met `review-pr` §7's bar, so nothing in the round cap could stop them: the round count was simply how many members the class had \(#466\)\./);
   });
 
   it('open-pr §4 concedes no exemption, in any of the voices one would be written in', () => {
@@ -4314,8 +4320,15 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
       .toMatch(/agents: cannot spawn \(subagent\)/);
     expect(a, "§4's reachability test comes with the agents, or the diff grows hardening nobody can reach")
       .toMatch(/reachability test before you change anything/);
-    expect(a, 'and what to do with such a finding, which is the disposition the test is for')
-      .toMatch(/a note for the body, not an edit to the diff/);
+    // #771: the free-floating `/a note for the body, not an edit to the diff/` pin this replaced does not
+    // care what precedes it, so "is not automatically a note for the body, not an edit to the diff" — which
+    // reverses the disposition — still matched. Anchored to the word immediately before it.
+    expect(a, 'and what to do with such a finding, which is the disposition the test is for — anchored to the '
+      + 'word right before it, so nothing can be inserted between "is" and "a note" unnoticed')
+      .toMatch(/produce is a note for the body, not an edit to the diff\./);
+    expect(a, 'the absolute is pinned through its own full stop, so a hedge cannot be appended before it and '
+      + 'turn the prohibition into a conditional')
+      .toMatch(/a gap and a result must never be written the same way, and "say so in your own words" leaves them indistinguishable\./);
     expect(a, 'the reason, which is the only one that survives "but you cannot review your own work"')
       .toMatch(/different context/);
     expect(a, 'it is not a verdict').toMatch(/not for a verdict/i);
@@ -4334,6 +4347,12 @@ describe('a fix is sized to the class, not the instance (#466)', () => {
     const section = s3();
     const b = bullet();
     expect(b, 'a commit is the one form a reviewer cannot use').toMatch(/as an issue, not a commit/);
+    // #771: this sentence carried no pin of any kind before, so a hedge inserted right after the colon —
+    // "though not every topic, every spelling, every route needs listing" — would gut the enumeration
+    // requirement with nothing here to catch it. Anchored through its own full stop.
+    expect(b, 'the enumeration itself is pinned through its own full stop, so a hedge inserted right after the '
+      + 'colon cannot land there unnoticed')
+      .toMatch(/You enumerated a class to find it: every topic, every spelling, every route\./);
     expect(b, "and the rule says so in the reviewer's own terms, not only by implication")
       .toMatch(/develops nothing and may not\s+push/);
     expect(b, 'with a title shape, so two reviewers file the same thing under the same name')
