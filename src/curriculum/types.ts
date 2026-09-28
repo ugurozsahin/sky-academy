@@ -120,7 +120,7 @@ export const STAGE_NAMES = ['Apprentice', 'Warrior', 'Master', 'Grandmaster', 'L
  * `measureCompare(..., ['heavier', 'lighter', 'heaviest', 'lightest'], ..., 'holds')` compiled and shipped
  * "Which holds heavier?" with every rail green.
  */
-export type Compare = { verb: string; forms: [string, string, string, string] };
+export type Compare = { readonly verb: string; readonly forms: readonly [string, string, string, string] };
 export const LONGER: Compare = { verb: 'is', forms: ['longer', 'shorter', 'longest', 'shortest'] };
 export const TALLER: Compare = { verb: 'is', forms: ['taller', 'shorter', 'tallest', 'shortest'] };
 export const HEAVIER: Compare = { verb: 'is', forms: ['heavier', 'lighter', 'heaviest', 'lightest'] };

@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import type { Topic } from '../../src/curriculum';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, turnEnd, coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ } from '../../src/curriculum/util';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, turnEnd, coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ, measureCompare } from '../../src/curriculum/util';
 import { R_LETTERS_P2, R_LETTERS_ALL, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/reception';
 import { TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/year2';
 import type { SentenceType } from '../../src/curriculum/year2';
@@ -334,6 +334,16 @@ describe('curriculum ranges', () => {
     // y2-temp are all well above (321–450).
     for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp'])
       expect(perTopic.get(id), `${id} produced no comparison card this sweep saw`).toBeGreaterThan(100);
+  });
+  it('measureCompare (#324 item 5): the out-of-step call the issue names no longer type-checks', () => {
+    // The exact call #645 reports: a forms array and a trailing verb string as two independent arguments,
+    // with capacity's verb paired onto mass's forms. Wrapped in a never-called closure — calling it would
+    // throw immediately (`compare.forms` is undefined on an array), which is not the point; the point is
+    // that `tsc` refuses this call shape at all now that verb and forms are one `Compare` value.
+    const impossible = (): Question =>
+      // @ts-expect-error — forms and verb used to be two positional arguments; this shape must not compile.
+      measureCompare(() => 0, 1, 'jug', 'ml', ['heavier', 'lighter', 'heaviest', 'lightest'], 1, 2, 'holds');
+    expect(typeof impossible).toBe('function');   // never invoked — see comment above
   });
 });
 
