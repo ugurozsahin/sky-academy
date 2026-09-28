@@ -348,6 +348,9 @@ describe('save migration (#38)', () => {
     expect(migrate({ v: SAVE_VERSION, coins: 100, spent: -5 }).spent, 'a negative spent is treated the same way').toBe(100);
     expect(migrate({ v: SAVE_VERSION, spent: Infinity }).spent, 'no valid coins to clamp to still falls back to 0').toBe(0);
     expect(migrate({ v: SAVE_VERSION, coins: NaN, spent: NaN }).spent, 'coins itself corrupted too: clamps to its own reset value').toBe(0);
+    const onlyCoinsBad = migrate({ v: SAVE_VERSION, coins: NaN, spent: 80 });
+    expect(onlyCoinsBad, 'a valid spent survives a coins-only corruption untouched, and coins resets to 0 — the pairing still cannot grant a free balance, since balance() floors at 0 downstream')
+      .toMatchObject({ coins: 0, spent: 80 });
     expect(warn.mock.calls.length, 'every rejection above is traced').toBeGreaterThan(0);
     warn.mockRestore();
   });
