@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, it, expect, vi } from 'vitest';
-import { canHear, chooseVoice, haptic, HAPTICS, hush, NOISE_SECONDS, onVoiceStateChange, resetVoiceProbe, say, SAY_DEFER_MS, sfx, sliceFx, type SynthLike, VOICE_START_MS, voiceScore, voiceState } from '../../src/audio';
+import { canHear, chooseVoice, haptic, HAPTICS, hush, NOISE_SECONDS, onVoiceStateChange, resetVoiceProbe, say, SAY_DEFER_MS, sfx, sliceFx, type SpeakOptions, type SpeechEngine, speechEngine, type SpeechEvents, type SynthLike, VOICE_START_MS, voiceScore, voiceState } from '../../src/audio';
 import { load, reset, save } from '../../src/storage';
 
 const mem: Record<string, string> = {};
@@ -368,6 +368,112 @@ describe('voice capability detection (#65)', () => {
     reset(); resetVoiceProbe();
     say('Hello', false, { synth: undefined });                       // node: no default engine → `no`, same as say('Hello')
     expect(load().voice).toBe('no');
+  });
+});
+
+// #880: say()/hush() talk to one SpeechEngine, chosen by speechEngine() — the web engine today, a native one
+// (#881) tomorrow. These drive the probe through a fake SpeechEngine directly, rather than the SynthLike a
+// real (or fake) speechSynthesis is shimmed as, to pin the seam itself: the probe's yes/no verdicts, hush()
+// and the queue flag all reach whichever engine `say()`/`hush()` were handed, not only the web one.
+describe('SpeechEngine seam (#880)', () => {
+  afterEach(() => { resetVoiceProbe(); vi.useRealTimers(); reset(); });
+  const fresh = () => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); };
+
+  /** A `SpeechEngine` fake that records every `speak()` call and lets a test fire its events by hand. */
+  function fakeEngine() {
+    const calls: { text: string; opts: SpeakOptions }[] = [];
+    let cancelled = 0;
+    let events: SpeechEvents | undefined;
+    const engine: SpeechEngine = {
+      speak(text, opts, ev) { calls.push({ text, opts }); events = ev; return true; },
+      cancel() { cancelled++; },
+      busy: () => false,
+    };
+    return { engine, calls, cancelled: () => cancelled, fire: (which: keyof SpeechEvents, reason?: unknown) => (events?.[which] as (r?: unknown) => void)?.(reason) };
+  }
+
+  it('a fake SpeechEngine that reports started gives the verdict yes', () => {
+    fresh();
+    const f = fakeEngine();
+    say('Hello', false, { engine: f.engine });
+    expect(load().voice, 'nothing heard yet').toBe('unknown');
+    f.fire('started');
+    expect(load().voice).toBe('yes');
+  });
+
+  it('a fake SpeechEngine that never starts gives no after VOICE_START_MS', () => {
+    fresh();
+    const f = fakeEngine();
+    say('Hello', false, { engine: f.engine });
+    vi.advanceTimersByTime(VOICE_START_MS - 1);
+    expect(load().voice, 'inside the window is not yet a verdict').toBe('unknown');
+    vi.advanceTimersByTime(1);
+    expect(load().voice).toBe('no');
+  });
+
+  it("hush() calls the engine's cancel() and does not bank silence", () => {
+    fresh();
+    const f = fakeEngine();
+    say('Hello', false, { engine: f.engine });
+    vi.advanceTimersByTime(VOICE_START_MS / 2);
+    hush(null, { engine: f.engine });
+    expect(f.cancelled()).toBe(1);
+    vi.advanceTimersByTime(VOICE_START_MS);
+    expect(load().voice, 'a line taken back by hush() is not evidence, silent or not').toBe('unknown');
+  });
+
+  it('say(text, false, { queue: true }) reaches the engine with queue: true', () => {
+    fresh();
+    const f = fakeEngine();
+    say('b', false, { engine: f.engine, queue: true });
+    expect(f.calls).toEqual([{ text: 'b', opts: { lang: 'en-GB', rate: 0.9, pitch: 1.08, queue: true } }]);
+    say('a', false, { engine: f.engine });
+    expect(f.calls[1].opts.queue, 'the default call carries no queue flag').toBeUndefined();
+  });
+
+  it('a failed() reason other than canceled/interrupted leaves the silence clock running', () => {
+    fresh();
+    const f = fakeEngine();
+    say('Hello', false, { engine: f.engine });
+    f.fire('failed', 'synthesis-failed');
+    expect(load().voice, 'a mid-flight engine error is not evidence either way').toBe('unknown');
+    vi.advanceTimersByTime(VOICE_START_MS);
+    expect(load().voice, 'the clock kept running: no start means no by the deadline').toBe('no');
+  });
+
+  it('an explicit engine wins over a synth passed alongside it', () => {
+    fresh();
+    const f = fakeEngine();
+    const poisoned = { speaking: false, pending: false, cancel() { throw new Error('must not be called'); }, speak() { throw new Error('must not be called'); } } as SynthLike;
+    expect(() => say('Hello', false, { engine: f.engine, synth: poisoned })).not.toThrow();
+    expect(f.calls.map(c => c.text)).toEqual(['Hello']);
+    hush(poisoned, { engine: f.engine });
+    expect(f.cancelled()).toBe(1);
+  });
+
+  it('speechEngine(null) is null; speechEngine(synth) speaks through the synth and tracks busy()', () => {
+    reset();
+    expect(speechEngine(null)).toBeNull();
+    const idle = fakeSynth().synth;
+    const engine = speechEngine(idle)!;
+    expect(engine.busy(), 'nothing has been spoken yet').toBe(false);
+    const { synth: busySynth } = fakeSynth({ speaking: true });
+    expect(speechEngine(busySynth)!.busy()).toBe(true);
+  });
+
+  // Review of PR #1316: every other hush() test here passes the *same* synth (or engine) to say() and hush(),
+  // so the resolved engine's own cancel() clears the shared `deferred` macrotask too and masks whether hush()'s
+  // own unconditional clear does anything at all. This one resolves hush() to no engine at all — the exact case
+  // the fix is for — so only that unconditional clear can save it. Removing the `if (deferred !== undefined)
+  // ...` line at the top of hush() turns this red; every other test in the file still passes without it.
+  it('hush() drops a stale deferred line even when it resolves no engine of its own', () => {
+    fresh();
+    const { synth, calls } = fakeSynth({ speaking: true, starts: false });
+    say('stale', false, { synth });                                  // busy → cancel now, speak('stale') deferred
+    expect(calls).toEqual(['cancel']);
+    hush(null);                                                      // no synth, no engine override: speechEngine(null) is null
+    vi.advanceTimersByTime(SAY_DEFER_MS + VOICE_START_MS);
+    expect(calls, 'the deferred speak() must never reach the original engine').toEqual(['cancel']);
   });
 });
 
