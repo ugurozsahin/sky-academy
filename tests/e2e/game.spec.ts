@@ -534,6 +534,17 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
+  // #1049: Memory Match's Reception-deck fallback is gone, so the button is hidden rather than handing a
+  // year with no decks of its own a Reception board. Every KS1 island still has decks, so it still shows.
+  test('Memory Match shows on every KS1 island (Reception, Year 1, Year 2)', async ({ page }) => {
+    await seedPlayer(page);
+    for (const y of ['reception', 'year1', 'year2']) {
+      await page.click(`.island[data-year="${y}"]`);
+      await expect(page.locator('#memory')).toBeVisible();
+      await page.click('#back'); await expect(page.locator('.map')).toBeVisible();
+    }
+  });
+
   test('real swipe slices the correct bubble and scores', { tag: '@smoke' }, async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
