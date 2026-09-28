@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, it, expect, vi } from 'vitest';
-import { canHear, chooseVoice, haptic, HAPTICS, hush, NOISE_SECONDS, onVoiceStateChange, resetVoiceProbe, say, SAY_DEFER_MS, sfx, sliceFx, type SynthLike, VOICE_START_MS, voiceScore, voiceState } from '../../src/audio';
+import { canHear, chooseVoice, haptic, HAPTICS, hush, NOISE_SECONDS, onVoiceStateChange, resetVoiceProbe, say, SAY_DEFER_MS, sfx, sliceFx, type SpeakOptions, type SpeechEngine, type SpeechEvents, type SynthLike, VOICE_START_MS, voiceScore, voiceState } from '../../src/audio';
 import { load, reset, save } from '../../src/storage';
 
 const mem: Record<string, string> = {};
@@ -368,6 +368,67 @@ describe('voice capability detection (#65)', () => {
     reset(); resetVoiceProbe();
     say('Hello', false, { synth: undefined });                       // node: no default engine → `no`, same as say('Hello')
     expect(load().voice).toBe('no');
+  });
+});
+
+// #880: say()/hush() talk to one SpeechEngine, chosen by speechEngine() — the web engine today, a native one
+// (#881) tomorrow. These drive the probe through a fake SpeechEngine directly, rather than the SynthLike a
+// real (or fake) speechSynthesis is shimmed as, to pin the seam itself: the probe's yes/no verdicts, hush()
+// and the queue flag all reach whichever engine `say()`/`hush()` were handed, not only the web one.
+describe('SpeechEngine seam (#880)', () => {
+  afterEach(() => { resetVoiceProbe(); vi.useRealTimers(); reset(); });
+  const fresh = () => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); };
+
+  /** A `SpeechEngine` fake that records every `speak()` call and lets a test fire its events by hand. */
+  function fakeEngine() {
+    const calls: { text: string; opts: SpeakOptions }[] = [];
+    let cancelled = 0;
+    let events: SpeechEvents | undefined;
+    const engine: SpeechEngine = {
+      speak(text, opts, ev) { calls.push({ text, opts }); events = ev; return {}; },
+      cancel() { cancelled++; },
+      busy: () => false,
+    };
+    return { engine, calls, cancelled: () => cancelled, fire: (which: keyof SpeechEvents, reason?: unknown) => (events?.[which] as (r?: unknown) => void)?.(reason) };
+  }
+
+  it('a fake SpeechEngine that reports started gives the verdict yes', () => {
+    fresh();
+    const f = fakeEngine();
+    say('Hello', false, { engine: f.engine });
+    expect(load().voice, 'nothing heard yet').toBe('unknown');
+    f.fire('started');
+    expect(load().voice).toBe('yes');
+  });
+
+  it('a fake SpeechEngine that never starts gives no after VOICE_START_MS', () => {
+    fresh();
+    const f = fakeEngine();
+    say('Hello', false, { engine: f.engine });
+    vi.advanceTimersByTime(VOICE_START_MS - 1);
+    expect(load().voice, 'inside the window is not yet a verdict').toBe('unknown');
+    vi.advanceTimersByTime(1);
+    expect(load().voice).toBe('no');
+  });
+
+  it("hush() calls the engine's cancel() and does not bank silence", () => {
+    fresh();
+    const f = fakeEngine();
+    say('Hello', false, { engine: f.engine });
+    vi.advanceTimersByTime(VOICE_START_MS / 2);
+    hush(null, { engine: f.engine });
+    expect(f.cancelled()).toBe(1);
+    vi.advanceTimersByTime(VOICE_START_MS);
+    expect(load().voice, 'a line taken back by hush() is not evidence, silent or not').toBe('unknown');
+  });
+
+  it('say(text, false, { queue: true }) reaches the engine with queue: true', () => {
+    fresh();
+    const f = fakeEngine();
+    say('b', false, { engine: f.engine, queue: true });
+    expect(f.calls).toEqual([{ text: 'b', opts: { lang: 'en-GB', rate: 0.9, pitch: 1.08, queue: true } }]);
+    say('a', false, { engine: f.engine });
+    expect(f.calls[1].opts.queue, 'the default call carries no queue flag').toBeUndefined();
   });
 });
 
