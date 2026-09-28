@@ -1376,7 +1376,7 @@ export function recordDuel(d: StoredDuel): StoredDuel[] {
   const duels = fileDuel(duelHistory(), d);
   save({ duels }); return duels;
 }
-export const today = (now = new Date()) => now.toISOString().slice(0, 10);
+export const today = (now = new Date()) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 /** Update the daily streak for a play today. Returns the streak length. */
 export function touchStreak(now = new Date()): number {
   const d = load(); const t = today(now);

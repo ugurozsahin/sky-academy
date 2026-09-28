@@ -75,7 +75,7 @@ export function certToStored(c: CertInfo, o: { id: string }): StoredCert {
 }
 /** The award day as the album stores it. Mirrors `storage.ts`'s `today()`; kept here so this module's two
  *  directions (`certToStored`/`certFromStored`) agree about the format without importing save machinery. */
-const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 /**
  * `isoDay(d)`, read for a human at local noon (#410) — the same trick `certFromStored()` uses when it parses
  * a stored day back into a `Date`, applied here going the other way so `certificateText()` never has to format

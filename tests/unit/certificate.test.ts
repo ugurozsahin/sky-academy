@@ -145,6 +145,19 @@ describe('the printed date and the filed date agree, whatever the timezone (#410
   });
 });
 
+/** #873: `isoDay()` used to read the UTC calendar day, so a certificate earned just after local midnight but
+ *  before UTC midnight (the whole BST half of the year, for Europe/London) was filed a day early. */
+describe('a certificate earned just after local midnight files under the local day (#873)', () => {
+  const restoreTZ = process.env.TZ;
+  afterEach(() => { if (restoreTZ === undefined) delete process.env.TZ; else process.env.TZ = restoreTZ; });
+
+  it('00:30 BST files as the same date the local clock shows, not the UTC day before', () => {
+    process.env.TZ = 'Europe/London';
+    const cert = { ...base, date: new Date('2026-09-28T23:30:00Z') };   // 2026-09-29 00:30 BST
+    expect(certToStored(cert, { id: 'year1:number-bonds' }).date).toBe('2026-09-29');
+  });
+});
+
 const caps = (o: Partial<Parameters<typeof certRoute>[0]> = {}) =>
   ({ canShareFiles: false, claudeSave: false, claudeRuntime: false, nativeShell: false, capacitorShare: false, ...o });
 

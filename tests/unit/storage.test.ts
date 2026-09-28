@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { activeProfile, addProfile, deleteProfile, cleanName, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { activeProfile, addProfile, deleteProfile, cleanName, MAX_PROFILES, NAME_MAX, renameProfile, MIGRATIONS, onboardedOf, PROFILE_IDS, profileCard, profileCards, profileIds, saveKeyFor, setActiveProfile, addCoins, ACHIEVEMENTS, certificates, dojoToday, evaluateStickers, exportSave, fileCert, importSave, isFutureSave, isMigratable, isReadOnlySave, isWriteFailing, load, migrate, recordAccuracy, recordBossWin, recordCert, recordDojo, recordEndless, recordGameEnd, recordMemory, recordSprint, recordTopic, recordTraining, reset, save, saveVersionOf, stickersFor, today, touchStreak, CERT_CAP, SAVE_VERSION, SPRINT_STICKER_SCORE, STICKER_IDS, STICKER_COST, TOPICS_STARRED_GOAL, UNREADABLE_VERSION, DUEL_CAP, duelHistory, fileDuel, recordDuel, type StoredCert, type StoredDuel } from '../../src/storage';
 import { certFromStored } from '../../src/ui/certificate';
 import { duelHeadline, duelHistoryLine, type DuelResult } from '../../src/game/duel';
 import { carriedStreak } from '../../src/game/dojo';
@@ -178,6 +178,39 @@ describe('rewards storage', () => {
     expect(touchStreak(new Date('2026-09-05T20:00:00Z'))).toBe(1);   // same day
     expect(touchStreak(new Date('2026-09-06T08:00:00Z'))).toBe(2);   // next day
     expect(touchStreak(new Date('2026-09-09T08:00:00Z'))).toBe(1);   // gap resets
+  });
+});
+
+/**
+ * #873: `today()` used to read the UTC calendar day, so for half the year (whenever a UK local day has not
+ * yet reached the following UTC day) a child playing after 00:00 local but before 00:00 UTC — i.e. any time
+ * the local clock is ahead of UTC, which for Europe/London is the whole BST half of the year — had their play
+ * filed under yesterday's date. `touchStreak()`'s own "yesterday" arithmetic is already local (`Date#setDate`),
+ * so once `today()` reads the local calendar the two agree without changing `touchStreak()` itself.
+ */
+describe('the day key is local, not UTC, so a streak survives a UK clock change (#873)', () => {
+  const restoreTZ = process.env.TZ;
+  beforeEach(() => { reset(); process.env.TZ = 'Europe/London'; });
+  afterEach(() => { if (restoreTZ === undefined) delete process.env.TZ; else process.env.TZ = restoreTZ; });
+
+  it('today() reads the local calendar day, not the UTC one', () => {
+    expect(today(new Date('2026-09-28T23:30:00Z'))).toBe('2026-09-29');   // 00:30 BST, still 09-28 UTC
+  });
+  it('a streak survives the autumn clock change (BST → GMT, clocks went back on 2026-10-25)', () => {
+    expect(touchStreak(new Date('2026-10-25T11:00:00Z'))).toBe(1);   // 12:00 BST
+    expect(touchStreak(new Date('2026-10-26T00:30:00Z'))).toBe(2);   // 00:30 GMT, the next local day
+  });
+  it('a streak survives the spring clock change (GMT → BST, clocks went forward on 2026-03-29)', () => {
+    expect(touchStreak(new Date('2026-03-29T11:00:00Z'))).toBe(1);   // 12:00 BST (already sprung forward)
+    expect(touchStreak(new Date('2026-03-29T23:30:00Z'))).toBe(2);   // 00:30 BST the next local day
+  });
+  // pr-test-analyzer review: today()/touchStreak() alone don't prove the Daily Dojo path — dojoToday() and
+  // recordGameEnd() both key off today() too, through dojoFor()/applyEvent() in src/game/dojo.ts.
+  it('the Daily Dojo rolls over with the local day, not the UTC one', () => {
+    expect(dojoToday(new Date('2026-09-28T20:00:00Z')).date).toBe('2026-09-28');   // 21:00 BST
+    const e = { mode: 'mission', won: true, correct: 5, attempts: 5, bestCombo: 3, stars: 3, score: 90 } as const;
+    const out = recordGameEnd(e, 10, new Date('2026-09-28T23:15:00Z'));            // 00:15 BST, still 09-28 UTC
+    expect(out.dojo.state.date).toBe('2026-09-29');
   });
 });
 
