@@ -203,9 +203,9 @@ const rTrace: Generator = (d, rng) => {
   return { prompt: `Trace the letter ${t}`, say: `Trace the letter ${l}`, answer: t, options: [t], visual: { type: 'word', text: t } };
 };
 
-const R_SENTS: Sent[][] = [
+export const R_SENTS: Sent[][] = [
   [['I can run.', '🏃'], ['I can hop.', '🐰'], ['I like jam.', '🍯'], ['The cat sat.', '🐱'], ['The dog ran.', '🐶'], ['I see mum.', '👩'], ['We can jump.', '🤸'], ['It is hot.', '☀️'], ['The sun is up.', '🌅'], ['I am six.', '🎂']],
-  [['I like my hat.', '🎩'], ['The pig is pink.', '🐷'], ['Dad has a van.', '🚐'], ['The fox can run.', '🦊'], ['We go to bed.', '🛏️'], ['Mum has a cup.', '☕'], ['The bus is red.', '🚌'], ['I can see it.', '👀'], ['The hen has an egg.', '🐔'], ['My bag is big.', '👜']],
+  [['I like my hat.', '🎩'], ['The pig is pink.', '🐷'], ['Dad has a van.', '🚐'], ['The fox can run.', '🦊'], ['We go to bed.', '🛏️'], ['Mum has a cup.', '🥤'], ['The bus is red.', '🚌'], ['I can see it.', '👀'], ['The hen has an egg.', '🐔'], ['My bag is big.', '👜']],
   [['The cat sat on a mat.', '🐱'], ['I can see a red bus.', '🚌'], ['The dog is in the sun.', '🐶'], ['We had jam on toast.', '🍞'], ['The fish can swim fast.', '🐟'], ['I put my hat on.', '🎩'], ['A frog sat on the log.', '🐸'], ['My cat is on the bed.', '🛏️'], ['Can you see the moon?', '🌙'], ['The big pig is in mud.', '🐷']],
 ];
 const R_DECOYS = ['dog', 'cat', 'sun', 'hat', 'pig', 'run', 'big', 'red', 'mum', 'bed', 'jam', 'bus', 'hop', 'cup', 'fox', 'egg'];
