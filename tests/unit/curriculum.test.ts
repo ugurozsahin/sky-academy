@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
+import { YEAR2_TOPICS } from '../../src/curriculum/year2-topics';
 import type { Topic } from '../../src/curriculum';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID, EVERYDAY, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, turnEnd, coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ, measureCompare } from '../../src/curriculum/util';
@@ -38,6 +39,18 @@ describe('topic registry', () => {
       expect(topicsFor(y.id, 'maths').length).toBeGreaterThanOrEqual(6);
       expect(topicsFor(y.id, 'writing').length).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  // #889: YEAR2_TOPICS moved into its own module so new Year 2 topics have room in year2.ts. This pins the
+  // registry's ids, in order, so that move (and every later one) cannot silently drop, reorder or rename a row.
+  it('YEAR2_TOPICS holds these 37 ids, in this order', () => {
+    expect(YEAR2_TOPICS.map(t => t.id)).toEqual([
+      'y2-pv', 'y2-compare', 'y2-skip', 'y2-add', 'y2-sub', 'y2-three', 'y2-inverse', 'y2-tables', 'y2-oddeven',
+      'y2-fractions', 'y2-money', 'y2-time', 'y2-words', 'y2-order', 'y2-line', 'y2-shapes', 'y2-symmetry',
+      'y2-patterns', 'y2-position', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp', 'y2-duration', 'y2-balance',
+      'y2-stats', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-suffix-root', 'y2-homophones', 'y2-wordclass',
+      'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-trace',
+    ]);
   });
 });
 

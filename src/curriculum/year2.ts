@@ -2,7 +2,7 @@
 // #325 stage 4: the curriculum used to be split by subject (maths.ts/writing.ts); this file holds every
 // Year 2 generator so a reviewer checking "is Year 2 right" reads one file. Generators shared with
 // Reception/Year 1 live in util.ts.
-import { type Difficulty, type Generator, type Question, type Rng, type Topic, LONGER, HEAVIER, HOLDS } from './types';
+import { type Difficulty, type Generator, type Question, type Rng, LONGER, HEAVIER, HOLDS } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel,
   SHAPES_3D,
@@ -36,7 +36,7 @@ import {
  */
 const slowAtD3 = (d: Difficulty, question: Question): Question => d === 3 ? { ...question, slow: true } : question;
 
-const y2PlaceValue: Generator = (d, rng) => {
+export const y2PlaceValue: Generator = (d, rng) => {
   const n = ri(rng, 10, 99);
   const t = Math.floor(n / 10), o = n % 10;
   const kind = d === 1 ? 0 : ri(rng, 0, 2);
@@ -44,13 +44,13 @@ const y2PlaceValue: Generator = (d, rng) => {
   if (kind === 1) return numQ(rng, `${n}: how many ones?`, o, { min: 0, max: 9, say: `In ${n}, how many ones?`, distractors: [t, o + 1, o - 1] });
   const tw = t === 1 ? '1 ten' : `${t} tens`, ow = o === 1 ? '1 one' : `${o} ones`; return numQ(rng, `${tw} and ${ow} = ?`, n, { min: 10, max: 99, say: `${tw} and ${ow}. What number is that?`, distractors: [t + o * 10, n + 10, n - 1] });
 };
-const y2Compare: Generator = (d, rng) => {
+export const y2Compare: Generator = (d, rng) => {
   const max = d === 1 ? 20 : 100;
   const a = ri(rng, 0, max), b = d === 3 && rng() < 0.2 ? a : ri(rng, 0, max);
   const ans = a < b ? '<' : a > b ? '>' : '=';
   return wordQ(rng, `${a} ? ${b}`, ans, ['<', '>', '='], { say: `${a} compared with ${b}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
 };
-const y2Add: Generator = (d, rng) => {
+export const y2Add: Generator = (d, rng) => {
   let a: number, b: number;
   if (d === 1) { a = ri(rng, 10, 89); b = ri(rng, 1, 9); }          // 2-digit + ones
   else if (d === 2) { a = ri(rng, 10, 79); b = 10 * ri(rng, 1, 5); } // 2-digit + tens
@@ -59,7 +59,7 @@ const y2Add: Generator = (d, rng) => {
   const p = `${a} + ${b} = ?`;
   return slowAtD3(d, numQ(rng, p, a + b, { min: 0, max: 100, ...q(p) }));
 };
-const y2Sub: Generator = (d, rng) => {
+export const y2Sub: Generator = (d, rng) => {
   let a: number, b: number;
   if (d === 1) { a = ri(rng, 10, 99); b = ri(rng, 1, 9); }
   else if (d === 2) { a = ri(rng, 30, 99); b = 10 * ri(rng, 1, 2); }
@@ -67,13 +67,13 @@ const y2Sub: Generator = (d, rng) => {
   const p = `${a} − ${b} = ?`;
   return slowAtD3(d, numQ(rng, p, a - b, { min: 0, max: 100, ...q(p) }));
 };
-const y2Three: Generator = (d, rng) => {
+export const y2Three: Generator = (d, rng) => {
   const max = d === 1 ? 5 : 9;
   const a = ri(rng, 1, max), b = ri(rng, 1, max), c = ri(rng, 1, max);
   const p = `${a} + ${b} + ${c} = ?`;
   return numQ(rng, p, a + b + c, { min: 3, max: 27, ...q(p) });
 };
-const y2Tables: Generator = (d, rng) => {
+export const y2Tables: Generator = (d, rng) => {
   const table = d === 1 ? pick(rng, [2, 10]) : pick(rng, [2, 5, 10]);
   const n = ri(rng, 1, 12);
   const kind = d === 3 ? ri(rng, 0, 2) : d === 2 ? ri(rng, 0, 1) : 0;
@@ -81,11 +81,11 @@ const y2Tables: Generator = (d, rng) => {
   if (kind === 1) { const p = `${n * table} ÷ ${table} = ?`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) }); }
   const p = `? × ${table} = ${n * table}`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) });
 };
-const y2OddEven: Generator = (d, rng) => {
+export const y2OddEven: Generator = (d, rng) => {
   const n = ri(rng, 1, d === 1 ? 20 : 100);
   return wordQ(rng, `Is ${n} odd or even?`, n % 2 ? 'odd' : 'even', ['odd', 'even']);
 };
-const y2Inverse: Generator = (d, rng) => {
+export const y2Inverse: Generator = (d, rng) => {
   const a = ri(rng, 10, d === 1 ? 30 : 99), b = ri(rng, 1, d === 1 ? 9 : Math.min(30, a - 1));
   const kind = ri(rng, 0, 2);
   const p = kind === 0 ? `? − ${b} = ${a - b}` : kind === 1 ? `${a - b} + ? = ${a}` : `${a} − ? = ${b}`;
@@ -94,7 +94,7 @@ const y2Inverse: Generator = (d, rng) => {
 };
 /** `a/b` written as text has the same value as num/den (cross-multiplied, so 2/4 and 1/2 are equal). */
 const sameFraction = (text: string, num: number, den: number) => { const [a, b] = text.split('/').map(Number); return a * den === num * b; };
-const y2Fractions: Generator = (d, rng) => {
+export const y2Fractions: Generator = (d, rng) => {
   const fr = d === 1 ? pick(rng, [[1, 2], [1, 4]]) : d === 2 ? pick(rng, [[1, 2], [1, 3], [1, 4]]) : pick(rng, [[1, 3], [1, 4], [2, 4], [3, 4]]);
   const [num, den] = fr;
   if (rng() < 0.4) {
@@ -111,7 +111,7 @@ const y2Fractions: Generator = (d, rng) => {
   const ans = whole / den * num;
   return numQ(rng, `${num}/${den} of ${whole} = ?`, ans, { min: 0, max: 24, say: `What is ${num} ${den === 2 ? 'half' : den === 3 ? 'third' : 'quarter'}${num > 1 ? 's' : ''} of ${whole}?`, visual: { type: 'objects', emoji: '⭐', n: whole } });
 };
-const y2Money: Generator = (d, rng) => {
+export const y2Money: Generator = (d, rng) => {
   if (d === 1) { const coins = Array.from({ length: 3 }, () => pick(rng, [2, 5, 10, 20, 50])); return unitQ(rng, coins.reduce((s, c) => s + c, 0), coins); }
   // £ and p recorded separately, never `£1.50` — decimal money is Year 4 (#298 slice 2). `coinLabel` is the
   // one source for the label, so the distractors are filtered as amounts before they are ever formatted.
@@ -136,7 +136,7 @@ const y2Money: Generator = (d, rng) => {
 export const clockPhrase = (hh: number, mm: number): string =>
   mm === 0 ? `${hh} o'clock` : mm === 15 ? `quarter past ${hh}` : mm === 30 ? `half past ${hh}` : mm === 45 ? `quarter to ${hh % 12 + 1}` : mm < 30 ? `${mm} past ${hh}` : `${60 - mm} to ${hh % 12 + 1}`;
 
-const y2Time: Generator = (d, rng) => {
+export const y2Time: Generator = (d, rng) => {
   const h = ri(rng, 1, 12);
   const m = d === 1 ? pick(rng, [0, 15, 30, 45]) : d === 2 ? pick(rng, [0, 5, 10, 15, 30, 45]) : 5 * ri(rng, 0, 11);
   const ans = clockPhrase(h, m);
@@ -145,7 +145,7 @@ const y2Time: Generator = (d, rng) => {
   while (ds.size < 3 && guard++ < 30) { const mm = 5 * ri(rng, 0, 11); const hh = rng() < 0.5 ? h : ri(rng, 1, 12); const l = clockPhrase(hh, mm); if (l !== ans) ds.add(l); }
   return wordQ(rng, 'What time is it?', ans, [...ds], { visual: { type: 'clock', h, m } });
 };
-const y2Words: Generator = (d, rng) => {
+export const y2Words: Generator = (d, rng) => {
   const n = ri(rng, d === 1 ? 10 : 21, d === 1 ? 20 : d === 2 ? 60 : 100);
   if (rng() < 0.5) return numQ(rng, numberWord(n), n, { min: 0, max: 100, say: `Which number is ${numberWord(n)}?`, visual: { type: 'word', text: numberWord(n) }, distractors: [n + 10, n - 10, n + 1] });
   // At n = 100 (the top of the range, only reachable at d3) both n+10 and n+1 fall outside [0,100], leaving
@@ -155,7 +155,7 @@ const y2Words: Generator = (d, rng) => {
   const ds = shuffle(rng, [n + 10, n - 10, n + 1, n - 1, n - 2].filter(x => x >= 0 && x <= 100)).slice(0, 3).map(numberWord);
   return wordQ(rng, `${n}`, numberWord(n), ds, { say: `Which words say ${n}?` });
 };
-const y2Skip: Generator = (d, rng) => {
+export const y2Skip: Generator = (d, rng) => {
   const step = d === 1 ? pick(rng, [2, 5, 10]) : pick(rng, [2, 3, 5, 10]);
   const back = d === 3 && rng() < 0.4;
   const start = back ? step * ri(rng, 5, 10) : step * ri(rng, 0, 6) + (step === 10 ? ri(rng, 0, 9) : 0);
@@ -163,11 +163,11 @@ const y2Skip: Generator = (d, rng) => {
   const seq = [start, start + s, start + 2 * s];
   return numQ(rng, `${seq.join(', ')}, ?`, start + 3 * s, { min: 0, max: 120, say: `${seq.join(', ')}. What comes next?`, distractors: [start + 3 * s + 1, start + 3 * s - 1, start + 4 * s] });
 };
-const y2Order: Generator = (d, rng) => orderQ(rng, d === 1 ? 30 : 100, d === 1 ? 3 : 4);
-const y2Line: Generator = (d, rng) => { const step = d === 1 ? 1 : d === 2 ? pick(rng, [2, 5, 10]) : pick(rng, [2, 3, 5, 10]); return lineQ(rng, step * ri(rng, 0, d === 1 ? 90 : 6), step, 6); };
+export const y2Order: Generator = (d, rng) => orderQ(rng, d === 1 ? 30 : 100, d === 1 ? 3 : 4);
+export const y2Line: Generator = (d, rng) => { const step = d === 1 ? 1 : d === 2 ? pick(rng, [2, 5, 10]) : pick(rng, [2, 3, 5, 10]); return lineQ(rng, step * ri(rng, 0, d === 1 ? 90 : 6), step, 6); };
 
 /** Year 2: "identify and describe the properties of 3-D shapes, including the number of edges, vertices and faces". */
-const y2Shapes: Generator = (d, rng) => {
+export const y2Shapes: Generator = (d, rng) => {
   if (d === 1 || rng() < 0.4) return name3dQ(rng, SHAPES_3D, d === 1 || rng() < 0.5);
   const [g, , p] = pick(rng, SHAPES_3D);
   // Edges and vertices are the d2–d3 stretch and only the polyhedra carry them (util.ts); everything else
@@ -179,7 +179,7 @@ const y2Shapes: Generator = (d, rng) => {
   return numQ(rng, `How many ${label} has a ${p.as}?`, n, { min: 0, max: 14, visual: { type: 'word', text: g }, say: `How many ${label} has a ${p.as}?` });
 };
 
-const y2Balance: Generator = (d, rng) => {
+export const y2Balance: Generator = (d, rng) => {
   if (d === 1) { const a = ri(rng, 1, 15), b = ri(rng, 1, 20 - a), c = ri(rng, 1, a + b - 1); return balanceQ(rng, `${a} + ${b}`, rng() < 0.5 ? `${c} + ?` : `? + ${c}`, a + b - c, 20, { distractors: [a + b, c] }); }
   const kind = d === 2 ? ri(rng, 0, 1) : ri(rng, 0, 3);
   if (kind === 0) { const a = ri(rng, 10, 80), b = ri(rng, 1, 9), c = 10 * ri(rng, 1, Math.floor((a + b) / 10)); return balanceQ(rng, `${a} + ${b}`, `${c} + ?`, a + b - c, 100, { distractors: [a + b, c] }); }
@@ -191,7 +191,7 @@ const y2Balance: Generator = (d, rng) => {
 
 // ---------- Position & direction (#8 Phase 2) ----------
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const y2Position: Generator = (d, rng) => {
+export const y2Position: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) {                                              // where do you face after a turn (all four turns, both directions)
     const [name, steps] = pick(rng, TURNS_ALL);
@@ -251,7 +251,7 @@ function breakSymmetry(rng: Rng, half: readonly string[], n: number): string[] {
 const SYM_LETTERS = ['A', 'H', 'I', 'M', 'O', 'T', 'U', 'V', 'W', 'X', 'Y'];
 const ASYM_LETTERS = ['B', 'C', 'D', 'E', 'F', 'G', 'J', 'K', 'L', 'N', 'P', 'Q', 'R', 'S', 'Z'];
 /** Year 2: "identify line symmetry in a vertical line" — on a drawn picture, and on capital letters. */
-const y2Symmetry: Generator = (d, rng) => {
+export const y2Symmetry: Generator = (d, rng) => {
   if (d === 1 || rng() < 0.6) {
     const half = pick(rng, SYM_HALVES);
     const grid = rng() < 0.5 ? mirrored(half) : breakSymmetry(rng, half, d === 1 ? 3 : d === 2 ? 2 : 1);
@@ -294,7 +294,7 @@ const PATTERN_OBJECTS: readonly (readonly [string, string])[] = [
 const PATTERN_GLYPHS = PATTERN_OBJECTS.map(([g]) => g);
 /** Unit shapes as letters: which positions repeat, filled with objects at generation time. */
 const UNITS_D1 = ['AB'], UNITS_LONGER = ['ABC', 'AAB', 'ABB'];
-const y2Patterns: Generator = (d, rng) => {
+export const y2Patterns: Generator = (d, rng) => {
   const shape = pick(rng, d === 1 ? UNITS_D1 : UNITS_LONGER);
   const letters = [...new Set([...shape])];
   const chosen = shuffle(rng, PATTERN_GLYPHS).slice(0, letters.length);
@@ -321,7 +321,7 @@ const y2Patterns: Generator = (d, rng) => {
 // draw (a 4 kg crate against a 17 kg sack) *and* smaller objects in the small unit, because a sack does not
 // weigh 60 g. Every noun below is colour-neutral — `measureCompare` renders `${colour} ${noun}` and the
 // colour is the answer, so a green orange or a purple lemon is a card this project will not show.
-const y2Length: Generator = (d, rng) => {
+export const y2Length: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) return rng() < 0.5
     ? measureCompare(rng, d, pick(rng, ['rope', 'ribbon', 'plank', 'path']), 'cm', LONGER, 10, 99)
@@ -329,7 +329,7 @@ const y2Length: Generator = (d, rng) => {
   if (kind === 1) return unitChoice(rng, [['pencil', 'cm'], ['finger', 'cm'], ['book', 'cm'], ['door', 'm'], ['room', 'm'], ['garden', 'm'], ['playground', 'm']], 'cm', 'm', 'measure');
   return measureSum(rng, 'cm', ['How long altogether?', 'How long is left?']);
 };
-const y2Mass: Generator = (d, rng) => {
+export const y2Mass: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) return rng() < 0.5
     ? measureCompare(rng, d, pick(rng, ['spoon', 'sock', 'pebble', 'candle']), 'g', HEAVIER, 20, 99)
@@ -337,7 +337,7 @@ const y2Mass: Generator = (d, rng) => {
   if (kind === 1) return unitChoice(rng, [['feather', 'g'], ['apple', 'g'], ['coin', 'g'], ['cat', 'kg'], ['dog', 'kg'], ['bag of flour', 'kg']], 'g', 'kg', 'weigh');
   return measureSum(rng, 'g', ['How heavy altogether?', 'How much is left?']);
 };
-const y2Capacity: Generator = (d, rng) => {
+export const y2Capacity: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) return rng() < 0.5
     ? measureCompare(rng, d, pick(rng, ['eggcup', 'lid', 'spoon', 'pot']), 'ml', HOLDS, 20, 99)
@@ -348,7 +348,7 @@ const y2Capacity: Generator = (d, rng) => {
 /** Minimum °C between an estimate's answer and each decoy, and between decoys (#296). */
 export const TEMP_GAP = 10;
 const TEMP_STEP = TEMP_GAP * 2;   // the ladder's rung: twice the floor — the rail below checks the floor and the resulting gaps, not this constant, so a regression to TEMP_GAP would still pass at exactly 10 °C apart
-const y2Temp: Generator = (d, rng) => {
+export const y2Temp: Generator = (d, rng) => {
   if (d >= 2 && rng() < 0.4) {
     const [thing, t] = pick(rng, [['ice', 0], ['a cold morning', 5], ['a warm room', 20], ['a hot bath', 40], ['a summer day', 28], ['inside a fridge', 4]] as [string, number][]);
     // #296: an estimate has no exact answer, so a decoy 1 °C away is as true as the answer. Decoys sit on a
@@ -393,7 +393,7 @@ const PICTO_SYMBOL = '⭐';
  * Legend-stage child the d1 tally chart in 5.3% of d3 draws, and terminated only because d1 happens to force
  * `ask = 'one'` — a guard twenty-five lines away from the recursion it was holding up (#8 review).
  */
-const y2Stats: Generator = (d, rng) => {
+export const y2Stats: Generator = (d, rng) => {
   const survey = pick(rng, SURVEYS);
   const kind = d === 1 ? 'tally' : d === 2 ? 'pictogram' : 'block';
   // The pictogram key is the whole of its difficulty: counts must be whole multiples of it or the drawing
@@ -499,7 +499,7 @@ function endTime(rng: Rng): Question {
   return wordQ(rng, said, ans, ds, { say: said });
 }
 
-const y2Duration: Generator = (d, rng) => {
+export const y2Duration: Generator = (d, rng) => {
   if (d === 1) {
     const [phrase, n] = pick(rng, DUR_FACTS);
     return numQ(rng, `How many ${phrase}?`, n, { min: 0, max: 100, say: `How many ${phrase}?`, distractors: [n + 1, n - 1, n === 60 ? 30 : n * 2] });
@@ -509,21 +509,21 @@ const y2Duration: Generator = (d, rng) => {
 };
 
 // ---------- Year 2 writing ----------
-const y2Spelling: Generator = (d, rng) => {
+export const y2Spelling: Generator = (d, rng) => {
   const w = pick(rng, Y2_CEW.filter(x => x.length <= (d === 1 ? 5 : d === 2 ? 7 : 10)));
   if (d === 3 && rng() < 0.4) return spellQ(rng, w, undefined, 3);
   const idx = ri(rng, 0, w.length - 1);
   return gapQ(rng, w, idx, gapLetters(w, idx), undefined, `Which letter is missing from the word ${w}?`);
 };
 const CONTRACTIONS: [string, string][] = [['do not', "don't"], ['can not', "can't"], ['is not', "isn't"], ['I am', "I'm"], ['it is', "it's"], ['you are', "you're"], ['we will', "we'll"], ['did not', "didn't"], ['has not', "hasn't"], ['they are', "they're"], ['I will', "I'll"], ['could not', "couldn't"]];
-const y2Contractions: Generator = (d, rng) => {
+export const y2Contractions: Generator = (d, rng) => {
   const [long, short] = pick(rng, CONTRACTIONS);
   const ds = shuffle(rng, CONTRACTIONS.filter(c => c[1] !== short)).slice(0, d === 1 ? 2 : 3).map(c => c[1]);
   if (d === 3 && rng() < 0.5) return wordQ(rng, short, long, shuffle(rng, CONTRACTIONS.filter(c => c[0] !== long)).slice(0, 3).map(c => c[0]), { visual: { type: 'word', text: short }, say: `What does ${short} mean?` });
   return wordQ(rng, long, short, ds, { visual: { type: 'word', text: long }, say: `Which contraction means ${long}?`, hint: 'Slice the short form', hintIsData: false });
 };
 const SUFFIX2: [string, string, string][] = [['care', 'ful', 'Be care___ on the road.'], ['hope', 'less', 'The lost sock was hope___.'], ['kind', 'ness', 'Show kind___ to others.'], ['slow', 'ly', 'The snail moved slow___.'], ['enjoy', 'ment', 'We had lots of enjoy___.'], ['help', 'ful', 'A very help___ friend.'], ['quick', 'ly', 'She ran quick___.'], ['sad', 'ness', 'He felt great sad___.'], ['fear', 'less', 'The fear___ ninja jumped.'], ['pay', 'ment', 'Mum made the pay___.']];
-const y2Suffix: Generator = (d, rng) => {
+export const y2Suffix: Generator = (d, rng) => {
   const [, suf, sent] = pick(rng, SUFFIX2);
   return wordQ(rng, sent, suf, ['ful', 'less', 'ness', 'ly', 'ment'].filter(x => x !== suf).slice(0, d === 1 ? 2 : 3), { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the ending', hintIsData: false });
 };
@@ -561,7 +561,7 @@ export const SUFFIX_ROOT: ReadonlyArray<readonly [string, string, string, Suffix
 ];
 /** d1 is the rule you can see (an `e` disappears); d2 adds doubling; d3 adds `y → i`, which changes a letter inside the word. */
 const SUFFIX_RULES: Record<number, SuffixRule[]> = { 1: ['drop-e'], 2: ['drop-e', 'double'], 3: ['drop-e', 'double', 'y-to-i'] };
-const y2SuffixRoot: Generator = (d, rng) => {
+export const y2SuffixRoot: Generator = (d, rng) => {
   const rules = SUFFIX_RULES[d] ?? SUFFIX_RULES[3];
   const [root, suf, ans, , naive, misrule] = pick(rng, SUFFIX_ROOT.filter(e => rules.includes(e[3])));
   return wordQ(rng, `${root} + ${suf} = ?`, ans, [naive, misrule], {
@@ -594,7 +594,7 @@ export const WORD_CLASSES: ReadonlyArray<readonly [string, string, string, strin
 ];
 /** Column order in `WORD_CLASSES`, and the order the difficulties unlock them in. Exported for the rail. */
 export const WORD_CLASS_NAMES = ['noun', 'verb', 'adjective', 'adverb'] as const;
-const y2WordClass: Generator = (d, rng) => {
+export const y2WordClass: Generator = (d, rng) => {
   const row = pick(rng, WORD_CLASSES);
   // Nouns and verbs first: Year 1 already names them (Appendix 2), while adjective and adverb are Year 2's own
   // vocabulary — and "which word is the adverb?" on a card whose adverb is the last word is the stretch.
@@ -652,7 +652,7 @@ export const SENTENCE_TYPES: ReadonlyArray<readonly [string, SentenceType]> = [
  * The bubbles are the types unlocked so far, not all four, so d1 is a two-way choice rather than a guess
  * between words the child has not been taught yet.
  */
-const y2SentenceType: Generator = (d, rng) => {
+export const y2SentenceType: Generator = (d, rng) => {
   const allowed = SENTENCE_TYPE_NAMES.slice(0, d === 1 ? 2 : d === 2 ? 3 : 4);
   const [sent, type] = pick(rng, SENTENCE_TYPES.filter(e => allowed.includes(e[1])));
   return wordQ(rng, 'What kind of sentence is this?', type, allowed.filter(n => n !== type), {
@@ -700,7 +700,7 @@ export const TENSE_FRAMES: ReadonlyArray<readonly [string, TenseCol, 'present' |
  * the auxiliary rather than the verb ending carries the tense. d3 turns the same sentence round and asks the
  * child to produce the form the gap needs, with all four forms of that one verb on the bubbles.
  */
-const y2Tense: Generator = (d, rng) => {
+export const y2Tense: Generator = (d, rng) => {
   const [frame, col, tense] = pick(rng, d === 1 ? TENSE_FRAMES.filter(f => f[1] !== 3) : TENSE_FRAMES);
   const v = pick(rng, TENSE_VERBS);
   if (d === 3) return wordQ(rng, frame, v[col], v.filter(w => w !== v[col]), {
@@ -722,11 +722,11 @@ const y2Tense: Generator = (d, rng) => {
  */
 export const HOMOPHONE_SETS: ReadonlyArray<readonly string[]> = [['to', 'too', 'two'], ['their', 'there', "they're"], ['see', 'sea'], ['sun', 'son'], ['one', 'won'], ['here', 'hear'], ['piece', 'peace'], ['bare', 'bear'], ['blue', 'blew'], ['night', 'knight'], ['be', 'bee'], ['quite', 'quiet']];
 export const HOMOPHONES: ReadonlyArray<readonly [string, readonly string[], string]> = [['I want ___ go home.', ['to', 'too', 'two'], 'to'], ['I have ___ cats.', ['two', 'to', 'too'], 'two'], ['Me ___!', ['too', 'to', 'two'], 'too'], ['___ house is big.', ['Their', 'There', "They're"], 'Their'], ['Look over ___!', ['there', 'their', "they're"], 'there'], ['___ going out.', ["They're", 'Their', 'There'], "They're"], ['I can ___ the sea.', ['see', 'sea'], 'see'], ['The ___ shines.', ['sun', 'son'], 'sun'], ['It is ___ o\'clock.', ['one', 'won'], 'one'], ['We ___ the race!', ['won', 'one'], 'won'], ['The ___ ate the honey.', ['bear', 'bare'], 'bear'], ['The wind ___ my hat off.', ['blew', 'blue'], 'blew'], ['___ is a bird.', ['Here', 'Hear'], 'Here'], ['I can ___ you.', ['hear', 'here'], 'hear'], ['A ___ of bread.', ['piece', 'peace'], 'piece'], ['The ___ rode a horse.', ['knight', 'night'], 'knight'], ['A ___ makes honey.', ['bee', 'be'], 'bee'], ['Please be ___ in the library.', ['quiet', 'quite'], 'quiet']];
-const y2Homophones: Generator = (_d, rng) => {
+export const y2Homophones: Generator = (_d, rng) => {
   const [sent, opts, ans] = pick(rng, HOMOPHONES);
   return wordQ(rng, sent, ans, opts.filter(o => o !== ans), { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the right word', hintIsData: false });
 };
-const y2Punct: Generator = (d, rng) => {
+export const y2Punct: Generator = (d, rng) => {
   const k = d === 1 ? 0 : ri(rng, 0, 2);
   if (k === 0) { const [s, p] = pick(rng, PUNCT_SENTS); return wordQ(rng, `${s}_`, p, ['.', '?', '!'], { visual: { type: 'sentence', text: `${s}_` }, say: `${s}. Which punctuation mark ends this sentence?` }); }
   if (k === 1) {
@@ -749,51 +749,9 @@ const Y2_SENTS: Sent[][] = [
   [['If it rains, we will stay inside.', '☂️'], ['You can play when you have finished.', '🎮'], ['The bird sang because it was happy.', '🐦'], ['We can walk or take the bus.', '🚌'], ['The dragon roared and the village shook.', '🐉'], ['I know that the snow is cold.', '🧣'], ['Please tidy your room before dinner.', '🧹'], ['The clever fox found a secret path.', '🦊'], ['Everybody cheered when our team scored.', '⚽'], ['After lunch we painted colourful pictures.', '🎨']],
 ];
 const Y2_DECOYS = ['because', 'when', 'and', 'but', 'quickly', 'happy', 'tiny', 'huge', 'garden', 'school', 'dragon', 'river', 'shiny', 'after', 'before', 'yellow', 'kite', 'mouse'];
-const y2Sentence = sentGen(Y2_SENTS, Y2_DECOYS, [2, 3, 3], 1);
+export const y2Sentence = sentGen(Y2_SENTS, Y2_DECOYS, [2, 3, 3], 1);
 
-const y2Trace: Generator = (d, rng) => {
+export const y2Trace: Generator = (d, rng) => {
   const w = pick(rng, d === 1 ? Y1_CEW.filter(x => x.length >= 2 && x.length <= 4) : Y2_CEW.filter(x => x.length <= (d === 2 ? 5 : 7)));
   return { prompt: `Trace: ${w}`, say: `Trace the word ${w}`, answer: w, options: [w], visual: { type: 'word', text: w } };
 };
-
-export const YEAR2_TOPICS: Topic[] = [
-  // Year 2 maths
-  { id: 'y2-pv', title: 'Tens & Ones', icon: '🔟', subject: 'maths', year: 'year2', nc: 'Y2 NPV: place value', gen: y2PlaceValue },
-  { id: 'y2-compare', title: 'Compare < > =', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 NPV: compare to 100', gen: y2Compare },
-  { id: 'y2-skip', title: 'Count in 2s, 3s, 5s, 10s', icon: '🦘', subject: 'maths', year: 'year2', nc: 'Y2 NPV: count in steps', gen: y2Skip },
-  { id: 'y2-add', title: 'Adding to 100', icon: '➕', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit addition', gen: y2Add },
-  { id: 'y2-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit subtraction', gen: y2Sub },
-  { id: 'y2-three', title: 'Three Numbers', icon: '🎯', subject: 'maths', year: 'year2', nc: 'Y2 A&S: add three 1-digit', gen: y2Three },
-  { id: 'y2-inverse', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year2', nc: 'Y2 A&S: inverse, missing number', gen: y2Inverse },
-  { id: 'y2-tables', title: '2, 5, 10 Times Tables', icon: '✖️', subject: 'maths', year: 'year2', nc: 'Y2 M&D: 2, 5, 10 tables ×÷', gen: y2Tables },
-  { id: 'y2-oddeven', title: 'Odd or Even', icon: '🐾', subject: 'maths', year: 'year2', nc: 'Y2 M&D: odd and even', gen: y2OddEven },
-  { id: 'y2-fractions', title: 'Fractions', icon: '🍕', subject: 'maths', year: 'year2', nc: 'Y2 Fractions: 1/3 1/4 2/4 3/4', gen: y2Fractions },
-  { id: 'y2-money', title: 'Money £ and p', icon: '💷', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: money, change', gen: y2Money },
-  { id: 'y2-time', title: 'Telling Time', icon: '🕔', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: time to 5 min', gen: y2Time },
-  { id: 'y2-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year2', nc: 'Y2 NPV: numbers to 100 in words', gen: y2Words },
-  { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', sequenceFrom: 1, gen: y2Order },
-  { id: 'y2-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 NPV: number line, steps', gen: y2Line },
-  { id: 'y2-shapes', title: '3-D Shapes', icon: '🎲', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: 3-D shapes — faces, edges, vertices', gen: y2Shapes },
-  { id: 'y2-symmetry', title: 'Mirror Lines', icon: '🦋', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: line symmetry in a vertical line', gen: y2Symmetry },
-  { id: 'y2-patterns', title: 'What Comes Next?', icon: '🔁', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: order and arrange objects in patterns and sequences', gen: y2Patterns },
-  { id: 'y2-position', title: 'Turns & Right Angles', icon: '🧭', subject: 'maths', year: 'year2', nc: 'Y2 Geometry: position, direction, rotation as right angles', gen: y2Position },
-  { id: 'y2-length', title: 'Length: cm & m', icon: '📏', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: length (cm/m)', gen: y2Length },
-  { id: 'y2-mass', title: 'Mass: g & kg', icon: '🏋️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: mass (g/kg)', gen: y2Mass },
-  { id: 'y2-capacity', title: 'Capacity: ml & l', icon: '🥤', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: capacity (ml/l)', gen: y2Capacity },
-  { id: 'y2-temp', title: 'Temperature', icon: '🌡️', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: temperature (°C)', gen: y2Temp },
-  { id: 'y2-duration', title: 'Time & Durations', icon: '⏳', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: compare and sequence intervals of time', gen: y2Duration },
-  { id: 'y2-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year2', nc: 'Y2 A&S: equivalence, inverse, tables', gen: y2Balance },
-  { id: 'y2-stats', title: 'Charts & Tallies', icon: '📊', subject: 'maths', year: 'year2', nc: 'Y2 Statistics: pictograms, tally charts, block diagrams', gen: y2Stats },
-  // Year 2 writing
-  { id: 'y2-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year2', nc: 'Y2 common exception words', sequenceFrom: 3, gen: y2Spelling },
-  { id: 'y2-contractions', title: "Contractions don't", icon: '✂️', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: contractions', gen: y2Contractions },
-  { id: 'y2-suffix', title: 'Endings -ful -ly', icon: '🎀', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes', gen: y2Suffix },
-  { id: 'y2-suffix-root', title: 'Changing Endings', icon: '🔁', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: suffixes that change the root (drop e, double, y→i)', gen: y2SuffixRoot },
-  { id: 'y2-homophones', title: 'Sound-alike Words', icon: '👂', subject: 'writing', year: 'year2', nc: 'Y2 Spelling: homophones', gen: y2Homophones },
-  { id: 'y2-wordclass', title: 'Word Detective', icon: '🔍', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: nouns, verbs, adjectives, adverbs', gen: y2WordClass },
-  { id: 'y2-sentencetype', title: 'Sentence Types', icon: '💬', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: statements, questions, commands and exclamations', gen: y2SentenceType },
-  { id: 'y2-tense', title: 'Then & Now', icon: '⏳', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: present and past tense, including the progressive', gen: y2Tense },
-  { id: 'y2-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year2', nc: 'Y2 Grammar: commas, apostrophes', gen: y2Punct },
-  { id: 'y2-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year2', nc: 'Y2 Writing: word order, conjunctions, noun phrases', sequenceFrom: 1, gen: y2Sentence },
-  { id: 'y2-trace', title: 'Trace Words', icon: '✍️', subject: 'writing', year: 'year2', nc: 'Y2 Handwriting', input: 'tracing', gen: y2Trace },
-];

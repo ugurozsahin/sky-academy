@@ -1,6 +1,6 @@
 import { RECEPTION_TOPICS } from './reception';
 import { YEAR1_TOPICS } from './year1';
-import { YEAR2_TOPICS } from './year2';
+import { YEAR2_TOPICS } from './year2-topics';
 import type { Topic, YearId } from './types';
 
 export * from './types';
