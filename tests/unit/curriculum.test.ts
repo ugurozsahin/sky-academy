@@ -38,6 +38,11 @@ describe('topic registry', () => {
     for (const y of YEARS) {
       expect(topicsFor(y.id, 'maths').length).toBeGreaterThanOrEqual(6);
       expect(topicsFor(y.id, 'writing').length).toBeGreaterThanOrEqual(3);
+      // #908: Sky Storm/Ninja Sprint/Boss Battle now pool topicsFor(year, subject) filtered to non-tracing —
+      // an empty pool reaches Session.pickTopic() untouched (no fallback, unlike the old whole-year default)
+      // and crashes rather than degrading, so this must never be empty for either subject.
+      for (const s of ['maths', 'writing'] as const)
+        expect(topicsFor(y.id, s).filter(t => t.input !== 'tracing').length, `${y.id} ${s}`).toBeGreaterThan(0);
     }
   });
 

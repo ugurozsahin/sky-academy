@@ -38,6 +38,8 @@ export interface PlayState {
   trail: TrailSkin | null;
   /** Projectiles thrown so far this screen (#48) — a swipe never throws one, a tapped TNT never does either. */
   shots: number;
+  /** The current question's topic id (#908) — undefined before the first question is drawn. */
+  topic: string | undefined;
 }
 
 /** The `window.__sna` hooks set by the play screen. */

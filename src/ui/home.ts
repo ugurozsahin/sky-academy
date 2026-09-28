@@ -108,6 +108,9 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   // itself is not an object, which `importSave()`'s version-only check does not rule out.
   const training = safeRecord<number>(d.training), endless = safeRecord<number>(d.endless);
   const sprint = safeRecord<number>(d.sprint), boss = safeRecord<number>(d.boss), memory = safeRecord<number>(d.memory);
+  // #908: Sky Storm, Ninja Sprint and Boss Battle draw only from the open tab's topics — read at tap time via
+  // `subject` so a tab switch is honoured without rebuilding the menu.
+  const subjectPool = () => topicsFor(year.id, subject).filter(t => t.input !== 'tracing');
   // The island menu in one table (#26): adding a mode button is one entry, not a new <button> line plus a new
   // click handler. The three battle modes take their title from MODES; Sensei-training and Memory-Match are
   // separate flows (not a Session.Mode), so they live here too rather than being forced into MODES.
@@ -117,13 +120,13 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
-      go: () => nav.play({ year, mode: 'endless' }) },
+      go: () => nav.play({ year, mode: 'endless', pool: subjectPool() }) },
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
-      go: () => nav.play({ year, mode: 'sprint' }) },
+      go: () => nav.play({ year, mode: 'sprint', pool: subjectPool() }) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
-      go: () => nav.play({ year, mode: 'boss' }) },
+      go: () => nav.play({ year, mode: 'boss', pool: subjectPool() }) },
     { id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,
       title: 'Memory Match', blurb: `Calm card pairs, no slicing · boards ${memory[year.id] ?? 0}`,
       go: () => nav.memory(year) },
