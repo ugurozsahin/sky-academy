@@ -54,6 +54,16 @@ interface QuestionCore {
    * in order ("3.75" from template `_.__` and sequence `['3','7','5']`). Unlike a spelling sequence, the
    * prompt itself is kept on the card (`promptHTML`, `src/ui/hud.ts`) — a build card has no other way to
    * show the child what sum they are answering.
+   *
+   * Not a `SequenceOpt`-style required-sibling union alongside `sequence` (`HintOpt`'s pattern, tried and
+   * reverted here): `Omit`/`Pick` do not distribute over a union's members — `numQ`/`wordQ`'s
+   * `Partial<Omit<Question, …>>` opts-forwarding (this file's callers in `curriculum/util.ts`) reads a
+   * union's property through `T[K]`, which flattens `{ sequence: string[]; build: {…} } | { sequence?:
+   * string[]; build?: undefined }` into independently-optional `sequence`/`build` fields anyway — the exact
+   * correlation a union was meant to keep. Closing that would mean reworking every generator's
+   * options-forwarding, not this ticket's mechanism. The invariant stays runtime-only, checked for every
+   * topic in `tests/unit/curriculum.test.ts` — including `build` set with no `sequence`, asserted outside
+   * the `if (q.sequence)` gate so that mistake cannot hide inside it.
    */
   build?: { template: string };
   visual?: Visual;

@@ -108,6 +108,18 @@ describe('promptHTML — build cards (#1059)', () => {
     expect(promptHTML(spell, 1)).toBe('<span class="seq"><span class="got">c</span><span class="todo">_</span><span class="todo">_</span></span>');
     expect(promptHTML(spell, 1, true)).toBe('<span class="seq reveal"><span class="got">c</span><span class="todo">a</span><span class="todo">t</span></span>');
   });
+
+  it('a prompt with no ? appends the slots after a space, dropping nothing', () => {
+    const noQ: Question = { prompt: 'Work it out', answer: '89', options: ['89', '90'], sequence: ['8', '9'], build: { template: '__' } };
+    expect(plain(promptHTML(noQ, 0))).toBe('Work it out __');
+    expect(promptHTML(noQ, 0)).toBe('Work it out <span class="seq"><span class="todo">_</span><span class="todo">_</span></span>');
+  });
+
+  it('an earlier ? in the prompt (a comparison card, "5 ? 8") stays literal — only the last ? takes the slots', () => {
+    const twoQ: Question = { prompt: '5 ? 8, so 5 + 4 = ?', answer: '9', options: ['9', '8'], sequence: ['9'], build: { template: '_' } };
+    expect(plain(promptHTML(twoQ, 0))).toBe('5 ? 8, so 5 + 4 = _');
+    expect(promptHTML(twoQ, 0)).toContain('5 ? 8, so 5 + 4 = <span class="seq">');
+  });
 });
 
 // #65: `promptMode` is the one place the hear/read/peek decision is made, and the outcome reveal is one of its

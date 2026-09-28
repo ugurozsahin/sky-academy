@@ -95,6 +95,11 @@ for (const topic of TOPICS) {
           const q: Question = topic.gen(d, r);
           expect(q.prompt.length).toBeGreaterThan(0);
           expect(q.answer.length).toBeGreaterThan(0);
+          // #1059: `build` implies `sequence` (types.ts) — checked outside the `if (q.sequence)` gate below
+          // so a generator that sets `build` and forgets `sequence` cannot hide inside it: `promptHTML`
+          // (`src/ui/hud.ts`) checks `!q.sequence` first and would silently render the plain-prompt branch,
+          // dropping the digit-slot UI with nothing else noticing.
+          if (q.build) expect(q.sequence, q.prompt).toBeDefined();
           if (topic.input !== 'tracing') {
             // answer present, options unique, sensible count
             expect(q.options).toContain(q.sequence ? q.sequence[0] : q.answer);
