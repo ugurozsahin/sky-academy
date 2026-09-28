@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import type { Topic } from '../../src/curriculum';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID, EVERYDAY, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, turnEnd, coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ } from '../../src/curriculum/util';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID, EVERYDAY, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, turnEnd, coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ, measureCompare } from '../../src/curriculum/util';
 import { R_LETTERS_P2, R_LETTERS_ALL, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/reception';
 import { TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/year2';
 import type { SentenceType } from '../../src/curriculum/year2';
@@ -311,7 +311,10 @@ describe('curriculum ranges', () => {
     }
   });
   it('Measurement (#8): length/mass/capacity/temperature comparisons slice the correct extreme', () => {
-    let checked = 0;
+    // Per-topic, not one sum (#324 item 5): a summed floor of 100 across all seven topics never trips if one
+    // of them silently stops producing a comparison card — a future verb the regex below does not list
+    // (`weighs`, `measures`) would drop that topic out with the other six still carrying the total.
+    const perTopic = new Map<string, number>();
     for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp']) {
       const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 31);
       for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 150; i++) {
@@ -323,10 +326,24 @@ describe('curriculum ranges', () => {
         const target = big ? Math.max(...segs.map(x => x[1])) : Math.min(...segs.map(x => x[1]));
         const winner = segs.find(x => x[1] === target)![0];
         expect(winner === q.answer || winner.startsWith(q.answer + ' '), `${id}: "${q.prompt}" | ${q.hint} | ans=${q.answer}`).toBe(true);
-        checked++;
+        perTopic.set(id, (perTopic.get(id) ?? 0) + 1);
       }
     }
-    expect(checked).toBeGreaterThan(100);                                        // the comparison branch really did run
+    // Measured floor per topic: y2-length/mass/capacity are the thinnest (177–188 over these 450 draws,
+    // the comparison branch is one of three `kind`s and one of two forms within it); y1's three topics and
+    // y2-temp are all well above (321–450).
+    for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp'])
+      expect(perTopic.get(id), `${id} produced no comparison card this sweep saw`).toBeGreaterThan(100);
+  });
+  it('measureCompare (#324 item 5): the out-of-step call the issue names no longer type-checks', () => {
+    // The exact call #645 reports: a forms array and a trailing verb string as two independent arguments,
+    // with capacity's verb paired onto mass's forms. Wrapped in a never-called closure — calling it would
+    // throw immediately (`compare.forms` is undefined on an array), which is not the point; the point is
+    // that `tsc` refuses this call shape at all now that verb and forms are one `Compare` value.
+    const impossible = (): Question =>
+      // @ts-expect-error — forms and verb used to be two positional arguments; this shape must not compile.
+      measureCompare(() => 0, 1, 'jug', 'ml', ['heavier', 'lighter', 'heaviest', 'lightest'], 1, 2, 'holds');
+    expect(typeof impossible).toBe('function');   // never invoked — see comment above
   });
 });
 

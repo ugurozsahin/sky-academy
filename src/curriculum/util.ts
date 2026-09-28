@@ -1,4 +1,4 @@
-import type { Difficulty, Generator, HintOpt, Question, Rng } from './types';
+import type { Compare, Difficulty, Generator, HintOpt, Question, Rng } from './types';
 
 export const ri = (rng: Rng, min: number, max: number) => min + Math.floor(rng() * (max - min + 1));
 export const pick = <T>(rng: Rng, arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
@@ -215,13 +215,10 @@ function uniqVals(rng: Rng, n: number, lo: number, hi: number): number[] {
   while (s.size < n && guard++ < 200) s.add(ri(rng, lo, hi));
   return [...s];
 }
-/**
- * Slice the coloured thing that is the biggest/smallest by a measured value (d1 = 2 things comparative, d2/3 = 3
- * things superlative). `verb` is what the thing does with its value: a pencil *is* 12 cm, a jug *holds* 300 ml
- * (#296 — "fuller" is relative to the container, so 300 ml in a jug may be less full than 200 ml in a cup; the NC
- * vocabulary for the container is "holds more / holds less").
- */
-export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: string, forms: [string, string, string, string], lo: number, hi: number, verb = 'is'): Question {
+/** Slice the coloured thing that is the biggest/smallest by a measured value (d1 = 2 things comparative, d2/3 = 3
+ * things superlative). `compare` is the `Compare` (`types.ts`) whose verb and forms this card uses (#324 item 5). */
+export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: string, compare: Compare, lo: number, hi: number): Question {
+  const { verb, forms } = compare;
   const n = d === 1 ? 2 : 3;                                   // forms = [compBig, compSmall, superBig, superSmall]
   const cols = shuffle(rng, COLOURS).slice(0, n);
   const vals = uniqVals(rng, n, lo, hi);
@@ -237,7 +234,6 @@ export function measureCompare(rng: Rng, d: Difficulty, noun: string, unit: stri
     say: `${spoken}. Which one ${verb} ${n === 2 ? adj : 'the ' + adj}?`,
   });
 }
-export const HOLDS: [string, string, string, string] = ['more', 'less', 'most', 'least'];
 /** "Best unit" question: measure a familiar object in the smaller or larger standard unit. */
 export function unitChoice(rng: Rng, things: [string, string][], small: string, large: string, verb: string): Question {
   const [thing, unit] = pick(rng, things);
