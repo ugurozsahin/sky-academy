@@ -6,7 +6,7 @@ import type { Generator, Topic } from './types';
 import { LONGER, TALLER, HEAVIER, HOLDS } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel, isNote, NOTES,
-  SHAPES_2D, SHAPES_3D, SAME_SOLID,
+  SHAPES_2D, SHAPES_3D, sameShape,
   orderQ, lineQ, name3dQ, balanceQ, measureCompare, unitChoice, unitQ,
   DIRS, ARROWS, TURNS_ALL, turnEnd, DAYS,
   gapLetters, gapQ, spellQ, sentGen, type Sent, PUNCT_SENTS, LETTERS, CVC, DIGRAPHS, Y1_CEW,
@@ -148,7 +148,7 @@ const y1Line: Generator = (d, rng) => lineQ(rng, d === 1 ? 0 : ri(rng, 0, d === 
 /** Shapes (2-D) — properties and recognition. Tables live in util.ts (SHAPES_2D/SHAPES_3D). */
 const y1Shapes: Generator = (d, rng) => {
   const [g, name, sides] = pick(rng, SHAPES_2D);
-  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES_2D.filter(x => x[1] !== name)).slice(0, 3).map(x => x[0]), { hint: 'Slice the shape', hintIsData: false });
+  if (d === 1 || (d === 2 && rng() < 0.5)) return wordQ(rng, `Which is a ${name}?`, g, shuffle(rng, SHAPES_2D.filter(x => !sameShape(x[1], name))).slice(0, 3).map(x => x[0]), { hint: 'Slice the shape', hintIsData: false });
   if (sides === 0) return y1Shapes(d, rng);
   return numQ(rng, `How many sides has a ${name}?`, sides, { min: 0, max: 8, visual: { type: 'word', text: g }, distractors: [sides + 1, sides - 1, sides + 2] });
 };

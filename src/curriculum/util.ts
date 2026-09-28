@@ -155,8 +155,9 @@ export const SHAPES_3D: readonly [string, string, Shape3DProps][] = [
   ['🔺', 'pyramid', { as: 'square-based pyramid', flat: 5, edges: 8, vertices: 5 }],
   ['🧱', 'cuboid', { as: 'cuboid', flat: 6, edges: 12, vertices: 8 }],
 ];
-/** A cube *is* a cuboid ("cuboids including cubes", Y1 NC), so the two never share a naming card (#299). */
-export const SAME_SOLID = new Set(['cube', 'cuboid']);
+/** A cube *is* a cuboid, and a square *is* a rectangle (Y1 NC: "cuboids including cubes", "rectangles (including squares)"), so neither pair may be answer and decoy together (#299, #872) — sameShape() checks both. */
+export const SAME_SOLID = new Set(['cube', 'cuboid']), SAME_FLAT = new Set(['square', 'rectangle']);
+export function sameShape(a: string, b: string): boolean { return a === b || (SAME_SOLID.has(a) && SAME_SOLID.has(b)) || (SAME_FLAT.has(a) && SAME_FLAT.has(b)); }
 export function symSay(s: string): string {
   return s.replace(/×/g, ' times ').replace(/÷/g, ' divided by ').replace(/\+/g, ' plus ').replace(/[−-]/g, ' minus ').replace(/=/g, ' equals ').replace(/\?/g, ' what').replace(/\s+/g, ' ').trim();
 }
@@ -185,14 +186,13 @@ export function lineQ(rng: Rng, from: number, step: number, len: number): Questi
 }
 
 /**
- * Naming a 3-D shape, either direction: pick the glyph from the name, or the name from the glyph.
- * Decoys come from the whole table so there are always three, but never from the cube/cuboid pair, which
- * `SAME_SOLID` holds apart — "Which is a cuboid?" with a cube on the card has two defensible answers.
+ * Naming a 3-D shape, either direction: pick the glyph from the name, or the name from the glyph. Decoys
+ * come from the whole table, excluding any name sameShape() groups with it (here, only the cube/cuboid pair).
  * Year 1, Year 2.
  */
 export function name3dQ(rng: Rng, from: readonly (readonly [string, string, ...unknown[]])[], glyphIsAnswer: boolean): Question {
   const [g, name] = pick(rng, from);
-  const decoys = SHAPES_3D.filter(x => x[1] !== name && !(SAME_SOLID.has(x[1]) && SAME_SOLID.has(name)));
+  const decoys = SHAPES_3D.filter(x => !sameShape(x[1], name));
   const three = shuffle(rng, decoys).slice(0, 3);
   return glyphIsAnswer
     ? wordQ(rng, `Which is a ${name}?`, g, three.map(x => x[0]), { hint: 'Slice the 3-D shape', hintIsData: false })
