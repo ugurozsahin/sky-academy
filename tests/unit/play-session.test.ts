@@ -8,6 +8,7 @@ import { AVATARS } from '../../src/avatars';
 import { topicById, YEARS, type Question, type Rng } from '../../src/curriculum';
 import { say, resetVoiceProbe } from '../../src/audio';
 import type { WaveOpts } from '../../src/game/arena';
+import type { Mode } from '../../src/game/modes';
 import { reset, save } from '../../src/storage';
 import { createPlaySession, NO_VOICE_PEEK_MS, waveOptsFor, type PlaySessionDeps, type PlaySessionEls } from '../../src/ui/play-session';
 
@@ -63,7 +64,7 @@ function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
   const deps: PlaySessionDeps = {
     training: false, tracing: false, villain: false, av: AVATARS[0],
     els: els as unknown as PlaySessionEls,
-    hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {} },
+    hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {}, speakCorrection() {} },
     hold: { correct: 900, wrong: 1200, miss: 900 },
     arena: () => arena as never, mounted: () => mounted,
     later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },
@@ -425,6 +426,80 @@ describe('the line under the prompt says whose it is (#328)', () => {
 });
 
 /**
+ * #893: onWrong and onMiss are two different call paths into the same `hud.speakCorrection` — a wrong slice
+ * decides through `session.hit()`, a miss through `session.fall()` (a bubble that reaches the bottom uncut)
+ * or `waveEnd()`'s own "nothing decided" branch. Nothing above exercises `fall()` at all, so a regression
+ * reachable only from the miss path — the wrong argument order, or `session.currentTopic` read stale after
+ * `session.advance()` already ran — would pass every other test in this file.
+ */
+describe('speakCorrection is wired to both onWrong and onMiss, gated on mode (#893)', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); });
+  afterEach(() => { vi.useRealTimers(); });
+  const gen = (): Question => ({ prompt: 'Pick one', answer: 'right', options: ['right', 'wrong'] });
+
+  it('a wrong slice calls hud.speakCorrection with the live question and the current topic id, in Mission', async () => {
+    const spy = vi.fn();
+    const { ps } = build(gen, { hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {}, speakCorrection: spy } });
+    ps.session.start(); await settle();
+    const q = ps.session.current;
+    ps.session.hit('wrong');
+    expect(spy).toHaveBeenCalledExactlyOnceWith(q, 't');
+  });
+
+  it('a bubble that falls uncut (a miss, never a slice) also calls hud.speakCorrection', async () => {
+    const spy = vi.fn();
+    const { ps } = build(gen, { hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {}, speakCorrection: spy } });
+    ps.session.start(); await settle();
+    const q = ps.session.current!;
+    ps.session.fall(q.answer);
+    expect(spy).toHaveBeenCalledExactlyOnceWith(q, 't');
+  });
+
+  /** Sprint's own deps: no `build()` reuse — `build()` is fixed to Mission (#893 review). */
+  function buildSprint(spy: (q: Question, topicId: string | undefined) => void) {
+    const els = { score: fakeEl(), stage: fakeEl(), prompt: fakeEl(), vis: fakeEl(), hint: fakeEl(), qcard: fakeEl(), speak: fakeEl() };
+    const arena = {
+      paused: false, W: 390, topInset: 0, spawned: [] as WaveOpts[],
+      spawnWave(o: WaveOpts) { this.spawned.push(o); }, rush() { return false; }, floatText() {}, reveal() {}, clearWave() {},
+    };
+    const deps: PlaySessionDeps = {
+      training: false, tracing: false, villain: false, av: AVATARS[0],
+      els: els as unknown as PlaySessionEls,
+      hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {}, speakCorrection: spy },
+      hold: { correct: 350, wrong: 1000, miss: 800 },
+      arena: () => arena as never, mounted: () => true,
+      later: (fn, ms) => { setTimeout(fn, ms); },
+      holdTimers() {}, toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {},
+      commitResult: () => ({
+        newBest: false,
+        dojo: { state: { date: '', progress: {}, done: [], setDone: false, streak: { last: '', days: 0 }, total: 0 }, completed: [], setDone: false, coins: 0, multiplier: 1 },
+        fresh: [], streak: 1, cert: null, certSaved: false, dojoSaved: true,
+      }),
+      showResults() {},
+    };
+    const topic = { id: 't', title: 't', icon: 't', subject: 'writing' as const, year: 'year1' as const, nc: '', gen };
+    const mode: Mode = 'sprint';
+    return createPlaySession({ mode, year: YEARS[1], pool: [topic] }, deps);
+  }
+
+  it('Ninja Sprint never calls hud.speakCorrection on a wrong slice', async () => {
+    const spy = vi.fn();
+    const ps = buildSprint(spy);
+    ps.session.start(); await settle();
+    ps.session.hit('wrong');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('Ninja Sprint never calls hud.speakCorrection on a fall', async () => {
+    const spy = vi.fn();
+    const ps = buildSprint(spy);
+    ps.session.start(); await settle();
+    ps.session.fall(ps.session.current!.answer);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+/**
  * #484 (mirroring #375/#441's `commitMatch` for Ninja Duel): a finished game's writes must be committed the
  * instant `session.end()` decides it, not ~1.2s later inside the results overlay's own scope-bound `later()`
  * — where a quit before the overlay's timer fires (Pause -> Islands, or the Android back button) used to
@@ -450,7 +525,7 @@ describe('onEnd commits the payout before the results overlay is ever scheduled 
     const deps: PlaySessionDeps = {
       training: false, tracing: false, villain: false, av: AVATARS[0],
       els: els as unknown as PlaySessionEls,
-      hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {} },
+      hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {}, speakCorrection() {} },
       hold: { correct: 900, wrong: 1200, miss: 900 },
       arena: () => arena as never, mounted: () => mounted,
       later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },
@@ -503,7 +578,7 @@ describe('onEnd commits the payout before the results overlay is ever scheduled 
     const deps: PlaySessionDeps = {
       training: false, tracing: false, villain: false, av: AVATARS[0],
       els: els as unknown as PlaySessionEls,
-      hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {} },
+      hud: { drawLives() {}, drawTimer() {}, drawHp() {}, showOutcome() {}, speakCorrection() {} },
       hold: { correct: 900, wrong: 1200, miss: 900 },
       arena: () => arena as never, mounted: () => mounted,
       later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },

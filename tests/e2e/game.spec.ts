@@ -27,6 +27,18 @@ declare global {
 // augmentation and the `__sna?: SnaHooks` one in hooks.ts never meet in a single type-check pass.
 declare global { interface Window { __sna: PlayHooks & MemoryHooks; __SNA_FAST?: number } }
 
+/** Record every line handed to the engine, so a test can assert a sentence was *spoken* and not only printed. */
+const captureSpeech = (page: Page) => page.addInitScript(() => {
+  window.__spoken = [];
+  Object.defineProperty(window, 'speechSynthesis', {
+    configurable: true,
+    value: {
+      speaking: false, pending: false, getVoices: () => [], cancel: () => {}, onvoiceschanged: null,
+      speak: (u: SpeechSynthesisUtterance) => { window.__spoken!.push(u.text); },
+    },
+  });
+});
+
 /**
  * Walk the avatar screen the way a child does, on a cleared save. Kept for the handful of tests that are
  * *about* that screen — the pick itself, the Master Ninja unlock, the sticky-button layout — and for the one
@@ -577,6 +589,38 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.toast.bad')).toContainText('Not quite');
     await expect(page.locator('.lives span.off')).toHaveCount(1);
     await page.waitForFunction(() => window.__sna.state().index === 1);
+  });
+
+  // #893: the right answer is told, not only shown, so a pre-reader gets the correction too — never in Ninja
+  // Sprint, whose pace has no room for it (`hud.ts`'s `speakCorrection`). `y2-tables` answers a bare number,
+  // so `correctionLine` is never null here.
+  test('a wrong slice speaks "It\'s <answer>." before the next question, in Mission (#893)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-tables');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);   // a decoy must be in flight to slice wrong
+    const wrongAnswer = await page.evaluate(() => window.__sna.session.current.answer as string);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction(() => window.__sna.state().index === 1);   // the next question is already up
+    const spoken = (await page.evaluate(() => window.__spoken))!;
+    const at = spoken.indexOf(`It's ${wrongAnswer}.`);
+    expect(at, `the correction must be spoken; got ${JSON.stringify(spoken)}`).toBeGreaterThanOrEqual(0);
+    expect(spoken.length, 'the next question\'s own prompt was spoken after the correction').toBeGreaterThan(at + 1);
+  });
+
+  test('Ninja Sprint speaks no correction line after a wrong slice (#893)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await expect(page.locator('.play')).toBeVisible();
+    await waitForWrongOrEnd(page);
+    const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+    const wrongAnswer = await page.evaluate(() => window.__sna.session.current.answer as string);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before);
+    const spoken = (await page.evaluate(() => window.__spoken))!;
+    expect(spoken, `Sprint must stay silent on the correction; got ${JSON.stringify(spoken)}`).not.toContain(`It's ${wrongAnswer}.`);
   });
 
   test('statistics: the tally chart, then the pictogram and its key, reach the card (#8)', async ({ page }) => {
@@ -3429,18 +3473,6 @@ test.describe('profile picker (#20 slice 2)', () => {
         await page.click('#back'); await expect(page.locator('.home.map')).toBeVisible();
       }
     }
-  });
-
-  /** Record every line handed to the engine, so a test can assert a sentence was *spoken* and not only printed. */
-  const captureSpeech = (page: Page) => page.addInitScript(() => {
-    window.__spoken = [];
-    Object.defineProperty(window, 'speechSynthesis', {
-      configurable: true,
-      value: {
-        speaking: false, pending: false, getVoices: () => [], cancel: () => {}, onvoiceschanged: null,
-        speak: (u: SpeechSynthesisUtterance) => { window.__spoken!.push(u.text); },
-      },
-    });
   });
 
   /**

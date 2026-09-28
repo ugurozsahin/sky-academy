@@ -18,7 +18,7 @@ import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
 import type { CertInfo } from './certificate';
 import { $, esc } from './dom';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
-import { hintText, promptHTML, promptMode, stageHTML, type Hud, type Outcome } from './hud';
+import { hintText, promptHTML, promptMode, setHint, stageHTML, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
 import { createSolidSlot, type ArtFrame, type SolidArtState, type SolidState } from './solid';   // #684: the lazy three.js solid on a 3-D Shapes card
 
@@ -214,28 +214,10 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     peekToken++; peekActive = false; peekDone = null;
     syncPaused();
   }
-  /**
-   * Write the line under the prompt. `own` marks the one kind that must survive a short screen: a hint the
-   * card is *answered from*, which the generator declares with `hintIsData` (`types.ts`). The short-screen
-   * rule (`@media (max-height: 640px)` in style.css) hides `.hint` to buy the card vertical space on a phone
-   * held sideways — a fair trade for an instruction line, and not for the seven measure topics whose values
-   * being compared live in `hint` and nowhere else: hidden, "Which is fuller?" sits over two coloured
-   * bubbles with nothing to decide by (#328, and #65's rule that every card stays usable without read-aloud).
-   *
-   * **Not `!!q.hint`**, which is what the first version of this fix used. 47 of the registry's 87 topics
-   * write a `hint` and only 7 of those carry data; `hint` is documented as "small instruction text", and
-   * that is what the other 40 put there ("Slice the shape", "Put them in twos"). Marking all of them would
-   * have given a 16px line back to every one of those cards in landscape and pushed the arena down with it
-   * (`arena.topInset` below) — the space the media query exists to reclaim (PR #430 review, round 1).
-   */
-  function setHint(text: string, own = false) {
-    els.hint.textContent = text;
-    els.hint.classList.toggle('own', own);
-  }
   /** Show the sentence and start (or resume) its clock. `then` runs when it hides — nothing, for a repeat. */
   function showPeek(q: Question, then: (() => void) | null) {
     els.prompt.innerHTML = esc(q.listen!);
-    setHint('Look, remember, then build it');
+    setHint(els, 'Look, remember, then build it');
     peekActive = true; peekLeft = scaled(NO_VOICE_PEEK_MS); peekDone = then;
     syncPaused();
     if (!holdOpen) runPeek(q);
@@ -245,7 +227,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     deps.later(() => {
       if (token !== peekToken || activeQuestion !== q || !deps.mounted()) return;
       els.prompt.innerHTML = promptHTML(q, session.seqIndex);
-      setHint('Slice the words in order');
+      setHint(els, 'Slice the words in order');
       const then = peekDone; peekActive = false; peekDone = null;
       syncPaused();
       then?.();
@@ -271,7 +253,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     // conjunct is not redundant — `hintText()` falls back to a generic instruction when `q.hint` is absent,
     // and a generator that set the flag without a hint would otherwise mark that instruction (#328).
     const line = hintText(q, { reveal, tracing: deps.tracing });
-    setHint(line, !!q.hint && !!q.hintIsData);
+    setHint(els, line, !!q.hint && !!q.hintIsData);
     return false;
   }
 
@@ -344,13 +326,17 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       // a finished sequence spotlights its last letter; everything else spotlights the answer itself
       settle('correct', q, { good: q.sequence ? q.sequence[q.sequence.length - 1] : q.answer });
     },
+    // #893: relies on tracing never reaching onWrong/onMiss at all (startTrace()'s tracer only ever hits a
+    // pass) rather than checking deps.tracing itself — a future tracing "give up" path needs its own gate.
     onWrong(q, hit) {
       sfx.wrong(); haptic('wrong'); deps.toast('Not quite!', 'bad', scaled(hold.wrong));
       settle('wrong', q, { good: q.sequence ? q.sequence[session.seqIndex] : q.answer, bad: hit });
+      if (opts.mode !== 'sprint') hud.speakCorrection(q, session.currentTopic?.id);   // #893: the right answer, told
     },
     onMiss(q) {
       sfx.miss(); deps.toast('Missed!', 'bad', scaled(hold.miss));
       settle('miss', q, { good: q.sequence ? q.sequence[session.seqIndex] : q.answer });
+      if (opts.mode !== 'sprint') hud.speakCorrection(q, session.currentTopic?.id);   // #893: the right answer, told
     },
     onProgress(label, done, total) {
       releasePeek();

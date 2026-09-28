@@ -113,23 +113,24 @@ describe('guard rails', () => {
     ]);
   });
 
-  // #468 item 5: #430's correctness argument for `hintIsData` rests on "`setHint` (play-session.ts) and
-  // `showOutcome` (hud.ts) are the only writers of the play screen's `#hint` element" — true by inspection
-  // today, not by construction. A third writer anywhere in src/ui/ could show a data-carrying hint's raw
-  // values outside those two paths, or blank an instruction hint, with every other rail here still green.
-  // Scoped to `els.hint`, the play screen's element — a same-named local `hint` variable elsewhere
-  // (profiles.ts, avatar.ts, certificate.ts each build their own unrelated hint element) is not this rail's
-  // concern and does not match `els.hint`. This does not catch a write that reaches `els.hint` through an
-  // alias (a destructured `{ hint }` or a renamed reference), one split across more than one line, or a
-  // property other than `textContent`/`innerHTML` (`.innerText`, `insertAdjacentHTML`, `Object.assign`) —
-  // only a direct, single-line `els.hint.textContent`/`.innerHTML` access (silent-failure-hunter review of
-  // this pull request, round 1).
+  // #468 item 5: #430's correctness argument for `hintIsData` rests on "`setHint` and `showOutcome` (both
+  // hud.ts, #893 moved `setHint` there from play-session.ts to pay for the correction-line call without
+  // growing past the #714 ratchet cap) are the only writers of the play screen's `#hint` element" — true by
+  // inspection today, not by construction. A third writer anywhere in src/ui/ could show a data-carrying
+  // hint's raw values outside those two paths, or blank an instruction hint, with every other rail here
+  // still green. Scoped to `els.hint`, the play screen's element — a same-named local `hint` variable
+  // elsewhere (profiles.ts, avatar.ts, certificate.ts each build their own unrelated hint element) is not
+  // this rail's concern and does not match `els.hint`. This does not catch a write that reaches `els.hint`
+  // through an alias (a destructured `{ hint }` or a renamed reference), one split across more than one
+  // line, or a property other than `textContent`/`innerHTML` (`.innerText`, `insertAdjacentHTML`,
+  // `Object.assign`) — only a direct, single-line `els.hint.textContent`/`.innerHTML` access
+  // (silent-failure-hunter review of this pull request, round 1).
   it('the play screen\'s #hint has exactly two writers: setHint and showOutcome (#468 item 5)', () => {
     const writers = inDir('/src/ui/')
       .flatMap(([f, s]) => code(s).split('\n').filter(l => /\bels\.hint\.(?:textContent|innerHTML)\s*\+?=[^=]/.test(l)).map(l => `${f}: ${l.trim()}`));
     expect(writers, 'route a new hint write through setHint() or showOutcome(), never a direct assignment').toEqual([
+      '/src/ui/hud.ts: els.hint.textContent = text;',
       '/src/ui/hud.ts: els.hint.innerHTML = outcomeHintHTML(kind, q.answer);',
-      '/src/ui/play-session.ts: els.hint.textContent = text;',
     ]);
   });
 
@@ -3251,7 +3252,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
     'src/style.css': 1870, 'src/storage.ts': 1511, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
-    'src/curriculum/year2.ts': 757, 'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 435,
+    'src/curriculum/year2.ts': 757, 'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 421,
     'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 355, 'src/ui/certificate.ts': 341, 'src/audio.ts': 98,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {

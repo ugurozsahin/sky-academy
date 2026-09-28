@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createHud, livesHTML, outcomeHintHTML, promptMode, stageHTML } from '../../src/ui/hud';
-import type { Question } from '../../src/curriculum';
+import { CORRECTION_LINE_MAX, correctionLine, createHud, livesHTML, NO_SAY_ANSWER_TOPICS, outcomeHintHTML, promptMode, stageHTML } from '../../src/ui/hud';
+import { TOPICS, type Difficulty, type Question } from '../../src/curriculum';
 
 const plain = (s: string) => s.replace(/<[^>]+>/g, '');
 
@@ -139,6 +139,104 @@ describe('promptMode and the outcome reveal (#65)', () => {
       hud.showOutcome(kind, measure);
       expect((els.hint as unknown as { classes: Set<string> }).classes.has('own'),
         `${kind}: the outcome text is still marked as the question's own values`).toBe(false);
+    }
+  });
+});
+
+// #893: seeded so a failing draw reproduces — same mulberry32 shape as curriculum.test.ts's local `rng`.
+function rng(seed: number) {
+  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+describe('correctionLine (#893 — the spoken line after a wrong slice or a miss)', () => {
+  const q = (answer: string, extra: Partial<Omit<Question, 'hint' | 'hintIsData'>> = {}): Question => ({ prompt: 'p', answer, options: [answer, 'x'], ...extra });
+
+  it('reads a number', () => {
+    expect(correctionLine(q('7'), undefined)).toBe("It's 7.");
+  });
+  it('reads a word', () => {
+    expect(correctionLine(q('cat'), undefined)).toBe("It's cat.");
+  });
+  it('reads a money answer exactly as the card prints it, never rebuilt as a decimal (#652)', () => {
+    expect(correctionLine(q('£1 and 50p'), undefined)).toBe("It's £1 and 50p.");
+    expect(correctionLine(q('50p'), undefined)).toBe("It's 50p.");
+    expect(correctionLine(q('£2'), undefined)).toBe("It's £2.");
+  });
+  it('reads the whole word for a sequence question, not the letter just missed', () => {
+    const seqQ = q('cat', { sequence: ['c', 'a', 't'] });
+    expect(correctionLine(seqQ, undefined)).toBe("It's cat.");
+  });
+  it('is null for a glyph or symbol answer with no letter or digit', () => {
+    expect(correctionLine(q('■'), undefined)).toBeNull();
+    expect(correctionLine(q('<'), undefined)).toBeNull();
+  });
+  it('is null for an emoji answer', () => {
+    expect(correctionLine(q('🐱'), undefined)).toBeNull();
+  });
+  it('is null for a card that opts out with noSayAnswer', () => {
+    expect(correctionLine(q('7', { noSayAnswer: true }), undefined)).toBeNull();
+  });
+  it('is null for every topic in NO_SAY_ANSWER_TOPICS, whatever the answer', () => {
+    expect(NO_SAY_ANSWER_TOPICS.size).toBe(7);
+    for (const id of NO_SAY_ANSWER_TOPICS) expect(correctionLine(q('a'), id), id).toBeNull();
+  });
+  // A stale or mistyped id here would otherwise pass every test above (they only assert on the set's own
+  // contents) while silently no longer suppressing the real topic it once named — a topic rename is exactly
+  // the kind of drift `TOPICS` (the live registry) would catch and a bare string literal would not.
+  it('every id in NO_SAY_ANSWER_TOPICS names a topic that is actually registered', () => {
+    for (const id of NO_SAY_ANSWER_TOPICS) expect(TOPICS.some(t => t.id === id), id).toBe(true);
+  });
+  it('is not null for an ordinary topic id', () => {
+    expect(correctionLine(q('7'), 'y1-add')).toBe("It's 7.");
+  });
+  it('does not double the full stop when the answer already ends in sentence punctuation', () => {
+    expect(correctionLine(q('I can run.'), undefined)).toBe("It's I can run.");
+    expect(correctionLine(q('Is it hot?'), undefined)).toBe("It's Is it hot?");
+  });
+  it('is null once the line would reach CORRECTION_LINE_MAX, however its answer is shaped', () => {
+    const long = 'x'.repeat(CORRECTION_LINE_MAX);
+    expect(correctionLine(q(long), undefined)).toBeNull();
+    const short = 'x'.repeat(CORRECTION_LINE_MAX - "It's .".length - 1);
+    expect(correctionLine(q(short), undefined)).not.toBeNull();
+  });
+
+  // "Sweep the class, not the instance" (`open-pr` skill §4): every topic × difficulty × 20 seeds, drawn from
+  // the real generators rather than a hand-picked sample. This is what actually found that Story Sentences'
+  // longer banks (`y1-sentence`, `y2-sentence`, `r-sentence`) needed the length cap above, well past the
+  // seven topics the issue's own evidence section sampled by hand.
+  // Topics whose answer is never a letter or digit at any difficulty, so `correctionLine` is null on every
+  // draw by the generic glyph check rather than by `NO_SAY_ANSWER_TOPICS`: `y2-compare` answers a bare
+  // `<`/`>`/`=`, `y2-patterns` a pattern glyph/emoji, `y2-punct` a bare punctuation mark. Found by running
+  // the sweep once and reading which topics came back with zero non-null lines.
+  const ALWAYS_SYMBOLIC = new Set(['y2-compare', 'y2-patterns', 'y2-punct']);
+
+  it('every non-null correction line across the whole registry is "It\'s …", ends in one full stop, and fits the hold', () => {
+    let checked = 0, nonNull = 0;
+    const nonNullByTopic = new Map(TOPICS.map(t => [t.id, 0]));
+    for (const topic of TOPICS) {
+      for (const d of [1, 2, 3] as Difficulty[]) {
+        for (let seed = 0; seed < 20; seed++) {
+          const question = topic.gen(d, rng(topic.id.length * 97 + d * 31 + seed));
+          const line = correctionLine(question, topic.id);
+          checked++;
+          if (line === null) continue;
+          nonNull++; nonNullByTopic.set(topic.id, nonNullByTopic.get(topic.id)! + 1);
+          const where = `${topic.id} d${d} seed${seed}: answer "${question.answer}" → "${line}"`;
+          expect(line, where).toMatch(/^It's .+[.!?]$/);
+          expect(line, where).not.toMatch(/[.!?]{2,}$/);
+          expect(line.length, where).toBeLessThan(CORRECTION_LINE_MAX);
+        }
+      }
+    }
+    expect(checked).toBe(TOPICS.length * 3 * 20);
+    // The shape assertions above pass vacuously if every draw came back null — a `CORRECTION_LINE_MAX` of 0,
+    // or an early `return null`, would still leave every `if (line === null) continue;` a no-op and this test
+    // green. So: every topic not excluded by name, and not always-symbolic, must actually produce a spoken
+    // line at least once across its 60 draws (3 difficulties × 20 seeds) — proof the feature fires at all.
+    expect(nonNull, 'a total regression would leave every line null').toBeGreaterThan(0);
+    for (const topic of TOPICS) {
+      if (NO_SAY_ANSWER_TOPICS.has(topic.id) || ALWAYS_SYMBOLIC.has(topic.id)) continue;
+      expect(nonNullByTopic.get(topic.id), `${topic.id}: never spoke a correction across 60 draws`).toBeGreaterThan(0);
     }
   });
 });
