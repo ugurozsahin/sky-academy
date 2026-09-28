@@ -35,3 +35,21 @@ export function resultHeading(mode: Mode, opts: { won: boolean; training: boolea
   return spec.staged && opts.won && opts.training ? 'Training complete!'
     : opts.won ? spec.overHeadingWon : spec.overHeadingLost;
 }
+
+/**
+ * The results screen's spoken/shown headline. #877: Mission has no villain (`MODES.mission.villain` is
+ * false), so a lost Mission used to say "Hammer Man got away" regardless — the caller already has
+ * `senseiLine`/`praiseLine` (both need an Avatar, so they stay outside this pure function), passed as
+ * thunks rather than pre-drawn strings so a branch that does not use one never spends its `Math.random()` pick.
+ */
+export function resultHeadline(
+  r: RunOutcome, opts: { training: boolean; newBest: boolean; name: string; senseiLine: () => string; praiseLine: () => string },
+): string {
+  const name = opts.name || 'Ninja';
+  if (r.incomplete) return 'That question broke — here is what you earned so far!';
+  if (opts.training) return opts.senseiLine();
+  if (r.mode === 'sprint' && opts.newBest) return `New best, ${name}!`;
+  if (r.mode === 'boss' && r.won) return `K.O.! You beat Hammer Man, ${name}!`;
+  if (r.won) return opts.praiseLine();
+  return MODES[r.mode].villain ? `Hammer Man got away this time, ${name}!` : `Good try, ${name}! Have another go.`;
+}

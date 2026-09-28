@@ -16,7 +16,7 @@ import { screenScope, stickersHTML } from './screen';
 import { createHud } from './hud';
 import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
 import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
-import { resultMedal, resultHeading } from './results';
+import { resultMedal, resultHeading, resultHeadline } from './results';
 import { dojoRowsHTML } from './memory';
 import { certToStored, certWords, drawCertificate, deliverCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
@@ -237,12 +237,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     // is not one — `r.incomplete` withholds the win/loss framing (never a certificate either: `certInfo`
     // already requires `r.won`, which an incomplete session never has) and says plainly what happened instead,
     // mirroring `duel.ts`'s identical `r.incomplete` handling for an aborted match.
-    const headline = r.incomplete ? 'That question broke — here is what you earned so far!'
-      : training ? senseiLine(r.won, d.name)
-      : r.mode === 'sprint' && newBest ? `New best, ${d.name || 'Ninja'}!`
-      : r.mode === 'boss' && r.won ? `K.O.! You beat Hammer Man, ${d.name || 'Ninja'}!`
-      : r.won ? praiseLine(av, d.name)
-      : `Hammer Man got away this time, ${d.name || 'Ninja'}!`;
+    const headline = resultHeadline(r, { training, newBest, name: d.name, senseiLine: () => senseiLine(r.won, d.name), praiseLine: () => praiseLine(av, d.name) });
     const heading = r.incomplete ? 'Session ended early' : resultHeading(r.mode, { won: r.won, training });   // from the mode table (mission distinguishes a Sensei-training win)
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);

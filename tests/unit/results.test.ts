@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { resultMedal, resultHeading } from '../../src/ui/results';
+import { describe, expect, it, vi } from 'vitest';
+import { resultMedal, resultHeading, resultHeadline } from '../../src/ui/results';
 import { resultsHTML, type ResultsData } from '../../src/ui/overlays';
 import type { Mode } from '../../src/game/modes';
 
@@ -69,6 +69,85 @@ describe('resultHeading', () => {
     expect(resultHeading('endless', { won: true, training: true })).toBe('Storm over!');
     expect(resultHeading('sprint', { won: true, training: true })).toBe("Time's up!");
     expect(resultHeading('boss', { won: true, training: true })).toBe('Knock-out!');
+  });
+});
+
+/**
+ * #877: Mission has no villain (`MODES.mission.villain` is false), so a lost Mission used to say "Hammer Man
+ * got away" regardless of mode — the only mode that reaches the plain-loss branch without one, and the mode
+ * children play most. This table covers mode × won × training × incomplete × newBest.
+ */
+describe('resultHeadline', () => {
+  const base = { training: false, newBest: false, name: 'Ninja', senseiLine: () => 'SENSEI SAYS', praiseLine: () => 'PRAISE LINE' };
+
+  it('incomplete overrides every other case', () => {
+    for (const mode of ['mission', 'boss', 'endless', 'sprint'] as Mode[]) {
+      for (const won of [true, false]) {
+        expect(resultHeadline({ mode, won, score: 0, stars: 0, incomplete: true }, base))
+          .toBe('That question broke — here is what you earned so far!');
+      }
+    }
+  });
+
+  it('training reads senseiLine, won or lost', () => {
+    expect(resultHeadline({ mode: 'mission', won: true, score: 0, stars: 3 }, { ...base, training: true })).toBe('SENSEI SAYS');
+    expect(resultHeadline({ mode: 'mission', won: false, score: 0, stars: 0 }, { ...base, training: true })).toBe('SENSEI SAYS');
+  });
+
+  it('a Sprint new best reads "New best"', () => {
+    expect(resultHeadline({ mode: 'sprint', won: true, score: 0, stars: 3 }, { ...base, newBest: true })).toBe('New best, Ninja!');
+  });
+
+  it('a won Boss Battle reads the K.O. line', () => {
+    expect(resultHeadline({ mode: 'boss', won: true, score: 0, stars: 3 }, base)).toBe('K.O.! You beat Hammer Man, Ninja!');
+  });
+
+  it('any other win reads the praise line', () => {
+    for (const mode of ['mission', 'endless', 'sprint'] as Mode[]) {
+      expect(resultHeadline({ mode, won: true, score: 0, stars: 3 }, base)).toBe('PRAISE LINE');
+    }
+  });
+
+  it('a lost Mission never names Hammer Man — Mission has no villain', () => {
+    expect(resultHeadline({ mode: 'mission', won: false, score: 0, stars: 0 }, base)).toBe('Good try, Ninja! Have another go.');
+  });
+
+  it('a lost Sky Storm and a lost Boss Battle keep "Hammer Man got away this time"', () => {
+    expect(resultHeadline({ mode: 'endless', won: false, score: 0, stars: 0 }, base)).toBe('Hammer Man got away this time, Ninja!');
+    expect(resultHeadline({ mode: 'boss', won: false, score: 0, stars: 0 }, base)).toBe('Hammer Man got away this time, Ninja!');
+  });
+
+  it('falls back to "Ninja" when the child has no name', () => {
+    expect(resultHeadline({ mode: 'mission', won: false, score: 0, stars: 0 }, { ...base, name: '' })).toBe('Good try, Ninja! Have another go.');
+  });
+
+  // The type-design review of PR #877's fix: senseiLine/praiseLine draw a random line as a side effect
+  // (src/avatars.ts), so a plain string here would draw and discard one on every branch that does not read it.
+  it('never calls the line-generator thunk its branch does not read', () => {
+    const spies = () => ({ senseiLine: vi.fn(() => 'SENSEI SAYS'), praiseLine: vi.fn(() => 'PRAISE LINE') });
+    let s = spies();
+    resultHeadline({ mode: 'mission', won: true, score: 0, stars: 0, incomplete: true }, { ...base, ...s });
+    expect(s.senseiLine).not.toHaveBeenCalled(); expect(s.praiseLine).not.toHaveBeenCalled();
+
+    s = spies();
+    resultHeadline({ mode: 'sprint', won: true, score: 0, stars: 3 }, { ...base, ...s, newBest: true });
+    expect(s.senseiLine).not.toHaveBeenCalled(); expect(s.praiseLine).not.toHaveBeenCalled();
+
+    s = spies();
+    resultHeadline({ mode: 'boss', won: true, score: 0, stars: 3 }, { ...base, ...s });
+    expect(s.senseiLine).not.toHaveBeenCalled(); expect(s.praiseLine).not.toHaveBeenCalled();
+
+    s = spies();
+    resultHeadline({ mode: 'mission', won: false, score: 0, stars: 0 }, { ...base, ...s });
+    expect(s.senseiLine).not.toHaveBeenCalled(); expect(s.praiseLine).not.toHaveBeenCalled();
+
+    s = spies();
+    resultHeadline({ mode: 'mission', won: true, score: 0, stars: 3 }, { ...base, ...s });
+    expect(s.praiseLine).toHaveBeenCalledTimes(1); expect(s.senseiLine).not.toHaveBeenCalled();
+
+    s = spies();
+    resultHeadline({ mode: 'mission', won: false, score: 0, stars: 0 }, { ...base, ...s, training: true });
+    expect(s.senseiLine).toHaveBeenCalledTimes(1); expect(s.praiseLine).not.toHaveBeenCalled();
   });
 });
 
