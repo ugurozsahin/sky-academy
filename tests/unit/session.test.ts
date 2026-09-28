@@ -474,6 +474,32 @@ describe('deck replay and misses (#878)', () => {
     expect(s.hit(deck[0].q.answer)).toBe('correct');
     expect(ev.onCommit, 'perStage:1 makes index+1 >= perStage true after the first question — only the explicit o.deck guard keeps this silent').not.toHaveBeenCalled();
   });
+  /**
+   * #878 review round 2, blocking finding: every deck test built its deck from a single `Topic`
+   * (`deckTopic`), so nothing distinguished `nextDeckQuestion()` reading each item's own `topic` from a bug
+   * that pinned every item to the first one's. "Fix my mistakes" (#930) and "Recent slips" (#938) — the two
+   * features #878 exists for — are, by their own description, decks spanning many topics, and `Miss.topic`
+   * is a field #878 itself introduces, so a mis-attribution here would silently corrupt it.
+   */
+  it('each deck item is served under its own topic, not the first item\'s (#878 review)', () => {
+    const topicA = topicById('y1-add')!; const topicB = topicById('y1-sub')!;
+    const qA = topicA.gen(1, rng(1000)); const qB = topicB.gen(1, rng(1001));
+    const deck: DeckItem[] = [{ topic: topicA, q: qA }, { topic: topicB, q: qB }];
+    const ev = events();
+    const s = new Session({ mode: 'sprint', year: Y1, deck, rng: rng(1002) }, ev);
+    s.start();
+    expect(s.currentTopic).toBe(topicA);
+    const wrongA = qA.options.find(o => o !== qA.answer)!;
+    expect(s.hit(wrongA)).toBe('wrong'); s.advance();
+    expect(s.currentTopic, 'the second item keeps its own topic, not the first item\'s').toBe(topicB);
+    const wrongB = qB.options.find(o => o !== qB.answer)!;
+    expect(s.hit(wrongB)).toBe('wrong'); s.advance();
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.misses).toEqual([
+      { topic: topicA.id, q: qA, picked: wrongA },
+      { topic: topicB.id, q: qB, picked: wrongB },
+    ]);
+  });
 });
 
 /**
