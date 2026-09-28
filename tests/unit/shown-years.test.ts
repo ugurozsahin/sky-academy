@@ -14,6 +14,11 @@ installShim();
 
 describe('isKs2 (#1032)', () => {
   it.each(['reception', 'year1', 'year2'] as const)('%s is not KS2', y => expect(isKs2(y)).toBe(false));
+
+  // pr-test-analyzer review: only the false branch was covered above, which a broken negation
+  // (`EYFS_KS1.has(y)` for `!EYFS_KS1.has(y)`) would still pass unnoticed. No KS2 YearId exists yet (#1050+
+  // adds the first), so this casts a fabricated one to exercise the true branch ahead of that.
+  it('a hypothetical KS2 id is KS2', () => expect(isKs2('year3' as unknown as Parameters<typeof isKs2>[0])).toBe(true));
 });
 
 describe('meetsShowGate: KS2 needs 12 maths + 6 writing, EYFS/KS1 keeps 6 + 3 (#1032)', () => {
@@ -120,5 +125,12 @@ describe('islandArt (#1032)', () => {
     const [, size] = svg.match(/font-size='(\d+)'/) ?? [];
     expect(Number(size)).toBeGreaterThanOrEqual(17);
     expect(Number(size) * (96 / 120)).toBeGreaterThanOrEqual(13);
+  });
+
+  // pr-test-analyzer review: every other fixture's 9-char #rrggbbaa tint always takes the `.slice(0, 7)`
+  // branch — this is the only one that exercises the already-opaque (7-char) fallback.
+  it('an already-opaque 7-char tint is used as-is, not sliced short', () => {
+    const svg = decodeURIComponent(islandArt(fixture({ tint: '#7a5ad6' })));
+    expect(svg).toContain('#7a5ad6');
   });
 });

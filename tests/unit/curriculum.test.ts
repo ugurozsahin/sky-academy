@@ -46,6 +46,15 @@ describe('topic registry', () => {
     }
   });
 
+  // guard rail (#1032, silent-failure-hunter review): islandArt() strips YearInfo.tint's trailing alpha byte
+  // by slicing to 7 characters when the string is 9 long, and hands the result straight to an SVG `fill`
+  // otherwise — a tint in any other shape (a 4-digit `#abcd` shorthand, a typo'd 8-char hex) would render a
+  // wrong or invisible placeholder with nothing failing loudly. Pinned here, not on islandArt() itself,
+  // because the shape is a property of the registry data, and a bad row should fail where it is written.
+  it('every YEARS row’s tint is an 8-digit #rrggbbaa hex, which islandArt() assumes', () => {
+    for (const y of YEARS) expect(y.tint, y.id).toMatch(/^#[0-9a-f]{8}$/i);
+  });
+
   // #889: YEAR2_TOPICS moved into its own module so new Year 2 topics have room in year2.ts. This pins the
   // registry's ids, in order, so that move (and every later one) cannot silently drop, reorder or rename a row.
   it('YEAR2_TOPICS holds these 37 ids, in this order', () => {
