@@ -459,6 +459,45 @@ describe('deck replay and misses (#878)', () => {
     expect(ev.onEnd).toHaveBeenCalledTimes(1);
     expect(ev.onEnd.mock.calls[0][0]).toMatchObject({ won: true, correct: 1, questions: 1 });
   });
+  /**
+   * #878 review round 1, blocking finding 1: the previous "onCommit never fires for a deck session" test
+   * passes even with `this.o.deck ||` deleted from `maybeCommitFinalStage()`'s guard, because every real
+   * `YearInfo` has `perStage >= 5` — `this.index + 1 < this.perStage` (`0 + 1 < 6`) already short-circuits it
+   * for a deck session, which never advances `index`. This test reaches the branch the guard actually exists
+   * for, with a `YearInfo` shaped so `index + 1 >= perStage` — the guard's own removal turns this red.
+   */
+  it('the o.deck guard on maybeCommitFinalStage is load-bearing, not incidental (#878 review)', () => {
+    const oneQuestionYear = { ...Y1, perStage: 1 };
+    const deck = buildDeck(3, 990); const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: oneQuestionYear, deck, stages: 1, rng: rng(991) }, ev);
+    s.start();
+    expect(s.hit(deck[0].q.answer)).toBe('correct');
+    expect(ev.onCommit, 'perStage:1 makes index+1 >= perStage true after the first question — only the explicit o.deck guard keeps this silent').not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * #878 review round 1, blocking finding 2: every `.misses` assertion added by #878 lived inside
+ * `describe('deck replay and misses (#878)')`, so a plain generated session — mission, sprint, endless, boss,
+ * the common case, not the new one — was never checked to populate `misses` on its own `SessionResult`.
+ */
+describe('misses without a deck (#878 review)', () => {
+  it('a plain generated session (no deck) also records misses', () => {
+    const ev = events();
+    const s = new Session({ mode: 'sprint', year: Y1, topic: topicById('y1-add')!, rng: rng(996) }, ev);
+    s.start();
+    const q1 = s.current!;
+    const wrong = q1.options.find(o => o !== q1.answer)!;
+    expect(s.hit(wrong)).toBe('wrong'); s.advance();
+    const q2 = s.current!;
+    s.fall(q2.answer); s.advance();
+    s.tick(60_000);
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.misses).toEqual([
+      { topic: 'y1-add', q: q1, picked: wrong },
+      { topic: 'y1-add', q: q2, picked: null },
+    ]);
+  });
 });
 
 describe('boss battle', () => {
