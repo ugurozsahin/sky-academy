@@ -508,6 +508,11 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // would be as silent a drift as unreachable-and-claimed-reachable was.
     expect(known.has('cow@2'), 'cow@2 has become reachable — move it into the reachable table above').toBe(false);
     expect(AVOID.has('cok') && AVOID.has('coc'), 'cok/coc left AVOID — cow@2 is unreachable, but this is the only place that said so').toBe(true);
+    // Same shape for `jam@2`: #874 removed `jam` from `CVC`, so no frame offers it any more and the
+    // `['jam', 2, 'p']` row above would now prove nothing. `jap` stays in `AVOID` regardless — a word can
+    // return to `CVC` later — pinned as unreachable rather than claimed reachable, both halves asserted.
+    expect(known.has('jam@2'), 'jam@2 has become reachable — move it into the reachable table above').toBe(false);
+    expect(AVOID.has('jap'), 'jap left AVOID — jam@2 is unreachable, but this is the only place that said so').toBe(true);
     // `put@2` is not in the table above either: `put` is not in `CVC` at all, so no Reception frame ever offers
     // it — `put_2_s` (spelling `pus`) already has its own row in the Y1/Y2 word-list table above, which is the
     // table that actually reaches it (#445).
