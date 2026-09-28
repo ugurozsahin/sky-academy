@@ -328,7 +328,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     // is now the only writer, so the e2e's stored assertions cover the drawn object too.
     // Both refusal paths (#470 review round 1): `isWriteFailing()` alone missed a write `save()` skipped
     // deliberately under `isReadOnlySave()`'s latch (#232) — the row was offered though the album never got it.
-    if (cert) { recordCert(certToStored(cert, { id: `${o.year.id}:duel` })); certSaved = !isWriteFailing() && !isReadOnlySave(); }
+    if (cert) { recordCert(certToStored(cert, { id: `${o.year.id}:duel:${topic.id}` })); certSaved = !isWriteFailing() && !isReadOnlySave(); }   // #670: per topic, not per year
     // The last piece of item 5: the match itself, so it outlives this overlay. Filed for every finished match
     // — a loss and a draw are as much a thing that happened as a win, which is the one place this parts
     // company with the certificate above (that is an award; only a Player 1 win earns one, `duelEarnsCertificate`)
@@ -433,7 +433,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     if (!duelEarnsCertificate(r)) return null;      // the predicate is in game/duel.ts so all three winners are unit-pinned
     const t = duelAccuracy(r);
     return {
-      name: d.name, avatar: av, year: o.year.title, title: 'Ninja Duel',
+      name: d.name, avatar: av, year: o.year.title, title: `Ninja Duel · ${topic.title}`,   // #670: names the topic, not just the mode
       stars: duelStars(t), score: r.scoreA, correct: t.hits, attempts: t.tries, duel: true, date: new Date(),
     };
   }

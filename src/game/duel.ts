@@ -326,8 +326,8 @@ export function duelAccuracy(r: DuelResult): DuelTally {
  * It is the **stage** bar, not a mission certificate's own `stars`, which is the rounded mean of five stage
  * stars — close, and deliberately not called identical (#16 review, note 3). An earlier draft of this comment
  * justified the reuse by `fileCert()` "ranking two different scales against each other"; that was wrong and is
- * removed rather than reworded. `fileCert()` only ever compares entries sharing an `id`, and `<year>:duel` has
- * one writer, so it never ranks a duel against a mission.
+ * removed rather than reworded. `fileCert()` only ever compares entries sharing an `id`, and a duel's own
+ * `<year>:duel:<topic>` id (#670) never ranks it against a mission's.
  *
  * It **calls** `starsForAccuracy()` rather than restating it (#397 review round 2, B2). The thresholds used to
  * be copied here, and the copy was defended by a guard that did not exist: moving `Session`'s bar left this
@@ -351,8 +351,8 @@ export function duelStars(t: DuelTally): 1 | 2 | 3 {
  * round 2, note 1). Lifted out of `duelScreen`'s closure so all three `winner` values can be pinned in a unit
  * test: inside `ui/duel.ts` it was reachable only through a full ten-round Playwright match, so the draw arm
  * was exercised and a *loss* was not — and weakening it to `r.winner === 'draw'` left the whole suite green
- * while a defeat filed `<year>:duel` into the child's own album, with the loser's score and stars off a tally
- * that is not theirs.
+ * while a defeat filed `<year>:duel:<topic>` (#670) into the child's own album, with the loser's score and
+ * stars off a tally that is not theirs.
  *
  * Player 2 is the friend `DUEL_HANDOVER` sends to the top half, and the save has one profile, so there is no
  * second child to award — the same reason `duelCoins()` pays no win bonus and `duelAccuracy()` reports one seat.

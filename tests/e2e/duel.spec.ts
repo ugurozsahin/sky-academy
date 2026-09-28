@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { DUEL_HANDOVER, duelPool, seededRng } from '../../src/game/duel';
-import { topicsFor, YEARS, type Question, type Topic, type Visual } from '../../src/curriculum';
+import { topicById, topicsFor, YEARS, type Question, type Topic, type Visual } from '../../src/curriculum';
 import { renderVisual } from '../../src/ui/visuals';
 import { dailyChallenges } from '../../src/game/dojo';
 import { SAVE_VERSION } from '../../src/storage';
@@ -53,7 +53,24 @@ const refuseWrites = (page: Page) => page.addInitScript(() => {
   proto.setItem = () => { throw new DOMException('quota', 'QuotaExceededError'); };
 });
 
-async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins = 0, opts?: { refuseWrites?: boolean }) {
+/**
+ * Rig `duelScreen`'s one topic draw (`pool[Math.floor(Math.random() * pool.length)]`) to land on `pool[index]`,
+ * run `click` (which must trigger that draw), then restore real randomness once `state().topic` confirms it
+ * landed (#670: the two-topic test needs to know which topic each of two matches drew, and the pool is
+ * otherwise an unseeded pick). `Math.random` is held fixed for the whole window rather than consumed by
+ * whichever caller asks first, because after a match ends there is async work in flight (coin/dojo effects)
+ * that can call `Math.random` before the rematch click's own synchronous draw does; holding it fixed costs
+ * those callers their randomness for an instant rather than costing this test its determinism.
+ */
+async function forceTopicAndClick(page: Page, index: number, poolSize: number, expectedTopicId: string, click: () => Promise<void>) {
+  const v = (index + 0.5) / poolSize;
+  await page.evaluate(v => { (window as any).__realRandom ??= Math.random; Math.random = () => v; }, v);
+  await click();
+  await page.waitForFunction(id => window.__sna?.state().topic === id, expectedTopicId);
+  await page.evaluate(() => { const w = window as any; if (w.__realRandom) { Math.random = w.__realRandom; delete w.__realRandom; } });
+}
+
+async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins = 0, opts?: { refuseWrites?: boolean; forceTopic?: { index: number; poolSize: number; topicId: string } }) {
   // The dojo seed is chosen by the PAGE's date, not this process's: `storage.ts`'s `today()` runs in the
   // browser, and a seed built against a different day is silently rolled over by `dojoFor()` — progress
   // gone, the case green for the wrong reason. The two clocks straddle midnight UTC in the general case,
@@ -75,7 +92,9 @@ async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins
   await page.goto('/');
   await expect(page.locator('.home')).toBeVisible();
   await page.click('.island[data-year="year1"]');
-  await page.click('#duel');
+  const ft = opts?.forceTopic;
+  if (ft) await forceTopicAndClick(page, ft.index, ft.poolSize, ft.topicId, () => page.click('#duel'));
+  else await page.click('#duel');
   await expect(page.locator('.duel-screen')).toBeVisible();
   await page.waitForFunction(() => window.__sna?.state().prompt);
 }
@@ -112,6 +131,16 @@ function dojoSeeds(volume: 'short' | 'fresh'): Record<string, unknown> {
 async function winRound(page: Page, p: 'a' | 'b') {
   await page.waitForFunction(p => { const s = window.__sna.state(); return !s.decided && !s.ended && window.__sna.bubbles(p).some(b => b.label === s.answer); }, p);
   expect(await page.evaluate(p => window.__sna.answer(p), p)).toBe(true);
+}
+
+/** Play out a whole 10-round match with Player 1 taking every round, for a test whose subject is the earned
+ *  certificate rather than the score — #670 needs two whole matches, so the win itself stays this short. */
+async function winWholeMatch(page: Page) {
+  for (let r = 1; r <= 10; r++) {
+    if (r > 1) await page.waitForFunction(r => window.__sna.state().round === r, r);
+    await winRound(page, 'a');
+  }
+  await expect(page.locator('.duel-end')).toBeVisible({ timeout: 10_000 });
 }
 
 test.describe('Ninja Duel', () => {
@@ -296,10 +325,13 @@ test.describe('Ninja Duel', () => {
     const won = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).duels);
     expect(won, 'a win files one history row, like every other outcome').toHaveLength(1);
     expect(won[0]).toMatchObject({ winner: 'a', scoreA: 6, scoreB: 4, rounds: 10 });
+    // #670: the id and title both carry the topic this match actually drew (`duelScreen` picks it at random),
+    // so this reads it back off the live state rather than assuming which of the pool's topics it was.
+    const drawnTopic = topicById(await page.evaluate(() => window.__sna.state().topic))!;
     const filed = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs);
-    expect(filed, 'one entry per year, so a rematch upgrades rather than fills the album').toHaveLength(1);
+    expect(filed, 'one entry for this topic — a rematch on the SAME topic would upgrade it, not add a second').toHaveLength(1);
     expect(filed[0]).toMatchObject({
-      id: 'year1:duel', title: 'Ninja Duel', year: 'Year 1', name: 'Ada', duel: true,
+      id: `year1:duel:${drawnTopic.id}`, title: `Ninja Duel · ${drawnTopic.title}`, year: 'Year 1', name: 'Ada', duel: true,
       // Player 1's own five-of-six, not the 6–4 scoreline: 83% is two stars on the stage bar, and reading
       // `scoreA` as the tally would have filed three. `score` is the rounds this child took.
       stars: 2, score: 6, correct: 5, attempts: 6,
@@ -357,6 +389,26 @@ test.describe('Ninja Duel', () => {
       setTimeout(() => res({ advanced: window.__deadArenas.map((a, i) => +(a.time - t0[i]).toFixed(2)), sna: typeof window.__sna }), 500);
     }));
     expect(leaked).toEqual({ advanced: [0, 0], sna: 'undefined' });
+  });
+
+  test('a duel won on a second topic gets its own album entry, not the first one\'s row overwritten (#670)', async ({ page }) => {
+    const pool = duelPool(topicsFor('year1'), YEARS.find(y => y.id === 'year1')!.diffs[0]);
+    expect(pool.length, 'need two distinct topics on offer to prove the id is per-topic, not per-year').toBeGreaterThan(1);
+    const [topicA, topicB] = pool;
+    await startDuel(page, dojoSeeds('fresh'), 0, { forceTopic: { index: 0, poolSize: pool.length, topicId: topicA.id } });
+    expect(await page.evaluate(() => window.__seedMiss)).toBe(false);
+    await winWholeMatch(page);
+    // Rematch, rigged onto a DIFFERENT topic from the pool — #670's bug was the id ignoring which one this is.
+    await forceTopicAndClick(page, 1, pool.length, topicB.id, () => page.click('.duel-end #again'));
+    await expect(page.locator('.duel-screen')).toBeVisible();
+    await winWholeMatch(page);
+    const filed: { id: string; title: string }[] = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).certs);
+    expect(filed, 'two topics won, two rows — before #670 the shared `year1:duel` id let the second win overwrite the first').toHaveLength(2);
+    const byId = Object.fromEntries(filed.map(c => [c.id, c.title]));
+    expect(byId).toEqual({
+      [`year1:duel:${topicA.id}`]: `Ninja Duel · ${topicA.title}`,
+      [`year1:duel:${topicB.id}`]: `Ninja Duel · ${topicB.title}`,
+    });
   });
 
   test('guard rail: a certificate that resolves after the screen tears down is dropped, not written into the new one (#436 review, B2)', async ({ page }) => {
@@ -1133,8 +1185,8 @@ test.describe('Ninja Duel', () => {
   /**
    * The third `winner` arm (#397 round 2, note 1). `duelEarnsCertificate` is unit-pinned for all three values,
    * but the *call site* in `ui/duel.ts` is reachable only from a real match — and weakening it to
-   * `r.winner === 'draw'` leaves every unit test green while a **defeat** files `year1:duel` into the child's
-   * own album, carrying the loser's score and stars off a tally that is not theirs. The draw case is covered
+   * `r.winner === 'draw'` leaves every unit test green while a **defeat** files `year1:duel:<topic>` into the
+   * child's own album, carrying the loser's score and stars off a tally that is not theirs. The draw case is covered
    * by the Daily Dojo test below; this is the loss.
    */
   test('a match Player 2 wins earns the profile nothing — no button, no album entry (#16 item 5)', async ({ page }) => {
@@ -1439,7 +1491,7 @@ test.describe('Ninja Duel', () => {
     expect(saved.duels, 'the match itself outlived the overlay that never opened').toHaveLength(1);
     expect(saved.duels[0]).toMatchObject({ winner: 'a', scoreA: 10, scoreB: 0, rounds: 10 });
     expect(saved.certs, 'and the win filed its certificate').toHaveLength(1);
-    expect(saved.certs[0]).toMatchObject({ id: 'year1:duel', title: 'Ninja Duel', duel: true });
+    expect(saved.certs[0]).toMatchObject({ id: `year1:duel:${topic}`, title: `Ninja Duel · ${topicById(topic)!.title}`, duel: true });
   });
 
   /**
