@@ -30,6 +30,12 @@ function solve(prompt: string): number | null {
   return null;
 }
 
+/** A build card's template (#1059) with its `_` slots filled by `sequence`, in order. */
+function fillTemplate(template: string, sequence: readonly string[]): string {
+  let i = 0;
+  return Array.from(template).map(ch => ch === '_' ? sequence[i++] : ch).join('');
+}
+
 const N = 150;
 
 describe('topic registry', () => {
@@ -97,7 +103,12 @@ for (const topic of TOPICS) {
             expect(q.options.length).toBeLessThanOrEqual(10);
             for (const o of q.options) expect(o.trim().length).toBeGreaterThan(0);
             if (q.sequence) {
-              expect([q.sequence.join(''), q.sequence.join(','), q.sequence.join(' ')]).toContain(q.answer);
+              if (q.build) {
+                expect((q.build.template.match(/_/g) ?? []).length, q.prompt).toBe(q.sequence.length);
+                expect(q.answer, q.prompt).toBe(fillTemplate(q.build.template, q.sequence));
+              } else {
+                expect([q.sequence.join(''), q.sequence.join(','), q.sequence.join(' ')]).toContain(q.answer);
+              }
               for (const l of q.sequence) expect(q.options).toContain(l);
             }
           }

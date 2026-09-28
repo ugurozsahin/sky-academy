@@ -47,6 +47,15 @@ interface QuestionCore {
    */
   optionsAreContent?: boolean;
   sequence?: string[];    // slice these in order (spelling); options = sequence letters + decoys
+  /**
+   * A sequence whose slices are an answer's digits, not a spelling (#1059): `build` implies `sequence`, and
+   * `template`'s `_` count must equal `sequence.length` — every other character (`.`, `,`, `/`, `−`, ` r `,
+   * spaces) prints as itself between the slots. `answer` is `template` with the slots filled by `sequence`,
+   * in order ("3.75" from template `_.__` and sequence `['3','7','5']`). Unlike a spelling sequence, the
+   * prompt itself is kept on the card (`promptHTML`, `src/ui/hud.ts`) — a build card has no other way to
+   * show the child what sum they are answering.
+   */
+  build?: { template: string };
   visual?: Visual;
   wide?: boolean;         // options are words → bigger bubbles
   listen?: string;        // spoken-only question: shown on the card instead of `prompt` when read-aloud is off

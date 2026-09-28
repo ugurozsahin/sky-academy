@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CORRECTION_LINE_MAX, correctionLine, createHud, livesHTML, NO_SAY_ANSWER_TOPICS, outcomeHintHTML, promptMode, stageHTML } from '../../src/ui/hud';
+import { CORRECTION_LINE_MAX, correctionLine, createHud, livesHTML, NO_SAY_ANSWER_TOPICS, outcomeHintHTML, promptHTML, promptMode, stageHTML } from '../../src/ui/hud';
 import { TOPICS, type Difficulty, type Question } from '../../src/curriculum';
 
 const plain = (s: string) => s.replace(/<[^>]+>/g, '');
@@ -69,6 +69,44 @@ describe('outcomeHintHTML (#36 — the outcome reveal under the question card)',
   it('escapes HTML in the answer', () => {
     expect(outcomeHintHTML('wrong', '5 < 8')).toContain('5 &lt; 8');
     expect(outcomeHintHTML('correct', '5 < 8')).not.toContain('5 < 8');
+  });
+});
+
+// #1059: a build card keeps its prompt on the card and draws the answer's digits as slots beside it, so a
+// device with no speech (the APK, until #880/#881) still shows the child what sum they are answering.
+describe('promptHTML — build cards (#1059)', () => {
+  const sum: Question = { prompt: '45 + 44 = ?', answer: '89', options: ['89', '90'], sequence: ['8', '9'], build: { template: '__' } };
+  const dec: Question = { prompt: '7.5 ÷ 2 = ?', answer: '3.75', options: ['3.75', '3.5'], sequence: ['3', '7', '5'], build: { template: '_.__' } };
+
+  it('keeps the prompt on the card, with a slot for every digit', () => {
+    const h = promptHTML(sum, 0);
+    expect(plain(h)).toBe('45 + 44 = __');
+    expect(h.match(/class="todo"/g)).toHaveLength(2);
+  });
+
+  it('fills slots in order as digits are sliced, and leaves the rest as blanks', () => {
+    expect(plain(promptHTML(sum, 1))).toBe('45 + 44 = 8_');
+    expect(promptHTML(sum, 1)).toContain('<span class="got">8</span>');
+    expect(promptHTML(sum, 1)).toContain('<span class="todo">_</span>');
+    expect(plain(promptHTML(sum, 2))).toBe('45 + 44 = 89');
+    expect(promptHTML(sum, 2).match(/class="got"/g)).toHaveLength(2);
+  });
+
+  it('prints the template\'s non-slot characters as themselves, between the slots', () => {
+    expect(plain(promptHTML(dec, 0))).toBe('7.5 ÷ 2 = _.__');
+    expect(plain(promptHTML(dec, 2))).toBe('7.5 ÷ 2 = 3.7_');
+  });
+
+  it('reveal never shows a digit that has not been sliced', () => {
+    expect(promptHTML(sum, 0, true)).not.toContain('>8<');
+    expect(promptHTML(sum, 0, true)).not.toContain('>9<');
+    expect(plain(promptHTML(sum, 1, true))).toBe('45 + 44 = 8_');
+  });
+
+  it('a plain sequence card with no build renders exactly as before', () => {
+    const spell: Question = { prompt: 'Spell it', answer: 'cat', options: ['c', 'a', 't', 'x'], sequence: ['c', 'a', 't'] };
+    expect(promptHTML(spell, 1)).toBe('<span class="seq"><span class="got">c</span><span class="todo">_</span><span class="todo">_</span></span>');
+    expect(promptHTML(spell, 1, true)).toBe('<span class="seq reveal"><span class="got">c</span><span class="todo">a</span><span class="todo">t</span></span>');
   });
 });
 
