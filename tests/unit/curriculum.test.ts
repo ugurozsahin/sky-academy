@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
 import type { Topic } from '../../src/curriculum';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
-import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, turnEnd, coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ } from '../../src/curriculum/util';
+import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID, EVERYDAY, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, turnEnd, coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ } from '../../src/curriculum/util';
 import { R_LETTERS_P2, R_LETTERS_ALL, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/reception';
 import { TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/year2';
 import type { SentenceType } from '../../src/curriculum/year2';
@@ -511,6 +511,10 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // line was green on the state #324 exists to fix. The rows above are what stop that one, stem by stem.
     for (const w of AVOID) expect(GAP_WORDS.has(w), `${w} is in AVOID, so it may not also be a word the lists carry`).toBe(false);
     expect(AVOID.size, 'and the set is not empty, which would make the line above vacuous').toBeGreaterThan(20);
+    // #646: EVERYDAY grew across three append-only batches with nothing to say which one owns a word or
+    // whether a later removal is safe — a duplicate is harmless at runtime (folded into the Set above) but
+    // means nobody can tell. Asserted at zero so the next batch checks before appending.
+    expect(EVERYDAY.length, 'EVERYDAY has a duplicate entry — check before adding a word to a new batch').toBe(new Set(EVERYDAY).size);
     // Exhaustive over both lists and the days, every index: the pool the generators draw from is clean and still deep enough.
     for (const w of [...Y1_CEW, ...Y2_CEW, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) for (let i = 0; i < w.length; i++) {
       const pool = gapLetters(w, i);

@@ -347,7 +347,7 @@ const y2Capacity: Generator = (d, rng) => {
 };
 /** Minimum °C between an estimate's answer and each decoy, and between decoys (#296). */
 export const TEMP_GAP = 10;
-const TEMP_STEP = TEMP_GAP * 2;   // the ladder's rung: twice the floor, so a regression of the step trips the rail
+const TEMP_STEP = TEMP_GAP * 2;   // the ladder's rung: twice the floor — the rail below checks the floor and the resulting gaps, not this constant, so a regression to TEMP_GAP would still pass at exactly 10 °C apart
 const y2Temp: Generator = (d, rng) => {
   if (d >= 2 && rng() < 0.4) {
     const [thing, t] = pick(rng, [['ice', 0], ['a cold morning', 5], ['a warm room', 20], ['a hot bath', 40], ['a summer day', 28], ['inside a fridge', 4]] as [string, number][]);
