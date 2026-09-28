@@ -7,7 +7,7 @@ import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { MODES } from '../game/modes';
 import { weakestTopics } from '../game/sensei';
-import { carriedStreak, dailyChallenges, multiplier, SET_BONUS } from '../game/dojo';
+import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
 import { $, $$, capDigits, render, stars } from './dom';
@@ -40,11 +40,15 @@ function topbar(nav: Nav, rerender: () => void) {
   return { html, bind };
 }
 
+/** #894: a Daily Dojo row read aloud, for a pre-reader who cannot read the challenge title on the card. */
+export function dojoRowLine(c: Challenge, progress: number): string {
+  return progress >= c.goal ? `${c.title}. Done!` : `${c.title}. ${progress} of ${c.goal} done.`;
+}
 /** Daily Dojo card: today's three challenges, progress bars, bonus coins and the streak multiplier. */
 function dojoCard() {
   const s = dojoToday(); const cs = dailyChallenges(s.date); const carried = carriedStreak(s, s.date); const mult = multiplier(carried);
   const items = cs.map(c => { const p = Math.min(c.goal, s.progress[c.id] ?? 0); const done = s.done.includes(c.id); return `
-    <li class="dojo-item${done ? ' done' : ''}"><span class="ic">${c.icon}</span><span class="txt"><b>${c.title}</b><span class="isl-bar"><i style="width:${Math.round(100 * p / c.goal)}%"></i></span></span><span class="prog">${done ? `✓ +${Math.floor(c.bonus * mult)} 🪙` : `${p}/${c.goal}`}</span></li>`; }).join('');
+    <li class="dojo-item${done ? ' done' : ''}" data-id="${c.id}"><span class="ic">${c.icon}</span><span class="txt"><b>${c.title}</b><span class="isl-bar"><i style="width:${Math.round(100 * p / c.goal)}%"></i></span></span><span class="prog">${done ? `✓ +${Math.floor(c.bonus * mult)} 🪙` : `${p}/${c.goal}`}</span></li>`; }).join('');
   return `
     <div class="dojo${s.setDone ? ' complete' : ''}" id="dojo" aria-label="Daily Dojo challenges">
       <div class="dojo-head"><b>🏯 Daily Dojo</b><small>${s.setDone ? `All done today · streak ${s.streak.days} day${s.streak.days === 1 ? '' : 's'}` : `Three challenges · bonus coins`}</small>${mult > 1 ? `<span class="pill mult">×${mult} streak</span>` : ''}</div>
@@ -88,6 +92,12 @@ export function mapScreen(nav: Nav) {
   $$('.island').forEach(b => b.addEventListener('click', () => {
     const y = shown.find(x => x.id === b.dataset.year)!;
     save({ year: y.id }); sfx.tap(); say(`${y.title} island`); nav.island(y);
+  }));
+  // #894: a Daily Dojo row has no action of its own, so tapping it just reads it aloud, for a pre-reader.
+  const dojoState = dojoToday(); const dojoChallenges = dailyChallenges(dojoState.date);
+  $$('.dojo-item').forEach(li => li.addEventListener('click', () => {
+    const c = dojoChallenges.find(x => x.id === li.dataset.id); if (!c) return;
+    say(dojoRowLine(c, Math.min(c.goal, dojoState.progress[c.id] ?? 0)), true);
   }));
   $('#grownups').addEventListener('click', () => { sfx.tap(); nav.parents(); });
   // #20 slice 2: with one profile the launch picker never shows, so this is the only way a second child is ever
@@ -177,6 +187,10 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   menu.forEach(m => $(`#${m.id}`).addEventListener('click', () => { sfx.tap(); m.go(); }));
 }
 
+/** #894: a locked sticker shows only "???" and a small-print hint, so tapping it reads how it is earned aloud. */
+export function lockedStickerLine(cost: number | undefined, achievementTitle: string | undefined): string {
+  return cost != null ? `This sticker costs ${cost} coins.` : (achievementTitle ?? '');
+}
 /** Rewards: coins, streak and the sticker album. */
 export function rewardsScreen(nav: Nav) {
   const d = load();
@@ -187,7 +201,7 @@ export function rewardsScreen(nav: Nav) {
     const ach = ACHIEVEMENTS.find(x => x.id === id);
     const prog = !got && ach ? ach.progress(d) : null;
     const hint = i < STICKER_COST.length ? `🪙 ${STICKER_COST[i]}` : (ach?.title ?? '');
-    return `<div class="sticker${got ? ' got' : ''}" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${img}" alt=""></span><b>${got ? name : '???'}</b><small>${got ? sub : hint}</small>${prog ? `<span class="isl-bar"><i style="width:${Math.min(100, Math.round(100 * prog.done / prog.goal))}%"></i></span><small class="prog">${prog.done}/${prog.goal}</small>` : ''}</div>`;
+    return `<div class="sticker${got ? ' got' : ''}" data-id="${id}" style="--glow:${a?.glow ?? '#ff3b5c'}"><span class="figure"><img src="${img}" alt=""></span><b>${got ? name : '???'}</b><small>${got ? sub : hint}</small>${prog ? `<span class="isl-bar"><i style="width:${Math.min(100, Math.round(100 * prog.done / prog.goal))}%"></i></span><small class="prog">${prog.done}/${prog.goal}</small>` : ''}</div>`;
   }).join('');
   const nextCoinIdx = STICKER_COST.findIndex(c => d.coins < c);
   const nextCoin = nextCoinIdx === -1 ? null : STICKER_COST[nextCoinIdx];
@@ -227,6 +241,12 @@ export function rewardsScreen(nav: Nav) {
   tb.bind();
   $('#back').addEventListener('click', () => { sfx.tap(); nav.map(); });
   $('#shop').addEventListener('click', () => { sfx.tap(); nav.shop(); });
+  // #894: a locked sticker's goal is printed in small text a pre-reader cannot read — a tap reads it aloud.
+  $$('.sticker:not(.got)').forEach(el => el.addEventListener('click', () => {
+    const i = STICKER_IDS.indexOf(el.dataset.id!);
+    const ach = ACHIEVEMENTS.find(x => x.id === el.dataset.id);
+    say(lockedStickerLine(i >= 0 && i < STICKER_COST.length ? STICKER_COST[i] : undefined, ach?.title), true);
+  }));
   $$('.cert-open').forEach(b => b.addEventListener('click', async () => {
     sfx.tap(); const btn = b as HTMLButtonElement; const c = certs.find(x => x.id === btn.dataset.id);
     if (!c) return;

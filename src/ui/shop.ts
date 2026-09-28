@@ -7,6 +7,10 @@ import { sfx, say } from '../audio';
 import { $, $$, capDigits, render } from './dom';
 import type { Nav } from './home';
 
+/** #894: a shop item card's name and blurb are read aloud on tap, for a pre-reader. */
+export function shopItemLine(item: { name: string; blurb: string }): string {
+  return `${item.name}. ${item.blurb}`;
+}
 const KINDS: ItemKind[] = ['trail', 'bubble', 'decor', 'costume'];
 const SOON: Record<ItemKind, string> = { trail: '', bubble: 'Cloud, lantern and scroll bubbles are being drawn', decor: 'Lanterns, flags and huts for your islands are on the way', costume: 'New outfits for every ninja are being painted' };
 
@@ -30,6 +34,12 @@ export function shopScreen(nav: Nav) {
     ${sections}
   </section>`, 'bg-sky');
   $('#back').addEventListener('click', () => { sfx.tap(); nav.up(); });
+  // #894: tapping an item's card (not its Buy/Use button) reads its name and blurb aloud, for a pre-reader.
+  $$('.item[data-item]').forEach(el => el.addEventListener('click', e => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    const it = SHOP_ITEMS.find(x => x.id === el.dataset.item); if (!it) return;
+    say(shopItemLine(it), true);
+  }));
   $$('[data-buy]').forEach(b => b.addEventListener('click', () => {
     const id = b.dataset.buy!; const name = b.closest('.item')?.querySelector('b')?.textContent ?? 'it';
     if (buyItem(id)) { sfx.stage(); say(`You bought the ${name}!`, true); } else sfx.wrong();
