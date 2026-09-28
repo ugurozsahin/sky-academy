@@ -143,7 +143,7 @@ test.describe('Ninja Duel', () => {
    * as a second, independent comparison. (An earlier draft of this comment claimed one check closed both;
    * it did not — silent-failure-hunter and pr-test-analyzer both found the same gap reviewing this PR.)
    */
-  test('guard rail: the two halves pose the identical wave — same order, same moments, same arcs, fresh each round (#389/#400)', async ({ page }) => {
+  test('guard rail: the two halves pose the identical wave — same order, same moments, same arcs, fresh each round (#389/#400)', { tag: '@smoke' }, async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
     await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
     // Read off `arenas`, already on the hooks contract, rather than `bubbles()`: that one reports only the

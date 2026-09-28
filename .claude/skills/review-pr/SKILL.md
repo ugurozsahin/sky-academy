@@ -54,7 +54,7 @@ npx playwright test --project=desktop        # when the diff could behave differ
 
 Take screenshots too if the change is player-visible.
 
-**Since #751, CI's e2e on a pull request is the four-test mobile `@smoke` subset, so this run is the only
+**Since #751, CI's e2e on a pull request is the eight-test mobile `@smoke` subset, so this run is the only
 full-mobile e2e a pull request's tree gets before it lands.** CI's green on the head tells you the smoke tests
 passed, never that the project did: do not let it stand in for this run.
 
@@ -216,6 +216,23 @@ incidents behind each.
    been judged — check the draft flag and the `REVIEW:` comments by eye rather than reading absence as a pass.
 4. **It is labelled `owner-approval` with no `OWNER: APPROVED` comment.** Never write an `OWNER:` marker
    yourself, in any form. Nothing but you not doing it prevents it.
+
+**Behind `main` is not a fifth condition. It is the last step before the merge, and it is yours (#857).** The
+`main` ruleset requires a branch to be up to date before it merges (owner, 2026-09-28), so a pull request whose
+`mergeable_state` is `behind` cannot merge as it stands, whatever its review says. Bringing it up to date is
+mechanical, and only the run about to merge knows the moment; left to the author's hourly run, every merge would
+put every other open pull request behind again. So, with all four conditions above clear:
+
+1. Call `PUT /repos/ugurozsahin/sky-academy/pulls/<n>/update-branch` with the head SHA you reviewed as
+   `expected_head_sha`, so an author's push in the meantime is refused rather than merged unread. It merges
+   `main` into the branch and never rebases, so the author's checkout stays valid (`open-pr` §2).
+2. Wait for the newest CI run on the new head, exactly as condition 1 asks, and merge if it is green.
+
+Two outcomes are the author's, not yours, because each means the two changes do not fit together: GitHub
+refuses the update because the branch conflicts (`dirty`), or the updated head goes red. Block it back the usual
+way, `REVIEW: CHANGES REQUESTED`, naming what `main` brought in. Your review of the diff still stands after an
+update that only merged `main` in; re-read what the merge commit changed only where `main` touched the same
+files.
 
 A pull request that touches a governance file raises one more question before a merge: **which way does it
 move the constraint?** Check its one-line direction statement against the diff. A loosening — or a declared

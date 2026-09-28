@@ -244,7 +244,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
   });
 
-  test('avatar selection is required, saved and shown on the home screen', async ({ page }) => {
+  test('avatar selection is required, saved and shown on the home screen', { tag: '@smoke' }, async ({ page }) => {
     await pickAvatar(page, 'blaze', 'Zoe');
     await expect(page.locator('.hero b')).toHaveText('Zoe');
     await expect(page.locator('.hero small')).toContainText('Blaze');
@@ -569,7 +569,7 @@ test.describe('Sky Ninja Academy', () => {
     expect(await page.evaluate(() => window.__sna.arena!.shots.length)).toBe(0);    // and none is in flight
   });
 
-  test('wrong slice loses a life and shows the answer; correct then continues', async ({ page }) => {
+  test('wrong slice loses a life and shows the answer; correct then continues', { tag: '@smoke' }, async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-tables');
     await page.waitForFunction(() => window.__sna.bubbles().length > 1);
@@ -747,7 +747,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().stage === 2);
   });
 
-  test('a full mission (5 stages) ends with results, medal, coins, a sticker and saved stars', async ({ page }) => {
+  test('a full mission (5 stages) ends with results, medal, coins, a sticker and saved stars', { tag: '@smoke' }, async ({ page }) => {
     test.setTimeout(150_000);
     // #544: seeded with an avatar id `avatarById` cannot resolve, rather than a real one — this mission
     // already pays for a full playthrough, so the regression rides along on it instead of a second one
