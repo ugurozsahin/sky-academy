@@ -24,6 +24,9 @@ describe('roman (#1056)', () => {
     'IC',     // a skipped subtractive pair (should be XCIX)
     'XM',     // a skipped subtractive pair (should be CM after C's worth of numerals)
     'IL',     // a skipped subtractive pair (should be XLIX)
+    'MMMM',   // M has no subtractive-pair cap, so the greedy parse fully consumes it at total 4000 — the
+              // only rejection reached via the total > 3999 guard rather than rest !== '' or the final
+              // canonical-string check
     'iv',     // lower case
     'I V',    // spaces
     '',       // empty string
