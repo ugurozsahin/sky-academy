@@ -500,6 +500,24 @@ describe('deck replay and misses (#878)', () => {
       { topic: topicB.id, q: qB, picked: wrongB },
     ]);
   });
+  /**
+   * #878 review round 3, blocking finding: every mission-mode deck test used 2–5 items against `Y1.perStage`
+   * (6), so `advance()`'s `this.o.deck ||` guard — the sibling of `maybeCommitFinalStage()`'s round-1 guard —
+   * was never exercised past `this.index < this.perStage`. A deck at least as long as `perStage`, in a staged
+   * mode, is exactly what "Fix my mistakes" (#930) and "Recent slips" (#938) need and what the PR's own doc
+   * comment claims works ("a deck works identically in a staged mode... and an unstaged one").
+   */
+  it('a mission-mode deck at least as long as perStage still flattens fully (#878 review)', () => {
+    const deck = buildDeck(Y1.perStage + 2, 1010); const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck, rng: rng(1011) }, ev);
+    s.start();
+    for (const item of deck) { expect(s.current).toBe(item.q); expect(s.hit(item.q.answer)).toBe('correct'); s.advance(); }
+    expect(ev.onStageClear, 'a deck never triggers a stage clear, however long').not.toHaveBeenCalled();
+    expect(ev.onQuestion.mock.calls.map((c: any[]) => c[0])).toEqual(deck.map(d => d.q));
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.won).toBe(true); expect(r.questions).toBe(deck.length);
+  });
 });
 
 /**
