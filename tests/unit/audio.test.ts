@@ -460,6 +460,21 @@ describe('SpeechEngine seam (#880)', () => {
     const { synth: busySynth } = fakeSynth({ speaking: true });
     expect(speechEngine(busySynth)!.busy()).toBe(true);
   });
+
+  // Review of PR #1316: every other hush() test here passes the *same* synth (or engine) to say() and hush(),
+  // so the resolved engine's own cancel() clears the shared `deferred` macrotask too and masks whether hush()'s
+  // own unconditional clear does anything at all. This one resolves hush() to no engine at all — the exact case
+  // the fix is for — so only that unconditional clear can save it. Removing the `if (deferred !== undefined)
+  // ...` line at the top of hush() turns this red; every other test in the file still passes without it.
+  it('hush() drops a stale deferred line even when it resolves no engine of its own', () => {
+    fresh();
+    const { synth, calls } = fakeSynth({ speaking: true, starts: false });
+    say('stale', false, { synth });                                  // busy → cancel now, speak('stale') deferred
+    expect(calls).toEqual(['cancel']);
+    hush(null);                                                      // no synth, no engine override: speechEngine(null) is null
+    vi.advanceTimersByTime(SAY_DEFER_MS + VOICE_START_MS);
+    expect(calls, 'the deferred speak() must never reach the original engine').toEqual(['cancel']);
+  });
 });
 
 describe('say() — speaking without wedging the phone (#40)', () => {

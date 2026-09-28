@@ -232,6 +232,8 @@ export function hush(synth: SynthLike | null = defaultSynth(), o: { engine?: Spe
   // Cleared here, unconditionally, not only inside whichever engine's own cancel(): a `say()` with no engine
   // at all (or a different one from this hush()'s) must still drop a macrotask already queued to speak — the
   // very drop-on-screen-change this function exists for, and it must not depend on an engine resolving.
+  // "hush() drops a stale deferred line even when it resolves no engine of its own" (audio.test.ts) is red
+  // without this line and without it alone — every other hush() test here passes.
   if (deferred !== undefined) { clearTimeout(deferred); deferred = undefined; }
   stopSilence(false);
   (o.engine ?? speechEngine(synth))?.cancel();
