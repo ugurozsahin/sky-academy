@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, it, expect, vi } from 'vitest';
-import { canHear, chooseVoice, haptic, HAPTICS, hush, NOISE_SECONDS, onVoiceStateChange, resetVoiceProbe, say, SAY_DEFER_MS, sfx, sliceFx, type SpeakOptions, type SpeechEngine, type SpeechEvents, type SynthLike, VOICE_START_MS, voiceScore, voiceState } from '../../src/audio';
+import { canHear, chooseVoice, haptic, HAPTICS, hush, NOISE_SECONDS, onVoiceStateChange, resetVoiceProbe, say, SAY_DEFER_MS, sfx, sliceFx, type SpeakOptions, type SpeechEngine, speechEngine, type SpeechEvents, type SynthLike, VOICE_START_MS, voiceScore, voiceState } from '../../src/audio';
 import { load, reset, save } from '../../src/storage';
 
 const mem: Record<string, string> = {};
@@ -385,7 +385,7 @@ describe('SpeechEngine seam (#880)', () => {
     let cancelled = 0;
     let events: SpeechEvents | undefined;
     const engine: SpeechEngine = {
-      speak(text, opts, ev) { calls.push({ text, opts }); events = ev; return {}; },
+      speak(text, opts, ev) { calls.push({ text, opts }); events = ev; return true; },
       cancel() { cancelled++; },
       busy: () => false,
     };
@@ -429,6 +429,36 @@ describe('SpeechEngine seam (#880)', () => {
     expect(f.calls).toEqual([{ text: 'b', opts: { lang: 'en-GB', rate: 0.9, pitch: 1.08, queue: true } }]);
     say('a', false, { engine: f.engine });
     expect(f.calls[1].opts.queue, 'the default call carries no queue flag').toBeUndefined();
+  });
+
+  it('a failed() reason other than canceled/interrupted leaves the silence clock running', () => {
+    fresh();
+    const f = fakeEngine();
+    say('Hello', false, { engine: f.engine });
+    f.fire('failed', 'synthesis-failed');
+    expect(load().voice, 'a mid-flight engine error is not evidence either way').toBe('unknown');
+    vi.advanceTimersByTime(VOICE_START_MS);
+    expect(load().voice, 'the clock kept running: no start means no by the deadline').toBe('no');
+  });
+
+  it('an explicit engine wins over a synth passed alongside it', () => {
+    fresh();
+    const f = fakeEngine();
+    const poisoned = { speaking: false, pending: false, cancel() { throw new Error('must not be called'); }, speak() { throw new Error('must not be called'); } } as SynthLike;
+    expect(() => say('Hello', false, { engine: f.engine, synth: poisoned })).not.toThrow();
+    expect(f.calls.map(c => c.text)).toEqual(['Hello']);
+    hush(poisoned, { engine: f.engine });
+    expect(f.cancelled()).toBe(1);
+  });
+
+  it('speechEngine(null) is null; speechEngine(synth) speaks through the synth and tracks busy()', () => {
+    reset();
+    expect(speechEngine(null)).toBeNull();
+    const idle = fakeSynth().synth;
+    const engine = speechEngine(idle)!;
+    expect(engine.busy(), 'nothing has been spoken yet').toBe(false);
+    const { synth: busySynth } = fakeSynth({ speaking: true });
+    expect(speechEngine(busySynth)!.busy()).toBe(true);
   });
 });
 

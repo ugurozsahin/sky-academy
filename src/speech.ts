@@ -55,19 +55,25 @@ let deferred: ReturnType<typeof setTimeout> | undefined;
 /** What a line handed to a `SpeechEngine` is spoken with. */
 export interface SpeakOptions { lang: string; rate: number; pitch: number; queue?: boolean }
 /** Callbacks a `SpeechEngine` reports a line's fate through — one fresh set per `speak()` call, so a caller
- *  that closes over its own per-line token in `ended`/`failed` can tell a late event about an old, superseded
- *  line apart from one about the line it is actually waiting on. `started` may fire more than once (a
- *  boundary or a resume counts, matching real engines' foibles) and needs no such check — any sign of life
- *  from the *current* engine is evidence, whichever line it was for. */
+ *  that closes over its own identity in `ended`/`failed` can tell a late event about an old, superseded line
+ *  apart from one about the line it is actually waiting on. `started` may fire more than once (a boundary or
+ *  a resume counts, matching real engines' foibles) and needs no such check — any sign of life from the
+ *  *current* engine is evidence, whichever line it was for. An implementation calls `ended` or `failed` at
+ *  most once per `speak()` — the line it was handed has one fate, not several. */
 export interface SpeechEvents { started(): void; ended(): void; failed(reason?: unknown): void }
 /**
- * One engine that can speak, one at a time, chosen once by `speechEngine()`. `speak()` returns a token
- * identifying the line — `undefined` if the engine could not even attempt it (an unbuildable line), in which
- * case no `events` callback follows for it.
+ * One engine that can speak, one at a time, chosen once by `speechEngine()`. `speak()` returns whether the
+ * line was even attempted — `false` for one the engine could not build at all, in which case no `events`
+ * callback follows for it; a caller that needs to tell one attempted line from another already has its own
+ * `events` object per call to close over, so nothing here carries a line's identity back out.
  */
 export interface SpeechEngine {
-  speak(text: string, opts: SpeakOptions, events: SpeechEvents): unknown;
+  speak(text: string, opts: SpeakOptions, events: SpeechEvents): boolean;
   cancel(): void;
+  /** Whether the engine currently holds or is voicing a line — the signal a future caller (a "sensei is
+   *  talking" indicator, or #881's own bridge) reads before deciding to interrupt. `say()` reads the web
+   *  engine's underlying state directly today rather than through this method, so nothing here exercises it
+   *  yet; `webEngine`'s own unit test (audio.test.ts) does. */
   busy(): boolean;
 }
 
@@ -90,7 +96,7 @@ function webEngine(s: SynthLike): SpeechEngine {
       // Nothing below may throw into the caller: `say()` runs on the line before the wave spawns, and a throw
       // there is a question card with no bubbles (#65 review). An engine whose utterance constructor throws
       // cannot be handed a line at all — `undefined` is the missing-engine verdict, not a hiccup.
-      try { u = new SpeechSynthesisUtterance(text); } catch { return undefined; }
+      try { u = new SpeechSynthesisUtterance(text); } catch { return false; }
       u.lang = opts.lang; u.rate = opts.rate; u.pitch = opts.pitch;
       try { const v = pickVoice(s); if (v) u.voice = v; } catch { /* a voice is a nicety; the default will do */ }
       u.onstart = () => events.started();
@@ -102,14 +108,14 @@ function webEngine(s: SynthLike): SpeechEngine {
       // `speak()` (or `cancel()`) that throws is judged by the deadline, not condemned on the spot.
       if (opts.queue || !(s.speaking || s.pending)) {
         try { s.speak(u); } catch { /* the deadline decides */ }
-        return u;
+        return true;
       }
       try { s.cancel(); } catch { /* the engine would not even cancel: the deferred speak() and the deadline decide */ }
       deferred = setTimeout(() => {
         deferred = undefined;
         try { s.speak(u); } catch { /* the deadline decides */ }
       }, SAY_DEFER_MS);
-      return u;
+      return true;
     },
   };
 }
@@ -218,8 +224,15 @@ export function resetVoiceProbe() {
  * calling `speechSynthesis.cancel()` from the screen, because a cancel is also the one thing that must void
  * the probe: a line cut off by a screen change is no evidence that the engine is silent, so its time is
  * dropped, not banked — three quick screen changes on a cold engine must not add up to a `no`.
+ *
+ * `o.engine` is the `SpeechEngine`-level test seam `say()` also takes, over `synth`'s older, web-shaped one;
+ * production code passes neither. Passing both is not a real call shape — `engine` wins.
  */
 export function hush(synth: SynthLike | null = defaultSynth(), o: { engine?: SpeechEngine } = {}) {
+  // Cleared here, unconditionally, not only inside whichever engine's own cancel(): a `say()` with no engine
+  // at all (or a different one from this hush()'s) must still drop a macrotask already queued to speak — the
+  // very drop-on-screen-change this function exists for, and it must not depend on an engine resolving.
+  if (deferred !== undefined) { clearTimeout(deferred); deferred = undefined; }
   stopSilence(false);
   (o.engine ?? speechEngine(synth))?.cancel();
 }
@@ -232,6 +245,11 @@ export function hush(synth: SynthLike | null = defaultSynth(), o: { engine?: Spe
  * spoken is a `yes`; the only negative signal is silence with a line pending, summed across lines by
  * `startSilence`/`stopSilence` above. Once the launch already reads `yes`, a line is still spoken but no
  * longer probed — nothing left to learn, and `recordVoice('yes')` on an already-`yes` launch is a no-op.
+ *
+ * `synth` and `engine` are the same seam at two levels: production code passes neither, and always gets
+ * `speechEngine(defaultSynth())`. `synth` is the older, web-shaped test seam (`tests/unit/audio.test.ts`'s
+ * `SynthLike` fakes); `engine` lets a test drive the `SpeechEngine` contract itself, with no `SynthLike` or
+ * `SpeechSynthesisUtterance` involved. Passing both is not a real call shape — `engine` wins.
  */
 export function say(text: string, force = false, o: { queue?: boolean; synth?: SynthLike | null; engine?: SpeechEngine } = {}) {
   if (!force && !load().speech) return;
@@ -246,8 +264,8 @@ export function say(text: string, force = false, o: { queue?: boolean; synth?: S
     // running — a later line may still start, and if none does the device really cannot be heard.
     failed: reason => { if (pendingToken === token && (reason === 'canceled' || reason === 'interrupted')) stopSilence(); },
   };
-  const handed = engine.speak(text, { lang: 'en-GB', rate: 0.9, pitch: 1.08, queue: o.queue }, events);
-  if (handed === undefined) recordVoice('no');
+  const attempted = engine.speak(text, { lang: 'en-GB', rate: 0.9, pitch: 1.08, queue: o.queue }, events);
+  if (!attempted) recordVoice('no');
 }
 
 if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.onvoiceschanged = () => { voice = undefined; };
