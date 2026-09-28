@@ -489,7 +489,7 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // `it('7. …')` below builds, so a row here can only claim a stem the generator actually draws.
     const known = new Set(receptionGapFrames().map(f => `${f.word}@${f.idx}`));
     for (const [w, i, l] of [['cup', 2, 'm'], ['cup', 2, 'n'], ['pot', 2, 'o'], ['pan', 2, 'p'], ['pan', 2, 'k'],
-      ['bus', 2, 'm'], ['jam', 2, 'p'], ['bug', 2, 'm'], ['van', 2, 'g'],
+      ['bus', 2, 'm'], ['bug', 2, 'm'], ['van', 2, 'g'],
       ['pig', 0, 'n'], ['hen', 1, 'u'],
       // #443: the fifth sweep, and this stem was reachable through the whole fourth (#418/#419) — `le_`
       // offered `z`, a slur, to a Reception card.
@@ -691,8 +691,10 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     // #445: pinned to the whole reachable set, not `toBeGreaterThan(8)` — a margin of two (or three, against
     // today's eleven) against a number nobody reads is the same "arbitrary-reading floor" shape the fixture
     // above exists to replace. A new one lands here named, in a diff a person reads, same as the fixture.
+    // #874 removed `jam` from `CVC`, so `jap` (from the now-gone `jam@2` frame) is no longer reachable and
+    // dropped off this list — `AVOID` still keeps the entry, since a word can leave `CVC` again later.
     const blocked = receptionBlocked();
-    expect(blocked).toEqual(['bum', 'cum', 'cun', 'hun', 'jap', 'lez', 'nig', 'pak', 'pap', 'poo', 'vag']);
+    expect(blocked).toEqual(['bum', 'cum', 'cun', 'hun', 'lez', 'nig', 'pak', 'pap', 'poo', 'vag']);
     for (const w of blocked)
       expect(set.has(w), `${w} is blocked and also in the reviewed set — one of the two is wrong`).toBe(false);
   });
@@ -2155,10 +2157,14 @@ describe('a card\'s bubble width is derived from its options, never from its ans
    * is one of the six topics #369 was filed about: on that difficulty every card is one where `q.wide`
    * alone decides the on-screen width, and restoring the old derivation there leaves this suite green.
    * Closing that needs a check of a different shape, which #482 carries.
+   *
+   * `r-build` d2's decoys are near-miss spellings of the answer too, the same structural reason `r-build`
+   * d3 is already here — d2 only stayed off the list because a smaller `CVC` pool makes an overlap less
+   * likely at this seed and `DRAWS`, and #874 shrank it by four words (the wrongly-pictured entries).
    */
   const NO_REPEATED_SET = new Set([
     'r-order d1', 'r-order d2', 'r-order d3', 'r-share d2', 'r-share d3',
-    'r-build d3', 'r-sentence d1', 'r-sentence d2', 'r-sentence d3',
+    'r-build d2', 'r-build d3', 'r-sentence d1', 'r-sentence d2', 'r-sentence d3',
     'y1-skip d1', 'y1-skip d2', 'y1-skip d3', 'y1-order d1', 'y1-order d2', 'y1-order d3',
     'y1-coins d3', 'y1-shapes d3', 'y1-plurals d1', 'y1-punct d1', 'y1-days d3',
     'y1-sentence d1', 'y1-sentence d2', 'y1-sentence d3',
