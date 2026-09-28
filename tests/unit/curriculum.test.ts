@@ -11,6 +11,7 @@ import type { SentenceType } from '../../src/curriculum/year2';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
 import { digraphBlocked, digraphFrames, digraphSpellings } from './helpers/digraph-gaps';
+import { parseNumericAnswer } from './helpers/numeric-answer';
 
 // Deterministic RNG (mulberry32)
 function rng(seed: number) {
@@ -69,7 +70,9 @@ describe('topic registry', () => {
 });
 
 for (const topic of TOPICS) {
-  const maxAnswer = YEARS.find(y => y.id === topic.year)!.maxAnswer;   // NC answer ceiling for this year
+  const year = YEARS.find(y => y.id === topic.year)!;
+  const maxAnswer = year.maxAnswer;   // NC answer ceiling for this year
+  const minAnswer = year.minAnswer ?? 0;   // NC answer floor for this year (#1042)
   describe(`${topic.year} / ${topic.title} (${topic.id})`, () => {
     for (const d of [1, 2, 3] as Difficulty[]) {
       it(`difficulty ${d}: ${N} valid questions`, () => {
@@ -94,8 +97,11 @@ for (const topic of TOPICS) {
           // arithmetic prompts must be correct
           const s = solve(q.prompt);
           if (s !== null) expect(Number(q.answer), q.prompt).toBe(s);
-          // numeric answers never negative, never absurd for KS1
-          if (/^-?\d+$/.test(q.answer) && !q.sequence) { expect(Number(q.answer)).toBeGreaterThanOrEqual(0); expect(Number(q.answer), q.prompt).toBeLessThanOrEqual(maxAnswer); }
+          // numeric answers stay within the year's range — never absurd, never below its floor (0 for KS1)
+          if (!q.sequence) {
+            const n = parseNumericAnswer(q.answer);
+            if (n !== null) { expect(n, q.prompt).toBeGreaterThanOrEqual(minAnswer); expect(n, q.prompt).toBeLessThanOrEqual(maxAnswer); }
+          }
           seen.add(q.prompt + '|' + q.answer + '|' + JSON.stringify(q.visual ?? ''));
         }
         // variety: at least a handful of distinct questions
