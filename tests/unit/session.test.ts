@@ -341,6 +341,88 @@ describe('sprint session (60-second time attack)', () => {
   });
 });
 
+describe('deck replay and misses (#878)', () => {
+  const deckTopic = topicById('y1-add')!;
+  /** `n` distinct questions (by `repeatKey`) from `deckTopic`, pre-generated the way a "Fix my mistakes" deck
+   *  would be — never re-rolled or regenerated once play starts. */
+  const buildDeck = (n: number, seed: number): { topic: Topic; q: Question }[] => {
+    const gen = rng(seed); const seen = new Set<string>(); const deck: { topic: Topic; q: Question }[] = [];
+    while (deck.length < n) {
+      const q = deckTopic.gen(1, gen); const key = repeatKey(q);
+      if (seen.has(key)) continue;
+      seen.add(key); deck.push({ topic: deckTopic, q });
+    }
+    return deck;
+  };
+  it('a deck of 3 asks exactly those 3 prompts, in order, then ends', () => {
+    const deck = buildDeck(3, 900); const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck, rng: rng(901) }, ev);
+    s.start();
+    for (const item of deck) { expect(s.current).toBe(item.q); expect(s.hit(item.q.answer)).toBe('correct'); s.advance(); }
+    expect(ev.onQuestion.mock.calls.map((c: any[]) => c[0])).toEqual(deck.map(d => d.q));
+    expect(ev.onStageClear, 'a deck flattens the mode\'s own staging').not.toHaveBeenCalled();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.won).toBe(true); expect(r.questions).toBe(3);
+  });
+  it('a deck works in a staged mode (mission) and an unstaged one (sprint) alike', () => {
+    for (const mode of ['mission', 'sprint'] as const) {
+      const deck = buildDeck(2, 910); const ev = events();
+      const s = new Session({ mode, year: Y1, deck, rng: rng(911) }, ev);
+      s.start();
+      expect(s.hit(deck[0].q.answer)).toBe('correct'); s.advance();
+      expect(s.hit(deck[1].q.answer)).toBe('correct'); s.advance();
+      expect(ev.onEnd, mode).toHaveBeenCalledTimes(1);
+      expect(ev.onEnd.mock.calls[0][0].won, mode).toBe(true);
+    }
+  });
+  it('with no deck, every existing session test passes unchanged', () => {
+    // #878's own acceptance criterion — asserted by the fact that every other test in this file constructs a
+    // Session with no `deck` at all and still passes; this line just says so where the deck tests live.
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, topic: deckTopic, rng: rng(920) }, ev);
+    s.start();
+    expect(s.o.deck).toBeUndefined();
+  });
+  it('a wrong slice records the picked label, a fall records null', () => {
+    const deck = buildDeck(2, 930); const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck, rng: rng(931) }, ev);
+    s.start();
+    const wrong = deck[0].q.options.find(o => o !== deck[0].q.answer)!;
+    expect(s.hit(wrong)).toBe('wrong'); s.advance();
+    s.fall(deck[1].q.answer); s.advance();
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.misses).toEqual([
+      { topic: deckTopic.id, q: deck[0].q, picked: wrong },
+      { topic: deckTopic.id, q: deck[1].q, picked: null },
+    ]);
+  });
+  it('a card missed twice keeps only its latest miss, moved to the end', () => {
+    const [a, b] = buildDeck(2, 940);
+    const deck = [a, b, a]; const ev = events();
+    const s = new Session({ mode: 'sprint', year: Y1, deck, rng: rng(941) }, ev);
+    s.start();
+    const wrongA = a.q.options.find(o => o !== a.q.answer)!;
+    expect(s.hit(wrongA)).toBe('wrong'); s.advance();              // a missed, picked recorded
+    s.fall(b.q.answer); s.advance();                               // b missed, a fall
+    s.fall(a.q.answer); s.advance();                                // a missed again, this time a fall
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.misses, 'one entry for a, holding its latest miss, newest last').toEqual([
+      { topic: deckTopic.id, q: b.q, picked: null },
+      { topic: deckTopic.id, q: a.q, picked: null },
+    ]);
+  });
+  it('25 distinct misses keep the latest 20, capped at MISSES_CAP', () => {
+    const deck = buildDeck(25, 950); const ev = events();
+    const s = new Session({ mode: 'sprint', year: Y1, deck, rng: rng(951) }, ev);
+    s.start();
+    for (const item of deck) { const wrong = item.q.options.find(o => o !== item.q.answer)!; expect(s.hit(wrong)).toBe('wrong'); s.advance(); }
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.misses).toHaveLength(20);
+    expect(r.misses.map((m: any) => m.q)).toEqual(deck.slice(5).map(d => d.q));
+  });
+});
+
 describe('boss battle', () => {
   const pool = topicsFor('year1').filter(t => t.input !== 'tracing');
   const wrongOf = (s: Session) => { const c = s.current!; const t = c.sequence ? c.sequence[s.seqIndex] : c.answer; return c.options.find(o => o !== t && !(c.sequence ?? []).includes(o)) ?? c.options.find(o => o !== t)!; };
