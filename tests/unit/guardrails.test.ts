@@ -1166,9 +1166,13 @@ describe('guard rails', () => {
    * performance.now();` — the old regex allowed anything between `const seed =` and `performance.now()`, a
    * literal included), and the whole statement HOISTED out of `onQuestion` to run once per match instead of
    * once per round (`lastIndexOf` searched the entire file backward with no floor, so a seed drawn anywhere
-   * above the loop satisfied it). Neither is caught here without a behavioural check too — `tests/e2e/duel.spec.ts`'s
-   * "fresh each round" case is that check, comparing round 2's timetable against round 1's — but both are worth
-   * closing at the cheap layer as well, so the mistake is red on `npm test` and not only on the slower e2e.
+   * above the loop satisfied it). The two close differently, and only one has a behavioural backstop: hoisting
+   * freezes `at` too, so `tests/e2e/duel.spec.ts`'s "fresh each round" case (round 2's timetable against round
+   * 1's) catches it independently of this rail. A constant SEED alone does not — `at` is still a fresh
+   * `performance.now()` every round even when `seed` is not, so round 2's absolute launch times differ from
+   * round 1's whether or not `seed` is really random, and that e2e case cannot tell the two apart. The
+   * `Math.random` requirement below is the ONLY thing that closes the constant-seed edit; silent-failure-hunter
+   * review of this PR found the first draft of this comment overclaiming otherwise (#400 review, R1).
    */
   it('the duel spawns both halves from one draw, one clock origin and equal geometry (#389/#400)', () => {
     // #400: the anti-vacuity convention the #425 rail below this one uses (`?? ''` plus a length assertion) —
@@ -1194,10 +1198,15 @@ describe('guard rails', () => {
     // draw hoisted out to `duelScreen`'s own body (run once per match) still count as "before either half".
     expect(seedAt, 'the seed and clock origin are drawn inside onQuestion, once per round — not hoisted above it').toBeGreaterThan(handlerFrom);
     const draw = duel.slice(seedAt, from);
+    // Both patterns need the seed statement on one physical line to match (no `s`/dotall flag) — true of the
+    // real statement today; a reformat that split it across lines would fail this rail loudly rather than
+    // silently, which is the acceptable side of that trade (silent-failure-hunter review of this PR).
     expect(draw, 'one seed and one `now` for the round, drawn before either half').toMatch(/const seed = .*performance\.now\(\)/);
     // #400: the old regex above only required `performance.now()` to appear somewhere after `const seed =`,
     // so a constant replacing the draw itself (`const seed = 1234, at = performance.now();`) still matched.
-    expect(draw, 'the seed itself is a fresh draw, not a constant — Math.random has to appear too').toMatch(/Math\.random/);
+    // Math.random has to appear IN THE SEED ASSIGNMENT specifically — between `const seed =` and the comma —
+    // not merely anywhere in the slice, which an unrelated later Math.random() call could otherwise satisfy.
+    expect(draw, 'the seed itself is drawn from Math.random, not a constant').toMatch(/const seed = [^,]*Math\.random\(\)/);
     expect(spawn, 'so neither of them is re-drawn per arena').not.toMatch(/performance\.now\(\)|Math\.random/);
     // And the seam they ride: `spawnWave`'s shared draw is optional, so every wave outside the duel keeps
     // `Math.random` and the live clock — a seeded arena in ordinary play would repeat itself (#389).

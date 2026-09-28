@@ -135,11 +135,13 @@ test.describe('Ninja Duel', () => {
    *
    * #400: the source rail this behavioural rail backs up pins the spawn statement's spelling, so a constant
    * seed or a draw hoisted out of the per-round closure survives it (both reproduced against `3ec1a01`,
-   * `docs`/the issue has the transcripts). Neither re-spelling can survive comparing round 2's wave against
-   * round 1's: a constant seed still redraws a fresh `now` every round (`performance.now()` moves on), and a
-   * hoisted draw freezes `now` at the match's start, so by round 2 every `launchAt` is already in the past —
-   * both leave round 2 with an absolute launch timetable that is NOT round 1's, which is what the second half
-   * of this test asserts, indifferent to how the statement drawing them is spelled.
+   * the issue has the transcripts). The two need different behavioural checks, not one: a HOISTED draw
+   * freezes `at` as well as `seed`, so round 2's absolute `launchAt`s repeat round 1's exactly — caught below.
+   * A CONSTANT seed leaves `at` moving (still a fresh `performance.now()` every round), so `launchAt` differs
+   * either way and that check alone cannot see it; what a constant seed DOES repeat is the per-slot arc and
+   * colour (`vx`/`g`/`color`), which come from the seed's own rng draws and never read `at` — checked below
+   * as a second, independent comparison. (An earlier draft of this comment claimed one check closed both;
+   * it did not — silent-failure-hunter and pr-test-analyzer both found the same gap reviewing this PR.)
    */
   test('guard rail: the two halves pose the identical wave — same order, same moments, same arcs, fresh each round (#389/#400)', async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
@@ -161,17 +163,30 @@ test.describe('Ninja Duel', () => {
       .toContain(round1.answer);
     // Win round 1 and let round 2's wave spawn, then run the same shared-halves check again — and check it
     // against round 1's own timetable. A re-spelling of the spawn statement that still passes the source
-    // rail (a constant seed, or the draw hoisted out of the per-round closure) leaves the two halves matching
-    // EACH OTHER here too, which is why a source-only rail cannot tell the difference; only round 2 disagreeing
-    // with round 1 does.
+    // rail leaves the two halves matching EACH OTHER here too, which is why a source-only rail cannot tell
+    // the difference; only round 2 disagreeing with round 1 does.
     await winRound(page, 'a');
     await page.waitForFunction(() => window.__sna.state().round === 2);
     await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
     const round2 = await captureWave();
     expect(round2.b, 'round 2 is shared between the halves too').toEqual(round2.a);
+    // The draw HOISTED out of onQuestion (run once per match, not once per round) freezes `at` too, so this
+    // catches it: every launchAt is `at + <fixed offset for slot k>`, and a frozen `at` makes round 2's array
+    // literally round 1's again.
     expect(round2.a.map(b => b.launchAt),
-      'round 2 draws its own seed and clock origin — a constant seed or a hoisted draw would repeat round 1\'s launch timetable exactly (#400)')
+      'round 2 has its own clock origin — a draw hoisted out of onQuestion would repeat round 1\'s launch timetable exactly (#400)')
       .not.toEqual(round1.a.map(b => b.launchAt));
+    // A CONSTANT seed does not move `launchAt` at all — `at` is still a fresh `performance.now()` every round
+    // even when `seed` is not, so the check above cannot see it (silent-failure-hunter/pr-test-analyzer review
+    // of this PR, both independently: comparing only launchAt passes under this mutation whether or not the
+    // fix holds). `vx`/`g`/`color` DO depend on the seed and not on `at` — each slot's arc and colour are the
+    // k-th draw off the round's rng, so a reused seed repeats them exactly regardless of the question, while a
+    // fresh one does not (an exact float match across an independent draw is astronomically unlikely). This is
+    // the check that actually closes the constant-seed edit behaviourally, rather than leaving it solely to the
+    // source rail's `Math.random` requirement in `tests/unit/guardrails.test.ts`.
+    expect(round2.a.map(b => ({ vx: b.vx, g: b.g, color: b.color })),
+      'round 2 draws its own seed — a constant seed would repeat round 1\'s per-slot arc and colour exactly, whatever the question (#400)')
+      .not.toEqual(round1.a.map(b => ({ vx: b.vx, g: b.g, color: b.color })));
   });
 
   test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', async ({ page }) => {
