@@ -27,6 +27,7 @@ export function subDec(a: Dec, b: Dec): Dec {
 }
 
 export function mulDecByInt(a: Dec, k: number): Dec {
+  if (!Number.isInteger(k)) throw new Error(`mulDecByInt: k must be an integer (got ${k})`);
   return { v: a.v * k, dp: a.dp };
 }
 
@@ -81,6 +82,10 @@ export type RoundUnit = keyof typeof ROUND_UNITS;
 /** Round to the nearest `unit` (10 … 100,000, or 0.1). Halves round up. Non-negative inputs only. */
 export function roundTo(n: Dec, unit: RoundUnit): Dec {
   if (n.v < 0) throw new Error('roundTo: negative input');
+  // RoundUnit is a literal-number union, so this only ever fails a caller who has widened `unit` to a
+  // plain `number` and computed something the type couldn't check — the guard is for that caller, not
+  // for the literal call sites TypeScript already covers.
+  if (!(unit in ROUND_UNITS)) throw new Error(`roundTo: unsupported unit ${unit}`);
   const k = ROUND_UNITS[unit];
   const e = n.dp + k;
   if (e < 0) return { v: n.v * 10 ** -e, dp: k < 0 ? -k : 0 };
@@ -102,6 +107,7 @@ function toDec(n: Dec | number): Dec {
 
 /** The single digit (0–9) at `place` (millions to thousandths) — magnitude only, sign ignored. */
 export function digitAt(n: Dec | number, place: Place): number {
+  if (!(place in PLACES)) throw new Error(`digitAt: unsupported place ${place}`);
   const d = toDec(n);
   const e = d.dp + PLACES[place];
   const scaled = e >= 0 ? Math.floor(Math.abs(d.v) / 10 ** e) : Math.abs(d.v) * 10 ** -e;

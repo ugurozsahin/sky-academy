@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dec, addDec, subDec, mulDecByInt, mulPow10, divPow10, compareDec, fmt, parseNum, roundTo, digitAt, digitValue } from '../../src/curriculum/ks2num';
+import type { Place, RoundUnit } from '../../src/curriculum/ks2num';
 
 // Deterministic RNG (mulberry32) — same construction as curriculum.test.ts, kept local so this file has
 // no dependency on that one.
@@ -101,6 +102,10 @@ describe('ks2num', () => {
       expect(() => roundTo(dec(-5, 0), 10)).toThrow();
     });
 
+    it('rejects a unit the literal union cannot express but a widened caller could still pass', () => {
+      expect(() => roundTo(dec(5, 0), 7 as unknown as RoundUnit)).toThrow();
+    });
+
     it('rounding to a finer unit than the input carries (the e < 0 branch)', () => {
       // 5 (dp 0) rounded to the nearest 0.1 is 5.0 — no digit to round, just a finer dp.
       expect(compareDec(roundTo(dec(5, 0), 0.1), dec(50, 1))).toBe(0);
@@ -139,6 +144,12 @@ describe('ks2num', () => {
     it('rejects a non-integer plain number, which would defeat the whole exactness point', () => {
       expect(() => digitAt(3.5, 1)).toThrow();
     });
+
+    it('rejects a place value the literal union cannot express but a widened caller could still pass', () => {
+      // RoundUnit/Place are number-literal unions, so a caller that has widened the type to `number`
+      // (e.g. from a computed value) is the only way to reach this — `as` simulates that here.
+      expect(() => digitAt(5, 7 as unknown as Place)).toThrow();
+    });
   });
 
   describe('exact arithmetic', () => {
@@ -150,6 +161,9 @@ describe('ks2num', () => {
     it('mulDecByInt scales the integer, keeping dp, for a negative k too', () => {
       expect(compareDec(mulDecByInt(dec(375, 2), 3), dec(1125, 2))).toBe(0);     // 3.75 × 3 = 11.25
       expect(compareDec(mulDecByInt(dec(375, 2), -2), dec(-750, 2))).toBe(0);    // 3.75 × -2 = -7.50
+    });
+    it('mulDecByInt rejects a non-integer k, which would break the "v is always an integer" invariant', () => {
+      expect(() => mulDecByInt(dec(375, 2), 1.5)).toThrow();
     });
     it('mulPow10/divPow10 shift the decimal point exactly', () => {
       expect(compareDec(mulPow10(dec(375, 2), 1), dec(375, 1))).toBe(0);         // 3.75 × 10 = 37.5
