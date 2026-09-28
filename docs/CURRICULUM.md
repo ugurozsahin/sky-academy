@@ -114,6 +114,7 @@ the m draw is an addition, not a rescue.) Owner's KS1 review, #298 slice 1; the 
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
 Reception phonics adds a second, cumulative dimension (#14): the letters a difficulty may use follow the Little Wandle / Letters and Sounds order — d1 phase 2 only, d2–3 every single-letter sound — for the answer **and** the decoys. The pools are derived from the Sound Hunt banks in `src/curriculum/util.ts`, so the phase order has one home. Missions have 5 stages (Apprentice, Warrior, Master, Grandmaster, Legend); each year maps stages → (difficulty, speed) in `YEARS[].diffs/speeds`.
+KS2 naming rule (#1041): plain curriculum titles (no emoji, no "!"), functional icons, no toy icons, and no emoji-counting pictures (objects, ten-frame, dots) except a fraction-of-an-amount d1; `tests/unit/ks2-naming.test.ts` holds it.
 
 ## Not yet covered (candidates)
 Free sentence composition (Story Sentences covers word order only), handwriting joins, phonics phase-by-phase sequencing as a mission order (Sound Hunt covers phases 2–5 by ear), Year 3+.
