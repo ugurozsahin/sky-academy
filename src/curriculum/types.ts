@@ -107,6 +107,7 @@ export interface YearInfo {
                            // none draws `islandArt()`'s code-drawn placeholder instead (#1032)
   tint: string;           // island border tint (rgba hex)
   maxAnswer: number;      // largest sensible numeric answer for this year (curriculum range guard)
+  minAnswer?: number;     // lowest sensible numeric answer for this year (curriculum range guard); absent means 0
   perStage: number;       // questions per stage
   lives: number;
   gentle: boolean;        // missed bubbles don't cost a life

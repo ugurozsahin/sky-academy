@@ -8,6 +8,7 @@ import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { MODES } from '../game/modes';
 import { weakestTopics } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS } from '../game/dojo';
+import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
 import { $, $$, capDigits, render, stars } from './dom';
 
@@ -129,9 +130,11 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
       go: () => nav.play({ year, mode: 'boss', pool: subjectPool() }) },
-    { id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,
+    // #1049: Memory Match used to fall back to Reception's decks for a year with none of its own — hidden
+    // instead, since `pickTheme` now throws rather than hand a KS2 child a Reception board.
+    ...(hasMemoryDecks(year.id) ? [{ id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,
       title: 'Memory Match', blurb: `Calm card pairs, no slicing · boards ${memory[year.id] ?? 0}`,
-      go: () => nav.memory(year) },
+      go: () => nav.memory(year) }] : []),
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
       title: 'Ninja Duel', blurb: 'Two players · first slice wins',
       go: () => nav.duel(year) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
