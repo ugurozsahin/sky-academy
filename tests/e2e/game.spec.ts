@@ -2188,6 +2188,36 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#endless small')).toContainText('best');
   });
 
+  test('Sky Storm, Ninja Sprint and Boss Battle only draw from the island\'s open Maths/Writing tab (#908)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year2"]');
+    await page.click('.tab[data-s="writing"]');
+    await page.click('#endless');
+    for (let i = 0; i < 5; i++) {
+      const topic = (await state(page)).topic;
+      expect(TOPICS.find(t => t.id === topic)?.subject).toBe('writing');
+      await solveCurrent(page);
+    }
+    await page.click('#pause'); await page.click('#quit');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await page.click('.tab[data-s="maths"]');
+    await page.click('#boss');
+    for (let i = 0; i < 5; i++) {
+      const topic = (await state(page)).topic;
+      expect(TOPICS.find(t => t.id === topic)?.subject).toBe('maths');
+      await solveCurrent(page);
+    }
+    await page.click('#pause'); await page.click('#quit');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await page.click('.tab[data-s="writing"]');
+    await page.click('#sprint');
+    for (let i = 0; i < 5; i++) {
+      const topic = (await state(page)).topic;
+      expect(TOPICS.find(t => t.id === topic)?.subject).toBe('writing');
+      await solveCurrent(page);
+    }
+  });
+
   test('Train with Sensei: a staged mission over the weakest topics, each question named by topic', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');

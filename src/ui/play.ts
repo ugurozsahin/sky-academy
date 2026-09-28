@@ -331,7 +331,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       stage: session.stage, index: session.index, score: session.score, lives: session.lives,
       ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt,
       answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null,
-      shots: arena?.shotsThrown ?? 0,
+      shots: arena?.shotsThrown ?? 0, topic: session.currentTopic?.id,
     }),
     // PNG data URL of the certificate for the finished mission — the one `CertInfo` actually filed (#410),
     // not a fresh `certInfo()` call: that used to hand back a certificate with its own `new Date()`, live at
