@@ -2,11 +2,11 @@
 // #325 stage 4: the curriculum used to be split by subject (maths.ts/writing.ts); this file holds every
 // Year 2 generator so a reviewer checking "is Year 2 right" reads one file. Generators shared with
 // Reception/Year 1 live in util.ts.
-import type { Difficulty, Generator, Question, Rng, Topic } from './types';
+import { type Difficulty, type Generator, type Question, type Rng, type Topic, LONGER, HEAVIER, HOLDS } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel,
   SHAPES_3D,
-  orderQ, lineQ, name3dQ, balanceQ, measureCompare, unitChoice, HOLDS, measureSum, unitQ,
+  orderQ, lineQ, name3dQ, balanceQ, measureCompare, unitChoice, measureSum, unitQ,
   DIRS, ARROWS, TURNS_ALL, turnEnd,
   gapLetters, gapQ, spellQ, sentGen, type Sent,
   PUNCT_SENTS, Y1_CEW, Y2_CEW,
@@ -324,24 +324,24 @@ const y2Patterns: Generator = (d, rng) => {
 const y2Length: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) return rng() < 0.5
-    ? measureCompare(rng, d, pick(rng, ['rope', 'ribbon', 'plank', 'path']), 'cm', ['longer', 'shorter', 'longest', 'shortest'], 10, 99)
-    : measureCompare(rng, d, pick(rng, ['fence', 'wall', 'ladder', 'pipe']), 'm', ['longer', 'shorter', 'longest', 'shortest'], 2, 40);
+    ? measureCompare(rng, d, pick(rng, ['rope', 'ribbon', 'plank', 'path']), 'cm', LONGER, 10, 99)
+    : measureCompare(rng, d, pick(rng, ['fence', 'wall', 'ladder', 'pipe']), 'm', LONGER, 2, 40);
   if (kind === 1) return unitChoice(rng, [['pencil', 'cm'], ['finger', 'cm'], ['book', 'cm'], ['door', 'm'], ['room', 'm'], ['garden', 'm'], ['playground', 'm']], 'cm', 'm', 'measure');
   return measureSum(rng, 'cm', ['How long altogether?', 'How long is left?']);
 };
 const y2Mass: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) return rng() < 0.5
-    ? measureCompare(rng, d, pick(rng, ['spoon', 'sock', 'pebble', 'candle']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], 20, 99)
-    : measureCompare(rng, d, pick(rng, ['sack', 'crate', 'suitcase', 'barrel']), 'kg', ['heavier', 'lighter', 'heaviest', 'lightest'], 2, 20);
+    ? measureCompare(rng, d, pick(rng, ['spoon', 'sock', 'pebble', 'candle']), 'g', HEAVIER, 20, 99)
+    : measureCompare(rng, d, pick(rng, ['sack', 'crate', 'suitcase', 'barrel']), 'kg', HEAVIER, 2, 20);
   if (kind === 1) return unitChoice(rng, [['feather', 'g'], ['apple', 'g'], ['coin', 'g'], ['cat', 'kg'], ['dog', 'kg'], ['bag of flour', 'kg']], 'g', 'kg', 'weigh');
   return measureSum(rng, 'g', ['How heavy altogether?', 'How much is left?']);
 };
 const y2Capacity: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
   if (kind === 0) return rng() < 0.5
-    ? measureCompare(rng, d, pick(rng, ['eggcup', 'lid', 'spoon', 'pot']), 'ml', HOLDS, 20, 99, 'holds')
-    : measureCompare(rng, d, pick(rng, ['bucket', 'tank', 'barrel', 'watering can']), 'l', HOLDS, 2, 20, 'holds');
+    ? measureCompare(rng, d, pick(rng, ['eggcup', 'lid', 'spoon', 'pot']), 'ml', HOLDS, 20, 99)
+    : measureCompare(rng, d, pick(rng, ['bucket', 'tank', 'barrel', 'watering can']), 'l', HOLDS, 2, 20);
   if (kind === 1) return unitChoice(rng, [['teaspoon', 'ml'], ['cup', 'ml'], ['mug', 'ml'], ['bath', 'l'], ['bucket', 'l'], ['paddling pool', 'l']], 'ml', 'l', 'measure');
   return measureSum(rng, 'ml', ['How much altogether?', 'How much is left?']);
 };

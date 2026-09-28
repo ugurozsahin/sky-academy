@@ -114,6 +114,20 @@ export interface YearInfo {
 }
 export const STAGE_NAMES = ['Apprentice', 'Warrior', 'Master', 'Grandmaster', 'Legend'];
 
+/**
+ * A comparison's verb and its four forms, bundled so a call site cannot pair one topic's verb with another's
+ * forms (#324 item 5) — `measureCompare` (`util.ts`) used to take them as two separate arguments, and
+ * `measureCompare(..., ['heavier', 'lighter', 'heaviest', 'lightest'], ..., 'holds')` compiled and shipped
+ * "Which holds heavier?" with every rail green.
+ */
+export type Compare = { verb: string; forms: [string, string, string, string] };
+export const LONGER: Compare = { verb: 'is', forms: ['longer', 'shorter', 'longest', 'shortest'] };
+export const TALLER: Compare = { verb: 'is', forms: ['taller', 'shorter', 'tallest', 'shortest'] };
+export const HEAVIER: Compare = { verb: 'is', forms: ['heavier', 'lighter', 'heaviest', 'lightest'] };
+// `holds`: a jug *holds* 300 ml (#296 — "fuller" is relative to the container, so a jug's 300 ml may be
+// less full than a cup's 200 ml; the NC vocabulary for the container is "holds more / holds less").
+export const HOLDS: Compare = { verb: 'holds', forms: ['more', 'less', 'most', 'least'] };
+
 // Island illustrations (code-drawn SVGs, no external assets). Kept beside the year they belong to
 // so a new year ships its own art without editing style.css.
 const ART_RECEPTION = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M18 34h84l-14 26H36z' fill='%235a3a2a'/%3E%3Cpath d='M30 42l18 12 12-8 16 10 14-14' stroke='%233d2618' stroke-width='3' fill='none'/%3E%3Cellipse cx='60' cy='34' rx='44' ry='9' fill='%2366c25a'/%3E%3Cellipse cx='60' cy='31' rx='40' ry='6' fill='%238fe07a'/%3E%3Crect x='52' y='12' width='16' height='20' rx='2' fill='%23ff6a3d'/%3E%3Cpath d='M46 12h28l-3 4H49z' fill='%23c92e12'/%3E%3Ccircle cx='60' cy='22' r='3' fill='%23ffe9a8'/%3E%3Ccircle cx='24' cy='28' r='5' fill='%23ffd54f'/%3E%3Ccircle cx='96' cy='27' r='4' fill='%23ff7ac6'/%3E%3C/svg%3E";

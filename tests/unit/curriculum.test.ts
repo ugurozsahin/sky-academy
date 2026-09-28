@@ -311,7 +311,10 @@ describe('curriculum ranges', () => {
     }
   });
   it('Measurement (#8): length/mass/capacity/temperature comparisons slice the correct extreme', () => {
-    let checked = 0;
+    // Per-topic, not one sum (#324 item 5): a summed floor of 100 across all seven topics never trips if one
+    // of them silently stops producing a comparison card — a future verb the regex below does not list
+    // (`weighs`, `measures`) would drop that topic out with the other six still carrying the total.
+    const perTopic = new Map<string, number>();
     for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp']) {
       const t = TOPICS.find(x => x.id === id)!; const r = rng(id.length + 31);
       for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 150; i++) {
@@ -323,10 +326,14 @@ describe('curriculum ranges', () => {
         const target = big ? Math.max(...segs.map(x => x[1])) : Math.min(...segs.map(x => x[1]));
         const winner = segs.find(x => x[1] === target)![0];
         expect(winner === q.answer || winner.startsWith(q.answer + ' '), `${id}: "${q.prompt}" | ${q.hint} | ans=${q.answer}`).toBe(true);
-        checked++;
+        perTopic.set(id, (perTopic.get(id) ?? 0) + 1);
       }
     }
-    expect(checked).toBeGreaterThan(100);                                        // the comparison branch really did run
+    // Measured floor per topic: y2-length/mass/capacity are the thinnest (177–188 over these 450 draws,
+    // the comparison branch is one of three `kind`s and one of two forms within it); y1's three topics and
+    // y2-temp are all well above (321–450).
+    for (const id of ['y1-length', 'y1-mass', 'y1-capacity', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp'])
+      expect(perTopic.get(id), `${id} produced no comparison card this sweep saw`).toBeGreaterThan(100);
   });
 });
 

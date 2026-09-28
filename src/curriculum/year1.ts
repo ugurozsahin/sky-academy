@@ -3,10 +3,11 @@
 // Year 1 generator so a reviewer checking "is Year 1 right" reads one file. Generators shared with
 // Reception/Year 2 live in util.ts.
 import type { Generator, Topic } from './types';
+import { LONGER, TALLER, HEAVIER, HOLDS } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel, isNote, NOTES,
   SHAPES_2D, SHAPES_3D, SAME_SOLID,
-  orderQ, lineQ, name3dQ, balanceQ, measureCompare, unitChoice, HOLDS, unitQ,
+  orderQ, lineQ, name3dQ, balanceQ, measureCompare, unitChoice, unitQ,
   DIRS, ARROWS, TURNS_ALL, turnEnd, DAYS,
   gapLetters, gapQ, spellQ, sentGen, type Sent, PUNCT_SENTS, LETTERS, CVC, DIGRAPHS, Y1_CEW,
   soundQ, PHASE3, PHASE5, SPLIT,
@@ -174,14 +175,14 @@ const y1Position: Generator = (d, rng) => {
 };
 
 const y1Length: Generator = (d, rng) => rng() < 0.5
-  ? measureCompare(rng, d, pick(rng, ['pencil', 'ribbon', 'snake', 'straw', 'scarf']), 'cm', ['longer', 'shorter', 'longest', 'shortest'], d === 1 ? 3 : 5, d === 1 ? 12 : 40)
-  : measureCompare(rng, d, pick(rng, ['sunflower', 'tower', 'ladder', 'plant']), 'cm', ['taller', 'shorter', 'tallest', 'shortest'], d === 1 ? 5 : 10, d === 1 ? 20 : 60);
+  ? measureCompare(rng, d, pick(rng, ['pencil', 'ribbon', 'snake', 'straw', 'scarf']), 'cm', LONGER, d === 1 ? 3 : 5, d === 1 ? 12 : 40)
+  : measureCompare(rng, d, pick(rng, ['sunflower', 'tower', 'ladder', 'plant']), 'cm', TALLER, d === 1 ? 5 : 10, d === 1 ? 20 : 60);
 const y1Mass: Generator = (d, rng) =>
-  measureCompare(rng, d, pick(rng, ['bag', 'parcel', 'box', 'basket']), 'g', ['heavier', 'lighter', 'heaviest', 'lightest'], d === 1 ? 5 : 20, d === 1 ? 30 : 100);
+  measureCompare(rng, d, pick(rng, ['bag', 'parcel', 'box', 'basket']), 'g', HEAVIER, d === 1 ? 5 : 20, d === 1 ? 30 : 100);
 // d2–d3 used to roll 50–500 ml, which put three-digit numbers on a Year 1 card; Year 1's numbers stop at 100
 // (#298 slice 5). Capped to match `y1Mass` beside it, which already stopped at 100.
 const y1Capacity: Generator = (d, rng) =>
-  measureCompare(rng, d, pick(rng, ['jug', 'cup', 'bottle', 'bucket']), 'ml', HOLDS, d === 1 ? 10 : 50, d === 1 ? 90 : 100, 'holds');
+  measureCompare(rng, d, pick(rng, ['jug', 'cup', 'bottle', 'bucket']), 'ml', HOLDS, d === 1 ? 10 : 50, d === 1 ? 90 : 100);
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const y1Months: Generator = (d, rng) => {
   const kind = d === 1 ? ri(rng, 0, 1) : ri(rng, 0, 2);
