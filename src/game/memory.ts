@@ -114,8 +114,8 @@ export class Memory {
 export const hasMemoryDecks = (year: YearId): boolean => (THEMES[year]?.length ?? 0) > 0;
 
 export function pickTheme(year: YearId, rng: Rng = Math.random, id?: string): Theme {
-  const list = THEMES[year];
-  if (!list) throw new Error(`no Memory Match decks for ${year}`);   // unreachable once the button is hidden (#1049)
+  if (!hasMemoryDecks(year)) throw new Error(`no Memory Match decks for ${year}`);   // unreachable once the button is hidden (#1049)
+  const list = THEMES[year]!;
   return list.find(t => t.id === id) ?? pick(rng, list);
 }
 
