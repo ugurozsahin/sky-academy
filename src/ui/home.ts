@@ -1,5 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
-import { YEARS, topicsFor, type Topic, type YearInfo } from '../curriculum';
+import { shownYears, topicsFor, type Topic, type YearInfo } from '../curriculum';
+import { islandArt } from './island-placeholder';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
@@ -60,15 +61,16 @@ export function mapScreen(nav: Nav) {
   const progress = safeRecord<TopicProgress>(d.progress);
   const totalStars = (y: YearInfo) => topicsFor(y.id).reduce((s, t) => s + (progress[t.id]?.stars ?? 0), 0);
   const maxStars = (y: YearInfo) => topicsFor(y.id).length * 3;
+  const shown = shownYears();
   const tb = topbar(nav, () => mapScreen(nav));
   render(`
   <section class="screen home map">
     ${tb.html}
     <h2 class="section-title">Where will you train today?</h2>
-    <div class="islands big" style="--cols:${YEARS.length}">
-      ${YEARS.map((y, i) => { const s = totalStars(y), m = maxStars(y); return `
+    <div class="islands big" style="--cols:${shown.length}">
+      ${shown.map((y, i) => { const s = totalStars(y), m = maxStars(y); return `
         <button class="island${y.id === d.year ? ' sel' : ''}" data-year="${y.id}" style="--tint:${y.tint}" aria-label="${y.title} island">
-          <span class="isl-art" style="background-image:url(&quot;${y.art}&quot;);animation-delay:${(-1.3 * i).toFixed(1)}s"></span>
+          <span class="isl-art" style="background-image:url(&quot;${islandArt(y)}&quot;);animation-delay:${(-1.3 * i).toFixed(1)}s"></span>
           <span class="isl-text"><b>${y.title}</b><small>${y.age} · ${y.blurb}</small>
           <span class="isl-bar"><i style="width:${m ? Math.round(100 * s / m) : 0}%"></i></span><span class="isl-stars">★ ${s}/${m}</span></span>
           <span class="isl-go">Go →</span>
@@ -83,7 +85,7 @@ export function mapScreen(nav: Nav) {
   </section>`, 'bg-sky');
   tb.bind();
   $$('.island').forEach(b => b.addEventListener('click', () => {
-    const y = YEARS.find(x => x.id === b.dataset.year)!;
+    const y = shown.find(x => x.id === b.dataset.year)!;
     save({ year: y.id }); sfx.tap(); say(`${y.title} island`); nav.island(y);
   }));
   $('#grownups').addEventListener('click', () => { sfx.tap(); nav.parents(); });
@@ -139,7 +141,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     ${tb.html}
     <div class="isl-head">
       <button class="icon-btn" id="back" aria-label="Back to the sky map">←</button>
-      <span class="isl-art" style="background-image:url(&quot;${year.art}&quot;)"></span>
+      <span class="isl-art" style="background-image:url(&quot;${islandArt(year)}&quot;)"></span>
       <div><b>${year.title} Island</b><small>${year.age} · ${year.blurb}</small></div>
     </div>
     <div class="tabs" role="tablist">

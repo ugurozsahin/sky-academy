@@ -103,7 +103,8 @@ export interface YearInfo {
   short: string;
   age: string;
   blurb: string;          // island subtitle (topics at a glance)
-  art: string;            // island illustration: an SVG data URI used as the .isl-art background
+  art?: string;           // island illustration: an SVG data URI used as the .isl-art background; a year with
+                           // none draws `islandArt()`'s code-drawn placeholder instead (#1032)
   tint: string;           // island border tint (rgba hex)
   maxAnswer: number;      // largest sensible numeric answer for this year (curriculum range guard)
   perStage: number;       // questions per stage
