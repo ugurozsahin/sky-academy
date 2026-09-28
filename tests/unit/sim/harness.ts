@@ -143,6 +143,8 @@ export interface Sim {
   drainWaveEnds(): number;
   /** Virtual milliseconds since the harness was installed. */
   now(): number;
+  /** Move the virtual clock forward with no frame drawn — the app hidden, or two calls with nothing between. */
+  tick(ms: number): void;
   /** Run one animation frame (1/60 s). */
   frame(): void;
   /** Run whole frames until at least `ms` of virtual time has passed. Returns the frames run. */
@@ -259,6 +261,7 @@ export function createSim(opts: SimOpts = {}): Sim {
     arena, events,
     take, drainWaveEnds,
     now: () => t,
+    tick(ms: number) { t += ms; },
     frame,
     advance(ms: number) {
       const until = t + ms;
