@@ -337,6 +337,21 @@ describe('save migration (#38)', () => {
     expect(migrate({ v: SAVE_VERSION, coins: 'lots' as unknown }).coins, 'an outright wrong type is still rejected').toBe(0);
   });
 
+  // #795: dropping a corrupted `spent` to 0 the same way every other rejected field falls back to DEFAULT
+  // silently inflates the shop balance (`balance = coins − spent`) — a hand-edited or corrupted `spent`
+  // became indistinguishable from free currency. A corrupted `spent` now clamps to the (already-sanitized)
+  // `coins` figure instead, the worst-case assumption (already all spent) rather than the best-case one
+  // (none spent) a delete-to-0 makes, and each rejection is traced with a console.warn.
+  it('a corrupted spent clamps to coins rather than resetting to 0, so it cannot grant a free balance (#795)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(migrate({ v: SAVE_VERSION, coins: 100, spent: NaN }).spent, 'clamped to coins, not reset to 0').toBe(100);
+    expect(migrate({ v: SAVE_VERSION, coins: 100, spent: -5 }).spent, 'a negative spent is treated the same way').toBe(100);
+    expect(migrate({ v: SAVE_VERSION, spent: Infinity }).spent, 'no valid coins to clamp to still falls back to 0').toBe(0);
+    expect(migrate({ v: SAVE_VERSION, coins: NaN, spent: NaN }).spent, 'coins itself corrupted too: clamps to its own reset value').toBe(0);
+    expect(warn.mock.calls.length, 'every rejection above is traced').toBeGreaterThan(0);
+    warn.mockRestore();
+  });
+
   it('falls back to a fresh default for corrupt or non-object data', () => {
     for (const bad of [null, undefined, 42, 'nonsense', [] as unknown]) {
       const d = migrate(bad);

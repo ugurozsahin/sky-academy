@@ -1033,9 +1033,9 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['stickers', 'owned', 'certs', 'duels'] as const) {
     if (k in clean && !Array.isArray(clean[k])) delete clean[k];
   }
-  for (const k of ['coins', 'spent'] as const) {   // #777: reject non-finite/negative too — capDigits only bounds the top
-    if (k in clean && (typeof clean[k] !== 'number' || !Number.isFinite(clean[k] as number) || (clean[k] as number) < 0)) delete clean[k];
-  }
+  // #795: dropping a corrupted `spent` to 0 the way every other field falls back to DEFAULT would silently inflate the shop balance (`coins − spent`) — clamp it to (already-sanitized) `coins` instead, the worst-case assumption, and warn on both rejections so a corruption event leaves a trace.
+  if ('coins' in clean && (typeof clean.coins !== 'number' || !Number.isFinite(clean.coins) || clean.coins < 0)) { console.warn(`sanitizeTypes: invalid coins (${JSON.stringify(clean.coins)}) — reset`); delete clean.coins; }
+  if ('spent' in clean && (typeof clean.spent !== 'number' || !Number.isFinite(clean.spent) || clean.spent < 0)) { const cap = typeof clean.coins === 'number' && Number.isFinite(clean.coins) ? clean.coins : 0; console.warn(`sanitizeTypes: invalid spent (${JSON.stringify(clean.spent)}) — clamped to ${cap}`); clean.spent = cap; }
   // #171 review: the object/array/number branches above missed every primitive-typed field — `name` most of
   // all, since it is the one field a person freely types into the Restore box. `nameScreen()`'s `esc(d.name)`
   // (`dom.ts`) and `hasName(d.name)` (`.trim()`) both throw on a non-string, and `migrate({ v: 1, name: 123
