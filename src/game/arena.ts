@@ -59,9 +59,22 @@ export class Arena {
   // #700: this wave's gentle-year single-relaunch target; #742 extends it — who it comes back WITH (gentleRelaunch.ts).
   private gentleTarget: string | undefined; private gentleUsed = false; private gentleTargetFallen: Bubble | null = null; private gentleDecoys: Bubble[] = [];
   private waveT = 4400; private batchSpan = 0;                  // this wave's flight time and one batch's stagger span (rush)
-  paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
-  private pausedSince: number | null = null;       // #490: when the CURRENT pause began, so resuming can shift launchAt by its length
+  private _paused = false; frozen = false; trailColor = '#7fe0ff'; trailCore?: string; fx: FxKind = 'blade'; private onSwish?: () => void; private trailEmit = 0;   // trailCore = shop skin's bright core (#6)
+  private pausedSince: number | null = null;       // #883: when the CURRENT pause began — stamped by the `paused` setter below, not the loop
   private onThrow?: () => void; private onLand?: () => void;
+  /** #883: the pause edge is read HERE, not in the render loop, so a pause set and lifted with no frame in
+   *  between still shifts every un-launched bubble's `launchAt` by the pause length (same clock the loop's
+   *  own `now` uses). A same-value write is a no-op. */
+  get paused() { return this._paused; }
+  set paused(v: boolean) {
+    if (v === this._paused) return;
+    this._paused = v;
+    if (v) { this.pausedSince = performance.now(); return; }
+    if (this.pausedSince === null) return;
+    const shift = Math.max(0, performance.now() - this.pausedSince);
+    for (const b of this.bubbles) if (!b.launched && !b.dead) b.launchAt += shift;
+    this.pausedSince = null;
+  }
   /** Which bubbles a tap throws a projectile at; anything else pops instantly, like a swipe (the TNT does — #48). */
   private throwFor?: (b: Bubble) => boolean;
   private labelArt?: ArenaOpts['labelArt']; private isHazard?: ArenaOpts['isHazard'];
@@ -321,22 +334,9 @@ export class Arena {
     if (dt > 0.5) dt = 0.016;                       // tab was hidden: don't jump
     dt = Math.min(dt, 0.1);
     // #331: the home of the rule. A freeze lasting at least one frame stales every live stroke (#561: one per
-    // pointer), whichever field caused it — `paused` is assigned from the play screen with no entry point of
-    // its own — so a finger held perfectly still, sending no pointermove at all, is caught here.
+    // pointer), whichever field caused it — caught here, once a frame, since a stroke can go stale with no
+    // pointer event at all: a finger held perfectly still sends no pointermove.
     if (this.stalls()) for (const s of this.strokes.values()) s.stale = true;
-    // #490: `update()` below is skipped entirely while `paused`, so nothing launches DURING a pause — but
-    // nothing used to shift `launchAt` either, so every bubble whose moment passed behind the overlay became
-    // due all at once on the resumed frame. `paused` is assigned from the play screen with no entry point of
-    // its own (same constraint the comment above already lives with), so the transition is read here, once a
-    // frame, the only place both edges of it are ever seen. Mirrors `rush()`'s own `launchAt -= shift` for the
-    // opposite direction — same clock, same reason: `launchAt` stays an absolute timestamp throughout, and the
-    // same `Math.max(0, …)`/`!x.dead` guards, so a review reading the two side by side sees one shape, not two.
-    if (this.paused) { if (this.pausedSince === null) this.pausedSince = now; }
-    else if (this.pausedSince !== null) {
-      const shift = Math.max(0, now - this.pausedSince);
-      for (const b of this.bubbles) if (!b.launched && !b.dead) b.launchAt += shift;
-      this.pausedSince = null;
-    }
     if (!this.paused) { this.time += dt; for (let left = dt; left > 0; left -= 1 / 60) this.update(Math.min(left, 1 / 60), now); }
     this.cull(now);
     this.render(now);
