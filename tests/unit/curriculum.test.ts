@@ -56,6 +56,13 @@ describe('topic registry', () => {
     for (const y of YEARS) expect(y.tint, y.id).toMatch(/^#[0-9a-f]{8}$/i);
   });
 
+  // guard rail (#1042, type-design-analyzer review): a row could set minAnswer above maxAnswer by mistake —
+  // no range check below reads the two together, so a bad row would fail silently inside a future generator
+  // rather than here, where it is written.
+  it('every YEARS row’s minAnswer, when set, is at or below its maxAnswer', () => {
+    for (const y of YEARS) if (y.minAnswer !== undefined) expect(y.minAnswer, y.id).toBeLessThanOrEqual(y.maxAnswer);
+  });
+
   // #889: YEAR2_TOPICS moved into its own module so new Year 2 topics have room in year2.ts. This pins the
   // registry's ids, in order, so that move (and every later one) cannot silently drop, reorder or rename a row.
   it('YEAR2_TOPICS holds these 37 ids, in this order', () => {
