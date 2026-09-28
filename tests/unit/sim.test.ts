@@ -271,6 +271,88 @@ describe('the wave launches on its own timetable', () => {
     expect(launchedNow, 'the second batch (well past the pause) must not launch early either').toEqual(dueBeforePause);
   });
 
+  /**
+   * #883: the pause/resume edge used to be read once a frame, inside the render loop, which never ran while
+   * the app was hidden. A pause set and lifted entirely inside that hidden stretch — no frame drawn at any
+   * point — stamped no `pausedSince` at all, so the shift above silently never applied. `sim.tick()` models
+   * the hidden stretch: the virtual clock moves, but no rAF callback (the arena's loop included) ever runs.
+   */
+  it('a pause set and lifted with no frame drawn in between still shifts launchAt by the full pause', () => {
+    sim = createSim({ seed: 7 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2 });
+    const plannedAt = new Map(sim.all().map(b => [b.label, b.launchAt]));
+
+    advanceUntil(sim, () => sim!.now() >= 200, 'never reached the pause point');
+    sim.arena.paused = true;
+    sim.tick(30000);                                        // 30s pass with the app hidden: no frame at all
+    sim.arena.paused = false;                                // lifted, still with no frame drawn yet
+    sim.frame();                                              // the first (and only) resumed frame
+
+    const dueBeforePause = [...plannedAt].filter(([, at]) => at <= 200).map(([label]) => label).sort();
+    const launchedNow = sim.all().filter(b => b.launched).map(b => b.label).sort();
+    expect(launchedNow, 'only the bubbles already due before the pause may be airborne on the resume frame')
+      .toEqual(dueBeforePause);
+  });
+
+  it('assigning paused the value it already has changes nothing: no new stamp, no shift', () => {
+    sim = createSim({ seed: 7 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2 });
+    const plannedAt = new Map(sim.all().map(b => [b.label, b.launchAt]));
+
+    advanceUntil(sim, () => sim!.now() >= 200, 'never reached the pause point');
+    sim.arena.paused = true;                                 // the real edge — stamps pausedSince
+    sim.arena.paused = true;                                 // same value again: must not re-stamp
+    sim.tick(1000);
+    sim.arena.paused = true;                                 // same value again, mid-pause: must still not touch it
+    sim.tick(1000);                                           // 2000ms paused in total
+    sim.arena.paused = false;                                 // the real edge back — must shift by the full 2000ms
+    sim.arena.paused = false;                                 // same value again: must not shift a second time
+
+    for (const b of sim.all()) {
+      const planned = plannedAt.get(b.label)!;
+      if (planned > 200) expect(b.launchAt - planned, `${b.label} did not shift by the full 2000ms pause`).toBe(2000);
+    }
+  });
+
+  it('two pause/resume cycles entirely inside a hidden stretch both shift launchAt — not just the last', () => {
+    sim = createSim({ seed: 7 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2 });
+    const plannedAt = new Map(sim.all().map(b => [b.label, b.launchAt]));
+
+    advanceUntil(sim, () => sim!.now() >= 200, 'never reached the pause point');
+    sim.arena.paused = true;
+    sim.tick(1000);
+    sim.arena.paused = false;                                 // first cycle lifted, still no frame drawn anywhere
+    sim.tick(500);                                              // a hidden gap between the two cycles
+    sim.arena.paused = true;
+    sim.tick(2000);
+    sim.arena.paused = false;                                 // second cycle lifted — still no frame yet
+    sim.frame();                                                // the first (and only) resumed frame
+
+    for (const b of sim.all()) {
+      const planned = plannedAt.get(b.label)!;
+      if (planned > 200) expect(b.launchAt - planned, `${b.label} did not shift by both pauses summed`).toBe(3000);
+    }
+  });
+
+  it('a frame drawn mid-pause does not stop the resume shift when the lift itself draws no frame', () => {
+    sim = createSim({ seed: 7 });
+    sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2 });
+    const plannedAt = new Map(sim.all().map(b => [b.label, b.launchAt]));
+
+    advanceUntil(sim, () => sim!.now() >= 200, 'never reached the pause point');
+    sim.arena.paused = true;
+    sim.frame();                                                // one real frame while still paused (app briefly visible)
+    sim.tick(2000);                                             // then hidden again, with no frame, until resume
+    sim.arena.paused = false;
+    sim.frame();                                                // the resume frame
+
+    const dueBeforePause = [...plannedAt].filter(([, at]) => at <= 200).map(([label]) => label).sort();
+    const launchedNow = sim.all().filter(b => b.launched).map(b => b.label).sort();
+    expect(launchedNow, 'a frame mid-pause must not make the shift on the un-framed lift go missing')
+      .toEqual(dueBeforePause);
+  });
+
   it('a wave that never pauses is unaffected — the shift is inert when paused never becomes true', () => {
     sim = createSim({ seed: 7 });
     sim.spawn({ labels: ['1', '2', '3', '4'], speed: 2 });
