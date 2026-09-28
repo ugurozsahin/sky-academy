@@ -47,6 +47,25 @@ interface QuestionCore {
    */
   optionsAreContent?: boolean;
   sequence?: string[];    // slice these in order (spelling); options = sequence letters + decoys
+  /**
+   * A sequence whose slices are an answer's digits, not a spelling (#1059): `build` implies `sequence`, and
+   * `template`'s `_` count must equal `sequence.length` — every other character (`.`, `,`, `/`, `−`, ` r `,
+   * spaces) prints as itself between the slots. `answer` is `template` with the slots filled by `sequence`,
+   * in order ("3.75" from template `_.__` and sequence `['3','7','5']`). Unlike a spelling sequence, the
+   * prompt itself is kept on the card (`promptHTML`, `src/ui/hud.ts`) — a build card has no other way to
+   * show the child what sum they are answering.
+   *
+   * Not a `SequenceOpt`-style required-sibling union alongside `sequence` (`HintOpt`'s pattern, tried and
+   * reverted here): `Omit`/`Pick` do not distribute over a union's members — `numQ`/`wordQ`'s
+   * `Partial<Omit<Question, …>>` opts-forwarding (this file's callers in `curriculum/util.ts`) reads a
+   * union's property through `T[K]`, which flattens `{ sequence: string[]; build: {…} } | { sequence?:
+   * string[]; build?: undefined }` into independently-optional `sequence`/`build` fields anyway — the exact
+   * correlation a union was meant to keep. Closing that would mean reworking every generator's
+   * options-forwarding, not this ticket's mechanism. The invariant stays runtime-only, checked for every
+   * topic in `tests/unit/curriculum.test.ts` — including `build` set with no `sequence`, asserted outside
+   * the `if (q.sequence)` gate so that mistake cannot hide inside it.
+   */
+  build?: { template: string };
   visual?: Visual;
   wide?: boolean;         // options are words → bigger bubbles
   listen?: string;        // spoken-only question: shown on the card instead of `prompt` when read-aloud is off

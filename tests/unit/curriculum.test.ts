@@ -30,6 +30,12 @@ function solve(prompt: string): number | null {
   return null;
 }
 
+/** A build card's template (#1059) with its `_` slots filled by `sequence`, in order. */
+function fillTemplate(template: string, sequence: readonly string[]): string {
+  let i = 0;
+  return Array.from(template).map(ch => ch === '_' ? sequence[i++] : ch).join('');
+}
+
 const N = 150;
 
 describe('topic registry', () => {
@@ -89,6 +95,11 @@ for (const topic of TOPICS) {
           const q: Question = topic.gen(d, r);
           expect(q.prompt.length).toBeGreaterThan(0);
           expect(q.answer.length).toBeGreaterThan(0);
+          // #1059: `build` implies `sequence` (types.ts) — checked outside the `if (q.sequence)` gate below
+          // so a generator that sets `build` and forgets `sequence` cannot hide inside it: `promptHTML`
+          // (`src/ui/hud.ts`) checks `!q.sequence` first and would silently render the plain-prompt branch,
+          // dropping the digit-slot UI with nothing else noticing.
+          if (q.build) expect(q.sequence, q.prompt).toBeDefined();
           if (topic.input !== 'tracing') {
             // answer present, options unique, sensible count
             expect(q.options).toContain(q.sequence ? q.sequence[0] : q.answer);
@@ -97,7 +108,12 @@ for (const topic of TOPICS) {
             expect(q.options.length).toBeLessThanOrEqual(10);
             for (const o of q.options) expect(o.trim().length).toBeGreaterThan(0);
             if (q.sequence) {
-              expect([q.sequence.join(''), q.sequence.join(','), q.sequence.join(' ')]).toContain(q.answer);
+              if (q.build) {
+                expect((q.build.template.match(/_/g) ?? []).length, q.prompt).toBe(q.sequence.length);
+                expect(q.answer, q.prompt).toBe(fillTemplate(q.build.template, q.sequence));
+              } else {
+                expect([q.sequence.join(''), q.sequence.join(','), q.sequence.join(' ')]).toContain(q.answer);
+              }
               for (const l of q.sequence) expect(q.options).toContain(l);
             }
           }

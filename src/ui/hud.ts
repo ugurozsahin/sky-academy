@@ -113,8 +113,28 @@ export function promptMode(q: Pick<Question, 'listen' | 'peek'>, audible: boolea
  */
 export function promptHTML(q: Question, done: number, reveal = false): string {
   if (!q.sequence) return esc(reveal && q.listen ? q.listen : q.prompt);
+  if (q.build) return buildPromptHTML(q.prompt, q.build.template, q.sequence, done);
   const items = q.sequence.map((l, i) => `<span class="${i < done ? 'got' : 'todo'}">${i < done || reveal ? esc(l) : '_'}</span>`);
   return `<span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
+}
+
+/**
+ * A build card (#1059) keeps its prompt on the card and draws the answer's digits as slots beside it, in
+ * place of the prompt's last `?` (or after it, with a space, when the prompt has none — a build card
+ * should still have one, but this never drops a slot silently if it does not). Slots reuse the sequence
+ * markup (`.got`/`.todo`, `src/styles/play.css`); the template's non-`_` characters print as plain text
+ * between them. Unlike a spelling sequence, `reveal` never shows an unsliced digit here — the prompt is
+ * already on the card, so there is nothing left to reveal.
+ */
+function buildPromptHTML(prompt: string, template: string, sequence: string[], done: number): string {
+  let i = 0;
+  const slots = Array.from(template).map(ch => {
+    if (ch !== '_') return esc(ch);
+    const shown = i < done, item = sequence[i]; i++;
+    return `<span class="${shown ? 'got' : 'todo'}">${shown ? esc(item) : '_'}</span>`;
+  }).join('');
+  const q = prompt.lastIndexOf('?');
+  return q === -1 ? `${esc(prompt)} <span class="seq">${slots}</span>` : `${esc(prompt.slice(0, q))}<span class="seq">${slots}</span>${esc(prompt.slice(q + 1))}`;
 }
 
 /**
