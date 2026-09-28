@@ -117,10 +117,10 @@ async function winRound(page: Page, p: 'a' | 'b') {
 test.describe('Ninja Duel', () => {
   /**
    * guard rail (#389), found in play by the owner and his child. Each arena used to lay its own wave out from
-   * `Math.random` and its own `performance.now()`, so the answer took a different slot in each side's launch
-   * queue: at speed 1 one slot is 420 ms and a whole batch is over four seconds, and a four-option question
-   * on a half-width arena batches at three — so the answer landing in batch 0 for one player and batch 1 for
-   * the other was an ordinary draw. The match measured the shuffle rather than who was quicker.
+   * `Math.random` and its own `performance.now()`, so the answer took a different launch slot on each side: a
+   * four-option duel wave is one batch (#400 — `perBatch` covers all four options on both halves' geometry),
+   * so the difference was up to the last of the four slots, 1.26 s at speed 1 — decisive for a five-year-old,
+   * and the match measured the shuffle rather than who was quicker.
    *
    * Every field compared here is fixed at spawn. `x`, `y` and `wobble` are deliberately not: all three are
    * advanced every frame (`arena.ts` — `b.x += b.vx * dt`, `b.wobble += dt * 3`), and the two arenas run
@@ -128,24 +128,65 @@ test.describe('Ninja Duel', () => {
    * project caught exactly that on `wobble`, drifting by 0.0024 rad between the halves while the seeded
    * draw behind it was identical. `vx` and `g` carry the arc instead, and the *initial* wobble is held by
    * the deep-equality check in `tests/unit/duel.test.ts`, where no clock is running.
+   * ("Fixed at spawn" is a claim about `layoutWave`'s plan, not a guarantee every field here can never move:
+   * `vx` is nudged by collision resolution and `launchAt` by `rush()`. Neither is reachable at the moment this
+   * captures — no bubble has landed and no slice has happened yet — so it holds here; `retries: 0` (#32) means
+   * a future case that captures later would need to re-check it rather than lean on this comment.)
+   *
+   * #400: the source rail this behavioural rail backs up pins the spawn statement's spelling, so a constant
+   * seed or a draw hoisted out of the per-round closure survives it (both reproduced against `3ec1a01`,
+   * the issue has the transcripts). The two need different behavioural checks, not one: a HOISTED draw
+   * freezes `at` as well as `seed`, so round 2's absolute `launchAt`s repeat round 1's exactly — caught below.
+   * A CONSTANT seed leaves `at` moving (still a fresh `performance.now()` every round), so `launchAt` differs
+   * either way and that check alone cannot see it; what a constant seed DOES repeat is the per-slot arc and
+   * colour (`vx`/`g`/`color`), which come from the seed's own rng draws and never read `at` — checked below
+   * as a second, independent comparison. (An earlier draft of this comment claimed one check closed both;
+   * it did not — silent-failure-hunter and pr-test-analyzer both found the same gap reviewing this PR.)
    */
-  test('guard rail: the two halves pose the identical wave — same order, same moments, same arcs (#389)', { tag: '@smoke' }, async ({ page }) => {
+  test('guard rail: the two halves pose the identical wave — same order, same moments, same arcs, fresh each round (#389/#400)', { tag: '@smoke' }, async ({ page }) => {
     await startDuel(page, dojoSeeds('fresh'));
     await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
     // Read off `arenas`, already on the hooks contract, rather than `bubbles()`: that one reports only the
     // bubbles in flight *now* and drops every field fixed at spawn, which is exactly what has to be compared.
-    const wave = await page.evaluate(() => {
+    const captureWave = () => page.evaluate(() => {
       const spawned = (p: 'a' | 'b') => window.__sna.arenas[p].bubbles.map(b =>
         ({ label: b.label, launchAt: b.launchAt, r: b.r, vx: b.vx, g: b.g, color: b.color }));
       return { a: spawned('a'), b: spawned('b'), answer: window.__sna.state().answer };
     });
-    expect(wave.a.length, 'a real wave was captured, so the comparison below is not two empty lists').toBeGreaterThan(1);
-    expect(wave.b, 'both halves are dealt from one seed and one clock origin').toEqual(wave.a);
+    const round1 = await captureWave();
+    expect(round1.a.length, 'a real wave was captured, so the comparison below is not two empty lists').toBeGreaterThan(1);
+    expect(round1.b, 'both halves are dealt from one seed and one clock origin').toEqual(round1.a);
     // Named on its own: the launch timetable is the half of it the children actually felt.
-    expect(wave.b.map(b => [b.label, b.launchAt]), 'the answer rises at the same moment on both sides')
-      .toEqual(wave.a.map(b => [b.label, b.launchAt]));
-    expect(wave.a.map(b => b.label), 'and the answer is in the wave, so the rows above are not agreeing about its absence')
-      .toContain(wave.answer);
+    expect(round1.b.map(b => [b.label, b.launchAt]), 'the answer rises at the same moment on both sides')
+      .toEqual(round1.a.map(b => [b.label, b.launchAt]));
+    expect(round1.a.map(b => b.label), 'and the answer is in the wave, so the rows above are not agreeing about its absence')
+      .toContain(round1.answer);
+    // Win round 1 and let round 2's wave spawn, then run the same shared-halves check again — and check it
+    // against round 1's own timetable. A re-spelling of the spawn statement that still passes the source
+    // rail leaves the two halves matching EACH OTHER here too, which is why a source-only rail cannot tell
+    // the difference; only round 2 disagreeing with round 1 does.
+    await winRound(page, 'a');
+    await page.waitForFunction(() => window.__sna.state().round === 2);
+    await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
+    const round2 = await captureWave();
+    expect(round2.b, 'round 2 is shared between the halves too').toEqual(round2.a);
+    // The draw HOISTED out of onQuestion (run once per match, not once per round) freezes `at` too, so this
+    // catches it: every launchAt is `at + <fixed offset for slot k>`, and a frozen `at` makes round 2's array
+    // literally round 1's again.
+    expect(round2.a.map(b => b.launchAt),
+      'round 2 has its own clock origin — a draw hoisted out of onQuestion would repeat round 1\'s launch timetable exactly (#400)')
+      .not.toEqual(round1.a.map(b => b.launchAt));
+    // A CONSTANT seed does not move `launchAt` at all — `at` is still a fresh `performance.now()` every round
+    // even when `seed` is not, so the check above cannot see it (silent-failure-hunter/pr-test-analyzer review
+    // of this PR, both independently: comparing only launchAt passes under this mutation whether or not the
+    // fix holds). `vx`/`g`/`color` DO depend on the seed and not on `at` — each slot's arc and colour are the
+    // k-th draw off the round's rng, so a reused seed repeats them exactly regardless of the question, while a
+    // fresh one does not (an exact float match across an independent draw is astronomically unlikely). This is
+    // the check that actually closes the constant-seed edit behaviourally, rather than leaving it solely to the
+    // source rail's `Math.random` requirement in `tests/unit/guardrails.test.ts`.
+    expect(round2.a.map(b => ({ vx: b.vx, g: b.g, color: b.color })),
+      'round 2 draws its own seed — a constant seed would repeat round 1\'s per-slot arc and colour exactly, whatever the question (#400)')
+      .not.toEqual(round1.a.map(b => ({ vx: b.vx, g: b.g, color: b.color })));
   });
 
   test('both players see the same question, the first correct slice takes the round, and the match ends with the right winner', async ({ page }) => {

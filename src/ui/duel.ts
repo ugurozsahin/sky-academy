@@ -149,10 +149,10 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
         if (info.round === 1) later(() => say(line), 0); else say(line);
         // #389: one draw and one clock origin for the whole round, so both halves pose the identical wave.
         // Each arena spawned from `Math.random` and its own `performance.now()`, so the answer took a
-        // different slot in the launch queue on each side — at speed 1 a batch apart is over four seconds of
-        // head start, and the match was decided by whose shuffle dealt it early rather than by who was
-        // quicker. `topInset` is set for both above the draw because the plan is only shared while the
-        // geometry is (`layoutWave` reads W, H and topInset); the rail in `guardrails.test.ts` holds that.
+        // different launch slot on each side — a four-option duel wave is one batch (#400), worst case 1.26 s
+        // at speed 1 — and the match was decided by whose shuffle dealt it early, not by who was quicker.
+        // `topInset` is set for both above the draw because the plan is only shared while the geometry is
+        // (`layoutWave` reads W, H and topInset); the rail in `guardrails.test.ts` holds that.
         //
         // Identical, not mirrored: both children see the answer in the same place at the same moment, which
         // is the fair reading of "the same question" — a mirror about the divider would make the two halves
