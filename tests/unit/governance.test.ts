@@ -5690,3 +5690,47 @@ describe('a rail that enumerates the routine prompts covers all of them (#512, r
     }
   });
 });
+
+/**
+ * #1334. #889 moved Year 2's topic rows from `year2.ts` into `year2-topics.ts`. The add-topic skill still
+ * sent a Year 2 row to `year2.ts` until #1321 caught it by eye, because the #180 block pins a skill's
+ * `description:` line and never its body. This block checks the two facts about files that the skill states:
+ *   1. every `.ts` file it names exists (a bare name is resolved in `src/curriculum/`);
+ *   2. every `src/curriculum/` file that holds a Reception, Year 1 or Year 2 topic row is named somewhere in
+ *      the skill, so a split that moves those rows is red until the skill says where they went.
+ * The scope is the three years the skill covers. KS2 year files are left out, because #1314 gives KS2 its
+ * own rules file, and because a routine that ships a Year 3 file cannot edit `.claude/` to make it green (#342).
+ * What it cannot catch: whether the sentence that names a file says the right thing about it. A skill that
+ * names `year2-topics.ts` only to say "never put a row here" is green, so read the skill when a split lands.
+ * It also misses a row whose `year:` is not a quoted literal, which no curriculum file writes today.
+ */
+describe('the add-topic skill names the curriculum files a topic really goes in (#1334)', () => {
+  const SKILL = '.claude/skills/add-topic/SKILL.md';
+  const skill = doc(SKILL);
+  const CURRICULUM = 'src/curriculum/';
+  const named = [...new Set([...skill.matchAll(/`([\w./-]+\.ts)`/g)].map((m) => m[1]))];
+  const resolve = (name: string) => (name.includes('/') ? name : `${CURRICULUM}${name}`);
+
+  it('reads the skill and the paths it names', () => {
+    expect(skill.length).toBeGreaterThan(500);
+    expect(named).toEqual(expect.arrayContaining(['year1.ts', 'year2.ts', 'util.ts']));
+  });
+
+  it.each(named)('%s names a file that exists', (name) => {
+    expect(existsSync(new URL(resolve(name), REPO_ROOT)), `${SKILL} names ${name}, which is not ${resolve(name)}`)
+      .toBe(true);
+  });
+
+  const KS1_ROW = /\byear:\s*['"](?:reception|year1|year2)['"]/;
+  const holders = readdirSync(new URL(CURRICULUM, REPO_ROOT))
+    .filter((f) => f.endsWith('.ts') && KS1_ROW.test(doc(`${CURRICULUM}${f}`))).sort();
+
+  it('finds the files that hold the Reception, Year 1 and Year 2 rows', () => {
+    expect(holders).toEqual(expect.arrayContaining(['reception.ts', 'year1.ts', 'year2-topics.ts']));
+  });
+
+  it.each(holders)('%s holds topic rows, so the skill names it', (file) => {
+    expect(named.map((n) => n.split('/').pop()), `${CURRICULUM}${file} holds topic rows; say so in ${SKILL}`)
+      .toContain(file);
+  });
+});
