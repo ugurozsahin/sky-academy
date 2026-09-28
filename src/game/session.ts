@@ -34,6 +34,8 @@ export interface SessionEvents {
    */
   onCommit?: (r: SessionResult) => void;
 }
+/** One entry in `SessionResult.misses` (#878): `picked` is the label a wrong slice actually chose, and `null`
+ *  means the question was missed outright — the target bubble fell, or the wave ended with nothing decided. */
 export interface Miss { topic: string; q: Question; picked: string | null }
 export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number; incomplete?: boolean; misses: Miss[] }
 
@@ -50,14 +52,17 @@ export interface SessionResult { mode: Mode; won: boolean; score: number; stars:
  * standing between these numbers and an accidental edit.
  */
 export const starsForAccuracy = (acc: number): 1 | 2 | 3 => acc >= 0.95 ? 3 : acc >= 0.7 ? 2 : 1;
+export interface DeckItem { topic: Topic; q: Question }
 /**
  * With `deck` set, a Session replays exactly that list of questions, in order, and never generates or re-rolls
  * one — `topic` and `pool` are ignored (#878). It ends `won: true` once the deck is exhausted (unless lives ran
  * out first), whatever the mode's own `staged` behaviour would otherwise do: a deck flattens a mission into a
  * single run, the same shape as sprint, so "Fix my mistakes" (#930) and a friend's Challenge code (#294) do not
- * each need their own end-of-run handling.
+ * each need their own end-of-run handling. That includes Boss Battle: exhausting the deck ends the run won,
+ * whether or not the boss still has HP left — nothing pairs `deck` with `mode: 'boss'` today, so this is stated
+ * rather than tested, the same way the rest of this comment is.
  */
-export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; deck?: { topic: Topic; q: Question }[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number }
+export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; deck?: DeckItem[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number }
 
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
@@ -269,9 +274,13 @@ export class Session {
    * those still change exactly once, naturally, when `advance()` is actually reached, so this is a preview,
    * not a second write. Guarded on `!this.ended` so a wrong answer that also empties the last life (a LOSS,
    * not a stage clear) can never fire this with `won: true` — `loseLife()`'s own `end(false)` runs first.
+   *
+   * Guarded on `!this.o.deck` too (#878 review): a deck session never moves `this.stage`/`this.index` — the
+   * same reason `advance()` special-cases it — so without this the guard below would depend on no `YearInfo`
+   * ever setting `perStage: 1`, rather than ruling the case out directly.
    */
   private maybeCommitFinalStage() {
-    if (!this.ev.onCommit || this.ended || !this.spec.staged || this.stage < this.stages || this.index + 1 < this.perStage) return;
+    if (!this.ev.onCommit || this.ended || this.o.deck || !this.spec.staged || this.stage < this.stages || this.index + 1 < this.perStage) return;
     const acc = this.stageAttempts ? this.stageCorrect / this.stageAttempts : 0;
     this.ev.onCommit(this.buildResult(true, [...this.stageStars, starsForAccuracy(acc)]));
   }

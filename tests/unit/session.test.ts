@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Session, repeatKey, starsForAccuracy, type SessionEvents } from '../../src/game/session';
+import { Session, repeatKey, starsForAccuracy, type DeckItem, type SessionEvents } from '../../src/game/session';
 import { TOPICS, YEARS, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -345,8 +345,8 @@ describe('deck replay and misses (#878)', () => {
   const deckTopic = topicById('y1-add')!;
   /** `n` distinct questions (by `repeatKey`) from `deckTopic`, pre-generated the way a "Fix my mistakes" deck
    *  would be — never re-rolled or regenerated once play starts. */
-  const buildDeck = (n: number, seed: number): { topic: Topic; q: Question }[] => {
-    const gen = rng(seed); const seen = new Set<string>(); const deck: { topic: Topic; q: Question }[] = [];
+  const buildDeck = (n: number, seed: number): DeckItem[] => {
+    const gen = rng(seed); const seen = new Set<string>(); const deck: DeckItem[] = [];
     while (deck.length < n) {
       const q = deckTopic.gen(1, gen); const key = repeatKey(q);
       if (seen.has(key)) continue;
@@ -420,6 +420,44 @@ describe('deck replay and misses (#878)', () => {
     const r = ev.onEnd.mock.calls[0][0];
     expect(r.misses).toHaveLength(20);
     expect(r.misses.map((m: any) => m.q)).toEqual(deck.slice(5).map(d => d.q));
+  });
+  it('a deck session ends won: false when lives run out before the deck is exhausted', () => {
+    const deck = buildDeck(5, 960); const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck, rng: rng(961) }, ev);   // Y1: 3 lives, not gentle
+    s.start();
+    const wrongOf = (i: number) => deck[i].q.options.find(o => o !== deck[i].q.answer)!;
+    for (let i = 0; i < Y1.lives; i++) { expect(s.hit(wrongOf(i))).toBe('wrong'); s.advance(); }
+    expect(s.lives).toBe(0); expect(s.ended).toBe(true);
+    expect(ev.onQuestion, 'the deck stops being served the moment lives hit zero').toHaveBeenCalledTimes(Y1.lives);
+    const r = ev.onEnd.mock.calls[0][0];
+    expect(r.won).toBe(false);
+    expect(r.misses).toEqual(deck.slice(0, Y1.lives).map((d, i) => ({ topic: deckTopic.id, q: d.q, picked: wrongOf(i) })));
+  });
+  it('onCommit never fires for a deck session, even in a staged mode with a single stage', () => {
+    // #878 review (silent-failure-hunter, pr-test-analyzer): a deck never moves `stage`/`index`, so
+    // `maybeCommitFinalStage()` must not fire its staged-mission preview through a deck run.
+    const deck = buildDeck(3, 970); const ev = events(); ev.onCommit = vi.fn();
+    const s = new Session({ mode: 'mission', year: Y1, deck, stages: 1, rng: rng(971) }, ev);
+    s.start();
+    for (const item of deck) { expect(s.hit(item.q.answer)).toBe('correct'); s.advance(); }
+    expect(ev.onCommit).not.toHaveBeenCalled();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0].won).toBe(true);
+  });
+  it('a sequence question inside a deck steps letter by letter like any other', () => {
+    const seqTopic = topicById('y1-sentence')!;
+    const gen = rng(980);
+    let q = seqTopic.gen(1, gen);
+    while (!q.sequence) q = seqTopic.gen(1, gen);   // y1-sentence sequences from d1, but don't assume it forever
+    const deck: DeckItem[] = [{ topic: seqTopic, q }];
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck, rng: rng(981) }, ev);
+    s.start();
+    expect(s.current!.sequence).toBeDefined();
+    expect(solve(s)).toBe('correct');
+    s.advance();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0]).toMatchObject({ won: true, correct: 1, questions: 1 });
   });
 });
 
