@@ -983,6 +983,58 @@ describe('Year 1 ranges: capacity and doubles stay inside the year (#298 slice 5
   });
 });
 
+describe('#876: every symbol prompt has a say, and y2-pv reads "1 ten"/"1 one"', () => {
+  const SYMBOL = /[=+−×÷]/;
+  it('a prompt with =, +, −, ×, or ÷ always carries a non-empty say, whichever topic draws it', () => {
+    let checked = 0;
+    for (const t of TOPICS) for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(t.id.length + d + 876);
+      for (let i = 0; i < 300; i++) {
+        const q = t.gen(d, r);
+        if (!SYMBOL.test(q.prompt)) continue;
+        checked++;
+        expect(q.say, `${t.id} d${d} "${q.prompt}" has a symbol prompt with no say`).toBeTruthy();
+      }
+    }
+    expect(checked, 'the sweep found no symbol prompts — this rail would pass vacuously').toBeGreaterThan(0);
+  });
+
+  it('y2-pv never shows "1 tens" or "1 ones" — t = 1 or o = 1 reads "1 ten"/"1 one"', () => {
+    const t = TOPICS.find(x => x.id === 'y2-pv')!; const r = rng(876);
+    let sawOneTen = 0, sawOneOne = 0, sawCard = 0;
+    for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 300; i++) {
+      const q = t.gen(d, r);
+      if (!q.prompt.includes(' and ')) continue;   // the "tens and ones" card only
+      sawCard++;
+      const text = `${q.prompt} ${q.say ?? ''}`;
+      expect(text, q.prompt).not.toMatch(/\b1 tens\b/);
+      expect(text, q.prompt).not.toMatch(/\b1 ones\b/);
+      if (text.includes('1 ten ')) sawOneTen++;
+      if (text.includes('1 one ')) sawOneOne++;
+    }
+    expect(sawCard, 'the sweep drew no "tens and ones" cards — this rail would pass vacuously').toBeGreaterThan(50);
+    expect(sawOneTen, 'the sweep never hit t = 1 — the singular branch went untested').toBeGreaterThan(0);
+    expect(sawOneOne, 'the sweep never hit o = 1 — the singular branch went untested').toBeGreaterThan(0);
+  });
+
+  it('the "tens and ones" say and the y1-doubles say are read-aloud sentences, not raw symbols', () => {
+    for (const [id, filter] of [['y2-pv', (p: string) => p.includes(' and ')], ['y1-doubles', () => true]] as const) {
+      const t = TOPICS.find(x => x.id === id)!; const r = rng(876 + id.length);
+      let checked = 0;
+      for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 100; i++) {
+        const q = t.gen(d, r);
+        if (!filter(q.prompt)) continue;
+        checked++;
+        expect(q.say, `${id} d${d} "${q.prompt}" has no say`).toBeTruthy();
+        expect(q.say, `${id} d${d} say "${q.say}" reads a raw =`).not.toMatch(/=/);
+        const qMark = q.say!.indexOf('?');
+        if (qMark !== -1) expect(qMark, `${id} d${d} say "${q.say}" has a ? that is not the last character`).toBe(q.say!.length - 1);
+      }
+      expect(checked, `${id}: the sweep found no matching cards`).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('y1-skip counts to 100 and no further, answer and decoys alike (#366)', () => {
   /**
    * Red on `main` at `d0f0a99`: `step * 8` in tens started the run at 80, so d3 drew "80, 90, 100, ?" with

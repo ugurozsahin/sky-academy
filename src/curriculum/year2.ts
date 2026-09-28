@@ -42,7 +42,7 @@ const y2PlaceValue: Generator = (d, rng) => {
   const kind = d === 1 ? 0 : ri(rng, 0, 2);
   if (kind === 0) return numQ(rng, `${n}: how many tens?`, t, { min: 0, max: 9, say: `In ${n}, how many tens?`, distractors: [o, t + 1, t - 1] });
   if (kind === 1) return numQ(rng, `${n}: how many ones?`, o, { min: 0, max: 9, say: `In ${n}, how many ones?`, distractors: [t, o + 1, o - 1] });
-  return numQ(rng, `${t} tens and ${o} ones = ?`, n, { min: 10, max: 99, distractors: [t + o * 10, n + 10, n - 1] });
+  const tw = t === 1 ? '1 ten' : `${t} tens`, ow = o === 1 ? '1 one' : `${o} ones`; return numQ(rng, `${tw} and ${ow} = ?`, n, { min: 10, max: 99, say: `${tw} and ${ow}. What number is that?`, distractors: [t + o * 10, n + 10, n - 1] });
 };
 const y2Compare: Generator = (d, rng) => {
   const max = d === 1 ? 20 : 100;

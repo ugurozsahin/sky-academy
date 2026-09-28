@@ -91,7 +91,8 @@ const y1Half: Generator = (d, rng) => {
  */
 const y1Doubles: Generator = (d, rng) => {
   const n = d === 1 ? ri(rng, 1, 5) : d === 2 ? ri(rng, 1, 10) : ri(rng, 6, 10);
-  return numQ(rng, `Double ${n} = ?`, n * 2, { min: 0, max: 20, visual: d === 1 ? { type: 'tenframe', n, n2: n } : undefined });
+  const p = `Double ${n} = ?`;
+  return numQ(rng, p, n * 2, { min: 0, max: 20, visual: d === 1 ? { type: 'tenframe', n, n2: n } : undefined, ...q(p) });
 };
 const COINS = [1, 2, 5, 10, 20, 50, 100, 200];
 /**
