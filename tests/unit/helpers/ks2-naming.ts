@@ -18,22 +18,28 @@ function rng(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 
+// Independent seeds, not one continuing stream (silent-failure-hunter review of PR #1041's first draft): a
+// generator that only emits a counting visual on a rare rng branch could otherwise dodge a single deterministic
+// trajectory forever. Mirrors the multi-seed shape `duelPool`'s own sweep test uses (`tests/unit/duel.test.ts`).
+const SEEDS = [1, 2, 3, 4, 5];
+
 /**
  * Every KS2 naming-rule problem a topic has: a toy icon, an emoji or "!" in the title, or an emoji-counting
  * visual (`objects`/`tenframe`/`dots`) on a drawn card outside the fraction-of-an-amount d1 exception.
- * `draws` questions are drawn at each difficulty (1–3) from a fixed seed, since only the *presence* of a
- * counting visual is checked, not which one a particular seed happens to draw.
+ * `draws` questions are drawn at each difficulty (1–3) from each of five fixed seeds.
  */
 export function namingProblems(topic: Topic, draws: number): string[] {
   const problems: string[] = [];
   if (TOY_ICON.test(topic.icon)) problems.push(`${topic.id}: toy icon "${topic.icon}"`);
   if (TITLE_EMOJI.test(topic.title) || topic.title.includes('!')) problems.push(`${topic.id}: playful title "${topic.title}"`);
-  const r = rng(1);
   for (const d of [1, 2, 3] as Difficulty[]) {
-    const exempt = d === 1 && FRAC_OF_D1_EXEMPT.has(topic.id);
-    for (let i = 0; i < draws; i++) {
-      const v = topic.gen(d, r).visual;
-      if (v && COUNTING_VISUALS.has(v.type) && !exempt) problems.push(`${topic.id} d${d}: emoji-counting visual "${v.type}"`);
+    if (d === 1 && FRAC_OF_D1_EXEMPT.has(topic.id)) continue;
+    seeds: for (const seed of SEEDS) {
+      const r = rng(seed);
+      for (let i = 0; i < draws; i++) {
+        const v = topic.gen(d, r).visual;
+        if (v && COUNTING_VISUALS.has(v.type)) { problems.push(`${topic.id} d${d}: emoji-counting visual "${v.type}"`); break seeds; }
+      }
     }
   }
   return problems;

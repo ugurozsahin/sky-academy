@@ -18,21 +18,35 @@ const VISUALS = {
 const withVisual = (type: keyof typeof VISUALS) => () => ({ prompt: '?', answer: '3', options: ['3', '4', '5', '2'], visual: VISUALS[type] });
 
 describe('KS2 naming rule (#1041): plain titles, functional icons, no emoji-counting pictures', () => {
+  // type-design-analyzer review: the sweep test below only exercises `isKs2` indirectly (it currently filters
+  // every real YearId to nothing), so pin the invariant itself rather than relying on that as incidental proof.
+  it.each(['reception', 'year1', 'year2'] as const)('%s is not KS2', y => { expect(isKs2(y)).toBe(false); });
+
   it('every KS2 registry row draws 150 questions at each difficulty with no naming problem', () => {
-    // With no KS2 YearId defined yet (#1050+ add the first), this set is empty and the sweep passes by having
-    // nothing to check — the fixtures below carry the proof until a real KS2 topic lands.
+    // With no KS2 YearId defined yet (#1050+ adds the first), this set is empty and the sweep passes by having
+    // nothing to check — the fixtures below carry the proof until a real KS2 topic lands. Asserted directly
+    // (pr-test-analyzer review), not left to a bare unasserted loop: a vacuous rail is worse than none
+    // (the same idiom `tests/unit/avatars.test.ts`'s roster-length check uses).
     const ks2 = TOPICS.filter(t => isKs2(t.year));
+    expect(ks2.length, 'no KS2 topics yet (#1050+) — this sweep is inert until one lands').toBe(0);
     for (const t of ks2) expect(namingProblems(t, 150), t.id).toEqual([]);
   });
 
-  it('a toy icon reports a problem', () => {
-    const t = fixture({ icon: '🐾', gen: noVisual });
-    expect(namingProblems(t, 1)).toEqual([`${t.id}: toy icon "🐾"`]);
+  it.each([
+    ['🐾', 'U+1F400–1F43F'], ['🦘', 'U+1F980–1F9AE'], ['🍕', 'U+1F32D–1F37F'], ['🧁', 'the named literal list'],
+  ])('a toy icon (%s, %s) reports a problem', (icon) => {
+    const t = fixture({ icon, gen: noVisual });
+    expect(namingProblems(t, 1)).toEqual([`${t.id}: toy icon "${icon}"`]);
   });
 
-  it('a playful title ("Order Up!") reports a problem', () => {
+  it('a playful title ("Order Up!", an exclamation mark) reports a problem', () => {
     const t = fixture({ title: 'Order Up!', gen: noVisual });
     expect(namingProblems(t, 1)).toEqual([`${t.id}: playful title "Order Up!"`]);
+  });
+
+  it('a playful title (an emoji, no exclamation mark) also reports a problem', () => {
+    const t = fixture({ title: 'Fractions Fun 🎉', gen: noVisual });
+    expect(namingProblems(t, 1)).toEqual([`${t.id}: playful title "Fractions Fun 🎉"`]);
   });
 
   it('an emoji-counting visual (tenframe) reports a problem at every difficulty', () => {
