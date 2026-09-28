@@ -7,7 +7,7 @@ import { sfx, say } from '../audio';
 import { SPRINT_SECONDS, type Mode } from '../game/session';
 import { MODES } from '../game/modes';
 import { weakestTopics } from '../game/sensei';
-import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge } from '../game/dojo';
+import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
 import { $, $$, capDigits, render, stars } from './dom';
@@ -44,9 +44,12 @@ function topbar(nav: Nav, rerender: () => void) {
 export function dojoRowLine(c: Challenge, progress: number): string {
   return progress >= c.goal ? `${c.title}. Done!` : `${c.title}. ${progress} of ${c.goal} done.`;
 }
-/** Daily Dojo card: today's three challenges, progress bars, bonus coins and the streak multiplier. */
-function dojoCard() {
-  const s = dojoToday(); const cs = dailyChallenges(s.date); const carried = carriedStreak(s, s.date); const mult = multiplier(carried);
+/** Daily Dojo card: today's three challenges, progress bars, bonus coins and the streak multiplier.
+ *  Takes today's state and challenges rather than reading them itself (#894 silent-failure-hunter review):
+ *  `mapScreen` needs the same two values again to bind the tap-to-speak handler, and a second `dojoToday()`
+ *  call — a fresh `new Date()` — could in principle land on the other side of midnight from the first. */
+function dojoCard(s: DojoState, cs: Challenge[]) {
+  const carried = carriedStreak(s, s.date); const mult = multiplier(carried);
   const items = cs.map(c => { const p = Math.min(c.goal, s.progress[c.id] ?? 0); const done = s.done.includes(c.id); return `
     <li class="dojo-item${done ? ' done' : ''}" data-id="${c.id}"><span class="ic">${c.icon}</span><span class="txt"><b>${c.title}</b><span class="isl-bar"><i style="width:${Math.round(100 * p / c.goal)}%"></i></span></span><span class="prog">${done ? `✓ +${Math.floor(c.bonus * mult)} 🪙` : `${p}/${c.goal}`}</span></li>`; }).join('');
   return `
@@ -68,6 +71,7 @@ export function mapScreen(nav: Nav) {
   const maxStars = (y: YearInfo) => topicsFor(y.id).length * 3;
   const shown = shownYears();
   const tb = topbar(nav, () => mapScreen(nav));
+  const dojoState = dojoToday(); const dojoChallenges = dailyChallenges(dojoState.date);
   render(`
   <section class="screen home map">
     ${tb.html}
@@ -81,7 +85,7 @@ export function mapScreen(nav: Nav) {
           <span class="isl-go">Go →</span>
         </button>`; }).join('')}
     </div>
-    ${dojoCard()}
+    ${dojoCard(dojoState, dojoChallenges)}
     <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS & KS1 National Curriculum</span>
       <div class="foot-links">
         <button class="foot-link" id="grownups" aria-label="For grown-ups">👤 For grown-ups</button>
@@ -94,7 +98,6 @@ export function mapScreen(nav: Nav) {
     save({ year: y.id }); sfx.tap(); say(`${y.title} island`); nav.island(y);
   }));
   // #894: a Daily Dojo row has no action of its own, so tapping it just reads it aloud, for a pre-reader.
-  const dojoState = dojoToday(); const dojoChallenges = dailyChallenges(dojoState.date);
   $$('.dojo-item').forEach(li => li.addEventListener('click', () => {
     const c = dojoChallenges.find(x => x.id === li.dataset.id); if (!c) return;
     say(dojoRowLine(c, Math.min(c.goal, dojoState.progress[c.id] ?? 0)), true);

@@ -1476,6 +1476,71 @@ test.describe('Sky Ninja Academy', () => {
     expect(spoken.filter(l => l === cardLine), 'the Buy tap must not also speak the card a second time').toHaveLength(1);
   });
 
+  // pr-test-analyzer review of #894: the pure-function unit test covers the "Done!" boundary with a hand-built
+  // Challenge, but nothing drove a real completed row through the actual DOM/progress binding — seeded for
+  // both today and tomorrow (`dailyChallenges` is a pure function of the date string) so the page's own clock
+  // decides which one applies, the same way the #518 Memory Match test above seeds across a midnight boundary.
+  test('menu tap-to-speak (#894): a completed Daily Dojo row reads "Done!", not a fraction', async ({ page }) => {
+    await captureSpeech(page);
+    const dojoByDate: Record<string, unknown> = {};
+    for (const offset of [0, 1]) {
+      const dt = new Date(); dt.setUTCDate(dt.getUTCDate() + offset);
+      const date = dt.toISOString().slice(0, 10);
+      const cs = dailyChallenges(date);
+      dojoByDate[date] = {
+        date, progress: Object.fromEntries(cs.map(c => [c.id, c.goal])), done: cs.map(c => c.id),
+        setDone: true, streak: { last: date, days: 1 }, total: cs.length,
+      };
+    }
+    await page.addInitScript(({ save, dojoByDate }) => {
+      if (localStorage.getItem('sna:v1')) return;
+      const d = JSON.parse(save) as Record<string, unknown>;
+      d.dojo = dojoByDate[new Date().toISOString().slice(0, 10)];
+      localStorage.setItem('sna:v1', JSON.stringify(d));
+    }, { save: JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' }), dojoByDate });
+    await page.goto('/');
+    await expect(page.locator('.home')).toBeVisible();
+    const row = page.locator('.dojo-item.done').first();
+    const title = await row.locator('b').textContent();
+    await row.click();
+    await expect.poll(() => page.evaluate(() => window.__spoken ?? []))
+      .toEqual(expect.arrayContaining([`${title}. Done!`]));
+  });
+
+  // pr-test-analyzer review of #894: `.sticker:not(.got)` is never given a listener, so an earned sticker
+  // should stay silent — asserted here rather than only implied by the locked-sticker tests above.
+  test('menu tap-to-speak (#894): an already-earned sticker stays silent on tap', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page, 'volt', 'Ada', { stickers: ['volt'] });
+    await page.click('#rewards');
+    const card = page.locator('.sticker.got').first();
+    await expect(card).toBeVisible();
+    await card.click();
+    expect(await page.evaluate(() => window.__spoken ?? []), 'an earned sticker has no listener at all').toEqual([]);
+  });
+
+  // pr-test-analyzer review of #894: the "Using ✓" pill is a <span>, not a <button>, so the card handler's
+  // `closest('button')` guard does not exclude it — a tap there speaks the card, deliberately, since the pill
+  // performs no action of its own. The neighbouring "Use" button on the still-owned default trail DOES perform
+  // an action (equip), and that path was covered only by code-reading before this test.
+  test('menu tap-to-speak (#894): the equipped pill still speaks the card; the "Use" button does not', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page, 'volt', 'Ada', { coins: 200, spent: 0, owned: ['trail-gold'], equipped: { trail: 'trail-gold' } });
+    await page.click('#rewards'); await page.click('#shop');
+    const goldCard = page.locator('.item[data-item="trail-gold"]');
+    const goldLine = `${await goldCard.locator('b').textContent()}. ${await goldCard.locator('small').textContent()}`;
+    await goldCard.locator('.pill.on').click();
+    await expect.poll(() => page.evaluate(() => window.__spoken ?? []))
+      .toEqual(expect.arrayContaining([goldLine]));
+
+    const elementCard = page.locator('.item[data-item="trail-element"]');
+    await expect(elementCard.locator('[data-equip]'), 'owned for free, not equipped — the "Use" button, not the pill').toBeVisible();
+    const before = (await page.evaluate(() => window.__spoken ?? [])).length;
+    await elementCard.locator('[data-equip]').click();
+    await expect(elementCard.locator('.pill.on'), 'the equip itself must still have worked').toBeVisible();
+    expect(await page.evaluate(() => window.__spoken ?? []), 'the Use button must not also speak the card').toHaveLength(before);
+  });
+
   test('reception is gentle: missed bubbles re-ask without losing lives', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-onemore');
