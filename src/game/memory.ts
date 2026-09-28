@@ -110,9 +110,12 @@ export class Memory {
   get coins() { return this.done ? this.matched * 2 + 5 * this.stars : 0; }
 }
 
+/** Whether `year` has Memory Match decks of its own — `src/ui/home.ts` hides the button when this is false. */
+export const hasMemoryDecks = (year: YearId): boolean => (THEMES[year]?.length ?? 0) > 0;
+
 export function pickTheme(year: YearId, rng: Rng = Math.random, id?: string): Theme {
-  // Fall back to Reception's decks for any year that has no themes yet (e.g. Y3–Y6 before their own are added).
-  const list = THEMES[year] ?? THEMES.reception!;
+  const list = THEMES[year];
+  if (!list) throw new Error(`no Memory Match decks for ${year}`);   // unreachable once the button is hidden (#1049)
   return list.find(t => t.id === id) ?? pick(rng, list);
 }
 
