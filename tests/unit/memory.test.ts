@@ -1,12 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { gridFor, Memory, THEMES, pickTheme } from '../../src/game/memory';
-import { YEARS } from '../../src/curriculum';
+import { gridFor, hasMemoryDecks, Memory, THEMES, pickTheme } from '../../src/game/memory';
+import { YEARS, type YearId } from '../../src/curriculum';
 import { SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const faceKey = (f: { text: string; coin?: number }) => `${f.coin ? 'coin:' : ''}${f.text}`;
 
 describe('memory decks', () => {
+  // #1049: a year with no THEMES entry used to fall back to Reception's decks — a Year 3+ child matching "3"
+  // to three apples. hasMemoryDecks is what src/ui/home.ts hides the button on; pickTheme now throws instead
+  // of falling back, so the button being hidden is the only thing standing between a bare year and a crash.
+  it('hasMemoryDecks is true for Reception, Year 1 and Year 2, and false for a year with no decks', () => {
+    for (const y of YEARS) expect(hasMemoryDecks(y.id), y.id).toBe(true);
+    expect(hasMemoryDecks('year3' as YearId)).toBe(false);
+  });
+  it('pickTheme throws for a year with no decks, and never falls back to Reception', () => {
+    expect(() => pickTheme('year3' as YearId, rng(1))).toThrow('no Memory Match decks for year3');
+  });
   it('every theme builds 4–8 pairs with distinct faces on each side, for every year', () => {
     for (const y of YEARS) {
       const themes = THEMES[y.id];
