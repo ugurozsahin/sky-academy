@@ -4,6 +4,7 @@ import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
 import { settingsHTML } from '../../src/ui/parents-settings';
+import { slipsHTML } from '../../src/ui/parents-slips';
 import { freshDojo } from '../../src/game/dojo';
 
 // minimal localStorage shim for node, same as tests/unit/storage.test.ts
@@ -322,5 +323,37 @@ describe('settingsHTML marks the stored 3-D value as checked (#904)', () => {
       const btn = new RegExp(`<button class="tab${v === stored ? ' on' : ''}" data-three="${v}" role="radio" aria-checked="${v === stored}">`);
       expect(html, `${v} must ${v === stored ? '' : 'not '}be marked checked`).toMatch(btn);
     }
+  });
+});
+
+describe('slipsHTML (#938): the "Recent slips" section\'s markup', () => {
+  const row = (over: Partial<SlipRow> = {}): SlipRow => ({ icon: '➕', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29', ...over });
+  it('an empty list shows the empty-state line, not a list', () => {
+    const html = slipsHTML([]);
+    expect(html).toContain('No wrong answers yet');
+    expect(html).not.toContain('<ul');
+  });
+  it('a real pick reads "Sliced: <label>"', () => {
+    expect(slipsHTML([row({ picked: '8' })])).toMatch(/Answer: 9 · Sliced: 8/);
+  });
+  it('an empty pick (the bubble fell, never sliced) reads "Not sliced in time"', () => {
+    const html = slipsHTML([row({ picked: '' })]);
+    expect(html).toContain('Not sliced in time');
+    expect(html).not.toContain('Sliced:');
+  });
+  // y2-compare's own answers are '<'/'>'/'=' (src/curriculum/year2.ts) — a real prompt/answer/pick this
+  // markup will actually receive, not a synthetic XSS string, so escaping here is load-bearing, not defensive.
+  it('escapes prompt, answer and picked — a "<" answer never opens a tag', () => {
+    const html = slipsHTML([row({ prompt: '7 < 9', answer: '<', picked: '>' })]);
+    expect(html).toContain('7 &lt; 9');
+    expect(html).toContain('Answer: &lt;');
+    expect(html).toContain('Sliced: &gt;');
+  });
+  it('renders one row per slip, in the given order, with the icon and the day', () => {
+    const rows = [row({ icon: '🔤', at: '2026-09-29' }), row({ icon: '➗', at: '2026-09-28' })];
+    const html = slipsHTML(rows);
+    expect(html.indexOf('🔤')).toBeLessThan(html.indexOf('➗'));
+    expect(html).toContain('2026-09-29');
+    expect(html).toContain('2026-09-28');
   });
 });

@@ -2756,6 +2756,18 @@ describe('a finished game is persisted in one write, or not at all (#365)', () =
       recordGameEnd({ ...memoryWin, slips: [oneSlip] }, 0, new Date('2026-09-29T12:00:00Z'));
       expect(disked().slips).toEqual([{ ...oneSlip, at: '2026-09-29' }, { topic: 'y1-add', prompt: '1 + 1', answer: '2', picked: '', at: '2026-01-01' }]);
     });
+    // A single session can miss more than one question — missSlips() already puts its own slips newest-first
+    // (session.test.ts pins that), so recordGameEnd() must not re-order what it is handed, only prepend it.
+    it('several slips from one call keep the order they arrived in, all stamped with this call\'s own day', () => {
+      const newer = { topic: 'y1-add', prompt: '4 + 5', answer: '9', picked: '8' };
+      const older = { topic: 'y1-sub', prompt: '9 − 3', answer: '6', picked: '5' };
+      save({ slips: [{ topic: 'y1-add', prompt: '1 + 1', answer: '2', picked: '', at: '2026-01-01' }] });
+      recordGameEnd({ ...memoryWin, slips: [newer, older] }, 0, new Date('2026-09-29T12:00:00Z'));
+      expect(disked().slips).toEqual([
+        { ...newer, at: '2026-09-29' }, { ...older, at: '2026-09-29' },
+        { topic: 'y1-add', prompt: '1 + 1', answer: '2', picked: '', at: '2026-01-01' },
+      ]);
+    });
     it('stays capped at 20, dropping the oldest', () => {
       const old = Array.from({ length: 20 }, (_, i) => ({ topic: 'y1-add', prompt: `q${i}`, answer: '1', picked: '', at: '2026-01-01' }));
       save({ slips: old });
