@@ -5741,8 +5741,10 @@ describe('the add-topic skill names the curriculum files a topic really goes in 
  * report named other issues as the free ones. Meanwhile P2 and P3 pull requests opened. The rule now names
  * the test: each blocker's live state, and never the label or a report. The pick line records how many
  * blockers were read, so a run that skipped the reading shows in its own pulse.
- * What this cannot catch: a run that writes the count without having read anything. The watchdog's
- * re-derivation (#1348's own method) is what sees that.
+ * What this cannot catch: whether a run reads anything, or whether the count it writes is true. It is text over
+ * an instruction file, and nothing here or elsewhere re-reads a run's blockers. The watchdog's check 5(b)
+ * compares a run's pull request with the query's top issue, so it misses a made-up count on a correct pick
+ * and a run that wrongly writes `none eligible` (PR #1365 review, round 2).
  */
 describe('STEP 3 drops a blocked issue by its blockers\' live state, not the label (#1348)', () => {
   const prompt = doc('docs/ROUTINE-PROMPT.md');
@@ -5751,10 +5753,8 @@ describe('STEP 3 drops a blocked issue by its blockers\' live state, not the lab
   // PR #1365 review: "count them" let a run count only the picked issue's own blockers (0 or 1, true every run
   // with no other candidate read), and a singular "an issue" let a run check only the first of two blockers.
   it('rule 2 reads every named blocker of every candidate live, and never the label or a report', () => {
-    expect(rule2).toContain('`Blocked by #<n>, #<m>…` names even one issue open **now**');
-    expect(rule2).toContain("read every named blocker's live state for every candidate, never the `blocked` label or a report's list");
-    expect(rule2, 'a blocker this repo cannot read never counts as closed').toContain('`owner/repo#<n>` counts as open');
-    expect(rule2, 'the count is the whole pass, not the pick').toContain('The pick line gives the total read (#1348)');
+    // Round 2: fragment pins left the lead-in free to narrow back to the picked candidate, so the unit is pinned whole.
+    expect(rule2).toBe("2. **drop** anything with an open PR already solving it, yours or another run's (search the open PR list for its number first), and any candidate whose first line `Blocked by #<n>, #<m>…` names even one issue open **now**: read every named blocker's live state for every candidate, never the `blocked` label or a report's list; another repo's `owner/repo#<n>` counts as open. The pick line gives the total read (#1348);");
   });
 
   it('the example snapshot shows a non-zero total in its pick line', () => {
