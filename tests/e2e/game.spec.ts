@@ -2594,6 +2594,51 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.celebrate')).toBeVisible({ timeout: 5000 });
   });
 
+  /**
+   * Fakes just enough of the injected Capacitor bridge (#885) to drive `main.ts`'s real `wireBackButton` call
+   * through a browser, with no device: `Plugins.App` so `plugin('App', …)` registers the real listener and
+   * hands back its callback as `window.__backCb`, and `getPlatform: () => 'web'` so `isNativeShell()` — read
+   * elsewhere by `pwa.ts` and `certificate.ts`, neither under test here — answers exactly as it does with no
+   * bridge at all, rather than flipping unrelated native-only behaviour on for the rest of the page.
+   */
+  async function fakeBackButton(page: Page) {
+    await page.addInitScript(() => {
+      (window as any).Capacitor = {
+        getPlatform: () => 'web',
+        Plugins: {
+          App: {
+            addListener: (event: string, cb: () => void) => { if (event === 'backButton') (window as any).__backCb = cb; },
+            minimizeApp: () => { (window as any).__minimized = ((window as any).__minimized ?? 0) + 1; return Promise.resolve(); },
+          },
+        },
+      };
+    });
+  }
+  /** Fires the captured `backButton` callback — the hardware/gesture press itself. */
+  const pressBack = (page: Page) => page.evaluate(() => (window as any).__backCb());
+
+  test('a hardware back press during a live Sprint opens Pause; a second press then leaves to the island (#885)', async ({ page }) => {
+    await fakeBackButton(page);
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await expect(page.locator('.play')).toBeVisible();
+    await pressBack(page);
+    await expect(page.locator('#resume')).toBeVisible();
+    expect((await state(page)).paused).toBe(true);
+    expect(await page.evaluate(() => (window as any).__minimized), 'the guard consumed the press: no minimize').toBeUndefined();
+    await pressBack(page);                                          // Pause already up: the guard returns false
+    await expect(page.locator('.island-screen')).toBeVisible();      // and the press falls through, same as #699
+  });
+
+  test('a hardware back press at the sky map — no live game — still backgrounds the app, unchanged (#885)', async ({ page }) => {
+    await fakeBackButton(page);
+    await seedPlayer(page);
+    await expect(page.locator('.home')).toBeVisible();
+    await pressBack(page);
+    expect(await page.evaluate(() => (window as any).__minimized)).toBe(1);   // #699's own root behaviour, untouched
+  });
+
   test('Daily Dojo: three challenges on the sky map, progress survives a reload, bonus rows on results', async ({ page }) => {
     await seedPlayer(page);
     const items = page.locator('.dojo-item');

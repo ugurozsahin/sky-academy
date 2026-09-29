@@ -436,6 +436,27 @@ test.describe('Ninja Duel', () => {
     expect(await page.locator('#cert-msg').count(), 'nor write its message into whatever screen replaced it').toBe(0);
   });
 
+  /** Same fake as `game.spec.ts`'s `fakeBackButton` (#885) — duplicated rather than shared, as this file's own
+   *  fixtures already are, since the two suites do not share module scope. */
+  async function fakeBackButton(page: Page) {
+    await page.addInitScript(() => {
+      (window as any).Capacitor = {
+        getPlatform: () => 'web',
+        Plugins: { App: { addListener: (event: string, cb: () => void) => { if (event === 'backButton') (window as any).__backCb = cb; }, minimizeApp: () => Promise.resolve() } },
+      };
+    });
+  }
+  const pressBack = (page: Page) => page.evaluate(() => (window as any).__backCb());
+
+  test('a hardware back press during a live duel opens Pause; a second press then leaves to the island (#885)', async ({ page }) => {
+    await fakeBackButton(page);
+    await startDuel(page);
+    await pressBack(page);
+    await expect(page.locator('#resume')).toBeVisible();
+    await pressBack(page);                                    // Pause already up: the guard returns false
+    await expect(page.locator('.island-screen')).toBeVisible();
+  });
+
   test('the card carries the line the round is decided by, every round (#65, PR #295 review)', async ({ page }) => {
     await startDuel(page);
     // The pool's comparison topics (length, mass, capacity, temperature) put the values being compared in
