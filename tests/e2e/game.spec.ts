@@ -709,8 +709,14 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   // #981: y1-story is the first problem-in-context topic in the game — a unit test of the generator cannot
-  // see whether the objects visual actually renders or whether a story sentence (up to 65 characters) fits
-  // the shortest phone we support without pushing the bubbles off screen.
+  // see whether the objects visual actually renders, whether the take-away form's cross-out markup actually
+  // appears in a real DOM, or whether a story sentence (up to 65 characters) fits the shortest phone we
+  // support without pushing the bubbles off screen.
+  //
+  // Stage 1 is difficulty 1, which only ever draws the add or take-away form (never the d3-only missing-part
+  // one — `tests/unit/topic-y1-story.test.ts` covers that one's oracle and visual maths directly, since
+  // reaching it here would need `skipToStage` plus retrying against a real random draw for no `__sna` hook
+  // this repo has to force a topic's own internal `kind` choice).
   test('y1-story: the story card, its objects and the bubbles reach the card on the shortest phone (#981)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 664 });
     await seedPlayer(page);
@@ -718,6 +724,11 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.vis.objs')).toBeVisible();
     const overflow = await page.locator('.vis').evaluate(el => el.scrollWidth - el.clientWidth);
     expect(overflow, `the story card overflowed the viewport by ${overflow}px`).toBeLessThanOrEqual(1);
+    // Whichever of the two d1 forms was drawn, its own picture actually rendered: add's two separate groups,
+    // or take-away's cross-out on exactly the departed objects — never a bare uniform group either way.
+    const n2 = await page.evaluate(() => (window.__sna.session.current.visual as { n2?: number }).n2);
+    if (n2! < 0) await expect(page.locator('.vis.objs .obj.gone').first()).toBeVisible();
+    else await expect(page.locator('.vis.objs.two .grp')).toHaveCount(2);
     await waitForTarget(page);
     expect(await answer(page)).toBe(true);
   });

@@ -30,11 +30,13 @@ const y1Add: Generator = (d, rng) => {
 /**
  * #981: Year 1 must "solve one-step problems ... using concrete objects and pictorial representations"
  * (KS1 maths PoS) — `y1Add`/`y1Sub`/`y1Missing` above are all bare number sentences, so this is the first
- * problem-in-context topic in the game. Every number *written* in the story is 2 or more (no "1 ducks"), the
- * same rule `y1Words` etc. don't need but a story sentence does; the *answer* itself may still be 0–20.
+ * problem-in-context topic in the game. Every number *written* in the story is 2 or more (no "1 ducks"); the
+ * generator's own bounds (`a,b,left ≥ 2` with `b/left ≤ a − 2`) mean the *answer* is always achievable in
+ * 2–20 in practice, never actually 0 or 1, though `numQ` is still given the full `min: 0` floor rather than a
+ * tighter one that would need re-deriving per kind.
  */
-interface StoryFrame { emoji: string; noun: string; place: string; join: string; leave: string }
-const Y1_STORY_BANK: StoryFrame[] = [
+export interface StoryFrame { emoji: string; noun: string; place: string; join: string; leave: string }
+export const Y1_STORY_BANK: StoryFrame[] = [
   { emoji: '🦆', noun: 'ducks', place: 'on the pond', join: 'more swim over', leave: 'fly away' },
   { emoji: '🐦', noun: 'birds', place: 'in the tree', join: 'more land nearby', leave: 'fly away' },
   { emoji: '🐝', noun: 'bees', place: 'in the garden', join: 'more buzz in', leave: 'buzz off' },
@@ -52,7 +54,11 @@ const y1Story: Generator = (d, rng) => {
   if (kind === 2) {
     const a = ri(rng, 4, max), left = ri(rng, 2, a - 2), eaten = a - left;
     const p = `${a} ${bank.noun} ${bank.place}. ${left} are left. How many ${bank.leave}?`;
-    return numQ(rng, p, eaten, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a }, distractors: [a + left, a, eaten + 1, eaten - 1] });
+    // The picture has to carry the same "concrete objects" weight as the add/take-away forms below: crossing
+    // out exactly the `eaten` group (review finding) leaves the stated `left` count showing normally, the
+    // same cross-out `fiveFrames()` already draws for an ordinary take-away — a bare `n: a` with no `n2` (the
+    // first version of this branch) drew a uniform group with nothing for the story's "are left" to point at.
+    return numQ(rng, p, eaten, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: -eaten }, distractors: [a + left, a, eaten + 1, eaten - 1] });
   }
   if (kind === 1) {
     const a = ri(rng, 4, max), b = ri(rng, 2, a - 2), answer = a - b;
