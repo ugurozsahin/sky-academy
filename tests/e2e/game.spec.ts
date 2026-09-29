@@ -2255,6 +2255,53 @@ test.describe('Sky Ninja Academy', () => {
       + 'only thing hiding the score float that finishes inside it').toBeGreaterThanOrEqual(0.9);
   });
 
+  // #899: the game already honours prefers-reduced-motion for confetti, hero art and the timer (#154), but
+  // the wrong-answer card shake and the locked-avatar shake were added later and never joined that rule
+  // (`src/styles/overlays.css`'s reduced-motion selector list). Reduced Motion is one of Apple's Accessibility
+  // Nutrition Labels, so this is not cosmetic. The colour change (`.qcard.bad`'s red border) is deliberately
+  // kept — only the shake stops — so the check pins `animationName` rather than the whole computed style.
+  test('guard rail: a wrong answer stops shaking the question card under reduced motion, but stays red (#899)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-tables');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    const bad = await page.evaluate(() => {
+      const s = getComputedStyle(document.querySelector('.qcard.bad')!);
+      return { animation: s.animationName, border: s.borderColor };
+    });
+    expect(bad.animation).toBe('none');
+    expect(bad.border).not.toBe('');   // the bad-answer border colour is unaffected — only the shake stops
+  });
+
+  test('guard rail: a wrong answer still shakes the question card without reduced motion (#899)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-tables');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    const animation = await page.evaluate(() => getComputedStyle(document.querySelector('.qcard.bad')!).animationName);
+    expect(animation).toBe('qshake');
+  });
+
+  test('guard rail: tapping a locked avatar does not shake it under reduced motion (#899)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/?reset=1');
+    const card = page.locator('.avatar-card[data-id="master"]');
+    await expect(card).toHaveClass(/locked/);
+    await card.click();
+    const animation = await page.evaluate(() => getComputedStyle(document.querySelector('.avatar-card.shake')!).animationName);
+    expect(animation).toBe('none');
+  });
+
+  test('guard rail: tapping a locked avatar still shakes it without reduced motion (#899)', async ({ page }) => {
+    await page.goto('/?reset=1');
+    const card = page.locator('.avatar-card[data-id="master"]');
+    await expect(card).toHaveClass(/locked/);
+    await card.click();
+    const animation = await page.evaluate(() => getComputedStyle(document.querySelector('.avatar-card.shake')!).animationName);
+    expect(animation).toBe('shake');
+  });
+
   // #32: the suite runs at 8× (the beforeEach above), which compresses the outcome holds. This one test forces
   // speed 1 and asserts the holds are the curriculum values the owner asked for (correct 1000, wrong 1800,
   // miss 1500). Without it the fast suite verifies nothing about the holds, and the day someone changes a
