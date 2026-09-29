@@ -39,6 +39,8 @@
     "src/ui/visuals.ts::renderVisual": 89
   },
   "fileLines": {
+    "src/curriculum/year2.ts": 753,
+    "src/storage.ts": 1491,
     "tests/unit/arena.test.ts": 948,
     "tests/unit/audio.test.ts": 617,
     "tests/unit/curriculum.test.ts": 2650,
