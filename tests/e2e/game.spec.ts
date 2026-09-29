@@ -1026,6 +1026,51 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   /**
+   * #929: the results row's one contextual action, real play through to a real second mission — the unit
+   * tests (`results.test.ts`, `screen.test.ts`) pin `resultsAction()`'s precedence and the button's markup;
+   * this is the one place `play.ts`'s own wiring (which topic "next" resolves to, and that tapping it starts
+   * a mission on it) is exercised at all. Reception maths has 13 topics (`reception.ts`); every one but
+   * `r-count` (about to be won) and `r-doubles` is pre-starred, so `r-doubles` is the only unstarred topic
+   * left after the win and the "first after r-count, wrapping" rule has exactly one candidate to find.
+   */
+  test('results screen (#929): "Next topic →" starts the next unstarred topic in the same subject', async ({ page }) => {
+    test.setTimeout(150_000);
+    await seedPlayer(page, 'volt', 'Ada', {
+      progress: Object.fromEntries(
+        ['r-subitise', 'r-compare', 'r-onemore', 'r-bonds', 'r-add', 'r-sub', 'r-counton', 'r-order', 'r-balance', 'r-share', 'r-oddeven']
+          .map(id => [id, { stars: 1, best: 5, plays: 1 }]),
+      ),
+    });
+    await startTopic(page, 'reception', 'r-count');
+    await winMission(page);   // the precondition (#749) — commitResult() stars r-count before showResults() runs
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    const action = results.locator('#next-topic');
+    await expect(action).toHaveText('Next topic →');
+    await action.click();
+    await expect(page.locator('.play')).toBeVisible();
+    await expect(page.locator('.ttl')).toHaveText('Doubles');
+    await expect(page.locator('.results')).toHaveCount(0);   // a fresh mission, not the old overlay left behind
+  });
+
+  test('results screen (#929): no "Next topic →" once every topic in the subject is already starred', async ({ page }) => {
+    test.setTimeout(150_000);
+    await seedPlayer(page, 'volt', 'Ada', {
+      progress: Object.fromEntries(
+        ['r-subitise', 'r-compare', 'r-onemore', 'r-bonds', 'r-add', 'r-sub', 'r-counton', 'r-order', 'r-balance', 'r-doubles', 'r-share', 'r-oddeven']
+          .map(id => [id, { stars: 1, best: 5, plays: 1 }]),
+      ),
+    });
+    await startTopic(page, 'reception', 'r-count');
+    await winMission(page);
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    await expect(results.locator('#next-topic')).toHaveCount(0);
+    await expect(results.locator('#again')).toBeVisible();   // the row still renders its two ordinary buttons
+    await expect(results.locator('#home')).toBeVisible();
+  });
+
+  /**
    * #470: `recordCert()`'s own `save()` swallows a refused `setItem` (#151) and the 🎓 row used to be drawn
    * from the in-memory certificate regardless, offering a keepsake the album does not actually hold. Same
    * shape as the Ninja Duel case (`tests/e2e/duel.spec.ts`), the other of the two `recordCert()` call sites.
