@@ -35,6 +35,9 @@ export interface ResultsData {
   starCount: number; score: number; correct: number; attempts: number; bestCombo: number;
   coins: number; newBest: boolean; streak: number;
   dojoRows: string; stickerHTML: string; cert: boolean;
+  /** Belt/island/trophy/best/rest announcements (#896), already rendered as `best-pill` spans; '' or
+   *  omitted when the caller supplies none — today, always, since nothing produces a candidate yet. */
+  resultLines?: string;
 }
 export function resultsHTML(d: ResultsData): string {
   return resultsModal({
@@ -47,7 +50,7 @@ export function resultsHTML(d: ResultsData): string {
     stars: d.mode !== 'endless' ? d.starCount : undefined,
     stats: `<div><b>${d.score}</b><small>score</small></div><div><b>${d.correct}/${d.attempts}</b><small>correct</small></div><div><b>×${d.bestCombo}</b><small>best combo</small></div>`,
     coins: d.coins,
-    pills: `${d.newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${d.streak > 1 ? `<span class="streak-pill">🔥 ${d.streak}-day streak</span>` : ''}`,
+    pills: `${d.newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${d.streak > 1 ? `<span class="streak-pill">🔥 ${d.streak}-day streak</span>` : ''}${d.resultLines ?? ''}`,
     dojoRows: d.dojoRows, stickerHTML: d.stickerHTML,
     cert: d.cert,
   });

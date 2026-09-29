@@ -2,6 +2,7 @@
 // decided purely from the finished run, with no DOM or side effects, so they can be unit-tested directly
 // instead of only through the e2e results screen. play.ts keeps the recording, speech and overlay wiring.
 import { MODES, type Mode } from '../game/modes';
+import { esc } from './dom';
 
 /** How a finished run scored — the fields the medal reads. */
 export interface RunOutcome {
@@ -52,4 +53,34 @@ export function resultHeadline(
   if (r.mode === 'boss' && r.won) return `K.O.! You beat Hammer Man, ${name}!`;
   if (r.won) return opts.praiseLine();
   return MODES[r.mode].villain ? `Hammer Man got away this time, ${name}!` : `Good try, ${name}! Have another go.`;
+}
+
+/**
+ * A results-screen announcement (#896) — the new-best line, a belt, a trophy, island master or the rest
+ * prompt. Each is its own later ticket (#933, #951, #912, #952, #940); this only makes room for them.
+ */
+export interface ResultCandidate { kind: 'belt' | 'island' | 'trophy' | 'best' | 'rest'; text: string }
+
+/** Register order (§R of #896): belt outranks island, island outranks trophy, and so on. */
+const RESULT_LINE_ORDER: ResultCandidate['kind'][] = ['belt', 'island', 'trophy', 'best', 'rest'];
+
+/**
+ * At most two results-screen announcements, in register order, so two features speaking on the same
+ * results screen never talk over each other or crowd the coin row. A stable sort, so two candidates of the
+ * same kind (which should not happen — each kind is one announcement) keep their input order rather than
+ * being reordered against each other.
+ */
+export function resultsLines(candidates: ResultCandidate[]): ResultCandidate[] {
+  return [...candidates].sort((a, b) => RESULT_LINE_ORDER.indexOf(a.kind) - RESULT_LINE_ORDER.indexOf(b.kind)).slice(0, 2);
+}
+
+/**
+ * `lines` (already chosen by `resultsLines()`) rendered as `best-pill` spans for the coin row — the same
+ * class `newBest`'s pill already uses (`overlays.ts`), escaped through `esc()` the way every other piece of
+ * child-authored or generated text on this screen is. Pulled out as its own pure function (#896 review,
+ * pr-test-analyzer) so the escaping has a unit test that does not need a real DOM, which this project's
+ * unit suite has no `document` for.
+ */
+export function resultPillsHTML(lines: ResultCandidate[]): string {
+  return lines.map(l => `<span class="best-pill">${esc(l.text)}</span>`).join('');
 }
