@@ -14,6 +14,16 @@ const isoDay = (v: unknown): v is string => typeof v === 'string' && ISO_DAY.tes
 const strArr = (v: unknown): v is string[] => Array.isArray(v) && v.every(str);
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
+/**
+ * The cap #903's Proposed fix asks for on every free-text field these records store — "cut every stored
+ * string to at most 200 characters, as `cleanName` (`storage.ts`, #424) bounds a name" — because the Restore
+ * box accepts any version-valid paste and `str`/`isoDay` above check type only, never length. Unlike
+ * `cleanName`, these fields are never shown to a person (no reader exists yet, #903's own scope), so a plain
+ * code-unit `.slice` is enough: there is no rendered cluster to protect from splitting mid-character.
+ */
+const MAX_FIELD_LEN = 200;
+const clampStr = (s: string): string => s.slice(0, MAX_FIELD_LEN);
+
 /** One wrong answer logged for the parent view (#938 is the reader; #903 adds only the format). */
 export interface Slip { topic: string; prompt: string; answer: string; picked: string; at: string }
 const SLIP_FIELDS: Fields<Slip> = { topic: str, prompt: str, answer: str, picked: str, at: isoDay };
@@ -21,10 +31,13 @@ const isSlip = (v: unknown): v is Slip => isRecord(v) && checkFields(SLIP_FIELDS
 /**
  * Trusts the stored order (newest first, #903's table) rather than re-sorting by `at` — unlike `sanitizeLog`
  * below, which dedupes and re-sorts because a log day is keyed by date and a slip is not. #938, the eventual
- * writer, is what has to keep that order true on every write; this only drops what cannot be a slip at all
- * and caps what is left to the most recent 20.
+ * writer, is what has to keep that order true on every write; this only drops what cannot be a slip at all,
+ * clamps its four free-text fields to `MAX_FIELD_LEN`, and caps what is left to the most recent 20.
  */
-export const sanitizeSlips = (v: unknown): Slip[] => (Array.isArray(v) ? v.filter(isSlip) : []).slice(0, 20);
+export const sanitizeSlips = (v: unknown): Slip[] =>
+  (Array.isArray(v) ? v.filter(isSlip) : [])
+    .slice(0, 20)
+    .map(s => ({ ...s, topic: clampStr(s.topic), prompt: clampStr(s.prompt), answer: clampStr(s.answer), picked: clampStr(s.picked) }));
 
 /** One day's play, for the parent view (#939 is the reader; #903 adds only the format). */
 export interface LogDay { date: string; games: number; q: number; ok: number; topics: string[] }
@@ -32,14 +45,17 @@ const LOG_FIELDS: Fields<LogDay> = { date: isoDay, games: count, q: count, ok: c
 const isLogDay = (v: unknown): v is LogDay => isRecord(v) && checkFields(LOG_FIELDS, v);
 /**
  * Stored oldest first, one entry per date — a repeated date keeps the entry that comes later in the input,
- * matching a day that was logged and then re-logged rather than two separate days — and kept to the 30 most
- * recent dates (#903's table).
+ * matching a day that was logged and then re-logged rather than two separate days — kept to the 30 most
+ * recent dates (#903's table), each topic clamped to `MAX_FIELD_LEN`.
  */
 export function sanitizeLog(v: unknown): LogDay[] {
   if (!Array.isArray(v)) return [];
   const byDate = new Map<string, LogDay>();
   for (const entry of v) if (isLogDay(entry)) byDate.set(entry.date, entry);
-  return [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).slice(-30);
+  return [...byDate.values()]
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    .slice(-30)
+    .map(d => ({ ...d, topics: d.topics.map(clampStr) }));
 }
 
 /** Device-wide play settings kept in the save rather than `sna:three` (#940 keeps that one separate). */

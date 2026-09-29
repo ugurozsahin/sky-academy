@@ -2882,4 +2882,38 @@ describe('save format v5 (#903)', () => {
     expect(d.settings).toEqual({ slow: false });
     expect(d.coins).toBe(3);
   });
+
+  // Review finding: #903's Proposed fix asks every stored string to be cut to at most 200 characters, as
+  // `cleanName` bounds a name — the type guards (`str`/`isoDay`) only ever checked *type*, never length, so an
+  // arbitrary Restore paste carried an unbounded string straight through.
+  it('slips: each of the four free-text fields is cut to 200 characters, not dropped whole', () => {
+    const long = 'x'.repeat(5000);
+    const m = migrate({ v: 4, slips: [slip({ topic: long, prompt: long, answer: long, picked: long })] });
+    expect(m.slips.length).toBe(1);
+    for (const field of ['topic', 'prompt', 'answer', 'picked'] as const) expect(m.slips[0][field].length).toBe(200);
+    expect(m.slips[0].topic).toBe(long.slice(0, 200));
+    expect(m.slips[0].at).toBe('2026-09-28');   // the ISO day itself is never a free-text field
+  });
+
+  // pr-test-analyzer review: a 5000-char input cannot pin the boundary itself (it truncates the same way
+  // whether the cap is 199, 200 or 201) — this exercises the cap's own edge, both sides of it.
+  it('slips: exactly 200 characters survives untouched; 201 loses exactly one', () => {
+    const exact = 'a'.repeat(200);
+    const over = 'a'.repeat(201);
+    expect(migrate({ v: 4, slips: [slip({ topic: exact })] }).slips[0].topic).toBe(exact);
+    expect(migrate({ v: 4, slips: [slip({ topic: over })] }).slips[0].topic).toBe(exact);
+  });
+
+  it('log: each topic string is cut to 200 characters', () => {
+    const long = 'y'.repeat(5000);
+    const m = migrate({ v: 4, log: [logDay({ topics: [long, 'y1-sub'] })] });
+    expect(m.log[0].topics).toEqual([long.slice(0, 200), 'y1-sub']);
+  });
+
+  it('a save already at v5 with an over-length field is clamped on every load, not only on the v4 → v5 hop', () => {
+    const long = 'z'.repeat(5000);
+    const m = migrate({ v: SAVE_VERSION, slips: [slip({ topic: long })], log: [logDay({ topics: [long] })] });
+    expect(m.slips[0].topic.length).toBe(200);
+    expect(m.log[0].topics[0].length).toBe(200);
+  });
 });
