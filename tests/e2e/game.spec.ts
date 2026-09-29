@@ -2271,7 +2271,7 @@ test.describe('Sky Ninja Academy', () => {
       return { animation: s.animationName, border: s.borderColor };
     });
     expect(bad.animation).toBe('none');
-    expect(bad.border).not.toBe('');   // the bad-answer border colour is unaffected — only the shake stops
+    expect(bad.border).toBe('rgb(255, 95, 109)');   // the --bad border colour is unaffected — only the shake stops
   });
 
   test('guard rail: a wrong answer still shakes the question card without reduced motion (#899)', async ({ page }) => {
