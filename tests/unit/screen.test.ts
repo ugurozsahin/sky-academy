@@ -327,3 +327,52 @@ describe('screenScope.toast tokens its hide, so a later toast survives an earlie
     expect(shown(), 'a disposed screen must not clear a toast belonging to whatever screen replaced it').toBe(true);
   });
 });
+
+// #884: the play screen must open Pause and stop speaking the moment the app is hidden. `onHidden` is where
+// that reaches the DOM — one `visibilitychange` listener per scope, firing `fn` only on the hidden transition,
+// and removed by `dispose()` so it never outlives the screen it was built for.
+describe('screenScope.onHidden fires on a hidden visibilitychange, never after dispose() (#884)', () => {
+  let listeners: (() => void)[];
+  let visibilityState: 'visible' | 'hidden';
+  beforeEach(() => {
+    listeners = []; visibilityState = 'visible';
+    (globalThis as any).document = {
+      get visibilityState() { return visibilityState; },
+      addEventListener: (type: string, fn: () => void) => { if (type === 'visibilitychange') listeners.push(fn); },
+      removeEventListener: (type: string, fn: () => void) => {
+        if (type === 'visibilitychange') listeners = listeners.filter(f => f !== fn);
+      },
+    };
+  });
+  afterEach(() => { delete (globalThis as any).document; });
+  const fire = (state: 'visible' | 'hidden') => { visibilityState = state; listeners.forEach(fn => fn()); };
+
+  it('fires on hidden, not on visible', () => {
+    const scope = screenScope();
+    const fired: string[] = [];
+    scope.onHidden(() => fired.push('hidden'));
+    fire('visible');
+    expect(fired).toEqual([]);
+    fire('hidden');
+    expect(fired).toEqual(['hidden']);
+  });
+
+  it('never fires once the screen has been disposed', () => {
+    const scope = screenScope();
+    const fired: string[] = [];
+    scope.onHidden(() => fired.push('hidden'));
+    scope.dispose();
+    fire('hidden');
+    expect(fired, 'dispose() must remove the listener, not merely stop reacting to it').toEqual([]);
+  });
+
+  it('adds one listener, however many times onHidden is called', () => {
+    const scope = screenScope();
+    const fired: string[] = [];
+    scope.onHidden(() => fired.push('first'));
+    scope.onHidden(() => fired.push('second'));    // a later call replaces fn, not a second listener
+    fire('hidden');
+    expect(fired).toEqual(['second']);
+    expect(listeners.length).toBe(1);
+  });
+});

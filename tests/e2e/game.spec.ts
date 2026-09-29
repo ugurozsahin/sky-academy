@@ -2477,6 +2477,43 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#sprint small')).toContainText('best 10');
   });
 
+  /** Simulate the tab going to background (#884): override `document.visibilityState` and dispatch the event
+   *  the play screen's `onHidden()` listens for. */
+  async function hideApp(page: Page) {
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+  }
+
+  test('hiding the app opens Pause on a live Sprint, freezes the clock, and Resume continues it (#884)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await expect(page.locator('.play')).toBeVisible();
+    await hideApp(page);
+    await expect(page.locator('#resume')).toBeVisible();
+    expect((await state(page)).paused).toBe(true);
+    const frozen = (await state(page)).timeLeft;
+    await page.waitForTimeout(2000);
+    expect((await state(page)).timeLeft).toBe(frozen);                    // the Sprint clock does not run while hidden
+    await page.click('#resume');
+    await page.waitForFunction((t) => window.__sna.state().timeLeft < t, frozen);
+  });
+
+  test('hiding the app during a stage-clear overlay opens no second overlay, and paused stays false (#884)', async ({ page }) => {
+    await seedPlayer(page, 'kai', 'Sam');
+    await startTopic(page, 'year1', 'y1-bonds');
+    await answerAll(page, 6);
+    await expect(page.locator('.celebrate')).toBeVisible();
+    await hideApp(page);
+    await expect(page.locator('.celebrate')).toBeVisible();              // the stage-clear overlay, unchanged
+    await expect(page.locator('#resume')).toHaveCount(0);                // no Pause overlay stacked on top of it
+    expect((await state(page)).paused, 'paused names the Pause overlay specifically, not any held overlay').toBe(false);
+    await page.click('#next');
+    await page.waitForFunction(() => window.__sna.state().stage === 2);
+  });
+
   test('Daily Dojo: three challenges on the sky map, progress survives a reload, bonus rows on results', async ({ page }) => {
     await seedPlayer(page);
     const items = page.locator('.dojo-item');
