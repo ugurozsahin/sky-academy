@@ -63,6 +63,26 @@ describe('resultsModal (#35 — the shared end-of-run modal shell)', () => {
     const h = resultsModal({ ...base, pills: '<span class="best-pill">🏆 New best!</span>' });
     expect(h).toContain('<span class="coin-gain">+8 🪙</span><span class="best-pill">🏆 New best!</span>');
   });
+
+  it('#929: no third button with no action, and one appended after Islands with one, escaped', () => {
+    expect(resultsModal(base)).not.toContain('id="next-topic"');
+    const h = resultsModal({ ...base, action: { id: 'next-topic', label: 'Next topic →' } });
+    expect(h).toContain('<button class="btn big" id="home">Islands</button><button class="btn big" id="next-topic">Next topic →</button>');
+  });
+
+  it('#929: an action label is escaped, like every other on-screen string here', () => {
+    const h = resultsModal({ ...base, action: { id: 'next-topic', label: '<b>Next</b>' } });
+    expect(h).toContain('&lt;b&gt;Next&lt;/b&gt;');
+    expect(h).not.toContain('<b>Next</b>');
+  });
+
+  // #929 review (type-design-analyzer): `id` is the only caller-supplied string this file ever puts into an
+  // attribute unescaped — today's one producer is a hand-typed literal, but the type gives no reason a future
+  // one (#930/#931) could not derive it, so this holds it to the same rule every other slot here follows.
+  it('#929: an action id is escaped too, not just the label', () => {
+    const h = resultsModal({ ...base, action: { id: '"><script>x</script>', label: 'Next' } });
+    expect(h).not.toContain('<script>');
+  });
 });
 
 describe('stickersHTML (#35)', () => {

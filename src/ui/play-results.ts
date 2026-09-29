@@ -5,9 +5,11 @@ import { praiseLine, senseiLine, SENSEI, type Avatar } from '../avatars';
 import type { SessionResult } from '../game/session';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { say, sfx } from '../audio';
+import { topicsFor, type Topic, type YearInfo } from '../curriculum';
+import { load, safeRecord, type TopicProgress } from '../storage';
 import { $ } from './dom';
 import { resultsHTML } from './overlays';
-import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsLines, type ResultCandidate } from './results';
+import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, type ResultCandidate } from './results';
 import { dojoRowsHTML } from './memory';
 import { stickersHTML } from './screen';
 import { deliverCertificate, drawCertificate } from './certificate';
@@ -16,12 +18,33 @@ import type { ResultPayout } from './play-session';
 /** Everything the results overlay needs from the screen around it. Function-valued where the screen owns the state. */
 export interface ResultsScreenDeps {
   training: boolean;
+  year: YearInfo; topic?: Topic;             // #929: which topic to look past for "Next topic →"
   av: Avatar; name: string;                 // the child's avatar and name (`d.name`)
   els: { overlay: HTMLElement };
   hold: (open: boolean, beats?: boolean) => void;   // #65: the one writer of arena.paused is play-session's syncPaused()
   later: (fn: () => void, ms: number) => void;      // alive-guarded timer (#35)
   toast: (text: string, cls?: string, ms?: number) => void;
   replay: () => void; goHome: () => void; cleanup: () => void;
+  next: (t: Topic) => void;                 // #929: start a mission on a different topic ("Next topic →")
+}
+
+/**
+ * The first topic after `topic` in its own subject's `topicsFor()` order, wrapping round, whose stored stars
+ * are still 0 — `null` when there is no `topic` (training/pool runs), only one topic in the subject, or every
+ * other topic is already starred. Reads `load()` fresh rather than a screen-mount snapshot: `commitResult()`
+ * has already recorded this game's own stars by the time `showResults()` runs (`play-session.ts`'s `onEnd`).
+ */
+function nextUnstarredTopic(year: YearInfo, topic: Topic | undefined): Topic | null {
+  if (!topic) return null;
+  const list = topicsFor(year.id, topic.subject);
+  const i = list.findIndex(t => t.id === topic.id);
+  if (i < 0 || list.length < 2) return null;
+  const progress = safeRecord<TopicProgress>(load().progress);   // #95: tolerant of a hand-edited/corrupted save
+  for (let k = 1; k < list.length; k++) {
+    const t = list[(i + k) % list.length];
+    if ((progress[t.id]?.stars ?? 0) === 0) return t;
+  }
+  return null;
 }
 
 /**
@@ -30,7 +53,7 @@ export interface ResultsScreenDeps {
  * #940, #897), so today it is always `[]` and the overlay renders exactly as it did before this split.
  */
 export function createResultsScreen(deps: ResultsScreenDeps) {
-  const { training, av, name, els, hold, later, toast, replay, goHome, cleanup } = deps;
+  const { training, year, topic, av, name, els, hold, later, toast, replay, goHome, cleanup, next } = deps;
   return function showResults(r: SessionResult, payout: ResultPayout, candidates: ResultCandidate[] = []) {
     // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
     // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
@@ -55,15 +78,22 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     // the child as a keepsake the album does not actually hold. `cert` itself stays what was earned regardless:
     // the `certificate()` hook below still answers that, same as before #470.
     const earned = certSaved ? cert : null;
+    // #929: retry/fix have no caller yet (misses fixed at 0, no lostAtStage), so only `next` can come back.
+    // #929 review (silent-failure-hunter): the day #930/#931 pass a real `misses`/`lostAtStage` in, this line
+    // below only handling `'next'` would make `resultsAction()` correctly decide "fix"/"retry" and the row
+    // silently show no action at all — widen this alongside whichever of those two lands first.
+    const action = resultsAction({ mode: r.mode, training, won: r.won, misses: 0, next: nextUnstarredTopic(year, topic) });
     els.overlay.hidden = false;
     els.overlay.innerHTML = resultsHTML({
       mode: r.mode, won: r.won, training, incomplete: r.incomplete, glow: speaker.glow, img: speaker.img, name: speaker.name,
       headline, medal, heading, starCount: r.stars, score: r.score, correct: r.correct, attempts: r.attempts,
       bestCombo: r.bestCombo, coins: r.coins, newBest, streak, dojoRows: dojoSaved ? dojoRowsHTML(dojo) : '', stickerHTML, cert: !!earned,
       resultLines: resultPillsHTML(lines),
+      action: action?.kind === 'next' ? { id: 'next-topic', label: 'Next topic →' } : undefined,
     });
     $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
     $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
+    if (action?.kind === 'next') $('#next-topic').addEventListener('click', () => { sfx.tap(); cleanup(); next(action.topic); });
     if (earned) $('#cert').addEventListener('click', async () => {
       sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
       try {

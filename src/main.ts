@@ -50,7 +50,7 @@ const nav = {
   },
   map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
   island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
-  play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play(o)); }) as StartPlay,
+  play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play(o), t => nav.play({ year: o.year, mode: 'mission', topic: t })); }) as StartPlay,
   memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
   duel: (y: YearInfo) => { leave(); year = y; enter('duel'); dispose = duelScreen({ year: y }, up, () => nav.duel(y)); },   // #16
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },

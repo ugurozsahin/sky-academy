@@ -38,6 +38,9 @@ export interface ResultsData {
   /** Belt/island/trophy/best/rest announcements (#896), already rendered as `best-pill` spans; '' or
    *  omitted when the caller supplies none — today, always, since nothing produces a candidate yet. */
   resultLines?: string;
+  /** The one contextual action button (#929) beside Play again/Islands — "Next topic →" today, omitted
+   *  when `resultsAction()` returns null (every mode but a won, non-training mission with a topic left). */
+  action?: { id: string; label: string };
 }
 export function resultsHTML(d: ResultsData): string {
   return resultsModal({
@@ -52,7 +55,7 @@ export function resultsHTML(d: ResultsData): string {
     coins: d.coins,
     pills: `${d.newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${d.streak > 1 ? `<span class="streak-pill">🔥 ${d.streak}-day streak</span>` : ''}${d.resultLines ?? ''}`,
     dojoRows: d.dojoRows, stickerHTML: d.stickerHTML,
-    cert: d.cert,
+    cert: d.cert, action: d.action,
   });
 }
 

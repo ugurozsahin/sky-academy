@@ -1539,7 +1539,7 @@ describe('Charts & Tallies: the chart shows the number the question asks for (#8
  * below goes red if the pools are ever made disjoint instead of cumulative.
  */
 describe('Reception phonics follows the phase order (#14)', () => {
-  const RECEPTION_PHONICS = ['r-sounds', 'r-build', 'r-capitals', 'r-trace'];
+  const RECEPTION_PHONICS = ['r-sounds', 'r-build', 'r-capitals', 'r-trace', 'r-read'];
   /** Every letter the child is shown or asked to slice: the answer, the options, and the word on the card. */
   const lettersOf = (q: Question) => {
     const card = q.visual?.type === 'word' ? q.visual.text : '';

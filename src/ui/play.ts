@@ -22,7 +22,7 @@ import type { PlayHooks } from './hooks';
 
 export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
 
-export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) {
+export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void) {
   const d = load(); const av = avatarById(d.avatar);
   const trailItem = equippedItem(wallet(), 'trail');
   const skin = trailItem?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
@@ -80,8 +80,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   // `playSession` is assigned just below and `showResults` is only ever called once gameplay ends, long after
   // this object is built — the same TDZ-safe pattern `mounted` below uses for `hooks`.
   const showResults = createResultsScreen({
-    training, av, name: d.name, els, hold: (open, beats) => playSession.hold(open, beats),
-    later, toast, replay, goHome, cleanup,
+    training, year: o.year, topic: o.topic, av, name: d.name, els, hold: (open, beats) => playSession.hold(open, beats),
+    later, toast, replay, goHome, cleanup, next,
   });
 
   // #36: the Session callbacks — the question beat, the outcome beat, the sprint clock, the boss reactions —
@@ -206,7 +206,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     if (!r.incomplete) {
       if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
       else if (training) { if (r.won) recordTraining(o.year.id); }
-      else if (o.mode === 'sprint') newBest = recordSprint(o.year.id, r.score);
+      else if (o.mode === 'sprint') { if (!o.topic) newBest = recordSprint(o.year.id, r.score); }   // #910: a chooser topic writes nothing, not Endless's best
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
       else recordEndless(o.year.id, r.score);
     }
