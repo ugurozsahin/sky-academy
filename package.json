@@ -10,6 +10,7 @@
     "preview": "vite preview --host --port 4173",
     "sketch": "vite -c vite.sketchbook.config.ts --host",
     "sketch:shot": "node scripts/sketch-shot.mjs",
+    "hooks": "git config core.hooksPath .githooks",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --project=mobile --grep @smoke",

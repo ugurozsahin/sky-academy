@@ -1,0 +1,5 @@
+#!/bin/sh
+# Opt-in (`npm run hooks`, #1382): the unit suite and its guard rails, as CI runs them. e2e stays in CI.
+node -e 'process.exit(Number(process.versions.node.split(".")[0]) < 20 ? 1 : 0)' \
+  || { echo "git hook: Node 20+ is needed, this is $(node -v). Put a newer one first on PATH." >&2; exit 1; }
+npm test
