@@ -1053,6 +1053,32 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.results')).toHaveCount(0);   // a fresh mission, not the old overlay left behind
   });
 
+  /**
+   * #929 review (pr-test-analyzer): the test above always plays `r-count`, index 0 of Reception's 13 maths
+   * topics, so `(i + k) % list.length` never once reaches `list.length` and the modulo wrap is a no-op —
+   * the one line of `nextUnstarredTopic()` the wrap exists for was never actually exercised. This plays the
+   * *last* topic (`r-oddeven`, index 12) with the only unstarred one sitting near the *start* (`r-subitise`,
+   * index 1), so the search has to run off the end of the array and wrap back round to find it.
+   */
+  test('results screen (#929): "Next topic →" wraps from the last topic in the subject back to an early one', async ({ page }) => {
+    test.setTimeout(150_000);
+    await seedPlayer(page, 'volt', 'Ada', {
+      progress: Object.fromEntries(
+        ['r-count', 'r-compare', 'r-onemore', 'r-bonds', 'r-add', 'r-sub', 'r-counton', 'r-order', 'r-balance', 'r-doubles', 'r-share']
+          .map(id => [id, { stars: 1, best: 5, plays: 1 }]),
+      ),
+    });
+    await startTopic(page, 'reception', 'r-oddeven');
+    await winMission(page);
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    const action = results.locator('#next-topic');
+    await expect(action).toHaveText('Next topic →');
+    await action.click();
+    await expect(page.locator('.play')).toBeVisible();
+    await expect(page.locator('.ttl')).toHaveText('Quick Dots');   // r-subitise, wrapped past the end of the list
+  });
+
   test('results screen (#929): no "Next topic →" once every topic in the subject is already starred', async ({ page }) => {
     test.setTimeout(150_000);
     await seedPlayer(page, 'volt', 'Ada', {

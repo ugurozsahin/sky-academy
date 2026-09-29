@@ -174,7 +174,7 @@ export function resultsModal(p: ResultsModalParts): string {
           ${p.stickerHTML}
           ${p.cert ? '<div class="row"><button class="btn big cert" id="cert" aria-label="Save a certificate for this mission">🎓 Certificate</button></div>' : ''}
         </div>
-        <div class="row nav"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button>${p.action ? `<button class="btn big" id="${p.action.id}">${esc(p.action.label)}</button>` : ''}</div>
+        <div class="row nav"><button class="btn primary big" id="again">Play again</button><button class="btn big" id="home">Islands</button>${p.action ? `<button class="btn big" id="${esc(p.action.id)}">${esc(p.action.label)}</button>` : ''}</div>
       </div>`;
 }
 

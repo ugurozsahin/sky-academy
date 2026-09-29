@@ -75,6 +75,14 @@ describe('resultsModal (#35 — the shared end-of-run modal shell)', () => {
     expect(h).toContain('&lt;b&gt;Next&lt;/b&gt;');
     expect(h).not.toContain('<b>Next</b>');
   });
+
+  // #929 review (type-design-analyzer): `id` is the only caller-supplied string this file ever puts into an
+  // attribute unescaped — today's one producer is a hand-typed literal, but the type gives no reason a future
+  // one (#930/#931) could not derive it, so this holds it to the same rule every other slot here follows.
+  it('#929: an action id is escaped too, not just the label', () => {
+    const h = resultsModal({ ...base, action: { id: '"><script>x</script>', label: 'Next' } });
+    expect(h).not.toContain('<script>');
+  });
 });
 
 describe('stickersHTML (#35)', () => {

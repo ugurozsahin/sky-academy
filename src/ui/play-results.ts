@@ -79,6 +79,9 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     // the `certificate()` hook below still answers that, same as before #470.
     const earned = certSaved ? cert : null;
     // #929: retry/fix have no caller yet (misses fixed at 0, no lostAtStage), so only `next` can come back.
+    // #929 review (silent-failure-hunter): the day #930/#931 pass a real `misses`/`lostAtStage` in, this line
+    // below only handling `'next'` would make `resultsAction()` correctly decide "fix"/"retry" and the row
+    // silently show no action at all — widen this alongside whichever of those two lands first.
     const action = resultsAction({ mode: r.mode, training, won: r.won, misses: 0, next: nextUnstarredTopic(year, topic) });
     els.overlay.hidden = false;
     els.overlay.innerHTML = resultsHTML({
