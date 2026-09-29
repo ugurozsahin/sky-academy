@@ -2,7 +2,7 @@
 // #325 stage 4: the curriculum used to be split by subject (maths.ts/writing.ts); this file holds every
 // Reception generator, maths and writing alike, so a reviewer checking "is Reception right" reads one file.
 // Generators shared with Year 1/Year 2 live in util.ts (#325 stage 4).
-import type { Generator, Topic } from './types';
+import type { Generator, Rng, Topic } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, OBJECTS,
   orderQ, balanceQ,
@@ -189,6 +189,38 @@ const rCapitals: Generator = (d, rng) => {
   const ds = shuffle(rng, rLetters(d).filter(x => x !== l)).slice(0, d === 1 ? 2 : 3).map(x => (upper ? x : x.toUpperCase()));
   return wordQ(rng, shown, ans, ds, { visual: { type: 'word', text: shown }, say: `Find the ${upper ? 'small' : 'capital'} letter that matches ${l}`, hint: upper ? 'Find the lower-case letter' : 'Find the capital letter', hintIsData: false });
 };
+/**
+ * Reception tricky words (#968) — the phase 2/3 exception words *Letters and Sounds* lists as read on sight
+ * rather than sounded out. Spoken, never printed (`listen`/`peek: true`, the Story Sentences no-voice path):
+ * the ELG asks for reading aloud, not spelling, so the word never sits on the card for the whole wave — no
+ * `visual` either, which would print it regardless of `peek` (`renderVisual` is not gated by `promptMode`).
+ *
+ * The decoy pool is the difficulty's own phase pool; at d2–d3 at least one decoy shares a letter with the
+ * answer (he/she/the, me/we/be), so the first sound alone cannot answer. `I` needs no special case: it shares
+ * no letter with any other bank word, so it falls out of the general "no shared-letter partner" fallback below.
+ */
+export const R_TRICKY_P2 = ['the', 'to', 'I', 'no', 'go'];
+export const R_TRICKY_P3 = ['he', 'she', 'we', 'me', 'be', 'was', 'my', 'you', 'her', 'they', 'all', 'are'];
+const rTrickyPool = (d: 1 | 2 | 3) => (d === 1 ? R_TRICKY_P2 : d === 2 ? R_TRICKY_P3 : [...R_TRICKY_P2, ...R_TRICKY_P3]);
+const shareLetter = (a: string, b: string) => [...a.toLowerCase()].some(c => b.toLowerCase().includes(c));
+const rTrickyDecoys = (rng: Rng, pool: string[], w: string, d: 1 | 2 | 3): string[] => {
+  const rest = pool.filter(x => x !== w);
+  const count = d === 1 ? 2 : 3;
+  const shared = d === 1 ? [] : shuffle(rng, rest.filter(x => shareLetter(x, w)));
+  // A word with no shared-letter partner in its own pool (only "I", today) falls back to an unconstrained
+  // draw rather than shipping `undefined` as a decoy — belt-and-braces alongside the pool invariant the test
+  // file checks directly, so a future bank edit that breaks it degrades quietly instead of drawing a broken
+  // bubble.
+  if (shared.length === 0) return shuffle(rng, rest).slice(0, count);
+  const others = shuffle(rng, rest.filter(x => x !== shared[0])).slice(0, count - 1);
+  return shuffle(rng, [shared[0], ...others]);
+};
+const rTricky: Generator = (d, rng) => {
+  const pool = rTrickyPool(d);
+  const w = pick(rng, pool);
+  const ds = rTrickyDecoys(rng, pool, w, d);
+  return wordQ(rng, 'Find the word you hear', w, ds, { say: `Find the word: ${w}`, listen: w, peek: true });
+};
 const rBuild: Generator = (d, rng) => {
   const [w, e] = pick(rng, rWords(d));
   return spellQ(rng, w, e, d === 1 ? 2 : d === 2 ? 3 : 4, rLetters(d));
@@ -254,6 +286,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-sounds', title: 'Letter Sounds', icon: '🔊', subject: 'writing', year: 'reception', nc: 'ELG Writing: sounds to letters', gen: rLetterSound },
   { id: 'r-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: say a sound for each letter; phase 2–3 sounds by ear', gen: rSoundHunt },
   { id: 'r-capitals', title: 'Big & Small Letters', icon: '🅰️', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: letters', gen: rCapitals },
+  { id: 'r-tricky', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: common exception words', gen: rTricky },
   { id: 'r-build', title: 'Build a Word', icon: '🧱', subject: 'writing', year: 'reception', nc: 'ELG Writing: spell by sounds (CVC)', sequenceFrom: 1, gen: rBuild },
   { id: 'r-read', title: 'Read It!', icon: '📗', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: read words by sound-blending', gen: rRead },
   { id: 'r-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'reception', nc: 'ELG Writing: simple sentences', sequenceFrom: 1, gen: rSentence },

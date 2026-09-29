@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Session, fixDeck, repeatKey, starsForAccuracy, type DeckItem, type Miss, type SessionEvents } from '../../src/game/session';
+import { Session, fixDeck, repeatKey, starsForAccuracy, type DeckItem, type Miss } from '../../src/game/session';
 import { TOPICS, YEARS, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -276,6 +276,88 @@ describe('mission session', () => {
     const labels = ev.onQuestion.mock.calls[1][1].labels as string[];
     expect(labels).not.toContain(undefined);
     expect(labels.length).toBeLessThan(ev.onQuestion.mock.calls[0][1].labels.length);
+  });
+});
+
+/**
+ * #918: the "Slice Them All" engine. Fixture card from the issue's own worked example: targets {4, 8, 12},
+ * decoys {3, 7}, delivered as a one-item deck so the test drives the exact `Question` object rather than a
+ * real generator (no topic sets `anyOrder` yet — that is #920/#926–#928's job).
+ */
+describe('an any-order card: every target sliced, in any order (#918)', () => {
+  const fixtureTopic = topicById('y1-add')!;
+  const fixture: Question = {
+    prompt: 'Slice 4, 8 and 12', answer: '4,8,12', sequence: ['4', '8', '12'], anyOrder: true,
+    options: ['3', '4', '7', '8', '12'], hint: 'Slice every target, in any order', hintIsData: false,
+  };
+  const mkSession = (seed: number) => {
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck: [{ topic: fixtureTopic, q: fixture }], rng: rng(seed) }, ev);
+    s.start();
+    return { s, ev };
+  };
+  it('slicing the targets out of order is correct once the last one goes, and the run ends won', () => {
+    const { s, ev } = mkSession(1);
+    expect(s.hit('12')).toBe('step');
+    expect(s.remaining()).toEqual(['4', '8']);
+    expect(s.hit('4')).toBe('step');
+    expect(s.remaining()).toEqual(['8']);
+    expect(s.hit('8')).toBe('correct');
+    s.advance();   // a one-item deck ends here (#878's own advance()/nextDeckQuestion() wiring, unchanged by #918)
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0]).toMatchObject({ won: true, correct: 1, questions: 1 });
+  });
+  it('re-hitting an already-sliced target is wrong, and does not double-count it', () => {
+    const { s } = mkSession(1.5);
+    expect(s.hit('12')).toBe('step');
+    expect(s.hit('12')).toBe('wrong');   // already sliced — not a fresh target, not a repeat of the same step
+    expect(s.remaining()).toEqual(['4', '8']);   // still exactly the two left, '12' not re-added or dropped
+  });
+  it('a decoy mid-way is wrong, and does not consume a target', () => {
+    const { s } = mkSession(2);
+    expect(s.hit('12')).toBe('step');
+    expect(s.hit('3')).toBe('wrong');   // decoy
+    expect(s.remaining()).toEqual(['4', '8']);   // wrong slice loses the life, not a target
+  });
+  it('a fallen remaining target is a miss, ending the question', () => {
+    const { s, ev } = mkSession(3);
+    s.hit('12');
+    s.fall('8');
+    expect(ev.onMiss).toHaveBeenCalledTimes(1);
+    expect(ev.onMiss.mock.calls[0][0]).toBe(fixture);
+    expect(s.lives).toBe(Y1.lives - 1);
+  });
+  it('a fallen decoy is not a target and changes nothing', () => {
+    const { s, ev } = mkSession(4);
+    s.hit('12');
+    s.fall('3');   // decoy falling
+    expect(ev.onMiss).not.toHaveBeenCalled();
+    expect(s.remaining()).toEqual(['4', '8']);
+  });
+  it('a wave end with targets left relaunches only the remaining ones, and slicing those still finishes correctly', () => {
+    const { s, ev } = mkSession(5);
+    s.hit('12');
+    s.waveEnd();
+    expect(ev.onQuestion).toHaveBeenCalledTimes(2);   // the relaunch, not a new question
+    const labels = ev.onQuestion.mock.calls[1][1].labels as string[];
+    expect(labels).not.toContain('12');
+    expect(labels).toEqual(expect.arrayContaining(['4', '8']));
+    // slicedTargets survived the relaunch: '12' stays done, only '4' and '8' are still needed
+    expect(s.hit('4')).toBe('step');
+    expect(s.hit('8')).toBe('correct');
+    s.advance();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0]).toMatchObject({ won: true });
+  });
+  it('two any-order questions in a row each start with a clean slicedTargets', () => {
+    const q2: Question = { ...fixture, prompt: 'Slice again' };
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck: [{ topic: fixtureTopic, q: fixture }, { topic: fixtureTopic, q: q2 }], rng: rng(6) }, ev);
+    s.start();
+    s.hit('12'); s.hit('4'); expect(s.hit('8')).toBe('correct');
+    s.advance();   // onto the second any-order question
+    expect(s.remaining()).toEqual(['4', '8', '12']);   // nothing carried over from the first
+    expect(s.hit('12')).toBe('step');   // '12' is a fresh target again, not "already sliced"
   });
 });
 
@@ -1092,7 +1174,7 @@ describe('the repeat key holds the whole question (#412)', () => {
    */
   const MEASURABLE_TOPICS = [
     'r-soundhunt', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-soundhunt',
-    'y1-spelling', 'y1-sub', 'y2-balance', 'y2-capacity', 'y2-compare', 'y2-inverse', 'y2-length', 'y2-mass',
+    'y1-spelling', 'y1-story', 'y1-sub', 'y2-balance', 'y2-capacity', 'y2-compare', 'y2-inverse', 'y2-length', 'y2-mass',
     'y2-oddeven', 'y2-punct', 'y2-pv', 'y2-spelling', 'y2-stats', 'y2-temp', 'y2-three',
   ];
   it('the measurable set is exactly these topics, not just this many (#453 item 3)', () => {
@@ -1136,7 +1218,7 @@ describe('the repeat key holds the whole question (#412)', () => {
    *  "these twenty-eight" from "twenty-eight, several of them not the ones B1 was measured on". */
   const BIG_ENOUGH_TOPICS = [
     'r-soundhunt', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
-    'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-sub', 'y2-add', 'y2-balance', 'y2-capacity', 'y2-compare',
+    'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-story', 'y1-sub', 'y2-add', 'y2-balance', 'y2-capacity', 'y2-compare',
     'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats',
     'y2-sub', 'y2-temp', 'y2-three',
   ];

@@ -7,7 +7,7 @@ import { LONGER, TALLER, HEAVIER, HOLDS } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel, isNote, NOTES,
   SHAPES_2D, SHAPES_3D, sameShape,
-  orderQ, lineQ, name3dQ, balanceQ, measureCompare, unitChoice, unitQ,
+  orderQ, lineQ, name3dQ, balanceQ, measureCompare, unitQ,
   DIRS, ARROWS, TURNS_ALL, turnEnd, DAYS,
   gapLetters, gapQ, spellQ, sentGen, type Sent, PUNCT_SENTS, LETTERS, CVC, DIGRAPHS, Y1_CEW,
   soundQ, PHASE3, PHASE5, SPLIT,
@@ -26,6 +26,48 @@ const y1Add: Generator = (d, rng) => {
   const a = ri(rng, 0, max), b = ri(rng, 0, max - a);
   const p = `${a} + ${b} = ?`;
   return numQ(rng, p, a + b, { min: 0, max: 20, ...q(p) });
+};
+/**
+ * #981: Year 1 must "solve one-step problems ... using concrete objects and pictorial representations"
+ * (KS1 maths PoS) — `y1Add`/`y1Sub`/`y1Missing` above are all bare number sentences, so this is the first
+ * problem-in-context topic in the game. Every number *written* in the story is 2 or more (no "1 ducks"); the
+ * generator's own bounds (`a,b,left ≥ 2` with `b/left ≤ a − 2`) mean the *answer* is always achievable in
+ * 2–20 in practice, never actually 0 or 1, though `numQ` is still given the full `min: 0` floor rather than a
+ * tighter one that would need re-deriving per kind.
+ */
+export interface StoryFrame { emoji: string; noun: string; place: string; join: string; leave: string }
+export const Y1_STORY_BANK: StoryFrame[] = [
+  { emoji: '🦆', noun: 'ducks', place: 'on the pond', join: 'more swim over', leave: 'fly away' },
+  { emoji: '🐦', noun: 'birds', place: 'in the tree', join: 'more land nearby', leave: 'fly away' },
+  { emoji: '🐝', noun: 'bees', place: 'in the garden', join: 'more buzz in', leave: 'buzz off' },
+  { emoji: '🐟', noun: 'fish', place: 'in the tank', join: 'more swim in', leave: 'swim away' },
+  { emoji: '🐸', noun: 'frogs', place: 'by the pond', join: 'more hop in', leave: 'hop away' },
+  { emoji: '🐑', noun: 'sheep', place: 'in the field', join: 'more wander in', leave: 'wander off' },
+  { emoji: '🐜', noun: 'ants', place: 'by the nest', join: 'more march in', leave: 'march away' },
+  { emoji: '🦋', noun: 'butterflies', place: 'in the meadow', join: 'more flutter in', leave: 'flutter away' },
+];
+const y1Story: Generator = (d, rng) => {
+  const max = d === 1 ? 10 : 20;
+  const bank = pick(rng, Y1_STORY_BANK);
+  const kind = d === 3 ? ri(rng, 0, 2) : ri(rng, 0, 1); // 0 add, 1 take away, 2 missing part (d3 only)
+  const n = d === 1 ? 2 : 3;
+  if (kind === 2) {
+    const a = ri(rng, 4, max), left = ri(rng, 2, a - 2), eaten = a - left;
+    const p = `${a} ${bank.noun} ${bank.place}. ${left} are left. How many ${bank.leave}?`;
+    // The picture has to carry the same "concrete objects" weight as the add/take-away forms below: crossing
+    // out exactly the `eaten` group (review finding) leaves the stated `left` count showing normally, the
+    // same cross-out `fiveFrames()` already draws for an ordinary take-away — a bare `n: a` with no `n2` (the
+    // first version of this branch) drew a uniform group with nothing for the story's "are left" to point at.
+    return numQ(rng, p, eaten, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: -eaten }, distractors: [a + left, a, eaten + 1, eaten - 1] });
+  }
+  if (kind === 1) {
+    const a = ri(rng, 4, max), b = ri(rng, 2, a - 2), answer = a - b;
+    const p = `${a} ${bank.noun} ${bank.place}. ${b} ${bank.leave}. How many now?`;
+    return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: -b }, distractors: [a + b, a, answer + 1, answer - 1] });
+  }
+  const a = ri(rng, 2, max - 2), b = ri(rng, 2, max - a), answer = a + b;
+  const p = `${a} ${bank.noun} ${bank.place}. ${b} ${bank.join}. How many now?`;
+  return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: b }, distractors: [Math.abs(a - b), Math.max(a, b), answer + 1, answer - 1] });
 };
 const y1Sub: Generator = (d, rng) => {
   const max = d === 1 ? 10 : d === 2 ? 15 : 20;
@@ -226,7 +268,7 @@ const y1Plurals: Generator = (d, rng) => {
   const [w, suf] = pick(rng, d === 1 ? S.filter(x => x[1] === 's') : S);
   return wordQ(rng, `one ${w}, two ${w}__`, suf, ['s', 'es', 'ies'], { visual: { type: 'word', text: `${w}_` }, say: `One ${w}, two ${w}${suf}. Which ending makes it more than one?`, hint: 'Add -s or -es', hintIsData: false });
 };
-const y1Suffix: Generator = (d, rng) => {
+const y1Suffix: Generator = (_d, rng) => {
   const W: [string, string, string][] = [['jump', 'ing', 'She is jump___ now.'], ['play', 'ed', 'Yesterday he play___.'], ['walk', 'ing', 'I am walk___ to school.'], ['look', 'ed', 'We look___ at the sky.'], ['fast', 'er', 'A car is fast___ than a bike.'], ['tall', 'est', 'The tall___ tree in the park.'], ['help', 'ing', 'Dad is help___ me.'], ['kick', 'ed', 'He kick___ the ball yesterday.'], ['kind', 'er', 'Be kind___ to your friends.'], ['small', 'est', 'The small___ mouse of all.']];
   const [, suf, sent] = pick(rng, W);
   return wordQ(rng, sent, suf, ['ing', 'ed', 'er', 'est'], { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the ending', hintIsData: false });
@@ -267,6 +309,7 @@ export const YEAR1_TOPICS: Topic[] = [
   // Year 1 maths
   { id: 'y1-bonds', title: 'Number Bonds', icon: '🔗', subject: 'maths', year: 'year1', nc: 'Y1 A&S: bonds within 20', gen: y1Bonds },
   { id: 'y1-add', title: 'Adding to 20', icon: '➕', subject: 'maths', year: 'year1', nc: 'Y1 A&S: add within 20', gen: y1Add },
+  { id: 'y1-story', title: 'Story Sums', icon: '🦆', subject: 'maths', year: 'year1', nc: 'Y1 A&S: one-step problems, objects and pictures', gen: y1Story },
   { id: 'y1-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year1', nc: 'Y1 A&S: subtract within 20', gen: y1Sub },
   { id: 'y1-missing', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year1', nc: 'Y1 A&S: missing number problems', gen: y1Missing },
   { id: 'y1-doubles', title: 'Doubles', icon: '👯', subject: 'maths', year: 'year1', nc: 'Y1 A&S: doubles', gen: y1Doubles },

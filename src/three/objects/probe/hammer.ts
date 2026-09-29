@@ -13,7 +13,7 @@
 import { Group, LatheGeometry, Mesh, Vector2, type BufferGeometry } from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { defineObject, n, type Params } from '../define';
+import { defineObject, n } from '../define';
 
 // Sampled from `public/avatars/hammer.webp` (the dominant lit tone of each area): the avatar an object belongs
 // to is one of the palette's two sources (decision record 010, item 3), and no design-language token is grey
@@ -30,7 +30,6 @@ const params = {
   grips: n(4, 3, 5),
   tilt: n(0.4, 0, 0.8),
 };
-type P = Params<typeof params>;
 
 const BURIED = 0.14;   // how far the collar reaches into the head: past the stage's `OUTLINE_WIDTH`
 const RADIAL = 12;   // around every turned part: fewer shows facets in the toon bands, more costs the budget
