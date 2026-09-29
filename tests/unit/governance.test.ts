@@ -5714,7 +5714,7 @@ describe('the add-topic skill names the curriculum files a topic really goes in 
 
   it('reads the skill and the paths it names', () => {
     expect(skill.length).toBeGreaterThan(500);
-    expect(named).toEqual(expect.arrayContaining(['year1.ts', 'year2.ts', 'util.ts']));
+    expect(named).toEqual(expect.arrayContaining(['year1.ts', 'src/curriculum/year2/index.ts', 'util.ts']));
   });
 
   it.each(named)('%s names a file that exists', (name) => {
