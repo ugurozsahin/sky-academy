@@ -158,6 +158,11 @@ for (const topic of TOPICS) {
                 const sorted = [...q.sequence].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
                 expect(q.sequence, q.prompt).toEqual(sorted);
                 expect(q.answer, q.prompt).toBe(sorted.join(','));
+                // #918 round 2: a duplicate target label collapses in `Session.hit()`'s `slicedTargets` Set
+                // while `q.sequence.length` still counts it, so the question never reaches its `'correct'`
+                // threshold — a silent, permanent softlock. `anyOrderQ()` already refuses this at construction;
+                // this is the backstop for a hand-built card that skips the builder.
+                expect(new Set(q.sequence).size, q.prompt).toBe(q.sequence.length);
               }
             }
           }
