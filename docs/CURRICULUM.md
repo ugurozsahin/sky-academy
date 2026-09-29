@@ -30,6 +30,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 Maths:
 - y1-bonds — bonds within 20
 - y1-add — within 20, incl. 0
+- y1-story — Story Sums: one-step adding/subtracting in a spoken, pictured story (d3 adds "how many were left/taken")
 - y1-sub — within 20, incl. 0
 - y1-missing — missing-number problems
 - y1-doubles — double within 20

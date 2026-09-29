@@ -27,6 +27,42 @@ const y1Add: Generator = (d, rng) => {
   const p = `${a} + ${b} = ?`;
   return numQ(rng, p, a + b, { min: 0, max: 20, ...q(p) });
 };
+/**
+ * #981: Year 1 must "solve one-step problems ... using concrete objects and pictorial representations"
+ * (KS1 maths PoS) — `y1Add`/`y1Sub`/`y1Missing` above are all bare number sentences, so this is the first
+ * problem-in-context topic in the game. Every number *written* in the story is 2 or more (no "1 ducks"), the
+ * same rule `y1Words` etc. don't need but a story sentence does; the *answer* itself may still be 0–20.
+ */
+interface StoryFrame { emoji: string; noun: string; place: string; join: string; leave: string }
+const Y1_STORY_BANK: StoryFrame[] = [
+  { emoji: '🦆', noun: 'ducks', place: 'on the pond', join: 'more swim over', leave: 'fly away' },
+  { emoji: '🐦', noun: 'birds', place: 'in the tree', join: 'more land nearby', leave: 'fly away' },
+  { emoji: '🐝', noun: 'bees', place: 'in the garden', join: 'more buzz in', leave: 'buzz off' },
+  { emoji: '🐟', noun: 'fish', place: 'in the tank', join: 'more swim in', leave: 'swim away' },
+  { emoji: '🐸', noun: 'frogs', place: 'by the pond', join: 'more hop in', leave: 'hop away' },
+  { emoji: '🐑', noun: 'sheep', place: 'in the field', join: 'more wander in', leave: 'wander off' },
+  { emoji: '🐜', noun: 'ants', place: 'by the nest', join: 'more march in', leave: 'march away' },
+  { emoji: '🦋', noun: 'butterflies', place: 'in the meadow', join: 'more flutter in', leave: 'flutter away' },
+];
+const y1Story: Generator = (d, rng) => {
+  const max = d === 1 ? 10 : 20;
+  const bank = pick(rng, Y1_STORY_BANK);
+  const kind = d === 3 ? ri(rng, 0, 2) : ri(rng, 0, 1); // 0 add, 1 take away, 2 missing part (d3 only)
+  const n = d === 1 ? 2 : 3;
+  if (kind === 2) {
+    const a = ri(rng, 4, max), left = ri(rng, 2, a - 2), eaten = a - left;
+    const p = `${a} ${bank.noun} ${bank.place}. ${left} are left. How many ${bank.leave}?`;
+    return numQ(rng, p, eaten, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a }, distractors: [a + left, a, eaten + 1, eaten - 1] });
+  }
+  if (kind === 1) {
+    const a = ri(rng, 4, max), b = ri(rng, 2, a - 2), answer = a - b;
+    const p = `${a} ${bank.noun} ${bank.place}. ${b} ${bank.leave}. How many now?`;
+    return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: -b }, distractors: [a + b, a, answer + 1, answer - 1] });
+  }
+  const a = ri(rng, 2, max - 2), b = ri(rng, 2, max - a), answer = a + b;
+  const p = `${a} ${bank.noun} ${bank.place}. ${b} ${bank.join}. How many now?`;
+  return numQ(rng, p, answer, { min: 0, max: 20, n, say: p, visual: { type: 'objects', emoji: bank.emoji, n: a, n2: b }, distractors: [Math.abs(a - b), Math.max(a, b), answer + 1, answer - 1] });
+};
 const y1Sub: Generator = (d, rng) => {
   const max = d === 1 ? 10 : d === 2 ? 15 : 20;
   const a = ri(rng, 1, max), b = ri(rng, 0, a);
@@ -267,6 +303,7 @@ export const YEAR1_TOPICS: Topic[] = [
   // Year 1 maths
   { id: 'y1-bonds', title: 'Number Bonds', icon: '🔗', subject: 'maths', year: 'year1', nc: 'Y1 A&S: bonds within 20', gen: y1Bonds },
   { id: 'y1-add', title: 'Adding to 20', icon: '➕', subject: 'maths', year: 'year1', nc: 'Y1 A&S: add within 20', gen: y1Add },
+  { id: 'y1-story', title: 'Story Sums', icon: '🦆', subject: 'maths', year: 'year1', nc: 'Y1 A&S: one-step problems, objects and pictures', gen: y1Story },
   { id: 'y1-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year1', nc: 'Y1 A&S: subtract within 20', gen: y1Sub },
   { id: 'y1-missing', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year1', nc: 'Y1 A&S: missing number problems', gen: y1Missing },
   { id: 'y1-doubles', title: 'Doubles', icon: '👯', subject: 'maths', year: 'year1', nc: 'Y1 A&S: doubles', gen: y1Doubles },

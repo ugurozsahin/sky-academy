@@ -708,6 +708,20 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
+  // #981: y1-story is the first problem-in-context topic in the game — a unit test of the generator cannot
+  // see whether the objects visual actually renders or whether a story sentence (up to 65 characters) fits
+  // the shortest phone we support without pushing the bubbles off screen.
+  test('y1-story: the story card, its objects and the bubbles reach the card on the shortest phone (#981)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-story');
+    await expect(page.locator('.vis.objs')).toBeVisible();
+    const overflow = await page.locator('.vis').evaluate(el => el.scrollWidth - el.clientWidth);
+    expect(overflow, `the story card overflowed the viewport by ${overflow}px`).toBeLessThanOrEqual(1);
+    await waitForTarget(page);
+    expect(await answer(page)).toBe(true);
+  });
+
   // #299 slice 4: for `y2-symmetry` the drawing *is* the question — "Is the dotted line a line of symmetry?"
   // is unanswerable without the picture and the line, and a unit test of `renderVisual` cannot see whether
   // the SVG is laid out, sized or visible in a browser. Stage 1 is difficulty 1 (`YEARS[year2].diffs` is
