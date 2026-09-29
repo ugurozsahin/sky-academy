@@ -75,16 +75,47 @@ describe('r-read (#967)', () => {
     }
   });
 
+  // pr-test-analyzer review: d1 pinned its option count, but d2/d3 (3 decoys, 4 options) never did — a
+  // regression shrinking the decoy set (wordQ's own de-dup, or a future CVC entry sharing an emoji) would
+  // pass every other assertion here while shipping a 3-bubble card.
+  it('d2: exactly 3 decoys drawn from the phase pool, no first-letter constraint either way', () => {
+    const r = rng(9715);
+    for (let i = 0; i < DRAWS; i++) {
+      const q = topic.gen(2, r);
+      expect(q.options.length, `draw ${i}`).toBe(4);
+    }
+  });
+
   it('d3: at least one decoy shares the first letter of the word shown — the first sound alone cannot answer', () => {
     const r = rng(9720);
     let sawSharedFirstLetter = false;
     for (let i = 0; i < DRAWS; i++) {
       const q = topic.gen(3, r);
       const word = q.visual?.type === 'word' ? q.visual.text : '';
+      expect(q.options.length, `draw ${i}`).toBe(4);
       const decoyWords = q.options.filter(o => o !== q.answer).map(o => CVC.find(([, e]) => e === o)![0]);
       if (decoyWords.some(dw => dw[0] === word[0])) sawSharedFirstLetter = true;
       expect(decoyWords.some(dw => dw[0] === word[0]), `draw ${i}: no decoy of "${word}" shares its first letter`).toBe(true);
     }
     expect(sawSharedFirstLetter, 'the rule never actually fired across all draws').toBe(true);
+  });
+
+  // pr-test-analyzer review: the d3 retry (`return rRead(d, rng)`) needs a same-first-letter sibling in the
+  // pool to terminate, so a word that is the only one for its first letter can never be the d3 *target* — only
+  // ever a decoy. That holds today (21 of 30 CVC words have a sibling) but nothing pinned it, so a future CVC
+  // edit could erode it silently into a slow/failing retry with no assertion explaining why.
+  it('d3: the phase pool has enough first-letter siblings for the retry to always terminate, and a singleton-first-letter word never lands as the target', () => {
+    const allowed = rWords(3);
+    const byFirst = new Map<string, number>();
+    for (const [w] of allowed) byFirst.set(w[0], (byFirst.get(w[0]) ?? 0) + 1);
+    const singletons = new Set([...byFirst].filter(([, n]) => n === 1).map(([l]) => l));
+    expect(singletons.size, 'every letter must keep at least one sibling pair for the d3 retry to converge').toBeLessThan(byFirst.size);
+
+    const r = rng(9730);
+    for (let i = 0; i < DRAWS; i++) {
+      const q = topic.gen(3, r);
+      const word = q.visual?.type === 'word' ? q.visual.text : '';
+      expect(singletons.has(word[0]), `draw ${i}: "${word}" is a singleton-first-letter word but was drawn as the d3 target`).toBe(false);
+    }
   });
 });
