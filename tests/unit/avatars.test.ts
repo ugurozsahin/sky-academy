@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ALL_AVATARS, AVATARS, avatarById, MASTER, nameElementCollide, praiseLine, SENSEI, SENSEI_LINES, senseiLine, welcomeLine } from '../../src/avatars';
 import { masterProgress } from '../../src/game/sensei';
-import { TOPICS } from '../../src/curriculum';
+import { TOPICS, YEARS, topicsFor, type Topic } from '../../src/curriculum';
 import { STICKER_IDS, type TopicProgress } from '../../src/storage';
 
 const starred = (ids: string[], stars = 1): Record<string, TopicProgress> => Object.fromEntries(ids.map(id => [id, { stars, best: 0, plays: 1 }]));
@@ -89,13 +89,25 @@ describe('Master Ninja', () => {
     expect(welcomeLine('')).toMatch(/Ninja/);
     expect(welcomeLine('')).not.toMatch(/\{name\}/);
   });
-  it('unlocks only when every topic on every island has at least one star', () => {
+  it('unlocks only when every topic on three islands has at least one star (#1039 Decision D7)', () => {
     const ids = TOPICS.map(t => t.id);
-    expect(masterProgress(TOPICS, {})).toEqual({ done: 0, total: ids.length, unlocked: false });
-    const allButOne = masterProgress(TOPICS, starred(ids.slice(1), 3));
-    expect(allButOne).toEqual({ done: ids.length - 1, total: ids.length, unlocked: false });
-    expect(masterProgress(TOPICS, { ...starred(ids), [ids[0]]: { stars: 0, best: 50, plays: 4 } }).unlocked).toBe(false);   // played but never won
-    expect(masterProgress(TOPICS, starred(ids)).unlocked).toBe(true);
+    const islands = YEARS.map(y => topicsFor(y.id));
+    expect(masterProgress(islands, {})).toEqual({ done: 0, total: 3, unlocked: false });
+    // ids[0] is the very first registered topic (reception), so leaving it unstarred leaves its island short —
+    // the other two islands are still fully starred, and `done` counts islands, not topics.
+    const allButOne = masterProgress(islands, starred(ids.slice(1), 3));
+    expect(allButOne).toEqual({ done: 2, total: 3, unlocked: false });
+    expect(masterProgress(islands, { ...starred(ids), [ids[0]]: { stars: 0, best: 50, plays: 4 } }).unlocked).toBe(false);   // played but never won
+    expect(masterProgress(islands, starred(ids)).unlocked).toBe(true);
     expect(masterProgress([], {}).unlocked).toBe(false);
+  });
+  it('never needs more than three fully-starred islands, so a KS2 island appearing never re-locks it (#1039)', () => {
+    const islands = YEARS.map(y => topicsFor(y.id));
+    const allStars = starred(TOPICS.map(t => t.id));
+    // A fourth, wholly unstarred island (a KS2 year once one exists) changes nothing: three islands already
+    // satisfy the cap, so the fourth is never even asked for.
+    const hiddenIsland: Topic[] = [{ ...TOPICS[0], id: 'fixture-ks2-topic', year: 'year3' as Topic['year'] }];
+    expect(masterProgress([...islands, hiddenIsland], allStars)).toEqual({ done: 3, total: 3, unlocked: true });
+    expect(masterProgress([islands[0]], starred(topicsFor('reception').map(t => t.id)))).toEqual({ done: 1, total: 3, unlocked: false });
   });
 });

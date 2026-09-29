@@ -32,7 +32,7 @@ describe('rewards storage', () => {
     recordTopic(`t${TOPICS_STARRED_GOAL - 1}`, 1, 10);
     expect(evaluateStickers(d())).toContain('terra');
   });
-  it('gust needs a star on every island, not just one', () => {
+  it('gust needs a star on three islands, not just one (#1039)', () => {
     recordTopic('r-count', 1, 5); recordTopic('y1-bonds', 1, 5);            // reception + year1 only
     expect(evaluateStickers(load())).not.toContain('gust');
     recordTopic('y2-tables', 1, 5);                                         // + year2 → all three
