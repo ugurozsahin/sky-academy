@@ -168,6 +168,8 @@ jobs:
           else
             echo "sketch=false" >> "$GITHUB_OUTPUT"
           fi
+      - name: Lint (complexity and function length, frozen per file; #1381)
+        run: npm run lint
       - name: Unit tests + guard rails
         run: npm test
       - run: npm run build          # `tsc --noEmit && vite build` — the typecheck lives here

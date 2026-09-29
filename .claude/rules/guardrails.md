@@ -7,6 +7,10 @@ paths:
   - "tests/unit/helpers/sources.ts"
   - "tests/unit/helpers.test.ts"
   - "scripts/**"
+  - "eslint.config.js"
+  - "lint-ratchet.json"
+  - "tests/unit/lint-ratchet.test.ts"
+  - ".githooks/**"
 ---
 
 # Guard rails and scripts (#101)
@@ -49,4 +53,10 @@ paths:
   specific behaviour by a rail in `tests/unit/scripts.test.ts` itself.
 - The dependency allowlist rail fails on an unlisted `package.json` dependency — do not add one without a
   reason, and update the allowlist in the same change if the owner has agreed to it.
+- `npm run lint` (CI runs it) checks `complexity` and `max-lines-per-function` in `src/`. `lint-ratchet.json` freezes each
+  function already over the base limit at its size today, keyed `file::name` (`(anonymous)`, or `name#2` for a repeat), and `lint-ratchet.test.ts` makes that number equal the real one. A
+  number only goes DOWN, and a new function in a frozen file gets the base limit, not the frozen one (#1387): when you shrink a function, lower its entry; when lint fails on new code, split the function — never
+  add an entry or raise one (#1381).
+- `.githooks/` holds opt-in local hooks (the owner runs `npm run hooks` once; nothing installs them, and a run never does).
+  They run only what CI runs: `tsc --noEmit`, `lint` and `npm test`. Never add a `prepare`/`postinstall` script for them (#1382).
 - If a rail blocks you and you think it is wrong, say so in the PR — do not weaken or delete it quietly.
