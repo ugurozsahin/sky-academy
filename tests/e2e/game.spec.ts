@@ -1148,6 +1148,13 @@ test.describe('Sky Ninja Academy', () => {
     await expect(fixResults.locator('.coin-gain')).toHaveText('+0 🪙');
     const coinsAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).coins);
     expect(coinsAfter, 'a practice round pays nothing into the wallet').toBe(coinsBefore);
+    // "Play again" restarts the ORIGINAL mission, not another run of the fix deck (`nav.play`'s `replay`
+    // strips `deck`/`practice` in main.ts).
+    await fixResults.locator('#again').click();
+    await expect(page.locator('.play')).toBeVisible();
+    await expect(page.locator('.ttl')).toHaveText('Adding to 20');
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    expect(await page.evaluate(() => window.__sna.session.o.deck)).toBeUndefined();
   });
 
   /**

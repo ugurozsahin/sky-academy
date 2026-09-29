@@ -29,7 +29,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   const fx = trailItem?.fx ?? av.fx;   // a bought element trail overrides the avatar's own particle/sound effect too (#69)
   const tracing = o.topic?.input === 'tracing';
   const spec = MODES[o.mode];
-  const sprint = spec.timed; const boss = spec.boss; const training = spec.staged && !!o.pool;
+  const sprint = spec.timed; const boss = spec.boss; const training = spec.staged && !!o.pool && !o.practice;
   const villainMode = spec.villain;                     // Hammer Man on screen, TNT bubbles in the mix
   const title = o.practice ? 'Fix my mistakes' : spec.staged ? (training ? 'Sensei Training' : o.topic!.title) : spec.title;
   render(`

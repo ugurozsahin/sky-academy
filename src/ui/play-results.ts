@@ -13,15 +13,11 @@ import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAct
 import { dojoRowsHTML } from './memory';
 import { stickersHTML } from './screen';
 import { deliverCertificate, drawCertificate } from './certificate';
-import { freshDojo } from '../game/dojo';
 import type { ResultPayout } from './play-session';
 
-/** The payout a practice ("Fix my mistakes", #930) run commits — nothing at all. `dojo`/`dojoSaved: false`
- *  means `dojo`'s own contents are never read by the results screen; `freshDojo('')` only satisfies the type. */
-export const PRACTICE_PAYOUT: ResultPayout = {
-  newBest: false, dojo: { state: freshDojo(''), completed: [], setDone: false, coins: 0, multiplier: 1 },
-  fresh: [], streak: 0, cert: null, certSaved: false, dojoSaved: false,
-};
+/** The payout a practice ("Fix my mistakes", #930) run commits — nothing at all: no dojo outcome was ever
+ *  computed, so `dojo: null` says that outright rather than a placeholder value pretending one exists. */
+export const PRACTICE_PAYOUT: ResultPayout = { newBest: false, dojo: null, fresh: [], streak: 0, cert: null, certSaved: false, dojoSaved: false };
 
 /** Everything the results overlay needs from the screen around it. Function-valued where the screen owns the state. */
 export interface ResultsScreenDeps {
@@ -71,7 +67,7 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     hold(true, false);
     const { newBest, dojo, fresh, streak, cert, certSaved, dojoSaved } = payout;
     const stickerHTML = dojoSaved ? stickersHTML(fresh) : '';   // #518: no keepsake for a refused write, same shape as certSaved
-    if (dojoSaved && (fresh.length || dojo.completed.length)) later(() => sfx.stage(), scaled(600));   // #138
+    if (dojoSaved && (fresh.length || dojo!.completed.length)) later(() => sfx.stage(), scaled(600));   // #138
     const medal = resultMedal(r);
     // #522: a generator throw ends the session through the same `won: false` path as a genuine loss, but it
     // is not one — `r.incomplete` withholds the win/loss framing (never a certificate either: `certInfo`
@@ -95,7 +91,7 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     els.overlay.innerHTML = resultsHTML({
       mode: r.mode, won: r.won, training, incomplete: r.incomplete, glow: speaker.glow, img: speaker.img, name: speaker.name,
       headline, medal, heading, starCount: r.stars, score: r.score, correct: r.correct, attempts: r.attempts,
-      bestCombo: r.bestCombo, coins: practice ? 0 : r.coins, newBest, streak, dojoRows: dojoSaved ? dojoRowsHTML(dojo) : '', stickerHTML, cert: !!earned,
+      bestCombo: r.bestCombo, coins: practice ? 0 : r.coins, newBest, streak, dojoRows: dojoSaved ? dojoRowsHTML(dojo!) : '', stickerHTML, cert: !!earned,
       resultLines: resultPillsHTML(lines),
       action: action?.kind === 'next' ? { id: 'next-topic', label: 'Next topic →' } : action?.kind === 'fix' ? { id: 'fix-mistakes', label: 'Fix my mistakes' } : undefined,
     });
