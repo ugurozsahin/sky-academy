@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import tseslint from 'typescript-eslint';
 
-// Two rules only (#1381). `lint-ratchet.json` holds the base limits and, per file, the size of its worst function
+// Two rules only (#1381), in `src/`; `tests/unit/` gets `complexity` only (#1388). `lint-ratchet.json` holds the base limits and, per file, the size of its worst function
 // today; a number there only ever goes DOWN (`tests/unit/lint-ratchet.test.ts`, `.claude/rules/guardrails.md`).
 const { base, complexity, lines } = JSON.parse(readFileSync(new URL('./lint-ratchet.json', import.meta.url), 'utf8'));
 const linesRule = (max) => ['error', { max, skipBlankLines: true, skipComments: true }];
@@ -12,6 +12,9 @@ const perFile = (table) => Object.entries(Object.entries(table).reduce((acc, [ke
 }, {}));
 
 export default [
+  // Tests (#1388): complexity only. `describe`/`it` callbacks make a function-length limit meaningless there; file length is
+  // ratcheted by `lint-ratchet.test.ts` instead.
+  { files: ['tests/unit/**/*.ts'], languageOptions: { parser: tseslint.parser }, rules: { complexity: ['error', { max: base.complexity }] } },
   {
     files: ['src/**/*.ts'],
     languageOptions: { parser: tseslint.parser },
