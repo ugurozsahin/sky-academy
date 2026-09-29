@@ -10,7 +10,7 @@
     "preview": "vite preview --host --port 4173",
     "sketch": "vite -c vite.sketchbook.config.ts --host",
     "sketch:shot": "node scripts/sketch-shot.mjs",
-    "lint": "eslint src",
+    "lint": "eslint src tests/unit",
     "hooks": "git config core.hooksPath .githooks",
     "test": "vitest run",
     "test:e2e": "playwright test",
