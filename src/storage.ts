@@ -1,6 +1,6 @@
 // Persistent player state (localStorage). Small, versioned, safe on failure.
 import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type DojoState } from './game/dojo';
-import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
+import { balance, buy, equip, ownedTitleId, type ItemKind, type Wallet } from './game/shop';
 import { TOPICS, YEARS, type YearId } from './curriculum';
 import { AVATARS, VILLAIN } from './avatars';
 // Type-only plus one small runtime tuple, so this stays the mirror of the `type-only` imports duel.ts already
@@ -161,26 +161,9 @@ interface ProfileIndex { v: 1; active: ProfileId; ids: readonly ProfileId[] }
 const isProfileId = (x: unknown): x is ProfileId => typeof x === 'string' && (PROFILE_IDS as readonly string[]).includes(x);
 const readItem = (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } };
 
-/* ─── 3-D: the grown-ups' setting (#714) ───────────────────────────────────────────────────────────────────
- * Device-wide, not part of a profile's save: it answers "can this tablet manage 3-D", so it survives a profile
- * switch and a `reset()`, and it is not in the save code. The key is spelt again in
- * `src/three/mount/enabled.ts`, which reads it without importing this module (its chunk must reach back into
- * nothing — the comment there says why; the type is imported from here); `tests/unit/three.test.ts` pins the two
- * spellings equal. */
-export type ThreeSetting = 'auto' | 'on' | 'off';
-const THREE_KEY = 'sna:three';
-export const THREE_SETTINGS: readonly ThreeSetting[] = ['auto', 'on', 'off'];
-export function threeSetting(): ThreeSetting {
-  const raw = readItem(THREE_KEY);
-  return raw === 'on' || raw === 'off' ? raw : 'auto';
-}
-/** `auto` is the default, so it is stored as the absence of a value rather than a third spelling. Returns whether
- *  the store now holds `v`: a refused write (private mode, quota) leaves the device on its previous answer, and
- *  the control that asked must paint that answer, not the tap (silent-failure review of #714). */
-export function setThreeSetting(v: ThreeSetting): boolean {
-  try { if (v === 'auto') localStorage.removeItem(THREE_KEY); else localStorage.setItem(THREE_KEY, v); } catch { /* fall through to the read */ }
-  return threeSetting() === v;
-}
+// 3-D: the grown-ups' setting (#714). Moved to device-settings.ts (#904) — parents.ts's other three settings
+// (#905/#906/#907/#940) go there too, rather than growing this file's own #714 ratchet cap.
+export { type ThreeSetting, THREE_SETTINGS, threeSetting, setThreeSetting } from './device-settings';
 /** The stored index, or null when there is none, it is not ours, or it is not self-consistent. Deliberately
  *  strict: our `v`, and `ids` must be distinct known slots containing `active`. */
 function readIndex(): ProfileIndex | null {
@@ -870,7 +853,7 @@ export type ProfileCard =
   | { id: ProfileId; state: 'empty' }
   | { id: ProfileId; state: 'future' }
   | { id: ProfileId; state: 'corrupt' }
-  | { id: ProfileId; state: 'save'; name: string; avatar: string | null; onboarded: boolean };
+  | { id: ProfileId; state: 'save'; name: string; avatar: string | null; onboarded: boolean; title: string | null };
 export function profileCard(id: ProfileId): ProfileCard {
   const raw = readItem(saveKeyFor(id));
   if (!raw) return { id, state: 'empty' };
@@ -886,7 +869,7 @@ export function profileCard(id: ProfileId): ProfileCard {
     state: 'save',
     name: typeof s.name === 'string' ? s.name : '',
     avatar: typeof s.avatar === 'string' ? s.avatar : null,
-    onboarded: onboardedOf(s),
+    onboarded: onboardedOf(s), title: ownedTitleId((s.equipped as Record<string, unknown> | undefined)?.title, s.owned),
   };
 }
 /**

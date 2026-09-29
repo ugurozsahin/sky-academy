@@ -52,6 +52,24 @@ export function starPath(c: CanvasRenderingContext2D, points: number, ro: number
   c.closePath();
 }
 
+/** Read `prefers-reduced-motion` once, when an `Arena` is built, never per frame (#900) — guarded for a test
+ *  stub or an environment with no `matchMedia` at all, in which case motion is left full rather than thrown. */
+export function prefersReducedMotion(w: { matchMedia?: (q: string) => { matches: boolean } }): boolean {
+  return w.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
+/** The dot/shard particles a slice burst throws (#900: `n` is already halved by the caller under reduced
+ *  motion). The ring and whether element sparks fire at all stay `Arena.burst()`'s own call — the ring always
+ *  shows, and sparks are a second, separate decision this pool has no say in. */
+export function burstParticles(x: number, y: number, color: string, n: number): Particle[] {
+  const out: Particle[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = 120 + Math.random() * 260;
+    out.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 80, life: 0, max: 0.5 + Math.random() * 0.5, color, size: 3 + Math.random() * 5, kind: Math.random() < 0.3 ? 'shard' : 'dot', rot: Math.random() * 6 });
+  }
+  return out;
+}
+
 /** Drop the entries `keep` rejects, in place and in order, allocating nothing — `arr = arr.filter(keep)`
  *  without the new array (#31). The order matters: the trail is drawn as a polyline from oldest to newest,
  *  and the particle cap drops the oldest from the front. Returns the array so a call reads as an expression. */

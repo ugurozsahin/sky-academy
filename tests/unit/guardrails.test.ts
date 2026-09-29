@@ -239,8 +239,11 @@ describe('guard rails', () => {
   // 3-D Shapes cards are three.js primitives — and `@types/three` is its typings (three ships none). The
   // spike measured the cost in its pull request; the owner decides on the issue whether it stays. Both
   // lists are exact, so a second runtime dependency is still a red build until it is argued for here.
+  // #881: `@capacitor-community/text-to-speech` is the same exception again — the Android WebView has no
+  // `speechSynthesis` (crbug 40417848), so `cap sync` needs the plugin's native code to give read-aloud a
+  // device to speak through there. Pinned at an exact version (`npm i -D -E`, not `^`), per the issue.
   it('dependencies match the allowlist below (CLAUDE.md explains the rule)', () => {
-    const allowed = ['@capacitor/android', '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', '@types/three', 'typescript', 'vite', 'vitest'];
+    const allowed = ['@capacitor-community/text-to-speech', '@capacitor/android', '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', '@types/three', 'typescript', 'vite', 'vitest'];
     expect(Object.keys((pkg as { dependencies?: object }).dependencies ?? {})).toEqual(['three']);   // #684: the one thing that ships to the browser beside our own code
     expect(Object.keys((pkg as { devDependencies?: object }).devDependencies ?? {}).sort()).toEqual([...allowed].sort());
   });
@@ -249,16 +252,18 @@ describe('guard rails', () => {
   // describe block at the end of this file — `three.js: the src/three/ tree, the flag and the bundle (#714)`.
 
 
-  // #110/#699: `@capacitor/filesystem`/`@capacitor/share`/`@capacitor/app` exist only so `npx cap sync`
-  // registers their native Android code; the web bundle must never import any of the three (that would ship
-  // Capacitor's own wrapper code — and the web-only build's `dist/` output — to every non-APK player).
-  // `src/native.ts`'s `plugin()` reads them off the injected bridge instead, the same pattern `isNativeShell`
-  // already uses for `@capacitor/core`. Proved red first: added `import '@capacitor/share'` to a scratch
-  // file under `src/`, watched this fail, removed it.
-  it('src/ never imports @capacitor/filesystem, @capacitor/share or @capacitor/app (#110, #699)', () => {
+  // #110/#699/#881: `@capacitor/filesystem`/`@capacitor/share`/`@capacitor/app`/`@capacitor-community/text-to-speech`
+  // exist only so `npx cap sync` registers their native Android code; the web bundle must never import any of
+  // them (that would ship Capacitor's own wrapper code — and the web-only build's `dist/` output — to every
+  // non-APK player). `src/native.ts`'s `plugin()` reads them off the injected bridge instead (`src/speech-native.ts`
+  // for the text-to-speech one), the same pattern `isNativeShell` already uses for `@capacitor/core`. Proved red
+  // first: added `import '@capacitor/share'` to a scratch file under `src/`, watched this fail, removed it.
+  it('src/ never imports @capacitor/filesystem, @capacitor/share, @capacitor/app or @capacitor-community/text-to-speech (#110, #699, #881)', () => {
     for (const [path, src] of Object.entries(SOURCES)) {
       expect(src, `${path} must read the Capacitor plugin bridge, not import the plugin package`)
         .not.toMatch(/\bimport\s*\(?[^;]*['"]@capacitor\/(filesystem|share|app)['"]/);
+      expect(src, `${path} must read the Capacitor plugin bridge, not import the plugin package`)
+        .not.toMatch(/\bimport\s*\(?[^;]*['"]@capacitor-community\/text-to-speech['"]/);
     }
   });
 
@@ -3251,8 +3256,8 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // file at or past the 300-line bar this table is scoped to — joins it rather than going unbudgeted;
   // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
-    'src/style.css': 1870, 'src/storage.ts': 1511, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
-    'src/curriculum/year2.ts': 757, 'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 451, 'src/ui/play-session.ts': 421,
+    'src/style.css': 1870, 'src/storage.ts': 1494, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
+    'src/curriculum/year2.ts': 757, 'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 421,
     'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 355, 'src/ui/certificate.ts': 341, 'src/audio.ts': 98,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {

@@ -1863,12 +1863,12 @@ describe('profiles: siblings on one device (#20)', () => {
     expect(addProfile()).toEqual({ ok: true, id: 'p2' });
     save({ name: 'Bo', avatar: 'blaze', onboarded: true });
 
-    expect(profileCard('p1')).toEqual({ id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true });
+    expect(profileCard('p1')).toEqual({ id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true, title: null });
     expect(activeProfile(), 'reading a card is not a switch').toBe('p2');
     expect(load().name, 'and the session is still the child who was playing').toBe('Bo');
     expect(profileCards()).toEqual([
-      { id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true },
-      { id: 'p2', state: 'save', name: 'Bo', avatar: 'blaze', onboarded: true },
+      { id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true, title: null },
+      { id: 'p2', state: 'save', name: 'Bo', avatar: 'blaze', onboarded: true, title: null },
     ]);
   });
 
@@ -1880,7 +1880,32 @@ describe('profiles: siblings on one device (#20)', () => {
     localStorage.setItem(saveKeyFor('p4'), JSON.stringify(['an', 'array']));
     expect(profileCard('p4'), 'JSON that is not an object').toEqual({ id: 'p4', state: 'empty' });
     localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 3, name: 42, avatar: 7, onboarded: 'yes' }));
-    expect(profileCard('p2'), 'fields of the wrong type are dropped, not shown').toEqual({ id: 'p2', state: 'save', name: '', avatar: null, onboarded: false });
+    expect(profileCard('p2'), 'fields of the wrong type are dropped, not shown').toEqual({ id: 'p2', state: 'save', name: '', avatar: null, onboarded: false, title: null });
+  });
+
+  // #1295: the picker shows a bought Dojo title under a sibling's name, so the card needs the equipped title
+  // id. `profileCard` reads a sibling's save directly, with no live Wallet to run `equippedItem()`'s ownership
+  // check against, so it is re-checked here (`ownedTitleId`) — a title equipped but never bought (a save
+  // hand-edited to point `equipped.title` at a title with an empty `owned` list) must not show, or coins would
+  // buy nothing a save-editor could not already fake for free.
+  it('profileCard carries an owned, real title id — never a tampered/unowned one, the default, or a non-string (#1295)', () => {
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Ada', avatar: 'volt', owned: ['title-scout'], equipped: { title: 'title-scout' } }));
+    expect(profileCard('p1'), 'bought and equipped').toEqual({ id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true, title: 'title-scout' });
+
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Bo', avatar: 'blaze', owned: [], equipped: { title: 'title-scout' } }));
+    expect(profileCard('p1'), 'equipped but never bought — a hand-edited save must not show a title nobody paid for').toMatchObject({ title: null });
+
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Cass', avatar: 'kai', owned: [], equipped: { title: 'title-none' } }));
+    expect(profileCard('p1'), 'the free default is never shown as a title').toMatchObject({ title: null });
+
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Dev', avatar: 'volt', owned: ['trail-gold'], equipped: { title: 'trail-gold' } }));
+    expect(profileCard('p1'), 'a hand-edited id that names a real item of the wrong kind').toMatchObject({ title: null });
+
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Eli', avatar: 'kai', equipped: { title: 7 } }));
+    expect(profileCard('p1'), 'a hand-edited non-string is dropped, not shown').toMatchObject({ title: null });
+
+    localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: SAVE_VERSION, name: 'Fay', avatar: 'blaze' }));
+    expect(profileCard('p1'), 'no title equipped at all yet').toMatchObject({ title: null });
   });
 
   it("a v2 save's card agrees with load() about whether that child has played (#20 slice 2)", () => {
@@ -1890,16 +1915,16 @@ describe('profiles: siblings on one device (#20)', () => {
     // empty (#380 review B3). The card and the migration must give the same answer about the same bytes.
     localStorage.setItem(saveKeyFor('p1'), JSON.stringify({ v: 2, name: 'Ada', avatar: 'volt', coins: 30 }));
     expect(migrate({ v: 2, name: 'Ada', avatar: 'volt' }).onboarded, "the migration's own answer").toBe(true);
-    expect(profileCard('p1')).toEqual({ id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true });
+    expect(profileCard('p1')).toEqual({ id: 'p1', state: 'save', name: 'Ada', avatar: 'volt', onboarded: true, title: null });
 
     // And the other half of that rule: a v2 blob with no ninja chosen never played, so the card says so.
     localStorage.setItem(saveKeyFor('p2'), JSON.stringify({ v: 2, name: 'Bo' }));
     expect(migrate({ v: 2, name: 'Bo' }).onboarded).toBe(false);
-    expect(profileCard('p2')).toEqual({ id: 'p2', state: 'save', name: 'Bo', avatar: null, onboarded: false });
+    expect(profileCard('p2')).toEqual({ id: 'p2', state: 'save', name: 'Bo', avatar: null, onboarded: false, title: null });
 
     // A v3 blob still wins on its own field — `false` there means mid-wizard, whatever the avatar says (#67).
     localStorage.setItem(saveKeyFor('p3'), JSON.stringify({ v: 3, name: 'Cass', avatar: 'kai', onboarded: false }));
-    expect(profileCard('p3')).toEqual({ id: 'p3', state: 'save', name: 'Cass', avatar: 'kai', onboarded: false });
+    expect(profileCard('p3')).toEqual({ id: 'p3', state: 'save', name: 'Cass', avatar: 'kai', onboarded: false, title: null });
   });
 
   it('a card is blank for a save this build cannot open, exactly as load() is (#20 slice 2)', () => {
@@ -1924,7 +1949,7 @@ describe('profiles: siblings on one device (#20)', () => {
 
     // And the gate is a gate, not a blanket: the versions the ladder *can* walk are unaffected.
     localStorage.setItem(saveKeyFor('p4'), JSON.stringify({ v: 1, name: 'Dev', avatar: 'kai' }));
-    expect(profileCard('p4')).toEqual({ id: 'p4', state: 'save', name: 'Dev', avatar: 'kai', onboarded: true });
+    expect(profileCard('p4')).toEqual({ id: 'p4', state: 'save', name: 'Dev', avatar: 'kai', onboarded: true, title: null });
   });
 
   it('the card and the migration derive onboarded from one rule, not two copies (#20 slice 2)', () => {

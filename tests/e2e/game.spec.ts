@@ -1415,6 +1415,21 @@ test.describe('Sky Ninja Academy', () => {
     expect(await page.evaluate(() => window.__sna.state().trail)).toEqual(water.trail);
   });
 
+  // #1295: once the trails are all bought, coins have nothing left to buy — a bought Dojo title is text only
+  // (no art, no save version change) and shows under the child's name on the "Who is playing?" card instead.
+  test('ninja shop: a bought Dojo title shows under the child\'s name on the "Who is playing?" card (#1295)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { coins: 500, spent: 0 });
+    await page.click('#rewards'); await page.click('#shop');
+    await expect(page.locator('.shop')).toBeVisible();
+    await page.click('.item[data-item="title-scout"] [data-buy]');
+    await expect(page.locator('.item[data-item="title-scout"]')).toHaveClass(/\bon\b/);
+    await page.click('#back'); await expect(page.locator('.rewards')).toBeVisible();
+    await page.click('#back'); await expect(page.locator('.islands.big')).toBeVisible();
+    await page.click('#who');
+    await expect(page.locator('.profile-screen')).toBeVisible();
+    await expect(page.locator('.avatar-card[data-profile] small')).toHaveText('Sky Scout');
+  });
+
   // #894: Daily Dojo rows, locked stickers and shop item cards have no action of their own for a pre-reader
   // to trigger, so tapping them just reads the card aloud. The title/blurb/fraction are read back from the
   // DOM rather than hardcoded, so these stay correct whichever Daily Dojo challenges the seeded date drew.
