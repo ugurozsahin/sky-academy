@@ -278,13 +278,13 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     answer: () => {
       const q = session.current; if (!q) return false;
       if (tracing) { tracer?.autoTrace(); return true; }
-      const label = q.sequence ? q.sequence[session.seqIndex] : q.answer;
+      const label = q.sequence ? session.remaining()[0] : q.answer;
       return arena!.hitLabel(label);
     },
     wrong: () => {
       const q = session.current; if (!q || !arena) return false;
-      const target = q.sequence ? q.sequence[session.seqIndex] : q.answer;
-      const b = arena.bubbles.find(x => x.launched && !x.dead && x.label !== target && x.label !== BOMB);
+      const targets = q.anyOrder ? session.remaining() : [q.sequence ? session.remaining()[0] : q.answer];
+      const b = arena.bubbles.find(x => x.launched && !x.dead && !targets.includes(x.label) && x.label !== BOMB);
       return b ? arena.hitLabel(b.label) : false;
     },
     bubbles: () =>

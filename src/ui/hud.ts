@@ -110,10 +110,22 @@ export function promptMode(q: Pick<Question, 'listen' | 'peek'>, audible: boolea
  *
  * It lives here beside `promptMode` (#16 review) because the duel card renders the same question the play
  * screen does: two copies would let one screen drift into showing a question the other hides.
+ *
+ * `q.anyOrder` (#919, building on #918's engine) is the one case that keeps the prompt text on the card
+ * instead of replacing it — "Slice every even number" means nothing once the numbers are gone — and adds the
+ * `.seq` progress run after it, `got`/`todo` by set membership (`remaining`, the caller's own `Session.remaining()`)
+ * rather than by position: an any-order target can be found out of the order it was drawn in, unlike a spelling
+ * sequence's position-based `done`. `remaining` defaults to the whole sequence so a caller mid-refactor that
+ * forgets it still renders every target as `todo` rather than throwing.
  */
-export function promptHTML(q: Question, done: number, reveal = false): string {
+export function promptHTML(q: Question, done: number, reveal = false, remaining?: readonly string[]): string {
   if (!q.sequence) return esc(reveal && q.listen ? q.listen : q.prompt);
   if (q.build) return buildPromptHTML(q.prompt, q.build.template, q.sequence, done);
+  if (q.anyOrder) {
+    const left = new Set(remaining ?? q.sequence);
+    const items = q.sequence.map(t => `<span class="${left.has(t) ? 'todo' : 'got'}">${left.has(t) && !reveal ? '_' : esc(t)}</span>`);
+    return `${esc(q.prompt)} <span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
+  }
   const items = q.sequence.map((l, i) => `<span class="${i < done ? 'got' : 'todo'}">${i < done || reveal ? esc(l) : '_'}</span>`);
   return `<span class="seq${reveal ? ' reveal' : ''}">${items.join(reveal && q.wide ? ' ' : '')}</span>`;
 }
