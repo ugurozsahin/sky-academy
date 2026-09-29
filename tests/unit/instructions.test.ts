@@ -15,7 +15,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 
 // Every skill is one or the other; a new directory fails the test below until it is put in a list, so a
 // project skill cannot go unread here without anyone noticing.
-const OWN_SKILLS = ['add-guard-rail', 'add-topic', 'design-language', 'open-pr', 'qa-screenshot', 'review-pr', 'three-art'];
+const OWN_SKILLS = ['add-guard-rail', 'add-topic', 'design-language', 'open-pr', 'pick-issue', 'qa-screenshot', 'review-pr', 'three-art'];
 const VENDORED_SKILLS = ['frontend-design', 'systematic-debugging', 'test-driven-development', 'using-git-worktrees',
                          'verification-before-completion'];   // pinned upstream; they point at their own siblings
 
