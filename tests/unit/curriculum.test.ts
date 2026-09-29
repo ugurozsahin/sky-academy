@@ -5,6 +5,7 @@ import { YEAR2_TOPICS } from '../../src/curriculum/year2-topics';
 import type { Topic } from '../../src/curriculum';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID, EVERYDAY, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, turnEnd, coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ, measureCompare } from '../../src/curriculum/util';
+import { anyOrderQ } from '../../src/curriculum/any-order';
 import { R_LETTERS_P2, R_LETTERS_ALL, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/reception';
 import {
   TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES,
@@ -128,6 +129,11 @@ for (const topic of TOPICS) {
           // (`src/ui/hud.ts`) checks `!q.sequence` first and would silently render the plain-prompt branch,
           // dropping the digit-slot UI with nothing else noticing.
           if (q.build) expect(q.sequence, q.prompt).toBeDefined();
+          // #918: `anyOrder` is legal only alongside `sequence` (types.ts) — checked outside the
+          // `if (q.sequence)` gate below, same as `build` above, so a generator that sets `anyOrder`
+          // and forgets `sequence` cannot hide inside it and silently degrade to plain single-answer
+          // matching (`Session` reads `q.anyOrder` only inside `if (q.sequence)` gates).
+          if (q.anyOrder) expect(q.sequence, q.prompt).toBeDefined();
           if (topic.input !== 'tracing') {
             // answer present, options unique, sensible count
             expect(q.options).toContain(q.sequence ? q.sequence[0] : q.answer);
@@ -143,6 +149,21 @@ for (const topic of TOPICS) {
                 expect([q.sequence.join(''), q.sequence.join(','), q.sequence.join(' ')]).toContain(q.answer);
               }
               for (const l of q.sequence) expect(q.options).toContain(l);
+              // #918: an any-order card's targets (`sequence`) are canonically sorted, its answer is their
+              // comma join, it has at least 2 targets, and at least 1 decoy beyond them (`options` is already
+              // asserted unique above, so a target sharing a label with a decoy would already have failed that).
+              if (q.anyOrder) {
+                expect(q.sequence.length, q.prompt).toBeGreaterThanOrEqual(2);
+                expect(q.options.length, q.prompt).toBeGreaterThan(q.sequence.length);
+                const sorted = [...q.sequence].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+                expect(q.sequence, q.prompt).toEqual(sorted);
+                expect(q.answer, q.prompt).toBe(sorted.join(','));
+                // #918 round 2: a duplicate target label collapses in `Session.hit()`'s `slicedTargets` Set
+                // while `q.sequence.length` still counts it, so the question never reaches its `'correct'`
+                // threshold — a silent, permanent softlock. `anyOrderQ()` already refuses this at construction;
+                // this is the backstop for a hand-built card that skips the builder.
+                expect(new Set(q.sequence).size, q.prompt).toBe(q.sequence.length);
+              }
             }
           }
           // arithmetic prompts must be correct
@@ -2650,5 +2671,31 @@ describe("every other spellQ caller keeps the same invariant (#481)", () => {
       expect(spellingDraws, `${id} d${d}: the spellQ branch was never drawn — this rail would pass vacuously`)
         .toBeGreaterThan(50);
     }
+  });
+});
+
+describe('anyOrderQ (#918): the "Slice Them All" builder, no topic uses it yet', () => {
+  it('sorts the targets canonically and joins them as the answer', () => {
+    const q = anyOrderQ(rng(918), 'Slice every even number', ['8', '12', '4'], ['3', '7']);
+    expect(q.sequence).toEqual(['4', '8', '12']);           // numeric localeCompare, not lexical ('12' < '4')
+    expect(q.answer).toBe('4,8,12');
+    expect(q.anyOrder).toBe(true);
+    for (const l of [...q.sequence!, '3', '7']) expect(q.options).toContain(l);
+    expect(q.options.length).toBe(5);
+  });
+  it('forwards extra Question fields, same as numQ/wordQ', () => {
+    const q = anyOrderQ(rng(919), 'p', ['a', 'b'], ['c'], { hint: 'Slice them all', hintIsData: false, wide: true });
+    expect(q.hint).toBe('Slice them all'); expect(q.wide).toBe(true);
+  });
+  it('refuses fewer than 2 targets, no decoys, or an overlapping/repeated label', () => {
+    expect(() => anyOrderQ(rng(1), 'p', ['a'], ['b'])).toThrow(RangeError);
+    expect(() => anyOrderQ(rng(1), 'p', ['a', 'b'], [])).toThrow(RangeError);
+    expect(() => anyOrderQ(rng(1), 'p', ['a', 'a'], ['b'])).toThrow(RangeError);
+    expect(() => anyOrderQ(rng(1), 'p', ['a', 'b'], ['a'])).toThrow(RangeError);   // decoy repeats a target
+    expect(() => anyOrderQ(rng(1), 'p', ['a', 'b'], ['c', 'c'])).toThrow(RangeError);   // a decoy repeats another decoy
+  });
+  it('accepts the minimum legal shape: 2 targets and 1 decoy', () => {
+    const q = anyOrderQ(rng(2), 'p', ['b', 'a'], ['c']);
+    expect(q.sequence).toEqual(['a', 'b']); expect(q.answer).toBe('a,b'); expect(q.options.sort()).toEqual(['a', 'b', 'c']);
   });
 });

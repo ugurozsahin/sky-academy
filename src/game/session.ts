@@ -87,6 +87,7 @@ export class Session {
   byTopic: Record<string, AnswerTally> = {};   // per-topic tally (pool modes feed Sensei's weakest-topic ranking)
   private deckIndex = 0;                                // o.deck only: how far through it this session is
   private misses: Miss[] = [];                          // every wrong slice / miss, de-duplicated by repeatKey (#878)
+  private slicedTargets = new Set<string>();            // q.anyOrder only: targets sliced so far this question (#918)
   timeLeft: number;                                     // ms, sprint only (0 otherwise)
   bossHp: number; readonly bossMax: number;             // boss only (0 otherwise)
   private rng: () => number; readonly stages: number;
@@ -128,12 +129,25 @@ export class Session {
   }
   start() { this.nextQuestion(); }
 
-  /** Bubble labels for the current question (sequence letters incl. duplicates + decoys). */
+  /** Bubble labels for the current question (remaining sequence targets + decoys). */
   labelsFor(q: Question): string[] {
     if (!q.sequence) return q.options;
     const decoys = q.options.filter(o => !q.sequence!.includes(o));
-    return shuffle(this.rng, [...q.sequence.slice(this.seqIndex), ...decoys]);
+    return shuffle(this.rng, [...this.remainingOf(q), ...decoys]);
   }
+  /**
+   * Targets not yet sliced for `q` — order-sensitive for an ordered sequence (spelling, a sentence), order-free
+   * for an any-order card (#918): the position `seqIndex` tracks means nothing once slicing order is free, so
+   * that branch instead removes whatever `slicedTargets` already holds. Takes `q` rather than reading
+   * `this.current`, matching `labelsFor()`'s own parameter, so it can be called for a question that is about to
+   * become current (`nextQuestion()`/`nextDeckQuestion()`) as well as for the current one (`remaining()` below).
+   */
+  private remainingOf(q: Question): string[] {
+    if (!q.sequence) return [];
+    return q.anyOrder ? q.sequence.filter(t => !this.slicedTargets.has(t)) : q.sequence.slice(this.seqIndex);
+  }
+  /** Targets not yet sliced on the current question, exposed for the UI/hooks (#918/#919 build on this). */
+  remaining(): string[] { return this.current ? this.remainingOf(this.current) : []; }
   nextQuestion() {
     if (this.ended) return;
     if (this.o.deck) { this.nextDeckQuestion(); return; }
@@ -154,7 +168,7 @@ export class Session {
       this.end(false, true);
       return;
     }
-    this.current = q; this.seqIndex = 0; this.waiting = false; this.questionsAsked++;
+    this.current = q; this.seqIndex = 0; this.slicedTargets = new Set(); this.waiting = false; this.questionsAsked++;
     this.ev.onQuestion(q, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(q) });
   }
   /** `nextQuestion()` when `o.deck` is set: serve the next deck item, or end once it runs out (#878). */
@@ -162,7 +176,7 @@ export class Session {
     const deck = this.o.deck!;
     if (this.deckIndex >= deck.length) { this.end(true); return; }
     const { topic, q } = deck[this.deckIndex++];
-    this.currentTopic = topic; this.current = q; this.seqIndex = 0; this.waiting = false; this.questionsAsked++;
+    this.currentTopic = topic; this.current = q; this.seqIndex = 0; this.slicedTargets = new Set(); this.waiting = false; this.questionsAsked++;
     this.ev.onQuestion(q, { stage: this.stage, index: this.index, total: this.perStage, speed: this.speed, labels: this.labelsFor(q) });
   }
   /** Re-launch the remaining letters of a spelling sequence. */
@@ -172,6 +186,12 @@ export class Session {
   hit(label: string): 'correct' | 'wrong' | 'step' | 'ignored' {
     const q = this.current; if (!q || this.waiting || this.ended) return 'ignored';
     if (q.sequence) {
+      if (q.anyOrder) {
+        if (!q.sequence.includes(label) || this.slicedTargets.has(label)) { this.markWrong(label); return 'wrong'; }
+        this.slicedTargets.add(label); this.ev.onProgress(label, this.slicedTargets.size, q.sequence.length);
+        if (this.slicedTargets.size >= q.sequence.length) { this.markCorrect(); return 'correct'; }
+        return 'step';
+      }
       const target = q.sequence[this.seqIndex];
       if (label === target) {
         this.seqIndex++; this.ev.onProgress(label, this.seqIndex, q.sequence.length);
@@ -186,7 +206,13 @@ export class Session {
   /** A bubble fell off-screen without being hit. */
   fall(label: string) {
     const q = this.current; if (!q || this.waiting || this.ended) return;
-    const isTarget = q.sequence ? label === q.sequence[this.seqIndex] : label === q.answer;
+    // An ordered sequence only decides on its one current letter falling — the other remaining letters are
+    // on screen too (labelsFor() launches the whole remainder at once) but simply relaunch, undecided, on the
+    // next wave (waveEnd()'s "nothing decided" branch). An any-order card has no "current" target, so any
+    // remaining (unsliced) one falling is the same decisive miss (#918).
+    const isTarget = q.sequence
+      ? (q.anyOrder ? q.sequence.includes(label) && !this.slicedTargets.has(label) : label === q.sequence[this.seqIndex])
+      : label === q.answer;
     if (!isTarget) return;
     this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false); this.recordMiss(q, null);
     this.ev.onMiss(q); this.bossHeal();

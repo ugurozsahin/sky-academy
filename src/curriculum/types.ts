@@ -66,6 +66,14 @@ interface QuestionCore {
    * the `if (q.sequence)` gate so that mistake cannot hide inside it.
    */
   build?: { template: string };
+  /**
+   * "Slice Them All" (#869/#918): legal only alongside `sequence`, which then holds the card's *targets*
+   * rather than an ordered spelling — the card is correct once every target is sliced, in any order, and
+   * `options` holds the targets plus decoys. `Session.hit()`/`fall()`/`labelsFor()` (`src/game/session.ts`)
+   * read this flag to switch from position-in-sequence to set-membership. No generator sets it yet: this
+   * ticket ships the engine only, the topic children are #926–#928.
+   */
+  anyOrder?: true;
   visual?: Visual;
   wide?: boolean;         // options are words → bigger bubbles
   listen?: string;        // spoken-only question: shown on the card instead of `prompt` when read-aloud is off

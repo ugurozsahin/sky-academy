@@ -279,6 +279,88 @@ describe('mission session', () => {
   });
 });
 
+/**
+ * #918: the "Slice Them All" engine. Fixture card from the issue's own worked example: targets {4, 8, 12},
+ * decoys {3, 7}, delivered as a one-item deck so the test drives the exact `Question` object rather than a
+ * real generator (no topic sets `anyOrder` yet — that is #920/#926–#928's job).
+ */
+describe('an any-order card: every target sliced, in any order (#918)', () => {
+  const fixtureTopic = topicById('y1-add')!;
+  const fixture: Question = {
+    prompt: 'Slice 4, 8 and 12', answer: '4,8,12', sequence: ['4', '8', '12'], anyOrder: true,
+    options: ['3', '4', '7', '8', '12'], hint: 'Slice every target, in any order', hintIsData: false,
+  };
+  const mkSession = (seed: number) => {
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck: [{ topic: fixtureTopic, q: fixture }], rng: rng(seed) }, ev);
+    s.start();
+    return { s, ev };
+  };
+  it('slicing the targets out of order is correct once the last one goes, and the run ends won', () => {
+    const { s, ev } = mkSession(1);
+    expect(s.hit('12')).toBe('step');
+    expect(s.remaining()).toEqual(['4', '8']);
+    expect(s.hit('4')).toBe('step');
+    expect(s.remaining()).toEqual(['8']);
+    expect(s.hit('8')).toBe('correct');
+    s.advance();   // a one-item deck ends here (#878's own advance()/nextDeckQuestion() wiring, unchanged by #918)
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0]).toMatchObject({ won: true, correct: 1, questions: 1 });
+  });
+  it('re-hitting an already-sliced target is wrong, and does not double-count it', () => {
+    const { s } = mkSession(1.5);
+    expect(s.hit('12')).toBe('step');
+    expect(s.hit('12')).toBe('wrong');   // already sliced — not a fresh target, not a repeat of the same step
+    expect(s.remaining()).toEqual(['4', '8']);   // still exactly the two left, '12' not re-added or dropped
+  });
+  it('a decoy mid-way is wrong, and does not consume a target', () => {
+    const { s } = mkSession(2);
+    expect(s.hit('12')).toBe('step');
+    expect(s.hit('3')).toBe('wrong');   // decoy
+    expect(s.remaining()).toEqual(['4', '8']);   // wrong slice loses the life, not a target
+  });
+  it('a fallen remaining target is a miss, ending the question', () => {
+    const { s, ev } = mkSession(3);
+    s.hit('12');
+    s.fall('8');
+    expect(ev.onMiss).toHaveBeenCalledTimes(1);
+    expect(ev.onMiss.mock.calls[0][0]).toBe(fixture);
+    expect(s.lives).toBe(Y1.lives - 1);
+  });
+  it('a fallen decoy is not a target and changes nothing', () => {
+    const { s, ev } = mkSession(4);
+    s.hit('12');
+    s.fall('3');   // decoy falling
+    expect(ev.onMiss).not.toHaveBeenCalled();
+    expect(s.remaining()).toEqual(['4', '8']);
+  });
+  it('a wave end with targets left relaunches only the remaining ones, and slicing those still finishes correctly', () => {
+    const { s, ev } = mkSession(5);
+    s.hit('12');
+    s.waveEnd();
+    expect(ev.onQuestion).toHaveBeenCalledTimes(2);   // the relaunch, not a new question
+    const labels = ev.onQuestion.mock.calls[1][1].labels as string[];
+    expect(labels).not.toContain('12');
+    expect(labels).toEqual(expect.arrayContaining(['4', '8']));
+    // slicedTargets survived the relaunch: '12' stays done, only '4' and '8' are still needed
+    expect(s.hit('4')).toBe('step');
+    expect(s.hit('8')).toBe('correct');
+    s.advance();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0]).toMatchObject({ won: true });
+  });
+  it('two any-order questions in a row each start with a clean slicedTargets', () => {
+    const q2: Question = { ...fixture, prompt: 'Slice again' };
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck: [{ topic: fixtureTopic, q: fixture }, { topic: fixtureTopic, q: q2 }], rng: rng(6) }, ev);
+    s.start();
+    s.hit('12'); s.hit('4'); expect(s.hit('8')).toBe('correct');
+    s.advance();   // onto the second any-order question
+    expect(s.remaining()).toEqual(['4', '8', '12']);   // nothing carried over from the first
+    expect(s.hit('12')).toBe('step');   // '12' is a fresh target again, not "already sliced"
+  });
+});
+
 describe('endless session', () => {
   it('ramps difficulty and ends on lives 0 with a score', () => {
     const ev = events();
