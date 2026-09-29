@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Session, fixDeck, repeatKey, starsForAccuracy, type DeckItem, type Miss, type SessionEvents } from '../../src/game/session';
+import { Session, fixDeck, repeatKey, starsForAccuracy, type DeckItem, type Miss } from '../../src/game/session';
 import { TOPICS, YEARS, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }

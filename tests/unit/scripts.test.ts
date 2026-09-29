@@ -3,7 +3,6 @@ import { execFileSync } from 'node:child_process';
 import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import pkg from '../../package.json';
 import { code } from './helpers/sources';
 
 /**
