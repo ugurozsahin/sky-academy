@@ -43,7 +43,7 @@
     "tests/unit/audio.test.ts": 617,
     "tests/unit/curriculum.test.ts": 2701,
     "tests/unit/duel.test.ts": 970,
-    "tests/unit/governance.test.ts": 5762,
+    "tests/unit/governance.test.ts": 5764,
     "tests/unit/guardrails.test.ts": 3632,
     "tests/unit/hooks.test.ts": 1200,
     "tests/unit/play-session.test.ts": 629,
