@@ -12,6 +12,7 @@ import { initGameSpeed } from './game/speed';
 import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
 import { plugin, wireBackButton, type AppPlugin } from './native';
+import { backGuard } from './ui/screen';
 import type { YearInfo } from './curriculum';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
@@ -155,7 +156,12 @@ window.addEventListener('popstate', () => {
 // the browser's own back button does; the root (sky map, nothing on the stack) backgrounds the app instead.
 // `minimizeApp()` is a native Promise — caught here too, alongside `wireBackButton`'s own try/catch, so a
 // rejection never surfaces as an unhandled one from a native callback nothing else is watching.
-wireBackButton({ bridge: window, history, minimize: () => { plugin<AppPlugin>('App')?.minimizeApp().catch(() => {}); } });
+// #885: `beforeLeave` asks the live screen's Pause guard (`screen.ts`'s `backGuard()`) first — a live mission
+// or duel opens Pause instead of the press stepping back through history or backgrounding the app.
+wireBackButton({
+  bridge: window, history, beforeLeave: backGuard,
+  minimize: () => { plugin<AppPlugin>('App')?.minimizeApp().catch(() => {}); },
+});
 
 // ?reset=1 clears saved progress (used by tests).
 const params = new URLSearchParams(location.search);

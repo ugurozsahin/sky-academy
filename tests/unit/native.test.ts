@@ -71,4 +71,49 @@ describe('wireBackButton (#699)', () => {
     wireBackButton({ bridge: bridge({ App }), history: { state: { screen: 'play' }, back: boom }, minimize: vi.fn() });
     expect(onBack).not.toThrow();
   });
+
+  // #885: `beforeLeave` (a live screen's Pause guard, `screen.ts`'s `backGuard()`) is asked before either the
+  // ordinary history pop or `minimize()` — the four cases the issue's own acceptance criteria name.
+  describe('beforeLeave (#885)', () => {
+    const fire = (beforeLeave: () => boolean, state: unknown = { screen: 'play' }) => {
+      let onBack!: () => void;
+      const App = { addListener: (event: string, cb: () => void) => { if (event === 'backButton') onBack = cb; } };
+      const history = { state, back: vi.fn() };
+      const minimize = vi.fn();
+      wireBackButton({ bridge: bridge({ App }), history, minimize, beforeLeave });
+      onBack();
+      return { history, minimize };
+    };
+
+    it('a beforeLeave that returns true consumes the press: neither history.back() nor minimize() runs', () => {
+      const { history, minimize } = fire(() => true);
+      expect(history.back).not.toHaveBeenCalled();
+      expect(minimize).not.toHaveBeenCalled();
+    });
+
+    it('a beforeLeave that returns false leaves the #699 behaviour unchanged', () => {
+      const { history, minimize } = fire(() => false);
+      expect(history.back).toHaveBeenCalledOnce();
+      expect(minimize).not.toHaveBeenCalled();
+      const root = fire(() => false, null);
+      expect(root.minimize).toHaveBeenCalledOnce();
+    });
+
+    it('no beforeLeave given behaves exactly as before beforeLeave existed', () => {
+      let onBack!: () => void;
+      const App = { addListener: (event: string, cb: () => void) => { if (event === 'backButton') onBack = cb; } };
+      const history = { state: { screen: 'play' }, back: vi.fn() };
+      const minimize = vi.fn();
+      wireBackButton({ bridge: bridge({ App }), history, minimize });
+      onBack();
+      expect(history.back).toHaveBeenCalledOnce();
+      expect(minimize).not.toHaveBeenCalled();
+    });
+
+    it('a beforeLeave that throws is caught, and the press falls through to the #699 behaviour', () => {
+      const { history, minimize } = fire(() => { throw new Error('guard failed'); });
+      expect(history.back).toHaveBeenCalledOnce();
+      expect(minimize).not.toHaveBeenCalled();
+    });
+  });
 });

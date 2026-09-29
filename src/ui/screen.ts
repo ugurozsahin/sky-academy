@@ -4,6 +4,15 @@ import { AVATARS, VILLAIN } from '../avatars';
 import { hush } from '../audio';
 import { $, esc, stars } from './dom';
 
+// #885: the live screen's hardware/gesture back-button guard — module-wide, not per scope, because there is
+// only ever one screen showing at a time (the same invariant `onHidden`'s single `visibilitychange`
+// listener already leans on). `main.ts`'s one `wireBackButton` call asks `backGuard()` rather than importing
+// whichever screen happens to be live, so neither file needs to know about the other.
+let backFn: (() => boolean) | null = null;
+/** Runs the live screen's back guard, or does nothing (`false`) with none registered — what `main.ts` passes
+ *  `wireBackButton` as `beforeLeave` (#885). */
+export function backGuard(): boolean { return backFn?.() ?? false; }
+
 export interface ScreenScope {
   /** Run `fn` after `ms`, but only while the screen is still alive AND not held; the timer is tracked for
    *  teardown, and `holdTimers(true)` stops its clock with the rest of the screen's beats. */
@@ -27,6 +36,10 @@ export interface ScreenScope {
    *  becoming visible again, and never after `dispose()`. One listener per scope; a later call replaces `fn`
    *  rather than adding a second (#884). */
   onHidden(fn: () => void): void;
+  /** Register `fn` as this screen's back-button guard (#885), run through the module's `backGuard()`: a
+   *  `true` return consumes a hardware/gesture back press. One guard at a time — a later call replaces `fn`,
+   *  same as `onHidden` — and `dispose()` clears it, so no guard outlives the screen that set it. */
+  onBack(fn: () => boolean): void;
   /** Show the `#toast` message with an optional class, auto-hiding after `ms`. Each call invalidates any
    *  earlier call's pending auto-hide (#478), so two toasts raised inside one hold no longer race: the first
    *  one's timer can no longer strip the second. */
@@ -83,6 +96,10 @@ export function screenScope(): ScreenScope {
       if (!hiddenFn) document.addEventListener('visibilitychange', onVisibility);
       hiddenFn = fn;
     },
+    onBack(fn) {
+      if (!alive) return;   // same guard as onHidden(): dispose() has already done its one cleanup
+      backFn = fn;
+    },
     holdTimers(open) {
       if (open === held) return;
       held = open;
@@ -120,6 +137,7 @@ export function screenScope(): ScreenScope {
     dispose() {
       alive = false; for (const b of beats) if ('id' in b) clearTimeout(b.id); beats.clear(); hush();
       if (hiddenFn) { document.removeEventListener('visibilitychange', onVisibility); hiddenFn = null; }
+      backFn = null;
       delete window.__sna;
     },
   };

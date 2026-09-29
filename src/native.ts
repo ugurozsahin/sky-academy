@@ -111,11 +111,19 @@ export function wireBackButton(env: {
   bridge: Window & typeof globalThis;
   history: Pick<History, 'back'> & { readonly state: unknown };
   minimize: () => void;
+  /** Asked first, on every press (#885): a `true` return consumes it — neither `history.back()` nor
+   *  `minimize()` runs. `main.ts` passes `screen.ts`'s `backGuard()`, so a live game's Pause guard applies
+   *  wherever the press lands. A throw counts as `false` — the guard degrading must not block the press it
+   *  was asked about, any more than a throw from `minimize`/`history.back()` below is allowed to. */
+  beforeLeave?: () => boolean;
 }): void {
   const app = plugin<AppPlugin>('App', env.bridge);
   if (!app || typeof app.addListener !== 'function') return;
   app.addListener('backButton', () => {
     try {
+      let consumed = false;
+      try { consumed = !!env.beforeLeave?.(); } catch { /* a throwing guard must not block the press */ }
+      if (consumed) return;
       const screen = (env.history.state as { screen?: string } | null)?.screen;
       if (screen) env.history.back(); else env.minimize();
     } catch {

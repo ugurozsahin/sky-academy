@@ -80,7 +80,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
-  const scope = screenScope(); const { later, toast } = scope;
+  const scope = screenScope(); const { later, toast, onBack } = scope; onBack(pauseIfLive);   // #885
   const overlay = $('#overlay'); const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
   let waveId = 0; let holdOpen = false;
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
@@ -442,10 +442,10 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     $('#resume').addEventListener('click', () => { overlay.hidden = true; hold(false); });
     $('#quit').addEventListener('click', () => { cleanup(); goHome(); });
   }
+  function pauseIfLive(): boolean { if (!overlay.hidden || duel.ended) return false; showPause(); return true; }   // #885, #884's shape
   const repeat = () => { const q = duel.current; if (q) say(q.say ?? q.prompt, true); };
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
-  $('#speak').addEventListener('click', repeat);
-  $('#qcard').addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeat(); });
+  $('#speak').addEventListener('click', repeat); $('#qcard').addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeat(); });
   // #73: a route change tears the arenas down — two rAF loops leaked across screens would be twice the incident.
   function cleanup() { for (const p of PLAYERS) arenas[p].destroy(); scope.dispose(); }
 

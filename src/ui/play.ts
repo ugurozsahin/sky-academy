@@ -63,7 +63,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   let arena: Arena | null = null; let tracer: Tracer | null = null; let paused = false;   // #884: mirrors the Pause overlay, for state()
   let lastCert: CertInfo | null = null;   // the one CertInfo actually filed (#410) — hooks read this, not a fresh certInfo() call
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
-  const { later, toast, holdTimers, onHidden } = scope; onHidden(() => { hush(); pauseIfLive(); });
+  const { later, toast, holdTimers, onHidden, onBack } = scope; onHidden(() => { hush(); pauseIfLive(); }); onBack(pauseIfLive);   // #885
   const hud = createHud(els, o.year.lives, canHear);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.

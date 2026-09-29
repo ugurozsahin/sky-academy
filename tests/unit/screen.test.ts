@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resultsModal, screenScope, stickersHTML, type ResultsModalParts } from '../../src/ui/screen';
+import { backGuard, resultsModal, screenScope, stickersHTML, type ResultsModalParts } from '../../src/ui/screen';
 
 // `screenScope()` reaches for `window.setTimeout` and `performance.now()` and nothing else until `toast()` or
 // `dispose()` is called, neither of which the beat rails below touch. Stubbed the same way
@@ -388,5 +388,47 @@ describe('screenScope.onHidden fires on a hidden visibilitychange, never after d
     fire('hidden');
     expect(fired, 'a disposed screen must not add a listener at all').toEqual([]);
     expect(listeners.length).toBe(0);
+  });
+});
+
+// #885: the Android hardware/gesture back button (`native.ts`'s `wireBackButton`) asks `backGuard()` before
+// stepping back through history or backgrounding the app. `onBack` is where the live screen registers what
+// that runs — module-wide, not per scope, because there is only ever one screen showing at a time.
+describe('screenScope.onBack / backGuard (#885)', () => {
+  it('backGuard() does nothing (returns false) with no guard registered', () => {
+    expect(backGuard()).toBe(false);
+  });
+
+  it('backGuard() runs the registered guard and returns what it returns', () => {
+    const scope = screenScope();
+    scope.onBack(() => true);
+    expect(backGuard()).toBe(true);
+    scope.dispose();
+  });
+
+  it('a later onBack() call replaces the earlier guard, not adds a second', () => {
+    const scope = screenScope();
+    const calls: string[] = [];
+    scope.onBack(() => { calls.push('first'); return true; });
+    scope.onBack(() => { calls.push('second'); return true; });
+    backGuard();
+    expect(calls).toEqual(['second']);
+    scope.dispose();
+  });
+
+  it('dispose() clears the guard, so no guard outlives its screen', () => {
+    const scope = screenScope();
+    scope.onBack(() => true);
+    scope.dispose();
+    expect(backGuard()).toBe(false);
+  });
+
+  // silent-failure-hunter shape (#884's onHidden precedent): a call after dispose() must not resurrect a
+  // guard nothing can ever clear again.
+  it('does nothing once the screen has been disposed, same guard as onHidden()/toast() (#884/#411)', () => {
+    const scope = screenScope();
+    scope.dispose();
+    scope.onBack(() => true);
+    expect(backGuard()).toBe(false);
   });
 });
