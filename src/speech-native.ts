@@ -39,6 +39,16 @@ export function resetNativeVoiceMemo() { voiceIndex = undefined; }
 
 let rangeListenerArmed = false;
 let current: SpeechEvents | undefined;
+// Module-wide, not a per-call closure: `speechEngine()` (speech.ts) builds a fresh `nativeEngine(tts)` wrapper
+// on every `say()`/`hush()`, since nothing caches the engine object itself — there is exactly one physical
+// plugin regardless of how many JS wrappers reference it, the same reason `current` above is module state too.
+// A `let busy = false` local to this function would make `busy()` always read `false` on any wrapper other
+// than the one currently speaking — pr-test-analyzer review of this PR, caught before push.
+let busy = false;
+/** Test-only: `current`/`busy` are module state (above), so a call left mid-flight by one test would
+ *  otherwise leak into the next. Never touches `rangeListenerArmed` — that models a real plugin registration
+ *  and is exercised through fresh `nativeSpeechEngine(bridge)` calls instead. */
+export function resetNativeEngineState() { current = undefined; busy = false; }
 
 /**
  * Wraps `@capacitor-community/text-to-speech` as a `SpeechEngine`. The plugin has no `SpeechSynthesisUtterance`
@@ -51,13 +61,22 @@ let current: SpeechEvents | undefined;
 export function nativeEngine(tts: TextToSpeechPlugin): SpeechEngine {
   if (!rangeListenerArmed) {
     rangeListenerArmed = true;
-    try { void tts.addListener('onRangeStart', () => current?.started()).catch(() => {}); }
-    catch { /* no boundary signal: ended()/failed() from the speak() promise are what's left */ }
+    // A rejection here must let a *later* nativeEngine() call try again — silent-failure-hunter review of
+    // this PR: leaving `rangeListenerArmed` true on a failed registration would drop the `started()` signal
+    // for the rest of the session with nothing to retry it, pushing every probe onto `ended()` alone (only
+    // fired when the *whole* line finishes) and risking a wrong `no` verdict on any line longer than the
+    // probe's own budget (`VOICE_START_MS`, speech.ts).
+    const disarm = () => { rangeListenerArmed = false; };
+    try { void tts.addListener('onRangeStart', () => current?.started()).catch(disarm); }
+    catch { disarm(); }
   }
-  let busy = false;
   return {
     busy: () => busy,
     cancel() {
+      // Cleared optimistically, before stop() is known to succeed: say()/hush() must never wait on the
+      // native call (busy()/say() would otherwise stall on a device that never answers), the same trade the
+      // web engine's own cancel() makes. A stop() that genuinely fails leaves the device speaking with
+      // busy() reporting false — nothing reads busy() yet (the SpeechEngine doc names a future caller).
       current = undefined; busy = false;
       try { void tts.stop().catch(() => {}); } catch { /* nothing left to stop */ }
     },
@@ -70,8 +89,13 @@ export function nativeEngine(tts: TextToSpeechPlugin): SpeechEngine {
           ...(voice !== undefined ? { voice } : {}),
           queueStrategy: opts.queue ? ADD : FLUSH,
         }))
-        .then(() => settle(events.ended))
-        .catch(reason => settle(() => events.failed(reason)));
+        // Two-argument then(), not .then().catch(): a throw from the caller's own events.ended() must not
+        // fall into the rejection branch below and replay as a *second* callback (events.failed()) for the
+        // same line — SpeechEngine's own contract is ended() or failed(), never both. silent-failure-hunter
+        // review of this PR. The trailing .catch() only stops that same throw becoming an unhandled promise
+        // rejection; it must never call events.failed() itself — the fate was already decided above.
+        .then(() => settle(events.ended), reason => settle(() => events.failed(reason)))
+        .catch(() => {});
       return true;
     },
   } satisfies SpeechEngine;

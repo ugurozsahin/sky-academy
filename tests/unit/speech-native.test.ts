@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hush, resetVoiceProbe, say, speechEngine, type SpeechEvents } from '../../src/audio';
-import { nativeEngine, nativeSpeechEngine, resetNativeVoiceMemo } from '../../src/speech-native';
+import { nativeEngine, nativeSpeechEngine, resetNativeEngineState, resetNativeVoiceMemo } from '../../src/speech-native';
 import { reset } from '../../src/storage';
 
 const mem: Record<string, string> = {};
@@ -38,6 +38,39 @@ function fakeTts(voices: { name: string; lang: string; localService?: boolean }[
 const bridge = (Plugins?: Record<string, unknown>) =>
   ({ Capacitor: Plugins === undefined ? undefined : { Plugins } }) as unknown as Window & typeof globalThis;
 
+// `rangeListenerArmed` is module state, armed at most once for the whole file (it models one real plugin
+// registration, #881) — so these two tests must run before any other in this file calls nativeEngine() or
+// nativeSpeechEngine(), or the arming they mean to exercise has already happened. Kept first in the file for
+// exactly that reason.
+describe('onRangeStart arming, first in this file so the module has not armed yet (#881)', () => {
+  // silent-failure-hunter review of this PR: a rejected addListener() used to leave `rangeListenerArmed`
+  // true forever, with nothing to retry it — the `started()` signal gone for the rest of the session. One
+  // test, not two: `rangeListenerArmed` is module state that never un-arms once a registration succeeds, so
+  // the only way to prove the *retry* actually re-registered is to drive the listener it registered — a
+  // second nativeEngine() call in a fresh test would find the module already armed from this one.
+  it("a rejected addListener() lets the retry register, and that registration's onRangeStart fires started()", async () => {
+    const broken = fakeTts();
+    broken.tts.addListener = () => Promise.reject(new Error('plugin not ready'));
+    nativeEngine(broken.tts);
+    await tick(); await tick();                                              // let the rejection (and its .catch) settle
+
+    let onRange: (() => void) | undefined;
+    const recovered = fakeTts();
+    recovered.tts.addListener = ((_: string, cb: () => void) => { onRange = cb; return Promise.resolve({ remove: () => {} }); }) as typeof recovered.tts.addListener;
+    const engine = nativeEngine(recovered.tts);
+    expect(onRange, 'the earlier rejection must not have latched arming on forever').toBeDefined();
+
+    const events: SpeechEvents = { started: vi.fn(), ended: vi.fn(), failed: vi.fn() };
+    engine.speak('Hello', { lang: 'en-GB', rate: 0.9, pitch: 1.08 }, events);
+    await tick();
+    onRange?.();
+    expect(events.started).toHaveBeenCalledOnce();
+    recovered.resolve();
+    await tick();
+    resetNativeVoiceMemo(); resetNativeEngineState();
+  });
+});
+
 describe('nativeSpeechEngine (#881)', () => {
   // Proved red first: a bare `w: Window & typeof globalThis = window` default threw `ReferenceError: window
   // is not defined` here, and then inside `say('Hello')` — Vitest's node environment declares no `window`
@@ -62,7 +95,7 @@ describe('nativeSpeechEngine (#881)', () => {
 });
 
 describe('the native engine as say()/hush() reach it (#881)', () => {
-  afterEach(() => { resetVoiceProbe(); resetNativeVoiceMemo(); reset(); });
+  afterEach(() => { resetVoiceProbe(); resetNativeVoiceMemo(); resetNativeEngineState(); reset(); });
 
   it("say() reaches the fake plugin's speak with the line, en-GB, and the flush strategy", async () => {
     reset(); resetNativeVoiceMemo();
@@ -118,7 +151,39 @@ describe('the native engine as say()/hush() reach it (#881)', () => {
 });
 
 describe('nativeEngine as a SpeechEngine, driven directly (#881)', () => {
-  afterEach(() => resetNativeVoiceMemo());
+  afterEach(() => { resetNativeVoiceMemo(); resetNativeEngineState(); });
+
+  // pr-test-analyzer review of this PR: busy() was untested and, before the fix, always read `false` on any
+  // engine wrapper other than the one that made the in-flight speak() call — because speechEngine() builds a
+  // *fresh* nativeEngine(tts) wrapper on every say()/hush(), so a caller (the "sensei is talking" indicator
+  // the SpeechEngine doc names) fetching busy() through a new wrapper never saw the real state.
+  it('busy() reflects the in-flight call even read through a freshly re-fetched wrapper', async () => {
+    const f = fakeTts();
+    const speaking = nativeEngine(f.tts);
+    const events: SpeechEvents = { started: vi.fn(), ended: vi.fn(), failed: vi.fn() };
+    speaking.speak('Hello', { lang: 'en-GB', rate: 0.9, pitch: 1.08 }, events);
+    await tick();
+    const fresh = nativeEngine(f.tts);                                       // a different wrapper, same underlying plugin
+    expect(fresh.busy(), 'the plugin is still speaking the line').toBe(true);
+    f.resolve();
+    await tick();
+    expect(fresh.busy(), 'the line finished').toBe(false);
+  });
+
+  // silent-failure-hunter review of this PR: `.then().catch()` let a throw from the caller's own ended()
+  // fall into the trailing catch and replay as failed() for the same line — SpeechEngine's contract is one
+  // fate per line, never both.
+  it("a throwing ended() does not also fire failed() for the same line", async () => {
+    const f = fakeTts();
+    const engine = nativeEngine(f.tts);
+    const failed = vi.fn();
+    const events: SpeechEvents = { started: vi.fn(), ended: () => { throw new Error('listener bug'); }, failed };
+    engine.speak('Hello', { lang: 'en-GB', rate: 0.9, pitch: 1.08 }, events);
+    await tick();
+    f.resolve();
+    await tick();
+    expect(failed, "ended()'s own throw must not be replayed as this line's failed()").not.toHaveBeenCalled();
+  });
 
   it('a rejected speak() calls failed(), not ended()', async () => {
     reset(); resetNativeVoiceMemo();
