@@ -10,6 +10,7 @@ import { weakestTopics } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
+import { openChooser } from './chooser';
 import { $, $$, capDigits, render, stars } from './dom';
 
 export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
@@ -137,9 +138,13 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
       go: () => nav.play({ year, mode: 'endless', pool: subjectPool() }) },
+    // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
-      go: () => nav.play({ year, mode: 'sprint', pool: subjectPool() }) },
+      go: () => openChooser($('#island-overlay'), subjectPool(), topic => {
+        sfx.tap();
+        topic ? nav.play({ year, mode: 'sprint', topic }) : nav.play({ year, mode: 'sprint', pool: subjectPool() });
+      }, { mixed: true }) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
       go: () => nav.play({ year, mode: 'boss', pool: subjectPool() }) },
@@ -170,6 +175,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
         `<button class="btn mode-btn${m.mod ? ` ${m.mod}` : ''}" id="${m.id}">${m.vport}<span><b>${m.title}</b><small>${m.blurb}</small></span></button>`
       ).join('\n      ')}
     </div>
+    <div class="overlay" id="island-overlay" hidden></div>
   </section>`, 'bg-sky');
   tb.bind();
   const drawTopics = () => {
