@@ -2,13 +2,13 @@
 // lifetime total (stickers unlock from it); spending adds to `spent`, and the balance is what is left to spend.
 import { FX_COLORS, type Element } from './arena';
 
-export type ItemKind = 'trail' | 'bubble' | 'decor' | 'costume';
+export type ItemKind = 'trail' | 'bubble' | 'decor' | 'costume' | 'title';
 export interface TrailSkin { color: string; core: string }          // slice-trail colours (glow + bright core)
 // `fx` overrides the equipped avatar's own particle/sound effect (#69) — undefined = keep the avatar's element.
 export interface ShopItem { id: string; kind: ItemKind; name: string; blurb: string; icon: string; price: number; trail?: TrailSkin; fx?: Element }
 export interface Wallet { coins: number; spent: number; owned: string[]; equipped: Partial<Record<ItemKind, string>> }
 
-export const KIND_LABEL: Record<ItemKind, string> = { trail: 'Slice trails', bubble: 'Bubble skins', decor: 'Island decorations', costume: 'Costumes' };
+export const KIND_LABEL: Record<ItemKind, string> = { trail: 'Slice trails', bubble: 'Bubble skins', decor: 'Island decorations', costume: 'Costumes', title: 'Dojo titles' };
 
 // One shop item per element trail (#69): colour *and* particle effect come from the same FX_COLORS the arena
 // already draws, so a bought trail is never just a recolour of the avatar's own effect. `master` is the
@@ -37,9 +37,29 @@ export const SHOP_ITEMS: ShopItem[] = [
     return { id: `trail-${fx}`, kind: 'trail', name, blurb, icon, price, fx, trail: { color: FX_COLORS[fx][0], core: FX_COLORS[fx][1] } };
   }),
   { id: 'trail-gold', kind: 'trail', name: 'Golden Trail', blurb: 'A shimmering gold slice', icon: '🌟', price: 200, trail: { color: '#ffd23a', core: '#fff6c4' } },
+  // Dojo titles (#1295): once the trails are all bought there was nothing left for coins to buy, so a text-only
+  // title under the child's name on the "Who is playing?" card is the next coin sink. No art, no save change.
+  { id: 'title-none', kind: 'title', name: 'No title', blurb: 'Your name shows on its own', icon: '📜', price: 0 },
+  { id: 'title-scout', kind: 'title', name: 'Sky Scout', blurb: 'A title under your name on the Who is playing? screen', icon: '📜', price: 300 },
+  { id: 'title-blade', kind: 'title', name: 'Swift Blade', blurb: 'A title under your name on the Who is playing? screen', icon: '📜', price: 400 },
+  { id: 'title-cloud', kind: 'title', name: 'Cloud Walker', blurb: 'A title under your name on the Who is playing? screen', icon: '📜', price: 500 },
+  { id: 'title-tactician', kind: 'title', name: 'Shadow Tactician', blurb: 'A title under your name on the Who is playing? screen', icon: '📜', price: 650 },
+  { id: 'title-sage', kind: 'title', name: 'Storm Sage', blurb: 'A title under your name on the Who is playing? screen', icon: '📜', price: 800 },
+  { id: 'title-grand', kind: 'title', name: 'Grand Ninja', blurb: 'A title under your name on the Who is playing? screen', icon: '📜', price: 1000 },
 ];
 
 export const itemById = (id: string) => SHOP_ITEMS.find(i => i.id === id);
+/** The equipped Dojo title id from a raw save, once ownership is checked — or null when there is none, the id
+ *  is unknown/not a `title` item (a hand-edited save), it was never bought, or it is the free default
+ *  `title-none` (#1295). `profileCard` reads a *sibling's* save directly, with no live Wallet to run
+ *  `equippedItem()` against, so this is the one place ownership is checked for a stored, non-active profile —
+ *  otherwise a hand-edited `equipped.title` with an empty `owned` list would show a title never bought. */
+export const ownedTitleId = (equippedTitle: unknown, owned: unknown): string | null => {
+  if (typeof equippedTitle !== 'string') return null;
+  const it = itemById(equippedTitle);
+  const list = Array.isArray(owned) ? owned : [];
+  return it && it.kind === 'title' && it.id !== 'title-none' && (it.price === 0 || list.includes(equippedTitle)) ? equippedTitle : null;
+};
 export const balance = (w: Wallet) => Math.max(0, w.coins - w.spent);
 export const owns = (w: Wallet, id: string) => { const it = itemById(id); return !!it && (it.price === 0 || w.owned.includes(id)); };
 
