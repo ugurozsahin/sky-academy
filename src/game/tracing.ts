@@ -11,6 +11,17 @@ export function scoreTrace(glyphHits: number[], glyphTotals: number[], insidePts
   return { coverage, outside, glyphs, weakest, pass: coverage >= WORD_MIN && outside <= OUTSIDE_MAX && glyphs.every(g => g >= GLYPH_MIN) };
 }
 
+/** The toast text for a trace that has not passed — `null` when there is nothing to say. Pulled out of
+ *  `play.ts` (#895) so the same words can be spoken as well as shown; the thresholds are unchanged.
+ *  `strokes` mirrors the screen's own stroke-count rule for a mid-trace nudge (only after the first stroke). */
+export function traceFeedback(r: TraceResult, answer: string, via: 'stroke' | 'check', strokes: number): string | null {
+  if (r.pass) return null;
+  if (via === 'stroke') return strokes >= 1 && r.outside > 0.6 ? 'Stay on the dotted lines' : null;
+  if (r.outside > 0.45) return 'Stay on the dotted lines';
+  const missing = r.glyphs.filter(g => g < GLYPH_MIN).length;   // name the letter the child skipped
+  return answer.length > 1 && missing ? `Trace the "${[...answer][r.weakest]}" too — every letter!` : `Keep tracing — cover the whole ${answer.length > 1 ? 'word' : 'letter'}`;
+}
+
 /** The mask is built at half the canvas resolution, so a canvas point maps to `x * MASK_SCALE` in the grid. */
 export const MASK_SCALE = 0.5;
 /** The faint glyph the child is tracing over, and how much of it they have covered.

@@ -4,7 +4,7 @@ import { Arena, hittable } from '../game/arena';
 import { type Mode, type SessionResult } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
-import { Tracer } from '../game/tracing';
+import { Tracer, traceFeedback } from '../game/tracing';
 import {
   isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd,
   recordSprint, recordTopic, recordTraining, save, touchStreak, wallet,
@@ -135,21 +135,18 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     tracer?.destroy();
     const c = $('#trace') as HTMLCanvasElement;
     tracer = new Tracer(c, q.answer, r => {
-      if (r.pass) { sfx.correct(); session.hit(q.answer); }
-      else if (tracer!.strokes >= 1 && r.outside > 0.6) toast('Stay on the dotted lines', 'bad');
+      if (r.pass) { sfx.correct(); session.hit(q.answer); return; }
+      const msg = traceFeedback(r, q.answer, 'stroke', tracer!.strokes); if (msg) speakTrace(msg);
     }, av.glow);
     $('#tclear').onclick = () => { sfx.tap(); tracer?.clear(); };
     $('#tcheck').onclick = () => {
       const r = tracer!.result(); if (r.pass) { sfx.correct(); session.hit(q.answer); return; }
-      const missing = r.glyphs.filter(g => g < 0.55).length;   // name the letter the child skipped
-      toast(
-        r.outside > 0.45 ? 'Stay on the dotted lines'
-          : q.answer.length > 1 && missing ? `Trace the "${[...q.answer][r.weakest]}" too — every letter!`
-          : `Keep tracing — cover the whole ${q.answer.length > 1 ? 'word' : 'letter'}`,
-        'bad',
-      );
+      const msg = traceFeedback(r, q.answer, 'check', tracer!.strokes); if (msg) speakTrace(msg);
     };
   }
+  /** Toast tracing feedback and speak the same words (#895): a child who cannot yet read gets more than a toast.
+   *  say() respects the read-aloud setting itself; the em dash becomes a spoken pause, not a read-aloud symbol. */
+  function speakTrace(msg: string) { toast(msg, 'bad'); say(msg.replace(' — ', ', ')); }
   /** First-play demo: show the animated hand over the arena; returns how long to hold the first wave (ms). */
   function showTutorial(): number {
     const t = $('#tutorial'); if (!t || !t.hidden) return 0;

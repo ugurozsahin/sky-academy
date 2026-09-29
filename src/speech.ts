@@ -1,32 +1,12 @@
 // Read-aloud: voice choice, the "can this device be heard?" probe, and say()/hush() themselves. Split out of
 // audio.ts (#880) so the Android app's native text-to-speech (#881) has somewhere to plug in: everything here
-// talks to one SpeechEngine, chosen once, and the web engine is the only one that exists today.
+// talks to one SpeechEngine, chosen once — the web engine always, the native one (speech-native.ts) when the
+// APK's bridge has it registered.
 import { load, save, type SaveData } from './storage';
+import { chooseVoice, voiceScore, type VoiceLike } from './voice-score';
+import { nativeSpeechEngine } from './speech-native';
+export { chooseVoice, voiceScore, type VoiceLike } from './voice-score';
 
-/** Minimal shape of SpeechSynthesisVoice so the ranking is testable in node. */
-export interface VoiceLike { name: string; lang: string; localService?: boolean }
-/**
- * Score a voice for reading to a 4–7 year old: British English first, warm/child voices first,
- * "natural"/online voices over robotic local ones. Higher = better; < 0 = unusable.
- */
-export function voiceScore(v: VoiceLike): number {
-  const lang = v.lang.replace('_', '-').toLowerCase(); const name = v.name;
-  if (!lang.startsWith('en')) return -1;
-  let s = lang === 'en-gb' ? 100 : /en-(ie|au|nz)/.test(lang) ? 60 : 30;
-  if (/maisie/i.test(name)) s += 40;                                        // Microsoft's en-GB child voice
-  else if (/libby|sonia|kate|serena|martha|google uk english female|moira|fiona/i.test(name)) s += 30;
-  else if (/female/i.test(name)) s += 20;
-  else if (/daniel|ryan|thomas|oliver|google uk english male|arthur/i.test(name)) s += 10;
-  if (/natural|neural|online|premium|enhanced/i.test(name)) s += 8;
-  if (v.localService === false) s += 4;                                     // cloud voices sound less robotic
-  if (/eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|bad news|bells|boing|bubbles|cellos|jester|organ|superstar|trinoids|whisper|wobble|zarvox|albert|fred|junior|ralph|kathy/i.test(name)) s -= 100; // Apple novelty voices: any plain English voice beats them
-  return s;
-}
-export function chooseVoice<T extends VoiceLike>(voices: T[]): T | null {
-  let best: T | null = null, bs = -1;
-  for (const v of voices) { const s = voiceScore(v); if (s > bs) { best = v; bs = s; } }
-  return best;
-}
 let voice: SpeechSynthesisVoice | null | undefined;
 function pickVoice(s: { getVoices?: () => SpeechSynthesisVoice[] }) {
   if (voice !== undefined) return voice;
@@ -127,10 +107,20 @@ const defaultSynth = (): SynthLike | null =>
   typeof window !== 'undefined' && window.speechSynthesis && typeof SpeechSynthesisUtterance === 'function'
     ? window.speechSynthesis : null;
 
-/** The engine this device speaks through today — the one place a native engine (#881) plugs in. `null` means
- *  no engine at all, the one verdict `say()` needs no probe to reach. */
-export function speechEngine(synth: SynthLike | null = defaultSynth()): SpeechEngine | null {
-  return synth ? webEngine(synth) : null;
+/**
+ * The engine this device speaks through today. An explicit `synth` (a test's fake, or `null` for "no engine")
+ * always wins and is never second-guessed — that is the seam `tests/unit/audio.test.ts` drives directly.
+ * Only the *default*, no-argument call — every real caller in `src/` — asks `speech-native.ts` first: the
+ * Android APK's `speechSynthesis` is unsupported (crbug 40417848), so `defaultSynth()` there is always `null`
+ * and the web engine could never be reached anyway. Off the APK, `nativeSpeechEngine()` finds no plugin and
+ * returns `undefined`, so nothing here changes off Android.
+ */
+export function speechEngine(synth?: SynthLike | null): SpeechEngine | null {
+  if (synth !== undefined) return synth ? webEngine(synth) : null;
+  const native = nativeSpeechEngine();
+  if (native) return native;
+  const web = defaultSynth();
+  return web ? webEngine(web) : null;
 }
 
 /**
@@ -227,8 +217,12 @@ export function resetVoiceProbe() {
  *
  * `o.engine` is the `SpeechEngine`-level test seam `say()` also takes, over `synth`'s older, web-shaped one;
  * production code passes neither. Passing both is not a real call shape — `engine` wins.
+ *
+ * `synth` carries no default of its own (unlike `voiceState`/`canHear` below): it is handed straight to
+ * `speechEngine()`, whose *own* default is what tries the native engine first (#881) — resolving it here
+ * too would fix it at the web engine (or `null`, off the web) before `speechEngine()` ever saw the call.
  */
-export function hush(synth: SynthLike | null = defaultSynth(), o: { engine?: SpeechEngine } = {}) {
+export function hush(synth?: SynthLike | null, o: { engine?: SpeechEngine } = {}) {
   // Cleared here, unconditionally, not only inside whichever engine's own cancel(): a `say()` with no engine
   // at all (or a different one from this hush()'s) must still drop a macrotask already queued to speak — the
   // very drop-on-screen-change this function exists for, and it must not depend on an engine resolving.
@@ -248,10 +242,11 @@ export function hush(synth: SynthLike | null = defaultSynth(), o: { engine?: Spe
  * `startSilence`/`stopSilence` above. Once the launch already reads `yes`, a line is still spoken but no
  * longer probed — nothing left to learn, and `recordVoice('yes')` on an already-`yes` launch is a no-op.
  *
- * `synth` and `engine` are the same seam at two levels: production code passes neither, and always gets
- * `speechEngine(defaultSynth())`. `synth` is the older, web-shaped test seam (`tests/unit/audio.test.ts`'s
- * `SynthLike` fakes); `engine` lets a test drive the `SpeechEngine` contract itself, with no `SynthLike` or
- * `SpeechSynthesisUtterance` involved. Passing both is not a real call shape — `engine` wins.
+ * `synth` and `engine` are the same seam at two levels: production code passes neither, so `o.synth` is
+ * `undefined` and `speechEngine()` picks native-then-web itself (#881). `synth` is the older, web-shaped
+ * test seam (`tests/unit/audio.test.ts`'s `SynthLike` fakes); `engine` lets a test drive the `SpeechEngine`
+ * contract itself, with no `SynthLike` or `SpeechSynthesisUtterance` involved. Passing both is not a real
+ * call shape — `engine` wins.
  */
 export function say(text: string, force = false, o: { queue?: boolean; synth?: SynthLike | null; engine?: SpeechEngine } = {}) {
   if (!force && !load().speech) return;

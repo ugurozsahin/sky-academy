@@ -20,6 +20,7 @@ cd android && ./gradlew assembleDebug        # → app/build/outputs/apk/debug/a
 `npx cap open android` opens the project in Android Studio; `npx cap run android` installs on a connected device.
 
 ## Notes
+- Read-aloud in the APK speaks through the device's own text-to-speech engine (`@capacitor-community/text-to-speech`, #881) — the WebView has no `speechSynthesis` of its own (crbug 40417848) — with no plugin, or in a browser, `say()`/`hush()` behave exactly as before.
 - Back button (hardware or browser) steps back one screen: play/memory → island → sky map; the in-app Back/Islands buttons pop the same history, so the stack never grows. On the sky map, back sends the app to the background rather than closing it (`App.minimizeApp()`, #699) — in the browser or the PWA, where there is no such plugin, back at the root leaves the page as before.
 - Icons and splash screens are generated from the 忍 mark by `python3 scripts/android-assets.py` (owner art can replace them later).
 - Fonts: Fredoka is loaded from Google Fonts; offline the system font is used (inlining the font is issue #44).

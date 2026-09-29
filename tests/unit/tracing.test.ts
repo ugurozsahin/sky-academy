@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GLYPH_MIN, MASK_SCALE, type TraceGrid, type TraceTally, markPoint, paintStroke, scoreTrace } from '../../src/game/tracing';
+import { GLYPH_MIN, MASK_SCALE, type TraceGrid, type TraceResult, type TraceTally, markPoint, paintStroke, scoreTrace, traceFeedback } from '../../src/game/tracing';
 
 describe('scoreTrace (per-letter pass rule)', () => {
   const totals = [100, 100, 100];
@@ -21,6 +21,40 @@ describe('scoreTrace (per-letter pass rule)', () => {
   });
   it('spaces (no pixels) never block a pass', () => {
     expect(scoreTrace([80, 0, 80], [100, 0, 100], 100, 0).pass).toBe(true);
+  });
+});
+
+// #895: traceFeedback is the toast/spoken message play.ts's startTrace picks; a pass, and the no-stroke case
+// on the way to a first pass, both say nothing.
+describe('traceFeedback (#895)', () => {
+  const passed: TraceResult = { coverage: 1, outside: 0, glyphs: [1], weakest: 0, pass: true };
+  const scribble: TraceResult = { coverage: 1, outside: 0.7, glyphs: [1], weakest: 0, pass: false };   // #895 evidence: outside > 0.6 on a stroke
+  const offLines: TraceResult = { coverage: 0.9, outside: 0.5, glyphs: [0.9, 0.9], weakest: 0, pass: false };   // > 0.45, on check
+  const oneLetterMissed: TraceResult = { coverage: 0.7, outside: 0.1, glyphs: [1, 0.3], weakest: 1, pass: false };
+  const halfCovered: TraceResult = { coverage: 0.7, outside: 0.1, glyphs: [0.7], weakest: 0, pass: false };
+
+  it('says nothing for a pass, whatever the via or stroke count', () => {
+    expect(traceFeedback(passed, 'a', 'stroke', 1)).toBeNull();
+    expect(traceFeedback(passed, 'cat', 'check', 3)).toBeNull();
+  });
+  it('a mid-stroke nudge only fires after the first stroke, and only well outside the lines', () => {
+    expect(traceFeedback(scribble, 'a', 'stroke', 0)).toBeNull();               // #895: strokes 0 says nothing
+    expect(traceFeedback(scribble, 'a', 'stroke', 1)).toBe('Stay on the dotted lines');
+    const barelyOutside: TraceResult = { ...scribble, outside: 0.5 };
+    expect(traceFeedback(barelyOutside, 'a', 'stroke', 1)).toBeNull();          // 0.5 is not > 0.6
+  });
+  it('on Check ✓: outside the lines beats a missed letter', () => {
+    expect(traceFeedback(offLines, 'cat', 'check', 2)).toBe('Stay on the dotted lines');
+  });
+  it('on Check ✓: names the weakest letter of a multi-letter answer', () => {
+    expect(traceFeedback(oneLetterMissed, 'cat', 'check', 2)).toBe('Trace the "a" too — every letter!');
+  });
+  it('on Check ✓: a single letter gets the generic nudge, never "every letter!"', () => {
+    expect(traceFeedback(halfCovered, 'a', 'check', 1)).toBe('Keep tracing — cover the whole letter');
+  });
+  it('on Check ✓: an undercovered word with no single weak letter gets the word-shaped nudge', () => {
+    const evenlyThin: TraceResult = { coverage: 0.6, outside: 0.1, glyphs: [0.6, 0.6], weakest: 0, pass: false };
+    expect(traceFeedback(evenlyThin, 'cat', 'check', 2)).toBe('Keep tracing — cover the whole word');
   });
 });
 
