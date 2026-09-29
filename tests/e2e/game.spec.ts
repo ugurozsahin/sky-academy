@@ -20,6 +20,7 @@ declare global {
   interface Window { __lastVoiceLine?: SpeechSynthesisUtterance }   // #65: the stubbed engine parks the last line here for a test to start by hand
   interface Window { __spoken?: string[] }                          // #380 review B2: every line the engine was handed, in order
   interface Window { __seedMiss?: boolean }                         // #518: true when a dojo seed keyed by date missed the page's own day
+  interface Window { __cancelled?: number }                         // #884: how many times the engine's cancel() ran — hush() reaches it
 }
 
 // The live screen sets `__sna` to PlayHooks or MemoryHooks; a given test knows which, so the spec views it as
@@ -27,13 +28,14 @@ declare global {
 // augmentation and the `__sna?: SnaHooks` one in hooks.ts never meet in a single type-check pass.
 declare global { interface Window { __sna: PlayHooks & MemoryHooks; __SNA_FAST?: number } }
 
-/** Record every line handed to the engine, so a test can assert a sentence was *spoken* and not only printed. */
+/** Record every line handed to the engine, so a test can assert a sentence was *spoken* and not only printed.
+ *  Also counts cancel() calls (#884): hush() reaches the engine through it, and nothing else in this stub says so. */
 const captureSpeech = (page: Page) => page.addInitScript(() => {
-  window.__spoken = [];
+  window.__spoken = []; window.__cancelled = 0;
   Object.defineProperty(window, 'speechSynthesis', {
     configurable: true,
     value: {
-      speaking: false, pending: false, getVoices: () => [], cancel: () => {}, onvoiceschanged: null,
+      speaking: false, pending: false, getVoices: () => [], cancel: () => { window.__cancelled!++; }, onvoiceschanged: null,
       speak: (u: SpeechSynthesisUtterance) => { window.__spoken!.push(u.text); },
     },
   });
@@ -2522,6 +2524,74 @@ test.describe('Sky Ninja Academy', () => {
     await expect(results.locator('.coin-gain')).toContainText('+6');         // 1 correct + 1 star × 5
     await page.click('#home');
     await expect(page.locator('#sprint small')).toContainText('best 10');
+  });
+
+  /** Simulate the tab going to background (#884): override `document.visibilityState` and dispatch the event
+   *  the play screen's `onHidden()` listens for. */
+  async function hideApp(page: Page) {
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+  }
+
+  test('hiding the app opens Pause on a live Sprint, stops speech in flight, freezes the clock, and Resume continues it (#884)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await expect(page.locator('.play')).toBeVisible();
+    await hideApp(page);
+    await expect(page.locator('#resume')).toBeVisible();
+    expect((await state(page)).paused).toBe(true);
+    // hush() reaches the stubbed engine's cancel() — this is the only e2e evidence that onHidden() actually
+    // calls it, not only pauseIfLive() (pr-test-analyzer review).
+    expect(await page.evaluate(() => window.__cancelled)).toBeGreaterThan(0);
+    const frozen = (await state(page)).timeLeft;
+    await page.waitForTimeout(2000);
+    expect((await state(page)).timeLeft).toBe(frozen);                    // the Sprint clock does not run while hidden
+    await page.click('#resume');
+    await page.waitForFunction((t) => window.__sna.state().timeLeft < t, frozen);
+  });
+
+  test('hiding the app during a stage-clear overlay opens no second overlay, and paused stays false (#884)', async ({ page }) => {
+    await seedPlayer(page, 'kai', 'Sam');
+    await startTopic(page, 'year1', 'y1-bonds');
+    await answerAll(page, 6);
+    await expect(page.locator('.celebrate')).toBeVisible();
+    await hideApp(page);
+    await expect(page.locator('.celebrate')).toBeVisible();              // the stage-clear overlay, unchanged
+    await expect(page.locator('#resume')).toHaveCount(0);                // no Pause overlay stacked on top of it
+    expect((await state(page)).paused, 'paused names the Pause overlay specifically, not any held overlay').toBe(false);
+    await page.click('#next');
+    await page.waitForFunction(() => window.__sna.state().stage === 2);
+  });
+
+  // pr-test-analyzer review: the overlay/paused test above hides the app only once `.celebrate` is already up
+  // — well past the outcome hold that precedes it. This is the tighter version of the same race: the
+  // stage-clearing slice and the hide happen in the SAME synchronous tick, before the deferred stage-clear
+  // beat (play-session.ts's settle() -> endWave() -> waveEnd()) has had any time to run at all. If Pause did
+  // not freeze that beat (screenScope's holdTimers, driven by playSession.hold(true) inside showPause()), it
+  // would fire while hidden and overwrite the Pause overlay with .celebrate underneath the child's back.
+  test('hiding at the exact instant a stage-clearing answer lands holds the deferred stage-clear off until Resume (#884)', async ({ page }) => {
+    await seedPlayer(page, 'kai', 'Sam');
+    await startTopic(page, 'year1', 'y1-bonds');
+    for (let i = 0; i < 5; i++) { await waitForTarget(page); expect(await answer(page)).toBe(true); }
+    await waitForTarget(page);
+    const sliced = await page.evaluate(() => {
+      const ok = window.__sna.answer();                                    // the 6th, stage-clearing answer
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));               // same tick — the tightest version of the race
+      return ok;
+    });
+    expect(sliced).toBe(true);
+    await expect(page.locator('#resume')).toBeVisible();
+    await expect(page.locator('.celebrate')).toHaveCount(0);
+    await page.waitForTimeout(2500);                                       // real time, well past the (8×-scaled) outcome hold
+    expect(await page.locator('#resume').isVisible(), 'Pause must not be clobbered by the deferred stage-clear beat').toBe(true);
+    await expect(page.locator('.celebrate')).toHaveCount(0);
+    await page.click('#resume');
+    await expect(page.locator('.celebrate')).toBeVisible({ timeout: 5000 });
   });
 
   test('Daily Dojo: three challenges on the sky map, progress survives a reload, bonus rows on results', async ({ page }) => {

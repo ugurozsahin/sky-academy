@@ -10,7 +10,7 @@ import {
   recordSprint, recordTopic, recordTraining, save, touchStreak, wallet,
 } from '../storage';
 import { equippedItem } from '../game/shop';
-import { canHear, haptic, say, sfx, sliceFx } from '../audio';
+import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
 import { screenScope, stickersHTML } from './screen';
 import { createHud } from './hud';
@@ -60,10 +60,10 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     lives: $('#lives'), score: $('#score'), stage: $('#stage'), prompt: $('#prompt'), vis: $('#vis'), hint: $('#hint'),
     overlay: $('#overlay'), qcard: $('#qcard'), speak: $('#speak'),
   };
-  let arena: Arena | null = null; let tracer: Tracer | null = null;
+  let arena: Arena | null = null; let tracer: Tracer | null = null; let paused = false;   // #884: mirrors the Pause overlay, for state()
   let lastCert: CertInfo | null = null;   // the one CertInfo actually filed (#410) — hooks read this, not a fresh certInfo() call
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
-  const { later, toast, holdTimers } = scope;
+  const { later, toast, holdTimers, onHidden } = scope; onHidden(() => { hush(); pauseIfLive(); });
   const hud = createHud(els, o.year.lives, canHear);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
@@ -293,11 +293,13 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
         }
       : null;
   function showPause() {
-    playSession.hold(true);                       // #65: pauses the arena, and stops a sentence peek's clock with it
+    playSession.hold(true); paused = true;         // #65: pauses the arena, and stops a sentence peek's clock with it
     els.overlay.hidden = false; els.overlay.innerHTML = pauseHTML();
-    $('#resume').addEventListener('click', () => { els.overlay.hidden = true; playSession.hold(false); });
+    $('#resume').addEventListener('click', () => { els.overlay.hidden = true; playSession.hold(false); paused = false; });
     $('#quit').addEventListener('click', () => { cleanup(); goHome(); });
   }
+  // #884: opens Pause on a live game (no overlay up, not yet ended); a stage-clear/results overlay stays as it is.
+  function pauseIfLive(): boolean { if (!els.overlay.hidden || session.ended) return false; showPause(); return true; }
   $('#pause').addEventListener('click', () => { sfx.tap(); showPause(); });
   $('#speak').addEventListener('click', repeatPrompt);
   els.qcard.addEventListener('click', e => { if ((e.target as HTMLElement).closest('button')) return; repeatPrompt(); });
@@ -328,7 +330,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
       stage: session.stage, index: session.index, score: session.score, lives: session.lives,
       ended: session.ended, waiting: session.waiting, prompt: session.current?.prompt,
       answer: session.current?.answer, timeLeft: session.timeLeft, bossHp: session.bossHp, trail: skin ?? null,
-      shots: arena?.shotsThrown ?? 0, topic: session.currentTopic?.id,
+      shots: arena?.shotsThrown ?? 0, topic: session.currentTopic?.id, paused,
     }),
     // PNG data URL of the certificate for the finished mission — the one `CertInfo` actually filed (#410),
     // not a fresh `certInfo()` call: that used to hand back a certificate with its own `new Date()`, live at

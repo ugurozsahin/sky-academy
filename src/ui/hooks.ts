@@ -40,6 +40,8 @@ export interface PlayState {
   shots: number;
   /** The current question's topic id (#908) — undefined before the first question is drawn. */
   topic: string | undefined;
+  /** The Pause overlay holds the session (#884) — true for tracing too, which has no arena. */
+  paused: boolean;
 }
 
 /** The `window.__sna` hooks set by the play screen. */

@@ -23,6 +23,10 @@ export interface ScreenScope {
    * not re-measure what is already frozen and lose the first freeze's remainder.
    */
   holdTimers(open: boolean): void;
+  /** Run `fn` when the tab is hidden (`document.visibilitychange`, `visibilityState === 'hidden'`) — never on
+   *  becoming visible again, and never after `dispose()`. One listener per scope; a later call replaces `fn`
+   *  rather than adding a second (#884). */
+  onHidden(fn: () => void): void;
   /** Show the `#toast` message with an optional class, auto-hiding after `ms`. Each call invalidates any
    *  earlier call's pending auto-hide (#478), so two toasts raised inside one hold no longer race: the first
    *  one's timer can no longer strip the second. */
@@ -56,6 +60,10 @@ export function screenScope(): ScreenScope {
   // `performance.now()` and not `Date.now()`: this measures an interval, and a wall clock that a device
   // adjusts mid-pause would hand back a negative remainder or a minute-long one.
   const now = () => performance.now();
+  // #884: at most one `visibilitychange` listener per scope, added on the first onHidden() call and removed by
+  // dispose() — never left running against a screen that is gone.
+  let hiddenFn: (() => void) | null = null;
+  const onVisibility = () => { if (document.visibilityState === 'hidden') hiddenFn?.(); };
   // Builds the armed shape; the `id` `setTimeout` returns is only known once `b` exists, so `b` is built with a
   // placeholder and patched once — the closure below still needs to name `b` to remove itself from `beats`.
   const arm = (fn: () => void, ms: number): Beat => {
@@ -69,6 +77,11 @@ export function screenScope(): ScreenScope {
       // Armed frozen if the screen is already held — a beat scheduled from inside a held screen (a toast raised
       // by the overlay itself) must not be the one thing still running behind it.
       beats.add(held ? { fn, left: ms } : arm(fn, ms));
+    },
+    onHidden(fn) {
+      if (!alive) return;   // same guard as toast()/clearToast(): dispose() has already done its one cleanup
+      if (!hiddenFn) document.addEventListener('visibilitychange', onVisibility);
+      hiddenFn = fn;
     },
     holdTimers(open) {
       if (open === held) return;
@@ -104,7 +117,11 @@ export function screenScope(): ScreenScope {
       document.querySelector<HTMLElement>('#toast')?.classList.remove('show');
     },
     // hush() also voids the voice probe (#65)
-    dispose() { alive = false; for (const b of beats) if ('id' in b) clearTimeout(b.id); beats.clear(); hush(); delete window.__sna; },
+    dispose() {
+      alive = false; for (const b of beats) if ('id' in b) clearTimeout(b.id); beats.clear(); hush();
+      if (hiddenFn) { document.removeEventListener('visibilitychange', onVisibility); hiddenFn = null; }
+      delete window.__sna;
+    },
   };
   return scope;
 }
