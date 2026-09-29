@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Session, fixDeck, repeatKey, starsForAccuracy, type DeckItem, type Miss, type SessionEvents } from '../../src/game/session';
+import { Session, fixDeck, repeatKey, starsForAccuracy, type DeckItem, type Miss } from '../../src/game/session';
 import { TOPICS, YEARS, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -1174,7 +1174,7 @@ describe('the repeat key holds the whole question (#412)', () => {
    */
   const MEASURABLE_TOPICS = [
     'r-soundhunt', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-soundhunt',
-    'y1-spelling', 'y1-sub', 'y2-balance', 'y2-capacity', 'y2-compare', 'y2-inverse', 'y2-length', 'y2-mass',
+    'y1-spelling', 'y1-story', 'y1-sub', 'y2-balance', 'y2-capacity', 'y2-compare', 'y2-inverse', 'y2-length', 'y2-mass',
     'y2-oddeven', 'y2-punct', 'y2-pv', 'y2-spelling', 'y2-stats', 'y2-temp', 'y2-three',
   ];
   it('the measurable set is exactly these topics, not just this many (#453 item 3)', () => {
@@ -1218,7 +1218,7 @@ describe('the repeat key holds the whole question (#412)', () => {
    *  "these twenty-eight" from "twenty-eight, several of them not the ones B1 was measured on". */
   const BIG_ENOUGH_TOPICS = [
     'r-soundhunt', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
-    'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-sub', 'y2-add', 'y2-balance', 'y2-capacity', 'y2-compare',
+    'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-story', 'y1-sub', 'y2-add', 'y2-balance', 'y2-capacity', 'y2-compare',
     'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats',
     'y2-sub', 'y2-temp', 'y2-three',
   ];

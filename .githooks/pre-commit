@@ -1,0 +1,5 @@
+#!/bin/sh
+# Opt-in (`npm run hooks`, #1382): the fast half of what CI runs. CI stays the gate; this only saves a round trip.
+node -e 'process.exit(Number(process.versions.node.split(".")[0]) < 20 ? 1 : 0)' \
+  || { echo "git hook: Node 20+ is needed, this is $(node -v). Put a newer one first on PATH." >&2; exit 1; }
+npx tsc --noEmit && npm run --silent lint --if-present

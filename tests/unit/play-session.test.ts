@@ -539,7 +539,7 @@ describe('onEnd commits the payout before the results overlay is ever scheduled 
       later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },
       holdTimers() {}, toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {},
       commitResult: () => { calls.push('commit'); return payout; },
-      showResults: (r, p) => { calls.push('show'); expect(p, 'the overlay draws the payout it was handed, never a second one it computed itself').toBe(payout); },
+      showResults: (_r, p) => { calls.push('show'); expect(p, 'the overlay draws the payout it was handed, never a second one it computed itself').toBe(payout); },
     };
     const gen = (): Question => ({ prompt: 'Pick one', answer: 'right', options: ['right', 'wrong'] });
     const topic = { id: 't', title: 't', icon: 't', subject: 'writing' as const, year: 'year1' as const, nc: '', gen };
@@ -592,7 +592,7 @@ describe('onEnd commits the payout before the results overlay is ever scheduled 
       later: (fn, ms) => { setTimeout(() => { if (mounted) fn(); }, ms); },
       holdTimers() {}, toast() {}, startTrace() {}, showTutorial: () => 0, showTaunt() {}, showStageClear() {},
       commitResult: (r) => { commitCalls.push(r); return payout; },
-      showResults: (r, p) => { showCalls.push(p); },
+      showResults: (_r, p) => { showCalls.push(p); },
     };
     const gen = (): Question => ({ prompt: 'Pick one', answer: 'right', options: ['right', 'wrong'] });
     const topic = { id: 't', title: 't', icon: 't', subject: 'writing' as const, year: 'year1' as const, nc: '', gen };

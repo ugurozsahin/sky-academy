@@ -1,9 +1,8 @@
-import { readdirSync, readFileSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, mkdtempSync, realpathSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import pkg from '../../package.json';
 import { code } from './helpers/sources';
 
 /**
@@ -214,7 +213,8 @@ describe('every scripts/*.d.mts names exactly the runtime exports of the .mjs be
  */
 describe('build scripts run their CLI block from a path that needs URL-escaping (#116)', () => {
   const runFromSpacedPath = (scriptRelPath: string, args: string[]) => {
-    const dir = mkdtempSync(join(tmpdir(), 'sna guard rail '));   // the space is the point
+    // realpath: macOS's tmpdir() is under the /var symlink, and the scripts' entry-point guard compares real paths
+    const dir = mkdtempSync(join(realpathSync(tmpdir()), 'sna guard rail '));   // the space is the point
     const scriptPath = join(dir, basename(scriptRelPath));
     writeFileSync(scriptPath, readFileSync(new URL(`../../${scriptRelPath}`, import.meta.url)));
     try {

@@ -21,6 +21,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-sounds | Literacy Writing: sounds→letters | initial/final/medial sound of CVC words; the word and the decoys follow the phase order (d1 phase 2 letters, d2–3 all single-letter sounds). The final (d2) and medial (d3) questions additionally require the letter at the gap to be a genuine single-letter sound (#135): `cow` ends in the digraph `ow` and `fox`/`box` end in the blend `/ks/`, so none of the three is drawn for the final question; `egg`'s middle letter is a consonant, so it is not drawn for the medial question. Each keeps its other (correct) roles — `egg` still teaches its initial sound at d1. |
 | r-soundhunt | Word Reading: say a sound for each letter | Sound Hunt: three keyword words are spoken, nothing to read; slice the grapheme (d1 phase 2 sets 1–4, d2 all single letters + qu, d3 phase 3 digraphs/trigraphs); sound-alike graphemes never appear as decoys |
 | r-capitals | Word Reading: letters | match A↔a; letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
+| r-tricky | Word Reading: common exception words | Letters and Sounds phase 2/3 tricky words, spoken never shown (peek path): d1 phase 2, d2 phase 3, d3 both. d2–3 decoys share a letter with the answer (he/she/the, me/we/be) except `I`, which shares none with any bank word |
 | r-build | Writing: spell by sounds | slice letters in order (CVC); word and decoy letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
 | r-read | Word Reading: read words by sound-blending | Read It!: a CVC word is shown, never spoken — slice its picture; word and decoys follow the phase pools (d1 phase 2, d2–3 all single-letter sounds); d3 always includes a same-first-letter decoy, so the first sound alone cannot answer |
 | r-sentence | Writing: simple sentences | Story Sentences: sentence shown + read aloud, slice the words in order (3 → 6 words, 1–2 decoys) |
@@ -30,6 +31,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 Maths:
 - y1-bonds — bonds within 20
 - y1-add — within 20, incl. 0
+- y1-story — Story Sums: one-step adding/subtracting in a spoken, pictured story (d3 adds "how many were left/taken")
 - y1-sub — within 20, incl. 0
 - y1-missing — missing-number problems
 - y1-doubles — double within 20
