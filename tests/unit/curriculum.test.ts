@@ -8,10 +8,11 @@ import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID
 import { R_LETTERS_P2, R_LETTERS_ALL, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/reception';
 import {
   TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES,
-  y2PlaceValue, y2Compare, y2Skip, y2Add, y2Sub, y2Three, y2Inverse, y2Tables, y2OddEven, y2Fractions, y2Money, y2Time, y2Words, y2Order, y2Line,
+  y2PlaceValue, y2Compare, y2Skip, y2Add, y2Sub, y2Three, y2Inverse, y2Tables, y2Fractions, y2Money, y2Time, y2Words, y2Order, y2Line,
   y2Shapes, y2Symmetry, y2Patterns, y2Position, y2Length, y2Mass, y2Capacity, y2Temp, y2Duration, y2Balance, y2Stats, y2Spelling, y2Contractions,
   y2Suffix, y2SuffixRoot, y2Homophones, y2WordClass, y2SentenceType, y2Tense, y2Punct, y2Sentence, y2Trace,
 } from '../../src/curriculum/year2';
+import { y2OddEven, nearOppositeParity } from '../../src/curriculum/year2-oddeven';
 import type { SentenceType } from '../../src/curriculum/year2';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
@@ -372,6 +373,54 @@ describe('curriculum ranges', () => {
       const q = t.gen(3, r); const [a, b] = q.prompt.split(' ? ').map(Number);
       expect(q.answer).toBe(a < b ? '<' : a > b ? '>' : '=');
     }
+  });
+  // #890: a guess used to score 50% at every stage — two bubbles, "odd" or "even". d1 keeps that; d2–d3 also
+  // draw a 4-bubble form ("Which number is even/odd?"), so both forms must appear from d2.
+  it('y2-oddeven: d1 is the unchanged 2-option form; d2–d3 also draw a 4-option form with one correct parity', () => {
+    const t = TOPICS.find(x => x.id === 'y2-oddeven')!; const r = rng(890);
+    for (let i = 0; i < 300; i++) {
+      const q = t.gen(1, r);
+      expect(q.prompt).toMatch(/^Is \d+ odd or even\?$/);
+      expect(q.options.length).toBe(2);
+      const n = Number(q.prompt.match(/\d+/)![0]);
+      expect(q.answer, q.prompt).toBe(n % 2 ? 'odd' : 'even');
+      expect(n, q.prompt).toBeLessThanOrEqual(20);   // d1's own range, unchanged by the split (#890)
+    }
+    for (const d of [2, 3] as Difficulty[]) {
+      let twoOption = 0, fourOption = 0, decoyOver5 = 0;
+      for (let i = 0; i < 300; i++) {
+        const q = t.gen(d, r);
+        if (q.options.length === 2) { twoOption++; expect(q.prompt).toMatch(/^Is \d+ odd or even\?$/); continue; }
+        fourOption++;
+        expect(q.prompt, q.prompt).toMatch(/^Which number is (odd|even)\?$/);
+        const wantEven = q.prompt.includes('even');
+        const ans = Number(q.answer);
+        expect(ans % 2 === 0, q.prompt).toBe(wantEven);
+        expect(q.options.length, q.prompt).toBe(4);
+        for (const o of q.options) {
+          const on = Number(o);
+          expect(on, q.prompt).toBeGreaterThanOrEqual(1);
+          expect(on, q.prompt).toBeLessThanOrEqual(100);
+          if (o !== q.answer) expect(on % 2 === 0, `${q.prompt}: decoy ${o}`).toBe(!wantEven);
+          if (o === q.answer) continue;
+          if (d === 3) expect(Math.abs(on - ans), `${q.prompt}: decoy ${o} not within 5`).toBeLessThanOrEqual(5);
+          else if (Math.abs(on - ans) > 5) decoyOver5++;
+        }
+      }
+      expect(twoOption, `d${d}: the unchanged 2-option form never drew`).toBeGreaterThan(0);
+      expect(fourOption, `d${d}: the 4-option form never drew`).toBeGreaterThan(0);
+      // d2 decoys come from anywhere in 1–100, unlike d3's ±5 neighbourhood — if a copy-paste ever pointed d2
+      // at the same near-neighbour draw as d3, every decoy would land within 5 and this would go to zero.
+      if (d === 2) expect(decoyOver5, 'd2 decoys never strayed past ±5 — did d3\'s near draw leak into d2?').toBeGreaterThan(0);
+    }
+  });
+  // The fewest valid neighbours nearOppositeParity can return — pinned directly (#890 review) rather than
+  // only landed on by whichever seed happens to draw ans = 1 or 100 among 300 d3 cards above.
+  it('nearOppositeParity: still 3 long at both ends of 1–100, never fewer', () => {
+    expect(nearOppositeParity(1)).toEqual([2, 4, 6]);
+    expect(nearOppositeParity(100)).toEqual([95, 97, 99]);
+    expect(nearOppositeParity(1).length).toBeGreaterThanOrEqual(3);
+    expect(nearOppositeParity(100).length).toBeGreaterThanOrEqual(3);
   });
 
   // #8 measurement & time: the generic suite checks structure; these check the domain facts it cannot infer.

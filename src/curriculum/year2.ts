@@ -81,10 +81,6 @@ export const y2Tables: Generator = (d, rng) => {
   if (kind === 1) { const p = `${n * table} ÷ ${table} = ?`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) }); }
   const p = `? × ${table} = ${n * table}`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) });
 };
-export const y2OddEven: Generator = (d, rng) => {
-  const n = ri(rng, 1, d === 1 ? 20 : 100);
-  return wordQ(rng, `Is ${n} odd or even?`, n % 2 ? 'odd' : 'even', ['odd', 'even']);
-};
 export const y2Inverse: Generator = (d, rng) => {
   const a = ri(rng, 10, d === 1 ? 30 : 99), b = ri(rng, 1, d === 1 ? 9 : Math.min(30, a - 1));
   const kind = ri(rng, 0, 2);
