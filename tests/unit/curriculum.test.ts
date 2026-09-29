@@ -483,6 +483,21 @@ describe('KS1 questions with one right answer, and only the right one marked (#2
     for (let i = 0; i < 100; i++) { const q = t.gen(2, r); expect(q.options.map(o => o.toLowerCase()).sort()).toEqual([...new Set(q.options.map(o => o.toLowerCase()))].sort()); }
   });
 
+  it('3b. y2-contractions: cannot is one word, never "can not" (#961)', () => {
+    const t = gen('y2-contractions');
+    let sawCannot = false;
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(961 + d);
+      for (let i = 0; i < 400; i++) {
+        const q = t.gen(d, r);
+        const text = [q.prompt, q.say ?? '', q.answer, ...q.options, q.visual?.type === 'word' ? q.visual.text : ''].join(' ');
+        expect(text, `${JSON.stringify(q)}: the NC spelling is "cannot", one word`).not.toMatch(/\bcan not\b/);
+        if (/\bcannot\b/.test(text)) sawCannot = true;
+      }
+    }
+    expect(sawCannot, 'cannot must still be reachable, as a prompt or as an answer').toBe(true);
+  });
+
   it('4. y2-temp: an estimate\'s decoys sit at least 10 °C from the answer and from each other', () => {
     // The floor is the issue's number, not the source constant (second review of PR #303): comparing the gaps
     // to `TEMP_GAP` held for every value of it, so `TEMP_GAP = 1` stayed green with a fridge asked against

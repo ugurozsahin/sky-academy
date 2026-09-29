@@ -147,7 +147,7 @@ describe('ninjas on this device (#20 slice 3)', () => {
   const card = (over: Partial<{ id: ProfileId; name: string; avatar: string | null; onboarded: boolean; state: ProfileCard['state'] }> = {}): ProfileCard => {
     const id = over.id ?? 'p1';
     if (over.state && over.state !== 'save') return { id, state: over.state };
-    return { id, state: 'save', name: over.name ?? '', avatar: over.avatar ?? null, onboarded: over.onboarded ?? false };
+    return { id, state: 'save', name: over.name ?? '', avatar: over.avatar ?? null, onboarded: over.onboarded ?? false, title: null };
   };
 
   it('offers a rename exactly when there is a save behind the row', () => {
