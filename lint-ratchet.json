@@ -4,26 +4,34 @@
     "lines": 60
   },
   "complexity": {
-    "src/curriculum/year2.ts": 17,
-    "src/game/arena.ts": 42,
-    "src/game/bubbles.ts": 20,
-    "src/game/dojo.ts": 35,
-    "src/main.ts": 17,
-    "src/storage.ts": 39,
-    "src/ui/play-results.ts": 23,
-    "src/ui/play.ts": 27,
-    "src/ui/profiles.ts": 16,
-    "src/ui/visuals.ts": 49
+    "src/curriculum/year2.ts::(anonymous)": 17,
+    "src/game/arena.ts::reveal": 16,
+    "src/game/arena.ts::onMove": 19,
+    "src/game/arena.ts::update": 42,
+    "src/game/arena.ts::render": 19,
+    "src/game/arena.ts::drawBubble": 16,
+    "src/game/arena.ts::drawParticle": 21,
+    "src/game/arena.ts::drawTrail": 19,
+    "src/game/bubbles.ts::layoutWave": 20,
+    "src/game/dojo.ts::measure": 35,
+    "src/main.ts::(anonymous)": 17,
+    "src/storage.ts::sanitizeTypes": 39,
+    "src/ui/play-results.ts::showResults": 23,
+    "src/ui/play.ts::playScreen": 27,
+    "src/ui/profiles.ts::(anonymous)": 16,
+    "src/ui/visuals.ts::renderVisual": 49,
+    "src/ui/visuals.ts::coinSVG": 16
   },
   "lines": {
-    "src/three/sketchbook/view.ts": 81,
-    "src/ui/duel.ts": 201,
-    "src/ui/home.ts": 70,
-    "src/ui/memory.ts": 84,
-    "src/ui/parents.ts": 102,
-    "src/ui/play-session.ts": 186,
-    "src/ui/play.ts": 210,
-    "src/ui/solid.ts": 110,
-    "src/ui/visuals.ts": 89
+    "src/three/sketchbook/view.ts::createView": 81,
+    "src/ui/duel.ts::duelScreen": 201,
+    "src/ui/home.ts::islandScreen": 70,
+    "src/ui/memory.ts::memoryScreen": 84,
+    "src/ui/parents.ts::parentsScreen": 102,
+    "src/ui/parents.ts::(anonymous)": 77,
+    "src/ui/play-session.ts::createPlaySession": 186,
+    "src/ui/play.ts::playScreen": 210,
+    "src/ui/solid.ts::createSolidSlot": 110,
+    "src/ui/visuals.ts::renderVisual": 89
   }
 }
