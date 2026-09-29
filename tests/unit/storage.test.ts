@@ -2980,4 +2980,45 @@ describe('save format v5 (#903)', () => {
     const m = migrate({ v: SAVE_VERSION, log: [logDay({ topics })] });
     expect(m.log[0].topics.length).toBe(50);
   });
+
+  // Round 4 review: a progress entry keyed `__proto__` — a real own string key once JSON.parse has made one,
+  // as importSave() does — reassigned the sanitized map's own prototype instead of becoming an entry, since
+  // the map was built as a plain `{}`. Fixed by building the map with `Object.create(null)`: `__proto__`
+  // becomes an ordinary own key like any other rather than a prototype hijack, pinned two ways — the map's
+  // own prototype is untouched (`null`, never re-pointed at the pasted `{stars: 1}`), and the key survives as
+  // a normal, sanitized entry rather than vanishing into `out`'s prototype.
+  it('progress extras: a "__proto__" key becomes an ordinary entry, never the sanitized map\'s own prototype', () => {
+    const parsed = JSON.parse('{"__proto__": {"stars": 1, "best": 1, "plays": 1}}') as Record<string, unknown>;
+    const m = migrate({ v: SAVE_VERSION, progress: parsed });
+    expect(Object.getPrototypeOf(m.progress)).toBeNull();
+    expect(Object.keys(m.progress)).toEqual(['__proto__']);
+    expect(m.progress['__proto__']).toEqual({ stars: 1, best: 1, plays: 1 });
+  });
+
+  // Round 4 review: the progress map's own keys had no length cap, unlike every value field this file clamps
+  // — a 50,000-character id survived untouched. A legitimate topic id is always a short kebab string, so an
+  // over-length one can only be junk; dropped, not truncated (truncating risks colliding with a real id).
+  it('progress extras: an over-length topic id is dropped, not truncated or kept', () => {
+    const longId = 'x'.repeat(5000);
+    const m = migrate({ v: SAVE_VERSION, progress: { [longId]: { stars: 1, best: 1, plays: 1 }, 'y1-add': { stars: 2, best: 2, plays: 2 } } });
+    expect(Object.keys(m.progress)).toEqual(['y1-add']);
+  });
+
+  // Round 4 review: nothing capped how many keys a Restore paste could carry — 5,000 synthetic ids all
+  // survived. The registry holds 87 topics today; 500 is generous headroom, not a tight fit.
+  it('progress extras: entries past the 500th are dropped, not carried through unbounded', () => {
+    const progress = Object.fromEntries(Array.from({ length: 600 }, (_, i) => [`t${i}`, { stars: 1, best: 1, plays: 1 }]));
+    const m = migrate({ v: SAVE_VERSION, progress });
+    expect(Object.keys(m.progress).length).toBe(500);
+    expect(m.progress['t0']).toBeDefined();
+    expect(m.progress['t499']).toBeDefined();
+    expect(m.progress['t500']).toBeUndefined();
+  });
+
+  // Round 4 review: a non-record progress[id] value used to pass through verbatim instead of being dropped
+  // like every sibling malformed shape in this file — a 2 MB string could round-trip straight into `progress`.
+  it('progress extras: a non-record entry is dropped, not carried through verbatim', () => {
+    const m = migrate({ v: SAVE_VERSION, progress: { someTopic: 'y'.repeat(2_000_000), 'y1-add': { stars: 1, best: 1, plays: 1 } } });
+    expect(Object.keys(m.progress)).toEqual(['y1-add']);
+  });
 });

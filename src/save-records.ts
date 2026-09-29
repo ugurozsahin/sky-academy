@@ -32,6 +32,14 @@ const clampStr = (s: string): string => s.slice(0, MAX_FIELD_LEN);
  */
 const MAX_TOPICS_PER_DAY = 50;
 
+/**
+ * Round 4 review: `progress` is keyed by topic id, and nothing capped how many keys a Restore paste could
+ * carry (5,000 synthetic ids all survived) or how long any one of them could be (a 50,000-character id
+ * survived too). The registry holds 87 topics today and the KS2 programme in the backlog will add more, so
+ * this is the same generous-headroom sizing `MAX_TOPICS_PER_DAY` uses, not a tight fit.
+ */
+const MAX_PROGRESS_ENTRIES = 500;
+
 /** One wrong answer logged for the parent view (#938 is the reader; #903 adds only the format). */
 export interface Slip { topic: string; prompt: string; answer: string; picked: string; at: string }
 const SLIP_FIELDS: Fields<Slip> = { topic: str, prompt: str, answer: str, picked: str, at: isoDay };
@@ -102,11 +110,20 @@ export function sanitizeStreakRest(streak: Record<string, unknown>): Record<stri
  * `last` (#936), `sprint` (#911), `crown` (#932). Round 3 review: rebuilds each entry from `TopicProgress`'s
  * known fields rather than spreading `v` — `stars`/`best`/`plays`/`hits`/`tries` pass through unvalidated, as
  * before (this function has never type-checked them), but an unrelated key can no longer ride along unbounded.
+ * Round 4 review, three more gaps in the same threat model: `out` was a plain object literal, so a `progress`
+ * entry keyed `__proto__` (a real own string key once `JSON.parse` has made it one, as `importSave()` does)
+ * silently reassigned `out`'s own prototype instead of becoming an entry — closed structurally by building
+ * `out` with `Object.create(null)`, so no key spelling can ever reach a prototype; a non-record `v` used to
+ * pass through verbatim instead of being dropped like every sibling malformed shape in this file, now just
+ * dropped; and the key itself (`id`) had no length or count cap, unlike every value field this file clamps —
+ * now an over-length id is dropped and the map stops accepting entries past `MAX_PROGRESS_ENTRIES`.
  */
 export function sanitizeProgressExtras(progress: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+  const out: Record<string, unknown> = Object.create(null);
+  let n = 0;
   for (const [id, v] of Object.entries(progress)) {
-    if (!isRecord(v)) { out[id] = v; continue; }
+    if (n >= MAX_PROGRESS_ENTRIES) break;
+    if (id.length > MAX_FIELD_LEN || !isRecord(v)) continue;
     const entry: Record<string, unknown> = { stars: v.stars, best: v.best, plays: v.plays };
     if ('hits' in v) entry.hits = v.hits;
     if ('tries' in v) entry.tries = v.tries;
@@ -114,6 +131,7 @@ export function sanitizeProgressExtras(progress: Record<string, unknown>): Recor
     if (fin(v.sprint) && (v.sprint as number) >= 0) entry.sprint = v.sprint;
     if (v.crown === true) entry.crown = true;
     out[id] = entry;
+    n++;
   }
   return out;
 }
