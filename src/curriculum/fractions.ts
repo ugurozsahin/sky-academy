@@ -25,11 +25,17 @@ export function simplify(f: Frac): Frac {
   return { n: n / g, d: d / g };
 }
 
-/** By value, cross-multiplied — the same rule `sameFraction` (`year2.ts:92`) uses, generalised to any two fractions. */
-export function equal(a: Frac, b: Frac): boolean { return a.n * b.d === b.n * a.d; }
+/**
+ * By value, cross-multiplied — the same rule `sameFraction` (`year2.ts:92`) uses, generalised to any two
+ * fractions. `simplify` first, same as every other function here: a raw `d < 0` flips the sign of a cross
+ * product but not the other, which silently mis-orders `compare` (not `equal`, whose product is sign-safe
+ * either way) — simplifying first is one fix for both, and the same `d === 0` throw as everywhere else.
+ */
+export function equal(a: Frac, b: Frac): boolean { const x = simplify(a), y = simplify(b); return x.n * y.d === y.n * x.d; }
 
 export function compare(a: Frac, b: Frac): -1 | 0 | 1 {
-  const l = a.n * b.d, r = b.n * a.d;
+  const x = simplify(a), y = simplify(b);
+  const l = x.n * y.d, r = y.n * x.d;
   return l < r ? -1 : l > r ? 1 : 0;
 }
 
@@ -86,7 +92,12 @@ export function parseFrac(label: string): Frac | null {
   if (mixed) {
     const [, whole, n, d] = mixed;
     const dd = Number(d); if (dd === 0) return null;
-    return fromMixed(Number(whole), { n: Number(n), d: dd });
+    // Not `fromMixed(Number(whole), { n: Number(n), d: dd })`: fromMixed expects `frac.n` signed the way
+    // toMixed's own output is (matching `whole`'s sign, e.g. -1 and {n:-3,d:4} for -7/4), but the regex
+    // only ever captures a positive `n` — the sign in the text belongs to `whole` alone ("-1 3/4" means
+    // -(1 3/4), not -1 + 3/4). Building the value directly from that convention instead.
+    const w = Number(whole), sign = w < 0 ? -1 : 1;
+    return simplify({ n: sign * (Math.abs(w) * dd + Number(n)), d: dd });
   }
   const plain = FRAC_RE.exec(trimmed);
   if (plain) {

@@ -22,6 +22,16 @@ describe('fractions.ts: exact arithmetic for KS2 (#1044)', () => {
     expect(() => simplify({ n: 1, d: 0 })).toThrow(RangeError);
   });
 
+  it('equal and compare simplify first, so a raw negative denominator neither mis-orders nor bypasses the d=0 throw', () => {
+    // -1/2 (as {n:1,d:-2}) really is less than 1/3 — a bare cross-multiply without simplifying first flips
+    // this, since it needs b.d*a.d > 0 to hold and this pair does not.
+    expect(compare({ n: 1, d: -2 }, { n: 1, d: 3 })).toBe(-1);
+    expect(compare({ n: 1, d: 3 }, { n: 1, d: -2 })).toBe(1);
+    expect(equal({ n: 1, d: -2 }, { n: -1, d: 2 })).toBe(true);
+    expect(() => equal({ n: 1, d: 0 }, { n: 1, d: 2 })).toThrow(RangeError);
+    expect(() => compare({ n: 1, d: 0 }, { n: 1, d: 2 })).toThrow(RangeError);
+  });
+
   it('equal agrees with Year 2\'s own cross-multiplication rule, over every n/d pair in 1–5 (#296, year2.ts:92)', () => {
     for (let a = 1; a <= 5; a++) for (let b = 1; b <= 5; b++) for (let num = 1; num <= 5; num++) for (let den = 1; den <= 5; den++) {
       expect(equal({ n: a, d: b }, { n: num, d: den })).toBe(a * den === num * b);
@@ -59,13 +69,17 @@ describe('fractions.ts: exact arithmetic for KS2 (#1044)', () => {
     expect(toDecimal({ n: 1, d: 3 })).toBeNull();
   });
 
-  it('fmtFrac/parseFrac round-trip a proper fraction, an improper one and a whole number', () => {
-    for (const f of [{ n: 3, d: 4 }, { n: 7, d: 4 }, { n: 8, d: 4 }, { n: 0, d: 5 }]) {
+  it('fmtFrac/parseFrac round-trip a proper fraction, an improper one, a whole number and a negative one', () => {
+    for (const f of [{ n: 3, d: 4 }, { n: 7, d: 4 }, { n: 8, d: 4 }, { n: 0, d: 5 }, { n: -7, d: 4 }, { n: -3, d: 4 }]) {
       expect(parseFrac(fmtFrac(simplify(f), { mixed: true }))).toEqual(simplify(f));
       expect(parseFrac(fmtFrac(simplify(f)))).toEqual(simplify(f));
     }
     expect(parseFrac('3/0')).toBeNull();
     expect(parseFrac('not a fraction')).toBeNull();
+  });
+
+  it('divWhole throws on a 0 divisor, the same as simplify does on a 0 denominator', () => {
+    expect(() => divWhole({ n: 1, d: 2 }, 0)).toThrow(RangeError);
   });
 
   // Property tests over 10,000 seeded pairs, denominators 1-12, per the issue's own bar (#1044).
@@ -84,8 +98,12 @@ describe('fractions.ts: exact arithmetic for KS2 (#1044)', () => {
       expect(equal(a, b)).toBe(compare(a, b) === 0);
     }
   });
-  it('parseFrac(fmtFrac(f)) round-trips, over 10,000 seeded pairs', () => {
-    for (let i = 0; i < 10000; i++) { const f = fracIn12(); expect(parseFrac(fmtFrac(f))).toEqual(simplify(f)); }
+  it('parseFrac(fmtFrac(f)) round-trips, plain and mixed, over 10,000 seeded pairs', () => {
+    for (let i = 0; i < 10000; i++) {
+      const f = fracIn12();
+      expect(parseFrac(fmtFrac(f))).toEqual(simplify(f));
+      expect(parseFrac(fmtFrac(f, { mixed: true }))).toEqual(simplify(f));
+    }
   });
 
   it('mulWhole and mul agree on a whole number expressed as n/1', () => {
