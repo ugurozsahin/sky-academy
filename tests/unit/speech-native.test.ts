@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hush, resetVoiceProbe, say, speechEngine, type SpeechEvents } from '../../src/audio';
 import { nativeEngine, nativeSpeechEngine, resetNativeEngineState, resetNativeVoiceMemo } from '../../src/speech-native';
-import { reset } from '../../src/storage';
+import { load, reset } from '../../src/storage';
 
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
@@ -147,6 +147,40 @@ describe('the native engine as say()/hush() reach it (#881)', () => {
     expect(engine).toBeNull();                                              // speechEngine(null): the seam every other test in the file drives directly
     const web = speechEngine({ speaking: false, pending: false, cancel() {}, speak() {} });
     expect(web).not.toBeNull();                                             // an explicit web synth is unaffected by #881
+  });
+});
+
+// review of this PR (#1343): every test above drives the native engine through an explicit `{ engine }`
+// override or an explicit `synth`/`null` argument — `speechEngine(o.synth)`'s own `synth !== undefined`
+// branch, never the native-first branch a real, no-argument say()/hush() actually takes. Deleting that
+// branch entirely left the rest of the suite green. These two tests are the ones that would have caught it:
+// a genuinely no-argument call must reach a plugin registered on the real global `window`, and an explicit
+// argument must still win over one even when a native plugin exists.
+describe('speechEngine()/say() with NO argument at all, through a real global window (#881, PR #1343 review)', () => {
+  const savedWindow = (globalThis as any).window;
+  afterEach(() => {
+    resetVoiceProbe(); resetNativeVoiceMemo(); resetNativeEngineState(); reset();
+    if (savedWindow === undefined) delete (globalThis as any).window; else (globalThis as any).window = savedWindow;
+  });
+
+  it('a no-argument say() reaches a plugin registered on window.Capacitor.Plugins.TextToSpeech', async () => {
+    reset();
+    const f = fakeTts();
+    (globalThis as any).window = { Capacitor: { Plugins: { TextToSpeech: f.tts } } };
+    say('Hello');                                                          // no second or third argument at all — the real call shape
+    await tick();
+    expect(f.calls, 'a real zero-argument say() must reach the registered native plugin').toHaveLength(1);
+    expect(f.calls[0]).toMatchObject({ text: 'Hello', lang: 'en-GB' });
+  });
+
+  it('an explicit synth/null still wins over a plugin registered on window', async () => {
+    reset();
+    const f = fakeTts();
+    (globalThis as any).window = { Capacitor: { Plugins: { TextToSpeech: f.tts } } };
+    say('Hello', false, { synth: null });                                  // explicit: speechEngine(null) short-circuits to no engine
+    await tick();
+    expect(f.calls, 'an explicit null must not fall through to the native engine').toHaveLength(0);
+    expect(load().voice, 'no engine at all is the one verdict that needs no probe').toBe('no');
   });
 });
 
