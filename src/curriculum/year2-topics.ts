@@ -4,11 +4,12 @@
 // may import from year2.ts; year2.ts never imports them back.
 import type { Topic } from './types';
 import {
-  y2PlaceValue, y2Compare, y2Skip, y2Add, y2Sub, y2Three, y2Inverse, y2Tables, y2OddEven, y2Fractions,
+  y2PlaceValue, y2Compare, y2Skip, y2Add, y2Sub, y2Three, y2Inverse, y2Tables, y2Fractions,
   y2Money, y2Time, y2Words, y2Order, y2Line, y2Shapes, y2Symmetry, y2Patterns, y2Position, y2Length,
   y2Mass, y2Capacity, y2Temp, y2Duration, y2Balance, y2Stats, y2Spelling, y2Contractions, y2Suffix,
   y2SuffixRoot, y2Homophones, y2WordClass, y2SentenceType, y2Tense, y2Punct, y2Sentence, y2Trace,
 } from './year2';
+import { y2OddEven } from './year2-oddeven';
 
 export const YEAR2_TOPICS: Topic[] = [
   // Year 2 maths
