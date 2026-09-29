@@ -1,6 +1,6 @@
 // The grown-ups Settings section (#904): today just the 3-D pictures control, moved out of parents.ts (at its
 // #714 ratchet cap) under one "Settings" heading so #905/#906/#907/#940 each have room to add their own row.
-import { setThreeSetting, THREE_SETTINGS, threeSetting, type ThreeSetting } from '../storage';
+import { setThreeSetting, THREE_SETTINGS, threeSetting, type ThreeSetting } from '../device-settings';
 import { sfx } from '../audio';
 import { $, $$ } from './dom';
 
