@@ -1861,7 +1861,25 @@ test.describe('Sky Ninja Academy', () => {
     expect(await page.evaluate(() => window.__spoken)).toEqual([]);
   });
 
+  // pr-test-analyzer (#895 review): the two tests above only drove the #tcheck ('check') branch of
+  // speakTrace — the live mid-stroke nudge (the 'stroke' branch, wired straight off the Tracer's own
+  // onProgress) went unexercised end-to-end. A real pointer stroke well clear of the glyph proves that
+  // wiring, not just traceFeedback('stroke', …) as a pure function.
+  test('a stroke that never touches the glyph speaks the same nudge as the toast (#895)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-trace');
+    const box = (await page.locator('#trace').boundingBox())!;
+    await page.mouse.move(box.x + 6, box.y + 6);          // top-left corner: blank paper, clear of the glyph
+    await page.mouse.down();
+    await page.mouse.move(box.x + 20, box.y + 6);
+    await page.mouse.up();
+    await expect(page.locator('.toast.bad')).toContainText('Stay on the dotted lines');
+    await expect.poll(() => page.evaluate(() => window.__spoken)).toContain('Stay on the dotted lines');
+  });
+
   test('word tracing: 2 of 3 letters is not enough, every letter must be covered', async ({ page }) => {
+    await captureSpeech(page);
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-trace');
     const word = (await state(page)).answer as string;
@@ -1871,6 +1889,10 @@ test.describe('Sky Ninja Academy', () => {
     expect(r.coverage).toBeGreaterThan(0.3); expect(r.pass).toBe(false);
     await page.click('#tcheck');
     await expect(page.locator('.toast.bad')).toContainText('every letter');
+    // #895: the toast's em dash is spoken as a pause, on this message too — not only "Keep tracing…"'s.
+    // The tracing prompt itself is also spoken on question load (play-session.ts), so this checks for the
+    // feedback line among whatever else was said rather than asserting the whole __spoken array.
+    await expect.poll(() => page.evaluate(() => window.__spoken!.some(l => l.endsWith('too, every letter!')))).toBe(true);
     await page.evaluate(() => window.__sna.tracer.autoTrace());                // the rest
     await expect(page.locator('.toast.good')).toBeVisible();
     await page.waitForFunction(() => window.__sna.state().index === 1);

@@ -141,7 +141,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     $('#tclear').onclick = () => { sfx.tap(); tracer?.clear(); };
     $('#tcheck').onclick = () => {
       const r = tracer!.result(); if (r.pass) { sfx.correct(); session.hit(q.answer); return; }
-      speakTrace(traceFeedback(r, q.answer, 'check', tracer!.strokes)!);
+      const msg = traceFeedback(r, q.answer, 'check', tracer!.strokes); if (msg) speakTrace(msg);
     };
   }
   /** Toast tracing feedback and speak the same words (#895): a child who cannot yet read gets more than a toast.
