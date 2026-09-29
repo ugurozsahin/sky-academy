@@ -6,6 +6,9 @@ import { AVATARS, VILLAIN } from './avatars';
 // Type-only plus one small runtime tuple, so this stays the mirror of the `type-only` imports duel.ts already
 // takes from here (#423 review item 1) — no runtime edge, since duel.ts's own import back is `import type`.
 import { DUEL_OUTCOMES, type DuelOutcome } from './game/duel';
+// Field-check infrastructure (Fields/checkFields/str/fin/strOrNull/count) and the v5 save fields (#903) live in
+// save-records.ts, which storage.ts is too close to its #714 ratchet cap to hold itself.
+import { checkFields, count, fin, str, strOrNull, toV5, type Fields, type LogDay, type Settings, type Slip } from './save-records';
 /**
  * A tally of questions answered for one topic — `hits` right of `tries` attempted — while it is still being
  * built, before `recordAccuracy()` folds it into `TopicProgress`'s own optional `hits?`/`tries?` below (the
@@ -26,7 +29,10 @@ export interface AnswerTally { hits: number; tries: number }
  * which this field cannot hold: `weakestTopics()` and `parents.ts` divide it) — they now agree on every case
  * except a round lost purely to the other seat's speed, which duel.ts alone still drops.
  */
-export interface TopicProgress { stars: number; best: number; plays: number; hits?: number; tries?: number }
+export interface TopicProgress {
+  stars: number; best: number; plays: number; hits?: number; tries?: number;
+  last?: string; sprint?: number; crown?: true;   // #903: last-played day (#936), Sprint best (#911), crown flag (#932)
+}
 /**
  * One earned certificate, kept as **data rather than a PNG** (#205): `certFromStored()` in `ui/certificate.ts`
  * turns it back into the `CertInfo` that `drawCertificate()` draws, so a stored certificate costs a few dozen
@@ -76,7 +82,7 @@ export interface StoredDuel {
   scoreA: number; scoreB: number; rounds: number;
 }
 export interface SaveData {
-  v: 4;
+  v: 5;
   name: string;
   avatar: string | null;
   year: YearId;
@@ -91,7 +97,7 @@ export interface SaveData {
   training: Record<string, number>;  // year -> Sensei training sessions completed
   coins: number;                     // ninja coins earned (lifetime)
   stickers: string[];                // unlocked sticker ids
-  streak: { last: string; days: number };   // daily play streak (ISO date)
+  streak: { last: string; days: number; rest?: string };   // daily play streak (ISO date); rest = a held day (#950)
   tutorialSeen: boolean;             // the "slice the bubble" demo hand has done its job
   dojo: DojoState;                   // Daily Dojo challenges (progress resets each day)
   spent: number;                     // coins spent in the shop (#6) — balance = coins − spent, stickers still unlock from lifetime coins
@@ -100,10 +106,13 @@ export interface SaveData {
   certs: StoredCert[];               // certificates earned, most recently filed first (#205)
   onboarded: boolean;                // the first-run wizard (#67) has been completed or skipped past
   duels: StoredDuel[];               // Ninja Duels played, most recent first (#16)
+  slips: Slip[];                     // wrong answers for the parent view, newest first (#903; reader: #938)
+  log: LogDay[];                     // daily play summary for the parent view, oldest first (#903; reader: #939)
+  settings: Settings;                // device-wide play settings kept in the save (#903; reader: #905)
 }
-export const SAVE_VERSION = 4 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
+export const SAVE_VERSION = 5 as const;   // bump when the stored shape changes; add the step to MIGRATIONS below
 const KEY = 'sna:v1';                       // stable localStorage slot (its `v1` is historical; `raw.v` drives migration)
-const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [], onboarded: false, duels: [] };
+const DEFAULT: SaveData = { v: SAVE_VERSION, name: '', avatar: null, year: 'reception', sound: true, speech: true, voice: 'unknown', progress: {}, endless: {}, sprint: {}, boss: {}, memory: {}, training: {}, coins: 0, stickers: [], streak: { last: '', days: 0 }, tutorialSeen: false, dojo: freshDojo(''), spent: 0, owned: [], equipped: {}, certs: [], onboarded: false, duels: [], slips: [], log: [], settings: { slow: false } };
 
 /* ─── Profiles: siblings on one device (#20 slice 1 — storage only, no UI) ──────────────────────────────────
  *
@@ -924,6 +933,10 @@ export const MIGRATIONS: Record<number, (s: RawSave) => RawSave> = {
     ...s,
     duels: Array.isArray(s.duels) ? s.duels.filter(isDuel) : [],
   }),
+  // v4 → v5: #903's save-format ticket, ahead of the seven register features that build on it. The step body
+  // (toV5, save-records.ts) is additive: `slips`/`log`/`settings` default and are filtered, and `streak`/
+  // `progress` keep their existing shape and only gain the optional extras those seven tickets will read.
+  4: toV5,
 };
 
 /**
@@ -1237,27 +1250,9 @@ export function addCoins(n: number): string[] {
 }
 /** Certificate album cap. Far above the mission count, so it only ever trims a hand-edited or imported save. */
 export const CERT_CAP = 60;
-/**
- * A checker per field, keyed so **adding a required field to `T` without a checker for it is a compile
- * error** (`-?` strips the optionality of the *key*, not of the value: every key of `T` must appear here,
- * whether or not `T` itself marks it optional). `Fields<StoredDuel>` uses this directly, since every one of
- * its fields is meant to be checked; `Fields<CheckedCertFields>` below deliberately narrows `T` first, for
- * the two fields that must stay out of this table.
- */
-type Fields<T> = { [K in keyof T]-?: (v: unknown) => v is T[K] };
-/**
- * Runs a `Fields<T>` table against an object, in the one place that needs the unsafe cast this pattern relies
- * on — nothing else ties `Object.keys(fields)` at runtime to `keyof T` at compile time. Safe only because
- * every caller assigns its table directly to a `Fields<T>`-typed literal: TS's excess-property check then
- * makes a missing *or* a stray key a compile error, so the literal cannot drift from `keyof T`. Building a
- * table by spreading, `Object.assign`, or a function return would silently lose that guarantee — keep them
- * as plain literals.
- */
-const checkFields = <T>(fields: Fields<T>, x: Record<string, unknown>): boolean =>
-  (Object.keys(fields) as (keyof T)[]).every(k => fields[k](x[k as string]));
-const str = (v: unknown): v is string => typeof v === 'string';
-const fin = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const strOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
+// `Fields`/`checkFields`/`str`/`fin`/`strOrNull` (the per-field checker table `CERT_FIELDS`/`DUEL_FIELDS` below
+// build) live in save-records.ts now, moved out with the new v5 fields (#903) to keep this file under its
+// #714 ratchet cap; imported at the top of this file.
 // A stored certificate has to survive a hand-edited save without taking the album down with it. Still not
 // #174's full validator — it checks types, not values — but it checks **every field an entry is used
 // through**, because a half-checked entry is worse than an unchecked one here: `{ id, title }` alone passed
@@ -1320,7 +1315,6 @@ export const DUEL_CAP = 20;
  * before and rendered as-is. `at` stays on bare finiteness; it is a timestamp, not a count.
  */
 const isWinner = (v: unknown): v is DuelOutcome => (DUEL_OUTCOMES as readonly unknown[]).includes(v);
-const count = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
 const DUEL_FIELDS: Fields<StoredDuel> = {
   at: fin, topic: str, title: str, year: str, winner: isWinner, scoreA: count, scoreB: count, rounds: count,
 };

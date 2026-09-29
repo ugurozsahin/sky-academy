@@ -2742,3 +2742,118 @@ describe('a finished game is persisted in one write, or not at all (#365)', () =
     warn.mockRestore();
   });
 });
+
+// #903: the v4 → v5 save format change. No reader exists yet for any of these fields (that is each named
+// ticket's own job) — everything here goes through migrate()/load()/save()/exportSave()/importSave(), the
+// only doors a value can enter or leave the save through today.
+describe('save format v5 (#903)', () => {
+  beforeEach(() => reset());
+
+  const slip = (p: Partial<Record<string, unknown>> = {}) => ({ topic: 'y1-add', prompt: '2 + 2', answer: '4', picked: '5', at: '2026-09-28', ...p });
+  const day = (offset: number) => new Date(Date.UTC(2026, 7, 1) + offset * 86_400_000).toISOString().slice(0, 10);
+  const logDay = (p: Partial<Record<string, unknown>> = {}) => ({ date: day(19), games: 3, q: 12, ok: 9, topics: ['y1-add'], ...p });
+
+  it('a v4 save migrates with slips, log and settings defaulted, losing nothing it already had', () => {
+    const m = migrate({ v: 4, name: 'Mo', coins: 12, progress: { 'y1-add': { stars: 2, best: 40, plays: 3 } } });
+    expect(m.v).toBe(SAVE_VERSION);
+    expect(m.slips).toEqual([]);
+    expect(m.log).toEqual([]);
+    expect(m.settings).toEqual({ slow: false });
+    expect(m.name).toBe('Mo');
+    expect(m.coins).toBe(12);
+    expect(m.progress['y1-add']).toEqual({ stars: 2, best: 40, plays: 3 });
+  });
+
+  it('the e2e seed at v: 1 also lands on the v5 defaults, walking every step in between', () => {
+    const m = migrate({ v: 1, name: 'Seed' });
+    expect(m.slips).toEqual([]); expect(m.log).toEqual([]); expect(m.settings).toEqual({ slow: false });
+  });
+
+  it('slips: well-formed rows survive migration in their stored, newest-first order', () => {
+    const rows = [slip({ at: '2026-09-28' }), slip({ at: '2026-09-27' })];
+    expect(migrate({ v: 4, slips: rows }).slips).toEqual(rows);
+  });
+
+  it('slips: a row missing a field, with a non-ISO `at`, or not an object at all is dropped, never thrown on', () => {
+    const bad = [slip({ answer: undefined }), slip({ at: 'yesterday' }), 'junk', 42, null];
+    expect(migrate({ v: 4, slips: [...bad, slip()] }).slips).toEqual([slip()]);
+    expect(migrate({ v: 4, slips: 'not an array' }).slips).toEqual([]);
+  });
+
+  it('slips: more than 20 well-formed rows are capped on migration, keeping the first (newest) 20', () => {
+    const rows = Array.from({ length: 25 }, (_, i) => slip({ at: day(24 - i) }));
+    const m = migrate({ v: 4, slips: rows });
+    expect(m.slips.length).toBe(20);
+    expect(m.slips).toEqual(rows.slice(0, 20));
+  });
+
+  it('log: well-formed days survive migration, resorted ascending by date', () => {
+    const m = migrate({ v: 4, log: [logDay({ date: day(2) }), logDay({ date: day(0) })] });
+    expect(m.log.map((d: { date: string }) => d.date)).toEqual([day(0), day(2)]);
+  });
+
+  it('log: a day with a non-integer or negative count, a non-string-array topics, or a bad date is dropped', () => {
+    const bad = [logDay({ games: 1.5 }), logDay({ ok: -1 }), logDay({ topics: 'y1-add' }), logDay({ date: 'today' })];
+    expect(migrate({ v: 4, log: [...bad, logDay()] }).log).toEqual([logDay()]);
+  });
+
+  it('log: a repeated date keeps the entry that comes later in the input', () => {
+    const dup = [logDay({ games: 1 }), logDay({ games: 9 })];   // same date, only games differs
+    expect(migrate({ v: 4, log: dup }).log).toEqual([logDay({ games: 9 })]);
+  });
+
+  it('log: more than 30 days are capped on migration to the most recent 30, oldest dropped, still ascending', () => {
+    const rows = Array.from({ length: 35 }, (_, i) => logDay({ date: day(i) }));
+    const m = migrate({ v: 4, log: rows });
+    expect(m.log.length).toBe(30);
+    expect(m.log[0].date).toBe(day(5));     // the oldest 5 (day 0-4) are dropped
+    expect(m.log[29].date).toBe(day(34));   // still ascending: the newest day is last
+  });
+
+  it('settings: a wrong-typed or missing `slow` resets to the default rather than throwing', () => {
+    expect(migrate({ v: 4, settings: { slow: 'yes' } }).settings).toEqual({ slow: false });
+    expect(migrate({ v: 4, settings: 'nope' }).settings).toEqual({ slow: false });
+    expect(migrate({ v: 4 }).settings).toEqual({ slow: false });
+    expect(migrate({ v: 4, settings: { slow: true } }).settings).toEqual({ slow: true });
+  });
+
+  it('streak.rest: dropped unless it is a stored ISO day; the rest of streak is untouched either way', () => {
+    expect(migrate({ v: 4, streak: { last: '2026-09-28', days: 3, rest: 123 } }).streak).toEqual({ last: '2026-09-28', days: 3 });
+    expect(migrate({ v: 4, streak: { last: '2026-09-28', days: 3, rest: '2026-09-27' } }).streak)
+      .toEqual({ last: '2026-09-28', days: 3, rest: '2026-09-27' });
+  });
+
+  it('progress extras: last/sprint/crown are each dropped alone when wrong-typed, kept when valid', () => {
+    const m = migrate({
+      v: 4,
+      progress: {
+        'y1-add': { stars: 1, best: 10, plays: 2, last: 'not-a-day', sprint: -1, crown: 'yes' },
+        'y1-sub': { stars: 2, best: 20, plays: 3, last: '2026-09-28', sprint: 40, crown: true },
+      },
+    });
+    expect(m.progress['y1-add']).toEqual({ stars: 1, best: 10, plays: 2 });
+    expect(m.progress['y1-sub']).toEqual({ stars: 2, best: 20, plays: 3, last: '2026-09-28', sprint: 40, crown: true });
+  });
+
+  it('export then import round-trips every new field unchanged', () => {
+    save({
+      slips: [slip()], log: [logDay()], settings: { slow: true },
+      streak: { last: '2026-09-28', days: 4, rest: '2026-09-25' },
+      progress: { 'y1-add': { stars: 3, best: 50, plays: 5, last: '2026-09-28', sprint: 60, crown: true } },
+    });
+    const code = exportSave();
+    reset();
+    expect(importSave(code)).toBe(true);
+    const d = load();
+    expect(d.slips).toEqual([slip()]);
+    expect(d.log).toEqual([logDay()]);
+    expect(d.settings).toEqual({ slow: true });
+    expect(d.streak).toEqual({ last: '2026-09-28', days: 4, rest: '2026-09-25' });
+    expect(d.progress['y1-add']).toEqual({ stars: 3, best: 50, plays: 5, last: '2026-09-28', sprint: 60, crown: true });
+  });
+
+  it('a v6 blob (a future build) is still refused, exactly as before v5 existed', () => {
+    expect(isFutureSave({ v: SAVE_VERSION + 1 })).toBe(true);
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION + 1, name: 'Future' }))).toBe(false);
+  });
+});
