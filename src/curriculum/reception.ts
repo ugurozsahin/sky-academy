@@ -192,22 +192,25 @@ const rCapitals: Generator = (d, rng) => {
 /**
  * Reception tricky words (#968) — the phase 2/3 exception words *Letters and Sounds* lists as read on sight
  * rather than sounded out. Spoken, never printed (`listen`/`peek: true`, the Story Sentences no-voice path):
- * the ELG asks for reading aloud, not spelling, so the word never sits on the card for the whole wave.
+ * the ELG asks for reading aloud, not spelling, so the word never sits on the card for the whole wave — no
+ * `visual` either, which would print it regardless of `peek` (`renderVisual` is not gated by `promptMode`).
  *
  * The decoy pool is the difficulty's own phase pool; at d2–d3 at least one decoy shares a letter with the
- * answer (he/she/the, me/we/be), so the first sound alone cannot answer. `I` is the one exception — it shares
- * no letter with any other bank word — so an `I` card draws its decoys unconstrained.
+ * answer (he/she/the, me/we/be), so the first sound alone cannot answer. `I` needs no special case: it shares
+ * no letter with any other bank word, so it falls out of the general "no shared-letter partner" fallback below.
  */
 export const R_TRICKY_P2 = ['the', 'to', 'I', 'no', 'go'];
 export const R_TRICKY_P3 = ['he', 'she', 'we', 'me', 'be', 'was', 'my', 'you', 'her', 'they', 'all', 'are'];
 const rTrickyPool = (d: 1 | 2 | 3) => (d === 1 ? R_TRICKY_P2 : d === 2 ? R_TRICKY_P3 : [...R_TRICKY_P2, ...R_TRICKY_P3]);
 const shareLetter = (a: string, b: string) => [...a.toLowerCase()].some(c => b.toLowerCase().includes(c));
-const rTrickyDecoys = (rng: Rng, pool: string[], w: string, count: number, forceShared: boolean): string[] => {
+const rTrickyDecoys = (rng: Rng, pool: string[], w: string, d: 1 | 2 | 3): string[] => {
   const rest = pool.filter(x => x !== w);
-  const shared = forceShared && w !== 'I' ? shuffle(rng, rest.filter(x => shareLetter(x, w))) : [];
-  // A word with no shared-letter partner in its own pool falls back to an unconstrained draw rather than
-  // shipping `undefined` as a decoy — belt-and-braces alongside the pool invariant the test file checks
-  // directly, so a future bank edit that breaks it degrades quietly instead of drawing a broken bubble.
+  const count = d === 1 ? 2 : 3;
+  const shared = d === 1 ? [] : shuffle(rng, rest.filter(x => shareLetter(x, w)));
+  // A word with no shared-letter partner in its own pool (only "I", today) falls back to an unconstrained
+  // draw rather than shipping `undefined` as a decoy — belt-and-braces alongside the pool invariant the test
+  // file checks directly, so a future bank edit that breaks it degrades quietly instead of drawing a broken
+  // bubble.
   if (shared.length === 0) return shuffle(rng, rest).slice(0, count);
   const others = shuffle(rng, rest.filter(x => x !== shared[0])).slice(0, count - 1);
   return shuffle(rng, [shared[0], ...others]);
@@ -215,7 +218,7 @@ const rTrickyDecoys = (rng: Rng, pool: string[], w: string, count: number, force
 const rTricky: Generator = (d, rng) => {
   const pool = rTrickyPool(d);
   const w = pick(rng, pool);
-  const ds = rTrickyDecoys(rng, pool, w, d === 1 ? 2 : 3, d !== 1);
+  const ds = rTrickyDecoys(rng, pool, w, d);
   return wordQ(rng, 'Find the word you hear', w, ds, { say: `Find the word: ${w}`, listen: w, peek: true });
 };
 const rBuild: Generator = (d, rng) => {

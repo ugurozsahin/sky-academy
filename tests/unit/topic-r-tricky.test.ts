@@ -18,13 +18,16 @@ const DRAWS = 150;
  * not anything printed on the card.
  */
 describe('r-tricky (#968)', () => {
-  it('the answer is the word `listen` carries, and `peek` is always set', () => {
+  it('the answer is the word `listen` carries, `peek` is always set, and no `visual` ever prints it', () => {
     for (const d of [1, 2, 3] as Difficulty[]) {
       const r = rng(9680 + d);
       for (let i = 0; i < DRAWS; i++) {
         const q = topic.gen(d, r);
         expect(q.listen, `d${d} draw ${i}`).toBe(q.answer);
         expect(q.peek, `d${d} draw ${i}`).toBe(true);
+        // #1372 review: `renderVisual` is not gated by `peek`/`promptMode` — a `visual` here would print the
+        // word for the whole wave regardless of read-aloud, silently defeating the spoken-only contract.
+        expect(q.visual, `d${d} draw ${i}: a visual would print the word this topic must only speak`).toBeUndefined();
       }
     }
   });
@@ -52,9 +55,17 @@ describe('r-tricky (#968)', () => {
     }
   });
 
-  it('d1: exactly 2 decoys (3 options), no shared-letter requirement', () => {
+  it('d1: exactly 2 decoys (3 options), and the shared-letter rule is genuinely off, not just untriggered', () => {
     const r = rng(9710);
-    for (let i = 0; i < DRAWS; i++) expect(topic.gen(1, r).options.length, `draw ${i}`).toBe(3);
+    let sawUnshared = false;
+    for (let i = 0; i < DRAWS; i++) {
+      const q = topic.gen(1, r);
+      expect(q.options.length, `draw ${i}`).toBe(3);
+      const decoys = q.options.filter(o => o !== q.answer);
+      const shared = decoys.some(dec => [...dec.toLowerCase()].some(c => q.answer.toLowerCase().includes(c)));
+      if (!shared) sawUnshared = true;
+    }
+    expect(sawUnshared, 'every d1 draw happened to share a letter — the constraint may be on, not just unexercised').toBe(true);
   });
 
   it('d2/d3: exactly 3 decoys (4 options), and at least one decoy shares a letter with the answer unless it is "I"', () => {
