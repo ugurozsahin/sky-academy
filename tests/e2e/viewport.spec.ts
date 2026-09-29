@@ -689,13 +689,14 @@ test.describe('tablet viewports (#116)', () => {
   // 40 keeps that one-line margin in hand while staying far short of the ~150-200px a real reflow regression
   // would need to hide behind it.
   const SHOP_TOLERANCE = 40;
-  // Real, measured: 1130px at 1280x800, 1145px at 1024x768 — matches the issue's own audit. `.shop-grid`
-  // already reflows (`repeat(auto-fill, minmax(140px, 1fr))`); the remainder is the Slice trails grid's real
-  // item count needing two rows, which is content rather than a stacking bug, so there is nothing group-B
-  // shaped to fix here.
+  // Real, measured: 1387px at 1280x800, 1625px at 1024x768 (nightly run 36558253302, 2026-09-29). `.shop-grid`
+  // already reflows (`repeat(auto-fill, minmax(140px, 1fr))`); the remainder is real content — the Slice
+  // trails grid's item count needing two rows, plus the new Dojo titles section (#1295) added a whole extra
+  // `<h3>`+`.shop-grid` block of up to seven cards — rather than a stacking bug, so there is nothing group-B
+  // shaped to fix here. Raised from 1130/1145 when #1295 landed the titles section.
   const SHOP_CASES = [
-    { w: 1280, h: 800, target: 1130 },
-    { w: 1024, h: 768, target: 1145 },
+    { w: 1280, h: 800, target: 1387 },
+    { w: 1024, h: 768, target: 1625 },
   ] as const;
 
   for (const { w, h, target } of SHOP_CASES) {

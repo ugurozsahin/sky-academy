@@ -2,6 +2,7 @@
 // decided purely from the finished run, with no DOM or side effects, so they can be unit-tested directly
 // instead of only through the e2e results screen. play.ts keeps the recording, speech and overlay wiring.
 import { MODES, type Mode } from '../game/modes';
+import type { Topic } from '../curriculum';
 import { esc } from './dom';
 
 /** How a finished run scored — the fields the medal reads. */
@@ -83,4 +84,22 @@ export function resultsLines(candidates: ResultCandidate[]): ResultCandidate[] {
  */
 export function resultPillsHTML(lines: ResultCandidate[]): string {
   return lines.map(l => `<span class="best-pill">${esc(l.text)}</span>`).join('');
+}
+
+/**
+ * The results row's one contextual action (#929) — beside Play again and Islands. `retry` and `fix` are
+ * #931's and #930's own buttons; nothing supplies `lostAtStage` or a non-zero `misses` yet, so today only
+ * `next` can ever be returned. Precedence: retry a lost mission from its lost stage, else offer to fix
+ * mistakes, else move on to the next unstarred topic in the same subject.
+ */
+export interface ResultsActionCtx {
+  mode: Mode; training: boolean; won: boolean; lostAtStage?: number; misses: number; next: Topic | null;
+}
+export type ResultsAction = { kind: 'retry'; stage: number } | { kind: 'fix' } | { kind: 'next'; topic: Topic };
+
+export function resultsAction(ctx: ResultsActionCtx): ResultsAction | null {
+  if (ctx.mode === 'mission' && !ctx.training && !ctx.won && (ctx.lostAtStage ?? 0) >= 3) return { kind: 'retry', stage: ctx.lostAtStage! };
+  if ((ctx.mode === 'mission' || ctx.training) && ctx.misses >= 1) return { kind: 'fix' };
+  if (ctx.mode === 'mission' && !ctx.training && ctx.won && ctx.next) return { kind: 'next', topic: ctx.next };
+  return null;
 }
