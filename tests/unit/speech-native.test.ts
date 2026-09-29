@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { hush, resetVoiceProbe, say, speechEngine, type SpeechEvents } from '../../src/audio';
+import { hush, resetVoiceProbe, say, speechEngine, VOICE_START_MS, type SpeechEvents } from '../../src/audio';
 import { nativeEngine, nativeSpeechEngine, resetNativeEngineState, resetNativeVoiceMemo } from '../../src/speech-native';
 import { load, reset } from '../../src/storage';
 
@@ -10,6 +10,13 @@ const mem: Record<string, string> = {};
  *  before it calls `tts.speak` at all, so a synchronous assertion right after `say()`/`engine.speak()` is too
  *  early — a `setTimeout(0)` runs after every already-queued microtask, real timers or fake. */
 const tick = () => new Promise(r => setTimeout(r, 0));
+
+/** The same flush, but for tests below that fake `setTimeout` itself (to drive `VOICE_START_MS` without a
+ *  real four-second wait): a faked macrotask queue never fires `tick()`'s own `setTimeout(0)`, but native
+ *  Promise microtasks are not part of what `vi.useFakeTimers` intercepts, so awaiting the chain enough times
+ *  drains it regardless. `nativeVoiceIndex()`'s own `await`, then two `.then()`s in `speak()`, is three hops;
+ *  extra ticks beyond that are harmless. */
+const flush = async (n = 6) => { for (let i = 0; i < n; i++) await Promise.resolve(); };
 
 /** A fake `@capacitor-community/text-to-speech` plugin: records every `speak()` call and lets a test settle
  *  it by hand, the same shape `tests/unit/native.test.ts`'s `bridge()` stands plugins up with. */
@@ -43,6 +50,11 @@ const bridge = (Plugins?: Record<string, unknown>) =>
 // nativeSpeechEngine(), or the arming they mean to exercise has already happened. Kept first in the file for
 // exactly that reason.
 describe('onRangeStart arming, first in this file so the module has not armed yet (#881)', () => {
+  // Shared with the #892 test below: `rangeListenerArmed` never re-arms once a registration succeeds (the
+  // comment on the next test explains why), so this file gets exactly one real `onRangeStart` callback to
+  // drive, ever. Captured here so a later test can still trigger it against a `say()`-built engine.
+  let onRange: (() => void) | undefined;
+
   // silent-failure-hunter review of this PR: a rejected addListener() used to leave `rangeListenerArmed`
   // true forever, with nothing to retry it — the `started()` signal gone for the rest of the session. One
   // test, not two: `rangeListenerArmed` is module state that never un-arms once a registration succeeds, so
@@ -54,7 +66,6 @@ describe('onRangeStart arming, first in this file so the module has not armed ye
     nativeEngine(broken.tts);
     await tick(); await tick();                                              // let the rejection (and its .catch) settle
 
-    let onRange: (() => void) | undefined;
     const recovered = fakeTts();
     recovered.tts.addListener = ((_: string, cb: () => void) => { onRange = cb; return Promise.resolve({ remove: () => {} }); }) as typeof recovered.tts.addListener;
     const engine = nativeEngine(recovered.tts);
@@ -68,6 +79,90 @@ describe('onRangeStart arming, first in this file so the module has not armed ye
     recovered.resolve();
     await tick();
     resetNativeVoiceMemo(); resetNativeEngineState();
+  });
+
+  // #892: onRangeStart feeds `current?.started()`, where `current` is whichever `speak()` call is in flight —
+  // module state shared across every `nativeEngine()` wrapper (speech-native.ts's own comment on `current`),
+  // not tied to the specific plugin instance that got armed. So the listener captured above still fires
+  // `started()` for a *fresh* engine's in-flight call, which is exactly what proves the wiring reaches
+  // `say()`'s probe (`speech.ts`) and not just `nativeEngine`'s own `SpeechEvents` contract in isolation.
+  it("say()'s voice probe reaches 'yes' the instant the armed onRangeStart callback fires", async () => {
+    expect(onRange, 'must run after the arming test above, in this same describe block').toBeDefined();
+    reset(); resetVoiceProbe(); resetNativeVoiceMemo(); resetNativeEngineState();
+    const f = fakeTts();
+    say('Hello', false, { engine: nativeEngine(f.tts) });                    // sets `current` synchronously, before any promise settles
+    expect(load().voice, 'silence so far is not yet a verdict').toBe('unknown');
+    onRange?.();
+    expect(load().voice, 'onRangeStart is the yes signal, same as the web engine\'s onstart/onboundary').toBe('yes');
+    f.resolve();
+    await tick();
+  });
+});
+
+// #892: the four remaining acceptance cases, all about the timed verdict (`VOICE_START_MS`) rather than the
+// `SpeechEvents` wiring above — modelled on the web engine's own probe tests, `audio.test.ts` "voice capability
+// detection (#65)". `rangeListenerArmed` is already true by the time this block runs (the describe above), so
+// these engines get no real `onRangeStart` registration of their own — none of the four needs one.
+describe("say()'s voice probe through the native engine, timed cases (#892)", () => {
+  afterEach(() => { resetVoiceProbe(); resetNativeVoiceMemo(); resetNativeEngineState(); vi.useRealTimers(); reset(); });
+  // `performance` is faked with the timers, as audio.test.ts's own `fresh()` does: the probe banks silence by
+  // the clock, and the two must agree.
+  const fresh = () => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); resetNativeVoiceMemo(); resetNativeEngineState(); };
+
+  it('a speak() that resolves within VOICE_START_MS with no range event still gives yes (Android 7: no range callback at all)', async () => {
+    fresh();
+    const f = fakeTts();
+    say('Hello', false, { engine: nativeEngine(f.tts) });
+    await flush();
+    f.resolve();
+    await flush();
+    expect(load().voice, "ended() is the yes signal here, same as the web engine's onend").toBe('yes');
+  });
+
+  it('a native engine that holds a line for the whole VOICE_START_MS, starting and finishing nothing, gives no', async () => {
+    fresh();
+    const f = fakeTts();
+    say('Hello', false, { engine: nativeEngine(f.tts) });
+    await flush();
+    vi.advanceTimersByTime(VOICE_START_MS - 1);
+    expect(load().voice, 'silence inside the window is not yet a verdict').toBe('unknown');
+    vi.advanceTimersByTime(1);
+    expect(load().voice).toBe('no');
+  });
+
+  it('a rejected speak() does not itself give yes; the deadline still decides', async () => {
+    fresh();
+    const f = fakeTts();
+    say('Hello', false, { engine: nativeEngine(f.tts) });
+    await flush();
+    f.reject(new Error('engine busy'));
+    await flush();
+    expect(load().voice, 'a rejection is evidence of nothing, same as an engine that throws on speak()').toBe('unknown');
+    vi.advanceTimersByTime(VOICE_START_MS);
+    expect(load().voice, 'nothing ever started: the deadline fires no, as it would for any silent engine').toBe('no');
+  });
+
+  // pr-test-analyzer review of this PR: a version of this test that only checked the verdict stayed 'unknown'
+  // right after hush() did not actually distinguish "dropped" from "banked" — both read 'unknown' at that
+  // instant, since nothing had reached VOICE_START_MS yet either way. The proof is in what a *second*, fresh
+  // line does afterwards: if hush() had banked the first line's silence, `startSilence` would give the second
+  // line a shortened deadline (`VOICE_START_MS - silentMs`) and it would wrongly read 'no' partway through its
+  // own budget — the audio.test.ts pattern this mirrors ("hush() drops a cut line's time…", #65).
+  it("a hush() mid-line adds no silence: the next line still gets its own full VOICE_START_MS budget", async () => {
+    fresh();
+    const first = fakeTts();
+    const engine = nativeEngine(first.tts);
+    say('Hello', false, { engine });
+    await flush();
+    vi.advanceTimersByTime(VOICE_START_MS / 2);                              // half the budget, silent so far
+    hush(null, { engine });
+    expect(first.stopped(), 'hush() must reach the native stop(), not just clear the deadline').toBe(1);
+
+    const second = fakeTts();
+    say('World', false, { engine: nativeEngine(second.tts) });               // a fresh line, on a fresh engine wrapper
+    await flush();
+    vi.advanceTimersByTime(VOICE_START_MS - 1);                              // just short of a FULL budget of its own
+    expect(load().voice, "banked silence would have shortened this line's own deadline and already said no").toBe('unknown');
   });
 });
 
