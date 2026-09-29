@@ -79,7 +79,9 @@ describe('lint ratchet (#1381, #1387)', () => {
   it.each(Object.entries(table.fileLines))('fileLines: %s is frozen at its real length, %i', (file, frozen) => {
     const now = testFiles('tests/unit').includes(file) ? length(file) : undefined;
     expect(now, `${file} is gone or renamed: delete or rename its fileLines entry`).toBeDefined();
-    expect(frozen, `${file} is now ${now} lines: lower the entry to ${now}, and never raise it`).toBe(now);
+    expect(frozen, now! > frozen
+      ? `${file} grew to ${now} lines and a frozen file cannot grow: move the tests you added to a new tests/unit/*.test.ts, and leave the entry at ${frozen}`
+      : `${file} shrank to ${now} lines: lower the entry to ${now}`).toBe(now);
     expect(frozen).toBeGreaterThan(table.base.fileLines);
   });
 
