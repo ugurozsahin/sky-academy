@@ -36,8 +36,15 @@ describe('island gate (#1032, #1040)', () => {
     const id = 'year3' as YearId;
     expect(agreesWithExpectedShown([{ id, maths: 12, writing: 6 }], { [id]: false })).toBe(false);
   });
-  it('a KS2 year at 11 maths / 6 writing (one short) disagrees with a `true` row', () => {
+  it('a KS2 year at 11 maths / 6 writing (one short on maths) disagrees with a `true` row', () => {
     const id = 'year3' as YearId;
     expect(agreesWithExpectedShown([{ id, maths: 11, writing: 6 }], { [id]: true })).toBe(false);
+  });
+  // The two fixtures above both fail (or pass) on maths and writing together, so a mutation dropping either
+  // half of `meetsShowGate`'s `&&` could still slip past them (pr-test-analyzer, this PR's review). This one
+  // isolates maths passing while writing alone falls short.
+  it('a KS2 year at 12 maths / 5 writing (maths met, writing one short) agrees with a `false` row', () => {
+    const id = 'year3' as YearId;
+    expect(agreesWithExpectedShown([{ id, maths: 12, writing: 5 }], { [id]: false })).toBe(true);
   });
 });
