@@ -626,6 +626,7 @@ test.describe('Sky Ninja Academy', () => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');
     await page.click('#sprint');
+    await page.click('.topic[data-mixed]');   // #910: Sprint opens a chooser first
     await expect(page.locator('.play')).toBeVisible();
     await waitForWrongOrEnd(page);
     const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
@@ -2550,6 +2551,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.island-screen')).toBeVisible();
     await page.click('.tab[data-s="writing"]');
     await page.click('#sprint');
+    await page.click('.topic[data-mixed]');   // #910: Sprint opens a chooser first
     for (let i = 0; i < 5; i++) {
       const topic = (await state(page)).topic;
       expect(TOPICS.find(t => t.id === topic)?.subject).toBe('writing');
@@ -2583,6 +2585,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('.island[data-year="year1"]');
     await expect(page.locator('#sprint small')).toContainText('best 0');
     await page.click('#sprint');
+    await page.click('.topic[data-mixed]');   // #910: Sprint opens a chooser first
     await expect(page.locator('.play')).toBeVisible();
     await expect(page.locator('#timer')).toContainText(/⏱ (60|59|58)/);
     await expect(page.locator('#lives')).toHaveCount(0);
@@ -2609,6 +2612,60 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#sprint small')).toContainText('best 10');
   });
 
+  test('Ninja Sprint topic chooser (#910): 🎲 Mixed first, then the open subject\'s topics', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    const cards = page.locator('#island-overlay .topics .topic');
+    await expect(cards.first()).toHaveAttribute('data-mixed', '');
+    await expect(cards.first()).toContainText('Mixed');
+    const ids = await cards.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.id).filter(Boolean));
+    expect(ids.length).toBeGreaterThan(0);   // the assertions below are vacuous on an empty list
+    expect(ids.every(id => TOPICS.find(t => t.id === id)?.subject === 'maths')).toBe(true);
+    expect(ids.some(id => TOPICS.find(t => t.id === id)?.input === 'tracing')).toBe(false);   // non-tracing only
+  });
+
+  test('Ninja Sprint: a one-topic run never changes the year\'s mixed-pool best (#910)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('#sprint small')).toContainText('best 0');
+    await expect(page.locator('#endless small')).toContainText('best 0');
+    await page.click('#sprint');
+    await page.click('#island-overlay .topic[data-id="y1-bonds"]');
+    await expect(page.locator('.play')).toBeVisible();
+    for (let i = 0; i < 5; i++) {
+      expect((await state(page)).topic).toBe('y1-bonds');
+      await solveCurrent(page);
+    }
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toBeVisible();
+    await page.click('#home');
+    await expect(page.locator('#sprint small')).toContainText('best 0');    // never written for a one-topic run
+    // A real regression, not a hypothetical: `commitResult()`'s mode chain fell through to the catch-all
+    // `else recordEndless(...)` for `sprint && o.topic` until this line existed to catch it.
+    await expect(page.locator('#endless small')).toContainText('best 0');
+  });
+
+  test('Ninja Sprint chooser: Back closes it without starting a game (#910)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await expect(page.locator('#island-overlay .topics .topic').first()).toBeVisible();
+    await page.click('#chooser-back');
+    await expect(page.locator('#island-overlay')).toBeHidden();
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await expect(page.locator('.play')).toHaveCount(0);
+  });
+
+  test('Ninja Sprint chooser fits a 390×664 phone without horizontal overflow (#910)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await expect(page.locator('#island-overlay .topics .topic').first()).toBeVisible();
+    await expectFitsViewport(page, 'Ninja Sprint chooser at 390x664');
+  });
+
   /** Simulate the tab going to background (#884): override `document.visibilityState` and dispatch the event
    *  the play screen's `onHidden()` listens for. */
   async function hideApp(page: Page) {
@@ -2623,6 +2680,7 @@ test.describe('Sky Ninja Academy', () => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');
     await page.click('#sprint');
+    await page.click('.topic[data-mixed]');   // #910: Sprint opens a chooser first
     await expect(page.locator('.play')).toBeVisible();
     await hideApp(page);
     await expect(page.locator('#resume')).toBeVisible();
@@ -2705,6 +2763,7 @@ test.describe('Sky Ninja Academy', () => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');
     await page.click('#sprint');
+    await page.click('.topic[data-mixed]');   // #910: Sprint opens a chooser first
     await expect(page.locator('.play')).toBeVisible();
     await pressBack(page);
     await expect(page.locator('#resume')).toBeVisible();
@@ -2731,6 +2790,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.dojo-head .mult')).toHaveCount(0);
     await page.click('.island[data-year="year1"]');
     await page.click('#sprint');
+    await page.click('.topic[data-mixed]');   // #910: Sprint opens a chooser first
     await expect(page.locator('.play')).toBeVisible();
     await solveCurrent(page);
     await page.evaluate(() => window.__sna.session.tick(60_000));
