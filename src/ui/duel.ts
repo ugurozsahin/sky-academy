@@ -132,7 +132,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
       hintLine = hintText(q, { reveal }); hintEl.textContent = hintLine;
       const myWave = ++waveId; waveDone.a = waveDone.b = false;
       const speed = o.year.speeds[0] ?? 2;
-      const opts = waveOptsFor(q, { labels: q.options, speed }, []);
+      const opts = waveOptsFor(q, { labels: q.options, speed });
       // #44: the first wave waits for Fredoka (cached after that); #138: a spawn that waited must still be this wave's.
       // Through `later(..., 0)` and not straight out of the promise (PR #474 review, B2). `waveId`/`alive`
       // are the only guards a raw continuation has, and neither reads the hold — so a pause pressed inside

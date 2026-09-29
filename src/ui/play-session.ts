@@ -36,11 +36,11 @@ export const BOMB = '💣';
  * `gentle` (#700) — the year's `gentle` flag — is passed separately rather than read off a `year` this
  * function otherwise has no reason to take: it only ever affects a non-sequence question's single
  * `gentleTarget`, so a scenario that does not care about it can go on calling this with three arguments.
- */
-export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining: readonly string[], gentle?: boolean): WaveOpts {
+ * `remaining` (#919) defaults to the whole sequence: omitted means "nothing sliced yet", not "nothing left". */
+export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining?: readonly string[], gentle?: boolean): WaveOpts {
   return {
     labels: info.labels, speed: info.speed, wide: !!q.wide || wideFor(info.labels),
-    ordered: q.sequence ? [...remaining] : undefined, gentleTarget: gentle && !q.sequence ? q.answer : undefined,
+    ordered: q.sequence ? [...(remaining ?? q.sequence)] : undefined, gentleTarget: gentle && !q.sequence ? q.answer : undefined,
   };
 }
 
