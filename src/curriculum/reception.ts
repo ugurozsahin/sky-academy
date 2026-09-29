@@ -204,8 +204,11 @@ const rTrickyPool = (d: 1 | 2 | 3) => (d === 1 ? R_TRICKY_P2 : d === 2 ? R_TRICK
 const shareLetter = (a: string, b: string) => [...a.toLowerCase()].some(c => b.toLowerCase().includes(c));
 const rTrickyDecoys = (rng: Rng, pool: string[], w: string, count: number, forceShared: boolean): string[] => {
   const rest = pool.filter(x => x !== w);
-  if (!forceShared || w === 'I') return shuffle(rng, rest).slice(0, count);
-  const shared = shuffle(rng, rest.filter(x => shareLetter(x, w)));
+  const shared = forceShared && w !== 'I' ? shuffle(rng, rest.filter(x => shareLetter(x, w))) : [];
+  // A word with no shared-letter partner in its own pool falls back to an unconstrained draw rather than
+  // shipping `undefined` as a decoy — belt-and-braces alongside the pool invariant the test file checks
+  // directly, so a future bank edit that breaks it degrades quietly instead of drawing a broken bubble.
+  if (shared.length === 0) return shuffle(rng, rest).slice(0, count);
   const others = shuffle(rng, rest.filter(x => x !== shared[0])).slice(0, count - 1);
   return shuffle(rng, [shared[0], ...others]);
 };

@@ -84,4 +84,19 @@ describe('r-tricky (#968)', () => {
   it('no bank word is in AVOID', () => {
     for (const w of [...R_TRICKY_P2, ...R_TRICKY_P3]) expect(AVOID.has(w.toLowerCase()), w).toBe(false);
   });
+
+  // A structural guarantee, not a probabilistic one (pr-test-analyzer/silent-failure-hunter review): the
+  // shared-letter decoy rule falls back to an unconstrained draw when a word has no partner, so no word can
+  // ever ship `undefined` as a decoy — but only "I" is *meant* to lack one. This pins the bank's own
+  // invariant, so a future word added with no shared-letter partner (and no "I" exemption) fails here with a
+  // clear message rather than surfacing as a silent `undefined` bubble that only 150 seeded draws might catch.
+  it('every non-"I" word in d2/d3\'s pools shares a letter with at least one other word in its own pool', () => {
+    for (const pool of [R_TRICKY_P3, [...R_TRICKY_P2, ...R_TRICKY_P3]]) {
+      for (const w of pool) {
+        if (w === 'I') continue;
+        const partner = pool.some(x => x !== w && [...x.toLowerCase()].some(c => w.toLowerCase().includes(c)));
+        expect(partner, `"${w}" has no shared-letter partner in its pool`).toBe(true);
+      }
+    }
+  });
 });
