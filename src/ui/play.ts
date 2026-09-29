@@ -1,4 +1,4 @@
-import { avatarById, praiseLine, SENSEI, SENSEI_LINES, senseiLine, VILLAIN } from '../avatars';
+import { avatarById, praiseLine, SENSEI, SENSEI_LINES, VILLAIN } from '../avatars';
 import { topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { type Mode, type SessionResult } from '../game/session';
@@ -12,13 +12,12 @@ import {
 import { equippedItem } from '../game/shop';
 import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
-import { screenScope, stickersHTML } from './screen';
+import { screenScope } from './screen';
 import { createHud } from './hud';
 import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
-import { pauseHTML, resultsHTML, stageClearHTML } from './overlays';
-import { resultMedal, resultHeading, resultHeadline } from './results';
-import { dojoRowsHTML } from './memory';
-import { certToStored, certWords, drawCertificate, deliverCertificate, type CertInfo } from './certificate';
+import { createResultsScreen } from './play-results';   // #896: the results overlay lives in play-results.ts
+import { pauseHTML, stageClearHTML } from './overlays';
+import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
 export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
@@ -76,6 +75,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   // it: the sprint ticker below samples the REAL clock — speed.ts must never speed the clock up, which is
   // the mistake this repo has made four times.
   const HOLD = sprint ? { correct: 350, wrong: 1000, miss: 800 } : { correct: 1000, wrong: 1800, miss: 1500 };
+
+  // #896: the results overlay lives in play-results.ts. `hold` is a thunk rather than `playSession` itself —
+  // `playSession` is assigned just below and `showResults` is only ever called once gameplay ends, long after
+  // this object is built — the same TDZ-safe pattern `mounted` below uses for `hooks`.
+  const showResults = createResultsScreen({
+    training, av, name: d.name, els, hold: (open, beats) => playSession.hold(open, beats),
+    later, toast, replay, goHome, cleanup,
+  });
 
   // #36: the Session callbacks — the question beat, the outcome beat, the sprint clock, the boss reactions —
   // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
@@ -220,49 +227,6 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     // was earned regardless: the `certificate()` hook below still answers that, same as before #470.
     const certSaved = cert ? fileCertificate(cert) : false;
     return { newBest, dojo, fresh, streak, cert, certSaved, dojoSaved };
-  }
-  function showResults(r: SessionResult, payout: ResultPayout) {
-    // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
-    // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
-    // certificate toasts' own auto-hide) belong to this overlay rather than to the held game, so they still run.
-    playSession.hold(true, false);
-    const { newBest, dojo, fresh, streak, cert, certSaved, dojoSaved } = payout;
-    const stickerHTML = dojoSaved ? stickersHTML(fresh) : '';   // #518: no keepsake for a refused write, same shape as certSaved
-    if (dojoSaved && (fresh.length || dojo.completed.length)) later(() => sfx.stage(), scaled(600));   // #138
-    const medal = resultMedal(r);
-    // #522: a generator throw ends the session through the same `won: false` path as a genuine loss, but it
-    // is not one — `r.incomplete` withholds the win/loss framing (never a certificate either: `certInfo`
-    // already requires `r.won`, which an incomplete session never has) and says plainly what happened instead,
-    // mirroring `duel.ts`'s identical `r.incomplete` handling for an aborted match.
-    const headline = resultHeadline(r, { training, newBest, name: d.name, senseiLine: () => senseiLine(r.won, d.name), praiseLine: () => praiseLine(av, d.name) });
-    const heading = r.incomplete ? 'Session ended early' : resultHeading(r.mode, { won: r.won, training });   // from the mode table (mission distinguishes a Sensei-training win)
-    const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
-    say(headline);
-    // `certSaved` (#470) is read the instant after `fileCertificate`'s own write, inside `commitResult()` —
-    // per `isWriteFailing()`'s own contract of reflecting only the last attempt — a refusal is not offered to
-    // the child as a keepsake the album does not actually hold. `cert` itself stays what was earned regardless:
-    // the `certificate()` hook below still answers that, same as before #470.
-    const earned = certSaved ? cert : null;
-    els.overlay.hidden = false;
-    els.overlay.innerHTML = resultsHTML({
-      mode: r.mode, won: r.won, training, incomplete: r.incomplete, glow: speaker.glow, img: speaker.img, name: speaker.name,
-      headline, medal, heading, starCount: r.stars, score: r.score, correct: r.correct, attempts: r.attempts,
-      bestCombo: r.bestCombo, coins: r.coins, newBest, streak, dojoRows: dojoSaved ? dojoRowsHTML(dojo) : '', stickerHTML, cert: !!earned,
-    });
-    $('#again').addEventListener('click', () => { sfx.tap(); cleanup(); replay(); });
-    $('#home').addEventListener('click', () => { sfx.tap(); cleanup(); goHome(); });
-    if (earned) $('#cert').addEventListener('click', async () => {
-      sfx.tap(); const b = $('#cert') as HTMLButtonElement; b.disabled = true;
-      try {
-        const how = await deliverCertificate(await drawCertificate(earned), `sky-ninja-certificate-${(d.name || 'ninja').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
-        if (how === 'shared') toast('Certificate shared!', 'good');
-        else if (how === 'saved' || how === 'downloaded') toast('Certificate saved!', 'good');
-        else if (how === 'declined') toast('No problem — you can save it next time!', 'good');
-        // 'shown' opens the full-screen view with its own save hint, so no toast
-      }
-      catch (e) { console.error('certificate delivery failed', e); toast('Could not make the certificate', 'bad'); }
-      b.disabled = false;
-    });
   }
   /**
    * Keep the certificate this mission earned (#205), and report whether the write actually landed (#470).

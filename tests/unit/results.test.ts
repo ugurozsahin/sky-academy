@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resultMedal, resultHeading, resultHeadline } from '../../src/ui/results';
+import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsLines, type ResultCandidate } from '../../src/ui/results';
 import { resultsHTML, type ResultsData } from '../../src/ui/overlays';
 import type { Mode } from '../../src/game/modes';
 
@@ -152,6 +152,63 @@ describe('resultHeadline', () => {
 });
 
 /**
+ * #896: at most two results-screen announcements, in register order (belt > island > trophy > best > rest),
+ * so two features speaking on the same results screen never talk over each other.
+ */
+describe('resultsLines', () => {
+  const c = (kind: ResultCandidate['kind'], text: string = kind): ResultCandidate => ({ kind, text });
+
+  it('returns every candidate, in precedence order, when two or fewer', () => {
+    expect(resultsLines([c('rest'), c('belt')])).toEqual([c('belt'), c('rest')]);
+    expect(resultsLines([c('best')])).toEqual([c('best')]);
+  });
+
+  it('caps at two even when every kind is present, keeping the two highest', () => {
+    const all = ['rest', 'best', 'trophy', 'island', 'belt'].map(k => c(k as ResultCandidate['kind']));
+    expect(resultsLines(all)).toEqual([c('belt'), c('island')]);
+  });
+
+  it('returns an empty list for an empty list', () => {
+    expect(resultsLines([])).toEqual([]);
+  });
+
+  it('keeps ties (two candidates of the same kind) in their input order', () => {
+    const first = c('best', 'first'); const second = c('best', 'second');
+    expect(resultsLines([first, second])).toEqual([first, second]);
+  });
+
+  it('the full precedence order: belt > island > trophy > best > rest', () => {
+    const shuffled = [c('best'), c('rest'), c('trophy'), c('belt'), c('island')];
+    expect(resultsLines(shuffled).map(l => l.kind)).toEqual(['belt', 'island']);
+    expect(resultsLines(shuffled.filter(l => l.kind !== 'belt')).map(l => l.kind)).toEqual(['island', 'trophy']);
+    expect(resultsLines(shuffled.filter(l => !['belt', 'island'].includes(l.kind))).map(l => l.kind)).toEqual(['trophy', 'best']);
+    expect(resultsLines(shuffled.filter(l => ['best', 'rest'].includes(l.kind))).map(l => l.kind)).toEqual(['best', 'rest']);
+  });
+});
+
+/**
+ * #896 review (pr-test-analyzer): the escaping itself lives in `resultPillsHTML`'s `esc()` call, one layer
+ * below the `overlays.ts` test above that only proves an already-escaped string passes through unchanged.
+ * A future candidate's `text` (a belt name, eventually a child's own name) is untrusted the same way every
+ * other on-screen string here is.
+ */
+describe('resultPillsHTML', () => {
+  it('wraps each line in a best-pill span, in resultsLines order', () => {
+    const lines: ResultCandidate[] = [{ kind: 'belt', text: 'Green Belt' }, { kind: 'best', text: 'New best!' }];
+    expect(resultPillsHTML(lines)).toBe('<span class="best-pill">Green Belt</span><span class="best-pill">New best!</span>');
+  });
+
+  it('escapes HTML-unsafe characters in the candidate text', () => {
+    expect(resultPillsHTML([{ kind: 'best', text: '<b>Ada</b> & "friends"' }]))
+      .toBe('<span class="best-pill">&lt;b&gt;Ada&lt;/b&gt; &amp; &quot;friends&quot;</span>');
+  });
+
+  it('renders nothing for an empty list', () => {
+    expect(resultPillsHTML([])).toBe('');
+  });
+});
+
+/**
  * #522 review (pr-test-analyzer, silent-failure-hunter): `.hero-big.sad` is the genuine-defeat face
  * (grayscale portrait, `src/style.css`) — an incomplete run must never wear it, whatever `won` reads, or the
  * avatar contradicts the "that question broke" copy right beside it.
@@ -170,5 +227,25 @@ describe('resultsHTML heroExtra (#522)', () => {
   });
   it('a win never wears it either way', () => {
     expect(resultsHTML({ ...base, won: true })).not.toContain('sad');
+  });
+});
+
+/**
+ * #896: with no candidates the overlay's HTML is unchanged (`resultLines` omitted); a candidate line renders
+ * into the coin row as an existing `best-pill` span, the same class `newBest` already uses — no new class,
+ * rule or element type.
+ */
+describe('resultsHTML resultLines (#896)', () => {
+  const base: ResultsData = {
+    mode: 'mission', won: true, training: false, glow: '#fff', img: 'x.webp', name: 'Ninja',
+    headline: 'hi', medal: '🥇', heading: 'Mission complete!', starCount: 3, score: 10, correct: 5, attempts: 5,
+    bestCombo: 3, coins: 5, newBest: false, streak: 0, dojoRows: '', stickerHTML: '', cert: false,
+  };
+  it('renders the same HTML with resultLines omitted as with it empty', () => {
+    expect(resultsHTML(base)).toBe(resultsHTML({ ...base, resultLines: '' }));
+  });
+  it('a supplied line renders as a best-pill in the coin row, escaped', () => {
+    const html = resultsHTML({ ...base, resultLines: '<span class="best-pill">Green Belt &lt;3&gt;</span>' });
+    expect(html).toContain('<span class="best-pill">Green Belt &lt;3&gt;</span>');
   });
 });
