@@ -1,10 +1,10 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
-import { shownYears, topicsFor, type Topic, type YearInfo } from '../curriculum';
+import { shownYears, topicsFor, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
-import { SPRINT_SECONDS, type Mode } from '../game/session';
+import { SPRINT_SECONDS } from '../game/session';
 import { MODES } from '../game/modes';
 import { weakestTopics } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
