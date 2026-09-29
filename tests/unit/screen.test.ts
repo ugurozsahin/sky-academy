@@ -375,4 +375,18 @@ describe('screenScope.onHidden fires on a hidden visibilitychange, never after d
     expect(fired).toEqual(['second']);
     expect(listeners.length).toBe(1);
   });
+
+  // silent-failure-hunter review: toast()/clearToast() both guard on `alive`, so a disposed screen's stale
+  // caller cannot reach into whatever replaced it (#411) — onHidden() had no such guard, so a call made after
+  // dispose() (hiddenFn already nulled by dispose()'s own cleanup) would silently add a second, permanent
+  // listener nothing could ever remove.
+  it('does nothing once the screen has been disposed, same guard as toast()/clearToast() (#884)', () => {
+    const scope = screenScope();
+    scope.dispose();
+    const fired: string[] = [];
+    scope.onHidden(() => fired.push('hidden'));
+    fire('hidden');
+    expect(fired, 'a disposed screen must not add a listener at all').toEqual([]);
+    expect(listeners.length).toBe(0);
+  });
 });

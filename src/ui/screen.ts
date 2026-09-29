@@ -79,6 +79,7 @@ export function screenScope(): ScreenScope {
       beats.add(held ? { fn, left: ms } : arm(fn, ms));
     },
     onHidden(fn) {
+      if (!alive) return;   // same guard as toast()/clearToast(): dispose() has already done its one cleanup
       if (!hiddenFn) document.addEventListener('visibilitychange', onVisibility);
       hiddenFn = fn;
     },
