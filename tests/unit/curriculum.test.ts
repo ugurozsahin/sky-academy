@@ -129,6 +129,11 @@ for (const topic of TOPICS) {
           // (`src/ui/hud.ts`) checks `!q.sequence` first and would silently render the plain-prompt branch,
           // dropping the digit-slot UI with nothing else noticing.
           if (q.build) expect(q.sequence, q.prompt).toBeDefined();
+          // #918: `anyOrder` is legal only alongside `sequence` (types.ts) — checked outside the
+          // `if (q.sequence)` gate below, same as `build` above, so a generator that sets `anyOrder`
+          // and forgets `sequence` cannot hide inside it and silently degrade to plain single-answer
+          // matching (`Session` reads `q.anyOrder` only inside `if (q.sequence)` gates).
+          if (q.anyOrder) expect(q.sequence, q.prompt).toBeDefined();
           if (topic.input !== 'tracing') {
             // answer present, options unique, sensible count
             expect(q.options).toContain(q.sequence ? q.sequence[0] : q.answer);
