@@ -3,10 +3,20 @@
 import type { Generator, Rng } from './types';
 import { ri, numQ, wordQ, shuffle } from './util';
 
-/** `n`'s opposite-parity neighbours within 1–100 — `±1, ±3, ±5` — so the ones digit alone decides. */
-const nearOppositeParity = (n: number): number[] => [n - 5, n - 3, n - 1, n + 1, n + 3, n + 5].filter(x => x >= 1 && x <= 100);
+/**
+ * `n`'s opposite-parity neighbours within 1–100 — `±1, ±3, ±5` — so the ones digit alone decides. Always at
+ * least 3 long: the fewest valid offsets are at `n`'s own extremes (`n = 1` or `n = 100`), where exactly 3 of
+ * the 6 fall in range — exported so that boundary is pinned directly rather than only landed on by a seed.
+ */
+export const nearOppositeParity = (n: number): number[] => [n - 5, n - 3, n - 1, n + 1, n + 3, n + 5].filter(x => x >= 1 && x <= 100);
 
-/** Three distinct numbers of the opposite parity to `wantEven`, drawn from anywhere in 1–100. */
+/**
+ * Three distinct numbers of the opposite parity to `wantEven`, drawn from anywhere in 1–100 — a rejection
+ * sample, unlike `nearOppositeParity`'s proven-≥3 neighbourhood. Throws rather than under-filling: the pool
+ * is ~49 of 99 candidates, so 200 tries never actually falls short, but `numQ`'s own `nearby()` top-up is
+ * parity-blind — silently handing it a short list could pad in a same-parity decoy, an ambiguous card with a
+ * second "correct" bubble (`unitQ`'s equivalent guard throws the same way, `util.ts`).
+ */
 function anyOppositeParity(rng: Rng, ans: number, wantEven: boolean): number[] {
   const ds = new Set<number>();
   let guard = 0;
@@ -14,6 +24,7 @@ function anyOppositeParity(rng: Rng, ans: number, wantEven: boolean): number[] {
     const v = ri(rng, 1, 100);
     if (v !== ans && (v % 2 === 0) !== wantEven) ds.add(v);
   }
+  if (ds.size < 3) throw new Error(`y2OddEven: only ${ds.size} opposite-parity decoy(s) found for ${ans}`);
   return [...ds];
 }
 
