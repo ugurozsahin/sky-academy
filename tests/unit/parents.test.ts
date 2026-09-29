@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '../../src/game/parents';
+import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES, recentSlips, type SlipRow } from '../../src/game/parents';
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
@@ -134,6 +134,38 @@ describe('parent dashboard summary', () => {
     expect(pct(0.725)).toBe(73);
     expect(pct(1)).toBe(100);
     expect(pct(0)).toBe(0);
+  });
+});
+
+describe('recentSlips (#938): the grown-ups "Recent slips" reader', () => {
+  const y1add = TOPICS.find(t => t.id === 'y1-add')!;
+  it('resolves each stored slip to its topic icon, in stored order (newest first)', () => {
+    const data: SaveData = { ...base, slips: [
+      { topic: 'y1-add', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' },
+      { topic: 'y1-add', prompt: '2 + 3', answer: '5', picked: '', at: '2026-09-28' },
+    ] };
+    const rows: SlipRow[] = recentSlips(data, TOPICS);
+    expect(rows).toEqual([
+      { icon: y1add.icon, prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' },
+      { icon: y1add.icon, prompt: '2 + 3', answer: '5', picked: '', at: '2026-09-28' },
+    ]);
+  });
+  it('drops a slip whose topic id no longer exists in the registry, without throwing', () => {
+    const data: SaveData = { ...base, slips: [
+      { topic: 'not-a-real-topic', prompt: '1 + 1', answer: '2', picked: '3', at: '2026-09-29' },
+      { topic: 'y1-add', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' },
+    ] };
+    let rows!: SlipRow[];
+    expect(() => { rows = recentSlips(data, TOPICS); }).not.toThrow();
+    expect(rows).toEqual([{ icon: y1add.icon, prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' }]);
+  });
+  it('is empty with no slips', () => {
+    expect(recentSlips(base, TOPICS)).toEqual([]);
+  });
+  it('parentSummary exposes the same rows as its own .slips field', () => {
+    const data: SaveData = { ...base, slips: [{ topic: 'y1-add', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' }] };
+    const sm = parentSummary(data, TOPICS, YEARS, STICKER_IDS.length);
+    expect(sm.slips).toEqual(recentSlips(data, TOPICS));
   });
 });
 

@@ -2741,6 +2741,31 @@ describe('a finished game is persisted in one write, or not at all (#365)', () =
     expect(warn).toHaveBeenCalledOnce();
     warn.mockRestore();
   });
+
+  // #938: recordGameEnd()'s optional `slips` — prepended ahead of whatever is already stored, stamped with
+  // `now`'s local day (not the caller's), and capped at 20 the same way sanitizeSlips() caps a Restore paste.
+  describe('recordGameEnd(): slips (#938)', () => {
+    const oneSlip = { topic: 'y1-add', prompt: '4 + 5', answer: '9', picked: '8' };
+    it('with no slips, the stored list is untouched', () => {
+      save({ slips: [{ topic: 'y1-add', prompt: '1 + 1', answer: '2', picked: '', at: '2026-01-01' }] });
+      recordGameEnd(memoryWin, 0);
+      expect(disked().slips).toHaveLength(1);
+    });
+    it('a new slip is prepended (newest first) and stamped with this call\'s own day', () => {
+      save({ slips: [{ topic: 'y1-add', prompt: '1 + 1', answer: '2', picked: '', at: '2026-01-01' }] });
+      recordGameEnd({ ...memoryWin, slips: [oneSlip] }, 0, new Date('2026-09-29T12:00:00Z'));
+      expect(disked().slips).toEqual([{ ...oneSlip, at: '2026-09-29' }, { topic: 'y1-add', prompt: '1 + 1', answer: '2', picked: '', at: '2026-01-01' }]);
+    });
+    it('stays capped at 20, dropping the oldest', () => {
+      const old = Array.from({ length: 20 }, (_, i) => ({ topic: 'y1-add', prompt: `q${i}`, answer: '1', picked: '', at: '2026-01-01' }));
+      save({ slips: old });
+      recordGameEnd({ ...memoryWin, slips: [oneSlip] }, 0, new Date('2026-09-29T12:00:00Z'));
+      const stored = disked().slips;
+      expect(stored).toHaveLength(20);
+      expect(stored[0]).toEqual({ ...oneSlip, at: '2026-09-29' });
+      expect(stored.at(-1)).toEqual(old.at(-2));               // the 20th old entry (index 19) is the one dropped
+    });
+  });
 });
 
 // #903: the v4 → v5 save format change. No reader exists yet for any of these fields (that is each named

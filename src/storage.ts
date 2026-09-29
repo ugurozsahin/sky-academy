@@ -8,7 +8,7 @@ import { AVATARS, VILLAIN } from './avatars';
 import { DUEL_OUTCOMES, type DuelOutcome } from './game/duel';
 // Field-check infrastructure (Fields/checkFields/str/fin/strOrNull/count) and the v5 save fields (#903) live in
 // save-records.ts, which storage.ts is too close to its #714 ratchet cap to hold itself.
-import { checkFields, count, fin, str, strOrNull, sanitizeV5Fields, toV5, type Fields, type LogDay, type Settings, type Slip } from './save-records';
+import { checkFields, count, fin, str, strOrNull, sanitizeSlips, sanitizeV5Fields, toV5, type Fields, type LogDay, type Settings, type Slip } from './save-records';
 /**
  * A tally of questions answered for one topic — `hits` right of `tries` attempted — while it is still being
  * built, before `recordAccuracy()` folds it into `TopicProgress`'s own optional `hits?`/`tries?` below (the
@@ -1395,7 +1395,7 @@ export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[] }
  * is unreachable rather than merely unlikely. A refusal still leaves `writeFailed` for the grown-ups screen to
  * report, exactly as before — this closes the *inconsistency*, not the refusal (#151 stands).
  */
-export function recordGameEnd(e: DojoEvent, gameCoins: number, now = new Date()): GameEndOutcome {
+export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[] }, gameCoins: number, now = new Date()): GameEndOutcome {
   if (!Number.isFinite(gameCoins)) console.warn(`recordGameEnd: non-finite gameCoins (${gameCoins}) — ignored`);   // same #797 guard as addCoins()
   const d = load(); const dojo = applyEvent(d.dojo, e, today(now));
   // `gameCoins`, not `coins`: every call site on `main` read `addCoins(paid + dojo.coins)`, so a maintainer
@@ -1413,7 +1413,8 @@ export function recordGameEnd(e: DojoEvent, gameCoins: number, now = new Date())
   // undetectable by any test. Deliberate forward-compatibility, deliberately untested (round 2, note 1).
   const unlocked = evaluateStickers({ ...d, coins: total, dojo: dojo.state });
   const fresh = unlocked.filter(id => !d.stickers.includes(id));
-  save({ dojo: dojo.state, coins: total, stickers: unlocked });
+  const slips = e.slips?.length ? sanitizeSlips([...e.slips.map(s => ({ ...s, at: today(now) })), ...d.slips]) : d.slips;   // #938: newest first, capped 20
+  save({ dojo: dojo.state, coins: total, stickers: unlocked, slips });
   return { dojo, fresh };
 }
 /** The spendable part of the save. */

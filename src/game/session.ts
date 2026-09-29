@@ -37,6 +37,10 @@ export interface SessionEvents {
 /** One entry in `SessionResult.misses` (#878): `picked` is the label a wrong slice actually chose, and `null`
  *  means the question was missed outright — the target bubble fell, or the wave ended with nothing decided. */
 export interface Miss { topic: string; q: Question; picked: string | null }
+/** `SessionResult.misses` → the shape a grown-ups "Recent slip" is stored as (#938; `at` is stamped by
+ *  `recordGameEnd()` itself, from its own `now`, not read here). `q.listen ?? q.prompt` so a spoken-only
+ *  card still reads as text; a fallen bubble's `null` pick becomes `''` (#903's `Slip.picked` is never null). */
+export const missSlips = (misses: readonly Miss[]) => misses.map(m => ({ topic: m.topic, prompt: m.q.listen ?? m.q.prompt, answer: m.q.answer, picked: m.picked ?? '' }));
 export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number; incomplete?: boolean; misses: Miss[] }
 
 /**
