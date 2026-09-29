@@ -1812,6 +1812,18 @@ test.describe('Sky Ninja Academy', () => {
     expect(listen.split(' · ')).toHaveLength(3);
   });
 
+  test('Read It!: the word is shown but never said, the card fits the phone, and slicing its picture answers (#967)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-read');
+    const q = await page.evaluate(() => window.__sna.session.current);
+    const word = q.visual?.type === 'word' ? (q.visual as { text: string }).text : '';
+    expect(word).not.toBe('');
+    await expect(page.locator('.prompt')).toHaveText('Read it!');
+    expect(q.prompt.toLowerCase()).not.toContain(word.toLowerCase());
+    await expectFitsViewport(page, `Read It! word card ("${word}") and bubbles`);
+    await waitForTarget(page); expect(await answer(page)).toBe(true);
+  });
+
   // #65, one test per topic rather than one walk through all of them: the walk ran to ~60 s on a loaded desktop
   // runner and was reported as "page.goto hangs" — the test budget expiring mid-navigation, not a wedged page.
   test('no voice: Sound Hunt prints its keywords, mid-wave and without a pause, and stays answerable (#65)', async ({ page }) => {
