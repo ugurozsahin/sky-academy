@@ -11,8 +11,8 @@ import type { Nav } from './home';
 export function shopItemLine(item: { name: string; blurb: string }): string {
   return `${item.name}. ${item.blurb}`;
 }
-const KINDS: ItemKind[] = ['trail', 'bubble', 'decor', 'costume'];
-const SOON: Record<ItemKind, string> = { trail: '', bubble: 'Cloud, lantern and scroll bubbles are being drawn', decor: 'Lanterns, flags and huts for your islands are on the way', costume: 'New outfits for every ninja are being painted' };
+const KINDS: ItemKind[] = ['trail', 'bubble', 'decor', 'costume', 'title'];
+const SOON: Record<ItemKind, string> = { trail: '', bubble: 'Cloud, lantern and scroll bubbles are being drawn', decor: 'Lanterns, flags and huts for your islands are on the way', costume: 'New outfits for every ninja are being painted', title: '' };
 
 export function shopScreen(nav: Nav) {
   const w = wallet(); const bal = coinBalance();

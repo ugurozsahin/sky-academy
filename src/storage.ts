@@ -1,6 +1,6 @@
 // Persistent player state (localStorage). Small, versioned, safe on failure.
 import { applyEvent, dojoFor, freshDojo, type DojoEvent, type DojoOutcome, type DojoState } from './game/dojo';
-import { balance, buy, equip, type ItemKind, type Wallet } from './game/shop';
+import { balance, buy, equip, ownedTitleId, type ItemKind, type Wallet } from './game/shop';
 import { TOPICS, YEARS, type YearId } from './curriculum';
 import { AVATARS, VILLAIN } from './avatars';
 // Type-only plus one small runtime tuple, so this stays the mirror of the `type-only` imports duel.ts already
@@ -853,7 +853,7 @@ export type ProfileCard =
   | { id: ProfileId; state: 'empty' }
   | { id: ProfileId; state: 'future' }
   | { id: ProfileId; state: 'corrupt' }
-  | { id: ProfileId; state: 'save'; name: string; avatar: string | null; onboarded: boolean };
+  | { id: ProfileId; state: 'save'; name: string; avatar: string | null; onboarded: boolean; title: string | null };
 export function profileCard(id: ProfileId): ProfileCard {
   const raw = readItem(saveKeyFor(id));
   if (!raw) return { id, state: 'empty' };
@@ -869,7 +869,7 @@ export function profileCard(id: ProfileId): ProfileCard {
     state: 'save',
     name: typeof s.name === 'string' ? s.name : '',
     avatar: typeof s.avatar === 'string' ? s.avatar : null,
-    onboarded: onboardedOf(s),
+    onboarded: onboardedOf(s), title: ownedTitleId((s.equipped as Record<string, unknown> | undefined)?.title, s.owned),
   };
 }
 /**

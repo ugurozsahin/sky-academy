@@ -13,7 +13,7 @@ import {
 } from './bubbles';
 import type { Bubble, WaveOpts, ArenaBox, ClampCounts } from './bubbles';
 import {
-  FX_PARTICLE, FX_COLORS, MAX_PARTICLES, SHOT_FLIGHT, SHOT_STYLE, shotPose, starPath, compact, BOLT_HALO, STAR_HALO, ELEMENTS,
+  FX_PARTICLE, FX_COLORS, MAX_PARTICLES, SHOT_FLIGHT, SHOT_STYLE, shotPose, starPath, compact, BOLT_HALO, STAR_HALO, ELEMENTS, burstParticles, prefersReducedMotion,
 } from './particles';
 import type { Particle, Shot, FxKind } from './particles';
 import { segCircle } from './slicing';
@@ -29,7 +29,7 @@ export interface ArenaCallbacks {
   onWaveEnd: () => void;                             // no live bubbles remain
 }
 export interface ArenaOpts {
-  trailColor?: string; trailCore?: string; fx?: FxKind;
+  trailColor?: string; trailCore?: string; fx?: FxKind; reducedMotion?: boolean;   // #900: the option if given, else read from matchMedia once, at construction
   onSwish?: () => void;
   onThrow?: () => void;                        // a projectile has just left the ninja's hand
   onLand?: () => void;                         // it has reached the bubble and popped it
@@ -78,6 +78,7 @@ export class Arena {
   /** Which bubbles a tap throws a projectile at; anything else pops instantly, like a swipe (the TNT does — #48). */
   private throwFor?: (b: Bubble) => boolean;
   private labelArt?: ArenaOpts['labelArt']; private isHazard?: ArenaOpts['isHazard'];
+  private reducedMotion = false;   // #900: resolved once in the constructor, never re-read per frame
   time = 0;
 
   constructor(public canvas: HTMLCanvasElement, private cb: ArenaCallbacks, opts: ArenaOpts = {}) {
@@ -87,6 +88,7 @@ export class Arena {
     if (opts.fx) this.fx = opts.fx;
     this.onSwish = opts.onSwish; this.onThrow = opts.onThrow; this.onLand = opts.onLand;
     this.throwFor = opts.throwFor; this.labelArt = opts.labelArt; this.isHazard = opts.isHazard;
+    this.reducedMotion = opts.reducedMotion ?? prefersReducedMotion(window);
     this.resize();
     window.addEventListener('resize', this.resize);
     canvas.addEventListener('pointerdown', this.onDown);
@@ -219,12 +221,10 @@ export class Arena {
     this.particles.push({ x, y, vx: 0, vy: -60, life: 0, max: 1.1, color, size: 26, kind: 'text', text });
   }
   burst(x: number, y: number, color: string, n = 18) {
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, s = 120 + Math.random() * 260;
-      this.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 80, life: 0, max: 0.5 + Math.random() * 0.5, color, size: 3 + Math.random() * 5, kind: Math.random() < 0.3 ? 'shard' : 'dot', rot: Math.random() * 6 });
-    }
+    // #900: half the dots/shards (rounded up) and no sparks under reduced motion; the ring always shows.
+    this.particles.push(...burstParticles(x, y, color, this.reducedMotion ? Math.ceil(n / 2) : n));
     this.particles.push({ x, y, vx: 0, vy: 0, life: 0, max: 0.45, color, size: 10, kind: 'ring' });
-    if (n >= 12) this.emitFx(x, y, 8, 0, 0);
+    if (n >= 12 && !this.reducedMotion) this.emitFx(x, y, 8, 0, 0);
   }
   /** Element-flavoured particles (trail wake or hit burst). */
   emitFx(x: number, y: number, n: number, dx: number, dy: number) {
@@ -283,7 +283,7 @@ export class Arena {
       this.trail.push({ ...p, t: performance.now() });
       if (this.trail.length > 24) this.trail.shift();
       if (s.moved > 40 && this.trail.length % 6 === 0) this.onSwish?.();
-      if (++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);
+      if (!this.reducedMotion && ++this.trailEmit % 2 === 0) this.emitFx(p.x, p.y, 1, p.x - prev.x, p.y - prev.y);   // #900: no wake sparks
     }
     for (const b of this.bubbles) { if (this.frozen) break; if (b.launched && !b.hit && !b.dead && segCircle(prev.x, prev.y, p.x, p.y, b.x, b.y, b.r)) this.hitBubble(b, true); }
   };
@@ -377,7 +377,7 @@ export class Arena {
     for (const s of this.shots) {                   // shots fly on even while the wave is frozen for the reveal
       if (s.t >= SHOT_FLIGHT) continue;             // already landed this frame; cull() takes it out below (#31)
       const p = shotPose(s.x0, s.y0, s.target.x, s.target.y, s.t += dt);
-      if (++s.emit % 2 === 0) this.emitFx(s.x, s.y, 1, (p.x - s.x) * 0.2, (p.y - s.y) * 0.2);   // element wake
+      if (!this.reducedMotion && ++s.emit % 2 === 0) this.emitFx(s.x, s.y, 1, (p.x - s.x) * 0.2, (p.y - s.y) * 0.2);   // element wake, none under #900
       s.x = p.x; s.y = p.y;
       if (p.done) this.landShot(s);
     }

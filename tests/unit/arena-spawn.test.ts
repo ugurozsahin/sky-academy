@@ -199,3 +199,100 @@ describe('warnUnfitLabel says so out loud when a label does not fit (#348 / #495
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('reduced motion thins bursts and drops wake sparks (#900)', () => {
+  const particlesOf = (arena: Arena) => (arena as unknown as { particles: { kind: string }[] }).particles;
+  const newArena = (opts: ConstructorParameters<typeof Arena>[2] = {}) => {
+    const arena = new Arena(stubCanvas(ctx), { onHit: () => {}, onFall: () => {}, onWaveEnd: () => {} }, opts);
+    arenas.push(arena);
+    return arena;
+  };
+  // `onDown`/`onMove` are private, exactly like `render` above — cast the same way `drawOnce` does.
+  const strokeOf = (arena: Arena) => arena as unknown as { onDown: (e: PointerEvent) => void; onMove: (e: PointerEvent) => void };
+  const pointerEvent = (x: number, y: number) => ({ pointerId: 1, clientX: x, clientY: y }) as PointerEvent;
+
+  it('with reduced motion off, a default burst throws all 18 dots/shards plus the ring', () => {
+    const arena = newArena();
+    arena.burst(10, 10, '#fff');
+    const ps = particlesOf(arena);
+    expect(ps.filter(p => p.kind === 'dot' || p.kind === 'shard')).toHaveLength(18);
+    expect(ps.filter(p => p.kind === 'ring')).toHaveLength(1);
+  });
+
+  it('with reduced motion on, a default burst throws half the dots/shards, rounded up, plus the ring', () => {
+    const arena = newArena({ reducedMotion: true });
+    arena.burst(10, 10, '#fff');   // n defaults to 18: ceil(18 / 2) = 9
+    const ps = particlesOf(arena);
+    expect(ps.filter(p => p.kind === 'dot' || p.kind === 'shard')).toHaveLength(9);
+    expect(ps.filter(p => p.kind === 'ring')).toHaveLength(1);
+  });
+
+  it('with reduced motion off, a burst of 12+ still adds its 8 element sparks', () => {
+    const arena = newArena({ fx: 'fire' });
+    arena.burst(10, 10, '#fff', 18);
+    expect(particlesOf(arena).filter(p => p.kind === 'ember')).toHaveLength(8);
+  });
+
+  it('with reduced motion on, a burst of 12+ adds no element sparks', () => {
+    const arena = newArena({ reducedMotion: true, fx: 'fire' });
+    arena.burst(10, 10, '#fff', 18);
+    expect(particlesOf(arena).some(p => p.kind === 'ember')).toBe(false);
+  });
+
+  it('reads the preference once, at construction — a later matchMedia change is never picked up', () => {
+    g.window = { addEventListener: () => {}, removeEventListener: () => {}, devicePixelRatio: 1, matchMedia: () => ({ matches: false }) };
+    const arena = newArena();
+    (g.window as { matchMedia: () => { matches: boolean } }).matchMedia = () => ({ matches: true });
+    arena.burst(10, 10, '#fff');
+    expect(particlesOf(arena).filter(p => p.kind === 'dot' || p.kind === 'shard')).toHaveLength(18);   // still full
+  });
+
+  // Every other "on" case above passes the `reducedMotion` option directly, which short-circuits the
+  // `matchMedia` read entirely (`arena.ts`'s `opts.reducedMotion ?? prefersReducedMotion(window)`) — so none
+  // of them would notice `prefersReducedMotion` silently always returning false. This is the one case that
+  // takes the real fallback path #900 also asks for: no option, `matchMedia` alone says reduce.
+  it('drives reduction through matchMedia alone, with no explicit option (#900)', () => {
+    g.window = { addEventListener: () => {}, removeEventListener: () => {}, devicePixelRatio: 1, matchMedia: () => ({ matches: true }) };
+    const arena = newArena();
+    arena.burst(10, 10, '#fff');
+    expect(particlesOf(arena).filter(p => p.kind === 'dot' || p.kind === 'shard')).toHaveLength(9);
+  });
+
+  it('with reduced motion on, a trail move adds no wake sparks', () => {
+    const arena = strokeOf(newArena({ reducedMotion: true, fx: 'fire' }));
+    arena.onDown(pointerEvent(10, 500));
+    for (let i = 0; i < 6; i++) arena.onMove(pointerEvent(10 + i * 10, 500 - i * 10));
+    expect(particlesOf(arena as unknown as Arena).some(p => p.kind === 'ember')).toBe(false);
+  });
+
+  it('with reduced motion off, a trail move adds wake sparks', () => {
+    const arena = strokeOf(newArena({ fx: 'fire' }));
+    arena.onDown(pointerEvent(10, 500));
+    for (let i = 0; i < 6; i++) arena.onMove(pointerEvent(10 + i * 10, 500 - i * 10));
+    expect(particlesOf(arena as unknown as Arena).some(p => p.kind === 'ember')).toBe(true);
+  });
+
+  // The projectile wake (`update()`'s own `shots` loop) is a second, separate call site from the trail wake
+  // above, gated the same one-line way — untested so far, and it's half of what #900 changed at the per-frame
+  // layer. Pushed directly into the private `shots` array and driven through two `update()` calls: the first
+  // takes `emit` from 0 to 1 (odd, no spark), the second from 1 to 2 (even, a spark would fire) — the same
+  // `++s.emit % 2 === 0` cadence `arena.ts` already uses for the trail wake.
+  const shotAt = (arena: Arena) => (arena as unknown as { shots: { target: unknown; x0: number; y0: number; x: number; y: number; t: number; fx: string; emit: number }[]; update: (dt: number, now: number) => void });
+  const pushShot = (arena: Arena, fx = 'fire') => {
+    const a = shotAt(arena);
+    a.shots.push({ target: { x: 50, y: 50, color: '#fff', dead: false }, x0: 10, y0: 500, x: 10, y: 500, t: 0, fx, emit: 0 });
+    return a;
+  };
+
+  it('with reduced motion on, a thrown projectile leaves no wake sparks', () => {
+    const a = pushShot(newArena({ reducedMotion: true, fx: 'fire' }));
+    a.update(0.01, 1000); a.update(0.01, 1000);
+    expect(particlesOf(a as unknown as Arena).some(p => p.kind === 'ember')).toBe(false);
+  });
+
+  it('with reduced motion off, a thrown projectile leaves wake sparks', () => {
+    const a = pushShot(newArena({ fx: 'fire' }));
+    a.update(0.01, 1000); a.update(0.01, 1000);
+    expect(particlesOf(a as unknown as Arena).some(p => p.kind === 'ember')).toBe(true);
+  });
+});

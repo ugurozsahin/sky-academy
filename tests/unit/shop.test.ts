@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { balance, buy, canBuy, equip, equippedItem, itemById, SHOP_ITEMS, type Wallet } from '../../src/game/shop';
 import { addCoins, buyItem, coinBalance, equipItem, isWriteFailing, load, reset, wallet } from '../../src/storage';
+import { code, SOURCES } from './helpers/sources';
 
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
@@ -33,6 +34,24 @@ describe('coin shop rules (#6)', () => {
     const paid = prices.filter(p => p > 0);
     expect(paid[0]).toBeGreaterThan(0);                                 // the cheapest paid trail is still a real price
     expect(Math.max(...paid)).toBe(itemById('trail-gold')!.price);     // gold stays the premium item at the top
+  });
+  it('Dojo titles (#1295): the six paid titles are buyable, cost their price and equip; unowned/tampered falls back to no title', () => {
+    const titles = SHOP_ITEMS.filter(i => i.kind === 'title' && i.price > 0);
+    expect(titles.length).toBe(6);
+    for (const it of titles) {
+      const bought = buy(w(it.price), it.id);
+      expect(bought.ok, `${it.id} must be buyable for exactly its price`).toBe(true);
+      expect(bought.wallet.spent).toBe(it.price);
+      expect(bought.wallet.equipped.title).toBe(it.id);
+    }
+    expect(equippedItem(w(0), 'title')?.id).toBe('title-none');                                    // free default
+    expect(equippedItem(w(0, { equipped: { title: 'title-scout' } }), 'title')?.id, 'equipped but not owned (tampered save)').toBe('title-none');
+  });
+  // #1295: a title is text on the "Who is playing?" card only — the topbar chip is full to the pixel (PR #380)
+  // and certificate.ts is a fixed canvas look, so neither ever reads the equipped title.
+  it('a Dojo title never reaches the topbar chip or a certificate', () => {
+    expect(code(SOURCES['/src/ui/home.ts'])).not.toMatch(/equipped\.title/);
+    expect(code(SOURCES['/src/ui/certificate.ts'])).not.toMatch(/equipped\.title/);
   });
   it('balance is lifetime coins minus spent, never negative', () => {
     expect(balance(w(200, { spent: 150 }))).toBe(50);
