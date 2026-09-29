@@ -1097,6 +1097,60 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   /**
+   * #930: "Fix my mistakes" end to end — the unit tests (`session.test.ts`, `results.test.ts`) pin `fixDeck()`
+   * and `resultsAction()`'s own precedence; this is the one place the whole wire-up (the button, the deck it
+   * builds, the practice rule, the results screen it ends on) is exercised together. Two wrong slices on
+   * `y1-add` (a bare-number answer, so #893's `correctionLine` is never null) give two misses; the mission is
+   * then fast-forwarded to a win the same way #929's own tests do.
+   */
+  test('"Fix my mistakes" (#930): replays the misses newest first, costs no life, speaks each answer, pays nothing', async ({ page }) => {
+    test.setTimeout(150_000);
+    await captureSpeech(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    const firstMiss = await page.evaluate(() => ({ prompt: window.__sna.session.current.prompt as string, answer: window.__sna.session.current.answer as string }));
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction(() => window.__sna.state().index === 1);
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    const secondMiss = await page.evaluate(() => ({ prompt: window.__sna.session.current.prompt as string, answer: window.__sna.session.current.answer as string }));
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction(() => window.__sna.state().index === 2);
+    await winMission(page);
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    const action = results.locator('#fix-mistakes');
+    await expect(action).toHaveText('Fix my mistakes');
+    // The real mission's own win pays coins first; only the fix round below must add nothing further.
+    const coinsBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).coins);
+    await page.evaluate(() => { window.__spoken = []; });   // isolate the fix round's own speech from the mission's
+    await action.click();
+    await expect(page.locator('.play')).toBeVisible();
+    await expect(page.locator('.ttl')).toHaveText('Fix my mistakes');
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    // Newest first: the second miss comes back before the first.
+    expect(await page.evaluate(() => window.__sna.state().prompt)).toBe(secondMiss.prompt);
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    // Spoken proactively, before any slice — unlike a normal mission, which only speaks it after a wrong one.
+    await expect.poll(() => page.evaluate(() => window.__spoken ?? [])).toContain(`It's ${secondMiss.answer}.`);
+    const livesBefore = await page.evaluate(() => window.__sna.state().lives);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);   // even a wrong slice in the fix round...
+    await page.waitForFunction(prompt => window.__sna.state().prompt === prompt, firstMiss.prompt);
+    expect(await page.evaluate(() => window.__sna.state().lives), 'a slip in a practice round costs no life').toBe(livesBefore);
+    await waitForTarget(page);
+    await expect.poll(() => page.evaluate(() => window.__spoken ?? [])).toContain(`It's ${firstMiss.answer}.`);
+    expect(await answer(page)).toBe(true);
+    await page.waitForFunction(() => window.__sna.state().ended);
+    const fixResults = page.locator('.results');
+    await expect(fixResults).toBeVisible();
+    await expect(fixResults).toContainText('Mistakes fixed!');
+    await expect(fixResults.locator('#fix-mistakes')).toHaveCount(0);   // never offers to fix its own fix round
+    await expect(fixResults.locator('.coin-gain')).toHaveText('+0 🪙');
+    const coinsAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).coins);
+    expect(coinsAfter, 'a practice round pays nothing into the wallet').toBe(coinsBefore);
+  });
+
+  /**
    * #470: `recordCert()`'s own `save()` swallows a refused `setItem` (#151) and the 🎓 row used to be drawn
    * from the in-memory certificate regardless, offering a keepsake the album does not actually hold. Same
    * shape as the Ninja Duel case (`tests/e2e/duel.spec.ts`), the other of the two `recordCert()` call sites.

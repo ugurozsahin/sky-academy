@@ -13,7 +13,8 @@ import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
 import { plugin, wireBackButton, type AppPlugin } from './native';
 import { backGuard } from './ui/screen';
-import type { YearInfo } from './curriculum';
+import { topicById, type YearInfo } from './curriculum';
+import { fixDeck } from './game/session';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
 // Each screen below the map pushes a history entry, so the browser's back button steps back one screen —
@@ -50,7 +51,7 @@ const nav = {
   },
   map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
   island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
-  play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play(o), t => nav.play({ year: o.year, mode: 'mission', topic: t })); }) as StartPlay,
+  play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, deck: fixDeck(misses, topicById), practice: true })); }) as StartPlay,
   memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
   duel: (y: YearInfo) => { leave(); year = y; enter('duel'); dispose = duelScreen({ year: y }, up, () => nav.duel(y)); },   // #16
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },

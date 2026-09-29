@@ -11,8 +11,9 @@ import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, 
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
 import { $, $$, capDigits, render, stars } from './dom';
+import type { PlayOpts } from './play';
 
-export type StartPlay = (o: { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }) => void;
+export type StartPlay = (o: PlayOpts) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
   memory: (year: YearInfo) => void; duel: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void;

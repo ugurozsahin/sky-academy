@@ -18,7 +18,7 @@ import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
 import type { CertInfo } from './certificate';
 import { $, esc } from './dom';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
-import { hintText, promptHTML, promptMode, setHint, stageHTML, type Hud, type Outcome } from './hud';
+import { correctionLine, hintText, promptHTML, promptMode, setHint, stageHTML, type Hud, type Outcome } from './hud';
 import { renderVisual } from './visuals';
 import { createSolidSlot, type ArtFrame, type SolidArtState, type SolidState } from './solid';   // #684: the lazy three.js solid on a 3-D Shapes card
 
@@ -158,7 +158,7 @@ const OUTCOME = {
 /** Build the session and its callbacks for one play screen. */
 export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): PlaySession {
   const { els, hud, hold } = deps;
-  const mission = opts.mode === 'mission';        // only missions show the stage pill and its segments
+  const mission = opts.mode === 'mission' && !opts.deck;   // only missions show the stage pill and its segments; a deck run (#930) counts plainly instead
   let lastOutcome: Outcome | 'none' = 'none';
   let waveId = 0; let revealUntil = 0;
   // #484: set by `onCommit` when a staged mission's last question is decided ahead of `onEnd` — so `onEnd`
@@ -287,7 +287,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         const spawn = () => {
           if (waveId !== myWave) return;                                 // superseded while we waited
           const arena = deps.arena()!;
-          say(q.say ?? q.prompt);
+          say(q.say ?? q.prompt); if (opts.practice) { const a = correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true }); }
           requestAnimationFrame(() => {
             if (waveId !== myWave) return;
             arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;
