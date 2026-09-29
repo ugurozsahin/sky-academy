@@ -574,3 +574,47 @@ describe("ci.yml's test-job timeout-minutes is a budget, not a bare number (#758
   // not lower the number itself — that waits for #749/#748/#750 to land and a measured job duration to lower
   // it to, per #758's stated intent.
 });
+
+/**
+ * #1360: `unblock.yml` runs unattended with `issues: write` on every issue close. It exists to REMOVE a label
+ * whose reason has gone; adding `blocked` moves work out of reach and stays behind the refiner's one-day gate.
+ * So the file is held to that one write, to a script that can be tested, and to issue text never reaching a
+ * shell or an expression (#215). What this cannot see: the predicate's own logic, which
+ * `tests/unit/unblock.test.ts` holds.
+ */
+describe('unblock.yml only ever removes the blocked label, and reads issue text as data (#1360)', () => {
+  const yml = workflowFiles().find((w) => w.name === 'unblock.yml')?.text ?? '';
+
+  it('exists and is read', () => expect(yml.length).toBeGreaterThan(500));
+
+  it('wakes on a closed issue, a daily schedule and by hand', () => {
+    expect(yml).toMatch(/issues:\n\s+types: \[closed\]/);
+    expect(yml).toMatch(/schedule:\n\s+- cron:/);
+    expect(yml).toContain('workflow_dispatch:');
+  });
+
+  it('asks for issues: write and contents: read, and nothing else', () => {
+    const perms = /^permissions:\n((?:  .*\n)+)/m.exec(yml)?.[1] ?? '';
+    const keys = perms.split('\n').filter(Boolean).map((l) => l.trim().split(':')[0]).sort();
+    expect(keys).toEqual(['contents', 'issues']);
+    expect(perms).toMatch(/contents: read/);
+    expect(perms).toMatch(/issues: write/);
+  });
+
+  it('its only write call is removeLabel on blocked', () => {
+    const calls = [...yml.matchAll(/github\.rest\.\w+\.(\w+)/g)].map((m) => m[1]);
+    expect([...new Set(calls)].sort()).toEqual(['listForRepo', 'removeLabel']);
+    expect(yml).toMatch(/removeLabel\(\{[^}]*name: 'blocked'/);
+    expect(yml).not.toMatch(/addLabels|createComment|issues\.update\b/);
+  });
+
+  it('has no run: step, and no expression reads the issue payload', () => {
+    expect(yml).not.toMatch(/^\s*(-\s+)?run:/m);
+    expect(yml).not.toMatch(/\$\{\{[^}]*github\.event/);
+  });
+
+  it('delegates the decision to scripts/unblock.mjs, the tested predicate', () => {
+    expect(yml).toContain('sparse-checkout: scripts/unblock.mjs');
+    expect(yml).toMatch(/import\(`\$\{process\.env\.GITHUB_WORKSPACE\}\/scripts\/unblock\.mjs`\)/);
+  });
+});

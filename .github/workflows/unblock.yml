@@ -1,0 +1,51 @@
+# Takes the `blocked` label off an issue once every blocker its first line names has closed (#1360).
+#
+# Why this exists: `.claude/rules/governance.md` pairs the label with a `Blocked by #<n>` first line. The line
+# goes stale by itself when #n closes; the label stayed until the refiner's one-day gate removed it, and on
+# 2026-09-29 that left 18 `priority:P1` issues parked while lower-priority work was taken (#1348).
+#
+# It only ever REMOVES the label. Adding one moves work out of reach, so that stays with the refiner, behind
+# its gate (`docs/REFINER-PROMPT.md` item 10). The decision lives in scripts/unblock.mjs, where
+# tests/unit/unblock.test.ts can hold it; an issue body is read there as data and never reaches a shell or a
+# `${{ }}` expression (#215).
+#
+# Cost: one paginated listing of open issues per run (a few API calls), whatever the backlog size. The daily
+# schedule is the backstop for a close event that never fired.
+name: Unblock
+on:
+  issues:
+    types: [closed]
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+concurrency:
+  group: unblock
+  cancel-in-progress: false
+permissions:
+  contents: read             # checkout, for the predicate module
+  issues: write              # removes the `blocked` label, and nothing else
+jobs:
+  unblock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5          # for scripts/unblock.mjs, the tested predicate
+        with: { sparse-checkout: scripts/unblock.mjs, sparse-checkout-cone-mode: false }
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const open = await github.paginate(github.rest.issues.listForRepo,
+              { owner, repo, state: 'open', per_page: 100 });
+            const closedNow = context.eventName === 'issues' ? context.payload.issue.number : null;
+            const { staleBlocked } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/unblock.mjs`);
+            const stale = staleBlocked(open, closedNow);
+            for (const issue_number of stale) {
+              try {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number, name: 'blocked' });
+                core.notice(`#${issue_number}: every named blocker is closed, so the blocked label is off`);
+              } catch (e) {
+                if (e.status !== 404) throw e;   // already removed by someone else: nothing to do
+              }
+            }
+            core.info(`${open.length} open issues and pull requests read; ${stale.length} unblocked.`);
