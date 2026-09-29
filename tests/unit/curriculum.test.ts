@@ -6,7 +6,12 @@ import type { Topic } from '../../src/curriculum';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
 import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID, EVERYDAY, gapLetters, gapDecoys, Y1_CEW, Y2_CEW, turnEnd, coinLabel, numQ, SHAPES_2D, SHAPES_3D, wideFor, wordQ, measureCompare } from '../../src/curriculum/util';
 import { R_LETTERS_P2, R_LETTERS_ALL, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/reception';
-import { TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES } from '../../src/curriculum/year2';
+import {
+  TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES,
+  y2PlaceValue, y2Compare, y2Skip, y2Add, y2Sub, y2Three, y2Inverse, y2Tables, y2OddEven, y2Fractions, y2Money, y2Time, y2Words, y2Order, y2Line,
+  y2Shapes, y2Symmetry, y2Patterns, y2Position, y2Length, y2Mass, y2Capacity, y2Temp, y2Duration, y2Balance, y2Stats, y2Spelling, y2Contractions,
+  y2Suffix, y2SuffixRoot, y2Homophones, y2WordClass, y2SentenceType, y2Tense, y2Punct, y2Sentence, y2Trace,
+} from '../../src/curriculum/year2';
 import type { SentenceType } from '../../src/curriculum/year2';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
@@ -79,6 +84,28 @@ describe('topic registry', () => {
       'y2-stats', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-suffix-root', 'y2-homophones', 'y2-wordclass',
       'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-trace',
     ]);
+  });
+
+  // #1320: five of these topics have no dedicated content test, only the generic structural loop below (answer
+  // in options, no duplicate options, in-range) — which a `gen:` swap between two similarly-shaped topics can
+  // pass regardless of which generator actually ran. #1320 named those five; every other row is just as
+  // exposed to the same swap, and every generator this file needs is already imported above for other tests
+  // (or importable at the same cost), so this pins the whole registry rather than only the instances named —
+  // an independent id → gen listing that must agree with `year2-topics.ts`'s own wiring, the same shape the
+  // id-order test above already uses for ids.
+  it('every YEAR2_TOPICS row wires its own generator, not a swapped one (#1320)', () => {
+    const EXPECTED: Record<string, Topic['gen']> = {
+      'y2-pv': y2PlaceValue, 'y2-compare': y2Compare, 'y2-skip': y2Skip, 'y2-add': y2Add, 'y2-sub': y2Sub,
+      'y2-three': y2Three, 'y2-inverse': y2Inverse, 'y2-tables': y2Tables, 'y2-oddeven': y2OddEven, 'y2-fractions': y2Fractions,
+      'y2-money': y2Money, 'y2-time': y2Time, 'y2-words': y2Words, 'y2-order': y2Order, 'y2-line': y2Line,
+      'y2-shapes': y2Shapes, 'y2-symmetry': y2Symmetry, 'y2-patterns': y2Patterns, 'y2-position': y2Position, 'y2-length': y2Length,
+      'y2-mass': y2Mass, 'y2-capacity': y2Capacity, 'y2-temp': y2Temp, 'y2-duration': y2Duration, 'y2-balance': y2Balance,
+      'y2-stats': y2Stats, 'y2-spelling': y2Spelling, 'y2-contractions': y2Contractions, 'y2-suffix': y2Suffix, 'y2-suffix-root': y2SuffixRoot,
+      'y2-homophones': y2Homophones, 'y2-wordclass': y2WordClass, 'y2-sentencetype': y2SentenceType, 'y2-tense': y2Tense, 'y2-punct': y2Punct,
+      'y2-sentence': y2Sentence, 'y2-trace': y2Trace,
+    };
+    expect(Object.keys(EXPECTED).sort()).toEqual(YEAR2_TOPICS.map(t => t.id).sort());   // this listing itself stays complete
+    for (const t of YEAR2_TOPICS) expect(t.gen, t.id).toBe(EXPECTED[t.id]);
   });
 });
 
