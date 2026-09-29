@@ -247,6 +247,17 @@ describe('reduced motion thins bursts and drops wake sparks (#900)', () => {
     expect(particlesOf(arena).filter(p => p.kind === 'dot' || p.kind === 'shard')).toHaveLength(18);   // still full
   });
 
+  // Every other "on" case above passes the `reducedMotion` option directly, which short-circuits the
+  // `matchMedia` read entirely (`arena.ts`'s `opts.reducedMotion ?? prefersReducedMotion(window)`) — so none
+  // of them would notice `prefersReducedMotion` silently always returning false. This is the one case that
+  // takes the real fallback path #900 also asks for: no option, `matchMedia` alone says reduce.
+  it('drives reduction through matchMedia alone, with no explicit option (#900)', () => {
+    g.window = { addEventListener: () => {}, removeEventListener: () => {}, devicePixelRatio: 1, matchMedia: () => ({ matches: true }) };
+    const arena = newArena();
+    arena.burst(10, 10, '#fff');
+    expect(particlesOf(arena).filter(p => p.kind === 'dot' || p.kind === 'shard')).toHaveLength(9);
+  });
+
   it('with reduced motion on, a trail move adds no wake sparks', () => {
     const arena = strokeOf(newArena({ reducedMotion: true, fx: 'fire' }));
     arena.onDown(pointerEvent(10, 500));
@@ -259,5 +270,29 @@ describe('reduced motion thins bursts and drops wake sparks (#900)', () => {
     arena.onDown(pointerEvent(10, 500));
     for (let i = 0; i < 6; i++) arena.onMove(pointerEvent(10 + i * 10, 500 - i * 10));
     expect(particlesOf(arena as unknown as Arena).some(p => p.kind === 'ember')).toBe(true);
+  });
+
+  // The projectile wake (`update()`'s own `shots` loop) is a second, separate call site from the trail wake
+  // above, gated the same one-line way — untested so far, and it's half of what #900 changed at the per-frame
+  // layer. Pushed directly into the private `shots` array and driven through two `update()` calls: the first
+  // takes `emit` from 0 to 1 (odd, no spark), the second from 1 to 2 (even, a spark would fire) — the same
+  // `++s.emit % 2 === 0` cadence `arena.ts` already uses for the trail wake.
+  const shotAt = (arena: Arena) => (arena as unknown as { shots: { target: unknown; x0: number; y0: number; x: number; y: number; t: number; fx: string; emit: number }[]; update: (dt: number, now: number) => void });
+  const pushShot = (arena: Arena, fx = 'fire') => {
+    const a = shotAt(arena);
+    a.shots.push({ target: { x: 50, y: 50, color: '#fff', dead: false }, x0: 10, y0: 500, x: 10, y: 500, t: 0, fx, emit: 0 });
+    return a;
+  };
+
+  it('with reduced motion on, a thrown projectile leaves no wake sparks', () => {
+    const a = pushShot(newArena({ reducedMotion: true, fx: 'fire' }));
+    a.update(0.01, 1000); a.update(0.01, 1000);
+    expect(particlesOf(a as unknown as Arena).some(p => p.kind === 'ember')).toBe(false);
+  });
+
+  it('with reduced motion off, a thrown projectile leaves wake sparks', () => {
+    const a = pushShot(newArena({ fx: 'fire' }));
+    a.update(0.01, 1000); a.update(0.01, 1000);
+    expect(particlesOf(a as unknown as Arena).some(p => p.kind === 'ember')).toBe(true);
   });
 });
