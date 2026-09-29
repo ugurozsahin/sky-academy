@@ -1843,6 +1843,24 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction(() => window.__sna.state().index === 1);
   });
 
+  test('tracing feedback is spoken as well as toasted when read-aloud is on (#895)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-trace');
+    await page.click('#tcheck');                                       // nothing traced yet
+    await expect(page.locator('.toast.bad')).toContainText('Keep tracing');
+    await expect.poll(() => page.evaluate(() => window.__spoken)).toContain('Keep tracing, cover the whole letter');
+  });
+
+  test('nothing is spoken for tracing feedback when read-aloud is off (#895)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page, 'volt', 'Ada', { speech: false });
+    await startTopic(page, 'reception', 'r-trace');
+    await page.click('#tcheck');
+    await expect(page.locator('.toast.bad')).toContainText('Keep tracing');
+    expect(await page.evaluate(() => window.__spoken)).toEqual([]);
+  });
+
   test('word tracing: 2 of 3 letters is not enough, every letter must be covered', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-trace');
