@@ -2916,4 +2916,37 @@ describe('save format v5 (#903)', () => {
     expect(m.slips[0].topic.length).toBe(200);
     expect(m.log[0].topics[0].length).toBe(200);
   });
+
+  // Round 2 review finding: sanitizeSlips/sanitizeLog spread the input object, so an unknown extra key rode
+  // through the clamp completely unbounded — the exact Restore-paste vector MAX_FIELD_LEN exists to close.
+  it('slips: an unknown extra key on a well-formed row is stripped, not carried through unbounded', () => {
+    const evil = 'x'.repeat(5000);
+    const m = migrate({ v: 4, slips: [{ ...slip(), evil }] });
+    expect(m.slips[0]).toEqual(slip());
+    expect((m.slips[0] as unknown as Record<string, unknown>).evil).toBeUndefined();
+  });
+
+  it('log: an unknown extra key on a well-formed day is stripped, not carried through unbounded', () => {
+    const evil = 'y'.repeat(5000);
+    const m = migrate({ v: 4, log: [{ ...logDay(), evil }] });
+    expect(m.log[0]).toEqual(logDay());
+    expect((m.log[0] as unknown as Record<string, unknown>).evil).toBeUndefined();
+  });
+
+  // Round 2 review finding: only each topic string was capped in length — the array itself had no length
+  // cap, so one log day could still balloon to megabytes via tens of thousands of (individually short) topics.
+  it('log: a topics array over 50 entries is capped to the first 50, each still clamped', () => {
+    const long = 'w'.repeat(5000);
+    const topics = Array.from({ length: 200 }, (_, i) => (i === 0 ? long : `t${i}`));
+    const m = migrate({ v: 4, log: [logDay({ topics })] });
+    expect(m.log[0].topics.length).toBe(50);
+    expect(m.log[0].topics[0]).toBe(long.slice(0, 200));
+    expect(m.log[0].topics[49]).toBe('t49');
+  });
+
+  it('a save already at v5 with an oversized topics array is capped on every load, not only on the v4 → v5 hop', () => {
+    const topics = Array.from({ length: 200 }, (_, i) => `t${i}`);
+    const m = migrate({ v: SAVE_VERSION, log: [logDay({ topics })] });
+    expect(m.log[0].topics.length).toBe(50);
+  });
 });

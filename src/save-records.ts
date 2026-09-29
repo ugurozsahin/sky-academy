@@ -24,6 +24,14 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 const MAX_FIELD_LEN = 200;
 const clampStr = (s: string): string => s.slice(0, MAX_FIELD_LEN);
 
+/**
+ * Round 2 review: a topics array has no cap of its own — 50,000 topic strings survived `sanitizeLog`
+ * with every one individually clamped to `MAX_FIELD_LEN`, so the array's own length was the unbounded
+ * dimension left open. A day cannot really hold more distinct topics than the curriculum has, so this is
+ * generous headroom, not a tight fit to today's registry size.
+ */
+const MAX_TOPICS_PER_DAY = 50;
+
 /** One wrong answer logged for the parent view (#938 is the reader; #903 adds only the format). */
 export interface Slip { topic: string; prompt: string; answer: string; picked: string; at: string }
 const SLIP_FIELDS: Fields<Slip> = { topic: str, prompt: str, answer: str, picked: str, at: isoDay };
@@ -33,11 +41,14 @@ const isSlip = (v: unknown): v is Slip => isRecord(v) && checkFields(SLIP_FIELDS
  * below, which dedupes and re-sorts because a log day is keyed by date and a slip is not. #938, the eventual
  * writer, is what has to keep that order true on every write; this only drops what cannot be a slip at all,
  * clamps its four free-text fields to `MAX_FIELD_LEN`, and caps what is left to the most recent 20.
+ * Round 2 review: rebuilds the object from the five known fields rather than spreading the input, matching
+ * `sanitizeSettings` below — a spread re-admits any extra key a Restore paste carries, unbounded, since
+ * `isSlip` only checks the fields it knows about and never rejects an object for having more.
  */
 export const sanitizeSlips = (v: unknown): Slip[] =>
   (Array.isArray(v) ? v.filter(isSlip) : [])
     .slice(0, 20)
-    .map(s => ({ ...s, topic: clampStr(s.topic), prompt: clampStr(s.prompt), answer: clampStr(s.answer), picked: clampStr(s.picked) }));
+    .map(s => ({ topic: clampStr(s.topic), prompt: clampStr(s.prompt), answer: clampStr(s.answer), picked: clampStr(s.picked), at: s.at }));
 
 /** One day's play, for the parent view (#939 is the reader; #903 adds only the format). */
 export interface LogDay { date: string; games: number; q: number; ok: number; topics: string[] }
@@ -46,7 +57,10 @@ const isLogDay = (v: unknown): v is LogDay => isRecord(v) && checkFields(LOG_FIE
 /**
  * Stored oldest first, one entry per date — a repeated date keeps the entry that comes later in the input,
  * matching a day that was logged and then re-logged rather than two separate days — kept to the 30 most
- * recent dates (#903's table), each topic clamped to `MAX_FIELD_LEN`.
+ * recent dates (#903's table), each topic clamped to `MAX_FIELD_LEN` and the topics array itself capped to
+ * `MAX_TOPICS_PER_DAY`. Round 2 review: rebuilds the object from the five known fields rather than spreading
+ * the input, matching `sanitizeSettings` below — the same unknown-key gap `sanitizeSlips` above closes the
+ * same way.
  */
 export function sanitizeLog(v: unknown): LogDay[] {
   if (!Array.isArray(v)) return [];
@@ -55,7 +69,13 @@ export function sanitizeLog(v: unknown): LogDay[] {
   return [...byDate.values()]
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
     .slice(-30)
-    .map(d => ({ ...d, topics: d.topics.map(clampStr) }));
+    .map(d => ({
+      date: d.date,
+      games: d.games,
+      q: d.q,
+      ok: d.ok,
+      topics: d.topics.slice(0, MAX_TOPICS_PER_DAY).map(clampStr),
+    }));
 }
 
 /** Device-wide play settings kept in the save rather than `sna:three` (#940 keeps that one separate). */
