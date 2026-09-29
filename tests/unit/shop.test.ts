@@ -50,8 +50,8 @@ describe('coin shop rules (#6)', () => {
   // #1295: a title is text on the "Who is playing?" card only — the topbar chip is full to the pixel (PR #380)
   // and certificate.ts is a fixed canvas look, so neither ever reads the equipped title.
   it('a Dojo title never reaches the topbar chip or a certificate', () => {
-    expect(code(SOURCES['/src/ui/home.ts'] ?? '')).not.toMatch(/equipped\.title/);
-    expect(code(SOURCES['/src/ui/certificate.ts'] ?? '')).not.toMatch(/equipped\.title/);
+    expect(code(SOURCES['/src/ui/home.ts'])).not.toMatch(/equipped\.title/);
+    expect(code(SOURCES['/src/ui/certificate.ts'])).not.toMatch(/equipped\.title/);
   });
   it('balance is lifetime coins minus spent, never negative', () => {
     expect(balance(w(200, { spent: 150 }))).toBe(50);
