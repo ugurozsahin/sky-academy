@@ -3,6 +3,7 @@ import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '..
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
+import { settingsHTML } from '../../src/ui/parents-settings';
 import { freshDojo } from '../../src/game/dojo';
 
 // minimal localStorage shim for node, same as tests/unit/storage.test.ts
@@ -278,5 +279,15 @@ describe('the not-saving sentence names everything a refused write can lose', ()
     expect(isWriteFailing(), 'a read-only save is never an attempted write, so this never latches from it').toBe(false);
     expect(isReadOnlySave(), 'and the read-only latch is untouched by it').toBe(true);
     expect(saveNote(), 'saveNote still reports the read-only reason').toContain('newer version of the app');
+  });
+});
+
+describe('settingsHTML marks the stored 3-D value as checked (#904)', () => {
+  it.each(['auto', 'on', 'off'] as const)('marks %s "on" and every other option off', (stored) => {
+    const html = settingsHTML(stored);
+    for (const v of ['auto', 'on', 'off'] as const) {
+      const btn = new RegExp(`<button class="tab${v === stored ? ' on' : ''}" data-three="${v}" role="radio" aria-checked="${v === stored}">`);
+      expect(html, `${v} must ${v === stored ? '' : 'not '}be marked checked`).toMatch(btn);
+    }
   });
 });
