@@ -8,7 +8,7 @@ import { AVATARS, VILLAIN } from './avatars';
 import { DUEL_OUTCOMES, type DuelOutcome } from './game/duel';
 // Field-check infrastructure (Fields/checkFields/str/fin/strOrNull/count) and the v5 save fields (#903) live in
 // save-records.ts, which storage.ts is too close to its #714 ratchet cap to hold itself.
-import { checkFields, count, fin, str, strOrNull, toV5, type Fields, type LogDay, type Settings, type Slip } from './save-records';
+import { checkFields, count, fin, str, strOrNull, sanitizeV5Fields, toV5, type Fields, type LogDay, type Settings, type Slip } from './save-records';
 /**
  * A tally of questions answered for one topic — `hits` right of `tries` attempted — while it is still being
  * built, before `recordAccuracy()` folds it into `TopicProgress`'s own optional `hits?`/`tries?` below (the
@@ -1029,6 +1029,9 @@ function sanitizeTypes(s: RawSave): RawSave {
   for (const k of ['stickers', 'owned', 'certs', 'duels'] as const) {
     if (k in clean && !Array.isArray(clean[k])) delete clean[k];
   }
+  // #903 review: every v5 field's own front-door guard, present-only like the array check just above — see
+  // save-records.ts's sanitizeV5Fields for why `toV5` alone was not enough.
+  sanitizeV5Fields(clean);
   // #795: dropping a corrupted `spent` to 0 the way every other field falls back to DEFAULT would silently inflate the shop balance (`coins − spent`) — clamp it to (already-sanitized) `coins` instead, the worst-case assumption, and warn on both rejections so a corruption event leaves a trace.
   if ('coins' in clean && (typeof clean.coins !== 'number' || !Number.isFinite(clean.coins) || clean.coins < 0)) { console.warn(`sanitizeTypes: invalid coins (${JSON.stringify(clean.coins)}) — reset`); delete clean.coins; }
   if ('spent' in clean && (typeof clean.spent !== 'number' || !Number.isFinite(clean.spent) || clean.spent < 0)) { const cap = typeof clean.coins === 'number' && Number.isFinite(clean.coins) ? clean.coins : 0; console.warn(`sanitizeTypes: invalid spent (${JSON.stringify(clean.spent)}) — clamped to ${cap}`); clean.spent = cap; }

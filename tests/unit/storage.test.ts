@@ -2856,4 +2856,30 @@ describe('save format v5 (#903)', () => {
     expect(isFutureSave({ v: SAVE_VERSION + 1 })).toBe(true);
     expect(importSave(JSON.stringify({ v: SAVE_VERSION + 1, name: 'Future' }))).toBe(false);
   });
+
+  // Review finding: `toV5` (the MIGRATIONS[4] step above) only ever runs while walking up from a version
+  // *below* 5, so a save already AT v5 — the ordinary, permanent state once a device has migrated once —
+  // used to carry a hand-edited or Restore-pasted malformed field straight through unsanitized, the same gap
+  // #363/#795/#171 (above, in "a corrupted save is normalised at the door") each closed for dojo/spent/name.
+  // Every case here starts from `v: SAVE_VERSION` — never `v: 4` — so the migration ladder plays no part.
+  it('a save already at v5 with a malformed field is sanitized on every load, not only on the v4 → v5 hop', () => {
+    expect(migrate({ v: SAVE_VERSION, slips: 'not an array' }).slips).toEqual([]);
+    expect(migrate({ v: SAVE_VERSION, log: 'not an array' }).log).toEqual([]);
+    expect(migrate({ v: SAVE_VERSION, settings: 'nope' }).settings).toEqual({ slow: false });
+    expect(migrate({ v: SAVE_VERSION, streak: { last: '2026-09-28', days: 3, rest: 12345 } }).streak)
+      .toEqual({ last: '2026-09-28', days: 3 });
+    expect(migrate({
+      v: SAVE_VERSION,
+      progress: { 'y1-add': { stars: 1, best: 1, plays: 1, last: 123, sprint: -99, crown: 'nope' } },
+    }).progress['y1-add']).toEqual({ stars: 1, best: 1, plays: 1 });
+  });
+
+  it('a v5 Restore paste with a malformed field is sanitized, never lands in the live save as pasted', () => {
+    reset();
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION, coins: 3, slips: 'not an array', settings: 42 }))).toBe(true);
+    const d = load();
+    expect(d.slips).toEqual([]);
+    expect(d.settings).toEqual({ slow: false });
+    expect(d.coins).toBe(3);
+  });
 });
