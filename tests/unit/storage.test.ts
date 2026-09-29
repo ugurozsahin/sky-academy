@@ -2883,6 +2883,21 @@ describe('save format v5 (#903)', () => {
     expect(d.coins).toBe(3);
   });
 
+  // Round 3 review's own reproduction, on a save already at v5 — toV5 plays no part, so this is the front
+  // door (sanitizeV5Fields, run unconditionally by sanitizeTypes) rather than the one-time migration step.
+  it('a v5 Restore paste with an unknown key on streak or a progress entry is stripped, never lands unbounded', () => {
+    reset();
+    const evilStreak = 'x'.repeat(10000); const evilProgress = 'y'.repeat(50000);
+    expect(importSave(JSON.stringify({
+      v: SAVE_VERSION,
+      streak: { last: '2026-09-28', days: 3, evil: evilStreak },
+      progress: { 'y1-add': { stars: 1, best: 1, plays: 1, evil: evilProgress } },
+    }))).toBe(true);
+    const d = load();
+    expect(d.streak).toEqual({ last: '2026-09-28', days: 3 });
+    expect(d.progress['y1-add']).toEqual({ stars: 1, best: 1, plays: 1 });
+  });
+
   // Review finding: #903's Proposed fix asks every stored string to be cut to at most 200 characters, as
   // `cleanName` bounds a name — the type guards (`str`/`isoDay`) only ever checked *type*, never length, so an
   // arbitrary Restore paste carried an unbounded string straight through.
@@ -2931,6 +2946,22 @@ describe('save format v5 (#903)', () => {
     const m = migrate({ v: 4, log: [{ ...logDay(), evil }] });
     expect(m.log[0]).toEqual(logDay());
     expect((m.log[0] as unknown as Record<string, unknown>).evil).toBeUndefined();
+  });
+
+  // Round 3 review: sanitizeStreakRest/sanitizeProgressExtras still spread their input, so the same
+  // unknown-key vector round 2 closed for slips/log/settings survived on these two siblings.
+  it('streak: an unknown extra key is stripped, not carried through unbounded', () => {
+    const evil = 'x'.repeat(10000);
+    const m = migrate({ v: 4, streak: { last: '2026-09-28', days: 3, rest: '2026-09-27', evil } });
+    expect(m.streak).toEqual({ last: '2026-09-28', days: 3, rest: '2026-09-27' });
+    expect((m.streak as unknown as Record<string, unknown>).evil).toBeUndefined();
+  });
+
+  it('progress extras: an unknown extra key on a topic entry is stripped, not carried through unbounded', () => {
+    const evil = 'y'.repeat(50000);
+    const m = migrate({ v: 4, progress: { 'y1-add': { stars: 1, best: 10, plays: 2, evil } } });
+    expect(m.progress['y1-add']).toEqual({ stars: 1, best: 10, plays: 2 });
+    expect((m.progress['y1-add'] as unknown as Record<string, unknown>).evil).toBeUndefined();
   });
 
   // Round 2 review finding: only each topic string was capped in length — the array itself had no length

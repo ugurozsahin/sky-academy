@@ -84,23 +84,35 @@ export const DEFAULT_SETTINGS: Settings = { slow: false };
 export const sanitizeSettings = (v: unknown): Settings =>
   isRecord(v) && typeof v.slow === 'boolean' ? { slow: v.slow } : { ...DEFAULT_SETTINGS };
 
-/** Drops `rest` unless it is a stored day (#950 reads it as the Daily Dojo's rest-day marker). */
-export function sanitizeStreakRest<T extends { rest?: unknown }>(streak: T): T {
-  if (!('rest' in streak) || isoDay(streak.rest)) return streak;
-  const { rest: _rest, ...clean } = streak;
-  return clean as T;
+/**
+ * Drops `rest` unless it is a stored day (#950 reads it as the Daily Dojo's rest-day marker).
+ * Round 3 review: rebuilds from `streak`'s two known fields (`last`, `days`, left as whatever type they
+ * already were — this function has never validated them, only `rest`) rather than spreading the input, the
+ * same unknown-key gap round 2 closed for `sanitizeSlips`/`sanitizeLog`/`sanitizeSettings` but left open here
+ * and in `sanitizeProgressExtras` below.
+ */
+export function sanitizeStreakRest(streak: Record<string, unknown>): Record<string, unknown> {
+  const clean: Record<string, unknown> = { last: streak.last, days: streak.days };
+  if (isoDay(streak.rest)) clean.rest = streak.rest;
+  return clean;
 }
 
-/** Drops each of the three progress extras unless it is the shape its own future ticket needs (#903's table):
- *  `last` (#936), `sprint` (#911), `crown` (#932). */
+/**
+ * Drops each of the three progress extras unless it is the shape its own future ticket needs (#903's table):
+ * `last` (#936), `sprint` (#911), `crown` (#932). Round 3 review: rebuilds each entry from `TopicProgress`'s
+ * known fields rather than spreading `v` — `stars`/`best`/`plays`/`hits`/`tries` pass through unvalidated, as
+ * before (this function has never type-checked them), but an unrelated key can no longer ride along unbounded.
+ */
 export function sanitizeProgressExtras(progress: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [id, v] of Object.entries(progress)) {
     if (!isRecord(v)) { out[id] = v; continue; }
-    const entry = { ...v };
-    if ('last' in entry && !isoDay(entry.last)) delete entry.last;
-    if ('sprint' in entry && !(fin(entry.sprint) && (entry.sprint as number) >= 0)) delete entry.sprint;
-    if ('crown' in entry && entry.crown !== true) delete entry.crown;
+    const entry: Record<string, unknown> = { stars: v.stars, best: v.best, plays: v.plays };
+    if ('hits' in v) entry.hits = v.hits;
+    if ('tries' in v) entry.tries = v.tries;
+    if (isoDay(v.last)) entry.last = v.last;
+    if (fin(v.sprint) && (v.sprint as number) >= 0) entry.sprint = v.sprint;
+    if (v.crown === true) entry.crown = true;
     out[id] = entry;
   }
   return out;
@@ -120,7 +132,7 @@ export function sanitizeV5Fields(clean: Record<string, unknown>): void {
   if ('slips' in clean) clean.slips = sanitizeSlips(clean.slips);
   if ('log' in clean) clean.log = sanitizeLog(clean.log);
   if ('settings' in clean) clean.settings = sanitizeSettings(clean.settings);
-  if (isRecord(clean.streak)) clean.streak = sanitizeStreakRest(clean.streak as { rest?: unknown });
+  if (isRecord(clean.streak)) clean.streak = sanitizeStreakRest(clean.streak as Record<string, unknown>);
   if (isRecord(clean.progress)) clean.progress = sanitizeProgressExtras(clean.progress as Record<string, unknown>);
 }
 
@@ -137,7 +149,7 @@ export function toV5(s: Record<string, unknown>): Record<string, unknown> {
   // override that default with a real `streak: undefined` property, which is what sanitizeTypes already
   // deletes a wrong-typed streak/progress down to.
   const out: Record<string, unknown> = { ...s, slips: sanitizeSlips(s.slips), log: sanitizeLog(s.log), settings: sanitizeSettings(s.settings) };
-  if (isRecord(s.streak)) out.streak = sanitizeStreakRest(s.streak as { rest?: unknown });
+  if (isRecord(s.streak)) out.streak = sanitizeStreakRest(s.streak as Record<string, unknown>);
   if (isRecord(s.progress)) out.progress = sanitizeProgressExtras(s.progress);
   return out;
 }
