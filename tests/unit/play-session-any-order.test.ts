@@ -12,4 +12,13 @@ describe('waveOptsFor for an any-order card (#919)', () => {
     const sequence = ['2', '4', '6', '8'];
     expect(waveOptsFor(q({ sequence, anyOrder: true }), { labels: sequence, speed: 1 }, ['2', '8']).ordered).toEqual(['2', '8']);
   });
+
+  // #919 round 2 review: the fix for duel.ts's mistranslated `[]` was making `remaining` default to the
+  // whole sequence when omitted — but nothing pinned that default itself. Mutation-tested by the reviewer
+  // (temporarily `remaining ?? []`): the full suite still passed, since every other sequence-question test
+  // passes an explicit array. This is the one that would have caught it.
+  it('omitting remaining for a sequence question defaults to the whole sequence, not nothing left', () => {
+    const sequence = ['one', 'two', 'three'];
+    expect(waveOptsFor(q({ sequence }), { labels: sequence, speed: 1 }).ordered).toEqual(sequence);
+  });
 });
