@@ -242,8 +242,10 @@ describe('guard rails', () => {
   // #881: `@capacitor-community/text-to-speech` is the same exception again — the Android WebView has no
   // `speechSynthesis` (crbug 40417848), so `cap sync` needs the plugin's native code to give read-aloud a
   // device to speak through there. Pinned at an exact version (`npm i -D -E`, not `^`), per the issue.
+  // #1381 (owner, in session, 2026-09-29): `eslint` and `typescript-eslint` run two rules only, `complexity` and
+  // `max-lines-per-function` (`eslint.config.js`); exact versions, because `lint-ratchet.test.ts` reads rule messages.
   it('dependencies match the allowlist below (CLAUDE.md explains the rule)', () => {
-    const allowed = ['@capacitor-community/text-to-speech', '@capacitor/android', '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', '@types/three', 'typescript', 'vite', 'vitest'];
+    const allowed = ['@capacitor-community/text-to-speech', '@capacitor/android', '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', '@types/three', 'eslint', 'typescript', 'typescript-eslint', 'vite', 'vitest'];
     expect(Object.keys((pkg as { dependencies?: object }).dependencies ?? {})).toEqual(['three']);   // #684: the one thing that ships to the browser beside our own code
     expect(Object.keys((pkg as { devDependencies?: object }).devDependencies ?? {}).sort()).toEqual([...allowed].sort());
   });
