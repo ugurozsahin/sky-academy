@@ -2742,3 +2742,283 @@ describe('a finished game is persisted in one write, or not at all (#365)', () =
     warn.mockRestore();
   });
 });
+
+// #903: the v4 → v5 save format change. No reader exists yet for any of these fields (that is each named
+// ticket's own job) — everything here goes through migrate()/load()/save()/exportSave()/importSave(), the
+// only doors a value can enter or leave the save through today.
+describe('save format v5 (#903)', () => {
+  beforeEach(() => reset());
+
+  const slip = (p: Partial<Record<string, unknown>> = {}) => ({ topic: 'y1-add', prompt: '2 + 2', answer: '4', picked: '5', at: '2026-09-28', ...p });
+  const day = (offset: number) => new Date(Date.UTC(2026, 7, 1) + offset * 86_400_000).toISOString().slice(0, 10);
+  const logDay = (p: Partial<Record<string, unknown>> = {}) => ({ date: day(19), games: 3, q: 12, ok: 9, topics: ['y1-add'], ...p });
+
+  it('a v4 save migrates with slips, log and settings defaulted, losing nothing it already had', () => {
+    const m = migrate({ v: 4, name: 'Mo', coins: 12, progress: { 'y1-add': { stars: 2, best: 40, plays: 3 } } });
+    expect(m.v).toBe(SAVE_VERSION);
+    expect(m.slips).toEqual([]);
+    expect(m.log).toEqual([]);
+    expect(m.settings).toEqual({ slow: false });
+    expect(m.name).toBe('Mo');
+    expect(m.coins).toBe(12);
+    expect(m.progress['y1-add']).toEqual({ stars: 2, best: 40, plays: 3 });
+  });
+
+  it('the e2e seed at v: 1 also lands on the v5 defaults, walking every step in between', () => {
+    const m = migrate({ v: 1, name: 'Seed' });
+    expect(m.slips).toEqual([]); expect(m.log).toEqual([]); expect(m.settings).toEqual({ slow: false });
+  });
+
+  it('slips: well-formed rows survive migration in their stored, newest-first order', () => {
+    const rows = [slip({ at: '2026-09-28' }), slip({ at: '2026-09-27' })];
+    expect(migrate({ v: 4, slips: rows }).slips).toEqual(rows);
+  });
+
+  it('slips: a row missing a field, with a non-ISO `at`, or not an object at all is dropped, never thrown on', () => {
+    const bad = [slip({ answer: undefined }), slip({ at: 'yesterday' }), 'junk', 42, null];
+    expect(migrate({ v: 4, slips: [...bad, slip()] }).slips).toEqual([slip()]);
+    expect(migrate({ v: 4, slips: 'not an array' }).slips).toEqual([]);
+  });
+
+  it('slips: more than 20 well-formed rows are capped on migration, keeping the first (newest) 20', () => {
+    const rows = Array.from({ length: 25 }, (_, i) => slip({ at: day(24 - i) }));
+    const m = migrate({ v: 4, slips: rows });
+    expect(m.slips.length).toBe(20);
+    expect(m.slips).toEqual(rows.slice(0, 20));
+  });
+
+  it('log: well-formed days survive migration, resorted ascending by date', () => {
+    const m = migrate({ v: 4, log: [logDay({ date: day(2) }), logDay({ date: day(0) })] });
+    expect(m.log.map((d: { date: string }) => d.date)).toEqual([day(0), day(2)]);
+  });
+
+  it('log: a day with a non-integer or negative count, a non-string-array topics, or a bad date is dropped', () => {
+    const bad = [logDay({ games: 1.5 }), logDay({ ok: -1 }), logDay({ topics: 'y1-add' }), logDay({ date: 'today' })];
+    expect(migrate({ v: 4, log: [...bad, logDay()] }).log).toEqual([logDay()]);
+  });
+
+  it('log: a repeated date keeps the entry that comes later in the input', () => {
+    const dup = [logDay({ games: 1 }), logDay({ games: 9 })];   // same date, only games differs
+    expect(migrate({ v: 4, log: dup }).log).toEqual([logDay({ games: 9 })]);
+  });
+
+  it('log: more than 30 days are capped on migration to the most recent 30, oldest dropped, still ascending', () => {
+    const rows = Array.from({ length: 35 }, (_, i) => logDay({ date: day(i) }));
+    const m = migrate({ v: 4, log: rows });
+    expect(m.log.length).toBe(30);
+    expect(m.log[0].date).toBe(day(5));     // the oldest 5 (day 0-4) are dropped
+    expect(m.log[29].date).toBe(day(34));   // still ascending: the newest day is last
+  });
+
+  it('settings: a wrong-typed or missing `slow` resets to the default rather than throwing', () => {
+    expect(migrate({ v: 4, settings: { slow: 'yes' } }).settings).toEqual({ slow: false });
+    expect(migrate({ v: 4, settings: 'nope' }).settings).toEqual({ slow: false });
+    expect(migrate({ v: 4 }).settings).toEqual({ slow: false });
+    expect(migrate({ v: 4, settings: { slow: true } }).settings).toEqual({ slow: true });
+  });
+
+  it('streak.rest: dropped unless it is a stored ISO day; the rest of streak is untouched either way', () => {
+    expect(migrate({ v: 4, streak: { last: '2026-09-28', days: 3, rest: 123 } }).streak).toEqual({ last: '2026-09-28', days: 3 });
+    expect(migrate({ v: 4, streak: { last: '2026-09-28', days: 3, rest: '2026-09-27' } }).streak)
+      .toEqual({ last: '2026-09-28', days: 3, rest: '2026-09-27' });
+  });
+
+  it('progress extras: last/sprint/crown are each dropped alone when wrong-typed, kept when valid', () => {
+    const m = migrate({
+      v: 4,
+      progress: {
+        'y1-add': { stars: 1, best: 10, plays: 2, last: 'not-a-day', sprint: -1, crown: 'yes' },
+        'y1-sub': { stars: 2, best: 20, plays: 3, last: '2026-09-28', sprint: 40, crown: true },
+      },
+    });
+    expect(m.progress['y1-add']).toEqual({ stars: 1, best: 10, plays: 2 });
+    expect(m.progress['y1-sub']).toEqual({ stars: 2, best: 20, plays: 3, last: '2026-09-28', sprint: 40, crown: true });
+  });
+
+  it('export then import round-trips every new field unchanged', () => {
+    save({
+      slips: [slip()], log: [logDay()], settings: { slow: true },
+      streak: { last: '2026-09-28', days: 4, rest: '2026-09-25' },
+      progress: { 'y1-add': { stars: 3, best: 50, plays: 5, last: '2026-09-28', sprint: 60, crown: true } },
+    });
+    const code = exportSave();
+    reset();
+    expect(importSave(code)).toBe(true);
+    const d = load();
+    expect(d.slips).toEqual([slip()]);
+    expect(d.log).toEqual([logDay()]);
+    expect(d.settings).toEqual({ slow: true });
+    expect(d.streak).toEqual({ last: '2026-09-28', days: 4, rest: '2026-09-25' });
+    expect(d.progress['y1-add']).toEqual({ stars: 3, best: 50, plays: 5, last: '2026-09-28', sprint: 60, crown: true });
+  });
+
+  it('a v6 blob (a future build) is still refused, exactly as before v5 existed', () => {
+    expect(isFutureSave({ v: SAVE_VERSION + 1 })).toBe(true);
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION + 1, name: 'Future' }))).toBe(false);
+  });
+
+  // Review finding: `toV5` (the MIGRATIONS[4] step above) only ever runs while walking up from a version
+  // *below* 5, so a save already AT v5 — the ordinary, permanent state once a device has migrated once —
+  // used to carry a hand-edited or Restore-pasted malformed field straight through unsanitized, the same gap
+  // #363/#795/#171 (above, in "a corrupted save is normalised at the door") each closed for dojo/spent/name.
+  // Every case here starts from `v: SAVE_VERSION` — never `v: 4` — so the migration ladder plays no part.
+  it('a save already at v5 with a malformed field is sanitized on every load, not only on the v4 → v5 hop', () => {
+    expect(migrate({ v: SAVE_VERSION, slips: 'not an array' }).slips).toEqual([]);
+    expect(migrate({ v: SAVE_VERSION, log: 'not an array' }).log).toEqual([]);
+    expect(migrate({ v: SAVE_VERSION, settings: 'nope' }).settings).toEqual({ slow: false });
+    expect(migrate({ v: SAVE_VERSION, streak: { last: '2026-09-28', days: 3, rest: 12345 } }).streak)
+      .toEqual({ last: '2026-09-28', days: 3 });
+    expect(migrate({
+      v: SAVE_VERSION,
+      progress: { 'y1-add': { stars: 1, best: 1, plays: 1, last: 123, sprint: -99, crown: 'nope' } },
+    }).progress['y1-add']).toEqual({ stars: 1, best: 1, plays: 1 });
+  });
+
+  it('a v5 Restore paste with a malformed field is sanitized, never lands in the live save as pasted', () => {
+    reset();
+    expect(importSave(JSON.stringify({ v: SAVE_VERSION, coins: 3, slips: 'not an array', settings: 42 }))).toBe(true);
+    const d = load();
+    expect(d.slips).toEqual([]);
+    expect(d.settings).toEqual({ slow: false });
+    expect(d.coins).toBe(3);
+  });
+
+  // Round 3 review's own reproduction, on a save already at v5 — toV5 plays no part, so this is the front
+  // door (sanitizeV5Fields, run unconditionally by sanitizeTypes) rather than the one-time migration step.
+  it('a v5 Restore paste with an unknown key on streak or a progress entry is stripped, never lands unbounded', () => {
+    reset();
+    const evilStreak = 'x'.repeat(10000); const evilProgress = 'y'.repeat(50000);
+    expect(importSave(JSON.stringify({
+      v: SAVE_VERSION,
+      streak: { last: '2026-09-28', days: 3, evil: evilStreak },
+      progress: { 'y1-add': { stars: 1, best: 1, plays: 1, evil: evilProgress } },
+    }))).toBe(true);
+    const d = load();
+    expect(d.streak).toEqual({ last: '2026-09-28', days: 3 });
+    expect(d.progress['y1-add']).toEqual({ stars: 1, best: 1, plays: 1 });
+  });
+
+  // Review finding: #903's Proposed fix asks every stored string to be cut to at most 200 characters, as
+  // `cleanName` bounds a name — the type guards (`str`/`isoDay`) only ever checked *type*, never length, so an
+  // arbitrary Restore paste carried an unbounded string straight through.
+  it('slips: each of the four free-text fields is cut to 200 characters, not dropped whole', () => {
+    const long = 'x'.repeat(5000);
+    const m = migrate({ v: 4, slips: [slip({ topic: long, prompt: long, answer: long, picked: long })] });
+    expect(m.slips.length).toBe(1);
+    for (const field of ['topic', 'prompt', 'answer', 'picked'] as const) expect(m.slips[0][field].length).toBe(200);
+    expect(m.slips[0].topic).toBe(long.slice(0, 200));
+    expect(m.slips[0].at).toBe('2026-09-28');   // the ISO day itself is never a free-text field
+  });
+
+  // pr-test-analyzer review: a 5000-char input cannot pin the boundary itself (it truncates the same way
+  // whether the cap is 199, 200 or 201) — this exercises the cap's own edge, both sides of it.
+  it('slips: exactly 200 characters survives untouched; 201 loses exactly one', () => {
+    const exact = 'a'.repeat(200);
+    const over = 'a'.repeat(201);
+    expect(migrate({ v: 4, slips: [slip({ topic: exact })] }).slips[0].topic).toBe(exact);
+    expect(migrate({ v: 4, slips: [slip({ topic: over })] }).slips[0].topic).toBe(exact);
+  });
+
+  it('log: each topic string is cut to 200 characters', () => {
+    const long = 'y'.repeat(5000);
+    const m = migrate({ v: 4, log: [logDay({ topics: [long, 'y1-sub'] })] });
+    expect(m.log[0].topics).toEqual([long.slice(0, 200), 'y1-sub']);
+  });
+
+  it('a save already at v5 with an over-length field is clamped on every load, not only on the v4 → v5 hop', () => {
+    const long = 'z'.repeat(5000);
+    const m = migrate({ v: SAVE_VERSION, slips: [slip({ topic: long })], log: [logDay({ topics: [long] })] });
+    expect(m.slips[0].topic.length).toBe(200);
+    expect(m.log[0].topics[0].length).toBe(200);
+  });
+
+  // Round 2 review finding: sanitizeSlips/sanitizeLog spread the input object, so an unknown extra key rode
+  // through the clamp completely unbounded — the exact Restore-paste vector MAX_FIELD_LEN exists to close.
+  it('slips: an unknown extra key on a well-formed row is stripped, not carried through unbounded', () => {
+    const evil = 'x'.repeat(5000);
+    const m = migrate({ v: 4, slips: [{ ...slip(), evil }] });
+    expect(m.slips[0]).toEqual(slip());
+    expect((m.slips[0] as unknown as Record<string, unknown>).evil).toBeUndefined();
+  });
+
+  it('log: an unknown extra key on a well-formed day is stripped, not carried through unbounded', () => {
+    const evil = 'y'.repeat(5000);
+    const m = migrate({ v: 4, log: [{ ...logDay(), evil }] });
+    expect(m.log[0]).toEqual(logDay());
+    expect((m.log[0] as unknown as Record<string, unknown>).evil).toBeUndefined();
+  });
+
+  // Round 3 review: sanitizeStreakRest/sanitizeProgressExtras still spread their input, so the same
+  // unknown-key vector round 2 closed for slips/log/settings survived on these two siblings.
+  it('streak: an unknown extra key is stripped, not carried through unbounded', () => {
+    const evil = 'x'.repeat(10000);
+    const m = migrate({ v: 4, streak: { last: '2026-09-28', days: 3, rest: '2026-09-27', evil } });
+    expect(m.streak).toEqual({ last: '2026-09-28', days: 3, rest: '2026-09-27' });
+    expect((m.streak as unknown as Record<string, unknown>).evil).toBeUndefined();
+  });
+
+  it('progress extras: an unknown extra key on a topic entry is stripped, not carried through unbounded', () => {
+    const evil = 'y'.repeat(50000);
+    const m = migrate({ v: 4, progress: { 'y1-add': { stars: 1, best: 10, plays: 2, evil } } });
+    expect(m.progress['y1-add']).toEqual({ stars: 1, best: 10, plays: 2 });
+    expect((m.progress['y1-add'] as unknown as Record<string, unknown>).evil).toBeUndefined();
+  });
+
+  // Round 2 review finding: only each topic string was capped in length — the array itself had no length
+  // cap, so one log day could still balloon to megabytes via tens of thousands of (individually short) topics.
+  it('log: a topics array over 50 entries is capped to the first 50, each still clamped', () => {
+    const long = 'w'.repeat(5000);
+    const topics = Array.from({ length: 200 }, (_, i) => (i === 0 ? long : `t${i}`));
+    const m = migrate({ v: 4, log: [logDay({ topics })] });
+    expect(m.log[0].topics.length).toBe(50);
+    expect(m.log[0].topics[0]).toBe(long.slice(0, 200));
+    expect(m.log[0].topics[49]).toBe('t49');
+  });
+
+  it('a save already at v5 with an oversized topics array is capped on every load, not only on the v4 → v5 hop', () => {
+    const topics = Array.from({ length: 200 }, (_, i) => `t${i}`);
+    const m = migrate({ v: SAVE_VERSION, log: [logDay({ topics })] });
+    expect(m.log[0].topics.length).toBe(50);
+  });
+
+  // Round 4 review: a progress entry keyed `__proto__` — a real own string key once JSON.parse has made one,
+  // as importSave() does — reassigned the sanitized map's own prototype instead of becoming an entry, since
+  // the map was built as a plain `{}`. Fixed by building the map with `Object.create(null)`: `__proto__`
+  // becomes an ordinary own key like any other rather than a prototype hijack, pinned two ways — the map's
+  // own prototype is untouched (`null`, never re-pointed at the pasted `{stars: 1}`), and the key survives as
+  // a normal, sanitized entry rather than vanishing into `out`'s prototype.
+  it('progress extras: a "__proto__" key becomes an ordinary entry, never the sanitized map\'s own prototype', () => {
+    const parsed = JSON.parse('{"__proto__": {"stars": 1, "best": 1, "plays": 1}}') as Record<string, unknown>;
+    const m = migrate({ v: SAVE_VERSION, progress: parsed });
+    expect(Object.getPrototypeOf(m.progress)).toBeNull();
+    expect(Object.keys(m.progress)).toEqual(['__proto__']);
+    expect(m.progress['__proto__']).toEqual({ stars: 1, best: 1, plays: 1 });
+  });
+
+  // Round 4 review: the progress map's own keys had no length cap, unlike every value field this file clamps
+  // — a 50,000-character id survived untouched. A legitimate topic id is always a short kebab string, so an
+  // over-length one can only be junk; dropped, not truncated (truncating risks colliding with a real id).
+  it('progress extras: an over-length topic id is dropped, not truncated or kept', () => {
+    const longId = 'x'.repeat(5000);
+    const m = migrate({ v: SAVE_VERSION, progress: { [longId]: { stars: 1, best: 1, plays: 1 }, 'y1-add': { stars: 2, best: 2, plays: 2 } } });
+    expect(Object.keys(m.progress)).toEqual(['y1-add']);
+  });
+
+  // Round 4 review: nothing capped how many keys a Restore paste could carry — 5,000 synthetic ids all
+  // survived. The registry holds 87 topics today; 500 is generous headroom, not a tight fit.
+  it('progress extras: entries past the 500th are dropped, not carried through unbounded', () => {
+    const progress = Object.fromEntries(Array.from({ length: 600 }, (_, i) => [`t${i}`, { stars: 1, best: 1, plays: 1 }]));
+    const m = migrate({ v: SAVE_VERSION, progress });
+    expect(Object.keys(m.progress).length).toBe(500);
+    expect(m.progress['t0']).toBeDefined();
+    expect(m.progress['t499']).toBeDefined();
+    expect(m.progress['t500']).toBeUndefined();
+  });
+
+  // Round 4 review: a non-record progress[id] value used to pass through verbatim instead of being dropped
+  // like every sibling malformed shape in this file — a 2 MB string could round-trip straight into `progress`.
+  it('progress extras: a non-record entry is dropped, not carried through verbatim', () => {
+    const m = migrate({ v: SAVE_VERSION, progress: { someTopic: 'y'.repeat(2_000_000), 'y1-add': { stars: 1, best: 1, plays: 1 } } });
+    expect(Object.keys(m.progress)).toEqual(['y1-add']);
+  });
+});
