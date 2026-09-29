@@ -43,7 +43,7 @@
     "src/storage.ts": 1491,
     "tests/unit/arena.test.ts": 948,
     "tests/unit/audio.test.ts": 617,
-    "tests/unit/curriculum.test.ts": 2650,
+    "tests/unit/curriculum.test.ts": 2649,
     "tests/unit/duel.test.ts": 970,
     "tests/unit/governance.test.ts": 5764,
     "tests/unit/guardrails.test.ts": 3632,

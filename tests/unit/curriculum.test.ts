@@ -48,8 +48,7 @@ describe('topic registry', () => {
     const ids = TOPICS.map(t => t.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const y of YEARS) {
-      expect(topicsFor(y.id, 'maths').length).toBeGreaterThanOrEqual(6);
-      expect(topicsFor(y.id, 'writing').length).toBeGreaterThanOrEqual(3);
+      // The EYFS/KS1 6-maths/3-writing minimum and each KS2 shell's gate are `island-gate.test.ts`'s now (#1040).
       // #908: Sky Storm/Ninja Sprint/Boss Battle now pool topicsFor(year, subject) filtered to non-tracing —
       // an empty pool reaches Session.pickTopic() untouched (no fallback, unlike the old whole-year default)
       // and crashes rather than degrading, so this must never be empty for either subject.
