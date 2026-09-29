@@ -1,7 +1,7 @@
 import { avatarById, praiseLine, SENSEI, SENSEI_LINES, VILLAIN } from '../avatars';
 import { topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
-import { type Mode, type SessionResult } from '../game/session';
+import { type Mode, type SessionResult, type DeckItem, type Miss } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import { Tracer, traceFeedback } from '../game/tracing';
@@ -15,23 +15,23 @@ import { $, esc, render } from './dom';
 import { screenScope } from './screen';
 import { createHud } from './hud';
 import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
-import { createResultsScreen } from './play-results';   // #896: the results overlay lives in play-results.ts
+import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
 import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
-export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[] }   // pool + mission = Sensei training over the weakest topics
+export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[]; deck?: DeckItem[]; practice?: boolean }   // pool = Sensei training
 
-export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) {
+export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (misses: Miss[]) => void) {
   const d = load(); const av = avatarById(d.avatar);
   const trailItem = equippedItem(wallet(), 'trail');
   const skin = trailItem?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
   const fx = trailItem?.fx ?? av.fx;   // a bought element trail overrides the avatar's own particle/sound effect too (#69)
   const tracing = o.topic?.input === 'tracing';
   const spec = MODES[o.mode];
-  const sprint = spec.timed; const boss = spec.boss; const training = spec.staged && !!o.pool;
+  const sprint = spec.timed; const boss = spec.boss; const training = spec.staged && !!o.pool && !o.practice;
   const villainMode = spec.villain;                     // Hammer Man on screen, TNT bubbles in the mix
-  const title = spec.staged ? (training ? 'Sensei Training' : o.topic!.title) : spec.title;
+  const title = o.practice ? 'Fix my mistakes' : spec.staged ? (training ? 'Sensei Training' : o.topic!.title) : spec.title;
   render(`
   <section class="screen play ${tracing ? 'tracing' : ''}" style="--glow:${av.glow}">
     ${tracing ? '' : '<canvas id="arena" aria-label="Game arena"></canvas>'}
@@ -80,15 +80,15 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
   // `playSession` is assigned just below and `showResults` is only ever called once gameplay ends, long after
   // this object is built — the same TDZ-safe pattern `mounted` below uses for `hooks`.
   const showResults = createResultsScreen({
-    training, av, name: d.name, els, hold: (open, beats) => playSession.hold(open, beats),
-    later, toast, replay, goHome, cleanup,
+    training, year: o.year, topic: o.topic, av, name: d.name, els, hold: (open, beats) => playSession.hold(open, beats),
+    later, toast, replay, goHome, cleanup, next, fix, practice: !!o.practice,
   });
 
   // #36: the Session callbacks — the question beat, the outcome beat, the sprint clock, the boss reactions —
   // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
   const playSession = createPlaySession({
-    mode: o.mode, year: o.year, topic: o.topic,
+    mode: o.mode, year: o.year, topic: o.topic, deck: o.deck, practice: o.practice,
     pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
   }, {
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
@@ -197,7 +197,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
    * recomputed there, so the overlay can never pay the game a second time.
    */
   function commitResult(r: SessionResult): ResultPayout {
-    let newBest = false;
+    if (o.practice) return PRACTICE_PAYOUT; let newBest = false;   // #930: a fix round writes nothing at all
     // #522 review (silent-failure-hunter): a generator throw is not a genuine finished play of this topic/mode
     // — `recordTopic`'s `plays`/`best` and `recordSprint`/`recordEndless`'s "new best" are permanent per-topic/
     // per-year history, the same kind of record `duel.ts` withholds with its own `!r.incomplete` gate on
@@ -206,7 +206,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void) 
     if (!r.incomplete) {
       if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
       else if (training) { if (r.won) recordTraining(o.year.id); }
-      else if (o.mode === 'sprint') newBest = recordSprint(o.year.id, r.score);
+      else if (o.mode === 'sprint') { if (!o.topic) newBest = recordSprint(o.year.id, r.score); }   // #910: a chooser topic writes nothing, not Endless's best
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
       else recordEndless(o.year.id, r.score);
     }

@@ -62,7 +62,20 @@ export interface DeckItem { topic: Topic; q: Question }
  * whether or not the boss still has HP left — nothing pairs `deck` with `mode: 'boss'` today, so this is stated
  * rather than tested, the same way the rest of this comment is.
  */
-export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; deck?: DeckItem[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number }
+export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; deck?: DeckItem[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean }
+
+/**
+ * The "Fix my mistakes" deck (#930): the 5 most recent misses, newest first — `misses` is already newest-last
+ * (`recordMiss`'s own order below), so this takes the tail and reverses it. `topicById` is injected rather
+ * than imported from the curriculum registry directly, so this pure function stays testable without it; a
+ * miss whose topic id no longer resolves is dropped rather than crashing the deck (unreachable with today's
+ * static registry, defensive only).
+ */
+export function fixDeck(misses: Miss[], topicById: (id: string) => Topic | undefined): DeckItem[] {
+  return misses.slice(-5).reverse()
+    .map(m => ({ topic: topicById(m.topic), q: m.q }))
+    .filter((d): d is DeckItem => !!d.topic);
+}
 
 export class Session {
   stage = 1; index = 0; score = 0; combo = 0; bestCombo = 0; lives: number;
@@ -247,7 +260,7 @@ export class Session {
     if (this.misses.length > MISSES_CAP) this.misses.shift();
   }
   private loseLife() {
-    if (!this.spec.hasLives) return;                    // no lives in a sprint: a slip only costs time
+    if (!this.spec.hasLives || this.o.practice) return;   // no lives in a sprint: a slip only costs time; practice (#930) never loses one either
     this.lives = Math.max(0, this.lives - 1); this.ev.onLives(this.lives);
     if (this.lives === 0) this.end(false);
   }

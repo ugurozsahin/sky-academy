@@ -193,6 +193,30 @@ const rBuild: Generator = (d, rng) => {
   const [w, e] = pick(rng, rWords(d));
   return spellQ(rng, w, e, d === 1 ? 2 : d === 2 ? 3 : 4, rLetters(d));
 };
+/**
+ * #967: the ELG Word Reading goal itself — sound-blend a *written* word — so unlike every other Reception
+ * writing topic here, the word is never spoken. `say` carries only the instruction; the word lives solely in
+ * the `word` visual, so the 🔊 repeat (which speaks `q.say ?? q.prompt`, `play.ts:168`) never says it aloud.
+ * d1/d2 decoys are drawn from any other word in the phase pool; d3 additionally forces one decoy to share
+ * `w`'s first letter, so the first sound alone cannot answer — retried when the drawn word has no
+ * same-first-letter sibling to draw that decoy from (`rat`/`sun`/`map`… each the only word for their letter).
+ */
+const rRead: Generator = (d, rng) => {
+  const pool = rWords(d);
+  const [w, e] = pick(rng, pool);
+  const rest = pool.filter(([ow]) => ow !== w);
+  let decoyWords: [string, string][];
+  if (d === 3) {
+    const sameFirst = rest.filter(([ow]) => ow[0] === w[0]);
+    if (sameFirst.length === 0) return rRead(d, rng);
+    const other = shuffle(rng, rest.filter(([ow]) => ow[0] !== w[0])).slice(0, 2);
+    decoyWords = shuffle(rng, [pick(rng, sameFirst), ...other]);
+  } else {
+    const candidates = d === 1 ? rest.filter(([ow]) => ow[0] !== w[0]) : rest;
+    decoyWords = shuffle(rng, candidates).slice(0, d === 1 ? 2 : 3);
+  }
+  return wordQ(rng, 'Read it!', e, decoyWords.map(([, em]) => em), { visual: { type: 'word', text: w }, say: 'Read the word. Slice its picture.' });
+};
 // Tracing is letter *formation*, so difficulty 3 keeps the whole alphabet — a child learns to write `q` and
 // the handwriting ELG covers all 26, whatever phase the sound belongs to. Stages 1 and 2 still follow the
 // phase order, so the letters a child traces first are the ones they are being taught to read first.
@@ -231,6 +255,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: say a sound for each letter; phase 2–3 sounds by ear', gen: rSoundHunt },
   { id: 'r-capitals', title: 'Big & Small Letters', icon: '🅰️', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: letters', gen: rCapitals },
   { id: 'r-build', title: 'Build a Word', icon: '🧱', subject: 'writing', year: 'reception', nc: 'ELG Writing: spell by sounds (CVC)', sequenceFrom: 1, gen: rBuild },
+  { id: 'r-read', title: 'Read It!', icon: '📗', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: read words by sound-blending', gen: rRead },
   { id: 'r-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'reception', nc: 'ELG Writing: simple sentences', sequenceFrom: 1, gen: rSentence },
   { id: 'r-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'reception', nc: 'ELG Writing: form letters', input: 'tracing', gen: rTrace },
 ];

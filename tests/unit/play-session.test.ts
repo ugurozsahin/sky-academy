@@ -11,6 +11,7 @@ import type { WaveOpts } from '../../src/game/arena';
 import type { Mode } from '../../src/game/modes';
 import { reset, save } from '../../src/storage';
 import { createPlaySession, NO_VOICE_PEEK_MS, waveOptsFor, type PlaySessionDeps, type PlaySessionEls } from '../../src/ui/play-session';
+import type { SessionOpts } from '../../src/game/session';
 
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
@@ -53,7 +54,7 @@ const sentenceQ = (): Question => ({
 });
 const soundHuntQ = (): Question => ({ prompt: '🔊 Listen!', say: 'Listen: sun, sock, sad', answer: 's', options: ['s', 'a', 't', 'p'], listen: 'sun · sock · sad' });
 
-function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
+function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}, sessionOver: Partial<SessionOpts> = {}) {
   const els = { score: fakeEl(), stage: fakeEl(), prompt: fakeEl(), vis: fakeEl(), hint: fakeEl(), qcard: fakeEl(), speak: fakeEl() };
   const arena = {
     paused: false, W: 390, topInset: 0, spawned: [] as WaveOpts[],
@@ -80,7 +81,7 @@ function build(gen: () => Question, over: Partial<PlaySessionDeps> = {}) {
     showResults() {},
     ...over,
   };
-  const ps = createPlaySession({ mode: 'mission', year: YEARS[1], stages: 1, topic: { id: 't', title: 't', icon: 't', subject: 'writing', year: 'year1', nc: '', gen } }, deps);
+  const ps = createPlaySession({ mode: 'mission', year: YEARS[1], stages: 1, topic: { id: 't', title: 't', icon: 't', subject: 'writing', year: 'year1', nc: '', gen }, ...sessionOver }, deps);
   return { els: els as Record<keyof typeof els, FakeEl>, arena, ps, holdCalls, unmount: () => { mounted = false; ps.dispose(); } };
 }
 
@@ -606,5 +607,23 @@ describe('onEnd commits the payout before the results overlay is ever scheduled 
     await vi.advanceTimersByTimeAsync(5000);
     expect(commitCalls, 'onEnd must reuse the early payout, never call commitResult a second time').toHaveLength(1);
     expect(showCalls, 'the overlay eventually draws the SAME payout object commitResult returned').toEqual([payout]);
+  });
+});
+
+describe('a deck run counts its questions plainly, never as a mission stage pill (#930)', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] }); reset(); resetVoiceProbe(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('a mode: mission deck writes "Q1"/"Q2" to the stage pill, not a segmented stage/perStage pill', async () => {
+    const gen = (): Question => ({ prompt: 'Pick one', answer: 'right', options: ['right', 'wrong'] });
+    const topic = { id: 't', title: 't', icon: 't', subject: 'writing' as const, year: 'year1' as const, nc: '', gen };
+    const { els, ps } = build(gen, {}, { mode: 'mission', deck: [{ topic, q: gen() }, { topic, q: gen() }], practice: true });
+    ps.session.start(); await settle();
+    // Y1's real perStage is 6 — a segmented pill would show "1/6" here and freeze there for the whole deck,
+    // since a deck run never moves `session.index`/`stage` (`advance()`'s own `o.deck` guard).
+    expect(els.stage.textContent).toBe('Q1');
+    expect(ps.session.hit('right')).toBe('correct');
+    ps.waveEnd(); await vi.advanceTimersByTimeAsync(5000);
+    expect(els.stage.textContent).toBe('Q2');
   });
 });

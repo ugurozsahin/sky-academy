@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Session, repeatKey, starsForAccuracy, type DeckItem, type SessionEvents } from '../../src/game/session';
+import { Session, fixDeck, repeatKey, starsForAccuracy, type DeckItem, type Miss, type SessionEvents } from '../../src/game/session';
 import { TOPICS, YEARS, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -599,6 +599,42 @@ describe('deck replay and misses (#878)', () => {
     expect(ev.onEnd).toHaveBeenCalledTimes(1);
     const r = ev.onEnd.mock.calls[0][0];
     expect(r.won).toBe(true); expect(r.questions).toBe(deck.length);
+  });
+});
+
+describe('"Fix my mistakes" (#930): fixDeck and practice sessions', () => {
+  const topicA = topicById('y1-add')!; const topicB = topicById('y1-sub')!;
+  const miss = (topic: Topic, seed: number, picked: string | null = null): Miss => {
+    const q = topic.gen(1, rng(seed)); return { topic: topic.id, q, picked: picked ?? q.options.find(o => o !== q.answer)! };
+  };
+  it('takes the 5 most recent misses, newest first, and resolves each by its own topic', () => {
+    const misses = Array.from({ length: 8 }, (_, i) => miss(i % 2 ? topicB : topicA, 100 + i));
+    const deck = fixDeck(misses, id => TOPICS.find(t => t.id === id));
+    expect(deck).toHaveLength(5);
+    expect(deck).toEqual(misses.slice(-5).reverse().map(m => ({ topic: m.topic === topicA.id ? topicA : topicB, q: m.q })));
+  });
+  it('fewer than 5 misses gives a shorter deck, not padding', () => {
+    const misses = [miss(topicA, 200), miss(topicA, 201)];
+    expect(fixDeck(misses, id => TOPICS.find(t => t.id === id))).toHaveLength(2);
+  });
+  it('drops a miss whose topic id no longer resolves, rather than crashing the deck', () => {
+    const misses = [{ ...miss(topicA, 210), topic: 'no-such-topic' }, miss(topicB, 211)];
+    const deck = fixDeck(misses, id => TOPICS.find(t => t.id === id));
+    expect(deck).toEqual([{ topic: topicB, q: misses[1].q }]);
+  });
+  it('a practice session never loses a life on a wrong slice, a fall, or a wave that decides nothing', () => {
+    const deck = [miss(topicA, 220), miss(topicA, 221), miss(topicA, 222)].map(m => ({ topic: topicA, q: m.q }));
+    const ev = events();
+    const s = new Session({ mode: 'mission', year: Y1, deck, practice: true, rng: rng(223) }, ev);   // Y1: 3 lives
+    s.start();
+    const wrong = s.current!.options.find(o => o !== s.current!.answer)!;
+    expect(s.hit(wrong)).toBe('wrong'); expect(s.lives).toBe(Y1.lives); s.advance();
+    s.fall(s.current!.answer); expect(s.lives).toBe(Y1.lives); s.advance();
+    s.fall(s.current!.answer); expect(s.lives).toBe(Y1.lives);   // third slip: a real mission would have ended here
+    expect(ev.onEnd).not.toHaveBeenCalled();
+    s.advance();
+    expect(ev.onEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onEnd.mock.calls[0][0]).toMatchObject({ won: true, questions: 3 });
   });
 });
 
