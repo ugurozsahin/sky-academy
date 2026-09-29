@@ -116,7 +116,9 @@ export function promptMode(q: Pick<Question, 'listen' | 'peek'>, audible: boolea
  * `.seq` progress run after it, `got`/`todo` by set membership (`remaining`, the caller's own `Session.remaining()`)
  * rather than by position: an any-order target can be found out of the order it was drawn in, unlike a spelling
  * sequence's position-based `done`. `remaining` defaults to the whole sequence so a caller mid-refactor that
- * forgets it still renders every target as `todo` rather than throwing.
+ * forgets it still renders every target as `todo` rather than throwing. `done` itself is read only by the
+ * two branches above this one — it stays 0 for the life of an any-order question (`Session.hit()` never
+ * advances it there) so this branch never reads it.
  */
 export function promptHTML(q: Question, done: number, reveal = false, remaining?: readonly string[]): string {
   if (!q.sequence) return esc(reveal && q.listen ? q.listen : q.prompt);
