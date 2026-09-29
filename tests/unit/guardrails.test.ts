@@ -1671,21 +1671,24 @@ describe('guard rails', () => {
   it('both game screens put their beats on the hold, and take the terminal hold off it (#301, PR #474 review B1)', () => {
     const play = code(SOURCES['/src/ui/play.ts'] ?? '');
     const playSession = code(SOURCES['/src/ui/play-session.ts'] ?? '');
+    // #896: showResults (the terminal hold, the results-screen jingle) moved out of play.ts into its own
+    // module, the same split #36 already made for the Session callbacks — this rail follows it there.
+    const playResults = code(SOURCES['/src/ui/play-results.ts'] ?? '');
     const duel = code(SOURCES['/src/ui/duel.ts'] ?? '');
-    expect({ play: play.length > 1000, playSession: playSession.length > 1000, duel: duel.length > 1000 },
-      'all three must be read, not blank imports').toEqual({ play: true, playSession: true, duel: true });
+    expect({ play: play.length > 1000, playSession: playSession.length > 1000, playResults: playResults.length > 500, duel: duel.length > 1000 },
+      'all four must be read, not blank imports').toEqual({ play: true, playSession: true, playResults: true, duel: true });
     // Wired at all: the pause hold reaches the beat clock on both screens.
     expect(playSession, "play-session's hold drives the screen's beats, not only the arena").toMatch(/\bdeps\.holdTimers\(open\)/);
     expect(play, "and play.ts hands the scope's holdTimers to the session").toMatch(/\bholdTimers\b/);
     expect(duel, "the duel's hold drives them too").toMatch(/\bscope\.holdTimers\(open\)/);
     // And taken OFF it where the hold is TERMINAL. `showResults` never reopens — both screens offer only
     // Play again and Islands, and both go straight to cleanup — so a beat armed after it has no resume.
-    expect(play, 'the play results hold does not freeze the beats it is about to arm')
-      .toMatch(/playSession\.hold\(true,\s*false\)/);
+    expect(playResults, 'the play results hold does not freeze the beats it is about to arm')
+      .toMatch(/\bhold\(true,\s*false\)/);
     expect(duel, 'nor does the duel results hold').toMatch(/\bhold\(true,\s*false\)/);
     // The beat that proved it, still inside the results path on both screens. Named so that moving it out is
     // a deliberate act rather than something this rail silently stops covering.
-    for (const [name, src] of [['play.ts', play], ['duel.ts', duel]] as const) {
+    for (const [name, src] of [['play-results.ts', playResults], ['duel.ts', duel]] as const) {
       const at = src.indexOf('function showResults');
       expect(at, `${name} still has a showResults for this rule to be about`).toBeGreaterThan(-1);
       expect(src.slice(at), `${name}'s results screen still arms the unlock jingle after its hold`)
@@ -3258,7 +3261,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   const RATCHET: Record<string, number> = {
     'src/style.css': 1870, 'src/storage.ts': 1494, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
     'src/curriculum/year2.ts': 753, 'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 421,
-    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 355, 'src/ui/certificate.ts': 341, 'src/audio.ts': 98,
+    'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 318, 'src/ui/certificate.ts': 341, 'src/audio.ts': 98,
   };
   it.each(Object.entries(RATCHET))('%s has not grown past %i lines (#714 ratchet)', (file, cap) => {
     // src/style.css split into src/styles/*.css (#558): the entry itself is now a 12-line @import shim, so a

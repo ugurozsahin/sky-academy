@@ -22,6 +22,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-soundhunt | Word Reading: say a sound for each letter | Sound Hunt: three keyword words are spoken, nothing to read; slice the grapheme (d1 phase 2 sets 1–4, d2 all single letters + qu, d3 phase 3 digraphs/trigraphs); sound-alike graphemes never appear as decoys |
 | r-capitals | Word Reading: letters | match A↔a; letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
 | r-build | Writing: spell by sounds | slice letters in order (CVC); word and decoy letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
+| r-read | Word Reading: read words by sound-blending | Read It!: a CVC word is shown, never spoken — slice its picture; word and decoys follow the phase pools (d1 phase 2, d2–3 all single-letter sounds); d3 always includes a same-first-letter decoy, so the first sound alone cannot answer |
 | r-sentence | Writing: simple sentences | Story Sentences: sentence shown + read aloud, slice the words in order (3 → 6 words, 1–2 decoys) |
 | r-trace | Writing: form letters | trace on canvas; d1–2 follow the phase order, d3 is the whole alphabet — formation covers all 26 whatever phase the sound is in |
 

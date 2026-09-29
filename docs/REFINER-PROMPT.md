@@ -307,7 +307,9 @@ yourself (#513 review, round 12).
 10. **`blocked`, from the issue's own body.** `.claude/rules/governance.md` gives it a mechanical meaning:
    `Blocked by #<n>` as the first line, with `#<n>` open. Propose `blocked` where that holds and the label is
    missing; propose removing it where the named blocker has **closed**, which is the case nobody does by hand
-   and which leaves work parked in the board's Blocked column after its reason is gone. Never remove one
+   and which leaves work parked in the board's Blocked column after its reason is gone. Since #1360,
+   `.github/workflows/unblock.yml` removes it within minutes of the last blocker closing, so a removal you
+   derive is the backstop for a close event that never fired; adding it is unchanged. Never remove one
    whose blocker is still open, and never re-apply either after someone has changed it back. The section above
    says what actually enforces that last clause here, and it is weaker than it is for `priority:*`: read it
    before you add this label, because a timeline you did not read to its end means you do not add it.

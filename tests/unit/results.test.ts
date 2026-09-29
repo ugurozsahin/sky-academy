@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resultMedal, resultHeading, resultHeadline } from '../../src/ui/results';
+import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, type ResultCandidate } from '../../src/ui/results';
 import { resultsHTML, type ResultsData } from '../../src/ui/overlays';
 import type { Mode } from '../../src/game/modes';
+import type { Topic } from '../../src/curriculum';
 
 // #36: these were dense ternaries buried in play.ts's showResults, reached only by the e2e results screen.
 // Now they are pure functions, so every mode/win/star combination is checked here directly.
@@ -152,6 +153,115 @@ describe('resultHeadline', () => {
 });
 
 /**
+ * #896: at most two results-screen announcements, in register order (belt > island > trophy > best > rest),
+ * so two features speaking on the same results screen never talk over each other.
+ */
+describe('resultsLines', () => {
+  const c = (kind: ResultCandidate['kind'], text: string = kind): ResultCandidate => ({ kind, text });
+
+  it('returns every candidate, in precedence order, when two or fewer', () => {
+    expect(resultsLines([c('rest'), c('belt')])).toEqual([c('belt'), c('rest')]);
+    expect(resultsLines([c('best')])).toEqual([c('best')]);
+  });
+
+  it('caps at two even when every kind is present, keeping the two highest', () => {
+    const all = ['rest', 'best', 'trophy', 'island', 'belt'].map(k => c(k as ResultCandidate['kind']));
+    expect(resultsLines(all)).toEqual([c('belt'), c('island')]);
+  });
+
+  it('returns an empty list for an empty list', () => {
+    expect(resultsLines([])).toEqual([]);
+  });
+
+  it('keeps ties (two candidates of the same kind) in their input order', () => {
+    const first = c('best', 'first'); const second = c('best', 'second');
+    expect(resultsLines([first, second])).toEqual([first, second]);
+  });
+
+  it('the full precedence order: belt > island > trophy > best > rest', () => {
+    const shuffled = [c('best'), c('rest'), c('trophy'), c('belt'), c('island')];
+    expect(resultsLines(shuffled).map(l => l.kind)).toEqual(['belt', 'island']);
+    expect(resultsLines(shuffled.filter(l => l.kind !== 'belt')).map(l => l.kind)).toEqual(['island', 'trophy']);
+    expect(resultsLines(shuffled.filter(l => !['belt', 'island'].includes(l.kind))).map(l => l.kind)).toEqual(['trophy', 'best']);
+    expect(resultsLines(shuffled.filter(l => ['best', 'rest'].includes(l.kind))).map(l => l.kind)).toEqual(['best', 'rest']);
+  });
+});
+
+/**
+ * #929: the results row's one contextual action. `retry` and `fix` have no caller yet (#931/#930 supply
+ * `lostAtStage`/`misses` later) — this pins the precedence order the pure function already implements, so
+ * the day a caller does pass them the rule is proven rather than assumed.
+ */
+describe('resultsAction', () => {
+  const topic = { id: 'y1-bonds', title: 'Number Bonds' } as Topic;
+  const base = { mode: 'mission' as Mode, training: false, won: true, misses: 0, next: null as Topic | null };
+
+  it('a won, non-training mission with a topic left offers "next"', () => {
+    expect(resultsAction({ ...base, next: topic })).toEqual({ kind: 'next', topic });
+  });
+
+  it('a won mission with every topic already starred (next: null) offers nothing', () => {
+    expect(resultsAction({ ...base, next: null })).toBeNull();
+  });
+
+  it('a non-mission win never offers "next", whatever topic is passed', () => {
+    for (const mode of ['endless', 'sprint', 'boss'] as Mode[]) expect(resultsAction({ ...base, mode, next: topic })).toBeNull();
+  });
+
+  it('a won training run never offers "next" — Sensei has no single topic to advance from', () => {
+    expect(resultsAction({ ...base, training: true, next: topic })).toBeNull();
+  });
+
+  it('a lost mission offers "retry" only from stage 3 or later', () => {
+    expect(resultsAction({ ...base, won: false, lostAtStage: 3, next: topic })).toEqual({ kind: 'retry', stage: 3 });
+    expect(resultsAction({ ...base, won: false, lostAtStage: 2, next: topic })).toBeNull();
+    expect(resultsAction({ ...base, won: false, lostAtStage: undefined, next: topic })).toBeNull();
+  });
+
+  it('a lost training run never offers "retry" — training has no stage to repeat', () => {
+    expect(resultsAction({ ...base, won: false, training: true, lostAtStage: 5 })).toBeNull();
+  });
+
+  it('one or more misses offers "fix" on a mission or a training run', () => {
+    expect(resultsAction({ ...base, misses: 1, next: topic })).toEqual({ kind: 'fix' });
+    expect(resultsAction({ ...base, training: true, won: false, misses: 2 })).toEqual({ kind: 'fix' });
+  });
+
+  it('the full precedence order: retry > fix > next > nothing', () => {
+    // A lost mission at stage 3+ with misses still reads "retry", never "fix".
+    expect(resultsAction({ ...base, won: false, lostAtStage: 3, misses: 4 })).toEqual({ kind: 'retry', stage: 3 });
+    // A won mission with misses reads "fix", never "next", even though a topic is left.
+    expect(resultsAction({ ...base, misses: 1, next: topic })).toEqual({ kind: 'fix' });
+  });
+
+  it('a non-mission, non-training run with misses never offers "fix"', () => {
+    expect(resultsAction({ ...base, mode: 'endless', misses: 3 })).toBeNull();
+  });
+});
+
+/**
+ * #896 review (pr-test-analyzer): the escaping itself lives in `resultPillsHTML`'s `esc()` call, one layer
+ * below the `overlays.ts` test above that only proves an already-escaped string passes through unchanged.
+ * A future candidate's `text` (a belt name, eventually a child's own name) is untrusted the same way every
+ * other on-screen string here is.
+ */
+describe('resultPillsHTML', () => {
+  it('wraps each line in a best-pill span, in resultsLines order', () => {
+    const lines: ResultCandidate[] = [{ kind: 'belt', text: 'Green Belt' }, { kind: 'best', text: 'New best!' }];
+    expect(resultPillsHTML(lines)).toBe('<span class="best-pill">Green Belt</span><span class="best-pill">New best!</span>');
+  });
+
+  it('escapes HTML-unsafe characters in the candidate text', () => {
+    expect(resultPillsHTML([{ kind: 'best', text: '<b>Ada</b> & "friends"' }]))
+      .toBe('<span class="best-pill">&lt;b&gt;Ada&lt;/b&gt; &amp; &quot;friends&quot;</span>');
+  });
+
+  it('renders nothing for an empty list', () => {
+    expect(resultPillsHTML([])).toBe('');
+  });
+});
+
+/**
  * #522 review (pr-test-analyzer, silent-failure-hunter): `.hero-big.sad` is the genuine-defeat face
  * (grayscale portrait, `src/style.css`) — an incomplete run must never wear it, whatever `won` reads, or the
  * avatar contradicts the "that question broke" copy right beside it.
@@ -170,5 +280,41 @@ describe('resultsHTML heroExtra (#522)', () => {
   });
   it('a win never wears it either way', () => {
     expect(resultsHTML({ ...base, won: true })).not.toContain('sad');
+  });
+});
+
+/**
+ * #896: with no candidates the overlay's HTML is unchanged (`resultLines` omitted); a candidate line renders
+ * into the coin row as an existing `best-pill` span, the same class `newBest` already uses — no new class,
+ * rule or element type.
+ */
+describe('resultsHTML resultLines (#896)', () => {
+  const base: ResultsData = {
+    mode: 'mission', won: true, training: false, glow: '#fff', img: 'x.webp', name: 'Ninja',
+    headline: 'hi', medal: '🥇', heading: 'Mission complete!', starCount: 3, score: 10, correct: 5, attempts: 5,
+    bestCombo: 3, coins: 5, newBest: false, streak: 0, dojoRows: '', stickerHTML: '', cert: false,
+  };
+  it('renders the same HTML with resultLines omitted as with it empty', () => {
+    expect(resultsHTML(base)).toBe(resultsHTML({ ...base, resultLines: '' }));
+  });
+  it('a supplied line renders as a best-pill in the coin row, escaped', () => {
+    const html = resultsHTML({ ...base, resultLines: '<span class="best-pill">Green Belt &lt;3&gt;</span>' });
+    expect(html).toContain('<span class="best-pill">Green Belt &lt;3&gt;</span>');
+  });
+});
+
+/** #929: `action` passes straight through to `resultsModal()`'s own row — the escaping and placement are
+ *  pinned there (`tests/unit/screen.test.ts`); this only proves `resultsHTML` forwards it. */
+describe('resultsHTML action (#929)', () => {
+  const base: ResultsData = {
+    mode: 'mission', won: true, training: false, glow: '#fff', img: 'x.webp', name: 'Ninja',
+    headline: 'hi', medal: '🥇', heading: 'Mission complete!', starCount: 3, score: 10, correct: 5, attempts: 5,
+    bestCombo: 3, coins: 5, newBest: false, streak: 0, dojoRows: '', stickerHTML: '', cert: false,
+  };
+  it('renders the same HTML with action omitted as with no action at all', () => {
+    expect(resultsHTML(base)).not.toContain('next-topic');
+  });
+  it('a supplied action reaches the row as its own button', () => {
+    expect(resultsHTML({ ...base, action: { id: 'next-topic', label: 'Next topic →' } })).toContain('id="next-topic">Next topic →</button>');
   });
 });
