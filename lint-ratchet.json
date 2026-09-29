@@ -1,17 +1,18 @@
 {
   "base": {
     "complexity": 15,
-    "lines": 60
+    "lines": 60,
+    "fileLines": 600
   },
   "complexity": {
     "src/curriculum/year2.ts::(anonymous)": 17,
-    "src/game/arena.ts::reveal": 16,
-    "src/game/arena.ts::onMove": 19,
-    "src/game/arena.ts::update": 42,
-    "src/game/arena.ts::render": 19,
     "src/game/arena.ts::drawBubble": 16,
     "src/game/arena.ts::drawParticle": 21,
     "src/game/arena.ts::drawTrail": 19,
+    "src/game/arena.ts::onMove": 19,
+    "src/game/arena.ts::render": 19,
+    "src/game/arena.ts::reveal": 16,
+    "src/game/arena.ts::update": 42,
     "src/game/bubbles.ts::layoutWave": 20,
     "src/game/dojo.ts::measure": 35,
     "src/main.ts::(anonymous)": 17,
@@ -19,8 +20,11 @@
     "src/ui/play-results.ts::showResults": 23,
     "src/ui/play.ts::playScreen": 27,
     "src/ui/profiles.ts::(anonymous)": 16,
+    "src/ui/visuals.ts::coinSVG": 16,
     "src/ui/visuals.ts::renderVisual": 49,
-    "src/ui/visuals.ts::coinSVG": 16
+    "tests/unit/curriculum.test.ts::(anonymous)#1": 16,
+    "tests/unit/curriculum.test.ts::(anonymous)#2": 28,
+    "tests/unit/guardrails.test.ts::(anonymous)": 34
   },
   "lines": {
     "src/three/sketchbook/view.ts::createView": 81,
@@ -33,5 +37,19 @@
     "src/ui/play.ts::playScreen": 210,
     "src/ui/solid.ts::createSolidSlot": 110,
     "src/ui/visuals.ts::renderVisual": 89
+  },
+  "fileLines": {
+    "tests/unit/arena.test.ts": 948,
+    "tests/unit/audio.test.ts": 617,
+    "tests/unit/curriculum.test.ts": 2701,
+    "tests/unit/duel.test.ts": 970,
+    "tests/unit/governance.test.ts": 5764,
+    "tests/unit/guardrails.test.ts": 3632,
+    "tests/unit/hooks.test.ts": 1200,
+    "tests/unit/play-session.test.ts": 629,
+    "tests/unit/session.test.ts": 1284,
+    "tests/unit/sim.test.ts": 1641,
+    "tests/unit/storage.test.ts": 3024,
+    "tests/unit/workflows.test.ts": 620
   }
 }

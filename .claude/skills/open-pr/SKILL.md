@@ -140,6 +140,7 @@ the body — not the list.
 
 ```
 npx tsc --noEmit
+npm run lint
 npm test
 npm run build && npm run test:e2e:smoke
 npx playwright test --project=mobile         # the full project, under the conditions below

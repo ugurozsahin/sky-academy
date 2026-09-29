@@ -1,34 +1,40 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { ESLint } from 'eslint';
 import tseslint from 'typescript-eslint';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-// The lint ratchet (#1381, per function since #1387). `eslint.config.js` sets a base limit for `complexity` and
+// The lint ratchet (#1381, per function since #1387, tests since #1388). `eslint.config.js` sets a base limit for `complexity` and
 // `max-lines-per-function` in `src/` and freezes each function that is over today, keyed `file::name`, at its size. A
 // name that occurs twice among a file's over-base functions is `name#1`, `name#2` by line; a function with none is `(anonymous)`. This rail
-// keeps the table honest: an entry must equal that function's real size (a number here only ever goes DOWN), a
+// keeps the table honest (`tests/unit/` gets `complexity` only; its file length is the `fileLines` table, below): an entry must equal that function's real size (a number here only ever goes DOWN), a
 // function that is gone or under the base has no entry, and a function over the base without one fails.
 type Kind = 'complexity' | 'lines';
 const KINDS: Kind[] = ['complexity', 'lines'];
 const table = JSON.parse(readFileSync(new URL('../../lint-ratchet.json', import.meta.url), 'utf8')) as {
-  base: Record<Kind, number>; complexity: Record<string, number>; lines: Record<string, number>;
+  base: Record<Kind, number> & { fileLines: number };
+  complexity: Record<string, number>; lines: Record<string, number>; fileLines: Record<string, number>;
 };
-const BASE_CEILING: Record<Kind, number> = { complexity: 15, lines: 60 };
+const ROOT = new URL('../../', import.meta.url).pathname;
+const BASE_CEILING = { complexity: 15, lines: 60, fileLines: 600 };
 const real: Record<Kind, Record<string, number>> = { complexity: {}, lines: {} };
 
 beforeAll(async () => {
   const eslint = new ESLint({
-    cwd: new URL('../../', import.meta.url).pathname,
+    cwd: ROOT,
     overrideConfigFile: true,
-    overrideConfig: [{
-      files: ['src/**/*.ts'],
-      languageOptions: { parser: tseslint.parser },
-      rules: { complexity: ['error', { max: 1 }], 'max-lines-per-function': ['error', { max: 1, skipBlankLines: true, skipComments: true }] },
-    }],
+    overrideConfig: [
+      {
+        files: ['src/**/*.ts'],
+        languageOptions: { parser: tseslint.parser },
+        rules: { complexity: ['error', { max: 1 }], 'max-lines-per-function': ['error', { max: 1, skipBlankLines: true, skipComments: true }] },
+      },
+      { files: ['tests/unit/**/*.ts'], languageOptions: { parser: tseslint.parser }, rules: { complexity: ['error', { max: 1 }] } },
+    ],
   });
   const found: Record<Kind, { file: string; name: string; line: number; n: number }[]> = { complexity: [], lines: [] };
-  for (const r of await eslint.lintFiles(['src'])) {
-    const file = r.filePath.slice(r.filePath.indexOf('/src/') + 1);
+  for (const r of await eslint.lintFiles(['src', 'tests/unit'])) {
+    const file = relative(ROOT, r.filePath);
     for (const m of r.messages) {
       const kind: Kind | null = m.ruleId === 'complexity' ? 'complexity' : m.ruleId === 'max-lines-per-function' ? 'lines' : null;
       const n = kind && Number(/(?:complexity of |too many lines \()(\d+)/.exec(m.message)?.[1]);
@@ -48,7 +54,7 @@ beforeAll(async () => {
 }, 60_000);
 
 describe('lint ratchet (#1381, #1387)', () => {
-  it.each(KINDS)('the %s base limit is no looser than its ceiling', (kind) => {
+  it.each([...KINDS, 'fileLines' as const])('the %s base limit is no looser than its ceiling', (kind) => {
     expect(table.base[kind], `lint-ratchet.json: base.${kind} may go down, never up`).toBeLessThanOrEqual(BASE_CEILING[kind]);
   });
 
@@ -65,4 +71,22 @@ describe('lint ratchet (#1381, #1387)', () => {
       expect(missing, `new ${kind} over ${table.base[kind]}: split the function, do not add an entry`).toEqual([]);
     });
   }
+
+  const testFiles = (dir: string): string[] => readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? testFiles(join(dir, e.name)) : e.name.endsWith('.ts') ? [join(dir, e.name)] : []);
+  const length = (file: string) => readFileSync(join(ROOT, file), 'utf8').split('\n').length - 1;
+
+  it.each(Object.entries(table.fileLines))('fileLines: %s is frozen at its real length, %i', (file, frozen) => {
+    const now = testFiles('tests/unit').includes(file) ? length(file) : undefined;
+    expect(now, `${file} is gone or renamed: delete or rename its fileLines entry`).toBeDefined();
+    expect(frozen, now! > frozen
+      ? `${file} grew to ${now} lines and a frozen file cannot grow: move the tests you added to a new tests/unit/*.test.ts, and leave the entry at ${frozen}`
+      : `${file} shrank to ${now} lines: lower the entry to ${now}`).toBe(now);
+    expect(frozen).toBeGreaterThan(table.base.fileLines);
+  });
+
+  it('fileLines: no test file over the base length is missing from the table', () => {
+    const missing = testFiles('tests/unit').filter((f) => length(f) > table.base.fileLines && !(f in table.fileLines));
+    expect(missing, `over ${table.base.fileLines} lines: put new tests in a new file, do not add an entry`).toEqual([]);
+  });
 });
