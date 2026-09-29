@@ -11,6 +11,6 @@ description: Add or change a curriculum topic (question generator) in Sky Ninja 
    - `say` = spoken form for non-readers; `visual` types are in `types.ts` (objects, tenframe, dots, array, coins, clock, fraction, word, sentence).
    - Spelling-in-order questions: return `sequence` (see `spellQ` in `util.ts`). Tracing topics: `mode: 'tracing'`, `answer` = text to trace.
 3. Register in the `*_TOPICS` array — in the year file for Reception and Year 1, in `year2-topics.ts` for Year 2 (#889), importing the generator from `year2.ts`: `{ id: 'y1-foo', title, icon, subject, year, nc, gen }`. Ids are `r-`, `y1-`, `y2-` prefixed and unique.
-4. Run `npm test` — the generic suite checks answer∈options, uniqueness, arithmetic correctness, ranges and variety for every topic × difficulty automatically. Add a targeted test in `tests/unit/curriculum.test.ts` only for a rule the generic suite can't infer.
+4. Run `npm test` — the generic suite checks answer∈options, uniqueness, arithmetic correctness, ranges and variety for every topic × difficulty automatically. Add a targeted test only for a rule the generic suite can't infer, in the topic's own `tests/unit/topic-<id>.test.ts`: `tests/unit/curriculum.test.ts` is frozen at its length (#1388).
 5. If the topic needs a new visual, add a case to `src/ui/visuals.ts` + CSS in `style.css`, then `npm run test:e2e`.
 6. Add the topic to `docs/CURRICULUM.md` — the issue closes with the pull request (`Closes #<n>`).
