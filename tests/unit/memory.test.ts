@@ -143,7 +143,7 @@ describe('memory decks', () => {
 describe('memory game', () => {
   const deck = () => pickTheme('year1', rng(1), 'words').pairs(rng(1));
   const partner = (g: Memory, i: number) => g.cards.findIndex((c, k) => k !== i && c.pair === g.cards[i].pair);
-  const other = (g: Memory, i: number) => g.cards.findIndex((c, k) => c.pair !== g.cards[i].pair && !c.matched);
+  const other = (g: Memory, i: number) => g.cards.findIndex((c) => c.pair !== g.cards[i].pair && !c.matched);
   it('shuffles two cards per pair and starts face down', () => {
     const g = new Memory(deck(), rng(2));
     expect(g.cards.length).toBe(12); expect(g.cards.every(c => !c.up && !c.matched)).toBe(true);

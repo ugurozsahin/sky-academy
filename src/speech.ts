@@ -3,7 +3,7 @@
 // talks to one SpeechEngine, chosen once — the web engine always, the native one (speech-native.ts) when the
 // APK's bridge has it registered.
 import { load, save, type SaveData } from './storage';
-import { chooseVoice, voiceScore, type VoiceLike } from './voice-score';
+import { chooseVoice } from './voice-score';
 import { nativeSpeechEngine } from './speech-native';
 export { chooseVoice, voiceScore, type VoiceLike } from './voice-score';
 

@@ -2,7 +2,7 @@
 // screens (#35): the alive-guarded timer helper, the #toast helper, teardown, and the "new sticker" markup.
 import { AVATARS, VILLAIN } from '../avatars';
 import { hush } from '../audio';
-import { $, esc, stars } from './dom';
+import { esc, stars } from './dom';
 
 // #885: the live screen's hardware/gesture back-button guard — module-wide, not per scope, because there is
 // only ever one screen showing at a time (the same invariant `onHidden`'s single `visibilitychange`
