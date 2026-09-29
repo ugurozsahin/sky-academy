@@ -2608,6 +2608,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(cards.first()).toHaveAttribute('data-mixed', '');
     await expect(cards.first()).toContainText('Mixed');
     const ids = await cards.evaluateAll(els => els.map(el => (el as HTMLElement).dataset.id).filter(Boolean));
+    expect(ids.length).toBeGreaterThan(0);   // the assertions below are vacuous on an empty list
     expect(ids.every(id => TOPICS.find(t => t.id === id)?.subject === 'maths')).toBe(true);
     expect(ids.some(id => TOPICS.find(t => t.id === id)?.input === 'tracing')).toBe(false);   // non-tracing only
   });
