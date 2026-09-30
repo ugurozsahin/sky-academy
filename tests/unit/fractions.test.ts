@@ -78,6 +78,17 @@ describe('fractions.ts: exact arithmetic for KS2 (#1044)', () => {
     expect(parseFrac('not a fraction')).toBeNull();
   });
 
+  // #1423 review round 4: fmtFrac itself never emits U+2212 (template-literal number-to-string only ever
+  // gives an ASCII '-'), but ks2num.ts's own fmt() deliberately does for every negative KS2 number — so a
+  // negative fraction/mixed-number KS2 answer built the way this codebase's own convention formats numbers
+  // must still parse, not just fmtFrac's own round-trip.
+  it('parseFrac reads a plain or mixed fraction signed with U+2212, same as a hyphen', () => {
+    expect(parseFrac('−3/4')).toEqual({ n: -3, d: 4 });
+    expect(parseFrac('-3/4')).toEqual({ n: -3, d: 4 });
+    expect(parseFrac('−1 1/2')).toEqual({ n: -3, d: 2 });
+    expect(parseFrac('-1 1/2')).toEqual({ n: -3, d: 2 });
+  });
+
   it('divWhole throws on a 0 divisor, the same as simplify does on a 0 denominator', () => {
     expect(() => divWhole({ n: 1, d: 2 }, 0)).toThrow(RangeError);
   });

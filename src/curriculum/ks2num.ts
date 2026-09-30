@@ -51,16 +51,26 @@ export function compareDec(a: Dec, b: Dec): -1 | 0 | 1 {
 export interface FmtOpts {
   /** Pad/trim the fraction to exactly this many places (money: "3.50"). Omit for "no trailing zeros". */
   fixedDp?: number;
+  /** A year (#1047): never comma-grouped ("1999", not "1,999"), whatever the digit count. */
+  year?: boolean;
 }
 
 /** Commas from four digits, U+2212 for negatives (never ASCII "-"), no trailing zeros unless `fixedDp`. */
 export function fmt(a: Dec, opts: FmtOpts = {}): string {
+  if (opts.year) {
+    if (opts.fixedDp !== undefined) throw new Error('fmt: year and fixedDp are mutually exclusive — a year has no decimal places');
+    // `dp` is storage scale, not an actual remainder (review round 1): `addDec`/alignment can leave a whole
+    // number at `dp > 0` — `dec(1999, 0)` plus `dec(0, 2)` is `{v: 199900, dp: 2}`, exactly 1999 — so the
+    // real test is whether `a.v` divides evenly at that scale, not whether `dp` is merely nonzero.
+    if (a.v % 10 ** a.dp !== 0) throw new Error('fmt: year given a fractional value — a year has no decimal places');
+    if (a.v < 0) throw new Error('fmt: year given a negative value — years are never negative');
+  }
   const negative = a.v < 0;
   const digits = String(Math.abs(a.v)).padStart(a.dp + 1, '0');
   const intDigits = a.dp > 0 ? digits.slice(0, digits.length - a.dp) : digits;
   let fracDigits = a.dp > 0 ? digits.slice(digits.length - a.dp) : '';
   fracDigits = opts.fixedDp !== undefined ? fracDigits.padEnd(opts.fixedDp, '0').slice(0, opts.fixedDp) : fracDigits.replace(/0+$/, '');
-  const grouped = intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const grouped = opts.year ? intDigits : intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return (negative && a.v !== 0 ? '−' : '') + grouped + (fracDigits ? '.' + fracDigits : '');
 }
 
