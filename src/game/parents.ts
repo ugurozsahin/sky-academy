@@ -41,6 +41,23 @@ export interface ParentSummary {
   weakest: TopicStat[]; strongest: TopicStat[];
   modes: ModeBest[];
   streakDays: number; coins: number; stickers: number; stickersTotal: number;
+  slips: SlipRow[];
+}
+/** One row of the "Recent slips" list (#938): a stored `Slip` (#903) with its topic resolved to an icon. */
+export interface SlipRow { icon: string; prompt: string; answer: string; picked: string; at: string }
+/**
+ * The last 20 wrong answers, newest first (`data.slips` is already stored that way — #903), for grown-ups.
+ * A slip whose topic id no longer exists in the registry (a removed or renamed topic) is dropped rather than
+ * shown with no icon, since nothing here can throw on a hand-edited or `Restore`-pasted save (#95's rule).
+ */
+export function recentSlips(data: SaveData, topics: Topic[]): SlipRow[] {
+  const byId = new Map(topics.map(t => [t.id, t]));
+  const rows: SlipRow[] = [];
+  for (const s of data.slips) {
+    const t = byId.get(s.topic); if (!t) continue;
+    rows.push({ icon: t.icon, prompt: s.prompt, answer: s.answer, picked: s.picked, at: s.at });
+  }
+  return rows;
 }
 
 /** Only topics a child has actually answered enough of for the accuracy to mean something rank against each other. */
@@ -96,6 +113,7 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
     strongest: [...ranked].sort((a, b) => byAcc(b, a)).slice(0, 4),
     modes,
     streakDays: data.streak.days, coins: data.coins, stickers: data.stickers.length, stickersTotal,
+    slips: recentSlips(data, topics),
   };
 }
 

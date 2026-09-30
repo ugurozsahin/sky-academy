@@ -92,49 +92,49 @@ describe('waveOptsFor: the spawn-options bridge to tests/unit/sim.test.ts (#126)
   const q = (extra: Partial<Omit<Question, 'hint' | 'hintIsData'>> = {}): Question => ({ prompt: 'p', answer: 'a', options: ['a', 'b'], ...extra });
 
   it('is wide when the question itself says so, whatever the label lengths', () => {
-    expect(waveOptsFor(q({ wide: true }), { labels: ['a', 'b'], speed: 2 }, 0).wide).toBe(true);
+    expect(waveOptsFor(q({ wide: true }), { labels: ['a', 'b'], speed: 2 }, []).wide).toBe(true);
   });
 
   it('is wide when any label is longer than two characters, even if the question does not say so (#482)', () => {
-    expect(waveOptsFor(q(), { labels: ['a', 'blaze'], speed: 2 }, 0).wide).toBe(true);
+    expect(waveOptsFor(q(), { labels: ['a', 'blaze'], speed: 2 }, []).wide).toBe(true);
   });
 
   // #482: this fallback used to read `> 3`, one character stricter than `wordQ`'s own `> 2` — a three-letter
   // label like 'cat' was wide by wordQ's count and narrow by this screen's, depending only on which generator
   // wrote the card. Both now go through the shared `wideFor`, so 'bee'/'cat' (three characters) are wide here.
   it('is wide once any label reaches three characters, the same boundary wordQ uses', () => {
-    expect(waveOptsFor(q(), { labels: ['a', 'bee', 'cat'], speed: 2 }, 0).wide).toBe(true);
+    expect(waveOptsFor(q(), { labels: ['a', 'bee', 'cat'], speed: 2 }, []).wide).toBe(true);
   });
 
   it('is not wide when the question says nothing and every label is two characters or fewer', () => {
-    expect(waveOptsFor(q(), { labels: ['a', 'be', 'ox'], speed: 2 }, 0).wide).toBe(false);
+    expect(waveOptsFor(q(), { labels: ['a', 'be', 'ox'], speed: 2 }, []).wide).toBe(false);
   });
 
   it('carries the labels and speed straight from info, untouched', () => {
-    const opts = waveOptsFor(q(), { labels: ['x', 'y'], speed: 3 }, 0);
+    const opts = waveOptsFor(q(), { labels: ['x', 'y'], speed: 3 }, []);
     expect(opts.labels).toEqual(['x', 'y']);
     expect(opts.speed).toBe(3);
   });
 
-  it('slices the sequence from the given index for an ordered question, or omits it for one with none', () => {
+  it('sends the given remaining targets as ordered for a sequence question, or omits it for one with none', () => {
     const sequence = ['one', 'two', 'three'];
-    expect(waveOptsFor(q({ sequence }), { labels: sequence, speed: 1 }, 1).ordered).toEqual(['two', 'three']);
-    expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, 0).ordered).toBeUndefined();
+    expect(waveOptsFor(q({ sequence }), { labels: sequence, speed: 1 }, ['two', 'three']).ordered).toEqual(['two', 'three']);
+    expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, []).ordered).toBeUndefined();
   });
 
   describe('gentleTarget (#700): the one label a gentle year gets a free relaunch on', () => {
     it('is the answer, for a gentle non-sequence question', () => {
-      expect(waveOptsFor(q({ answer: 'a' }), { labels: ['a', 'b'], speed: 1 }, 0, true).gentleTarget).toBe('a');
+      expect(waveOptsFor(q({ answer: 'a' }), { labels: ['a', 'b'], speed: 1 }, [], true).gentleTarget).toBe('a');
     });
     it('is undefined for a gentle SEQUENCE question — the sequence relaunch already covers it', () => {
       const sequence = ['one', 'two'];
-      expect(waveOptsFor(q({ sequence }), { labels: sequence, speed: 1 }, 0, true).gentleTarget).toBeUndefined();
+      expect(waveOptsFor(q({ sequence }), { labels: sequence, speed: 1 }, [], true).gentleTarget).toBeUndefined();
     });
     it('is undefined when the year is not gentle, whatever the question', () => {
-      expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, 0, false).gentleTarget).toBeUndefined();
+      expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, [], false).gentleTarget).toBeUndefined();
     });
     it('is undefined when `gentle` is omitted — every pre-#700 call site stays unaffected', () => {
-      expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, 0).gentleTarget).toBeUndefined();
+      expect(waveOptsFor(q(), { labels: ['a', 'b'], speed: 1 }, []).gentleTarget).toBeUndefined();
     });
   });
 });

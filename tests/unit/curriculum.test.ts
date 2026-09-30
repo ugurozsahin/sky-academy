@@ -2339,7 +2339,7 @@ describe('a hint is instruction text unless the generator says it is data (#328,
  */
 describe('a card\'s bubble width is derived from its options, never from its answer (#369)', () => {
   const setKey = (q: Question) => [...q.options].sort().join('\u0000');
-  const widthOf = (q: Question) => !!waveOptsFor(q, { labels: q.options, speed: 1 }, 0).wide;
+  const widthOf = (q: Question) => !!waveOptsFor(q, { labels: q.options, speed: 1 }, []).wide;
   const BUBBLE_TOPICS = TOPICS.filter(t => t.input !== 'tracing');       // a tracing mission has no wave
   const DRAWS = 400;
 

@@ -3,6 +3,7 @@ import type { Difficulty, Question, Topic, YearInfo } from '../curriculum';
 import { shuffle } from '../curriculum/util';
 import { MODES, type Mode, type ModeCtx, type ModeSpec } from './modes';
 import type { AnswerTally } from '../storage';
+import type { Slip } from '../save-records';
 export { repeatKey } from './repeat-key';
 import { repeatKey } from './repeat-key';
 
@@ -37,6 +38,13 @@ export interface SessionEvents {
 /** One entry in `SessionResult.misses` (#878): `picked` is the label a wrong slice actually chose, and `null`
  *  means the question was missed outright — the target bubble fell, or the wave ended with nothing decided. */
 export interface Miss { topic: string; q: Question; picked: string | null }
+/** `SessionResult.misses` → the shape a grown-ups "Recent slip" is stored as (#938; `at` is stamped by
+ *  `recordGameEnd()` itself, from its own `now`, not read here). `q.listen ?? q.prompt` so a spoken-only
+ *  card still reads as text; a fallen bubble's `null` pick becomes `''` (#903's `Slip.picked` is never null).
+ *  `misses` is newest-*last* (`recordMiss`'s own doc, just above) — reversed here the same way `fixDeck`
+ *  reverses it, so what `recordGameEnd` prepends is newest-first, matching every other reader of `Slip`. */
+export const missSlips = (misses: readonly Miss[]): Omit<Slip, 'at'>[] =>
+  [...misses].reverse().map(m => ({ topic: m.topic, prompt: m.q.listen ?? m.q.prompt, answer: m.q.answer, picked: m.picked ?? '' }));
 export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number; incomplete?: boolean; misses: Miss[] }
 
 /**

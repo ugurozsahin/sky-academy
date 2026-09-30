@@ -1,7 +1,7 @@
 import { avatarById, praiseLine, SENSEI, SENSEI_LINES, VILLAIN } from '../avatars';
 import { topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
-import { type Mode, type SessionResult, type DeckItem, type Miss } from '../game/session';
+import { missSlips, type Mode, type SessionResult, type DeckItem, type Miss } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import { Tracer, traceFeedback } from '../game/tracing';
@@ -217,7 +217,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     const { dojo, fresh } = recordGameEnd({
       mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo,
       stars: r.stars, score: r.score, training,
-      mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'),
+      mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'), slips: missSlips(r.misses),   // #938
     }, r.coins);
     const dojoSaved = !isWriteFailing() && !isReadOnlySave(); const streak = touchStreak();   // #518: read before this write overwrites the flag
     const cert = certInfo(r); lastCert = cert;
@@ -278,13 +278,13 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     answer: () => {
       const q = session.current; if (!q) return false;
       if (tracing) { tracer?.autoTrace(); return true; }
-      const label = q.sequence ? q.sequence[session.seqIndex] : q.answer;
+      const label = q.sequence ? session.remaining()[0] : q.answer;
       return arena!.hitLabel(label);
     },
     wrong: () => {
       const q = session.current; if (!q || !arena) return false;
-      const target = q.sequence ? q.sequence[session.seqIndex] : q.answer;
-      const b = arena.bubbles.find(x => x.launched && !x.dead && x.label !== target && x.label !== BOMB);
+      const targets = q.anyOrder ? session.remaining() : [q.sequence ? session.remaining()[0] : q.answer];
+      const b = arena.bubbles.find(x => x.launched && !x.dead && !targets.includes(x.label) && x.label !== BOMB);
       return b ? arena.hitLabel(b.label) : false;
     },
     bubbles: () =>

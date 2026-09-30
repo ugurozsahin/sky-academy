@@ -334,7 +334,7 @@ describe('every option label the curriculum can generate — the #348 sweep (def
         const draw = rng(topic.id.length * 11 + d);
         for (let i = 0; i < DRAWS; i++) {
           const q = topic.gen(d, draw);
-          const wide = !!waveOptsFor(q, { labels: q.options, speed: 1 }, 0).wide;
+          const wide = !!waveOptsFor(q, { labels: q.options, speed: 1 }, []).wide;
           const r = radiusFor(q.options, wide) * MARGIN;
           for (const label of q.options) {
             if (fitLabelLines(label, r, measure).state === 'overflow') found.add(key(topic.id, label));
