@@ -101,6 +101,20 @@ const NULLS = [
   // which throws inside `simplify` rather than returning anything at all.
   '5 + 3 = 8',       // no `?`/letter anywhere
   'n + 3 = n + 5',   // a genuine cancellation: the same coefficient on both sides
+  // Self-audit after round 3, looking for the same two shapes (an ORed refusal condition; a "throws
+  // instead of returning null" risk) at every other return-null site in the file, since three different
+  // reviewers have each found one of these the review before did not. Both confirmed by the same mutation
+  // method: readNumber's mixed-number branch checks a zero denominator on its own line, separate from the
+  // plain-fraction branch '3/0 + 1 = ?' above already covers — removing the mixed-number check leaves the
+  // suite green and throws `RangeError: simplify: denominator is 0` (the same class as the coefDiff finding
+  // above) instead of returning anything.
+  '2 3/0 + 1 = ?',
+  // ks2Solve's `if (!lhs || !rhs) return null;` is an OR of two reasons, the same shape divLin's own OR
+  // had in rounds 1-2 — every other null case here happens to put the malformed half on the lhs, so only
+  // that half was ever exercised. This one isolates the rhs half instead (lhs parses fine on its own):
+  // removing the `!rhs` half leaves the suite green here and throws `TypeError: Cannot read properties of
+  // null (reading 'coef')` at `sub(lhs.coef, rhs.coef)` instead of returning anything.
+  '5 = @',
   '',
 ];
 
