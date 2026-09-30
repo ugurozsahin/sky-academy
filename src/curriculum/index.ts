@@ -1,6 +1,7 @@
 import { RECEPTION_TOPICS } from './reception';
 import { YEAR1_TOPICS } from './year1';
 import { YEAR2_TOPICS } from './year2-topics';
+import { YEAR3_TOPICS } from './year3-topics';
 import { isKs2 } from './key-stage';
 import { meetsShowGate, previewAllYears } from './shown';
 import { YEARS, type Topic, type YearId, type YearInfo } from './types';
@@ -8,7 +9,7 @@ import { YEARS, type Topic, type YearId, type YearInfo } from './types';
 export * from './types';
 export * from './key-stage';
 export * from './shown';
-export const TOPICS: Topic[] = [...RECEPTION_TOPICS, ...YEAR1_TOPICS, ...YEAR2_TOPICS];
+export const TOPICS: Topic[] = [...RECEPTION_TOPICS, ...YEAR1_TOPICS, ...YEAR2_TOPICS, ...YEAR3_TOPICS];
 export const topicById = (id: string) => TOPICS.find(t => t.id === id);
 export const topicsFor = (year: YearId, subject?: Topic['subject']) => TOPICS.filter(t => t.year === year && (!subject || t.subject === subject));
 

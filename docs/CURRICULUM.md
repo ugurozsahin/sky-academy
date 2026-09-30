@@ -115,6 +115,15 @@ kg or l, and smaller objects in g and ml. (`y2-length` needed neither — its cm
 the m draw is an addition, not a rescue.) Owner's KS1 review, #298 slice 1; the rails are in
 `tests/unit/curriculum.test.ts`.
 
+## Year 3 — 7 q/stage, 3 lives
+The first KS2 shell (#1050): hidden behind `meetsShowGate` until it reaches 12 maths and 6 writing topics
+(`src/curriculum/shown.ts`), so it carries no island art yet and does not appear on the map. Every strand is
+its own module (`src/curriculum/year3-*.ts`), each with one `// slot: <id>` comment per planned topic — a
+later PR fills its own slot and touches no other line.
+
+Maths:
+- y3-count — count on and back in 4s, 8s, 50s and 100s; 10 or 100 more or less
+
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
 Reception phonics adds a second, cumulative dimension (#14): the letters a difficulty may use follow the Little Wandle / Letters and Sounds order — d1 phase 2 only, d2–3 every single-letter sound — for the answer **and** the decoys. The pools are derived from the Sound Hunt banks in `src/curriculum/util.ts`, so the phase order has one home. Missions have 5 stages (Apprentice, Warrior, Master, Grandmaster, Legend); each year maps stages → (difficulty, speed) in `YEARS[].diffs/speeds`.

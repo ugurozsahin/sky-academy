@@ -16,9 +16,8 @@ describe('isKs2 (#1032)', () => {
   it.each(['reception', 'year1', 'year2'] as const)('%s is not KS2', y => expect(isKs2(y)).toBe(false));
 
   // pr-test-analyzer review: only the false branch was covered above, which a broken negation
-  // (`EYFS_KS1.has(y)` for `!EYFS_KS1.has(y)`) would still pass unnoticed. No KS2 YearId exists yet (#1050+
-  // adds the first), so this casts a fabricated one to exercise the true branch ahead of that.
-  it('a hypothetical KS2 id is KS2', () => expect(isKs2('year3' as unknown as Parameters<typeof isKs2>[0])).toBe(true));
+  // (`EYFS_KS1.has(y)` for `!EYFS_KS1.has(y)`) would still pass unnoticed.
+  it('year3 (#1050, the first real KS2 id) is KS2', () => expect(isKs2('year3')).toBe(true));
 });
 
 describe('meetsShowGate: KS2 needs 12 maths + 6 writing, EYFS/KS1 keeps 6 + 3 (#1032)', () => {
@@ -75,11 +74,11 @@ describe('previewAllYears: the sna:years device key (#1032)', () => {
 describe('shownYears (#1032)', () => {
   beforeEach(() => localStorage.clear());
 
-  it('shows every YEARS row today — no KS2 year exists yet, so nothing is gated out', () => {
-    expect(shownYears().map(y => y.id)).toEqual(YEARS.map(y => y.id));
+  it('shows every EYFS/KS1 row, and gates year3 out (#1050: one topic, well short of 12 maths + 6 writing)', () => {
+    expect(shownYears().map(y => y.id)).toEqual(['reception', 'year1', 'year2']);
   });
 
-  it('the preview key shows every row too, since there is nothing to add yet', () => {
+  it('the preview key shows every row, including the gated year3', () => {
     localStorage.setItem(SHOWN_YEARS_KEY, 'all');
     expect(shownYears()).toEqual(YEARS);
   });

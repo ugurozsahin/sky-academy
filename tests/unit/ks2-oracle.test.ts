@@ -197,11 +197,18 @@ describe('arithmeticCheck (the generic loop\'s one call site, #1045)', () => {
 });
 
 describe('the wired check (curriculum.test.ts)', () => {
-  it('no KS2 topic exists yet — isKs2 never fires today, so the wiring is inert until Y3–Y6 land', () => {
-    // #1045 lands ahead of the year registry (isKs2 is #1032's stub in key-stage.ts): this pins that fact so
-    // the day a KS2 YearId is added, this test goes red as the signal to look here rather than ship a KS2
-    // card whose arithmetic silently went unchecked by the oracle this issue built for it.
-    expect(TOPICS.some((t) => isKs2(t.year))).toBe(false);
+  it('a KS2 topic now exists (#1050) and the wiring is live', () => {
+    // The tripwire this used to be ("no KS2 topic exists yet") has done its job: `y3-count` is the first real
+    // KS2 topic, so `curriculum.test.ts`'s generic loop now calls `arithmeticCheck(true, ...)` for real draws.
+    expect(TOPICS.some((t) => isKs2(t.year))).toBe(true);
+  });
+  it('y3-count\'s own prompts are outside ks2Solve\'s linear-equation grammar (null, not a false negative)', () => {
+    // `y3-count`'s two card kinds are a sequence run ("12, 16, ?, 24") and an English "N more/less than" phrase
+    // — neither is an arithmetic expression, so `arithmeticCheck` falls through to `null` (curriculum.test.ts's
+    // own "if (arith !== null)" gate treats that as no opinion, not a failure). The oracle for this topic's own
+    // arithmetic is its dedicated `topic-y3-count.test.ts`, per #1050's acceptance criteria — not this shared one.
+    expect(arithmeticCheck(true, '12, 16, ?, 24 = ?', '20')).toBeNull();
+    expect(arithmeticCheck(true, '10 more than 347 = ?', '357')).toBeNull();
   });
 
   it('sameValue agrees with a real KS1 topic\'s own numeric answers, as a sanity check on the plumbing', () => {

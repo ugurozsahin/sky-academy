@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi } from 'vitest';
-import { TOPICS, topicsFor, YEARS } from '../../src/curriculum';
+import { TOPICS, topicsFor, YEARS, shownYears } from '../../src/curriculum';
 import { YEAR2_TOPICS } from '../../src/curriculum/year2-topics';
 import type { Topic } from '../../src/curriculum';
 import type { Difficulty, Question, Rng } from '../../src/curriculum';
@@ -37,11 +37,11 @@ describe('topic registry', () => {
   it('has unique ids and every year has maths + writing', () => {
     const ids = TOPICS.map(t => t.id);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const y of YEARS) {
+    for (const y of shownYears()) {
       // The EYFS/KS1 6-maths/3-writing minimum and each KS2 shell's gate are `island-gate.test.ts`'s now (#1040).
-      // #908: Sky Storm/Ninja Sprint/Boss Battle now pool topicsFor(year, subject) filtered to non-tracing —
-      // an empty pool reaches Session.pickTopic() untouched (no fallback, unlike the old whole-year default)
-      // and crashes rather than degrading, so this must never be empty for either subject.
+      // #908: Sky Storm/Ninja Sprint/Boss Battle now pool topicsFor(year, subject) filtered to non-tracing — an
+      // empty pool reaches Session.pickTopic() untouched and crashes — never empty for either subject, for any
+      // year a player can reach (`shownYears()`, not raw `YEARS`: a hidden KS2 shell is built one topic at a time).
       for (const s of ['maths', 'writing'] as const)
         expect(topicsFor(y.id, s).filter(t => t.input !== 'tracing').length, `${y.id} ${s}`).toBeGreaterThan(0);
     }

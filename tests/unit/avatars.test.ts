@@ -93,11 +93,15 @@ describe('Master Ninja', () => {
     const ids = TOPICS.map(t => t.id);
     const islands = YEARS.map(y => topicsFor(y.id));
     expect(masterProgress(islands, {})).toEqual({ done: 0, total: 3, unlocked: false });
-    // ids[0] is the very first registered topic (reception), so leaving it unstarred leaves its island short —
-    // the other two islands are still fully starred, and `done` counts islands, not topics.
-    const allButOne = masterProgress(islands, starred(ids.slice(1), 3));
+    // ids[0] is the very first registered topic (reception); `y3-count` (#1050) is the only Year 3 topic
+    // today, so leaving both unstarred leaves reception's and Year 3's islands short — the other two
+    // (Year 1, Year 2) are still fully starred, and `done` counts islands, not topics.
+    const allButOne = masterProgress(islands, starred(ids.filter(id => id !== ids[0] && id !== 'y3-count'), 3));
     expect(allButOne).toEqual({ done: 2, total: 3, unlocked: false });
-    expect(masterProgress(islands, { ...starred(ids), [ids[0]]: { stars: 0, best: 50, plays: 4 } }).unlocked).toBe(false);   // played but never won
+    // Star everything except reception's first topic (played but never won) and leave Year 3 untouched, so
+    // only Year 1 and Year 2 are fully done — one short of the three-island bar.
+    const almostAll = ids.filter(id => id !== 'y3-count');
+    expect(masterProgress(islands, { ...starred(almostAll), [ids[0]]: { stars: 0, best: 50, plays: 4 } }).unlocked).toBe(false);   // played but never won
     expect(masterProgress(islands, starred(ids)).unlocked).toBe(true);
     expect(masterProgress([], {}).unlocked).toBe(false);
   });
