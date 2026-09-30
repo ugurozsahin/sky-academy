@@ -13,6 +13,14 @@ import ts from 'typescript';
  */
 export const SOURCES = import.meta.glob('/src/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
+/** Every `src/storage/*.ts` part joined in path order, for the rails that read storage as one text (#1415). Throws
+ *  on none: a moved folder must not turn every storage rail vacuous. */
+export const STORAGE_SRC = ((): string => {
+  const parts = Object.keys(SOURCES).filter((p) => p.startsWith('/src/storage/')).sort();
+  if (parts.length === 0) throw new Error('no src/storage/*.ts modules found — every storage rail would pass vacuously');
+  return parts.map((p) => SOURCES[p]).join('\n');
+})();
+
 const WORKFLOWS = new URL('../../../.github/workflows/', import.meta.url);
 
 // Vite's glob does not reach `.github/`, so these are read from disk. `readFileSync` throwing on a path that
