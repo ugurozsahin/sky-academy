@@ -441,12 +441,14 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     expect(sayIsSafe('')).toBe(true);
   });
 
-  // The registry sweep runs zero times today — no KS2 (`isKs2`) topic exists yet — so this loop is proven
-  // vacuous rather than silently always-passing, per the issue's own framing. It starts checking real cards
-  // the moment the first KS2 topic lands, with no test to write then.
+  // The registry sweep ran zero times when this file first landed — no KS2 (`isKs2`) topic existed yet —
+  // proven vacuous rather than silently always-passing, per the issue's own framing. #1050's Year 3 shell
+  // (merged after this PR opened) shipped the first one (`y3-count`), so the sweep now checks a real topic;
+  // the `>= 1` keeps this test itself from quietly going vacuous again if that topic is ever renamed away
+  // from KS2, the same way the old `toBe(0)` pinned the previous state.
   it('every KS2 topic\'s say (or prompt) is free of raw notation, 150 draws per difficulty', () => {
     const ks2Topics = TOPICS.filter(t => isKs2(t.year));
-    expect(ks2Topics.length).toBe(0); // update this once a KS2 topic ships (#1050 is blocked)
+    expect(ks2Topics.length).toBeGreaterThanOrEqual(1);
     for (const topic of ks2Topics) {
       for (const d of [1, 2, 3] as Difficulty[]) {
         const draw = rng(d * 1000 + topic.id.length);
