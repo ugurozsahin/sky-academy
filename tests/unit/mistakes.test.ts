@@ -159,28 +159,36 @@ describe('mistakes (#1058): misconception decoys', () => {
     });
 
     it('£5.00: the last-digit fill steps by the printed place, not the raw dp past a trailing zero', () => {
-      // answer prints "5" (dp 2 internally, but no fractional digits shown) — a fill derived from raw dp
-      // would step by 0.10 (giving 4.90/5.10, last printed digit 9/1, never matching "5"); the real fix
-      // steps by 10 (the ones place actually printed), giving 15/−5, both ending in the printed digit 5.
+      // n = 1 and a range narrow enough ([1,20]) to exclude every rule candidate (signFlip's −5,
+      // placeValueShift's ÷10 = 0.5, its ×10 = 50, wrongOperation's −1) isolates fillLast's own fallback as
+      // the only possible source of the single returned decoy — round 8's review found the original fixture
+      // let signFlip/placeValueShift coincidentally supply a last-digit-5 candidate ahead of the fallback,
+      // so the fallback itself was never actually exercised. A fill derived from raw dp (2) would step by
+      // 0.10 (giving 4.90/5.10, last printed digit 9/1, neither in range or matching); the real fix steps by
+      // 10 (the ones place actually printed), giving 15 — deterministic across every seed.
       const calc = numCalc(200, 300, 500, 2);
       const r = rng(5);
       for (let i = 0; i < 50; i++) {
-        const vals = decoysFor('add', calc, 3, r, { min: -20, max: 20 }).map(label);
-        const lastDigits = vals.map(s => s.replace(/[^0-9]/g, '').slice(-1));
-        expect(lastDigits, `draw ${i}: no decoy shares £5.00's printed last digit`).toContain('5');
+        const vals = decoysFor('add', calc, 1, r, { min: 1, max: 20 }).map(label);
+        expect(vals, `draw ${i}: fillLast's own fallback did not deliver the printed-place fill`).toEqual(['15']);
       }
     });
 
-    it('1.5 + 3.5 = 5.0: the leading-digit fill steps by the printed place too, not the raw dp (round 5, #1435)', () => {
-      // 5.0 prints "5" (bare fmt trims the trailing zero) — fillLead used to step by the raw dp (1), giving
-      // 5.1/4.9: a decoy with a decimal point where the answer's own printed form has none, an instant tell.
-      const calc = numCalc(15, 35, 50, 1);
+    it('27.0 + 27.0 = 54.0: the leading-digit fill steps by the printed place too, not the raw dp (round 5/8, #1435)', () => {
+      // n = 1 and a range narrow enough ([50,58]) to exclude every rule candidate (carrySlip's 64/44,
+      // placeValueShift's ×10/÷10, signFlip's −54, swappedDigits' 45, wrongOperation's 0) and fillLast's own
+      // fallback (its 64/44 both fall outside the range too) isolates fillLead's fallback as the only
+      // possible source. Round 8's review found the original 1.5+3.5=5.0 fixture's leading-digit guarantee
+      // was never actually met by any mechanism (single-digit answer, ±1 step always changes the one digit
+      // it has), so the assertion — gated on a leading digit that never appeared — silently never ran. Here
+      // 54.0 prints "54" (dp 1 internally, no fractional digit shown): a fill derived from raw dp (1) would
+      // step by 0.1, giving "54.1" — a decoy with a decimal point where the answer's own printed form has
+      // none; the real fix steps by 1 (the ones place actually printed), giving 55 — deterministic, no leak.
+      const calc = numCalc(270, 270, 540, 1);
       const r = rng(31);
       for (let i = 0; i < 100; i++) {
-        const vals = decoysFor('add', calc, 3, r, { min: 0, max: 20 }).map(label);
-        // Only decoys sharing the answer's own leading digit ('5') are this fill's business — a decimal
-        // elsewhere (e.g. a carry-slip candidate like "0.5") is a different rule's legitimate output.
-        for (const v of vals) if (v[0] === '5') expect(v, `draw ${i}: decoy ${v} shares the leading digit but leaks extra precision`).not.toContain('.');
+        const vals = decoysFor('add', calc, 1, r, { min: 50, max: 58 }).map(label);
+        expect(vals, `draw ${i}: fillLead's own fallback did not deliver the printed-place fill`).toEqual(['55']);
       }
     });
 
