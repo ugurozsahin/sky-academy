@@ -31,7 +31,10 @@ export function solve(prompt: string): number | null {
 
 const ZERO: Frac = { n: 0, d: 1 };
 const isZero = (f: Frac) => f.n === 0;
-const reciprocal = (f: Frac): Frac => ({ n: f.d, d: f.n });
+/** `simplify`s the flipped fraction, since a raw `{ n: f.d, d: f.n }` can carry `f.n`'s sign on `d` instead
+ * of `n` — a call site that took it at face value rather than re-normalising through `mul`/`sub` first would
+ * violate `Frac`'s own invariant (#1423 review). Callers guard `f` non-zero first; `f.n` is never 0 here. */
+const reciprocal = (f: Frac): Frac => simplify({ n: f.d, d: f.n });
 
 /** A value that may still depend on the one unknown: `coef * x + const`. A plain number is `coef = 0`. */
 interface Lin { readonly coef: Frac; readonly const: Frac }
@@ -55,7 +58,7 @@ function divLin(a: Lin, b: Lin): Lin | null {
 
 type Tok =
   | { k: 'num'; v: Frac }
-  | { k: 'unk' }
+  | { k: 'unk'; letter?: string }
   | { k: 'op'; v: '+' | '-' | '×' | '÷' }
   | { k: 'lparen' }
   | { k: 'rparen' };
@@ -98,7 +101,6 @@ const SIMPLE_TOKENS: Record<string, Tok> = {
   '(': { k: 'lparen' }, ')': { k: 'rparen' },
   '+': { k: 'op', v: '+' }, '-': { k: 'op', v: '-' }, '−': { k: 'op', v: '-' },
   '×': { k: 'op', v: '×' }, '*': { k: 'op', v: '×' }, '÷': { k: 'op', v: '÷' }, '/': { k: 'op', v: '÷' },
-  '?': { k: 'unk' },
 };
 const isLower = (c: string) => c >= 'a' && c <= 'z';
 const isDigit = (c: string) => c >= '0' && c <= '9';
@@ -114,16 +116,30 @@ function readNumberTokens(s: string, i: number): { toks: Tok[]; next: number } |
   return { toks, next };
 }
 
+/** Shared across both sides of one equation (`ks2Solve` passes the same object to both `tokenize` calls),
+ * so `letterOf` can refuse a second, different unknown symbol wherever in the prompt it turns up — "at most
+ * one unknown" is a claim about the whole equation, not about either side read on its own, and `?` and a
+ * letter are two different symbols even though both parse as `UNKNOWN` (#1423 review: `'? + n = 10'`). `'?'`
+ * itself stands in for "the `?` symbol was the unknown seen so far", never a real variable name. */
+interface LetterState { letter: string | null }
+
 /** Tokenises a linear expression: `+ - − × ÷ ( )`, number literals, and `?`/a single lowercase letter as the
  * one unknown. A digit run immediately followed by a letter (`3n`) is an implicit `×`. `null` on anything
- * this grammar does not cover (a word, an unsupported symbol, a malformed number). */
-function tokenize(s: string): Tok[] | null {
+ * this grammar does not cover (a word, an unsupported symbol, a malformed number, a second distinct letter). */
+function tokenize(s: string, letterOf: LetterState): Tok[] | null {
   const toks: Tok[] = [];
   let i = 0;
   while (i < s.length) {
     const c = s[i];
     if (c === ' ') { i++; continue; }
     if (c in SIMPLE_TOKENS) { toks.push(SIMPLE_TOKENS[c]); i++; continue; }
+    if (c === '?') {
+      if (letterOf.letter !== null && letterOf.letter !== '?') return null;   // e.g. "? + n" — two symbols
+      letterOf.letter = '?';
+      toks.push({ k: 'unk' });
+      i++;
+      continue;
+    }
     if (isDigit(c)) {
       const read = readNumberTokens(s, i);
       if (!read) return null;
@@ -131,7 +147,13 @@ function tokenize(s: string): Tok[] | null {
       i = read.next;
       continue;
     }
-    if (isLower(c)) { toks.push({ k: 'unk' }); i++; continue; }
+    if (isLower(c)) {
+      if (letterOf.letter !== null && letterOf.letter !== c) return null;   // a second, different letter
+      letterOf.letter = c;
+      toks.push({ k: 'unk', letter: c });
+      i++;
+      continue;
+    }
     return null;
   }
   return toks;
@@ -143,7 +165,7 @@ interface Cur { i: number }
 function parseFactor(t: Tok[], c: Cur): Lin | null {
   const tok = t[c.i];
   if (!tok) return null;
-  if (tok.k === 'op' && tok.v === '-') { c.i++; const f = parseFactor(t, c); return f && { coef: { n: -f.coef.n, d: f.coef.d }, const: { n: -f.const.n, d: f.const.d } }; }
+  if (tok.k === 'op' && tok.v === '-') { c.i++; const f = parseFactor(t, c); return f && subLin(known(ZERO), f); }
   if (tok.k === 'num') { c.i++; return known(tok.v); }
   if (tok.k === 'unk') { c.i++; return UNKNOWN; }
   if (tok.k === 'lparen') {
@@ -190,8 +212,8 @@ function parseExpr(t: Tok[], c: Cur): Lin | null {
 
 /** `s` read whole as one linear expression (brackets and precedence honoured), or `null` if any of it is
  * left over — a partial parse is not a reading of the prompt. */
-function readSide(s: string): Lin | null {
-  const toks = tokenize(s.trim());
+function readSide(s: string, letterOf: LetterState): Lin | null {
+  const toks = tokenize(s.trim(), letterOf);
   if (!toks || toks.length === 0) return null;
   const c: Cur = { i: 0 };
   const lin = parseExpr(toks, c);
@@ -210,8 +232,9 @@ export function ks2Solve(prompt: string): Frac | null {
   const rewritten = prompt.replace(/(\d+)%/g, '($1/100)').replace(/\bof\b/g, '×');
   const eq = rewritten.indexOf('=');
   if (eq === -1) return null;
-  const lhs = readSide(rewritten.slice(0, eq));
-  const rhs = readSide(rewritten.slice(eq + 1));
+  const letterOf: LetterState = { letter: null };
+  const lhs = readSide(rewritten.slice(0, eq), letterOf);
+  const rhs = readSide(rewritten.slice(eq + 1), letterOf);
   if (!lhs || !rhs) return null;
   const coefDiff = sub(lhs.coef, rhs.coef);
   if (isZero(coefDiff)) return null;   // no unknown at all (not this oracle's job), or it cancelled out

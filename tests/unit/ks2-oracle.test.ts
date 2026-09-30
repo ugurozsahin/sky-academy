@@ -52,11 +52,14 @@ const KNOWN: [string, Frac][] = [
   ['60% of 45 = ?', f(27)],
   ['7/10 of 200 = ?', f(140)],
   ['? − 6 = −2', f(4)],
+  // the same letter, used consistently on both sides of the `=`, is not "two unknowns" (#1423 review)
+  ['n + 3 = 2n − 1', f(4)],
 ];
 
 // A prompt this oracle deliberately does not answer: a word problem, an instruction rather than an
 // equation, an unsupported symbol, a malformed number, division by zero, or a non-linear equation
-// (two unknown factors, or dividing by an expression that still carries the unknown).
+// (two unknown factors, dividing by an expression that still carries the unknown, or two distinct
+// unknown letters, since "at most one unknown" is a claim about the whole equation).
 const NULLS = [
   'What is half of 10?',
   'Round 34,567 to the nearest 1,000',
@@ -65,7 +68,16 @@ const NULLS = [
   '5 @ 3 = ?',
   'n × n = 9',
   '36 ÷ n = 4',
+  // #1423 review: divLin's refusal ORs "divisor still carries the unknown" with "divisor is 0" — the case
+  // above has both true at once, so it cannot tell the two reasons apart. Here the divisor (n + 1) is never
+  // 0-valued as a constant (its `const` is 1), so only the unknown-coefficient half can be catching this.
+  '36 ÷ (n + 1) = 4',
   '10 ÷ 0 = ?',
+  // #1423 review: every KNOWN bracket case is well-formed, so an unbalanced one never exercised the
+  // rparen check at all.
+  '(5 + 3 = ?',
+  'n + m = 10',
+  '? + n = 10',
   '5 + = 8',
   '',
 ];
