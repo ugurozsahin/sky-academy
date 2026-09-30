@@ -241,11 +241,11 @@ describe('guard rails', () => {
   // lists are exact, so a second runtime dependency is still a red build until it is argued for here.
   // #881: `@capacitor-community/text-to-speech` is the same exception again — the Android WebView has no
   // `speechSynthesis` (crbug 40417848), so `cap sync` needs the plugin's native code to give read-aloud a
-  // device to speak through there. Pinned at an exact version (`npm i -D -E`, not `^`), per the issue.
+  // device to speak through there. Pinned at an exact version (`npm i -D -E`, not `^`), per the issue. #882: `@capacitor/haptics` is the same exception again — the app manifest declares no `VIBRATE` permission of its own, so `navigator.vibrate` silently does nothing in the APK; `src/audio.ts`'s `haptic()` is unchanged and never imports the plugin, present only for its own library manifest's `VIBRATE` line, which the merger folds in.
   // #1381 (owner, in session, 2026-09-29): `eslint` and `typescript-eslint` run two rules only, `complexity` and
   // `max-lines-per-function` (`eslint.config.js`); exact versions, because `lint-ratchet.test.ts` reads rule messages.
   it('dependencies match the allowlist below (CLAUDE.md explains the rule)', () => {
-    const allowed = ['@capacitor-community/text-to-speech', '@capacitor/android', '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/share', '@playwright/test', '@types/three', 'eslint', 'typescript', 'typescript-eslint', 'vite', 'vitest'];
+    const allowed = ['@capacitor-community/text-to-speech', '@capacitor/android', '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/filesystem', '@capacitor/haptics', '@capacitor/share', '@playwright/test', '@types/three', 'eslint', 'typescript', 'typescript-eslint', 'vite', 'vitest'];
     expect(Object.keys((pkg as { dependencies?: object }).dependencies ?? {})).toEqual(['three']);   // #684: the one thing that ships to the browser beside our own code
     expect(Object.keys((pkg as { devDependencies?: object }).devDependencies ?? {}).sort()).toEqual([...allowed].sort());
   });
@@ -254,16 +254,16 @@ describe('guard rails', () => {
   // describe block at the end of this file — `three.js: the src/three/ tree, the flag and the bundle (#714)`.
 
 
-  // #110/#699/#881: `@capacitor/filesystem`/`@capacitor/share`/`@capacitor/app`/`@capacitor-community/text-to-speech`
+  // #110/#699/#881/#882: `@capacitor/filesystem`/`@capacitor/share`/`@capacitor/app`/`@capacitor-community/text-to-speech`/`@capacitor/haptics`
   // exist only so `npx cap sync` registers their native Android code; the web bundle must never import any of
   // them (that would ship Capacitor's own wrapper code — and the web-only build's `dist/` output — to every
   // non-APK player). `src/native.ts`'s `plugin()` reads them off the injected bridge instead (`src/speech-native.ts`
-  // for the text-to-speech one), the same pattern `isNativeShell` already uses for `@capacitor/core`. Proved red
+  // for the text-to-speech one), the same pattern `isNativeShell` already uses for `@capacitor/core`. `haptic()` in `src/audio.ts` never imports `@capacitor/haptics` either — present only for its manifest's `VIBRATE` line. Proved red
   // first: added `import '@capacitor/share'` to a scratch file under `src/`, watched this fail, removed it.
-  it('src/ never imports @capacitor/filesystem, @capacitor/share, @capacitor/app or @capacitor-community/text-to-speech (#110, #699, #881)', () => {
+  it('src/ never imports @capacitor/filesystem, @capacitor/share, @capacitor/app, @capacitor-community/text-to-speech or @capacitor/haptics (#110, #699, #881, #882)', () => {
     for (const [path, src] of Object.entries(SOURCES)) {
       expect(src, `${path} must read the Capacitor plugin bridge, not import the plugin package`)
-        .not.toMatch(/\bimport\s*\(?[^;]*['"]@capacitor\/(filesystem|share|app)['"]/);
+        .not.toMatch(/\bimport\s*\(?[^;]*['"]@capacitor\/(filesystem|share|app|haptics)['"]/);
       expect(src, `${path} must read the Capacitor plugin bridge, not import the plugin package`)
         .not.toMatch(/\bimport\s*\(?[^;]*['"]@capacitor-community\/text-to-speech['"]/);
     }
