@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ALL_AVATARS, AVATARS, avatarById, MASTER, nameElementCollide, praiseLine, SENSEI, SENSEI_LINES, senseiLine, welcomeLine } from '../../src/avatars';
 import { masterProgress } from '../../src/game/sensei';
-import { TOPICS, YEARS, topicsFor, type Topic } from '../../src/curriculum';
+import { TOPICS, YEARS, isKs2, topicsFor, type Topic } from '../../src/curriculum';
 import { STICKER_IDS, type TopicProgress } from '../../src/storage';
 
 const starred = (ids: string[], stars = 1): Record<string, TopicProgress> => Object.fromEntries(ids.map(id => [id, { stars, best: 0, plays: 1 }]));
@@ -92,12 +92,19 @@ describe('Master Ninja', () => {
   it('unlocks only when every topic on three islands has at least one star (#1039 Decision D7)', () => {
     const ids = TOPICS.map(t => t.id);
     const islands = YEARS.map(y => topicsFor(y.id));
+    // Every KS2 topic (#1050+), computed rather than named, so a future Year 3 slot filling in doesn't
+    // silently stop this fixture from also leaving that island short.
+    const ks2Ids = new Set(TOPICS.filter(t => isKs2(t.year)).map(t => t.id));
     expect(masterProgress(islands, {})).toEqual({ done: 0, total: 3, unlocked: false });
-    // ids[0] is the very first registered topic (reception), so leaving it unstarred leaves its island short —
-    // the other two islands are still fully starred, and `done` counts islands, not topics.
-    const allButOne = masterProgress(islands, starred(ids.slice(1), 3));
+    // ids[0] is the very first registered topic (reception); leaving it and every KS2 topic unstarred
+    // leaves reception's and the KS2 island(s) short — Year 1 and Year 2 are still fully starred, and
+    // `done` counts islands, not topics.
+    const allButOne = masterProgress(islands, starred(ids.filter(id => id !== ids[0] && !ks2Ids.has(id)), 3));
     expect(allButOne).toEqual({ done: 2, total: 3, unlocked: false });
-    expect(masterProgress(islands, { ...starred(ids), [ids[0]]: { stars: 0, best: 50, plays: 4 } }).unlocked).toBe(false);   // played but never won
+    // Star everything except reception's first topic (played but never won) and leave every KS2 topic untouched, so
+    // only Year 1 and Year 2 are fully done — one short of the three-island bar.
+    const almostAll = ids.filter(id => !ks2Ids.has(id));
+    expect(masterProgress(islands, { ...starred(almostAll), [ids[0]]: { stars: 0, best: 50, plays: 4 } }).unlocked).toBe(false);   // played but never won
     expect(masterProgress(islands, starred(ids)).unlocked).toBe(true);
     expect(masterProgress([], {}).unlocked).toBe(false);
   });

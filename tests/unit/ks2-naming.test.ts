@@ -23,12 +23,11 @@ describe('KS2 naming rule (#1041): plain titles, functional icons, no emoji-coun
   it.each(['reception', 'year1', 'year2'] as const)('%s is not KS2', y => { expect(isKs2(y)).toBe(false); });
 
   it('every KS2 registry row draws 150 questions at each difficulty with no naming problem', () => {
-    // With no KS2 YearId defined yet (#1050+ adds the first), this set is empty and the sweep passes by having
-    // nothing to check — the fixtures below carry the proof until a real KS2 topic lands. Asserted directly
+    // #1050 landed the first KS2 topic (`y3-count`): the sweep below is now live. Asserted directly
     // (pr-test-analyzer review), not left to a bare unasserted loop: a vacuous rail is worse than none
     // (the same idiom `tests/unit/avatars.test.ts`'s roster-length check uses).
     const ks2 = TOPICS.filter(t => isKs2(t.year));
-    expect(ks2.length, 'no KS2 topics yet (#1050+) — this sweep is inert until one lands').toBe(0);
+    expect(ks2.length, 'the KS2 registry sweep must have at least one real topic to check').toBeGreaterThan(0);
     for (const t of ks2) expect(namingProblems(t, 150), t.id).toEqual([]);
   });
 

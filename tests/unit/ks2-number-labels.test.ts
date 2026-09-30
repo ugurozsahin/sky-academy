@@ -263,10 +263,9 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
         }
       }
     }
-    // Not a vacuous pass by accident: nothing in `TOPICS` is `isKs2` yet (Year 3+ ships behind #1050,
-    // still `blocked`), so this loop runs zero times today and the rail is proven only against `fmt()`
-    // above. It starts checking real topics the moment the first one lands, with no test to write then.
-    expect(ks2Topics.length, 'update this comment once a KS2 topic exists to check').toBe(0);
+    // Not a vacuous pass by accident: #1050 landed the first KS2 topic (`y3-count`), so this loop now runs
+    // for real rather than being proven only against `fmt()` above.
+    expect(ks2Topics.length, 'the KS2 registry sweep must have at least one real topic to check').toBeGreaterThan(0);
   });
 
   it.each([

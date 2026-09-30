@@ -9,7 +9,7 @@ import { topicsFor, type Topic, type YearInfo } from '../curriculum';
 import { load, safeRecord, type TopicProgress } from '../storage';
 import { $ } from './dom';
 import { resultsHTML } from './overlays';
-import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, type ResultCandidate } from './results';
+import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, scoreLine, type ResultCandidate } from './results';
 import { dojoRowsHTML } from './memory';
 import { stickersHTML } from './screen';
 import { deliverCertificate, drawCertificate } from './certificate';
@@ -77,6 +77,7 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     const heading = r.incomplete ? 'Session ended early' : practice ? 'Mistakes fixed!' : resultHeading(r.mode, { won: r.won, training });   // from the mode table (mission distinguishes a Sensei-training win)
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
+    say(scoreLine(r), false, { queue: true });   // #897: how they did, not only a praise line — queued after the headline
     const lines = resultsLines(candidates);   // #896: belt > island > trophy > best > rest, at most two
     for (const l of lines) say(l.text, false, { queue: true });   // queued so a candidate never cuts the headline off
     // `certSaved` (#470) is read the instant after `fileCertificate`'s own write, inside `commitResult()` —

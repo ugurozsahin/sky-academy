@@ -11,12 +11,11 @@ function rng(seed: number) {
 const DRAWS = 150;
 
 describe('R-LBL (#1046): every KS2 bubble label reads at 13px or above on a 390px phone', () => {
-  // With no KS2 YearId defined yet (#1050+ adds the first), this set is empty and the sweep passes by having
-  // nothing to check — the fixtures below carry the proof until a real KS2 topic lands (same idiom as
-  // `ks2-naming.test.ts`'s own registry sweep).
+  // #1050 landed the first KS2 topic (`y3-count`): the sweep below is now live, not vacuous — asserted
+  // directly (not left to a bare unasserted loop) so a future KS2 topic never quietly shrinks this set back to 0.
   it('every KS2 registry row draws 150 questions at each difficulty with no unreadable label', () => {
     const ks2 = TOPICS.filter(t => isKs2(t.year));
-    expect(ks2.length, 'no KS2 topics yet (#1050+) — this sweep is inert until one lands').toBe(0);
+    expect(ks2.length, 'the KS2 registry sweep must have at least one real topic to check').toBeGreaterThan(0);
     for (const t of ks2) {
       for (const d of [1, 2, 3] as const) {
         const r = rng(1046_000 + d);
