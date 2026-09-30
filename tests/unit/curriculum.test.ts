@@ -2311,8 +2311,8 @@ describe('a hint is instruction text unless the generator says it is data (#328,
  *
  * `bubbleRadius` draws a wide wave 1.25x bigger (41 px against 33 px on a 390x700 arena), so as long as
  * `wide` was read off the answer alone, every card whose options differ in length sized the correct bubble
- * differently from its decoys — on a two-option card (`r-oddeven`'s `yes`/`no`, `y1-coins` d2's `50p`/`1p`)
- * a child who never read the picture could slice by size.
+ * differently from its decoys — on a two-option card (the yes/no shape `r-oddeven` used before #898,
+ * `y1-coins` d2's `50p`/`1p`) a child who never read the picture could slice by size.
  *
  * The check is the one that found the bug: group a cell's cards by their option **set** and require the
  * width to be the same for every card in a group. Two cards offering the same bubbles must look the same.
