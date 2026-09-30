@@ -127,6 +127,42 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     expect(labelProblems('There were 1999 apples in 1999.', { years: [1999] })).toHaveLength(2);
   });
 
+  it('a coordinate with a sign or a decimal-tailed component is still recognised as one (review round 5)', () => {
+    // "(−3,4500)" — the round-3 coordinate check looked at the character right before the digit run, which
+    // is the sign for a negative first component, not "(". "(19,99.5)" — the "after" check expected ")"
+    // right after the integer part, but a decimal point sits there instead. Both are ordinary coordinates.
+    expect(labelProblems('(−3,4500)')).toEqual([]);
+    expect(labelProblems('(19,99.5)')).toEqual([]);
+  });
+
+  it('money always wins over a coincidental year value, in both directions (review round 5)', () => {
+    // Correct money equal to a named year is still just money, not "a year written with a comma" — and
+    // malformed money equal to a named year is still a grouping defect, not exempted as "the year".
+    expect(labelProblems('The prize is £1,999.', { years: [1999] })).toEqual([]);
+    expect(labelProblems('This vase, worth £1999, was made that year.', { years: [1999] }))
+      .toEqual(['"1999" is grouped incorrectly — commas must mark exact groups of three digits']);
+    // A bare real year elsewhere in the same sentence as money sharing its digits is unaffected either way
+    // — money is excluded from occurrence-ambiguity counting, the same as a coordinate.
+    expect(labelProblems('The book, made in 1999, costs £1,999.', { years: [1999] })).toEqual([]);
+  });
+
+  it('a bare year wrapped in unrelated parentheses is still exempt (review round 5)', () => {
+    // "(1999)" has no comma, so it is not a coordinate at all — just a bare year in parenthetical prose
+    // ("the population (1999) grew"). The old parens-skip in occurrence counting excluded every
+    // parenthesised token regardless of a comma, starving this of the one count it needed to read as
+    // unambiguous.
+    expect(labelProblems('(1999)', { years: [1999] })).toEqual([]);
+  });
+
+  it('a year is never allowed a decimal place, independently of the comma check (review round 5)', () => {
+    expect(labelProblems('1999.5', { years: [1999] }))
+      .toEqual(['"1999" is a year and must not have a decimal place']);
+    // A decimal-tailed lookalike must not corrupt a genuine bare year elsewhere in the same text — it is
+    // simply never counted as a same-value occurrence in the first place (it is flagged on its own merits).
+    expect(labelProblems('The year was 1999, though 1999.5 is not a valid year.', { years: [1999] }))
+      .toEqual(['"1999" is a year and must not have a decimal place']);
+  });
+
   it('a list of correctly-grouped numbers never trips the space-grouping check (review round 1)', () => {
     // The old space check let its leading run swallow commas, so it bridged straight across an ordinary
     // ", " list separator into the next number: "4,521, 891" read as one bad grouping when both numbers
