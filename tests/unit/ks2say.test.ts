@@ -139,10 +139,19 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
   // not fully converted by ks2Say (documented, narrow shapes — a Roman numerator, a three-fraction run with
   // no separator, a bare decimal glued to a time), so this checks the rail catches the raw leftover on its
   // own, independent of ks2Say ever fixing the conversion itself.
-  it('sayIsSafe fails a digit orphaned on only one side of "/" or "." by an adjacent conversion', () => {
-    for (const bad of [ks2Say('XIV/2'), ks2Say('1/23/4'), ks2Say('3.4.5'), ks2Say('1.5:30')]) {
+  it('sayIsSafe fails a digit orphaned on only one side of "/", "." or ":" by an adjacent conversion', () => {
+    for (const bad of [ks2Say('XIV/2'), ks2Say('1/23/4'), ks2Say('3.4.5'), ks2Say('1.5:30'), ks2Say('1:2/3'), ks2Say('IV:30')]) {
       expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
     }
+  });
+
+  // The obvious broader fix for the case above — drop the digit requirement on "."/":" entirely — was
+  // tried and rejected: this codebase's own real spoken text uses both for ordinary punctuation, not just
+  // KS2 notation, and an unconditional check would reject it. Pinning that these stay safe.
+  it('sayIsSafe does not flag ordinary punctuation this codebase already uses in spoken text', () => {
+    expect(sayIsSafe('Read the word. Slice its picture.')).toBe(true); // reception.ts's own say field
+    expect(sayIsSafe('Find the word: cat')).toBe(true); // year1.ts's own say field shape
+    expect(sayIsSafe('Hammer the ninja')).toBe(true); // avatars.ts's own avatar name, contains "mm"
   });
 
   // The module's own core invariant (its header comment states it): ks2Say never leaves behind what

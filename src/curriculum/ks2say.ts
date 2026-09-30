@@ -100,14 +100,23 @@ const ROMAN_GLUED_UNIT_RE = new RegExp(`\\b[IVXLCDM]{2,}(?:${UNIT_ALT})`);
  * an already-adjacent fraction's own "/", so "1/2 3/4" is two fractions, not "1/" plus a mixed number), a
  * 24-hour time, and a decimal (read digit by digit after the point).
  *
- * Three shapes this cannot resolve without context a pure string function does not have, so it does not
- * try — `sayIsSafe` still catches all three, so none reaches a speech engine unflagged: an ordinary word
- * that happens to be a canonical Roman numeral ("MIX", "XL") reads as one outside the one carved-out case
- * ("I", the pronoun); "H:MM" always reads as a time, even as a ratio ("mix 1:10") — no ratio topic exists
- * in the registry today, so this is not yet reachable from any real card; and a Roman numeral glued
- * directly to a unit with no space ("IIkg") shares no word boundary with either, so it is left unconverted
- * (the same combination *with* a space, "X cm", converts correctly — the unit pass's Roman-prefix support
- * above needs that space to see where the numeral ends).
+ * Shapes this cannot resolve without context a pure string function does not have, so it does not try —
+ * none reachable from any real card today, and `sayIsSafe` is deliberately *not* widened to catch them
+ * unconditionally, because each of the obvious broader checks was tried against this codebase's own real
+ * spoken text and found a live false positive: an unconditional "/"/"." check would reject
+ * `reception.ts`'s `'Read the word. Slice its picture.'` (an ordinary sentence-ending period) and
+ * `year1.ts`'s label-style `` `Find the word: ${w}` `` (an ordinary colon); dropping the Roman-numeral
+ * check's canonical-numeral requirement would reject a future "CVC word" prompt the moment one exists
+ * (`CVC`'s own three letters are a canonical-invalid, so today's check correctly leaves it alone); and an
+ * unconditional scan for a bare unit code would reject `avatars.ts`'s "Hammer" (contains "mm"). Given that,
+ * the remaining gaps stay documented rather than "fixed" into a regression: an ordinary word that happens
+ * to be a canonical Roman numeral ("MIX", "XL") reads as one outside the one carved-out case ("I", the
+ * pronoun); "H:MM" always reads as a time, even as a ratio ("mix 1:10"); a Roman numeral glued directly to
+ * a unit with no space ("IIkg") shares no word boundary with either (the same combination *with* a space,
+ * "X cm", converts correctly); a unit code followed immediately by more notation with no space or space
+ * ("5kg3cm") only ever converts its last unit; and a bare "/" or "." with no digit beside it at all, from
+ * a three-or-more-fraction chain ("1/2/3/4") or a four-decimal chain ("1.2.3.4"), is invisible to a check
+ * that (correctly, given the above) still requires a digit on at least one side.
  */
 export function ks2Say(text: string): string {
   const hadLowerCase = /[a-z]/.test(text); // checked before symSay adds its own lower-case operator words
@@ -141,7 +150,7 @@ export function ks2Say(text: string): string {
 export function sayIsSafe(text: string): boolean {
   if (/\d\//.test(text) || /\/\d/.test(text)) return false;
   if (/\d\./.test(text) || /\.\d/.test(text)) return false;
-  if (/\d:\d\d/.test(text)) return false;
+  if (/\d:/.test(text) || /:\d/.test(text)) return false;
   if (text.includes('²')) return false;
   if (UNIT_LEFT_RE.test(text) || UNIT_BARE_RE.test(text) || ROMAN_GLUED_UNIT_RE.test(text)) return false;
   for (const tok of text.match(/\b[IVXLCDM]{2,}\b/g) ?? []) if (fromRoman(tok) !== null) return false;
