@@ -25,6 +25,20 @@ describe('mistakes (#1058): misconception decoys', () => {
       const vals = swappedDigits(dec(282, 0)).map(label);
       expect(vals).toEqual(expect.arrayContaining(['228', '822']));
     });
+    it('225: the identical-adjacent-digit pair is skipped (only the distinguishable swap survives)', () => {
+      expect(swappedDigits(dec(225, 0)).map(label)).toEqual(['252']);
+    });
+    it('105: a swap that would leave a whole number reading with a leading zero is dropped', () => {
+      // swap(0,1) -> "015" (reads as the shorter, undistinguishable 15) is dropped; swap(1,2) -> "150" survives.
+      expect(swappedDigits(dec(105, 0)).map(label)).toEqual(['150']);
+    });
+    it('£0.45 and £0.05: a leading zero before the decimal point is a normal decimal, never dropped', () => {
+      expect(swappedDigits(dec(45, 2)).map(label)).toEqual(expect.arrayContaining(['4.05', '0.54']));
+      expect(swappedDigits(dec(5, 2)).map(label)).toEqual(['0.5']);
+    });
+    it('−282: the sign is reapplied after the digit-string swap', () => {
+      expect(swappedDigits(dec(-282, 0)).map(label)).toEqual(expect.arrayContaining(['−228', '−822']));
+    });
     it('47 × 6 = 282: neighbouring table fact varies one factor by one', () => {
       const vals = neighbourFact(47, 6).map(label);
       expect(vals).toEqual(expect.arrayContaining(['329', '235', '288', '276']));
@@ -41,6 +55,10 @@ describe('mistakes (#1058): misconception decoys', () => {
     });
     it('123 + 456 = 579: carry slip is empty when no column carries', () => {
       expect(carrySlip(dec(123, 0), dec(456, 0), 'add', dec(579, 0))).toEqual([]);
+    });
+    it('£0.45 + £0.65 = £1.10: a pence-into-pounds carry is included, not just whole-unit columns', () => {
+      const vals = carrySlip(dec(45, 2), dec(65, 2), 'add', dec(110, 2)).map(label);
+      expect(vals).toEqual(expect.arrayContaining(['1.2', '1']));
     });
     it('sign flip on 219 gives −219', () => {
       expect(signFlip(dec(219, 0)).map(label)).toEqual(['−219']);
@@ -124,6 +142,35 @@ describe('mistakes (#1058): misconception decoys', () => {
         expect(vals.some(v => lastOf(String(v)) === '5'), `draw ${i}: no in-range last-digit fill among ${vals}`).toBe(true);
       }
     });
+
+    it('kind sub: never returns the answer, a duplicate or an out-of-range value, including a multi-column borrow cascade', () => {
+      const r = rng(700);
+      for (let i = 0; i < 300; i++) {
+        const a = ri(r, 100, 999), b = ri(r, 1, a);
+        const calc = numCalc(a, b, a - b);
+        const ds = decoysFor('sub', calc, 3, r, { min: 0, max: 2000 });
+        const vals = ds.map(val);
+        expect(new Set(vals).size, `draw ${i}: duplicate among ${vals}`).toBe(vals.length);
+        for (const v of vals) expect(v, `draw ${i}: decoy equals the answer`).not.toBe(a - b);
+      }
+      // 300 − 1 = 299: borrowing cascades through the tens and hundreds columns (a three-column borrow).
+      const cascade = decoysFor('sub', numCalc(300, 1, 299), 4, rng(1), { min: 0, max: 1000 }).map(val);
+      expect(cascade.length).toBeGreaterThan(0);
+      expect(cascade).not.toContain(299);
+    });
+
+    it('a money decoy set never carries a true-value duplicate under different (v, dp) representations', () => {
+      // placeValueShift's ÷10 candidate has a different dp than every add/sub-based candidate, so this is a
+      // regression test for keying decoysFor's dedup on the printed value rather than the raw (v, dp) pair.
+      const r = rng(321);
+      for (let i = 0; i < 2000; i++) {
+        const a = ri(r, 5, 995), b = ri(r, 5, 995);
+        const calc = numCalc(a, b, a + b, 2);
+        const ds = decoysFor('add', calc, 3, r, { min: 0, max: 2000 });
+        const printed = ds.map(label);
+        expect(new Set(printed).size, `draw ${i}: value duplicate among ${printed}`).toBe(printed.length);
+      }
+    });
   });
 
   describe('fracDecoys', () => {
@@ -132,6 +179,16 @@ describe('mistakes (#1058): misconception decoys', () => {
       for (let i = 0; i < 100; i++) {
         const ds = fracDecoys({ n: 1, d: 3 }, { n: 1, d: 4 }, 3, r);
         for (const d of ds) { expect(d.n).toBeGreaterThan(0); expect(`${d.n}/${d.d}`).not.toBe('7/12'); }
+      }
+    });
+
+    it('delivers a full n even above the old fixed ±1/±2 fill\'s 5-value ceiling', () => {
+      // The fill spread used to be fixed at ±1/±2 regardless of n (4 distinct values, plus at most 1 from
+      // topsAndBottoms) — n = 8 used to come back silently short. It must not any more.
+      const r = rng(13);
+      for (let i = 0; i < 50; i++) {
+        const ds = fracDecoys({ n: 1, d: 3 }, { n: 1, d: 4 }, 8, r);
+        expect(ds.length, `draw ${i}: only ${ds.length} of 8 requested`).toBe(8);
       }
     });
   });

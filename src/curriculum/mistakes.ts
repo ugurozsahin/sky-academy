@@ -5,8 +5,8 @@
 // will (#1050 onward) is still behind #1050's Year 3 shell.
 import type { Rng } from './types';
 import { nearby, shuffle } from './util';
-import { addDec, dec, digitAt, divPow10, fmt, mulPow10, subDec, type Dec } from './ks2num';
-import { add as fracAdd, equal as fracEqual, type Frac } from './fractions';
+import { addDec, dec, digitAt, divPow10, fmt, mulPow10, subDec, type Dec, type Place } from './ks2num';
+import { add as fracAdd, equal as fracEqual, simplify as fracSimplify, type Frac } from './fractions';
 
 export type MistakeKind = 'add' | 'sub' | 'mul';
 
@@ -20,24 +20,32 @@ const lastDigit = (a: Dec): string => printedDigits(a).slice(-1);
 /** ×10 and ÷10 of the answer — the place-value shift a child makes reading the wrong column. */
 export const placeValueShift = (answer: Dec): Dec[] => [mulPow10(answer, 1), divPow10(answer, 1)];
 
-const CARRY_PLACES = [1000000, 100000, 10000, 1000, 100, 10, 1] as const;
+const WHOLE_PLACES = [1000000, 100000, 10000, 1000, 100, 10, 1] as const;
+const DECIMAL_PLACES = [0.1, 0.01, 0.001] as const;
 
-/** ±10^k at every whole-number column k where `a + b` would carry, or `a − b` would borrow. */
+/** ±10^k at every column k where `a + b` would carry, or `a − b` would borrow — whole-number columns always,
+ *  plus the decimal columns `a`/`b` actually use (so a money answer also gets the pence-into-pounds slip). */
 export function carrySlip(a: Dec, b: Dec, op: 'add' | 'sub', answer: Dec): Dec[] {
+  const places: Place[] = [...WHOLE_PLACES, ...DECIMAL_PLACES.slice(0, Math.max(a.dp, b.dp))];
   const out: Dec[] = [];
   let carry = 0;
-  for (let i = CARRY_PLACES.length - 1; i >= 0; i--) {
-    const p = CARRY_PLACES[i];
+  for (let i = places.length - 1; i >= 0; i--) {
+    const p = places[i];
     const da = digitAt(a, p), db = digitAt(b, p);
     const carried = op === 'add' ? da + db + carry >= 10 : da - carry < db;
     // Mishandled, a carry/borrow at column `p` shows up one column higher (never bumped or reduced).
-    if (carried && i > 0) { const step = dec(CARRY_PLACES[i - 1], 0); out.push(addDec(answer, step), subDec(answer, step)); }
+    if (carried && i > 0) {
+      const step = dec(Math.round(places[i - 1] * 10 ** answer.dp), answer.dp);
+      out.push(addDec(answer, step), subDec(answer, step));
+    }
     carry = carried ? 1 : 0;
   }
   return out;
 }
 
-/** Two adjacent printed digits of the answer's magnitude exchanged (282 → 228, swapping the tens and units). */
+/** Two adjacent printed digits of the answer's magnitude exchanged (282 → 228, swapping the tens and units). A
+ *  swap that leaves a leading zero is dropped only for a whole number (`052` reads as the shorter `52`, not a
+ *  distinguishable misconception) — a decimal's integer part is genuinely `0` in plenty of valid answers. */
 export function swappedDigits(answer: Dec): Dec[] {
   const negative = answer.v < 0;
   const digits = String(Math.abs(answer.v)).padStart(answer.dp + 1, '0').split('');
@@ -46,7 +54,7 @@ export function swappedDigits(answer: Dec): Dec[] {
     if (digits[i] === digits[i + 1]) continue;
     const swapped = digits.slice();
     [swapped[i], swapped[i + 1]] = [swapped[i + 1], swapped[i]];
-    if (swapped[0] === '0' && swapped.length > 1) continue;
+    if (answer.dp === 0 && swapped[0] === '0' && swapped.length > 1) continue;
     out.push(dec(Number(swapped.join('')) * (negative ? -1 : 1), answer.dp));
   }
   return out;
@@ -80,7 +88,10 @@ function rulesFor(kind: MistakeKind, { a, b, answer }: NumCalc): Dec[] {
   return out;
 }
 
-const key = (d: Dec) => `${d.v}:${d.dp}`;
+// Keyed on the printed value, not the raw (v, dp) pair: placeValueShift's ÷10 candidate carries a different
+// `dp` than every add/sub/swap-based candidate, so two decoys can represent the same number at different
+// scales (410 at dp 2 and 41 at dp 1 both print "4.1") and must still be recognised as the one duplicate.
+const key = (d: Dec) => fmt(d);
 function tryAdd(picked: Dec[], seen: Set<string>, d: Dec, range: Range): boolean {
   const k = key(d);
   if (seen.has(k) || decValue(d) < range.min || decValue(d) > range.max) return false;
@@ -141,20 +152,24 @@ export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng,
   return picked.slice(0, n);
 }
 
-/** `a/b + c/d`'s misconception decoys, plus `nearby()`-style fills over simplified fraction values. */
+const fracKey = (f: Frac) => { const s = fracSimplify(f); return `${s.n}/${s.d}`; };
+
+/** `a/b + c/d`'s misconception decoys, plus `nearby()`-style fills over simplified fraction values. The fill
+ *  spread scales with `n` (never just ±1/±2) so a large `n` cannot silently run out of distinct values. */
 export function fracDecoys(a: Frac, b: Frac, n: number, rng: Rng): Frac[] {
   const answer = fracAdd(a, b);
-  const seen = new Set<string>([`${answer.n}/${answer.d}`]);
+  const seen = new Set<string>([fracKey(answer)]);
   const picked: Frac[] = [];
   for (const d of shuffle(rng, topsAndBottoms(a, b))) {
     if (picked.length >= n) break;
-    const k = `${d.n}/${d.d}`;
+    const k = fracKey(d);
     if (!seen.has(k)) { seen.add(k); picked.push(d); }
   }
+  const spread = Math.max(2, n + 1);
   let guard = 0;
   while (picked.length < n && guard++ < 20) {
-    const cand: Frac = { n: answer.n + (Math.floor(rng() * 5) - 2 || 1), d: answer.d };
-    const k = `${cand.n}/${cand.d}`;
+    const cand: Frac = { n: answer.n + (Math.floor(rng() * (2 * spread + 1)) - spread || 1), d: answer.d };
+    const k = fracKey(cand);
     if (cand.n > 0 && !seen.has(k)) { seen.add(k); picked.push(cand); }
   }
   return picked.slice(0, n);
