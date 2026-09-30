@@ -54,6 +54,11 @@ describe('y1-alien (#982): Real or Alien?, both banks hand-curated', () => {
       // vosh≈wash, zibe≈vibe), plus four more the same class caught mechanically below (vunk≈funk,
       // kift≈gift, trum≈drum, zay/zoy/zaw≈say/soy/saw — the last three via GAP_WORDS/ALIEN_REAL directly).
       'vork', 'zort', 'zurd', 'veak', 'vosh', 'zibe', 'vunk', 'kift', 'trum', 'zay', 'zoy', 'zaw',
+      // round 8 (#982): more swap collisions and slang/names the swap check's curated `EXTRA_REAL` set
+      // could not see (plob≈blob/plop, dorg≈dork, zid≈zit, zob≈sob, chab≈chap, zift≈sift), plus words that
+      // were themselves real as spelt, not just a swap away (zup itself "'sup", nurt itself "nurd"/nerd,
+      // swen itself a name spelling, nork itself slang, hend itself a name).
+      'plob', 'dorg', 'zid', 'zob', 'chab', 'zift', 'zup', 'nurt', 'swen', 'nork', 'hend',
     ];
     for (const w of RETIRED) expect(fakeWords, `"${w}" was already fixed out of ALIEN_FAKE once`).not.toContain(w);
   });
