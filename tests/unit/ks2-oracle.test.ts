@@ -87,6 +87,14 @@ const NULLS = [
   // away and watching the leftover check still return `null` here. Kept as a null case in its own right;
   // not a regression test for the rparen check specifically, which this suite does not isolate.
   '(5 + 3 = ?',
+  // #1423 review round 4: round 2's "the leftover check backs this up regardless" conclusion only holds
+  // for a bracket that's missing its close entirely. Here the bracketed content parses to a complete `Lin`
+  // but leaves a stray token ('4') where ')' should be; round 2's mutation (`if (!inner) return null;`)
+  // then unconditionally advances past that stray token as if it *were* the consumed ')', which makes the
+  // cursor land exactly on the token count by coincidence — defeating the leftover check too. Confirmed by
+  // mutation: the suite stays green without this case, and with it removed this exact prompt goes from
+  // `null` to a fabricated `{n:8,d:1}` — a malformed prompt has no "real" answer at all.
+  '(3 + n 4 = 11',
   'n + m = 10',
   '? + n = 10',
   // #1423 review round 3: the two cases above only ever put the letter after the `?`/other letter, so they
@@ -147,6 +155,12 @@ describe('sameValue', () => {
   it('reads a comma-grouped whole number', () => { expect(sameValue('1,000', f(1000))).toBe(true); });
   it('reads a U+2212-signed number', () => { expect(sameValue('−7', f(-7))).toBe(true); });
   it('reads a hyphen-signed number', () => { expect(sameValue('-7', f(-7))).toBe(true); });
+  // #1423 review round 4: this doc comment already promised U+2212 for "a plain or mixed fraction", but
+  // fractions.ts's own parseFrac only accepted an ASCII hyphen there — ks2num.ts's fmt() deliberately
+  // emits U+2212 for every negative KS2 number, so a negative-fraction KS2 answer formatted the codebase's
+  // own way would have been marked wrong by the very oracle built to check it. Fixed in fractions.ts.
+  it('reads a U+2212-signed fraction', () => { expect(sameValue('−3/4', f(-3, 4))).toBe(true); });
+  it('reads a U+2212-signed mixed number', () => { expect(sameValue('−1 1/2', f(-3, 2))).toBe(true); });
   it('rejects a value that disagrees', () => { expect(sameValue('6', f(7))).toBe(false); });
   it('is false for text it cannot read at all', () => {
     expect(sameValue('abc', f(1))).toBe(false);
