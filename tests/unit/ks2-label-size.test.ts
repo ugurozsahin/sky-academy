@@ -121,6 +121,27 @@ describe('R-LBL (#1046): every KS2 bubble label reads at 13px or above on a 390p
     });
   });
 
+  describe('regression: the real wave can carry one more bubble than the card has options (review finding, round 2)', () => {
+    const opts = (options: string[], extra?: { wide?: boolean; sequence?: unknown[] }) => ({ options, ...extra });
+    // Villain modes (Sky Storm, Boss Battle — `deps.villain` in `src/ui/play-session.ts`) mix a 💣 bubble into
+    // a non-sequence card's wave every third question past the fourth, with no key-stage gate. So the real
+    // wave a 6-option KS2 card can face carries 7 labels, and an 8-option card can face 9 — one crowding
+    // bucket narrower than the card's own option count alone predicts. `rLblProblem` used to key its radius
+    // on `q.options.length` only, so a card at exactly the 6- or 8-option boundary could be certified
+    // readable while the real bomb-carrying wave draws it smaller.
+    it('a 6-option card at the bomb-shifted 6→7 boundary: readable by option count alone, not with the bomb folded in', () => {
+      const six = ['1,000,000', 'a', 'b', 'c', 'd', 'e'];
+      expect(rLblProblem(opts(six))).toMatch(/1,000,000/);                 // real wave: 7 labels, 11.9px — fails
+      expect(rLblProblem(opts(six, { sequence: ['1'] }))).toBeNull();      // a sequence card never sees a bomb — 6 labels, 13.3px — passes
+    });
+
+    it('an 8-option card at the bomb-shifted 8→9 boundary: readable by option count alone, not with the bomb folded in', () => {
+      const eight = ['500,000', 'a', 'b', 'c', 'd', 'e', 'f', 'g'];
+      expect(rLblProblem(opts(eight))).toMatch(/500,000/);                 // real wave: 9 labels, 12.3px — fails
+      expect(rLblProblem(opts(eight, { sequence: ['1'] }))).toBeNull();    // exempt: 8 labels, 13.9px — passes
+    });
+  });
+
   describe('the sizing rule itself, against the issue\'s own worked numbers', () => {
     it('matches the phone radius (33.15px) and wide radius (41.4px) the issue measured against', () => {
       expect(bubbleRadius(390, 664, false)).toBeCloseTo(33.15, 1);

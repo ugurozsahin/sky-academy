@@ -40,15 +40,22 @@ function measureViaTable(font: string, text: string): number {
  * estimate, which could report a label as readable when `fitLabelLines` would actually have drawn it smaller
  * (review finding, #1046). `waveRadius` is the same radius `layoutWave` lays real waves out at.
  *
+ * The crowding factor `waveRadius` narrows by is keyed on the wave's real label count, not the card's own
+ * option count: a villain mode (Sky Storm, Boss Battle — `deps.villain` in `src/ui/play-session.ts`) mixes
+ * one 💣 bubble into a non-sequence card's wave every third question past the fourth, so the real wave a
+ * card can face is one bubble larger than `q.options.length` whenever the card isn't a `sequence` (review
+ * finding, #1046 round 2). `+1` unconditionally would over-narrow a sequence card that can never see a bomb.
+ *
  * Returns the first option that fails, naming the fix (#1046 acceptance criteria), or `null` if every
  * option is readable.
  */
-export function rLblProblem(q: { options: string[]; wide?: boolean }): string | null {
-  const r = waveRadius(PHONE_W, PHONE_H, !!q.wide, q.options.length);
+export function rLblProblem(q: { options: string[]; wide?: boolean; sequence?: unknown[] }): string | null {
+  const n = q.options.length + (q.sequence ? 0 : 1);
+  const r = waveRadius(PHONE_W, PHONE_H, !!q.wide, n);
   for (const label of q.options) {
     const fit = fitLabelLines(label, r, measureViaTable);
     if (fit.fs < LABEL_READABLE_FS) {
-      return `"${label}" draws at ${fit.fs.toFixed(1)}px (r ${r.toFixed(1)}, ${q.options.length} options) — put the term on the card; bubbles carry a letter, yes/no, a symbol or a digit`;
+      return `"${label}" draws at ${fit.fs.toFixed(1)}px (r ${r.toFixed(1)}, ${n} options incl. a possible bomb bubble) — put the term on the card; bubbles carry a letter, yes/no, a symbol or a digit`;
     }
   }
   return null;
