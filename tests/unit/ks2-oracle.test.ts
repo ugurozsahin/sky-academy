@@ -54,6 +54,9 @@ const KNOWN: [string, Frac][] = [
   ['? − 6 = −2', f(4)],
   // the same letter, used consistently on both sides of the `=`, is not "two unknowns" (#1423 review)
   ['n + 3 = 2n − 1', f(4)],
+  // a repeated `?`, used consistently, is one unknown too — isolates line 137's accepting half from its
+  // "two different symbols" refusal, which only `'? + n'`-shaped NULLS exercised until now (#1423 round 5)
+  ['? + ? = 10', f(5)],
 ];
 
 // A prompt this oracle deliberately does not answer: a word problem, an instruction rather than an
