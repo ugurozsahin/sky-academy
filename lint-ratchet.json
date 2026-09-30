@@ -16,7 +16,7 @@
     "src/game/bubbles.ts::layoutWave": 20,
     "src/game/dojo.ts::measure": 35,
     "src/main.ts::(anonymous)": 17,
-    "src/storage.ts::sanitizeTypes": 39,
+    "src/storage/migrate.ts::sanitizeTypes": 39,
     "src/ui/play-results.ts::showResults": 23,
     "src/ui/play.ts::playScreen": 27,
     "src/ui/profiles.ts::(anonymous)": 16,
@@ -39,6 +39,7 @@
     "src/ui/visuals.ts::renderVisual": 89
   },
   "fileLines": {
+    "src/curriculum/year2.ts": 753,
     "tests/unit/arena.test.ts": 948,
     "tests/unit/audio.test.ts": 617,
     "tests/unit/curriculum.test.ts": 2650,

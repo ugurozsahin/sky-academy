@@ -9,7 +9,7 @@ import { stripHead } from '../../scripts/bundle-single.mjs';
 import { NOISE_SECONDS } from '../../src/audio';   // #41: the rail below holds every SFX inside the shared buffer
 import { FONT_PROBE } from '../../src/ui/font';   // #44: the rail below pins the gate's probe to index.html
 import { exportSave, isMigratable, load, migrate, reset, MIGRATIONS, SAVE_VERSION } from '../../src/storage';   // #205/#232: the rails below hold the migration ladder complete, one-directional, and honest about what it exports
-import { SOURCES, inDir, code, workflow, styleCss } from './helpers/sources';
+import { SOURCES, STORAGE_SRC, inDir, code, workflow, styleCss } from './helpers/sources';
 import { YEARS } from '../../src/curriculum/types';   // #392: the rail below holds docs/CURRICULUM.md's per-year headers to this table
 import { TOPICS } from '../../src/curriculum';   // #766: the registry the wordQ-collision sweep below iterates
 import type { Difficulty } from '../../src/curriculum/types';
@@ -471,7 +471,7 @@ describe('guard rails', () => {
   // "Not started yet". There is one rule now, so what this holds is that both sites call it rather than
   // spelling it out again — which a copy cannot pass by looking similar.
   it("a card's onboarded flag and the migration's are the same rule, not two copies (#20 slice 2)", () => {
-    const store = code(SOURCES['/src/storage.ts']);
+    const store = code(STORAGE_SRC);
     const at = (fn: string) => store.slice(store.indexOf(fn), store.indexOf('\n}', store.indexOf(fn)));
     const raw = /typeof s\.onboarded === 'boolean' \? s\.onboarded/;
     expect(store, 'the rule has one home').toMatch(/export const onboardedOf = \(s: RawSave\): boolean =>/);
@@ -492,7 +492,7 @@ describe('guard rails', () => {
   // `onboarded: false` off the default, and the child was put through the first-run wizard with `readOnly`
   // latched and every write dropped. The card has to agree with `load()` about the same bytes.
   it('a card is blank for a save load() would refuse, not a name the tap cannot deliver (#20 slice 2)', () => {
-    const store = code(SOURCES['/src/storage.ts']);
+    const store = code(STORAGE_SRC);
     const card = store.slice(store.indexOf('export function profileCard('), store.indexOf('\n}', store.indexOf('export function profileCard(')));
     // The card still answers blank for every blob `migrate()` refuses — it now also says *which* refusal, so a
     // screen can stop claiming "this ninja has not played" about bytes it could not read (#420 review B2), and
@@ -508,7 +508,7 @@ describe('guard rails', () => {
   });
 
   it("a sibling's card is read from the slot, never through the session's load() (#20 slice 2)", () => {
-    const store = code(SOURCES['/src/storage.ts']);
+    const store = code(STORAGE_SRC);
     const from = store.indexOf('export function profileCard('), to = store.indexOf('\n}', from);
     expect({ fn: from >= 0 && to > from }).toEqual({ fn: true });
     const body = store.slice(from, to);
@@ -519,7 +519,7 @@ describe('guard rails', () => {
   });
 
   it('addProfile probes the slot it hands out, not just the index (#335 item 1)', () => {
-    const store = code(SOURCES['/src/storage.ts']);
+    const store = code(STORAGE_SRC);
     const from = store.indexOf('export function addProfile('), to = store.indexOf('\n}', from);
     expect({ fn: from >= 0 && to > from }).toEqual({ fn: true });
     // Counting alone gave a new child a slot already holding a sibling's save, and onboarding merged over it.
@@ -677,11 +677,11 @@ describe('guard rails', () => {
   // keep stale keys with no place to transform them. The fix routes load() through migrate(), which switches on
   // `raw.v` and is the seam future shape changes slot into. This rail keeps load() from reverting to a raw merge.
   it('storage.load() routes stored data through migrate() (#38)', () => {
-    const storage = code(SOURCES['/src/storage.ts']);
+    const storage = code(STORAGE_SRC);
     const load = storage.slice(storage.indexOf('function load'), storage.indexOf('function save'));
     expect(/migrate\(/.test(load), 'load() must migrate the stored blob, not shallow-merge it').toBe(true);
     expect(/\{\s*\.\.\.DEFAULT\s*,\s*\.\.\.JSON\.parse/.test(load)).toBe(false);   // the old shallow-merge is gone
-    expect(/switch\s*\(|MIGRATIONS\[/.test(code(SOURCES['/src/storage.ts']))).toBe(true);   // migrate keys off the version
+    expect(/switch\s*\(|MIGRATIONS\[/.test(code(STORAGE_SRC))).toBe(true);   // migrate keys off the version
   });
 
   // The other half of #38, found while writing the first real step (#205, v1 → v2): migrate()'s ladder is
@@ -755,7 +755,7 @@ describe('guard rails', () => {
   it('dead symbols removed in #37 stay gone', () => {
     expect(SOURCES['/src/curriculum/index.ts'], 'yearById was unused').not.toContain('yearById');
     expect(code(SOURCES['/src/ui/dom.ts']), 'dom.wait was unused').not.toMatch(/export\s+(?:const|function)\s+wait\b/);
-    expect(code(SOURCES['/src/storage.ts']), 'SaveData.totalSlices was never read').not.toContain('totalSlices');
+    expect(code(STORAGE_SRC), 'SaveData.totalSlices was never read').not.toContain('totalSlices');
     const bubbles = code(SOURCES['/src/game/bubbles.ts']);   // #559: Bubble moved out of arena.ts
     const from = bubbles.indexOf('interface Bubble');
     const iface = bubbles.slice(from, bubbles.indexOf('}', from));
@@ -1412,7 +1412,7 @@ describe('guard rails', () => {
     expect(spec.length, 'the e2e spec must be read, not an empty string').toBeGreaterThan(10000);
     const src = code(spec);
     // the storage slot the seed writes is the one the app reads — a rename in storage.ts must not be silent
-    const key = /const KEY = '([^']+)'/.exec(code(SOURCES['/src/storage.ts'] ?? ''))?.[1];
+    const key = /const KEY = '([^']+)'/.exec(code(STORAGE_SRC))?.[1];
     expect(key, 'storage.ts must still declare a KEY').toBeTruthy();
     expect(src, `seedPlayer writes the save slot storage.ts reads (${key})`).toContain(`localStorage.getItem('${key}')`);
     expect(src, 'seedPlayer seeds only an empty slot, so a reload reads what the test stored')
@@ -3261,7 +3261,7 @@ describe('three.js: the src/three/ tree, the flag and the bundle (#714)', () => 
   // file at or past the 300-line bar this table is scoped to — joins it rather than going unbudgeted;
   // `slicing.ts` (16 lines) and `particles.ts` (56) are both well under that bar.
   const RATCHET: Record<string, number> = {
-    'src/style.css': 1870, 'src/storage.ts': 1494, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
+    'src/style.css': 1870, 'src/game/arena.ts': 566, 'src/game/bubbles.ts': 521,
     'src/curriculum/year2.ts': 753, 'src/curriculum/util.ts': 543, 'src/ui/duel.ts': 507, 'src/ui/parents.ts': 432, 'src/ui/play-session.ts': 421,
     'src/game/session.ts': 395, 'src/game/duel.ts': 395, 'src/ui/play.ts': 318, 'src/ui/certificate.ts': 341, 'src/audio.ts': 98,
   };
