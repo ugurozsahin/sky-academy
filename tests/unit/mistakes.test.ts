@@ -56,6 +56,11 @@ describe('mistakes (#1058): misconception decoys', () => {
     it('123 + 456 = 579: carry slip is empty when no column carries', () => {
       expect(carrySlip(dec(123, 0), dec(456, 0), 'add', dec(579, 0))).toEqual([]);
     });
+    it('5 − 12 = −7: a negative-result subtraction is empty, not a runaway borrow cascade', () => {
+      // digitAt is magnitude-only, so a < b makes every remaining column re-borrow forever unless this is
+      // guarded — sign flip already covers the "sign mishandled" misconception for this shape.
+      expect(carrySlip(dec(5, 0), dec(12, 0), 'sub', dec(-7, 0))).toEqual([]);
+    });
     it('£0.45 + £0.65 = £1.10: a pence-into-pounds carry is included, not just whole-unit columns', () => {
       const vals = carrySlip(dec(45, 2), dec(65, 2), 'add', dec(110, 2)).map(label);
       expect(vals).toEqual(expect.arrayContaining(['1.2', '1']));
@@ -159,6 +164,41 @@ describe('mistakes (#1058): misconception decoys', () => {
       expect(cascade).not.toContain(299);
     });
 
+    it('kind sub with a negative result: no runaway-magnitude decoy from the borrow model, and no crash', () => {
+      // a < b (an entirely ordinary NC Year 4+ shape, "how much colder") used to make carrySlip's borrow
+      // chain re-trigger at every remaining column, leaking a candidate in the hundreds of thousands into a
+      // card whose range is nowhere near that. decoysFor itself already range-filters, but the regression is
+      // that carrySlip must not even offer such a candidate.
+      const r = rng(900);
+      for (let i = 0; i < 200; i++) {
+        const a = ri(r, 1, 500), b = ri(r, a + 1, 999);
+        const calc = numCalc(a, b, a - b);
+        const ds = decoysFor('sub', calc, 3, r, { min: -1000, max: 1000 });
+        const vals = ds.map(val);
+        expect(new Set(vals).size, `draw ${i}: duplicate among ${vals}`).toBe(vals.length);
+        for (const v of vals) {
+          expect(v, `draw ${i}: decoy equals the answer`).not.toBe(a - b);
+          expect(v, `draw ${i}: decoy ${v} outside a sane magnitude`).toBeGreaterThanOrEqual(-1000);
+          expect(v, `draw ${i}: decoy ${v} outside a sane magnitude`).toBeLessThanOrEqual(1000);
+        }
+      }
+      expect(decoysFor('sub', numCalc(5, 12, -7), 3, rng(1), { min: -200, max: 200 }).map(val)).not.toContain(93);
+    });
+
+    it('when no fill keeps both range and the last digit, decoysFor falls back cleanly rather than a false guarantee', () => {
+      // Every value in [127,139] except 133 itself has a different last digit, so the last-digit guarantee is
+      // structurally unmeetable here — fillLast must return null (not a plausible-looking but wrong "guarantee")
+      // and decoysFor must still return n in-range, non-duplicate, non-answer values via its ordinary fallback.
+      const calc = numCalc(74, 59, 133);
+      for (let seed = 1; seed <= 20; seed++) {
+        const vals = decoysFor('add', calc, 1, rng(seed), { min: 127, max: 139 }).map(val);
+        expect(vals.length).toBe(1);
+        expect(vals[0]).toBeGreaterThanOrEqual(127);
+        expect(vals[0]).toBeLessThanOrEqual(139);
+        expect(vals[0]).not.toBe(133);
+      }
+    });
+
     it('a money decoy set never carries a true-value duplicate under different (v, dp) representations', () => {
       // placeValueShift's ÷10 candidate has a different dp than every add/sub-based candidate, so this is a
       // regression test for keying decoysFor's dedup on the printed value rather than the raw (v, dp) pair.
@@ -182,13 +222,23 @@ describe('mistakes (#1058): misconception decoys', () => {
       }
     });
 
-    it('delivers a full n even above the old fixed ±1/±2 fill\'s 5-value ceiling', () => {
-      // The fill spread used to be fixed at ±1/±2 regardless of n (4 distinct values, plus at most 1 from
-      // topsAndBottoms) — n = 8 used to come back silently short. It must not any more.
-      const r = rng(13);
-      for (let i = 0; i < 50; i++) {
-        const ds = fracDecoys({ n: 1, d: 3 }, { n: 1, d: 4 }, 8, r);
-        expect(ds.length, `draw ${i}: only ${ds.length} of 8 requested`).toBe(8);
+    it('delivers a full n across ordinary pairs and n up to 30 — never a silent shortfall', () => {
+      // The fill used to be a random one-draw-per-iteration guess capped at 20 tries, so it could exhaust its
+      // guard before finding n distinct positive values — silently short at realistic n (not just extreme
+      // ones), and worse for a small answer numerator. Confirmed empirically before this fix: 0/200 short at
+      // n=3 but already 12/200 short at n=6 across these same five pairs; a deterministic ±1,±2,±3,... walk
+      // (this test's fix) cannot fall short the way that random search could.
+      const pairs: [{ n: number; d: number }, { n: number; d: number }][] = [
+        [{ n: 1, d: 3 }, { n: 1, d: 4 }], [{ n: 1, d: 3 }, { n: 1, d: 6 }], [{ n: 2, d: 5 }, { n: 1, d: 5 }],
+        [{ n: 1, d: 2 }, { n: 1, d: 8 }], [{ n: 3, d: 7 }, { n: 1, d: 7 }],
+      ];
+      for (const n of [3, 4, 5, 6, 8, 15, 30]) {
+        for (const [a, b] of pairs) {
+          for (let seed = 1; seed <= 20; seed++) {
+            const ds = fracDecoys(a, b, n, rng(seed));
+            expect(ds.length, `n=${n}, ${a.n}/${a.d}+${b.n}/${b.d}, seed ${seed}: only ${ds.length}`).toBe(n);
+          }
+        }
       }
     });
   });

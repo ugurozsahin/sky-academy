@@ -24,8 +24,12 @@ const WHOLE_PLACES = [1000000, 100000, 10000, 1000, 100, 10, 1] as const;
 const DECIMAL_PLACES = [0.1, 0.01, 0.001] as const;
 
 /** ±10^k at every column k where `a + b` would carry, or `a − b` would borrow — whole-number columns always,
- *  plus the decimal columns `a`/`b` actually use (so a money answer also gets the pence-into-pounds slip). */
+ *  plus the decimal columns `a`/`b` actually use (so a money answer also gets the pence-into-pounds slip).
+ *  The borrow model only holds for `a ≥ b`: below that, `a`'s magnitude-only digits (`digitAt` ignores sign)
+ *  are all `0` against `b`'s, so every remaining column re-triggers a borrow and the candidates run away —
+ *  empty in that case, since sign flip already covers "answer's sign mishandled". */
 export function carrySlip(a: Dec, b: Dec, op: 'add' | 'sub', answer: Dec): Dec[] {
+  if (op === 'sub' && decValue(a) < decValue(b)) return [];
   const places: Place[] = [...WHOLE_PLACES, ...DECIMAL_PLACES.slice(0, Math.max(a.dp, b.dp))];
   const out: Dec[] = [];
   let carry = 0;
@@ -101,15 +105,16 @@ function tryAdd(picked: Dec[], seen: Set<string>, d: Dec, range: Range): boolean
 const inRange = (d: Dec, range: Range) => { const v = decValue(d); return v >= range.min && v <= range.max; };
 
 /** A decoy sharing `answer`'s last printed digit: a rule candidate if one qualifies, else a ±10-units fill,
- *  preferring whichever sign stays in `range` (and, of those, whichever also keeps the leading digit). */
-function fillLast(pool: Dec[], seen: Set<string>, answer: Dec, range: Range): Dec {
+ *  preferring whichever sign stays in `range` (and, of those, whichever also keeps the leading digit) —
+ *  `null`, like `fillLead`, when neither sign of the fill stays in `range` and no rule candidate matches. */
+function fillLast(pool: Dec[], seen: Set<string>, answer: Dec, range: Range): Dec | null {
   const match = pool.find(d => !seen.has(key(d)) && lastDigit(d) === lastDigit(answer));
   if (match) return match;
   const fillStep = dec(10, answer.dp);
   const plus = addDec(answer, fillStep), minus = subDec(answer, fillStep);
   const keepsLeading = (d: Dec) => leadDigit(d) === leadDigit(answer);
   const inR = [plus, minus].filter(d => inRange(d, range));
-  return inR.find(keepsLeading) ?? inR[0] ?? plus;
+  return inR.find(keepsLeading) ?? inR[0] ?? null;
 }
 
 /** A decoy sharing `answer`'s leading digit: a rule candidate if one qualifies, else a ±`step` fill that
@@ -135,7 +140,8 @@ export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng,
   const pool = shuffle(rng, rulesFor(kind, calc)).filter(d => key(d) !== key(answer) && decValue(d) >= range.min && decValue(d) <= range.max);
 
   // The two guarantees are reserved first, so a later slice-to-`n` never cuts them.
-  tryAdd(picked, seen, fillLast(pool, seen, answer, range), range);
+  const last = fillLast(pool, seen, answer, range);
+  if (last) tryAdd(picked, seen, last, range);
   if (!picked.some(d => leadDigit(d) === leadDigit(answer))) {
     const lead = fillLead(pool, seen, answer, step, range);
     if (lead) tryAdd(picked, seen, lead, range);
@@ -154,8 +160,11 @@ export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng,
 
 const fracKey = (f: Frac) => { const s = fracSimplify(f); return `${s.n}/${s.d}`; };
 
-/** `a/b + c/d`'s misconception decoys, plus `nearby()`-style fills over simplified fraction values. The fill
- *  spread scales with `n` (never just ±1/±2) so a large `n` cannot silently run out of distinct values. */
+/** `a/b + c/d`'s misconception decoys, plus fills over simplified fraction values at `answer`'s own
+ *  denominator. The fill walks `answer.n ± 1, ± 2, ± 3, ...` in order (never a random one-draw-per-iteration
+ *  guess, which could exhaust its guard before finding `n` distinct positive values) — for any `n`, the
+ *  positive-numerator direction alone supplies `n` new values well before the walk's own bound is reached, so
+ *  this cannot silently fall short the way a fixed ±1/±2 range, or a capped random search, both could. */
 export function fracDecoys(a: Frac, b: Frac, n: number, rng: Rng): Frac[] {
   const answer = fracAdd(a, b);
   const seen = new Set<string>([fracKey(answer)]);
@@ -165,12 +174,13 @@ export function fracDecoys(a: Frac, b: Frac, n: number, rng: Rng): Frac[] {
     const k = fracKey(d);
     if (!seen.has(k)) { seen.add(k); picked.push(d); }
   }
-  const spread = Math.max(2, n + 1);
-  let guard = 0;
-  while (picked.length < n && guard++ < 20) {
-    const cand: Frac = { n: answer.n + (Math.floor(rng() * (2 * spread + 1)) - spread || 1), d: answer.d };
-    const k = fracKey(cand);
-    if (cand.n > 0 && !seen.has(k)) { seen.add(k); picked.push(cand); }
+  for (let delta = 1; picked.length < n && delta <= n + Math.max(answer.n, 0) + 5; delta++) {
+    for (const sign of [1, -1] as const) {
+      if (picked.length >= n) break;
+      const cand: Frac = { n: answer.n + sign * delta, d: answer.d };
+      const k = fracKey(cand);
+      if (cand.n > 0 && !seen.has(k)) { seen.add(k); picked.push(cand); }
+    }
   }
-  return picked.slice(0, n);
+  return shuffle(rng, picked).slice(0, n);
 }
