@@ -154,6 +154,25 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     expect(sayIsSafe('Hammer the ninja')).toBe(true); // avatars.ts's own avatar name, contains "mm"
   });
 
+  // A unit code glued to a digit or Roman letter on *both* sides at once falls through the gap between
+  // the old "digit-before" and "no-alnum-either-side" checks: neither individually matches it, since each
+  // was built assuming the *other* side was clean. UNIT_TOUCH_RE closes this without a trailing lookahead —
+  // which is also why the single-letter codes need their own narrower leading check (next test).
+  it('sayIsSafe fails a unit code glued to a digit or Roman letter on both sides at once', () => {
+    for (const bad of ['5kg3', ks2Say('5kg3cm'), ks2Say('1kg500g'), 'Xkg5', 'Xkgcm', '5m3', '5g3', '5l3']) {
+      expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
+    }
+  });
+
+  // Regression on the fix above: "m"/"g"/"l" alone are also the first letter of their own fully-converted
+  // word ("metres", "grams", "litres"), so a digit immediately before one of *those* words — exactly what
+  // ks2Say's own unit substitution produces — must never be misread as a raw single-letter code glued on.
+  it('sayIsSafe does not mistake a digit-prefixed unit word for a glued single-letter code', () => {
+    for (const good of ['5 metres', '5 grams', '5 litres', '5 millimetres', '5 milligrams', '5 millilitres']) {
+      expect(sayIsSafe(good), `${JSON.stringify(good)} should be safe`).toBe(true);
+    }
+  });
+
   // The module's own core invariant (its header comment states it): ks2Say never leaves behind what
   // sayIsSafe is built to catch. Checked over a wider table than the five official rail fixtures above,
   // including the values that once broke cardinal() past 99 (a one-line regression there reads as
@@ -164,6 +183,7 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
       '4 cm²', '9 m²', '12 km', '5 mm', '200 mg', 'XIV', 'MCMXCIX', '−3.5', '7 − 3 = ?',
       '1/20', '1/1000', '1/999', '3.5 kg', '3/4 m', '1 1/2 kg', '12.5cm',
       '1/2 3/4', '3/4 1/2', '1000000.5', '1234567.5', 'X cm', 'IIkg',
+      '5 mm', '5 m', '5 g', '5 l', '200 ml', '200 mg',
     ];
     for (const text of raw) expect(sayIsSafe(ks2Say(text)), `ks2Say(${JSON.stringify(text)}) = ${JSON.stringify(ks2Say(text))}`).toBe(true);
   });

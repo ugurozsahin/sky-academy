@@ -80,16 +80,26 @@ const unitWord = (u: string): string => EXTRA_UNIT_WORD[u] ?? UNIT_WORD[u] ?? u;
 // absent space here would otherwise fuse two spelled-out words together later ("...fivecentimetres").
 const UNIT_ALT = 'cm²|m²|km|mm|ml|mg|kg|cm|m|g|l';
 const UNIT_RE = new RegExp(`(\\d+|[IVXLCDM]+) ?(${UNIT_ALT})(?![a-zA-Z0-9²])`, 'g');
-/** `UNIT_RE`'s prefix+code, with no capture groups/`g` flag: does `text` carry one, whatever produced it? */
-const UNIT_LEFT_RE = new RegExp(`(?:\\d|[IVXLCDM]) ?(?:${UNIT_ALT})(?![a-zA-Z0-9²])`);
-// Once a number is fully spelled out there is no digit left for UNIT_LEFT_RE to anchor on ("three point
+const MULTI_UNIT_ALT = 'cm²|m²|km|mm|ml|mg|kg|cm'; // none of these prefixes its own or another unit's spelled-out word
+const SINGLE_UNIT_ALT = 'm|g|l'; // "m"/"g"/"l" do — "metres"/"grams"/"litres" all start with the letter itself
+// A unit code touching a digit or a Roman-numeral letter on *either* side — with or without a space, and
+// regardless of what (if anything) sits on the *other* side — is always suspicious: "5kg", "5 kg", "5kg3"
+// (glued on both sides at once, the one gap UNIT_RE's own trailing lookahead leaves unconverted, since it
+// requires nothing alphanumeric to follow) and "Xkg5" are all caught by this. Deliberately no such lookahead
+// here for the multi-letter codes or the trailing side of a single-letter one — that lookahead is precisely
+// what let a both-sides-glued unit code through both the conversion above and this check when they shared
+// its copy. The leading side of a single-letter code keeps a narrower one regardless (not-a-letter, so a
+// digit or nothing still matches): unlike a multi-letter code, "m"/"g"/"l" alone is also the first letter of
+// its own fully-converted word, so "5 metres" must not itself flag as "5" touching a bare "m".
+const UNIT_TOUCH_RE = new RegExp(
+  `(?:\\d|[IVXLCDM]) ?(?:${MULTI_UNIT_ALT})` +
+  `|(?:${UNIT_ALT})(?:\\d|[IVXLCDM])` +
+  `|(?:\\d|[IVXLCDM]) ?(?:${SINGLE_UNIT_ALT})(?![a-zA-Z])`,
+);
+// Once a number is fully spelled out there is no digit left for UNIT_TOUCH_RE to anchor on ("three point
 // five kg" has none next to "kg"), so a *multi-letter* code is flagged unconditionally instead — unlike a
 // bare "m"/"g"/"l" (a real algebra variable), none of these is an ordinary English word or variable name.
 const UNIT_BARE_RE = /(?<![a-zA-Z0-9])(?:cm²|m²|km|mm|ml|mg|kg|cm)(?![a-zA-Z0-9²])/;
-// A Roman numeral glued directly to a unit with no space ("IIkg") shares no word boundary with it, so
-// neither the conversion above nor a plain `\b[IVXLCDM]{2,}\b` scan (below) ever sees the numeral half —
-// caught here instead, independent of whether ks2Say managed to convert it.
-const ROMAN_GLUED_UNIT_RE = new RegExp(`\\b[IVXLCDM]{2,}(?:${UNIT_ALT})`);
 
 /**
  * Turns KS2 notation in `text` into words: `symSay`'s operators, then a unit code (run early, on the raw
@@ -152,7 +162,7 @@ export function sayIsSafe(text: string): boolean {
   if (/\d\./.test(text) || /\.\d/.test(text)) return false;
   if (/\d:/.test(text) || /:\d/.test(text)) return false;
   if (text.includes('²')) return false;
-  if (UNIT_LEFT_RE.test(text) || UNIT_BARE_RE.test(text) || ROMAN_GLUED_UNIT_RE.test(text)) return false;
+  if (UNIT_TOUCH_RE.test(text) || UNIT_BARE_RE.test(text)) return false;
   for (const tok of text.match(/\b[IVXLCDM]{2,}\b/g) ?? []) if (fromRoman(tok) !== null) return false;
   return true;
 }
