@@ -365,8 +365,8 @@ export const LABEL_HARD_MIN_FS = 8;
  * the sweep in the pull request body is the evidence for where it is now.
  */
 export const LABEL_READABLE_FS = 13;
-/** How much of `r` one line may spend across the middle of the bubble. */
-const LINE_BUDGET = 1.75;
+/** How much of `r` one line may spend. Exported for the R-LBL rail (#1046, `tests/unit/helpers/r-lbl.ts`). */
+export const LINE_BUDGET = 1.75;
 /** A wrapped line sits above or below the centre, where the disc's chord is a shade narrower. */
 const WRAP_BUDGET = 1.7;
 /** Two lines of this size stack to at most `WRAP_STACK * r`, so both stay inside the disc. */
