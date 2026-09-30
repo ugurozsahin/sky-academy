@@ -16,7 +16,7 @@ type Step = typeof STEPS[number];
 function runTerms(d: Difficulty, step: Step, rng: () => number): { terms: number[]; gapIndex: number; localStep: number } {
   const direction = d === 3 ? pick(rng, [1, -1] as const) : 1;
   const localStep = step * direction;
-  const fromZeroOnly = d !== 2 || step === 4 || step === 8; // 4s/8s always count from 0; 50s/100s (d2+) may start from any multiple
+  const fromZeroOnly = d === 1 || step === 4 || step === 8; // 4s/8s always count from 0; 50s/100s at d2/d3 may start from any multiple
   const start = localStep > 0
     ? (fromZeroOnly ? 0 : step * ri(rng, 0, Math.floor((1099 - 3 * localStep) / step)))
     : step * ri(rng, Math.ceil(3 * step / step), Math.floor(1099 / step)); // never crosses below 0 counting back
@@ -60,7 +60,7 @@ function moreOrLess(d: Difficulty, rng: () => number): Question {
   do {
     base = ri(rng, 100, 999);
     guard++;
-  } while (d === 1 ? crosses(base) : d === 3 ? !crosses(base) && guard < 200 : false);
+  } while (guard < 200 && (d === 1 ? crosses(base) : d === 3 ? !crosses(base) : false));
   const answer = base + amt * sign;
   const prompt = `${amt} ${more ? 'more' : 'less'} than ${fmtN(base)} = ?`;
   const otherPower = base + otherAmt * sign;

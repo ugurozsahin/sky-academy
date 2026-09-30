@@ -107,6 +107,21 @@ describe('y3-count (#1050)', () => {
     expect(sawInside, 'expected at least one non-final gap over 400 d3 draws').toBe(true);
   });
 
+  it('d3 ascending 50s/100s runs vary their start, not always from 0 (pr-test-analyzer, round 1)', () => {
+    const r = rng(1050_450);
+    const starts = new Set<number>();
+    for (let i = 0; i < DRAWS; i++) {
+      const q = topic.gen(3, r);
+      if (!q.prompt.includes(',')) continue;
+      const parts = q.prompt.replace(/\s*=\s*\?$/, '').split(', ');
+      const known = [0, 1, 2, 3].filter(idx => parts[idx] !== '?');
+      const step = (num(parts[known[1]]) - num(parts[known[0]])) / (known[1] - known[0]);
+      if (step <= 0 || (step !== 50 && step !== 100)) continue; // ascending 50s/100s only
+      starts.add(num(parts[0]));
+    }
+    expect([...starts].some(s => s !== 0), `expected a non-zero start among ${[...starts]} over ${DRAWS} d3 draws`).toBe(true);
+  });
+
   it('every answer and option stays within 0–1,099, options are unique, and the answer is among them', () => {
     for (const d of [1, 2, 3] as Difficulty[]) {
       const r = rng(1050_500 + d);
