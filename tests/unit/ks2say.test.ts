@@ -42,16 +42,25 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     ['1/1000', 'one thousandth'],
     ['3/1000', 'three thousandths'],
     ['1/999', 'one nine hundred and ninety-ninth'],
+    // round 7 (#1430): ordinalWord's hundreds branch dropped the leading digit at exactly n·100
+    // ("hundredth" not "one hundredth") on the reasoning that it reads more naturally alone — correct in
+    // isolation, but that branch is only ever reached composed under a larger denominator (denomWord's own
+    // table intercepts exactly 100), where the dropped digit silently went missing: "3/1100" read as
+    // "...thousand hundredths" instead of "...thousand one hundredths". Not reachable from any current
+    // generator (KS2 fraction work tops out around thousandths), fixed anyway since it was cheap and correct.
+    ['3/1100', 'three one thousand one hundredths'],
+    ['1/2100', 'one two thousand one hundredth'],
     // a unit right after a fraction or a decimal — the digit the unit substitution needs has to survive
     // long enough to be seen, before the fraction/decimal passes turn it into words
     ['3.5 kg', 'three point five kilograms'],
     ['3/4 m', 'three quarters metres'],
     ['1/2 kg', 'one half kilograms'],
     ['1 1/2 kg', 'one and one half kilograms'],
-    // a unit with no space at all — the substituted space must not fuse into the spelled-out number
+    // a unit with no space at all — the tokenizer's own gluing rule inserts exactly one
     ['12.5cm', 'twelve point five centimetres'],
     ['5cm', '5 centimetres'],
-    // adjacent, separate fractions — never read as one fraction's whole part plus the next one's own
+    // adjacent, separate fractions — a left-to-right scan never reads across a fraction's own "/" into
+    // the next one, so no lookbehind hack is needed for this (#1430 round 1)
     ['1/2 3/4', 'one half three quarters'],
     ['3/4 1/2', 'three quarters one half'],
     ['1/2 3/4 5/6', 'one half three quarters five sixths'],
@@ -62,6 +71,25 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     // a Roman numeral directly beside a unit, spaced and unspaced
     ['X cm', 'Roman numeral X centimetres'],
     ['IIkg', 'Roman numeral I, I kilograms'],
+    // a Roman numeral glued to a chain of two units, and the mirror image — a chain of units glued to a
+    // Roman numeral (#1430 round 3/6/7: this exact asymmetry — `unitThenRoman` originally stripped only a
+    // single unit code before requiring a Roman suffix, unlike `romanThenUnits`'s full chain — was itself
+    // a self-review finding on the round-7 tokenizer rewrite, caught before it ever reached a reviewer):
+    // the tokenizer converts every span in a glued run, not just one, whichever side the chain is on.
+    ['Xkgcm', 'Roman numeral X kilograms centimetres'],
+    ['kgX', 'kilograms Roman numeral X'],
+    ['kgcmX', 'kilograms centimetres Roman numeral X'],
+    // the "longest code first" tie-break inside a glued chain — "cm²" must not be cut short as "cm" with
+    // a bare "²" left over
+    ['Xkgcm²', 'Roman numeral X kilograms square centimetres'],
+    // a Roman numeral or a unit glued directly to a digit, either order — different token classes in the
+    // tokenizer (a letter run and a digit run), so no `\b`-boundary trick is needed (#1430 round 4)
+    ['X5cm', 'Roman numeral X 5 centimetres'],
+    ['5Xcm', '5 Roman numeral X centimetres'],
+    ['IV12kg', 'Roman numeral I, V 12 kilograms'],
+    // a unit code glued to a digit or Roman letter on both sides at once (#1430 round 3)
+    ['5kg3', '5 kilograms 3'],
+    ['5kg3cm', '5 kilograms 3 centimetres'],
     // 24-hour times
     ['14:35', 'fourteen thirty-five'],
     ['14:05', 'fourteen oh five'],
@@ -85,6 +113,11 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     ['MCMXCIX', 'Roman numeral M, C, M, X, C, I, X'],
     // operators still go through symSay
     ['3 × 4 = ?', '3 times 4 equals what'],
+    // the National Curriculum "N-D shape" idiom (#1430 round 6): read as the digit then the letter D,
+    // never as subtraction into a bare Roman numeral D (500) — the shape `symSay`'s own hyphen-to-"minus"
+    // rule would otherwise produce, and the same reachable NC vocabulary `util.ts`'s own hint text uses
+    ['Slice the 3-D shape', 'Slice the 3 D shape'],
+    ['Identify the 2-D shape.', 'Identify the 2 D shape.'],
   ] as const)('ks2Say(%j) is %j', (input, expected) => {
     expect(ks2Say(input)).toBe(expected);
   });
@@ -133,33 +166,62 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     expect(sayIsSafe('solve for m')).toBe(true);
   });
 
-  // A conversion pass can consume a token boundary belonging to adjacent, separate notation — a scan
-  // reaching past where it should stop leaves a raw digit with only *one* side of its delimiter converted
-  // ("1/two", "V/2"), which the plain digit-delimiter-digit checks above cannot see. These four inputs are
-  // not fully converted by ks2Say (documented, narrow shapes — a Roman numerator, a three-fraction run with
-  // no separator, a bare decimal glued to a time), so this checks the rail catches the raw leftover on its
-  // own, independent of ks2Say ever fixing the conversion itself.
-  it('sayIsSafe fails a digit orphaned on only one side of "/", "." or ":" by an adjacent conversion', () => {
-    for (const bad of [ks2Say('XIV/2'), ks2Say('1/23/4'), ks2Say('3.4.5'), ks2Say('1.5:30'), ks2Say('1:2/3'), ks2Say('IV:30')]) {
+  // A three-or-more fraction/decimal chain with no digit beside its middle delimiter ("1/2/3/4") tokenizes
+  // as two converted fractions either side of one leftover "/" or "." — the same shape as the ordinary
+  // punctuation this codebase already ships (a sentence-ending period, a label colon), so sayIsSafe cannot
+  // tell them apart without a false positive against real spoken text (see the punctuation test below).
+  // Documented, narrow, and not reachable from any real card today.
+  it('a three-or-more fraction/decimal chain leaves one bare delimiter, undetected — a disclosed, narrow gap', () => {
+    expect(ks2Say('1/2/3/4')).toBe('one half/three quarters');
+    expect(ks2Say('1.2.3.4')).toBe('one point two.three point four');
+  });
+
+  // Two independently-reachable narrow gaps from round 1's own review: a Roman numerator glued straight
+  // to a following "/", and a decimal glued straight to a following 24-hour time with no separator.
+  it('sayIsSafe fails a digit orphaned on only one side of "/" or ":" by an adjacent conversion', () => {
+    for (const bad of [ks2Say('XIV/2'), ks2Say('1.5:30'), ks2Say('1:2/3'), ks2Say('IV:30')]) {
       expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
     }
   });
 
-  // The obvious broader fix for the case above — drop the digit requirement on "."/":" entirely — was
+  // The obvious broader fix for the gap above — drop the digit requirement on "."/":" entirely — was
   // tried and rejected: this codebase's own real spoken text uses both for ordinary punctuation, not just
   // KS2 notation, and an unconditional check would reject it. Pinning that these stay safe.
   it('sayIsSafe does not flag ordinary punctuation this codebase already uses in spoken text', () => {
     expect(sayIsSafe('Read the word. Slice its picture.')).toBe(true); // reception.ts's own say field
     expect(sayIsSafe('Find the word: cat')).toBe(true); // year1.ts's own say field shape
     expect(sayIsSafe('Hammer the ninja')).toBe(true); // avatars.ts's own avatar name, contains "mm"
+    // a sentence that simply ends in a plain number has nothing to convert (#1430 round 6) — the digit
+    // stays a bare digit (out of this module's scope on its own) and the following "." is ordinary
+    expect(sayIsSafe(ks2Say('The bus leaves at 9.'))).toBe(true);
+    expect(sayIsSafe(ks2Say('There were 10.'))).toBe(true);
+    expect(sayIsSafe(ks2Say('Divide 3/4 by 2.'))).toBe(true);
   });
 
-  // A unit code glued to a digit or Roman letter on *both* sides at once falls through the gap between
-  // the old "digit-before" and "no-alnum-either-side" checks: neither individually matches it, since each
-  // was built assuming the *other* side was clean. UNIT_TOUCH_RE closes this without a trailing lookahead —
-  // which is also why the single-letter codes need their own narrower leading check (next test).
-  it('sayIsSafe fails a unit code glued to a digit or Roman letter on both sides at once', () => {
-    for (const bad of ['5kg3', ks2Say('5kg3cm'), ks2Say('1kg500g'), 'Xkg5', 'Xkgcm', '5m3', '5g3', '5l3']) {
+  // Round 6 (#1430): the previous round's "a Roman letter glued to a lower-case letter" rail check had no
+  // digit/notation anchor at all, so it fired on the first two letters of any capitalised word starting
+  // with I/V/X/L/C/D/M — most of the National Curriculum's own instruction verbs, and any name starting
+  // with one of those letters. The tokenizer only ever classifies a run as a Roman numeral (or a Roman
+  // numeral spliced with a unit code) when the whole run actually decomposes that way, so an ordinary
+  // word is text from the start, never something a rail check has to specially exempt.
+  it('sayIsSafe does not flag an ordinary capitalised word starting with a Roman-numeral letter', () => {
+    for (const sentence of [
+      'Circle the shapes below.', 'Complete the number sentence.', 'Divide the cake.', 'Count to 10.',
+      'Match the picture to the word.', 'List the Roman numerals I, V, X, L, C, D, M.',
+    ]) {
+      expect(sayIsSafe(ks2Say(sentence)), `${JSON.stringify(sentence)} should be safe`).toBe(true);
+    }
+    expect(sayIsSafe('Xavier likes maths.')).toBe(true);
+  });
+
+  // A unit code glued to a digit or Roman letter on *both* sides at once (#1430 round 3) — the tokenizer
+  // properly converts every span in the glued run, rather than only flagging the leftover as unsafe.
+  it('a unit code glued to a digit or Roman letter on both sides converts and is safe', () => {
+    for (const input of ['5kg3', '5kg3cm', '1kg500g', 'Xkg5', 'Xkgcm', 'kgcmX', '5m3', '5g3', '5l3']) {
+      expect(sayIsSafe(ks2Say(input)), `ks2Say(${JSON.stringify(input)}) = ${JSON.stringify(ks2Say(input))} should be safe`).toBe(true);
+    }
+    // the raw, unconverted forms are still correctly flagged unsafe
+    for (const bad of ['5kg3', 'Xkg5', 'Xkgcm', 'kgcmX', '5m3', '5g3', '5l3']) {
       expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
     }
   });
@@ -173,13 +235,13 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     }
   });
 
-  // A Roman numeral glued directly to a digit, either order, shares no word boundary with the digit on
-  // either side, so the Roman-numeral pass can't isolate it — ks2Say leaves it raw whether or not a unit is
-  // involved. Not fixed in ks2Say (a pathological, unreachable input shape), but sayIsSafe must no longer
-  // call the leftover safe.
-  it('sayIsSafe fails a Roman numeral glued directly to a digit, either order', () => {
-    for (const bad of [ks2Say('X5cm'), ks2Say('5Xcm'), ks2Say('IV12kg'), ks2Say('X5')]) {
-      expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
+  // A Roman numeral glued directly to a digit, either order (#1430 round 4), and a unit code glued to a
+  // Roman-numeral suffix (#1430 round 6) — the tokenizer converts these properly (a digit run and a
+  // letter run are different token classes, so no `\b`-boundary trick is needed), rather than leaving them
+  // raw and only flagging the leftover.
+  it('a Roman numeral glued directly to a digit, either order, converts and is safe', () => {
+    for (const input of ['X5cm', '5Xcm', 'IV12kg', 'X5', 'kgX']) {
+      expect(sayIsSafe(ks2Say(input)), `ks2Say(${JSON.stringify(input)}) = ${JSON.stringify(ks2Say(input))} should be safe`).toBe(true);
     }
   });
 
@@ -203,19 +265,30 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
   });
 
   // Round 5 (#1430): a bare "I" glued with no space to a unit code fooled the pronoun heuristic the same
-  // way the spaced case above once did — the old unit-strip refused to remove a unit preceded by *any*
-  // letter, including "I" itself, which isn't prose at all. (A glued "I" inside real surrounding prose,
-  // e.g. "the length is Icm", still reads as the pronoun-ambiguous case — the same "other lower-case words
-  // nearby" rule the spaced form above already uses — since no real sentence glues "I" straight onto the
-  // next word with no space either way.)
+  // way the spaced case above once did.
   it('a lone "I" glued directly to a unit code is read as the numeral too', () => {
     expect(ks2Say('Icm')).toBe('Roman numeral I centimetres');
     expect(sayIsSafe(ks2Say('Icm'))).toBe(true);
+    // glued still means glued inside real surrounding prose too — no real sentence glues "I" straight
+    // onto the next word either way, so this is never a false positive against real spoken text
+    expect(ks2Say('the length is Icm')).toBe('the length is Roman numeral I centimetres');
   });
 
-  // Round 5 (#1430): a bare unit code with nothing before it at all was never converted, since the unit
-  // pass required a leading digit/Roman prefix — and once its trailing fraction/decimal was spelled out,
-  // nothing was left for sayIsSafe's digit-anchored unit checks to catch either.
+  // Round 7 (#1430): the pronoun heuristic used one flag for the *whole* input ("does this text have any
+  // ordinary prose in it anywhere"), applied to *every* bare "I" regardless of that occurrence's own
+  // neighbours — so a genuinely separate, glued leftover elsewhere in the same sentence hid behind an
+  // unrelated, genuine pronoun earlier in it. A self-review finding on the round-7 rewrite, caught before
+  // it ever reached a reviewer.
+  it('a genuine pronoun "I" earlier in a sentence does not exempt a separately glued "I" later in it', () => {
+    const sentence = 'I think the ratio is I/2 to check.';
+    expect(sayIsSafe(sentence)).toBe(false);
+    expect(sayIsSafe(ks2Say(sentence))).toBe(false);
+    expect(ks2Say(sentence)).toBe('I think the ratio is Roman numeral I/2 to check.');
+    expect(sayIsSafe('I have I5 apples')).toBe(false);
+  });
+
+  // Round 5 (#1430): a bare unit code with nothing before it at all — the tokenizer converts a multi-letter
+  // unit code unconditionally, wherever its own isolated letter run turns up.
   it('a bare unit code glued to a following fraction or decimal converts, and is flagged raw', () => {
     expect(ks2Say('kg3/4')).toBe('kilograms three quarters');
     expect(sayIsSafe(ks2Say('kg3/4'))).toBe(true);
@@ -226,13 +299,26 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
   });
 
   // Round 5 (#1430): a Roman numeral glued with no space to a fraction or decimal shares no word boundary
-  // with the *spelled-out word* its neighbour becomes, on either side — not fixed in ks2Say itself (a
-  // pathological, unreachable input shape, the same call rounds 3-4 made for a Roman numeral glued to a
-  // digit), but sayIsSafe must no longer call the leftover safe.
-  it('sayIsSafe fails a Roman numeral glued directly to an already-spelled-out word, either order', () => {
-    for (const bad of [ks2Say('3/4X'), ks2Say('1.5XIV'), ks2Say('X1.5')]) {
-      expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
+  // with the *spelled-out word* its neighbour becomes, on either side — the tokenizer converts both spans
+  // and spaces them apart, rather than leaving the Roman numeral raw.
+  it('a Roman numeral glued directly to an already-spelled-out word, either order, converts and is safe', () => {
+    for (const input of ['3/4X', '1.5XIV', 'X1.5']) {
+      expect(sayIsSafe(ks2Say(input)), `ks2Say(${JSON.stringify(input)}) = ${JSON.stringify(ks2Say(input))} should be safe`).toBe(true);
     }
+  });
+
+  // Round 6 (#1430): the National Curriculum's own "N-D shape" idiom ("3-D", "2-D") — `symSay`'s hyphen
+  // rule would otherwise free the bare "D" to be read as the Roman numeral 500 the moment the hyphen
+  // splits it off from its digit. Reachable today: util.ts's own hint text uses exactly this shape.
+  it('the "N-D shape" idiom reads as the digit and the letter, never subtraction into a Roman numeral', () => {
+    expect(ks2Say('Slice the 3-D shape')).toBe('Slice the 3 D shape');
+    expect(sayIsSafe(ks2Say('Slice the 3-D shape'))).toBe(true);
+    expect(ks2Say('The cube is a 3-D shape.')).toBe('The cube is a 3 D shape.');
+    expect(sayIsSafe(ks2Say('The cube is a 3-D shape.'))).toBe(true);
+    // an ordinary hyphenated word starting with "D" is unaffected — not the "N-D" idiom at all
+    expect(ks2Say('10-Diego')).toBe('10 minus Diego');
+    // NC material is not consistent about case
+    expect(ks2Say('Slice the 3-d shape')).toBe('Slice the 3 d shape');
   });
 
   // The module's own core invariant (its header comment states it): ks2Say never leaves behind what
@@ -247,8 +333,23 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
       '1/2 3/4', '3/4 1/2', '1000000.5', '1234567.5', 'X cm', 'IIkg',
       '5 mm', '5 m', '5 g', '5 l', '200 ml', '200 mg',
       'Icm', 'the length is Icm', 'kg3/4', 'mg2.5', 'I kg',
+      '5kg3', '5kg3cm', '1kg500g', 'Xkg5', 'Xkgcm', 'kgX', 'kgcmX', 'Xkgcm²', 'X5cm', '5Xcm', 'IV12kg', 'X5',
+      '3/4X', '1.5XIV', 'X1.5', 'Slice the 3-D shape', 'The cube is a 3-D shape.',
+      'Circle the shapes below.', 'Divide 3/4 by 2.', 'The bus leaves at 9.',
     ];
     for (const text of raw) expect(sayIsSafe(ks2Say(text)), `ks2Say(${JSON.stringify(text)}) = ${JSON.stringify(ks2Say(text))}`).toBe(true);
+  });
+
+  // The tokenizer must not crash or hang on ordinary-shaped-but-unusual input: a non-canonical Roman run,
+  // an empty string, a large-but-finite number. `cardinal(Infinity)` recursing forever on a digit string
+  // long enough to overflow `Number` (round 3's own disclosed, declined finding — NC caps KS2 numbers at
+  // 10,000,000, so this is not reachable from any real generator) is not this test's concern.
+  it('never crashes on ordinary-shaped input, including a large number', () => {
+    expect(() => ks2Say('9'.repeat(15) + '.5')).not.toThrow();
+    expect(() => ks2Say('')).not.toThrow();
+    expect(() => ks2Say('IIII')).not.toThrow();
+    expect(ks2Say('')).toBe('');
+    expect(sayIsSafe('')).toBe(true);
   });
 
   // The registry sweep runs zero times today — no KS2 (`isKs2`) topic exists yet — so this loop is proven
