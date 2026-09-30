@@ -48,12 +48,21 @@ function countRun(d: Difficulty, rng: () => number): Question {
   return { prompt: `${prompt} = ?`, say: `Count in ${step}s. ${prompt.replace(/,(?=[^,]*$)/, ' then')} = what?`, answer: fmtN(answer), options };
 }
 
-/** 10 or 100 more/less than a given number (#1050 y3-count). */
-function moreOrLess(d: Difficulty, rng: () => number): Question {
-  const amt: 10 | 100 = d === 2 ? 100 : d === 3 ? pick(rng, [10, 100] as const) : 10;
-  const otherAmt: 10 | 100 = amt === 10 ? 100 : 10;
-  const more = rng() < 0.5;
-  const sign = more ? 1 : -1;
+/** A decoy sharing the answer's leading (hundreds) digit, the same way `mistakes.ts`'s `fillLead` guarantees
+ *  one for its sibling module (#1448 review). Only needed for `amt === 100`: adding/subtracting exactly 100
+ *  is precisely the operation that changes the leading digit, so none of `moreOrLess`'s other three named
+ *  decoys ever land in the answer's own hundred there (measured 46-89% leak, past the KS2 ≤30% ceiling).
+ *  `amt === 10`'s crossing case needs no such fix: its `otherPower` decoy already lands in the answer's own
+ *  hundred there, by construction. `null` when no same-hundred candidate exists (an extreme range edge). */
+function sameLeadDecoy(answer: number, rng: () => number): number | null {
+  const lo = Math.max(0, Math.floor(answer / 100) * 100), hi = Math.min(1099, lo + 99);
+  const candidates = [answer - 20, answer - 10, answer + 10, answer + 20].filter(v => v !== answer && v >= lo && v <= hi);
+  return candidates.length ? pick(rng, candidates) : null;
+}
+
+/** A base whose crossing behaviour matches the difficulty (#1050 y3-count): d1 never crosses a hundred, d3
+ *  always does, d2 doesn't care. Rejection-sampled, capped at 200 tries either way. */
+function pickBase(d: Difficulty, amt: 10 | 100, sign: 1 | -1, rng: () => number): number {
   const crosses = (base: number) => Math.floor(base / 100) !== Math.floor((base + amt * sign) / 100);
   let base: number;
   let guard = 0;
@@ -61,12 +70,24 @@ function moreOrLess(d: Difficulty, rng: () => number): Question {
     base = ri(rng, 100, 999);
     guard++;
   } while (guard < 200 && (d === 1 ? crosses(base) : d === 3 ? !crosses(base) : false));
+  return base;
+}
+
+/** 10 or 100 more/less than a given number (#1050 y3-count). */
+function moreOrLess(d: Difficulty, rng: () => number): Question {
+  const amt: 10 | 100 = d === 2 ? 100 : d === 3 ? pick(rng, [10, 100] as const) : 10;
+  const otherAmt: 10 | 100 = amt === 10 ? 100 : 10;
+  const more = rng() < 0.5;
+  const sign = more ? 1 : -1;
+  const base = pickBase(d, amt, sign, rng);
   const answer = base + amt * sign;
   const prompt = `${amt} ${more ? 'more' : 'less'} than ${fmtN(base)} = ?`;
   const otherPower = base + otherAmt * sign;
   const wrongDirection = base - amt * sign;
   const both = base - otherAmt * sign;
-  const pool = new Set<number>([otherPower, wrongDirection, both].filter(v => v !== answer && v >= 0 && v <= 1099));
+  const sameLead = amt === 100 ? sameLeadDecoy(answer, rng) : null;
+  const named = sameLead !== null ? [sameLead, wrongDirection, both] : [otherPower, wrongDirection, both];
+  const pool = new Set<number>(named.filter(v => v !== answer && v >= 0 && v <= 1099));
   while (pool.size < 3) {
     const v = answer + ri(rng, -Math.max(amt, 10), Math.max(amt, 10));
     if (v !== answer && v >= 0 && v <= 1099 && !pool.has(v)) pool.add(v);

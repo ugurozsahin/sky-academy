@@ -146,6 +146,28 @@ describe('y3-count (#1050)', () => {
       for (const label of [q.answer, ...q.options]) expect(label, q.prompt).not.toMatch(/\d{4,}/);
     }
   });
+
+  // Review (#1448 round 1): the KS2 distractor rule's own leak-limit — over 2,000 draws per difficulty, at
+  // most 30% of whole-number-≥20 answers may have a leading (or last-printed) digit no decoy shares. The
+  // formal sweep (`decoy-leak.ts`'s `leakShares`) isn't available yet (#1058/#1435, still open); this
+  // reimplements its exact measurement against `moreOrLess`'s "N more/less than BASE" cards, where the leak
+  // actually lived (an `amt=100` card never had a decoy sharing the answer's own hundred).
+  it('KS2 leak limit: moreOrLess cards leak the leading digit at most 30% of the time', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(1050_700 + d);
+      let leaked = 0, total = 0;
+      for (let i = 0; i < 2000; i++) {
+        const q = topic.gen(d, r);
+        if (q.prompt.includes(',')) continue; // countRun, not this card kind
+        const answer = num(q.answer);
+        if (answer < 20) continue;
+        total++;
+        const lead = q.answer.replace(/[^0-9]/g, '')[0];
+        if (!q.options.some(o => o !== q.answer && o.replace(/[^0-9]/g, '')[0] === lead)) leaked++;
+      }
+      expect(leaked / total, `d${d}: ${leaked}/${total} leaked the leading digit`).toBeLessThanOrEqual(0.30);
+    }
+  });
 });
 
 describe('Year 3 strand modules (#1050): import direction', () => {
