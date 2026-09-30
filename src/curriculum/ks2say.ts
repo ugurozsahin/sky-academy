@@ -21,8 +21,12 @@ function cardinal(n: number): string {
     const hundreds = Math.floor(n / 100), rest = n % 100;
     return rest === 0 ? `${ONES[hundreds]} hundred` : `${ONES[hundreds]} hundred and ${cardinal(rest)}`;
   }
-  const thousands = Math.floor(n / 1000), rest = n % 1000;
-  return rest === 0 ? `${cardinal(thousands)} thousand` : `${cardinal(thousands)} thousand ${cardinal(rest)}`;
+  if (n < 1000000) {
+    const thousands = Math.floor(n / 1000), rest = n % 1000;
+    return rest === 0 ? `${cardinal(thousands)} thousand` : `${cardinal(thousands)} thousand ${cardinal(rest)}`;
+  }
+  const millions = Math.floor(n / 1000000), rest = n % 1000000;
+  return rest === 0 ? `${cardinal(millions)} million` : `${cardinal(millions)} million ${cardinal(rest)}`;
 }
 
 const ORDINAL_ONES: Record<number, string> = { 1: 'first', 2: 'second', 3: 'third', 4: 'fourth', 5: 'fifth', 6: 'sixth', 7: 'seventh', 8: 'eighth', 9: 'ninth' };
@@ -42,9 +46,14 @@ function ordinalWord(n: number): string {
     if (rest === 0) return hundreds === 1 ? 'hundredth' : `${ONES[hundreds]} hundredth`;
     return `${ONES[hundreds]} hundred and ${ordinalWord(rest)}`;
   }
-  const thousands = Math.floor(n / 1000), rest = n % 1000;
-  if (rest === 0) return thousands === 1 ? 'thousandth' : `${cardinal(thousands)} thousandth`;
-  return `${cardinal(thousands)} thousand ${ordinalWord(rest)}`;
+  if (n < 1000000) {
+    const thousands = Math.floor(n / 1000), rest = n % 1000;
+    if (rest === 0) return thousands === 1 ? 'thousandth' : `${cardinal(thousands)} thousandth`;
+    return `${cardinal(thousands)} thousand ${ordinalWord(rest)}`;
+  }
+  const millions = Math.floor(n / 1000000), rest = n % 1000000;
+  if (rest === 0) return millions === 1 ? 'millionth' : `${cardinal(millions)} millionth`;
+  return `${cardinal(millions)} million ${ordinalWord(rest)}`;
 }
 
 const DENOM_WORD: Record<number, string> = {
@@ -64,38 +73,54 @@ const EXTRA_UNIT_WORD: Record<string, string> = {
   'cm²': 'square centimetres', 'm²': 'square metres', km: 'kilometres', mm: 'millimetres', mg: 'milligrams',
 };
 const unitWord = (u: string): string => EXTRA_UNIT_WORD[u] ?? UNIT_WORD[u] ?? u;
-// A unit code only counts right after a digit (a bare algebra letter like "m" is never mistaken for one).
-// Longer codes first in the alternation, so "cm²"/"mm"/"ml"/"mg" win over "cm"/"m"/"g" at the same spot.
+// A unit code only counts right after a digit or a Roman numeral (a bare algebra letter like "m" is never
+// mistaken for one). Longer codes first, so "cm²"/"mm"/"ml"/"mg" win over "cm"/"m"/"g" at the same spot. The
+// replacement always inserts exactly one space before the unit word, whatever the input had (none, in
+// "12.5cm") or not — the number beside it is not spelled out yet at this point in the pipeline, so an
+// absent space here would otherwise fuse two spelled-out words together later ("...fivecentimetres").
 const UNIT_ALT = 'cm²|m²|km|mm|ml|mg|kg|cm|m|g|l';
-const UNIT_RE = new RegExp(`(\\d)( ?)(${UNIT_ALT})(?![a-zA-Z0-9²])`, 'g');
-/** `UNIT_RE` with no capture groups/`g` flag: does `text` carry one, whatever produced it? */
-const UNIT_LEFT_RE = new RegExp(`\\d ?(?:${UNIT_ALT})(?![a-zA-Z0-9²])`);
+const UNIT_RE = new RegExp(`(\\d+|[IVXLCDM]+) ?(${UNIT_ALT})(?![a-zA-Z0-9²])`, 'g');
+/** `UNIT_RE`'s prefix+code, with no capture groups/`g` flag: does `text` carry one, whatever produced it? */
+const UNIT_LEFT_RE = new RegExp(`(?:\\d|[IVXLCDM]) ?(?:${UNIT_ALT})(?![a-zA-Z0-9²])`);
 // Once a number is fully spelled out there is no digit left for UNIT_LEFT_RE to anchor on ("three point
 // five kg" has none next to "kg"), so a *multi-letter* code is flagged unconditionally instead — unlike a
 // bare "m"/"g"/"l" (a real algebra variable), none of these is an ordinary English word or variable name.
 const UNIT_BARE_RE = /(?<![a-zA-Z0-9])(?:cm²|m²|km|mm|ml|mg|kg|cm)(?![a-zA-Z0-9²])/;
+// A Roman numeral glued directly to a unit with no space ("IIkg") shares no word boundary with it, so
+// neither the conversion above nor a plain `\b[IVXLCDM]{2,}\b` scan (below) ever sees the numeral half —
+// caught here instead, independent of whether ks2Say managed to convert it.
+const ROMAN_GLUED_UNIT_RE = new RegExp(`\\b[IVXLCDM]{2,}(?:${UNIT_ALT})`);
 
 /**
  * Turns KS2 notation in `text` into words: `symSay`'s operators, then a unit code (run early, on the raw
- * digit, since the fraction/decimal passes below turn that same digit into words first otherwise — "3.5
- * kg" or "3/4 m" would reach a speech engine with the abbreviation left unconverted), a Roman numeral
- * (spelled out letter by letter, never read as its value — a card asking what XIV *means* must not say the
- * answer), a mixed or plain fraction, a 24-hour time, and a decimal (read digit by digit after the point).
+ * digit or Roman-numeral prefix, since the fraction/decimal/Roman passes below turn that same prefix into
+ * words first otherwise — "3.5 kg" or "X cm" would reach a speech engine with the abbreviation left
+ * unconverted), a Roman numeral (spelled out letter by letter, never read as its value — a card asking what
+ * XIV *means* must not say the answer), a mixed or plain fraction (a whole-number scan never reads across
+ * an already-adjacent fraction's own "/", so "1/2 3/4" is two fractions, not "1/" plus a mixed number), a
+ * 24-hour time, and a decimal (read digit by digit after the point).
  *
- * Two shapes this cannot resolve without context a pure string function does not have, so it does not try:
- * an ordinary word that happens to be a canonical Roman numeral ("MIX", "XL") reads as one outside the one
- * carved-out case ("I", the pronoun); and "H:MM" always reads as a time, even as a ratio ("mix 1:10") — no
- * ratio topic exists in the registry today, so this is not yet reachable from any real card.
+ * Three shapes this cannot resolve without context a pure string function does not have, so it does not
+ * try — `sayIsSafe` still catches all three, so none reaches a speech engine unflagged: an ordinary word
+ * that happens to be a canonical Roman numeral ("MIX", "XL") reads as one outside the one carved-out case
+ * ("I", the pronoun); "H:MM" always reads as a time, even as a ratio ("mix 1:10") — no ratio topic exists
+ * in the registry today, so this is not yet reachable from any real card; and a Roman numeral glued
+ * directly to a unit with no space ("IIkg") shares no word boundary with either, so it is left unconverted
+ * (the same combination *with* a space, "X cm", converts correctly — the unit pass's Roman-prefix support
+ * above needs that space to see where the numeral ends).
  */
 export function ks2Say(text: string): string {
   const hadLowerCase = /[a-z]/.test(text); // checked before symSay adds its own lower-case operator words
   let out = symSay(text);
-  out = out.replace(UNIT_RE, (_, digit, space, unit) => `${digit}${space}${unitWord(unit)}`);
+  out = out.replace(UNIT_RE, (_, prefix, unit) => `${prefix} ${unitWord(unit)}`);
   out = out.replace(/\b[IVXLCDM]+\b/g, tok => {
     if (tok === 'I' && hadLowerCase) return tok; // the pronoun "I" in an ordinary sentence, left alone
     return fromRoman(tok) === null ? tok : `Roman numeral ${tok.split('').join(', ')}`;
   });
-  out = out.replace(/(\d+) (\d+)\/(\d+)/g, (_, w, n, d) => `${cardinal(Number(w))} and ${fracWord(Number(n), Number(d))}`);
+  // A whole-number part can never itself be the denominator half of an already-adjacent fraction ("1/2
+  // 3/4" is two proper fractions, not "1/" plus the mixed number "2 3/4") — the lookbehind keeps this scan
+  // from reading across that boundary.
+  out = out.replace(/(?<!\/)(\d+) (\d+)\/(\d+)/g, (_, w, n, d) => `${cardinal(Number(w))} and ${fracWord(Number(n), Number(d))}`);
   out = out.replace(/(\d+)\/(\d+)/g, (_, n, d) => fracWord(Number(n), Number(d)));
   out = out.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g, (_, h, m) => {
     const mm = Number(m);
@@ -106,15 +131,19 @@ export function ks2Say(text: string): string {
   return out.replace(/\s+/g, ' ').trim();
 }
 
-/** False while `text` still carries raw notation a speech engine would misread: a fraction, a decimal point
- *  between digits, a 24-hour time, a superscript, a digit-adjacent unit code, or a canonical Roman numeral
- *  of two or more letters (a lone "I" is never flagged — as likely the pronoun as the numeral). */
+/**
+ * False while `text` still carries raw notation a speech engine would misread. A conversion pass earlier in
+ * `ks2Say` can consume a token boundary that belonged to an adjacent, separate piece of notation (a mixed-
+ * number scan reading "1/2 3/4" as "1/" plus the mixed number "2 3/4"), which orphans a raw digit with only
+ * *one* side of its delimiter converted — "1/two", "V/2" — so both sides of `/` and `.` are checked, not
+ * only the fully-raw digit-delimiter-digit shape.
+ */
 export function sayIsSafe(text: string): boolean {
-  if (/\d+\/\d+/.test(text)) return false;
-  if (/\d\.\d/.test(text)) return false;
+  if (/\d\//.test(text) || /\/\d/.test(text)) return false;
+  if (/\d\./.test(text) || /\.\d/.test(text)) return false;
   if (/\d:\d\d/.test(text)) return false;
   if (text.includes('²')) return false;
-  if (UNIT_LEFT_RE.test(text) || UNIT_BARE_RE.test(text)) return false;
+  if (UNIT_LEFT_RE.test(text) || UNIT_BARE_RE.test(text) || ROMAN_GLUED_UNIT_RE.test(text)) return false;
   for (const tok of text.match(/\b[IVXLCDM]{2,}\b/g) ?? []) if (fromRoman(tok) !== null) return false;
   return true;
 }

@@ -48,6 +48,20 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     ['3/4 m', 'three quarters metres'],
     ['1/2 kg', 'one half kilograms'],
     ['1 1/2 kg', 'one and one half kilograms'],
+    // a unit with no space at all — the substituted space must not fuse into the spelled-out number
+    ['12.5cm', 'twelve point five centimetres'],
+    ['5cm', '5 centimetres'],
+    // adjacent, separate fractions — never read as one fraction's whole part plus the next one's own
+    ['1/2 3/4', 'one half three quarters'],
+    ['3/4 1/2', 'three quarters one half'],
+    ['1/2 3/4 5/6', 'one half three quarters five sixths'],
+    // a million and above (NC Y5-6: numbers to 1,000,000/10,000,000)
+    ['1000000.5', 'one million point five'],
+    ['2000000.25', 'two million point two five'],
+    ['1234567.5', 'one million two hundred and thirty-four thousand five hundred and sixty-seven point five'],
+    // a Roman numeral directly beside a unit, spaced and unspaced
+    ['X cm', 'Roman numeral X centimetres'],
+    ['IIkg', 'Roman numeral I, I kilograms'],
     // 24-hour times
     ['14:35', 'fourteen thirty-five'],
     ['14:05', 'fourteen oh five'],
@@ -119,6 +133,18 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     expect(sayIsSafe('solve for m')).toBe(true);
   });
 
+  // A conversion pass can consume a token boundary belonging to adjacent, separate notation — a scan
+  // reaching past where it should stop leaves a raw digit with only *one* side of its delimiter converted
+  // ("1/two", "V/2"), which the plain digit-delimiter-digit checks above cannot see. These four inputs are
+  // not fully converted by ks2Say (documented, narrow shapes — a Roman numerator, a three-fraction run with
+  // no separator, a bare decimal glued to a time), so this checks the rail catches the raw leftover on its
+  // own, independent of ks2Say ever fixing the conversion itself.
+  it('sayIsSafe fails a digit orphaned on only one side of "/" or "." by an adjacent conversion', () => {
+    for (const bad of [ks2Say('XIV/2'), ks2Say('1/23/4'), ks2Say('3.4.5'), ks2Say('1.5:30')]) {
+      expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
+    }
+  });
+
   // The module's own core invariant (its header comment states it): ks2Say never leaves behind what
   // sayIsSafe is built to catch. Checked over a wider table than the five official rail fixtures above,
   // including the values that once broke cardinal() past 99 (a one-line regression there reads as
@@ -127,7 +153,8 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     const raw = [
       '3/4', '2 3/4', '300/4', '3.75', '123.5', '1234.56', '14:35', '23:59',
       '4 cm²', '9 m²', '12 km', '5 mm', '200 mg', 'XIV', 'MCMXCIX', '−3.5', '7 − 3 = ?',
-      '1/20', '1/1000', '1/999', '3.5 kg', '3/4 m', '1 1/2 kg',
+      '1/20', '1/1000', '1/999', '3.5 kg', '3/4 m', '1 1/2 kg', '12.5cm',
+      '1/2 3/4', '3/4 1/2', '1000000.5', '1234567.5', 'X cm', 'IIkg',
     ];
     for (const text of raw) expect(sayIsSafe(ks2Say(text)), `ks2Say(${JSON.stringify(text)}) = ${JSON.stringify(ks2Say(text))}`).toBe(true);
   });
