@@ -48,8 +48,39 @@ describe('y1-alien (#982): Real or Alien?, both banks hand-curated', () => {
    * exact words already found is the cheap alternative the round-4 review asked for.
    */
   it('a previously-fixed real word/sound-alike never returns to ALIEN_FAKE (#982)', () => {
-    const RETIRED = ['yow', 'thob', 'zue', 'zew', 'yoe', 'zow', 'shund', 'zute', 'zeak', 'chun', 'mulk', 'phum', 'zade', 'chok'];
+    const RETIRED = [
+      'yow', 'thob', 'zue', 'zew', 'yoe', 'zow', 'shund', 'zute', 'zeak', 'chun', 'mulk', 'phum', 'zade', 'chok',
+      // round 7 (#982): confusable-consonant sound-alikes (vork≈fork, zort≈sort, zurd≈word, veak≈weak,
+      // vosh≈wash, zibe≈vibe), plus four more the same class caught mechanically below (vunk≈funk,
+      // kift≈gift, trum≈drum, zay/zoy/zaw≈say/soy/saw — the last three via GAP_WORDS/ALIEN_REAL directly).
+      'vork', 'zort', 'zurd', 'veak', 'vosh', 'zibe', 'vunk', 'kift', 'trum', 'zay', 'zoy', 'zaw',
+    ];
     for (const w of RETIRED) expect(fakeWords, `"${w}" was already fixed out of ALIEN_FAKE once`).not.toContain(w);
+  });
+
+  /**
+   * #982 review round 7: seven rounds each found a different real word or sound-alike; six of round 7's
+   * own six findings (vork≈fork, zort≈sort, zurd≈word, veak≈weak, vosh≈wash, zibe≈vibe) share one shape —
+   * a single confusable-consonant swap turns the pseudo-word into a real one, the kind of voicing mix-up
+   * (v/f, z/s, w/v, b/p, d/t, g/k) an early reader plausibly makes. This is the mechanical, non-manual
+   * check round 7 asked for: it does not need a phoneme engine, only a swap table, and it catches a class a
+   * human eye-sweep keeps missing rather than any specific word. It is not a full solution — `vosh`≈"wash"
+   * and `zurd`≈"word" (round 7's own findings) also change a vowel, not just a consonant, so this check
+   * would not have caught either on its own; it narrows the manual-sweep gap without claiming to close it.
+   */
+  it('no ALIEN_FAKE word is one confusable-consonant swap from a real word (#982 round 7)', () => {
+    const CONFUSABLE_PAIRS: [string, string][] = [['v', 'f'], ['z', 's'], ['w', 'v'], ['z', 'v'], ['w', 'z'], ['b', 'p'], ['d', 't'], ['g', 'k']];
+    const EXTRA_REAL = new Set(['sort', 'weak', 'vibe', 'funk', 'melt', 'swan', 'drum', 'chock', 'yo', 'zowie', 'shunned', 'zoot', 'nigh', 'fum', 'soy']);
+    const realSet = new Set([...GAP_WORDS, ...realWords.map(w => w.toLowerCase()), ...EXTRA_REAL]);
+    const swaps = (w: string) => CONFUSABLE_PAIRS.flatMap(([a, b]) => [...w].flatMap((c, i) => {
+      if (c === a) return [w.slice(0, i) + b + w.slice(i + 1)];
+      if (c === b) return [w.slice(0, i) + a + w.slice(i + 1)];
+      return [];
+    }));
+    for (const w of fakeWords) {
+      const hit = swaps(w).find(n => realSet.has(n));
+      expect(hit, `"${w}" is one confusable-consonant swap from real word "${hit}"`).toBeUndefined();
+    }
   });
 
   /**

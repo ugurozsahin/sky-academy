@@ -272,9 +272,9 @@ const ALIEN_REAL: [string, Difficulty][] = [
 ];
 /** Decodable pseudo-words. Never a real word, a slur or a sound-alike of one (`tests/unit/topic-y1-alien.test.ts`). */
 const ALIEN_FAKE: [string, Difficulty][] = [
-  ['chab', 1], ['vunk', 1], ['shig', 1], ['vosh', 1], ['nolp', 1], ['zeeg', 1], ['zark', 1], ['toop', 1], ['vork', 1], ['zort', 1], ['yurk', 1], ['zurd', 1], ['zelp', 1], ['zosk', 1], ['feeg', 1],
-  ['stog', 2], ['flep', 2], ['crun', 2], ['drep', 2], ['plob', 2], ['swen', 2], ['delk', 2], ['nelt', 2], ['mulf', 2], ['fost', 2], ['hend', 2], ['zamp', 2], ['kift', 2], ['trum', 2], ['glap', 2],
-  ['zay', 3], ['zout', 3], ['nurt', 3], ['veak', 3], ['zoy', 3], ['mirt', 3], ['zirn', 3], ['zaw', 3], ['whep', 3], ['phik', 3], ['zesk', 3], ['noup', 3], ['zaup', 3], ['zebe', 3], ['zibe', 3],
+  ['chab', 1], ['helk', 1], ['shig', 1], ['zift', 1], ['nolp', 1], ['zeeg', 1], ['zark', 1], ['toop', 1], ['nork', 1], ['zelk', 1], ['yurk', 1], ['morv', 1], ['zelp', 1], ['zosk', 1], ['feeg', 1],
+  ['stog', 2], ['flep', 2], ['crun', 2], ['drep', 2], ['plob', 2], ['swen', 2], ['delk', 2], ['nelt', 2], ['mulf', 2], ['fost', 2], ['hend', 2], ['zamp', 2], ['dorg', 2], ['zunt', 2], ['glap', 2],
+  ['zup', 3], ['zout', 3], ['nurt', 3], ['nolk', 3], ['zid', 3], ['mirt', 3], ['zirn', 3], ['zob', 3], ['whep', 3], ['phik', 3], ['zesk', 3], ['noup', 3], ['zaup', 3], ['zebe', 3], ['dorv', 3],
 ];
 /** Exported for `tests/unit/topic-y1-alien.test.ts` (#982), which walks both banks against `AVOID`/`GAP_WORDS`. */
 export { ALIEN_REAL, ALIEN_FAKE };
