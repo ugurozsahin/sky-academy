@@ -119,7 +119,7 @@ other) or **loosens** them (**owner-gated, never routine-merged, however obvious
 `.claude/rules/governance.md` and `.claude/skills/open-pr/SKILL.md` §6 for the full rule, the three things to
 get right, and worked examples.
 
-STEP 4 — NOTHING ELIGIBLE? (snapshot: `- query top pick: none eligible`.) Do not invent work no open issue asks for — if it is worth doing, file it with a priority label and the next run picks it up. Instead: QA something merged without review, lower a guard-rail budget you can, thicken unit coverage of `arena`/`visuals`/`tracing` (#43), or write up what you would do next and why. Fix obvious low-risk bugs (wrong ranges, typos, failing tests) in a PR.
+STEP 4 — NOTHING ELIGIBLE? (snapshot: `- query top pick: none eligible · N blockers read live`, STEP 3's count.) Do not invent work no open issue asks for — if it is worth doing, file it with a priority label and the next run picks it up. Instead: QA something merged without review, lower a guard-rail budget you can, thicken unit coverage of `arena`/`visuals`/`tracing` (#43), or write up what you would do next and why. Fix low-risk bugs in a PR.
 
 STEP 5 — RECORD. One write, and it is the whole record: **your heartbeat snapshot**. "Where a record goes" above has the other kinds.
 

@@ -92,6 +92,7 @@ export function bubbleRadius(W: number, H: number, wide: boolean): number {
   return Math.max(30, Math.min(wide ? 64 : 54, wide ? base * 1.25 : base));
 }
 
+export function waveRadius(W: number, H: number, wide: boolean, n: number): number { return Math.min(Math.max(26, bubbleRadius(W, H, wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1)), ((W - 16) / 3 - 10) / 2); }   // layoutWave's own formula, exported for R-LBL (#1046)
 /** The arena's drawable box, in CSS pixels. */
 export interface ArenaBox { W: number; H: number }
 /**
@@ -297,8 +298,7 @@ export interface WavePlan { r: number; waveT: number; batchSpan: number; perBatc
 export function layoutWave(o: WaveOpts, geom: WaveGeom, speedK: number, now: number, rng: Rng): WavePlan {
   const { W, H, topInset } = geom;
   const n = o.labels.length;
-  let r = Math.max(26, bubbleRadius(W, H, !!o.wide) * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1));
-  r = Math.min(r, ((W - 16) / 3 - 10) / 2);                                    // at least three always fit across
+  let r = waveRadius(W, H, !!o.wide, n);
   const T = (o.speed === 0 ? 7.5 : o.speed === 1 ? 5.6 : o.speed === 2 ? 4.4 : 3.4) / speedK;   // seconds in the air — 0 is Reception's gentle float (#700)
   const apexMin = topInset + r + 10;
   const usable = H - apexMin - r;
@@ -365,8 +365,8 @@ export const LABEL_HARD_MIN_FS = 8;
  * the sweep in the pull request body is the evidence for where it is now.
  */
 export const LABEL_READABLE_FS = 13;
-/** How much of `r` one line may spend across the middle of the bubble. */
-const LINE_BUDGET = 1.75;
+/** How much of `r` one line may spend. Exported for the R-LBL rail (#1046, `tests/unit/helpers/r-lbl.ts`). */
+export const LINE_BUDGET = 1.75;
 /** A wrapped line sits above or below the centre, where the disc's chord is a shade narrower. */
 const WRAP_BUDGET = 1.7;
 /** Two lines of this size stack to at most `WRAP_STACK * r`, so both stay inside the disc. */

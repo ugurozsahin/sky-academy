@@ -75,7 +75,7 @@ Maths:
 - y2-three — three 1-digit
 - y2-inverse — missing number
 - y2-tables — 2,5,10 × and ÷
-- y2-oddeven — is n odd/even (d1, and half of d2–d3); the other half of d2–d3 shows 4 numbers and asks which one is odd/even, d3 decoys within 5 of the answer
+- y2-oddeven — is n odd/even (d1); at d2–d3 about 1 in 3 cards is "slice every even/odd number" over six numbers (any order); of the rest, half asks n odd/even and half shows 4 numbers and asks which one is odd/even, d3 decoys within 5 of the answer
 - y2-fractions — ⅓ ¼ 2/4 ¾, of quantities
 - y2-money — £ and p recorded separately — `£1 and 50p`, never `£1.50`; change
 - y2-time — 5 minutes, quarter past/to

@@ -378,7 +378,7 @@ describe('curriculum ranges', () => {
     }
   });
   // #890: a guess used to score 50% at every stage — two bubbles, "odd" or "even". d1 keeps that; d2–d3 also
-  // draw a 4-bubble form ("Which number is even/odd?"), so both forms must appear from d2.
+  // draw a 4-bubble form ("Which number is even/odd?"); #926's any-order form is topic-y2-oddeven-anyorder.test.ts.
   it('y2-oddeven: d1 is the unchanged 2-option form; d2–d3 also draw a 4-option form with one correct parity', () => {
     const t = TOPICS.find(x => x.id === 'y2-oddeven')!; const r = rng(890);
     for (let i = 0; i < 300; i++) {
@@ -392,7 +392,7 @@ describe('curriculum ranges', () => {
     for (const d of [2, 3] as Difficulty[]) {
       let twoOption = 0, fourOption = 0, decoyOver5 = 0;
       for (let i = 0; i < 300; i++) {
-        const q = t.gen(d, r);
+        const q = t.gen(d, r); if (q.anyOrder) continue;   // #926, checked elsewhere
         if (q.options.length === 2) { twoOption++; expect(q.prompt).toMatch(/^Is \d+ odd or even\?$/); continue; }
         fourOption++;
         expect(q.prompt, q.prompt).toMatch(/^Which number is (odd|even)\?$/);
@@ -2622,7 +2622,7 @@ describe("every other spellQ caller keeps the same invariant (#481)", () => {
   });
 });
 
-describe('anyOrderQ (#918): the "Slice Them All" builder, no topic uses it yet', () => {
+describe('anyOrderQ (#918): the "Slice Them All" builder, used by y2-oddeven (#926)', () => {
   it('sorts the targets canonically and joins them as the answer', () => {
     const q = anyOrderQ(rng(918), 'Slice every even number', ['8', '12', '4'], ['3', '7']);
     expect(q.sequence).toEqual(['4', '8', '12']);           // numeric localeCompare, not lexical ('12' < '4')
