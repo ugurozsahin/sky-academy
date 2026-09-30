@@ -148,13 +148,18 @@ const contentList = (s: string) => {
 export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : '', q.optionsAreContent ? [...q.options].sort().join('\u0001') : ''].join('\u0000');
 
 /**
- * Draw with `draw()`, re-rolling up to `tries` times while the result's `repeatKey` still matches `prevKey` —
- * the loop `Session.nextQuestion()` runs inline, generalised so `Duel.nextQuestion()` (#879) can share it
- * rather than reimplementing it. `prevKey` is `null` for a match's/session's first question, which never
- * re-rolls (there is nothing yet to repeat). `gaveUp` is true when the key space collapsed even after `tries`
- * re-rolls (#453 item 4) — the caller counts it, since only it knows what a give-up means for its own tally.
+ * Draw with `draw()`, re-rolling up to `tries` times while the result's `repeatKey` still matches
+ * `prevQuestion`'s — the loop `Session.nextQuestion()` runs inline, generalised so `Duel.nextQuestion()`
+ * (#879) can share it rather than reimplementing it. Takes the previous `Question` itself, not its
+ * already-computed key: a bare `string` would accept any string a caller handed it (a stale key, `q.answer`
+ * by mistake), which is exactly the shape of thing `repeatKey` exists to get right in one place (#879
+ * review, type-design-analyzer). `prevQuestion` is `null` for a match's/session's first question, which
+ * never re-rolls (there is nothing yet to repeat). `gaveUp` is true when the key space collapsed even after
+ * `tries` re-rolls (#453 item 4) — the caller counts it, since only it knows what a give-up means for its
+ * own tally.
  */
-export function drawFresh(draw: () => Question, prevKey: string | null, tries = 5): { q: Question; gaveUp: boolean } {
+export function drawFresh(draw: () => Question, prevQuestion: Question | null, tries = 5): { q: Question; gaveUp: boolean } {
+  const prevKey = prevQuestion && repeatKey(prevQuestion);
   let q = draw();
   for (let i = 0; i < tries && prevKey !== null && repeatKey(q) === prevKey; i++) q = draw();
   return { q, gaveUp: prevKey !== null && repeatKey(q) === prevKey };

@@ -2,7 +2,7 @@
 // DOM/canvas), mirroring session.ts's own separation so it stays unit-testable ahead of any arena/HUD wiring.
 import type { Difficulty, Question, Topic } from '../curriculum';
 import { starsForAccuracy } from './session';
-import { repeatKey, drawFresh } from './repeat-key';
+import { drawFresh } from './repeat-key';
 import { seededRng } from './rng';
 import type { DojoEvent } from './dojo';
 // Type-only, so it erases at compile time and adds no runtime edge — the same shape `game/parents.ts` and
@@ -78,8 +78,7 @@ export class Duel {
     try {
       // avoid immediate repeats, the same rule Session.nextQuestion() applies (#879; previously this file's own
       // doc comment on repeatKey said Ninja Duel never consulted it — now it does, through drawFresh()).
-      const prevKey = this.current && repeatKey(this.current);
-      const { q, gaveUp } = drawFresh(() => this.o.topic.gen(this.o.difficulty, this.rng), prevKey);
+      const { q, gaveUp } = drawFresh(() => this.o.topic.gen(this.o.difficulty, this.rng), this.current);
       if (gaveUp) this.repeatGiveUps++;   // the key space collapsed even after five tries (#453 item 4)
       this.current = q;
       // "First correct slice" has no meaning for a sequence: `answer` is the joined string, every slice would
