@@ -15,14 +15,19 @@ export function mapCols(n: number): number {
 export type MapLayout = { cols: number; compact: boolean };
 
 /**
- * `compact` is true from n = 4: the row switches to a smaller size — the same 96×64 art size `isl-head`
- * already uses — carried as inline custom properties on the `.islands` container so it applies at every
- * width; the ≥720px media rules in `home.css` still decide row-vs-column layout and padding on top of it.
- * The actual `--isl-h`/`--isl-pad`/`--art-w`/`--art-h` declarations live at the one place they are read — the
- * `style="…"` attribute `mapScreen` (`home.ts`) writes — rather than in a string this function hands back:
- * the #399 rail only credits a custom property as declared where a browser can actually read it, a literal
- * `style="…"` attribute, and a string returned from here is neither literal nor an attribute until `home.ts`
- * writes it into one.
+ * The four custom properties compact mode sets — the same 96×64 art size `isl-head` already uses — kept here
+ * as the one place their pixel values are decided, even though `mapScreen` (`home.ts`) is where they are
+ * actually *declared*: the #399 rail only credits a custom property as declared where a browser can read it,
+ * a literal `style="…"` attribute, and a value returned from a function is neither literal nor an attribute
+ * until `home.ts` writes it into one. `tests/unit/map-layout.test.ts` pins `home.ts`'s literal against this
+ * constant, so the two cannot silently drift apart.
+ */
+export const COMPACT_VARS = ';--isl-h:88px;--isl-pad:118px;--art-w:96px;--art-h:62px';
+
+/**
+ * `compact` is true from n = 4: the row switches to the `COMPACT_VARS` size, carried as inline custom
+ * properties on the `.islands` container so it applies at every width; the ≥720px media rules in `home.css`
+ * still decide row-vs-column layout and padding on top of it.
  */
 export function mapLayout(n: number): MapLayout {
   return { cols: mapCols(n), compact: n >= 4 };

@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import { islandsHTML, mapCols, mapLayout } from '../../src/ui/map-layout';
+import { COMPACT_VARS, islandsHTML, mapCols, mapLayout } from '../../src/ui/map-layout';
 import { YEARS } from '../../src/curriculum/types';
 import type { YearInfo } from '../../src/curriculum/types';
 
@@ -61,5 +62,37 @@ describe('islandsHTML (#1048)', () => {
       const html = islandsHTML(YEARS7, stars, undefined, compact).toLowerCase();
       for (const bad of ['coming soon', 'placeholder', 'temporary']) expect(html, `${bad} (compact=${compact})`).not.toContain(bad);
     }
+  });
+
+  it('carries the star bar (percentage math), the star count, the CTA and the art background for every island', () => {
+    const html = islandsHTML(YEARS7, () => ({ s: 1, m: 4 }), undefined, false);
+    for (const y of YEARS7) {
+      expect(html, y.id).toContain(`data-year="${y.id}"`);
+    }
+    expect(html.match(/class="isl-bar"/g)).toHaveLength(YEARS7.length);
+    expect(html.match(/style="width:25%"/g), '1/4 must round to a 25% bar').toHaveLength(YEARS7.length);
+    expect(html.match(/class="isl-stars">★ 1\/4</g)).toHaveLength(YEARS7.length);
+    expect(html.match(/class="isl-go">Go →</g)).toHaveLength(YEARS7.length);
+    expect(html.match(/class="isl-art"[^>]*background-image:url/g)).toHaveLength(YEARS7.length);
+  });
+});
+
+/**
+ * #1048 pr-test-analyzer review: the e2e tests inject a compact style string of their own rather than
+ * exercising `mapScreen` (which #399 requires to write these four properties as a literal `style="…"`
+ * attribute — see the comment above that attribute in `home.ts` — so nothing else pins them against a typo
+ * there). This reads `home.ts`'s own source text and checks the literal compact suffix is exactly what
+ * `mapLayout`'s doc comment, and every test above, assumes it to be — the same static-source-pinning method
+ * `guardrails.test.ts`'s `#399` rail itself already uses for the very same class of property.
+ */
+describe('home.ts writes the exact compact custom properties this module documents (#1048, #399)', () => {
+  const src = readFileSync(new URL('../../src/ui/home.ts', import.meta.url), 'utf8');
+
+  it('the literal ternary branch matches map-layout.ts\'s COMPACT_VARS', () => {
+    expect(src).toContain(`${COMPACT_VARS}' : ''`);
+  });
+
+  it('the container style attribute reads layout.cols and layout.compact, not a hand-typed island count', () => {
+    expect(src).toContain('style="--cols:${layout.cols}${layout.compact ?');
   });
 });

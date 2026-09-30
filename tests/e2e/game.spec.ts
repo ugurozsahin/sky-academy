@@ -6,7 +6,7 @@ import { itemById } from '../../src/game/shop';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 import { expectFitsViewport } from './viewport';
-import { islandsHTML, mapLayout } from '../../src/ui/map-layout';
+import { COMPACT_VARS, islandsHTML, mapLayout } from '../../src/ui/map-layout';
 /** A context with nothing stored: the 3-D setting at its default, `auto` — the opt-out from `THREE_OFF`. */
 const NO_STORED_STATE = { cookies: [], origins: [] };   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
 
@@ -2611,7 +2611,7 @@ test.describe('Sky Ninja Academy', () => {
       const years = fixtureYears(n);
       const layout = mapLayout(n);
       const html = islandsHTML(years, () => ({ s: 1, m: 3 }), undefined, layout.compact);
-      const style = `--cols:${layout.cols}${layout.compact ? ';--isl-h:88px;--isl-pad:118px;--art-w:96px;--art-h:62px' : ''}`;
+      const style = `--cols:${layout.cols}${layout.compact ? COMPACT_VARS : ''}`;
       await page.evaluate(({ html, style }) => {
         const el = document.querySelector('.islands')!;
         el.setAttribute('style', style);

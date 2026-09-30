@@ -76,6 +76,9 @@ export function mapScreen(nav: Nav) {
   const layout = mapLayout(shown.length);
   const tb = topbar(nav, () => mapScreen(nav));
   const dojoState = dojoToday(); const dojoChallenges = dailyChallenges(dojoState.date);
+  // #1048: the four compact pixel values below belong to map-layout.ts's own compact size — they are
+  // written here, not there, only because the #399 rail credits a custom property as declared where a
+  // browser actually reads it, a literal style="…" attribute.
   render(`
   <section class="screen home map">
     ${tb.html}
