@@ -145,7 +145,8 @@ function fillLast(pool: Dec[], seen: Set<string>, answer: Dec, range: Range, dis
 function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number, range: Range, display: Display): Dec | null {
   const match = pool.find(d => !seen.has(key(d)) && leadDigit(d, display) === leadDigit(answer, display));
   if (match) return match;
-  const plus = addDec(answer, dec(step, answer.dp)), minus = subDec(answer, dec(step, answer.dp));
+  const fracLen = printedFracLen(answer, display);
+  const plus = addDec(answer, dec(step, fracLen)), minus = subDec(answer, dec(step, fracLen));
   const keepsLeading = (d: Dec) => leadDigit(d, display) === leadDigit(answer, display) && inRange(d, range);
   return keepsLeading(plus) ? plus : keepsLeading(minus) ? minus : null;
 }

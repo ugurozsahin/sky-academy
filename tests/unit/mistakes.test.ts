@@ -165,6 +165,32 @@ describe('mistakes (#1058): misconception decoys', () => {
       }
     });
 
+    it('1.5 + 3.5 = 5.0: the leading-digit fill steps by the printed place too, not the raw dp (round 5, #1435)', () => {
+      // 5.0 prints "5" (bare fmt trims the trailing zero) — fillLead used to step by the raw dp (1), giving
+      // 5.1/4.9: a decoy with a decimal point where the answer's own printed form has none, an instant tell.
+      const calc = numCalc(15, 35, 50, 1);
+      const r = rng(31);
+      for (let i = 0; i < 100; i++) {
+        const vals = decoysFor('add', calc, 3, r, { min: 0, max: 20 }).map(label);
+        // Only decoys sharing the answer's own leading digit ('5') are this fill's business — a decimal
+        // elsewhere (e.g. a carry-slip candidate like "0.5") is a different rule's legitimate output.
+        for (const v of vals) if (v[0] === '5') expect(v, `draw ${i}: decoy ${v} shares the leading digit but leaks extra precision`).not.toContain('.');
+      }
+    });
+
+    it('£2 + £3 = £5, fixed 2dp money display: the leading-digit guarantee is met, not silently dropped (round 5, #1435)', () => {
+      // A whole-pound answer (dp 0) under a fixed-2dp display: fillLead used to step by the raw dp (0), so
+      // its ±1 fill landed on £6.00/£4.00 — neither shares £5.00's leading digit, and no candidate did either.
+      const calc = numCalc(2, 3, 5);
+      const display = (d: Dec) => fmt(d, { fixedDp: 2 });
+      const r = rng(41);
+      for (let i = 0; i < 100; i++) {
+        const vals = decoysFor('add', calc, 2, r, { min: 0, max: 20 }, 1, display).map(display);
+        const leadDigits = vals.map(s => s.replace(/[^0-9]/g, '')[0]);
+        expect(leadDigits, `draw ${i}: no decoy shares £5.00's printed leading digit among ${vals}`).toContain('5');
+      }
+    });
+
     it('near a range boundary, the fill picks whichever side actually stays in range, never an out-of-range one', () => {
       // answer 95, range [80,100]: the +10 fill (105) is out of range, only the −10 fill (85) is usable.
       const calc = numCalc(50, 45, 95);
