@@ -499,7 +499,7 @@ describe('the @smoke e2e subset is non-empty and actually reachable by npm run t
       ['a duel starting, both arenas dealt one wave', 'the two halves pose the identical wave — same order, same moments, same arcs'],
     ]) expect(out, `the @smoke subset must still walk ${path} (#854)`).toContain(title);
     expect(Number(testCount), 'the eight paths above, one test each (#854)').toBe(8);
-  });
+  }, 20_000);   // Vitest's own default 5000ms test timeout fired before the 15s subprocess timeout above ever got the chance to, under CI load (reproduced twice) — now exceeds it.
 });
 
 /**
