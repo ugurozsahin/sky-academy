@@ -54,6 +54,10 @@ describe('mistakes (#1058): misconception decoys', () => {
       const vals = neighbourFact(dec(45, 1), dec(3, 0)).map(label);
       expect(vals).toEqual(expect.arrayContaining(['18', '9']));
     });
+    it('3 × 4.5 = 13.5: the same holds with the whole-number factor argument first', () => {
+      const vals = neighbourFact(dec(3, 0), dec(45, 1)).map(label);
+      expect(vals).toEqual(expect.arrayContaining(['18', '9']));
+    });
     it('47 × 6: wrong operation reads it as 47 + 6', () => {
       expect(wrongOperation(dec(47, 0), dec(6, 0), 'mul').map(label)).toEqual(['53']);
     });
@@ -148,6 +152,19 @@ describe('mistakes (#1058): misconception decoys', () => {
       }
     });
 
+    it('£5.00: the last-digit fill steps by the printed place, not the raw dp past a trailing zero', () => {
+      // answer prints "5" (dp 2 internally, but no fractional digits shown) — a fill derived from raw dp
+      // would step by 0.10 (giving 4.90/5.10, last printed digit 9/1, never matching "5"); the real fix
+      // steps by 10 (the ones place actually printed), giving 15/−5, both ending in the printed digit 5.
+      const calc = numCalc(200, 300, 500, 2);
+      const r = rng(5);
+      for (let i = 0; i < 50; i++) {
+        const vals = decoysFor('add', calc, 3, r, { min: -20, max: 20 }).map(label);
+        const lastDigits = vals.map(s => s.replace(/[^0-9]/g, '').slice(-1));
+        expect(lastDigits, `draw ${i}: no decoy shares £5.00's printed last digit`).toContain('5');
+      }
+    });
+
     it('near a range boundary, the fill picks whichever side actually stays in range, never an out-of-range one', () => {
       // answer 95, range [80,100]: the +10 fill (105) is out of range, only the −10 fill (85) is usable.
       const calc = numCalc(50, 45, 95);
@@ -202,6 +219,18 @@ describe('mistakes (#1058): misconception decoys', () => {
         }
       }
       expect(decoysFor('sub', numCalc(5, 12, -7), 3, rng(1), { min: -200, max: 200 }).map(val)).not.toContain(93);
+    });
+
+    it('kind sub at dp > 0 (a money borrow): never a duplicate, never the answer, never out of range', () => {
+      const r = rng(910);
+      for (let i = 0; i < 150; i++) {
+        const a = ri(r, 100, 999), b = ri(r, 1, a); // pence, 2dp
+        const calc = numCalc(a, b, a - b, 2);
+        const ds = decoysFor('sub', calc, 3, r, { min: -20, max: 20 });
+        const vals = ds.map(val);
+        expect(new Set(vals).size, `draw ${i}: duplicate among ${vals}`).toBe(vals.length);
+        for (const v of vals) expect(v, `draw ${i}: decoy equals the answer`).not.toBe((a - b) / 100);
+      }
     });
 
     it('when no fill keeps both range and the last digit, decoysFor falls back cleanly rather than a false guarantee', () => {

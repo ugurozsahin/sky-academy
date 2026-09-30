@@ -16,6 +16,9 @@ const decValue = (a: Dec): number => a.v / 10 ** a.dp;
 const printedDigits = (a: Dec): string => fmt(a).replace(/[^0-9]/g, '');
 const leadDigit = (a: Dec): string => printedDigits(a)[0] ?? '';
 const lastDigit = (a: Dec): string => printedDigits(a).slice(-1);
+// How many decimal places `fmt` actually prints — never the raw `dp`, which overstates it whenever the value
+// has trailing zero fractional digits (`dec(500, 2)` is internally 2dp but prints "5", zero places).
+const printedFracLen = (a: Dec): number => { const s = fmt(a), i = s.indexOf('.'); return i === -1 ? 0 : s.length - i - 1; };
 
 /** ×10 and ÷10 of the answer — the place-value shift a child makes reading the wrong column. */
 export const placeValueShift = (answer: Dec): Dec[] => [mulPow10(answer, 1), divPow10(answer, 1)];
@@ -113,16 +116,19 @@ function tryAdd(picked: Dec[], seen: Set<string>, d: Dec, range: Range): boolean
 
 const inRange = (d: Dec, range: Range) => { const v = decValue(d); return v >= range.min && v <= range.max; };
 
-/** A decoy sharing `answer`'s last printed digit: a rule candidate if one qualifies, else a ±10-units fill,
- *  preferring whichever sign stays in `range` (and, of those, whichever also keeps the leading digit) —
- *  `null`, like `fillLead`, when neither sign of the fill stays in `range` and no rule candidate matches. */
+/** A decoy sharing `answer`'s last printed digit: a rule candidate if one qualifies, else a fill of ±10 units
+ *  of the last place `fmt` actually prints (never raw `dp`, which overstates it past a trailing zero — a
+ *  £5.00 answer prints "5", so its fill steps by 10, not by the 0.01 `dp` alone would suggest), preferring
+ *  whichever sign stays in `range` (and, of those, whichever also keeps the leading digit) — `null`, like
+ *  `fillLead`, when neither sign keeps the range and the shared last digit both, and no rule candidate does. */
 function fillLast(pool: Dec[], seen: Set<string>, answer: Dec, range: Range): Dec | null {
   const match = pool.find(d => !seen.has(key(d)) && lastDigit(d) === lastDigit(answer));
   if (match) return match;
-  const fillStep = dec(10, answer.dp);
+  const fracLen = printedFracLen(answer);
+  const fillStep = fracLen === 0 ? dec(10, 0) : dec(1, fracLen - 1);
   const plus = addDec(answer, fillStep), minus = subDec(answer, fillStep);
   const keepsLeading = (d: Dec) => leadDigit(d) === leadDigit(answer);
-  const inR = [plus, minus].filter(d => inRange(d, range));
+  const inR = [plus, minus].filter(d => inRange(d, range) && lastDigit(d) === lastDigit(answer));
   return inR.find(keepsLeading) ?? inR[0] ?? null;
 }
 
