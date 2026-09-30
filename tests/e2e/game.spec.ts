@@ -2492,6 +2492,42 @@ test.describe('Sky Ninja Academy', () => {
     expect(animation).toBe('shake');
   });
 
+  // #1346: #899's rule beat `.qcard.bad` only because the override and the state class have the same
+  // specificity and the override comes later. `.timer.hurry` and `.villain.hit img` were never in the list, so
+  // the plain `.timer` / `.villain img` entries lost to them. Each state class is added and read in one
+  // synchronous `evaluate`, so the HUD's own once-a-second `hurry` toggle cannot race the check.
+  const animationsWith = (page: Page, checks: [string, string][]) => page.evaluate(cs => cs.map(([sel, cls]) => {
+    const el = document.querySelector(sel)!;
+    el.classList.add(cls);
+    return getComputedStyle(el).animationName;
+  }), checks);
+
+  for (const [reduced, want] of [[true, ['none', 'none']], [false, ['hurry', 'qpulse']]] as const) {
+    test(`guard rail: the Sprint timer's hurry pulse and the card's correct pulse ${reduced ? 'stop under' : 'still run without'} reduced motion (#1346)`, async ({ page }) => {
+      if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' });
+      await seedPlayer(page);
+      await page.click('.island[data-year="year1"]');
+      await page.click('#sprint');
+      await page.click('.topic[data-mixed]');
+      await expect(page.locator('#timer')).toBeVisible();
+      expect(await animationsWith(page, [['#timer', 'hurry'], ['.qcard', 'pulse']])).toEqual(want);
+    });
+
+    test(`guard rail: Hammer Man's hit and heal flashes ${reduced ? 'stop under' : 'still run without'} reduced motion (#1346)`, async ({ page }) => {
+      if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' });
+      await seedPlayer(page);
+      await page.click('.island[data-year="year2"]');
+      await page.click('#boss');
+      await expect(page.locator('.villain.boss img')).toBeVisible();
+      const got = await page.evaluate(() => ['hit', 'heal'].map((k) => {
+        const v = document.querySelector('#villain')!;
+        v.classList.remove('hit', 'heal'); v.classList.add(k);
+        return getComputedStyle(v.querySelector('img')!).animationName;
+      }));
+      expect(got).toEqual(reduced ? ['none', 'none'] : ['vhit', 'vheal']);
+    });
+  }
+
   // #32: the suite runs at 8× (the beforeEach above), which compresses the outcome holds. This one test forces
   // speed 1 and asserts the holds are the curriculum values the owner asked for (correct 1000, wrong 1800,
   // miss 1500). Without it the fast suite verifies nothing about the holds, and the day someone changes a
