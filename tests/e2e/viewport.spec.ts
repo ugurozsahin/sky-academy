@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
 import { expectFitsViewport, outsideItsBox, overrideSafeAreaInsets } from './viewport';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import type { StoredCert, StoredDuel } from '../../src/storage';
