@@ -15,7 +15,7 @@ import { Session, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { wideFor } from '../curriculum/util';   // #482: the same wide-vs-narrow rule wordQ uses, not a second one
 import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
-import type { CertInfo } from './certificate';
+import type { CertInfo } from './certificate'; import { firstQuestionLine } from './results';   // #897, kept on this line: play-session.ts is at its #714 ratchet cap
 import { $, esc } from './dom';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
 import { correctionLine, hintText, promptHTML, promptMode, setHint, stageHTML, type Hud, type Outcome } from './hud';
@@ -266,12 +266,12 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         // Sensei: name the topic of each question
         const t = session.currentTopic;
         if (deps.training && t) $('.ttl').textContent = `${t.icon} ${t.title}`;
-        activeQuestion = q; readThrough = false;
+        activeQuestion = q; readThrough = false; const firstLine = firstQuestionLine(q, opts.topic, session.questionsAsked === 1, !!opts.practice);
         const peek = renderQuestion(q, false);
         els.vis.innerHTML = renderVisual(q.visual);
         solid.show(q, session.currentTopic?.id);
         lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
-        if (deps.tracing) { say(q.say ?? q.prompt); deps.startTrace(q); return; }
+        if (deps.tracing) { say(firstLine); deps.startTrace(q); return; }
         const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
         const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle);
         const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
@@ -287,7 +287,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         const spawn = () => {
           if (waveId !== myWave) return;                                 // superseded while we waited
           const arena = deps.arena()!;
-          say(q.say ?? q.prompt); if (opts.practice) { const a = correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true }); }
+          say(firstLine); if (opts.practice) { const a = correctionLine(q, session.currentTopic?.id); if (a) say(a, false, { queue: true }); }
           requestAnimationFrame(() => {
             if (waveId !== myWave) return;
             arena.topInset = els.qcard.getBoundingClientRect().bottom + 6;

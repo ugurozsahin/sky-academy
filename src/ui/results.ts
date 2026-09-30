@@ -2,7 +2,7 @@
 // decided purely from the finished run, with no DOM or side effects, so they can be unit-tested directly
 // instead of only through the e2e results screen. play.ts keeps the recording, speech and overlay wiring.
 import { MODES, type Mode } from '../game/modes';
-import type { Topic } from '../curriculum';
+import type { Question, Topic } from '../curriculum';
 import { esc } from './dom';
 
 /** How a finished run scored — the fields the medal reads. */
@@ -102,4 +102,30 @@ export function resultsAction(ctx: ResultsActionCtx): ResultsAction | null {
   if ((ctx.mode === 'mission' || ctx.training) && ctx.misses >= 1) return { kind: 'fix' };
   if (ctx.mode === 'mission' && !ctx.training && ctx.won && ctx.next) return { kind: 'next', topic: ctx.next };
   return null;
+}
+
+/**
+ * The results screen's spoken score line (#897) — a non-reader hears how they did, not only a praise line.
+ * "You got 18 right." always; a won mission with a star tier adds "Three/Two/One star(s)!" (endless/sprint's
+ * own medal reads score/star-tier the same way, but this line is scoped to the one mode the issue asks for).
+ */
+export function scoreLine(r: { mode: Mode; won: boolean; correct: number; stars: number }): string {
+  const right = `You got ${r.correct} right.`;
+  if (r.mode !== 'mission' || !r.won || r.stars <= 0) return right;
+  const word = r.stars === 3 ? 'Three' : r.stars === 2 ? 'Two' : 'One';
+  return `${right} ${word} star${r.stars === 1 ? '' : 's'}!`;
+}
+
+/**
+ * The first utterance of a topic mission (#897): a pre-reader tapping straight into a topic hears its name.
+ * Folded into the SAME utterance as the first question — a separate, earlier `say()` would be cancelled by
+ * the question's own line, the same reasoning `duel.ts`'s `spokenQuestion` hand-over already follows for
+ * Ninja Duel's round 1. `topic` is undefined for every pool-driven mode (Sensei training, Storm, Sprint,
+ * Boss all pass `pool`, never a single `topic`) and `isFirst` only ever true once per session, so this reaches
+ * only a topic mission's first question — never a later one, and never a "Fix my mistakes" replay of one
+ * (`practice`), which already heard its topic named the first time it was played.
+ */
+export function firstQuestionLine(q: Question, topic: Topic | undefined, isFirst: boolean, practice: boolean): string {
+  const line = q.say ?? q.prompt;
+  return topic && isFirst && !practice ? `${topic.title}! ${line}` : line;
 }

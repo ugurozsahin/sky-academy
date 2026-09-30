@@ -640,6 +640,38 @@ test.describe('Sky Ninja Academy', () => {
     expect(spoken, `Sprint must stay silent on the correction; got ${JSON.stringify(spoken)}`).not.toContain(`It's ${wrongAnswer}.`);
   });
 
+  // #897: a pre-reader taps a topic and is dropped straight into the first question with no spoken name —
+  // the topic's title now folds into that first question's own utterance, one `say()`, so a separate, earlier
+  // line naming the topic cannot be cancelled by the question that follows it (`duel.ts`'s hand-over does the
+  // same for Ninja Duel's round 1, pinned by `tests/e2e/duel.spec.ts:37-42`).
+  test('starting a topic mission speaks the topic\'s title folded into question 1, one utterance (#897)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-tables');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    const title = TOPICS.find(t => t.id === 'y2-tables')!.title;
+    const spoken = (await page.evaluate(() => window.__spoken))!;   // an island-name line and, on a first-ever play, a tutorial hint precede it
+    const last = spoken[spoken.length - 1];
+    expect(last.startsWith(`${title}! `), `the last line spoken so far must open with the topic title; got ${JSON.stringify(spoken)}`).toBe(true);
+  });
+
+  // #897: the results screen now speaks how the child did, not only a praise line — "You got N right." (plus
+  // the star tier on a won mission), queued straight after the headline and before any #896 announcement.
+  test('the results screen speaks the headline then the score line, in order (#897)', async ({ page }) => {
+    await captureSpeech(page);
+    await seedPlayer(page);
+    await startTopic(page, 'year2', 'y2-tables');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    // winMission()'s own cheat, inline: exact stars/correct do not matter here. Every stage this skips through
+    // still asks (and speaks) its own first question on the way, so the score line is found by position from
+    // the end, not by index from the start.
+    await page.evaluate(() => { const s = window.__sna.session; while (!s.ended) s.nextStage(); });
+    await expect(page.locator('.results')).toBeVisible();
+    const spoken = (await page.evaluate(() => window.__spoken))!;
+    expect(spoken.length, `expected at least a headline and a score line; got ${JSON.stringify(spoken)}`).toBeGreaterThanOrEqual(2);
+    expect(spoken[spoken.length - 1], `the score line must be the last line spoken; got ${JSON.stringify(spoken)}`).toMatch(/^You got \d+ right\./);
+  });
+
   test('statistics: the tally chart, then the pictogram and its key, reach the card (#8)', async ({ page }) => {
     // Reaching difficulty 2 means playing out stage 1, which is longer than the 60 s default — the same
     // reason the full-mission test raises its own. The pictogram is the only chart with arithmetic in its
