@@ -47,7 +47,7 @@ export function swappedDigits(answer: Dec): Dec[] {
     const swapped = digits.slice();
     [swapped[i], swapped[i + 1]] = [swapped[i + 1], swapped[i]];
     if (swapped[0] === '0' && swapped.length > 1) continue;
-    out.push({ v: Number(swapped.join('')) * (negative ? -1 : 1), dp: answer.dp });
+    out.push(dec(Number(swapped.join('')) * (negative ? -1 : 1), answer.dp));
   }
   return out;
 }
@@ -61,7 +61,7 @@ export function neighbourFact(a: number, b: number): Dec[] {
 export const wrongOperation = (a: Dec, b: Dec, forOp: 'mul' | 'add'): Dec[] => [forOp === 'mul' ? addDec(a, b) : subDec(a, b)];
 
 /** The answer's sign dropped or flipped: `b − a` written for `a − b`, or a positive misread as negative. */
-export const signFlip = (answer: Dec): Dec[] => [{ v: -answer.v, dp: answer.dp }];
+export const signFlip = (answer: Dec): Dec[] => [dec(-answer.v, answer.dp)];
 
 /** `a/b + c/d` misread as `(a+c)/(b+d)` — adding the tops and the bottoms straight across, unreduced. */
 export function topsAndBottoms(a: Frac, b: Frac): Frac[] {
@@ -87,22 +87,28 @@ function tryAdd(picked: Dec[], seen: Set<string>, d: Dec, range: Range): boolean
   seen.add(k); picked.push(d); return true;
 }
 
-/** A decoy sharing `answer`'s last printed digit: a rule candidate if one qualifies, else a ±10-units fill. */
-function fillLast(pool: Dec[], seen: Set<string>, answer: Dec): Dec {
+const inRange = (d: Dec, range: Range) => { const v = decValue(d); return v >= range.min && v <= range.max; };
+
+/** A decoy sharing `answer`'s last printed digit: a rule candidate if one qualifies, else a ±10-units fill,
+ *  preferring whichever sign stays in `range` (and, of those, whichever also keeps the leading digit). */
+function fillLast(pool: Dec[], seen: Set<string>, answer: Dec, range: Range): Dec {
   const match = pool.find(d => !seen.has(key(d)) && lastDigit(d) === lastDigit(answer));
   if (match) return match;
   const fillStep = dec(10, answer.dp);
   const plus = addDec(answer, fillStep), minus = subDec(answer, fillStep);
   const keepsLeading = (d: Dec) => leadDigit(d) === leadDigit(answer);
-  return keepsLeading(plus) ? plus : keepsLeading(minus) ? minus : plus;
+  const inR = [plus, minus].filter(d => inRange(d, range));
+  return inR.find(keepsLeading) ?? inR[0] ?? plus;
 }
 
-/** A decoy sharing `answer`'s leading digit: a rule candidate if one qualifies, else a ±`step` fill. */
-function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number): Dec | null {
+/** A decoy sharing `answer`'s leading digit: a rule candidate if one qualifies, else a ±`step` fill that
+ *  both keeps the leading digit and stays in `range` — `null` when neither sign manages both. */
+function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number, range: Range): Dec | null {
   const match = pool.find(d => !seen.has(key(d)) && leadDigit(d) === leadDigit(answer));
   if (match) return match;
   const plus = addDec(answer, dec(step, answer.dp)), minus = subDec(answer, dec(step, answer.dp));
-  return leadDigit(plus) === leadDigit(answer) ? plus : leadDigit(minus) === leadDigit(answer) ? minus : null;
+  const keepsLeading = (d: Dec) => leadDigit(d) === leadDigit(answer) && inRange(d, range);
+  return keepsLeading(plus) ? plus : keepsLeading(minus) ? minus : null;
 }
 
 /**
@@ -118,9 +124,9 @@ export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng,
   const pool = shuffle(rng, rulesFor(kind, calc)).filter(d => key(d) !== key(answer) && decValue(d) >= range.min && decValue(d) <= range.max);
 
   // The two guarantees are reserved first, so a later slice-to-`n` never cuts them.
-  tryAdd(picked, seen, fillLast(pool, seen, answer), range);
+  tryAdd(picked, seen, fillLast(pool, seen, answer, range), range);
   if (!picked.some(d => leadDigit(d) === leadDigit(answer))) {
-    const lead = fillLead(pool, seen, answer, step);
+    const lead = fillLead(pool, seen, answer, step, range);
     if (lead) tryAdd(picked, seen, lead, range);
   }
 

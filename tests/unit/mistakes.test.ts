@@ -113,6 +113,17 @@ describe('mistakes (#1058): misconception decoys', () => {
         expect(ds.some(d => digits(d)[0] === lead), `draw ${i}: no decoy shares leading digit`).toBe(true);
       }
     });
+
+    it('near a range boundary, the fill picks whichever side actually stays in range, never an out-of-range one', () => {
+      // answer 95, range [80,100]: the +10 fill (105) is out of range, only the −10 fill (85) is usable.
+      const calc = numCalc(50, 45, 95);
+      const r = rng(42);
+      for (let i = 0; i < 50; i++) {
+        const vals = decoysFor('add', calc, 3, r, { min: 80, max: 100 }).map(val);
+        for (const v of vals) { expect(v).toBeGreaterThanOrEqual(80); expect(v).toBeLessThanOrEqual(100); }
+        expect(vals.some(v => lastOf(String(v)) === '5'), `draw ${i}: no in-range last-digit fill among ${vals}`).toBe(true);
+      }
+    });
   });
 
   describe('fracDecoys', () => {
