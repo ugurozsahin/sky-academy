@@ -191,6 +191,19 @@ describe('mistakes (#1058): misconception decoys', () => {
       }
     });
 
+    it('dedup is keyed by the caller\'s own display, not bare fmt — two candidates distinct raw but identical once rounded never both ship (round 6, #1435)', () => {
+      // A rounded-to-nearest-10 display, the kind an estimate-style card might reasonably use: 154 and 146
+      // both round to "150" and must be recognised as one duplicate under that display, even though bare
+      // fmt() (and the raw v/dp pair) would call them distinct.
+      const roundedDisplay = (d: Dec) => String(Math.round(val(d) / 10) * 10);
+      const calc = numCalc(100, 45, 145);
+      const r = rng(0);
+      for (let i = 0; i < 200; i++) {
+        const printed = decoysFor('add', calc, 4, r, { min: 0, max: 400 }, 1, roundedDisplay).map(roundedDisplay);
+        expect(new Set(printed).size, `draw ${i}: two decoys print identically among ${printed}`).toBe(printed.length);
+      }
+    });
+
     it('near a range boundary, the fill picks whichever side actually stays in range, never an out-of-range one', () => {
       // answer 95, range [80,100]: the +10 fill (105) is out of range, only the −10 fill (85) is usable.
       const calc = numCalc(50, 45, 95);

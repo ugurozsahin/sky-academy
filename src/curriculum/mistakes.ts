@@ -111,9 +111,13 @@ function rulesFor(kind: MistakeKind, { a, b, answer }: NumCalc): Dec[] {
 // Keyed on the printed value, not the raw (v, dp) pair: placeValueShift's ÷10 candidate carries a different
 // `dp` than every add/sub/swap-based candidate, so two decoys can represent the same number at different
 // scales (410 at dp 2 and 41 at dp 1 both print "4.1") and must still be recognised as the one duplicate.
-const key = (d: Dec) => fmt(d);
-function tryAdd(picked: Dec[], seen: Set<string>, d: Dec, range: Range): boolean {
-  const k = key(d);
+// Keyed by the caller's own `display`, not bare `fmt` — two candidates distinct under `fmt` can still collapse
+// to the same string under a fixed-width or rounding `display` (e.g. a money "£3.10"/"£3.1" pair, or two
+// values a rounding display prints identically), and that collapse is a real duplicate on the card the child
+// actually sees, not a false positive `fmt` alone would miss.
+const key = (d: Dec, display: Display) => display(d);
+function tryAdd(picked: Dec[], seen: Set<string>, d: Dec, range: Range, display: Display): boolean {
+  const k = key(d, display);
   if (seen.has(k) || decValue(d) < range.min || decValue(d) > range.max) return false;
   seen.add(k); picked.push(d); return true;
 }
@@ -126,7 +130,7 @@ const inRange = (d: Dec, range: Range) => { const v = decValue(d); return v >= r
  *  whichever sign stays in `range` (and, of those, whichever also keeps the leading digit) — `null`, like
  *  `fillLead`, when neither sign keeps the range and the shared last digit both, and no rule candidate does. */
 function fillLast(pool: Dec[], seen: Set<string>, answer: Dec, range: Range, display: Display): Dec | null {
-  const match = pool.find(d => !seen.has(key(d)) && lastDigit(d, display) === lastDigit(answer, display));
+  const match = pool.find(d => !seen.has(key(d, display)) && lastDigit(d, display) === lastDigit(answer, display));
   if (match) return match;
   const fracLen = printedFracLen(answer, display);
   const fillStep = fracLen === 0 ? dec(10, 0) : dec(1, fracLen - 1);
@@ -143,7 +147,7 @@ function fillLast(pool: Dec[], seen: Set<string>, answer: Dec, range: Range, dis
  *  special-case it further, since a caller asking for the guarantee on a zero answer is asking the
  *  unaskable, the same way `range.min > range.max` is). */
 function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number, range: Range, display: Display): Dec | null {
-  const match = pool.find(d => !seen.has(key(d)) && leadDigit(d, display) === leadDigit(answer, display));
+  const match = pool.find(d => !seen.has(key(d, display)) && leadDigit(d, display) === leadDigit(answer, display));
   if (match) return match;
   const fracLen = printedFracLen(answer, display);
   const plus = addDec(answer, dec(step, fracLen)), minus = subDec(answer, dec(step, fracLen));
@@ -173,25 +177,25 @@ function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number, ran
  */
 export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng, range: Range, step = 1, display: Display = fmt): Dec[] {
   const { answer } = calc;
-  const seen = new Set<string>([key(answer)]);
+  const seen = new Set<string>([key(answer, display)]);
   const picked: Dec[] = [];
-  const pool = shuffle(rng, rulesFor(kind, calc)).filter(d => key(d) !== key(answer) && decValue(d) >= range.min && decValue(d) <= range.max);
+  const pool = shuffle(rng, rulesFor(kind, calc)).filter(d => key(d, display) !== key(answer, display) && decValue(d) >= range.min && decValue(d) <= range.max);
 
   // The two guarantees are reserved first, so a later slice-to-`n` never cuts them.
   const last = fillLast(pool, seen, answer, range, display);
-  if (last) tryAdd(picked, seen, last, range);
+  if (last) tryAdd(picked, seen, last, range, display);
   if (!picked.some(d => leadDigit(d, display) === leadDigit(answer, display))) {
     const lead = fillLead(pool, seen, answer, step, range, display);
-    if (lead) tryAdd(picked, seen, lead, range);
+    if (lead) tryAdd(picked, seen, lead, range, display);
   }
 
-  for (const d of pool) { if (picked.length >= n) break; tryAdd(picked, seen, d, range); }
+  for (const d of pool) { if (picked.length >= n) break; tryAdd(picked, seen, d, range, display); }
 
   let guard = 0;
   while (picked.length < n && guard++ < 20) {
     const extra = nearby(rng, decValue(answer), n - picked.length, range.min, range.max, new Set(picked.map(decValue)));
     if (extra.length === 0) break;
-    for (const v of extra) tryAdd(picked, seen, dec(Math.round(v * 10 ** answer.dp), answer.dp), range);
+    for (const v of extra) tryAdd(picked, seen, dec(Math.round(v * 10 ** answer.dp), answer.dp), range, display);
   }
   return picked.slice(0, n);
 }
