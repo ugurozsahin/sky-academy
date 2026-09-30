@@ -52,9 +52,10 @@ const rCompare: Generator = (d, rng) => {
   if (d === 3 && rng() < 1 / 3) {
     const a = ri(rng, 1, max);
     const near = a === max ? a - 1 : a + 1;
-    return wordQ(rng, 'Which is more?', '=', [String(a), String(near)], {
+    const wantMore = rng() < 0.5;
+    return wordQ(rng, `Which is ${wantMore ? 'more' : 'fewer'}?`, '=', [String(a), String(near)], {
       visual: { type: 'objects', emoji: '🍎', n: a, emoji2: '🍌', n2: a },
-      say: `Which number is more, ${a} or ${a}, or are they the same?`,
+      say: `Which number is ${wantMore ? 'more' : 'fewer'}, ${a} or ${a}, or are they the same?`,
     });
   }
   let a = ri(rng, 1, max), b = ri(rng, 1, max);
