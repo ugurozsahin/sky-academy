@@ -18,7 +18,7 @@ import { certToStored, certWords, deliverCertificate, drawCertificate, type Cert
 import { canHear, haptic, hush, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { hintText, promptHTML, promptMode } from './hud';
-import { screenScope, stickersHTML } from './screen';
+import { pushBackGuard, screenScope, stickersHTML } from './screen';
 import { dojoRowsHTML } from './memory';
 import { pauseHTML } from './overlays';
 import { waveOptsFor } from './play-session';
@@ -80,7 +80,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
-  const scope = screenScope(); const { later, toast, onBack, onHidden } = scope; onBack(pauseIfLive); onHidden(() => { hush(); pauseIfLive(); });   // #885, #886
+  const scope = screenScope(); const { later, toast, onBack, onHidden } = scope; onBack(pauseIfLive); onHidden(() => { hush(); pauseIfLive(); }); pushBackGuard();   // #885, #886, #887
   const overlay = $('#overlay'); const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
   let waveId = 0; let holdOpen = false; let paused = false;   // #886: mirrors the Pause overlay, for state()
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
@@ -439,7 +439,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   }
   function showPause() {
     hold(true); overlay.hidden = false; overlay.innerHTML = pauseHTML(); paused = true;
-    $('#resume').addEventListener('click', () => { overlay.hidden = true; hold(false); paused = false; });
+    $('#resume').addEventListener('click', () => { overlay.hidden = true; hold(false); paused = false; pushBackGuard(); });   // #887: re-arm, already consumed by the press that opened this
     $('#quit').addEventListener('click', () => { cleanup(); goHome(); });
   }
   function pauseIfLive(): boolean { if (!overlay.hidden || duel.ended) return false; showPause(); return true; }   // #885, #884's shape
