@@ -163,6 +163,42 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
       .toEqual(['"1999" is a year and must not have a decimal place']);
   });
 
+  it('a coordinate component may itself be signed, decimal-tailed or spaced from the comma (review round 6)', () => {
+    // A coordinate's two components are pulled out as a pair before either is judged individually — a sign
+    // or a decimal on one component, or whitespace anywhere near the comma, settles "this is a pair, not
+    // one mis-grouped number" outright, whatever the other component's own shape.
+    expect(labelProblems('(12,−1000)')).toEqual([]); // a sign on a non-first component
+    expect(labelProblems('(3.5,1000)')).toEqual([]); // a decimal tail on a non-last component
+    expect(labelProblems('(−12,−1000)')).toEqual([]); // both components signed
+    expect(labelProblems('(3, 4500)')).toEqual([]); // a space after the comma
+    expect(labelProblems('(12 ,1000)')).toEqual([]); // a space before the comma
+  });
+
+  it('money in parentheses is still money, not a coordinate (review round 6)', () => {
+    // "(£4,50)" must fail exactly like unparenthesised "£4,50" — a pair's two components are never "£",
+    // which is what actually distinguishes a coordinate from money that merely sits in parens.
+    expect(labelProblems('She saved (£4,50) this year.')).toHaveLength(1);
+    expect(labelProblems('She saved £4,50 this year.')).toHaveLength(1);
+  });
+
+  it('a parenthesised badly-grouped plain number is still flagged, not read as a coordinate (review round 6)', () => {
+    // "(1,2345)" — no sign, no decimal, no whitespace anywhere, and its second half is 4+ digits: the one
+    // length a genuine thousands group can never be. That combination could plausibly be one number with
+    // its comma in the wrong place ("12,345" written as "1,2345"), so it is judged as one, exactly like the
+    // unparenthesised text — unlike "(19,99)", whose second half is short enough that misreading it as a
+    // pair costs nothing either way.
+    expect(labelProblems('The crowd numbered (1,2345) that day.')).toHaveLength(1);
+    expect(labelProblems('The crowd numbered 1,2345 that day.')).toHaveLength(1);
+  });
+
+  it('a coordinate mis-split does not corrupt an unrelated standalone year (review round 6)', () => {
+    // Confirms scanTokens' exclusion is a hard boundary: nothing inside a detected coordinate span ever
+    // reaches the ordinary token scan, so it cannot collide with occurrence counting for a real year
+    // elsewhere in the same text, however the coordinate's own components are shaped.
+    expect(labelProblems('The point (12,−1000) marks the spot founded in 1000.', { years: [1000] }))
+      .toEqual([]);
+  });
+
   it('a list of correctly-grouped numbers never trips the space-grouping check (review round 1)', () => {
     // The old space check let its leading run swallow commas, so it bridged straight across an ordinary
     // ", " list separator into the next number: "4,521, 891" read as one bad grouping when both numbers
