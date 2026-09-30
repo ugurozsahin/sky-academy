@@ -217,16 +217,16 @@ function tokenize(text: string): Tok[] {
       toks.push({ kind: 'dimension', start: i, end: i + m[0].length, raw: m[0], spoken: `${m[1]} ${m[2]}` });
       i += m[0].length; continue;
     }
-    if ((m = rest.match(/^(\d+) (\d+)\/(\d+)/))) {
+    if ((m = rest.match(/^(\d+) (\d+)\s*\/\s*(\d+)/))) {
       const spoken = `${cardinal(Number(m[1]))} and ${fracWord(Number(m[2]), Number(m[3]))}`;
       toks.push({ kind: 'mixedFraction', start: i, end: i + m[0].length, raw: m[0], spoken });
       i += m[0].length; continue;
     }
-    if ((m = rest.match(/^(\d+)\/(\d+)/))) {
+    if ((m = rest.match(/^(\d+)\s*\/\s*(\d+)/))) {
       toks.push({ kind: 'fraction', start: i, end: i + m[0].length, raw: m[0], spoken: fracWord(Number(m[1]), Number(m[2])) });
       i += m[0].length; continue;
     }
-    if ((m = rest.match(/^([01]?\d|2[0-3]):([0-5]\d)\b/))) {
+    if ((m = rest.match(/^([01]?\d|2[0-3])\s*:\s*([0-5]\d)\b/))) {
       const mm = Number(m[2]);
       const spoken = mm === 0 ? `${cardinal(Number(m[1]))} hundred hours`
         : `${cardinal(Number(m[1]))} ${mm < 10 ? `oh ${cardinal(mm)}` : cardinal(mm)}`;
@@ -259,21 +259,13 @@ function tokenize(text: string): Tok[] {
 // notation a bare numeral could be mistaken for the edge of).
 const SAFE_ROMAN_NEIGHBOUR = new Set([' ', ',', '.', '?', '!']);
 /** True when a single-letter Roman numeral touches, with no space, anything but the punctuation above —
- *  the shared test for both directions this matters: `romanAtomIsUnsafe` below (an unconverted leftover
- *  glued to a digit/letter is never safe) and the "I"-pronoun decision (a genuinely glued "I" — "I/2" —
- *  is never the pronoun, whatever the rest of the string reads like; PR #1430 round 7). No legitimate
- *  output glues a bare numeral to anything else, so this is never true of `ks2Say`'s own rendering. */
+ *  used by the "I"-pronoun decision: a genuinely glued "I" ("I/2") is never the pronoun, whatever the rest
+ *  of the string reads like (PR #1430 round 7). */
 function isGlued(tok: Tok, text: string): boolean {
   const before = text[tok.start - 1], after = text[tok.end];
   const gluedBefore = before !== undefined && !SAFE_ROMAN_NEIGHBOUR.has(before);
   const gluedAfter = after !== undefined && !SAFE_ROMAN_NEIGHBOUR.has(after);
   return gluedBefore || gluedAfter;
-}
-/** A single-letter Roman numeral found glued is always a leftover: no legitimate output glues a bare
- *  numeral to anything else. A run of 2+ letters is unconditionally a leftover, glued or not: nothing in
- *  `ks2Say`'s own output is ever a bare, unconverted multi-letter run. */
-function romanAtomIsUnsafe(tok: Tok, text: string): boolean {
-  return tok.raw.length >= 2 || isGlued(tok, text);
 }
 
 /** A lone "I" reads as the pronoun rather than the numeral only when the *surrounding text as a whole*
@@ -305,9 +297,21 @@ const isPronounI = (tok: Tok, text: string, hadLowerCase: boolean): boolean =>
  * "one half/three quarters" — and `sayIsSafe` cannot tell that stray character from ordinary punctuation
  * (the same reason a sentence-ending "." or a label ":" must stay unflagged), so this one shape is still
  * accepted as raw and left documented rather than "fixed" into a false positive against real spoken text.
+ *
+ * Both this function and `sayIsSafe` normalise whitespace (`normalizeWs`) *before* tokenizing, not after —
+ * PR #1430 round 9: `singleLetterUnitOK`'s digit/Roman adjacency check reads the text *around* a token's
+ * start, so a double space ("5  m") used to read as "not touching" pre-conversion while `ks2Say`'s own
+ * trailing whitespace collapse then closed that same gap in its output, leaving `sayIsSafe` disagreeing
+ * with itself on the string it had just produced. Normalising first means both functions classify off the
+ * same one-space-only adjacency every time, whatever the input's original spacing.
  */
+function normalizeWs(text: string): string {
+  return text.replace(/\s+/g, ' ');
+}
+
 export function ks2Say(text: string): string {
-  const toks = tokenize(text);
+  const norm = normalizeWs(text);
+  const toks = tokenize(norm);
   // A raw unit or Roman-numeral token supplies letters of its own that must not count as "ordinary prose"
   // when deciding whether a lone "I" is the pronoun or the numeral — only a genuine word (a `text` token)
   // does. "I kg", "Icm" are bare notation either way; "I weigh 5 kg, I think" has real prose alongside it.
@@ -317,7 +321,7 @@ export function ks2Say(text: string): string {
   for (const tok of toks) {
     // `symSay` runs per plain-text span, never over a notation span's own rendering — otherwise its
     // hyphen-to-"minus" rule would mangle a hyphen `ks2Say` itself just wrote ("twenty-three").
-    const isPronoun = isPronounI(tok, text, hadLowerCase);
+    const isPronoun = isPronounI(tok, norm, hadLowerCase);
     const spoken = isPronoun ? 'I' : tok.kind === 'text' && tok.raw.trim() !== '' ? symSay(tok.raw) : tok.spoken;
     // Two spans glued with nothing between them in the input get exactly one space if joining their
     // rendered forms directly would run two words/numbers together — never for ordinary trailing
@@ -326,7 +330,44 @@ export function ks2Say(text: string): string {
     out += spoken;
     prevSpoken = spoken;
   }
+  // `symSay` can still introduce its own irregular spacing (a word substitution padded on either side), so
+  // this stays as a defensive second pass — `norm` above is what classification reads, not a promise about
+  // what every spoken substitution produces.
   return out.replace(/\s+/g, ' ').trim();
+}
+
+// `romanTok` always renders as `Roman numeral <raw>`, its letters joined by ", " when `raw` is 2+ long
+// (`raw.split('').join(', ')`); `dimension`'s own `spoken` (the "N-D shape" idiom) renders as bare
+// "<digits> D" with no such prefix. These are the only two shapes `ks2Say`'s own output ever leaves a
+// bare Roman-numeral-shaped letter in. Re-tokenizing that output finds those same letters again, so
+// `sayIsSafe` must tell "already spelled out by `ks2Say`" apart from "still raw" some other way than the
+// letter itself, which reads identically either way.
+// `\b` after each letter matters: without it, "Roman numeral V, Roman numeral X" lets ", R" (the *next*
+// phrase's own "Roman") be mistaken for another bare single-letter numeral, over-extending the match into
+// the following word and losing the real boundary between two separately-rendered numerals.
+const ALREADY_SPOKEN_ROMAN = /Roman numeral [A-Za-z]\b(?:, [A-Za-z]\b)*/g;
+const ALREADY_SPOKEN_DIMENSION = /\d+ [Dd]\b/g;
+/** The character span(s) of a `Roman numeral …`/dimension rendering's own letters — *not* a defensive
+ *  "was this glued to something else" check, only where the template itself puts a letter. A matched
+ *  `Roman numeral …` run that is itself glued to something unsafe right outside it (the digit-orphan and
+ *  colon-between-numerals regressions, PR #1430 round 9 fixing) still needs catching, so the caller applies
+ *  `isGlued`-style neighbour checks around the *whole* span, not just membership in it. */
+function alreadySpokenSpans(text: string): Array<readonly [number, number, boolean]> {
+  const roman = [...text.matchAll(ALREADY_SPOKEN_ROMAN)].map(m => [m.index!, m.index! + m[0].length, true] as const);
+  const dim = [...text.matchAll(ALREADY_SPOKEN_DIMENSION)]
+    .map(m => [m.index! + m[0].length - 1, m.index! + m[0].length, false] as const); // just the D/d itself
+  return [...roman, ...dim];
+}
+/** A rendered span is only genuinely safe when nothing unsafe is glued right outside it too — "Roman
+ *  numeral V/2" (a fraction glued straight onto the numeral with no separator) must still fail, the same
+ *  way a raw glued Roman letter must (PR #1430 round 9, the digit-orphan and colon-between-numerals
+ *  regressions this fix introduced on its first pass). The dimension idiom's own `\b` already rules out
+ *  being glued to a following word character, so only the Roman-numeral spans need the outer check. */
+function spanIsGlued(start: number, end: number, checkBoundary: boolean, text: string): boolean {
+  if (!checkBoundary) return false;
+  const before = text[start - 1], after = text[end];
+  return (before !== undefined && !SAFE_ROMAN_NEIGHBOUR.has(before)) ||
+    (after !== undefined && !SAFE_ROMAN_NEIGHBOUR.has(after));
 }
 
 /**
@@ -334,19 +375,29 @@ export function ks2Say(text: string): string {
  * a decimal point between digits, a 24-hour time, a unit code, a Roman numeral, or the "N-D" idiom — plus a
  * defensive check for a stray superscript. Runs on `text` however it arrives: raw notation, or `ks2Say`'s
  * own output, since callers pass both.
+ *
+ * Every `NOTATION` kind is unsafe whenever the tokenizer finds one, `roman` included, *except* a letter that
+ * sits inside a rendering `ks2Say` itself would just have produced (a `Roman numeral X[, Y...]` span, or the
+ * bare "<digits> D" the "N-D shape" idiom leaves) and that rendering is not itself glued to something else
+ * unsafe — PR #1430 round 9 finding 2: a standalone, unglued Roman letter other than "I" ("Choose V or X")
+ * was wrongly treated the same as one `ks2Say` had already spelled out, because the old check asked only
+ * whether the letter was glued, never whether it was *already rendered*. A letter is either one or the
+ * other; nothing in real prose puts the literal phrase "Roman numeral" directly before a bare notation
+ * letter by coincidence, so this reads as "was this produced by this module", not a content guess.
  */
 export function sayIsSafe(text: string): boolean {
-  if (text.includes('²')) return false;
-  if (/\d:|:\d/.test(text)) return false; // digit-adjacent colon that isn't a valid 24-hour time (e.g.
-  // "123:45") is not itself matched by the tokenizer's time token, so this stays as a direct backstop
-  const toks = tokenize(text);
+  const norm = normalizeWs(text);
+  if (norm.includes('²')) return false;
+  if (/\d ?:|: ?\d/.test(norm)) return false; // digit-adjacent colon (one optional space either side, since
+  // `norm` never has more than one) that isn't a valid 24-hour time is not matched by the tokenizer's time
+  // token, so this stays as a direct backstop
+  const toks = tokenize(norm);
   const hadLowerCase = toks.some(t => t.kind === 'text' && /[a-z]/.test(t.raw));
+  const spoken = alreadySpokenSpans(norm);
   for (const tok of toks) {
-    if (tok.kind === 'roman') {
-      if (isPronounI(tok, text, hadLowerCase)) continue; // the pronoun, not the numeral
-      if (romanAtomIsUnsafe(tok, text)) return false;
-      continue;
-    }
+    if (isPronounI(tok, norm, hadLowerCase)) continue; // the pronoun, not the numeral
+    if (tok.kind === 'roman' &&
+      spoken.some(([s, e, checkBoundary]) => tok.start >= s && tok.end <= e && !spanIsGlued(s, e, checkBoundary, norm))) continue;
     if (NOTATION.has(tok.kind)) return false;
   }
   return true;

@@ -362,6 +362,51 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     expect(ks2Say('Slice the 3-d shape')).toBe('Slice the 3 d shape');
   });
 
+  // Round 9 (#1430) finding 1: `singleLetterUnitOK`'s digit/Roman adjacency check used to read the text as
+  // it arrived, before `ks2Say`'s own trailing whitespace collapse closed a double space into one — so raw
+  // "5  m" (not touching, by that stale reading) and its own output "5 m" (touching) disagreed about
+  // whether "m" is the unit or the algebra variable. Both functions now normalise whitespace before
+  // tokenizing, so classification never depends on how many spaces the input happened to have.
+  it('sayIsSafe classifies a digit/unit adjacency the same way whatever the original spacing', () => {
+    for (const raw of ['5  m', '5   m', '5  g', '5  l']) {
+      const said = ks2Say(raw);
+      expect(sayIsSafe(raw), `${JSON.stringify(raw)} should not be safe`).toBe(false);
+      expect(sayIsSafe(said), `ks2Say(${JSON.stringify(raw)}) = ${JSON.stringify(said)} should be safe`).toBe(true);
+    }
+  });
+
+  // Round 9 (#1430) finding 2: a standalone, unglued Roman letter other than "I" was never flagged, even
+  // though ks2Say always spells one out — the old check asked only "is this glued", never "is this already
+  // the rendering ks2Say itself would produce". A card comparing two numerals ("V or X") is exactly the
+  // shape this module exists to catch.
+  it('sayIsSafe flags a standalone, unglued Roman numeral letter other than "I"', () => {
+    for (const raw of ['Choose V or X', 'What is D?', 'Is L bigger than C?']) {
+      expect(sayIsSafe(raw), `${JSON.stringify(raw)} should not be safe`).toBe(false);
+      expect(sayIsSafe(ks2Say(raw)), `ks2Say(${JSON.stringify(raw)}) should be safe`).toBe(true);
+    }
+    // the fix does not just blanket-allow every rendered roman letter: one still glued to something else
+    // unsafe right outside the "Roman numeral …" span it sits in must still fail
+    expect(sayIsSafe(ks2Say('XIV/2'))).toBe(false);
+    expect(sayIsSafe(ks2Say('V:I'))).toBe(false);
+  });
+
+  // Round 9 (#1430) finding 3: the fraction and 24-hour-time separators required the digits to touch it
+  // directly, so "3 / 4" and "3:4" with a space either side tokenised as plain text/digits — outside
+  // `NOTATION` — and slipped past both the conversion and the safety check.
+  it('sayIsSafe and ks2Say treat a spaced fraction separator the same as a tight one', () => {
+    expect(ks2Say('3 / 4')).toBe('three quarters');
+    expect(sayIsSafe('3 / 4')).toBe(false);
+    expect(ks2Say('Is 3 / 4 bigger than 1 / 2?')).toBe('Is three quarters bigger than one half what');
+    expect(sayIsSafe('Is 3 / 4 bigger than 1 / 2?')).toBe(false);
+    expect(ks2Say('2 1 / 2 kg')).toBe('two and one half kilograms');
+    expect(sayIsSafe('2 1 / 2 kg')).toBe(false);
+    // a spaced 24-hour time converts the same way as a tight one
+    expect(ks2Say('14 : 35')).toBe('fourteen thirty-five');
+    expect(sayIsSafe('14 : 35')).toBe(false);
+    // a spaced colon that is not a valid time still trips the digit-adjacent backstop
+    expect(sayIsSafe('The ratio is 3 : 4 today')).toBe(false);
+  });
+
   // The module's own core invariant (its header comment states it): ks2Say never leaves behind what
   // sayIsSafe is built to catch. Checked over a wider table than the five official rail fixtures above,
   // including the values that once broke cardinal() past 99 (a one-line regression there reads as
@@ -378,6 +423,8 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
       '3/4X', '1.5XIV', 'X1.5', 'Slice the 3-D shape', 'The cube is a 3-D shape.',
       'Circle the shapes below.', 'Divide 3/4 by 2.', 'The bus leaves at 9.',
       'kgcm', '5kgcm', 'Convert 5kgcm to cm', 'xkg', 'kgx', '5kgv',
+      '5  m', '5  g', '5  l', 'Choose V or X', 'What is D?', 'List the Roman numerals I, V, X, L, C, D, M.',
+      '3 / 4', 'Is 3 / 4 bigger than 1 / 2?', '2 1 / 2 kg', '14 : 35',
     ];
     for (const text of raw) expect(sayIsSafe(ks2Say(text)), `ks2Say(${JSON.stringify(text)}) = ${JSON.stringify(ks2Say(text))}`).toBe(true);
   });
