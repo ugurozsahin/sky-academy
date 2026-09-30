@@ -130,9 +130,13 @@ const unitTok = (raw: string, start: number): Tok => ({ kind: 'unit', start, end
  *  no space ("Icm", "IIkg", "Xkgcm" — PR #1430 rounds 3 and 5) — `null` for anything else, ordinary words
  *  ("Divide", "Circle") included, since their lower-case remainder is never built entirely out of
  *  unit-code fragments. */
+// Lower-case `i`/`v`/`x`/`d` fold to their upper-case reading here (PR #1430 round 8: "xkg", "5kgv") because
+// no unit code starts with any of the four — `c`/`m`/`l` deliberately stay upper-case-only, since those
+// *are* unit-code initials ("cm", "m", "l") and folding them would swallow a unit's own first letter into
+// a longer, wrong Roman-numeral guess ("Icm" misread two letters deep instead of "I" + "cm").
 function romanThenUnits(run: string, start: number): Tok[] | null {
-  const upper = run.match(/^[IVXLCDM]+/)?.[0];
-  if (!upper || fromRoman(upper) === null) return null;
+  const upper = run.match(/^[IVXLCDMivxd]+/)?.[0];
+  if (!upper || fromRoman(upper.toUpperCase()) === null) return null;
   const chain = decomposeUnits(run.slice(upper.length));
   if (!chain) return null;
   const toks = [romanTok(upper, start)];
@@ -158,11 +162,27 @@ function consumeUnitChainPrefix(s: string): { chain: string[]; rest: string } {
  *  never ambiguous against each other. */
 function unitThenRoman(run: string, start: number): Tok[] | null {
   const { chain, rest } = consumeUnitChainPrefix(run);
-  if (chain.length === 0 || !rest || !/^[IVXLCDM]+$/.test(rest) || fromRoman(rest) === null) return null;
+  if (chain.length === 0 || !rest || !/^[IVXLCDMivxd]+$/.test(rest) || fromRoman(rest.toUpperCase()) === null) return null;
   const toks: Tok[] = [];
   let pos = start;
   for (const code of chain) { toks.push(unitTok(code, pos)); pos += code.length; }
   toks.push(romanTok(rest, pos));
+  return toks;
+}
+
+/** A run of 2+ unit codes glued together with nothing else and no Roman-numeral anchor on either side
+ *  ("kgcm", "5kgcm") — `decomposeUnits` already recognises this chain shape when a Roman numeral sits next
+ *  to it (`romanThenUnits`/`unitThenRoman` below); this is the same chain with no such neighbour, which
+ *  neither of those two require in the first place (PR #1430 round 8 — this used to fall through to `text`
+ *  and round-trip completely unconverted and unflagged). A single matched code (length 1) is deliberately
+ *  excluded: a lone single-letter code still needs `singleLetterUnitOK`'s digit/Roman adjacency, checked
+ *  above, and a lone multi-letter code is already caught by the direct `MULTI_LETTER_UNITS.has` check. */
+function bareUnitChain(run: string, start: number): Tok[] | null {
+  const chain = decomposeUnits(run);
+  if (!chain || chain.length < 2) return null;
+  const toks: Tok[] = [];
+  let pos = start;
+  for (const code of chain) { toks.push(unitTok(code, pos)); pos += code.length; }
   return toks;
 }
 
@@ -176,7 +196,8 @@ function classifyLetterRun(run: string, start: number, text: string): Tok[] {
     return [unitTok(run, start)];
   }
   if (/^[IVXLCDM]+$/.test(run) && fromRoman(run) !== null) return [romanTok(run, start)];
-  return romanThenUnits(run, start) ?? unitThenRoman(run, start) ?? [{ kind: 'text', start, end: start + run.length, raw: run, spoken: run }];
+  return bareUnitChain(run, start) ?? romanThenUnits(run, start) ?? unitThenRoman(run, start)
+    ?? [{ kind: 'text', start, end: start + run.length, raw: run, spoken: run }];
 }
 
 /** One left-to-right scan claiming the longest notation match at each position; everything else is a

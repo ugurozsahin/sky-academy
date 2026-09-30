@@ -318,6 +318,27 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     expect(sayIsSafe('mg2.5')).toBe(false);
   });
 
+  // Round 8 (#1430): a bare chain of 2+ unit codes with no Roman-numeral anchor on either side ("kgcm")
+  // matched no existing branch — `romanThenUnits`/`unitThenRoman` both require a Roman numeral next to the
+  // chain, which this doesn't have — and fell all the way through to a `text` token, round-tripping
+  // completely unconverted and unflagged. Also covers the same round's mirror finding: the two Roman-anchor
+  // checks were themselves still upper-case-only, so a lower-case anchor next to a correctly-decomposed
+  // chain ("xkg", "kgx") fell through the same way.
+  it('a bare chain of 2+ unit codes with no Roman anchor converts, and is flagged raw', () => {
+    expect(ks2Say('kgcm')).toBe('kilograms centimetres');
+    expect(sayIsSafe(ks2Say('kgcm'))).toBe(true);
+    expect(sayIsSafe('kgcm')).toBe(false);
+    expect(ks2Say('5kgcm')).toBe('5 kilograms centimetres');
+    expect(sayIsSafe(ks2Say('5kgcm'))).toBe(true);
+    expect(sayIsSafe('5kgcm')).toBe(false);
+    expect(ks2Say('Convert 5kgcm to cm')).toBe('Convert 5 kilograms centimetres to centimetres');
+    expect(sayIsSafe(ks2Say('Convert 5kgcm to cm'))).toBe(true);
+    for (const input of ['xkg', 'kgx', '5kgv']) {
+      expect(sayIsSafe(ks2Say(input)), `ks2Say(${JSON.stringify(input)}) = ${JSON.stringify(ks2Say(input))} should be safe`).toBe(true);
+      expect(sayIsSafe(input), `${JSON.stringify(input)} should not be safe raw`).toBe(false);
+    }
+  });
+
   // Round 5 (#1430): a Roman numeral glued with no space to a fraction or decimal shares no word boundary
   // with the *spelled-out word* its neighbour becomes, on either side — the tokenizer converts both spans
   // and spaces them apart, rather than leaving the Roman numeral raw.
@@ -356,6 +377,7 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
       '5kg3', '5kg3cm', '1kg500g', 'Xkg5', 'Xkgcm', 'kgX', 'kgcmX', 'Xkgcm²', 'X5cm', '5Xcm', 'IV12kg', 'X5',
       '3/4X', '1.5XIV', 'X1.5', 'Slice the 3-D shape', 'The cube is a 3-D shape.',
       'Circle the shapes below.', 'Divide 3/4 by 2.', 'The bus leaves at 9.',
+      'kgcm', '5kgcm', 'Convert 5kgcm to cm', 'xkg', 'kgx', '5kgv',
     ];
     for (const text of raw) expect(sayIsSafe(ks2Say(text)), `ks2Say(${JSON.stringify(text)}) = ${JSON.stringify(ks2Say(text))}`).toBe(true);
   });
