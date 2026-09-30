@@ -82,28 +82,35 @@ export function fmtFrac(f: Frac, opts: { mixed?: boolean } = {}): string {
   return frac.n === 0 ? `${whole}` : `${whole} ${Math.abs(frac.n)}/${frac.d}`;
 }
 
-const FRAC_RE = /^(-?\d+)\/(\d+)$/;
-const MIXED_RE = /^(-?\d+) (\d+)\/(\d+)$/;
+// The sign is its own capture group, never folded into the digit groups: `Number()` does not understand
+// U+2212 (`Number('−7')` is `NaN`), and `fmt()` (`ks2num.ts`, #1043/#1047) deliberately emits U+2212 for
+// every negative KS2 number, so a KS2 answer built from a negative fraction can carry either sign (#1423
+// review round 4).
+const FRAC_RE = /^([-−]?)(\d+)\/(\d+)$/;
+const MIXED_RE = /^([-−]?)(\d+) (\d+)\/(\d+)$/;
+const BARE_INT_RE = /^([-−]?)(\d+)$/;
 
-/** The inverse of `fmtFrac`: "3/4", "1 3/4" or a bare integer. `null` for anything else, including a `/0`. */
+/** The inverse of `fmtFrac`: "3/4", "1 3/4" or a bare integer, signed with U+2212 or a hyphen. `null` for
+ * anything else, including a `/0`. */
 export function parseFrac(label: string): Frac | null {
   const trimmed = label.trim();
   const mixed = MIXED_RE.exec(trimmed);
   if (mixed) {
-    const [, whole, n, d] = mixed;
+    const [, signStr, whole, n, d] = mixed;
     const dd = Number(d); if (dd === 0) return null;
     // Not `fromMixed(Number(whole), { n: Number(n), d: dd })`: fromMixed expects `frac.n` signed the way
     // toMixed's own output is (matching `whole`'s sign, e.g. -1 and {n:-3,d:4} for -7/4), but the regex
     // only ever captures a positive `n` — the sign in the text belongs to `whole` alone ("-1 3/4" means
     // -(1 3/4), not -1 + 3/4). Building the value directly from that convention instead.
-    const w = Number(whole), sign = w < 0 ? -1 : 1;
-    return simplify({ n: sign * (Math.abs(w) * dd + Number(n)), d: dd });
+    const sign = signStr ? -1 : 1;
+    return simplify({ n: sign * (Number(whole) * dd + Number(n)), d: dd });
   }
   const plain = FRAC_RE.exec(trimmed);
   if (plain) {
-    const [, n, d] = plain;
+    const [, signStr, n, d] = plain;
     const dd = Number(d); if (dd === 0) return null;
-    return simplify({ n: Number(n), d: dd });
+    return simplify({ n: (signStr ? -1 : 1) * Number(n), d: dd });
   }
-  return /^-?\d+$/.test(trimmed) ? { n: Number(trimmed), d: 1 } : null;
+  const bare = BARE_INT_RE.exec(trimmed);
+  return bare ? { n: (bare[1] ? -1 : 1) * Number(bare[2]), d: 1 } : null;
 }

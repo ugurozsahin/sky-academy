@@ -17,22 +17,12 @@ import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './h
 import { digraphBlocked, digraphFrames, digraphSpellings } from './helpers/digraph-gaps';
 import { parseNumericAnswer } from './helpers/numeric-answer';
 import { NO_REPEATED_SET, Y2_GENS, Y2_IDS } from './helpers/topic-lists';
+import { arithmeticCheck, solve } from './helpers/ks2-oracle';
+import { isKs2 } from '../../src/curriculum/key-stage';
 
 // Deterministic RNG (mulberry32)
 function rng(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
-
-/** Independently evaluate simple arithmetic prompts like "7 + 5 = ?" / "? × 2 = 8" / "12 − ? = 5". */
-function solve(prompt: string): number | null {
-  const m = prompt.replace(/−/g, '-').match(/^(\?|\d+)\s*([+\-×÷])\s*(\?|\d+)\s*=\s*(\?|\d+)$/);
-  if (!m) return null;
-  const [, a, op, b, c] = m;
-  const f = (x: number, y: number) => op === '+' ? x + y : op === '-' ? x - y : op === '×' ? x * y : x / y;
-  if (c === '?') return f(+a, +b);
-  if (a === '?') return op === '+' ? +c - +b : op === '-' ? +c + +b : op === '×' ? +c / +b : +c * +b;
-  if (b === '?') return op === '+' ? +c - +a : op === '-' ? +a - +c : op === '×' ? +c / +a : +a / +c;
-  return null;
 }
 
 /** A build card's template (#1059) with its `_` slots filled by `sequence`, in order. */
@@ -148,9 +138,11 @@ for (const topic of TOPICS) {
               }
             }
           }
-          // arithmetic prompts must be correct
-          const s = solve(q.prompt);
-          if (s !== null) expect(Number(q.answer), q.prompt).toBe(s);
+          // arithmetic prompts must be correct — a KS2 topic tries the exact ks2Solve oracle first
+          // (decimals, fractions, brackets, percentages, one-step letter equations), falling back to
+          // solve()'s bare-number check when it does not recognise the form (#1045)
+          const arith = arithmeticCheck(isKs2(topic.year), q.prompt, q.answer);
+          if (arith !== null) expect(arith, q.prompt).toBe(true);
           // numeric answers stay within the year's range — never absurd, never below its floor (0 for KS1)
           if (!q.sequence) {
             const n = parseNumericAnswer(q.answer);
