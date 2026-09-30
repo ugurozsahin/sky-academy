@@ -100,6 +100,10 @@ const UNIT_TOUCH_RE = new RegExp(
 // five kg" has none next to "kg"), so a *multi-letter* code is flagged unconditionally instead — unlike a
 // bare "m"/"g"/"l" (a real algebra variable), none of these is an ordinary English word or variable name.
 const UNIT_BARE_RE = /(?<![a-zA-Z0-9])(?:cm²|m²|km|mm|ml|mg|kg|cm)(?![a-zA-Z0-9²])/;
+// For `hadLowerCase` below only: a raw unit code (e.g. "kg" in "I kg") supplies a lower-case letter of its
+// own, which used to make the "I" pronoun heuristic mistake bare notation for a sentence. Stripped only when
+// not itself touching another letter, so it never eats part of an ordinary word ("Hammer" keeps its "mm").
+const UNIT_FOR_CASE_RE = new RegExp(`(?<![a-zA-Z])(?:${UNIT_ALT})(?![a-zA-Z])`, 'g');
 
 /**
  * Turns KS2 notation in `text` into words: `symSay`'s operators, then a unit code (run early, on the raw
@@ -121,15 +125,22 @@ const UNIT_BARE_RE = /(?<![a-zA-Z0-9])(?:cm²|m²|km|mm|ml|mg|kg|cm)(?![a-zA-Z0-
  * unconditional scan for a bare unit code would reject `avatars.ts`'s "Hammer" (contains "mm"). Given that,
  * the remaining gaps stay documented rather than "fixed" into a regression: an ordinary word that happens
  * to be a canonical Roman numeral ("MIX", "XL") reads as one outside the one carved-out case ("I", the
- * pronoun); "H:MM" always reads as a time, even as a ratio ("mix 1:10"); a Roman numeral glued directly to
- * a unit with no space ("IIkg") shares no word boundary with either (the same combination *with* a space,
- * "X cm", converts correctly); a unit code followed immediately by more notation with no space or space
- * ("5kg3cm") only ever converts its last unit; and a bare "/" or "." with no digit beside it at all, from
- * a three-or-more-fraction chain ("1/2/3/4") or a four-decimal chain ("1.2.3.4"), is invisible to a check
- * that (correctly, given the above) still requires a digit on at least one side.
+ * pronoun); "H:MM" always reads as a time, even as a ratio ("mix 1:10"); a unit code followed immediately
+ * by more notation with no separating space ("5kg3cm") only ever converts its last unit; and a bare "/" or
+ * "." with no digit beside it at all, from a three-or-more-fraction chain ("1/2/3/4") or a four-decimal
+ * chain ("1.2.3.4"), is invisible to a check that (correctly, given the above) still requires a digit on at
+ * least one side. Two shapes convert incompletely but no longer read as safe: a Roman numeral glued
+ * directly to a digit either order ("X5cm", "IV12kg") shares no word boundary with the digit on either
+ * side, so the Roman-numeral pass can't isolate it — `sayIsSafe` now flags any Roman letter touching a
+ * digit directly, whether or not `ks2Say` managed to convert it; and two bare Roman numerals either side of
+ * a colon ("V:I") never reach the digit-only 24-hour-time pass, so the colon itself survives raw between
+ * the two converted numerals — `sayIsSafe` now flags a colon glued straight to a letter, since every real
+ * label colon in this codebase is followed by a space.
  */
 export function ks2Say(text: string): string {
-  const hadLowerCase = /[a-z]/.test(text); // checked before symSay adds its own lower-case operator words
+  // Checked before symSay adds its own lower-case operator words, and with any raw unit code stripped first —
+  // "I kg" is bare notation (a numeral next to a unit), not a sentence, even though "kg" is lower-case.
+  const hadLowerCase = /[a-z]/.test(text.replace(UNIT_FOR_CASE_RE, ''));
   let out = symSay(text);
   out = out.replace(UNIT_RE, (_, prefix, unit) => `${prefix} ${unitWord(unit)}`);
   out = out.replace(/\b[IVXLCDM]+\b/g, tok => {
@@ -158,9 +169,15 @@ export function ks2Say(text: string): string {
  * only the fully-raw digit-delimiter-digit shape.
  */
 export function sayIsSafe(text: string): boolean {
-  if (/\d\//.test(text) || /\/\d/.test(text)) return false;
-  if (/\d\./.test(text) || /\.\d/.test(text)) return false;
-  if (/\d:/.test(text) || /:\d/.test(text)) return false;
+  if (/\d\/|\/\d/.test(text)) return false;
+  if (/\d\.|\.\d/.test(text)) return false;
+  if (/\d:|:\d/.test(text)) return false;
+  if (/:[A-Za-z]/.test(text)) return false; // a colon glued straight to a letter — every real label colon in
+  // this codebase is followed by a space ("Find the word: …"), so this is always a leftover (e.g. "V:I", two
+  // bare Roman numerals the digit-only time regex never touches, converted to "Roman numeral V:Roman numeral I")
+  if (/[IVXLCDM][0-9]|[0-9][IVXLCDM]/.test(text)) return false; // a Roman letter glued
+  // straight to a digit either order ("X5", "IV12") shares no word boundary with the digit on either side, so
+  // neither the conversion pass nor the old boundary-based Roman check below ever sees it
   if (text.includes('²')) return false;
   if (UNIT_TOUCH_RE.test(text) || UNIT_BARE_RE.test(text)) return false;
   for (const tok of text.match(/\b[IVXLCDM]{2,}\b/g) ?? []) if (fromRoman(tok) !== null) return false;

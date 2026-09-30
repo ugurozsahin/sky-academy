@@ -173,6 +173,35 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     }
   });
 
+  // A Roman numeral glued directly to a digit, either order, shares no word boundary with the digit on
+  // either side, so the Roman-numeral pass can't isolate it — ks2Say leaves it raw whether or not a unit is
+  // involved. Not fixed in ks2Say (a pathological, unreachable input shape), but sayIsSafe must no longer
+  // call the leftover safe.
+  it('sayIsSafe fails a Roman numeral glued directly to a digit, either order', () => {
+    for (const bad of [ks2Say('X5cm'), ks2Say('5Xcm'), ks2Say('IV12kg'), ks2Say('X5')]) {
+      expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
+    }
+  });
+
+  // Two bare Roman numerals either side of a colon ("V:I") never reach the digit-only 24-hour-time pass —
+  // each numeral converts on its own, but the colon between them survives raw, glued straight to a letter
+  // on both sides. Every real label colon in this codebase is followed by a space, so this is always safe
+  // to flag.
+  it('sayIsSafe fails a colon left between two converted Roman numerals', () => {
+    expect(ks2Say('V:I')).toBe('Roman numeral V:Roman numeral I');
+    expect(sayIsSafe(ks2Say('V:I'))).toBe(false);
+    expect(sayIsSafe(ks2Say('the ratio is V:X exactly'))).toBe(false);
+  });
+
+  // A bare "I" next to a raw unit code is bare notation (a numeral, not a sentence) even though the unit's
+  // own spelling supplies a lower-case letter — "kg" must not trip the pronoun heuristic.
+  it('a lone "I" next to a unit code is read as the numeral, not mistaken for the pronoun', () => {
+    expect(ks2Say('I kg')).toBe('Roman numeral I kilograms');
+    expect(sayIsSafe(ks2Say('I kg'))).toBe(true);
+    // a real sentence with other lower-case words nearby still keeps "I" as the pronoun
+    expect(ks2Say('I weigh 5 kg, I think')).toBe('I weigh 5 kilograms, I think');
+  });
+
   // The module's own core invariant (its header comment states it): ks2Say never leaves behind what
   // sayIsSafe is built to catch. Checked over a wider table than the five official rail fixtures above,
   // including the values that once broke cardinal() past 99 (a one-line regression there reads as
