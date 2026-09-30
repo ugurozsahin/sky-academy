@@ -44,10 +44,14 @@ describe('y2-oddeven "Slice Them All" form (#926): 2–4 targets of the asked pa
       const share = anyOrder / DRAWS;
       expect(share, `d${d}: any-order share ${share} drifted from 1/3`).toBeGreaterThan(1 / 3 - 0.05);
       expect(share, `d${d}: any-order share ${share} drifted from 1/3`).toBeLessThan(1 / 3 + 0.05);
-      // #926 review: `nearOppositeDecoys`' whole point — a `±1` decoy so the ones digit alone decides — was
-      // otherwise unverified; every other assertion here would still pass if the near-neighbour bias were
-      // dropped entirely and every decoy fell back to a plain opposite-parity draw anywhere in 1–100.
-      expect(adjacentDecoys, `d${d}: no any-order card ever had a decoy adjacent to a target`).toBeGreaterThan(0);
+      // #926 review round 1: `nearOppositeDecoys`' whole point — a `±1` decoy so the ones digit alone decides
+      // — was otherwise unverified; a bare `toBeGreaterThan(0)` can't tell "always biased" apart from
+      // "sometimes lucky", since ~50 opposite-parity candidates in 1–100 against 2-4 targets means a purely
+      // random decoy lands adjacent to *some* target by chance in roughly a third of draws anyway (measured:
+      // ~31–36% with the bias mechanism removed entirely, vs 100% with it intact). 0.8 sits comfortably above
+      // that chance baseline and comfortably below the real rate, so only a real regression can fail it.
+      const adjacentShare = adjacentDecoys / anyOrder;
+      expect(adjacentShare, `d${d}: adjacent-decoy share ${adjacentShare} too low for the bias to be real`).toBeGreaterThan(0.8);
     }
   });
 });
