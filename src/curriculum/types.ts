@@ -70,8 +70,8 @@ interface QuestionCore {
    * "Slice Them All" (#869/#918): legal only alongside `sequence`, which then holds the card's *targets*
    * rather than an ordered spelling — the card is correct once every target is sliced, in any order, and
    * `options` holds the targets plus decoys. `Session.hit()`/`fall()`/`labelsFor()` (`src/game/session.ts`)
-   * read this flag to switch from position-in-sequence to set-membership. No generator sets it yet: this
-   * ticket ships the engine only, the topic children are #926–#928.
+   * read this flag to switch from position-in-sequence to set-membership. `y2-oddeven` (#926) is the first
+   * generator to set it; #920, #927 and #928 are further topic children of the same engine.
    */
   anyOrder?: true;
   visual?: Visual;
