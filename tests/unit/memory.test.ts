@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { gridFor, hasMemoryDecks, Memory, THEMES, pickTheme } from '../../src/game/memory';
-import { YEARS, type YearId } from '../../src/curriculum';
+import { YEARS, isKs2, type YearId } from '../../src/curriculum';
 import { SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -10,19 +10,24 @@ describe('memory decks', () => {
   // #1049: a year with no THEMES entry used to fall back to Reception's decks — a Year 3+ child matching "3"
   // to three apples. hasMemoryDecks is what src/ui/home.ts hides the button on; pickTheme now throws instead
   // of falling back, so the button being hidden is the only thing standing between a bare year and a crash.
-  it('hasMemoryDecks is true for Reception, Year 1 and Year 2, and false for a year with no decks', () => {
-    for (const y of YEARS) expect(hasMemoryDecks(y.id), y.id).toBe(true);
+  it('hasMemoryDecks is true for every EYFS/KS1 year, and false for a KS2 year with no decks', () => {
+    for (const y of YEARS) if (!isKs2(y.id)) expect(hasMemoryDecks(y.id), y.id).toBe(true);
     expect(hasMemoryDecks('year3' as YearId)).toBe(false);
   });
   it('pickTheme throws for a year with no decks, and never falls back to Reception', () => {
     expect(() => pickTheme('year3' as YearId, rng(1))).toThrow('no Memory Match decks for year3');
   });
-  it('every theme builds 4–8 pairs with distinct faces on each side, for every year', () => {
+  // #1040: a KS2 year may ship with no THEMES entry at all (Memory Match hides behind hasMemoryDecks above) —
+  // only an EYFS/KS1 year is required to have one, with at least 3 decks; whichever themes do exist, for any
+  // year, still have to build a valid board.
+  it('every theme builds 4–8 pairs with distinct faces on each side, for every year that has decks', () => {
     for (const y of YEARS) {
       const themes = THEMES[y.id];
-      expect(themes, `${y.id} has its own decks`).toBeDefined();
-      expect(themes!.length).toBeGreaterThanOrEqual(3);
-      for (const theme of themes!) for (let seed = 1; seed <= 40; seed++) {
+      if (!isKs2(y.id)) {
+        expect(themes, `${y.id} has its own decks`).toBeDefined();
+        expect(themes!.length).toBeGreaterThanOrEqual(3);
+      }
+      for (const theme of themes ?? []) for (let seed = 1; seed <= 40; seed++) {
         const pairs = theme.pairs(rng(seed));
         // Year 2's 3-D board is FIVE, not six: `SHAPES_3D` has six rows and no board may carry two names
         // from `SAME_SOLID` (#372), so one row is always dropped. A smaller board, not a wrong one —

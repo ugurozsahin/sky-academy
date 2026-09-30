@@ -1,5 +1,5 @@
 // The sticker album: which stickers a save qualifies for, from coins and from achievements (#114).
-import { TOPICS, YEARS } from '../curriculum';
+import { listedTopics, shownYears } from '../curriculum';
 import { AVATARS, VILLAIN } from '../avatars';
 import type { SaveData, TopicProgress } from './shape';
 /** Sticker album (#114). Order = avatars then the villain. The first three stay a fast, purely-coin win —
@@ -29,10 +29,10 @@ export function stickersFor(coins: number): string[] {
  * that same fix reaching the readers #270 did not touch. */
 export const safeRecord = <T>(x: unknown): Record<string, T> => (x && typeof x === 'object' && !Array.isArray(x)) ? x as Record<string, T> : {};
 const topicsStarred = (d: SaveData) => Object.values(safeRecord<TopicProgress>(d.progress)).filter(p => (p?.stars ?? 0) > 0).length;
-const islandsWithAStar = (d: SaveData) => { const p = safeRecord<TopicProgress>(d.progress); return YEARS.filter(y => TOPICS.some(t => t.year === y.id && (p[t.id]?.stars ?? 0) > 0)).length; };
+const islandsWithAStar = (d: SaveData) => { const p = safeRecord<TopicProgress>(d.progress); return shownYears().filter(y => listedTopics().some(t => t.year === y.id && (p[t.id]?.stars ?? 0) > 0)).length; };
 const islandFullyStarred = (d: SaveData) => {
   const p = safeRecord<TopicProgress>(d.progress);
-  return YEARS.some(y => { const ts = TOPICS.filter(t => t.year === y.id); return ts.length > 0 && ts.every(t => (p[t.id]?.stars ?? 0) > 0); });
+  return shownYears().some(y => { const ts = listedTopics().filter(t => t.year === y.id); return ts.length > 0 && ts.every(t => (p[t.id]?.stars ?? 0) > 0); });
 };
 const sumOf = (x: unknown) => Object.values(safeRecord<number>(x)).reduce((n: number, v) => n + (typeof v === 'number' ? v : 0), 0);
 const totalBossWins = (d: SaveData) => sumOf(d.boss);
@@ -45,7 +45,7 @@ export const SPRINT_STICKER_SCORE = 150;   // roughly a 3-star sprint (12+ corre
 export interface Achievement { id: string; title: string; progress: (d: SaveData) => { done: number; goal: number } }
 export const ACHIEVEMENTS: Achievement[] = [
   { id: 'terra', title: `Star ${TOPICS_STARRED_GOAL} topics`, progress: d => ({ done: Math.min(topicsStarred(d), TOPICS_STARRED_GOAL), goal: TOPICS_STARRED_GOAL }) },
-  { id: 'gust', title: 'Star a topic on every island', progress: d => ({ done: islandsWithAStar(d), goal: YEARS.length }) },
+  { id: 'gust', title: 'Star a topic on three islands', progress: d => ({ done: Math.min(islandsWithAStar(d), 3), goal: 3 }) },
   { id: 'frost', title: '3-day streak', progress: d => ({ done: Math.min(d.streak.days, 3), goal: 3 }) },
   { id: 'sol', title: '7-day streak', progress: d => ({ done: Math.min(d.streak.days, 7), goal: 7 }) },
   { id: 'shadow', title: 'Beat Hammer Man once', progress: d => ({ done: Math.min(totalBossWins(d), 1), goal: 1 }) },

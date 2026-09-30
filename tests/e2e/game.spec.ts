@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { TOPICS } from '../../src/curriculum';
+import { TOPICS, shownYears } from '../../src/curriculum';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
@@ -272,7 +272,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.avatar-card')).toHaveCount(11);
     await expect(card).toHaveClass(/locked/);
     await expect(card.locator('.lock')).toBeVisible();
-    await expect(card.locator('small')).toHaveText(`0/${TOPICS.length} topics ★`);
+    await expect(card.locator('small')).toHaveText('0/3 islands ★');   // #1039 Decision D7: fixed at three islands, never every topic in the registry
     await card.click();
     await expect(page.locator('#next')).toBeDisabled();                               // a locked card never selects
     await expect(card).not.toHaveClass(/sel/);
@@ -3270,7 +3270,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#gate-go');
     await expect(page.locator('.parents-dash')).toBeVisible();
     await expect(page.locator('.p-stats div')).toHaveCount(4);       // overall stat tiles
-    await expect(page.locator('.p-table tbody tr')).toHaveCount(3);  // one row per island
+    await expect(page.locator('.p-table tbody tr')).toHaveCount(shownYears().length);  // one row per shown island (#1039)
 
     // back returns to the sky map
     await page.click('#back');
@@ -3332,6 +3332,26 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.p-extra')).toContainText('456 coins');
     await expect(page.locator('.isl-head small')).toContainText('Rye');
     expect(JSON.parse(await page.inputValue('#save-code')).coins).toBe(456);
+  });
+
+  // #938: a wrong slice becomes a row on the grown-ups "Recent slips" list, carrying the question it was on.
+  test('For grown-ups: Recent slips shows a wrong answer from a played mission (#938)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await startTopic(page, 'year1', 'y1-bonds');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+    const wrongPrompt = await page.evaluate(() => window.__sna.session.current.prompt as string);
+    expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+    await page.waitForFunction(() => window.__sna.state().index === 1 || window.__sna.state().ended);
+    await winMission(page);   // the precondition (#749) — one real wrong slice already logged, the rest fast-forwarded
+    await expect(page.locator('.results')).toBeVisible();
+    await page.click('#home');
+    await expect(page.locator('.island-screen')).toBeVisible();   // #home is history.back(), not the map (up(), main.ts)
+    await page.click('#back');
+    await expect(page.locator('.map')).toBeVisible();
+    await openGrownUps(page);
+    const row = page.locator('.p-topics li', { hasText: wrongPrompt });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('Sliced:');
   });
 
   // #115: a guarded "Start again" on the grown-ups screen — for handing the tablet to a new child.

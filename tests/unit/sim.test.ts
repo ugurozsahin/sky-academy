@@ -800,11 +800,11 @@ describe('#142: sequence progress rushes only the next earned batch', () => {
         rng: rngFor(seed), stages: 1,
       },
       {
-        onQuestion: (q, info) => { speeds.push(info.speed); s.spawn(waveOptsFor(q, info, session.seqIndex)); },
+        onQuestion: (q, info) => { speeds.push(info.speed); s.spawn(waveOptsFor(q, info, session.remaining())); },
         onCorrect: () => { correct++; }, onWrong: () => {}, onMiss: () => {},
         onProgress: (label, done, total) => {
           progress.push(label);
-          if (done < total) s.arena.rush(session.current!.sequence![done]);
+          if (done < total) s.arena.rush(session.remaining()[0]);
         },
         onLives: () => {}, onStageClear: () => {}, onEnd: () => {},
       });
@@ -1126,7 +1126,7 @@ describe('#142: the arena drives the whole mission stage machine', () => {
       {
         onQuestion: (q, info) => {
           questions.push({ stage: info.stage, index: info.index, speed: info.speed });
-          sim!.spawn(waveOptsFor(q, info, session.seqIndex));
+          sim!.spawn(waveOptsFor(q, info, session.remaining()));
         },
         onCorrect: () => {}, onWrong: () => {}, onProgress: () => {},
         onMiss: q => { misses.push(q.answer); },

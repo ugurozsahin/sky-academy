@@ -122,6 +122,35 @@ describe('promptHTML — build cards (#1059)', () => {
   });
 });
 
+// #919: "Slice Them All" (#918's engine) has no position to be `done` past — a target can be found in any
+// order, so `got`/`todo` here comes from set membership against `remaining`, never from `done`'s index.
+describe('promptHTML — any-order cards (#919)', () => {
+  const anyQ: Question = { prompt: 'Slice every even number', answer: '2,4,6', options: ['2', '3', '4', '5', '6'], sequence: ['2', '4', '6'], anyOrder: true };
+
+  it('keeps the prompt text, unlike an ordered sequence which replaces it', () => {
+    expect(plain(promptHTML(anyQ, 0, false, anyQ.sequence))).toBe('Slice every even number ___');
+  });
+
+  it('marks a found target `got` wherever it sits, and every other target `todo`, regardless of finding order', () => {
+    // the middle target found first — a plain `done`-index check would get this wrong
+    const h = promptHTML(anyQ, 0, false, ['2', '6']);
+    expect(h).toBe('Slice every even number <span class="seq"><span class="todo">_</span><span class="got">4</span><span class="todo">_</span></span>');
+  });
+
+  it('defaults to every target still open when `remaining` is omitted', () => {
+    expect(promptHTML(anyQ, 0)).toContain('<span class="todo">_</span><span class="todo">_</span><span class="todo">_</span>');
+  });
+
+  it('reveals every target once none remain, same as a finished ordered sequence', () => {
+    expect(promptHTML(anyQ, 0, false, [])).toBe('Slice every even number <span class="seq"><span class="got">2</span><span class="got">4</span><span class="got">6</span></span>');
+  });
+
+  it('reveal (#65, no voice) prints every target, found or not — dimmed by `.todo` the same way as an ordered sequence', () => {
+    const h = promptHTML(anyQ, 0, true, ['2', '6']);
+    expect(h).toBe('Slice every even number <span class="seq reveal"><span class="todo">2</span><span class="got">4</span><span class="todo">6</span></span>');
+  });
+});
+
 // #65: `promptMode` is the one place the hear/read/peek decision is made, and the outcome reveal is one of its
 // three readers — the one with no test until the 17:41Z review pointed at it. A reveal that ignored the mode
 // would overwrite a silent device's listen-words card with the filled-in answer.

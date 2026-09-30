@@ -1,5 +1,5 @@
 import { ALL_AVATARS, avatarById, MASTER, SENSEI_LINES, welcomeLine } from '../avatars';
-import { TOPICS } from '../curriculum';
+import { shownYears, topicsFor } from '../curriculum';
 import { masterProgress } from '../game/sensei';
 import { cleanName, load, NAME_MAX, safeRecord, save, type TopicProgress } from '../storage';
 import { sfx, say } from '../audio';
@@ -40,16 +40,16 @@ export function wizardProgress(step: number, total: number) {
  */
 export function chooseNinjaScreen(go: () => void) {
   const d = load();
-  const master = masterProgress(TOPICS, safeRecord<TopicProgress>(d.progress));   // #95: tolerant of a hand-edited/corrupted save; the 11th ninja unlocks when every topic has a star
+  const master = masterProgress(shownYears().map(y => topicsFor(y.id)), safeRecord<TopicProgress>(d.progress));   // #95: tolerant of a hand-edited/corrupted save; the 11th ninja unlocks when three islands are fully starred
   render(`
   <section class="screen avatar-screen choose-ninja-screen">
     <header class="brand"><span class="kanji">忍</span><h1>Sky Ninja<br><span>Academy</span></h1><p class="tag">Choose your ninja</p></header>
     ${wizardProgress(1, 3)}
     <div class="avatar-grid" role="list">
       ${ALL_AVATARS.map(a => { const locked = a.id === MASTER.id && !master.unlocked && d.avatar !== MASTER.id; /* an earned Master is never taken away */ return `
-        <button class="avatar-card${d.avatar === a.id ? ' sel' : ''}${locked ? ' locked' : ''}" data-id="${a.id}" style="--glow:${a.glow}" role="listitem" aria-label="${a.name}, ${a.element}${locked ? `, locked: ${master.done} of ${master.total} topics starred` : ''}" ${locked ? 'aria-disabled="true"' : ''}>
+        <button class="avatar-card${d.avatar === a.id ? ' sel' : ''}${locked ? ' locked' : ''}" data-id="${a.id}" style="--glow:${a.glow}" role="listitem" aria-label="${a.name}, ${a.element}${locked ? `, locked: ${master.done} of ${master.total} islands fully starred` : ''}" ${locked ? 'aria-disabled="true"' : ''}>
           <span class="figure"><img src="${a.img}" alt="" draggable="false">${locked ? '<span class="lock">🔒</span>' : ''}</span>
-          <b>${a.name}</b><small>${locked ? `${master.done}/${master.total} topics ★` : a.element}</small>
+          <b>${a.name}</b><small>${locked ? `${master.done}/${master.total} islands ★` : a.element}</small>
         </button>`; }).join('')}
     </div>
     <button id="next" class="btn primary big" ${d.avatar ? '' : 'disabled'}>Continue ➡️</button>
@@ -115,15 +115,15 @@ export function nameScreen(go: () => void) {
  */
 export function changeAvatarScreen(go: () => void) {
   const d = load();
-  const master = masterProgress(TOPICS, safeRecord<TopicProgress>(d.progress));
+  const master = masterProgress(shownYears().map(y => topicsFor(y.id)), safeRecord<TopicProgress>(d.progress));
   render(`
   <section class="screen avatar-screen change-avatar">
     <header class="brand"><span class="kanji">忍</span><h1>Sky Ninja<br><span>Academy</span></h1><p class="tag">Choose your ninja</p></header>
     <div class="avatar-grid" role="list">
       ${ALL_AVATARS.map(a => { const locked = a.id === MASTER.id && !master.unlocked && d.avatar !== MASTER.id; return `
-        <button class="avatar-card${d.avatar === a.id ? ' sel' : ''}${locked ? ' locked' : ''}" data-id="${a.id}" style="--glow:${a.glow}" role="listitem" aria-label="${a.name}, ${a.element}${locked ? `, locked: ${master.done} of ${master.total} topics starred` : ''}" ${locked ? 'aria-disabled="true"' : ''}>
+        <button class="avatar-card${d.avatar === a.id ? ' sel' : ''}${locked ? ' locked' : ''}" data-id="${a.id}" style="--glow:${a.glow}" role="listitem" aria-label="${a.name}, ${a.element}${locked ? `, locked: ${master.done} of ${master.total} islands fully starred` : ''}" ${locked ? 'aria-disabled="true"' : ''}>
           <span class="figure"><img src="${a.img}" alt="" draggable="false">${locked ? '<span class="lock">🔒</span>' : ''}</span>
-          <b>${a.name}</b><small>${locked ? `${master.done}/${master.total} topics ★` : a.element}</small>
+          <b>${a.name}</b><small>${locked ? `${master.done}/${master.total} islands ★` : a.element}</small>
         </button>`; }).join('')}
     </div>
     <button id="change-save" class="btn primary big">Done ✅</button>
