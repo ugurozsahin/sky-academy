@@ -1,11 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
-import { TOPICS, shownYears } from '../../src/curriculum';
+import { TOPICS, shownYears, YEARS, type YearInfo } from '../../src/curriculum';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 import { expectFitsViewport } from './viewport';
+import { COMPACT_VARS, islandsHTML, mapLayout } from '../../src/ui/map-layout';
 /** A context with nothing stored: the 3-D setting at its default, `auto` — the opt-out from `THREE_OFF`. */
 const NO_STORED_STATE = { cookies: [], origins: [] };   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
 
@@ -2594,6 +2595,66 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.home')).toBeVisible();
     const withKey = await page.$$eval('.islands .island', els => els.map(el => (el as HTMLElement).dataset.year));
     expect(withKey).toEqual(['reception', 'year1', 'year2']);
+  });
+
+  /**
+   * #1048: with seven islands, the pre-#1048 map put 952px of island cards on a phone before the Daily Dojo
+   * card (7 × 124px cards + 6 × 14px gaps), and seven ~95px desktop columns at 720px. `mapLayout`/`islandsHTML`
+   * (`src/ui/map-layout.ts`) give a compact size from 4 islands and cap desktop at 4 columns; these inject
+   * 4–7 real years (via the same pure functions `mapScreen` calls, the `renderVisual`-in-Node pattern
+   * `duel.spec.ts` already uses) onto the live map rather than waiting for #1050+ to add a fourth `YearId`.
+   */
+  test.describe('the Sky Map holds four to seven islands (#1048)', () => {
+    const fixtureYears = (n: number): YearInfo[] => Array.from({ length: n }, (_, i) => ({
+      ...YEARS[i % YEARS.length], id: `fixture-${i}` as YearInfo['id'], short: `F${i}`, title: `Fixture Isle ${i + 1}`,
+    }));
+
+    const injectIslands = async (page: Page, n: number) => {
+      const years = fixtureYears(n);
+      const layout = mapLayout(n);
+      const html = islandsHTML(years, () => ({ s: 1, m: 3 }), undefined, layout.compact);
+      const style = `--cols:${layout.cols}${layout.compact ? COMPACT_VARS : ''}`;
+      await page.evaluate(({ html, style }) => {
+        const el = document.querySelector('.islands')!;
+        el.setAttribute('style', style);
+        el.innerHTML = html;
+      }, { html, style });
+    };
+
+    for (const n of [4, 5, 6, 7]) {
+      test(`${n} islands at 390×664: every island is ≥44px tall, no sideways scroll, Daily Dojo within two screen heights`, async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 664 });
+        await seedPlayer(page);
+        await injectIslands(page, n);
+        await expectFitsViewport(page, `sky map with ${n} islands at 390x664`);
+        const heights = await page.$$eval('.islands .island', els => els.map(el => el.getBoundingClientRect().height));
+        expect(heights.length, `${n} islands`).toBe(n);
+        for (const h of heights) expect(h, `${n} islands: an island under the 44px touch floor`).toBeGreaterThanOrEqual(44);
+        const dojoTop = await page.$eval('#dojo', el => el.getBoundingClientRect().top + window.scrollY);
+        expect(dojoTop, `${n} islands: Daily Dojo starts past two screen heights`).toBeLessThanOrEqual(2 * 664);
+        const labelSizes = await page.$$eval('.islands .island b, .islands .island small',
+          els => els.map(el => parseFloat(getComputedStyle(el).fontSize)));
+        for (const sz of labelSizes) expect(sz, `${n} islands: a map label under 13px`).toBeGreaterThanOrEqual(13);
+      });
+    }
+
+    test('7 islands at ≥720px: never more than 4 columns, each at least 150px wide, no sideways scroll', async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await seedPlayer(page);
+      await injectIslands(page, 7);
+      const style = await page.$eval('.islands', el => el.getAttribute('style') || '');
+      expect(style).toContain('--cols:4');
+      const widths = await page.$$eval('.islands .island', els => els.map(el => el.getBoundingClientRect().width));
+      expect(widths.length).toBe(7);
+      for (const w of widths) expect(w, 'a desktop island under 150px wide').toBeGreaterThanOrEqual(150);
+      await expectFitsViewport(page, 'sky map with 7 islands at 1280x800');
+    });
+
+    test('3 islands (today): the map\'s container style is unchanged by this module', async ({ page }) => {
+      await seedPlayer(page);
+      const style = await page.$eval('.islands', el => el.getAttribute('style') || '');
+      expect(style).toBe('--cols:3');
+    });
   });
 
   test('endless Sky Storm ramps up and ends when lives run out', async ({ page }) => {

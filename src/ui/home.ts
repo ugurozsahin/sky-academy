@@ -1,6 +1,7 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
 import { isKs2, shownYears, topicsFor, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
+import { islandsHTML, mapLayout } from './map-layout';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
@@ -72,20 +73,18 @@ export function mapScreen(nav: Nav) {
   const totalStars = (y: YearInfo) => topicsFor(y.id).reduce((s, t) => s + (progress[t.id]?.stars ?? 0), 0);
   const maxStars = (y: YearInfo) => topicsFor(y.id).length * 3;
   const shown = shownYears();
+  const layout = mapLayout(shown.length);
   const tb = topbar(nav, () => mapScreen(nav));
   const dojoState = dojoToday(); const dojoChallenges = dailyChallenges(dojoState.date);
+  // #1048: the four compact pixel values below belong to map-layout.ts's own compact size — they are
+  // written here, not there, only because the #399 rail credits a custom property as declared where a
+  // browser actually reads it, a literal style="…" attribute.
   render(`
   <section class="screen home map">
     ${tb.html}
     <h2 class="section-title">Where will you train today?</h2>
-    <div class="islands big" style="--cols:${shown.length}">
-      ${shown.map((y, i) => { const s = totalStars(y), m = maxStars(y); return `
-        <button class="island${y.id === d.year ? ' sel' : ''}" data-year="${y.id}" style="--tint:${y.tint}" aria-label="${y.title} island">
-          <span class="isl-art" style="background-image:url(&quot;${islandArt(y)}&quot;);animation-delay:${(-1.3 * i).toFixed(1)}s"></span>
-          <span class="isl-text"><b>${y.title}</b><small>${y.age} · ${y.blurb}</small>
-          <span class="isl-bar"><i style="width:${m ? Math.round(100 * s / m) : 0}%"></i></span><span class="isl-stars">★ ${s}/${m}</span></span>
-          <span class="isl-go">Go →</span>
-        </button>`; }).join('')}
+    <div class="islands big" style="--cols:${layout.cols}${layout.compact ? ';--isl-h:88px;--isl-pad:118px;--art-w:96px;--art-h:62px' : ''}">
+      ${islandsHTML(shown, y => ({ s: totalStars(y), m: maxStars(y) }), d.year, layout.compact)}
     </div>
     ${dojoCard(dojoState, dojoChallenges)}
     <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS${shown.some(y => isKs2(y.id)) ? ', KS1 & KS2' : ' & KS1'} National Curriculum</span>

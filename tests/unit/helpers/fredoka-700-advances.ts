@@ -1,0 +1,130 @@
+/**
+ * Fredoka 700 advance widths (em = glyph units / 1000 unitsPerEm), for the KS2 label-size rail (#1046,
+ * `r-lbl.ts`). 700 is the only weight a bubble label ever draws (`labelFont` in `src/game/bubbles.ts`).
+ *
+ * Generated once from `public/fonts/fredoka-latin.woff2` (a variable font, wght 300–700), instanced at
+ * wght=700, with fontTools:
+ *
+ *   pip install fonttools brotli
+ *   python3 -c "
+ *   from fontTools.ttLib import TTFont
+ *   from fontTools.varLib.instancer import instantiateVariableFont
+ *   f = TTFont('public/fonts/fredoka-latin.woff2')
+ *   inst = instantiateVariableFont(f, {'wght': 700})
+ *   cmap, hmtx, upm = inst.getBestCmap(), inst['hmtx'], inst['head'].unitsPerEm
+ *   for ch in CHARS:  # printable ASCII 0x20-0x7E + the maths/fraction glyphs below
+ *       glyph = cmap[ord(ch)]
+ *       print(ch, round(hmtx[glyph][0] / upm, 4))
+ *   "
+ *
+ * Covers printable ASCII plus the maths/currency/fraction glyphs a KS2 label can carry: U+2212 (minus, never
+ * ASCII "-", per `ks2num.ts`'s `fmt`), ×, ÷, £, ², ³, ½, ¼, ¾. `labelEm` (`r-lbl.ts`) throws on any character
+ * missing here, so a new glyph in a label forces this table to be regenerated rather than silently costing
+ * nothing towards the label's measured width.
+ */
+export const FREDOKA_700_ADVANCES: Readonly<Record<string, number>> = {
+  ' ': 0.235,
+  '!': 0.248,
+  '"': 0.399,
+  '#': 0.697,
+  '$': 0.442,
+  '%': 0.779,
+  '&': 0.696,
+  "'": 0.193,
+  '(': 0.357,
+  ')': 0.357,
+  '*': 0.468,
+  '+': 0.49,
+  ',': 0.223,
+  '-': 0.403,
+  '.': 0.22,
+  '/': 0.489,
+  '0': 0.565,
+  '1': 0.379,
+  '2': 0.566,
+  '3': 0.565,
+  '4': 0.551,
+  '5': 0.493,
+  '6': 0.521,
+  '7': 0.522,
+  '8': 0.541,
+  '9': 0.521,
+  ':': 0.221,
+  ';': 0.22,
+  '<': 0.583,
+  '=': 0.445,
+  '>': 0.583,
+  '?': 0.476,
+  '@': 0.844,
+  'A': 0.711,
+  'B': 0.609,
+  'C': 0.631,
+  'D': 0.655,
+  'E': 0.603,
+  'F': 0.613,
+  'G': 0.719,
+  'H': 0.65,
+  'I': 0.239,
+  'J': 0.531,
+  'K': 0.597,
+  'L': 0.569,
+  'M': 0.809,
+  'N': 0.67,
+  'O': 0.721,
+  'P': 0.595,
+  'Q': 0.782,
+  'R': 0.604,
+  'S': 0.542,
+  'T': 0.64,
+  'U': 0.675,
+  'V': 0.728,
+  'W': 0.947,
+  'X': 0.689,
+  'Y': 0.638,
+  'Z': 0.598,
+  '[': 0.324,
+  '\\': 0.491,
+  ']': 0.324,
+  '^': 0.489,
+  '_': 0.768,
+  '`': 0.448,
+  'a': 0.557,
+  'b': 0.554,
+  'c': 0.503,
+  'd': 0.554,
+  'e': 0.535,
+  'f': 0.419,
+  'g': 0.546,
+  'h': 0.563,
+  'i': 0.251,
+  'j': 0.234,
+  'k': 0.512,
+  'l': 0.311,
+  'm': 0.791,
+  'n': 0.566,
+  'o': 0.558,
+  'p': 0.541,
+  'q': 0.543,
+  'r': 0.432,
+  's': 0.457,
+  't': 0.429,
+  'u': 0.568,
+  'v': 0.577,
+  'w': 0.737,
+  'x': 0.538,
+  'y': 0.576,
+  'z': 0.545,
+  '{': 0.354,
+  '|': 0.202,
+  '}': 0.354,
+  '~': 0.556,
+  '−': 0.54,
+  '×': 0.485,
+  '÷': 0.468,
+  '£': 0.628,
+  '²': 0.423,
+  '³': 0.425,
+  '½': 0.748,
+  '¼': 0.731,
+  '¾': 0.748,
+};
