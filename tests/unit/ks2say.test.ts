@@ -202,6 +202,39 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     expect(ks2Say('I weigh 5 kg, I think')).toBe('I weigh 5 kilograms, I think');
   });
 
+  // Round 5 (#1430): a bare "I" glued with no space to a unit code fooled the pronoun heuristic the same
+  // way the spaced case above once did — the old unit-strip refused to remove a unit preceded by *any*
+  // letter, including "I" itself, which isn't prose at all. (A glued "I" inside real surrounding prose,
+  // e.g. "the length is Icm", still reads as the pronoun-ambiguous case — the same "other lower-case words
+  // nearby" rule the spaced form above already uses — since no real sentence glues "I" straight onto the
+  // next word with no space either way.)
+  it('a lone "I" glued directly to a unit code is read as the numeral too', () => {
+    expect(ks2Say('Icm')).toBe('Roman numeral I centimetres');
+    expect(sayIsSafe(ks2Say('Icm'))).toBe(true);
+  });
+
+  // Round 5 (#1430): a bare unit code with nothing before it at all was never converted, since the unit
+  // pass required a leading digit/Roman prefix — and once its trailing fraction/decimal was spelled out,
+  // nothing was left for sayIsSafe's digit-anchored unit checks to catch either.
+  it('a bare unit code glued to a following fraction or decimal converts, and is flagged raw', () => {
+    expect(ks2Say('kg3/4')).toBe('kilograms three quarters');
+    expect(sayIsSafe(ks2Say('kg3/4'))).toBe(true);
+    expect(sayIsSafe('kg3/4')).toBe(false);
+    expect(ks2Say('mg2.5')).toBe('milligrams two point five');
+    expect(sayIsSafe(ks2Say('mg2.5'))).toBe(true);
+    expect(sayIsSafe('mg2.5')).toBe(false);
+  });
+
+  // Round 5 (#1430): a Roman numeral glued with no space to a fraction or decimal shares no word boundary
+  // with the *spelled-out word* its neighbour becomes, on either side — not fixed in ks2Say itself (a
+  // pathological, unreachable input shape, the same call rounds 3-4 made for a Roman numeral glued to a
+  // digit), but sayIsSafe must no longer call the leftover safe.
+  it('sayIsSafe fails a Roman numeral glued directly to an already-spelled-out word, either order', () => {
+    for (const bad of [ks2Say('3/4X'), ks2Say('1.5XIV'), ks2Say('X1.5')]) {
+      expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
+    }
+  });
+
   // The module's own core invariant (its header comment states it): ks2Say never leaves behind what
   // sayIsSafe is built to catch. Checked over a wider table than the five official rail fixtures above,
   // including the values that once broke cardinal() past 99 (a one-line regression there reads as
@@ -213,6 +246,7 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
       '1/20', '1/1000', '1/999', '3.5 kg', '3/4 m', '1 1/2 kg', '12.5cm',
       '1/2 3/4', '3/4 1/2', '1000000.5', '1234567.5', 'X cm', 'IIkg',
       '5 mm', '5 m', '5 g', '5 l', '200 ml', '200 mg',
+      'Icm', 'the length is Icm', 'kg3/4', 'mg2.5', 'I kg',
     ];
     for (const text of raw) expect(sayIsSafe(ks2Say(text)), `ks2Say(${JSON.stringify(text)}) = ${JSON.stringify(ks2Say(text))}`).toBe(true);
   });

@@ -104,6 +104,10 @@ const UNIT_BARE_RE = /(?<![a-zA-Z0-9])(?:cm²|m²|km|mm|ml|mg|kg|cm)(?![a-zA-Z0-
 // own, which used to make the "I" pronoun heuristic mistake bare notation for a sentence. Stripped only when
 // not itself touching another letter, so it never eats part of an ordinary word ("Hammer" keeps its "mm").
 const UNIT_FOR_CASE_RE = new RegExp(`(?<![a-zA-Z])(?:${UNIT_ALT})(?![a-zA-Z])`, 'g');
+// A unit code with nothing before it at all ("kg3/4") is still real notation — the trailing digit/Roman run
+// is what the leading UNIT_RE above needs a *prefix* for, so a bare leading unit needs its own pass, run
+// alongside it before the fraction/decimal/time passes turn that digit into words.
+const UNIT_TRAILING_RE = new RegExp(`(?<![a-zA-Z0-9])(${UNIT_ALT})(\\d+|[IVXLCDM]+)`, 'g');
 
 /**
  * Turns KS2 notation in `text` into words: `symSay`'s operators, then a unit code (run early, on the raw
@@ -129,20 +133,29 @@ const UNIT_FOR_CASE_RE = new RegExp(`(?<![a-zA-Z])(?:${UNIT_ALT})(?![a-zA-Z])`, 
  * by more notation with no separating space ("5kg3cm") only ever converts its last unit; and a bare "/" or
  * "." with no digit beside it at all, from a three-or-more-fraction chain ("1/2/3/4") or a four-decimal
  * chain ("1.2.3.4"), is invisible to a check that (correctly, given the above) still requires a digit on at
- * least one side. Two shapes convert incompletely but no longer read as safe: a Roman numeral glued
+ * least one side. Three shapes convert incompletely but no longer read as safe: a Roman numeral glued
  * directly to a digit either order ("X5cm", "IV12kg") shares no word boundary with the digit on either
  * side, so the Roman-numeral pass can't isolate it — `sayIsSafe` now flags any Roman letter touching a
- * digit directly, whether or not `ks2Say` managed to convert it; and two bare Roman numerals either side of
+ * digit directly, whether or not `ks2Say` managed to convert it; two bare Roman numerals either side of
  * a colon ("V:I") never reach the digit-only 24-hour-time pass, so the colon itself survives raw between
  * the two converted numerals — `sayIsSafe` now flags a colon glued straight to a letter, since every real
- * label colon in this codebase is followed by a space.
+ * label colon in this codebase is followed by a space; and a Roman numeral glued with no space to a fraction
+ * or decimal ("3/4X", "X1.5") shares no word boundary with the *spelled-out word* the digit becomes either
+ * — `sayIsSafe` now flags any Roman letter glued straight to a lower-case letter, since ks2Say's own "Roman
+ * numeral X, I, V" rendering always keeps a space or comma before the next word.
  */
 export function ks2Say(text: string): string {
   // Checked before symSay adds its own lower-case operator words, and with any raw unit code stripped first —
-  // "I kg" is bare notation (a numeral next to a unit), not a sentence, even though "kg" is lower-case.
-  const hadLowerCase = /[a-z]/.test(text.replace(UNIT_FOR_CASE_RE, ''));
+  // "I kg" is bare notation (a numeral next to a unit), not a sentence, even though "kg" is lower-case. Every
+  // canonical Roman-numeral run is stripped first too: a unit glued straight to one ("Icm") is still bare
+  // notation, but the old unit-only strip refused to remove a unit preceded by *any* letter — including a
+  // Roman letter that isn't prose at all — so "cm" leaked a lower-case letter into the check and "I" read as
+  // the pronoun instead of the numeral.
+  const forCase = text.replace(/[IVXLCDM]+/g, tok => (fromRoman(tok) === null ? tok : '')).replace(UNIT_FOR_CASE_RE, '');
+  const hadLowerCase = /[a-z]/.test(forCase);
   let out = symSay(text);
   out = out.replace(UNIT_RE, (_, prefix, unit) => `${prefix} ${unitWord(unit)}`);
+  out = out.replace(UNIT_TRAILING_RE, (_, unit, rest) => `${unitWord(unit)} ${rest}`);
   out = out.replace(/\b[IVXLCDM]+\b/g, tok => {
     if (tok === 'I' && hadLowerCase) return tok; // the pronoun "I" in an ordinary sentence, left alone
     return fromRoman(tok) === null ? tok : `Roman numeral ${tok.split('').join(', ')}`;
@@ -178,6 +191,11 @@ export function sayIsSafe(text: string): boolean {
   if (/[IVXLCDM][0-9]|[0-9][IVXLCDM]/.test(text)) return false; // a Roman letter glued
   // straight to a digit either order ("X5", "IV12") shares no word boundary with the digit on either side, so
   // neither the conversion pass nor the old boundary-based Roman check below ever sees it
+  if (/[IVXLCDM][a-z]|[a-z][IVXLCDM]/.test(text)) return false; // a Roman letter glued straight to an
+  // already-spelled-out word, either order ("three quartersX", "Xone point five") — the fraction/decimal pass
+  // converts the digit it was glued to, but the Roman-numeral pass needs a word boundary neither side ever
+  // had, so it's left raw. Every legitimate "Roman numeral X, I, V" rendering keeps a space or comma before
+  // the next word, so this never fires on ks2Say's own output.
   if (text.includes('²')) return false;
   if (UNIT_TOUCH_RE.test(text) || UNIT_BARE_RE.test(text)) return false;
   for (const tok of text.match(/\b[IVXLCDM]{2,}\b/g) ?? []) if (fromRoman(tok) !== null) return false;
