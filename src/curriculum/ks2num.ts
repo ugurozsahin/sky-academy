@@ -51,6 +51,8 @@ export function compareDec(a: Dec, b: Dec): -1 | 0 | 1 {
 export interface FmtOpts {
   /** Pad/trim the fraction to exactly this many places (money: "3.50"). Omit for "no trailing zeros". */
   fixedDp?: number;
+  /** A year (#1047): never comma-grouped ("1999", not "1,999"), whatever the digit count. */
+  year?: boolean;
 }
 
 /** Commas from four digits, U+2212 for negatives (never ASCII "-"), no trailing zeros unless `fixedDp`. */
@@ -60,7 +62,7 @@ export function fmt(a: Dec, opts: FmtOpts = {}): string {
   const intDigits = a.dp > 0 ? digits.slice(0, digits.length - a.dp) : digits;
   let fracDigits = a.dp > 0 ? digits.slice(digits.length - a.dp) : '';
   fracDigits = opts.fixedDp !== undefined ? fracDigits.padEnd(opts.fixedDp, '0').slice(0, opts.fixedDp) : fracDigits.replace(/0+$/, '');
-  const grouped = intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const grouped = opts.year ? intDigits : intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return (negative && a.v !== 0 ? '−' : '') + grouped + (fracDigits ? '.' + fracDigits : '');
 }
 
