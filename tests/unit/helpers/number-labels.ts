@@ -18,11 +18,12 @@ const YEAR_RE = /^(?:1[0-9]{3}|20[0-9]{2})$/;
 export function labelProblems(text: string, opts: LabelProblemsOpts = {}): string[] {
   const problems: string[] = [];
 
-  // An ASCII "-" is a minus sign only when it sits where a sign can sit (line start, after a space, "(", "="
-  // or "," — "1,-2" and "(3,-4)" both hide a minus right after a comma with no space) and is immediately
-  // followed by a digit. "twenty-four" and "-ly" both fail that: the character after the hyphen there is a
-  // letter, not a digit.
-  for (const m of text.matchAll(/(?:^|[\s(=,])-(?=\d)/g)) {
+  // An ASCII "-" is a minus sign whenever it is NOT glued to a preceding letter or digit (review round 1:
+  // a colon, quote or closing bracket right before it — "Score:-5", "(x)-5", "\"-5\"" — is a sign as much as
+  // a space is) and is followed, directly or via a single "£", by a digit ("-£3.50" is a sign too — a
+  // currency symbol between the sign and the amount is an ordinary label shape, not an exception to it).
+  // "twenty-four" and "-ly" both fail the first test: the character before the hyphen there is a letter.
+  for (const m of text.matchAll(/(?<![A-Za-z0-9])-(?=£?\d)/g)) {
     problems.push(`ASCII "-" used as a minus sign at "${text.slice(m.index, m.index + 8)}" — U+2212 only`);
   }
 
@@ -34,8 +35,11 @@ export function labelProblems(text: string, opts: LabelProblemsOpts = {}): strin
 
   // A space where a comma should group thousands ("10 000") — checked before the digit/comma span check
   // below, since a run this shape never lands in one unbroken span for that check to see (a plain space
-  // isn't part of the character class it scans).
-  for (const m of text.matchAll(/\d[\d,]*(?: \d{3})+/g)) {
+  // isn't part of the character class it scans). No comma in the leading run (review round 1): allowing one
+  // let this bridge straight across an ordinary list separator into the next number entirely — "4,521, 891"
+  // (two correctly-grouped numbers, comma-space between them) matched as "4,521, 891" and was flagged as a
+  // bad grouping that was never there. A run already broken by its own comma is the other check's job.
+  for (const m of text.matchAll(/\d+(?: \d{3})+/g)) {
     problems.push(`"${m[0]}" groups digits with a space, not a comma`);
   }
 

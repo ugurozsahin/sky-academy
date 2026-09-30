@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dec, fmt } from '../../src/curriculum/ks2num';
+import { dec, fmt, addDec } from '../../src/curriculum/ks2num';
 import { isKs2 } from '../../src/curriculum/key-stage';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
@@ -43,6 +43,13 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     expect(() => fmt(dec(-1999, 0), { year: true })).toThrow(/negative/);
   });
 
+  it('fmt() accepts a whole year even at a nonzero dp (review round 1): dp is storage scale, not a remainder', () => {
+    // addDec/alignment can leave an exact whole number at dp > 0 — dec(1999, 0) + dec(0, 2) is
+    // {v: 199900, dp: 2}, exactly 1999 — and the old `a.dp > 0` guard misread that as fractional.
+    const aligned = addDec(dec(1999, 0), dec(0, 2));
+    expect(fmt(aligned, { year: true })).toBe('1999');
+  });
+
   it('the years exemption holds its upper boundary: 2100 still fails even with years: true', () => {
     expect(labelProblems('2100', { years: true })).not.toEqual([]);
     expect(labelProblems('3000', { years: true })).not.toEqual([]);
@@ -64,6 +71,24 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
   it('an ASCII minus right after a comma, with no space, is still caught', () => {
     expect(labelProblems('1,-2')).toHaveLength(1);
     expect(labelProblems('(3,-4)')).toHaveLength(1);
+  });
+
+  it('a list of correctly-grouped numbers never trips the space-grouping check (review round 1)', () => {
+    // The old space check let its leading run swallow commas, so it bridged straight across an ordinary
+    // ", " list separator into the next number: "4,521, 891" read as one bad grouping when both numbers
+    // were fine on their own. "Order these numbers" / "which is bigger" is the obvious next KS2 shape.
+    expect(labelProblems('Order these numbers: 4,521, 891, 10,234')).toEqual([]);
+    expect(labelProblems('1,234, 567')).toEqual([]);
+  });
+
+  it('an ASCII minus is caught after a colon, a quote or a closing bracket, with no space (review round 1)', () => {
+    expect(labelProblems('Score:-5')).toHaveLength(1);
+    expect(labelProblems('(x)-5')).toHaveLength(1);
+    expect(labelProblems('"-5"')).toHaveLength(1);
+  });
+
+  it('an ASCII minus is caught before a currency symbol too (review round 1)', () => {
+    expect(labelProblems('Change: -£3.50')).toHaveLength(1);
   });
 
   it('every isKs2 registry topic\'s prompt, answer and options pass the rail', () => {

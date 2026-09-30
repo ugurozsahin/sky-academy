@@ -59,7 +59,10 @@ export interface FmtOpts {
 export function fmt(a: Dec, opts: FmtOpts = {}): string {
   if (opts.year) {
     if (opts.fixedDp !== undefined) throw new Error('fmt: year and fixedDp are mutually exclusive — a year has no decimal places');
-    if (a.dp > 0) throw new Error('fmt: year given a fractional value — a year has no decimal places');
+    // `dp` is storage scale, not an actual remainder (review round 1): `addDec`/alignment can leave a whole
+    // number at `dp > 0` — `dec(1999, 0)` plus `dec(0, 2)` is `{v: 199900, dp: 2}`, exactly 1999 — so the
+    // real test is whether `a.v` divides evenly at that scale, not whether `dp` is merely nonzero.
+    if (a.v % 10 ** a.dp !== 0) throw new Error('fmt: year given a fractional value — a year has no decimal places');
     if (a.v < 0) throw new Error('fmt: year given a negative value — years are never negative');
   }
   const negative = a.v < 0;
