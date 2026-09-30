@@ -1,7 +1,7 @@
 /* ---------- home ---------- */
 .islands.big { grid-template-columns: 1fr; gap: 14px; }
-.islands.big .island { flex-direction: row; align-items: center; text-align: left; padding: 14px 16px 14px 150px; min-height: 124px; gap: 10px; }
-.islands.big .isl-art { left: 12px; top: 50%; width: 130px; height: 84px; transform: translateY(-50%); }
+.islands.big .island { flex-direction: row; align-items: center; text-align: left; padding: 14px 16px 14px var(--isl-pad, 150px); min-height: var(--isl-h, 124px); gap: 10px; }
+.islands.big .isl-art { left: 12px; top: 50%; width: var(--art-w, 130px); height: var(--art-h, 84px); transform: translateY(-50%); }
 @keyframes hoverBig { 0%, 100% { transform: translateY(-50%); } 50% { transform: translateY(calc(-50% - 6px)); } }
 .islands.big .isl-art { animation-name: hoverBig; }
 .isl-text { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
