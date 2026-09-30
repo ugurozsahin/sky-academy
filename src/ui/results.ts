@@ -120,12 +120,19 @@ export function scoreLine(r: { mode: Mode; won: boolean; correct: number; stars:
  * The first utterance of a topic mission (#897): a pre-reader tapping straight into a topic hears its name.
  * Folded into the SAME utterance as the first question — a separate, earlier `say()` would be cancelled by
  * the question's own line, the same reasoning `duel.ts`'s `spokenQuestion` hand-over already follows for
- * Ninja Duel's round 1. `topic` is undefined for every pool-driven mode (Sensei training, Storm, Sprint,
- * Boss all pass `pool`, never a single `topic`) and `isFirst` only ever true once per session, so this reaches
- * only a topic mission's first question — never a later one, and never a "Fix my mistakes" replay of one
- * (`practice`), which already heard its topic named the first time it was played.
+ * Ninja Duel's round 1 (round === 1, decided inside that function too, not by its caller). `topic` is
+ * undefined for every pool-driven mode (Sensei training, Storm, Sprint, Boss all pass `pool`, never a single
+ * `topic`) and `questionsAsked === 1` only once per session, so this reaches only a topic mission's first
+ * question — never a later one, and never a "Fix my mistakes" replay of one (`practice`), which already heard
+ * its topic named the first time it was played.
+ *
+ * `prev` guards a fourth, easy-to-miss repeat: `Session.respawn()` re-poses the SAME `Question` object (a
+ * sequence card whose wave fell with nothing decided) without advancing `questionsAsked`, so question 1
+ * respawned would otherwise read `questionsAsked === 1` a second time and announce the topic again, cutting
+ * off whatever was still speaking — `q === prev` is exactly the respawn signature (a genuinely new question
+ * is always a new object), so the announcement fires only the first time this question is posed at all.
  */
-export function firstQuestionLine(q: Question, topic: Topic | undefined, isFirst: boolean, practice: boolean): string {
+export function firstQuestionLine(q: Question, topic: Topic | undefined, questionsAsked: number, practice: boolean, prev: Question | null): string {
   const line = q.say ?? q.prompt;
-  return topic && isFirst && !practice ? `${topic.title}! ${line}` : line;
+  return topic && questionsAsked === 1 && !practice && q !== prev ? `${topic.title}! ${line}` : line;
 }

@@ -266,7 +266,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         // Sensei: name the topic of each question
         const t = session.currentTopic;
         if (deps.training && t) $('.ttl').textContent = `${t.icon} ${t.title}`;
-        activeQuestion = q; readThrough = false; const firstLine = firstQuestionLine(q, opts.topic, session.questionsAsked === 1, !!opts.practice);
+        const firstLine = firstQuestionLine(q, opts.topic, session.questionsAsked, !!opts.practice, activeQuestion); activeQuestion = q; readThrough = false;
         const peek = renderQuestion(q, false);
         els.vis.innerHTML = renderVisual(q.visual);
         solid.show(q, session.currentTopic?.id);

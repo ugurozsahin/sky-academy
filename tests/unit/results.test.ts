@@ -360,23 +360,38 @@ describe('firstQuestionLine', () => {
   const q = { prompt: '2 + 2', say: undefined } as unknown as Question;
 
   it('folds the topic title into question 1 of a topic mission, title first', () => {
-    expect(firstQuestionLine(q, topic, true, false)).toBe('Number Bonds! 2 + 2');
+    expect(firstQuestionLine(q, topic, 1, false, null)).toBe('Number Bonds! 2 + 2');
   });
 
   it('prefers q.say over q.prompt, same as every other question utterance', () => {
     const spoken = { prompt: '2 + 2', say: 'Two plus two' } as unknown as Question;
-    expect(firstQuestionLine(spoken, topic, true, false)).toBe('Number Bonds! Two plus two');
+    expect(firstQuestionLine(spoken, topic, 1, false, null)).toBe('Number Bonds! Two plus two');
   });
 
-  it('returns the plain prompt for every question after the first', () => {
-    expect(firstQuestionLine(q, topic, false, false)).toBe('2 + 2');
+  it('returns the plain prompt for every question after the first — questionsAsked decides it, not a caller-passed flag', () => {
+    expect(firstQuestionLine(q, topic, 2, false, null)).toBe('2 + 2');
   });
 
   it('returns the plain prompt with no topic — every pool-driven mode (training, Storm, Sprint, Boss)', () => {
-    expect(firstQuestionLine(q, undefined, true, false)).toBe('2 + 2');
+    expect(firstQuestionLine(q, undefined, 1, false, null)).toBe('2 + 2');
   });
 
   it('returns the plain prompt on a "Fix my mistakes" replay, even of a topic mission\'s own first question', () => {
-    expect(firstQuestionLine(q, topic, true, true)).toBe('2 + 2');
+    expect(firstQuestionLine(q, topic, 1, true, null)).toBe('2 + 2');
+  });
+
+  /**
+   * #897 review (silent-failure-hunter): `Session.respawn()` re-poses the SAME `Question` object (a sequence
+   * card whose wave fell with nothing decided) without advancing `questionsAsked` — so question 1 respawned
+   * would otherwise read `questionsAsked === 1` a second time and announce the topic again, interrupting
+   * whatever was still speaking. `prev === q` is the respawn signature; a genuinely new question is a new object.
+   */
+  it('never repeats the announcement on a respawn of the SAME question object', () => {
+    expect(firstQuestionLine(q, topic, 1, false, q)).toBe('2 + 2');
+  });
+
+  it('still announces when the previous question is a DIFFERENT object, even with an identical prompt', () => {
+    const same = { prompt: '2 + 2', say: undefined } as unknown as Question;
+    expect(firstQuestionLine(q, topic, 1, false, same)).toBe('Number Bonds! 2 + 2');
   });
 });
