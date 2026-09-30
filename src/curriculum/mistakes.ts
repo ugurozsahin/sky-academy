@@ -11,14 +11,18 @@ import { add as fracAdd, equal as fracEqual, simplify as fracSimplify, type Frac
 export type MistakeKind = 'add' | 'sub' | 'mul';
 
 const decValue = (a: Dec): number => a.v / 10 ** a.dp;
+/** How a caller will actually show a `Dec` on a card — bare `fmt` (trims trailing fractional zeros) by
+ *  default, but a topic that always pads to a fixed width (money, "£3.10" never "£3.1") must pass its own,
+ *  since "the last printed digit" only means what a child will see when it matches that real convention. */
+export type Display = (d: Dec) => string;
 // Printed digits (sign/comma/point/£/p ignored, same as the leak-scope rule) — never the raw scaled
 // integer, which two candidates can share at different `dp` for unrelated values.
-const printedDigits = (a: Dec): string => fmt(a).replace(/[^0-9]/g, '');
-const leadDigit = (a: Dec): string => printedDigits(a)[0] ?? '';
-const lastDigit = (a: Dec): string => printedDigits(a).slice(-1);
-// How many decimal places `fmt` actually prints — never the raw `dp`, which overstates it whenever the value
-// has trailing zero fractional digits (`dec(500, 2)` is internally 2dp but prints "5", zero places).
-const printedFracLen = (a: Dec): number => { const s = fmt(a), i = s.indexOf('.'); return i === -1 ? 0 : s.length - i - 1; };
+const printedDigits = (a: Dec, display: Display): string => display(a).replace(/[^0-9]/g, '');
+const leadDigit = (a: Dec, display: Display): string => printedDigits(a, display)[0] ?? '';
+const lastDigit = (a: Dec, display: Display): string => printedDigits(a, display).slice(-1);
+// How many decimal places `display` actually prints — never the raw `dp`, which overstates it whenever the
+// value has trailing zero fractional digits (`dec(500, 2)` is internally 2dp but bare `fmt` prints "5").
+const printedFracLen = (a: Dec, display: Display): number => { const s = display(a), i = s.indexOf('.'); return i === -1 ? 0 : s.length - i - 1; };
 
 /** ×10 and ÷10 of the answer — the place-value shift a child makes reading the wrong column. */
 export const placeValueShift = (answer: Dec): Dec[] => [mulPow10(answer, 1), divPow10(answer, 1)];
@@ -117,28 +121,32 @@ function tryAdd(picked: Dec[], seen: Set<string>, d: Dec, range: Range): boolean
 const inRange = (d: Dec, range: Range) => { const v = decValue(d); return v >= range.min && v <= range.max; };
 
 /** A decoy sharing `answer`'s last printed digit: a rule candidate if one qualifies, else a fill of ±10 units
- *  of the last place `fmt` actually prints (never raw `dp`, which overstates it past a trailing zero — a
+ *  of the last place `display` actually prints (never raw `dp`, which overstates it past a trailing zero — a
  *  £5.00 answer prints "5", so its fill steps by 10, not by the 0.01 `dp` alone would suggest), preferring
  *  whichever sign stays in `range` (and, of those, whichever also keeps the leading digit) — `null`, like
  *  `fillLead`, when neither sign keeps the range and the shared last digit both, and no rule candidate does. */
-function fillLast(pool: Dec[], seen: Set<string>, answer: Dec, range: Range): Dec | null {
-  const match = pool.find(d => !seen.has(key(d)) && lastDigit(d) === lastDigit(answer));
+function fillLast(pool: Dec[], seen: Set<string>, answer: Dec, range: Range, display: Display): Dec | null {
+  const match = pool.find(d => !seen.has(key(d)) && lastDigit(d, display) === lastDigit(answer, display));
   if (match) return match;
-  const fracLen = printedFracLen(answer);
+  const fracLen = printedFracLen(answer, display);
   const fillStep = fracLen === 0 ? dec(10, 0) : dec(1, fracLen - 1);
   const plus = addDec(answer, fillStep), minus = subDec(answer, fillStep);
-  const keepsLeading = (d: Dec) => leadDigit(d) === leadDigit(answer);
-  const inR = [plus, minus].filter(d => inRange(d, range) && lastDigit(d) === lastDigit(answer));
+  const keepsLeading = (d: Dec) => leadDigit(d, display) === leadDigit(answer, display);
+  const inR = [plus, minus].filter(d => inRange(d, range) && lastDigit(d, display) === lastDigit(answer, display));
   return inR.find(keepsLeading) ?? inR[0] ?? null;
 }
 
 /** A decoy sharing `answer`'s leading digit: a rule candidate if one qualifies, else a ±`step` fill that
- *  both keeps the leading digit and stays in `range` — `null` when neither sign manages both. */
-function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number, range: Range): Dec | null {
-  const match = pool.find(d => !seen.has(key(d)) && leadDigit(d) === leadDigit(answer));
+ *  both keeps the leading digit and stays in `range` — `null` when neither sign manages both, which is every
+ *  time for a whole-number-zero answer (`leadDigit` is `'0'` only for `0` itself, so nothing else can ever
+ *  share it — not a range-width case like every other `null` here, but a permanent one; `decoysFor` does not
+ *  special-case it further, since a caller asking for the guarantee on a zero answer is asking the
+ *  unaskable, the same way `range.min > range.max` is). */
+function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number, range: Range, display: Display): Dec | null {
+  const match = pool.find(d => !seen.has(key(d)) && leadDigit(d, display) === leadDigit(answer, display));
   if (match) return match;
   const plus = addDec(answer, dec(step, answer.dp)), minus = subDec(answer, dec(step, answer.dp));
-  const keepsLeading = (d: Dec) => leadDigit(d) === leadDigit(answer) && inRange(d, range);
+  const keepsLeading = (d: Dec) => leadDigit(d, display) === leadDigit(answer, display) && inRange(d, range);
   return keepsLeading(plus) ? plus : keepsLeading(minus) ? minus : null;
 }
 
@@ -148,6 +156,13 @@ function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number, ran
  * one sharing its leading digit (a fill of `answer ± 10 units of its last printed place`, or `± step` inside
  * the leading digit when no such fill keeps it), topped up with `nearby()` only once both are met.
  *
+ * "Printed" means whatever `display` renders (bare `fmt` by default) — pass the same fixed-width renderer a
+ * money/decimal topic actually shows on the card (e.g. `d => fmt(d, {fixedDp: 2})`) so the guarantee is about
+ * the digit a child actually sees, not an internal trimmed form nobody renders. The leading-digit guarantee
+ * is unmeetable, always, when `answer` itself is a whole-number `0` — `'0'` is `0`'s own leading digit and no
+ * other integer's, a permanent limit of place-value notation, not a range-width case; `fillLead` returns
+ * `null` for it like any other unmeetable case, and this is not special-cased further.
+ *
  * Returns up to `n`, never fewer than the distinct values `range` actually has room for once the answer and
  * any dp-scale duplicates are excluded — the same bound `nearby()` itself already has for a narrow `range`,
  * inherited here rather than worked around: asking for `n` decoys from a range too small to hold them is not
@@ -155,17 +170,17 @@ function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number, ran
  * card's answer range in practice. Unlike `fracDecoys`' own numerator walk, there is no unbounded direction
  * to extend into here — `range` is the only source of new whole-number/decimal values.
  */
-export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng, range: Range, step = 1): Dec[] {
+export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng, range: Range, step = 1, display: Display = fmt): Dec[] {
   const { answer } = calc;
   const seen = new Set<string>([key(answer)]);
   const picked: Dec[] = [];
   const pool = shuffle(rng, rulesFor(kind, calc)).filter(d => key(d) !== key(answer) && decValue(d) >= range.min && decValue(d) <= range.max);
 
   // The two guarantees are reserved first, so a later slice-to-`n` never cuts them.
-  const last = fillLast(pool, seen, answer, range);
+  const last = fillLast(pool, seen, answer, range, display);
   if (last) tryAdd(picked, seen, last, range);
-  if (!picked.some(d => leadDigit(d) === leadDigit(answer))) {
-    const lead = fillLead(pool, seen, answer, step, range);
+  if (!picked.some(d => leadDigit(d, display) === leadDigit(answer, display))) {
+    const lead = fillLead(pool, seen, answer, step, range, display);
     if (lead) tryAdd(picked, seen, lead, range);
   }
 

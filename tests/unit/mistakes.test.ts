@@ -364,18 +364,48 @@ describe('mistakes (#1058): misconception decoys', () => {
       expect(leading).toBeLessThanOrEqual(0.30);
     });
 
-    // Money additions (£0.05–£9.95) through decoysFor.
+    // Money additions (£0.05–£9.95) through decoysFor. `moneyDisplay` is passed as decoysFor's own `display`,
+    // matching what the card actually renders (fixed 2dp, "£3.10" never "£3.1") — the guarantee is measured
+    // against the same string a child sees, not decoysFor's internal bare-fmt default.
+    const moneyDisplay = (d: Dec) => fmt(d, { fixedDp: 2 });
     const moneyGen: Generator = (_d, r) => {
       const a = ri(r, 5, 995), b = ri(r, 5, 995); // pence, 2dp Dec
       const answer = a + b;
       const calc = numCalc(a, b, answer, 2);
-      const decoys = decoysFor('add', calc, 3, r, { min: 0, max: 2000 }).map(d => '£' + fmt(d, { fixedDp: 2 }));
-      return { prompt: 'money fixture', answer: '£' + fmt(dec(answer, 2), { fixedDp: 2 }), options: shuffle(r, [`£${fmt(dec(answer, 2), { fixedDp: 2 })}`, ...decoys]) };
+      const decoys = decoysFor('add', calc, 3, r, { min: 0, max: 2000 }, 1, moneyDisplay).map(d => '£' + moneyDisplay(d));
+      return { prompt: 'money fixture', answer: '£' + moneyDisplay(dec(answer, 2)), options: shuffle(r, [`£${moneyDisplay(dec(answer, 2))}`, ...decoys]) };
     };
     it('money additions £0.05–£9.95: decoysFor measures ≤ 0.30 on both digits', () => {
       const { units, leading } = leakShares(moneyGen, 1, 2000);
       expect(units).toBeLessThanOrEqual(0.30);
       expect(leading).toBeLessThanOrEqual(0.30);
+    });
+
+    it('£3.10: with a fixed-2dp display, the last-digit fill matches what the card actually shows, not bare fmt', () => {
+      // bare fmt() trims £3.10 to "3.1" (last digit '1'); the money display convention shows "£3.10" (last
+      // digit '0') — decoysFor must guarantee against whichever `display` it's told the card actually uses.
+      const calc = numCalc(155, 155, 310, 2);
+      for (let seed = 1; seed <= 50; seed++) {
+        const ds = decoysFor('add', calc, 3, rng(seed), { min: 0, max: 50 }, 1, moneyDisplay).map(moneyDisplay);
+        const lastDigits = ds.map(s => s.replace(/[^0-9]/g, '').slice(-1));
+        expect(lastDigits, `seed ${seed}: no decoy shares £3.10's displayed last digit`).toContain('0');
+      }
+    });
+
+    it('a whole-number-zero answer never crashes; the leading-digit guarantee is honestly unmet, not faked', () => {
+      // '0' is 0's own leading digit and no other integer's — the only guarantee case that fails at every
+      // range width, not just a narrow one. decoysFor must still return n sane, in-range, non-duplicate values.
+      const r = rng(1);
+      for (let i = 0; i < 50; i++) {
+        const ds = decoysFor('sub', numCalc(6, 6, 0), 3, r, { min: -50, max: 50 });
+        const vals = ds.map(d => d.v / 10 ** d.dp);
+        expect(new Set(vals).size, `draw ${i}: duplicate among ${vals}`).toBe(vals.length);
+        for (const v of vals) {
+          expect(v, `draw ${i}: decoy equals the answer`).not.toBe(0);
+          expect(v).toBeGreaterThanOrEqual(-50);
+          expect(v).toBeLessThanOrEqual(50);
+        }
+      }
     });
   });
 });
