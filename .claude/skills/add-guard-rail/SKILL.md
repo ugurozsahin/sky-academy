@@ -38,6 +38,10 @@ which of the three only if they go and read it.
 | `tests/unit/british.test.ts` | game wording (#47) |
 | a job in `.github/workflows/ci.yml` | what is not in the tree the tests read — the head branch name (#160) |
 
+**Three of these files are full** (#1388): `guardrails`, `governance` and `workflows` are frozen at their length, so an added
+line fails `lint-ratchet.test.ts`. A new rail goes in a sibling file, `tests/unit/<home>-<topic>.test.ts`, reading the sources
+through `tests/unit/helpers/sources.ts`; the table says what it is *for*, not which file it must be in.
+
 The one that cannot work here: **a CSS rail written in Vitest passes vacuously.** Vite's css plugin returns an
 empty string for `?raw` and `?inline` outside the browser, so the rail reads nothing and goes green for ever.
 CSS rails live in the e2e spec, and the header comment of `guardrails.test.ts` says so where an author will

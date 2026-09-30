@@ -7,7 +7,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // The lint ratchet (#1381, per function since #1387, tests since #1388). `eslint.config.js` sets a base limit for `complexity` and
 // `max-lines-per-function` in `src/` and freezes each function that is over today, keyed `file::name`, at its size. A
 // name that occurs twice among a file's over-base functions is `name#1`, `name#2` by line; a function with none is `(anonymous)`. This rail
-// keeps the table honest (`tests/unit/` gets `complexity` only; its file length is the `fileLines` table, below): an entry must equal that function's real size (a number here only ever goes DOWN), a
+// keeps the table honest (`tests/unit/` gets `complexity` only; the file length of `src/` and `tests/unit/` is the `fileLines` table, below): an entry must equal that function's real size (a number here only ever goes DOWN), a
 // function that is gone or under the base has no entry, and a function over the base without one fails.
 type Kind = 'complexity' | 'lines';
 const KINDS: Kind[] = ['complexity', 'lines'];
@@ -72,19 +72,25 @@ describe('lint ratchet (#1381, #1387)', () => {
     });
   }
 
-  const testFiles = (dir: string): string[] => readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? testFiles(join(dir, e.name)) : e.name.endsWith('.ts') ? [join(dir, e.name)] : []);
+  const tsFiles = (dir: string): string[] => readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? tsFiles(join(dir, e.name)) : e.name.endsWith('.ts') ? [join(dir, e.name)] : []);
+  const FILE_DIRS = ['src', 'tests/unit'];
+  const fileLinesOf = () => FILE_DIRS.flatMap(tsFiles);
   const length = (file: string) => readFileSync(join(ROOT, file), 'utf8').split('\n').length - 1;
 
   it.each(Object.entries(table.fileLines))('fileLines: %s is frozen at its real length, %i', (file, frozen) => {
-    const now = testFiles('tests/unit').includes(file) ? length(file) : undefined;
+    const now = fileLinesOf().includes(file) ? length(file) : undefined;
     expect(now, `${file} is gone or renamed: delete or rename its fileLines entry`).toBeDefined();
-    expect(frozen, `${file} is now ${now} lines: lower the entry to ${now}, and never raise it`).toBe(now);
+    expect(frozen, now! > frozen
+      ? `${file} grew to ${now} lines and a frozen file cannot grow: ${file.startsWith('src/')
+        ? 'move the code you added to a new file, in a folder named for the module (guardrails.md, "a frozen src file")'
+        : 'move the tests you added to a new tests/unit/*.test.ts'}, and leave the entry at ${frozen}`
+      : `${file} shrank to ${now} lines: lower the entry to ${now}`).toBe(now);
     expect(frozen).toBeGreaterThan(table.base.fileLines);
   });
 
-  it('fileLines: no test file over the base length is missing from the table', () => {
-    const missing = testFiles('tests/unit').filter((f) => length(f) > table.base.fileLines && !(f in table.fileLines));
-    expect(missing, `over ${table.base.fileLines} lines: put new tests in a new file, do not add an entry`).toEqual([]);
+  it('fileLines: no src or test file over the base length is missing from the table', () => {
+    const missing = fileLinesOf().filter((f) => length(f) > table.base.fileLines && !(f in table.fileLines));
+    expect(missing, `over ${table.base.fileLines} lines: put the new code or tests in a new file, do not add an entry`).toEqual([]);
   });
 });

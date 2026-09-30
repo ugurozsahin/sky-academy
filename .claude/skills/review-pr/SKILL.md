@@ -27,6 +27,7 @@ first makes you a proof-reader of the author's plan instead of a check on it.
 
 ```
 npx tsc --noEmit
+npm run lint
 npm test
 npm run build
 ```

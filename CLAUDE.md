@@ -11,7 +11,7 @@ Vite + vanilla TypeScript (no framework), canvas arena, DOM HUD, localStorage. V
 - `src/curriculum/` — `types.ts` (Question/Topic, YEARS), `reception.ts`/`year1.ts`/`year2.ts` (pure generators `(difficulty, rng) => Question`), `util.ts` (shared ones, numQ/wordQ…), `index.ts` (registry). NC map: `docs/CURRICULUM.md`.
 - `src/game/` — `arena.ts` (bubbles, slicing, particles), `session.ts` (stages/lives/score, pure logic), `tracing.ts` (letter tracing).
 - `src/ui/` — `avatar.ts`, `home.ts` (mapScreen = islands, islandScreen = topics), `play.ts` (HUD + overlays + `window.__sna` test hooks), `visuals.ts` (ten-frames, coins, clocks…), `dom.ts`.
-- `src/avatars.ts` (roster, `fx` element style, praise lines; art in `public/avatars/*.webp`), `src/audio.ts` (synth SFX + speech), `src/storage.ts`, `src/style.css`.
+- `src/avatars.ts` (roster, `fx` element style, praise lines; art in `public/avatars/*.webp`), `src/audio.ts` (synth SFX + speech), `src/storage/`, `src/style.css`.
 - `tests/unit/*.test.ts`, `tests/e2e/game.spec.ts`, `scripts/` (screenshots, single-file bundle, art extraction).
 
 ## Rules
