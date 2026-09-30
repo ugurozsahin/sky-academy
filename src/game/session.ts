@@ -70,7 +70,7 @@ export interface DeckItem { topic: Topic; q: Question }
  * whether or not the boss still has HP left — nothing pairs `deck` with `mode: 'boss'` today, so this is stated
  * rather than tested, the same way the rest of this comment is.
  */
-export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; deck?: DeckItem[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean }
+export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; deck?: DeckItem[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean; slower?: boolean }
 
 /**
  * The "Fix my mistakes" deck (#930): the 5 most recent misses, newest first — `misses` is already newest-last
@@ -106,7 +106,7 @@ export class Session {
   }
   /** The behaviour table entry for this run's mode (#26). */
   get spec(): ModeSpec { return MODES[this.o.mode]; }
-  private get ctx(): ModeCtx { return { year: this.o.year, stage: this.stage, questionsAsked: this.questionsAsked, sequence: !!this.current?.sequence, slow: !!this.current?.slow, enraged: this.enraged }; }
+  private get ctx(): ModeCtx { return { year: this.o.year, stage: this.stage, questionsAsked: this.questionsAsked, sequence: !!this.current?.sequence, slow: !!this.current?.slow, slower: !!this.o.slower, enraged: this.enraged }; }
   get perStage() { return this.o.year.perStage; }
   get secondsLeft() { return Math.ceil(this.timeLeft / 1000); }
   get difficulty(): Difficulty { return this.spec.difficulty(this.ctx); }

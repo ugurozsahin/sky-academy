@@ -88,7 +88,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
   const playSession = createPlaySession({
-    mode: o.mode, year: o.year, topic: o.topic, deck: o.deck, practice: o.practice,
+    mode: o.mode, year: o.year, topic: o.topic, deck: o.deck, practice: o.practice, slower: d.settings.slow,
     pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
   }, {
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,

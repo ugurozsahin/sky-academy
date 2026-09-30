@@ -326,6 +326,20 @@ describe('settingsHTML marks the stored 3-D value as checked (#904)', () => {
   });
 });
 
+describe('settingsHTML marks the stored "Slower bubbles" value as checked (#905)', () => {
+  it.each([false, true])('marks %s as checked and the other option off', (stored) => {
+    const html = settingsHTML('auto', stored);
+    for (const [v, on] of [['off', !stored], ['on', stored]] as const) {
+      const btn = new RegExp(`<button class="tab${on ? ' on' : ''}" data-slow="${v}" role="radio" aria-checked="${on}">`);
+      expect(html, `${v} must ${on ? '' : 'not '}be marked checked`).toMatch(btn);
+    }
+  });
+  it('defaults to the stored save value when no explicit argument is passed', () => {
+    save({ settings: { slow: true } });
+    expect(settingsHTML()).toMatch(/<button class="tab on" data-slow="on"/);
+  });
+});
+
 describe('slipsHTML (#938): the "Recent slips" section\'s markup', () => {
   const row = (over: Partial<SlipRow> = {}): SlipRow => ({ icon: '➕', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29', ...over });
   it('an empty list shows the empty-state line, not a list', () => {

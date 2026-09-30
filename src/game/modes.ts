@@ -12,6 +12,7 @@ export interface ModeCtx {
   questionsAsked: number;
   sequence: boolean;        // the current question is a spelling/sentence sequence (a touch slower)
   slow: boolean;            // the current question is flagged `slow` by its generator — several mental steps (#297)
+  slower: boolean;          // the child's own "Slower bubbles" accessibility setting is on (#905)
   enraged: boolean;         // boss on its last 3 HP
 }
 /** What a finished run scored — used to award end-stars and coins. */
@@ -53,7 +54,18 @@ export interface ModeSpec {
 // The floor is 1 for Year 1/Year 2, whose slowest table entry is 1 — but Reception's gentle-float 0 (#700)
 // is slower still, so a gentle year's floor drops to 0 or a sequence/slow question at Reception's own
 // floor would ease to a FASTER flight than the plain question beside it, the opposite of what easing means.
-const eased = (c: ModeCtx, s: number) => c.sequence || c.slow ? Math.max(c.year.gentle ? 0 : 1, s - 1) : s;
+//
+// The "Slower bubbles" accessibility setting (#905) is a second, independent step: it always applies (on top
+// of a sequence/slow question's own step, never instead of it) and its own floor is 0 in every year, not just
+// gentle ones — the setting exists precisely so a non-gentle year can reach Reception's gentle-float speed
+// when a child needs it, which a floor of 1 would refuse.
+const eased = (c: ModeCtx, s: number) => {
+  const out = c.sequence || c.slow ? Math.max(c.year.gentle ? 0 : 1, s - 1) : s;
+  return c.slower ? Math.max(0, out - 1) : out;
+};
+// Sky Storm's own one-step drop for "Slower bubbles" — it never goes through `eased()` (see the comment
+// above), so it gets the same floor-0 treatment inline instead.
+const slowerStep = (c: ModeCtx, s: number) => c.slower ? Math.max(0, s - 1) : s;
 
 // Endless and Boss share the same "ramp on questions answered" points curve.
 const rampPoints = (c: ModeCtx) => 10 + Math.min(20, Math.floor(c.questionsAsked / 5) * 5);
@@ -74,7 +86,7 @@ export const MODES: Record<Mode, ModeSpec> = {
     id: 'endless', title: 'Sky Storm', overHeadingWon: 'Storm over!', overHeadingLost: 'Storm over!',
     hasLives: true, staged: false, timed: false, boss: false, villain: true,
     difficulty: c => c.questionsAsked < 8 ? 1 : c.questionsAsked < 20 ? 2 : 3,
-    speed: c => { const s = c.questionsAsked < 10 ? 1 : c.questionsAsked < 25 ? 2 : 3; return c.year.gentle ? Math.min(2, s) : s; },
+    speed: c => { const s = c.questionsAsked < 10 ? 1 : c.questionsAsked < 25 ? 2 : 3; return slowerStep(c, c.year.gentle ? Math.min(2, s) : s); },
     basePoints: rampPoints,
     stars: c => c.score >= 300 ? 3 : c.score >= 150 ? 2 : c.score >= 50 ? 1 : 0,
     coins: c => baseCoins(c) + Math.floor(c.score / 10),
