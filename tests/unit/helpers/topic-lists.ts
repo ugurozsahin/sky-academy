@@ -51,13 +51,15 @@ export const Y2_GENS: Record<string, Topic['gen']> = {
  * alone decides the on-screen width, and restoring the old derivation there leaves this suite green.
  * Closing that needs a check of a different shape, which #482 carries.
  *
- * `r-build` d2's decoys are near-miss spellings of the answer too, the same structural reason `r-build`
- * d3 is already here — d2 only stayed off the list because a smaller `CVC` pool makes an overlap less
- * likely at this seed and `DRAWS`, and #874 shrank it by four words (the wrongly-pictured entries).
+ * `r-build` d3's decoys are near-miss spellings of the answer too, the same structural reason `r-build`
+ * d2 used to be here — d2 stayed off the list only because a smaller `CVC` pool made an overlap less
+ * likely at this seed and `DRAWS`; #874 shrank it by four words and #875 by one more (`log`, Emoji 13.0
+ * with no floor-compliant picture), which was enough to make an overlap land at this seed. d2 now
+ * compares, so it came off; d3's own pool is still small enough to stay blind.
  */
 export const NO_REPEATED_SET = new Set([
 'r-order d1', 'r-order d2', 'r-order d3', 'r-share d2', 'r-share d3',
-'r-build d2', 'r-build d3', 'r-sentence d1', 'r-sentence d2', 'r-sentence d3',
+'r-build d3', 'r-sentence d1', 'r-sentence d2', 'r-sentence d3',
 'y1-skip d1', 'y1-skip d2', 'y1-skip d3', 'y1-order d1', 'y1-order d2', 'y1-order d3',
 'y1-coins d3', 'y1-shapes d3', 'y1-plurals d1', 'y1-punct d1', 'y1-days d3',
 'y1-sentence d1', 'y1-sentence d2', 'y1-sentence d3',
