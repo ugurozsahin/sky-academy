@@ -141,6 +141,12 @@ async function swipeAnswer(page: Page) {
 }
 const answer = (page: Page) => page.evaluate(() => window.__sna.answer());
 const waitForTarget = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s || s.waiting) return false; const c = window.__sna.session.current; const label = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; return window.__sna.bubbles().some((b: any) => b.label === label); }, null, { timeout: 20000 });
+/**
+ * Like `waitForTarget`, but for an any-order card (#926): the next slice can be any of the remaining
+ * targets, not `sequence[seqIndex]` — `waitForTarget`'s own check would keep waiting on the first target
+ * even after it is gone, once a later slice removes it from `session.remaining()` but not from `sequence`.
+ */
+const waitForAnyOrderTarget = (page: Page) => page.waitForFunction(() => { const s = window.__sna; if (!s || s.state().waiting) return false; const label = s.session.remaining()[0]; return label !== undefined && s.bubbles().some((b: any) => b.label === label); }, null, { timeout: 20000 });
 const state = (page: Page) => page.evaluate(() => window.__sna.state());
 /**
  * Bring up a Sky Storm wave carrying a TNT. Bombs ride every third question (`play-session.ts`), but never a
@@ -4663,4 +4669,36 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     expect(await page.locator('#vis canvas').count()).toBe(0);
     expect(chunks).toEqual([]);
   });
+
+});
+
+// #926, the first topic to draw an "any-order" card (#918/#919): the prompt stays on screen while targets
+// are found in any order, and slicing every target — via the same `answer()` hook an ordered sequence
+// uses — completes the card and raises the score, exactly as #919's "no topic uses this yet" left to prove.
+test('y2-oddeven "Slice Them All": every target sliced in any order completes the card and scores (#926)', async ({ page }) => {
+  await seedPlayer(page);
+  await startTopic(page, 'year2', 'y2-oddeven');
+  // d2 draws the any-order form about 1 card in 3 (#926) — never guaranteed on the first try, so redraw the
+  // current question (the same `s.stage = …; s.index = 0; s.nextQuestion()` hook other tests jump difficulty
+  // with) until one lands; (2/3)^60 is astronomically unlikely to exhaust this loop on a real draw.
+  const q = await page.evaluate(() => {
+    const s = window.__sna.session;
+    s.stage = 2; s.index = 0;
+    for (let i = 0; i < 60; i++) { s.nextQuestion(); if (s.current!.anyOrder) break; }
+    return { anyOrder: !!s.current!.anyOrder, prompt: s.current!.prompt, targetCount: s.current!.sequence!.length };
+  });
+  expect(q.anyOrder, 'an any-order y2-oddeven card never drew in 60 tries at d2').toBe(true);
+  expect(q.prompt).toMatch(/^Slice every (even|odd) number$/);
+  // The instruction stays on the card with a `.seq` progress run after it (#919), not replaced by it —
+  // unlike an ordered spelling sequence, so this checks the prompt text is still there rather than an exact
+  // `.prompt` match, which would also see the "found so far" blanks/letters that run carries.
+  await expect(page.locator('.prompt')).toContainText(q.prompt);
+  await expect(page.locator('.prompt .seq')).toBeVisible();
+  await expectFitsViewport(page, `y2-oddeven any-order card ("${q.prompt}")`);
+  const scoreBefore = await page.evaluate(() => window.__sna.session.score);
+  for (let i = 0; i < q.targetCount; i++) {
+    await waitForAnyOrderTarget(page);
+    expect(await answer(page)).toBe(true);
+  }
+  await expect.poll(() => page.evaluate(() => window.__sna.session.score)).toBeGreaterThan(scoreBefore);
 });
