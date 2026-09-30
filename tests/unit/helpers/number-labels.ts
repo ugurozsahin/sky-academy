@@ -20,6 +20,7 @@ export interface LabelProblemsOpts {
 }
 
 interface Span { start: number; end: number }
+interface CoordinateSpan extends Span { components: [string, string] }
 
 const PLAIN_COMPONENT_RE = /^[-−]?\d+(?:\.\d+)?$/;
 
@@ -35,9 +36,13 @@ const PLAIN_COMPONENT_RE = /^[-−]?\d+(?:\.\d+)?$/;
  * instead (finding 6). A sign, a decimal point, or whitespace next to the comma never appears inside a
  * single written number at all, so any of those settles it as a pair outright, however long `b` is (findings
  * 1, 3, 4, 5 — a coordinate component is not bounded to 3 digits the way a thousands group is).
+ *
+ * Being a genuine pair only settles what the *separating* comma means; it is not a verdict on either
+ * component's own formatting (review round 7) — `coordinateComponentProblems`, below, is what still checks
+ * that.
  */
-function findCoordinateSpans(text: string): Span[] {
-  const spans: Span[] = [];
+function findCoordinateSpans(text: string): CoordinateSpan[] {
+  const spans: CoordinateSpan[] = [];
   for (const m of text.matchAll(/\(([^()]*)\)/g)) {
     const rawParts = m[1].split(',');
     if (rawParts.length !== 2) continue;
@@ -48,9 +53,28 @@ function findCoordinateSpans(text: string): Span[] {
     const hasSignOrDecimal = /[-−.]/.test(a) || /[-−.]/.test(b);
     const bLooksLikeAGroup = b.replace(/^[-−]/, '').length <= 3;
     if (!hasWhitespace && !hasSignOrDecimal && !bLooksLikeAGroup) continue; // "(1,2345)" — one number, not a pair
-    spans.push({ start: m.index, end: m.index + m[0].length });
+    spans.push({ start: m.index, end: m.index + m[0].length, components: [a, b] });
   }
   return spans;
+}
+
+/**
+ * A coordinate component is never subject to the multi-group comma-*position* rule — the split above
+ * already guarantees it carries no comma of its own to misplace — but it still owes the one rule that
+ * applies to any number regardless of context: 4 or more digits needs a comma (review round 7). Every
+ * round through the sixth treated "is this genuinely a pair" as the whole question and, once it answered
+ * yes, exempted both components from every check `labelProblems` exists to run — silently, for anything
+ * sitting in parens next to a comma, however long either side was.
+ */
+function coordinateComponentProblems(spans: CoordinateSpan[]): string[] {
+  const problems: string[] = [];
+  for (const { components } of spans) {
+    for (const c of components) {
+      const digits = c.replace(/^[-−]/, '').split('.')[0];
+      if (digits.length >= 4) problems.push(`"${c}" is four or more digits with no comma grouping`);
+    }
+  }
+  return problems;
 }
 
 interface NumberToken {
@@ -165,6 +189,10 @@ export function labelProblems(text: string, opts: LabelProblemsOpts = {}): strin
   for (const m of text.matchAll(/\d+(?: \d{3})+/g)) {
     problems.push(`"${m[0]}" groups digits with a space, not a comma`);
   }
+
+  // A coordinate's own components, each checked for the one rule that survives being read as a pair
+  // (review round 7) — see coordinateComponentProblems' own comment.
+  problems.push(...coordinateComponentProblems(findCoordinateSpans(text)));
 
   // Every standalone number token (a coordinate's two components are excluded before this point — see
   // scanTokens), judged for grouping.

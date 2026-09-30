@@ -130,8 +130,10 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
   it('a coordinate with a sign or a decimal-tailed component is still recognised as one (review round 5)', () => {
     // "(−3,4500)" — the round-3 coordinate check looked at the character right before the digit run, which
     // is the sign for a negative first component, not "(". "(19,99.5)" — the "after" check expected ")"
-    // right after the integer part, but a decimal point sits there instead. Both are ordinary coordinates.
-    expect(labelProblems('(−3,4500)')).toEqual([]);
+    // right after the integer part, but a decimal point sits there instead. Both are ordinary coordinates,
+    // still correctly read as a pair (no "grouped incorrectly" comma-position message) — "4500" itself
+    // being 4 digits is a separate, later-found gap (review round 7, its own test below).
+    expect(labelProblems('(−3,4500)')).toEqual(['"4500" is four or more digits with no comma grouping']);
     expect(labelProblems('(19,99.5)')).toEqual([]);
   });
 
@@ -166,12 +168,18 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
   it('a coordinate component may itself be signed, decimal-tailed or spaced from the comma (review round 6)', () => {
     // A coordinate's two components are pulled out as a pair before either is judged individually — a sign
     // or a decimal on one component, or whitespace anywhere near the comma, settles "this is a pair, not
-    // one mis-grouped number" outright, whatever the other component's own shape.
-    expect(labelProblems('(12,−1000)')).toEqual([]); // a sign on a non-first component
-    expect(labelProblems('(3.5,1000)')).toEqual([]); // a decimal tail on a non-last component
-    expect(labelProblems('(−12,−1000)')).toEqual([]); // both components signed
-    expect(labelProblems('(3, 4500)')).toEqual([]); // a space after the comma
-    expect(labelProblems('(12 ,1000)')).toEqual([]); // a space before the comma
+    // one mis-grouped number" outright, whatever the other component's own shape. Each component still
+    // owes its own "4+ digits needs a comma" check once it's read as a pair member (round 7, below) — these
+    // five all happen to have a 4-digit component, so each now reports exactly one problem, on that
+    // component, rather than the `[]` round 6 alone established (a real gap round 7 found and this closes).
+    expect(labelProblems('(12,−1000)')).toEqual(['"−1000" is four or more digits with no comma grouping']);
+    expect(labelProblems('(3.5,1000)')).toEqual(['"1000" is four or more digits with no comma grouping']);
+    expect(labelProblems('(−12,−1000)')).toEqual(['"−1000" is four or more digits with no comma grouping']);
+    expect(labelProblems('(3, 4500)')).toEqual(['"4500" is four or more digits with no comma grouping']);
+    expect(labelProblems('(12 ,1000)')).toEqual(['"1000" is four or more digits with no comma grouping']);
+    // Still correctly read as a pair at all, not a single number: no "grouped incorrectly" comma-position
+    // message, which is what a misread as one number would have produced instead.
+    expect(labelProblems('(3, 4500)')[0]).not.toMatch(/grouped incorrectly/);
   });
 
   it('money in parentheses is still money, not a coordinate (review round 6)', () => {
@@ -194,9 +202,29 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
   it('a coordinate mis-split does not corrupt an unrelated standalone year (review round 6)', () => {
     // Confirms scanTokens' exclusion is a hard boundary: nothing inside a detected coordinate span ever
     // reaches the ordinary token scan, so it cannot collide with occurrence counting for a real year
-    // elsewhere in the same text, however the coordinate's own components are shaped.
+    // elsewhere in the same text, however the coordinate's own components are shaped. The coordinate's own
+    // "−1000" component still gets its own comma-length check (review round 7); only the year exemption is
+    // what's confirmed unaffected here.
     expect(labelProblems('The point (12,−1000) marks the spot founded in 1000.', { years: [1000] }))
-      .toEqual([]);
+      .toEqual(['"−1000" is four or more digits with no comma grouping']);
+  });
+
+  it('a coordinate component still owes its own "4+ digits needs a comma" check (review round 7)', () => {
+    // Being read as a genuine pair only settles what the separating comma means; it says nothing about
+    // either component's own formatting. Every one of these was `[]` before round 7 — silently exempted
+    // just for sitting in parens next to a comma, whichever signal made the pair-classification correct.
+    expect(labelProblems('Plot the point (12345,400) on the grid.'))
+      .toEqual(['"12345" is four or more digits with no comma grouping']);
+    expect(labelProblems('(3, 12345)')).toEqual(['"12345" is four or more digits with no comma grouping']);
+    expect(labelProblems('(3.5,12345)')).toEqual(['"12345" is four or more digits with no comma grouping']);
+    // "(1234,567)" is still correctly read as a pair (b="567" is short), but a itself is malformed — the
+    // fix that closes this also closes the narrower classification asymmetry finding 1 named separately.
+    expect(labelProblems('(1234,567) marks it.')).toEqual(['"1234" is four or more digits with no comma grouping']);
+    // Controls: unaffected cases stay exactly as before.
+    expect(labelProblems('The crowd numbered 2345 that day.'))
+      .toEqual(['"2345" is four or more digits with no comma grouping']); // unparenthesised: already worked
+    expect(labelProblems('The point (400,12345) on the grid.'))
+      .toEqual(['"400,12345" is grouped incorrectly — commas must mark exact groups of three digits']); // never classified as a pair at all (b is 4+ digits, no sign/decimal/space) — read as one number, as before
   });
 
   it('a list of correctly-grouped numbers never trips the space-grouping check (review round 1)', () => {
