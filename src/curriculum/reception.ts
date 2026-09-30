@@ -116,8 +116,9 @@ const rShare: Generator = (d, rng) => {
  * Reception odds and evens (#299 slice 1) — "evens and odds", by pairing rather than by the ×2 rule.
  *
  * A Reception child meets odd and even as "can everyone find a partner?", so d1–d2 ask exactly that and
- * answer `yes`/`no`; only d3 puts the words `odd`/`even` on the bubbles, which is the vocabulary Year 2's
- * `y2-oddeven` then assumes. Numbers stay ≤ 10 (≤ 6 at d1) per the ELG's "within numbers up to 10".
+ * answer `✅`/`❌` (#898 — a pre-reader cannot read `yes`/`no`); only d3 puts the words `odd`/`even` on the
+ * bubbles, which is the vocabulary Year 2's `y2-oddeven` then assumes. Numbers stay ≤ 10 (≤ 6 at d1) per the
+ * ELG's "within numbers up to 10".
  *
  * No new visual, per the slice: the `objects` five-frames show the quantity and the `hint` carries the
  * pairing ("put them in twos"). A frame that drew the pairs would answer the question in the picture.
@@ -127,7 +128,7 @@ const rOddEven: Generator = (d, rng) => {
   const even = n % 2 === 0;
   const visual = { type: 'objects', emoji: pick(rng, OBJECTS), n } as const;
   if (d === 3) return wordQ(rng, `${n} — odd or even?`, even ? 'even' : 'odd', ['odd', 'even'], { visual, hint: 'Put them in twos', hintIsData: false, say: `Is ${n} odd or even?` });
-  return wordQ(rng, 'Can they all find a partner?', even ? 'yes' : 'no', ['yes', 'no'], { visual, hint: 'Put them in twos', hintIsData: false, say: `There are ${n}. Can they all find a partner?` });
+  return wordQ(rng, 'Can they all find a partner?', even ? '✅' : '❌', ['✅', '❌'], { visual, hint: 'Put them in twos', hintIsData: false, say: `There are ${n}. Can they all find a partner?` });
 };
 const rOrder: Generator = (d, rng) => orderQ(rng, d === 1 ? 5 : 10, 3);
 const rBalance: Generator = (d, rng) => {
