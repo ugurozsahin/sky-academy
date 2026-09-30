@@ -1,17 +1,41 @@
-// Spoken forms for KS2 notation (#1057). A speech engine reads written maths wrong, or gives the answer
-// away — "3/4" can sound like a date, "3.75" like "three seventy-five", "XIV" like the answer on a card
-// that asks what XIV means. `ks2Say` turns it into words a teacher would say; `sayIsSafe` proves none of
-// it is left. `util.ts` (its own line cap) stays untouched: `symSay`'s operator words still run, but only
-// over the plain characters the tokenizer below leaves as ordinary text — never over a notation span.
+// Spoken forms for KS2 notation (#1057). A speech engine reads written maths wrong — "3/4" can sound like
+// a date, "3.75" like "three seventy-five". `ks2Say` turns it into words a teacher would say; `sayIsSafe`
+// proves none of it is left. `util.ts` (its own line cap) stays untouched: `symSay`'s operator words still
+// run, but only over the plain characters the tokenizer below leaves as ordinary text — never over a
+// notation span.
 //
 // Both functions walk the same left-to-right tokenizer (`tokenize`) instead of two hand-maintained regex
-// sets. Six review rounds on PR #1430 found a recurring class of bug: a `ks2Say` conversion pass and the
-// `sayIsSafe` check meant to catch what it missed disagreed about where one piece of notation ends and
-// the next begins, because each was a separate regex free to define "adjacent" its own way. A shared
-// tokenizer removes the seam — `ks2Say` renders every non-prose token it finds, `sayIsSafe` fails whenever
-// one is left un-rendered — so the two structurally cannot drift apart, unlike the six rounds of
-// independently-drifting regexes they replace.
-import { fromRoman } from './roman';
+// sets. Six review rounds on PR #1430 found a recurring class of bug in the pre-tokenizer design: a
+// `ks2Say` conversion pass and the `sayIsSafe` check meant to catch what it missed disagreed about where
+// one piece of notation ends and the next begins, because each was a separate regex free to define
+// "adjacent" its own way. A shared tokenizer removes that seam — `ks2Say` renders every non-prose token it
+// finds, `sayIsSafe` fails whenever one is left un-rendered.
+//
+// **Roman numerals are out of scope here, moved to a follow-up issue (#1463).** They were in the original
+// ask and are documented in that issue rather than this file's own header from here on: rounds 4 through
+// 10 found nine defects in Roman-numeral detection alone — a textual "was this glued to something" or "was
+// this already rendered by ks2Say" heuristic keeps colliding with real KS2 prose, because the vocabulary a
+// heuristic like this has to recognise ("Roman numeral", a bare letter) is simultaneously the rendered
+// output and ordinary English a card can legitimately use. Round 10's own finding — `sayIsSafe("The Roman
+// numeral V equals which number?")` reads `true` on genuinely raw, unconverted text, because the phrase
+// "Roman numeral V" is real prose as often as it is ks2Say's own rendering — has no small fix: distinguishing
+// the two needs `ks2Say` to hand back which spans it produced (a structural change, not a tenth pattern).
+// Every other notation kind here (units, fractions, decimals, times, the "N-D shape" idiom) has been stable
+// since round 2; landing those now rather than a further Roman-numeral patch is round 9 and round 10's own
+// recommendation, independently arrived at twice.
+//
+// Two residual traps for whoever picks up #1463 — self-review found both, neither reachable today (no
+// generator produces Roman-numeral text yet; `grep -rn "fromRoman" src/curriculum` outside roman.ts itself
+// returns nothing, and the one planned slot, `year3-measure.ts`'s `// slot: y3-roman`, is an empty
+// placeholder). First: a canonical Roman numeral built entirely from unit-code letters case-insensitively
+// ("CM" = 900, "MM" = 2000, "L" = 50) is silently misread as the unit instead ("centimetres",
+// "millimetres", "litres") — unit-code matching (round 7) already ran before Roman detection ever did, so
+// this collision predates this removal; it was simply masked before by every *other* Roman numeral
+// converting correctly through the now-removed branch. Second: a Roman-numeral-shaped fragment glued
+// directly to a real unit with no space ("Xkgcm", "kgX") now fails `decomposeUnits` at the first
+// non-unit-code letter and falls through as one opaque, unconverted `text` token — silently losing the
+// *unit* conversion too, not just the Roman half. Both need `ks2Say` to know about Roman numerals again to
+// fix, so both belong with #1463 rather than a patch here.
 import { symSay, UNIT_WORD } from './util';
 
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
@@ -89,22 +113,21 @@ const EXTRA_UNIT_WORD: Record<string, string> = {
 const unitWord = (u: string): string => EXTRA_UNIT_WORD[u] ?? UNIT_WORD[u] ?? u;
 // A multi-letter unit code is unambiguous wherever it stands alone (no ordinary KS2 word is exactly "kg"
 // or "cm²"), so it is always notation. "m"/"g"/"l" alone are also real algebra variables, so they only
-// count as notation touching a digit or a Roman numeral — see `singleLetterUnitOK`.
+// count as notation immediately after a digit — see `singleLetterUnitOK`.
 const MULTI_LETTER_UNITS = new Set(['cm²', 'm²', 'km', 'mm', 'ml', 'mg', 'kg', 'cm']);
 const SINGLE_LETTER_UNITS = new Set(['m', 'g', 'l']);
-const singleLetterUnitOK = (text: string, start: number): boolean => /(?:[0-9]|[IVXLCDM]) ?$/.test(text.slice(0, start));
+const singleLetterUnitOK = (text: string, start: number): boolean => /[0-9] ?$/.test(text.slice(0, start));
 
-type TokKind = 'text' | 'digit' | 'dimension' | 'mixedFraction' | 'fraction' | 'time' | 'decimal' | 'roman' | 'unit';
+type TokKind = 'text' | 'digit' | 'dimension' | 'mixedFraction' | 'fraction' | 'time' | 'decimal' | 'unit';
 interface Tok { readonly kind: TokKind; readonly start: number; readonly end: number; readonly raw: string; readonly spoken: string; }
 // Everything but plain prose and a bare digit run (out of scope on its own — "347 + 128 = ?" is meant to
 // stay "347") is a span `ks2Say` must render and `sayIsSafe` must never find un-rendered.
-const NOTATION: ReadonlySet<TokKind> = new Set(['dimension', 'mixedFraction', 'fraction', 'time', 'decimal', 'roman', 'unit']);
+const NOTATION: ReadonlySet<TokKind> = new Set(['dimension', 'mixedFraction', 'fraction', 'time', 'decimal', 'unit']);
 
 // Longest code first, so "cm²"/"cm" aren't mistaken for a shorter prefix of themselves.
 const UNIT_CODES_LONGEST_FIRST = [...MULTI_LETTER_UNITS, ...SINGLE_LETTER_UNITS].sort((a, b) => b.length - a.length);
-/** Greedily splits `s` into known unit codes with nothing left over — "kgcm" -> ["kg","cm"], the chain a
- *  Roman-numeral prefix can be glued to with no separators at all ("Xkgcm", PR #1430 round 3). Returns
- *  `null` the moment a position matches no code, so an ordinary word ("Divide", "Circle" — neither has a
+/** Greedily splits `s` into known unit codes with nothing left over — "kgcm" -> ["kg","cm"]. Returns `null`
+ *  the moment a position matches no code, so an ordinary word ("Divide", "Circle" — neither has a
  *  lower-case remainder built entirely out of unit-code fragments) is never mistaken for one. */
 function decomposeUnits(s: string): string[] | null {
   const lower = s.toLowerCase(); // match case-insensitively; keep `s`'s own casing in the pushed slices
@@ -119,64 +142,16 @@ function decomposeUnits(s: string): string[] | null {
   return out;
 }
 
-const romanTok = (raw: string, start: number): Tok =>
-  ({ kind: 'roman', start, end: start + raw.length, raw, spoken: `Roman numeral ${raw.split('').join(', ')}` });
 // `raw` keeps whatever case the input used (so the token's span still matches the source text exactly);
 // the word lookup always runs on the lower-cased form, since `unitWord`'s tables are lower-case keyed and
 // a capitalised unit code ("KG", "5 CM") is ordinary label text, not a different unit (PR #1430 round 7).
 const unitTok = (raw: string, start: number): Tok => ({ kind: 'unit', start, end: start + raw.length, raw, spoken: unitWord(raw.toLowerCase()) });
 
-/** An upper-case canonical Roman-numeral prefix glued straight to a chain of lower-case unit codes with
- *  no space ("Icm", "IIkg", "Xkgcm" — PR #1430 rounds 3 and 5) — `null` for anything else, ordinary words
- *  ("Divide", "Circle") included, since their lower-case remainder is never built entirely out of
- *  unit-code fragments. */
-// Lower-case `i`/`v`/`x`/`d` fold to their upper-case reading here (PR #1430 round 8: "xkg", "5kgv") because
-// no unit code starts with any of the four — `c`/`m`/`l` deliberately stay upper-case-only, since those
-// *are* unit-code initials ("cm", "m", "l") and folding them would swallow a unit's own first letter into
-// a longer, wrong Roman-numeral guess ("Icm" misread two letters deep instead of "I" + "cm").
-function romanThenUnits(run: string, start: number): Tok[] | null {
-  const upper = run.match(/^[IVXLCDMivxd]+/)?.[0];
-  if (!upper || fromRoman(upper.toUpperCase()) === null) return null;
-  const chain = decomposeUnits(run.slice(upper.length));
-  if (!chain) return null;
-  const toks = [romanTok(upper, start)];
-  let pos = start + upper.length;
-  for (const code of chain) { toks.push(unitTok(code, pos)); pos += code.length; }
-  return toks;
-}
-
-/** Greedily consumes as many unit codes as will match from the start of `s`, stopping the moment none
- *  does — unlike `decomposeUnits`, leftover is expected here, since what follows is a Roman-numeral
- *  suffix, not more unit codes. */
-function consumeUnitChainPrefix(s: string): { chain: string[]; rest: string } {
-  const lower = s.toLowerCase(); // match case-insensitively; keep `s`'s own casing in the pushed slices
-  const chain: string[] = [];
-  let i = 0;
-  for (let code; (code = UNIT_CODES_LONGEST_FIRST.find(c => lower.startsWith(c, i)));) { chain.push(s.slice(i, i + code.length)); i += code.length; }
-  return { chain, rest: s.slice(i) };
-}
-
-/** The mirror image of `romanThenUnits` — a *chain* of unit codes glued straight to a Roman-numeral
- *  suffix ("kgX", "kgcmX"), rather than before it. A run can never satisfy both this and `romanThenUnits`
- *  at once (each requires the *other* reading to fail first at the run's one boundary), so the two are
- *  never ambiguous against each other. */
-function unitThenRoman(run: string, start: number): Tok[] | null {
-  const { chain, rest } = consumeUnitChainPrefix(run);
-  if (chain.length === 0 || !rest || !/^[IVXLCDMivxd]+$/.test(rest) || fromRoman(rest.toUpperCase()) === null) return null;
-  const toks: Tok[] = [];
-  let pos = start;
-  for (const code of chain) { toks.push(unitTok(code, pos)); pos += code.length; }
-  toks.push(romanTok(rest, pos));
-  return toks;
-}
-
-/** A run of 2+ unit codes glued together with nothing else and no Roman-numeral anchor on either side
- *  ("kgcm", "5kgcm") — `decomposeUnits` already recognises this chain shape when a Roman numeral sits next
- *  to it (`romanThenUnits`/`unitThenRoman` below); this is the same chain with no such neighbour, which
- *  neither of those two require in the first place (PR #1430 round 8 — this used to fall through to `text`
- *  and round-trip completely unconverted and unflagged). A single matched code (length 1) is deliberately
- *  excluded: a lone single-letter code still needs `singleLetterUnitOK`'s digit/Roman adjacency, checked
- *  above, and a lone multi-letter code is already caught by the direct `MULTI_LETTER_UNITS.has` check. */
+/** A run of 2+ unit codes glued together with nothing else ("kgcm", "5kgcm") — PR #1430 round 8: this used
+ *  to fall through to `text` and round-trip completely unconverted and unflagged. A single matched code
+ *  (length 1) is deliberately excluded: a lone single-letter code still needs `singleLetterUnitOK`'s digit
+ *  adjacency, checked above, and a lone multi-letter code is already caught by the direct
+ *  `MULTI_LETTER_UNITS.has` check. */
 function bareUnitChain(run: string, start: number): Tok[] | null {
   const chain = decomposeUnits(run);
   if (!chain || chain.length < 2) return null;
@@ -186,24 +161,19 @@ function bareUnitChain(run: string, start: number): Tok[] | null {
   return toks;
 }
 
-/** Splits a maximal run of letters (plus a trailing "²") into whatever it actually holds: a unit, a Roman
- *  numeral, one of the two glued combinations above, or, for an ordinary English word (however it happens
- *  to start — "Divide", "Circle", "Xavier"), text. */
+/** Splits a maximal run of letters (plus a trailing "²") into whatever it actually holds: a unit, a glued
+ *  chain of units, or, for an ordinary English word (however it happens to start — "Divide", "Circle",
+ *  "Xavier"), text. */
 function classifyLetterRun(run: string, start: number, text: string): Tok[] {
-  const lower = run.toLowerCase(); // unit codes match case-insensitively (#1430 round 7); the Roman check
-  // below stays case-sensitive on purpose — "m" alone is the letter, never lower-case "d" for 500.
+  const lower = run.toLowerCase(); // unit codes match case-insensitively (#1430 round 7)
   if (MULTI_LETTER_UNITS.has(lower) || (SINGLE_LETTER_UNITS.has(lower) && singleLetterUnitOK(text, start))) {
     return [unitTok(run, start)];
   }
-  if (/^[IVXLCDM]+$/.test(run) && fromRoman(run) !== null) return [romanTok(run, start)];
-  return bareUnitChain(run, start) ?? romanThenUnits(run, start) ?? unitThenRoman(run, start)
-    ?? [{ kind: 'text', start, end: start + run.length, raw: run, spoken: run }];
+  return bareUnitChain(run, start) ?? [{ kind: 'text', start, end: start + run.length, raw: run, spoken: run }];
 }
 
 /** One left-to-right scan claiming the longest notation match at each position; everything else is a
- *  digit run (kept bare — plain numerals are out of this module's scope) or one plain character. Because
- *  digit runs and letter runs are different token classes here, "X5" is a Roman numeral immediately
- *  followed by a digit, not one `\w`-boundary-proof blob the way `\b`-based regexes saw it. */
+ *  digit run (kept bare — plain numerals are out of this module's scope) or one plain character. */
 function tokenize(text: string): Tok[] {
   const toks: Tok[] = [];
   let i = 0;
@@ -211,8 +181,7 @@ function tokenize(text: string): Tok[] {
     const rest = text.slice(i);
     let m: RegExpMatchArray | null;
     // The National Curriculum's "2-D"/"3-D shape" idiom: read as "the digit, then the letter D", never as
-    // subtraction-then-a-Roman-numeral-D (`symSay`'s own hyphen-to-"minus" rule would otherwise free that
-    // bare D to be read as the Roman numeral 500 the moment the hyphen splits it off, #1430 round 6).
+    // subtraction (`symSay`'s own hyphen-to-"minus" rule would otherwise split the digit from its D).
     if ((m = rest.match(/^(\d+)-([Dd])\b/))) {
       toks.push({ kind: 'dimension', start: i, end: i + m[0].length, raw: m[0], spoken: `${m[1]} ${m[2]}` });
       i += m[0].length; continue;
@@ -252,58 +221,31 @@ function tokenize(text: string): Tok[] {
   return toks;
 }
 
-// Ordinary sentence/list punctuation that may legitimately sit right against a bare Roman numeral with no
-// space — the comma `ks2Say`'s own "Roman numeral X, I, V" rendering puts after one mid-run, and whatever
-// a sentence around a *standalone* numeral ends or pauses on ("List the numerals I, V, X.", "Numeral I?").
-// Never ":" or "/" — those are exactly the shapes rounds 4-5 needed flagged (a colon or slash is itself
-// notation a bare numeral could be mistaken for the edge of).
-const SAFE_ROMAN_NEIGHBOUR = new Set([' ', ',', '.', '?', '!']);
-/** True when a single-letter Roman numeral touches, with no space, anything but the punctuation above —
- *  used by the "I"-pronoun decision: a genuinely glued "I" ("I/2") is never the pronoun, whatever the rest
- *  of the string reads like (PR #1430 round 7). */
-function isGlued(tok: Tok, text: string): boolean {
-  const before = text[tok.start - 1], after = text[tok.end];
-  const gluedBefore = before !== undefined && !SAFE_ROMAN_NEIGHBOUR.has(before);
-  const gluedAfter = after !== undefined && !SAFE_ROMAN_NEIGHBOUR.has(after);
-  return gluedBefore || gluedAfter;
-}
-
-/** A lone "I" reads as the pronoun rather than the numeral only when the *surrounding text as a whole*
- *  has ordinary prose in it (`hadLowerCase`) *and this specific occurrence* isn't itself glued to
- *  anything — a global "does this text have any real prose" flag applied to every bare "I" regardless of
- *  its own neighbours let a genuinely separate, glued leftover ("I think the ratio is I/2 to check.") hide
- *  behind an unrelated pronoun earlier in the same sentence (PR #1430 round 7). */
-const isPronounI = (tok: Tok, text: string, hadLowerCase: boolean): boolean =>
-  tok.kind === 'roman' && tok.raw === 'I' && hadLowerCase && !isGlued(tok, text);
-
 /**
- * Turns KS2 notation in `text` into words: a unit code, a Roman numeral (spelled out letter by letter,
- * never read as its value — a card asking what XIV *means* must not say the answer), a mixed or plain
- * fraction, a 24-hour time, a decimal (read digit by digit after the point), and the NC "N-D shape" idiom.
- * A lone "I" is treated as the pronoun unless the surrounding text has no lower-case prose in it at all
- * (bare notation, not a sentence). `symSay`'s operator words then run over what is left.
+ * Turns KS2 notation in `text` into words: a unit code, a mixed or plain fraction, a 24-hour time, a
+ * decimal (read digit by digit after the point), and the NC "N-D shape" idiom. `symSay`'s operator words
+ * then run over what is left. (Roman numerals are not handled here — see the file header, #1463.)
  *
  * Two tokens glued together with nothing between them in the input always get exactly one space between
- * their spoken forms in the output, whichever one (or both) was notation — the same "5kg3cm" chain that
- * used to leave every unit but the last unconverted now reads "5 kilograms 3 centimetres".
+ * their spoken forms in the output, whichever one (or both) was notation — "5kg3cm", every unit but the
+ * last used to stay unconverted, now reads "5 kilograms 3 centimetres".
  *
- * Shapes this cannot resolve without context a pure string function does not have, so it does not try —
- * neither reachable from any real card today: an ordinary English word that happens to be a canonical
- * Roman numeral ("MIX", "XL") still reads as one outside the one carved-out case ("I", the pronoun); and
- * "H:MM" colon notation always reads as a 24-hour time, even where meant as a ratio ("mix 1:10") — no
- * ratio topic exists in the registry today. A bare "/" or "." with no digit beside it at all, from a
- * three-or-more-fraction chain ("1/2/3/4") or a four-decimal chain ("1.2.3.4"), tokenizes as two converted
- * fractions/decimals either side of one leftover punctuation character with nothing forcing them apart —
- * "one half/three quarters" — and `sayIsSafe` cannot tell that stray character from ordinary punctuation
- * (the same reason a sentence-ending "." or a label ":" must stay unflagged), so this one shape is still
- * accepted as raw and left documented rather than "fixed" into a false positive against real spoken text.
+ * Shapes this cannot resolve without context a pure string function does not have, so it does not try, and
+ * neither is reachable from any real card today: "H:MM" colon notation always reads as a 24-hour time, even
+ * where meant as a ratio ("mix 1:10") — no ratio topic exists in the registry today. A bare "/" or "." with
+ * no digit beside it at all, from a three-or-more-fraction chain ("1/2/3/4") or a four-decimal chain
+ * ("1.2.3.4"), tokenizes as two converted fractions/decimals either side of one leftover punctuation
+ * character with nothing forcing them apart — "one half/three quarters" — and `sayIsSafe` cannot tell that
+ * stray character from ordinary punctuation (the same reason a sentence-ending "." or a label ":" must stay
+ * unflagged), so this one shape is still accepted as raw and left documented rather than "fixed" into a
+ * false positive against real spoken text.
  *
  * Both this function and `sayIsSafe` normalise whitespace (`normalizeWs`) *before* tokenizing, not after —
- * PR #1430 round 9: `singleLetterUnitOK`'s digit/Roman adjacency check reads the text *around* a token's
- * start, so a double space ("5  m") used to read as "not touching" pre-conversion while `ks2Say`'s own
- * trailing whitespace collapse then closed that same gap in its output, leaving `sayIsSafe` disagreeing
- * with itself on the string it had just produced. Normalising first means both functions classify off the
- * same one-space-only adjacency every time, whatever the input's original spacing.
+ * PR #1430 round 9: `singleLetterUnitOK`'s digit adjacency check reads the text *around* a token's start,
+ * so a double space ("5  m") used to read as "not touching" pre-conversion while `ks2Say`'s own trailing
+ * whitespace collapse then closed that same gap in its output, leaving `sayIsSafe` disagreeing with itself
+ * on the string it had just produced. Normalising first means both functions classify off the same
+ * one-space-only adjacency every time, whatever the input's original spacing.
  */
 function normalizeWs(text: string): string {
   return text.replace(/\s+/g, ' ');
@@ -312,17 +254,12 @@ function normalizeWs(text: string): string {
 export function ks2Say(text: string): string {
   const norm = normalizeWs(text);
   const toks = tokenize(norm);
-  // A raw unit or Roman-numeral token supplies letters of its own that must not count as "ordinary prose"
-  // when deciding whether a lone "I" is the pronoun or the numeral — only a genuine word (a `text` token)
-  // does. "I kg", "Icm" are bare notation either way; "I weigh 5 kg, I think" has real prose alongside it.
-  const hadLowerCase = toks.some(t => t.kind === 'text' && /[a-z]/.test(t.raw));
   let out = '';
   let prevSpoken = '';
   for (const tok of toks) {
     // `symSay` runs per plain-text span, never over a notation span's own rendering — otherwise its
     // hyphen-to-"minus" rule would mangle a hyphen `ks2Say` itself just wrote ("twenty-three").
-    const isPronoun = isPronounI(tok, norm, hadLowerCase);
-    const spoken = isPronoun ? 'I' : tok.kind === 'text' && tok.raw.trim() !== '' ? symSay(tok.raw) : tok.spoken;
+    const spoken = tok.kind === 'text' && tok.raw.trim() !== '' ? symSay(tok.raw) : tok.spoken;
     // Two spans glued with nothing between them in the input get exactly one space if joining their
     // rendered forms directly would run two words/numbers together — never for ordinary trailing
     // punctuation ("5 kg," needs no space before the comma just because "kg" became "kilograms").
@@ -336,54 +273,11 @@ export function ks2Say(text: string): string {
   return out.replace(/\s+/g, ' ').trim();
 }
 
-// `romanTok` always renders as `Roman numeral <raw>`, its letters joined by ", " when `raw` is 2+ long
-// (`raw.split('').join(', ')`); `dimension`'s own `spoken` (the "N-D shape" idiom) renders as bare
-// "<digits> D" with no such prefix. These are the only two shapes `ks2Say`'s own output ever leaves a
-// bare Roman-numeral-shaped letter in. Re-tokenizing that output finds those same letters again, so
-// `sayIsSafe` must tell "already spelled out by `ks2Say`" apart from "still raw" some other way than the
-// letter itself, which reads identically either way.
-// `\b` after each letter matters: without it, "Roman numeral V, Roman numeral X" lets ", R" (the *next*
-// phrase's own "Roman") be mistaken for another bare single-letter numeral, over-extending the match into
-// the following word and losing the real boundary between two separately-rendered numerals.
-const ALREADY_SPOKEN_ROMAN = /Roman numeral [A-Za-z]\b(?:, [A-Za-z]\b)*/g;
-const ALREADY_SPOKEN_DIMENSION = /\d+ [Dd]\b/g;
-/** The character span(s) of a `Roman numeral …`/dimension rendering's own letters — *not* a defensive
- *  "was this glued to something else" check, only where the template itself puts a letter. A matched
- *  `Roman numeral …` run that is itself glued to something unsafe right outside it (the digit-orphan and
- *  colon-between-numerals regressions, PR #1430 round 9 fixing) still needs catching, so the caller applies
- *  `isGlued`-style neighbour checks around the *whole* span, not just membership in it. */
-function alreadySpokenSpans(text: string): Array<readonly [number, number, boolean]> {
-  const roman = [...text.matchAll(ALREADY_SPOKEN_ROMAN)].map(m => [m.index!, m.index! + m[0].length, true] as const);
-  const dim = [...text.matchAll(ALREADY_SPOKEN_DIMENSION)]
-    .map(m => [m.index! + m[0].length - 1, m.index! + m[0].length, false] as const); // just the D/d itself
-  return [...roman, ...dim];
-}
-/** A rendered span is only genuinely safe when nothing unsafe is glued right outside it too — "Roman
- *  numeral V/2" (a fraction glued straight onto the numeral with no separator) must still fail, the same
- *  way a raw glued Roman letter must (PR #1430 round 9, the digit-orphan and colon-between-numerals
- *  regressions this fix introduced on its first pass). The dimension idiom's own `\b` already rules out
- *  being glued to a following word character, so only the Roman-numeral spans need the outer check. */
-function spanIsGlued(start: number, end: number, checkBoundary: boolean, text: string): boolean {
-  if (!checkBoundary) return false;
-  const before = text[start - 1], after = text[end];
-  return (before !== undefined && !SAFE_ROMAN_NEIGHBOUR.has(before)) ||
-    (after !== undefined && !SAFE_ROMAN_NEIGHBOUR.has(after));
-}
-
 /**
  * False while `text` still carries a notation token the tokenizer above would need to render — a fraction,
- * a decimal point between digits, a 24-hour time, a unit code, a Roman numeral, or the "N-D" idiom — plus a
- * defensive check for a stray superscript. Runs on `text` however it arrives: raw notation, or `ks2Say`'s
- * own output, since callers pass both.
- *
- * Every `NOTATION` kind is unsafe whenever the tokenizer finds one, `roman` included, *except* a letter that
- * sits inside a rendering `ks2Say` itself would just have produced (a `Roman numeral X[, Y...]` span, or the
- * bare "<digits> D" the "N-D shape" idiom leaves) and that rendering is not itself glued to something else
- * unsafe — PR #1430 round 9 finding 2: a standalone, unglued Roman letter other than "I" ("Choose V or X")
- * was wrongly treated the same as one `ks2Say` had already spelled out, because the old check asked only
- * whether the letter was glued, never whether it was *already rendered*. A letter is either one or the
- * other; nothing in real prose puts the literal phrase "Roman numeral" directly before a bare notation
- * letter by coincidence, so this reads as "was this produced by this module", not a content guess.
+ * a decimal point between digits, a 24-hour time, a unit code, or the "N-D" idiom — plus a defensive check
+ * for a stray superscript. Runs on `text` however it arrives: raw notation, or `ks2Say`'s own output, since
+ * callers pass both.
  */
 export function sayIsSafe(text: string): boolean {
   const norm = normalizeWs(text);
@@ -392,13 +286,5 @@ export function sayIsSafe(text: string): boolean {
   // `norm` never has more than one) that isn't a valid 24-hour time is not matched by the tokenizer's time
   // token, so this stays as a direct backstop
   const toks = tokenize(norm);
-  const hadLowerCase = toks.some(t => t.kind === 'text' && /[a-z]/.test(t.raw));
-  const spoken = alreadySpokenSpans(norm);
-  for (const tok of toks) {
-    if (isPronounI(tok, norm, hadLowerCase)) continue; // the pronoun, not the numeral
-    if (tok.kind === 'roman' &&
-      spoken.some(([s, e, checkBoundary]) => tok.start >= s && tok.end <= e && !spanIsGlued(s, e, checkBoundary, norm))) continue;
-    if (NOTATION.has(tok.kind)) return false;
-  }
-  return true;
+  return toks.every(t => !NOTATION.has(t.kind));
 }
