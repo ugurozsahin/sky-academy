@@ -5,7 +5,7 @@
     "fileLines": 600
   },
   "complexity": {
-    "src/curriculum/year2.ts::(anonymous)": 17,
+    "src/curriculum/year2/measure.ts::(anonymous)": 17,
     "src/game/arena.ts::drawBubble": 16,
     "src/game/arena.ts::drawParticle": 21,
     "src/game/arena.ts::drawTrail": 19,
@@ -13,7 +13,7 @@
     "src/game/arena.ts::render": 19,
     "src/game/arena.ts::reveal": 16,
     "src/game/arena.ts::update": 42,
-    "src/game/bubbles.ts::layoutWave": 20,
+    "src/game/bubbles.ts::layoutWave": 18,
     "src/game/dojo.ts::measure": 35,
     "src/main.ts::(anonymous)": 17,
     "src/storage/migrate.ts::sanitizeTypes": 39,
@@ -39,7 +39,6 @@
     "src/ui/visuals.ts::renderVisual": 89
   },
   "fileLines": {
-    "src/curriculum/year2.ts": 753,
     "tests/unit/arena.test.ts": 948,
     "tests/unit/audio.test.ts": 617,
     "tests/unit/curriculum.test.ts": 2641,

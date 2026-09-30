@@ -152,7 +152,7 @@
   opacity: .9;
 }
 @media (prefers-reduced-motion: reduce) { .confetti i, .hero-big img, .isl-art, .bg-sky::after, .villain img, .results .ko img, .timer, #stage .segs i.cur,
-  .qcard.bad, .avatar-card.shake { animation: none; } }
+  .qcard.bad, .avatar-card.shake, .timer.hurry, .villain.hit img, .villain.heal img, .qcard.pulse { animation: none; } }
 @keyframes conf { to { transform: translateY(520px) rotate(720deg); } }
 @media (min-width: 720px) {
   .qcard { margin-top: 10px; }

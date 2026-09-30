@@ -1,11 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
-import { TOPICS, shownYears } from '../../src/curriculum';
+import { TOPICS, shownYears, YEARS, type YearInfo } from '../../src/curriculum';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 import { expectFitsViewport } from './viewport';
+import { COMPACT_VARS, islandsHTML, mapLayout } from '../../src/ui/map-layout';
 /** A context with nothing stored: the 3-D setting at its default, `auto` — the opt-out from `THREE_OFF`. */
 const NO_STORED_STATE = { cookies: [], origins: [] };   // #380 review round 5, B1: the rail this repo already built for a screen that does not fit (#107, #109, #110)
 
@@ -141,6 +142,8 @@ async function swipeAnswer(page: Page) {
 }
 const answer = (page: Page) => page.evaluate(() => window.__sna.answer());
 const waitForTarget = (page: Page) => page.waitForFunction(() => { const s = window.__sna?.state(); if (!s || s.waiting) return false; const c = window.__sna.session.current; const label = c.sequence ? c.sequence[window.__sna.session.seqIndex] : c.answer; return window.__sna.bubbles().some((b: any) => b.label === label); }, null, { timeout: 20000 });
+/** Wait until a specific labelled bubble is launched and hittable, for slicing a chosen (not first-remaining) target. */
+const waitForLabel = (page: Page, label: string) => page.waitForFunction((l) => { const s = window.__sna; if (!s || s.state().waiting) return false; return s.bubbles().some((b: any) => b.label === l); }, label, { timeout: 20000 });
 const state = (page: Page) => page.evaluate(() => window.__sna.state());
 /**
  * Bring up a Sky Storm wave carrying a TNT. Bombs ride every third question (`play-session.ts`), but never a
@@ -2489,6 +2492,42 @@ test.describe('Sky Ninja Academy', () => {
     expect(animation).toBe('shake');
   });
 
+  // #1346: #899's rule beat `.qcard.bad` only because the override and the state class have the same
+  // specificity and the override comes later. `.timer.hurry` and `.villain.hit img` were never in the list, so
+  // the plain `.timer` / `.villain img` entries lost to them. Each state class is added and read in one
+  // synchronous `evaluate`, so the HUD's own once-a-second `hurry` toggle cannot race the check.
+  const animationsWith = (page: Page, checks: [string, string][]) => page.evaluate(cs => cs.map(([sel, cls]) => {
+    const el = document.querySelector(sel)!;
+    el.classList.add(cls);
+    return getComputedStyle(el).animationName;
+  }), checks);
+
+  for (const [reduced, want] of [[true, ['none', 'none']], [false, ['hurry', 'qpulse']]] as const) {
+    test(`guard rail: the Sprint timer's hurry pulse and the card's correct pulse ${reduced ? 'stop under' : 'still run without'} reduced motion (#1346)`, async ({ page }) => {
+      if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' });
+      await seedPlayer(page);
+      await page.click('.island[data-year="year1"]');
+      await page.click('#sprint');
+      await page.click('.topic[data-mixed]');
+      await expect(page.locator('#timer')).toBeVisible();
+      expect(await animationsWith(page, [['#timer', 'hurry'], ['.qcard', 'pulse']])).toEqual(want);
+    });
+
+    test(`guard rail: Hammer Man's hit and heal flashes ${reduced ? 'stop under' : 'still run without'} reduced motion (#1346)`, async ({ page }) => {
+      if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' });
+      await seedPlayer(page);
+      await page.click('.island[data-year="year2"]');
+      await page.click('#boss');
+      await expect(page.locator('.villain.boss img')).toBeVisible();
+      const got = await page.evaluate(() => ['hit', 'heal'].map((k) => {
+        const v = document.querySelector('#villain')!;
+        v.classList.remove('hit', 'heal'); v.classList.add(k);
+        return getComputedStyle(v.querySelector('img')!).animationName;
+      }));
+      expect(got).toEqual(reduced ? ['none', 'none'] : ['vhit', 'vheal']);
+    });
+  }
+
   // #32: the suite runs at 8× (the beforeEach above), which compresses the outcome holds. This one test forces
   // speed 1 and asserts the holds are the curriculum values the owner asked for (correct 1000, wrong 1800,
   // miss 1500). Without it the fast suite verifies nothing about the holds, and the day someone changes a
@@ -2592,6 +2631,66 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.home')).toBeVisible();
     const withKey = await page.$$eval('.islands .island', els => els.map(el => (el as HTMLElement).dataset.year));
     expect(withKey).toEqual(['reception', 'year1', 'year2']);
+  });
+
+  /**
+   * #1048: with seven islands, the pre-#1048 map put 952px of island cards on a phone before the Daily Dojo
+   * card (7 × 124px cards + 6 × 14px gaps), and seven ~95px desktop columns at 720px. `mapLayout`/`islandsHTML`
+   * (`src/ui/map-layout.ts`) give a compact size from 4 islands and cap desktop at 4 columns; these inject
+   * 4–7 real years (via the same pure functions `mapScreen` calls, the `renderVisual`-in-Node pattern
+   * `duel.spec.ts` already uses) onto the live map rather than waiting for #1050+ to add a fourth `YearId`.
+   */
+  test.describe('the Sky Map holds four to seven islands (#1048)', () => {
+    const fixtureYears = (n: number): YearInfo[] => Array.from({ length: n }, (_, i) => ({
+      ...YEARS[i % YEARS.length], id: `fixture-${i}` as YearInfo['id'], short: `F${i}`, title: `Fixture Isle ${i + 1}`,
+    }));
+
+    const injectIslands = async (page: Page, n: number) => {
+      const years = fixtureYears(n);
+      const layout = mapLayout(n);
+      const html = islandsHTML(years, () => ({ s: 1, m: 3 }), undefined, layout.compact);
+      const style = `--cols:${layout.cols}${layout.compact ? COMPACT_VARS : ''}`;
+      await page.evaluate(({ html, style }) => {
+        const el = document.querySelector('.islands')!;
+        el.setAttribute('style', style);
+        el.innerHTML = html;
+      }, { html, style });
+    };
+
+    for (const n of [4, 5, 6, 7]) {
+      test(`${n} islands at 390×664: every island is ≥44px tall, no sideways scroll, Daily Dojo within two screen heights`, async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 664 });
+        await seedPlayer(page);
+        await injectIslands(page, n);
+        await expectFitsViewport(page, `sky map with ${n} islands at 390x664`);
+        const heights = await page.$$eval('.islands .island', els => els.map(el => el.getBoundingClientRect().height));
+        expect(heights.length, `${n} islands`).toBe(n);
+        for (const h of heights) expect(h, `${n} islands: an island under the 44px touch floor`).toBeGreaterThanOrEqual(44);
+        const dojoTop = await page.$eval('#dojo', el => el.getBoundingClientRect().top + window.scrollY);
+        expect(dojoTop, `${n} islands: Daily Dojo starts past two screen heights`).toBeLessThanOrEqual(2 * 664);
+        const labelSizes = await page.$$eval('.islands .island b, .islands .island small',
+          els => els.map(el => parseFloat(getComputedStyle(el).fontSize)));
+        for (const sz of labelSizes) expect(sz, `${n} islands: a map label under 13px`).toBeGreaterThanOrEqual(13);
+      });
+    }
+
+    test('7 islands at ≥720px: never more than 4 columns, each at least 150px wide, no sideways scroll', async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await seedPlayer(page);
+      await injectIslands(page, 7);
+      const style = await page.$eval('.islands', el => el.getAttribute('style') || '');
+      expect(style).toContain('--cols:4');
+      const widths = await page.$$eval('.islands .island', els => els.map(el => el.getBoundingClientRect().width));
+      expect(widths.length).toBe(7);
+      for (const w of widths) expect(w, 'a desktop island under 150px wide').toBeGreaterThanOrEqual(150);
+      await expectFitsViewport(page, 'sky map with 7 islands at 1280x800');
+    });
+
+    test('3 islands (today): the map\'s container style is unchanged by this module', async ({ page }) => {
+      await seedPlayer(page);
+      const style = await page.$eval('.islands', el => el.getAttribute('style') || '');
+      expect(style).toBe('--cols:3');
+    });
   });
 
   test('endless Sky Storm ramps up and ends when lives run out', async ({ page }) => {
@@ -4663,4 +4762,38 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     expect(await page.locator('#vis canvas').count()).toBe(0);
     expect(chunks).toEqual([]);
   });
+
+});
+
+// #926, the first topic to draw an "any-order" card (#918/#919): the prompt stays on screen while targets
+// are found in any order, and slicing every target completes the card and raises the score, exactly as
+// #919's "no topic uses this yet" left to prove. Sliced highest-first here, deliberately against `sequence`'s
+// own ascending order (#926 review): `answer()` always hits `session.remaining()[0]`, the canonically-sorted
+// list's own first entry, so a test built on it alone would never distinguish this from an ordered sequence.
+test('y2-oddeven "Slice Them All": every target sliced in any order completes the card and scores (#926)', async ({ page }) => {
+  await seedPlayer(page);
+  await startTopic(page, 'year2', 'y2-oddeven');
+  // d2 draws the any-order form about 1 card in 3 (#926) — never guaranteed on the first try, so redraw the
+  // current question (the same `s.stage = …; s.index = 0; s.nextQuestion()` hook other tests jump difficulty
+  // with) until one lands; (2/3)^60 is astronomically unlikely to exhaust this loop on a real draw.
+  const q = await page.evaluate(() => {
+    const s = window.__sna.session;
+    s.stage = 2; s.index = 0;
+    for (let i = 0; i < 60; i++) { s.nextQuestion(); if (s.current!.anyOrder) break; }
+    return { anyOrder: !!s.current!.anyOrder, prompt: s.current!.prompt, sequence: s.current!.sequence! };
+  });
+  expect(q.anyOrder, 'an any-order y2-oddeven card never drew in 60 tries at d2').toBe(true);
+  expect(q.prompt).toMatch(/^Slice every (even|odd) number$/);
+  // The instruction stays on the card with a `.seq` progress run after it (#919), not replaced by it —
+  // unlike an ordered spelling sequence, so this checks the prompt text is still there rather than an exact
+  // `.prompt` match, which would also see the "found so far" blanks/letters that run carries.
+  await expect(page.locator('.prompt')).toContainText(q.prompt);
+  await expect(page.locator('.prompt .seq')).toBeVisible();
+  await expectFitsViewport(page, `y2-oddeven any-order card ("${q.prompt}")`);
+  const scoreBefore = await page.evaluate(() => window.__sna.session.score);
+  for (const label of [...q.sequence].reverse()) {
+    await waitForLabel(page, label);
+    expect(await page.evaluate((l) => window.__sna.arena!.hitLabel(l), label)).toBe(true);
+  }
+  await expect.poll(() => page.evaluate(() => window.__sna.session.score)).toBeGreaterThan(scoreBefore);
 });
