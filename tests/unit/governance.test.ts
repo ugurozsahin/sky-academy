@@ -470,7 +470,7 @@ describe('STEP 4 gives the query line a value, so an empty run still records one
     const step4 = prompt.split('\n').find((l) => l.startsWith('STEP 4')) ?? '';
     expect(step4, 'STEP 4 must still exist, or this rail reads nothing').toContain('NOTHING ELIGIBLE');
     expect(step4, 'or every such run invents its own word and the field stops meaning anything')
-      .toContain('- query top pick: none eligible');
+      .toContain('- query top pick: none eligible · N blockers read live');
   });
 });
 
@@ -5745,7 +5745,7 @@ describe('the add-topic skill names the curriculum files a topic really goes in 
  * What this cannot catch: whether a run reads anything, or whether the count it writes is true. It is text over
  * an instruction file, and nothing here or elsewhere re-reads a run's blockers. The watchdog's check 5(b)
  * compares a run's pull request with the query's top issue, so it misses a made-up count on a correct pick
- * and a run that wrongly writes `none eligible`, which #1369 only makes leave a count to compare (PR #1365 review, round 2).
+ * and a run that wrongly writes `none eligible`, which #1369 answers with a count and a 5(b) re-run (PR #1365 review, round 2).
  */
 describe('STEP 3 drops a blocked issue by its blockers\' live state, not the label (#1348)', () => {
   const prompt = doc('docs/ROUTINE-PROMPT.md');

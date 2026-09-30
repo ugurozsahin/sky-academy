@@ -153,6 +153,8 @@ your first finding and the only one you can report.
    compare the issue it names with the issue each PR opened
    since your last check actually develops. A PR developing a lower-priority issue while that one sat
    unstarted is the finding, and the query is reproducible, so it is evidence rather than an impression.
+   Run it too when a pulse says `none eligible` (#1369): with no PR there is nothing to compare, so an eligible
+   issue the query returns is the finding, and so is a `blockers read live` count the query does not bear out.
    (A `review` or `debt` finding no longer blocks everything, but it is no longer last either — it sorts by
    its priority label like anything else.) The documented ways past the order are the same three as before:
    work the owner asked for in a session, `playtest` bugs, and anything that made the game unplayable or
