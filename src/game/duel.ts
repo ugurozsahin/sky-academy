@@ -2,6 +2,8 @@
 // DOM/canvas), mirroring session.ts's own separation so it stays unit-testable ahead of any arena/HUD wiring.
 import type { Difficulty, Question, Topic } from '../curriculum';
 import { starsForAccuracy } from './session';
+import { repeatKey, drawFresh } from './repeat-key';
+import { seededRng } from './rng';
 import type { DojoEvent } from './dojo';
 // Type-only, so it erases at compile time and adds no runtime edge — the same shape `game/parents.ts` and
 // `game/sensei.ts` already use to name a stored type without depending on the store.
@@ -55,6 +57,8 @@ export interface DuelOpts { topic: Topic; difficulty: Difficulty; rng?: () => nu
 
 export class Duel {
   round = 0; scoreA = 0; scoreB = 0; current: Question | null = null; roundDecided = false; ended = false;
+  /** Rounds where a repeat card still ran because five re-rolls all came back the same (#879, #453 item 4). */
+  repeatGiveUps = 0;
   /**
    * Each seat's own answers, for Sensei (#16 item 5). Kept per seat rather than as a match total because the
    * score is a race: see `duelAccuracy()` for why only one seat's is ever written to the save.
@@ -72,7 +76,12 @@ export class Duel {
     if (this.ended) return;
     this.round++; this.roundDecided = false; this.answered.a = this.answered.b = false;
     try {
-      this.current = this.o.topic.gen(this.o.difficulty, this.rng);
+      // avoid immediate repeats, the same rule Session.nextQuestion() applies (#879; previously this file's own
+      // doc comment on repeatKey said Ninja Duel never consulted it — now it does, through drawFresh()).
+      const prevKey = this.current && repeatKey(this.current);
+      const { q, gaveUp } = drawFresh(() => this.o.topic.gen(this.o.difficulty, this.rng), prevKey);
+      if (gaveUp) this.repeatGiveUps++;   // the key space collapsed even after five tries (#453 item 4)
+      this.current = q;
       // "First correct slice" has no meaning for a sequence: `answer` is the joined string, every slice would
       // be wrong and the match would drain in draws with nothing red. duelPool() screens this out too, at the
       // same 8 fixed seeds the comment below explains the limit of — this is the floor for what live play can
@@ -219,16 +228,7 @@ export function spokenQuestion(q: Question, round: number): string {
   const line = q.say ?? q.prompt;
   return round === 1 ? `${DUEL_HANDOVER} ${line}` : line;
 }
-/**
- * A tiny deterministic rng (mulberry32) for the sample above — a constant would spin a generator that draws
- * until distinct. Exported since #389: the duel screen seeds one of these per arena from a single round seed,
- * so both halves lay out the identical wave instead of each shuffling for itself. **One generator per call,
- * never one shared between them** — it is stateful, and a shared instance deals the second half the first's
- * leftovers.
- */
-export function seededRng(seed: number) {
-  return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
+export { seededRng };
 
 /**
  * Rounds the match decided: one correct slice each, by whichever player got there first. The one source for
