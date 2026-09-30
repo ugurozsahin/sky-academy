@@ -416,6 +416,22 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.islands.big')).toBeVisible();
   });
 
+  // #1451 review round 1: the same leak game.spec.ts's equivalent guard rail pins for "Play again" — a duel
+  // rematch (`#again`) never pops first, so it re-entered the SAME `enter()` screen slot as the still-live
+  // #887 guard entry and left one permanent dead history entry behind, unboundedly, per rematch.
+  test('guard rail: a duel rematch does not leak a history entry — #887\'s guard is carried through, not duplicated', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    const before = await page.evaluate(() => history.length);
+    await winWholeMatch(page);
+    await page.click('.duel-end #again');
+    await expect(page.locator('.duel-screen')).toBeVisible();
+    expect(await page.evaluate(() => history.length), 'one rematch must not grow the history stack').toBe(before);
+    // and the new match's own #887 guard still works: first back pauses it, not a stale double-pop
+    await page.evaluate(() => history.back());
+    await expect(page.locator('#resume')).toBeVisible();
+    expect(await page.evaluate(() => window.__sna.state().ended), 'the rematch, not the old one').toBe(false);
+  });
+
   test('a duel won on a second topic gets its own album entry, not the first one\'s row overwritten (#670)', async ({ page }) => {
     const pool = duelPool(topicsFor('year1'), YEARS.find(y => y.id === 'year1')!.diffs[0]);
     expect(pool.length, 'need two distinct topics on offer to prove the id is per-topic, not per-year').toBeGreaterThan(1);

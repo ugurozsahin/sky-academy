@@ -2170,6 +2170,28 @@ test.describe('Sky Ninja Academy', () => {
     expect(await page.evaluate(() => history.state)).toBeNull();
   });
 
+  // #1451 review round 1: `enter()` only compared `.screen` when deciding push-vs-replace, so re-entering the
+  // SAME screen (Play again/Fix my mistakes/Next topic, none of which ever pop first) replaced the still-live
+  // #887 guard entry in place — dropping its `guard` flag — and the fresh screen's own `pushBackGuard()` call
+  // then saw no guard on top and pushed a brand new one, leaking one permanent dead history entry per replay.
+  test('guard rail: "Play again" does not leak a history entry — #887\'s guard is carried through, not duplicated', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    const before = await page.evaluate(() => history.length);
+    await winMission(page);
+    await expect(page.locator('#again')).toBeVisible();
+    await page.click('#again');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    expect(await page.evaluate(() => history.length), 'one replay must not grow the history stack').toBe(before);
+    // and the new mission's own #887 guard still works: first back pauses it, not a stale double-pop
+    await page.goBack();
+    await expect(page.locator('#resume')).toBeVisible();
+    expect(await page.evaluate(() => window.__sna.state().ended), 'the replayed mission, not the old one').toBe(false);
+    await page.goBack();
+    await expect(page.locator('.isl-head b')).toContainText('Year 1');
+  });
+
   test('a long sentence can be built without waiting: each word arrives in order, in its batch or the next', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year2', 'y2-sentence');

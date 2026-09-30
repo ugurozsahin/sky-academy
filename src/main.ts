@@ -24,7 +24,12 @@ import { fixDeck } from './game/session';
 let year: YearInfo | null = null; let fromPop = false;
 const enter = (screen: string) => {
   if (fromPop) { fromPop = false; return; }                                   // re-rendering after a pop: the entry already exists
-  if (history.state?.screen === screen) history.replaceState({ screen }, ''); else history.pushState({ screen }, '');
+  // #887 review: re-entering the SAME screen (Play again/Fix my mistakes/Next topic/duel rematch, none of
+  // which ever pop first) replaces the live entry in place — carrying its `guard` flag through rather than
+  // dropping it, so the fresh screen's own `pushBackGuard()` call sees a guard already on top and no-ops,
+  // instead of pushing a permanent extra entry every replay (unbounded growth, #1451 review round 1).
+  if (history.state?.screen === screen) history.replaceState({ screen, guard: history.state?.guard }, '');
+  else history.pushState({ screen }, '');
 };
 /** Go up one screen by popping history (so the stack stays [map, island?, play|memory?] / [map, rewards?]). */
 const up = () => { if (history.state?.screen) history.back(); else nav.map(); };
