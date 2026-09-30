@@ -36,11 +36,11 @@ export const BOMB = '💣';
  * `gentle` (#700) — the year's `gentle` flag — is passed separately rather than read off a `year` this
  * function otherwise has no reason to take: it only ever affects a non-sequence question's single
  * `gentleTarget`, so a scenario that does not care about it can go on calling this with three arguments.
- */
-export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, seqIndex: number, gentle?: boolean): WaveOpts {
+ * `remaining` (#919) defaults to the whole sequence: omitted means "nothing sliced yet", not "nothing left". */
+export function waveOptsFor(q: Question, info: { labels: string[]; speed: number }, remaining?: readonly string[], gentle?: boolean): WaveOpts {
   return {
     labels: info.labels, speed: info.speed, wide: !!q.wide || wideFor(info.labels),
-    ordered: q.sequence?.slice(seqIndex), gentleTarget: gentle && !q.sequence ? q.answer : undefined,
+    ordered: q.sequence ? [...(remaining ?? q.sequence)] : undefined, gentleTarget: gentle && !q.sequence ? q.answer : undefined,
   };
 }
 
@@ -226,7 +226,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     const token = ++peekToken; peekSince = performance.now();
     deps.later(() => {
       if (token !== peekToken || activeQuestion !== q || !deps.mounted()) return;
-      els.prompt.innerHTML = promptHTML(q, session.seqIndex);
+      els.prompt.innerHTML = promptHTML(q, session.seqIndex, false, session.remaining());
       setHint(els, 'Slice the words in order');
       const then = peekDone; peekActive = false; peekDone = null;
       syncPaused();
@@ -248,7 +248,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     els.speak.hidden = reveal;
     if (!reveal) { els.speak.setAttribute('aria-label', SPEAK_LABEL[mode].aria); els.speak.setAttribute('title', SPEAK_LABEL[mode].title); }
     if (mode === 'peek' && !launched) return true;
-    els.prompt.innerHTML = promptHTML(q, session.seqIndex, reveal);
+    els.prompt.innerHTML = promptHTML(q, session.seqIndex, reveal, session.remaining());
     // Both halves: the generator says this hint is data, AND it is the hint that reached the card. The second
     // conjunct is not redundant — `hintText()` falls back to a generic instruction when `q.hint` is absent,
     // and a generator that set the flag without a hint would otherwise mark that instruction (#328).
@@ -273,7 +273,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
         lastOutcome = 'none'; waveId++; els.qcard.classList.remove('good', 'bad');
         if (deps.tracing) { say(q.say ?? q.prompt); deps.startTrace(q); return; }
         const bomb = deps.villain && session.questionsAsked > 3 && session.questionsAsked % 3 === 0 && !q.sequence;
-        const waveOpts = waveOptsFor(q, info, session.seqIndex, opts.year.gentle);
+        const waveOpts = waveOptsFor(q, info, session.remaining(), opts.year.gentle);
         const labels = bomb ? [...waveOpts.labels, BOMB] : waveOpts.labels;
         // #138: a spawn can be queued — behind the tutorial hold, or behind the font gate — and the session
         // can move on while it waits, so it must check that its own question is still the one on screen.
@@ -330,12 +330,12 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     // pass) rather than checking deps.tracing itself — a future tracing "give up" path needs its own gate.
     onWrong(q, hit) {
       sfx.wrong(); haptic('wrong'); deps.toast('Not quite!', 'bad', scaled(hold.wrong));
-      settle('wrong', q, { good: q.sequence ? q.sequence[session.seqIndex] : q.answer, bad: hit });
+      settle('wrong', q, { good: q.sequence ? session.remaining()[0] : q.answer, bad: hit });
       if (opts.mode !== 'sprint') hud.speakCorrection(q, session.currentTopic?.id);   // #893: the right answer, told
     },
     onMiss(q) {
       sfx.miss(); deps.toast('Missed!', 'bad', scaled(hold.miss));
-      settle('miss', q, { good: q.sequence ? q.sequence[session.seqIndex] : q.answer });
+      settle('miss', q, { good: q.sequence ? session.remaining()[0] : q.answer });
       if (opts.mode !== 'sprint') hud.speakCorrection(q, session.currentTopic?.id);   // #893: the right answer, told
     },
     onProgress(label, done, total) {
@@ -343,9 +343,9 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
       sfx.slice();
       const arena = deps.arena();
       // the next word is earned: bring it up now instead of making the child wait for its batch
-      if (done < total) arena?.rush(session.current!.sequence![done]);
+      if (done < total) arena?.rush(session.remaining()[0]);
       const q = session.current!;
-      els.prompt.innerHTML = promptHTML(q, done, promptMode(q, canHear()) === 'read' || readThrough);
+      els.prompt.innerHTML = promptHTML(q, done, promptMode(q, canHear()) === 'read' || readThrough, session.remaining());
       if (arena) arena.floatText(arena.W / 2, arena.topInset + 40, label, deps.av.glow);
       // queued, never interrupting: sliced letters arrive faster than they can be spoken, and a plain say()
       // cuts each one off to start the next, so the child hears fragments instead of the word (#40)
