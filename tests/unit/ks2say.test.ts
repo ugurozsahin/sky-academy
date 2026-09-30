@@ -33,6 +33,21 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     ['1234.56', 'one thousand two hundred and thirty-four point five six'],
     ['125 1/2', 'one hundred and twenty-five and one half'],
     ['300/4', 'three hundred quarters'],
+    // fraction denominators outside the hand-written table (percentage-equivalence and place-value
+    // work, Y5-6) — the general ordinal fallback, not a bare cardinal+"th"
+    ['1/20', 'one twentieth'],
+    ['1/30', 'one thirtieth'],
+    ['1/21', 'one twenty-first'],
+    ['3/40', 'three fortieths'],
+    ['1/1000', 'one thousandth'],
+    ['3/1000', 'three thousandths'],
+    ['1/999', 'one nine hundred and ninety-ninth'],
+    // a unit right after a fraction or a decimal — the digit the unit substitution needs has to survive
+    // long enough to be seen, before the fraction/decimal passes turn it into words
+    ['3.5 kg', 'three point five kilograms'],
+    ['3/4 m', 'three quarters metres'],
+    ['1/2 kg', 'one half kilograms'],
+    ['1 1/2 kg', 'one and one half kilograms'],
     // 24-hour times
     ['14:35', 'fourteen thirty-five'],
     ['14:05', 'fourteen oh five'],
@@ -49,6 +64,8 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     ['2 m', '2 metres'],
     ['7 g', '7 grams'],
     ['2 l', '2 litres'],
+    ['5 mm', '5 millimetres'],
+    ['200 mg', '200 milligrams'],
     // Roman numerals — spelled letter by letter, never read as their value
     ['What does XIV mean?', 'What does Roman numeral X, I, V mean what'],
     ['MCMXCIX', 'Roman numeral M, C, M, X, C, I, X'],
@@ -86,6 +103,20 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
   it('sayIsSafe is true for ordinary spoken-word sentences with no leftover notation', () => {
     expect(sayIsSafe('three quarters of the pizza')).toBe(true);
     expect(sayIsSafe('fourteen thirty-five')).toBe(true);
+    expect(sayIsSafe('three point five kilograms')).toBe(true);
+  });
+
+  // Rail completeness, independent of what ks2Say currently produces: a table of known-bad spoken forms
+  // that must fail sayIsSafe on their own. The "ks2Say's output passes sayIsSafe" test below can only ever
+  // catch sayIsSafe being too strict; it cannot catch sayIsSafe being too lenient, which is the shape every
+  // bug found in review had (a leftover unit code with no digit left beside it, once its number is spelled
+  // out). This is the test that would have caught them.
+  it('sayIsSafe fails a unit code left raw, with or without a digit still beside it', () => {
+    for (const bad of ['4 kg', '12 km', '5 mm', 'three point five kg', 'three quarters cm', 'a length in mm']) {
+      expect(sayIsSafe(bad), `${JSON.stringify(bad)} should not be safe`).toBe(false);
+    }
+    // a bare algebra letter is not a unit code and must not be flagged
+    expect(sayIsSafe('solve for m')).toBe(true);
   });
 
   // The module's own core invariant (its header comment states it): ks2Say never leaves behind what
@@ -95,7 +126,8 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
   it('ks2Say\'s output always passes sayIsSafe, over every notation shape this file handles', () => {
     const raw = [
       '3/4', '2 3/4', '300/4', '3.75', '123.5', '1234.56', '14:35', '23:59',
-      '4 cm²', '9 m²', '12 km', 'XIV', 'MCMXCIX', '−3.5', '7 − 3 = ?',
+      '4 cm²', '9 m²', '12 km', '5 mm', '200 mg', 'XIV', 'MCMXCIX', '−3.5', '7 − 3 = ?',
+      '1/20', '1/1000', '1/999', '3.5 kg', '3/4 m', '1 1/2 kg',
     ];
     for (const text of raw) expect(sayIsSafe(ks2Say(text)), `ks2Say(${JSON.stringify(text)}) = ${JSON.stringify(ks2Say(text))}`).toBe(true);
   });
