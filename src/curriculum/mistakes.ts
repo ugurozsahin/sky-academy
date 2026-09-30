@@ -5,7 +5,7 @@
 // will (#1050 onward) is still behind #1050's Year 3 shell.
 import type { Rng } from './types';
 import { nearby, shuffle } from './util';
-import { addDec, dec, digitAt, divPow10, fmt, mulPow10, subDec, type Dec, type Place } from './ks2num';
+import { addDec, dec, digitAt, divPow10, fmt, mulDecByInt, mulPow10, subDec, type Dec, type Place } from './ks2num';
 import { add as fracAdd, equal as fracEqual, simplify as fracSimplify, type Frac } from './fractions';
 
 export type MistakeKind = 'add' | 'sub' | 'mul';
@@ -47,9 +47,11 @@ export function carrySlip(a: Dec, b: Dec, op: 'add' | 'sub', answer: Dec): Dec[]
   return out;
 }
 
-/** Two adjacent printed digits of the answer's magnitude exchanged (282 → 228, swapping the tens and units). A
- *  swap that leaves a leading zero is dropped only for a whole number (`052` reads as the shorter `52`, not a
- *  distinguishable misconception) — a decimal's integer part is genuinely `0` in plenty of valid answers. */
+/** Two adjacent printed digits of the answer's magnitude exchanged (282 → 228, swapping the tens and units,
+ *  or £10.34 → £13.04/£10.43). A swap is dropped only when it turns a genuine, non-zero leading digit into a
+ *  zero (`052` reads as the shorter `52`; `1034` at dp 2, "£10.34", swapping its first two digits the same
+ *  way reads as the shorter "£1.34") — never when the leading digit already was `0` (money and decimals under
+ *  one whole unit, "£0.45", are unaffected: that `0` was always genuine, dp aside). */
 export function swappedDigits(answer: Dec): Dec[] {
   const negative = answer.v < 0;
   const digits = String(Math.abs(answer.v)).padStart(answer.dp + 1, '0').split('');
@@ -58,15 +60,22 @@ export function swappedDigits(answer: Dec): Dec[] {
     if (digits[i] === digits[i + 1]) continue;
     const swapped = digits.slice();
     [swapped[i], swapped[i + 1]] = [swapped[i + 1], swapped[i]];
-    if (answer.dp === 0 && swapped[0] === '0' && swapped.length > 1) continue;
+    if (digits[0] !== '0' && swapped[0] === '0') continue;
     out.push(dec(Number(swapped.join('')) * (negative ? -1 : 1), answer.dp));
   }
   return out;
 }
 
-/** A neighbouring times-table fact: one factor one more or one less (47 × 6 → 47 × 5, 47 × 7, 46 × 6, 48 × 6). */
-export function neighbourFact(a: number, b: number): Dec[] {
-  return [a * (b + 1), a * (b - 1), (a + 1) * b, (a - 1) * b].filter(v => v > 0).map(v => dec(v, 0));
+/** A neighbouring times-table fact: one factor one more or one less (47 × 6 → 47 × 5, 47 × 7, 46 × 6, 48 × 6).
+ *  Only the whole-number factor is ever shifted — a decimal factor (4.5 × 3) has no "times table" to misread
+ *  by one, and shifting it by a bare ±1 is not itself a plausible slip, so that side is skipped rather than
+ *  producing a non-integer product `dec()` would reject. */
+export function neighbourFact(a: Dec, b: Dec): Dec[] {
+  const out: Dec[] = [];
+  const add = (x: Dec) => { if (decValue(x) > 0) out.push(x); };
+  if (b.dp === 0) { add(mulDecByInt(a, b.v + 1)); add(mulDecByInt(a, b.v - 1)); }
+  if (a.dp === 0) { add(mulDecByInt(b, a.v + 1)); add(mulDecByInt(b, a.v - 1)); }
+  return out;
 }
 
 /** The other formal method entirely: `a + b` read for `a × b`, or `a − b` read for `a + b`. */
@@ -88,7 +97,7 @@ function rulesFor(kind: MistakeKind, { a, b, answer }: NumCalc): Dec[] {
   const out = [...placeValueShift(answer), ...swappedDigits(answer), ...signFlip(answer)];
   if (kind === 'add') out.push(...carrySlip(a, b, 'add', answer), ...wrongOperation(a, b, 'add'));
   if (kind === 'sub') out.push(...carrySlip(a, b, 'sub', answer));
-  if (kind === 'mul') out.push(...neighbourFact(decValue(a), decValue(b)), ...wrongOperation(a, b, 'mul'));
+  if (kind === 'mul') out.push(...neighbourFact(a, b), ...wrongOperation(a, b, 'mul'));
   return out;
 }
 
@@ -132,6 +141,13 @@ function fillLead(pool: Dec[], seen: Set<string>, answer: Dec, step: number, ran
  * deduped and range-filtered, then guaranteed at least one decoy sharing the answer's last printed digit and
  * one sharing its leading digit (a fill of `answer ± 10 units of its last printed place`, or `± step` inside
  * the leading digit when no such fill keeps it), topped up with `nearby()` only once both are met.
+ *
+ * Returns up to `n`, never fewer than the distinct values `range` actually has room for once the answer and
+ * any dp-scale duplicates are excluded — the same bound `nearby()` itself already has for a narrow `range`,
+ * inherited here rather than worked around: asking for `n` decoys from a range too small to hold them is not
+ * a defect in the fill, it is a range chosen too tight for `n`, and a caller passes one no wider than a real
+ * card's answer range in practice. Unlike `fracDecoys`' own numerator walk, there is no unbounded direction
+ * to extend into here — `range` is the only source of new whole-number/decimal values.
  */
 export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng, range: Range, step = 1): Dec[] {
   const { answer } = calc;
@@ -174,7 +190,9 @@ export function fracDecoys(a: Frac, b: Frac, n: number, rng: Rng): Frac[] {
     const k = fracKey(d);
     if (!seen.has(k)) { seen.add(k); picked.push(d); }
   }
-  for (let delta = 1; picked.length < n && delta <= n + Math.max(answer.n, 0) + 5; delta++) {
+  // `Math.abs`, not `Math.max(..., 0)`: a negative `answer.n` needs the walk to first cross zero before its
+  // positive direction produces any valid candidate at all, which `Math.max(answer.n, 0)` gave no slack for.
+  for (let delta = 1; picked.length < n && delta <= n + Math.abs(answer.n) + 5; delta++) {
     for (const sign of [1, -1] as const) {
       if (picked.length >= n) break;
       const cand: Frac = { n: answer.n + sign * delta, d: answer.d };

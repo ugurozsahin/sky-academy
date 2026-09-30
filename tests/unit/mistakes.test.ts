@@ -36,12 +36,23 @@ describe('mistakes (#1058): misconception decoys', () => {
       expect(swappedDigits(dec(45, 2)).map(label)).toEqual(expect.arrayContaining(['4.05', '0.54']));
       expect(swappedDigits(dec(5, 2)).map(label)).toEqual(['0.5']);
     });
+    it('£10.34: swapping the pounds digits into a leading zero collapses two digits into one and is dropped', () => {
+      // Unlike £0.xx, £10.34's leading digit is genuinely '1' — swap(0,1) -> "0134" (£1.34) loses it the same
+      // way "052" loses a digit for a whole number, and must be dropped; the other two swaps are unaffected.
+      const vals = swappedDigits(dec(1034, 2)).map(label);
+      expect(vals).not.toContain('1.34');
+      expect(vals).toEqual(expect.arrayContaining(['13.04', '10.43']));
+    });
     it('−282: the sign is reapplied after the digit-string swap', () => {
       expect(swappedDigits(dec(-282, 0)).map(label)).toEqual(expect.arrayContaining(['−228', '−822']));
     });
     it('47 × 6 = 282: neighbouring table fact varies one factor by one', () => {
-      const vals = neighbourFact(47, 6).map(label);
+      const vals = neighbourFact(dec(47, 0), dec(6, 0)).map(label);
       expect(vals).toEqual(expect.arrayContaining(['329', '235', '288', '276']));
+    });
+    it('4.5 × 3 = 13.5: only the whole-number factor (3) is shifted, no crash on the decimal factor', () => {
+      const vals = neighbourFact(dec(45, 1), dec(3, 0)).map(label);
+      expect(vals).toEqual(expect.arrayContaining(['18', '9']));
     });
     it('47 × 6: wrong operation reads it as 47 + 6', () => {
       expect(wrongOperation(dec(47, 0), dec(6, 0), 'mul').map(label)).toEqual(['53']);
@@ -148,6 +159,14 @@ describe('mistakes (#1058): misconception decoys', () => {
       }
     });
 
+    it('requesting more than a narrow range can hold returns every distinct value the range has, never fewer by a bug and never a crash', () => {
+      // [13,17] holds exactly 4 non-answer integers (13,14,16,17) besides the answer 15 — asking for 8 is a
+      // range chosen too tight for n, not a fill bug, so this pins the bound: never over-deliver, never a
+      // duplicate, never the answer, and land on every one of the 4 that genuinely exist.
+      const vals = decoysFor('add', numCalc(10, 5, 15), 8, rng(3), { min: 13, max: 17 }).map(val).sort((x, y) => x - y);
+      expect(vals).toEqual([13, 14, 16, 17]);
+    });
+
     it('kind sub: never returns the answer, a duplicate or an out-of-range value, including a multi-column borrow cascade', () => {
       const r = rng(700);
       for (let i = 0; i < 300; i++) {
@@ -241,6 +260,15 @@ describe('mistakes (#1058): misconception decoys', () => {
         }
       }
     });
+
+    it('a negative-numerator answer gets the same slack as a positive one, not just Math.max(answer.n, 0)', () => {
+      // answer = -2/1 + -8/1 = -10/1: the walk must first cross zero before its positive direction produces
+      // any candidate at all, which the old Math.max(answer.n, 0) bound gave zero extra room for.
+      for (let seed = 1; seed <= 20; seed++) {
+        const ds = fracDecoys({ n: -2, d: 1 }, { n: -8, d: 1 }, 10, rng(seed));
+        expect(ds.length, `seed ${seed}: only ${ds.length} of 10`).toBe(10);
+      }
+    });
   });
 
   describe('the KS2 distractor rule (leak limit), via leakShares', () => {
@@ -261,7 +289,7 @@ describe('mistakes (#1058): misconception decoys', () => {
     const neighbourOnlyGen: Generator = (_d, r) => {
       const a = ri(r, 2, 12), b = ri(r, 2, 12);
       const answer = a * b;
-      const decoys = shuffle(r, neighbourFact(a, b)).slice(0, 3).map(label);
+      const decoys = shuffle(r, neighbourFact(dec(a, 0), dec(b, 0))).slice(0, 3).map(label);
       return { prompt: `${a} × ${b} = ?`, answer: label(dec(answer, 0)), options: shuffle(r, [label(dec(answer, 0)), ...decoys]) };
     };
     const misconceptionGen: Generator = (_d, r) => {
