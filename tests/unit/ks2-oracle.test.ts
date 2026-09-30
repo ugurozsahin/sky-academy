@@ -89,7 +89,18 @@ const NULLS = [
   '(5 + 3 = ?',
   'n + m = 10',
   '? + n = 10',
+  // #1423 review round 3: the two cases above only ever put the letter after the `?`/other letter, so they
+  // only ever trip tokenize's letter-branch guard — the `?`-branch guard (fires when `?` follows an
+  // already-seen letter) had no case of its own. Confirmed by mutation: removing the `?`-branch guard
+  // leaves the suite green without this case, and turns this exact prompt into a fabricated `{n:5,d:1}`.
+  'n + ? = 10',
   '5 + = 8',
+  // #1423 review round 3: ks2Solve's own "no unknown at all, or it cancelled out" refusal (`isZero(coefDiff)`)
+  // had no case of either kind. Confirmed by mutation: removing that line leaves the suite green for both
+  // sub-cases below, and — worse than a wrong value — makes `reciprocal` divide by the zero `coefDiff`,
+  // which throws inside `simplify` rather than returning anything at all.
+  '5 + 3 = 8',       // no `?`/letter anywhere
+  'n + 3 = n + 5',   // a genuine cancellation: the same coefficient on both sides
   '',
 ];
 
