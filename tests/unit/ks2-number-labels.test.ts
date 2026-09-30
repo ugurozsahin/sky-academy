@@ -37,6 +37,35 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     }
   });
 
+  it('fmt() rejects a year given decimal places, a negative value, or fixedDp', () => {
+    expect(() => fmt(dec(1999, 0), { year: true, fixedDp: 2 })).toThrow(/mutually exclusive/);
+    expect(() => fmt(dec(19995, 1), { year: true })).toThrow(/fractional/);
+    expect(() => fmt(dec(-1999, 0), { year: true })).toThrow(/negative/);
+  });
+
+  it('the years exemption holds its upper boundary: 2100 still fails even with years: true', () => {
+    expect(labelProblems('2100', { years: true })).not.toEqual([]);
+    expect(labelProblems('3000', { years: true })).not.toEqual([]);
+  });
+
+  it('two independent problems in one string both get reported', () => {
+    expect(labelProblems('-12345')).toHaveLength(2); // the "-1" minus sign, and "12345" ungrouped
+    expect(labelProblems('-3 and 12345', { years: true })).toHaveLength(2);
+  });
+
+  it('a comma does not excuse the digits either side of it', () => {
+    // "12,3456" — a comma that lands nowhere near a three-digit boundary is still a bad grouping, not a
+    // free pass for the run of four after it: a check that only skips digits *preceded* by a comma would
+    // miss this entirely.
+    expect(labelProblems('12,3456')).toHaveLength(1);
+    expect(labelProblems('1,004,235')).toEqual([]); // real three-digit groups throughout: still fine
+  });
+
+  it('an ASCII minus right after a comma, with no space, is still caught', () => {
+    expect(labelProblems('1,-2')).toHaveLength(1);
+    expect(labelProblems('(3,-4)')).toHaveLength(1);
+  });
+
   it('every isKs2 registry topic\'s prompt, answer and options pass the rail', () => {
     const ks2Topics = TOPICS.filter(t => isKs2(t.year));
     for (const t of ks2Topics) {

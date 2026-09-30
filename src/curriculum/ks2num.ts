@@ -57,6 +57,11 @@ export interface FmtOpts {
 
 /** Commas from four digits, U+2212 for negatives (never ASCII "-"), no trailing zeros unless `fixedDp`. */
 export function fmt(a: Dec, opts: FmtOpts = {}): string {
+  if (opts.year) {
+    if (opts.fixedDp !== undefined) throw new Error('fmt: year and fixedDp are mutually exclusive — a year has no decimal places');
+    if (a.dp > 0) throw new Error('fmt: year given a fractional value — a year has no decimal places');
+    if (a.v < 0) throw new Error('fmt: year given a negative value — years are never negative');
+  }
   const negative = a.v < 0;
   const digits = String(Math.abs(a.v)).padStart(a.dp + 1, '0');
   const intDigits = a.dp > 0 ? digits.slice(0, digits.length - a.dp) : digits;
