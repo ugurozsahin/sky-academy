@@ -1847,22 +1847,22 @@ describe('Reception number patterns (#299 slice 1)', () => {
           expect(n, 'the ELG ceiling is 10').toBeLessThanOrEqual(d === 1 ? 6 : 10);
           expect(n).toBeGreaterThanOrEqual(1);
           const even = n % 2 === 0;
-          expect(q.answer, `${n} objects, d${d}`).toBe(d === 3 ? (even ? 'even' : 'odd') : (even ? 'yes' : 'no'));
+          expect(q.answer, `${n} objects, d${d}`).toBe(d === 3 ? (even ? 'even' : 'odd') : (even ? '✅' : '❌'));
           expect(q.hint, 'the pairing is in the hint, never drawn — a drawn pair answers the question').toBe('Put them in twos');
         }
       }
     });
-    it('d1–d2 answer yes/no; only d3 puts the words odd and even on the bubbles', () => {
+    it('d1–d2 answer ✅/❌ (#898, a pre-reader cannot read yes/no); only d3 puts the words odd and even on the bubbles', () => {
       const t = topic('r-oddeven'), r = rng(2997);
       for (const d of [1, 2, 3] as Difficulty[]) {
         const answers = new Set<string>();
         for (let i = 0; i < N; i++) {
           const q = t.gen(d, r);
-          expect([...q.options].sort(), `d${d} options`).toEqual(d === 3 ? ['even', 'odd'] : ['no', 'yes']);
+          expect([...q.options].sort(), `d${d} options`).toEqual(d === 3 ? ['even', 'odd'] : ['✅', '❌']);
           answers.add(q.answer);
         }
         // Both verdicts are reachable — a generator stuck on evens would still pass the rail above.
-        expect([...answers].sort(), `d${d} must draw both odd and even`).toEqual(d === 3 ? ['even', 'odd'] : ['no', 'yes']);
+        expect([...answers].sort(), `d${d} must draw both odd and even`).toEqual(d === 3 ? ['even', 'odd'] : ['✅', '❌']);
       }
     });
   });
@@ -2311,8 +2311,8 @@ describe('a hint is instruction text unless the generator says it is data (#328,
  *
  * `bubbleRadius` draws a wide wave 1.25x bigger (41 px against 33 px on a 390x700 arena), so as long as
  * `wide` was read off the answer alone, every card whose options differ in length sized the correct bubble
- * differently from its decoys — on a two-option card (`r-oddeven`'s `yes`/`no`, `y1-coins` d2's `50p`/`1p`)
- * a child who never read the picture could slice by size.
+ * differently from its decoys — on a two-option card (the yes/no shape `r-oddeven` used before #898,
+ * `y1-coins` d2's `50p`/`1p`) a child who never read the picture could slice by size.
  *
  * The check is the one that found the bug: group a cell's cards by their option **set** and require the
  * width to be the same for every card in a group. Two cards offering the same bubbles must look the same.
@@ -2419,9 +2419,9 @@ describe('a card\'s bubble width is derived from its options, never from its ans
 
   it('wordQ widens on a long decoy, not only on a long answer', () => {
     const r = rng(369);
-    // `r-oddeven`'s own pair, the worst of the six: the same two bubbles, either one the answer. Only the
-    // second line discriminates — `answer.length > 2` gets the first right by accident, which is why a
-    // rail written from the passing case alone would have let the defect through.
+    // A yes/no pair, the shape `r-oddeven` used before #898: the same two bubbles, either one the answer.
+    // Only the second line discriminates — `answer.length > 2` gets the first right by accident, which is
+    // why a rail written from the passing case alone would have let the defect through.
     expect(wordQ(r, 'Are there 4? Can they pair up?', 'yes', ['no']).wide).toBe(true);
     expect(wordQ(r, 'Are there 3? Can they pair up?', 'no', ['yes']).wide).toBe(true);
     // `y1-coins` d2's pair, the same shape with the long option on the other side.
