@@ -235,6 +235,26 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     }
   });
 
+  // Round 7 (#1430): unit-code matching was case-sensitive, so a capitalised unit code ("KG", "5 CM" — the
+  // casing an ordinary ruler, packet or KS2 label uses) either mis-read as a Roman numeral (when every
+  // letter happened to be one — "5 M", "2 L", "5 CM") or fell through completely unconverted (when it
+  // didn't — "KG", "5 MG", "5 G"), and sayIsSafe called the raw, unspoken original safe either way.
+  it('a unit code matches case-insensitively, whatever case the source text uses', () => {
+    const cases: [string, string][] = [
+      ['5 KG', '5 kilograms'], ['KG', 'kilograms'], ['5 MG', '5 milligrams'], ['5 G', '5 grams'],
+      ['5 M', '5 metres'], ['2 L', '2 litres'], ['5 CM', '5 centimetres'], ['5 MM', '5 millimetres'],
+      ['500 ML', '500 millilitres'],
+    ];
+    for (const [input, expected] of cases) {
+      expect(ks2Say(input), `ks2Say(${JSON.stringify(input)})`).toBe(expected);
+      expect(sayIsSafe(input), `${JSON.stringify(input)} should not be safe raw`).toBe(false);
+      expect(sayIsSafe(ks2Say(input)), `ks2Say(${JSON.stringify(input)}) should be safe`).toBe(true);
+    }
+    // a standalone upper-case Roman numeral with no digit/unit context is unaffected — the Roman check
+    // itself stays case-sensitive on purpose, so this still reads as the numeral, not a unit
+    expect(ks2Say('M')).toBe('Roman numeral M');
+  });
+
   // A Roman numeral glued directly to a digit, either order (#1430 round 4), and a unit code glued to a
   // Roman-numeral suffix (#1430 round 6) — the tokenizer converts these properly (a digit run and a
   // letter run are different token classes, so no `\b`-boundary trick is needed), rather than leaving them

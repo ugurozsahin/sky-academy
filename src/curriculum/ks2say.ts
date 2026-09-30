@@ -107,12 +107,13 @@ const UNIT_CODES_LONGEST_FIRST = [...MULTI_LETTER_UNITS, ...SINGLE_LETTER_UNITS]
  *  `null` the moment a position matches no code, so an ordinary word ("Divide", "Circle" — neither has a
  *  lower-case remainder built entirely out of unit-code fragments) is never mistaken for one. */
 function decomposeUnits(s: string): string[] | null {
+  const lower = s.toLowerCase(); // match case-insensitively; keep `s`'s own casing in the pushed slices
   const out: string[] = [];
   let i = 0;
   while (i < s.length) {
-    const code = UNIT_CODES_LONGEST_FIRST.find(c => s.startsWith(c, i));
+    const code = UNIT_CODES_LONGEST_FIRST.find(c => lower.startsWith(c, i));
     if (!code) return null;
-    out.push(code);
+    out.push(s.slice(i, i + code.length));
     i += code.length;
   }
   return out;
@@ -120,7 +121,10 @@ function decomposeUnits(s: string): string[] | null {
 
 const romanTok = (raw: string, start: number): Tok =>
   ({ kind: 'roman', start, end: start + raw.length, raw, spoken: `Roman numeral ${raw.split('').join(', ')}` });
-const unitTok = (raw: string, start: number): Tok => ({ kind: 'unit', start, end: start + raw.length, raw, spoken: unitWord(raw) });
+// `raw` keeps whatever case the input used (so the token's span still matches the source text exactly);
+// the word lookup always runs on the lower-cased form, since `unitWord`'s tables are lower-case keyed and
+// a capitalised unit code ("KG", "5 CM") is ordinary label text, not a different unit (PR #1430 round 7).
+const unitTok = (raw: string, start: number): Tok => ({ kind: 'unit', start, end: start + raw.length, raw, spoken: unitWord(raw.toLowerCase()) });
 
 /** An upper-case canonical Roman-numeral prefix glued straight to a chain of lower-case unit codes with
  *  no space ("Icm", "IIkg", "Xkgcm" — PR #1430 rounds 3 and 5) — `null` for anything else, ordinary words
@@ -141,9 +145,10 @@ function romanThenUnits(run: string, start: number): Tok[] | null {
  *  does — unlike `decomposeUnits`, leftover is expected here, since what follows is a Roman-numeral
  *  suffix, not more unit codes. */
 function consumeUnitChainPrefix(s: string): { chain: string[]; rest: string } {
+  const lower = s.toLowerCase(); // match case-insensitively; keep `s`'s own casing in the pushed slices
   const chain: string[] = [];
   let i = 0;
-  for (let code; (code = UNIT_CODES_LONGEST_FIRST.find(c => s.startsWith(c, i)));) { chain.push(code); i += code.length; }
+  for (let code; (code = UNIT_CODES_LONGEST_FIRST.find(c => lower.startsWith(c, i)));) { chain.push(s.slice(i, i + code.length)); i += code.length; }
   return { chain, rest: s.slice(i) };
 }
 
@@ -165,7 +170,9 @@ function unitThenRoman(run: string, start: number): Tok[] | null {
  *  numeral, one of the two glued combinations above, or, for an ordinary English word (however it happens
  *  to start — "Divide", "Circle", "Xavier"), text. */
 function classifyLetterRun(run: string, start: number, text: string): Tok[] {
-  if (MULTI_LETTER_UNITS.has(run) || (SINGLE_LETTER_UNITS.has(run) && singleLetterUnitOK(text, start))) {
+  const lower = run.toLowerCase(); // unit codes match case-insensitively (#1430 round 7); the Roman check
+  // below stays case-sensitive on purpose — "m" alone is the letter, never lower-case "d" for 500.
+  if (MULTI_LETTER_UNITS.has(lower) || (SINGLE_LETTER_UNITS.has(lower) && singleLetterUnitOK(text, start))) {
     return [unitTok(run, start)];
   }
   if (/^[IVXLCDM]+$/.test(run) && fromRoman(run) !== null) return [romanTok(run, start)];
