@@ -17,7 +17,7 @@ const DRAWS = 300;
  * gives the answer away.
  */
 describe('r-compare (#891)', () => {
-  it('the answer is "=" if and only if the two visual counts are equal', () => {
+  it('the answer is "=" if and only if the two visual counts are equal, and otherwise names the greater/fewer count exactly as the prompt asks', () => {
     for (const d of [1, 2, 3] as Difficulty[]) {
       const r = rng(8910 + d);
       for (let i = 0; i < DRAWS; i++) {
@@ -26,6 +26,23 @@ describe('r-compare (#891)', () => {
         expect(v.type, `d${d} draw ${i}`).toBe('objects');
         const equal = v.n === v.n2;
         expect(q.answer === '=', `d${d} draw ${i}: n=${v.n} n2=${v.n2} answer="${q.answer}"`).toBe(equal);
+        if (equal) continue;
+        // pin max/min correctness against the prompt's own "more"/"fewer" framing (#891 review:
+        // a swapped max/min slipped past every other assertion here undetected until this one).
+        expect(q.prompt, `d${d} draw ${i}`).toMatch(/^Which is (more|fewer)\?$/);
+        const wantMore = q.prompt.includes('more');
+        const expected = wantMore ? Math.max(v.n, v.n2!) : Math.min(v.n, v.n2!);
+        expect(q.answer, `d${d} draw ${i}: n=${v.n} n2=${v.n2} prompt="${q.prompt}"`).toBe(String(expected));
+      }
+    }
+  });
+
+  it('option counts: 2 at d1/d2, 3 at d3', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(8915 + d);
+      for (let i = 0; i < DRAWS; i++) {
+        const q = topic.gen(d, r);
+        expect(q.options.length, `d${d} draw ${i}`).toBe(d === 3 ? 3 : 2);
       }
     }
   });
@@ -47,7 +64,7 @@ describe('r-compare (#891)', () => {
     expect(rate, `equal-card rate ${rate}`).toBeLessThan(0.47);
   });
 
-  it('d1 and d2 never draw equal groups, and never offer "="', () => {
+  it('d1 and d2 never draw equal groups, never offer "=", and keep the pre-#891 say wording exactly', () => {
     for (const d of [1, 2] as Difficulty[]) {
       const r = rng(8940 + d);
       for (let i = 0; i < DRAWS; i++) {
@@ -55,6 +72,8 @@ describe('r-compare (#891)', () => {
         const v = q.visual as { n: number; n2?: number };
         expect(v.n, `d${d} draw ${i}`).not.toBe(v.n2);
         expect(q.options, `d${d} draw ${i}`).not.toContain('=');
+        const wantMore = q.prompt.includes('more');
+        expect(q.say, `d${d} draw ${i}`).toBe(`Which number is ${wantMore ? 'more' : 'fewer'}, ${v.n} or ${v.n2}?`);
       }
     }
   });
