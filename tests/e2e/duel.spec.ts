@@ -499,6 +499,36 @@ test.describe('Ninja Duel', () => {
     expect((await page.evaluate(() => window.__sna.state())).paused).toBe(false);
   });
 
+  // pr-test-analyzer review: the two tests above hide the app well after a round settles. This is the
+  // tighter version of the same race #884 tests for the play screen — hiding in the SAME synchronous tick
+  // as the winning slice, before the deferred won-hold beat (`onRoundWon`'s `toast`/`endWave`, scheduled
+  // through `later()`) has had any time to run. `hold(true)` freezes those beats through `scope.holdTimers`
+  // — the same mechanism the #301 guard rail above already proves holds a round decided via the `#pause`
+  // button — but this proves it holds when the pause is triggered by hiding inside the winning `answer()`
+  // call itself, not by a click dispatched afterwards.
+  test('hiding at the exact instant a round-winning answer lands holds the deferred round-end beat off until Resume (#886)', async ({ page }) => {
+    await startDuel(page);
+    await page.evaluate(() => window.__sna.setSpeed(1));   // real hold length, as the #301 rail above does
+    await page.waitForFunction(() => { const s = window.__sna.state(); return !s.decided && !s.ended && window.__sna.bubbles('a').some(b => b.label === s.answer); });
+    const before = await page.evaluate(() => window.__sna.state());
+    const sliced = await page.evaluate(() => {
+      const ok = window.__sna.answer('a');                                  // the round-winning slice
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));                // same tick — the tightest version of the race
+      return ok;
+    });
+    expect(sliced).toBe(true);
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.waitForTimeout(3000);                                        // well past the won hold and its breath
+    const held = await page.evaluate(() => window.__sna.state());
+    expect(held.round, 'the round does not advance behind the overlay').toBe(before.round);
+    expect(held.prompt, 'nor is the next question written onto the card').toBe(before.prompt);
+    expect(await page.evaluate(() => window.__sna.arenas.a.frozen), "and Player 1's wave was never cleared").toBe(true);
+    expect(await page.evaluate(() => window.__sna.arenas.b.frozen), "nor Player 2's").toBe(true);
+    await page.click('#resume');
+    await page.waitForFunction(r => window.__sna.state().round === r + 1, before.round, { timeout: 5000 });
+  });
+
   test('the card carries the line the round is decided by, every round (#65, PR #295 review)', async ({ page }) => {
     await startDuel(page);
     // The pool's comparison topics (length, mass, capacity, temperature) put the values being compared in
