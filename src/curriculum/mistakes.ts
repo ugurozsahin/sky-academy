@@ -55,20 +55,24 @@ export function carrySlip(a: Dec, b: Dec, op: 'add' | 'sub', answer: Dec): Dec[]
 }
 
 /** Two adjacent printed digits of the answer's magnitude exchanged (282 → 228, swapping the tens and units,
- *  or £10.34 → £13.04/£10.43). A swap is dropped only when it turns a genuine, non-zero leading digit into a
- *  zero (`052` reads as the shorter `52`; `1034` at dp 2, "£10.34", swapping its first two digits the same
- *  way reads as the shorter "£1.34") — never when the leading digit already was `0` (money and decimals under
- *  one whole unit, "£0.45", are unaffected: that `0` was always genuine, dp aside). */
-export function swappedDigits(answer: Dec): Dec[] {
+ *  or £10.34 → £13.04/£10.43). Swaps the digits `display` actually prints, at the printed decimal length —
+ *  never the raw `(v, dp)` pair, which can carry more scale than is shown (`dec(510, 2)` prints "5.1" via
+ *  bare `fmt`, trailing zero trimmed; swapping its raw 3-digit form would offer "5.01", a decoy with a
+ *  decimal place nothing else on the card has). A swap is dropped only when it turns a genuine, non-zero
+ *  leading printed digit into a zero (`052` reads as the shorter `52`; `1034` at dp 2, "£10.34", swapping its
+ *  first two digits the same way reads as the shorter "£1.34") — never when the leading digit already was
+ *  `0` (money and decimals under one whole unit, "£0.45", are unaffected: that `0` was always genuine). */
+export function swappedDigits(answer: Dec, display: Display = fmt): Dec[] {
   const negative = answer.v < 0;
-  const digits = String(Math.abs(answer.v)).padStart(answer.dp + 1, '0').split('');
+  const fracLen = printedFracLen(answer, display);
+  const digits = printedDigits(answer, display).split('');
   const out: Dec[] = [];
   for (let i = 0; i < digits.length - 1; i++) {
     if (digits[i] === digits[i + 1]) continue;
     const swapped = digits.slice();
     [swapped[i], swapped[i + 1]] = [swapped[i + 1], swapped[i]];
     if (digits[0] !== '0' && swapped[0] === '0') continue;
-    out.push(dec(Number(swapped.join('')) * (negative ? -1 : 1), answer.dp));
+    out.push(dec(Number(swapped.join('')) * (negative ? -1 : 1), fracLen));
   }
   return out;
 }
@@ -100,8 +104,8 @@ export function topsAndBottoms(a: Frac, b: Frac): Frac[] {
 export interface NumCalc { a: Dec; b: Dec; answer: Dec }
 export interface Range { min: number; max: number }
 
-function rulesFor(kind: MistakeKind, { a, b, answer }: NumCalc): Dec[] {
-  const out = [...placeValueShift(answer), ...swappedDigits(answer), ...signFlip(answer)];
+function rulesFor(kind: MistakeKind, { a, b, answer }: NumCalc, display: Display): Dec[] {
+  const out = [...placeValueShift(answer), ...swappedDigits(answer, display), ...signFlip(answer)];
   if (kind === 'add') out.push(...carrySlip(a, b, 'add', answer), ...wrongOperation(a, b, 'add'));
   if (kind === 'sub') out.push(...carrySlip(a, b, 'sub', answer));
   if (kind === 'mul') out.push(...neighbourFact(a, b), ...wrongOperation(a, b, 'mul'));
@@ -179,7 +183,7 @@ export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng,
   const { answer } = calc;
   const seen = new Set<string>([key(answer, display)]);
   const picked: Dec[] = [];
-  const pool = shuffle(rng, rulesFor(kind, calc)).filter(d => key(d, display) !== key(answer, display) && decValue(d) >= range.min && decValue(d) <= range.max);
+  const pool = shuffle(rng, rulesFor(kind, calc, display)).filter(d => key(d, display) !== key(answer, display) && decValue(d) >= range.min && decValue(d) <= range.max);
 
   // The two guarantees are reserved first, so a later slice-to-`n` never cuts them.
   const last = fillLast(pool, seen, answer, range, display);
@@ -191,11 +195,18 @@ export function decoysFor(kind: MistakeKind, calc: NumCalc, n: number, rng: Rng,
 
   for (const d of pool) { if (picked.length >= n) break; tryAdd(picked, seen, d, range, display); }
 
+  // `tried` accumulates every raw value nearby() has already proposed, accepted or not — not just `picked`'s
+  // own raw values — so a coarse/lossy `display` (several raw values printing identically) can't make the
+  // loop re-propose, and re-waste a guard iteration on, the same already-rejected raw value every time.
   let guard = 0;
+  const tried = new Set<number>(picked.map(decValue));
   while (picked.length < n && guard++ < 20) {
-    const extra = nearby(rng, decValue(answer), n - picked.length, range.min, range.max, new Set(picked.map(decValue)));
+    const extra = nearby(rng, decValue(answer), n - picked.length, range.min, range.max, tried);
     if (extra.length === 0) break;
-    for (const v of extra) tryAdd(picked, seen, dec(Math.round(v * 10 ** answer.dp), answer.dp), range, display);
+    for (const v of extra) {
+      tried.add(v);
+      tryAdd(picked, seen, dec(Math.round(v * 10 ** answer.dp), answer.dp), range, display);
+    }
   }
   return picked.slice(0, n);
 }

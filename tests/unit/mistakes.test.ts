@@ -46,6 +46,12 @@ describe('mistakes (#1058): misconception decoys', () => {
     it('−282: the sign is reapplied after the digit-string swap', () => {
       expect(swappedDigits(dec(-282, 0)).map(label)).toEqual(expect.arrayContaining(['−228', '−822']));
     });
+    it('dec(510, 2) prints "5.1": swappedDigits swaps the printed digits, never offering "5.01" — extra precision nothing else on the card has (round 7, #1435)', () => {
+      const vals = swappedDigits(dec(510, 2)).map(label);
+      expect(vals).not.toContain('5.01');
+      // The printed digits are "5","1" (bare fmt trims the trailing zero) — the only swap is 1.5.
+      expect(vals).toEqual(['1.5']);
+    });
     it('47 × 6 = 282: neighbouring table fact varies one factor by one', () => {
       const vals = neighbourFact(dec(47, 0), dec(6, 0)).map(label);
       expect(vals).toEqual(expect.arrayContaining(['329', '235', '288', '276']));
@@ -201,6 +207,20 @@ describe('mistakes (#1058): misconception decoys', () => {
       for (let i = 0; i < 200; i++) {
         const printed = decoysFor('add', calc, 4, r, { min: 0, max: 400 }, 1, roundedDisplay).map(roundedDisplay);
         expect(new Set(printed).size, `draw ${i}: two decoys print identically among ${printed}`).toBe(printed.length);
+      }
+    });
+
+    it('under a coarse display, the top-up loop still delivers a full n — a rejected raw value is never re-proposed (round 7, #1435)', () => {
+      // Same rounded-to-nearest-10 display as the round-6 test, but this time asserting the count itself:
+      // the old top-up loop re-excluded only `picked`'s own raw values, so nearby() could keep re-proposing
+      // the same raw value that had already been rejected for colliding with an already-picked printed
+      // bucket, burning the guard budget on repeats instead of finding new ones.
+      const roundedDisplay = (d: Dec) => String(Math.round(val(d) / 10) * 10);
+      const calc = numCalc(100, 45, 145);
+      const r = rng(0);
+      for (let i = 0; i < 200; i++) {
+        const ds = decoysFor('add', calc, 4, r, { min: 0, max: 400 }, 1, roundedDisplay);
+        expect(ds.length, `draw ${i}: only ${ds.length}/4 decoys, range has room for more`).toBe(4);
       }
     });
 
