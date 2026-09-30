@@ -24,7 +24,12 @@ import { fixDeck } from './game/session';
 let year: YearInfo | null = null; let fromPop = false;
 const enter = (screen: string) => {
   if (fromPop) { fromPop = false; return; }                                   // re-rendering after a pop: the entry already exists
-  if (history.state?.screen === screen) history.replaceState({ screen }, ''); else history.pushState({ screen }, '');
+  // #887 review: re-entering the SAME screen (Play again/Fix my mistakes/Next topic/duel rematch, none of
+  // which ever pop first) replaces the live entry in place — carrying its `guard` flag through rather than
+  // dropping it, so the fresh screen's own `pushBackGuard()` call sees a guard already on top and no-ops,
+  // instead of pushing a permanent extra entry every replay (unbounded growth, #1451 review round 1).
+  if (history.state?.screen === screen) history.replaceState({ screen, guard: history.state?.guard }, '');
+  else history.pushState({ screen }, '');
 };
 /** Go up one screen by popping history (so the stack stays [map, island?, play|memory?] / [map, rewards?]). */
 const up = () => { if (history.state?.screen) history.back(); else nav.map(); };
@@ -133,10 +138,24 @@ const relaunch = () => {
   // save no longer exists (#420 review B1).
   if (profileIds().length > 1) goProfiles(true); else if (load().onboarded) nav.map(); else nav.avatar();
 };
+// The screens a bare pop steps back through to the entry below rather than rendering directly (below), and
+// the two with a #887 Pause guard — Sets rather than chains of `||`s, which is what keeps the listener under
+// the complexity rail with #887's added branch (`.has(s)` costs one branch each; nine `||`s would have cost
+// nine).
+const BACK_ONE = new Set<string | undefined>(['play', 'memory', 'duel', 'shop', 'parents']);
+const GUARDED_SCREEN = new Set<string | undefined>(['play', 'duel']);
 window.addEventListener('popstate', () => {
-  const s = history.state?.screen as string | undefined;   // the entry we landed on
+  const st = (history.state || {}) as { screen?: string; guard?: boolean };   // never `?.`-chained below
+  const s = st.screen;                                       // the entry we landed on
   fromPop = true;
-  if (pendingProfiles) { const { root } = pendingProfiles; pendingProfiles = null; goProfiles(root); return; }   // still unwinding towards the picker's root
+  if (pendingProfiles) { const { root } = pendingProfiles; pendingProfiles = null; goProfiles(root); return; }
+  // #887: a pop that lands back on a live play/duel screen's own (guard-less) entry — its guard entry was the
+  // one just popped — and that screen's Pause guard catches the press, the same question #885 already asks
+  // the Android hardware button. Neither re-render nor `leave()`: the screen is untouched, and the DOM
+  // already matches the entry now on top — the press just stops, exactly as the hardware button's
+  // `beforeLeave` does. Once the screen has torn itself down (Quit, Islands, results) `dispose()` has cleared
+  // the guard, `backGuard()` answers `false`, and this falls through to the chain below, same as before #887.
+  if (GUARDED_SCREEN.has(s) && !st.guard && backGuard()) { fromPop = false; return; }
   // The grown-ups screen's guarded reset (#115) must land on onboarding, never the map with an empty profile,
   // however it is left — including the hardware/browser back button landing here rather than through
   // parents.ts's own `#back` click handler.
@@ -148,7 +167,7 @@ window.addEventListener('popstate', () => {
   // hardware-back press — could land back on that stale entry and silently re-show a wizard step to a
   // player who has already finished onboarding. Once `onboarded` is true, every history entry from before
   // it is inert as far as the wizard is concerned; only the map (or wherever `nav.map()` sends it next) is.
-  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro' && !load().onboarded) { fromPop = false; leave(); renderIntro(); } else if (s === 'onboard-name' && !load().onboarded) { fromPop = false; leave(); renderName(); } else if (s === 'play' || s === 'memory' || s === 'duel' || s === 'shop' || s === 'parents') { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
+  if (s === 'island' && year) nav.island(year); else if (s === 'rewards') nav.rewards(); else if (s === 'onboard-intro' && !load().onboarded) { fromPop = false; leave(); renderIntro(); } else if (s === 'onboard-name' && !load().onboarded) { fromPop = false; leave(); renderName(); } else if (BACK_ONE.has(s)) { fromPop = false; history.back(); } else if (isPendingReset()) { clearPendingReset(); nav.avatar(); } else if (!load().onboarded) nav.avatar(); else nav.map();
 });
 
 // #699: on the Android APK, the hardware/gesture back button otherwise finishes the activity — Capacitor's

@@ -378,17 +378,58 @@ test.describe('Ninja Duel', () => {
     await expectHandoverHeard(page);   // the rematch's line is not dropped into the old screen's cancel()
     expect(await page.evaluate(() => window.__said.indexOf('<cancel>')), 'the old screen was hushed first, then the line went out').toBeGreaterThanOrEqual(0);
     // Leaving tears the duel down: the hooks go with it and BOTH render loops stop (#73 — no arena may leak
-    // across screens; the game.spec `__deadArena` pattern, once per arena). The exit is the hardware/browser
-    // back on an UNPAUSED screen, deliberately: `Arena.time` only advances while not paused, so leaving through
-    // the pause overlay's Quit would read a leaked loop as a stopped one (PR #295 review, round 3). It is also
-    // the `'duel'` popstate branch main.ts added.
-    await page.evaluate(() => { window.__deadArenas = [window.__sna.arenas.a, window.__sna.arenas.b]; history.back(); });
+    // across screens; the game.spec `__deadArena` pattern, once per arena). #887 makes hardware/browser back
+    // pause a live match first, so leaving now takes two presses — and `Arena.time` stops advancing the
+    // instant the FIRST press pauses, whether or not the second ever tears anything down, so it can no longer
+    // prove teardown on its own the way it could when back left directly (PR #295 review, round 3). Spying on
+    // `destroy()` itself closes that gap: a leaked-but-paused arena cannot read as torn down by coincidence.
+    await page.evaluate(() => {
+      window.__deadArenas = [window.__sna.arenas.a, window.__sna.arenas.b];
+      (window as any).__destroyed = [false, false];
+      window.__deadArenas.forEach((a: any, i) => { const orig = a.destroy.bind(a); a.destroy = () => { (window as any).__destroyed[i] = true; orig(); }; });
+      history.back();                                          // #887: first back pauses the live match
+    });
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.evaluate(() => history.back());                 // second back actually leaves, tearing the screen down
     await expect(page.locator('.island-screen')).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__destroyed)).toEqual([true, true]);
     const leaked = await page.evaluate(() => new Promise<{ advanced: number[]; sna: string }>(res => {
       const t0 = window.__deadArenas.map(a => a.time);
       setTimeout(() => res({ advanced: window.__deadArenas.map((a, i) => +(a.time - t0[i]).toFixed(2)), sna: typeof window.__sna }), 500);
     }));
     expect(leaked).toEqual({ advanced: [0, 0], sna: 'undefined' });
+  });
+
+  test('back button opens Pause first on a live duel too, and Quit reaches the island with no dead entry (#887)', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    await expect(page.locator('#round')).toHaveText('Round 1 of 10');
+    await page.evaluate(() => history.back());                 // first back pauses, doesn't leave
+    await expect(page.locator('#resume')).toBeVisible();
+    expect(await page.evaluate(() => window.__sna.state().paused)).toBe(true);
+    await page.click('#resume');
+    await expect(page.locator('#resume')).toBeHidden();
+    await page.evaluate(() => history.back());                 // after Resume, back pauses again — the guard was re-armed
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.click('#quit');
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await page.goBack();                                       // no dead entry: one more back reaches the sky map
+    await expect(page.locator('.islands.big')).toBeVisible();
+  });
+
+  // #1451 review round 1: the same leak game.spec.ts's equivalent guard rail pins for "Play again" — a duel
+  // rematch (`#again`) never pops first, so it re-entered the SAME `enter()` screen slot as the still-live
+  // #887 guard entry and left one permanent dead history entry behind, unboundedly, per rematch.
+  test('guard rail: a duel rematch does not leak a history entry — #887\'s guard is carried through, not duplicated', async ({ page }) => {
+    await startDuel(page, dojoSeeds('fresh'));
+    const before = await page.evaluate(() => history.length);
+    await winWholeMatch(page);
+    await page.click('.duel-end #again');
+    await expect(page.locator('.duel-screen')).toBeVisible();
+    expect(await page.evaluate(() => history.length), 'one rematch must not grow the history stack').toBe(before);
+    // and the new match's own #887 guard still works: first back pauses it, not a stale double-pop
+    await page.evaluate(() => history.back());
+    await expect(page.locator('#resume')).toBeVisible();
+    expect(await page.evaluate(() => window.__sna.state().ended), 'the rematch, not the old one').toBe(false);
   });
 
   test('a duel won on a second topic gets its own album entry, not the first one\'s row overwritten (#670)', async ({ page }) => {
