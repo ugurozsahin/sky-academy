@@ -1,5 +1,5 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
-import { shownYears, topicsFor, type YearInfo } from '../curriculum';
+import { isKs2, shownYears, topicsFor, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
 import { certAlbumHTML, showStoredCertificate } from './certificate';
@@ -88,7 +88,7 @@ export function mapScreen(nav: Nav) {
         </button>`; }).join('')}
     </div>
     ${dojoCard(dojoState, dojoChallenges)}
-    <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS & KS1 National Curriculum</span>
+    <footer class="foot"><span>Sky Ninja Academy · aligned to EYFS${shown.some(y => isKs2(y.id)) ? ', KS1 & KS2' : ' & KS1'} National Curriculum</span>
       <div class="foot-links">
         <button class="foot-link" id="grownups" aria-label="For grown-ups">👤 For grown-ups</button>
         <button class="foot-link" id="who" aria-label="Who is playing?">👥 Who is playing?</button>

@@ -20,3 +20,8 @@ const GATED_YEARS: YearInfo[] = YEARS.filter(y =>
 /** Every `YEARS` row the map may show right now: every EYFS/KS1 island, always, plus the KS2 islands that
  *  meet the topic-count gate — or, with the preview key set, every row regardless (#1032). */
 export const shownYears = (): YearInfo[] => (previewAllYears() ? YEARS : GATED_YEARS);
+
+/** #1039: `TOPICS` rows on an island the map is showing right now — what a reward or a dashboard total should
+ *  count, so a topic added to a hidden KS2 year (below `shownYears()`'s gate) never moves a star tally, a
+ *  sticker or the Master Ninja unlock until its island actually appears. */
+export const listedTopics = (): Topic[] => { const shown = new Set(shownYears().map(y => y.id)); return TOPICS.filter(t => shown.has(t.year)); };

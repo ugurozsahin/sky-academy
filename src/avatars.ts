@@ -44,7 +44,7 @@ export const VILLAIN = { id: 'hammer', name: 'Hammer Man', img: 'avatars/hammer.
 /**
  * The Master Ninja (owner art: white hair, all elements). Two roles:
  * - Sensei, the guide: face of Train with Sensei, the first-play tutorial and (later) the Lessons and the coin shop.
- * - Playable 11th avatar `master`, locked until every topic on every island has at least one star (see `masterProgress`).
+ * - Playable 11th avatar `master`, locked until every topic on three islands has at least one star (see `masterProgress`).
  */
 export const MASTER: Avatar = { id: 'master', name: 'Master Ninja', element: 'Sensei of all elements', glow: '#ffd87a', img: 'avatars/sensei.webp', fx: 'master', focus: 0.3,
   praise: ['Calm mind, sharp blade, {name}.', 'The student becomes the master, {name}.', 'Patience and practice, {name}. Well done.'], cheer: ['Steady.', 'Just so.', 'Wise.'] };

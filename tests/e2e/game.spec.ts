@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { TOPICS } from '../../src/curriculum';
+import { TOPICS, shownYears } from '../../src/curriculum';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
@@ -274,7 +274,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.avatar-card')).toHaveCount(11);
     await expect(card).toHaveClass(/locked/);
     await expect(card.locator('.lock')).toBeVisible();
-    await expect(card.locator('small')).toHaveText(`0/${TOPICS.length} topics ★`);
+    await expect(card.locator('small')).toHaveText('0/3 islands ★');   // #1039 Decision D7: fixed at three islands, never every topic in the registry
     await card.click();
     await expect(page.locator('#next')).toBeDisabled();                               // a locked card never selects
     await expect(card).not.toHaveClass(/sel/);
@@ -3272,7 +3272,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#gate-go');
     await expect(page.locator('.parents-dash')).toBeVisible();
     await expect(page.locator('.p-stats div')).toHaveCount(4);       // overall stat tiles
-    await expect(page.locator('.p-table tbody tr')).toHaveCount(3);  // one row per island
+    await expect(page.locator('.p-table tbody tr')).toHaveCount(shownYears().length);  // one row per shown island (#1039)
 
     // back returns to the sky map
     await page.click('#back');

@@ -5,7 +5,7 @@
     "fileLines": 600
   },
   "complexity": {
-    "src/curriculum/year2.ts::(anonymous)": 17,
+    "src/curriculum/year2/measure.ts::(anonymous)": 17,
     "src/game/arena.ts::drawBubble": 16,
     "src/game/arena.ts::drawParticle": 21,
     "src/game/arena.ts::drawTrail": 19,
@@ -39,10 +39,9 @@
     "src/ui/visuals.ts::renderVisual": 89
   },
   "fileLines": {
-    "src/curriculum/year2.ts": 753,
     "tests/unit/arena.test.ts": 948,
     "tests/unit/audio.test.ts": 617,
-    "tests/unit/curriculum.test.ts": 2650,
+    "tests/unit/curriculum.test.ts": 2649,
     "tests/unit/duel.test.ts": 970,
     "tests/unit/governance.test.ts": 5764,
     "tests/unit/guardrails.test.ts": 3632,

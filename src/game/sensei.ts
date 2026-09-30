@@ -4,13 +4,20 @@ import type { TopicProgress } from '../storage';
 
 export const TRAIN_TOPICS = 3;
 
+// #1039 Decision D7. Its own constant, deliberately not `TRAIN_TOPICS` above: the two are unrelated invariants
+// that happen to share a value today, and reusing one for the other would silently couple them.
+const MASTER_ISLANDS_NEEDED = 3;
+
 /**
- * Master Ninja unlock: every topic (all islands, tracing included) has at least one star.
- * Returns how many topics are starred out of the total, so the locked card can show progress.
+ * Master Ninja unlock (#1039, Decision D7): every topic on any three islands (tracing included) has at least
+ * one star — fixed at three so a new KS2 island never asks a Reception child to star a Year 6 topic. `islands`
+ * is one topic list per island (`shownYears().map(y => topicsFor(y.id))`); `done` counts fully-starred islands,
+ * capped at the three needed, so it never grows past 3/3 as more islands appear. `ts.length > 0` is defensive
+ * only — every real island has topics — so an all-empty `islands` reads as not yet unlocked rather than a crash.
  */
-export function masterProgress(topics: Topic[], progress: Record<string, TopicProgress>): { done: number; total: number; unlocked: boolean } {
-  const done = topics.filter(t => (progress[t.id]?.stars ?? 0) >= 1).length;
-  return { done, total: topics.length, unlocked: topics.length > 0 && done === topics.length };
+export function masterProgress(islands: Topic[][], progress: Record<string, TopicProgress>): { done: number; total: number; unlocked: boolean } {
+  const done = Math.min(islands.filter(ts => ts.length > 0 && ts.every(t => (progress[t.id]?.stars ?? 0) >= 1)).length, MASTER_ISLANDS_NEEDED);
+  return { done, total: MASTER_ISLANDS_NEEDED, unlocked: done >= MASTER_ISLANDS_NEEDED };
 }
 
 /** Accuracy so far (0–1) from recorded slices; older saves without tallies fall back to their star rating. */

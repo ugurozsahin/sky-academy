@@ -1,5 +1,5 @@
 import { avatarOrNull } from '../avatars';
-import { TOPICS, YEARS } from '../curriculum';
+import { listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
 import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
@@ -331,7 +331,7 @@ export function parentsScreen(nav: Nav) {
   const drawDash = () => {
     let snapshot: SaveData | null = null;
 
-    const sm = parentSummary(load(), TOPICS, YEARS, STICKER_IDS.length);
+    const sm = parentSummary(load(), listedTopics(), shownYears(), STICKER_IDS.length);
     render(`
     <section class="screen home parents dash">
       <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Grown-ups dashboard</b><small>How ${esc(load().name || 'your ninja')} is getting on</small></div></div>
