@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, type ResultCandidate } from '../../src/ui/results';
+import { firstQuestionLine, resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, scoreLine, type ResultCandidate } from '../../src/ui/results';
 import { resultsHTML, type ResultsData } from '../../src/ui/overlays';
 import type { Mode } from '../../src/game/modes';
-import type { Topic } from '../../src/curriculum';
+import type { Question, Topic } from '../../src/curriculum';
 
 // #36: these were dense ternaries buried in play.ts's showResults, reached only by the e2e results screen.
 // Now they are pure functions, so every mode/win/star combination is checked here directly.
@@ -316,5 +316,82 @@ describe('resultsHTML action (#929)', () => {
   });
   it('a supplied action reaches the row as its own button', () => {
     expect(resultsHTML({ ...base, action: { id: 'next-topic', label: 'Next topic →' } })).toContain('id="next-topic">Next topic →</button>');
+  });
+});
+
+/**
+ * #897: the results screen's spoken score line — how a non-reader hears they did, not only a praise line.
+ */
+describe('scoreLine', () => {
+  const base = { mode: 'mission' as Mode, won: true, correct: 18, stars: 3 };
+
+  it('always opens with the correct count, singular phrasing included', () => {
+    expect(scoreLine({ ...base, correct: 18 })).toBe('You got 18 right. Three stars!');
+    expect(scoreLine({ ...base, correct: 1 })).toBe('You got 1 right. Three stars!');
+    expect(scoreLine({ ...base, correct: 0, won: false, stars: 0 })).toBe('You got 0 right.');
+  });
+
+  it('adds the star word only for a won mission with stars, one/two/three', () => {
+    expect(scoreLine({ ...base, stars: 1 })).toBe('You got 18 right. One star!');
+    expect(scoreLine({ ...base, stars: 2 })).toBe('You got 18 right. Two stars!');
+    expect(scoreLine({ ...base, stars: 3 })).toBe('You got 18 right. Three stars!');
+  });
+
+  it('never adds a star word to a lost mission, whatever stars carries over from a prior stage', () => {
+    expect(scoreLine({ ...base, won: false, stars: 2 })).toBe('You got 18 right.');
+  });
+
+  it('never adds a star word at 0 stars, even on a win', () => {
+    expect(scoreLine({ ...base, stars: 0 })).toBe('You got 18 right.');
+  });
+
+  it('never adds a star word outside mission mode', () => {
+    for (const mode of ['endless', 'sprint', 'boss'] as Mode[]) expect(scoreLine({ ...base, mode })).toBe('You got 18 right.');
+  });
+});
+
+/**
+ * #897: a pre-reader tapping straight into a topic mission hears its name, folded into the SAME utterance as
+ * the first question so a separate, earlier `say()` cannot be cancelled by it (the same reasoning `duel.ts`'s
+ * `spokenQuestion` hand-over already follows).
+ */
+describe('firstQuestionLine', () => {
+  const topic = { title: 'Number Bonds' } as Topic;
+  const q = { prompt: '2 + 2', say: undefined } as unknown as Question;
+
+  it('folds the topic title into question 1 of a topic mission, title first', () => {
+    expect(firstQuestionLine(q, topic, 1, false, null)).toBe('Number Bonds! 2 + 2');
+  });
+
+  it('prefers q.say over q.prompt, same as every other question utterance', () => {
+    const spoken = { prompt: '2 + 2', say: 'Two plus two' } as unknown as Question;
+    expect(firstQuestionLine(spoken, topic, 1, false, null)).toBe('Number Bonds! Two plus two');
+  });
+
+  it('returns the plain prompt for every question after the first — questionsAsked decides it, not a caller-passed flag', () => {
+    expect(firstQuestionLine(q, topic, 2, false, null)).toBe('2 + 2');
+  });
+
+  it('returns the plain prompt with no topic — every pool-driven mode (training, Storm, Sprint, Boss)', () => {
+    expect(firstQuestionLine(q, undefined, 1, false, null)).toBe('2 + 2');
+  });
+
+  it('returns the plain prompt on a "Fix my mistakes" replay, even of a topic mission\'s own first question', () => {
+    expect(firstQuestionLine(q, topic, 1, true, null)).toBe('2 + 2');
+  });
+
+  /**
+   * #897 review (silent-failure-hunter): `Session.respawn()` re-poses the SAME `Question` object (a sequence
+   * card whose wave fell with nothing decided) without advancing `questionsAsked` — so question 1 respawned
+   * would otherwise read `questionsAsked === 1` a second time and announce the topic again, interrupting
+   * whatever was still speaking. `prev === q` is the respawn signature; a genuinely new question is a new object.
+   */
+  it('never repeats the announcement on a respawn of the SAME question object', () => {
+    expect(firstQuestionLine(q, topic, 1, false, q)).toBe('2 + 2');
+  });
+
+  it('still announces when the previous question is a DIFFERENT object, even with an identical prompt', () => {
+    const same = { prompt: '2 + 2', say: undefined } as unknown as Question;
+    expect(firstQuestionLine(q, topic, 1, false, same)).toBe('Number Bonds! 2 + 2');
   });
 });

@@ -13,6 +13,18 @@ let backFn: (() => boolean) | null = null;
  *  `wireBackButton` as `beforeLeave` (#885). */
 export function backGuard(): boolean { return backFn?.() ?? false; }
 
+/** #887: pushes one history entry above the current one, flagged `guard: true`, so the browser/gesture Back
+ *  that pops it lands back on the screen's own (guard-less) entry rather than stepping past it — `main.ts`'s
+ *  `popstate` handler then asks `backGuard()` before unwinding further, same question #885 already asks the
+ *  Android hardware button. A live play/duel screen calls this once its game is actually live, and again on
+ *  Resume (the very press that opened Pause already consumed the guard). A no-op when the guard is already
+ *  on top, so a stray extra call can never stack two. */
+export function pushBackGuard(): void {
+  const s = history.state as { screen?: string; guard?: boolean } | null;
+  if (s?.guard) return;
+  history.pushState({ screen: s?.screen, guard: true }, '');
+}
+
 export interface ScreenScope {
   /** Run `fn` after `ms`, but only while the screen is still alive AND not held; the timer is tracked for
    *  teardown, and `holdTimers(true)` stops its clock with the rest of the screen's beats. */
