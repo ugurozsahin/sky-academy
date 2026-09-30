@@ -12,7 +12,7 @@ import {
 import { equippedItem } from '../game/shop';
 import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
 import { $, esc, render } from './dom';
-import { screenScope } from './screen';
+import { pushBackGuard, screenScope } from './screen';
 import { createHud } from './hud';
 import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
@@ -62,7 +62,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   let arena: Arena | null = null; let tracer: Tracer | null = null; let paused = false;   // #884: mirrors the Pause overlay, for state()
   let lastCert: CertInfo | null = null;   // the one CertInfo actually filed (#410) — hooks read this, not a fresh certInfo() call
   const scope = screenScope();                    // #35: alive-guarded timers, the #toast helper and teardown, shared with the memory screen
-  const { later, toast, holdTimers, onHidden, onBack } = scope; onHidden(() => { hush(); pauseIfLive(); }); onBack(pauseIfLive);   // #885
+  const { later, toast, holdTimers, onHidden, onBack } = scope; onHidden(() => { hush(); pauseIfLive(); }); onBack(pauseIfLive); pushBackGuard();   // #885, #887
   const hud = createHud(els, o.year.lives, canHear);   // #36: HUD writers live in hud.ts
   // Outcome beat: after a slice the wave freezes and the result is shown (✓ on the sliced bubble, or ✗ next to the glowing
   // right answer; the card fills in the answer) for `hold` ms, then a short gap before the next question. Sprint stays brisk.
@@ -259,7 +259,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   function showPause() {
     playSession.hold(true); paused = true;         // #65: pauses the arena, and stops a sentence peek's clock with it
     els.overlay.hidden = false; els.overlay.innerHTML = pauseHTML();
-    $('#resume').addEventListener('click', () => { els.overlay.hidden = true; playSession.hold(false); paused = false; });
+    $('#resume').addEventListener('click', () => { els.overlay.hidden = true; playSession.hold(false); paused = false; pushBackGuard(); });   // #887
     $('#quit').addEventListener('click', () => { cleanup(); goHome(); });
   }
   // #884: opens Pause on a live game (no overlay up, not yet ended); a stage-clear/results overlay stays as it is.

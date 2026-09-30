@@ -110,7 +110,7 @@ export type Generator = (d: Difficulty, rng: Rng) => Question;
 
 // One string source of truth for every year group. Adding a year (Y3–Y6) means one
 // new YearId member + one YEARS entry — no unions or per-year assets to retype elsewhere.
-export type YearId = 'reception' | 'year1' | 'year2';
+export type YearId = 'reception' | 'year1' | 'year2' | 'year3';
 
 export interface Topic {
   id: string;             // "y1-bonds"
@@ -168,4 +168,7 @@ export const YEARS: YearInfo[] = [
   { id: 'reception', title: 'Reception', short: 'R', age: 'Ages 4–5', blurb: 'First steps · counting, sounds & letters', art: ART_RECEPTION, tint: '#66c25a55', maxAnswer: 30, perStage: 5, lives: 4, gentle: true, speeds: [0, 0, 0, 1, 1], diffs: [1, 1, 2, 2, 3], sprintStars: { threeStar: 8, twoStar: 4 } },
   { id: 'year1', title: 'Year 1', short: 'Y1', age: 'Ages 5–6', blurb: 'Number bonds, adding, phonics & spelling', art: ART_YEAR1, tint: '#59b0b855', maxAnswer: 120, perStage: 6, lives: 3, gentle: false, speeds: [1, 2, 2, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
   { id: 'year2', title: 'Year 2', short: 'Y2', age: 'Ages 6–7', blurb: 'Times tables, money, time & tricky words', art: ART_YEAR2, tint: '#7a5ad655', maxAnswer: 130, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
+  // #1050: no `art` yet (#1032's placeholder draws instead) — a KS2 island stays hidden by `meetsShowGate`
+  // until it has 12 maths + 6 writing topics, so this row exists with no map presence today.
+  { id: 'year3', title: 'Year 3', short: 'Y3', age: 'Ages 7–8', blurb: 'Hundreds, 3, 4 & 8 tables, fractions & Roman numerals', tint: '#ffb02055', maxAnswer: 2000, perStage: 7, lives: 3, gentle: false, speeds: [1, 2, 3, 3, 3], diffs: [1, 2, 2, 3, 3], sprintStars: { threeStar: 12, twoStar: 6 } },
 ];

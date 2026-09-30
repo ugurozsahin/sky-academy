@@ -8,4 +8,5 @@ export const EXPECTED_SHOWN: Record<YearId, boolean> = {
   reception: true,
   year1: true,
   year2: true,
+  year3: false,
 };

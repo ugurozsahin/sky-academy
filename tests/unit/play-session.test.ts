@@ -269,7 +269,7 @@ describe('the no-voice sentence peek (#65)', () => {
     spoken.length = 0;
     const { ps } = build(sentenceQ);
     ps.session.start(); await settle();
-    expect(spoken).toEqual([`Build the sentence: ${SENTENCE}`]);
+    expect(spoken).toEqual([`t! Build the sentence: ${SENTENCE}`]);   // #897: build()'s topic (title 't') folds into question 1
   });
 
   it('teardown during a peek launches nothing and leaves nothing paused', async () => {
