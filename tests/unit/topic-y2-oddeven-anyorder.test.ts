@@ -18,7 +18,7 @@ describe('y2-oddeven "Slice Them All" form (#926): 2–4 targets of the asked pa
     for (const d of [2, 3] as Difficulty[]) {
       const r = rng(9260 + d);
       const DRAWS = 900;
-      let anyOrder = 0;
+      let anyOrder = 0, adjacentDecoys = 0;
       for (let i = 0; i < DRAWS; i++) {
         const q = t.gen(d, r);
         if (!q.anyOrder) continue;
@@ -36,6 +36,7 @@ describe('y2-oddeven "Slice Them All" form (#926): 2–4 targets of the asked pa
           expect(n, q.prompt).toBeGreaterThanOrEqual(1);
           expect(n, q.prompt).toBeLessThanOrEqual(100);
         }
+        if (decoys.some(dn => targets.some(tn => Math.abs(dn - tn) === 1))) adjacentDecoys++;
       }
       // A bigger sample than curriculum.test.ts's own mixed-form check, so this share estimate is tight
       // enough that ±5% (the issue's own acceptance criterion) is a real bound, not sampling noise: at
@@ -43,6 +44,10 @@ describe('y2-oddeven "Slice Them All" form (#926): 2–4 targets of the asked pa
       const share = anyOrder / DRAWS;
       expect(share, `d${d}: any-order share ${share} drifted from 1/3`).toBeGreaterThan(1 / 3 - 0.05);
       expect(share, `d${d}: any-order share ${share} drifted from 1/3`).toBeLessThan(1 / 3 + 0.05);
+      // #926 review: `nearOppositeDecoys`' whole point — a `±1` decoy so the ones digit alone decides — was
+      // otherwise unverified; every other assertion here would still pass if the near-neighbour bias were
+      // dropped entirely and every decoy fell back to a plain opposite-parity draw anywhere in 1–100.
+      expect(adjacentDecoys, `d${d}: no any-order card ever had a decoy adjacent to a target`).toBeGreaterThan(0);
     }
   });
 });

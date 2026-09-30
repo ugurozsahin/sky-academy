@@ -33,6 +33,8 @@ function anyOppositeParity(rng: Rng, ans: number, wantEven: boolean): number[] {
  * `count` distinct 1–100 numbers of `isWant`'s parity, none already in `used` — a plain rejection sample.
  * Throws rather than looping forever on a caller error (`used` covering an entire parity's ~50 candidates):
  * the same "fail where the mistake was made" precedent `anyOppositeParity` above and `gapQ` (`util.ts`) set.
+ * Mutates `used` in place, adding every number it returns — private to this file, one call chain, so nothing
+ * here reads `used` again afterwards, but a future caller reusing either helper elsewhere must expect that.
  */
 function distinctWanted(rng: Rng, count: number, used: Set<number>, isWant: (n: number) => boolean): number[] {
   const found: number[] = [];
