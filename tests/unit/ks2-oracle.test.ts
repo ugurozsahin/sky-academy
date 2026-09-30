@@ -68,13 +68,24 @@ const NULLS = [
   '5 @ 3 = ?',
   'n × n = 9',
   '36 ÷ n = 4',
-  // #1423 review: divLin's refusal ORs "divisor still carries the unknown" with "divisor is 0" — the case
-  // above has both true at once, so it cannot tell the two reasons apart. Here the divisor (n + 1) is never
-  // 0-valued as a constant (its `const` is 1), so only the unknown-coefficient half can be catching this.
-  '36 ÷ (n + 1) = 4',
+  // #1423 review round 1: divLin's refusal ORs "divisor still carries the unknown" with "divisor is 0" —
+  // the case above has both true at once, so it cannot tell the two reasons apart; round 1's own attempted
+  // fix, '36 ÷ (n + 1) = 4', still had a *constant* (coef-0) dividend, so a divLin that wrongly let it
+  // through produced a coef-0 result that ks2Solve's own top-level "no unknown at all" check then caught
+  // instead — passing for a reason that has nothing to do with divLin. Round 2 found that. This case's
+  // dividend (`n`) itself carries the unknown, so a divLin that wrongly lets the division through yields a
+  // nonzero coefficient that reaches ks2Solve's final line and returns a fabricated wrong answer (3) rather
+  // than tripping any other check — confirmed by mutating divLin to drop the unknown-coefficient half and
+  // watching this exact case go from `null` to `{n:3,d:1}`.
+  'n ÷ (n + 1) = 3',
   '10 ÷ 0 = ?',
-  // #1423 review: every KNOWN bracket case is well-formed, so an unbalanced one never exercised the
-  // rparen check at all.
+  // #1423 review: every KNOWN bracket case is well-formed, so an unbalanced one is worth a null case on
+  // its own merits. Round 2 found that this specific case does not actually isolate parseFactor's own
+  // rparen check from readSide's separate leftover-token check (`c.i === toks.length`): an unclosed '('
+  // always leaves the cursor short of the token count by the missing ')', so the leftover check catches
+  // it regardless of whether the rparen check itself still runs — confirmed by mutating the rparen check
+  // away and watching the leftover check still return `null` here. Kept as a null case in its own right;
+  // not a regression test for the rparen check specifically, which this suite does not isolate.
   '(5 + 3 = ?',
   'n + m = 10',
   '? + n = 10',
