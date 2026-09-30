@@ -63,6 +63,7 @@ export const NO_REPEATED_SET = new Set([
 'y1-skip d1', 'y1-skip d2', 'y1-skip d3', 'y1-order d1', 'y1-order d2', 'y1-order d3',
 'y1-coins d3', 'y1-shapes d3', 'y1-plurals d1', 'y1-punct d1', 'y1-days d3',
 'y1-sentence d1', 'y1-sentence d2', 'y1-sentence d3',
+  'y1-alien d1', 'y1-alien d2', 'y1-alien d3',
 'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
 'y2-add d3', 'y2-tables d1', 'y2-line d2', 'y2-line d3',
 'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',

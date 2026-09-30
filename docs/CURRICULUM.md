@@ -55,6 +55,7 @@ Maths:
 
 Writing:
 - y1-digraphs
+- y1-alien — Real or Alien?: decode a printed word (not by ear), phonics screening check practice; d1 phase 3, d2 phase 4 adjacent consonants, d3 phase 5 alternatives, half "slice the alien 👾"
 - y1-soundhunt — Sound Hunt by ear: d1 phase 3, d2 phase 5 alternatives ay/ou/ie/ea/oy/ir/ue/aw/wh/ph/ew/oe/au, d3 adds split digraphs a-e/i-e/o-e/u-e
 - y1-spelling — 45 CEW
 - y1-plurals — -s/-es
