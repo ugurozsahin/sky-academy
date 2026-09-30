@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES } from '../../src/game/parents';
+import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES, recentSlips, type SlipRow } from '../../src/game/parents';
 import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
 import { settingsHTML } from '../../src/ui/parents-settings';
+import { slipsHTML } from '../../src/ui/parents-slips';
 import { freshDojo } from '../../src/game/dojo';
 
 // minimal localStorage shim for node, same as tests/unit/storage.test.ts
@@ -134,6 +135,38 @@ describe('parent dashboard summary', () => {
     expect(pct(0.725)).toBe(73);
     expect(pct(1)).toBe(100);
     expect(pct(0)).toBe(0);
+  });
+});
+
+describe('recentSlips (#938): the grown-ups "Recent slips" reader', () => {
+  const y1add = TOPICS.find(t => t.id === 'y1-add')!;
+  it('resolves each stored slip to its topic icon, in stored order (newest first)', () => {
+    const data: SaveData = { ...base, slips: [
+      { topic: 'y1-add', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' },
+      { topic: 'y1-add', prompt: '2 + 3', answer: '5', picked: '', at: '2026-09-28' },
+    ] };
+    const rows: SlipRow[] = recentSlips(data, TOPICS);
+    expect(rows).toEqual([
+      { icon: y1add.icon, prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' },
+      { icon: y1add.icon, prompt: '2 + 3', answer: '5', picked: '', at: '2026-09-28' },
+    ]);
+  });
+  it('drops a slip whose topic id no longer exists in the registry, without throwing', () => {
+    const data: SaveData = { ...base, slips: [
+      { topic: 'not-a-real-topic', prompt: '1 + 1', answer: '2', picked: '3', at: '2026-09-29' },
+      { topic: 'y1-add', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' },
+    ] };
+    let rows!: SlipRow[];
+    expect(() => { rows = recentSlips(data, TOPICS); }).not.toThrow();
+    expect(rows).toEqual([{ icon: y1add.icon, prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' }]);
+  });
+  it('is empty with no slips', () => {
+    expect(recentSlips(base, TOPICS)).toEqual([]);
+  });
+  it('parentSummary exposes the same rows as its own .slips field', () => {
+    const data: SaveData = { ...base, slips: [{ topic: 'y1-add', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29' }] };
+    const sm = parentSummary(data, TOPICS, YEARS, STICKER_IDS.length);
+    expect(sm.slips).toEqual(recentSlips(data, TOPICS));
   });
 });
 
@@ -290,5 +323,37 @@ describe('settingsHTML marks the stored 3-D value as checked (#904)', () => {
       const btn = new RegExp(`<button class="tab${v === stored ? ' on' : ''}" data-three="${v}" role="radio" aria-checked="${v === stored}">`);
       expect(html, `${v} must ${v === stored ? '' : 'not '}be marked checked`).toMatch(btn);
     }
+  });
+});
+
+describe('slipsHTML (#938): the "Recent slips" section\'s markup', () => {
+  const row = (over: Partial<SlipRow> = {}): SlipRow => ({ icon: '➕', prompt: '4 + 5', answer: '9', picked: '8', at: '2026-09-29', ...over });
+  it('an empty list shows the empty-state line, not a list', () => {
+    const html = slipsHTML([]);
+    expect(html).toContain('No wrong answers yet');
+    expect(html).not.toContain('<ul');
+  });
+  it('a real pick reads "Sliced: <label>"', () => {
+    expect(slipsHTML([row({ picked: '8' })])).toMatch(/Answer: 9 · Sliced: 8/);
+  });
+  it('an empty pick (the bubble fell, never sliced) reads "Not sliced in time"', () => {
+    const html = slipsHTML([row({ picked: '' })]);
+    expect(html).toContain('Not sliced in time');
+    expect(html).not.toContain('Sliced:');
+  });
+  // y2-compare's own answers are '<'/'>'/'=' (src/curriculum/year2.ts) — a real prompt/answer/pick this
+  // markup will actually receive, not a synthetic XSS string, so escaping here is load-bearing, not defensive.
+  it('escapes prompt, answer and picked — a "<" answer never opens a tag', () => {
+    const html = slipsHTML([row({ prompt: '7 < 9', answer: '<', picked: '>' })]);
+    expect(html).toContain('7 &lt; 9');
+    expect(html).toContain('Answer: &lt;');
+    expect(html).toContain('Sliced: &gt;');
+  });
+  it('renders one row per slip, in the given order, with the icon and the day', () => {
+    const rows = [row({ icon: '🔤', at: '2026-09-29' }), row({ icon: '➗', at: '2026-09-28' })];
+    const html = slipsHTML(rows);
+    expect(html.indexOf('🔤')).toBeLessThan(html.indexOf('➗'));
+    expect(html).toContain('2026-09-29');
+    expect(html).toContain('2026-09-28');
   });
 });
