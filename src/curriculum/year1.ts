@@ -2,7 +2,7 @@
 // #325 stage 4: the curriculum used to be split by subject (maths.ts/writing.ts); this file holds every
 // Year 1 generator so a reviewer checking "is Year 1 right" reads one file. Generators shared with
 // Reception/Year 2 live in util.ts.
-import type { Generator, Topic } from './types';
+import type { Generator, Topic, Difficulty } from './types';
 import { LONGER, TALLER, HEAVIER, HOLDS } from './types';
 import {
   ri, pick, shuffle, numQ, wordQ, q, numberWord, coinLabel, isNote, NOTES,
@@ -257,6 +257,47 @@ const y1Digraphs: Generator = (d, rng) => {
   const ds = shuffle(rng, DIGRAPHS.filter(x => x !== dg)).slice(0, d === 1 ? 2 : 3);
   return wordQ(rng, shown, dg, ds, { visual: { type: 'word', text: shown, emoji: e }, say: `${w}. Which two letters are missing from ${w}?`, hint: 'Slice the missing sound', hintIsData: false });
 };
+/**
+ * "Real or Alien?" (#982): decode a *printed* word rather than a grapheme heard aloud — the Phonics
+ * Screening Check's other half. Both banks are hand-curated, never generated: a denylist check on a
+ * generated string would not catch a genuine real word slipping into the alien bank. Phase tag `1`/`2`/`3`
+ * matches this topic's own difficulty (phase 3 at d1, phase 4 adjacent consonants at d2, phase 5
+ * alternatives at d3) — never generate a pseudo-word; every `ALIEN_FAKE` entry is checked against `AVOID`
+ * and `GAP_WORDS` in `tests/unit/topic-y1-alien.test.ts`.
+ */
+const ALIEN_REAL: [string, Difficulty][] = [
+  ['ship', 1], ['fish', 1], ['chip', 1], ['chin', 1], ['moth', 1], ['bath', 1], ['ring', 1], ['king', 1], ['rain', 1], ['boat', 1], ['moon', 1], ['tree', 1], ['coin', 1], ['star', 1], ['fork', 1],
+  ['stop', 2], ['jump', 2], ['crab', 2], ['frog', 2], ['plan', 2], ['swim', 2], ['desk', 2], ['nest', 2], ['milk', 2], ['fast', 2], ['hand', 2], ['lamp', 2], ['gift', 2], ['drum', 2], ['clap', 2],
+  ['day', 3], ['play', 3], ['say', 3], ['out', 3], ['cloud', 3], ['pie', 3], ['leaf', 3], ['beach', 3], ['boy', 3], ['toy', 3], ['girl', 3], ['blue', 3], ['cake', 3], ['bike', 3], ['home', 3],
+];
+/** Decodable pseudo-words. Never a real word, a slur or a sound-alike of one (`tests/unit/topic-y1-alien.test.ts`). */
+const ALIEN_FAKE: [string, Difficulty][] = [
+  ['chov', 1], ['helk', 1], ['shig', 1], ['zesp', 1], ['nolp', 1], ['zeeg', 1], ['zark', 1], ['toop', 1], ['nolt', 1], ['zelk', 1], ['yurk', 1], ['morv', 1], ['zelp', 1], ['zosk', 1], ['feeg', 1],
+  ['stog', 2], ['flep', 2], ['crun', 2], ['drep', 2], ['plek', 2], ['zolp', 2], ['delk', 2], ['nelt', 2], ['mulf', 2], ['fost', 2], ['zelt', 2], ['zamp', 2], ['dulg', 2], ['zunt', 2], ['glap', 2],
+  ['zof', 3], ['zout', 3], ['chig', 3], ['nolk', 3], ['zom', 3], ['mirt', 3], ['zirn', 3], ['vesk', 3], ['whep', 3], ['phik', 3], ['zesk', 3], ['noup', 3], ['zaup', 3], ['zebe', 3], ['dorv', 3],
+];
+/** Exported for `tests/unit/topic-y1-alien.test.ts` (#982), which walks both banks against `AVOID`/`GAP_WORDS`. */
+export { ALIEN_REAL, ALIEN_FAKE };
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+const y1Alien: Generator = (d, rng) => {
+  const reals = ALIEN_REAL.filter(([, p]) => p === d).map(([w]) => w);
+  const fakes = ALIEN_FAKE.filter(([, p]) => p === d).map(([w]) => w);
+  const n = d === 1 ? 3 : 4;
+  if (d === 3 && rng() < 0.5) {
+    const target = pick(rng, fakes);
+    const decoys = shuffle(rng, reals).slice(0, n - 1);
+    return wordQ(rng, 'Which one is the alien word? 👾', target, decoys, {
+      say: `${cap(numberWord(decoys.length))} of these ${decoys.length === 1 ? 'is a real word' : 'are real words'}. Slice the alien word 👾!`,
+      hint: 'Which one is not a real word?', hintIsData: false,
+    });
+  }
+  const target = pick(rng, reals);
+  const decoys = shuffle(rng, fakes).slice(0, n - 1);
+  return wordQ(rng, 'Which one is the real word?', target, decoys, {
+    say: `${cap(numberWord(decoys.length))} of these ${decoys.length === 1 ? 'is an alien word' : 'are alien words'}. Slice the real word!`,
+    hint: 'Which one is a real word?', hintIsData: false,
+  });
+};
 const y1Spelling: Generator = (d, rng) => {
   const w = pick(rng, Y1_CEW.filter(x => x.length >= (d === 1 ? 2 : 3) && x.length <= (d === 3 ? 6 : 4)));
   if (d === 3 && rng() < 0.5) return spellQ(rng, w, undefined, 3);
@@ -332,6 +373,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year1', nc: 'Y1 A&S: equals sign, missing number', gen: y1Balance },
   // Year 1 writing
   { id: 'y1-digraphs', title: 'Sound Pairs', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: digraphs', gen: y1Digraphs },
+  { id: 'y1-alien', title: 'Real or Alien?', icon: '👾', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: decode words containing taught GPCs, including some pseudo-words', gen: y1Alien },
   { id: 'y1-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'year1', nc: 'Y1 Word Reading: respond speedily to graphemes; phase 3 & 5 alternatives, split digraphs', gen: y1SoundHunt },
   { id: 'y1-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year1', nc: 'Y1 common exception words', sequenceFrom: 3, gen: y1Spelling },
   { id: 'y1-plurals', title: 'Plurals -s -es', icon: '🐈', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: plurals', gen: y1Plurals },

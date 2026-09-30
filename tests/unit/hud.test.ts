@@ -256,7 +256,7 @@ describe('correctionLine (#893 — the spoken line after a wrong slice or a miss
     expect(correctionLine(q('7', { noSayAnswer: true }), undefined)).toBeNull();
   });
   it('is null for every topic in NO_SAY_ANSWER_TOPICS, whatever the answer', () => {
-    expect(NO_SAY_ANSWER_TOPICS.size).toBe(7);
+    expect(NO_SAY_ANSWER_TOPICS.size).toBe(8);
     for (const id of NO_SAY_ANSWER_TOPICS) expect(correctionLine(q('a'), id), id).toBeNull();
   });
   // A stale or mistyped id here would otherwise pass every test above (they only assert on the set's own

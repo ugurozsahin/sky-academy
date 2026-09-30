@@ -68,9 +68,9 @@ const contentList = (s: string) => {
 /**
  * The identity of a card, for "do not ask the same thing twice running" (#390, widened by #412).
  *
- * **`Session` only.** `nextQuestion` below is the one caller; `src/game/duel.ts` draws its cards with a bare
- * `topic.gen()` and never consults this, so nothing in Ninja Duel avoids an immediate repeat. Pre-existing, and
- * worth knowing before reading the rest of this as a property of the game (#412 review round 4, note 7).
+ * `Session.nextQuestion()` uses this directly (its re-roll loop is small enough to stay inline); `Duel.nextQuestion()`
+ * (`src/game/duel.ts`) goes through `drawFresh()` below instead, so a repeat is avoided the same way on both
+ * sides of a match (#879 — before this, Ninja Duel drew with a bare `topic.gen()` and never consulted this at all).
  *
  * `prompt` and `answer` are not enough, and neither is adding the visual: on nine topics the question is
  * carried by **text that is not the prompt**, and there is no visual at all. `measureCompare` puts the values
@@ -146,3 +146,21 @@ const contentList = (s: string) => {
  * separator, not on its own (round 2, B2; #465).
  */
 export const repeatKey = (q: Question) => [q.prompt, q.answer, contentList(q.hint ?? ''), contentList(q.listen ?? ''), q.visual ? `${q.visual.type}\u0000${visualKey(q.visual)}` : '', q.optionsAreContent ? [...q.options].sort().join('\u0001') : ''].join('\u0000');
+
+/**
+ * Draw with `draw()`, re-rolling up to `tries` times while the result's `repeatKey` still matches
+ * `prevQuestion`'s — the loop `Session.nextQuestion()` runs inline, generalised so `Duel.nextQuestion()`
+ * (#879) can share it rather than reimplementing it. Takes the previous `Question` itself, not its
+ * already-computed key: a bare `string` would accept any string a caller handed it (a stale key, `q.answer`
+ * by mistake), which is exactly the shape of thing `repeatKey` exists to get right in one place (#879
+ * review, type-design-analyzer). `prevQuestion` is `null` for a match's/session's first question, which
+ * never re-rolls (there is nothing yet to repeat). `gaveUp` is true when the key space collapsed even after
+ * `tries` re-rolls (#453 item 4) — the caller counts it, since only it knows what a give-up means for its
+ * own tally.
+ */
+export function drawFresh(draw: () => Question, prevQuestion: Question | null, tries = 5): { q: Question; gaveUp: boolean } {
+  const prevKey = prevQuestion && repeatKey(prevQuestion);
+  let q = draw();
+  for (let i = 0; i < tries && prevKey !== null && repeatKey(q) === prevKey; i++) q = draw();
+  return { q, gaveUp: prevKey !== null && repeatKey(q) === prevKey };
+}
