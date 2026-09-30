@@ -97,6 +97,14 @@ async function startTopic(page: Page, year: string, topic: string) {
   await expect(page.locator('.play')).toBeVisible();
   await page.waitForFunction(() => window.__sna?.state().prompt);
 }
+/** #887: a live play screen's first back press now opens Pause, not leave — a second press actually leaves.
+ *  For a test that just wants off this screen and onto the island, not exercising the pause mechanism itself. */
+async function leavePlayScreen(page: Page) {
+  await page.evaluate(() => history.back());
+  await expect(page.locator('#resume')).toBeVisible();
+  await page.evaluate(() => history.back());
+  await expect(page.locator('.island-screen')).toBeVisible();
+}
 /**
  * Real-pointer slice through the correct bubble. Pointer round trips are slow under headless software
  * rendering (hundreds of ms each), so the wave is frozen in place first: this test checks the pointer →
@@ -2165,10 +2173,17 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.toast.good')).toBeVisible();
   });
 
-  test('back button steps back one screen: play → island → sky map (Android/browser history)', async ({ page }) => {
+  test('back button opens Pause first, then steps back: play → island → sky map (#887, Android/browser history)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'year1', 'y1-add');
-    await page.goBack();
+    await page.goBack();                                                          // #887: first back pauses, never leaves a live mission
+    await expect(page.locator('#resume')).toBeVisible();
+    expect(await page.evaluate(() => window.__sna.state().ended)).toBe(false);
+    await page.click('#resume');
+    await expect(page.locator('#resume')).toBeHidden();
+    await page.goBack();                                                          // after Resume, back pauses again — the guard was re-armed
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.goBack();                                                          // a second back while paused leaves, raw press not Quit
     await expect(page.locator('.isl-head b')).toContainText('Year 1');
     await page.goBack();
     await expect(page.locator('.islands.big')).toBeVisible();
@@ -2185,6 +2200,28 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#back'); await expect(page.locator('.islands.big')).toBeVisible();
     await page.goBack();                                                          // nothing stale left: back from the map goes before the app
     expect(await page.evaluate(() => history.state)).toBeNull();
+  });
+
+  // #1451 review round 1: `enter()` only compared `.screen` when deciding push-vs-replace, so re-entering the
+  // SAME screen (Play again/Fix my mistakes/Next topic, none of which ever pop first) replaced the still-live
+  // #887 guard entry in place — dropping its `guard` flag — and the fresh screen's own `pushBackGuard()` call
+  // then saw no guard on top and pushed a brand new one, leaking one permanent dead history entry per replay.
+  test('guard rail: "Play again" does not leak a history entry — #887\'s guard is carried through, not duplicated', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    const before = await page.evaluate(() => history.length);
+    await winMission(page);
+    await expect(page.locator('#again')).toBeVisible();
+    await page.click('#again');
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    expect(await page.evaluate(() => history.length), 'one replay must not grow the history stack').toBe(before);
+    // and the new mission's own #887 guard still works: first back pauses it, not a stale double-pop
+    await page.goBack();
+    await expect(page.locator('#resume')).toBeVisible();
+    expect(await page.evaluate(() => window.__sna.state().ended), 'the replayed mission, not the old one').toBe(false);
+    await page.goBack();
+    await expect(page.locator('.isl-head b')).toContainText('Year 1');
   });
 
   test('a long sentence can be built without waiting: each word arrives in order, in its batch or the next', async ({ page }) => {
@@ -2339,8 +2376,7 @@ test.describe('Sky Ninja Academy', () => {
     // `.topic[data-id=...]` click this used before passed only because `y1-bonds` is maths and maths is the
     // default tab — and the useful controls here are hint-writing topics, several of which are writing
     // (#430 review). `y1-shapes` is maths too, so this is insurance against the next swap, not a fix.
-    await page.evaluate(() => history.back());
-    await expect(page.locator('.island-screen')).toBeVisible();
+    await leavePlayScreen(page);
     await startTopic(page, 'year1', 'y1-shapes');
     // `#hint` is never empty — `hintText()` falls back to an instruction line when the question writes none —
     // so waiting for non-empty text resolves on the very first frame regardless of which branch was drawn.
@@ -2400,8 +2436,7 @@ test.describe('Sky Ninja Academy', () => {
         hint: (document.querySelector('#hint') as HTMLElement).textContent ?? '',
       }));
       worst.push({ id, ...m });
-      await page.evaluate(() => history.back());
-      await expect(page.locator('.island-screen')).toBeVisible();
+      await leavePlayScreen(page);
       await page.evaluate(() => history.back());
       await expect(page.locator('.home')).toBeVisible();
     }
@@ -2421,8 +2456,19 @@ test.describe('Sky Ninja Academy', () => {
     // Sample only once the route change has finished: the arena legitimately ticks a frame or two between
     // `history.back()` and `popstate` running, so measuring across the pop would flake at ~0.02 s
     // (ugurozsahin/sky-academy-private-archive#74 review).
-    await page.evaluate(() => { (window as any).__deadArena = window.__sna.arena; history.back(); });
+    //
+    // #887 makes the first back press pause the live screen rather than leave it, and `Arena.time` stops
+    // advancing the instant it pauses — whether or not the second press ever tears anything down — so the
+    // `advanced` check alone can no longer prove teardown on its own. Spying on `destroy()` closes that gap.
+    await page.evaluate(() => {
+      const arena = window.__sna.arena!; (window as any).__deadArena = arena; (window as any).__destroyed = false;
+      const orig = arena.destroy.bind(arena); arena.destroy = () => { (window as any).__destroyed = true; orig(); };
+      history.back();                                            // #887: first back pauses the live mission
+    });
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.evaluate(() => history.back());                   // second back actually leaves, tearing the screen down
     await expect(page.locator('.island-screen')).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__destroyed), 'destroy() was really called, not just the loop paused').toBe(true);
     const leaked = await page.evaluate(() => new Promise<any>(res => {
       const dead = (window as any).__deadArena, t0 = dead.time;
       setTimeout(() => res({ advanced: +(dead.time - t0).toFixed(2), sna: typeof window.__sna }), 500);
@@ -4716,7 +4762,9 @@ test.describe('3-D solids on the 3-D Shapes cards (#684)', () => {
     // A GL context per play screen would hit the browser's context cap after a few play → back → play round
     // trips (the #73 teardown incident, one canvas over). `destroy()` forces the context lost; the canvas is
     // kept by hand so the loss can be read after the screen is gone.
-    await page.evaluate(() => { (window as any).__deadSolid = document.querySelector('#vis .solid canvas'); history.back(); });
+    await page.evaluate(() => { (window as any).__deadSolid = document.querySelector('#vis .solid canvas'); history.back(); });   // #887: first back pauses
+    await expect(page.locator('#resume')).toBeVisible();
+    await page.evaluate(() => history.back());                   // second back actually leaves
     await expect(page.locator('.island-screen')).toBeVisible();
     const after = await page.evaluate(() => {
       const c = (window as any).__deadSolid as HTMLCanvasElement;
