@@ -15,7 +15,7 @@ import { Duel, DUEL_PLAYERS, duelAccuracy, duelCoins, duelDojoEvent, duelEarnsCe
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';
 import { isReadOnlySave, isWriteFailing, load, recordAccuracy, recordCert, recordDuel, recordGameEnd, touchStreak, type GameEndOutcome, type StoredDuel } from '../storage';
 import { certToStored, certWords, deliverCertificate, drawCertificate, type CertInfo } from './certificate';
-import { canHear, haptic, say, sfx } from '../audio';
+import { canHear, haptic, hush, say, sfx } from '../audio';
 import { $, esc, render } from './dom';
 import { hintText, promptHTML, promptMode } from './hud';
 import { screenScope, stickersHTML } from './screen';
@@ -80,9 +80,9 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     <div class="overlay" id="overlay" hidden></div>
   </section>`, 'bg-play');
 
-  const scope = screenScope(); const { later, toast, onBack } = scope; onBack(pauseIfLive);   // #885
+  const scope = screenScope(); const { later, toast, onBack, onHidden } = scope; onBack(pauseIfLive); onHidden(() => { hush(); pauseIfLive(); });   // #885, #886
   const overlay = $('#overlay'); const prompt = $('#prompt'); const hintEl = $('#hint'); const speak = $('#speak');
-  let waveId = 0; let holdOpen = false;
+  let waveId = 0; let holdOpen = false; let paused = false;   // #886: mirrors the Pause overlay, for state()
   /** What the card is showing under the prompt this round — pinned by the e2e against `#hint` (#16 review). */
   let hintLine = '';
   // The four below are written by `commitMatch`, so they carry their values from the moment the match is
@@ -438,8 +438,8 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     };
   }
   function showPause() {
-    hold(true); overlay.hidden = false; overlay.innerHTML = pauseHTML();
-    $('#resume').addEventListener('click', () => { overlay.hidden = true; hold(false); });
+    hold(true); overlay.hidden = false; overlay.innerHTML = pauseHTML(); paused = true;
+    $('#resume').addEventListener('click', () => { overlay.hidden = true; hold(false); paused = false; });
     $('#quit').addEventListener('click', () => { cleanup(); goHome(); });
   }
   function pauseIfLive(): boolean { if (!overlay.hidden || duel.ended) return false; showPause(); return true; }   // #885, #884's shape
@@ -462,7 +462,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     state: () => ({
       mode: 'duel', round: duel.round, rounds: duel.rounds, scoreA: duel.scoreA, scoreB: duel.scoreB,
       decided: duel.roundDecided, ended: duel.ended, prompt: duel.current?.prompt, answer: duel.current?.answer, topic: topic.id,
-      hint: hintLine, coins: paid, dojoCoins: dojoPaid, taught,
+      hint: hintLine, coins: paid, dojoCoins: dojoPaid, taught, paused,
     }),
     certificate: async () => cert ? (await drawCertificate(cert)).toDataURL('image/png') : null,
     // The words that go on the drawn certificate. A byte count cannot tell one ninja's signature from another,
