@@ -457,6 +457,48 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.island-screen')).toBeVisible();
   });
 
+  /** Same fake as `game.spec.ts`'s `hideApp` (#884) — duplicated rather than shared, per this file's own
+   *  fixtures above. */
+  async function hideApp(page: Page) {
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+  }
+
+  test('hiding the app opens Pause on a live duel, stops speech, freezes both arenas, and Resume continues (#886)', async ({ page }) => {
+    await startDuel(page);
+    await page.waitForFunction(() => window.__sna.bubbles('a').length > 0 && window.__sna.bubbles('b').length > 0);
+    await hideApp(page);
+    await expect(page.locator('#resume')).toBeVisible();
+    expect((await page.evaluate(() => window.__sna.state())).paused).toBe(true);
+    expect(await page.evaluate(() => window.__said)).toContain('<cancel>');       // hush() reaches the stub's cancel()
+    const before = await page.evaluate(() => ({
+      round: window.__sna.state().round, scoreA: window.__sna.state().scoreA, scoreB: window.__sna.state().scoreB,
+      a: window.__sna.bubbles('a').map(b => ({ label: b.label, x: b.x, y: b.y })),
+      b: window.__sna.bubbles('b').map(b => ({ label: b.label, x: b.x, y: b.y })),
+    }));
+    await page.waitForTimeout(2000);
+    const after = await page.evaluate(() => ({
+      round: window.__sna.state().round, scoreA: window.__sna.state().scoreA, scoreB: window.__sna.state().scoreB,
+      a: window.__sna.bubbles('a').map(b => ({ label: b.label, x: b.x, y: b.y })),
+      b: window.__sna.bubbles('b').map(b => ({ label: b.label, x: b.x, y: b.y })),
+    }));
+    expect(after, 'nothing moves or scores while both arenas are held paused').toEqual(before);
+    await page.click('#resume');
+    expect((await page.evaluate(() => window.__sna.state())).paused).toBe(false);
+    await winRound(page, 'a');
+    await page.waitForFunction(r => window.__sna.state().round === r, before.round + 1);
+  });
+
+  test('hiding the app after the match has ended opens no Pause overlay (#886)', async ({ page }) => {
+    await startDuel(page);
+    await winWholeMatch(page);
+    await hideApp(page);
+    await expect(page.locator('#resume')).toHaveCount(0);
+    expect((await page.evaluate(() => window.__sna.state())).paused).toBe(false);
+  });
+
   test('the card carries the line the round is decided by, every round (#65, PR #295 review)', async ({ page }) => {
     await startDuel(page);
     // The pool's comparison topics (length, mass, capacity, temperature) put the values being compared in
