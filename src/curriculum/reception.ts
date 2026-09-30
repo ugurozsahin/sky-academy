@@ -46,11 +46,27 @@ const rSub: Generator = (d, rng) => {
 };
 const rCompare: Generator = (d, rng) => {
   const max = d === 1 ? 5 : 10;
+  // d3 (#891): the ELG asks for "greater than, less than OR THE SAME AS" — one card in three at d3 draws
+  // equal groups, answered "=", so "the same" is actually practised rather than merely possible. "=" rides
+  // every d3 card (not only the equal ones), so its presence never gives the answer away on its own.
+  if (d === 3 && rng() < 1 / 3) {
+    const a = ri(rng, 1, max);
+    const near = a === max ? a - 1 : a + 1;
+    return wordQ(rng, 'Which is more?', '=', [String(a), String(near)], {
+      visual: { type: 'objects', emoji: '🍎', n: a, emoji2: '🍌', n2: a },
+      say: `Which number is more, ${a} or ${a}, or are they the same?`,
+    });
+  }
   let a = ri(rng, 1, max), b = ri(rng, 1, max);
   while (b === a) b = ri(rng, 1, max);
   const wantMore = rng() < 0.5;
   const ans = wantMore ? Math.max(a, b) : Math.min(a, b);
-  return numQ(rng, `Which is ${wantMore ? 'more' : 'fewer'}?`, ans, { distractors: [wantMore ? Math.min(a, b) : Math.max(a, b)], n: 1, visual: { type: 'objects', emoji: '🍎', n: a, emoji2: '🍌', n2: b }, say: `Which number is ${wantMore ? 'more' : 'fewer'}, ${a} or ${b}?` });
+  const other = wantMore ? Math.min(a, b) : Math.max(a, b);
+  const say = `Which number is ${wantMore ? 'more' : 'fewer'}, ${a} or ${b}${d === 3 ? ', or are they the same' : ''}?`;
+  const visual = { type: 'objects' as const, emoji: '🍎', n: a, emoji2: '🍌', n2: b };
+  return d === 3
+    ? wordQ(rng, `Which is ${wantMore ? 'more' : 'fewer'}?`, String(ans), [String(other), '='], { visual, say })
+    : numQ(rng, `Which is ${wantMore ? 'more' : 'fewer'}?`, ans, { distractors: [other], n: 1, visual, say });
 };
 const rCountOn: Generator = (d, rng) => {
   const start = ri(rng, 1, d === 3 ? 25 : d === 2 ? 15 : 8);
