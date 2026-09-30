@@ -3,6 +3,8 @@ import { CVC } from '../../src/curriculum/util';
 
 /**
  * #874: `mug`/`rug`/`jam`/`zip` taught the wrong word from their pictures, and `cup`'s ☕ names no cup.
+ * #875: `log`'s 🪵 is Emoji 13.0, which draws as an empty box on an Android 10 device — no floor-compliant
+ * picture exists for a log, so the word is dropped rather than mismatched.
  * This pins the reviewed allowlist so a future `CVC` entry cannot land without the same review: word,
  * emoji, and the emoji's Unicode short name, checked against the actual codepoint rather than eyeballed.
  */
@@ -36,7 +38,6 @@ const REVIEWED: [string, string, string][] = [
   ['leg', '🦵', 'leg'],
   ['bug', '🐛', 'bug'],
   ['van', '🚐', 'minibus'],
-  ['log', '🪵', 'wood'],
 ];
 
 describe('CVC picture bank (#874)', () => {
@@ -47,6 +48,10 @@ describe('CVC picture bank (#874)', () => {
   it('removed the four mistaught words', () => {
     for (const w of ['mug', 'rug', 'jam', 'zip'])
       expect(CVC.some(([word]) => word === w), `${w} should be gone`).toBe(false);
+  });
+
+  it('removed log, whose 🪵 is above the Emoji 12.0 floor (#875)', () => {
+    expect(CVC.some(([word]) => word === 'log')).toBe(false);
   });
 
   it('cup is a cup, not a hot beverage', () => {
