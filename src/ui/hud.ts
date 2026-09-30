@@ -63,10 +63,11 @@ export function setHint(els: Pick<HudEls, 'hint'>, text: string, own = false) {
  * Topics whose answer must never be spoken as the correction line (#893): a grapheme read as a letter name
  * teaches the wrong sound (`r-sounds`, `r-soundhunt`, `y1-soundhunt`, the sound pairs of `y1-digraphs`), and
  * a word-ending fragment read alone means nothing out of context (the plurals of `y1-plurals`, the suffixes
- * of `y1-suffix` and `y2-suffix`).
+ * of `y1-suffix` and `y2-suffix`). `y1-alien` (#982) joins for a third reason: TTS mispronounces its
+ * pseudo-words, and speaking a real-word answer would give the "real or alien" call away either way.
  */
 export const NO_SAY_ANSWER_TOPICS: ReadonlySet<string> = new Set([
-  'r-sounds', 'r-soundhunt', 'y1-soundhunt', 'y1-digraphs', 'y1-plurals', 'y1-suffix', 'y2-suffix',
+  'r-sounds', 'r-soundhunt', 'y1-soundhunt', 'y1-digraphs', 'y1-plurals', 'y1-suffix', 'y2-suffix', 'y1-alien',
 ]);
 
 /** The outcome hold is 1.5 s at most (`play.ts`'s `HOLD`); a line at or past this many characters would not finish inside it. */

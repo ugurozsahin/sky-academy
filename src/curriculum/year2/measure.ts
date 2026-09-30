@@ -57,12 +57,13 @@ export const y2Temp: Generator = (d, rng) => {
 };
 // Y2 statistics (#8). Each survey is three categories the child picks out by emoji, so the chart can be read
 // without reading the words — the labels carry the emoji and so does the prompt.
-const SURVEYS: readonly { what: string; rows: readonly [string, string][] }[] = [
+/** Exported for `tests/unit/emoji-floor.test.ts` (#875), which pins the 'playtime game' row's emoji/label pair. */
+export const SURVEYS: readonly { what: string; rows: readonly [string, string][] }[] = [
   { what: 'fruit', rows: [['🍎', 'apples'], ['🍌', 'bananas'], ['🍓', 'strawberries']] },
   { what: 'pet', rows: [['🐶', 'dogs'], ['🐱', 'cats'], ['🐰', 'rabbits']] },
   { what: 'way to school', rows: [['🚌', 'bus'], ['🚗', 'car'], ['🚲', 'bike']] },
   { what: 'colour', rows: [['🔴', 'red'], ['🔵', 'blue'], ['🟢', 'green']] },
-  { what: 'playtime game', rows: [['⚽', 'football'], ['🪢', 'skipping'], ['🏃', 'tag']] },
+  { what: 'playtime game', rows: [['⚽', 'football'], ['🤸', 'cartwheels'], ['🏃', 'tag']] },
 ];
 /**
  * A pictogram's symbol is deliberately **not** one of the categories. Drawing every row with the first
