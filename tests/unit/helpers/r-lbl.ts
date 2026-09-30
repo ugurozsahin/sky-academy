@@ -1,4 +1,4 @@
-import { bubbleRadius, splitLabel, LINE_BUDGET, LABEL_READABLE_FS } from '../../../src/game/bubbles';
+import { waveRadius, fitLabelLines, LABEL_READABLE_FS } from '../../../src/game/bubbles';
 import { FREDOKA_700_ADVANCES } from './fredoka-700-advances';
 
 // #1046: the phone width the readable-size floor is measured against — the same 390px `bubbleRadius`'s own
@@ -8,10 +8,11 @@ const PHONE_W = 390, PHONE_H = 664;
 
 /**
  * Sum of Fredoka-700 advance widths (em) for `text`. Throws on any character missing from the committed
- * table (#1046) — a KS2 label using a glyph never measured must fail loudly, not silently count as zero
- * width and pass a rail it was never actually checked against.
+ * table, or on an empty label — either would otherwise divide/measure as zero width and read as maximally
+ * readable, the opposite of what a rail whose whole job is catching too-small text should ever do.
  */
 export function labelEm(text: string): number {
+  if (text.length === 0) throw new Error('labelEm: empty label');
   let sum = 0;
   for (const ch of text) {
     const em = FREDOKA_700_ADVANCES[ch];
@@ -21,31 +22,33 @@ export function labelEm(text: string): number {
   return sum;
 }
 
-// A label `splitLabel` can break onto two lines is measured by its wider half (#1046 proposed fix) — the
-// same line `fitLabelLines` (`src/game/bubbles.ts`) would end up drawing once it wraps.
-function measuredEm(label: string): number {
-  const split = splitLabel(label);
-  return split ? Math.max(labelEm(split[0]), labelEm(split[1])) : labelEm(label);
+// `fitLabel`/`fitLabelLines` (`src/game/bubbles.ts`) take a `measure(font, text)` callback so they can be
+// driven without a canvas (the same reason `bubbleRadius` is documented "pure"). This is that callback,
+// built off the committed advance table instead of `CanvasRenderingContext2D.measureText`: `font` is always
+// `labelFont(fs)`, so its pixel size is read back out of the string it was built from.
+function measureViaTable(font: string, text: string): number {
+  const fs = Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1]);
+  if (!Number.isFinite(fs)) throw new Error(`r-lbl: cannot read a font size out of "${font}"`);
+  return fs * labelEm(text);
 }
 
 /**
  * R-LBL (#1046): every KS2 card's bubble labels must render at `LABEL_READABLE_FS` (13px) or above on a
- * 390px phone. `fs = LINE_BUDGET * r / em` is the same relationship `fitLabel`'s shrink-to-fit loop
- * converges on (`src/game/bubbles.ts`) — measured statically here so a whole registry can be swept without
- * a canvas. `r` narrows exactly as `layoutWave` narrows it for a crowded wave: ×0.9 at 7–8 options, ×0.8 at
- * 9 or more.
+ * 390px phone. Drives the real `fitLabelLines` — the exact function the running game fits a label with,
+ * including its length-bucketed starting size, its shrink-to-fit floor, and its one-line-vs-wrapped choice —
+ * rather than a re-derived formula: an earlier version of this file computed its own `LINE_BUDGET * r / em`
+ * estimate, which could report a label as readable when `fitLabelLines` would actually have drawn it smaller
+ * (review finding, #1046). `waveRadius` is the same radius `layoutWave` lays real waves out at.
  *
  * Returns the first option that fails, naming the fix (#1046 acceptance criteria), or `null` if every
  * option is readable.
  */
 export function rLblProblem(q: { options: string[]; wide?: boolean }): string | null {
-  const base = bubbleRadius(PHONE_W, PHONE_H, !!q.wide);
-  const n = q.options.length;
-  const r = base * (n >= 9 ? 0.8 : n >= 7 ? 0.9 : 1);
+  const r = waveRadius(PHONE_W, PHONE_H, !!q.wide, q.options.length);
   for (const label of q.options) {
-    const fs = (LINE_BUDGET * r) / measuredEm(label);
-    if (fs < LABEL_READABLE_FS) {
-      return `"${label}" draws at ${fs.toFixed(1)}px (r ${r.toFixed(1)}, ${n} options) — put the term on the card; bubbles carry a letter, yes/no, a symbol or a digit`;
+    const fit = fitLabelLines(label, r, measureViaTable);
+    if (fit.fs < LABEL_READABLE_FS) {
+      return `"${label}" draws at ${fit.fs.toFixed(1)}px (r ${r.toFixed(1)}, ${q.options.length} options) — put the term on the card; bubbles carry a letter, yes/no, a symbol or a digit`;
     }
   }
   return null;

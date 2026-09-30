@@ -47,6 +47,10 @@ describe('R-LBL (#1046): every KS2 bubble label reads at 13px or above on a 390p
       expect(() => labelEm('café')).toThrow(/no entry for/);
     });
 
+    it('throws on an empty label rather than dividing to an infinite, maximally-readable size', () => {
+      expect(() => labelEm('')).toThrow(/empty label/);
+    });
+
     it('every table entry is a positive em width', () => {
       for (const [ch, em] of Object.entries(FREDOKA_700_ADVANCES)) expect(em, `"${ch}"`).toBeGreaterThan(0);
     });
@@ -80,12 +84,40 @@ describe('R-LBL (#1046): every KS2 bubble label reads at 13px or above on a 390p
       expect(rLblProblem(opts(['3 1/4', 'a', 'b', 'c']))).toBeNull();
     });
 
-    it('a breakable label is measured by its wider half, not its full width', () => {
-      // "perpendicular shape" splits on the space; its wider half ("perpendicular") still fails on its own,
-      // but a label this long would read as passing if measured by neither half at all.
+    it('a breakable label that still overflows both lines fails', () => {
+      // "perpendicular shape" splits on the space, but even wrapped onto two lines at the hard floor it is
+      // wider than its bubble — `fitLabelLines` reports 'overflow', which is also unreadable.
       const split = splitLabel('perpendicular shape');
       expect(split).not.toBeNull();
       expect(rLblProblem(opts(['perpendicular shape', 'a', 'b', 'c']))).toMatch(/perpendicular shape/);
+    });
+  });
+
+  describe('regression: rLblProblem drives the real fitLabelLines, not a re-derived formula (review finding)', () => {
+    const opts = (options: string[], wide?: boolean) => ({ options, wide });
+    // A first cut of this rail computed `fs = LINE_BUDGET * r / em` directly instead of calling
+    // `fitLabelLines`. That formula assumes a label always shrinks exactly down to the width budget, but
+    // `fitLabel`'s real shrink loop starts from a fixed, length-bucketed size (`startFs`) and only ever
+    // shrinks — it never grows past that bucket even when the width budget would allow a bigger size. A
+    // label made of narrow characters (all descenders/ascenders like "i"/"l") is short in em-width but long
+    // in character count, so it starts at the smallest bucket (0.4×r) regardless of how little room its
+    // narrow glyphs actually need — and the naive formula, unaware of that ceiling, computed a far larger
+    // "readable" size than the game would ever draw. Confirmed against the real code before pinning here:
+    // at 7 options (r≈29.8) the naive formula gave ~23.9px for "illiilii" while `fitLabelLines` draws it at
+    // 11.9px — genuinely unreadable and exactly the class of miss this rail exists to catch.
+    it('a narrow 8-character label fails once the wave is crowded enough to shrink it under 13px', () => {
+      expect(rLblProblem(opts(['illiilii', 'a', 'b', 'c']))).toBeNull();   // 4 options: still readable (13.3px)
+      expect(rLblProblem(opts(['illiilii', 'a', 'b', 'c', 'd', 'e', 'f']))).toMatch(/illiilii/);   // 7: 11.9px
+    });
+
+    // The same gap, on the two-line wrap path: the naive formula measured a split label's wider half against
+    // `LINE_BUDGET` (1.75), but `fitLabelLines`'s real wrap branch seeds from the longer half's own
+    // length-bucketed `fitLabel` size (capped at `WRAP_MAX_FS × r`) and only shrinks from there — a
+    // different, generally smaller, ceiling. "mmm iiiiiiii" splits on its space; the naive wider-half
+    // estimate gave ~22.0px at 7 options where `fitLabelLines` draws it at 11.9px.
+    it('a wrapped label with a narrow-character half fails at the same crowded threshold', () => {
+      expect(rLblProblem(opts(['mmm iiiiiiii', 'a', 'b', 'c']))).toBeNull();   // 4 options: 13.3px
+      expect(rLblProblem(opts(['mmm iiiiiiii', 'a', 'b', 'c', 'd', 'e', 'f']))).toMatch(/mmm iiiiiiii/);   // 7: 11.9px
     });
   });
 
