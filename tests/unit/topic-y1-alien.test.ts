@@ -48,7 +48,7 @@ describe('y1-alien (#982): Real or Alien?, both banks hand-curated', () => {
    * exact words already found is the cheap alternative the round-4 review asked for.
    */
   it('a previously-fixed real word/sound-alike never returns to ALIEN_FAKE (#982)', () => {
-    const RETIRED = ['yow', 'thob', 'zue', 'zew', 'yoe', 'zow', 'shund', 'zute', 'zeak', 'chun', 'mulk', 'phum', 'zade'];
+    const RETIRED = ['yow', 'thob', 'zue', 'zew', 'yoe', 'zow', 'shund', 'zute', 'zeak', 'chun', 'mulk', 'phum', 'zade', 'chok'];
     for (const w of RETIRED) expect(fakeWords, `"${w}" was already fixed out of ALIEN_FAKE once`).not.toContain(w);
   });
 
@@ -60,7 +60,9 @@ describe('y1-alien (#982): Real or Alien?, both banks hand-curated', () => {
    * instead, the same method `curriculum.test.ts` already uses for Reception's gap spellings and the y1
    * digraph bank: every entry in `fixtures/y1-alien-bank.txt` has been read once for this failure class, and
    * an addition, removal or edit to either bank shows up as a diff a person reads, rather than waiting for a
-   * sixth round's eye.
+   * sixth round's eye. Round 6 found a seventh instance anyway ('chok' → taught `ch` + short `o` + `k`
+   * decodes to "chock"), because the fixture only proves a word was *looked at*, not that this specific
+   * failure mode was caught — so 'chok' joins `RETIRED` below the same way 'zeak' did.
    */
   it('every ALIEN_REAL/ALIEN_FAKE entry has been looked at for a real-word/sound-alike risk (#982)', () => {
     const expected = readFileSync(new URL('./fixtures/y1-alien-bank.txt', import.meta.url), 'utf8')
