@@ -12,3 +12,5 @@ export declare function pickIssue(input: { candidates: Labelled[]; prs: Pr[]; op
   blockersRead: number;
 };
 export declare function report(result: ReturnType<typeof pickIssue>, total: number): string;
+export declare function curlGet(url: string, tok: string, run?: (cmd: string, args: string[], opts: { input: string; encoding: 'utf8'; maxBuffer: number }) => string): unknown[];
+export declare function fetchAll(path: string, tok: string, get?: (url: string, tok: string) => unknown[]): unknown[];
