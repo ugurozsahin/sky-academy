@@ -29,6 +29,10 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     ['0.375', 'zero point three seven five'],
     ['12.5', 'twelve point five'],
     ['1.234', 'one point two three four'],
+    ['123.5', 'one hundred and twenty-three point five'],
+    ['1234.56', 'one thousand two hundred and thirty-four point five six'],
+    ['125 1/2', 'one hundred and twenty-five and one half'],
+    ['300/4', 'three hundred quarters'],
     // 24-hour times
     ['14:35', 'fourteen thirty-five'],
     ['14:05', 'fourteen oh five'],
@@ -82,6 +86,18 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
   it('sayIsSafe is true for ordinary spoken-word sentences with no leftover notation', () => {
     expect(sayIsSafe('three quarters of the pizza')).toBe(true);
     expect(sayIsSafe('fourteen thirty-five')).toBe(true);
+  });
+
+  // The module's own core invariant (its header comment states it): ks2Say never leaves behind what
+  // sayIsSafe is built to catch. Checked over a wider table than the five official rail fixtures above,
+  // including the values that once broke cardinal() past 99 (a one-line regression there reads as
+  // "undefined" text, which is safe by sayIsSafe's own rules but wrong — this is what would catch that).
+  it('ks2Say\'s output always passes sayIsSafe, over every notation shape this file handles', () => {
+    const raw = [
+      '3/4', '2 3/4', '300/4', '3.75', '123.5', '1234.56', '14:35', '23:59',
+      '4 cm²', '9 m²', '12 km', 'XIV', 'MCMXCIX', '−3.5', '7 − 3 = ?',
+    ];
+    for (const text of raw) expect(sayIsSafe(ks2Say(text)), `ks2Say(${JSON.stringify(text)}) = ${JSON.stringify(ks2Say(text))}`).toBe(true);
   });
 
   // The registry sweep runs zero times today — no KS2 (`isKs2`) topic exists yet — so this loop is proven

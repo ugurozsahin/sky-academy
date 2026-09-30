@@ -10,11 +10,24 @@ const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'ei
   'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
 const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
 
-/** Cardinal number word, 0-99 (enough for a digit, an hour 0-23 or a minute 0-59). */
+/**
+ * Cardinal number word, any non-negative integer. An hour (0-23), a minute (0-59) and a single digit all
+ * fall inside the 0-99 base case; the decimal and mixed-fraction paths below feed it a whole number with
+ * no such cap (a KS2 money or measurement value can run into the hundreds or thousands), so the recursion
+ * has to hold for those too, or a value of 100+ prints "undefined" instead of failing loudly.
+ */
 function cardinal(n: number): string {
   if (n < 20) return ONES[n];
-  const tens = Math.floor(n / 10), ones = n % 10;
-  return ones === 0 ? TENS[tens] : `${TENS[tens]}-${ONES[ones]}`;
+  if (n < 100) {
+    const tens = Math.floor(n / 10), ones = n % 10;
+    return ones === 0 ? TENS[tens] : `${TENS[tens]}-${ONES[ones]}`;
+  }
+  if (n < 1000) {
+    const hundreds = Math.floor(n / 100), rest = n % 100;
+    return rest === 0 ? `${ONES[hundreds]} hundred` : `${ONES[hundreds]} hundred and ${cardinal(rest)}`;
+  }
+  const thousands = Math.floor(n / 1000), rest = n % 1000;
+  return rest === 0 ? `${cardinal(thousands)} thousand` : `${cardinal(thousands)} thousand ${cardinal(rest)}`;
 }
 
 const DENOM_WORD: Record<number, string> = {
