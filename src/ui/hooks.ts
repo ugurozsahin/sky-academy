@@ -120,6 +120,8 @@ export interface DuelState {
    * `{ hits: 0, tries: 0 }` until the match ends, and after a match Player 1 never sliced in (#16 item 5).
    */
   taught: DuelTally;
+  /** The Pause overlay holds the match (#886) — the same meaning as the play screen's `PlayState.paused`. */
+  paused: boolean;
 }
 
 /** The `window.__sna` hooks set by the Ninja Duel screen (#16): every action names the player it is for. */
