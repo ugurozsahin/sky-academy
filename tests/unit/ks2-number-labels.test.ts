@@ -87,13 +87,44 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     expect(labelProblems('(3,-4)')).toHaveLength(1);
   });
 
-  it('a coordinate pair is never read as a mis-grouped number (review round 2)', () => {
+  it('a coordinate pair is never read as a mis-grouped number (review rounds 2-3)', () => {
     // "(3,4)" is ordinary KS2 content — NC Year 4/6 position and direction — not a 34 written with a stray
-    // comma. Too short (2 digits total) to ever be a validly-grouped large number in the first place, so
-    // this rail has no business judging it either way.
+    // comma. A token directly wrapped in parentheses is never a grouping candidate at all, whatever its
+    // digit shape (round 3: a digit-count threshold alone let a real money typo through AND still flagged
+    // a legitimate longer coordinate like "(19,99)" — see the money and coordinate-vs-year tests below).
     expect(labelProblems('(3,4)')).toEqual([]);
     expect(labelProblems('Plot the point (3,4) on the grid')).toEqual([]);
-    expect(labelProblems('(12,345)')).toEqual([]); // long enough to check, and it happens to be well-formed
+    expect(labelProblems('(12,345)')).toEqual([]); // happens to look well-formed too; still exempt either way
+    expect(labelProblems('(19,99)')).toEqual([]); // 4+ total digits, but still just two short numbers
+  });
+
+  it('a comma is never valid in money, however short (review round 3)', () => {
+    // "£3,00" is the classic continental-decimal typo (a comma where SATs style needs a full stop, "£3.00")
+    // — round 2's coordinate-length exemption wrongly waved this through too, since its comma-joined token
+    // is only 3 digits. A token directly preceded by "£" is always money, never a coordinate, so it's
+    // always checked regardless of length.
+    expect(labelProblems('The toy costs £3,00 today, not £4,50.')).toHaveLength(2);
+    expect(labelProblems('£1,234.56')).toEqual([]); // a real, correctly-grouped amount: still fine
+  });
+
+  it('a coordinate is never misread as a year sharing its concatenated digits (review round 3)', () => {
+    // "(19,99)" is an ordinary coordinate; naming 1999 as a year must not make the coordinate-detection
+    // lose to the year check just because "19" + "99" happens to concatenate to the named value.
+    expect(labelProblems('The shape is at (19,99) on the grid.', { years: [1999] })).toEqual([]);
+    // A real bare year sharing digits with a nearby coordinate is still correctly exempt — the coordinate
+    // itself does not count as a competing "1999" occurrence (occurrenceCounts skips parenthesised tokens).
+    expect(labelProblems('The shape is at (19,99) on the grid, in 1999.', { years: [1999] })).toEqual([]);
+  });
+
+  it('an ambiguous repeated year value is judged as ordinary numbers, not silently exempted (review round 3)', () => {
+    // The same digits, twice, for two different reasons — nothing here can tell "1200 sheep" (needs a
+    // comma) from "1200 AD" (must not have one) apart, so both are judged as ordinary numbers rather than
+    // both being silently waved through (which round 2's design did, hiding the real "1200 sheep" defect
+    // entirely). One of the two flagged results is a false positive on the real year in this specific
+    // collision — a bounded, documented trade-off (see LabelProblemsOpts' own comment) — not a silent miss.
+    expect(labelProblems('1200 sheep were counted, and in 1200 AD the town was founded.', { years: [1200] }))
+      .toHaveLength(2);
+    expect(labelProblems('There were 1999 apples in 1999.', { years: [1999] })).toHaveLength(2);
   });
 
   it('a list of correctly-grouped numbers never trips the space-grouping check (review round 1)', () => {

@@ -4,16 +4,76 @@
 
 export interface LabelProblemsOpts {
   /**
-   * The exact whole-number year value(s) expected in this text (review round 2): each must appear with no
-   * comma, and nothing else is exempted for merely looking year-shaped. A blanket `years: true` (round 1's
-   * shape) could not tell "the real year in this label" from "an unrelated number that happens to fall in
-   * the same range" — `labelProblems('In 1999 the population grew by 1500.', {years: true})` wrongly waved
-   * both numbers through. Naming the value(s) fixes that: `{years: [1999]}` exempts only a bare "1999" and
-   * still catches "1500" needing its comma, and it also catches the opposite mistake — "1,999" written with
-   * a comma is flagged as wrong for a year precisely because 1999 is one, not because it fails the ordinary
-   * grouping check (which "1,999" would otherwise pass).
+   * The exact whole-number year value(s) expected in this text (review rounds 2-3): each must appear with
+   * no comma, and nothing else is exempted for merely looking year-shaped. A blanket `years: true` (round
+   * 1's shape) could not tell "the real year in this label" from "an unrelated number that happens to fall
+   * in the same range" — naming the value(s) fixed that (round 2). But a value alone still can't say which
+   * *occurrence* is the year when the same digits appear twice for different reasons in one string ("1200
+   * sheep were counted, and in 1200 AD the town was founded" — one 1200 needs a comma, the other must not
+   * carry one, and nothing here can tell which is which). Round 3's fix: when a candidate value's digits
+   * occur more than once in the text, none of those occurrences is treated as the year — every one of them
+   * is judged as an ordinary number instead. That can produce one false "needs a comma" on the real year in
+   * that specific collision, but the alternative (silently trusting an unresolvable guess) hides a always-
+   * real defect in the other occurrence entirely; a caller that hits the collision rewords one mention
+   * rather than relying on this rail to read intent it has no way to read.
    */
   years?: number[];
+}
+
+/** How many times `value`'s digits occur as a token's value anywhere in `text` — comma or no comma, since
+ *  both "1,999" and "1999" are candidate readings of the same year. Computed once per call, ahead of the
+ *  main scan, so "is this occurrence unambiguous" is answered before any single match is judged. A
+ *  parenthesised token is skipped, the same as the main scan skips it: a coordinate's two parts are never a
+ *  number-token candidate in the first place, so its coincidental digit-concatenation must not count
+ *  towards whether a real year elsewhere in the same text is ambiguous. */
+function occurrenceCounts(text: string, values: number[]): Map<number, number> {
+  const counts = new Map(values.map(v => [v, 0]));
+  for (const m of text.matchAll(/\d(?:[\d,]*\d)?(?:\.\d+)?/g)) {
+    const intPart = m[0].split('.')[0];
+    if (text[m.index - 1] === '(' && text[m.index + intPart.length] === ')') continue;
+    const v = Number(intPart.replace(/,/g, ''));
+    if (counts.has(v)) counts.set(v, counts.get(v)! + 1);
+  }
+  return counts;
+}
+
+/**
+ * The one problem (or none) a single number token has with its grouping — split out of `labelProblems` so
+ * that function's own complexity stays under this repo's ratchet, not because this half is independently
+ * reusable. `m` is a match of the number-token scan below; `isYear` is already resolved (unambiguous named
+ * value or not) by the caller, which is why it is a plain boolean parameter rather than recomputed here.
+ */
+function groupingProblem(text: string, m: RegExpMatchArray, intPart: string, isYear: boolean): string | null {
+  const digitsOnly = intPart.replace(/,/g, '');
+  const parts = intPart.split(',');
+  if (parts.length === 1) {
+    // No comma at all: fine if it's short, or it's the named year (a year is exempt from needing one).
+    if (isYear || digitsOnly.length < 4) return null;
+    return `"${digitsOnly}" is four or more digits with no comma grouping`;
+  }
+  // Context, not digit count or year-ness, decides whether a bare comma-joined token is even a grouping
+  // candidate at all (review round 3): round 2's "too short to be validly grouped" length cutoff both let a
+  // real money typo through ("£3,00" is only 3 digits) and still flagged a legitimate coordinate whose two
+  // parts happened to total 4+ ("(19,99)", whose digits also collide with a named year — checked first,
+  // below, it would otherwise be misread as "a year written with a comma"). A token directly wrapped in
+  // parentheses is coordinate/pair notation and is never a grouping OR a year candidate, whatever its digit
+  // shape; a token directly preceded by "£" is money and always must be correctly grouped, however short.
+  const before = text[m.index! - 1];
+  const after = text[m.index! + intPart.length];
+  if (before === '(' && after === ')') return null; // "(3,4)", "(19,99)" — two short numbers, not one
+  // A comma at all, on a token that IS the named year, is wrong regardless of where it falls — review
+  // round 2: "1,999" happens to satisfy the ordinary three-digit-group rule below, so only checking that
+  // would wave a year-with-a-comma straight through.
+  if (isYear) return `"${intPart}" is a year and must never carry a comma`;
+  const isMoney = before === '£';
+  const structurallyValid = parts[0].length <= 3 && parts.slice(1).every(p => p.length === 3);
+  if (structurallyValid || !(isMoney || digitsOnly.length >= 4)) return null;
+  // A comma inside the token does not excuse the digits either side of it: "12,3456" still has an ungrouped
+  // run of four after the comma, which a check that merely skips anything comma-adjacent would miss
+  // entirely; "£3,00" is only 3 digits but a comma is never valid in money at all. A short, uncontextualised
+  // comma pair (neither money nor 4+ digits) has no realistic fixture demanding a verdict, so it falls
+  // through the condition above unjudged — the same call round 2 made for exactly this shape.
+  return `"${intPart}" is grouped incorrectly — commas must mark exact groups of three digits`;
 }
 
 /**
@@ -52,35 +112,19 @@ export function labelProblems(text: string, opts: LabelProblemsOpts = {}): strin
 
   // Every maximal "number token" — digits and commas, an optional decimal tail — starting and ending on a
   // digit, so "(−3, 4)"'s comma-then-space never joins "3" and "4" into one token (a space is in neither
-  // character class either). Only the integer part is judged for grouping; the fraction is never comma-
-  // grouped and is already covered by the float-artefact scan above, so it is split off and ignored here
-  // rather than double-counted (or, worse, itself misread as an ungrouped integer).
+  // character class either). Only the integer part is judged for grouping (by groupingProblem, above); the
+  // fraction is never comma-grouped and is already covered by the float-artefact scan above, so it is split
+  // off and ignored here rather than double-counted (or, worse, itself misread as an ungrouped integer).
+  const yearCounts = occurrenceCounts(text, opts.years ?? []);
   for (const m of text.matchAll(/\d(?:[\d,]*\d)?(?:\.\d+)?/g)) {
     const intPart = m[0].split('.')[0];
-    const digitsOnly = intPart.replace(/,/g, '');
-    const isYear = (opts.years ?? []).includes(Number(digitsOnly));
-    const parts = intPart.split(',');
-    if (parts.length === 1) {
-      // No comma at all: fine if it's short, or it's the named year (a year is exempt from needing one).
-      if (isYear || digitsOnly.length < 4) continue;
-      problems.push(`"${digitsOnly}" is four or more digits with no comma grouping`);
-    } else if (isYear) {
-      // A comma at all, on a token that IS the named year, is wrong regardless of where it falls — review
-      // round 2: "1,999" happens to satisfy the ordinary three-digit-group rule below, so only checking
-      // that would wave a year-with-a-comma straight through.
-      problems.push(`"${intPart}" is a year and must never carry a comma`);
-    } else if (digitsOnly.length < 4) {
-      // Too short to ever be a validly-grouped number at all (the smallest valid shape, "1,000", already
-      // needs 4: one leading digit plus one exact three-digit group) — review round 2: "(3,4)" is ordinary
-      // KS2 coordinate notation, not a mis-grouped number, and a check with no lower bound here blocked it
-      // outright. A comma too short to represent grouping is content this rail has no business judging.
-      continue;
-    } else if (parts[0].length > 3 || parts.slice(1).some(p => p.length !== 3)) {
-      // A comma inside the token does not excuse the digits either side of it: "12,3456" still has an
-      // ungrouped run of four after the comma, which a check that merely skips anything comma-adjacent
-      // would miss entirely.
-      problems.push(`"${intPart}" is grouped incorrectly — commas must mark exact groups of three digits`);
-    }
+    // A candidate year is only treated as one where it is the sole occurrence of that value in the text
+    // (review round 3) — see occurrenceCounts' comment for why an ambiguous repeat is judged as ordinary
+    // numbers instead of guessed at.
+    const value = Number(intPart.replace(/,/g, ''));
+    const isYear = (opts.years ?? []).includes(value) && yearCounts.get(value) === 1;
+    const problem = groupingProblem(text, m, intPart, isYear);
+    if (problem) problems.push(problem);
   }
 
   return problems;
