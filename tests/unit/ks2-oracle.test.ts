@@ -126,6 +126,14 @@ const NULLS = [
   // removing the `!rhs` half leaves the suite green here and throws `TypeError: Cannot read properties of
   // null (reading 'coef')` at `sub(lhs.coef, rhs.coef)` instead of returning anything.
   '5 = @',
+  // #1423 review round 6: mulLin's final `return null` (both factors carry the unknown) had only one case,
+  // 'n × n = 9', and its second factor's `const` is 0 — so a mutation dropping the `isZero(b.coef)` check
+  // entirely (falling through to treat b as if it were a plain constant) still lands on {coef:0, const:0},
+  // which ks2Solve's own "no unknown at all" check then catches for an unrelated reason, masking the gap.
+  // This case's second factor (n + 3) has a nonzero const, so the same mutation instead yields a nonzero
+  // coefficient (mul(a.coef, b.const) = 3) that reaches ks2Solve's final line and returns a fabricated
+  // {n:4,d:3} rather than tripping any other check — confirmed by mutation.
+  'n × (n + 3) = 4',
   '',
 ];
 
