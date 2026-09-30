@@ -3,11 +3,18 @@
 // checker; `ks2-number-labels.test.ts` runs it over `fmt()` and over every `isKs2` registry topic.
 
 export interface LabelProblemsOpts {
-  /** A four-digit whole number from 1000 to 2099 may appear with no comma (a year). */
-  years?: boolean;
+  /**
+   * The exact whole-number year value(s) expected in this text (review round 2): each must appear with no
+   * comma, and nothing else is exempted for merely looking year-shaped. A blanket `years: true` (round 1's
+   * shape) could not tell "the real year in this label" from "an unrelated number that happens to fall in
+   * the same range" — `labelProblems('In 1999 the population grew by 1500.', {years: true})` wrongly waved
+   * both numbers through. Naming the value(s) fixes that: `{years: [1999]}` exempts only a bare "1999" and
+   * still catches "1500" needing its comma, and it also catches the opposite mistake — "1,999" written with
+   * a comma is flagged as wrong for a year precisely because 1999 is one, not because it fails the ordinary
+   * grouping check (which "1,999" would otherwise pass).
+   */
+  years?: number[];
 }
-
-const YEAR_RE = /^(?:1[0-9]{3}|20[0-9]{2})$/;
 
 /**
  * Every problem `text` has with SATs-style number formatting, or `[]` if it has none. Three independent
@@ -50,11 +57,24 @@ export function labelProblems(text: string, opts: LabelProblemsOpts = {}): strin
   // rather than double-counted (or, worse, itself misread as an ungrouped integer).
   for (const m of text.matchAll(/\d(?:[\d,]*\d)?(?:\.\d+)?/g)) {
     const intPart = m[0].split('.')[0];
+    const digitsOnly = intPart.replace(/,/g, '');
+    const isYear = (opts.years ?? []).includes(Number(digitsOnly));
     const parts = intPart.split(',');
     if (parts.length === 1) {
-      if (intPart.length < 4) continue;
-      if (opts.years && YEAR_RE.test(intPart)) continue;
-      problems.push(`"${intPart}" is four or more digits with no comma grouping`);
+      // No comma at all: fine if it's short, or it's the named year (a year is exempt from needing one).
+      if (isYear || digitsOnly.length < 4) continue;
+      problems.push(`"${digitsOnly}" is four or more digits with no comma grouping`);
+    } else if (isYear) {
+      // A comma at all, on a token that IS the named year, is wrong regardless of where it falls — review
+      // round 2: "1,999" happens to satisfy the ordinary three-digit-group rule below, so only checking
+      // that would wave a year-with-a-comma straight through.
+      problems.push(`"${intPart}" is a year and must never carry a comma`);
+    } else if (digitsOnly.length < 4) {
+      // Too short to ever be a validly-grouped number at all (the smallest valid shape, "1,000", already
+      // needs 4: one leading digit plus one exact three-digit group) — review round 2: "(3,4)" is ordinary
+      // KS2 coordinate notation, not a mis-grouped number, and a check with no lower bound here blocked it
+      // outright. A comma too short to represent grouping is content this rail has no business judging.
+      continue;
     } else if (parts[0].length > 3 || parts.slice(1).some(p => p.length !== 3)) {
       // A comma inside the token does not excuse the digits either side of it: "12,3456" still has an
       // ungrouped run of four after the comma, which a check that merely skips anything comma-adjacent

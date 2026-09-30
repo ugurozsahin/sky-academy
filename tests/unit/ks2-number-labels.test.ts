@@ -33,7 +33,7 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     for (const y of [1000, 1999, 2026, 2099]) {
       const label = fmt(dec(y, 0), { year: true });
       expect(label, label).not.toContain(',');
-      expect(labelProblems(label, { years: true }), label).toEqual([]);
+      expect(labelProblems(label, { years: [y] }), label).toEqual([]);
     }
   });
 
@@ -50,14 +50,28 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
     expect(fmt(aligned, { year: true })).toBe('1999');
   });
 
-  it('the years exemption holds its upper boundary: 2100 still fails even with years: true', () => {
-    expect(labelProblems('2100', { years: true })).not.toEqual([]);
-    expect(labelProblems('3000', { years: true })).not.toEqual([]);
+  it('years exempts only the exact value named, never anything merely year-shaped (review round 2)', () => {
+    // "In 1999 the population grew by 1500." — a blanket years:true (round 1's shape) could not tell 1999
+    // (the real year) from 1500 (an ordinary count that happens to fall in the same range) apart, and
+    // exempted both. Naming the value fixes it: 1500 still needs its comma.
+    expect(labelProblems('In 1999 the population grew by 1500.', { years: [1999] }))
+      .toEqual(['"1500" is four or more digits with no comma grouping']);
+    // A value not in the list is never exempted, however year-shaped it looks.
+    expect(labelProblems('2100', { years: [1999] })).not.toEqual([]);
+  });
+
+  it('a comma on the named year is wrong regardless of where it falls (review round 2)', () => {
+    // "1,999" happens to satisfy the ordinary three-digit-group rule, so only checking that would wave a
+    // year written with a comma straight through — a year must never carry one at all (CLAUDE.md D3).
+    expect(labelProblems('1,999', { years: [1999] }))
+      .toEqual(['"1,999" is a year and must never carry a comma']);
+    // Without naming 1999 as the year, "1,999" is just an ordinary, correctly-grouped 4-digit quantity.
+    expect(labelProblems('1,999')).toEqual([]);
   });
 
   it('two independent problems in one string both get reported', () => {
     expect(labelProblems('-12345')).toHaveLength(2); // the "-1" minus sign, and "12345" ungrouped
-    expect(labelProblems('-3 and 12345', { years: true })).toHaveLength(2);
+    expect(labelProblems('-3 and 12345')).toHaveLength(2);
   });
 
   it('a comma does not excuse the digits either side of it', () => {
@@ -71,6 +85,15 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
   it('an ASCII minus right after a comma, with no space, is still caught', () => {
     expect(labelProblems('1,-2')).toHaveLength(1);
     expect(labelProblems('(3,-4)')).toHaveLength(1);
+  });
+
+  it('a coordinate pair is never read as a mis-grouped number (review round 2)', () => {
+    // "(3,4)" is ordinary KS2 content — NC Year 4/6 position and direction — not a 34 written with a stray
+    // comma. Too short (2 digits total) to ever be a validly-grouped large number in the first place, so
+    // this rail has no business judging it either way.
+    expect(labelProblems('(3,4)')).toEqual([]);
+    expect(labelProblems('Plot the point (3,4) on the grid')).toEqual([]);
+    expect(labelProblems('(12,345)')).toEqual([]); // long enough to check, and it happens to be well-formed
   });
 
   it('a list of correctly-grouped numbers never trips the space-grouping check (review round 1)', () => {
@@ -94,11 +117,15 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
   it('every isKs2 registry topic\'s prompt, answer and options pass the rail', () => {
     const ks2Topics = TOPICS.filter(t => isKs2(t.year));
     for (const t of ks2Topics) {
-      const years = YEAR_LABEL_TOPICS.includes(t.id);
+      const isYearTopic = YEAR_LABEL_TOPICS.includes(t.id);
       const r = rng(2000 + t.id.length);
       for (const d of [1, 2, 3] as Difficulty[]) {
         for (let i = 0; i < 150; i++) {
           const q = t.gen(d, r);
+          // A year-label topic's own answer IS the year for that draw — named explicitly (review round 2:
+          // a blanket years flag can't tell the real year from a coincidental in-range number sharing the
+          // same label), best-effort until a real topic lands and fixes its actual answer shape.
+          const years = isYearTopic && /^\d+$/.test(q.answer) ? [Number(q.answer)] : undefined;
           for (const label of [q.prompt, q.answer, ...q.options]) {
             expect(labelProblems(label, { years }), `${t.id} d${d}: "${label}"`).toEqual([]);
           }
@@ -112,24 +139,24 @@ describe('KS2 number-label rail (#1047): no float artefact, no ASCII minus, comm
   });
 
   it.each([
-    ['0.30000000000000004', false, 1],
-    ['-3', false, 1],
-    ['1000', false, 1],
-    ['10 000', false, 1],
-    ['−3', false, 0],
-    ['1,000', false, 0],
-    ['3.75', false, 0],
-    ['£1,234.56', false, 0],
-    ['12.5%', false, 0],
-    ['twenty-four', false, 0],
-    ['-ly', false, 0],
-    ['(−3, 4)', false, 0],
-  ] as const)('%s (years:%s) has %i problem(s)', (text, years, count) => {
-    expect(labelProblems(text, { years })).toHaveLength(count);
+    ['0.30000000000000004', 1],
+    ['-3', 1],
+    ['1000', 1],
+    ['10 000', 1],
+    ['−3', 0],
+    ['1,000', 0],
+    ['3.75', 0],
+    ['£1,234.56', 0],
+    ['12.5%', 0],
+    ['twenty-four', 0],
+    ['-ly', 0],
+    ['(−3, 4)', 0],
+  ] as const)('%s has %i problem(s)', (text, count) => {
+    expect(labelProblems(text)).toHaveLength(count);
   });
 
-  it('"1999" fails with no years option and passes with years: true', () => {
+  it('"1999" fails with no years option and passes when named as the year', () => {
     expect(labelProblems('1999')).not.toEqual([]);
-    expect(labelProblems('1999', { years: true })).toEqual([]);
+    expect(labelProblems('1999', { years: [1999] })).toEqual([]);
   });
 });
