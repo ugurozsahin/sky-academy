@@ -357,3 +357,42 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     }
   });
 });
+
+describe('ks2say.ts: declared Roman numerals (#1057, #1463)', () => {
+  const say = (t: string, ...roman: string[]) => ks2Say(t, { roman });
+
+  it('speaks a declared numeral as letters, never as its value', () => {
+    expect(say('XIV', 'XIV')).toBe('Roman numeral X, I, V');
+    expect(say('What does XIV mean?', 'XIV')).toBe('What does Roman numeral X, I, V mean what');
+    expect(say('What does XIV mean?', 'XIV')).not.toMatch(/fourteen/);
+  });
+
+  it('is never guessed: undeclared text is untouched, so prose and variables are safe', () => {
+    expect(ks2Say('XIV')).toBe('XIV');
+    expect(ks2Say('The Roman numeral V equals which number?')).toBe('The Roman numeral V equals which number what');
+    expect(say('Add V and X', 'XIV')).toBe('Add V and X');
+    expect(say('Xavier lives in Cambridge', 'X')).toBe('Xavier lives in Cambridge');
+  });
+
+  it('a declared numeral made of unit letters is a numeral, not a unit (the CM / MM / L trap)', () => {
+    expect(say('CM', 'CM')).toBe('Roman numeral C, M');
+    expect(say('MM', 'MM')).toBe('Roman numeral M, M');
+    expect(say('L', 'L')).toBe('Roman numeral L');
+    expect(ks2Say('CM')).toBe('centimetres');
+    expect(say('5 cm', 'CM')).toBe('5 centimetres');
+  });
+
+  it('keeps the unit when a declared numeral is glued to one', () => {
+    expect(say('Xkg', 'X')).toBe('Roman numeral X kilograms');
+    expect(say('kgX', 'X')).toBe('kilograms Roman numeral X');
+  });
+
+  it('ignores a declaration that is not a canonical numeral', () => {
+    expect(say('IIII', 'IIII')).toBe('IIII');
+    expect(say('Xavier', 'Xavier')).toBe('Xavier');
+  });
+
+  it('still converts other notation beside a numeral', () => {
+    expect(say('XII is 3/4 of 16', 'XII')).toBe('Roman numeral X, I, I is three quarters of 16');
+  });
+});

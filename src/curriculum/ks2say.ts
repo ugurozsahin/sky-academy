@@ -11,32 +11,15 @@
 // "adjacent" its own way. A shared tokenizer removes that seam — `ks2Say` renders every non-prose token it
 // finds, `sayIsSafe` fails whenever one is left un-rendered.
 //
-// **Roman numerals are out of scope here, moved to a follow-up issue (#1463).** They were in the original
-// ask and are documented in that issue rather than this file's own header from here on: rounds 4 through
-// 10 found nine defects in Roman-numeral detection alone — a textual "was this glued to something" or "was
-// this already rendered by ks2Say" heuristic keeps colliding with real KS2 prose, because the vocabulary a
-// heuristic like this has to recognise ("Roman numeral", a bare letter) is simultaneously the rendered
-// output and ordinary English a card can legitimately use. Round 10's own finding — `sayIsSafe("The Roman
-// numeral V equals which number?")` reads `true` on genuinely raw, unconverted text, because the phrase
-// "Roman numeral V" is real prose as often as it is ks2Say's own rendering — has no small fix: distinguishing
-// the two needs `ks2Say` to hand back which spans it produced (a structural change, not a tenth pattern).
-// Every other notation kind here (units, fractions, decimals, times, the "N-D shape" idiom) has been stable
-// since round 2; landing those now rather than a further Roman-numeral patch is round 9 and round 10's own
-// recommendation, independently arrived at twice.
-//
-// Two residual traps for whoever picks up #1463 — self-review found both, neither reachable today (no
-// generator produces Roman-numeral text yet; `grep -rn "fromRoman" src/curriculum` outside roman.ts itself
-// returns nothing, and the one planned slot, `year3-measure.ts`'s `// slot: y3-roman`, is an empty
-// placeholder). First: a canonical Roman numeral built entirely from unit-code letters case-insensitively
-// ("CM" = 900, "MM" = 2000, "L" = 50) is silently misread as the unit instead ("centimetres",
-// "millimetres", "litres") — unit-code matching (round 7) already ran before Roman detection ever did, so
-// this collision predates this removal; it was simply masked before by every *other* Roman numeral
-// converting correctly through the now-removed branch. Second: a Roman-numeral-shaped fragment glued
-// directly to a real unit with no space ("Xkgcm", "kgX") now fails `decomposeUnits` at the first
-// non-unit-code letter and falls through as one opaque, unconverted `text` token — silently losing the
-// *unit* conversion too, not just the Roman half. Both need `ks2Say` to know about Roman numerals again to
-// fix, so both belong with #1463 rather than a patch here.
+// **Roman numerals are declared, never guessed (#1057, #1463).** Eleven rounds on PR #1430 found nine
+// defects in *detecting* a numeral in free text: "V" is a numeral, a variable and a letter, and "Roman
+// numeral V" is both ordinary prose and `ks2Say`'s own rendering. So there is no detection. A caller that
+// knows its card holds a numeral says so — `ks2Say(text, { roman: ['XIV'] })` — and only a whole letter run
+// equal to a declared, canonical numeral is spoken as letters ("Roman numeral X, I, V", never its value:
+// a card may ask what XIV means). Declared numerals are matched before unit codes, so "CM" or "MM" declared
+// is a numeral, not centimetres. `sayIsSafe` takes no declaration and never flags a numeral either way.
 import { symSay, UNIT_WORD } from './util';
+import { fromRoman } from './roman';
 
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
   'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
@@ -118,11 +101,16 @@ const MULTI_LETTER_UNITS = new Set(['cm²', 'm²', 'km', 'mm', 'ml', 'mg', 'kg',
 const SINGLE_LETTER_UNITS = new Set(['m', 'g', 'l']);
 const singleLetterUnitOK = (text: string, start: number): boolean => /[0-9] ?$/.test(text.slice(0, start));
 
-type TokKind = 'text' | 'digit' | 'dimension' | 'mixedFraction' | 'fraction' | 'time' | 'decimal' | 'unit';
+type TokKind = 'text' | 'digit' | 'dimension' | 'mixedFraction' | 'fraction' | 'time' | 'decimal' | 'unit' | 'roman';
+/** Numerals the caller declares (whole canonical numerals only — see the header). */
+export interface Ks2SayOpts { readonly roman?: readonly string[]; }
 interface Tok { readonly kind: TokKind; readonly start: number; readonly end: number; readonly raw: string; readonly spoken: string; }
 // Everything but plain prose and a bare digit run (out of scope on its own — "347 + 128 = ?" is meant to
 // stay "347") is a span `ks2Say` must render and `sayIsSafe` must never find un-rendered.
 const NOTATION: ReadonlySet<TokKind> = new Set(['dimension', 'mixedFraction', 'fraction', 'time', 'decimal', 'unit']);
+
+const romanTok = (raw: string, start: number): Tok =>
+  ({ kind: 'roman', start, end: start + raw.length, raw, spoken: `Roman numeral ${[...raw].join(', ')}` });
 
 // Longest code first, so "cm²"/"cm" aren't mistaken for a shorter prefix of themselves.
 const UNIT_CODES_LONGEST_FIRST = [...MULTI_LETTER_UNITS, ...SINGLE_LETTER_UNITS].sort((a, b) => b.length - a.length);
@@ -161,20 +149,36 @@ function bareUnitChain(run: string, start: number): Tok[] | null {
   return toks;
 }
 
+/** A declared numeral glued to units ("Xkg", "kgX"): the numeral keeps its letters, the rest must be units. */
+function gluedRoman(run: string, start: number, roman: ReadonlySet<string>): Tok[] | null {
+  for (const n of roman) {
+    const head = run.startsWith(n);
+    if (!head && !run.endsWith(n)) continue;
+    const unitsAt = head ? start + n.length : start;
+    const chain = decomposeUnits(head ? run.slice(n.length) : run.slice(0, run.length - n.length));
+    if (!chain) continue;
+    const units = bareUnitChain(chain.join(''), unitsAt) ?? [unitTok(chain[0], unitsAt)];
+    return head ? [romanTok(n, start), ...units] : [...units, romanTok(n, start + run.length - n.length)];
+  }
+  return null;
+}
+
 /** Splits a maximal run of letters (plus a trailing "²") into whatever it actually holds: a unit, a glued
  *  chain of units, or, for an ordinary English word (however it happens to start — "Divide", "Circle",
  *  "Xavier"), text. */
-function classifyLetterRun(run: string, start: number, text: string): Tok[] {
+function classifyLetterRun(run: string, start: number, text: string, roman: ReadonlySet<string>): Tok[] {
+  if (roman.has(run)) return [romanTok(run, start)];
   const lower = run.toLowerCase(); // unit codes match case-insensitively (#1430 round 7)
   if (MULTI_LETTER_UNITS.has(lower) || (SINGLE_LETTER_UNITS.has(lower) && singleLetterUnitOK(text, start))) {
     return [unitTok(run, start)];
   }
-  return bareUnitChain(run, start) ?? [{ kind: 'text', start, end: start + run.length, raw: run, spoken: run }];
+  return gluedRoman(run, start, roman) ?? bareUnitChain(run, start)
+    ?? [{ kind: 'text', start, end: start + run.length, raw: run, spoken: run }];
 }
 
 /** One left-to-right scan claiming the longest notation match at each position; everything else is a
  *  digit run (kept bare — plain numerals are out of this module's scope) or one plain character. */
-function tokenize(text: string): Tok[] {
+function tokenize(text: string, roman: ReadonlySet<string> = new Set()): Tok[] {
   const toks: Tok[] = [];
   let i = 0;
   while (i < text.length) {
@@ -208,7 +212,7 @@ function tokenize(text: string): Tok[] {
       i += m[0].length; continue;
     }
     if ((m = rest.match(/^[a-zA-Z]+²?/))) {
-      for (const tok of classifyLetterRun(m[0], i, text)) toks.push(tok);
+      for (const tok of classifyLetterRun(m[0], i, text, roman)) toks.push(tok);
       i += m[0].length; continue;
     }
     if ((m = rest.match(/^\d+/))) {
@@ -224,7 +228,7 @@ function tokenize(text: string): Tok[] {
 /**
  * Turns KS2 notation in `text` into words: a unit code, a mixed or plain fraction, a 24-hour time, a
  * decimal (read digit by digit after the point), and the NC "N-D shape" idiom. `symSay`'s operator words
- * then run over what is left. (Roman numerals are not handled here — see the file header, #1463.)
+ * then run over what is left. A numeral is spoken as letters only when the caller declares it in `opts.roman` (see the header).
  *
  * Two tokens glued together with nothing between them in the input always get exactly one space between
  * their spoken forms in the output, whichever one (or both) was notation — "5kg3cm", every unit but the
@@ -251,9 +255,11 @@ function normalizeWs(text: string): string {
   return text.replace(/\s+/g, ' ');
 }
 
-export function ks2Say(text: string): string {
+export function ks2Say(text: string, opts: Ks2SayOpts = {}): string {
   const norm = normalizeWs(text);
-  const toks = tokenize(norm);
+  // Only canonical numerals count: a declaration that is not one ("IIII", "Xavier") is ignored, not trusted.
+  const roman = new Set((opts.roman ?? []).filter(n => fromRoman(n) !== null));
+  const toks = tokenize(norm, roman);
   let out = '';
   let prevSpoken = '';
   for (const tok of toks) {
