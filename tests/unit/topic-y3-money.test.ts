@@ -73,6 +73,21 @@ describe('y3-money (#1099)', () => {
     }
   });
 
+  it('ladder shape: d1 shows 2–4 coins, d2 uses both operations, d3 uses both notes with prices over £1 and is slow', () => {
+    for (const c of draws(1, 1099_800)) {
+      const v = c.visual as { type: string; coins: number[] };
+      expect(v.type).toBe('coins');
+      expect(v.coins.length).toBeGreaterThanOrEqual(2);
+      expect(v.coins.length).toBeLessThanOrEqual(4);
+      expect(v.coins.reduce((s, x) => s + x, 0)).toBeGreaterThanOrEqual(10);
+    }
+    expect(new Set(draws(2, 1099_900).map(c => c.prompt.includes('+'))).size).toBe(2);
+    const d3 = draws(3, 1099_950);
+    expect(new Set(d3.map(c => amounts(c.prompt)[0]))).toEqual(new Set([500, 1000]));
+    for (const c of d3) { expect(amounts(c.prompt)[1], c.prompt).toBeGreaterThan(100); expect(c.slow, c.prompt).toBe(true); }
+    for (const d of [1, 2] as Difficulty[]) for (const c of draws(d, 1099_960, 50)) expect(c.slow).toBeFalsy();
+  });
+
   it.each([1, 2, 3] as Difficulty[])('d%i: leak limit over 2,000 draws (#1058)', d => {
     const s = leakShares(topic.gen, d, 2000);
     expect(s.counted).toBeGreaterThan(1500);
