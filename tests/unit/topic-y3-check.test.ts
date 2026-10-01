@@ -37,7 +37,8 @@ describe('y3-check (#1085)', () => {
       expect(op === '+' ? x + y : x - y).toBeLessThanOrEqual(1000);
       expect(op === '+' ? x + y : x - y).toBeGreaterThan(0);
       for (const o of c.options) { expect(Number(o)).toBeGreaterThan(0); expect(Number(o)).toBeLessThanOrEqual(1000); }
-      expect(new Set(c.options).size, c.prompt).toBe(c.options.length);
+      expect(c.options, c.prompt).toContain(c.answer);
+      expect(new Set(c.options).size, c.prompt).toBe(4);
       n++;
     }
     expect(n).toBeGreaterThan(500);
@@ -57,6 +58,9 @@ describe('y3-check (#1085)', () => {
       expect(Number(op === '+' ? Number(a) + Number(b) : Number(a) - Number(b)), c.prompt).toBe(Number(r));
       const right = c.options.filter(o => checks(o, add ? [Number(a), Number(b)] : [Number(a)], add));
       expect(right, c.prompt).toEqual([c.answer]);
+      // Mathematically, whichever way it is written, no other option may be a valid check either (a − c = b checks a − b = c).
+      const sameValue = c.options.filter(o => { const { x, op: p, y } = calc(o); return [Number(a), Number(b)].includes(p === '+' ? x + y : x - y); });
+      expect(sameValue, c.prompt).toEqual([c.answer]);
       expect(c.options, c.prompt).toHaveLength(4);
       expect(new Set(c.options).size, c.prompt).toBe(4);
       n++;
