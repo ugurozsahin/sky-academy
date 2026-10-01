@@ -137,6 +137,7 @@ Maths:
 
 Writing:
 - y3-wordlist — hear a word from Appendix 1's Year 3–4 words 1–50 and build it: the word alone, letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
+- y3-suffix — which spelling is right after adding -ly or -ation: plain -ly (d1), the exceptions happily, gently, basically, truly and -ation (d2), every rule in a gapped sentence (d3); the two wrong options are rule-based non-words
 
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
