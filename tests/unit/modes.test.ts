@@ -4,7 +4,7 @@ import { YEARS } from '../../src/curriculum';
 
 const Y1 = YEARS[1];
 const ALL: Mode[] = ['mission', 'endless', 'sprint', 'boss'];
-const ctx = (o: Partial<ModeCtx> = {}): ModeCtx => ({ year: Y1, stage: 1, questionsAsked: 0, sequence: false, slow: false, enraged: false, ...o });
+const ctx = (o: Partial<ModeCtx> = {}): ModeCtx => ({ year: Y1, stage: 1, questionsAsked: 0, sequence: false, slow: false, slower: false, enraged: false, ...o });
 const endCtx = (o: Partial<EndCtx> = {}): EndCtx => ({ won: false, score: 0, correct: 0, accuracy: 0, stageStarsTotal: 0, stages: 5, stars: 0, year: Y1, ...o });
 
 describe('mode table', () => {
@@ -147,14 +147,65 @@ describe('the slow flag reaches every mode that eases (#311)', () => {
     expect(MODES.boss.speed(ctx({ year: Y2, enraged: true, slow: true }))).toBe(2);
   });
 
-  it('Sky Storm does not ease, and that is the decision — not an oversight to be tidied away', () => {
+  it('Sky Storm does not ease for a flagged question, and that is the decision — not an oversight to be tidied away', () => {
     // `endless` ramps on questions answered and clamps for gentle years instead; `sequence` has never eased
     // there either (modes.ts). Pinned so a later reader who wraps `endless` in `eased()` has to change this
-    // test, and read the comment while doing it.
+    // test, and read the comment while doing it. It does ease for "Slower bubbles" (#905) — see the next
+    // `describe` — which is a separate, per-child accessibility setting, not this per-question flag.
     for (const q of [0, 12, 30]) {
       expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: q, slow: true })), `q=${q}`)
         .toBe(MODES.endless.speed(ctx({ year: Y2, questionsAsked: q, slow: false })));
     }
     expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: 30, slow: true })), 'full speed at the top of the ramp').toBe(3);
+  });
+});
+
+/**
+ * #905 — "Slower bubbles", the per-ninja accessibility setting. One step off every mode's speed, always
+ * applied (unlike `slow`, a per-question flag that some generators set — the two compose rather than collide),
+ * with its own floor of 0 in every year, not just gentle ones: the setting exists so a non-gentle year can
+ * still reach Reception's gentle-float speed when a child needs it.
+ */
+describe('"Slower bubbles" eases every mode by one step, with a floor of 0 (#905)', () => {
+  const Y2 = YEARS.find(y => y.id === 'year2')!;
+
+  it('Mission, Sprint and Boss each drop one step when slower is set', () => {
+    for (const m of ALL) {
+      const plain = MODES[m].speed(ctx({ year: Y2, slower: false, questionsAsked: 20 }));
+      const slower = MODES[m].speed(ctx({ year: Y2, slower: true, questionsAsked: 20 }));
+      expect(slower, m).toBeLessThan(plain);
+      expect(plain - slower, `${m} eases by exactly one step`).toBe(1);
+    }
+  });
+
+  it('Sky Storm eases too, even though a flagged question does not (the two are independent)', () => {
+    const plain = MODES.endless.speed(ctx({ year: Y2, slower: false, questionsAsked: 30 }));
+    const slower = MODES.endless.speed(ctx({ year: Y2, slower: true, questionsAsked: 30 }));
+    expect(plain, 'full speed at the top of the ramp').toBe(3);
+    expect(slower).toBe(2);
+  });
+
+  it('a slow/sequence question and "Slower bubbles" compose to two steps off, not one', () => {
+    expect(Y2.speeds[4], 'Y2 stage 5 is the fastest step').toBe(3);
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 5 }))).toBe(3);
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 5, slow: true }))).toBe(2);
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 5, slower: true }))).toBe(2);
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 5, slow: true, slower: true }))).toBe(1);
+  });
+
+  it('floors at 0 in every year, not 1 — the whole point of the setting', () => {
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 1, slower: true })), 'Y2 stage 1 is already speed 1').toBe(0);
+    expect(MODES.mission.speed(ctx({ year: Y2, stage: 1, slow: true, slower: true })), 'never below 0').toBe(0);
+    expect(MODES.endless.speed(ctx({ year: Y2, questionsAsked: 0, slower: true })), 'endless floor, too').toBe(0);
+  });
+
+  it('never speeds a question up, and Reception stays at its own floor', () => {
+    const R = YEARS.find(y => y.id === 'reception')!;
+    expect(MODES.mission.speed(ctx({ year: R, stage: 1, slower: true })), 'already 0 — cannot go lower').toBe(0);
+    for (const m of ALL) for (const stage of [1, 3, 5]) {
+      const plain = MODES[m].speed(ctx({ year: Y2, stage, slower: false, questionsAsked: 20 }));
+      const slower = MODES[m].speed(ctx({ year: Y2, stage, slower: true, questionsAsked: 20 }));
+      expect(slower, `${m} stage ${stage}`).toBeLessThanOrEqual(plain);
+    }
   });
 });
