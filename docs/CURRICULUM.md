@@ -126,6 +126,7 @@ Maths:
 - y3-pv — place value of each digit in a 3-digit number (d1), building it from hundreds, tens and ones (d2), partitioning it (d3)
 - y3-mental — a 3-digit number ± ones (no crossing a ten) or hundreds (d1), ± tens with hundred crossings (d2), all three forms with crossings and `slow` (d3)
 - y3-check — estimate a sum or difference of numbers within 4 of a hundred (d1), which calculation checks a subtraction (d2), checks of additions and subtractions with exchanges, plus estimates (d3)
+- y3-story-as — one-step story problems within 1,000, in one unit: ones, tens or hundreds (d1), a 2- or 3-digit amount with an exchange (d2), two-step stories with the first-step decoy and `slow` (d3)
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
 
 ## Difficulty convention
