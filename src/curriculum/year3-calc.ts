@@ -11,11 +11,12 @@
 // import: y3-story
 import type { Topic } from './types';
 import { y3Mental } from './year3-mental';
+import { y3Check } from './year3-check';
 
 export const Y3_CALC: Topic[] = [
   { id: 'y3-mental', title: 'Mental Adding and Subtracting', icon: '➕', subject: 'maths', year: 'year3', nc: 'Y3 A&S: 3-digit number and 1s, 10s, 100s mentally (3M7)', gen: y3Mental },
   // slot: y3-column
-  // slot: y3-check
+  { id: 'y3-check', title: 'Estimate and Check', icon: '✅', subject: 'maths', year: 'year3', nc: 'Y3 A&S: estimate, and check with inverse operations (3M9)', gen: y3Check },
   // slot: y3-missing
   // slot: y3-story-as
   // slot: y3-tables
