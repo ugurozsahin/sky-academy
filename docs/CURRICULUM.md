@@ -137,6 +137,7 @@ Maths:
 
 Writing:
 - y3-wordlist — hear a word from Appendix 1's Year 3–4 words 1–50 and build it: the word alone, letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
+- y3-prefix — the eight Year 3–4 prefixes (dis, mis, re, sub, inter, super, anti, auto): which prefix means under (d1, the six with a distinct meaning), which word means appear again (d2, real-word decoys including the bare root), build the word from its prefix and root (d3)
 
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
