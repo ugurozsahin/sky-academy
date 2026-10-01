@@ -123,6 +123,7 @@ later PR fills its own slot and touches no other line.
 
 Maths:
 - y3-count — count on and back in 4s, 8s, 50s and 100s; 10 or 100 more or less
+- y3-pv — place value of each digit in a 3-digit number (d1), building it from hundreds, tens and ones (d2), partitioning it (d3)
 
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
