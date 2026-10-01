@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
 import { DUEL_HANDOVER, duelPool, seededRng } from '../../src/game/duel';
 import { topicById, topicsFor, YEARS, type Question, type Topic, type Visual } from '../../src/curriculum';
 import { renderVisual } from '../../src/ui/visuals';
