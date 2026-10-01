@@ -133,6 +133,9 @@ Maths:
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
 - y3-fracof — unit fractions of 4–12 stars with a picture (d1), unit and non-unit fractions of wholes up to 60 (d2), the whole from a part, or non-unit fractions of wholes up to 80, with `slow` (d3)
 
+Writing:
+- y3-wordlist — hear a word from Appendix 1's Year 3–4 words 1–50 and build it: the word alone, letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
+
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
 Reception phonics adds a second, cumulative dimension (#14): the letters a difficulty may use follow the Little Wandle / Letters and Sounds order — d1 phase 2 only, d2–3 every single-letter sound — for the answer **and** the decoys. The pools are derived from the Sound Hunt banks in `src/curriculum/util.ts`, so the phase order has one home. Missions have 5 stages (Apprentice, Warrior, Master, Grandmaster, Legend); each year maps stages → (difficulty, speed) in `YEARS[].diffs/speeds`.
