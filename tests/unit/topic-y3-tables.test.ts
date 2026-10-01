@@ -52,13 +52,24 @@ describe('y3-tables (#1087)', () => {
     expect(d1.every(c => /^(4|8) × \d+ = \?$/.test(c.prompt))).toBe(true);
     for (const d of [2, 3] as Difficulty[]) {
       const cs = draws(d, 1087_310);
-      for (const t of [3, 4, 8]) expect(cs.some(c => nums(c.prompt).includes(t) && c.prompt.includes(String(t))), `table ${t}`).toBe(true);
+      // the table is read off the card where it is knowable: the dividend over the answer (÷ and missing-factor cards), never "any factor"
+      const tablesSeen = new Set(cs.filter(c => /÷|\?/.test(c.prompt.replace(/ = \?$/, ''))).map(c => Math.max(...nums(c.prompt)) / Number(c.answer)));
+      for (const t of [3, 4, 8]) expect(tablesSeen.has(t), `table ${t}`).toBe(true);
       expect(cs.some(c => c.prompt.includes('÷')), 'division').toBe(true);
       expect(cs.some(c => c.prompt.includes('×')), 'multiplication').toBe(true);
     }
     expect(draws(3, 1087_320).some(c => c.prompt.startsWith('?')), 'missing first factor').toBe(true);
     expect(draws(3, 1087_330).some(c => /^\d+ × \?/.test(c.prompt)), 'missing second factor').toBe(true);
     expect(draws(3, 1087_340).some(c => /÷ \?/.test(c.prompt)), 'missing divisor').toBe(true);
+  });
+
+  it('d2 asks × both ways round: table first and table second, for each table', () => {
+    for (const t of [3, 4, 8] as const) {
+      const r = rng(1087_450 + t);
+      const cs = Array.from({ length: 400 }, () => y3TablesQ(2, r, t).prompt);
+      expect(cs.some(p => new RegExp(`^${t} × (?!${t} )\\d+ = \\?$`).test(p)), `${t} × n`).toBe(true);
+      expect(cs.some(p => new RegExp(`^(?!${t} )\\d+ × ${t} = \\?$`).test(p)), `n × ${t}`).toBe(true);
+    }
   });
 
   it('d1: the shown fact, doubled, is the asked fact', () => {
