@@ -127,6 +127,7 @@ Maths:
 - y3-mental — a 3-digit number ± ones (no crossing a ten) or hundreds (d1), ± tens with hundred crossings (d2), all three forms with crossings and `slow` (d3)
 - y3-check — estimate a sum or difference of numbers within 4 of a hundred (d1), which calculation checks a subtraction (d2), checks of additions and subtractions with exchanges, plus estimates (d3)
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
+- y3-fracof — unit fractions of 4–12 stars with a picture (d1), unit and non-unit fractions of wholes up to 60 (d2), the whole from a part, or non-unit fractions of wholes up to 80, with `slow` (d3)
 
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
