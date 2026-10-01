@@ -26,8 +26,8 @@ interface Step { add: boolean; b: number }
 const exchange = (a: number, b: number, add: boolean) =>
   [1, 10].some(p => add ? Math.floor(a / p) % 10 + Math.floor(b / p) % 10 > 9 : Math.floor(a / p) % 10 < Math.floor(b / p) % 10);
 
-/** d1: ones, tens or hundreds; d2 and d3: a 2- or 3-digit amount. */
-const amount = (d: Difficulty, rng: Rng) => d === 1 ? [ri(rng, 1, 9), 10 * ri(rng, 1, 9), 100 * ri(rng, 1, 8)][ri(rng, 0, 2)] : ri(rng, 10, d === 2 ? 899 : 500);
+/** d1: ones (never 1: the bank's sentences are plural), tens or hundreds; d2 and d3: a 2- or 3-digit amount. */
+const amount = (d: Difficulty, rng: Rng) => d === 1 ? [ri(rng, 2, 9), 10 * ri(rng, 1, 9), 100 * ri(rng, 1, 8)][ri(rng, 0, 2)] : ri(rng, 10, d === 2 ? 899 : 500);
 
 function numbers(d: Difficulty, rng: Rng): { vals: number[]; steps: Step[] } {
   for (;;) {

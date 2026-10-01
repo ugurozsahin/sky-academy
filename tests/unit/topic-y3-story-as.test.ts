@@ -92,6 +92,17 @@ describe('y3-story-as (#1090)', () => {
     expect(new Set(draws(3, 1090_600).map(c => parse(c.prompt).ops.join())).size).toBe(4);
   });
 
+  it('no sentence is singular-ungrammatical: no amount is 1, over 3,000 draws per difficulty', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const r = rng(1090_990 + d);
+      for (let i = 0; i < 3000; i++) {
+        const c = topic.gen(d, r);
+        expect(c.prompt, c.prompt).not.toMatch(/\b1 (?!\d)/);
+        expect(c.say, c.prompt).not.toMatch(/\b1 (?!\d)/);
+      }
+    }
+  });
+
   it('decoys: the wrong operation turns up on one-step cards', () => {
     for (const d of [1, 2] as Difficulty[]) {
       const cards = draws(d, 1090_700).map(c => ({ ...parse(c.prompt), options: c.options.map(o => Number(o.replace(/\D/g, ''))) }));
