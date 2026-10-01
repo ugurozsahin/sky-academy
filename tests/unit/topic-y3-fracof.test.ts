@@ -28,6 +28,8 @@ describe('y3-fracof (#1092)', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d)) {
       const p = parse(c.prompt);
       expect(Number.isInteger(p.answer), c.prompt).toBe(true);
+      expect(p.num, c.prompt).toBeLessThan(p.den);
+      expect((c.say ?? '').length, c.prompt).toBeGreaterThan(0);
       expect(Number(c.answer), c.prompt).toBe(p.answer);
       expect(c.options.filter(o => o === c.answer), c.prompt).toHaveLength(1);
       expect(new Set(c.options).size, c.prompt).toBe(4);
@@ -46,6 +48,14 @@ describe('y3-fracof (#1092)', () => {
   it('only d1 carries an objects visual, whose n is the whole', () => {
     for (const c of draws(1)) { expect(c.visual).toMatchObject({ type: 'objects', n: parse(c.prompt).whole }); }
     for (const d of [2, 3] as Difficulty[]) for (const c of draws(d)) expect(c.visual, c.prompt).toBeUndefined();
+  });
+
+  it('d2 and d3 draw non-unit fractions and denominators beyond 5', () => {
+    for (const d of [2, 3] as Difficulty[]) {
+      const cards = draws(d).map(c => parse(c.prompt));
+      expect(cards.some(c => !c.reverse && c.num > 1), `d${d} non-unit`).toBe(true);
+      expect(cards.some(c => c.den > 5), `d${d} denominators beyond 5`).toBe(true);
+    }
   });
 
   it('d3 asks for the whole from a part on some cards, and non-unit fractions on others', () => {
