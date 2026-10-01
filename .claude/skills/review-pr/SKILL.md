@@ -259,6 +259,12 @@ finding whose evidence has evaporated. `docs/REVIEWER-PROMPT.md` STEP 2 already 
 
 **Merge** — squash into `main`, tick Review/QA/Done on the issue, and comment with the test results, which
 projects you ran, and the commit hash — ending, like every comment you post here, with your session URL (#199).
+**Immediately before the merge call, in this session, read the review you are merging on** (#1485): the PR's
+`REVIEW: CLEARED` comment (or the one you just posted), its `Head judged:` SHA against the live head, and the
+checks it names against the live ones; then write one line, `Merging <sha>: reviewed in <comment url>, CI and
+review-gate green`. Claude Code's auto-mode classifier judges the session, not GitHub, and refuses a merge it
+cannot see a review for as `[Merge Without Review]` — a PR cleared in an earlier run is the case it refuses. A
+refused merge is left for the owner or the next run; never route around it.
 
 **Block** — do both marks, or the block does not exist and the next run merges straight over it:
 
