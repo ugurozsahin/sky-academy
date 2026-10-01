@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Session, fixDeck, repeatKey, starsForAccuracy, type DeckItem, type Miss } from '../../src/game/session';
-import { TOPICS, YEARS, isKs2, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum';
+import { TOPICS, YEARS, topicById, topicsFor, type Question, type Topic } from '../../src/curriculum'; import { ks1Pinned } from './helpers/ks1-pin';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const events = (): any => ({ onQuestion: vi.fn(), onCorrect: vi.fn(), onWrong: vi.fn(), onMiss: vi.fn(), onProgress: vi.fn(), onLives: vi.fn(), onStageClear: vi.fn(), onTime: vi.fn(), onBoss: vi.fn(), onEnd: vi.fn() });
@@ -1181,7 +1181,7 @@ describe('the repeat key holds the whole question (#412)', () => {
     // The two extremes of the issue's own table are in this list: the listening topics, where the key *was* the
     // answer, and a measurement topic, where the values live in `hint`. `y2-punct` scrapes in at exactly 4.00
     // cards per answer (round 2, N2) — the one that would otherwise drop out of this rail in silence. #1050: EYFS/KS1-only; a KS2 topic still runs the `it.each` rail below, just unpinned here.
-    expect(measurable.map(s => s.id).filter(id => !isKs2(topicById(id)!.year)).sort()).toEqual([...MEASURABLE_TOPICS].sort());
+    expect(ks1Pinned(measurable.map(s => s.id), id => topicById(id)!.year).sort()).toEqual([...MEASURABLE_TOPICS].sort());
   });
 
   it.each(measurable.map(s => s.id))('%s: a driven session repeats an answer about as often as the generator does', (id) => {
@@ -1223,7 +1223,7 @@ describe('the repeat key holds the whole question (#412)', () => {
     'y2-sub', 'y2-temp', 'y2-three',
   ];
   it('the big-topic set is exactly these topics, not just this many (#453 item 3)', () => { // #1050: EYFS/KS1-only pin
-    expect(bigEnough.map(s => s.id).filter(id => !isKs2(topicById(id)!.year)).sort()).toEqual([...BIG_ENOUGH_TOPICS].sort());
+    expect(ks1Pinned(bigEnough.map(s => s.id), id => topicById(id)!.year).sort()).toEqual([...BIG_ENOUGH_TOPICS].sort());
   });
 
   it.each(bigEnough.map(s => s.id))('%s: a driven session never serves the same question twice running', (id) => {
