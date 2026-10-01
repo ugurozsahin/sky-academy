@@ -88,6 +88,14 @@ describe('y3-money (#1099)', () => {
     for (const d of [1, 2] as Difficulty[]) for (const c of draws(d, 1099_960, 50)) expect(c.slow).toBeFalsy();
   });
 
+  it('say never speaks the answer: d2 and d3 name exactly the prompt\'s amounts and nothing more', () => {
+    for (const d of [1, 2, 3] as Difficulty[]) for (const c of draws(d, 1099_970)) {
+      expect(c.say, c.prompt).toBeTruthy();
+      // Not "no amount equals the answer": "change from £10 for £5" legitimately has the answer (£5) in the prompt.
+      expect(amounts(c.say!), c.say).toEqual(d === 1 ? [] : amounts(c.prompt));
+    }
+  });
+
   it.each([1, 2, 3] as Difficulty[])('d%i: leak limit over 2,000 draws (#1058)', d => {
     const s = leakShares(topic.gen, d, 2000);
     expect(s.counted).toBeGreaterThan(1500);
