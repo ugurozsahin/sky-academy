@@ -2,7 +2,7 @@
 // see the `// slot:`/`// import:` comments below. Keep this file ≤300 lines (#1050): a generator that would
 // push it past that moves to its own `year3-<slug>.ts` and this file keeps only its row/import.
 import type { Difficulty, Generator, Question, Topic } from './types';
-import { ri, pick, shuffle } from './util';
+import { ri, pick, shuffle, wordQ } from './util';
 import { dec, fmt } from './ks2num';
 import { swappedDigits } from './mistakes';
 
@@ -152,10 +152,50 @@ function pvPartition(rng: () => number): Question {
 
 export const y3PlaceValue: Generator = (d, rng) => d === 1 ? pvDigit(rng) : d === 2 || rng() < 0.5 ? pvBuild(d, rng) : pvPartition(rng);
 
+// ---- y3-compare (#1080): < > = between numbers up to 1,000, then ordering three ----
+type Pair = [number, number];
+
+/** Same three digits, a different number ("473 ? 437"): the misconception is reading digits, not columns. */
+function reordered(rng: () => number): Pair {
+  for (;;) {
+    const a = ri(rng, 100, 999), b = Number(shuffle(rng, String(a).split('')).join(''));
+    if (b >= 100 && b !== a) return [a, b];
+  }
+}
+
+/** One d2 pair: the digits reordered, a shared hundreds digit, 2-digit against 3-digit, or 1,000; 15% equal. */
+function comparePair(d: Difficulty, rng: () => number): Pair {
+  if (d === 1) { // different hundreds digit in half the pairs, never equal
+    const a = ri(rng, 100, 999), h = Math.floor(a / 100) * 100;
+    const b = rng() < 0.5 ? ri(rng, 100, 999) : h + ri(rng, 0, 99);
+    return b === a ? comparePair(d, rng) : [a, b];
+  }
+  const kind = rng(), a = ri(rng, 100, 999);
+  if (kind < 0.15) return [a, a];
+  if (kind < 0.4) return reordered(rng);
+  if (kind < 0.65) { const b = Math.floor(a / 100) * 100 + ri(rng, 0, 99); return b === a ? [a, b + 1] : [a, b]; }
+  if (kind < 0.85) return [ri(rng, 10, 99), ri(rng, 100, 199)];
+  return [1000, ri(rng, 900, 999)];
+}
+
+/** d3: three numbers sharing a hundreds digit, sliced smallest to biggest (every number is under 1,000, so a comma join is never a thousands group). */
+function orderThree(rng: () => number): Question {
+  const h = ri(rng, 1, 9) * 100, set = new Set<number>();
+  while (set.size < 3) set.add(h + ri(rng, 0, 99));
+  const sorted = [...set].sort((x, y) => x - y).map(fmtN), shown = shuffle(rng, sorted);
+  return { prompt: 'Smallest to biggest!', say: `Slice the numbers from smallest to biggest: ${shown.join(', ')}`, answer: sorted.join(','), sequence: sorted, options: shown, visual: { type: 'word', text: shown.join('  ') }, hint: 'Slice the smallest number first', hintIsData: false };
+}
+
+export const y3Compare: Generator = (d, rng) => {
+  if (d === 3 && rng() < 0.4) return orderThree(rng);
+  const [x, y] = comparePair(d, rng), [a, b] = rng() < 0.5 ? [x, y] : [y, x];
+  return wordQ(rng, `${fmtN(a)} ? ${fmtN(b)}`, a < b ? '<' : a > b ? '>' : '=', ['<', '>', '='], { say: `${fmtN(a)} compared with ${fmtN(b)}. Less than, greater than, or equal?`, hint: 'Slice the correct sign', hintIsData: false });
+};
+
 export const Y3_NUMBER: Topic[] = [
   { id: 'y3-count', title: 'Count in 4s, 8s, 50s and 100s', icon: '🔢', subject: 'maths', year: 'year3', nc: 'Y3 NPV: count in 4s, 8s, 50s, 100s; 10 or 100 more or less', gen: y3Count },
   { id: 'y3-pv', title: 'Hundreds, Tens and Ones', icon: '💯', subject: 'maths', year: 'year3', nc: 'Y3 NPV: place value of each digit, partitioning (3M2)', gen: y3PlaceValue },
-  // slot: y3-compare
+  { id: 'y3-compare', title: 'Compare and Order to 1,000', icon: '⚖️', subject: 'maths', year: 'year3', nc: 'Y3 NPV: compare and order numbers to 1,000 (3M3)', sequenceFrom: 3, gen: y3Compare },
   // slot: y3-line
   // slot: y3-words
 ];
