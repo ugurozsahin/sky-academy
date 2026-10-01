@@ -4,7 +4,7 @@ import type { Difficulty, Generator, Question } from './types';
 import { ri, pick, shuffle, q } from './util';
 
 const MINUS = '−';
-type Gap = 'a' | 'b' | 'c'; // the gap is never the result `c`, which stays beside the "="
+type Gap = 'a' | 'b'; // the gap is never the result `c`, which stays beside the "="
 const digits = (n: number) => String(n);
 const hundreds = (n: number) => Math.floor(n / 100);
 /** A column needs an exchange: units or tens carry on an addition, or the top digit is smaller on a subtraction. */
@@ -13,7 +13,7 @@ const exchanges = (a: number, b: number, add: boolean) =>
 
 /** `a op b = c`, all within 1–999, shaped by the difficulty. */
 function triple(d: Difficulty, add: boolean, rng: () => number): { a: number; b: number; c: number } {
-  for (;;) {
+  for (let i = 0; i < 10000; i++) {
     const a = ri(rng, 100, 999);
     let b: number;
     if (d === 1) b = rng() < 0.5 ? 10 * ri(rng, 1, 90) : 100 * ri(rng, 1, 8);
@@ -22,10 +22,11 @@ function triple(d: Difficulty, add: boolean, rng: () => number): { a: number; b:
     if (c < 100 || c > 999 || (d === 3 && !exchanges(a, b, add))) continue;
     return { a, b, c };
   }
+  throw new Error(`y3-missing: no triple found at d${d}`);
 }
 
 /** Wrong answers a child makes: the wrong operation, the place-value shift, the number beside "=" copied, a dropped exchange. */
-function decoys(x: number, v: Record<Gap, number>, gap: Gap, add: boolean, rng: () => number): number[] {
+function decoys(x: number, v: Record<Gap | 'c', number>, gap: Gap, add: boolean, rng: () => number): number[] {
   const ok = (n: number) => n >= 1 && n <= 999 && n !== x;
   const op = gap === 'a' ? (add ? v.c + v.b : v.c - v.b) : v.a + v.c;
   const exchange = [x + 10, x - 10, x + 100, x - 100].filter(n => ok(n) && n % 10 === x % 10);
@@ -43,10 +44,10 @@ function decoys(x: number, v: Record<Gap, number>, gap: Gap, add: boolean, rng: 
 export const y3Missing: Generator = (d, rng): Question => {
   const add = rng() < 0.5;
   const { a, b, c } = triple(d, add, rng);
-  const gap: Gap = d === 1 ? 'b' : pick(rng, ['a', 'b', 'c'] as const).valueOf() === 'c' ? 'b' : pick(rng, ['a', 'b'] as const);
+  const gap: Gap = d === 1 ? 'b' : pick(rng, ['a', 'b'] as const);
   const x = { a, b, c }[gap];
   const sign = add ? '+' : MINUS;
-  const shown = (k: Gap) => k === gap ? '?' : digits({ a, b, c }[k]);
+  const shown = (k: Gap | 'c') => k === gap ? '?' : digits({ a, b, c }[k]);
   const calc = `${shown('a')} ${sign} ${shown('b')}`;
   const prompt = d === 3 && rng() < 0.5 ? `${shown('c')} = ${calc}` : `${calc} = ${shown('c')}`;
   const options = shuffle(rng, [x, ...decoys(x, { a, b, c }, gap, add, rng)].map(String));

@@ -21,7 +21,8 @@ function parse(prompt: string) {
   const gap = a === '?' ? 'a' : 'b';
   const value = gap === 'a' ? (add ? +c - +b : +c + +b) : (add ? +c - +a : +a - +c);
   const nums = [a, b, c].filter(n => n !== '?').map(Number);
-  return { gap, add, left, value, nums, a, b, c };
+  const full = { a: gap === 'a' ? value : +a, b: gap === 'b' ? value : +b };
+  return { gap, add, left, value, nums, a, b, c, full };
 }
 
 describe('y3-missing (#1086)', () => {
@@ -57,6 +58,18 @@ describe('y3-missing (#1086)', () => {
     expect(share).toBeGreaterThan(0.4);
     expect(share).toBeLessThan(0.6);
     expect(new Set(cards.map(x => x.gap + x.add)).size).toBe(4);
+    // Independently of the generator: a carry (addition) or a borrow (subtraction) in the units or tens column.
+    for (const x of cards) {
+      const col = (n: number, p: number) => Math.floor(n / p) % 10;
+      expect([1, 10].some(p => x.add ? col(x.full.a, p) + col(x.full.b, p) > 9 : col(x.full.a, p) < col(x.full.b, p)), `${x.a} ${x.b} ${x.c}`).toBe(true);
+    }
+  });
+
+  it('d2: the gap falls in each of the two positions about evenly', () => {
+    const cards = draws(2, 1086_450).map(c => parse(c.prompt));
+    const share = cards.filter(x => x.gap === 'a').length / DRAWS;
+    expect(share).toBeGreaterThan(0.4);
+    expect(share).toBeLessThan(0.6);
   });
 
   it('every number and answer is 1-999, and no gap is 0', () => {
@@ -75,7 +88,7 @@ describe('y3-missing (#1086)', () => {
   it('slow is set on every d3 card and on no d1-d2 card, and the say reads the sum aloud', () => {
     for (const c of draws(3, 1086_700)) expect(c.slow, c.prompt).toBe(true);
     for (const d of [1, 2] as Difficulty[]) for (const c of draws(d, 1086_700)) expect(c.slow, c.prompt).toBeFalsy();
-    for (const c of draws(3, 1086_800)) { expect(c.prompt).not.toMatch(/ - /); expect(c.say).not.toMatch(/[=?−]/); expect(c.say).toMatch(/what/); }
+    for (const c of draws(3, 1086_800)) { expect(c.prompt).not.toMatch(/ - /); expect(c.prompt).toMatch(/−|\+/); expect(c.say).not.toMatch(/[=?−]/); expect(c.say).toMatch(/what/); }
   });
 
   it('decoys: leading and last digit shares stay within the KS2 ceiling (#1058)', () => {
