@@ -95,15 +95,30 @@ function token() {
   try { return execFileSync('gh', ['auth', 'token'], { encoding: 'utf8' }).trim(); } catch { return ''; }
 }
 
-async function fetchAll(path, tok) {
+/**
+ * One GET, through curl and not Node's `fetch` (#1441). `fetch` ignores `HTTPS_PROXY`, and in a cloud session the
+ * token is a placeholder that only the proxy swaps for a real one in transit — so `fetch` sends the placeholder
+ * straight to GitHub and gets a permanent 401. `curl` honours the proxy. The token goes in on stdin (`-K -`),
+ * never in argv, where `ps` would show it.
+ */
+export function curlGet(url, tok, run = execFileSync) {
+  if (/["\\\r\n]/.test(tok)) throw new Error('the token has a character a curl config cannot carry');
+  const cfg = `header = "authorization: Bearer ${tok}"\nheader = "accept: application/vnd.github+json"\nheader = "user-agent: pick-issue"\n`;
+  const out = run('curl', ['-sS', '--max-time', '60', '-K', '-', '-w', '\n%{http_code}', url],
+    { input: cfg, encoding: 'utf8', maxBuffer: 1 << 28 });
+  const cut = out.lastIndexOf('\n');
+  const status = Number(out.slice(cut + 1));
+  if (!(status >= 200 && status < 300)) throw new Error(`HTTP ${status || 'none'}`);
+  return JSON.parse(out.slice(0, cut));
+}
+
+export function fetchAll(path, tok, get = curlGet) {
   const all = [];
   for (let page = 1; page < 30; page++) {
     const sep = path.includes('?') ? '&' : '?';
-    const res = await fetch(`https://api.github.com${path}${sep}per_page=100&page=${page}`, {
-      headers: { authorization: `Bearer ${tok}`, accept: 'application/vnd.github+json', 'user-agent': 'pick-issue' },
-    });
-    if (!res.ok) throw new Error(`GET ${path} page ${page}: HTTP ${res.status}`);
-    const rows = await res.json();
+    let rows;
+    try { rows = get(`https://api.github.com${path}${sep}per_page=100&page=${page}`, tok); }
+    catch (e) { throw new Error(`GET ${path} page ${page}: ${e.message}`); }
     all.push(...rows);
     if (rows.length < 100) return all;
   }
@@ -113,11 +128,11 @@ async function fetchAll(path, tok) {
 async function main() {
   const tok = token();
   if (!tok) { console.error('pick-issue: no $GITHUB_TOKEN/$GH_TOKEN and no `gh auth token`'); process.exit(2); }
-  const [candidates, prs, everyOpen] = await Promise.all([
+  const [candidates, prs, everyOpen] = [
     fetchAll(`/repos/${REPO}/issues?state=open&labels=routine-ok&creator=${CREATOR}`, tok),
     fetchAll(`/repos/${REPO}/pulls?state=open`, tok),
     fetchAll(`/repos/${REPO}/issues?state=open`, tok),
-  ]);
+  ];
   const open = new Set(everyOpen.map((i) => i.number));
   console.log(report(pickIssue({ candidates, prs, open }), candidates.length));
 }

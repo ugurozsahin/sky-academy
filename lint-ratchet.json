@@ -22,8 +22,7 @@
     "src/ui/profiles.ts::(anonymous)": 16,
     "src/ui/visuals.ts::coinSVG": 16,
     "src/ui/visuals.ts::renderVisual": 49,
-    "tests/unit/curriculum.test.ts::(anonymous)#1": 16,
-    "tests/unit/curriculum.test.ts::(anonymous)#2": 28,
+    "tests/unit/curriculum.test.ts::(anonymous)": 28,
     "tests/unit/guardrails.test.ts::(anonymous)": 34
   },
   "lines": {
@@ -41,7 +40,7 @@
   "fileLines": {
     "tests/unit/arena.test.ts": 948,
     "tests/unit/audio.test.ts": 617,
-    "tests/unit/curriculum.test.ts": 2641,
+    "tests/unit/curriculum.test.ts": 2566,
     "tests/unit/duel.test.ts": 970,
     "tests/unit/governance.test.ts": 5764,
     "tests/unit/guardrails.test.ts": 3632,

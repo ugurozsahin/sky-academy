@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { blockedBy, CREATOR, DROP_LABELS, HELD_LABELS, pickIssue, prSolves, report } from '../../scripts/pick-issue.mjs';
+import { blockedBy, CREATOR, curlGet, fetchAll, DROP_LABELS, HELD_LABELS, pickIssue, prSolves, report } from '../../scripts/pick-issue.mjs';
 import { PRIORITIES } from '../../scripts/board-sync.mjs';
 
 /**
@@ -100,5 +100,38 @@ describe('the script and STEP 3 cannot drift apart (#1374)', () => {
   it('STEP 3 sends a run to the skill, and the skill says why not to fetch it', () => {
     expect(step3).toMatch(/\.claude\/skills\/pick-issue\/SKILL\.md/);
     expect(skill).toMatch(/one page is over 1 MB/);
+  });
+});
+
+describe('the script reaches GitHub through curl, which honours the proxy (#1441)', () => {
+  const reply = (body: unknown, code: number | string) => () => `${JSON.stringify(body)}\n${code}`;
+
+  it('sends the token on stdin, never in argv, and the URL last', () => {
+    let seen: { args: string[]; input: string } | undefined;
+    const run = ((_cmd: string, args: string[], o: { input: string }) => { seen = { args, input: o.input }; return '[1]\n200'; }) as never;
+    expect(curlGet('https://api.github.com/x', 'sekret', run)).toEqual([1]);
+    expect(seen!.args.join(' ')).not.toContain('sekret');
+    expect(seen!.args.at(-1)).toBe('https://api.github.com/x');
+    expect(seen!.input).toContain('authorization: Bearer sekret');
+  });
+  it('turns a non-2xx status into an error that names it, and a missing one too', () => {
+    expect(() => curlGet('u', 't', reply({ message: 'Bad credentials' }, 401) as never)).toThrow('HTTP 401');
+    expect(() => curlGet('u', 't', reply([], '') as never)).toThrow('HTTP none');
+  });
+  it('refuses a token a curl config cannot carry', () => {
+    expect(() => curlGet('u', 'a"b', reply([], 200) as never)).toThrow('cannot carry');
+  });
+  it('pages until a short page, and a failure names the path and the page', () => {
+    const calls: string[] = [];
+    const get = (url: string) => { calls.push(url); return url.endsWith('page=1') ? new Array(100).fill({}) : [{}, {}, {}]; };
+    expect(fetchAll('/repos/x/issues?state=open', 't', get)).toHaveLength(103);
+    expect(calls).toEqual([
+      'https://api.github.com/repos/x/issues?state=open&per_page=100&page=1',
+      'https://api.github.com/repos/x/issues?state=open&per_page=100&page=2',
+    ]);
+    expect(() => fetchAll('/p', 't', () => { throw new Error('HTTP 401'); })).toThrow('GET /p page 1: HTTP 401');
+  });
+  it('never calls fetch, which ignores HTTPS_PROXY and so sends a cloud session\'s placeholder token to GitHub', () => {
+    expect(readFileSync('scripts/pick-issue.mjs', 'utf8')).not.toMatch(/\bfetch\(/);
   });
 });

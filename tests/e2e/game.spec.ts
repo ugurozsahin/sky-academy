@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
 import { TOPICS, shownYears, YEARS, type YearInfo } from '../../src/curriculum';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import { SAVE_VERSION } from '../../src/storage';

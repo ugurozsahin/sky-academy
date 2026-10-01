@@ -66,7 +66,7 @@ export default defineConfig({
   // a flake here is a race to fix, and the alternative is a green tick that means less.
   fullyParallel: true,
   reporter: [['list']],
-  use: { baseURL, trace: 'retain-on-failure', launchOptions: executablePath ? { executablePath } : {} },
+  use: { baseURL, trace: 'retain-on-failure', launchOptions: { ...(executablePath ? { executablePath } : {}), args: ['--mute-audio'] } },   // #1460: headless mutes itself; a headed or --ui run does not
   webServer: { command: `npx vite preview --port ${port} --strictPort`, url: baseURL, reuseExistingServer: true, timeout: 30_000 },
   // #116: a portrait tablet is neither of the two projects this file used to have. It is ~800 px wide, so it
   // crosses every `min-width: 600px` / `720px` rule the desktop layout uses (the island grid goes to three
