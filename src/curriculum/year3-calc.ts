@@ -13,12 +13,13 @@ import type { Topic } from './types';
 import { y3Mental } from './year3-mental';
 import { y3Column } from './year3-column';
 import { y3Check } from './year3-check';
+import { y3Missing } from './year3-missing';
 
 export const Y3_CALC: Topic[] = [
   { id: 'y3-mental', title: 'Mental Adding and Subtracting', icon: '➕', subject: 'maths', year: 'year3', nc: 'Y3 A&S: 3-digit number and 1s, 10s, 100s mentally (3M7)', gen: y3Mental },
   { id: 'y3-column', title: 'Column Adding and Subtracting', icon: '✏️', subject: 'maths', year: 'year3', nc: 'Y3 A&S: columnar addition and subtraction to 3 digits (3M8)', sequenceFrom: 1, gen: y3Column },
   { id: 'y3-check', title: 'Estimate and Check', icon: '✅', subject: 'maths', year: 'year3', nc: 'Y3 A&S: estimate, and check with inverse operations (3M9)', gen: y3Check },
-  // slot: y3-missing
+  { id: 'y3-missing', title: 'Missing Numbers to 1,000', icon: '❓', subject: 'maths', year: 'year3', nc: 'Y3 A&S: missing number problems (3M10)', gen: y3Missing },
   // slot: y3-story-as
   // slot: y3-tables
   // slot: y3-tables-3
