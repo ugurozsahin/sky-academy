@@ -173,7 +173,7 @@ function comparePair(d: Difficulty, rng: () => number): Pair {
   const kind = rng(), a = ri(rng, 100, 999);
   if (kind < 0.15) return [a, a];
   if (kind < 0.4) return reordered(rng);
-  if (kind < 0.65) { const b = Math.floor(a / 100) * 100 + ri(rng, 0, 99); return b === a ? [a, b + 1] : [a, b]; }
+  if (kind < 0.65) { const b = Math.floor(a / 100) * 100 + ri(rng, 0, 99); return b === a ? [a, a % 100 === 99 ? a - 1 : a + 1] : [a, b]; }
   if (kind < 0.85) return [ri(rng, 10, 99), ri(rng, 100, 199)];
   return [1000, ri(rng, 900, 999)];
 }

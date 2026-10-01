@@ -46,14 +46,16 @@ describe('y3-compare (#1080)', () => {
     expect(share).toBeLessThan(0.7);
   });
 
-  it('d2 draws each named pair kind', () => {
+  it('d2 draws each named pair kind, as a share of the cards (a lucky pair cannot satisfy it)', () => {
     const cards = signCards(2).map(q => pair(q.prompt));
     const digits = (n: number) => String(n).split('').sort().join('');
-    expect(cards.some(([a, b]) => a !== b && a >= 100 && b >= 100 && digits(a) === digits(b)), 'reordered digits').toBe(true);
-    expect(cards.some(([a, b]) => a !== b && Math.floor(a / 100) === Math.floor(b / 100)), 'same hundreds').toBe(true);
-    expect(cards.some(([a, b]) => Math.min(a, b) < 100), '2-digit against 3-digit').toBe(true);
-    expect(cards.some(([a, b]) => Math.max(a, b) === 1000), '1,000').toBe(true);
-    expect(cards.some(([a, b]) => a === b), 'equal').toBe(true);
+    const share = (f: (a: number, b: number) => boolean) => cards.filter(([a, b]) => f(a, b)).length / cards.length;
+    const reorder = (a: number, b: number) => a !== b && a >= 100 && b >= 100 && digits(a) === digits(b);
+    expect(share(reorder), 'reordered digits').toBeGreaterThan(0.15);
+    expect(share((a, b) => a !== b && !reorder(a, b) && Math.min(a, b) >= 100 && Math.floor(a / 100) === Math.floor(b / 100)), 'same hundreds, different digits').toBeGreaterThan(0.08);
+    expect(share((a, b) => Math.min(a, b) < 100), '2-digit against 3-digit').toBeGreaterThan(0.1);
+    expect(share((a, b) => Math.max(a, b) === 1000), '1,000').toBeGreaterThan(0.08);
+    expect(share((a, b) => a === b), 'equal').toBeGreaterThan(0.08);
   });
 
   it('1,000 is printed with its comma, never bare', () => {
