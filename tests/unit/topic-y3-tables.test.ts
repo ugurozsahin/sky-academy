@@ -32,12 +32,18 @@ describe('y3-tables (#1087)', () => {
   it('every card uses table 3, 4 or 8 and a factor of 1–12', () => {
     for (const d of DIFFS) for (const c of draws(d, 1087_200)) {
       const ns = nums(c.prompt), a = Number(c.answer);
-      const hasTable = ns.some(v => [3, 4, 8].includes(v));
-      expect(hasTable, c.prompt).toBe(true);
-      // the other factor: the answer on a ÷ / missing-factor card, otherwise the prompt's non-table number
-      const factor = /\?/.test(c.prompt.split('=')[0]) || c.prompt.includes('÷') ? a : ns.find(v => ![3, 4, 8].includes(v)) ?? ns[0];
-      expect(factor, c.prompt).toBeGreaterThanOrEqual(1);
-      expect(factor, c.prompt).toBeLessThanOrEqual(12);
+      if (/÷|\?\s*×|×\s*\?/.test(c.prompt) && !/^\d+ × \d+ = \?$/.test(c.prompt)) {
+        // ÷ and missing-factor cards: the answer is the other factor, the table is the dividend over it
+        const t = Math.max(...ns) / a;
+        expect([3, 4, 8], c.prompt).toContain(t);
+        expect(a, c.prompt).toBeGreaterThanOrEqual(1);
+        expect(a, c.prompt).toBeLessThanOrEqual(12);
+      } else {
+        const [x, y] = ns;
+        expect([x, y].some(v => [3, 4, 8].includes(v)), c.prompt).toBe(true);
+        expect(Math.max(x, y), c.prompt).toBeLessThanOrEqual(12);
+        expect(Math.min(x, y), c.prompt).toBeGreaterThanOrEqual(1);
+      }
     }
   });
 
@@ -80,20 +86,32 @@ describe('y3-tables (#1087)', () => {
     }
   });
 
-  it('decoys are neighbouring facts: a card carries one of (n±1)×t, n×(t±1) or the undoubled fact', () => {
-    const cs = draws(2, 1087_600).filter(c => /^\d+ × \d+ = \?$/.test(c.prompt));
-    expect(cs.length).toBeGreaterThan(100);
-    let n = 0;
-    for (const c of cs) {
-      const [x, y] = nums(c.prompt);
-      const near = [(x - 1) * y, (x + 1) * y, x * (y - 1), x * (y + 1)].map(String);
-      if (c.options.some(o => o !== c.answer && near.includes(o))) n++;
+  it('every card, at every difficulty, carries at least one neighbouring-fact decoy', () => {
+    for (const d of DIFFS) for (const c of draws(d, 1087_600)) {
+      const ns = nums(c.prompt), a = Number(c.answer);
+      let near: number[];
+      if (/^\d+ × \d+ = \?$/.test(c.prompt)) {
+        const [x, y] = ns;
+        near = [(x - 1) * y, (x + 1) * y, x * (y - 1), x * (y + 1)];
+        if (c.visual?.type === 'word') near.push(nums((c.visual as { text: string }).text)[2]); // d1: the undoubled fact
+      } else near = [a - 1, a + 1, Math.max(...ns) / a]; // quotients and factors: n ± 1, or the divisor copied
+      expect(c.options.some(o => o !== c.answer && near.includes(Number(o))), c.prompt + ' ' + c.options).toBe(true);
     }
-    expect(n / cs.length).toBeGreaterThan(0.9);
+  });
+
+  it('d1 shows the undoubled fact as a decoy on a share of cards (it is one candidate among the neighbours)', () => {
+    const cs = draws(1, 1087_610).filter(c => c.visual);
+    const share = cs.filter(c => c.options.includes(String(nums((c.visual as { text: string }).text)[2]))).length / cs.length;
+    expect(share).toBeGreaterThan(0.2);
+  });
+
+  it('factor and quotient answers never get a decoy outside 0–12', () => {
+    for (const c of draws(3, 1087_620)) if (!/^\d+ × \d+ = \?$/.test(c.prompt)) for (const o of c.options) expect(Number(o), c.prompt).toBeLessThanOrEqual(12);
   });
 
   for (const d of DIFFS) it(`#1058 leak limit at d${d}: ≤ 0.30 for the units and the leading digit`, () => {
     const s = leakShares(topic.gen, d, 2000);
-    if (s.counted > 0) { expect(s.units).toBeLessThanOrEqual(0.3); expect(s.leading).toBeLessThanOrEqual(0.3); }
+    if (d < 3) expect(s.counted).toBeGreaterThan(0); // d3 answers are factors of 12 or less: out of #1058's scope
+    expect(s.units).toBeLessThanOrEqual(0.3); expect(s.leading).toBeLessThanOrEqual(0.3);
   });
 });

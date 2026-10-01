@@ -20,25 +20,25 @@ export function y3TablesQ(d: Difficulty, rng: () => number, table?: 3 | 4 | 8): 
   const t = table ?? pick(rng, d === 1 ? [4, 8] : [3, 4, 8]);
   const n = ri(rng, d === 1 ? 2 : 1, 12), p = n * t;
   const half = t / 2, known = half * n; // d1: 4× and 8× are built by doubling the 2× / 4× fact
-  const ask = (prompt: string, ans: number, slips: number[], extra: Pick<Question, 'visual' | 'say'> = {}): Question => {
+  const ask = (prompt: string, ans: number, slips: number[], max: number, extra: Pick<Question, 'visual' | 'say'> = {}): Question => {
     // #1058: one place slip (±10, shares the units digit), then the neighbouring facts, those sharing the leading digit first
-    const max = ans > 12 ? 144 : 15, lead = (v: number) => String(v)[0];
+    const lead = (v: number) => String(v)[0];
     const slip = [ans + 10, ans - 10].filter(v => v >= 0 && v <= max), near = shuffle(rng, slips).filter(v => v >= 0 && v <= max);
     const cands = [...slip.slice(0, 1), ...near.filter(v => lead(v) === lead(ans)), ...near, ...slip.slice(1)];
     return numQ(rng, prompt, ans, { min: 0, max, distractors: cands, ...q(prompt), ...extra });
   };
   const prod = [(n - 1) * t, (n + 1) * t, n * (t - 1), n * (t + 1)];
   if (d === 1) {
-    if (t === 3) return ask(`${n} × 3 = ?`, p, prod);
+    if (t === 3) return ask(`${n} × 3 = ?`, p, prod, 144);
     const prompt = `${t} × ${n} = ?`, fact = `${half} × ${n} = ${known}`;
-    return ask(prompt, p, [...prod, known], { visual: { type: 'word', text: fact }, say: `${half} times ${n} is ${known}. So ${q(prompt).say}` });
+    return ask(prompt, p, [...prod, known], 144, { visual: { type: 'word', text: fact }, say: `${half} times ${n} is ${known}. So ${q(prompt).say}` });
   }
   const kind = d === 2 ? ri(rng, 0, 2) : ri(rng, 3, 5);
   const fac = [n - 1, n + 1, t].filter(v => v > 0);
-  if (kind === 0) return ask(`${n} × ${t} = ?`, p, prod);
-  if (kind === 1) return ask(`${t} × ${n} = ?`, p, prod);
-  if (kind === 2) return ask(`${p} ÷ ${t} = ?`, n, fac);
-  return ask(kind === 3 ? `? × ${t} = ${p}` : kind === 4 ? `${t} × ? = ${p}` : `${p} ÷ ? = ${t}`, n, fac);
+  if (kind === 0) return ask(`${n} × ${t} = ?`, p, prod, 144);
+  if (kind === 1) return ask(`${t} × ${n} = ?`, p, prod, 144);
+  if (kind === 2) return ask(`${p} ÷ ${t} = ?`, n, fac, 12);
+  return ask(kind === 3 ? `? × ${t} = ${p}` : kind === 4 ? `${t} × ? = ${p}` : `${p} ÷ ? = ${t}`, n, fac, 12);
 }
 export const y3Tables: Generator = (d, rng) => y3TablesQ(d, rng);
 
