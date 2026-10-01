@@ -118,6 +118,14 @@ describe('ks2say.ts: spoken forms for KS2 notation (#1057)', () => {
     }
   });
 
+  it('sayIsSafe lets a label colon through and still rejects a digit-both-sides colon', () => {
+    for (const t of ['Solve: 3 + 4 = ?', 'Total: 5 apples']) {
+      expect(sayIsSafe(ks2Say(t)), t).toBe(true);
+    }
+    expect(sayIsSafe('3:4')).toBe(false);
+    expect(sayIsSafe('3 : 4')).toBe(false);
+  });
+
   it('sayIsSafe is true for ordinary spoken-word sentences with no leftover notation', () => {
     expect(sayIsSafe('three quarters of the pizza')).toBe(true);
     expect(sayIsSafe('fourteen thirty-five')).toBe(true);

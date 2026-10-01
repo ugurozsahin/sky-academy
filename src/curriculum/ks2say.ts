@@ -5,7 +5,7 @@
 // notation span.
 //
 // Both functions walk the same left-to-right tokenizer (`tokenize`) instead of two hand-maintained regex
-// sets. Six review rounds on PR #1430 found a recurring class of bug in the pre-tokenizer design: a
+// sets. Eleven review rounds on PR #1430 found a recurring class of bug in the pre-tokenizer design: a
 // `ks2Say` conversion pass and the `sayIsSafe` check meant to catch what it missed disagreed about where
 // one piece of notation ends and the next begins, because each was a separate regex free to define
 // "adjacent" its own way. A shared tokenizer removes that seam — `ks2Say` renders every non-prose token it
@@ -282,9 +282,9 @@ export function ks2Say(text: string): string {
 export function sayIsSafe(text: string): boolean {
   const norm = normalizeWs(text);
   if (norm.includes('²')) return false;
-  if (/\d ?:|: ?\d/.test(norm)) return false; // digit-adjacent colon (one optional space either side, since
-  // `norm` never has more than one) that isn't a valid 24-hour time is not matched by the tokenizer's time
-  // token, so this stays as a direct backstop
+  if (/\d ?: ?\d/.test(norm)) return false; // a colon with a digit on both sides (one optional space either
+  // side, since `norm` never has more than one) is a time or ratio the tokenizer's time token did not match, so
+  // this stays as a direct backstop; a label colon ("Solve: 3 + 4") has a digit on one side only and passes
   const toks = tokenize(norm);
   return toks.every(t => !NOTATION.has(t.kind));
 }
