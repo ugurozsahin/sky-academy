@@ -34,7 +34,7 @@ const d1 = (rng: Rng): Question => {
 
 const d2 = (rng: Rng): Question => {
   const [word, prefix, root, def] = pick(rng, PREFIX_WORDS);
-  const others = shuffle(rng, PREFIX_WORDS.filter(r => group(r[1]) !== group(prefix) && r[0] !== root).map(r => r[0]));
+  const others = shuffle(rng, PREFIX_WORDS.filter(r => group(r[1]) !== group(prefix)).map(r => r[0]));
   return wordQ(rng, `Which word means ${def}?`, word, [root, ...others.slice(0, 2)], { hint: `Look at the prefix: ${prefix}`, hintIsData: false });
 };
 
