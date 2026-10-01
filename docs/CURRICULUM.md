@@ -130,7 +130,9 @@ Maths:
 - y3-check — estimate a sum or difference of numbers within 4 of a hundred (d1), which calculation checks a subtraction (d2), checks of additions and subtractions with exchanges, plus estimates (d3)
 - y3-money — how much money from 2–4 coins or notes (d1), add or subtract two amounts crossing a pound (d2), change from £5 or £10 (d3); £ and p always written separately, never a decimal
 - y3-missing — the gap in `a + ? = c` or `a − ? = c`, a multiple of 10 or 100 (d1), the gap in any position with a 2-digit number (d2), 3-digit numbers with exchanges and the equals sign on the left half the time, with `slow` (d3)
+- y3-story-as — one-step story problems within 1,000, in one unit: ones, tens or hundreds (d1), a 2- or 3-digit amount with an exchange (d2), two-step stories with the first-step decoy and `slow` (d3)
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
+- y3-fracof — unit fractions of 4–12 stars with a picture (d1), unit and non-unit fractions of wholes up to 60 (d2), the whole from a part, or non-unit fractions of wholes up to 80, with `slow` (d3)
 
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.
