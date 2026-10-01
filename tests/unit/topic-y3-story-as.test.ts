@@ -38,11 +38,11 @@ function parse(prompt: string) {
 }
 
 describe('y3-story-as (#1090)', () => {
-  it('is registered once, in Year 3, directly after y3-check in the calc strand', () => {
+  it('is registered once, in Year 3, directly after y3-missing in the calc strand', () => {
     expect(TOPICS.filter(t => t.id === 'y3-story-as')).toHaveLength(1);
     expect(topic.year).toBe('year3');
     const ids = TOPICS.filter(t => t.id.startsWith('y3-')).map(t => t.id);
-    expect(ids.indexOf('y3-story-as')).toBe(ids.indexOf('y3-check') + 1);
+    expect(ids.indexOf('y3-story-as')).toBe(ids.indexOf('y3-missing') + 1);
   });
 
   it('the bank holds at most 12 hand-written templates, one # in each sentence, with only the six unit codes', () => {
