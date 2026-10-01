@@ -67,6 +67,7 @@ describe('y3-wordlist (#1102)', () => {
       else { expect(c.sequence, c.answer).toEqual(c.answer.split('')); expect(c.peekHint).toBe('Slice the letters in order'); }
     }
     expect(forms.filter(f => f.w.length >= 10).every(f => f.chunks)).toBe(true);
+    expect(draws(3).some(c => c.peekHint === 'Slice the parts in order'), 'd3 must reach a chunk-built card').toBe(true);
   });
 
   it('d1 speaks the word alone; d2/d3 dictate it in a sentence and show the sentence with the word gapped', () => {
