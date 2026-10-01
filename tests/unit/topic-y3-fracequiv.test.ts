@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
 import type { Difficulty } from '../../src/curriculum';
 import { equal, parseFrac } from '../../src/curriculum/fractions';
-import { sayIsSafe } from '../../src/curriculum/ks2say';
+import { ks2Say, sayIsSafe } from '../../src/curriculum/ks2say';
 
 // Deterministic RNG (mulberry32), same construction `topic-y3-pv.test.ts` uses.
 function rng(seed: number) {
@@ -95,6 +95,20 @@ describe('y3-fracequiv (#1094)', () => {
       else expect(q.say, q.prompt).toMatch(/is the same as how many [a-z]+s\?$/);
     }
     expect(bottom).toBeGreaterThan(100);
+  });
+
+  it('the fraction each card speaks is the one on the card, not the answer', () => {
+    const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
+    for (const q of draws(1)) {
+      if (q.visual?.type !== 'fraction') continue;
+      expect(q.say, q.prompt).toBe(`${cap(ks2Say(`${q.visual.shaded}/${q.visual.parts}`))} ${q.visual.shaded > 1 ? 'are' : 'is'} shaded. Which fraction is the same?`);
+    }
+    for (const q of draws(2)) expect(q.say, q.prompt).toBe(`Which fraction is equal to ${ks2Say(/(\d+\/\d+)/.exec(q.prompt)![1])}?`);
+    for (const q of draws(3)) {
+      const { left, top, bottom } = gap(q.prompt);
+      expect(q.say, q.prompt).toMatch(new RegExp(`^${cap(ks2Say(`${left.n}/${left.d}`))} is the same as `));
+      if (top === '?') expect(q.say, q.prompt).toBe(`${cap(ks2Say(`${left.n}/${left.d}`))} is the same as how many ${ks2Say(`1/${bottom}`).replace(/^one /, '')}s?`);
+    }
   });
 
   it('d1 says "is shaded" for one part and "are shaded" for more', () => {

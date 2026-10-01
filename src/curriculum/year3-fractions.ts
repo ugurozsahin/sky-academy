@@ -5,6 +5,7 @@
 // import: y3-fracadd
 // import: y3-fraccompare
 import type { Difficulty, Generator, Question, Rng, Topic } from './types';
+import { y3FracOf } from './year3-fracof';
 import { ri, pick, shuffle } from './util';
 import { equal, type Frac } from './fractions';
 import { ks2Say } from './ks2say';
@@ -65,7 +66,7 @@ export const y3FracEquiv: Generator = (d: Difficulty, rng) => {
 
 export const Y3_FRACTIONS: Topic[] = [
   // slot: y3-tenths
-  // slot: y3-fracof
+  { id: 'y3-fracof', title: 'Fractions of Amounts', icon: '➗', subject: 'maths', year: 'year3', nc: 'Y3 Fractions: unit and non-unit fractions of a set (3M15)', gen: y3FracOf },
   // slot: y3-fracline
   { id: 'y3-fracequiv', title: 'Equivalent Fractions', icon: '⚖️', subject: 'maths', year: 'year3', nc: 'Y3 Fractions: equivalent fractions with diagrams (3M17)', gen: y3FracEquiv },
   // slot: y3-fracadd
