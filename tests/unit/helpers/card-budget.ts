@@ -2,7 +2,7 @@ import { labelEm } from './r-lbl';
 
 // #1051: the KS2 question card's prompt budget. Mirrors `.prompt` in `src/styles/play.css`
 // (`clamp(28px, 7vw, 44px)` — 28px at 390px wide — and `letter-spacing: .02em`) and its short-screen
-// override (`@media (max-height: 640px)`, 26px).
+// override (`@media (max-height: 640px)` in `src/styles/overlays.css`, 26px).
 export const PROMPT_FS_PHONE = 28;
 export const PROMPT_FS_SHORT = 26;
 export const PROMPT_LETTER_SPACING_EM = 0.02;
