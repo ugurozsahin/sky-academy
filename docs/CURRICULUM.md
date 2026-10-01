@@ -124,6 +124,7 @@ later PR fills its own slot and touches no other line.
 Maths:
 - y3-count — count on and back in 4s, 8s, 50s and 100s; 10 or 100 more or less
 - y3-pv — place value of each digit in a 3-digit number (d1), building it from hundreds, tens and ones (d2), partitioning it (d3)
+- y3-compare — compare 3-digit numbers with <, > and = (d1), the trickier pairs: reordered digits, 2-digit against 3-digit, 1,000, equal (d2), ordering three numbers (d3)
 - y3-mental — a 3-digit number ± ones (no crossing a ten) or hundreds (d1), ± tens with hundred crossings (d2), all three forms with crossings and `slow` (d3)
 - y3-check — estimate a sum or difference of numbers within 4 of a hundred (d1), which calculation checks a subtraction (d2), checks of additions and subtractions with exchanges, plus estimates (d3)
 - y3-tables — the 4 and 8 times tables built by doubling, with the known 2×/4× fact shown (d1); the 3, 4 and 8 facts as × both ways and ÷ (d2); the missing factor (d3). `y3TablesQ(d, rng, table)` fixes the table for the drills
