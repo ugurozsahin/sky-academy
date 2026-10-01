@@ -126,6 +126,7 @@ Maths:
 - y3-pv — place value of each digit in a 3-digit number (d1), building it from hundreds, tens and ones (d2), partitioning it (d3)
 - y3-mental — a 3-digit number ± ones (no crossing a ten) or hundreds (d1), ± tens with hundred crossings (d2), all three forms with crossings and `slow` (d3)
 - y3-check — estimate a sum or difference of numbers within 4 of a hundred (d1), which calculation checks a subtraction (d2), checks of additions and subtractions with exchanges, plus estimates (d3)
+- y3-tables — the 4 and 8 times tables built by doubling, with the known 2×/4× fact shown (d1); the 3, 4 and 8 facts as × both ways and ÷ (d2); the missing factor (d3). `y3TablesQ(d, rng, table)` fixes the table for the drills
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
 
 ## Difficulty convention
