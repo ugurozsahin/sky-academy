@@ -2697,9 +2697,8 @@ test.describe('Sky Ninja Academy', () => {
     expect(style).toContain('--cols:');                      // grid tracks YEARS.length, so a new year needs no CSS
   });
 
-  // #1032: the map-visibility gate. No KS2 YearId exists yet (#1050+ adds the first), so both branches show
-  // the same three islands today — this rail proves the `sna:years` device key is read and threaded through
-  // rather than proving a different island count, which nothing in the registry can produce yet.
+  // #1032: the map-visibility gate. Year 3 exists now (#1050) but stays hidden until the `sna:years` device
+  // key says `all`, so the two branches differ by exactly that island.
   test('guard rail: the map reads the sna:years preview key (#1032)', async ({ page }) => {
     await seedPlayer(page);
     const noKey = await page.$$eval('.islands .island', els => els.map(el => (el as HTMLElement).dataset.year));
@@ -2709,7 +2708,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.reload();
     await expect(page.locator('.home')).toBeVisible();
     const withKey = await page.$$eval('.islands .island', els => els.map(el => (el as HTMLElement).dataset.year));
-    expect(withKey).toEqual(['reception', 'year1', 'year2']);
+    expect(withKey).toEqual(['reception', 'year1', 'year2', 'year3']);
   });
 
   /**
