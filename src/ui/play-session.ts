@@ -227,7 +227,7 @@ export function createPlaySession(opts: SessionOpts, deps: PlaySessionDeps): Pla
     deps.later(() => {
       if (token !== peekToken || activeQuestion !== q || !deps.mounted()) return;
       els.prompt.innerHTML = promptHTML(q, session.seqIndex, false, session.remaining());
-      setHint(els, 'Slice the words in order');
+      setHint(els, q.peekHint ?? 'Slice the words in order');
       const then = peekDone; peekActive = false; peekDone = null;
       syncPaused();
       then?.();

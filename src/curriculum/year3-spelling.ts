@@ -8,9 +8,10 @@
 // import: y3-dictionary
 // import: y3-dictation
 import type { Topic } from './types';
+import { y3Wordlist } from './wordlist-y3';
 
 export const Y3_SPELLING: Topic[] = [
-  // slot: y3-wordlist
+  { id: 'y3-wordlist', title: 'Year 3–4 Word List', icon: '📝', subject: 'writing', year: 'year3', nc: 'Y3–4 Spelling: words often misspelt, Appendix 1 words 1–50', sequenceFrom: 1, gen: y3Wordlist },
   // slot: y3-prefix
   // slot: y3-suffix
   // slot: y3-double
