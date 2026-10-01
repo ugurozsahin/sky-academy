@@ -11,14 +11,16 @@ import { ks2Say } from './ks2say';
 
 // ---- y3-fracequiv (#1094): equivalent fractions with small denominators ----
 const lab = (f: Frac) => `${f.n}/${f.d}`;
+const WORD = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'] as const; // numerators are 1–9
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 /** A proper fraction in its lowest terms with denominator 2–5, scaled by `k` to a denominator ≤ 10 (`k` ≥ 2). */
 function pair(rng: Rng, maxD: number): { base: Frac; k: number; big: Frac } {
-  for (;;) {
+  for (let i = 0; i < 1000; i++) {
     const d = ri(rng, 2, 5), n = ri(rng, 1, d - 1), k = pick(rng, [2, 3] as const);
     if (d * k > maxD || [2, 3, 4, 5].some(m => n % m === 0 && d % m === 0)) continue; // room to scale, lowest terms
     return { base: { n, d }, k, big: { n: n * k, d: d * k } };
   }
+  throw new Error('y3-fracequiv: no fraction fits the range');
 }
 
 /** Mistakes first: same top and a new bottom, the same number added to both, the fraction turned over. */
@@ -44,7 +46,7 @@ function fracMissing(rng: Rng): Question {
   const ds = [...new Set(cands.filter(v => v !== answer && v >= 1 && v <= 10))].slice(0, 3);
   const prompt = top ? `${lab(base)} = ?/${big.d}` : `${lab(base)} = ${big.n}/?`;
   const say = top ? `${cap(ks2Say(lab(base)))} is the same as how many ${ks2Say(`1/${big.d}`).replace(/^one /, '')}s?`
-    : `${cap(ks2Say(lab(base)))} is the same as ${ks2Say(`${big.n}/1`).replace(/ (ones?|wholes?)$/, '')} over what?`;
+    : `${cap(ks2Say(lab(base)))} is the same as ${WORD[big.n]} over what?`;
   return { prompt, say, answer: String(answer), options: shuffle(rng, [answer, ...ds].map(String)), hint: 'Slice the missing number', hintIsData: false };
 }
 
@@ -56,7 +58,7 @@ export const y3FracEquiv: Generator = (d: Difficulty, rng) => {
   const options = shuffle(rng, [lab(ans), ...fracDecoys(ans, shown, rng)]);
   const say = ks2Say(lab(shown));
   const q: Question = d === 1
-    ? { prompt: 'Which fraction is the same as the shaded part?', say: `${cap(say)} is shaded. Which fraction is the same?`, answer: lab(ans), options, visual: { type: 'fraction', parts: shown.d, shaded: shown.n, shape: 'bar' }, hint: 'Slice the equal fraction', hintIsData: false }
+    ? { prompt: 'Which fraction is the same as the shaded part?', say: `${cap(say)} ${shown.n > 1 ? 'are' : 'is'} shaded. Which fraction is the same?`, answer: lab(ans), options, visual: { type: 'fraction', parts: shown.d, shaded: shown.n, shape: 'bar' }, hint: 'Slice the equal fraction', hintIsData: false }
     : { prompt: `Which is equal to ${lab(shown)}?`, say: `Which fraction is equal to ${say}?`, answer: lab(ans), options, hint: 'Slice the equal fraction', hintIsData: false };
   return q;
 };

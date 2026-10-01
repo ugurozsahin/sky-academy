@@ -84,8 +84,27 @@ describe('y3-fracequiv (#1094)', () => {
     }
   });
 
-  it('d3 cards read as sentences a child can follow', () => {
-    const says = new Set(draws(3).map(q => q.say!));
-    for (const s of says) expect(s, s).toMatch(/^[A-Z][a-z -]+ is the same as (how many \w+s\?|\w[\w -]* over what\?)$/);
+  it('d3 says the number it prompts with, in words (no "firsts")', () => {
+    const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    const cards = draws(3);
+    let bottom = 0;
+    for (const q of cards) {
+      const { top, bottom: b } = gap(q.prompt);
+      expect(q.say, q.prompt).not.toMatch(/first/);
+      if (b === '?') { bottom++; expect(q.say, q.prompt).toMatch(new RegExp(`is the same as ${WORDS[Number(top)]} over what\\?$`)); }
+      else expect(q.say, q.prompt).toMatch(/is the same as how many [a-z]+s\?$/);
+    }
+    expect(bottom).toBeGreaterThan(100);
+  });
+
+  it('d1 says "is shaded" for one part and "are shaded" for more', () => {
+    for (const q of draws(1)) {
+      const shaded = q.visual?.type === 'fraction' ? q.visual.shaded : 0;
+      expect(q.say, q.prompt).toMatch(shaded > 1 ? / are shaded\./ : / is shaded\./);
+    }
+  });
+
+  it('every shown fraction, d2 prompts and d3 prompts included, keeps its denominator at 10 or under', () => {
+    for (const d of [2, 3] as Difficulty[]) for (const q of draws(d)) for (const m of q.prompt.matchAll(/\/(\d+)/g)) expect(Number(m[1]), q.prompt).toBeLessThanOrEqual(10);
   });
 });
