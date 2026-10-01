@@ -14,6 +14,7 @@ const draws = (d: Difficulty, n = 400) => { const r = rng(1103 + d); return Arra
 const EXCLUDE = ['gay', 'queer', 'bitch', 'butt'];
 const bad = (s: string) => [...AVOID, ...EXCLUDE].some(a => s.toLowerCase().includes(a));
 const meaningOf = (p: string) => (p === 'dis' || p === 'mis' ? 'wrong' : p);
+const prefixes = [...new Set(PREFIX_WORDS.map(r => r[1]))];
 const rowOf = (word: string) => PREFIX_WORDS.find(r => r[0] === word);
 
 describe('y3-prefix (#1103)', () => {
@@ -64,7 +65,16 @@ describe('y3-prefix (#1103)', () => {
       expect(new Set(c.options).size).toBe(4);
       for (const s of c.sequence!) expect(c.options).toContain(s);
       expect(c.prompt).toContain(row[3]);
+      // The decoy rule on d3: two prefixes are offered and only one is in the answer's meaning group (never dis beside mis).
+      // Cross-joins that happen to be real words (dis + appear, re + act) are deliberate: the shown definition fixes the answer.
+      const offered = c.options.filter(o => prefixes.includes(o));
+      expect(offered, c.answer).toHaveLength(2);
+      expect(offered.filter(o => meaningOf(o) === meaningOf(row[1])), `${c.answer}: ${offered}`).toHaveLength(1);
     }
+  });
+
+  it('the six distinct meanings are the ones English Appendix 1 p.12 gives', () => {
+    expect(PREFIX_MEANING).toEqual({ re: 'again', sub: 'under', inter: 'between', super: 'above', anti: 'against', auto: 'self' });
   });
 
   it('every label passes R-LBL on d1–d3', () => {
@@ -74,7 +84,7 @@ describe('y3-prefix (#1103)', () => {
   it('keeps crude words out: no bank word, root or definition word, and no prefix + root join a d3 card can offer', () => {
     for (const [w, , r, def] of PREFIX_WORDS) for (const x of [w, r, ...def.toLowerCase().match(/[a-z]+/g)!]) expect(AVOID.has(x) || EXCLUDE.includes(x), x).toBe(false);
     for (const [w] of PREFIX_WORDS) expect(bad(w), w).toBe(false);
-    const prefixes = [...new Set(PREFIX_WORDS.map(r => r[1]))], roots = [...new Set(PREFIX_WORDS.map(r => r[2]))];
+    const roots = [...new Set(PREFIX_WORDS.map(r => r[2]))];
     for (const p of prefixes) for (const r of roots) expect(bad(p + r), p + r).toBe(false);
     for (const c of draws(3)) for (const p of c.options.filter(o => prefixes.includes(o))) for (const r of c.options.filter(o => roots.includes(o))) expect(bad(p + r), p + r).toBe(false);
   });
