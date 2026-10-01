@@ -125,6 +125,7 @@ Maths:
 - y3-count — count on and back in 4s, 8s, 50s and 100s; 10 or 100 more or less
 - y3-pv — place value of each digit in a 3-digit number (d1), building it from hundreds, tens and ones (d2), partitioning it (d3)
 - y3-mental — a 3-digit number ± ones (no crossing a ten) or hundreds (d1), ± tens with hundred crossings (d2), all three forms with crossings and `slow` (d3)
+- y3-column — build a 3-digit + 3-digit sum with at most one exchange, or 3-digit − 2-digit with none (d1), two exchanges to 1,998 and subtraction across a zero (d2), then find a missing digit in a column sum (d3)
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
 
 ## Difficulty convention

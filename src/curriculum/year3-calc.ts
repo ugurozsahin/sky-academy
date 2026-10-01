@@ -11,10 +11,11 @@
 // import: y3-story
 import type { Topic } from './types';
 import { y3Mental } from './year3-mental';
+import { y3Column } from './year3-column';
 
 export const Y3_CALC: Topic[] = [
   { id: 'y3-mental', title: 'Mental Adding and Subtracting', icon: '➕', subject: 'maths', year: 'year3', nc: 'Y3 A&S: 3-digit number and 1s, 10s, 100s mentally (3M7)', gen: y3Mental },
-  // slot: y3-column
+  { id: 'y3-column', title: 'Column Adding and Subtracting', icon: '✏️', subject: 'maths', year: 'year3', nc: 'Y3 A&S: columnar addition and subtraction to 3 digits (3M8)', sequenceFrom: 1, gen: y3Column },
   // slot: y3-check
   // slot: y3-missing
   // slot: y3-story-as
