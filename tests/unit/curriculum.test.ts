@@ -15,23 +15,17 @@ import type { SentenceType } from '../../src/curriculum/year2';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
 import { digraphBlocked, digraphFrames, digraphSpellings } from './helpers/digraph-gaps';
-import { parseNumericAnswer } from './helpers/numeric-answer';
 import { NO_REPEATED_SET, Y2_GENS, Y2_IDS } from './helpers/topic-lists';
-import { arithmeticCheck, solve } from './helpers/ks2-oracle';
+import { solve } from './helpers/ks2-oracle';
+import { genericTopicSuite } from './helpers/generic-topic-suite';
 import { isKs2 } from '../../src/curriculum/key-stage';
+
+const N = 150;
 
 // Deterministic RNG (mulberry32)
 function rng(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-
-/** A build card's template (#1059) with its `_` slots filled by `sequence`, in order. */
-function fillTemplate(template: string, sequence: readonly string[]): string {
-  let i = 0;
-  return Array.from(template).map(ch => ch === '_' ? sequence[i++] : ch).join('');
-}
-
-const N = 150;
 
 describe('topic registry', () => {
   it('has unique ids and every year has maths + writing', () => {
@@ -83,79 +77,7 @@ describe('topic registry', () => {
   });
 });
 
-for (const topic of TOPICS) {
-  const year = YEARS.find(y => y.id === topic.year)!;
-  const maxAnswer = year.maxAnswer;   // NC answer ceiling for this year
-  const minAnswer = year.minAnswer ?? 0;   // NC answer floor for this year (#1042)
-  describe(`${topic.year} / ${topic.title} (${topic.id})`, () => {
-    for (const d of [1, 2, 3] as Difficulty[]) {
-      it(`difficulty ${d}: ${N} valid questions`, () => {
-        const r = rng(topic.id.length * 1000 + d);
-        const seen = new Set<string>();
-        for (let i = 0; i < N; i++) {
-          const q: Question = topic.gen(d, r);
-          expect(q.prompt.length).toBeGreaterThan(0);
-          expect(q.answer.length).toBeGreaterThan(0);
-          // #1059: `build` implies `sequence` (types.ts) — checked outside the `if (q.sequence)` gate below
-          // so a generator that sets `build` and forgets `sequence` cannot hide inside it: `promptHTML`
-          // (`src/ui/hud.ts`) checks `!q.sequence` first and would silently render the plain-prompt branch,
-          // dropping the digit-slot UI with nothing else noticing.
-          if (q.build) expect(q.sequence, q.prompt).toBeDefined();
-          // #918: `anyOrder` is legal only alongside `sequence` (types.ts) — checked outside the
-          // `if (q.sequence)` gate below, same as `build` above, so a generator that sets `anyOrder`
-          // and forgets `sequence` cannot hide inside it and silently degrade to plain single-answer
-          // matching (`Session` reads `q.anyOrder` only inside `if (q.sequence)` gates).
-          if (q.anyOrder) expect(q.sequence, q.prompt).toBeDefined();
-          if (topic.input !== 'tracing') {
-            // answer present, options unique, sensible count
-            expect(q.options).toContain(q.sequence ? q.sequence[0] : q.answer);
-            expect(new Set(q.options).size).toBe(q.options.length);
-            expect(q.options.length).toBeGreaterThanOrEqual(2);
-            expect(q.options.length).toBeLessThanOrEqual(10);
-            for (const o of q.options) expect(o.trim().length).toBeGreaterThan(0);
-            if (q.sequence) {
-              if (q.build) {
-                expect((q.build.template.match(/_/g) ?? []).length, q.prompt).toBe(q.sequence.length);
-                expect(q.answer, q.prompt).toBe(fillTemplate(q.build.template, q.sequence));
-              } else {
-                expect([q.sequence.join(''), q.sequence.join(','), q.sequence.join(' ')]).toContain(q.answer);
-              }
-              for (const l of q.sequence) expect(q.options).toContain(l);
-              // #918: an any-order card's targets (`sequence`) are canonically sorted, its answer is their
-              // comma join, it has at least 2 targets, and at least 1 decoy beyond them (`options` is already
-              // asserted unique above, so a target sharing a label with a decoy would already have failed that).
-              if (q.anyOrder) {
-                expect(q.sequence.length, q.prompt).toBeGreaterThanOrEqual(2);
-                expect(q.options.length, q.prompt).toBeGreaterThan(q.sequence.length);
-                const sorted = [...q.sequence].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
-                expect(q.sequence, q.prompt).toEqual(sorted);
-                expect(q.answer, q.prompt).toBe(sorted.join(','));
-                // #918 round 2: a duplicate target label collapses in `Session.hit()`'s `slicedTargets` Set
-                // while `q.sequence.length` still counts it, so the question never reaches its `'correct'`
-                // threshold — a silent, permanent softlock. `anyOrderQ()` already refuses this at construction;
-                // this is the backstop for a hand-built card that skips the builder.
-                expect(new Set(q.sequence).size, q.prompt).toBe(q.sequence.length);
-              }
-            }
-          }
-          // arithmetic prompts must be correct — a KS2 topic tries the exact ks2Solve oracle first
-          // (decimals, fractions, brackets, percentages, one-step letter equations), falling back to
-          // solve()'s bare-number check when it does not recognise the form (#1045)
-          const arith = arithmeticCheck(isKs2(topic.year), q.prompt, q.answer);
-          if (arith !== null) expect(arith, q.prompt).toBe(true);
-          // numeric answers stay within the year's range — never absurd, never below its floor (0 for KS1)
-          if (!q.sequence) {
-            const n = parseNumericAnswer(q.answer);
-            if (n !== null) { expect(n, q.prompt).toBeGreaterThanOrEqual(minAnswer); expect(n, q.prompt).toBeLessThanOrEqual(maxAnswer); }
-          }
-          seen.add(q.prompt + '|' + q.answer + '|' + JSON.stringify(q.visual ?? ''));
-        }
-        // variety: at least a handful of distinct questions
-        expect(seen.size).toBeGreaterThan(3);
-      });
-    }
-  });
-}
+genericTopicSuite(TOPICS.filter(t => !isKs2(t.year)));   // #1050: Year 3+ run in their own files
 
 describe('curriculum ranges', () => {
   it('Reception addition stays within 10', () => {
@@ -1737,6 +1659,7 @@ describe('slow questions (#297)', () => {
   it('no other topic sets slow — it is opt-in per generator, not a year-wide setting', () => {
     for (const t of TOPICS) {
       if (SLOW_AT_D3.includes(t.id)) continue;
+      if (isKs2(t.year)) continue;   // #1050: a KS2 topic that sets `slow` asserts it in its own topic-<id>.test.ts
       const r = rng(2972);
       for (const d of [1, 2, 3] as Difficulty[]) {
         for (let i = 0; i < 40; i++) expect(t.gen(d, r).slow, `${t.id} d${d} must not set slow`).toBeUndefined();
@@ -2367,6 +2290,8 @@ describe('a card\'s bubble width is derived from its options, never from its ans
           const wider = seen.find(s => s.wide)!.answer, narrower = seen.find(s => !s.wide)!.answer;
           offenders.push(`${cell}: {${k.split('\u0000').join(', ')}} is wide when the answer is "${wider}" and narrow when it is "${narrower}"`);
         }
+        // #1050: the blind-list bookkeeping is EYFS/KS1-only; a KS2 cell still counts toward `swept`, `cards`, `discriminating` and `split`
+        if (isKs2(topic.year)) continue;
         if (cellDiscriminating === 0 && !NO_REPEATED_SET.has(cell)) unexpectedlyBlind.push(cell);
         if (cellDiscriminating > 0 && NO_REPEATED_SET.has(cell)) nowComparable.push(cell);
       }
