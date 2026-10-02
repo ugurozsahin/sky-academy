@@ -81,7 +81,7 @@ describe('emoji floor (#875): every curriculum glyph is Emoji 12.0 or older', ()
   it('the fixture is sorted, unique, three columns, every version at or under the floor', () => {
     expect(rows.length).toBeGreaterThan(100);
     expect(listed.size).toBe(rows.length);
-    for (const r of rows) { expect(r, r[0]).toHaveLength(3); expect(Number(r[1]), `${r[0]} ${r[2]}`).toBeLessThanOrEqual(FLOOR); expect(r[2].length).toBeGreaterThan(0); }
+    for (const r of rows) { expect(r, r[0]).toHaveLength(3); expect(r[1], r[0]).toMatch(/^\d+\.\d$/); expect(r[0], 'FE0F is stripped').not.toContain('\uFE0F'); expect(Number(r[1]), `${r[0]} ${r[2]}`).toBeLessThanOrEqual(FLOOR); expect(r[2].length).toBeGreaterThan(0); }
     const cps = rows.map(r => r[0].codePointAt(0)!);
     expect(cps, 'sorted by first code point').toEqual([...cps].sort((a, b) => a - b));
   });
@@ -91,13 +91,19 @@ describe('emoji floor (#875): every curriculum glyph is Emoji 12.0 or older', ()
   });
 
   it('the residue is measured: every fixture line is still spelled by a source file', () => {
-    const all = files.map(f => strip(readFileSync(f, 'utf8'))).join('\n');
-    expect(rows.filter(r => !all.includes(r[0])).map(r => r[0]), 'unused fixture lines').toEqual([]);
+    const spelled = new Set(files.flatMap(f => [...readFileSync(f, 'utf8').matchAll(SEQ)].map(m => strip(m[0]))));
+    expect(rows.filter(r => !spelled.has(r[0])).map(r => r[0]), 'unused fixture lines').toEqual([]);
   });
 
-  it('proves red: an unlisted glyph (🪙, E13.0) is reported, a listed one (🛢️) and a ZWJ-free text are not', () => {
+  it('no source hides a glyph from the sweep: no \\u escapes, fromCodePoint, flags or keycaps', () => {
+    expect(files.length).toBeGreaterThan(5);
+    for (const f of files) expect(readFileSync(f, 'utf8'), f).not.toMatch(/\\u\{?[0-9A-Fa-f]{4,6}|fromCodePoint|[\u{1F1E6}-\u{1F1FF}\u20E3]/u);
+  });
+
+  it('proves red: an unlisted glyph (🪙, E13.0) is reported, a listed one (🛢️) and plain text are not', () => {
     expect(unlisted('const a = "🪙";', listed)).toEqual(['🪙']);
     expect(unlisted("['oil', 'oi', '🛢️']", listed)).toEqual([]);
     expect(unlisted('no emoji here', listed)).toEqual([]);
+    expect(unlisted('x = "🧑‍🌾"', new Set())).toEqual(['🧑‍🌾']); // a ZWJ sequence is one unit
   });
 });
