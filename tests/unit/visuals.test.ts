@@ -108,6 +108,14 @@ describe('renderVisual — a builder for every Visual.type (#43)', () => {
     expect(h).not.toContain('_');                             // every run of underscores becomes the gap
   });
 
+  it('a sentence renders a line break as <br> after escaping, and a < stays escaped (#1110)', () => {
+    const h = renderVisual({ type: 'sentence', text: 'A  \u201CHi,\u201D said <b>Tom.\nB  Hi' });
+    expect(h).toContain('Tom.<br>B');
+    expect(h).toContain('&lt;b&gt;');
+    expect(h).not.toContain('<b>');
+    expect(h).not.toContain('\n');
+  });
+
   it('a pattern strip is its own visual, kept on one line unlike a sentence (#391)', () => {
     const h = renderVisual({ type: 'strip', text: '🔴 ⭐ _' });
     expect(h).toContain('class="vis strip"');
