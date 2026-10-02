@@ -38,6 +38,11 @@ describe('y3-an (#1106)', () => {
     }
   });
 
+  it('every sentence is unique across the three banks (rowFor keys on it)', () => {
+    const all = [...AN_D1, ...AN_D2, ...AN_D3].map(r => r[0]);
+    expect(new Set(all).size).toBe(all.length);
+  });
+
   it('every answer is an exactly when the next word starts with a vowel sound; every card offers exactly a and an', () => {
     for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d, 1106_100)) {
       const [, , vowel] = rowFor(sentenceOf(q));
@@ -56,6 +61,8 @@ describe('y3-an (#1106)', () => {
     const d3 = draws(3, 1106_400).map(sentenceOf);
     expect(d3.every(s => inSet(AN_D3, s) || inSet(AN_D2, s))).toBe(true);
     expect(d3.some(s => inSet(AN_D3, s)) && d3.some(s => inSet(AN_D2, s))).toBe(true);
+    const answers = draws(3, 1106_500).filter(q => AN_D3.some(r => r[0] === sentenceOf(q))).map(q => q.answer);
+    expect(new Set(answers)).toEqual(new Set(['a', 'an']));
   });
 
   it('no sentence word is in AVOID or the local EXCLUDE set', () => {
