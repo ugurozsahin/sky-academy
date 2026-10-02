@@ -43,6 +43,11 @@ export function weakestTopics(topics: Topic[], progress: Record<string, TopicPro
   return picked.length < n ? [...picked, back] : [...picked.slice(0, -1), back];   // the last slot goes to the returning topic
 }
 
+/** The island's Train with Sensei topics (#936). `now` is required so a caller cannot silently drop the stale-topic rule. */
+export function senseiTopics(topics: Topic[], progress: Record<string, TopicProgress>, now: Date): Topic[] {
+  return weakestTopics(topics, progress, TRAIN_TOPICS, now);
+}
+
 const STALE_DAYS = 14;   // #936: a starred topic unplayed this long is brought back
 
 /** Whole local days from the `YYYY-MM-DD` key `last` to `now`; null when the key is not one. */
