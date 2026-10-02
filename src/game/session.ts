@@ -6,6 +6,7 @@ import type { AnswerTally } from '../storage';
 import type { Slip } from '../save-records';
 export { repeatKey } from './repeat-key';
 import { repeatKey } from './repeat-key';
+import { weightedPick } from './sensei';
 
 // mission = 5 staged waves with lives · endless = Sky Storm, ramps until lives run out · sprint = 60-second time attack, no lives
 // boss = Boss Battle: every correct slice hits Hammer Man, every slip heals him; KO him before your lives run out
@@ -70,7 +71,7 @@ export interface DeckItem { topic: Topic; q: Question }
  * whether or not the boss still has HP left — nothing pairs `deck` with `mode: 'boss'` today, so this is stated
  * rather than tested, the same way the rest of this comment is.
  */
-export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; deck?: DeckItem[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean; slower?: boolean }
+export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean; slower?: boolean }
 
 /**
  * The "Fix my mistakes" deck (#930): the 5 most recent misses, newest first — `misses` is already newest-last
@@ -133,7 +134,7 @@ export class Session {
   }
   private pickTopic(): Topic {
     if (this.o.topic) return this.o.topic;
-    const pool = this.o.pool!; return pool[Math.floor(this.rng() * pool.length)];
+    return weightedPick(this.o.pool!, this.o.weights, this.rng);
   }
   start() { this.nextQuestion(); }
 

@@ -1,5 +1,5 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
-import { isKs2, shownYears, topicsFor, type YearInfo } from '../curriculum';
+import { isKs2, shownYears, topicsFor, type Topic, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
 import { islandsHTML, mapLayout } from './map-layout';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
@@ -7,7 +7,7 @@ import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS } from '../game/session';
 import { MODES } from '../game/modes';
-import { weakestTopics } from '../game/sensei';
+import { weakestTopics, poolWeights } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
@@ -44,6 +44,10 @@ function topbar(nav: Nav, rerender: () => void) {
 }
 
 /** #894: a Daily Dojo row read aloud, for a pre-reader who cannot read the challenge title on the card. */
+/** #909: Sky Storm, Mixed Sprint and Boss Battle lean on topics this child has met and found hard. */
+function playMixed(nav: Nav, year: YearInfo, mode: 'endless' | 'sprint' | 'boss', pool: Topic[], progress: Record<string, TopicProgress>) {
+  nav.play({ year, mode, pool, weights: poolWeights(pool, progress) });
+}
 export function dojoRowLine(c: Challenge, progress: number): string {
   return progress >= c.goal ? `${c.title}. Done!` : `${c.title}. ${progress} of ${c.goal} done.`;
 }
@@ -137,17 +141,17 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
-      go: () => nav.play({ year, mode: 'endless', pool: subjectPool() }) },
+      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) },
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
       go: () => openChooser($('#island-overlay'), subjectPool(), topic => {
         sfx.tap();
-        topic ? nav.play({ year, mode: 'sprint', topic }) : nav.play({ year, mode: 'sprint', pool: subjectPool() });
+        topic ? nav.play({ year, mode: 'sprint', topic }) : playMixed(nav, year, 'sprint', subjectPool(), progress);
       }, { mixed: true }) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
-      go: () => nav.play({ year, mode: 'boss', pool: subjectPool() }) },
+      go: () => playMixed(nav, year, 'boss', subjectPool(), progress) },
     // #1049: Memory Match used to fall back to Reception's decks for a year with none of its own — hidden
     // instead, since `pickTheme` now throws rather than hand a KS2 child a Reception board.
     ...(hasMemoryDecks(year.id) ? [{ id: 'memory', mod: 'memory', vport: `<span class="vport emoji">🃏</span>`,
