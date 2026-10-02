@@ -3,7 +3,7 @@ import type { AnswerTally } from './shape';
 import { load, save } from './store';
 export function recordTopic(topicId: string, stars: number, score: number) {
   const p = load().progress[topicId] ?? { stars: 0, best: 0, plays: 0 };
-  const next = { stars: Math.max(p.stars, stars), best: Math.max(p.best, score), plays: p.plays + 1 };
+  const next = { ...p, stars: Math.max(p.stars, stars), best: Math.max(p.best, score), plays: p.plays + 1 };   // keep sprint (#911), hits, tries, last, crown
   save({ progress: { ...load().progress, [topicId]: next } });
 }
 /**
@@ -38,6 +38,16 @@ export function recordEndless(year: string, score: number) {
 export function recordSprint(year: string, score: number): boolean {
   const s = load().sprint; if (score <= 0 || (s[year] ?? 0) >= score) return false;
   save({ sprint: { ...s, [year]: score } }); return true;
+}
+/**
+ * A topic's own Sprint best, in correct answers (#911) — what the trophy tiers compare against `sprintStars`.
+ * Touches only `progress[id].sprint`: `plays`/`stars`/`best` count missions, and the year's `sprint[year]`
+ * stays the island's Ninja Sprint best. A score of 0 never is a best. Returns true on a new best.
+ */
+export function recordTopicSprint(topicId: string, correct: number): boolean {
+  const p = load().progress[topicId] ?? { stars: 0, best: 0, plays: 0 };
+  if (!Number.isInteger(correct) || correct <= 0 || (p.sprint ?? 0) >= correct) return false;
+  save({ progress: { ...load().progress, [topicId]: { ...p, sprint: correct } } }); return true;
 }
 /** Count a Boss Battle knock-out for this year. Returns the new total. */
 export function recordBossWin(year: string): number {

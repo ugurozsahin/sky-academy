@@ -7,7 +7,7 @@ import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-
 import { Tracer, traceFeedback } from '../game/tracing';
 import {
   isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd,
-  recordSprint, recordTopic, recordTraining, save, touchStreak, wallet,
+  recordSprint, recordTopic, recordTopicSprint, recordTraining, save, touchStreak, wallet,
 } from '../storage';
 import { equippedItem } from '../game/shop';
 import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
@@ -206,7 +206,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     if (!r.incomplete) {
       if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
       else if (training) { if (r.won) recordTraining(o.year.id); }
-      else if (o.mode === 'sprint') { if (!o.topic) newBest = recordSprint(o.year.id, r.score); }   // #910: a chooser topic writes nothing, not Endless's best
+      else if (o.mode === 'sprint') newBest = o.topic ? recordTopicSprint(o.topic.id, r.correct) : recordSprint(o.year.id, r.score);   // #911
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
       else recordEndless(o.year.id, r.score);
     }

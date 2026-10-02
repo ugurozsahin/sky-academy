@@ -2912,6 +2912,23 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#endless small')).toContainText('best 0');
   });
 
+  test('Ninja Sprint: a one-topic run stores that topic\'s own best and leaves the year\'s untouched (#911)', async ({ page }) => {
+    await seedPlayer(page);
+    const read = () => page.evaluate(() => { const s = JSON.parse(localStorage.getItem('sna:v1')!); return { year: JSON.stringify(s.sprint ?? {}), topic: s.progress?.['y1-bonds'] }; });
+    const before = await read();
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await page.click('#island-overlay .topic[data-id="y1-bonds"]');
+    await expect(page.locator('.play')).toBeVisible();
+    for (let i = 0; i < 3; i++) await solveCurrent(page);
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toBeVisible();
+    const after = await read();
+    expect(after.year, 'sprint[year] is byte-identical').toBe(before.year);
+    expect(after.topic.sprint, 'the correct-answer count (3 solves), not the points score').toBe(3);
+    expect(after.topic.plays ?? 0, 'a Sprint is not a mission play').toBe(before.topic?.plays ?? 0);
+  });
+
   test('Ninja Sprint chooser: Back closes it without starting a game (#910)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');
