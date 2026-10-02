@@ -137,8 +137,10 @@ Maths:
 - y3-fracequiv — equivalent fractions: the shaded bar matched to an equal fraction (d1), "which is equal to" with no picture, both ways round (d2), the missing top or bottom of an equal pair (d3)
 
 Writing:
+- y3-an — a or an for the gap in a sentence: a noun follows (d1), an adjective sits between so it decides (d2), the sound not the letter decides — an hour, a unicorn — mixed with d2 (d3); always two bubbles, `a` and `an`
 - y3-wordlist — hear a word from Appendix 1's Year 3–4 words 1–50 and build it: the word alone, letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
 - y3-prefix — the eight Year 3–4 prefixes (dis, mis, re, sub, inter, super, anti, auto): which prefix means under (d1, the six with a distinct meaning), which word means appear again (d2, real-word decoys including the bare root), build the word from its prefix and root (d3)
+- y3-suffix — which spelling is right after adding -ly or -ation: plain -ly (d1), the exceptions happily, gently, basically, truly and -ation (d2), every rule in a gapped sentence (d3); the two wrong options are rule-based non-words
 - y3-conjunctions — time, place and cause words (when, before, after, while, so, because · then, next, soon, therefore · before, after, during, in, because of): the one word that fits the gap (d1 conjunctions, 3 bubbles; d2 all three classes, 4 bubbles); d3 mixes in "what is before in this sentence?" (conjunction, preposition or adverb, read from what follows it)
 
 ## Difficulty convention
