@@ -67,22 +67,30 @@
 🐉	1.0	dragon
 🐋	1.0	whale
 🐌	0.6	snail
+🐍	0.6	snake
 🐐	1.0	goat
 🐑	0.6	ewe
+🐒	0.6	monkey
 🐔	0.6	chicken
+🐘	0.6	elephant
 🐛	0.6	bug
 🐜	0.6	ant
 🐝	0.6	honeybee
 🐟	0.6	fish
 🐤	0.6	baby chick
 🐦	0.6	bird
+🐧	0.6	penguin
 🐭	0.6	mouse face
 🐮	0.6	cow face
+🐯	0.6	tiger face
 🐰	0.6	rabbit face
 🐱	0.6	cat face
+🐳	0.6	spouting whale
+🐴	0.6	horse face
 🐶	0.6	dog face
 🐷	0.6	pig face
 🐸	0.6	frog
+🐻	0.6	bear
 🐾	0.6	paw prints
 👀	0.6	eyes
 👂	0.6	ear
@@ -109,6 +117,7 @@
 🔁	1.0	repeat button
 🔊	0.6	speaker high volume
 🔍	0.6	magnifying glass tilted left
+🔔	0.6	bell
 🔗	0.6	link
 🔟	0.6	keycap: 10
 🔢	0.6	input numbers
@@ -146,6 +155,7 @@
 🥜	3.0	peanuts
 🥤	5.0	cup with straw
 🥫	5.0	canned food
+🦁	1.0	lion
 🦆	3.0	duck
 🦇	3.0	bat
 🦈	3.0	shark

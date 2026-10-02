@@ -4969,6 +4969,28 @@ test('y1-skip "Slice every multiple of 5/10": every target sliced in any order c
   await expect.poll(() => page.evaluate(() => window.__sna.session.score)).toBeGreaterThan(scoreBefore);
 });
 
+// #928: the any-order form on Reception's `r-initial` (d3). Not @smoke, for the same reason as #920's.
+test('r-initial "Slice every picture that starts like …": every matching picture, in any order, completes the card (#928)', async ({ page }) => {
+  await seedPlayer(page);
+  await startTopic(page, 'reception', 'r-initial');
+  const q = await page.evaluate(() => {
+    const s = window.__sna.session;
+    s.stage = 5; s.index = 0;
+    s.nextQuestion();
+    return { anyOrder: !!s.current!.anyOrder, d: s.difficulty, prompt: s.current!.prompt, sequence: s.current!.sequence! };
+  });
+  expect(q.d, 'the last stage is difficulty 3').toBe(3);
+  expect(q.anyOrder).toBe(true);
+  expect(q.prompt).toMatch(/^Slice every picture that starts like [a-z]+$/);
+  await expectFitsViewport(page, `r-initial any-order card ("${q.prompt}")`);
+  const scoreBefore = await page.evaluate(() => window.__sna.session.score);
+  for (const label of [...q.sequence].reverse()) {
+    await waitForLabel(page, label);
+    expect(await page.evaluate((l) => window.__sna.arena!.hitLabel(l), label)).toBe(true);
+  }
+  await expect.poll(() => page.evaluate(() => window.__sna.session.score)).toBeGreaterThan(scoreBefore);
+});
+
 // #1051: the KS2 card holds a long prompt on a phone. The unit rule (`tests/unit/ks2-card-budget.test.ts`) measures
 // text with an advance table; this ties it to the real card — the width it assumes, and that three lines fit.
 test.describe('a KS2 word-problem card fits a phone (#1051)', () => {

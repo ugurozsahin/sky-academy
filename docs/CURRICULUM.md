@@ -26,6 +26,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-read | Word Reading: read words by sound-blending | Read It!: a CVC word is shown, never spoken — slice its picture; word and decoys follow the phase pools (d1 phase 2, d2–3 all single-letter sounds); d3 always includes a same-first-letter decoy, so the first sound alone cannot answer |
 | r-sentence | Writing: simple sentences | Story Sentences: sentence shown + read aloud, slice the words in order (3 → 6 words, 1–2 decoys) |
 | r-trace | Writing: form letters | trace on canvas; d1–2 follow the phase order, d3 is the whole alphabet — formation covers all 26 whatever phase the sound is in |
+| r-initial | Word Reading: words with the same initial sound | A spoken keyword (snake) and pictures from the CVC bank; slice the one whose first sound matches, by phoneme family so `c` and `k` are one sound. d1 3 pictures, d2 4, d3 5 with 2–3 matches in any order (`sequenceFrom: 3`); d3 only uses sounds with 3+ CVC pictures |
 
 ## Year 1 — 6 q/stage, 3 lives
 Maths:

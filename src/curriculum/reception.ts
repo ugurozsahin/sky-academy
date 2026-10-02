@@ -3,6 +3,7 @@
 // Reception generator, maths and writing alike, so a reviewer checking "is Reception right" reads one file.
 // Generators shared with Year 1/Year 2 live in util.ts (#325 stage 4).
 import type { Generator, Rng, Topic } from './types';
+import { rInitial } from './reception-initial';
 import {
   ri, pick, shuffle, numQ, wordQ, OBJECTS,
   orderQ, balanceQ,
@@ -309,4 +310,5 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-read', title: 'Read It!', icon: '📗', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: read words by sound-blending', gen: rRead },
   { id: 'r-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'reception', nc: 'ELG Writing: simple sentences', sequenceFrom: 1, gen: rSentence },
   { id: 'r-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'reception', nc: 'ELG Writing: form letters', input: 'tracing', gen: rTrace },
+  { id: 'r-initial', title: 'Starts Like', icon: '🔔', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: words with the same initial sound (Development Matters)', sequenceFrom: 3, gen: rInitial },
 ];
