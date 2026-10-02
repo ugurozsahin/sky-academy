@@ -131,12 +131,14 @@ Maths:
 - y3-money — how much money from 2–4 coins or notes (d1), add or subtract two amounts crossing a pound (d2), change from £5 or £10 (d3); £ and p always written separately, never a decimal
 - y3-missing — the gap in `a + ? = c` or `a − ? = c`, a multiple of 10 or 100 (d1), the gap in any position with a 2-digit number (d2), 3-digit numbers with exchanges and the equals sign on the left half the time, with `slow` (d3)
 - y3-story-as — one-step story problems within 1,000, in one unit: ones, tens or hundreds (d1), a 2- or 3-digit amount with an exchange (d2), two-step stories with the first-step decoy and `slow` (d3)
+- y3-tables — the 4 and 8 times tables built by doubling, with the known 2×/4× fact shown (d1); the 3, 4 and 8 facts as × both ways and ÷ (d2); the missing factor (d3). `y3TablesQ(d, rng, table)` fixes the table for the drills
 - y3-time — read a clock to the minute (d1), with am and pm and noon/midnight words (d2), 12-hour ↔ 24-hour conversions (d3)
 - y3-fracof — unit fractions of 4–12 stars with a picture (d1), unit and non-unit fractions of wholes up to 60 (d2), the whole from a part, or non-unit fractions of wholes up to 80, with `slow` (d3)
 - y3-fracequiv — equivalent fractions: the shaded bar matched to an equal fraction (d1), "which is equal to" with no picture, both ways round (d2), the missing top or bottom of an equal pair (d3)
 
 Writing:
 - y3-wordlist — hear a word from Appendix 1's Year 3–4 words 1–50 and build it: the word alone, letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
+- y3-prefix — the eight Year 3–4 prefixes (dis, mis, re, sub, inter, super, anti, auto): which prefix means under (d1, the six with a distinct meaning), which word means appear again (d2, real-word decoys including the bare root), build the word from its prefix and root (d3)
 - y3-suffix — which spelling is right after adding -ly or -ation: plain -ly (d1), the exceptions happily, gently, basically, truly and -ation (d2), every rule in a gapped sentence (d3); the two wrong options are rule-based non-words
 
 ## Difficulty convention

@@ -70,13 +70,19 @@ describe('y3-suffix (#1104)', () => {
       const row = SUFFIX_BANK.find(r => r[2] === c.answer)!;
       expect(c.say).toContain(`${row[1]} to ${row[0]}`);
       expect(c.prompt).toContain(`${row[0]} + ${row[1]}`);
+      expect([...c.options].sort(), c.prompt).toEqual([row[2], row[4], row[5]].sort());
     }
   });
 
   it('d1 asks only plain -ly, d2 only the exceptions and -ation, d3 mixes every rule in a gapped sentence', () => {
     const rule = (a: string) => SUFFIX_BANK.find(r => r[2] === a)![3];
-    for (const c of draws(1)) { expect(rule(c.answer)).toBe('plain'); expect(c.visual?.type).toBe('word'); }
-    for (const c of draws(2)) { expect(rule(c.answer)).not.toBe('plain'); expect(c.visual?.type).toBe('word'); }
+    const rulesSeen = (d: Difficulty) => {
+      const set = new Set<string>();
+      for (const c of draws(d)) { set.add(rule(c.answer)); expect(c.visual?.type).toBe('word'); }
+      return [...set].sort();
+    };
+    expect(rulesSeen(1)).toEqual(['plain']);
+    expect(rulesSeen(2)).toEqual(['ation', 'ic', 'le', 'listed', 'y-to-i']);
     const seen = new Set<string>();
     for (const c of draws(3)) {
       seen.add(rule(c.answer));
