@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES, recentSlips, type SlipRow } from '../../src/game/parents';
+import { gateChallenge, checkGate, parentSummary, ncForGrownUps, pct, RANK_MIN_TRIES, recentSlips, type SlipRow } from '../../src/game/parents';
 import { TOPICS, CORE_TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
-import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
+import { topicRow, canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
 import { settingsHTML } from '../../src/ui/parents-settings';
 import { slipsHTML } from '../../src/ui/parents-slips';
 import { freshDojo } from '../../src/game/dojo';
@@ -369,5 +369,26 @@ describe('slipsHTML (#938): the "Recent slips" section\'s markup', () => {
     expect(html.indexOf('🔤')).toBeLessThan(html.indexOf('➗'));
     expect(html).toContain('2026-09-29');
     expect(html).toContain('2026-09-28');
+  });
+});
+
+describe('curriculum statements in words for grown-ups (#944)', () => {
+  it('expands each abbreviated prefix and leaves other text unchanged', () => {
+    expect(ncForGrownUps('Y1 A&S: bonds within 20')).toBe('Y1 Addition and subtraction: bonds within 20');
+    expect(ncForGrownUps('Y2 NPV: tens and ones')).toBe('Y2 Number and place value: tens and ones');
+    expect(ncForGrownUps('Y2 M&D: 2s, 5s and 10s')).toBe('Y2 Multiplication and division: 2s, 5s and 10s');
+    expect(ncForGrownUps('ELG Number: subitise to 5')).toBe('Early learning goal Number: subitise to 5');
+    expect(ncForGrownUps('Y1 Measure: length')).toBe('Y1 Measure: length');
+  });
+  it('no registered topic still shows A&S, NPV or M&D, and its statement is unchanged at source', () => {
+    for (const t of TOPICS) expect(ncForGrownUps(t.nc)).not.toMatch(/A&S|NPV|M&D/);
+    const data = { ...load(), progress: { 'y1-sub': { stars: 1, plays: 3, hits: 6, tries: 20, best: 0 } } } as SaveData;
+    const [w] = parentSummary(data, CORE_TOPICS, YEARS, 0).weakest;
+    expect(w.id).toBe('y1-sub');
+    expect(w.nc).toBe(ncForGrownUps(TOPICS.find(t => t.id === 'y1-sub')!.nc));
+  });
+  it('the topic row carries the statement, escaped', () => {
+    const html = topicRow({ id: 'x', title: 'T', icon: '1', year: 'year1', subject: 'maths', stars: 1, plays: 1, hits: 1, tries: 2, accuracy: 0.5, nc: 'Y1 <b>A</b> & more' });
+    expect(html).toContain('<small>Y1 &lt;b&gt;A&lt;/b&gt; &amp; more</small>');
   });
 });
