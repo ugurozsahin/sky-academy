@@ -1,41 +1,7 @@
-// Year 2 sentences: word classes, sentence types, tense, punctuation, sentence building. Split out of year2.ts (#1416); index.ts re-exports every name.
+// Year 2 sentences: sentence types, tense, punctuation, sentence building. Split out of year2.ts (#1416); index.ts re-exports every name.
 import { type Generator } from '../types';
 import { ri, pick, wordQ, sentGen, type Sent, PUNCT_SENTS } from '../util';
 
-/**
- * Word classes in a sentence (#299 slice 3, NC English Appendix 2 Year 2): `[sentence, noun, verb, adjective,
- * adverb]`. The three words **not** asked for are the card's distractors, so every option comes from the
- * child's own sentence and exactly one of them can be the class asked for.
- *
- * That only holds while no word in the bank belongs to two classes out of context — `play`, `run` and `smile`
- * are a noun and a verb both, and `fast` is an adjective and an adverb both — so the bank avoids them and a
- * rail holds every word to the one column it appears in. The sentences are deliberately four-content-word
- * sentences for the same reason: a word on the card that is not one of the four could be the honest answer.
- */
-export const WORD_CLASSES: ReadonlyArray<readonly [string, string, string, string, string]> = [
-  ['The happy kitten purred loudly.', 'kitten', 'purred', 'happy', 'loudly'],
-  ['A tiny bird sang sweetly.', 'bird', 'sang', 'tiny', 'sweetly'],
-  ['The brave ninja jumped quickly.', 'ninja', 'jumped', 'brave', 'quickly'],
-  ['My little sister giggled quietly.', 'sister', 'giggled', 'little', 'quietly'],
-  ['The old bus stopped suddenly.', 'bus', 'stopped', 'old', 'suddenly'],
-  ['A hungry rabbit nibbled greedily.', 'rabbit', 'nibbled', 'hungry', 'greedily'],
-  ['The red balloon floated slowly.', 'balloon', 'floated', 'red', 'slowly'],
-  ['Our new teacher smiled warmly.', 'teacher', 'smiled', 'new', 'warmly'],
-  ['The huge castle stood proudly.', 'castle', 'stood', 'huge', 'proudly'],
-  ['The tired baby yawned sleepily.', 'baby', 'yawned', 'tired', 'sleepily'],
-];
-/** Column order in `WORD_CLASSES`, and the order the difficulties unlock them in. Exported for the rail. */
-export const WORD_CLASS_NAMES = ['noun', 'verb', 'adjective', 'adverb'] as const;
-export const y2WordClass: Generator = (d, rng) => {
-  const row = pick(rng, WORD_CLASSES);
-  // Nouns and verbs first: Year 1 already names them (Appendix 2), while adjective and adverb are Year 2's own
-  // vocabulary — and "which word is the adverb?" on a card whose adverb is the last word is the stretch.
-  const k = ri(rng, 0, d === 1 ? 1 : d === 2 ? 2 : 3);
-  const cls = WORD_CLASS_NAMES[k], answer = row[k + 1];
-  return wordQ(rng, `Which word is the ${cls}?`, answer, row.slice(1).filter(w => w !== answer), {
-    visual: { type: 'sentence', text: row[0] }, say: `${row[0]} Which word is the ${cls}?`, hint: `Slice the ${cls}`, hintIsData: false,
-  });
-};
 /**
  * Sentence types (#299 slice 3, NC English Appendix 2 Year 2): `[sentence, type]`.
  *
