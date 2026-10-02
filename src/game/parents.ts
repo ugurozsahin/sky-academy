@@ -2,7 +2,8 @@
 // Pure logic (no DOM) so it can be unit-tested. Reads only what storage.ts already records.
 import type { Rng, Topic, YearId, YearInfo } from '../curriculum';
 import type { SaveData, TopicProgress } from '../storage';
-import { safeRecord } from '../storage';
+import { safeRecord, today } from '../storage';
+import type { LogDay } from '../save-records';
 import { accuracy } from './sensei';
 
 // ---------- Grown-ups gate ----------
@@ -42,6 +43,16 @@ export interface ParentSummary {
   modes: ModeBest[];
   streakDays: number; coins: number; stickers: number; stickersTotal: number;
   slips: SlipRow[];
+  week: WeekSummary;
+}
+/** The last seven local days of play (#939), read from the day log. `accuracy` is null with no questions. */
+export interface WeekSummary { days: number; questions: number; accuracy: number | null; topics: string[] }
+/** Seven local days ending `day` (`YYYY-MM-DD`): days played, questions, accuracy and the distinct topic ids. */
+export function weekSummary(log: readonly LogDay[], day: string): WeekSummary {
+  const [y, m, d] = day.split('-').map(Number), from = today(new Date(y, m - 1, d - 6));
+  const inWeek = (Array.isArray(log) ? log : []).filter(l => l.date >= from && l.date <= day);
+  const questions = inWeek.reduce((n, l) => n + l.q, 0), ok = inWeek.reduce((n, l) => n + l.ok, 0);
+  return { days: inWeek.length, questions, accuracy: questions ? ok / questions : null, topics: [...new Set(inWeek.flatMap(l => l.topics))] };
 }
 /** One row of the "Recent slips" list (#938): a stored `Slip` (#903) with its topic resolved to an icon. */
 export interface SlipRow { icon: string; prompt: string; answer: string; picked: string; at: string }
@@ -72,7 +83,7 @@ function stat(t: Topic, p: TopicProgress | undefined): TopicStat {
 }
 
 /** Build the whole read-only dashboard model from the save. `stickersTotal` is passed in so storage stays the source of the album size. */
-export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[], stickersTotal: number): ParentSummary {
+export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[], stickersTotal: number, now = new Date()): ParentSummary {
   // #95: `data` can be a hand-edited or corrupted "Restore" paste — importSave() only checks the version, so
   // any of these fields can arrive as anything. Read the same tolerant way storage.ts's own achievement
   // calculations already do, rather than indexing `data.progress` directly and throwing on the dashboard.
@@ -114,6 +125,7 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
     modes,
     streakDays: data.streak.days, coins: data.coins, stickers: data.stickers.length, stickersTotal,
     slips: recentSlips(data, topics),
+    week: weekSummary(data.log, today(now)),
   };
 }
 

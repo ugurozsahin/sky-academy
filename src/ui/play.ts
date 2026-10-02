@@ -217,7 +217,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     const { dojo, fresh } = recordGameEnd({
       mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo,
       stars: r.stars, score: r.score, training,
-      mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'), slips: missSlips(r.misses),   // #938
+      mathsCorrect: bySubject('maths'), writingCorrect: bySubject('writing'), slips: missSlips(r.misses), topics: Object.keys(session.byTopic),   // #938, #939
     }, r.coins);
     const dojoSaved = !isWriteFailing() && !isReadOnlySave(); const streak = touchStreak();   // #518: read before this write overwrites the flag
     const cert = certInfo(r); lastCert = cert;
