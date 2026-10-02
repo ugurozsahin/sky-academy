@@ -130,7 +130,7 @@ export function renderVisual(v: Visual | undefined): string {
       return `<div class="vis"><svg viewBox="-1 -2 ${w + 2} ${h + 4}" class="symgrid">${cells}<line x1="${w / 2}" y1="-2" x2="${w / 2}" y2="${h + 2}" class="mirror"/></svg></div>`;
     }
     case 'word': return `<div class="vis wordcard">${v.emoji ? `<span class="emoji">${v.emoji}</span>` : ''}<span class="txt">${esc(v.text)}</span></div>`;
-    case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
+    case 'sentence': return `<div class="vis sentence">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>').replace(/\n/g, '<br>')}</div>`;
     case 'strip': return `<div class="vis strip">${esc(v.text).replace(/_+/g, '<u class="gap">&nbsp;&nbsp;&nbsp;</u>')}</div>`;
   }
 }
