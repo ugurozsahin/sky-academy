@@ -2909,6 +2909,20 @@ test.describe('Sky Ninja Academy', () => {
     }
   });
 
+  test('Ninja Sprint: the Bonds to 10 drill asks only totals of 10 (#917)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#sprint');
+    await page.click('#island-overlay .topic[data-id="y1-bonds-10"]');
+    await expect(page.locator('.play')).toBeVisible();
+    for (let i = 0; i < 5; i++) {
+      const s = await state(page);
+      expect(s.topic).toBe('y1-bonds-10');
+      expect(s.prompt).toMatch(/= 10$/);
+      await solveCurrent(page);
+    }
+  });
+
   test('Ninja Sprint: a one-topic run never changes the year\'s mixed-pool best (#910)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');

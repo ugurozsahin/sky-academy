@@ -15,13 +15,14 @@ import {
 import { y1SkipAnyOrder } from './year1-skip-anyorder';
 
 // ---------- Year 1 maths ----------
-const y1Bonds: Generator = (d, rng) => {
-  const total = d === 1 ? 10 : d === 2 ? pick(rng, [10, 12, 15]) : 20;
+/** One bond card for a fixed `total`: a + ? = T or ? + a = T (#917). */
+const bondsQ = (rng: () => number, total: number) => {
   const a = ri(rng, 0, total);
   const missingLeft = rng() < 0.4;
   const p = missingLeft ? `? + ${a} = ${total}` : `${a} + ? = ${total}`;
   return numQ(rng, p, total - a, { min: 0, max: 20, ...q(p), visual: total <= 10 ? { type: 'tenframe', n: a } : undefined });
 };
+const y1Bonds: Generator = (d, rng) => bondsQ(rng, d === 1 ? 10 : d === 2 ? pick(rng, [10, 12, 15]) : 20);
 const y1Add: Generator = (d, rng) => {
   const max = d === 1 ? 10 : d === 2 ? 15 : 20;
   const a = ri(rng, 0, max), b = ri(rng, 0, max - a);
@@ -351,6 +352,8 @@ const y1Trace: Generator = (d, rng) => {
 export const YEAR1_TOPICS: Topic[] = [
   // Year 1 maths
   { id: 'y1-bonds', title: 'Number Bonds', icon: '🔗', subject: 'maths', year: 'year1', nc: 'Y1 A&S: bonds within 20', gen: y1Bonds },
+  { id: 'y1-bonds-10', title: 'Bonds to 10', icon: '🔗', subject: 'maths', year: 'year1', nc: 'Y1 A&S: bonds to 10', drill: true, gen: (_d, rng) => bondsQ(rng, 10) },
+  { id: 'y1-bonds-20', title: 'Bonds to 20', icon: '🔗', subject: 'maths', year: 'year1', nc: 'Y1 A&S: bonds to 20', drill: true, gen: (_d, rng) => bondsQ(rng, 20) },
   { id: 'y1-add', title: 'Adding to 20', icon: '➕', subject: 'maths', year: 'year1', nc: 'Y1 A&S: add within 20', gen: y1Add },
   { id: 'y1-story', title: 'Story Sums', icon: '🦆', subject: 'maths', year: 'year1', nc: 'Y1 A&S: one-step problems, objects and pictures', gen: y1Story },
   { id: 'y1-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year1', nc: 'Y1 A&S: subtract within 20', gen: y1Sub },

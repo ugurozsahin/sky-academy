@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { gateChallenge, checkGate, parentSummary, pct, RANK_MIN_TRIES, recentSlips, type SlipRow } from '../../src/game/parents';
-import { TOPICS, YEARS, topicsFor } from '../../src/curriculum';
+import { TOPICS, CORE_TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
 import { settingsHTML } from '../../src/ui/parents-settings';
@@ -46,13 +46,13 @@ describe('grown-ups gate', () => {
 
 describe('parent dashboard summary', () => {
   it('an untouched save reports nothing played but the full topic count', () => {
-    const sm = parentSummary(base, TOPICS, YEARS, STICKER_IDS.length);
+    const sm = parentSummary(base, CORE_TOPICS, YEARS, STICKER_IDS.length);
     expect(sm.totalAnswered).toBe(0);
     expect(sm.overallAccuracy).toBeNull();
     expect(sm.starsEarned).toBe(0);
-    expect(sm.starsMax).toBe(TOPICS.length * 3);
+    expect(sm.starsMax).toBe(CORE_TOPICS.length * 3);
     expect(sm.topicsTried).toBe(0);
-    expect(sm.topicsTotal).toBe(TOPICS.length);
+    expect(sm.topicsTotal).toBe(CORE_TOPICS.length);
     expect(sm.weakest).toEqual([]);
     expect(sm.strongest).toEqual([]);
     expect(sm.stickersTotal).toBe(STICKER_IDS.length);
@@ -71,7 +71,7 @@ describe('parent dashboard summary', () => {
       endless: { year1: 120 }, sprint: { year1: 15 }, boss: { year1: 2 }, memory: { year1: 1 }, training: { year1: 3 },
       coins: 70, stickers: ['volt', 'blaze'], streak: { last: '2026-09-06', days: 4 },
     };
-    const sm = parentSummary(data, TOPICS, YEARS, STICKER_IDS.length);
+    const sm = parentSummary(data, CORE_TOPICS, YEARS, STICKER_IDS.length);
 
     expect(sm.totalAnswered).toBe(50 + 20 + 5 + 3);
     expect(sm.totalCorrect).toBe(45 + 6 + 3 + 2);

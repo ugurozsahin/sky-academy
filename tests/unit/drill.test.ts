@@ -29,7 +29,7 @@ describe('a drill topic stays out of everything but the chooser (#915)', () => {
     expect(ids(TOPICS)).toContain(FX);
     expect(ids(drillsFor('year2')).filter(i => !i.startsWith('y2-tables-'))).toEqual([FX]);   // the real tables drills (#916) sit beside it
     expect(drillsFor('year2', 'writing')).toEqual([]);
-    expect(drillsFor('year1')).toEqual([]);
+    expect(ids(drillsFor('year1'))).toEqual(['y1-bonds-10', 'y1-bonds-20']);   // the real bond drills (#917)
     for (const l of [CORE_TOPICS, topicsFor('year2'), topicsFor('year2', 'maths'), listedTopics()]) expect(ids(l)).not.toContain(FX);
   });
 
