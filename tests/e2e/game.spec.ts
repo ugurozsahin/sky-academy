@@ -7,6 +7,8 @@ import { itemById } from '../../src/game/shop';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
 import { expectFitsViewport } from './viewport';
+import { seededRng } from '../../src/game/rng';
+import { renderVisual } from '../../src/ui/visuals';
 import { CARD_TEXT_WIDTH_390, PROMPT_FS_PHONE, PROMPT_FS_SHORT, promptLines } from '../unit/helpers/card-budget';
 import { COMPACT_VARS, islandsHTML, mapLayout } from '../../src/ui/map-layout';
 /** A context with nothing stored: the 3-D setting at its default, `auto` — the opt-out from `THREE_OFF`. */
@@ -4917,5 +4919,30 @@ test.describe('a KS2 word-problem card fits a phone (#1051)', () => {
       await render(THREE_LINE_PROMPT);
       await expectFitsViewport(page, `KS2 card 390×${h}`);
     });
+  }
+});
+
+// #1110: y3-speech puts three lettered sentences on the card, one per line. The card is built here from the real
+// generator and the real `renderVisual`, then laid out by the real page, so a line that wraps or overflows shows.
+test('a y3-speech d3 card fits a 390×664 phone, one version per line (#1110)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'the 390px phone card; the desktop card is wider by design');
+  await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+  await page.setViewportSize({ width: 390, height: 664 });
+  await seedPlayer(page);
+  await startTopic(page, 'year3', 'y3-speech');
+  const speech = TOPICS.find(t => t.id === 'y3-speech')!;
+  for (let seed = 1; seed <= 6; seed++) {
+    const q = speech.gen(3, seededRng(seed));
+    const html = renderVisual(q.visual!);
+    const lines = await page.evaluate(({ html, prompt }) => {
+      document.querySelector('#vis')!.innerHTML = html;
+      document.querySelector('#prompt')!.textContent = prompt;
+      const el = document.querySelector('#vis .sentence') as HTMLElement;
+      const r = document.createRange(); r.selectNodeContents(el);
+      return new Set([...r.getClientRects()].map(c => Math.round(c.top))).size;
+    }, { html, prompt: q.prompt });
+    expect(lines, `seed ${seed}: three versions, three lines, none wrapped`).toBe(3);
+    await expectFitsViewport(page, `y3-speech d3 card, seed ${seed}`);
   }
 });
