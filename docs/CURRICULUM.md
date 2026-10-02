@@ -136,6 +136,7 @@ Maths:
 - y3-fracequiv — equivalent fractions: the shaded bar matched to an equal fraction (d1), "which is equal to" with no picture, both ways round (d2), the missing top or bottom of an equal pair (d3)
 
 Writing:
+- y3-an — a or an for the gap in a sentence: a noun follows (d1), an adjective sits between so it decides (d2), the sound not the letter decides — an hour, a unicorn — mixed with d2 (d3); always two bubbles, `a` and `an`
 - y3-wordlist — hear a word from Appendix 1's Year 3–4 words 1–50 and build it: the word alone, letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
 
 ## Difficulty convention
