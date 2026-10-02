@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { firstQuestionLine, resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, scoreLine, type ResultCandidate } from '../../src/ui/results';
+import { firstQuestionLine, resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, missionBestCandidates, resultsLines, scoreLine, type ResultCandidate } from '../../src/ui/results';
 import { resultsHTML, type ResultsData } from '../../src/ui/overlays';
 import type { Mode } from '../../src/game/modes';
 import type { Question, Topic } from '../../src/curriculum';
@@ -398,5 +398,14 @@ describe('firstQuestionLine', () => {
   it('still announces when the previous question is a DIFFERENT object, even with an identical prompt', () => {
     const same = { prompt: '2 + 2', say: undefined } as unknown as Question;
     expect(firstQuestionLine(q, topic, 1, false, same)).toBe('Number Bonds! 2 + 2');
+  });
+});
+
+describe('missionBestCandidates (#933)', () => {
+  it('announces the topic title when the score is a new best', () => {
+    expect(missionBestCandidates({ title: 'Count It' }, true)).toEqual([{ kind: 'best', text: 'New best for Count It!' }]);
+  });
+  it('announces nothing otherwise', () => {
+    expect(missionBestCandidates({ title: 'Count It' }, false)).toEqual([]);
   });
 });

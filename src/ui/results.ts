@@ -172,3 +172,7 @@ export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r:
   const t = newBest ? trophyCandidate(topic, year, before, r.correct) : null;
   return { newBest, candidates: t ? [t] : [] };
 }
+
+/** A Mission's `best` announcement (#933): `New best for <topic title>!` only when `recordTopic()` said the score beat a real previous best. */
+export const missionBestCandidates = (topic: Pick<Topic, 'title'>, isNewBest: boolean): ResultCandidate[] =>
+  isNewBest ? [{ kind: 'best', text: `New best for ${topic.title}!` }] : [];
