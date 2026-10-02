@@ -143,6 +143,7 @@ Writing:
 - y3-wordlist — hear a word from Appendix 1's Year 3–4 words 1–50 and build it: the word alone, letter by letter (d1), in a dictated sentence with the word gapped (d2), longer words with 10+ letter forms built from chunks (d3); a no-voice device peeks the word, then hides it
 - y3-prefix — the eight Year 3–4 prefixes (dis, mis, re, sub, inter, super, anti, auto): which prefix means under (d1, the six with a distinct meaning), which word means appear again (d2, real-word decoys including the bare root), build the word from its prefix and root (d3)
 - y3-suffix — which spelling is right after adding -ly or -ation: plain -ly (d1), the exceptions happily, gently, basically, truly and -ation (d2), every rule in a gapped sentence (d3); the two wrong options are rule-based non-words
+- y3-conjunctions — time, place and cause words (when, before, after, while, so, because · then, next, soon, therefore · before, after, during, in, because of): the one word that fits the gap (d1 conjunctions, 3 bubbles; d2 all three classes, 4 bubbles); d3 mixes in "what is before in this sentence?" (conjunction, preposition or adverb, read from what follows it)
 
 ## Difficulty convention
 d1 = introduce (small range, visual support) · d2 = NC expectation · d3 = stretch / mixed forms.

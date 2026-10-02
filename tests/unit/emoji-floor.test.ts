@@ -5,6 +5,12 @@ import { DIGRAPH_WORDS } from '../../src/curriculum/year1';
 import { TOPICS } from '../../src/curriculum';
 import { SURVEYS } from '../../src/curriculum/year2/measure';
 
+const SEQ = /\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)*/gu;
+const FLOOR = 12.0;
+const strip = (g: string) => g.replaceAll('\uFE0F', '');
+/** Emoji sequences in `text` that the fixture does not list (variation selectors ignored). */
+const unlisted = (text: string, listed: ReadonlySet<string>) => [...new Set([...text.matchAll(SEQ)].map(m => strip(m[0])))].filter(g => !listed.has(g));
+
 /**
  * #875: three curriculum glyphs were Emoji 13.0 — 🪙 (`coin`), 🪢 (`skipping`), 🪵 (`log`) — which draw as
  * empty boxes on Android 10, a common cheap family tablet (`minSdkVersion = 24`, `android/variables.gradle`).
@@ -13,16 +19,10 @@ import { SURVEYS } from '../../src/curriculum/year2/measure';
  * of files, so a future curriculum split (already happened once here — `year2.ts` → `year2/*.ts` mid-issue)
  * cannot make the sweep miss a directory silently.
  *
- * **This is not the comprehensive floor rail the issue also asks for** (a fixture of every glyph's Unicode
- * emoji version, asserting all are ≤ 12.0). Building that fixture correctly needs an authoritative source —
- * the issue's own proposed fix says to build it by looking each glyph up in Unicode's `emoji-test.txt` — and
- * this session has no route to one: `curl https://unicode.org/...` and a general web fetch both come back
- * `403` from this environment's egress policy (`recentRelayFailures` in the agent-proxy status), and no
- * offline Unicode data is installed here either. Hand-typing ~158 version numbers from memory risks exactly
- * the failure this rail exists to prevent — a wrongly-cleared glyph reads as "checked" and ships broken — so
- * this PR does not attempt it. Left `Part of #875`, not `Closes`: the comprehensive sweep needs either a
- * session with real internet access (the owner's Mac session can reach it) or a vendored `emoji-test.txt`
- * excerpt added as a fixture, the same shape `#643` is waiting on for its own word list.
+ * The comprehensive floor rail is the second `describe` below (#875): `fixtures/emoji-floor.txt` lists every
+ * emoji sequence the curriculum sources spell, with its Emoji version and CLDR name, copied from Unicode's
+ * `emoji-test.txt` (UTS #51 v18.0 of 2026-02-05, via the unicode-org/cldr copy on raw.githubusercontent.com —
+ * unicode.org itself is refused by the cloud egress policy). The floor is **Emoji 12.0 / Android 10**.
  *
  * Literal-glyph substring match only, over each file's whole text — comments count too, same as code. A
  * `\u{1FAA2}`-style escape or a variation-selector variant of the same base codepoint would slip past this
@@ -68,5 +68,42 @@ describe('emoji floor (#875): three already-found above-floor glyphs cannot retu
   it("the 'playtime game' survey's swapped row is 🤸 cartwheels", () => {
     const survey = SURVEYS.find(s => s.what === 'playtime game');
     expect(survey?.rows).toContainEqual(['🤸', 'cartwheels']);
+  });
+});
+
+describe('emoji floor (#875): every curriculum glyph is Emoji 12.0 or older', () => {
+  const rows = readFileSync(join(__dirname, 'fixtures/emoji-floor.txt'), 'utf8').trimEnd().split('\n').map(l => l.split('\t') as [string, string, string]);
+  const listed = new Set(rows.map(r => r[0]));
+  const files = (function walk(dir: string): string[] {
+    return readdirSync(dir).flatMap(n => { const p = join(dir, n); return statSync(p).isDirectory() ? walk(p) : n.endsWith('.ts') ? [p] : []; });
+  })(join(__dirname, '../../src/curriculum'));
+
+  it('the fixture is sorted, unique, three columns, every version at or under the floor', () => {
+    expect(rows.length).toBeGreaterThan(100);
+    expect(listed.size).toBe(rows.length);
+    for (const r of rows) { expect(r, r[0]).toHaveLength(3); expect(r[1], r[0]).toMatch(/^\d+\.\d$/); expect(r[0], 'FE0F is stripped').not.toContain('\uFE0F'); expect(Number(r[1]), `${r[0]} ${r[2]}`).toBeLessThanOrEqual(FLOOR); expect(r[2].length).toBeGreaterThan(0); }
+    const cps = rows.map(r => r[0].codePointAt(0)!);
+    expect(cps, 'sorted by first code point').toEqual([...cps].sort((a, b) => a - b));
+  });
+
+  it.each(files.map(f => [f.slice(f.indexOf('src/curriculum'))]))('%s spells only listed glyphs', (f) => {
+    expect(unlisted(readFileSync(join(__dirname, '../..', f), 'utf8'), listed), 'add the glyph to the fixture with its Emoji version, or replace it').toEqual([]);
+  });
+
+  it('the residue is measured: every fixture line is still spelled by a source file', () => {
+    const spelled = new Set(files.flatMap(f => [...readFileSync(f, 'utf8').matchAll(SEQ)].map(m => strip(m[0]))));
+    expect(rows.filter(r => !spelled.has(r[0])).map(r => r[0]), 'unused fixture lines').toEqual([]);
+  });
+
+  it('no source hides a glyph from the sweep: no \\u escapes, fromCodePoint, flags or keycaps', () => {
+    expect(files.length).toBeGreaterThan(5);
+    for (const f of files) expect(readFileSync(f, 'utf8'), f).not.toMatch(/\\u\{?[0-9A-Fa-f]{4,6}|fromCodePoint|[\u{1F1E6}-\u{1F1FF}\u20E3]/u);
+  });
+
+  it('proves red: an unlisted glyph (🪙, E13.0) is reported, a listed one (🛢️) and plain text are not', () => {
+    expect(unlisted('const a = "🪙";', listed)).toEqual(['🪙']);
+    expect(unlisted("['oil', 'oi', '🛢️']", listed)).toEqual([]);
+    expect(unlisted('no emoji here', listed)).toEqual([]);
+    expect(unlisted('x = "🧑‍🌾"', new Set())).toEqual(['🧑‍🌾']); // a ZWJ sequence is one unit
   });
 });

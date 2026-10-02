@@ -1,0 +1,169 @@
+↔	0.6	left-right arrow
+⏰	0.6	alarm clock
+⏳	0.6	hourglass not done
+☀	0.6	sun
+☂	0.7	umbrella
+⚖	1.0	balance scale
+⚽	0.6	soccer ball
+⛵	0.6	sailboat
+✂	0.6	scissors
+✅	0.6	check mark button
+✈	0.6	airplane
+✍	0.7	writing hand
+✏	0.6	pencil
+✖	0.6	multiply
+❌	0.6	cross mark
+❓	0.6	red question mark
+❗	0.6	red exclamation mark
+❤	0.6	red heart
+➕	0.6	plus
+➖	0.6	minus
+➗	0.6	divide
+➡	0.6	right arrow
+⬅	0.6	left arrow
+⬆	0.6	up arrow
+⬇	0.6	down arrow
+⭐	0.6	star
+🅰	0.6	A button (blood type)
+🌅	0.6	sunrise
+🌈	0.6	rainbow
+🌙	0.6	crescent moon
+🌡	0.7	thermometer
+🌧	0.7	cloud with rain
+🌳	1.0	deciduous tree
+🌻	0.6	sunflower
+🌼	0.6	blossom
+🍌	0.6	banana
+🍎	0.6	red apple
+🍓	0.6	strawberry
+🍕	0.6	pizza
+🍞	0.6	bread
+🍟	0.6	french fries
+🍦	0.6	soft ice cream
+🍪	0.6	cookie
+🍯	0.6	honey pot
+🍲	0.6	pot of food
+🍳	0.6	cooking
+🍴	0.6	fork and knife
+🎀	0.6	ribbon
+🎁	0.6	wrapped gift
+🎂	0.6	birthday cake
+🎈	0.6	balloon
+🎤	0.6	microphone
+🎨	0.6	artist palette
+🎩	0.6	top hat
+🎮	0.6	video game
+🎯	0.6	bullseye
+🎲	0.6	game die
+🎻	0.6	violin
+🏃	0.6	person running
+🏇	1.0	horse racing
+🏊	0.6	person swimming
+🏋	0.7	person lifting weights
+🏖	0.7	beach with umbrella
+🏛	0.7	classical building
+🐀	1.0	rat
+🐈	0.7	cat
+🐉	1.0	dragon
+🐋	1.0	whale
+🐌	0.6	snail
+🐐	1.0	goat
+🐑	0.6	ewe
+🐔	0.6	chicken
+🐛	0.6	bug
+🐜	0.6	ant
+🐝	0.6	honeybee
+🐟	0.6	fish
+🐤	0.6	baby chick
+🐦	0.6	bird
+🐭	0.6	mouse face
+🐮	0.6	cow face
+🐰	0.6	rabbit face
+🐱	0.6	cat face
+🐶	0.6	dog face
+🐷	0.6	pig face
+🐸	0.6	frog
+🐾	0.6	paw prints
+👀	0.6	eyes
+👂	0.6	ear
+👑	0.6	crown
+👜	0.6	handbag
+👩	0.6	woman
+👯	0.6	people with bunny ears
+👴	0.6	old man
+👾	0.6	alien monster
+💍	0.6	ring
+💬	0.6	speech balloon
+💯	0.6	hundred points
+💷	1.0	pound banknote
+📅	0.6	calendar
+📊	0.6	bar chart
+📌	0.6	pushpin
+📏	0.6	straight ruler
+📖	0.6	open book
+📗	0.6	green book
+📚	0.6	books
+📝	0.6	memo
+📦	0.6	package
+📶	0.6	antenna bars
+🔁	1.0	repeat button
+🔊	0.6	speaker high volume
+🔍	0.6	magnifying glass tilted left
+🔗	0.6	link
+🔟	0.6	keycap: 10
+🔢	0.6	input numbers
+🔤	0.6	input latin letters
+🔴	0.6	red circle
+🔵	0.6	blue circle
+🔶	0.6	large orange diamond
+🔷	0.6	large blue diamond
+🔺	0.6	red triangle pointed up
+🔼	0.6	upwards button
+🕐	0.6	one o’clock
+🕒	0.6	three o’clock
+🕔	0.6	five o’clock
+🕸	0.7	spider web
+🖊	0.7	pen
+🗺	0.7	world map
+🚀	0.6	rocket
+🚌	0.6	bus
+🚐	1.0	minibus
+🚗	0.6	automobile
+🚢	0.6	ship
+🚪	0.6	door
+🚰	1.0	potable water
+🚲	0.6	bicycle
+🛁	1.0	bathtub
+🛏	0.7	bed
+🛢	0.7	oil drum
+🟢	12.0	green circle
+🟣	12.0	purple circle
+🟦	12.0	blue square
+🤝	3.0	handshake
+🤸	3.0	person cartwheeling
+🥅	3.0	goal net
+🥚	3.0	egg
+🥜	3.0	peanuts
+🥤	5.0	cup with straw
+🥫	5.0	canned food
+🦆	3.0	duck
+🦇	3.0	bat
+🦈	3.0	shark
+🦊	3.0	fox
+🦋	3.0	butterfly
+🦘	11.0	kangaroo
+🦵	11.0	leg
+🧁	11.0	cupcake
+🧊	12.0	ice
+🧠	5.0	brain
+🧢	5.0	billed cap
+🧣	5.0	scarf
+🧥	5.0	coat
+🧦	5.0	socks
+🧭	11.0	compass
+🧮	11.0	abacus
+🧱	11.0	brick
+🧹	11.0	broom
+🧼	11.0	soap
+🩹	12.0	adhesive bandage
+🪁	12.0	kite

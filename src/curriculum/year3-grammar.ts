@@ -5,13 +5,14 @@
 // import: y3-speech
 import type { Topic } from './types';
 import { y3An } from './year3-an';
+import { y3Conjunctions } from './year3-conjunctions';
 import { y3Perfect } from './year3-perfect';
 import { y3Speech } from './year3-speech';
 
 export const Y3_GRAMMAR: Topic[] = [
   { id: 'y3-an', title: 'A or An', icon: '🅰️', subject: 'writing', year: 'year3', nc: 'Y3 English grammar: a or an according to whether the next word begins with a consonant or a vowel (Appendix 2)', gen: y3An },
   // slot: y3-wordfamily
-  // slot: y3-conjunctions
+  { id: 'y3-conjunctions', title: 'Time, Place and Cause', icon: '🔗', subject: 'writing', year: 'year3', nc: 'Y3 Grammar: conjunctions, adverbs and prepositions to express time, place and cause', gen: y3Conjunctions },
   { id: 'y3-perfect', title: 'Has Gone or Went', icon: '⏳', subject: 'writing', year: 'year3', nc: 'Y3 English grammar: the present perfect form of verbs in contrast to the past tense (Appendix 2)', gen: y3Perfect },
   { id: 'y3-speech', title: 'Inverted Commas', icon: '💬', subject: 'writing', year: 'year3', nc: 'Y3 English punctuation: introduction to inverted commas to punctuate direct speech (Appendix 2)', gen: y3Speech },
 ];

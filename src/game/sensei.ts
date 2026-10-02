@@ -38,3 +38,33 @@ export function weakestTopics(topics: Topic[], progress: Record<string, TopicPro
   const fresh = playable.filter(t => !played.includes(t));
   return [...played, ...fresh].slice(0, Math.min(n, playable.length));
 }
+
+const WEIGHT_MIN_PLAYED = 3;       // #909: fewer played topics than this and the draw stays uniform
+const UNPLAYED_SHARE = 0.2;        // #909: unplayed topics together keep this share of the draws
+
+/**
+ * Draw weights for a mixed pool (#909): a played topic weighs `1 + 2 × (1 − accuracy)` (1 to 3), so the fast
+ * modes lean on what the child finds hard; the unplayed topics together keep a 20 % share, split equally, so
+ * new material still turns up. Uniform (all 1) until three pool topics have been played — a new save, or a
+ * one-topic history, gets today's behaviour.
+ */
+export function poolWeights(pool: Topic[], progress: Record<string, TopicProgress>): number[] {
+  const acc = pool.map(t => accuracy(progress[t.id]));
+  const played = acc.filter(a => a !== null).length;
+  if (played < WEIGHT_MIN_PLAYED) return pool.map(() => 1);
+  const weights = acc.map(a => (a === null ? 0 : 1 + 2 * (1 - a)));
+  const unplayed = pool.length - played;
+  if (unplayed === 0) return weights;
+  const playedTotal = weights.reduce((s, w) => s + w, 0);
+  const each = (playedTotal * UNPLAYED_SHARE / (1 - UNPLAYED_SHARE)) / unplayed;
+  return weights.map((w, i) => (acc[i] === null ? each : w));
+}
+
+/** One draw from `pool` in proportion to `weights` (same length); falls back to uniform if they are unusable. */
+export function weightedPick<T>(pool: T[], weights: number[] | undefined, rng: () => number): T {
+  const total = weights && weights.length === pool.length ? weights.reduce((s, w) => s + w, 0) : 0;
+  if (!weights || !(total > 0)) return pool[Math.floor(rng() * pool.length)];
+  let r = rng() * total;
+  for (let i = 0; i < pool.length; i++) { r -= weights[i]; if (r < 0) return pool[i]; }
+  return pool[pool.length - 1];
+}
