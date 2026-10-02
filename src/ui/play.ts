@@ -208,7 +208,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
       else if (training) { if (r.won) recordTraining(o.year.id); }
       else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r));   // #911/#912
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
-      else recordEndless(o.year.id, r.score);
+      else if (o.mode !== 'relaxed') recordEndless(o.year.id, r.score);   // #937: a relaxed run writes no best
     }
     for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t);   // every mode teaches Sensei what is hard
     const bySubject = (s: Topic['subject']) =>

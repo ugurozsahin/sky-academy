@@ -44,8 +44,15 @@ function topbar(nav: Nav, rerender: () => void) {
 }
 
 /** #909: Sky Storm, Mixed Sprint and Boss Battle lean on topics this child has met and found hard. */
-function playMixed(nav: Nav, year: YearInfo, mode: 'endless' | 'sprint' | 'boss', pool: Topic[], progress: Record<string, TopicProgress>) {
+function playMixed(nav: Nav, year: YearInfo, mode: 'endless' | 'sprint' | 'boss' | 'relaxed', pool: Topic[], progress: Record<string, TopicProgress>) {
   nav.play({ year, mode, pool, weights: poolWeights(pool, progress) });
+}
+/** #910/#937: Sprint and Relaxed practice open a chooser first — "🎲 Mixed" or one topic from the open subject. */
+function chooseThenPlay(nav: Nav, year: YearInfo, subject: 'maths' | 'writing', mode: 'sprint' | 'relaxed', pool: Topic[], progress: Record<string, TopicProgress>) {
+  openChooser($('#island-overlay'), chooserTopics(year.id, subject), topic => {
+    sfx.tap();
+    topic ? nav.play({ year, mode, topic }) : playMixed(nav, year, mode, pool, progress);
+  }, { mixed: true, badge: trophyBadge(year, progress) });
 }
 /** #894: a Daily Dojo row read aloud, for a pre-reader who cannot read the challenge title on the card. */
 export function dojoRowLine(c: Challenge, progress: number): string {
@@ -145,10 +152,9 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
-      go: () => openChooser($('#island-overlay'), chooserTopics(year.id, subject), topic => {
-        sfx.tap();
-        topic ? nav.play({ year, mode: 'sprint', topic }) : playMixed(nav, year, 'sprint', subjectPool(), progress);
-      }, { mixed: true, badge: trophyBadge(year, progress) }) },
+      go: () => chooseThenPlay(nav, year, subject, 'sprint', subjectPool(), progress) },
+    { id: 'relaxed', mod: 'relaxed', vport: `<span class="vport emoji">🌱</span>`, title: MODES.relaxed.title, blurb: 'No lives, no clock',   // #937
+      go: () => chooseThenPlay(nav, year, subject, 'relaxed', subjectPool(), progress) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
       go: () => playMixed(nav, year, 'boss', subjectPool(), progress) },

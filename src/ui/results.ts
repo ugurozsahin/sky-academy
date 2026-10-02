@@ -27,6 +27,7 @@ export interface RunOutcome {
 export function resultMedal(r: RunOutcome): string {
   if (r.incomplete) return '💪';
   if (r.mode === 'endless') return r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉';
+  if (r.mode === 'relaxed') return '💪';   // #937: effort, never stars
   if (r.mode === 'sprint') return r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪';
   return r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
 }
