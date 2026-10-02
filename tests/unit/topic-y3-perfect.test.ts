@@ -29,6 +29,7 @@ const EXPECT: Record<string, [string, string[]]> = {
   'I ___ a gold medal in 2020.': ['won', ['have won', 'has won']],
   'I ___ a whale when I was five.': ['saw', ['have seen', 'has seen']],
   'She ___ no sweets since Monday.': ['has eaten', ['ate', 'have eaten']],
+  'My cat ___ nothing since lunch.': ['has eaten', ['ate', 'have eaten']],
   'We ___ ten shells so far.': ['have found', ['found', 'has found']],
   'I ___ the same coat since winter.': ['have worn', ['wore', 'has worn']],
   'Have you ever ___ a whale?': ['seen', ['saw', 'see']],
