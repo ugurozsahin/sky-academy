@@ -77,3 +77,35 @@ describe('mixed-pool weighting (#909)', () => {
     expect(weightedPick(pool, [1, 2], () => 0.99)).toBe(pool[5]);
   });
 });
+
+describe('Sensei brings back a topic not played for 14 days (#936)', () => {
+  const now = new Date(2026, 9, 20, 15, 30);
+  const day = (ago: number) => { const d = new Date(2026, 9, 20 - ago); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const weak = { 'y1-add': p(1, 3, 1, 10), 'y1-sub': p(1, 3, 2, 10), 'y1-bonds': p(1, 3, 3, 10) };
+  const base = (o: Record<string, TopicProgress> = {}) => ({ ...weak, ...o });
+  const ids = (pr: Record<string, TopicProgress>, at?: Date) => weakestTopics(Y1, pr, TRAIN_TOPICS, at).map(t => t.id);
+  it('14 days is stale, 13 is not', () => {
+    expect(ids(base({ 'y1-coins': { ...p(2, 3, 9, 10), last: day(14) } }), now)).toContain('y1-coins');
+    expect(ids(base({ 'y1-coins': { ...p(2, 3, 9, 10), last: day(13) } }), now)).not.toContain('y1-coins');
+  });
+  it('the other slots stay the weakest as today', () => {
+    expect(ids(base({ 'y1-coins': { ...p(2, 3, 9, 10), last: day(20) } }), now)).toEqual(['y1-add', 'y1-sub', 'y1-coins']);
+  });
+  it('an unstarred old topic, and one with no `last`, are not picked', () => {
+    expect(ids(base({ 'y1-coins': { ...p(0, 3, 9, 10), last: day(30) } }), now)).not.toContain('y1-coins');
+    expect(ids(base({ 'y1-coins': p(2, 3, 9, 10) }), now)).not.toContain('y1-coins');
+  });
+  it('two stale topics resolve to the older one', () => {
+    const pr = base({ 'y1-coins': { ...p(2, 3, 9, 10), last: day(15) }, 'y1-time': { ...p(2, 3, 9, 10), last: day(40) } });
+    expect(ids(pr, now)).toContain('y1-time');
+    expect(ids(pr, now)).not.toContain('y1-coins');
+  });
+  it('a stale topic already among the weakest changes nothing', () => {
+    const pr = base({ 'y1-add': { ...p(1, 3, 1, 10), last: day(30) } });
+    expect(ids(pr, now)).toEqual(ids(pr));
+  });
+  it('without `now` the result is today\'s, whatever `last` says', () => {
+    const pr = base({ 'y1-coins': { ...p(2, 3, 9, 10), last: day(30) } });
+    expect(ids(pr)).toEqual(['y1-add', 'y1-sub', 'y1-bonds']);
+  });
+});

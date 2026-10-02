@@ -7,7 +7,7 @@ import { certAlbumHTML, showStoredCertificate } from './certificate';
 import { sfx, say } from '../audio';
 import { SPRINT_SECONDS } from '../game/session';
 import { MODES } from '../game/modes';
-import { weakestTopics, poolWeights } from '../game/sensei';
+import { senseiTopics, poolWeights } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
@@ -130,7 +130,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   let subject = subjectInit;
   const tb = topbar(nav, () => islandScreen(nav, year, subject));
   const progress = safeRecord<TopicProgress>(d.progress);   // #95: same tolerance as mapScreen's totalStars
-  const weakest = weakestTopics(topicsFor(year.id), progress);
+  const weakest = senseiTopics(topicsFor(year.id), progress, new Date());
   // #95: the four per-year best/count fields have the same hazard as `progress` — a hand-edited or corrupted
   // "Restore" paste can carry any of them as anything, and `d.training[year.id]` throws the moment `d.training`
   // itself is not an object, which `importSave()`'s version-only check does not rule out.
