@@ -4,19 +4,26 @@
 // shell, `src/styles/overlays.css`) holding the island's own `.topics`/`.topic` cards (`src/styles/home.css`)
 // and a `.row` of buttons (`src/styles/shared.css`) — not `.modal.results`, which guard rail #35 keeps
 // single-sourced in `screen.ts`; the surrounding `.overlay` already scrolls on its own if the list is long.
-import type { Topic } from '../curriculum';
+import { topicsFor, type Topic, type YearInfo } from '../curriculum';
+import { trophyFor } from '../game/trophies';
+import type { TopicProgress } from '../storage/shape';
 import { $, $$ } from './dom';
 
 export interface ChooserOpts {
   /** When true, "🎲 Mixed" is drawn first and calls `onPick(null)`. */
   mixed: boolean;
+  /** Text drawn after a topic's name (its trophy, #912); empty for none. */
+  badge?: (t: Topic) => string;
 }
+
+/** Topics the chooser can offer — every non-tracing topic. Shared with the island's trophy count (#912) so the count and the list cannot drift. */
+export const chooserEligible = (t: Topic): boolean => t.input !== 'tracing';
 
 /** Opens a topic chooser inside `overlay` (a hidden `.overlay` element already in the DOM, the pattern
  *  `src/ui/profiles.ts`'s `#profile-overlay` uses). Back, or picking a card, hides and empties it again. */
 export function openChooser(overlay: HTMLElement, topics: Topic[], onPick: (topic: Topic | null) => void, opts: ChooserOpts): void {
   const mixedCard = opts.mixed ? `<button class="topic" data-mixed><span class="ic">🎲</span><b>Mixed</b></button>` : '';
-  const cards = topics.map(t => `<button class="topic" data-id="${t.id}"><span class="ic">${t.icon}</span><b>${t.title}</b></button>`).join('');
+  const cards = topics.map(t => `<button class="topic" data-id="${t.id}"><span class="ic">${t.icon}</span><b>${t.title}</b>${opts.badge?.(t) ?? ''}</button>`).join('');
   overlay.hidden = false;
   overlay.innerHTML = `
     <div class="modal">
@@ -31,4 +38,18 @@ export function openChooser(overlay: HTMLElement, topics: Topic[], onPick: (topi
     onPick(picked);
   }));
   $('#chooser-back', overlay).addEventListener('click', close);
+}
+
+type Progress = Record<string, TopicProgress>;
+
+/** A topic's trophy as a chooser badge — a leading space and the emoji, or '' below one correct answer (#912). */
+export const trophyBadge = (year: YearInfo, progress: Progress) => (t: Topic): string => {
+  const k = trophyFor(progress[t.id]?.sprint ?? 0, year);
+  return k ? ` ${k}` : '';
+};
+
+/** The island header's ` · 🏆 n/m`: m counts the chooser's topics across both subject tabs, n those with a trophy (#912). */
+export function trophyCount(year: YearInfo, progress: Progress): string {
+  const all = topicsFor(year.id).filter(chooserEligible);
+  return all.length ? ` · 🏆 ${all.filter(t => trophyBadge(year, progress)(t)).length}/${all.length}` : '';
 }

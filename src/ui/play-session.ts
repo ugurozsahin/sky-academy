@@ -15,7 +15,7 @@ import { Session, type SessionOpts, type SessionResult } from '../game/session';
 import { scaled } from '../game/speed';   // #32: test-only time compression
 import { wideFor } from '../curriculum/util';   // #482: the same wide-vs-narrow rule wordQ uses, not a second one
 import { canHear, haptic, onVoiceStateChange, say, sfx } from '../audio';
-import type { CertInfo } from './certificate'; import { firstQuestionLine } from './results';   // #897, kept on this line: play-session.ts is at its #714 ratchet cap
+import type { CertInfo } from './certificate'; import { firstQuestionLine, type ResultCandidate } from './results';   // #897; one line: at its #714 cap
 import { $, esc } from './dom';
 import { fontReady } from './font';   // #44: the canvas bakes in whatever face is loaded — wait for Fredoka
 import { correctionLine, hintText, promptHTML, promptMode, setHint, stageHTML, type Hud, type Outcome } from './hud';
@@ -53,7 +53,7 @@ export interface ResultPayout {
   newBest: boolean; dojo: DojoOutcome | null; fresh: string[]; streak: number; cert: CertInfo | null;
   /** Whether `cert`'s write actually reached the store (#470) — see `play.ts`'s `commitResult()`. `cert`
    *  itself stays what was earned regardless; only this says whether the album kept it. */
-  certSaved: boolean; dojoSaved: boolean;   // dojoSaved: same shape, for recordGameEnd()'s write instead (#518)
+  certSaved: boolean; dojoSaved: boolean; candidates: ResultCandidate[];   // dojoSaved: same, for recordGameEnd()'s write (#518)
 }
 
 /** The HUD elements the callbacks write to — play.ts owns them and passes its own `els` straight in. */

@@ -2933,6 +2933,23 @@ test.describe('Sky Ninja Academy', () => {
     expect(after.topic.plays ?? 0, 'a Sprint is not a mission play').toBe(before.topic?.plays ?? 0);
   });
 
+  test('Ninja Sprint: a topic Sprint earns a trophy, shown on the results, the chooser and the island header (#912)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('.isl-head small')).toContainText(/🏆 0\/\d+/);
+    await page.click('#sprint');
+    await expect(page.locator('#island-overlay .topic[data-id="y1-bonds"]')).not.toContainText('🥉');
+    await page.click('#island-overlay .topic[data-id="y1-bonds"]');
+    await expect(page.locator('.play')).toBeVisible();
+    for (let i = 0; i < 3; i++) await solveCurrent(page);   // 3 correct: bronze for Year 1 (6 is silver)
+    await page.evaluate(() => window.__sna.session.tick(60_000));
+    await expect(page.locator('.results')).toContainText('New trophy: 🥉 Number Bonds!');
+    await page.click('#home');
+    await expect(page.locator('.isl-head small')).toContainText(/🏆 1\/\d+/);
+    await page.click('#sprint');
+    await expect(page.locator('#island-overlay .topic[data-id="y1-bonds"]')).toContainText('🥉');
+  });
+
   test('Ninja Sprint chooser: Back closes it without starting a game (#910)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');

@@ -9,7 +9,7 @@ import { topicsFor, type Topic, type YearInfo } from '../curriculum';
 import { load, safeRecord, type TopicProgress } from '../storage';
 import { $ } from './dom';
 import { resultsHTML } from './overlays';
-import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, scoreLine, type ResultCandidate } from './results';
+import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, scoreLine, spokenLine } from './results';
 import { dojoRowsHTML } from './memory';
 import { stickersHTML } from './screen';
 import { deliverCertificate, drawCertificate } from './certificate';
@@ -17,7 +17,7 @@ import type { ResultPayout } from './play-session';
 
 /** The payout a practice ("Fix my mistakes", #930) run commits — nothing at all: no dojo outcome was ever
  *  computed, so `dojo: null` says that outright rather than a placeholder value pretending one exists. */
-export const PRACTICE_PAYOUT: ResultPayout = { newBest: false, dojo: null, fresh: [], streak: 0, cert: null, certSaved: false, dojoSaved: false };
+export const PRACTICE_PAYOUT: ResultPayout = { newBest: false, dojo: null, fresh: [], streak: 0, cert: null, certSaved: false, dojoSaved: false, candidates: [] };
 
 /** Everything the results overlay needs from the screen around it. Function-valued where the screen owns the state. */
 export interface ResultsScreenDeps {
@@ -60,7 +60,7 @@ function nextUnstarredTopic(year: YearInfo, topic: Topic | undefined): Topic | n
  */
 export function createResultsScreen(deps: ResultsScreenDeps) {
   const { training, year, topic, av, name, els, hold, later, toast, replay, goHome, cleanup, next, fix, practice } = deps;
-  return function showResults(r: SessionResult, payout: ResultPayout, candidates: ResultCandidate[] = []) {
+  return function showResults(r: SessionResult, payout: ResultPayout) {
     // Terminal, and `beats: false` because of it (PR #474 review, B1): the game is over — syncPaused() also
     // reads session.ended, so nothing here can undo the pause — and the beats below (the sticker jingle, the
     // certificate toasts' own auto-hide) belong to this overlay rather than to the held game, so they still run.
@@ -78,8 +78,8 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
     say(scoreLine(r), false, { queue: true });   // #897: how they did, not only a praise line — queued after the headline
-    const lines = resultsLines(candidates);   // #896: belt > island > trophy > best > rest, at most two
-    for (const l of lines) say(l.text, false, { queue: true });   // queued so a candidate never cuts the headline off
+    const lines = resultsLines(payout.candidates);   // #896: belt > island > trophy > best > rest, at most two
+    for (const l of lines) say(spokenLine(l), false, { queue: true });   // queued so a candidate never cuts the headline off
     // `certSaved` (#470) is read the instant after `fileCertificate`'s own write, inside `commitResult()` —
     // per `isWriteFailing()`'s own contract of reflecting only the last attempt — a refusal is not offered to
     // the child as a keepsake the album does not actually hold. `cert` itself stays what was earned regardless:

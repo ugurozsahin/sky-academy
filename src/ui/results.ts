@@ -4,6 +4,9 @@
 import { MODES, type Mode } from '../game/modes';
 import type { Question, Topic } from '../curriculum';
 import { esc } from './dom';
+import { load, recordSprint, recordTopicSprint } from '../storage';
+import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
+import type { YearInfo } from '../curriculum';
 
 /** How a finished run scored — the fields the medal reads. */
 export interface RunOutcome {
@@ -60,7 +63,8 @@ export function resultHeadline(
  * A results-screen announcement (#896) — the new-best line, a belt, a trophy, island master or the rest
  * prompt. Each is its own later ticket (#933, #951, #912, #952, #940); this only makes room for them.
  */
-export interface ResultCandidate { kind: 'belt' | 'island' | 'trophy' | 'best' | 'rest'; text: string }
+/** `spoken` is what is said when it differs from what is shown (an emoji is not read aloud well, #912). */
+export interface ResultCandidate { kind: 'belt' | 'island' | 'trophy' | 'best' | 'rest'; text: string; spoken?: string }
 
 /** Register order (§R of #896): belt outranks island, island outranks trophy, and so on. */
 const RESULT_LINE_ORDER: ResultCandidate['kind'][] = ['belt', 'island', 'trophy', 'best', 'rest'];
@@ -135,4 +139,28 @@ export function scoreLine(r: { mode: Mode; won: boolean; correct: number; stars:
 export function firstQuestionLine(q: Question, topic: Topic | undefined, questionsAsked: number, practice: boolean, prev: Question | null): string {
   const line = q.say ?? q.prompt;
   return topic && questionsAsked === 1 && !practice && q !== prev ? `${topic.title}! ${line}` : line;
+}
+
+/**
+ * The results announcement for a topic Sprint that raised the topic's trophy tier (#912), or null: a Sprint
+ * that does not raise it announces nothing. Shown with the emoji, spoken with the metal's name.
+ */
+export function trophyCandidate(topic: Topic, year: YearInfo, before: number, after: number): ResultCandidate | null {
+  const t = raisesTrophy(before, after, year) ? trophyFor(after, year) : null;
+  return t ? { kind: 'trophy', text: `New trophy: ${t} ${topic.title}!`, spoken: `New ${TROPHY_WORD[t]} trophy for ${topic.title}!` } : null;
+}
+
+/** What is said for a results line: its `spoken` form when it has one, else its text. */
+export const spokenLine = (l: ResultCandidate): string => l.spoken ?? l.text;
+
+/**
+ * Record a Sprint's result (#911) and work out its announcement (#912): a topic Sprint writes the topic's own
+ * best and may announce a raised trophy; a mixed Sprint writes the year's best. Returns `newBest` and the
+ * results candidates, so `commitResult()` stays one line for it.
+ */
+export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r: { correct: number; score: number }): { newBest: boolean; candidates: ResultCandidate[] } {
+  if (!topic) return { newBest: recordSprint(year.id, r.score), candidates: [] };
+  const before = load().progress[topic.id]?.sprint ?? 0, newBest = recordTopicSprint(topic.id, r.correct);
+  const t = newBest ? trophyCandidate(topic, year, before, r.correct) : null;
+  return { newBest, candidates: t ? [t] : [] };
 }

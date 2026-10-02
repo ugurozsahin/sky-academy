@@ -17,7 +17,7 @@
     "src/game/dojo.ts::measure": 35,
     "src/main.ts::(anonymous)": 16,
     "src/storage/migrate.ts::sanitizeTypes": 39,
-    "src/ui/play-results.ts::showResults": 23,
+    "src/ui/play-results.ts::showResults": 22,
     "src/ui/play.ts::playScreen": 27,
     "src/ui/profiles.ts::(anonymous)": 16,
     "src/ui/visuals.ts::coinSVG": 16,

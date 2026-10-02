@@ -11,7 +11,7 @@ import { weakestTopics, poolWeights } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
-import { openChooser } from './chooser';
+import { chooserEligible, openChooser, trophyBadge, trophyCount } from './chooser';
 import { $, $$, capDigits, render, stars } from './dom';
 import type { PlayOpts } from './play';
 
@@ -131,7 +131,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   const sprint = safeRecord<number>(d.sprint), boss = safeRecord<number>(d.boss), memory = safeRecord<number>(d.memory);
   // #908: Sky Storm, Ninja Sprint and Boss Battle draw only from the open tab's topics — read at tap time via
   // `subject` so a tab switch is honoured without rebuilding the menu.
-  const subjectPool = () => topicsFor(year.id, subject).filter(t => t.input !== 'tracing');
+  const subjectPool = () => topicsFor(year.id, subject).filter(chooserEligible);
   // The island menu in one table (#26): adding a mode button is one entry, not a new <button> line plus a new
   // click handler. The three battle modes take their title from MODES; Sensei-training and Memory-Match are
   // separate flows (not a Session.Mode), so they live here too rather than being forced into MODES.
@@ -148,7 +148,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => openChooser($('#island-overlay'), subjectPool(), topic => {
         sfx.tap();
         topic ? nav.play({ year, mode: 'sprint', topic }) : playMixed(nav, year, 'sprint', subjectPool(), progress);
-      }, { mixed: true }) },
+      }, { mixed: true, badge: trophyBadge(year, progress) }) },
     { id: 'boss', mod: 'boss', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.boss.title, blurb: `Knock out Hammer Man · KOs ${boss[year.id] ?? 0}`,
       go: () => playMixed(nav, year, 'boss', subjectPool(), progress) },
@@ -167,7 +167,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     <div class="isl-head">
       <button class="icon-btn" id="back" aria-label="Back to the sky map">←</button>
       <span class="isl-art" style="background-image:url(&quot;${islandArt(year)}&quot;)"></span>
-      <div><b>${year.title} Island</b><small>${year.age} · ${year.blurb}</small></div>
+      <div><b>${year.title} Island</b><small>${year.age} · ${year.blurb}${trophyCount(year, progress)}</small></div>
     </div>
     <div class="tabs" role="tablist">
       <button class="tab${subject === 'maths' ? ' on' : ''}" data-s="maths" role="tab">🔢 Maths</button>
