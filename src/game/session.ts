@@ -46,7 +46,7 @@ export interface Miss { topic: string; q: Question; picked: string | null }
  *  reverses it, so what `recordGameEnd` prepends is newest-first, matching every other reader of `Slip`. */
 export const missSlips = (misses: readonly Miss[]): Omit<Slip, 'at'>[] =>
   [...misses].reverse().map(m => ({ topic: m.topic, prompt: m.q.listen ?? m.q.prompt, answer: m.q.answer, picked: m.picked ?? '' }));
-export interface SessionResult { mode: Mode; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number; incomplete?: boolean; misses: Miss[] }
+export interface SessionResult { mode: Mode; stage: number; won: boolean; score: number; stars: number; stageStars: number[]; correct: number; attempts: number; bestCombo: number; questions: number; coins: number; incomplete?: boolean; misses: Miss[] }
 
 /**
  * The three-star bar, from an accuracy in 0..1 — the **one** definition (#397 review round 2, B2).
@@ -71,7 +71,13 @@ export interface DeckItem { topic: Topic; q: Question }
  * whether or not the boss still has HP left — nothing pairs `deck` with `mode: 'boss'` today, so this is stated
  * rather than tested, the same way the rest of this comment is.
  */
-export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean; slower?: boolean }
+/**
+ * "Retry stage N" (#931): a lost mission restarts at stage `stage` with full lives and the stage stars it had
+ * already earned (`stageStars`, one per cleared stage). Those stars count towards the final star rating but
+ * their coins were paid in the lost run, so `buildResult()` leaves them out of the coins.
+ */
+export interface Resume { stage: number; stageStars: number[] }
+export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; resume?: Resume; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean; slower?: boolean }
 
 /**
  * The "Fix my mistakes" deck (#930): the 5 most recent misses, newest first — `misses` is already newest-last
@@ -102,6 +108,7 @@ export class Session {
   private rng: () => number; readonly stages: number;
   constructor(public o: SessionOpts, private ev: SessionEvents) {
     this.lives = o.year.lives; this.rng = o.rng ?? Math.random; this.stages = o.stages ?? o.year.speeds.length;
+    if (o.resume) { this.stage = o.resume.stage; this.stageStars = [...o.resume.stageStars]; }
     this.timeLeft = this.spec.timed ? (o.seconds ?? SPRINT_SECONDS) * 1000 : 0;
     this.bossMax = this.spec.boss ? (o.bossHp ?? BOSS_HP) : 0; this.bossHp = this.bossMax;
   }
@@ -311,8 +318,9 @@ export class Session {
     // End-stars and coins come from the mode's own rules in modes.ts (coins reads back the stars just computed).
     const end = { won: safeWon, score: this.score, correct: this.correct, accuracy: acc, stageStarsTotal: total, stages: this.stages, stars: 0, year: this.o.year };
     const stars = this.spec.stars(end);
-    const coins = this.spec.coins({ ...end, stars });
-    return { mode: this.o.mode, won: safeWon, score: this.score, stars, stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins, incomplete, misses: [...this.misses] };
+    const paid = (this.o.resume?.stageStars ?? []).reduce((s, x) => s + x, 0);   // #931: a retry's carried stars were paid already
+    const coins = this.spec.coins({ ...end, stars, stageStarsTotal: total - paid });
+    return { mode: this.o.mode, stage: this.stage, won: safeWon, score: this.score, stars, stageStars, correct: this.correct, attempts: this.attempts, bestCombo: this.bestCombo, questions: this.questionsAsked, coins, incomplete, misses: [...this.misses] };
   }
   /**
    * #484: the moment a staged mission's last question is decided — inside `markCorrect()`/`markWrong()`/

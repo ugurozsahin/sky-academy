@@ -218,6 +218,11 @@ describe('resultsAction', () => {
     expect(resultsAction({ ...base, won: false, lostAtStage: undefined, next: topic })).toBeNull();
   });
 
+  it('"retry" outranks "fix" on a lost mission, and a loss before stage 3 falls back to "fix" (#931)', () => {
+    expect(resultsAction({ ...base, won: false, lostAtStage: 4, misses: 3, next: topic })).toEqual({ kind: 'retry', stage: 4 });
+    expect(resultsAction({ ...base, won: false, lostAtStage: 2, misses: 3, next: topic })).toEqual({ kind: 'fix' });
+  });
+
   it('a lost training run never offers "retry" — training has no stage to repeat', () => {
     expect(resultsAction({ ...base, won: false, training: true, lostAtStage: 5 })).toBeNull();
   });

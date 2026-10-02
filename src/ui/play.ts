@@ -1,7 +1,7 @@
 import { avatarById, praiseLine, SENSEI, SENSEI_LINES, VILLAIN } from '../avatars';
-import { topicById, topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
+import { topicById, topicsFor, type Question, type Topic } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
-import { missSlips, type Mode, type SessionResult, type DeckItem, type Miss } from '../game/session';
+import { missSlips, type SessionResult, type Miss, type Resume, type SessionOpts } from '../game/session';
 import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import { Tracer, traceFeedback } from '../game/tracing';
@@ -20,9 +20,9 @@ import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
-export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; practice?: boolean }   // pool = Sensei training
+export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume'>;   // pool = Sensei training; resume = #931
 
-export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (misses: Miss[]) => void) {
+export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (m: Miss[]) => void, retry: (r: Resume) => void) {
   const d = load(); const av = avatarById(d.avatar);
   const trailItem = equippedItem(wallet(), 'trail');
   const skin = trailItem?.trail;   // shop slice-trail skin (#6); undefined = the avatar's element colours
@@ -81,14 +81,14 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // this object is built — the same TDZ-safe pattern `mounted` below uses for `hooks`.
   const showResults = createResultsScreen({
     training, year: o.year, topic: o.topic, av, name: d.name, els, hold: (open, beats) => playSession.hold(open, beats),
-    later, toast, replay, goHome, cleanup, next, fix, practice: !!o.practice,
+    later, toast, replay, goHome, cleanup, next, fix, retry, practice: !!o.practice,
   });
 
   // #36: the Session callbacks — the question beat, the outcome beat, the sprint clock, the boss reactions —
   // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
   const playSession = createPlaySession({
-    mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, slower: d.settings.slow,
+    mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, resume: o.resume, slower: d.settings.slow,
     pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
   }, {
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
