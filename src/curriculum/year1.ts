@@ -12,6 +12,7 @@ import {
   gapLetters, gapQ, spellQ, sentGen, type Sent, PUNCT_SENTS, LETTERS, CVC, DIGRAPHS, Y1_CEW,
   soundQ, PHASE3, PHASE5, SPLIT,
 } from './util';
+import { y1SkipAnyOrder } from './year1-skip-anyorder';
 
 // ---------- Year 1 maths ----------
 const y1Bonds: Generator = (d, rng) => {
@@ -84,6 +85,7 @@ const y1Missing: Generator = (d, rng) => {
   return numQ(rng, p, ans, { min: 0, max: 20, ...q(p) });
 };
 const y1Skip: Generator = (d, rng) => {
+  if (d >= 2 && rng() < 1 / 3) return y1SkipAnyOrder(rng); // "Slice every multiple of 5/10" (#920)
   const step = d === 1 ? 2 : d === 2 ? pick(rng, [2, 5, 10]) : pick(rng, [2, 5, 10]);
   // The answer is the fourth term, so the start has to leave room for three more steps inside the `max: 100`
   // this question declares (#366). It did not: `step * 8` in tens started at 80, so "80, 90, 100, ?" answered
@@ -354,7 +356,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year1', nc: 'Y1 A&S: subtract within 20', gen: y1Sub },
   { id: 'y1-missing', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year1', nc: 'Y1 A&S: missing number problems', gen: y1Missing },
   { id: 'y1-doubles', title: 'Doubles', icon: '👯', subject: 'maths', year: 'year1', nc: 'Y1 A&S: doubles', gen: y1Doubles },
-  { id: 'y1-skip', title: 'Count in 2s, 5s, 10s', icon: '🦘', subject: 'maths', year: 'year1', nc: 'Y1 NPV: count in multiples', gen: y1Skip },
+  { id: 'y1-skip', title: 'Count in 2s, 5s, 10s', icon: '🦘', subject: 'maths', year: 'year1', nc: 'Y1 NPV: count in multiples', sequenceFrom: 2, gen: y1Skip },
   { id: 'y1-moreless', title: 'One More, One Less', icon: '🔼', subject: 'maths', year: 'year1', nc: 'Y1 NPV: one more/less to 100', gen: y1MoreLess },
   { id: 'y1-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year1', nc: 'Y1 NPV: numbers to 20 in words', gen: y1Words },
   { id: 'y1-half', title: 'Halves & Quarters', icon: '🍕', subject: 'maths', year: 'year1', nc: 'Y1 Fractions: half, quarter', gen: y1Half },

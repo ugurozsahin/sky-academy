@@ -4902,6 +4902,28 @@ test('y2-oddeven "Slice Them All": every target sliced in any order completes th
   await expect.poll(() => page.evaluate(() => window.__sna.session.score)).toBeGreaterThan(scoreBefore);
 });
 
+// #920: the any-order form on `y1-skip`. Not @smoke: workflows.test.ts pins the smoke subset at eight paths (#854).
+test('y1-skip "Slice every multiple of 5/10": every target sliced in any order completes the card (#920)', async ({ page }) => {
+  await seedPlayer(page);
+  await startTopic(page, 'year1', 'y1-skip');
+  const q = await page.evaluate(() => {
+    const s = window.__sna.session;
+    s.stage = 2; s.index = 0;
+    for (let i = 0; i < 60; i++) { s.nextQuestion(); if (s.current!.anyOrder) break; }
+    return { anyOrder: !!s.current!.anyOrder, prompt: s.current!.prompt, sequence: s.current!.sequence! };
+  });
+  expect(q.anyOrder, 'an any-order y1-skip card never drew in 60 tries at d2').toBe(true);
+  expect(q.prompt).toMatch(/^Slice every multiple of (5|10)$/);
+  await expect(page.locator('.prompt')).toContainText(q.prompt);
+  await expectFitsViewport(page, `y1-skip any-order card ("${q.prompt}")`);
+  const scoreBefore = await page.evaluate(() => window.__sna.session.score);
+  for (const label of [...q.sequence].reverse()) {
+    await waitForLabel(page, label);
+    expect(await page.evaluate((l) => window.__sna.arena!.hitLabel(l), label)).toBe(true);
+  }
+  await expect.poll(() => page.evaluate(() => window.__sna.session.score)).toBeGreaterThan(scoreBefore);
+});
+
 // #1051: the KS2 card holds a long prompt on a phone. The unit rule (`tests/unit/ks2-card-budget.test.ts`) measures
 // text with an advance table; this ties it to the real card — the width it assumes, and that three lines fit.
 test.describe('a KS2 word-problem card fits a phone (#1051)', () => {

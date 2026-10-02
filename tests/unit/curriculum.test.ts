@@ -1115,7 +1115,7 @@ describe('y1-skip counts to 100 and no further, answer and decoys alike (#366)',
     const t = TOPICS.find(x => x.id === 'y1-skip')!; const r = rng(366);
     let seen = 0;
     for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 800; i++) {
-      const q = t.gen(d, r);
+      const q = t.gen(d, r); if (q.anyOrder) continue; // #920: its own file covers that form
       const terms = q.prompt.match(/^(\d+), (\d+), (\d+), \?$/);
       expect(terms, `d${d}: unexpected prompt shape "${q.prompt}"`).not.toBeNull();
       const [a, b, c] = terms!.slice(1, 4).map(Number);
@@ -1128,13 +1128,13 @@ describe('y1-skip counts to 100 and no further, answer and decoys alike (#366)',
       }
       seen++;
     }
-    expect(seen, 'the sweep drew no cards — this rail would pass vacuously').toBe(2400);
+    expect(seen, 'the sweep drew no cards — this rail would pass vacuously').toBeGreaterThan(1600);
   });
 
   it('keeps every decoy a near miss, so the answer is never the only plausible bubble', () => {
     const t = TOPICS.find(x => x.id === 'y1-skip')!; const r = rng(366 + 1);
     for (const d of [1, 2, 3] as Difficulty[]) for (let i = 0; i < 800; i++) {
-      const q = t.gen(d, r); const ans = Number(q.answer);
+      const q = t.gen(d, r); if (q.anyOrder) continue; const ans = Number(q.answer);
       expect(q.options, `d${d}: "${q.prompt}" lost a bubble to the range filter`).toHaveLength(4);
       // `nearby()` never strays further than ±10, and the widest declared decoy is one more step (≤ 10). A
       // bubble outside that band is the fallback fill scraping the bottom of the range — the #366 card.
@@ -1147,7 +1147,7 @@ describe('y1-skip counts to 100 and no further, answer and decoys alike (#366)',
     const t = TOPICS.find(x => x.id === 'y1-skip')!; const r = rng(366 + 2);
     const highest: Record<number, number> = {};
     for (const d of [2, 3] as Difficulty[]) for (let i = 0; i < 800; i++) {
-      const q = t.gen(d, r);
+      const q = t.gen(d, r); if (q.anyOrder) continue; // #920: its own file covers that form
       highest[d] = Math.max(highest[d] ?? 0, Number(q.answer));
     }
     expect(highest[3], 'd3 reaches no further than d2 — the stretch stage is no longer a stretch')

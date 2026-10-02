@@ -35,7 +35,7 @@ Maths:
 - y1-sub — within 20, incl. 0
 - y1-missing — missing-number problems
 - y1-doubles — double within 20
-- y1-skip — count in 2s/5s/10s
+- y1-skip — count in 2s/5s/10s; at d2–d3 one card in three is "Slice every multiple of 5/10" (any order, #920)
 - y1-moreless — to 100
 - y1-words — 1–20 in words
 - y1-half — ½, ¼ of quantities
