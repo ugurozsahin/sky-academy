@@ -117,6 +117,16 @@ export function mapScreen(nav: Nav) {
   $('#who').addEventListener('click', () => { sfx.tap(); nav.profiles(); });
 }
 
+/** #932: the Legend run menu row — only with a 3★ topic in hand; opens #910's chooser on exactly those topics, no Mixed. */
+function legendRow(nav: Nav, year: YearInfo, progress: Record<string, TopicProgress>) {
+  const list = topicsFor(year.id).filter(t => chooserEligible(t) && (progress[t.id]?.stars ?? 0) >= 3);
+  const crowned = (t: Topic) => !!progress[t.id]?.crown;
+  const pick = (t: Topic | null) => { if (t) { sfx.tap(); nav.play({ year, mode: 'mission', topic: t, legend: true }); } };
+  return list.length ? [{ id: 'legend', mod: '', vport: '<span class="vport emoji">👑</span>', title: 'Legend run',
+    blurb: `Hardest questions on your 3★ topics · 👑 ${list.filter(crowned).length}`,
+    go: () => openChooser($('#island-overlay'), list, pick, { mixed: false, badge: t => crowned(t) ? ' 👑' : '' }) }] : [];
+}
+
 /** Island: topics for one year group + its Sky Storm. */
 export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'writing' = 'maths') {
   const d = load();
@@ -132,16 +142,15 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
   // #908: Sky Storm, Ninja Sprint and Boss Battle draw only from the open tab's topics — read at tap time via
   // `subject` so a tab switch is honoured without rebuilding the menu.
   const subjectPool = () => topicsFor(year.id, subject).filter(chooserEligible);
-  // The island menu in one table (#26): adding a mode button is one entry, not a new <button> line plus a new
-  // click handler. The three battle modes take their title from MODES; Sensei-training and Memory-Match are
-  // separate flows (not a Session.Mode), so they live here too rather than being forced into MODES.
+  // The island menu in one table (#26): a mode button is one entry. The battle modes take their title from MODES;
+  // Sensei-training, Memory-Match and the Legend run (#932) are separate flows, so they live here too.
   const menu: { id: string; mod: string; vport: string; title: string; blurb: string; go: () => void }[] = [
     { id: 'train', mod: 'train', vport: `<span class="vport"><img src="${SENSEI.img}" alt="${SENSEI.name}"></span>`,
       title: 'Train with Sensei', blurb: `Your trickiest topics: ${weakest.map(t => t.icon).join(' ')} · sessions ${training[year.id] ?? 0}`,
       go: () => { say(`Sensei says: let's train ${weakest.map(t => t.title).join(', ')}`); nav.play({ year, mode: 'mission', pool: weakest }); } },
     { id: 'endless', mod: '', vport: `<span class="vport"><img src="${VILLAIN.img}" alt=""></span>`,
       title: MODES.endless.title, blurb: `Endless battle vs Hammer Man · best ${endless[year.id] ?? 0}`,
-      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) },
+      go: () => playMixed(nav, year, 'endless', subjectPool(), progress) }, ...legendRow(nav, year, progress),
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
@@ -187,7 +196,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     $('#topics').innerHTML = list.map(t => { const p = progress[t.id]; return `
       <button class="topic" data-id="${t.id}" data-subject="${t.subject}" title="${t.nc}">
         <span class="ic">${t.icon}</span><b>${t.title}</b>
-        ${stars(p?.stars ?? 0)}${t.input === 'tracing' ? '<small class="pill">tracing</small>' : ''}
+        ${stars(p?.stars ?? 0)}${t.input === 'tracing' ? '<small class="pill">tracing</small>' : p?.crown ? '<small class="pill">👑</small>' : ''}
       </button>`; }).join('');
     $$('.topic').forEach(b => b.addEventListener('click', () => { const t = list.find(x => x.id === b.dataset.id)!; sfx.tap(); nav.play({ year, topic: t, mode: 'mission' }); }));
   };

@@ -6,7 +6,7 @@ import { MODES } from '../game/modes';
 import { gameSpeed, scaled, setGameSpeed } from '../game/speed';   // #32: test-only time compression
 import { Tracer, traceFeedback } from '../game/tracing';
 import {
-  isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTopic, recordTraining, save, touchStreak, wallet,
+  isReadOnlySave, isWriteFailing, load, recordAccuracy, recordBossWin, recordCert, recordEndless, recordGameEnd, recordTraining, save, touchStreak, wallet,
 } from '../storage';
 import { equippedItem } from '../game/shop';
 import { canHear, haptic, hush, say, sfx, sliceFx } from '../audio';
@@ -15,12 +15,12 @@ import { pushBackGuard, screenScope } from './screen';
 import { createHud } from './hud';
 import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
-import { recordSprintOutcome, type ResultCandidate } from './results';
+import { recordMission, recordSprintOutcome, type ResultCandidate } from './results';
 import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
-export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; practice?: boolean }   // pool = Sensei training
+export interface PlayOpts { year: YearInfo; topic?: Topic; mode: Mode; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; practice?: boolean; legend?: boolean }
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (misses: Miss[]) => void) {
   const d = load(); const av = avatarById(d.avatar);
@@ -88,8 +88,8 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
   const playSession = createPlaySession({
-    mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, slower: d.settings.slow,
-    pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
+    mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, legend: o.legend,
+    slower: d.settings.slow, pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
   }, {
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
     arena: () => arena,
@@ -204,7 +204,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     // `recordDuel`. A phantom `plays` increment or an unearned best score would otherwise stick around forever
     // and skew `parents.ts`'s "topics tried" count and `sensei.ts`'s weakest-topic ranking.
     if (!r.incomplete) {
-      if (o.mode === 'mission' && o.topic) recordTopic(o.topic.id, r.stars, r.score);
+      if (o.mode === 'mission' && o.topic) recordMission(o.topic.id, r, !!o.legend);
       else if (training) { if (r.won) recordTraining(o.year.id); }
       else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r));   // #911/#912
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }

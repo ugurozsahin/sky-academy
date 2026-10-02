@@ -636,6 +636,31 @@ test.describe('Sky Ninja Academy', () => {
     expect(spoken.length, 'the next question\'s own prompt was spoken after the correction').toBeGreaterThan(at + 1);
   });
 
+  test('Legend run: only with a 3★ topic; winning one crowns the topic card (#932)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'y1-add': { stars: 3, best: 100, plays: 1 } } });
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('#legend')).toBeVisible();
+    await expect(page.locator('.topic[data-id="y1-add"] .pill')).toHaveCount(0);
+    await page.click('#legend');
+    await expect(page.locator('#island-overlay .topic')).toHaveCount(1);
+    await page.click('#island-overlay .topic[data-id="y1-add"]');
+    await expect(page.locator('.play')).toBeVisible();
+    await winMission(page);
+    await page.evaluate(() => (window as any).__sna.session.ended);
+    const crown = await page.waitForFunction(() => JSON.parse(localStorage.getItem('sna:v1')!).progress['y1-add']?.crown === true);
+    expect(crown).toBeTruthy();
+    await page.reload();
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('.topic[data-id="y1-add"] .pill')).toHaveText('👑');
+  });
+
+  test('no Legend run row without a 3★ topic (#932)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'y1-add': { stars: 2, best: 100, plays: 1 } } });
+    await page.click('.island[data-year="year1"]');
+    await expect(page.locator('.mode-grid')).toBeVisible();
+    await expect(page.locator('#legend')).toHaveCount(0);
+  });
+
   test('Ninja Sprint speaks no correction line after a wrong slice (#893)', async ({ page }) => {
     await captureSpeech(page);
     await seedPlayer(page);

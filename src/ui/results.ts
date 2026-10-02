@@ -4,7 +4,7 @@
 import { MODES, type Mode } from '../game/modes';
 import type { Question, Topic } from '../curriculum';
 import { esc } from './dom';
-import { load, recordSprint, recordTopicSprint } from '../storage';
+import { load, recordCrown, recordSprint, recordTopic, recordTopicSprint } from '../storage';
 import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
 import type { YearInfo } from '../curriculum';
 
@@ -163,4 +163,10 @@ export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r:
   const before = load().progress[topic.id]?.sprint ?? 0, newBest = recordTopicSprint(topic.id, r.correct);
   const t = newBest ? trophyCandidate(topic, year, before, r.correct) : null;
   return { newBest, candidates: t ? [t] : [] };
+}
+
+/** A finished mission's record; a *won* Legend run also crowns the topic (#932), a lost one changes nothing more. */
+export function recordMission(topicId: string, r: { stars: number; score: number; won: boolean }, legend: boolean): void {
+  recordTopic(topicId, r.stars, r.score);
+  if (legend && r.won) recordCrown(topicId);
 }

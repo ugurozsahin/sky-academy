@@ -4,7 +4,7 @@ import { YEARS } from '../../src/curriculum';
 
 const Y1 = YEARS[1];
 const ALL: Mode[] = ['mission', 'endless', 'sprint', 'boss'];
-const ctx = (o: Partial<ModeCtx> = {}): ModeCtx => ({ year: Y1, stage: 1, questionsAsked: 0, sequence: false, slow: false, slower: false, enraged: false, ...o });
+const ctx = (o: Partial<ModeCtx> = {}): ModeCtx => ({ year: Y1, stage: 1, questionsAsked: 0, sequence: false, slow: false, slower: false, legend: false, enraged: false, ...o });
 const endCtx = (o: Partial<EndCtx> = {}): EndCtx => ({ won: false, score: 0, correct: 0, accuracy: 0, stageStarsTotal: 0, stages: 5, stars: 0, year: Y1, ...o });
 
 describe('mode table', () => {
@@ -207,5 +207,28 @@ describe('"Slower bubbles" eases every mode by one step, with a floor of 0 (#905
       const slower = MODES[m].speed(ctx({ year: Y2, stage, slower: true, questionsAsked: 20 }));
       expect(slower, `${m} stage ${stage}`).toBeLessThanOrEqual(plain);
     }
+  });
+});
+
+// #932: a Legend run plays a 3★ topic at its hardest questions from stage 1, one speed step faster (capped at 3).
+describe('Legend run (#932)', () => {
+  const REC = YEARS.find(y => y.id === 'reception')!;
+  const Y2 = YEARS.find(y => y.id === 'year2')!;
+  const stages = [1, 2, 3, 4, 5];
+
+  it('asks d3 at every stage', () => {
+    for (const stage of stages) expect(MODES.mission.difficulty(ctx({ year: Y1, stage, legend: true })), `stage ${stage}`).toBe(3);
+  });
+  it('is one speed step faster, capped at 3, in Year 1 and Year 2', () => {
+    for (const year of [Y1, Y2]) for (const stage of stages) {
+      const plain = MODES.mission.speed(ctx({ year, stage }));
+      expect(MODES.mission.speed(ctx({ year, stage, legend: true })), `${year.id} stage ${stage}`).toBe(Math.min(3, plain + 1));
+    }
+  });
+  it('gives a gentle year no speed step', () => {
+    for (const stage of stages) expect(MODES.mission.speed(ctx({ year: REC, stage, legend: true }))).toBe(MODES.mission.speed(ctx({ year: REC, stage })));
+  });
+  it('"Slower bubbles" takes one step off the Legend speed', () => {
+    for (const stage of stages) expect(MODES.mission.speed(ctx({ year: Y1, stage, legend: true, slower: true }))).toBe(Math.min(3, MODES.mission.speed(ctx({ year: Y1, stage })) + 1) - 1);
   });
 });

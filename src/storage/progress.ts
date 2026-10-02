@@ -6,6 +6,11 @@ export function recordTopic(topicId: string, stars: number, score: number) {
   const next = { ...p, stars: Math.max(p.stars, stars), best: Math.max(p.best, score), plays: p.plays + 1 };   // keep sprint (#911), hits, tries, last, crown
   save({ progress: { ...load().progress, [topicId]: next } });
 }
+/** A won Legend run puts a 👑 on the topic (#932). Idempotent; touches nothing else. */
+export function recordCrown(topicId: string) {
+  const p = load().progress[topicId] ?? { stars: 0, best: 0, plays: 0 };
+  if (!p.crown) save({ progress: { ...load().progress, [topicId]: { ...p, crown: true } } });
+}
 /**
  * Add answered questions to a topic's lifetime tally (Sensei picks the weakest topics from these). Takes an
  * `AnswerTally` rather than two positional numbers a caller could pass in the wrong order (#379) — the two
