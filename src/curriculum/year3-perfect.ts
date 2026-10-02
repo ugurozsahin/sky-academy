@@ -16,9 +16,10 @@ export const PAST_MARKERS = ['yesterday', 'last week', 'last night', 'ago', 'in 
 export const PERFECT_MARKERS = ['already', 'yet', 'since', 'ever', 'never', 'so far'] as const;
 
 /** s = he/she/it (`has`), p = I/you/we/they (`have`). */
+export type Marker = typeof PAST_MARKERS[number] | typeof PERFECT_MARKERS[number];
 export type Person = 's' | 'p';
 /** [sentence with one `___`, verb, subject person, the time marker, gap kind: f = whole verb form, a = bare participle after a printed auxiliary]. */
-export type PerfectRow = readonly [string, VerbKey, Person, string, 'f' | 'a'];
+export type PerfectRow = readonly [string, VerbKey, Person, Marker, 'f' | 'a'];
 
 export const PERFECT_D1: readonly PerfectRow[] = [
   ['Tom ___ to the park yesterday.', 'go', 's', 'yesterday', 'f'], ['We ___ a film last week.', 'see', 'p', 'last week', 'f'],
@@ -47,11 +48,15 @@ export const PERFECT_D3_AUX: readonly PerfectRow[] = [
   ['Has she ever ___ a lion?', 'see', 's', 'ever', 'a'], ['We haven\'t ___ the dishes yet.', 'do', 'p', 'yet', 'a'],
 ];
 
+const auxOf = (p: Person) => (p === 's' ? 'has' : 'have');
+
 /** The answer an oracle derives from a row: past for a past marker, `has`/`have` + participle for a perfect one. */
 export function perfectAnswer([, verb, person, marker, kind]: PerfectRow): string {
   const [, past, part] = VERBS[verb];
   if (kind === 'a') return part;
-  return (PAST_MARKERS as readonly string[]).includes(marker) ? past : `${person === 's' ? 'has' : 'have'} ${part}`;
+  if ((PAST_MARKERS as readonly string[]).includes(marker)) return past;
+  if ((PERFECT_MARKERS as readonly string[]).includes(marker)) return `${auxOf(person)} ${part}`;
+  throw new Error(`y3-perfect: unknown time marker "${marker}"`);
 }
 
 export const y3Perfect: Generator = (d, rng): Question => {
@@ -61,7 +66,7 @@ export const y3Perfect: Generator = (d, rng): Question => {
   const [base, past, part] = VERBS[verb];
   const answer = perfectAnswer(row);
   const ds = kind === 'a' ? [past, base] : (() => {
-    const right = `${person === 's' ? 'has' : 'have'} ${part}`, wrong = `${person === 's' ? 'have' : 'has'} ${part}`;
+    const right = `${auxOf(person)} ${part}`, wrong = `${auxOf(person === 's' ? 'p' : 's')} ${part}`;
     const other = answer === past ? right : past;
     return d === 1 ? [other] : [other, wrong];
   })();

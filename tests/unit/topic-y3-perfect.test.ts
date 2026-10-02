@@ -18,9 +18,58 @@ const sets: [string, readonly PerfectRow[]][] = [['d1', PERFECT_D1], ['d2', PERF
 const all = [...PERFECT_D1, ...PERFECT_D2, ...PERFECT_D3_AUX];
 const rowFor = (s: string) => all.find(r => r[0] === s)!;
 const MARKERS = [...PAST_MARKERS, ...PERFECT_MARKERS];
+/** Hard-coded: sentence → [answer, distractors]. Nothing here is derived from the generator, so a marker moved to the wrong list turns it red. */
+const EXPECT: Record<string, [string, string[]]> = {
+  'Tom ___ to the park yesterday.': ['went', ['has gone']],
+  'We ___ a film last week.': ['saw', ['have seen']],
+  'She ___ her lunch already.': ['has eaten', ['ate']],
+  'I ___ my homework already.': ['have done', ['did']],
+  'The dog ___ my shoe last night.': ['ate', ['has eaten']],
+  'Gran ___ to Spain two years ago.': ['went', ['has gone', 'have gone']],
+  'I ___ a gold medal in 2020.': ['won', ['have won', 'has won']],
+  'I ___ a whale when I was five.': ['saw', ['have seen', 'has seen']],
+  'She ___ no sweets since Monday.': ['has eaten', ['ate', 'have eaten']],
+  'We ___ ten shells so far.': ['have found', ['found', 'has found']],
+  'I ___ the same coat since winter.': ['have worn', ['wore', 'has worn']],
+  'Have you ever ___ a whale?': ['seen', ['saw', 'see']],
+  'She hasn\'t ___ her lunch yet.': ['eaten', ['ate', 'eat']],
+  'We have never ___ a rainbow.': ['seen', ['saw', 'see']],
+  'He hasn\'t ___ to school since Monday.': ['gone', ['went', 'go']],
+};
 const count = (s: string, m: string) => (s.match(new RegExp(`(^|[^a-z])${m}($|[^a-z])`, 'gi')) ?? []).length;
 
 describe('y3-perfect (#1109)', () => {
+  it('the marker lists are fixed literals and disjoint', () => {
+    expect([...PAST_MARKERS]).toEqual(['yesterday', 'last week', 'last night', 'ago', 'in 2020', 'when I was five']);
+    expect([...PERFECT_MARKERS]).toEqual(['already', 'yet', 'since', 'ever', 'never', 'so far']);
+    expect(PAST_MARKERS.filter(m => (PERFECT_MARKERS as readonly string[]).includes(m))).toEqual([]);
+  });
+
+  it('literal answers: the generated answer and distractors match a hard-coded table (not the generator\'s own oracle)', () => {
+    const seen = new Set<string>();
+    for (const d of [1, 2, 3] as Difficulty[]) for (const q of draws(d, 1109_700, 600)) {
+      const e = EXPECT[sentenceOf(q)];
+      if (!e) continue;
+      seen.add(sentenceOf(q));
+      expect(q.answer, sentenceOf(q)).toBe(e[0]);
+      for (const x of q.options.filter(o => o !== q.answer)) expect(e[1], `${sentenceOf(q)} → ${x}`).toContain(x);
+    }
+    expect([...seen].sort()).toEqual(Object.keys(EXPECT).sort());
+  });
+
+  it('every marker has a literal row in the table, so none is unpinned', () => {
+    for (const m of MARKERS) expect(Object.keys(EXPECT).some(s => count(s, m) > 0), m).toBe(true);
+  });
+
+  it('perfectAnswer refuses a marker in neither list', () => {
+    expect(() => perfectAnswer(['x ___', 'go', 's', 'tomorrow' as never, 'f'])).toThrow(/unknown time marker/);
+  });
+
+  it('set membership: d2 never draws a d1 frame, and d1 never draws a d2 or aux frame', () => {
+    for (const q of draws(2, 1109_800)) expect(PERFECT_D1.some(r => r[0] === sentenceOf(q)), sentenceOf(q)).toBe(false);
+    for (const q of draws(2, 1109_810)) expect(PERFECT_D2.some(r => r[0] === sentenceOf(q)), sentenceOf(q)).toBe(true);
+  });
+
   it('is registered once, in Year 3 writing', () => {
     expect(TOPICS.filter(t => t.id === 'y3-perfect')).toHaveLength(1);
     expect(topic.year).toBe('year3');
