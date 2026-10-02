@@ -2700,18 +2700,20 @@ test.describe('Sky Ninja Academy', () => {
     expect(style).toContain('--cols:');                      // grid tracks YEARS.length, so a new year needs no CSS
   });
 
-  // #1032: the map-visibility gate. Year 3 exists now (#1050) but stays hidden until the `sna:years` device
-  // key says `all`, so the two branches differ by exactly that island.
+  // #1032: the map-visibility gate. A year below the topic-count threshold stays hidden until the `sna:years`
+  // device key says `all`. Year 3 crossed the threshold (#1495), so today every year is shown either way; the
+  // expectations are read from the registry, so the key's two branches differ by exactly the hidden years
+  // (none today) and this keeps guarding the key as the next KS2 year is added.
   test('guard rail: the map reads the sna:years preview key (#1032)', async ({ page }) => {
     await seedPlayer(page);
     const noKey = await page.$$eval('.islands .island', els => els.map(el => (el as HTMLElement).dataset.year));
-    expect(noKey).toEqual(['reception', 'year1', 'year2']);
+    expect(noKey).toEqual(shownYears().map(y => y.id));      // no key: the gated list, nothing more
 
     await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
     await page.reload();
     await expect(page.locator('.home')).toBeVisible();
     const withKey = await page.$$eval('.islands .island', els => els.map(el => (el as HTMLElement).dataset.year));
-    expect(withKey).toEqual(['reception', 'year1', 'year2', 'year3']);
+    expect(withKey).toEqual(YEARS.map(y => y.id));           // key set: every registry row, hidden or not
   });
 
   /**
@@ -2767,10 +2769,12 @@ test.describe('Sky Ninja Academy', () => {
       await expectFitsViewport(page, 'sky map with 7 islands at 1280x800');
     });
 
-    test('3 islands (today): the map\'s container style is unchanged by this module', async ({ page }) => {
+    test('today\'s islands: the map\'s container style is this module\'s own output', async ({ page }) => {
       await seedPlayer(page);
+      const n = shownYears().length;
+      const layout = mapLayout(n);
       const style = await page.$eval('.islands', el => el.getAttribute('style') || '');
-      expect(style).toBe('--cols:3');
+      expect(style).toBe(`--cols:${layout.cols}${layout.compact ? COMPACT_VARS : ''}`);
     });
   });
 
