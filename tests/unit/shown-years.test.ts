@@ -74,11 +74,11 @@ describe('previewAllYears: the sna:years device key (#1032)', () => {
 describe('shownYears (#1032)', () => {
   beforeEach(() => localStorage.clear());
 
-  it('shows every EYFS/KS1 row, and gates year3 out (#1050: one topic, well short of 12 maths + 6 writing)', () => {
-    expect(shownYears().map(y => y.id)).toEqual(['reception', 'year1', 'year2']);
+  it('shows every row, year3 included once it reaches 12 maths + 6 writing (#1050, #1109)', () => {
+    expect(shownYears().map(y => y.id)).toEqual(['reception', 'year1', 'year2', 'year3']);
   });
 
-  it('the preview key shows every row, including the gated year3', () => {
+  it('the preview key shows every row, including any gated row', () => {
     localStorage.setItem(SHOWN_YEARS_KEY, 'all');
     expect(shownYears()).toEqual(YEARS);
   });
