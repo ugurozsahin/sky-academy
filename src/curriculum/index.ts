@@ -10,8 +10,12 @@ export * from './types';
 export * from './key-stage';
 export * from './shown';
 export const TOPICS: Topic[] = [...RECEPTION_TOPICS, ...YEAR1_TOPICS, ...YEAR2_TOPICS, ...YEAR3_TOPICS];
+/** The registry minus drill topics (#915): what every star total, pool and unlock reads. `TOPICS` stays whole so `topicById` finds a drill. */
+export const CORE_TOPICS: Topic[] = TOPICS.filter(t => !t.drill);
 export const topicById = (id: string) => TOPICS.find(t => t.id === id);
-export const topicsFor = (year: YearId, subject?: Topic['subject']) => TOPICS.filter(t => t.year === year && (!subject || t.subject === subject));
+export const topicsFor = (year: YearId, subject?: Topic['subject']) => CORE_TOPICS.filter(t => t.year === year && (!subject || t.subject === subject));
+/** Drill topics for a year, offered after the regular ones in the Sprint chooser (#915). */
+export const drillsFor = (year: YearId, subject?: Topic['subject']) => TOPICS.filter(t => t.drill && t.year === year && (!subject || t.subject === subject));
 
 // #1032: the registry is static, so the gate is computed once here rather than on every map render. The `true`
 // is not hardcoded per row — the `||` above already guarantees `isKs2(y.id)` when this branch runs.
@@ -25,4 +29,4 @@ export const shownYears = (): YearInfo[] => (previewAllYears() ? YEARS : GATED_Y
 /** #1039: `TOPICS` rows on an island the map is showing right now — what a reward or a dashboard total should
  *  count, so a topic added to a hidden KS2 year (below `shownYears()`'s gate) never moves a star tally, a
  *  sticker or the Master Ninja unlock until its island actually appears. */
-export const listedTopics = (): Topic[] => { const shown = new Set(shownYears().map(y => y.id)); return TOPICS.filter(t => shown.has(t.year)); };
+export const listedTopics = (): Topic[] => { const shown = new Set(shownYears().map(y => y.id)); return CORE_TOPICS.filter(t => shown.has(t.year)); };

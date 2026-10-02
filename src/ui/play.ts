@@ -1,5 +1,5 @@
 import { avatarById, praiseLine, SENSEI, SENSEI_LINES, VILLAIN } from '../avatars';
-import { topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
+import { topicById, topicsFor, type Question, type Topic, type YearInfo } from '../curriculum';
 import { Arena, hittable } from '../game/arena';
 import { missSlips, type Mode, type SessionResult, type DeckItem, type Miss } from '../game/session';
 import { MODES } from '../game/modes';
@@ -212,7 +212,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     }
     for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t);   // every mode teaches Sensei what is hard
     const bySubject = (s: Topic['subject']) =>
-      Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicsFor(o.year.id).find(x => x.id === id)?.subject === s ? t.hits : 0), 0);
+      Object.entries(session.byTopic).reduce((n, [id, t]) => n + (topicById(id)?.subject === s ? t.hits : 0), 0);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
     const { dojo, fresh } = recordGameEnd({
       mode: r.mode, won: r.won, correct: r.correct, attempts: r.attempts, bestCombo: r.bestCombo,

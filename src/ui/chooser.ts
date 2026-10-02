@@ -4,7 +4,7 @@
 // shell, `src/styles/overlays.css`) holding the island's own `.topics`/`.topic` cards (`src/styles/home.css`)
 // and a `.row` of buttons (`src/styles/shared.css`) — not `.modal.results`, which guard rail #35 keeps
 // single-sourced in `screen.ts`; the surrounding `.overlay` already scrolls on its own if the list is long.
-import { topicsFor, type Topic, type YearInfo } from '../curriculum';
+import { drillsFor, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
 import { trophyFor } from '../game/trophies';
 import type { TopicProgress } from '../storage/shape';
 import { $, $$ } from './dom';
@@ -18,6 +18,9 @@ export interface ChooserOpts {
 
 /** Topics the chooser can offer — every non-tracing topic. Shared with the island's trophy count (#912) so the count and the list cannot drift. */
 export const chooserEligible = (t: Topic): boolean => t.input !== 'tracing';
+
+/** What the chooser lists for a year's open subject: the regular topics, then that subject's drills (#915). Drills are never in the Mixed pool. */
+export const chooserTopics = (year: YearId, subject: Topic['subject']): Topic[] => [...topicsFor(year, subject).filter(chooserEligible), ...drillsFor(year, subject)];
 
 /** Opens a topic chooser inside `overlay` (a hidden `.overlay` element already in the DOM, the pattern
  *  `src/ui/profiles.ts`'s `#profile-overlay` uses). Back, or picking a card, hides and empties it again. */

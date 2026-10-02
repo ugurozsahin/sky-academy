@@ -11,7 +11,7 @@ import { weakestTopics, poolWeights } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
-import { chooserEligible, openChooser, trophyBadge, trophyCount } from './chooser';
+import { chooserEligible, chooserTopics, openChooser, trophyBadge, trophyCount } from './chooser';
 import { $, $$, capDigits, render, stars } from './dom';
 import type { PlayOpts } from './play';
 
@@ -145,7 +145,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
     // #910: a chooser first — "🎲 Mixed" (today's Sprint, unchanged) or one topic from the open subject.
     { id: 'sprint', mod: 'sprint', vport: `<span class="vport emoji">⏱️</span>`,
       title: MODES.sprint.title, blurb: `${SPRINT_SECONDS} seconds, no lives · best ${sprint[year.id] ?? 0}`,
-      go: () => openChooser($('#island-overlay'), subjectPool(), topic => {
+      go: () => openChooser($('#island-overlay'), chooserTopics(year.id, subject), topic => {
         sfx.tap();
         topic ? nav.play({ year, mode: 'sprint', topic }) : playMixed(nav, year, 'sprint', subjectPool(), progress);
       }, { mixed: true, badge: trophyBadge(year, progress) }) },
