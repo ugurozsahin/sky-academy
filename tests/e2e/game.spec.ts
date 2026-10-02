@@ -2895,6 +2895,20 @@ test.describe('Sky Ninja Academy', () => {
     expect(ids.some(id => TOPICS.find(t => t.id === id)?.input === 'tracing')).toBe(false);   // non-tracing only
   });
 
+  test('Ninja Sprint: the 5× table drill asks only the five times table (#916)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year2"]');
+    await page.click('#sprint');
+    await page.click('#island-overlay .topic[data-id="y2-tables-5"]');
+    await expect(page.locator('.play')).toBeVisible();
+    for (let i = 0; i < 5; i++) {
+      const s = await state(page);
+      expect(s.topic).toBe('y2-tables-5');
+      expect(s.prompt).toContain('5');
+      await solveCurrent(page);
+    }
+  });
+
   test('Ninja Sprint: a one-topic run never changes the year\'s mixed-pool best (#910)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');

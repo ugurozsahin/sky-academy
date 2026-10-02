@@ -60,7 +60,7 @@ describe('topic registry', () => {
   // #889: YEAR2_TOPICS moved into its own module so new Year 2 topics have room in year2.ts. This pins the
   // registry's ids, in order, so that move (and every later one) cannot silently drop, reorder or rename a row.
   it('YEAR2_TOPICS holds the ids of Y2_IDS, in this order', () => {
-    expect(YEAR2_TOPICS.map(t => t.id)).toEqual(Y2_IDS);
+    expect(YEAR2_TOPICS.filter(t => !t.drill).map(t => t.id)).toEqual(Y2_IDS);   // drills (#916) are tested in tables-drill.test.ts
   });
 
   // #1320: five of these topics have no dedicated content test, only the generic structural loop below (answer
@@ -71,9 +71,8 @@ describe('topic registry', () => {
   // an independent id → gen listing that must agree with `year2-topics.ts`'s own wiring, the same shape the
   // id-order test above already uses for ids.
   it('every YEAR2_TOPICS row wires its own generator, not a swapped one (#1320)', () => {
-    const EXPECTED = Y2_GENS;
-    expect(Object.keys(EXPECTED).sort()).toEqual(YEAR2_TOPICS.map(t => t.id).sort());   // this listing itself stays complete
-    for (const t of YEAR2_TOPICS) expect(t.gen, t.id).toBe(EXPECTED[t.id]);
+    const core = YEAR2_TOPICS.filter(t => !t.drill); expect(Object.keys(Y2_GENS).sort()).toEqual(core.map(t => t.id).sort());   // complete
+    for (const t of core) expect(t.gen, t.id).toBe(Y2_GENS[t.id]);
   });
 });
 
@@ -2292,8 +2291,9 @@ describe('a card\'s bubble width is derived from its options, never from its ans
         }
         // #1050: the blind-list bookkeeping is EYFS/KS1-only; a KS2 cell still counts toward `swept`, `cards`, `discriminating` and `split`
         if (isKs2(topic.year)) continue;
-        if (cellDiscriminating === 0 && !NO_REPEATED_SET.has(cell)) unexpectedlyBlind.push(cell);
-        if (cellDiscriminating > 0 && NO_REPEATED_SET.has(cell)) nowComparable.push(cell);
+        const blindKey = cell.replace(/^y2-tables-\d+/, 'y2-tables');   // #916: a drill shares its mixed topic's pool
+        if (cellDiscriminating === 0 && !NO_REPEATED_SET.has(blindKey)) unexpectedlyBlind.push(cell);
+        if (cellDiscriminating > 0 && NO_REPEATED_SET.has(blindKey)) nowComparable.push(cell);
       }
     }
     // A topic dropped from the sweep — by a wrong `input: 'tracing'`, say — would otherwise vanish silently.

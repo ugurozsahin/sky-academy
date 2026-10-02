@@ -27,7 +27,7 @@ describe('a drill topic stays out of everything but the chooser (#915)', () => {
   it('is found by topicById and drillsFor, and by no other listing', () => {
     expect(topicById(FX)?.drill).toBe(true);
     expect(ids(TOPICS)).toContain(FX);
-    expect(ids(drillsFor('year2'))).toEqual([FX]);
+    expect(ids(drillsFor('year2')).filter(i => !i.startsWith('y2-tables-'))).toEqual([FX]);   // the real tables drills (#916) sit beside it
     expect(drillsFor('year2', 'writing')).toEqual([]);
     expect(drillsFor('year1')).toEqual([]);
     for (const l of [CORE_TOPICS, topicsFor('year2'), topicsFor('year2', 'maths'), listedTopics()]) expect(ids(l)).not.toContain(FX);
@@ -51,7 +51,7 @@ describe('a drill topic stays out of everything but the chooser (#915)', () => {
   it('the chooser lists it after the open subject\'s regular topics, in that subject only', () => {
     const maths = chooserTopics('year2', 'maths');
     expect(maths[maths.length - 1].id).toBe(FX);
-    expect(ids(maths.slice(0, -1))).toEqual(ids(topicsFor('year2', 'maths').filter(t => t.input !== 'tracing')));
+    expect(ids(maths.filter(t => !t.drill))).toEqual(ids(topicsFor('year2', 'maths').filter(t => t.input !== 'tracing')));
     expect(ids(chooserTopics('year2', 'writing'))).not.toContain(FX);
   });
 });

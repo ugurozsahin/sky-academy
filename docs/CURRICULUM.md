@@ -75,6 +75,9 @@ Maths:
 - y2-three — three 1-digit
 - y2-inverse — missing number
 - y2-tables — 2,5,10 × and ÷
+- y2-tables-2 — drill (Sprint chooser only): the 2× table alone, × at d1, adds ÷ at d2, adds ? × 2 = p at d3
+- y2-tables-5 — drill (Sprint chooser only): the 5× table alone, × at d1, adds ÷ at d2, adds ? × 5 = p at d3
+- y2-tables-10 — drill (Sprint chooser only): the 10× table alone, × at d1, adds ÷ at d2, adds ? × 10 = p at d3
 - y2-oddeven — is n odd/even (d1); at d2–d3 about 1 in 3 cards is "slice every even/odd number" over six numbers (any order); of the rest, half asks n odd/even and half shows 4 numbers and asks which one is odd/even, d3 decoys within 5 of the answer
 - y2-fractions — ⅓ ¼ 2/4 ¾, of quantities
 - y2-money — £ and p recorded separately — `£1 and 50p`, never `£1.50`; change

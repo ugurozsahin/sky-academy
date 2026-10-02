@@ -62,14 +62,7 @@ export const y2Three: Generator = (d, rng) => {
   const p = `${a} + ${b} + ${c} = ?`;
   return numQ(rng, p, a + b + c, { min: 3, max: 27, ...q(p) });
 };
-export const y2Tables: Generator = (d, rng) => {
-  const table = d === 1 ? pick(rng, [2, 10]) : pick(rng, [2, 5, 10]);
-  const n = ri(rng, 1, 12);
-  const kind = d === 3 ? ri(rng, 0, 2) : d === 2 ? ri(rng, 0, 1) : 0;
-  if (kind === 0) { const p = rng() < 0.5 ? `${n} × ${table} = ?` : `${table} × ${n} = ?`; return numQ(rng, p, n * table, { min: 0, max: 120, ...q(p), distractors: [n * table + table, n * table - table, n * table + 1] }); }
-  if (kind === 1) { const p = `${n * table} ÷ ${table} = ?`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) }); }
-  const p = `? × ${table} = ${n * table}`; return numQ(rng, p, n, { min: 0, max: 12, ...q(p) });
-};
+export { y2Tables } from '../tables';
 export const y2Inverse: Generator = (d, rng) => {
   const a = ri(rng, 10, d === 1 ? 30 : 99), b = ri(rng, 1, d === 1 ? 9 : Math.min(30, a - 1));
   const kind = ri(rng, 0, 2);
