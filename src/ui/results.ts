@@ -27,6 +27,7 @@ export interface RunOutcome {
 export function resultMedal(r: RunOutcome): string {
   if (r.incomplete) return '💪';
   if (r.mode === 'endless') return r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉';
+  if (r.mode === 'relaxed') return '💪';   // #937: effort, never stars
   if (r.mode === 'sprint') return r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪';
   return r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
 }
@@ -173,8 +174,13 @@ export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r:
   return { newBest, candidates: t ? [t] : [] };
 }
 
-/** A finished mission's record; a *won* Legend run also crowns the topic (#932), a lost one changes nothing more. */
-export function recordMission(topicId: string, r: { stars: number; score: number; won: boolean }, legend: boolean): void {
-  recordTopic(topicId, r.stars, r.score);
-  if (legend && r.won) recordCrown(topicId);
+/** A Mission's `best` announcement (#933): `New best for <topic title>!` only when `recordTopic()` said the score beat a real previous best. */
+export const missionBestCandidates = (topic: Pick<Topic, 'title'>, isNewBest: boolean): ResultCandidate[] =>
+  isNewBest ? [{ kind: 'best', text: `New best for ${topic.title}!` }] : [];
+
+/** Record a Mission's result and work out its announcement (#933), so `commitResult()` stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. A *won* Legend run also crowns the topic (#932); a lost one changes nothing more. */
+export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number; won?: boolean }, legend = false): { candidates: ResultCandidate[] } {
+  const isNewBest = recordTopic(topic.id, r.stars, r.score);
+  if (legend && r.won) recordCrown(topic.id);
+  return { candidates: missionBestCandidates(topic, isNewBest) };
 }

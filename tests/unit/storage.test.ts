@@ -134,9 +134,9 @@ describe('rewards storage', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     recordTopic('y1-add', 2, 80);
     recordAccuracy('y1-add', { hits: 5, tries: 6 }); recordAccuracy('y1-add', { hits: 3, tries: 4 }); recordAccuracy('y1-add', { hits: 0, tries: 0 });   // an empty tally changes nothing
-    expect(load().progress['y1-add']).toEqual({ stars: 2, best: 80, plays: 1, hits: 8, tries: 10 });
+    expect(load().progress['y1-add']).toEqual({ stars: 2, best: 80, plays: 1, hits: 8, tries: 10, last: today() });
     recordAccuracy('y1-sub', { hits: 1, tries: 2 });                                                    // a topic met only in Sensei training / Sky Storm
-    expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 1, tries: 2 });
+    expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 1, tries: 2, last: today() });
     expect(load().training).toEqual({});
     expect(recordTraining('year1')).toBe(1); expect(recordTraining('year1')).toBe(2);
     expect(load().training).toEqual({ year1: 2 });
@@ -147,11 +147,11 @@ describe('rewards storage', () => {
   it('recordAccuracy clamps hits into [0, tries] and warns — a caller cannot write an accuracy above 100%, silently (#379)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     recordAccuracy('y1-add', { hits: 9, tries: 4 });     // more hits than tries: clamped down to the ceiling
-    expect(load().progress['y1-add']).toEqual({ stars: 0, best: 0, plays: 0, hits: 4, tries: 4 });
+    expect(load().progress['y1-add']).toEqual({ stars: 0, best: 0, plays: 0, hits: 4, tries: 4, last: today() });
     recordAccuracy('y1-sub', { hits: -3, tries: 5 });    // negative hits: clamped up to the floor
-    expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 0, tries: 5 });
+    expect(load().progress['y1-sub']).toEqual({ stars: 0, best: 0, plays: 0, hits: 0, tries: 5, last: today() });
     recordAccuracy('y1-time', { hits: NaN, tries: 3 });  // NaN: the clamp itself cannot bound it, so it is 0
-    expect(load().progress['y1-time']).toEqual({ stars: 0, best: 0, plays: 0, hits: 0, tries: 3 });
+    expect(load().progress['y1-time']).toEqual({ stars: 0, best: 0, plays: 0, hits: 0, tries: 3, last: today() });
     // Each of the three malformed tallies above left a trace — the review finding this test guards: a silent
     // repair would trade one silent failure (accuracy over 100%) for another (no evidence the bug happened).
     expect(warn).toHaveBeenCalledTimes(3);
@@ -171,7 +171,7 @@ describe('rewards storage', () => {
     warn.mockRestore();
     // A rejected call must not half-write: a well-formed call for the same topic afterwards starts clean.
     recordAccuracy('y1-nan', { hits: 2, tries: 4 });
-    expect(load().progress['y1-nan']).toEqual({ stars: 0, best: 0, plays: 0, hits: 2, tries: 4 });
+    expect(load().progress['y1-nan']).toEqual({ stars: 0, best: 0, plays: 0, hits: 2, tries: 4, last: today() });
   });
   it('streak counts consecutive days only', () => {
     expect(touchStreak(new Date('2026-09-05T10:00:00Z'))).toBe(1);

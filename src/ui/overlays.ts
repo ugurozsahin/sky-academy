@@ -50,7 +50,7 @@ export function resultsHTML(d: ResultsData): string {
     heroExtra: ` ${d.won || d.incomplete ? '' : 'sad'}${d.training ? ' sensei' : ''}`,
     glow: d.glow, img: d.img, name: d.name, headline: d.headline,
     medal: d.medal, heading: d.heading,
-    stars: d.mode !== 'endless' ? d.starCount : undefined,
+    stars: d.mode !== 'endless' && d.mode !== 'relaxed' ? d.starCount : undefined,
     stats: `<div><b>${d.score}</b><small>score</small></div><div><b>${d.correct}/${d.attempts}</b><small>correct</small></div><div><b>×${d.bestCombo}</b><small>best combo</small></div>`,
     coins: d.coins,
     pills: `${d.newBest ? '<span class="best-pill">🏆 New best!</span>' : ''}${d.streak > 1 ? `<span class="streak-pill">🔥 ${d.streak}-day streak</span>` : ''}${d.resultLines ?? ''}`,

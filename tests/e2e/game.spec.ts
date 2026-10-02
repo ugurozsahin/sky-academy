@@ -677,6 +677,31 @@ test.describe('Sky Ninja Academy', () => {
     expect(spoken, `Sprint must stay silent on the correction; got ${JSON.stringify(spoken)}`).not.toContain(`It's ${wrongAnswer}.`);
   });
 
+  test('Relaxed practice: wrong slices cost nothing, ten questions, one coin each right, no stars and no Storm best (#937)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#relaxed');
+    await page.click('.topic[data-mixed]');
+    await expect(page.locator('.play')).toBeVisible();
+    const lives = await page.evaluate(() => window.__sna.state().lives);
+    for (let i = 0; i < 3; i++) {
+      await waitForWrongOrEnd(page);
+      const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+      expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+      await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, before);
+      expect(await page.evaluate(() => window.__sna.state().lives), 'a wrong slice costs no life').toBe(lives);
+    }
+    for (let i = 0; i < 7; i++) await solveCurrent(page);
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    await expect(results).toContainText('Practice done!');
+    await expect(results).toContainText('7/10');
+    await expect(results.locator('.coin-gain')).toContainText('+7');
+    await expect(results.locator('.stars')).toHaveCount(0);
+    await page.click('#home');
+    await expect(page.locator('#endless small')).toContainText('best 0');
+  });
+
   // #897: a pre-reader taps a topic and is dropped straight into the first question with no spoken name —
   // the topic's title now folds into that first question's own utterance, one `say()`, so a separate, earlier
   // line naming the topic cannot be cancelled by the question that follows it (`duel.ts`'s hand-over does the
@@ -3034,6 +3059,15 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.isl-head small')).toContainText(/🏆 1\/\d+/);
     await page.click('#sprint');
     await expect(page.locator('#island-overlay .topic[data-id="y1-bonds"]')).toContainText('🥉');
+  });
+
+  test('a Mission that beats the topic best announces it on the results screen (#933)', async ({ page }) => {
+    // A seeded best of 1 is a real previous best; one genuine solve scores above it (a skipped mission scores 0, #749).
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'r-count': { stars: 1, best: 1, plays: 1 } } });
+    await startTopic(page, 'reception', 'r-count');
+    await solveCurrent(page);
+    await winMission(page);
+    await expect(page.locator('.results')).toContainText('New best for Count It!');
   });
 
   test('Ninja Sprint chooser: Back closes it without starting a game (#910)', async ({ page }) => {

@@ -33,6 +33,7 @@ describe('daily dojo', () => {
   it('mode challenges only move for their own mode', () => {
     const memoryOnly = ev({ mode: 'memory', correct: 8, attempts: 10, bestCombo: 0, stars: 3, score: 40 });
     const sprint = ev({ mode: 'sprint', correct: 12, attempts: 14, bestCombo: 6, stars: 3, score: 130 });
+    const relaxed = ev({ mode: 'relaxed', correct: 7, attempts: 10, bestCombo: 3, stars: 0, score: 70 });   // #937
     const storm = ev({ mode: 'endless', won: false, correct: 9, attempts: 12, bestCombo: 4, stars: 1, score: 90 });
     for (const [date, cs] of Array.from({ length: 30 }, (_, i) => `2026-10-${String(i + 1).padStart(2, '0')}`).map(d => [d, dailyChallenges(d)] as const)) {
       const mode = cs[1]; const s = freshDojo(date);
@@ -42,6 +43,7 @@ describe('daily dojo', () => {
       if (mode.id === 'storm80') { expect(p(storm)).toBe(80); expect(p(sprint)).toBe(0); }
       if (mode.id === 'boss1') { expect(p(ev({ mode: 'boss', won: true }))).toBe(1); expect(p(ev({ mode: 'boss', won: false }))).toBe(0); }
       if (mode.id === 'sensei1') { expect(p(ev({ training: true }))).toBe(1); expect(p(ev())).toBe(0); }
+      if (['sprint1', 'boss1', 'storm80', 'memory1', 'sensei1', 'mission2'].includes(mode.id)) expect(p(relaxed), `${mode.id} must not count a relaxed run`).toBe(0);   // #937
       if (mode.id === 'mission2') { expect(p(ev())).toBe(1); expect(p(ev({ training: true }))).toBe(0); expect(p(ev({ won: false }))).toBe(0); }
     }
   });

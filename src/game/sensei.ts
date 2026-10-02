@@ -29,14 +29,43 @@ export function accuracy(p: TopicProgress | undefined): number | null {
 /**
  * The `n` weakest playable topics of a year: lowest accuracy first, then fewest stars, then fewest plays.
  * Topics never played come after the played ones (in curriculum order) so a new player still gets a full set.
+ * With `now` (#936) the last slot goes to a starred topic not played for 14+ days, if there is one.
  */
-export function weakestTopics(topics: Topic[], progress: Record<string, TopicProgress>, n = TRAIN_TOPICS): Topic[] {
+export function weakestTopics(topics: Topic[], progress: Record<string, TopicProgress>, n = TRAIN_TOPICS, now?: Date): Topic[] {
   const playable = topics.filter(t => t.input !== 'tracing');
   const played = playable.filter(t => accuracy(progress[t.id]) !== null);
   const key = (t: Topic) => { const p = progress[t.id]; return [accuracy(p)!, p.stars, p.plays]; };
   played.sort((a, b) => { const ka = key(a), kb = key(b); for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i]; return 0; });
   const fresh = playable.filter(t => !played.includes(t));
-  return [...played, ...fresh].slice(0, Math.min(n, playable.length));
+  const picked = [...played, ...fresh].slice(0, Math.min(n, playable.length));
+  const back = now ? staleStarred(playable, progress, now) : undefined;
+  if (!back || picked.includes(back)) return picked;
+  return picked.length < n ? [...picked, back] : [...picked.slice(0, -1), back];   // the last slot goes to the returning topic
+}
+
+/** The island's Train with Sensei topics (#936). `now` is required so a caller cannot silently drop the stale-topic rule. */
+export function senseiTopics(topics: Topic[], progress: Record<string, TopicProgress>, now: Date): Topic[] {
+  return weakestTopics(topics, progress, TRAIN_TOPICS, now);
+}
+
+const STALE_DAYS = 14;   // #936: a starred topic unplayed this long is brought back
+
+/** Whole local days from the `YYYY-MM-DD` key `last` to `now`; null when the key is not one. */
+function daysSince(last: string | undefined, now: Date): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(last ?? '');
+  if (!m) return null;
+  const then = new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+  return Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - then) / 86400000);
+}
+
+/** The stalest starred topic last played `STALE_DAYS`+ days before `now` (#936); ties go to curriculum order. A topic with no `last` is never stale. */
+function staleStarred(playable: Topic[], progress: Record<string, TopicProgress>, now: Date): Topic | undefined {
+  let best: Topic | undefined, bestAge = STALE_DAYS - 1;
+  for (const t of playable) {
+    const p = progress[t.id], age = p && p.stars >= 1 ? daysSince(p.last, now) : null;
+    if (age !== null && age > bestAge) { best = t; bestAge = age; }
+  }
+  return best;
 }
 
 const WEIGHT_MIN_PLAYED = 3;       // #909: fewer played topics than this and the draw stays uniform

@@ -15,7 +15,7 @@ import { pushBackGuard, screenScope } from './screen';
 import { createHud } from './hud';
 import { BOMB, createPlaySession, type ResultPayout } from './play-session';   // #36: the Session callbacks live in play-session.ts
 import { createResultsScreen, PRACTICE_PAYOUT } from './play-results';   // #896: the results overlay lives in play-results.ts
-import { recordMission, recordSprintOutcome, type ResultCandidate } from './results';
+import { recordMissionOutcome, recordSprintOutcome, type ResultCandidate } from './results';
 import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
@@ -204,11 +204,11 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     // `recordDuel`. A phantom `plays` increment or an unearned best score would otherwise stick around forever
     // and skew `parents.ts`'s "topics tried" count and `sensei.ts`'s weakest-topic ranking.
     if (!r.incomplete) {
-      if (o.mode === 'mission' && o.topic) recordMission(o.topic.id, r, !!o.legend);
+      if (o.mode === 'mission' && o.topic) ({ candidates } = recordMissionOutcome(o.topic, r, !!o.legend));   // #933, #932
       else if (training) { if (r.won) recordTraining(o.year.id); }
       else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r));   // #911/#912
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
-      else recordEndless(o.year.id, r.score);
+      else if (o.mode !== 'relaxed') recordEndless(o.year.id, r.score);   // #937: a relaxed run writes no best
     }
     for (const [id, t] of Object.entries(session.byTopic)) recordAccuracy(id, t);   // every mode teaches Sensei what is hard
     const bySubject = (s: Topic['subject']) =>
