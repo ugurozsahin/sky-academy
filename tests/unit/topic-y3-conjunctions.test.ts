@@ -59,10 +59,22 @@ describe('y3-conjunctions (#1108)', () => {
     }
   });
 
+  it('no conjunction gap offers before or after against the other: either one reads sensibly in a time gap (#666)', () => {
+    for (const [s, a, ds, c] of GAP_BANK) if (c === 'conjunction' && (a === 'before' || a === 'after')) expect(ds, s).not.toContain(a === 'before' ? 'after' : 'before');
+  });
+
+  it('every gap and class sentence is unique', () => {
+    expect(new Set(GAP_BANK.map(r => r[0])).size).toBe(GAP_BANK.length);
+    expect(new Set(CLASS_BANK.map(r => r[0])).size).toBe(CLASS_BANK.length);
+  });
+
   it('d1: conjunction answers only, 3 bubbles', () => {
     for (const c of draws(1)) {
       expect(c.options).toHaveLength(3);
-      expect(GAP_BANK.find(r => r[0] === c.prompt && r[1] === c.answer)?.[3], c.prompt).toBe('conjunction');
+      const row = GAP_BANK.find(r => r[0] === c.prompt && r[1] === c.answer);
+      expect(row?.[3], c.prompt).toBe('conjunction');
+      expect(c.options, c.prompt).toContain(c.answer);
+      for (const o of c.options) expect([row![1], ...row![2]], o).toContain(o);
     }
   });
 
