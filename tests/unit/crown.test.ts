@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { load, recordCrown, recordTopic, reset } from '../../src/storage';
+import { recordMission } from '../../src/ui/results';
 
 // minimal localStorage shim for node
 const mem: Record<string, string> = {};
@@ -9,5 +10,28 @@ describe('recordCrown (#932)', () => {
   it('sets the crown, keeps the rest of the topic, and is idempotent', () => {
     reset(); recordTopic('y1-add', 3, 120); recordCrown('y1-add'); recordCrown('y1-add');
     expect(load().progress['y1-add']).toMatchObject({ stars: 3, best: 120, plays: 1, crown: true });
+  });
+});
+
+describe('recordMission crowns only a won Legend run (#932)', () => {
+  const won = { stars: 3, score: 200, won: true }, lost = { stars: 0, score: 40, won: false };
+
+  it('a lost Legend run records like a lost mission and never crowns', () => {
+    reset(); recordMission('y1-add', lost, true);
+    const p = load().progress['y1-add'];
+    expect(p).toMatchObject({ stars: 0, best: 40, plays: 1 });
+    expect(p.crown).toBeUndefined();
+  });
+  it('a won Legend run crowns the topic', () => {
+    reset(); recordMission('y1-add', won, true);
+    expect(load().progress['y1-add']).toMatchObject({ stars: 3, plays: 1, crown: true });
+  });
+  it('a won plain mission never crowns', () => {
+    reset(); recordMission('y1-add', won, false);
+    expect(load().progress['y1-add'].crown).toBeUndefined();
+  });
+  it('a later lost Legend run keeps an earned crown', () => {
+    reset(); recordMission('y1-add', won, true); recordMission('y1-add', lost, true);
+    expect(load().progress['y1-add']).toMatchObject({ plays: 2, crown: true });
   });
 });
