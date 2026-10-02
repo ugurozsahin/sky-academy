@@ -3011,6 +3011,15 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#island-overlay .topic[data-id="y1-bonds"]')).toContainText('🥉');
   });
 
+  test('a Mission that beats the topic best announces it on the results screen (#933)', async ({ page }) => {
+    // A seeded best of 1 is a real previous best; one genuine solve scores above it (a skipped mission scores 0, #749).
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'r-count': { stars: 1, best: 1, plays: 1 } } });
+    await startTopic(page, 'reception', 'r-count');
+    await solveCurrent(page);
+    await winMission(page);
+    await expect(page.locator('.results')).toContainText('New best for Count It!');
+  });
+
   test('Ninja Sprint chooser: Back closes it without starting a game (#910)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');

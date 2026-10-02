@@ -4,7 +4,7 @@
 import { MODES, type Mode } from '../game/modes';
 import type { Question, Topic } from '../curriculum';
 import { esc } from './dom';
-import { load, recordSprint, recordTopicSprint } from '../storage';
+import { load, recordSprint, recordTopic, recordTopicSprint } from '../storage';
 import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
 import type { YearInfo } from '../curriculum';
 
@@ -176,3 +176,7 @@ export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r:
 /** A Mission's `best` announcement (#933): `New best for <topic title>!` only when `recordTopic()` said the score beat a real previous best. */
 export const missionBestCandidates = (topic: Pick<Topic, 'title'>, isNewBest: boolean): ResultCandidate[] =>
   isNewBest ? [{ kind: 'best', text: `New best for ${topic.title}!` }] : [];
+
+/** Record a Mission's result and work out its announcement (#933), so `commitResult()` stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. */
+export const recordMissionOutcome = (topic: Topic, r: { stars: number; score: number }): { candidates: ResultCandidate[] } =>
+  ({ candidates: missionBestCandidates(topic, recordTopic(topic.id, r.stars, r.score)) });
