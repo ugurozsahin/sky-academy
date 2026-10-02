@@ -622,6 +622,35 @@ test.describe('Sky Ninja Academy', () => {
   // #893: the right answer is told, not only shown, so a pre-reader gets the correction too — never in Ninja
   // Sprint, whose pace has no room for it (`hud.ts`'s `speakCorrection`). `y2-tables` answers a bare number,
   // so `correctionLine` is never null here.
+  test('Rest prompt: the grown-ups setting persists, and its row fits a 390×664 phone (#940)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await page.click('button[data-rest="20"]');
+    await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
+    expect(await page.evaluate(() => localStorage.getItem('sna:rest'))).toBe('20');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.reload();
+    await openGrownUps(page);
+    await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  test('Rest prompt: 10 min shows one calm line after 10 visible minutes, then waits for another 10 (#940)', async ({ page }) => {
+    await page.clock.install();
+    await page.addInitScript(() => localStorage.setItem('sna:rest', '10'));
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    await page.clock.fastForward('11:00');
+    await winMission(page);
+    await expect(page.locator('.results .best-pill', { hasText: 'little break' })).toBeVisible();
+    await expect(page.locator('#again')).toBeEnabled();                      // nothing blocks or locks
+    await page.click('#again');                                              // the next game, same session: the clock restarted
+    await expect(page.locator('.play')).toBeVisible();
+    await winMission(page);
+    await expect(page.locator('.results')).toBeVisible();
+    await expect(page.locator('.results .best-pill', { hasText: 'little break' })).toHaveCount(0);
+  });
+
   test('a wrong slice speaks "It\'s <answer>." before the next question, in Mission (#893)', async ({ page }) => {
     await captureSpeech(page);
     await seedPlayer(page);

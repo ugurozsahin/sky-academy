@@ -9,7 +9,9 @@ import { topicsFor, type Topic, type YearInfo } from '../curriculum';
 import { load, safeRecord, type TopicProgress } from '../storage';
 import { $ } from './dom';
 import { resultsHTML } from './overlays';
-import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, actionButton, resultsAction, resultsLines, scoreLine, spokenLine } from './results';
+import { restClock } from '../game/rest';
+import { restSetting } from '../device-settings';
+import { resultHeading, resultHeadline, resultMedal, resultPillsHTML, actionButton, resultsAction, withRestLine, scoreLine, spokenLine } from './results';
 import { dojoRowsHTML } from './memory';
 import { stickersHTML } from './screen';
 import { deliverCertificate, drawCertificate } from './certificate';
@@ -79,7 +81,7 @@ export function createResultsScreen(deps: ResultsScreenDeps) {
     const speaker = training ? SENSEI : av;   // Sensei closes a training session; the child's own ninja closes everything else
     say(headline);
     say(scoreLine(r), false, { queue: true });   // #897: how they did, not only a praise line — queued after the headline
-    const lines = resultsLines(payout.candidates);   // #896: belt > island > trophy > best > rest, at most two
+    const lines = withRestLine(payout.candidates, restClock, restSetting());   // #896: belt > island > trophy > best > rest, at most two (#940)
     for (const l of lines) say(spokenLine(l), false, { queue: true });   // queued so a candidate never cuts the headline off
     // `certSaved` (#470) is read the instant after `fileCertificate`'s own write, inside `commitResult()` —
     // per `isWriteFailing()`'s own contract of reflecting only the last attempt — a refusal is not offered to
