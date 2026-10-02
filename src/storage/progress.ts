@@ -1,10 +1,12 @@
 // Recording what a game achieved: stars, accuracy, the per-mode bests, and the daily streak.
 import type { AnswerTally } from './shape';
 import { load, save } from './store';
-export function recordTopic(topicId: string, stars: number, score: number) {
+/** Records a finished Mission; returns whether it beat a previous best above 0 — a first play is never a "new best" (#933). */
+export function recordTopic(topicId: string, stars: number, score: number): boolean {
   const p = load().progress[topicId] ?? { stars: 0, best: 0, plays: 0 };
   const next = { ...p, stars: Math.max(p.stars, stars), best: Math.max(p.best, score), plays: p.plays + 1 };   // keep sprint (#911), hits, tries, last, crown
   save({ progress: { ...load().progress, [topicId]: next } });
+  return p.best > 0 && score > p.best;
 }
 /**
  * Add answered questions to a topic's lifetime tally (Sensei picks the weakest topics from these). Takes an
