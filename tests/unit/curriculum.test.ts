@@ -8,9 +8,9 @@ import { PHASE2, PHASE2B, PHASE3, PHASE5, SPLIT, CVC, DIGRAPHS, GAP_WORDS, AVOID
 import { anyOrderQ } from '../../src/curriculum/any-order';
 import { R_LETTERS_P2, R_LETTERS_ALL, medialIsGenuine, finalIsGenuine } from '../../src/curriculum/reception';
 import {
-  TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, WORD_CLASSES, WORD_CLASS_NAMES, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES,
+  TEMP_GAP, HOMOPHONES, HOMOPHONE_SETS, SUFFIX_ROOT, SENTENCE_TYPES, SENTENCE_TYPE_NAMES, TENSE_VERBS, TENSE_FRAMES,
 } from '../../src/curriculum/year2';
-import { nearOppositeParity } from '../../src/curriculum/year2-oddeven';
+import { nearOppositeParity } from '../../src/curriculum/year2-oddeven'; import { WORD_CLASSES, WORD_CLASS_NAMES } from '../../src/curriculum/year2-wordclass';
 import type { SentenceType } from '../../src/curriculum/year2';
 import { waveOptsFor } from '../../src/ui/play-session';   // #369: the screen's own width derivation, not a copy of it
 import { receptionBlocked, receptionGapFrames, receptionGapSpellings } from './helpers/reception-gaps';
@@ -1862,7 +1862,7 @@ describe('Year 2 grammar and spelling (#299 slice 3)', () => {
       for (const d of [1, 2, 3] as Difficulty[]) {
         const drawn = new Set<string>();
         for (let i = 0; i < N; i++) {
-          const q = t.gen(d, r);
+          const q = t.gen(d, r); if (q.anyOrder) continue;   // #927: its own file covers that form
           const cls = q.prompt.replace('Which word is the ', '').replace('?', '');
           expect(allowed[d], `d${d} asked for a ${cls}`).toContain(cls);
           drawn.add(cls);
