@@ -26,7 +26,7 @@ export function recordAccuracy(topicId: string, t: AnswerTally) {
   const hits = Number.isFinite(t.hits) ? Math.min(Math.max(t.hits, 0), t.tries) : 0;
   if (hits !== t.hits) console.warn(`recordAccuracy("${topicId}"): tally out of range (hits=${t.hits}, tries=${t.tries}) — clamped to ${hits}`);
   const p = load().progress[topicId] ?? { stars: 0, best: 0, plays: 0 };
-  save({ progress: { ...load().progress, [topicId]: { ...p, hits: (p.hits ?? 0) + hits, tries: (p.tries ?? 0) + t.tries } } });
+  save({ progress: { ...load().progress, [topicId]: { ...p, hits: (p.hits ?? 0) + hits, tries: (p.tries ?? 0) + t.tries, last: today() } } });
 }
 /** Count a completed Sensei training session for this year. Returns the new total. */
 export function recordTraining(year: string): number {

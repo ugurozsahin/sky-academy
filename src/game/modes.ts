@@ -3,7 +3,7 @@
 // Session reads the behaviour (difficulty/speed/points/stars/coins/lives); the UI reads the labels.
 import type { Difficulty, YearInfo } from '../curriculum';
 
-export type Mode = 'mission' | 'endless' | 'sprint' | 'boss';
+export type Mode = 'mission' | 'endless' | 'sprint' | 'boss' | 'relaxed';
 
 /** Live state a mode needs while a question is on screen. */
 export interface ModeCtx {
@@ -35,6 +35,7 @@ export interface ModeSpec {
   hasLives: boolean;        // false = a slip costs no life (Ninja Sprint)
   staged: boolean;          // true = five staged waves (mission); false = one continuous run
   timed: boolean;           // Ninja Sprint clock
+  runLength?: number;       // an unstaged run that ends once this many questions are asked (Relaxed practice, #937)
   boss: boolean;            // Boss Battle HP bar
   villain: boolean;         // Hammer Man on screen + TNT bubbles in the mix
   difficulty(c: ModeCtx): Difficulty;
@@ -108,6 +109,16 @@ export const MODES: Record<Mode, ModeSpec> = {
     basePoints: rampPoints,
     stars: c => c.won ? (c.accuracy >= 0.9 ? 3 : c.accuracy >= 0.7 ? 2 : 1) : 0,
     coins: c => baseCoins(c) + (c.won ? 20 : 0) + c.stars * 5,
+  },
+  // #937: no lives, no clock, no villain — ten questions at the year's gentlest speed, one coin per right answer.
+  relaxed: {
+    id: 'relaxed', title: 'Relaxed practice', overHeadingWon: 'Practice done!', overHeadingLost: 'Practice done!',
+    hasLives: false, staged: false, timed: false, boss: false, villain: false, runLength: 10,
+    difficulty: c => c.questionsAsked < 5 ? 1 : c.questionsAsked < 12 ? 2 : 3,   // Sprint's ramp
+    speed: c => eased(c, c.year.speeds[0] ?? 1),
+    basePoints: () => 10,
+    stars: () => 0,
+    coins: c => c.correct,
   },
 };
 

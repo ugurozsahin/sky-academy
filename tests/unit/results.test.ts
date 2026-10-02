@@ -18,6 +18,10 @@ describe('resultMedal', () => {
     expect(resultMedal({ mode: 'endless', won: true, score: 0, stars: 0 })).toBe('🥉');
   });
 
+  it('Relaxed practice always shows the effort medal, whatever the stars (#937)', () => {
+    expect(resultMedal({ mode: 'relaxed', won: true, score: 100, stars: 3 })).toBe('💪');
+  });
+
   it('grades Ninja Sprint on its star tier (💪 when it earned none)', () => {
     expect(resultMedal({ mode: 'sprint', won: true, score: 999, stars: 3 })).toBe('🥇');
     expect(resultMedal({ mode: 'sprint', won: true, score: 0, stars: 2 })).toBe('🥈');
