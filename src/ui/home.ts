@@ -43,11 +43,11 @@ function topbar(nav: Nav, rerender: () => void) {
   return { html, bind };
 }
 
-/** #894: a Daily Dojo row read aloud, for a pre-reader who cannot read the challenge title on the card. */
 /** #909: Sky Storm, Mixed Sprint and Boss Battle lean on topics this child has met and found hard. */
 function playMixed(nav: Nav, year: YearInfo, mode: 'endless' | 'sprint' | 'boss', pool: Topic[], progress: Record<string, TopicProgress>) {
   nav.play({ year, mode, pool, weights: poolWeights(pool, progress) });
 }
+/** #894: a Daily Dojo row read aloud, for a pre-reader who cannot read the challenge title on the card. */
 export function dojoRowLine(c: Challenge, progress: number): string {
   return progress >= c.goal ? `${c.title}. Done!` : `${c.title}. ${progress} of ${c.goal} done.`;
 }
