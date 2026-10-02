@@ -1231,6 +1231,39 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   /**
+   * #931: "Retry stage N" end to end — a Year 1 mission lost in stage 3 offers the button, a loss in stage 2
+   * does not, and tapping it restarts at stage 3 with full lives (the unit tests pin the star and coin maths).
+   */
+  test('"Retry stage N" (#931): a mission lost in stage 3 restarts at stage 3 with full lives', async ({ page }) => {
+    test.setTimeout(150_000);
+    await seedPlayer(page);
+    const loseFrom = async (stage: number) => {
+      await startTopic(page, 'year1', 'y1-add');
+      await page.waitForFunction(() => window.__sna?.state().prompt);
+      await skipToStage(page, stage);
+      await page.waitForFunction(() => window.__sna.bubbles().length > 1);
+      for (let i = 0; i < 10 && !(await page.evaluate(() => window.__sna.state().ended)); i++) {
+        await waitForWrongOrEnd(page);
+        await page.evaluate(() => window.__sna.wrong());
+      }
+      await page.waitForFunction(() => window.__sna.state().ended);
+      await expect(page.locator('.results')).toBeVisible();
+    };
+    await loseFrom(2);
+    await expect(page.locator('#retry-stage')).toHaveCount(0);
+    await page.locator('#home').click();
+    await loseFrom(3);
+    const retry = page.locator('#retry-stage');
+    await expect(retry).toHaveText('Retry stage 3');
+    await retry.click();
+    await expect(page.locator('.play')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    const st = await page.evaluate(() => window.__sna.state());
+    expect(st.stage).toBe(3); expect(st.ended).toBe(false);
+    expect(st.lives, 'full lives for the year').toBe(await page.evaluate(() => window.__sna.session.o.year.lives));
+  });
+
+  /**
    * #470: `recordCert()`'s own `save()` swallows a refused `setItem` (#151) and the 🎓 row used to be drawn
    * from the in-memory certificate regardless, offering a keepsake the album does not actually hold. Same
    * shape as the Ninja Duel case (`tests/e2e/duel.spec.ts`), the other of the two `recordCert()` call sites.

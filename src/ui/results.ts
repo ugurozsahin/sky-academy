@@ -92,8 +92,7 @@ export function resultPillsHTML(lines: ResultCandidate[]): string {
 
 /**
  * The results row's one contextual action (#929) — beside Play again and Islands. `retry` and `fix` are
- * #931's and #930's own buttons; nothing supplies `lostAtStage` or a non-zero `misses` yet, so today only
- * `next` can ever be returned. Precedence: retry a lost mission from its lost stage, else offer to fix
+ * #931's and #930's own buttons; `lostAtStage` is the stage a lost mission ended in (play-results.ts). Precedence: retry a lost mission from its lost stage, else offer to fix
  * mistakes, else move on to the next unstarred topic in the same subject.
  */
 export interface ResultsActionCtx {
@@ -106,6 +105,15 @@ export function resultsAction(ctx: ResultsActionCtx): ResultsAction | null {
   if ((ctx.mode === 'mission' || ctx.training) && ctx.misses >= 1) return { kind: 'fix' };
   if (ctx.mode === 'mission' && !ctx.training && ctx.won && ctx.next) return { kind: 'next', topic: ctx.next };
   return null;
+}
+
+/** The results row's button for `action` (#929/#930/#931): its id and label, `undefined` for no action. */
+export function actionButton(action: ResultsAction | null): { id: string; label: string } | undefined {
+  if (!action) return undefined;
+  if (action.kind === 'next') return { id: 'next-topic', label: 'Next topic →' };
+  if (action.kind === 'fix') return { id: 'fix-mistakes', label: 'Fix my mistakes' };
+  if (action.kind === 'retry') return { id: 'retry-stage', label: `Retry stage ${action.stage}` };
+  return action satisfies never;
 }
 
 /**
