@@ -72,6 +72,7 @@ export const NO_REPEATED_SET = new Set([
 'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
 'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d1', 'y2-duration d3',
 'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
+  'y1-share d2', 'y1-share d3', // #986: the decoys are the total, k and answer ±1, all derived from the card, so no option set recurs with a different answer at these seeds
   'r-initial d3', // #928: any-order, the target set is every picture sharing the keyword's sound, so no two cards offer the same bubbles with different answers
   'y3-count d2', 'y3-count d3', // #1050/#1448: moreOrLess's decoys (otherPower/wrongDirection/both/sameLead) are all derived from base/answer, the same structural reason as every other entry above
 ]);

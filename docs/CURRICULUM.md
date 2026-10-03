@@ -47,6 +47,7 @@ Maths:
 - y1-words — 1–20 in words
 - y1-half — ½, ¼ of quantities
 - y1-arrays — M&D via arrays
+- y1-share — M&D by sharing and grouping objects, exact, within 20 (d1 share, d2 group, d3 both)
 - y1-coins — recognise coins **and the £5/£10 notes**, compare two coins, add two coins within 20p
 - y1-time — o'clock, half past
 - y1-order — order to 20

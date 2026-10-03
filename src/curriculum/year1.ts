@@ -196,6 +196,19 @@ const y1Arrays: Generator = (d, rng) => {
   const rows = ri(rng, 2, d === 1 ? 2 : 3), cols = ri(rng, 2, d === 1 ? 5 : d === 3 ? 5 : 4);
   return numQ(rng, `${rows} rows of ${cols} = ?`, rows * cols, { min: 2, max: 20, visual: { type: 'array', rows, cols }, say: `${rows} rows of ${cols}. How many altogether?` });
 };
+/**
+ * Year 1 M&D, the pictures-and-objects half (#986): "Share 12 between 3" and "How many groups of 2 in 10?"
+ * with the cookies on the card. Only exact divisions are drawn, every total is ≤ 20. d1 shares, d2 groups,
+ * d3 mixes. The total, `k` and the answer ± 1 are the named decoys ("didn't share" is the classic slip).
+ */
+const y1Share: Generator = (d, rng) => {
+  const share = d === 1 || (d === 3 && rng() < 0.5);
+  const k = share ? (d === 1 ? ri(rng, 2, 3) : ri(rng, 2, 5)) : pick(rng, [2, 5, 10]);
+  const ans = ri(rng, 1, Math.floor((d === 1 ? 12 : 20) / k)), total = k * ans;
+  const p = share ? `Share ${total} between ${k} — how many each?` : `How many groups of ${k} in ${total}?`;
+  const say = share ? `Share ${total} equally between ${k}. How many does each one get?` : `How many groups of ${k} can you make from ${total}?`;
+  return numQ(rng, p, ans, { min: 0, max: 20, n: d === 1 ? 2 : 3, say, visual: { type: 'objects', emoji: '🍪', n: total }, distractors: [total, k, ans + 1, ans - 1] });
+};
 const y1Order: Generator = (d, rng) => orderQ(rng, d === 1 ? 10 : 20, d === 3 ? 4 : 3);
 const y1Line: Generator = (d, rng) => lineQ(rng, d === 1 ? 0 : ri(rng, 0, d === 2 ? 10 : 90), 1, 6);
 
@@ -404,6 +417,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year1', nc: 'Y1 NPV: numbers to 20 in words', gen: y1Words },
   { id: 'y1-half', title: 'Halves & Quarters', icon: '🍕', subject: 'maths', year: 'year1', nc: 'Y1 Fractions: half, quarter', gen: y1Half },
   { id: 'y1-arrays', title: 'Arrays', icon: '🟦', subject: 'maths', year: 'year1', nc: 'Y1 M&D: arrays, grouping', gen: y1Arrays },
+  { id: 'y1-share', title: 'Share & Group', icon: '🍪', subject: 'maths', year: 'year1', nc: 'Y1 M&D: grouping, sharing', gen: y1Share },
   { id: 'y1-coins', title: 'Coins', icon: '💷', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: coins & notes', gen: y1Coins },
   { id: 'y1-time', title: "O'clock & Half Past", icon: '🕐', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time', gen: y1Time },
   { id: 'y1-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year1', nc: 'Y1 NPV: order numbers to 20', sequenceFrom: 1, gen: y1Order },
