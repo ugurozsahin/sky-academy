@@ -33,6 +33,7 @@
 🌧	0.7	cloud with rain
 🌳	1.0	deciduous tree
 🌷	0.6	tulip
+🌹	0.6	rose
 🌻	0.6	sunflower
 🌼	0.6	blossom
 🍌	0.6	banana
@@ -58,6 +59,7 @@
 🎮	0.6	video game
 🎯	0.6	bullseye
 🎲	0.6	game die
+🎵	0.6	musical note
 🎻	0.6	violin
 🏃	0.6	person running
 🏇	1.0	horse racing
@@ -100,6 +102,7 @@
 🐾	0.6	paw prints
 👀	0.6	eyes
 👂	0.6	ear
+👃	0.6	nose
 👑	0.6	crown
 👜	0.6	handbag
 👩	0.6	woman
@@ -123,6 +126,7 @@
 🔁	1.0	repeat button
 🔊	0.6	speaker high volume
 🔍	0.6	magnifying glass tilted left
+🔒	0.6	locked
 🔔	0.6	bell
 🔗	0.6	link
 🔟	0.6	keycap: 10

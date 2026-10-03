@@ -4,6 +4,7 @@
 // Generators shared with Year 1/Year 2 live in util.ts (#325 stage 4).
 import type { Generator, Rng, Topic } from './types';
 import { rInitial } from './reception-initial';
+import { rRhyme } from './reception-rhyme';
 import {
   ri, pick, shuffle, numQ, wordQ, OBJECTS,
   orderQ, balanceQ,
@@ -322,6 +323,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-share', title: 'Share It Out', icon: '🤝', subject: 'maths', year: 'reception', nc: 'ELG Patterns: distribute equally between two', gen: rShare },
   { id: 'r-oddeven', title: 'Partners', icon: '🐾', subject: 'maths', year: 'reception', nc: 'ELG Patterns: evens and odds', gen: rOddEven },
   // Reception writing
+  { id: 'r-rhyme', title: 'Rhyme Time', icon: '🎵', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: spot and suggest rhymes (Development Matters phonological awareness)', gen: rRhyme },
   { id: 'r-sounds', title: 'Letter Sounds', icon: '🔊', subject: 'writing', year: 'reception', nc: 'ELG Writing: sounds to letters', gen: rLetterSound },
   { id: 'r-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: say a sound for each letter; phase 2–3 sounds by ear', gen: rSoundHunt },
   { id: 'r-capitals', title: 'Big & Small Letters', icon: '🅰️', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: letters', gen: rCapitals },

@@ -12,7 +12,7 @@ import { senseiTopics, poolWeights } from '../game/sensei';
 import { carriedStreak, dailyChallenges, multiplier, SET_BONUS, type Challenge, type DojoState } from '../game/dojo';
 import { hasMemoryDecks } from '../game/memory';
 import { duelHistoryHTML } from './duel';
-import { chooserEligible, chooserTopics, openChooser, trophyBadge, trophyCount } from './chooser';
+import { chooserEligible, chooserTopics, duelChooserTopics, openChooser, trophyBadge, trophyCount } from './chooser';
 import { $, $$, capDigits, render, stars } from './dom';
 import type { PlayOpts } from './play';
 
@@ -175,7 +175,7 @@ export function islandScreen(nav: Nav, year: YearInfo, subjectInit: 'maths' | 'w
       go: () => nav.memory(year) }] : []),
     { id: 'duel', mod: 'duel', vport: `<span class="vport emoji">⚔️</span>`,
       title: 'Ninja Duel', blurb: 'Two players · first slice wins',
-      go: () => nav.duel(year) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
+      go: () => openChooser($('#island-overlay'), duelChooserTopics(year, subject), topic => { sfx.tap(); topic ? nav.duel(year, topic.id) : nav.duel(year); }, { mixed: true, mixedLabel: 'Random' }) },   // the hand-over line is spoken with round 1's question (src/game/duel.ts)
   ];
   render(`
   <section class="screen home island-screen">

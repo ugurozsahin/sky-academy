@@ -71,7 +71,7 @@ async function forceTopicAndClick(page: Page, index: number, poolSize: number, e
   await page.evaluate(() => { const w = window as any; if (w.__realRandom) { Math.random = w.__realRandom; delete w.__realRandom; } });
 }
 
-async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins = 0, opts?: { refuseWrites?: boolean; forceTopic?: { index: number; poolSize: number; topicId: string } }) {
+async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins = 0, opts?: { pickTopic?: string; refuseWrites?: boolean; forceTopic?: { index: number; poolSize: number; topicId: string } }) {
   // The dojo seed is chosen by the PAGE's date, not this process's: `storage.ts`'s `today()` runs in the
   // browser, and a seed built against a different day is silently rolled over by `dojoFor()` — progress
   // gone, the case green for the wrong reason. The two clocks straddle midnight UTC in the general case,
@@ -94,8 +94,8 @@ async function startDuel(page: Page, dojoByDate?: Record<string, unknown>, coins
   await expect(page.locator('.home')).toBeVisible();
   await page.click('.island[data-year="year1"]');
   const ft = opts?.forceTopic;
-  if (ft) await forceTopicAndClick(page, ft.index, ft.poolSize, ft.topicId, () => page.click('#duel'));
-  else await page.click('#duel');
+  if (ft) await forceTopicAndClick(page, ft.index, ft.poolSize, ft.topicId, async () => { await page.click('#duel'); await page.click('.topic[data-mixed]'); });   // #957: Random, as before
+  else { await page.click('#duel'); await page.click(opts?.pickTopic ? `#island-overlay .topic[data-id="${opts.pickTopic}"]` : '.topic[data-mixed]'); }
   await expect(page.locator('.duel-screen')).toBeVisible();
   await page.waitForFunction(() => window.__sna?.state().prompt);
 }
@@ -1413,6 +1413,7 @@ test.describe('Ninja Duel', () => {
     await expect(page.locator('.home')).toBeVisible();
     await page.click('.island[data-year="year1"]');
     await page.click('#duel');
+    await page.click('.topic[data-mixed]');   // #957
     await expect(page.locator('.duel-screen')).toBeVisible();
     await page.waitForFunction(() => window.__sna?.state().prompt);
     for (let r = 1; r <= 10; r++) {
@@ -1693,5 +1694,28 @@ test.describe('Ninja Duel', () => {
     expect(saved.duels, 'the match still happened, and a 9-0 is still a Player 1 win').toHaveLength(1);
     expect(saved.duels[0]).toMatchObject({ winner: 'a', scoreA: 9, scoreB: 0, rounds: 10 });
     expect(saved.certs, 'and a Player 1 win earns its certificate however the last round went').toHaveLength(1);
+  });
+
+  test('Ninja Duel opens a topic chooser: Random first, a named topic starts the match on it (#957)', async ({ page }) => {
+    const year = YEARS.find(y => y.id === 'year1')!;
+    const named = topicsFor('year1', 'maths').find(t => duelPool(topicsFor('year1'), year.diffs[0] ?? 1).some(p => p.id === t.id))!;
+    await startDuel(page, undefined, 0, { pickTopic: named.id });
+    expect(await page.evaluate(() => window.__sna.state().topic)).toBe(named.id);
+  });
+
+  test('Ninja Duel chooser: Random is the first card and only duel-able topics follow (#957)', async ({ page }) => {
+    await page.addInitScript(() => { if (!localStorage.getItem('sna:v1')) localStorage.setItem('sna:v1', JSON.stringify({ v: 1, name: 'Ada', avatar: 'volt' })); });
+    await page.goto('/');
+    await expect(page.locator('.home')).toBeVisible();
+    await page.click('.island[data-year="year1"]');
+    await page.click('#duel');
+    const cards = page.locator('#island-overlay .topic');
+    await expect(cards.first()).toHaveAttribute('data-mixed', '');
+    await expect(cards.first()).toContainText('Random');
+    expect(await cards.count()).toBeGreaterThan(1);
+    await page.setViewportSize({ width: 390, height: 664 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390×664').toBe(true);
+    await page.click('#chooser-back');
+    await expect(page.locator('.duel-screen')).toHaveCount(0);
   });
 });
