@@ -19,6 +19,9 @@ import { parseNum, type Dec } from '../../../src/curriculum/ks2num';
 /** Independently evaluate simple arithmetic prompts like "7 + 5 = ?" / "? × 2 = 8" / "12 − ? = 5" — the
  * EYFS/KS1 fallback the generic per-topic loop in `curriculum.test.ts` already used before this oracle. */
 export function solve(prompt: string): number | null {
+  // #984: "c = a op b" is "a op b = c" read the other way round.
+  const mirrored = prompt.match(/^(\?|\d+)\s*=\s*(.+)$/);
+  if (mirrored) prompt = `${mirrored[2]} = ${mirrored[1]}`;
   const m = prompt.replace(/−/g, '-').match(/^(\?|\d+)\s*([+\-×÷])\s*(\?|\d+)\s*=\s*(\?|\d+)$/);
   if (!m) return null;
   const [, a, op, b, c] = m;
