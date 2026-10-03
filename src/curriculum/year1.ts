@@ -107,8 +107,13 @@ const y1Skip: Generator = (d, rng) => {
   // misses rather than whatever `nearby()` scrapes together (#366).
   return numQ(rng, p, ans, { min: 0, max: 100, say: `Counting in ${step}s: ${seq.join(', ')}, what comes next?`, distractors: [ans + 1, ans - 1, ans + step, ans - step + 1, ans - 2] });
 };
-/** "Count back: 42, 41, 40, ?" (#983): a run of three one-steps down. At d3 a third of cards start just past a tens boundary, where children slip. */
-const y1CountBack = (d: Difficulty, rng: () => number) => {
+/**
+ * "Count back: 42, 41, 40, ?" (#983): a run of three one-steps down. At d3 a third of cards start at 10k, 10k+1 or
+ * 10k+2, where children slip: the run reaches or crosses a tens boundary (for 10k the answer is 10k−3, the card's
+ * tens digit falls inside the run). `ans + 1` is `s − 2`, printed in the prompt — a deliberately weak decoy that
+ * catches a child who repeats the last number shown.
+ */
+const y1CountBack: Generator = (d, rng) => {
   const s = d === 3 && rng() < 1 / 3 ? 10 * ri(rng, 1, 9) + ri(rng, 0, 2) : ri(rng, 3, d === 1 ? 30 : d === 2 ? 60 : 100);
   const run = `${s}, ${s - 1}, ${s - 2}`, ans = s - 3;
   return numQ(rng, `Count back: ${run}, ?`, ans, { min: 0, max: 100, say: `Count back: ${run}. What comes next?`, distractors: [ans - 1, ans + 1, ans - 10, ans + 10] });
