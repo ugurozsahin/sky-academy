@@ -58,6 +58,7 @@ Maths:
 - y1-mass — heavier/lighter, g
 - y1-capacity — holds more/less, ml within 100
 - y1-months — day & month order, days in a week/weekend, seasons
+- y1-when — My Day: morning, afternoon, evening; yesterday, today, tomorrow; before, after (list neighbour, no wrapping)
 - y1-balance — = as balance: `a + b = ? + c`, `a − b = ? + c`, `a + b = ? − c` within 20
 
 Writing:

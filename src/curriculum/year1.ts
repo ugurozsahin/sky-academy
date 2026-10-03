@@ -238,6 +238,30 @@ const y1Months: Generator = (d, rng) => {
   const i = ri(rng, 0, 11), after = rng() < 0.5, ans = MONTHS[(i + (after ? 1 : 11)) % 12];
   return wordQ(rng, `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?`, ans, shuffle(rng, MONTHS.filter(x => x !== ans)).slice(0, 3), { say: `Which month comes ${after ? 'after' : 'before'} ${MONTHS[i]}?` });
 };
+/** "My Day" (#979): two fixed ordered lists; the answer is the list neighbour, never wrapping. */
+const DAY_PARTS = ['morning', 'afternoon', 'evening'];
+const DAY_PART_EMOJI = ['🌅', '☀️', '🌙'];
+const DAY_WORDS = ['yesterday', 'today', 'tomorrow'];
+const y1When: Generator = (d, rng) => {
+  const hint = { hint: 'Slice the word', hintIsData: false };
+  const kind = d === 1 ? 0 : d === 2 ? ri(rng, 0, 2) : ri(rng, 1, 3);
+  const first = 'Which part of the day comes first?';
+  if (d === 1 && rng() < 0.25) return wordQ(rng, first, DAY_PARTS[0], DAY_PARTS.slice(1), { say: first, ...hint });  // keeps d1 above the suite's variety floor
+  if (kind === 0) {                                              // strip with one day part hidden
+    const gap = ri(rng, 0, 2), ans = DAY_PARTS[gap];
+    const text = DAY_PART_EMOJI.map((e, i) => (i === gap ? '_' : e)).join(' ');
+    return wordQ(rng, 'Which part of the day is missing?', ans, DAY_PARTS.filter(x => x !== ans), { visual: { type: 'strip', text }, say: 'Which part of the day is missing? Morning, afternoon or evening?', ...hint });
+  }
+  const parts = d === 2 ? kind === 2 : rng() < 0.5;              // d2: kind 1 = word cards, kind 2 = day parts
+  const list = parts ? DAY_PARTS : DAY_WORDS, other = parts ? DAY_WORDS : DAY_PARTS;
+  const decoys = (ans: string) => [...shuffle(rng, list.filter(x => x !== ans)), ...shuffle(rng, other)];
+  if (parts && rng() < 0.3) {
+    return wordQ(rng, first, DAY_PARTS[0], decoys(DAY_PARTS[0]), { say: first, ...hint });
+  }
+  const after = rng() < 0.5, i = after ? ri(rng, 0, 1) : ri(rng, 1, 2), ans = list[after ? i + 1 : i - 1];
+  const q2 = `What comes ${after ? 'after' : 'before'} ${list[i]}?`;
+  return wordQ(rng, q2, ans, decoys(ans), { say: q2, ...hint });
+};
 const y1Balance: Generator = (d, rng) => {
   if (d === 1) { const a = ri(rng, 1, 9), b = ri(rng, 1, 10 - a); return rng() < 0.5 ? balanceQ(rng, `${a} + ${b}`, '?', a + b, 20) : balanceQ(rng, '?', `${a} + ${b}`, a + b, 20); }
   const a = ri(rng, 1, 15), b = ri(rng, 1, 20 - a), total = a + b;
@@ -408,6 +432,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-mass', title: 'Heavy & Light', icon: '🏋️', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: mass/weight', gen: y1Mass },
   { id: 'y1-capacity', title: 'Full & Empty', icon: '🥤', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: capacity & volume', gen: y1Capacity },
   { id: 'y1-months', title: 'Days & Months', icon: '📅', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time (days, weeks, months)', gen: y1Months },
+  { id: 'y1-when', title: 'My Day', icon: '🌅', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: sequence events (morning, afternoon, evening; yesterday, today, tomorrow; before, after)', gen: y1When },
   { id: 'y1-balance', title: 'Balance the Scales', icon: '⚖️', subject: 'maths', year: 'year1', nc: 'Y1 A&S: equals sign, missing number', gen: y1Balance },
   // Year 1 writing
   { id: 'y1-digraphs', title: 'Sound Pairs', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: digraphs', gen: y1Digraphs },
