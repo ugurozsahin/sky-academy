@@ -3388,7 +3388,11 @@ test.describe('Sky Ninja Academy', () => {
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="reception"]');
     for (let tries = 0; tries < 60 && (await page.evaluate(() => window.__sna?.theme)) !== 'read'; tries++) {
-      if (await page.locator('.memory').count()) { await page.click('#back'); await page.click('.island[data-year="reception"]'); }
+      if (await page.locator('.memory').count()) {
+        await page.click('#back');                                      // lands on the island screen or the map, whichever the router returns to
+        await page.locator('#memory, .island[data-year="reception"]').first().waitFor();
+        if (!(await page.locator('#memory').count())) await page.click('.island[data-year="reception"]');
+      }
       await expect(page.locator('#memory')).toBeVisible();
       await page.click('#memory');
       await expect(page.locator('.memory')).toBeVisible();
@@ -3396,16 +3400,32 @@ test.describe('Sky Ninja Academy', () => {
     expect(await page.evaluate(() => window.__sna.theme)).toBe('read');
     await expect(page.locator('.card')).toHaveCount(8);
     const cards = await page.evaluate(() => window.__sna.cards() as { pair: number; text: string }[]);
-    const wi = cards.findIndex(c => /^[a-z]{3}$/.test(c.text));
-    const mate = cards.findIndex((c, k) => k !== wi && c.pair === cards[wi].pair);
-    const word = cards[wi].text;
+    const wordIdx = cards.map((c, k) => /^[a-z]{3}$/.test(c.text) ? k : -1).filter(k => k >= 0);
+    const mateOf = (w: number) => cards.findIndex((c, k) => k !== w && c.pair === cards[w].pair);
     const said = () => page.evaluate(() => (window as unknown as { __said: string[] }).__said);
-    await page.evaluate((k) => window.__sna.flip(k), wi);
+    const heard = async (word: string) => (await said()).filter(l => l === word).length;
+    const flip = (k: number) => page.evaluate((i) => window.__sna.flip(i), k);
+    // Word card first: silent on its flip; the picture (second) speaks the word once, the match adds nothing.
+    const w1 = wordIdx[0], word1 = cards[w1].text;
+    await flip(w1); await page.waitForTimeout(300);
+    expect(await heard(word1), 'the word card is not read to the child').toBe(0);
+    await flip(mateOf(w1));
+    await expect(page.locator(`.card[data-i="${w1}"]`)).toHaveClass(/matched/);
+    expect(await heard(word1)).toBe(1);
+    // Picture first, word card second: the picture speaks the word (1), and the match speaks it again (2). Without the match-time speech this stays 1.
+    await page.waitForFunction(() => !window.__sna.state().waiting);
+    const w2 = wordIdx[1], word2 = cards[w2].text;
+    await flip(mateOf(w2));
+    await expect.poll(() => heard(word2)).toBe(1);
+    await flip(w2);
+    await expect(page.locator(`.card[data-i="${w2}"]`)).toHaveClass(/matched/);
+    await expect.poll(() => heard(word2)).toBe(2);
+    // A miss with the word card turned second stays silent: the child has not matched it, so it is not read to them.
+    await page.waitForFunction(() => !window.__sna.state().waiting);
+    const w3 = wordIdx[2], other = mateOf(wordIdx[3]);
+    await flip(other); await flip(w3);
     await page.waitForTimeout(300);
-    expect(await said(), 'the word card is not read to the child').not.toContain(word);
-    await page.evaluate((k) => window.__sna.flip(k), mate);                   // the picture says the word, then the match speaks it
-    await expect(page.locator(`.card[data-i="${wi}"]`)).toHaveClass(/matched/);
-    expect(await said()).toContain(word);
+    expect(await heard(cards[w3].text), 'a missed word card is not read out').toBe(0);
   });
   test('Memory Match: cards flip, a miss turns back, pairs lock, and the finished board is counted', async ({ page }) => {
     await seedPlayer(page, 'splash', 'Mia');

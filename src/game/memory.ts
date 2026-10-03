@@ -50,7 +50,7 @@ const shapes = (rng: Rng, list: readonly (readonly [string, string, ...unknown[]
   }
   return out;
 };
-/** What a face says when it is turned over: nothing for a `quiet` word card, which would otherwise read itself to the child (#964); `src/ui/memory.ts` speaks it on the match when it was the second card turned (turned first, the picture has just said the word). */
+/** What a face says when it is turned over: nothing for a `quiet` word card, which would otherwise read itself to the child (#964); `src/ui/memory.ts` speaks it on the match when it was the second card turned, so the child hears the word twice (the picture, then the match); turned first, the picture has just said it and the match adds nothing. */
 export const spokenOnFlip = (f: Face): string | undefined => f.quiet ? undefined : f.say;
 /** Read & Match: four CVC words with no digraph (`cow`'s `ow` is not blendable letter by letter) beside their pictures. */
 const readPairs = (rng: Rng): Pair[] => shuffle(rng, CVC.filter(([w]) => !DIGRAPHS.some(d => w.includes(d)))).slice(0, 4).map(([w, e]) => ({ a: { text: w, say: w, quiet: true }, b: txt(e, w) }));
