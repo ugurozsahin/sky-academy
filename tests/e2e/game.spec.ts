@@ -3638,6 +3638,20 @@ test.describe('Sky Ninja Academy', () => {
     await expectFitsViewport(page, 'grown-ups This week block');
   });
 
+  test('For grown-ups: "Share a progress summary" falls back to the clipboard, with no save code in the text (#942)', async ({ page }) => {
+    await page.addInitScript(() => { (navigator as any).share = undefined; (window as any).__copied = ''; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => { (window as any).__copied = t; } }, configurable: true }); });
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    const btn = page.locator('#share-progress');
+    await btn.scrollIntoViewIfNeeded();
+    await expectFitsViewport(page, 'grown-ups share section');
+    await btn.click();
+    await expect(page.locator('#share-msg')).toContainText('Copied');
+    const text = await page.evaluate(() => (window as any).__copied as string);
+    expect(text).toContain('progress for Ada');
+    expect(text).not.toMatch(/NaN|undefined|—%|sna:v1/);
+  });
+
   test('a finished Mission writes today\'s entry into the day log with its topic (#939)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-count');

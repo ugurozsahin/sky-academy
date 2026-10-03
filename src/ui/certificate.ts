@@ -215,7 +215,7 @@ export function certRoute(caps: { canShareFiles: boolean; claudeSave: boolean; c
  * answered.
  */
 interface CapFilesystem { writeFile(o: { path: string; data: string; directory: string }): Promise<{ uri: string }> }
-interface CapShare { share(o: { url?: string; title?: string; dialogTitle?: string }): Promise<void> }
+export interface CapShare { share(o: { url?: string; text?: string; title?: string; dialogTitle?: string }): Promise<void> }
 
 /** Are both plugins this route needs actually on the bridge? (pure capability check, no I/O) */
 export function hasCapacitorShare(w: Window & typeof globalThis = window): boolean {

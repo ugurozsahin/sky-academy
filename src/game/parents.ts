@@ -137,3 +137,32 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
 
 /** Whole-number percent for display (null → em dash handled by the caller). */
 export const pct = (x: number | null): number | null => (x === null ? null : Math.round(x * 100));
+
+// ---------- Progress text for sharing (#942) ----------
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const titles = (ts: readonly TopicStat[]) => ts.map(t => t.title).join(', ');
+/**
+ * A short plain-text progress note a grown-up can paste into a reading record, an email or a school app. Only
+ * the child's name, the date, the week figures, stars per island and topic titles — no save code, no device data.
+ * An empty save reads sensibly: no accuracy is quoted without questions and no list is left blank.
+ */
+export function progressText(sm: ParentSummary, name: string, now: Date = new Date()): string {
+  const w = sm.week, who = name.trim() || 'your ninja';
+  const week = w.days
+    ? `This week: ${w.days}/7 days played, ${w.questions} questions${w.accuracy === null ? '' : `, ${pct(w.accuracy)}% right`}.`
+    : 'This week: no play yet.';
+  return [
+    `Sky Ninja Academy — progress for ${who}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`,
+    week,
+    `Stars: ${sm.years.map(y => `${y.title} ${y.stars}/${y.maxStars}`).join(' · ')} (${sm.starsEarned}/${sm.starsMax} in all)`,
+    `Going well: ${sm.strongest.length ? titles(sm.strongest) : 'not enough play yet'}`,
+    `Where to help: ${sm.weakest.length ? titles(sm.weakest) : 'not enough play yet'}`,
+  ].join('\n');
+}
+/** How the summary leaves the device: the browser's share sheet, the APK's, the clipboard, else selected for copying by hand. */
+export type SummaryRoute = 'share' | 'capacitor' | 'copy' | 'select';
+export function summaryRoute(caps: { webShare: boolean; capacitorShare: boolean; clipboard: boolean }): SummaryRoute {
+  if (caps.webShare) return 'share';
+  if (caps.capacitorShare) return 'capacitor';
+  return caps.clipboard ? 'copy' : 'select';
+}
