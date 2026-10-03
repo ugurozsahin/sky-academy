@@ -5,6 +5,7 @@
 // and a `.row` of buttons (`src/styles/shared.css`) — not `.modal.results`, which guard rail #35 keeps
 // single-sourced in `screen.ts`; the surrounding `.overlay` already scrolls on its own if the list is long.
 import { drillsFor, topicsFor, type Topic, type YearId, type YearInfo } from '../curriculum';
+import { duelPool } from '../game/duel';
 import { trophyFor } from '../game/trophies';
 import type { TopicProgress } from '../storage/shape';
 import { $, $$ } from './dom';
@@ -12,6 +13,8 @@ import { $, $$ } from './dom';
 export interface ChooserOpts {
   /** When true, "🎲 Mixed" is drawn first and calls `onPick(null)`. */
   mixed: boolean;
+  /** The first card's label and icon; "🎲 Mixed" unless a mode says otherwise (Ninja Duel's is "🎲 Random", #957). */
+  mixedLabel?: string;
   /** Text drawn after a topic's name (its trophy, #912); empty for none. */
   badge?: (t: Topic) => string;
 }
@@ -22,10 +25,16 @@ export const chooserEligible = (t: Topic): boolean => t.input !== 'tracing';
 /** What the chooser lists for a year's open subject: the regular topics, then that subject's drills (#915). Drills are never in the Mixed pool. */
 export const chooserTopics = (year: YearId, subject: Topic['subject']): Topic[] => [...topicsFor(year, subject).filter(chooserEligible), ...drillsFor(year, subject)];
 
+/** #957: what Ninja Duel's chooser lists — the open subject's chooser topics that `duelPool` keeps (no sequence or tracing topic, no drill), in the chooser's order. */
+export const duelChooserTopics = (year: YearInfo, subject: Topic['subject']): Topic[] => {
+  const playable = new Set(duelPool(topicsFor(year.id), year.diffs[0] ?? 1).map(t => t.id));
+  return chooserTopics(year.id, subject).filter(t => playable.has(t.id));
+};
+
 /** Opens a topic chooser inside `overlay` (a hidden `.overlay` element already in the DOM, the pattern
  *  `src/ui/profiles.ts`'s `#profile-overlay` uses). Back, or picking a card, hides and empties it again. */
 export function openChooser(overlay: HTMLElement, topics: Topic[], onPick: (topic: Topic | null) => void, opts: ChooserOpts): void {
-  const mixedCard = opts.mixed ? `<button class="topic" data-mixed><span class="ic">🎲</span><b>Mixed</b></button>` : '';
+  const mixedCard = opts.mixed ? `<button class="topic" data-mixed><span class="ic">🎲</span><b>${opts.mixedLabel ?? 'Mixed'}</b></button>` : '';
   const cards = topics.map(t => `<button class="topic" data-id="${t.id}"><span class="ic">${t.icon}</span><b>${t.title}</b>${opts.badge?.(t) ?? ''}</button>`).join('');
   overlay.hidden = false;
   overlay.innerHTML = `
