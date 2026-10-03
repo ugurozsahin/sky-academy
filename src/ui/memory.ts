@@ -1,7 +1,7 @@
 // Memory Match screen: a calm, non-slice card-flip mode. Cards are DOM buttons (no canvas).
 import { avatarById, cheerLine, praiseLine } from '../avatars';
 import type { YearInfo } from '../curriculum';
-import { gridFor, Memory, pickTheme, type Face } from '../game/memory';
+import { gridFor, Memory, pickTheme, spokenOnFlip, type Face } from '../game/memory';
 import { isReadOnlySave, isWriteFailing, load, recordGameEnd, recordMemory, touchStreak } from '../storage';
 import { say, sfx } from '../audio';
 import { $, $$, esc, render } from './dom';
@@ -60,13 +60,13 @@ export function memoryScreen(o: MemoryOpts, goHome: () => void, replay: () => vo
   function flip(i: number): boolean {
     if (lock) return false;
     const r = game.flip(i); if (r === 'ignored') return false;
-    sfx.tap(); say(game.cards[i].face.say, false); draw();
+    const face = game.cards[i].face, spoken = spokenOnFlip(face); sfx.tap(); if (spoken) say(spoken, false); draw();
     // #484: the board's own writes are committed here, the instant the winning pair is matched — not 900ms
     // later inside `finish()`, which used to run them from the overlay's own scope-bound timer. Quitting
     // through `#back` in that window (`cleanup()` -> `scope.dispose()`) cancelled `finish()` outright: the
     // last board of a session lost its coins, its Daily Dojo move and its streak, with nothing to say so.
     if (r === 'match') {
-      sfx.correct(); toast(`${cheerLine(av)} A pair!`, 'good'); cardEls[i].classList.add('pop');
+      if (face.quiet) say(face.say, false); sfx.correct(); toast(`${cheerLine(av)} A pair!`, 'good'); cardEls[i].classList.add('pop');
       cardEls[game.cards.findIndex((c, k) => k !== i && c.pair === game.cards[i].pair && c.matched)]?.classList.add('pop');
       if (game.done) { const payout = commit(); later(() => finish(payout), 900); }
     }

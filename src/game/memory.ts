@@ -1,8 +1,8 @@
 // Memory Match: flip two cards, keep the pairs. Pure logic + pair decks (no DOM) so it is unit-testable.
 import type { Rng, YearId } from '../curriculum';
-import { coinLabel, numberWord, OBJECTS, pick, ri, SAME_SOLID, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
+import { coinLabel, CVC, DIGRAPHS, numberWord, OBJECTS, pick, ri, SAME_SOLID, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
 
-export interface Face { text: string; say: string; coin?: number; small?: boolean }  // coin = pence, drawn as a coin
+export interface Face { text: string; say: string; coin?: number; small?: boolean; quiet?: true }  // coin = pence, drawn as a coin; quiet = not spoken when turned over (#964)
 export interface Pair { a: Face; b: Face }
 // `hintIsData` (named after the same flag on `Question`, `curriculum/types.ts`): true when the hint is the
 // only place the matching rule is stated. Every other theme pairs a picture/count/word with a name — the
@@ -50,6 +50,10 @@ const shapes = (rng: Rng, list: readonly (readonly [string, string, ...unknown[]
   }
   return out;
 };
+/** What a face says when it is turned over: nothing for a `quiet` word card, which would otherwise read itself to the child (#964); `src/ui/memory.ts` speaks it on the match when it was the second card turned (turned first, the picture has just said the word). */
+export const spokenOnFlip = (f: Face): string | undefined => f.quiet ? undefined : f.say;
+/** Read & Match: four CVC words with no digraph (`cow`'s `ow` is not blendable letter by letter) beside their pictures. */
+const readPairs = (rng: Rng): Pair[] => shuffle(rng, CVC.filter(([w]) => !DIGRAPHS.some(d => w.includes(d)))).slice(0, 4).map(([w, e]) => ({ a: { text: w, say: w, quiet: true }, b: txt(e, w) }));
 const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
 
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
@@ -58,6 +62,7 @@ export const THEMES: Partial<Record<YearId, Theme[]>> = {
     { id: 'count', title: 'Count & match', hint: 'Match each number to the same number of things', hintIsData: false, pairs: rng => { const e = pick(rng, OBJECTS); return shuffle(rng, [1, 2, 3, 4, 5, 6]).slice(0, 4).map(n => ({ a: txt(String(n), numberWord(n)), b: objs(n, e) })); } },
     { id: 'shapes', title: 'Shapes', hint: 'Match each shape to its name', hintIsData: false, pairs: rng => shapes(rng, SHAPES_2D.slice(0, 4), 4) },
     { id: 'words', title: 'Number words', hint: 'Match each number to its word', hintIsData: false, pairs: rng => words(rng, 1, 5, 4) },
+    { id: 'read', title: 'Read & Match', hint: 'Read the word and find its picture', hintIsData: false, pairs: readPairs },
   ],
   year1: [
     { id: 'words', title: 'Number words', hint: 'Match each number to its word', hintIsData: false, pairs: rng => words(rng, 1, 20, 6) },

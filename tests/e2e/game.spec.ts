@@ -3376,6 +3376,37 @@ test.describe('Sky Ninja Academy', () => {
       + `not the modal's fixed position (which would move it close to maxScroll = ${maxScroll}px)`).toBeLessThan(10);
   });
 
+  // #964: Read & Match's word card must not read itself when turned over; it is heard once its pair is matched.
+  test('Memory Match Read & Match: a word card is silent when flipped and spoken once matched (#964)', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as unknown as { __said: string[] }).__said = [];
+      Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
+        speaking: false, pending: false, getVoices: () => [], onvoiceschanged: null, cancel: () => {},
+        speak: (u: SpeechSynthesisUtterance) => { (window as unknown as { __said: string[] }).__said.push(u.text); },
+      } });
+    });
+    await seedPlayer(page, 'splash', 'Mia');
+    await page.click('.island[data-year="reception"]');
+    for (let tries = 0; tries < 60 && (await page.evaluate(() => window.__sna?.theme)) !== 'read'; tries++) {
+      if (await page.locator('.memory').count()) { await page.click('#back'); await page.click('.island[data-year="reception"]'); }
+      await expect(page.locator('#memory')).toBeVisible();
+      await page.click('#memory');
+      await expect(page.locator('.memory')).toBeVisible();
+    }
+    expect(await page.evaluate(() => window.__sna.theme)).toBe('read');
+    await expect(page.locator('.card')).toHaveCount(8);
+    const cards = await page.evaluate(() => window.__sna.cards() as { pair: number; text: string }[]);
+    const wi = cards.findIndex(c => /^[a-z]{3}$/.test(c.text));
+    const mate = cards.findIndex((c, k) => k !== wi && c.pair === cards[wi].pair);
+    const word = cards[wi].text;
+    const said = () => page.evaluate(() => (window as unknown as { __said: string[] }).__said);
+    await page.evaluate((k) => window.__sna.flip(k), wi);
+    await page.waitForTimeout(300);
+    expect(await said(), 'the word card is not read to the child').not.toContain(word);
+    await page.evaluate((k) => window.__sna.flip(k), mate);                   // the picture says the word, then the match speaks it
+    await expect(page.locator(`.card[data-i="${wi}"]`)).toHaveClass(/matched/);
+    expect(await said()).toContain(word);
+  });
   test('Memory Match: cards flip, a miss turns back, pairs lock, and the finished board is counted', async ({ page }) => {
     await seedPlayer(page, 'splash', 'Mia');
     await page.click('.island[data-year="reception"]');
