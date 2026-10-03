@@ -1,6 +1,6 @@
 // Paying out coins, stickers and the Daily Dojo when a game ends.
 import { applyEvent, dojoFor, type DojoEvent, type DojoOutcome, type DojoState } from '../game/dojo';
-import { sanitizeSlips, type Slip } from '../save-records';
+import { logGame, sanitizeSlips, type Slip } from '../save-records';
 import { load, save } from './store';
 import { evaluateStickers } from './stickers';
 import { today } from './progress';
@@ -45,7 +45,7 @@ export interface GameEndOutcome { dojo: DojoOutcome; fresh: string[] }
  * is unreachable rather than merely unlikely. A refusal still leaves `writeFailed` for the grown-ups screen to
  * report, exactly as before — this closes the *inconsistency*, not the refusal (#151 stands).
  */
-export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[] }, gameCoins: number, now = new Date()): GameEndOutcome {
+export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[]; topics?: string[] }, gameCoins: number, now = new Date()): GameEndOutcome {
   if (!Number.isFinite(gameCoins)) console.warn(`recordGameEnd: non-finite gameCoins (${gameCoins}) — ignored`);   // same #797 guard as addCoins()
   const d = load(); const dojo = applyEvent(d.dojo, e, today(now));
   // `gameCoins`, not `coins`: every call site on `main` read `addCoins(paid + dojo.coins)`, so a maintainer
@@ -64,6 +64,7 @@ export function recordGameEnd(e: DojoEvent & { slips?: Omit<Slip, 'at'>[] }, gam
   const unlocked = evaluateStickers({ ...d, coins: total, dojo: dojo.state });
   const fresh = unlocked.filter(id => !d.stickers.includes(id));
   const slips = e.slips?.length ? sanitizeSlips([...e.slips.map(s => ({ ...s, at: today(now) })), ...d.slips]) : d.slips;   // #938: newest first, capped 20
-  save({ dojo: dojo.state, coins: total, stickers: unlocked, slips });
+  const asked = e.mode === 'memory' ? { q: 0, ok: 0 } : { q: e.attempts, ok: e.correct };   // #939: Memory's pairs and moves are not questions
+  save({ dojo: dojo.state, coins: total, stickers: unlocked, slips, log: logGame(d.log, today(now), { ...asked, topics: e.topics }) });
   return { dojo, fresh };
 }

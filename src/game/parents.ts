@@ -2,7 +2,8 @@
 // Pure logic (no DOM) so it can be unit-tested. Reads only what storage.ts already records.
 import type { Rng, Topic, YearId, YearInfo } from '../curriculum';
 import type { SaveData, TopicProgress } from '../storage';
-import { safeRecord } from '../storage';
+import { safeRecord, today } from '../storage';
+import type { LogDay } from '../save-records';
 import { accuracy } from './sensei';
 
 // ---------- Grown-ups gate ----------
@@ -24,6 +25,7 @@ export function checkGate(input: string, answer: number): boolean {
 export interface TopicStat {
   id: string; title: string; icon: string; year: YearId; subject: Topic['subject'];
   stars: number; plays: number; hits: number; tries: number; accuracy: number | null;
+  nc: string;   // the curriculum statement in words (#944)
 }
 export interface YearStat {
   id: YearId; title: string;
@@ -42,6 +44,16 @@ export interface ParentSummary {
   modes: ModeBest[];
   streakDays: number; coins: number; stickers: number; stickersTotal: number;
   slips: SlipRow[];
+  week: WeekSummary;
+}
+/** The last seven local days of play (#939), read from the day log. `accuracy` is null with no questions. */
+export interface WeekSummary { days: number; questions: number; accuracy: number | null; topics: string[] }
+/** Seven local days ending `day` (`YYYY-MM-DD`): days played, questions, accuracy and the distinct topic ids. */
+export function weekSummary(log: readonly LogDay[], day: string): WeekSummary {
+  const [y, m, d] = day.split('-').map(Number), from = today(new Date(y, m - 1, d - 6));
+  const inWeek = (Array.isArray(log) ? log : []).filter(l => l.date >= from && l.date <= day);
+  const questions = inWeek.reduce((n, l) => n + l.q, 0), ok = inWeek.reduce((n, l) => n + l.ok, 0);
+  return { days: inWeek.length, questions, accuracy: questions ? ok / questions : null, topics: [...new Set(inWeek.flatMap(l => l.topics))] };
 }
 /** One row of the "Recent slips" list (#938): a stored `Slip` (#903) with its topic resolved to an icon. */
 export interface SlipRow { icon: string; prompt: string; answer: string; picked: string; at: string }
@@ -63,16 +75,21 @@ export function recentSlips(data: SaveData, topics: Topic[]): SlipRow[] {
 /** Only topics a child has actually answered enough of for the accuracy to mean something rank against each other. */
 export const RANK_MIN_TRIES = 5;
 
+/** A topic's `nc` reference with its four abbreviated prefixes spelled out for a grown-up (#944); the rest is untouched. */
+export const ncForGrownUps = (nc: string): string => nc
+  .replace(/\bA&S\b/g, 'Addition and subtraction').replace(/\bNPV\b/g, 'Number and place value')
+  .replace(/\bM&D\b/g, 'Multiplication and division').replace(/\bELG\b/g, 'Early learning goal');
+
 function stat(t: Topic, p: TopicProgress | undefined): TopicStat {
   return {
     id: t.id, title: t.title, icon: t.icon, year: t.year, subject: t.subject,
     stars: p?.stars ?? 0, plays: p?.plays ?? 0, hits: p?.hits ?? 0, tries: p?.tries ?? 0,
-    accuracy: accuracy(p),
+    accuracy: accuracy(p), nc: ncForGrownUps(t.nc),
   };
 }
 
 /** Build the whole read-only dashboard model from the save. `stickersTotal` is passed in so storage stays the source of the album size. */
-export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[], stickersTotal: number): ParentSummary {
+export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[], stickersTotal: number, now = new Date()): ParentSummary {
   // #95: `data` can be a hand-edited or corrupted "Restore" paste — importSave() only checks the version, so
   // any of these fields can arrive as anything. Read the same tolerant way storage.ts's own achievement
   // calculations already do, rather than indexing `data.progress` directly and throwing on the dashboard.
@@ -114,6 +131,7 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
     modes,
     streakDays: data.streak.days, coins: data.coins, stickers: data.stickers.length, stickersTotal,
     slips: recentSlips(data, topics),
+    week: weekSummary(data.log, today(now)),
   };
 }
 

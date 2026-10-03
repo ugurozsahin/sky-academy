@@ -25,3 +25,19 @@ export function setThreeSetting(v: ThreeSetting): boolean {
   try { if (v === 'auto') localStorage.removeItem(THREE_KEY); else localStorage.setItem(THREE_KEY, v); } catch { /* fall through to the read */ }
   return threeSetting() === v;
 }
+
+/* ─── Rest prompt: the grown-ups' "Suggest a break" setting (#940) ───────────────────────────────────────────
+ * Device-wide like the 3-D setting: a break rule belongs to the grown-up's device, not a child's save, so it
+ * survives a profile switch and is not in the export code. `off` is the default, stored as absence. */
+export type RestSetting = 'off' | '10' | '20' | '30';
+const REST_KEY = 'sna:rest';
+export const REST_SETTINGS: readonly RestSetting[] = ['off', '10', '20', '30'];
+export function restSetting(): RestSetting {
+  const raw = readItem(REST_KEY);
+  return raw === '10' || raw === '20' || raw === '30' ? raw : 'off';
+}
+/** Returns whether the store now holds `v` — a refused write leaves the previous answer, and the control paints that. */
+export function setRestSetting(v: RestSetting): boolean {
+  try { if (v === 'off') localStorage.removeItem(REST_KEY); else localStorage.setItem(REST_KEY, v); } catch { /* fall through to the read */ }
+  return restSetting() === v;
+}

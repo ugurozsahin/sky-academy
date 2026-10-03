@@ -4,6 +4,8 @@
 import { MODES, type Mode } from '../game/modes';
 import type { Question, Topic } from '../curriculum';
 import { esc } from './dom';
+import { REST_LINE, restDue, type RestClock } from '../game/rest';
+import type { RestSetting } from '../device-settings';
 import { load, recordCrown, recordSprint, recordTopic, recordTopicSprint } from '../storage';
 import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
 import type { YearInfo } from '../curriculum';
@@ -78,6 +80,16 @@ const RESULT_LINE_ORDER: ResultCandidate['kind'][] = ['belt', 'island', 'trophy'
  */
 export function resultsLines(candidates: ResultCandidate[]): ResultCandidate[] {
   return [...candidates].sort((a, b) => RESULT_LINE_ORDER.indexOf(a.kind) - RESULT_LINE_ORDER.indexOf(b.kind)).slice(0, 2);
+}
+
+/**
+ * #940: the rest line joins the candidates when the grown-up's time is up. It is last in register order, so a
+ * results screen already carrying two announcements leaves it pending, and only a line actually shown restarts the clock.
+ */
+export function withRestLine(candidates: ResultCandidate[], clock: RestClock, setting: RestSetting): ResultCandidate[] {
+  const lines = resultsLines(restDue(clock.elapsed(), setting) ? [...candidates, { kind: 'rest', text: REST_LINE }] : candidates);
+  if (lines.some(l => l.kind === 'rest')) clock.reset();
+  return lines;
 }
 
 /**

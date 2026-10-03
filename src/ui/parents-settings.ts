@@ -1,15 +1,16 @@
 // The grown-ups Settings section (#904): the 3-D pictures control plus the per-ninja "Slower bubbles" row
 // (#905), under one "Settings" heading so #906/#907/#940 each have room to add their own row.
-import { setThreeSetting, THREE_SETTINGS, threeSetting, type ThreeSetting } from '../device-settings';
+import { REST_SETTINGS, restSetting, setRestSetting, setThreeSetting, THREE_SETTINGS, threeSetting, type RestSetting, type ThreeSetting } from '../device-settings';
 import { sfx } from '../audio';
 import { isWriteFailing, load, save } from '../storage';
 import { $, $$ } from './dom';
 
 export const THREE_LABEL: Readonly<Record<ThreeSetting, string>> = { auto: 'Auto', on: 'On', off: 'Off' };
+export const REST_LABEL: Readonly<Record<RestSetting, string>> = { off: 'Off', '10': '10 min', '20': '20 min', '30': '30 min' };
 const SLOW_LABEL: Readonly<Record<'off' | 'on', string>> = { off: 'Off', on: 'On' };
 
 /** The Settings section's markup: the 3-D pictures control, then "Slower bubbles" (#905). */
-export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean = load().settings.slow): string {
+export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean = load().settings.slow, rest: RestSetting = restSetting()): string {
   return `
     <h3 class="p-h">Settings</h3>
     <div class="p-three">
@@ -23,6 +24,12 @@ export function settingsHTML(three: ThreeSetting = threeSetting(), slow: boolean
       <div class="tabs p-slow-pick" role="radiogroup" aria-label="Slower bubbles">${(['off', 'on'] as const).map(v =>
         `<button class="tab${(v === 'on') === slow ? ' on' : ''}" data-slow="${v}" role="radio" aria-checked="${(v === 'on') === slow}">${SLOW_LABEL[v]}</button>`).join('')}</div>
       <p class="p-three-msg" id="slow-msg" role="status" hidden></p>
+    </div>
+    <div class="p-three p-rest">
+      <p class="p-three-say">After this long, the next results screen suggests a little break. Nothing stops or locks; it is only a suggestion.</p>
+      <div class="tabs p-rest-pick" role="radiogroup" aria-label="Suggest a break">${REST_SETTINGS.map(v =>
+        `<button class="tab${v === rest ? ' on' : ''}" data-rest="${v}" role="radio" aria-checked="${v === rest}">${REST_LABEL[v]}</button>`).join('')}</div>
+      <p class="p-three-msg" id="rest-msg" role="status" hidden></p>
     </div>`;
 }
 
@@ -58,5 +65,15 @@ export function bindSettings(): void {
     const failed = isWriteFailing();
     msg.hidden = !failed;
     if (failed) { sfx.wrong(); msg.textContent = `This device is not saving right now, so this choice may be lost when the game closes.`; }
+  }));
+  // #940: device-wide like the 3-D setting, so painted from what the store holds after the write.
+  $$('button[data-rest]').forEach(b => b.addEventListener('click', () => {
+    sfx.tap();
+    const stored = setRestSetting(b.dataset.rest as RestSetting);
+    const now = restSetting();
+    $$('button[data-rest]').forEach(o => { const on = o.dataset.rest === now; o.classList.toggle('on', on); o.setAttribute('aria-checked', String(on)); });
+    const msg = $('#rest-msg');
+    msg.hidden = stored;
+    if (!stored) { sfx.wrong(); msg.textContent = `This device would not save that, so it stays on ${REST_LABEL[now]}.`; }
   }));
 }

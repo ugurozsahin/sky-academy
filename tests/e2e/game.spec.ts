@@ -622,6 +622,35 @@ test.describe('Sky Ninja Academy', () => {
   // #893: the right answer is told, not only shown, so a pre-reader gets the correction too — never in Ninja
   // Sprint, whose pace has no room for it (`hud.ts`'s `speakCorrection`). `y2-tables` answers a bare number,
   // so `correctionLine` is never null here.
+  test('Rest prompt: the grown-ups setting persists, and its row fits a 390×664 phone (#940)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await page.click('button[data-rest="20"]');
+    await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
+    expect(await page.evaluate(() => localStorage.getItem('sna:rest'))).toBe('20');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.reload();
+    await openGrownUps(page);
+    await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  test('Rest prompt: 10 min shows one calm line after 10 visible minutes, then waits for another 10 (#940)', async ({ page }) => {
+    await page.clock.install();
+    await page.addInitScript(() => localStorage.setItem('sna:rest', '10'));
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    await page.clock.fastForward('11:00');
+    await winMission(page);
+    await expect(page.locator('.results .best-pill', { hasText: 'little break' })).toBeVisible();
+    await expect(page.locator('#again')).toBeEnabled();                      // nothing blocks or locks
+    await page.click('#again');                                              // the next game, same session: the clock restarted
+    await expect(page.locator('.play')).toBeVisible();
+    await winMission(page);
+    await expect(page.locator('.results')).toBeVisible();
+    await expect(page.locator('.results .best-pill', { hasText: 'little break' })).toHaveCount(0);
+  });
+
   test('a wrong slice speaks "It\'s <answer>." before the next question, in Mission (#893)', async ({ page }) => {
     await captureSpeech(page);
     await seedPlayer(page);
@@ -3607,7 +3636,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.fill('#gate-input', String(a * b));
     await page.click('#gate-go');
     await expect(page.locator('.parents-dash')).toBeVisible();
-    await expect(page.locator('.p-stats div')).toHaveCount(4);       // overall stat tiles
+    await expect(page.locator('.p-stats div')).toHaveCount(8);       // overall stat tiles + the four "This week" tiles (#939)
     await expect(page.locator('.p-table tbody tr')).toHaveCount(shownYears().length);  // one row per shown island (#1039)
 
     // back returns to the sky map
@@ -3618,6 +3647,40 @@ test.describe('Sky Ninja Academy', () => {
   // #714: the 3-D setting is a device-wide choice on the grown-ups screen; the #684 solids obey it (#753). This
   // pins the control and the stored value. It starts from the default, `auto`, so it opts out of the game
   // projects' stored `off` (`THREE_OFF`, #713 decision 5).
+  test('For grown-ups: "This week" shows days played from the day log, and an empty week says so (#939)', async ({ page }) => {
+    const iso = (back: number) => { const d = new Date(); d.setDate(d.getDate() - back); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    await seedPlayer(page, 'volt', 'Ada', { log: [
+      { date: iso(8), games: 5, q: 50, ok: 50, topics: ['r-count'] },     // 8 days ago: not this week
+      { date: iso(1), games: 1, q: 4, ok: 2, topics: ['r-count'] },
+      { date: iso(0), games: 2, q: 6, ok: 6, topics: ['r-count', 'y1-bonds'] },
+    ] });
+    await openGrownUps(page);
+    const week = page.locator('.parents-dash .p-stats').nth(1);   // the lifetime tiles come first
+    await expect(page.locator('.parents-dash .p-h').first()).toHaveText('This week');
+    await expect(week).toContainText('2/7');
+    await expect(week).toContainText('10');          // 4 + 6 questions
+    await expect(week).toContainText('80%');         // 8 of 10
+    await expectFitsViewport(page, 'grown-ups This week block');
+  });
+
+  test('a finished Mission writes today\'s entry into the day log with its topic (#939)', async ({ page }) => {
+    await seedPlayer(page);
+    await startTopic(page, 'reception', 'r-count');
+    await solveCurrent(page);
+    await winMission(page);
+    await expect(page.locator('.results')).toBeVisible();
+    const e = await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('sna:v1')!); return d.log.at(-1); });
+    expect(e).toMatchObject({ games: 1, topics: ['r-count'] });
+    expect(e.q).toBeGreaterThan(0);
+  });
+
+  test('For grown-ups: with no play this week the block says so, with no NaN (#939)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await expect(page.locator('.parents-dash')).toContainText('No play yet this week.');
+    await expect(page.locator('.parents-dash .p-stats').nth(1)).not.toContainText(/NaN|—%/);
+  });
+
   test.describe(() => {
     test.use({ storageState: NO_STORED_STATE });
     test('For grown-ups: the 3-D pictures control stores its choice on the device (#714)', async ({ page }) => {

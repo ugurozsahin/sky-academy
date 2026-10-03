@@ -305,7 +305,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
     taught = duelAccuracy(r);
     recordAccuracy(topic.id, taught);
     // #365: one write for the whole finished game — the dojo state and the coins it pays cannot land apart.
-    const { dojo, fresh } = recordGameEnd(duelDojoEvent(r, topic.subject), paid);
+    const { dojo, fresh } = recordGameEnd({ ...duelDojoEvent(r, topic.subject), topics: [topic.id] }, paid);
     dojoPaid = dojo.coins;
     dojoSaved = !isWriteFailing() && !isReadOnlySave();   // #518: read before touchStreak() below overwrites the flag
     // #355 (owner decision, 2026-09-24): a finished duel marks the daily streak, the same as every other

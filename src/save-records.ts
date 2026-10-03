@@ -86,6 +86,18 @@ export function sanitizeLog(v: unknown): LogDay[] {
     }));
 }
 
+/**
+ * Add one finished game to the day log (#939): today's entry is created or bumped in place, `topics` gains any
+ * new ids, and the 30 most recent days are kept (`sanitizeLog` sorts and caps). A game with no questions
+ * (Memory Match: pairs and moves are not questions) passes `q: 0, ok: 0` and adds the game alone.
+ */
+export function logGame(log: readonly LogDay[], date: string, g: { q: number; ok: number; topics?: readonly string[] }): LogDay[] {
+  const n = (x: number) => (Number.isFinite(x) ? Math.max(0, Math.floor(x)) : 0), q = n(g.q), ok = Math.min(q, n(g.ok));   // a bad count must not make `sanitizeLog` drop the whole day
+  const day = log.find(d => d.date === date) ?? { date, games: 0, q: 0, ok: 0, topics: [] };
+  const topics = [...day.topics, ...(g.topics ?? []).filter(t => !day.topics.includes(t))];
+  return sanitizeLog([...log.filter(d => d.date !== date), { date, games: day.games + 1, q: day.q + q, ok: day.ok + ok, topics }]);
+}
+
 /** Device-wide play settings kept in the save rather than `sna:three` (#940 keeps that one separate). */
 export interface Settings { slow: boolean }
 export const DEFAULT_SETTINGS: Settings = { slow: false };
