@@ -11,6 +11,7 @@ import {
   gapQ, spellQ, soundQ, sentGen, type Sent,
   PHASE2, PHASE2B, PHASE3, VOWELS, LETTERS, CVC, DIGRAPHS,
 } from './util';
+import { syllableQ } from './syllables';
 
 // ---------- Reception maths ----------
 const rCount: Generator = (d, rng) => {
@@ -325,6 +326,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   // Reception writing
   { id: 'r-rhyme', title: 'Rhyme Time', icon: '🎵', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: spot and suggest rhymes (Development Matters phonological awareness)', gen: rRhyme },
   { id: 'r-sounds', title: 'Letter Sounds', icon: '🔊', subject: 'writing', year: 'reception', nc: 'ELG Writing: sounds to letters', gen: rLetterSound },
+  { id: 'r-syllables', title: 'How Many Beats?', icon: '👏', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: count or clap syllables in a word', gen: (d, rng) => syllableQ(rng, d, 2) },
   { id: 'r-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: say a sound for each letter; phase 2–3 sounds by ear', gen: rSoundHunt },
   { id: 'r-capitals', title: 'Big & Small Letters', icon: '🅰️', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: letters', gen: rCapitals },
   { id: 'r-tricky', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: common exception words', gen: rTricky },

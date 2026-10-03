@@ -21,6 +21,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-oddeven | Numerical Patterns: evens and odds | pairing, not the ×2 rule: d1–d2 ask "can they all find a partner?" (✅/❌), d3 names it (odd/even) — the vocabulary y2-oddeven then assumes. Numbers ≤ 10, ≤ 6 at d1 |
 | r-rhyme | Word Reading: spot a rhyme (phonological awareness) | The word is spoken and shown; slice the one picture that rhymes (cat → hat). Hand-keyed rimes, d1 2 pictures, d2 3, d3 4; a decoy never half-rhymes (shares neither the vowel nor the final sound with the rime) and never rhymes with another |
 | r-sounds | Literacy Writing: sounds→letters | initial/final/medial sound of CVC words; the word and the decoys follow the phase order (d1 phase 2 letters, d2–3 all single-letter sounds). The final (d2) and medial (d3) questions additionally require the letter at the gap to be a genuine single-letter sound (#135): `cow` ends in the digraph `ow` and `fox`/`box` end in the blend `/ks/`, so none of the three is drawn for the final question; `egg`'s middle letter is a consonant, so it is not drawn for the medial question. Each keeps its other (correct) roles — `egg` still teaches its initial sound at d1. |
+| r-syllables | Word Reading: count or clap syllables in a word | "How many beats?": the word is spoken and shown with its picture; hand-keyed 1–2 beat words; d1 options 1–2, d2–3 options 1–3 |
 | r-soundhunt | Word Reading: say a sound for each letter | Sound Hunt: three keyword words are spoken, nothing to read; slice the grapheme (d1 phase 2 sets 1–4, d2 all single letters + qu, d3 phase 3 digraphs/trigraphs); sound-alike graphemes never appear as decoys |
 | r-capitals | Word Reading: letters | match A↔a; letters follow the phase order (d1 phase 2, d2–3 all single-letter sounds) |
 | r-tricky | Word Reading: common exception words | Letters and Sounds phase 2/3 tricky words, spoken never shown (peek path): d1 phase 2, d2 phase 3, d3 both. d2–3 decoys share a letter with the answer (he/she/the, me/we/be) except `I`, which shares none with any bank word |
@@ -67,6 +68,7 @@ Writing:
 - y1-suffix — -ing -ed -er -est
 - y1-punct — capital letters, . ? !
 - y1-days
+- y1-syllables — How Many Beats?: same generator as r-syllables, hand-keyed 1–3 beat words; d1 words of 1–2 beats, d2 1–3, d3 adds a 4 option
 - y1-sentence — Story Sentences: 4–7 words, `and`/`or`/`but`, d1 shown, d2–3 listen & build
 - y1-trace
 
