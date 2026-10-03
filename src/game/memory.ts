@@ -1,5 +1,6 @@
 // Memory Match: flip two cards, keep the pairs. Pure logic + pair decks (no DOM) so it is unit-testable.
 import type { Rng, YearId } from '../curriculum';
+import { clockPhrase } from '../curriculum/year2';
 import { coinLabel, CVC, DIGRAPHS, numberWord, OBJECTS, pick, ri, SAME_SOLID, shuffle, SHAPES_2D, SHAPES_3D } from '../curriculum/util';
 
 export interface Face { text: string; say: string; coin?: number; small?: boolean; quiet?: true }  // coin = pence, drawn as a coin; quiet = not spoken when turned over (#964)
@@ -54,6 +55,13 @@ const shapes = (rng: Rng, list: readonly (readonly [string, string, ...unknown[]
 export const spokenOnFlip = (f: Face): string | undefined => f.quiet ? undefined : f.say;
 /** Read & Match: four CVC words with no digraph (`cow`'s `ow` is not blendable letter by letter) beside their pictures. */
 const readPairs = (rng: Rng): Pair[] => shuffle(rng, CVC.filter(([w]) => !DIGRAPHS.some(d => w.includes(d)))).slice(0, 4).map(([w, e]) => ({ a: { text: w, say: w, quiet: true }, b: txt(e, w) }));
+/** The clock-face emoji for `h` o'clock (U+1F550–U+1F55B) or half past `h` (U+1F55C–U+1F567), h in 1–12 (#965). */
+export const clockEmoji = (h: number, half: boolean): string => String.fromCodePoint((half ? 0x1F55B : 0x1F54F) + h);
+/** O'clock & Half Past: six distinct (hour, kind) times, each a clock emoji beside its phrase from `clockPhrase`. */
+const clockPairs = (rng: Rng): Pair[] => {
+  const all = Array.from({ length: 24 }, (_, i) => ({ h: i % 12 + 1, half: i >= 12 }));
+  return shuffle(rng, all).slice(0, 6).map(({ h, half }) => { const say = clockPhrase(h, half ? 30 : 0); return { a: txt(clockEmoji(h, half), say), b: txt(say, say, say.length > 6) }; });
+};
 const coins = (rng: Rng, list: number[], n: number): Pair[] => shuffle(rng, list).slice(0, n).map(p => ({ a: coin(p), b: txt(p >= 100 ? `£${p / 100}` : `${p}p`, coin(p).say) }));
 
 /** Card decks per island. Each theme yields 4 (Reception) to 8 (Year 2) pairs with all faces distinct. */
@@ -69,6 +77,7 @@ export const THEMES: Partial<Record<YearId, Theme[]>> = {
     { id: 'coins', title: 'Coins', hint: 'Match each coin to its value', hintIsData: false, pairs: rng => coins(rng, [1, 2, 5, 10, 20, 50], 6) },
     { id: 'shapes', title: '2-D shapes', hint: 'Match each shape to its name', hintIsData: false, pairs: rng => shapes(rng, SHAPES_2D, 6) },
     { id: 'doubles', title: 'Doubles', hint: 'Match each double to its answer', hintIsData: true, pairs: rng => shuffle(rng, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).slice(0, 6).map(n => ({ a: txt(`double ${n}`, `double ${n}`, true), b: txt(String(n * 2), numberWord(n * 2)) })) },
+    { id: 'clocks', title: "O'clock & Half Past", hint: 'Match each clock to its time', hintIsData: false, pairs: clockPairs },
   ],
   year2: [
     { id: 'words', title: 'Number words', hint: 'Match each number to its word', hintIsData: false, pairs: rng => words(rng, 21, 99, 6) },
