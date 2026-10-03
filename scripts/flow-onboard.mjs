@@ -16,5 +16,5 @@ export async function enterName(p, avatarId, name) {
 export default async function onboard(p, avatarId, name) {
   await enterName(p, avatarId, name);
   await p.waitForSelector('.intro-card');   // first run continues into the introduction
-  await p.click('#intro-go');
+  await p.click('#intro-skip');
 }

@@ -140,11 +140,12 @@ export function changeAvatarScreen(go: () => void) {
 /**
  * The wizard's introduction step (#67): Sensei greets the child by name and says what to do, once, before the
  * sky map — first-run only, and never shown again once `finish()` has run (`main.ts` sets `onboarded`).
- * Skippable: both buttons call the same `finish`, so tapping past the words loses nothing. Read aloud follows
+ * "Let's go!" calls `finish` (main.ts starts the first Mission, #947); "Skip" calls `skip` (default: the same
+ * `finish`) and lands on the map, so tapping past the words loses nothing. Read aloud follows
  * the existing `say()`/speech-toggle behaviour, and the words are on screen either way — #65's no-speech
  * fallback needs nothing extra here.
  */
-export function introScreen(finish: () => void) {
+export function introScreen(finish: () => void, skip: () => void = finish) {
   const d = load();
   const avatar = avatarById(d.avatar);
   const line = welcomeLine(d.name);
@@ -163,6 +164,6 @@ export function introScreen(finish: () => void) {
   </section>`, 'bg-sky');
   ($('#intro-heading') as HTMLElement).focus();
   say(line);
-  $('#intro-skip').addEventListener('click', () => { sfx.tap(); finish(); });
+  $('#intro-skip').addEventListener('click', () => { sfx.tap(); skip(); });
   $('#intro-go').addEventListener('click', () => { sfx.correct(); finish(); });
 }
