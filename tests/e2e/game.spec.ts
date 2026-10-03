@@ -622,6 +622,35 @@ test.describe('Sky Ninja Academy', () => {
   // #893: the right answer is told, not only shown, so a pre-reader gets the correction too — never in Ninja
   // Sprint, whose pace has no room for it (`hud.ts`'s `speakCorrection`). `y2-tables` answers a bare number,
   // so `correctionLine` is never null here.
+  test('Rest prompt: the grown-ups setting persists, and its row fits a 390×664 phone (#940)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await seedPlayer(page);
+    await openGrownUps(page);
+    await page.click('button[data-rest="20"]');
+    await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
+    expect(await page.evaluate(() => localStorage.getItem('sna:rest'))).toBe('20');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.reload();
+    await openGrownUps(page);
+    await expect(page.locator('button[data-rest="20"]')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  test('Rest prompt: 10 min shows one calm line after 10 visible minutes, then waits for another 10 (#940)', async ({ page }) => {
+    await page.clock.install();
+    await page.addInitScript(() => localStorage.setItem('sna:rest', '10'));
+    await seedPlayer(page);
+    await startTopic(page, 'year1', 'y1-add');
+    await page.clock.fastForward('11:00');
+    await winMission(page);
+    await expect(page.locator('.results .best-pill', { hasText: 'little break' })).toBeVisible();
+    await expect(page.locator('#again')).toBeEnabled();                      // nothing blocks or locks
+    await page.click('#again');                                              // the next game, same session: the clock restarted
+    await expect(page.locator('.play')).toBeVisible();
+    await winMission(page);
+    await expect(page.locator('.results')).toBeVisible();
+    await expect(page.locator('.results .best-pill', { hasText: 'little break' })).toHaveCount(0);
+  });
+
   test('a wrong slice speaks "It\'s <answer>." before the next question, in Mission (#893)', async ({ page }) => {
     await captureSpeech(page);
     await seedPlayer(page);
@@ -650,6 +679,31 @@ test.describe('Sky Ninja Academy', () => {
     await page.waitForFunction((n) => window.__sna.session.questionsAsked > n || window.__sna.state().ended, before);
     const spoken = (await page.evaluate(() => window.__spoken))!;
     expect(spoken, `Sprint must stay silent on the correction; got ${JSON.stringify(spoken)}`).not.toContain(`It's ${wrongAnswer}.`);
+  });
+
+  test('Relaxed practice: wrong slices cost nothing, ten questions, one coin each right, no stars and no Storm best (#937)', async ({ page }) => {
+    await seedPlayer(page);
+    await page.click('.island[data-year="year1"]');
+    await page.click('#relaxed');
+    await page.click('.topic[data-mixed]');
+    await expect(page.locator('.play')).toBeVisible();
+    const lives = await page.evaluate(() => window.__sna.state().lives);
+    for (let i = 0; i < 3; i++) {
+      await waitForWrongOrEnd(page);
+      const before = await page.evaluate(() => window.__sna.session.questionsAsked as number);
+      expect(await page.evaluate(() => window.__sna.wrong())).toBe(true);
+      await page.waitForFunction((n) => window.__sna.session.questionsAsked > n, before);
+      expect(await page.evaluate(() => window.__sna.state().lives), 'a wrong slice costs no life').toBe(lives);
+    }
+    for (let i = 0; i < 7; i++) await solveCurrent(page);
+    const results = page.locator('.results');
+    await expect(results).toBeVisible();
+    await expect(results).toContainText('Practice done!');
+    await expect(results).toContainText('7/10');
+    await expect(results.locator('.coin-gain')).toContainText('+7');
+    await expect(results.locator('.stars')).toHaveCount(0);
+    await page.click('#home');
+    await expect(page.locator('#endless small')).toContainText('best 0');
   });
 
   // #897: a pre-reader taps a topic and is dropped straight into the first question with no spoken name —
@@ -3009,6 +3063,15 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.isl-head small')).toContainText(/🏆 1\/\d+/);
     await page.click('#sprint');
     await expect(page.locator('#island-overlay .topic[data-id="y1-bonds"]')).toContainText('🥉');
+  });
+
+  test('a Mission that beats the topic best announces it on the results screen (#933)', async ({ page }) => {
+    // A seeded best of 1 is a real previous best; one genuine solve scores above it (a skipped mission scores 0, #749).
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'r-count': { stars: 1, best: 1, plays: 1 } } });
+    await startTopic(page, 'reception', 'r-count');
+    await solveCurrent(page);
+    await winMission(page);
+    await expect(page.locator('.results')).toContainText('New best for Count It!');
   });
 
   test('Ninja Sprint chooser: Back closes it without starting a game (#910)', async ({ page }) => {

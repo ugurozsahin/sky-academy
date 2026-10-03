@@ -8,7 +8,7 @@ export interface Challenge { id: string; group: DojoGroup; icon: string; title: 
  * maths the device saw and nothing it cannot honestly attribute to the save's owner.
  */
 export interface DojoEvent {
-  mode: 'mission' | 'endless' | 'sprint' | 'boss' | 'memory' | 'duel';
+  mode: 'mission' | 'endless' | 'sprint' | 'boss' | 'relaxed' | 'memory' | 'duel';
   won: boolean; correct: number; attempts: number; bestCombo: number; stars: number; score: number;
   training?: boolean;              // Sensei session (a mission over a pool)
   mathsCorrect?: number; writingCorrect?: number;   // per-subject hits (from the session's per-topic tally)

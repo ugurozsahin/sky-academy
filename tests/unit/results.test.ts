@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import { firstQuestionLine, resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, resultsLines, scoreLine, type ResultCandidate } from '../../src/ui/results';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { load, reset } from '../../src/storage';
+import { firstQuestionLine, resultHeading, resultHeadline, resultMedal, resultPillsHTML, resultsAction, missionBestCandidates, recordMissionOutcome, resultsLines, scoreLine, type ResultCandidate } from '../../src/ui/results';
 import { resultsHTML, type ResultsData } from '../../src/ui/overlays';
 import type { Mode } from '../../src/game/modes';
 import type { Question, Topic } from '../../src/curriculum';
@@ -15,6 +16,10 @@ describe('resultMedal', () => {
     expect(resultMedal({ mode: 'endless', won: true, score: 150, stars: 0 })).toBe('🥈');
     expect(resultMedal({ mode: 'endless', won: true, score: 149, stars: 3 })).toBe('🥉');
     expect(resultMedal({ mode: 'endless', won: true, score: 0, stars: 0 })).toBe('🥉');
+  });
+
+  it('Relaxed practice always shows the effort medal, whatever the stars (#937)', () => {
+    expect(resultMedal({ mode: 'relaxed', won: true, score: 100, stars: 3 })).toBe('💪');
   });
 
   it('grades Ninja Sprint on its star tier (💪 when it earned none)', () => {
@@ -398,5 +403,35 @@ describe('firstQuestionLine', () => {
   it('still announces when the previous question is a DIFFERENT object, even with an identical prompt', () => {
     const same = { prompt: '2 + 2', say: undefined } as unknown as Question;
     expect(firstQuestionLine(q, topic, 1, false, same)).toBe('Number Bonds! 2 + 2');
+  });
+});
+
+describe('missionBestCandidates (#933)', () => {
+  it('announces the topic title when the score is a new best', () => {
+    expect(missionBestCandidates({ title: 'Count It' }, true)).toEqual([{ kind: 'best', text: 'New best for Count It!' }]);
+  });
+  it('announces nothing otherwise', () => {
+    expect(missionBestCandidates({ title: 'Count It' }, false)).toEqual([]);
+  });
+});
+
+describe('recordMissionOutcome (#933)', () => {
+  const mem: Record<string, string> = {};
+  (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
+  const topic = { id: 'y1-bonds', title: 'Number Bonds' } as Topic;
+  beforeEach(() => reset());
+  it('announces nothing on the first play, which has no previous best to beat', () => {
+    expect(recordMissionOutcome(topic, { stars: 2, score: 40 }).candidates).toEqual([]);
+    expect(load().progress[topic.id].best).toBe(40);
+  });
+  it('announces `New best for <title>!` when a later score is higher, and records it', () => {
+    recordMissionOutcome(topic, { stars: 2, score: 40 });
+    expect(recordMissionOutcome(topic, { stars: 3, score: 90 }).candidates).toEqual([{ kind: 'best', text: 'New best for Number Bonds!' }]);
+    expect(load().progress[topic.id].best).toBe(90);
+  });
+  it('announces nothing for an equal or lower score', () => {
+    recordMissionOutcome(topic, { stars: 3, score: 90 });
+    expect(recordMissionOutcome(topic, { stars: 2, score: 90 }).candidates).toEqual([]);
+    expect(recordMissionOutcome(topic, { stars: 1, score: 50 }).candidates).toEqual([]);
   });
 });

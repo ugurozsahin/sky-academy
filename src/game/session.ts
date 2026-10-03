@@ -284,7 +284,7 @@ export class Session {
   advance() {
     if (this.ended) return;
     // A deck flattens the mode's own staging (#878, SessionOpts.deck's own doc) — it ends when it runs out.
-    if (this.o.deck || !this.spec.staged) { this.nextQuestion(); return; }
+    if (this.o.deck || !this.spec.staged) { if (this.spec.runLength && this.questionsAsked >= this.spec.runLength) this.end(true); else this.nextQuestion(); return; }
     this.index++;
     if (this.index >= this.perStage) {
       const acc = this.stageAttempts ? this.stageCorrect / this.stageAttempts : 0;

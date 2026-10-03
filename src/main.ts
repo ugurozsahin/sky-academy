@@ -9,6 +9,7 @@ import { clearPendingReset, isPendingReset, parentsScreen } from './ui/parents';
 import { profilesScreen } from './ui/profiles';
 import { load, profileIds, save } from './storage';
 import { initGameSpeed } from './game/speed';
+import { restClock } from './game/rest';
 import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
 import { plugin, wireBackButton, type AppPlugin } from './native';
@@ -186,6 +187,7 @@ wireBackButton({
 // ?reset=1 clears saved progress (used by tests).
 const params = new URLSearchParams(location.search);
 if (params.get('reset')) { try { localStorage.clear(); } catch { /* ignore */ } }
+document.addEventListener('visibilitychange', () => restClock.show(document.visibilityState === 'visible'));   // #940: hidden time never counts toward the rest prompt
 initGameSpeed();   // #32: test-only `?fast=N` time compression; default 1 (ordinary play)
 // #44: start waiting for Fredoka at boot, not when a mission starts. The result is cached, so by the time a
 // child has picked an avatar, an island and a topic the answer is already in — and the wait, including the

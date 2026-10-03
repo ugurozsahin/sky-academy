@@ -3,7 +3,7 @@ import { MODES, type Mode, type ModeCtx, type EndCtx } from '../../src/game/mode
 import { YEARS } from '../../src/curriculum';
 
 const Y1 = YEARS[1];
-const ALL: Mode[] = ['mission', 'endless', 'sprint', 'boss'];
+const ALL: Mode[] = ['mission', 'endless', 'sprint', 'boss', 'relaxed'];
 const ctx = (o: Partial<ModeCtx> = {}): ModeCtx => ({ year: Y1, stage: 1, questionsAsked: 0, sequence: false, slow: false, slower: false, enraged: false, ...o });
 const endCtx = (o: Partial<EndCtx> = {}): EndCtx => ({ won: false, score: 0, correct: 0, accuracy: 0, stageStarsTotal: 0, stages: 5, stars: 0, year: Y1, ...o });
 
@@ -13,6 +13,7 @@ describe('mode table', () => {
   });
   it('lives / staged / timed / boss / villain flags match each mode', () => {
     expect(MODES.sprint.hasLives).toBe(false);                                   // a slip only costs time
+    expect(MODES.relaxed.hasLives).toBe(false);                                  // #937: nothing is lost
     for (const m of ['mission', 'endless', 'boss'] as Mode[]) expect(MODES[m].hasLives).toBe(true);
     expect(ALL.filter(m => MODES[m].staged)).toEqual(['mission']);               // only missions have five staged waves
     expect(ALL.filter(m => MODES[m].timed)).toEqual(['sprint']);

@@ -4,7 +4,9 @@
 import { MODES, type Mode } from '../game/modes';
 import type { Question, Topic } from '../curriculum';
 import { esc } from './dom';
-import { load, recordSprint, recordTopicSprint } from '../storage';
+import { REST_LINE, restDue, type RestClock } from '../game/rest';
+import type { RestSetting } from '../device-settings';
+import { load, recordSprint, recordTopic, recordTopicSprint } from '../storage';
 import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
 import type { YearInfo } from '../curriculum';
 
@@ -27,6 +29,7 @@ export interface RunOutcome {
 export function resultMedal(r: RunOutcome): string {
   if (r.incomplete) return '💪';
   if (r.mode === 'endless') return r.score >= 300 ? '🥇' : r.score >= 150 ? '🥈' : '🥉';
+  if (r.mode === 'relaxed') return '💪';   // #937: effort, never stars
   if (r.mode === 'sprint') return r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : r.stars === 1 ? '🥉' : '💪';
   return r.won ? (r.stars === 3 ? '🥇' : r.stars === 2 ? '🥈' : '🥉') : '💪';
 }
@@ -77,6 +80,16 @@ const RESULT_LINE_ORDER: ResultCandidate['kind'][] = ['belt', 'island', 'trophy'
  */
 export function resultsLines(candidates: ResultCandidate[]): ResultCandidate[] {
   return [...candidates].sort((a, b) => RESULT_LINE_ORDER.indexOf(a.kind) - RESULT_LINE_ORDER.indexOf(b.kind)).slice(0, 2);
+}
+
+/**
+ * #940: the rest line joins the candidates when the grown-up's time is up. It is last in register order, so a
+ * results screen already carrying two announcements leaves it pending, and only a line actually shown restarts the clock.
+ */
+export function withRestLine(candidates: ResultCandidate[], clock: RestClock, setting: RestSetting): ResultCandidate[] {
+  const lines = resultsLines(restDue(clock.elapsed(), setting) ? [...candidates, { kind: 'rest', text: REST_LINE }] : candidates);
+  if (lines.some(l => l.kind === 'rest')) clock.reset();
+  return lines;
 }
 
 /**
@@ -172,3 +185,11 @@ export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r:
   const t = newBest ? trophyCandidate(topic, year, before, r.correct) : null;
   return { newBest, candidates: t ? [t] : [] };
 }
+
+/** A Mission's `best` announcement (#933): `New best for <topic title>!` only when `recordTopic()` said the score beat a real previous best. */
+export const missionBestCandidates = (topic: Pick<Topic, 'title'>, isNewBest: boolean): ResultCandidate[] =>
+  isNewBest ? [{ kind: 'best', text: `New best for ${topic.title}!` }] : [];
+
+/** Record a Mission's result and work out its announcement (#933), so `commitResult()` stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. */
+export const recordMissionOutcome = (topic: Topic, r: { stars: number; score: number }): { candidates: ResultCandidate[] } =>
+  ({ candidates: missionBestCandidates(topic, recordTopic(topic.id, r.stars, r.score)) });

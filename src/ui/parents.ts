@@ -29,8 +29,8 @@ export const clearPendingReset = () => { pendingReset = false; };
 const showPct = (x: number | null) => (x === null ? '—' : `${pct(x)}%`);
 const bar = (frac: number) => `<span class="isl-bar"><i style="width:${Math.round(100 * Math.max(0, Math.min(1, frac)))}%"></i></span>`;
 
-function topicRow(s: TopicStat): string {
-  return `<li class="p-topic"><span class="ic">${s.icon}</span><span class="p-topic-t"><b>${esc(s.title)}</b><small>${s.hits}/${s.tries} right · ${'★'.repeat(s.stars)}${'☆'.repeat(3 - s.stars)}</small></span><span class="p-acc">${showPct(s.accuracy)}</span></li>`;
+export function topicRow(s: TopicStat): string {
+  return `<li class="p-topic"><span class="ic">${s.icon}</span><span class="p-topic-t"><b>${esc(s.title)}</b><small>${s.hits}/${s.tries} right · ${'★'.repeat(s.stars)}${'☆'.repeat(3 - s.stars)}</small><small>${esc(s.nc)}</small></span><span class="p-acc">${showPct(s.accuracy)}</span></li>`;
 }
 
 /** One of #151's two distinguishable not-saving reasons, or null when saving is working normally. The wording

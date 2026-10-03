@@ -25,6 +25,7 @@ export function checkGate(input: string, answer: number): boolean {
 export interface TopicStat {
   id: string; title: string; icon: string; year: YearId; subject: Topic['subject'];
   stars: number; plays: number; hits: number; tries: number; accuracy: number | null;
+  nc: string;   // the curriculum statement in words (#944)
 }
 export interface YearStat {
   id: YearId; title: string;
@@ -74,11 +75,16 @@ export function recentSlips(data: SaveData, topics: Topic[]): SlipRow[] {
 /** Only topics a child has actually answered enough of for the accuracy to mean something rank against each other. */
 export const RANK_MIN_TRIES = 5;
 
+/** A topic's `nc` reference with its four abbreviated prefixes spelled out for a grown-up (#944); the rest is untouched. */
+export const ncForGrownUps = (nc: string): string => nc
+  .replace(/\bA&S\b/g, 'Addition and subtraction').replace(/\bNPV\b/g, 'Number and place value')
+  .replace(/\bM&D\b/g, 'Multiplication and division').replace(/\bELG\b/g, 'Early learning goal');
+
 function stat(t: Topic, p: TopicProgress | undefined): TopicStat {
   return {
     id: t.id, title: t.title, icon: t.icon, year: t.year, subject: t.subject,
     stars: p?.stars ?? 0, plays: p?.plays ?? 0, hits: p?.hits ?? 0, tries: p?.tries ?? 0,
-    accuracy: accuracy(p),
+    accuracy: accuracy(p), nc: ncForGrownUps(t.nc),
   };
 }
 
