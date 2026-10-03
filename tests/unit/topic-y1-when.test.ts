@@ -44,14 +44,34 @@ describe('y1-when (#979)', () => {
     }
   });
 
-  it('d1 hides each of the three day parts and uses only day-part words', () => {
-    const r = rng(9791), seen = new Set<string>();
+  it('d1 hides each of the three day parts on its strip cards, about a third each, and offers only day-part words', () => {
+    const r = rng(9791), hidden: Record<string, number> = { morning: 0, afternoon: 0, evening: 0 };
+    let strips = 0;
     for (let i = 0; i < DRAWS; i++) {
       const q = topic.gen(1, r);
-      seen.add(q.answer);
       expect([...q.options].sort()).toEqual([...PARTS].sort());
+      if ((q.visual as { type?: string } | undefined)?.type !== 'strip') continue;
+      strips++;
+      hidden[q.answer]++;
     }
-    expect([...seen].sort()).toEqual([...PARTS].sort());
+    for (const part of PARTS) {
+      expect(hidden[part], `strip hides ${part}`).toBeGreaterThan(strips * 0.2);
+      expect(hidden[part], `strip hides ${part}`).toBeLessThan(strips * 0.47);
+    }
+  });
+
+  it('decoys come from the answer\'s own list first, then the other list, and never repeat the answer', () => {
+    for (const d of [2, 3] as Difficulty[]) {
+      const r = rng(9780 + d);
+      for (let i = 0; i < DRAWS; i++) {
+        const q = topic.gen(d, r);
+        if (q.visual) continue;
+        const own = PARTS.includes(q.answer) ? PARTS : WORDS;
+        const where = `d${d} draw ${i}: ${q.prompt}`;
+        expect(q.options, where).toHaveLength(4);
+        for (const member of own) expect(q.options, where).toContain(member);
+      }
+    }
   });
 
   it('d2 and d3 reach both lists, d3 shows no strip, and decoys never repeat the answer', () => {
