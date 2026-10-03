@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TOPICS } from '../../src/curriculum';
+import { MEASURE_PAIRS } from '../../src/curriculum/reception';
 import type { Difficulty } from '../../src/curriculum';
 
 function rng(seed: number) {
@@ -14,7 +15,7 @@ const BANK: Record<string, [string, string][]> = {
   taller: [['🦒', '🐭'], ['🌳', '🌷'], ['🏢', '🏠'], ['🐘', '🐜']],
   longer: [['🐍', '🐛'], ['🚂', '🚲'], ['🚌', '🛴'], ['🦕', '🐸']],
   heavier: [['🐘', '🐁'], ['🚗', '🎈'], ['🚛', '🚲'], ['🐳', '🐟']],
-  'holds more': [['🛁', '☕'], ['🛁', '🥛'], ['🚰', '🥄'], ['🛢️', '🍼']],
+  'holds more': [['🛁', '☕'], ['🛁', '🥛'], ['🛢️', '🥄'], ['🛢️', '🍼']],
 };
 const FORM: Record<string, { attr: string; opposite: boolean }> = {
   'Which is taller?': { attr: 'taller', opposite: false }, 'Which is shorter?': { attr: 'taller', opposite: true },
@@ -29,7 +30,8 @@ describe('r-measure (#971)', () => {
       const r = rng(9710 + d);
       for (let i = 0; i < DRAWS; i++) {
         const q = topic.gen(d, r);
-        const f = FORM[q.prompt] ?? FORM['Which is shorter?'];
+        const f = FORM[q.prompt];
+        expect(f, `d${d} draw ${i}: unknown prompt ${q.prompt}`).toBeDefined();
         expect(q.options, `d${d} draw ${i}`).toHaveLength(2);
         expect(q.say, `d${d} draw ${i}`).toBe(q.prompt);
         for (const o of q.options) expect(o, `d${d} draw ${i}`).not.toMatch(/\d/);
@@ -45,13 +47,15 @@ describe('r-measure (#971)', () => {
     const seen = (d: Difficulty) => { const r = rng(9720 + d); return new Set(Array.from({ length: 400 }, () => topic.gen(d, r).prompt)); };
     expect([...seen(1)].sort()).toEqual(['Which is longer?', 'Which is taller?']);
     const d2 = seen(2);
+    for (const d of [1, 2, 3] as Difficulty[]) for (const p of seen(d)) expect(Object.keys(FORM), `d${d}`).toContain(p);
     expect(d2.has('Which is heavier?') && d2.has('Which is lighter?') && d2.has('Which is shorter?')).toBe(true);
     expect([...d2].some(p => p.includes('holds'))).toBe(false);
     const d3 = seen(3);
     expect(d3.has('Which holds more?') && d3.has('Which holds less?')).toBe(true);
   });
 
-  it('the bank has at least 4 pairs per attribute, and no emoji holds opposite roles within an attribute', () => {
+  it('the production bank is the keyed bank, has at least 4 pairs per attribute, and no emoji holds opposite roles within an attribute', () => {
+    expect(MEASURE_PAIRS).toEqual(BANK);
     for (const [attr, pairs] of Object.entries(BANK)) {
       expect(pairs.length, attr).toBeGreaterThanOrEqual(4);
       const bigs = new Set(pairs.map(p => p[0])), smalls = new Set(pairs.map(p => p[1]));

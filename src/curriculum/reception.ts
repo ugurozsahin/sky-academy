@@ -32,11 +32,11 @@ const rOneMore: Generator = (d, rng) => {
 // #971: Development Matters "compare length, weight and capacity" — hand-keyed [bigger, smaller] pairs, answered
 // from real-world knowledge. No numbers, no units, and the two emoji are drawn the same size (not to scale).
 type Measure = 'taller' | 'longer' | 'heavier' | 'holds more';
-const MEASURE_PAIRS: Record<Measure, [string, string][]> = {
+export const MEASURE_PAIRS: Record<Measure, [string, string][]> = {
   taller: [['🦒', '🐭'], ['🌳', '🌷'], ['🏢', '🏠'], ['🐘', '🐜']],
   longer: [['🐍', '🐛'], ['🚂', '🚲'], ['🚌', '🛴'], ['🦕', '🐸']],
   heavier: [['🐘', '🐁'], ['🚗', '🎈'], ['🚛', '🚲'], ['🐳', '🐟']],
-  'holds more': [['🛁', '☕'], ['🛁', '🥛'], ['🚰', '🥄'], ['🛢️', '🍼']],
+  'holds more': [['🛁', '☕'], ['🛁', '🥛'], ['🛢️', '🥄'], ['🛢️', '🍼']],
 };
 const MEASURE_OPPOSITE: Record<Measure, string> = { taller: 'shorter', longer: 'shorter', heavier: 'lighter', 'holds more': 'holds less' };
 const rMeasure: Generator = (d, rng) => {
