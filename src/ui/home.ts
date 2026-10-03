@@ -19,7 +19,7 @@ import type { PlayOpts } from './play';
 export type StartPlay = (o: PlayOpts) => void;
 export type Nav = {
   avatar: () => void; map: () => void; island: (year: YearInfo) => void; play: StartPlay;
-  memory: (year: YearInfo) => void; duel: (year: YearInfo) => void; rewards: () => void; shop: () => void; parents: () => void;
+  memory: (year: YearInfo) => void; duel: (year: YearInfo, topic?: string) => void; rewards: () => void; shop: () => void; parents: () => void;
   profiles: () => void;   // #20 slice 2: "Who is playing?"
   up: () => void;
 };
