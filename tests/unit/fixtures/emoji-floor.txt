@@ -72,12 +72,15 @@
 🏢	0.6	office building
 🐀	1.0	rat
 🐁	1.0	mouse
+🐆	1.0	leopard
+🐇	0.6	rabbit
 🐈	0.7	cat
 🐉	1.0	dragon
 🐊	1.0	crocodile
 🐋	1.0	whale
 🐌	0.6	snail
 🐍	0.6	snake
+🐎	0.6	horse
 🐐	1.0	goat
 🐑	0.6	ewe
 🐒	0.6	monkey
@@ -162,6 +165,7 @@
 🚫	0.6	prohibited
 🚰	1.0	potable water
 🚲	0.6	bicycle
+🚶	0.6	person walking
 🛁	1.0	bathtub
 🛏	0.7	bed
 🛢	0.7	oil drum
@@ -177,7 +181,9 @@
 🥚	3.0	egg
 🥛	3.0	glass of milk
 🥜	3.0	peanuts
+🥣	3.0	bowl with spoon
 🥤	5.0	cup with straw
+🥪	5.0	sandwich
 🥫	5.0	canned food
 🦁	1.0	lion
 🦆	3.0	duck

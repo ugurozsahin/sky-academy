@@ -204,6 +204,38 @@ const y1Time: Generator = (d, rng) => {
   if (d === 3 && rng() < 0.5) others[0] = half ? `${h} o'clock` : `half past ${h}`;
   return wordQ(rng, 'What time is it?', ans, others, { visual: { type: 'clock', h, m: half ? 30 : 0 } });
 };
+/**
+ * Year 1 time words (#988): "quicker, slower, earlier, later" and the three units hours, minutes, seconds.
+ * The banks are hand-curated so every card has one defensible answer; the oracle is the entry's stored order or unit.
+ */
+const SPEED_PAIRS: [string, string][] = [['🐆', '🐌'], ['🐇', '🐢'], ['🚗', '🚶'], ['🐎', '🐛']]; // [quicker, slower]
+const DAY_EVENTS: [string, string][] = [['🥣', 'breakfast'], ['🥪', 'lunch'], ['🛏️', 'bedtime']]; // fixed order, earliest first
+/** Only activities whose unit nobody argues over: a film or a bath could be minutes or hours, so they are left out. */
+const TIME_UNITS: Record<string, string[]> = {
+  seconds: ['a blink', 'a clap of your hands', 'a click of your fingers'],
+  minutes: ['brushing your teeth', 'eating your lunch', 'tidying your toys'],
+  hours: ["a night's sleep", 'a school day', 'a day at the seaside'],
+};
+const y1TimeWords: Generator = (d, rng) => {
+  const form = d === 1 ? 0 : d === 2 ? ri(rng, 1, 2) : ri(rng, 0, 2);
+  if (form === 0) {
+    const [fast, slow] = pick(rng, SPEED_PAIRS);
+    const quick = rng() < 0.5;
+    const [a, b] = shuffle(rng, [fast, slow]);
+    return wordQ(rng, `Which is ${quick ? 'quicker' : 'slower'}, ${a} or ${b}?`, quick ? fast : slow, [quick ? slow : fast], { say: `Which is ${quick ? 'quicker' : 'slower'}?` });
+  }
+  if (form === 1) {
+    const [a, b] = shuffle(rng, DAY_EVENTS).slice(0, 2);
+    const early = rng() < 0.5;
+    const first = DAY_EVENTS.findIndex(e => e === a) < DAY_EVENTS.findIndex(e => e === b) ? a : b;
+    const want = early ? first : first === a ? b : a;
+    return wordQ(rng, `Which is ${early ? 'earlier' : 'later'}, ${a[1]} or ${b[1]}?`, want[1], [want === a ? b[1] : a[1]], { say: `Which is ${early ? 'earlier' : 'later'}, ${a[1]} or ${b[1]}?` });
+  }
+  const unit = pick(rng, Object.keys(TIME_UNITS));
+  const act = pick(rng, TIME_UNITS[unit]);
+  const p = `Would you measure ${act}`;
+  return wordQ(rng, `${p} in seconds, minutes or hours?`, unit, Object.keys(TIME_UNITS).filter(u => u !== unit), { say: `${p} in seconds, minutes or hours?` });
+};
 const y1Arrays: Generator = (d, rng) => {
   const rows = ri(rng, 2, d === 1 ? 2 : 3), cols = ri(rng, 2, d === 1 ? 5 : d === 3 ? 5 : 4);
   return numQ(rng, `${rows} rows of ${cols} = ?`, rows * cols, { min: 2, max: 20, visual: { type: 'array', rows, cols }, say: `${rows} rows of ${cols}. How many altogether?` });
@@ -456,6 +488,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-share', title: 'Share & Group', icon: '🍪', subject: 'maths', year: 'year1', nc: 'Y1 M&D: grouping, sharing', gen: y1Share },
   { id: 'y1-coins', title: 'Coins', icon: '💷', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: coins & notes', gen: y1Coins },
   { id: 'y1-time', title: "O'clock & Half Past", icon: '🕐', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time', gen: y1Time },
+  { id: 'y1-timewords', title: 'Time Words', icon: '⏳', subject: 'maths', year: 'year1', nc: 'Y1 Measurement: time words, hours/minutes/seconds', gen: y1TimeWords },
   { id: 'y1-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year1', nc: 'Y1 NPV: order numbers to 20', sequenceFrom: 1, gen: y1Order },
   { id: 'y1-line', title: 'Number Line', icon: '📏', subject: 'maths', year: 'year1', nc: 'Y1 NPV: number line', gen: y1Line },
   { id: 'y1-shapes', title: '2-D Shapes', icon: '🔷', subject: 'maths', year: 'year1', nc: 'Y1 Geometry: 2-D shapes', gen: y1Shapes },

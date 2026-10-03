@@ -50,6 +50,7 @@ Maths:
 - y1-share — M&D by sharing and grouping objects, exact, within 20 (d1 share, d2 group, d3 both)
 - y1-coins — recognise coins **and the £5/£10 notes**, compare two coins, add two coins within 20p
 - y1-time — o'clock, half past
+- y1-timewords — quicker/slower, earlier/later, and the sensible unit (seconds, minutes, hours)
 - y1-order — order to 20
 - y1-line — number line, hidden number
 - y1-shapes — 2-D shapes, sides
