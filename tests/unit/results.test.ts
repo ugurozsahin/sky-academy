@@ -426,12 +426,27 @@ describe('recordMissionOutcome (#933)', () => {
   });
   it('announces `New best for <title>!` when a later score is higher, and records it', () => {
     recordMissionOutcome(topic, { stars: 2, score: 40 });
-    expect(recordMissionOutcome(topic, { stars: 3, score: 90 }).candidates).toEqual([{ kind: 'best', text: 'New best for Number Bonds!' }]);
+    expect(recordMissionOutcome(topic, { stars: 2, score: 90 }).candidates).toEqual([{ kind: 'best', text: 'New best for Number Bonds!' }]);
     expect(load().progress[topic.id].best).toBe(90);
   });
   it('announces nothing for an equal or lower score', () => {
     recordMissionOutcome(topic, { stars: 3, score: 90 });
     expect(recordMissionOutcome(topic, { stars: 2, score: 90 }).candidates).toEqual([]);
     expect(recordMissionOutcome(topic, { stars: 1, score: 50 }).candidates).toEqual([]);
+  });
+});
+
+describe('recordMissionOutcome belt line (#951)', () => {
+  const topic = { id: 'r-count', title: 'Count It' } as Topic;
+  beforeEach(() => reset());
+  it('announces a belt first, and only when the total crosses a threshold', () => {
+    const c = recordMissionOutcome(topic, { stars: 3, score: 40 }).candidates;
+    expect(c).toEqual([{ kind: 'belt', text: '🥋 You earned the Yellow belt!', spoken: 'You earned the Yellow belt!' }]);
+    expect(recordMissionOutcome(topic, { stars: 3, score: 20 }).candidates).toEqual([]);   // stars only ever go up: no rise, no line
+  });
+  it('lists the belt before a new best, through resultsLines', () => {
+    recordMissionOutcome(topic, { stars: 1, score: 10 });
+    const c = recordMissionOutcome(topic, { stars: 3, score: 90 }).candidates;
+    expect(resultsLines(c).map(l => l.kind)).toEqual(['belt', 'best']);
   });
 });

@@ -1,5 +1,6 @@
 // Daily Dojo: three challenges a day, picked deterministically from the date, with bonus coins and a
 // streak multiplier for finishing the whole set on consecutive days. Pure logic (no DOM, no storage).
+import { missedDays } from './streak';
 export type DojoGroup = 'volume' | 'mode' | 'focus';
 export interface Challenge { id: string; group: DojoGroup; icon: string; title: string; goal: number; bonus: number }
 /**
@@ -60,7 +61,9 @@ const yesterdayOf = (date: string) => { const d = new Date(date + 'T12:00:00Z');
 /** Consecutive days the set was finished *before* `date` (the streak carried into today). */
 export function carriedStreak(s: DojoState, date: string): number {
   if (s.streak.last === date) return Math.max(0, s.streak.days - 1);
-  return s.streak.last === yesterdayOf(date) ? s.streak.days : 0;
+  if (s.streak.last === yesterdayOf(date)) return s.streak.days;
+  // #950: after missed days the multiplier eases down a notch each, never resets outright.
+  return Math.max(0, Math.min(s.streak.days, 4) - missedDays(s.streak.last, date));
 }
 /** Streak multiplier for today's bonuses: ×1, then +0.25 per carried day up to ×2. */
 export const multiplier = (carried: number) => 1 + 0.25 * Math.min(4, carried);

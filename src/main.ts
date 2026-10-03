@@ -14,7 +14,7 @@ import { fontReady } from './ui/font';
 import { startServiceWorker } from './pwa';
 import { plugin, wireBackButton, type AppPlugin } from './native';
 import { backGuard } from './ui/screen';
-import { topicById, type YearInfo } from './curriculum';
+import { topicById, topicsFor, YEARS, type YearInfo } from './curriculum';
 import { fixDeck } from './game/session';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
@@ -47,7 +47,19 @@ const leave = () => { const d = dispose; dispose = null; d?.(); };
 // Finishing the wizard unwinds both of its pushed history entries (onboard-name, onboard-intro) in one go —
 // history.back() only undoes one, which would leave a dead onboard-name entry between the map and the start
 // of a fresh session's history and land there instead of the map on the next hardware-back press.
-const renderIntro = () => introScreen(() => { save({ onboarded: true }); history.go(-2); });
+// "Let's go!" (#947) also starts the first Mission: `pendingFirstMission` carries that intent across the
+// popstate of `go(-2)`, exactly as `pendingProfiles` does, so the island and play entries are pushed on the
+// far side — after the stack is back at the root, never racing it (#380 review B1). "Skip" lands on the map.
+let pendingFirstMission = false;
+const finishWizard = (go: boolean) => { save({ onboarded: true }); pendingFirstMission = go; history.go(-2); };
+const renderIntro = () => introScreen(() => finishWizard(true), () => finishWizard(false));
+/** The first Mission of the ninja's current island: its first Maths topic, never a tracing one. */
+const startFirstMission = () => {
+  const y = YEARS.find(i => i.id === load().year), topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
+  if (!y || !topic) { nav.map(); return; }
+  year = y; enter('island');   // [map, island, play]: Back from the mission lands on the island, then the map
+  nav.play({ year: y, mode: 'mission', topic });
+};
 const renderName = () => nameScreen(() => { enter('onboard-intro'); renderIntro(); });
 const nav = {
   avatar: () => {
@@ -145,6 +157,12 @@ const relaunch = () => {
 // nine).
 const BACK_ONE = new Set<string | undefined>(['play', 'memory', 'duel', 'shop', 'parents']);
 const GUARDED_SCREEN = new Set<string | undefined>(['play', 'duel']);
+// "Let's go!" (#947): its own listener, registered first, so the router's one below keeps its shape — the pop
+// that `finishWizard`'s go(-2) waits for starts the mission instead of drawing the map.
+window.addEventListener('popstate', e => {
+  if (!pendingFirstMission) return;
+  pendingFirstMission = false; fromPop = false; e.stopImmediatePropagation(); startFirstMission();
+});
 window.addEventListener('popstate', () => {
   const st = (history.state || {}) as { screen?: string; guard?: boolean };   // never `?.`-chained below
   const s = st.screen;                                       // the entry we landed on

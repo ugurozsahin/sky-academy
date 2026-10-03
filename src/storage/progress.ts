@@ -1,5 +1,6 @@
 // Recording what a game achieved: stars, accuracy, the per-mode bests, and the daily streak.
 import type { AnswerTally } from './shape';
+import { nextStreak } from '../game/streak';
 import { load, save } from './store';
 /** Records a finished Mission; returns whether it beat a previous best above 0 — a first play is never a "new best" (#933). */
 export function recordTopic(topicId: string, stars: number, score: number): boolean {
@@ -71,8 +72,7 @@ export const today = (now = new Date()) => `${now.getFullYear()}-${String(now.ge
 export function touchStreak(now = new Date()): number {
   const d = load(); const t = today(now);
   if (d.streak.last === t) return d.streak.days;
-  const y = new Date(now); y.setDate(y.getDate() - 1);
-  const days = d.streak.last === today(y) ? d.streak.days + 1 : 1;
-  save({ streak: { last: t, days } });
-  return days;
+  const streak = nextStreak(d.streak, t);   // #950: one missed day in seven is held
+  save({ streak });
+  return streak.days;
 }

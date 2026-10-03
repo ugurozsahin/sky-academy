@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { load, recordGameEnd, reset, today } from '../../src/storage';
 import { logGame, type LogDay } from '../../src/save-records';
-import { pct, weekSummary } from '../../src/game/parents';
+import { parentSummary, pct, progressText, summaryRoute, weekSummary } from '../../src/game/parents';
 import { weekHTML } from '../../src/ui/parents-week';
-import type { Topic } from '../../src/curriculum';
+import { listedTopics, shownYears, type Topic } from '../../src/curriculum';
 
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; }, clear: () => { for (const k in mem) delete mem[k]; } };
@@ -89,5 +89,33 @@ describe('weekHTML (#939)', () => {
     const html = weekHTML({ days: 2, questions: 12, accuracy: 0.75, topics: topics.map(t => t.id) }, topics);
     expect(html).toContain('2/7'); expect(html).toContain('75%');
     expect(html).toContain('Topic 5'); expect(html).not.toContain('Topic 6'); expect(html).toContain('+2 more');
+  });
+});
+
+describe('progressText and summaryRoute (#942)', () => {
+  beforeEach(() => reset());
+  const sm = (log: LogDay[] = []) => { const d = load(); d.log = log; return parentSummary(d, listedTopics(), shownYears(), 0, new Date('2026-10-03T12:00:00')); };
+  const now = new Date('2026-10-03T12:00:00');
+
+  it('an empty save has no NaN, undefined or a dash percentage, and a nameless child is "your ninja"', () => {
+    const t = progressText(sm(), '', now);
+    expect(t).toContain('progress for your ninja, 3 October 2026');
+    expect(t).toContain('This week: no play yet.');
+    expect(t).not.toMatch(/NaN|undefined|—%|-%/);
+    expect(t.split('\n')).toHaveLength(5);
+  });
+  it('a played week quotes days, questions and accuracy; stars come per island; no save code leaks', () => {
+    const d = load(); d.progress['y1-add'] = { plays: 3, stars: 3, hits: 9, tries: 10, best: 50 };
+    const s = parentSummary({ ...d, log: [day('2026-10-02', 10, 8, ['y1-add'])] }, listedTopics(), shownYears(), 0, now);
+    const t = progressText(s, 'Mia', now);
+    expect(t).toContain('progress for Mia, 3 October 2026');
+    expect(t).toContain('This week: 1/7 days played, 10 questions, 80% right.');
+    expect(t).toMatch(/Stars: .*\d+\/\d+ · /);
+    expect(t.length).toBeLessThan(700);
+  });
+  it('summaryRoute truth table: share sheet, then the APK, then the clipboard, then by hand', () => {
+    const r = (webShare: boolean, capacitorShare: boolean, clipboard: boolean) => summaryRoute({ webShare, capacitorShare, clipboard });
+    expect([r(true, true, true), r(false, true, true), r(false, false, true), r(false, false, false), r(true, false, false)])
+      .toEqual(['share', 'capacitor', 'copy', 'select', 'share']);
   });
 });

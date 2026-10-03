@@ -1409,7 +1409,7 @@ test.describe('Ninja Duel', () => {
     await page.fill('#name', 'Ada');
     await page.click('#go');
     await expect(page.locator('.intro-card')).toBeVisible();
-    await page.click('#intro-go');
+    await page.click('#intro-skip');
     await expect(page.locator('.home')).toBeVisible();
     await page.click('.island[data-year="year1"]');
     await page.click('#duel');
