@@ -67,6 +67,7 @@ export const NO_REPEATED_SET = new Set([
   'y1-alien d1', 'y1-alien d2', 'y1-alien d3',
   'y1-prefix d1', 'y1-prefix d2', 'y1-prefix d3', // #977: the options are un+root and bank words around a random root, so no option set recurs with a different answer at these seeds
   'y1-alphabet d1', 'y1-alphabet d3', // #976: the bubble sets are drawn from 26 letters, so no two cards offer the same set at these seeds; d2 does compare
+  'y1-moreless d3', // #983: count-back cards spread d3 over 0-100, so no option set recurs with a different answer at this seed; the options are all numerals, never wide
 'y2-skip d1', 'y2-skip d2', 'y2-skip d3', 'y2-order d1', 'y2-order d2', 'y2-order d3',
 'y2-add d3', 'y2-tables d1', 'y2-line d2', 'y2-line d3',
 'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
