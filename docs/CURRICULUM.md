@@ -43,7 +43,7 @@ Maths:
 - y1-missing — missing-number problems
 - y1-doubles — double within 20
 - y1-skip — count in 2s/5s/10s; at d2–d3 one card in three is "Slice every multiple of 5/10" (any order, #920)
-- y1-moreless — to 100
+- y1-moreless — to 100; half the cards are "Count back: 42, 41, 40, ?", d3 crossing a tens boundary a third of the time (#983)
 - y1-words — 1–20 in words
 - y1-half — ½, ¼ of quantities
 - y1-arrays — M&D via arrays

@@ -107,7 +107,14 @@ const y1Skip: Generator = (d, rng) => {
   // misses rather than whatever `nearby()` scrapes together (#366).
   return numQ(rng, p, ans, { min: 0, max: 100, say: `Counting in ${step}s: ${seq.join(', ')}, what comes next?`, distractors: [ans + 1, ans - 1, ans + step, ans - step + 1, ans - 2] });
 };
+/** "Count back: 42, 41, 40, ?" (#983): a run of three one-steps down. At d3 a third of cards start just past a tens boundary, where children slip. */
+const y1CountBack = (d: Difficulty, rng: () => number) => {
+  const s = d === 3 && rng() < 1 / 3 ? 10 * ri(rng, 1, 9) + ri(rng, 0, 2) : ri(rng, 3, d === 1 ? 30 : d === 2 ? 60 : 100);
+  const run = `${s}, ${s - 1}, ${s - 2}`, ans = s - 3;
+  return numQ(rng, `Count back: ${run}, ?`, ans, { min: 0, max: 100, say: `Count back: ${run}. What comes next?`, distractors: [ans - 1, ans + 1, ans - 10, ans + 10] });
+};
 const y1MoreLess: Generator = (d, rng) => {
+  if (rng() < 0.5) return y1CountBack(d, rng);
   const n = ri(rng, 1, d === 1 ? 30 : d === 2 ? 60 : 99);
   const more = rng() < 0.5;
   return numQ(rng, `One ${more ? 'more' : 'less'} than ${n}?`, more ? n + 1 : n - 1, { min: 0, max: 100 });
@@ -393,7 +400,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-missing', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year1', nc: 'Y1 A&S: missing number problems', gen: y1Missing },
   { id: 'y1-doubles', title: 'Doubles', icon: '👯', subject: 'maths', year: 'year1', nc: 'Y1 A&S: doubles', gen: y1Doubles },
   { id: 'y1-skip', title: 'Count in 2s, 5s, 10s', icon: '🦘', subject: 'maths', year: 'year1', nc: 'Y1 NPV: count in multiples', sequenceFrom: 2, gen: y1Skip },
-  { id: 'y1-moreless', title: 'One More, One Less', icon: '🔼', subject: 'maths', year: 'year1', nc: 'Y1 NPV: one more/less to 100', gen: y1MoreLess },
+  { id: 'y1-moreless', title: 'One More, One Less', icon: '🔼', subject: 'maths', year: 'year1', nc: 'Y1 NPV: one more/less, counting back, to 100', gen: y1MoreLess },
   { id: 'y1-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year1', nc: 'Y1 NPV: numbers to 20 in words', gen: y1Words },
   { id: 'y1-half', title: 'Halves & Quarters', icon: '🍕', subject: 'maths', year: 'year1', nc: 'Y1 Fractions: half, quarter', gen: y1Half },
   { id: 'y1-arrays', title: 'Arrays', icon: '🟦', subject: 'maths', year: 'year1', nc: 'Y1 M&D: arrays, grouping', gen: y1Arrays },
