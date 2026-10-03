@@ -3,7 +3,7 @@ import onboard from './flow-onboard.mjs';
 
 export default async function run(p) {
   await onboard(p, 'blaze', 'Ada');
-  await p.waitForSelector('.home'); await p.click('.island[data-year="year1"]'); await p.click('#duel');
+  await p.waitForSelector('.home'); await p.click('.island[data-year="year1"]'); await p.click('#duel'); await p.click('.topic[data-mixed]');   // #957: the chooser sits between
   await p.waitForSelector('.duel-screen'); await p.evaluate(() => window.__sna.setSpeed(4));
   for (let r = 1; r <= 10; r++) {
     const who = r <= 6 ? 'a' : 'b';

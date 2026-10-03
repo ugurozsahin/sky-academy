@@ -85,6 +85,7 @@ async function startDuel(page: Page) {
   await seedPlayer(page);
   await page.click('.island[data-year="year1"]');
   await page.click('#duel');
+  await page.click('.topic[data-mixed]');   // #957: Ninja Duel opens a chooser first
   await expect(page.locator('.duel-screen')).toBeVisible();
 }
 
