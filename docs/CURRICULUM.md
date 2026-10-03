@@ -6,6 +6,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | Topic id | ELG | Notes |
 |---|---|---|
 | r-count | Number: deep understanding to 10 | count emoji objects 1–10 |
+| r-numeral | Number: link a numeral to its quantity | numeral card, pick the matching dot group (1–5; d1 1–4) |
 | r-subitise | Number: subitise to 5 | dot patterns 1–6 |
 | r-compare | Numerical Patterns: compare quantities | more/fewer of two groups; d3: or the same (=) |
 | r-onemore | Number: composition | one more / one less to 20 |
