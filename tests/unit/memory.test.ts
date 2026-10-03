@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { gridFor, hasMemoryDecks, Memory, THEMES, pickTheme } from '../../src/game/memory';
+import { gridFor, hasMemoryDecks, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
 import { YEARS, isKs2, type YearId } from '../../src/curriculum';
-import { SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
+import { CVC, DIGRAPHS, SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const faceKey = (f: { text: string; coin?: number }) => `${f.coin ? 'coin:' : ''}${f.text}`;
@@ -176,5 +176,37 @@ describe('memory game', () => {
     for (let n = 0; n < 12; n++) { s.flip(0); s.flip(other(s, 0)); s.hide(); }          // 12 wasted turns
     for (let i = 0; i < s.cards.length; i++) if (!s.cards[i].matched) { s.flip(i); s.flip(partner(s, i)); }
     expect(s.done).toBe(true); expect(s.moves).toBe(18); expect(s.stars).toBe(1); expect(s.coins).toBe(12 + 5);
+  });
+});
+
+// #964: Read & Match pairs a written CVC word with its picture, so the word card must not read itself aloud.
+describe('Read & Match (#964)', () => {
+  const read = pickTheme('reception', rng(1), 'read');
+  it('deals 4 pairs of a bank word and its own picture, one partner each, over 200 seeds', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const pairs = read.pairs(rng(seed));
+      expect(pairs).toHaveLength(4);
+      for (const p of pairs) {
+        const row = CVC.filter(([w]) => w === p.a.text);
+        expect(row, `${p.a.text} is a bank word`).toHaveLength(1);
+        expect(p.b.text, 'the picture is the bank emoji').toBe(row[0][1]);
+        expect(pairs.filter(q => q.a.text === p.a.text)).toHaveLength(1);
+        expect(pairs.filter(q => q.b.text === p.b.text)).toHaveLength(1);
+        expect(p.a.say).toBe(p.a.text); expect(p.b.say).toBe(p.a.text);
+      }
+    }
+  });
+  it('never deals a word containing a digraph (cow)', () => {
+    for (let seed = 1; seed <= 200; seed++) for (const p of read.pairs(rng(seed))) expect(DIGRAPHS.some(d => p.a.text.includes(d)), p.a.text).toBe(false);
+  });
+  it('the bank emoji are unique, so a picture has one word', () => {
+    expect(new Set(CVC.map(([, e]) => e)).size).toBe(CVC.length);
+  });
+  it('spokenOnFlip is silent for the quiet word card and the say text for every other face in every deck', () => {
+    for (const themes of Object.values(THEMES)) for (const t of themes!) for (const p of t.pairs(rng(7))) for (const f of [p.a, p.b]) {
+      if (f.quiet) expect(spokenOnFlip(f)).toBeUndefined(); else expect(spokenOnFlip(f)).toBe(f.say);
+    }
+    expect(read.pairs(rng(3)).every(p => p.a.quiet && !p.b.quiet)).toBe(true);
+    expect(THEMES.reception!.filter(t => t.id !== 'read').every(t => t.pairs(rng(3)).every(p => !p.a.quiet && !p.b.quiet))).toBe(true);
   });
 });
