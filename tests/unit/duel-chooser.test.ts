@@ -12,6 +12,7 @@ describe('duelChooserTopics (#957)', () => {
         const listed = duelChooserTopics(year, subject);
         expect(listed.every(t => pool.has(t.id) && t.subject === subject)).toBe(true);
         expect(listed.every(t => t.input !== 'tracing')).toBe(true);
+        expect(listed.some(t => t.drill)).toBe(false);
         const expected = topicsFor(year.id, subject).filter(t => pool.has(t.id)).map(t => t.id);
         expect(listed.map(t => t.id)).toEqual(expected);
       });
