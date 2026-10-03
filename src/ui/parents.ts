@@ -3,7 +3,7 @@ import { listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
 import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
-import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
+import { bindSettings, settingsHTML } from './parents-settings'; import { slipsHTML } from './parents-slips'; import { aboutHTML } from './about'; import { weekHTML } from './parents-week'; import { bindShare, shareHTML } from './parents-share';   // #938: kept off a new line — parents.ts is at its #714 ratchet cap
 import { $, $$, esc, render } from './dom';
 
 /** `launch` is where a grown-up lands after removing the ninja this session was playing (#20 slice 3): the
@@ -197,7 +197,7 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
       <tbody>${modeRows}</tbody>
     </table></div>
 
-    ${profilesHtml(cards)}
+    ${aboutHTML()}${profilesHtml(cards)}
 
     ${settingsHTML(three)}
 

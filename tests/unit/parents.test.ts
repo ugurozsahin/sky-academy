@@ -3,6 +3,7 @@ import { gateChallenge, checkGate, parentSummary, ncForGrownUps, pct, RANK_MIN_T
 import { TOPICS, CORE_TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
 import { topicRow, canRemoveCard, canRenameCard, DELETE_HINTS, RENAME_HINTS, saveNote } from '../../src/ui/parents';
+import { ABOUT_LINES, aboutHTML } from '../../src/ui/about';
 import { settingsHTML } from '../../src/ui/parents-settings';
 import { slipsHTML } from '../../src/ui/parents-slips';
 import { freshDojo } from '../../src/game/dojo';
@@ -390,5 +391,27 @@ describe('curriculum statements in words for grown-ups (#944)', () => {
   it('the topic row carries the statement, escaped', () => {
     const html = topicRow({ id: 'x', title: 'T', icon: '1', year: 'year1', subject: 'maths', stars: 1, plays: 1, hits: 1, tries: 2, accuracy: 0.5, nc: 'Y1 <b>A</b> & more' });
     expect(html).toContain('<small>Y1 &lt;b&gt;A&lt;/b&gt; &amp; more</small>');
+  });
+});
+
+describe('About this game (#946)', () => {
+  it('shows exactly the four claims, in the grown-ups dashboard', () => {
+    expect([...ABOUT_LINES]).toEqual([
+      'No adverts.',
+      'No account — progress is kept on this device.',
+      'No tracking — no analytics, and nothing about your child is collected.',
+      'Works offline once installed or loaded.',
+    ]);
+    const html = aboutHTML();
+    expect(html).toContain('About this game');
+    for (const l of ABOUT_LINES) expect(html).toContain(`<li>${l}</li>`);
+  });
+  it('makes no claim that nothing leaves the device (certificate and progress summary share on request)', () => {
+    for (const l of ABOUT_LINES) expect(l).not.toMatch(/never leaves|nothing leaves/i);
+  });
+  it('src makes no network request — the claims stay true (dependencies: guardrails.test.ts)', () => {
+    const sources = import.meta.glob('/src/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+    const hits = Object.entries(sources).flatMap(([f, src]) => /\bfetch\(|sendBeacon|XMLHttpRequest|new WebSocket/.test(src) ? [f] : []);
+    expect(hits).toEqual([]);
   });
 });
