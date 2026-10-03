@@ -3106,6 +3106,17 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('.results')).toContainText('New best for Count It!');
   });
 
+  test('a Mission that raises the belt announces it, and the rewards header names it (#951)', async ({ page }) => {
+    await seedPlayer(page, 'volt', 'Ada', { progress: { 'r-counton': { stars: 2, best: 1, plays: 1 } } });
+    await startTopic(page, 'reception', 'r-count');
+    await solveCurrent(page);
+    await winMission(page);
+    await expect(page.locator('.results')).toContainText('You earned the Yellow belt!');
+    await page.click('#home');
+    await page.click('#rewards');
+    await expect(page.locator('.isl-head small').first()).toContainText('🥋 Yellow belt');
+  });
+
   test('Ninja Sprint chooser: Back closes it without starting a game (#910)', async ({ page }) => {
     await seedPlayer(page);
     await page.click('.island[data-year="year1"]');

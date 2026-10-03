@@ -1,5 +1,6 @@
 import { AVATARS, avatarById, SENSEI, VILLAIN } from '../avatars';
-import { isKs2, shownYears, topicsFor, type Topic, type YearInfo } from '../curriculum';
+import { beltFor, totalStarsOf } from '../game/belts';
+import { isKs2, listedTopics, shownYears, topicsFor, type Topic, type YearInfo } from '../curriculum';
 import { islandArt } from './island-placeholder';
 import { islandsHTML, mapLayout } from './map-layout';
 import { ACHIEVEMENTS, certificates, coinBalance, dojoToday, duelHistory, load, safeRecord, save, STICKER_IDS, STICKER_COST, type TopicProgress } from '../storage';
@@ -237,7 +238,7 @@ export function rewardsScreen(nav: Nav) {
   render(`
   <section class="screen home rewards">
     ${tb.html}
-    <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Ninja Rewards</b><small>Earn coins for a fast start — the rest of the album comes from playing</small></div></div>
+    <div class="isl-head"><button class="icon-btn" id="back" aria-label="Back">←</button><div><b>Ninja Rewards</b><small>🥋 ${beltFor(totalStarsOf(load().progress, listedTopics())).name} belt · Earn coins for a fast start — the rest of the album comes from playing</small></div></div>
     <button class="btn primary shop-btn" id="shop">🛍️ Ninja Shop <small>spend 🪙 ${capDigits(coinBalance())}</small></button>
     <div class="reward-stats">
       <div><b>🪙 ${capDigits(d.coins)}</b><small>coins earned</small></div>

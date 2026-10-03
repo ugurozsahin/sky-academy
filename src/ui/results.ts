@@ -8,7 +8,8 @@ import { REST_LINE, restDue, type RestClock } from '../game/rest';
 import type { RestSetting } from '../device-settings';
 import { load, recordSprint, recordTopic, recordTopicSprint } from '../storage';
 import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
-import type { YearInfo } from '../curriculum';
+import { listedTopics, type YearInfo } from '../curriculum';
+import { beltFor, totalStarsOf } from '../game/belts';
 
 /** How a finished run scored — the fields the medal reads. */
 export interface RunOutcome {
@@ -190,6 +191,9 @@ export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r:
 export const missionBestCandidates = (topic: Pick<Topic, 'title'>, isNewBest: boolean): ResultCandidate[] =>
   isNewBest ? [{ kind: 'best', text: `New best for ${topic.title}!` }] : [];
 
-/** Record a Mission's result and work out its announcement (#933), so `commitResult()` stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. */
-export const recordMissionOutcome = (topic: Topic, r: { stars: number; score: number }): { candidates: ResultCandidate[] } =>
-  ({ candidates: missionBestCandidates(topic, recordTopic(topic.id, r.stars, r.score)) });
+/** Record a Mission's result and work out its announcements (#933 best, #951 belt), so `commitResult()` stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. */
+export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number }): { candidates: ResultCandidate[] } {
+  const total = () => totalStarsOf(load().progress, listedTopics()), before = beltFor(total());
+  const candidates = missionBestCandidates(topic, recordTopic(topic.id, r.stars, r.score)), after = beltFor(total());
+  return { candidates: after.n > before.n ? [{ kind: 'belt', text: `🥋 You earned the ${after.name} belt!`, spoken: `You earned the ${after.name} belt!` }, ...candidates] : candidates };
+}

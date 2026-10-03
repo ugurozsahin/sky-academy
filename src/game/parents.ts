@@ -5,6 +5,7 @@ import type { SaveData, TopicProgress } from '../storage';
 import { safeRecord, today } from '../storage';
 import type { LogDay } from '../save-records';
 import { accuracy } from './sensei';
+import { beltFor } from './belts';
 
 // ---------- Grown-ups gate ----------
 // A times-table question a Reception/Year-1 child cannot do yet, but any grown-up answers at a glance.
@@ -38,7 +39,7 @@ export interface ModeBest {
 }
 export interface ParentSummary {
   totalAnswered: number; totalCorrect: number; overallAccuracy: number | null;
-  starsEarned: number; starsMax: number; topicsTried: number; topicsTotal: number;
+  starsEarned: number; belt: string; starsMax: number; topicsTried: number; topicsTotal: number;
   years: YearStat[];
   weakest: TopicStat[]; strongest: TopicStat[];
   modes: ModeBest[];
@@ -123,7 +124,7 @@ export function parentSummary(data: SaveData, topics: Topic[], years: YearInfo[]
 
   return {
     totalAnswered, totalCorrect, overallAccuracy: acc(totalCorrect, totalAnswered),
-    starsEarned: sum(stats.map(s => s.stars)), starsMax: stats.length * 3,
+    starsEarned: sum(stats.map(s => s.stars)), belt: beltFor(sum(stats.map(s => s.stars))).name, starsMax: stats.length * 3,
     topicsTried: stats.filter(s => s.plays > 0).length, topicsTotal: stats.length,
     years: years_,
     weakest: [...ranked].sort(byAcc).slice(0, 4),

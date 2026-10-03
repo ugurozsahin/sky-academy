@@ -179,7 +179,7 @@ function dashHtml(sm: ParentSummary, noVoice = false, note = saveNote(), cards: 
       <div><b>★ ${sm.starsEarned}/${sm.starsMax}</b><small>stars earned</small></div>
       <div><b>${sm.topicsTried}/${sm.topicsTotal}</b><small>topics tried</small></div>
     </div>
-    <div class="p-extra"><span>🔥 ${sm.streakDays}-day streak</span><span>🪙 ${sm.coins} coins</span><span>🏷️ ${sm.stickers}/${sm.stickersTotal} stickers</span></div>
+    <div class="p-extra"><span>🔥 ${sm.streakDays}-day streak</span><span>🪙 ${sm.coins} coins</span><span>🏷️ ${sm.stickers}/${sm.stickersTotal} stickers</span><span>🥋 ${sm.belt} belt</span></div>
     ${noVoice ? '<p class="p-note voice-note">This device has no speaking voice installed, so the game is showing the words instead. On Android: Settings → Accessibility → Text-to-speech.</p>' : ''}
     ${note ? `<p class="p-note save-note">${esc(note)}</p>` : ''}
 
