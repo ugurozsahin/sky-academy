@@ -3652,6 +3652,34 @@ test.describe('Sky Ninja Academy', () => {
     expect(text).not.toMatch(/NaN|undefined|—%|sna:v1/);
   });
 
+  test('For grown-ups: a cancelled share sheet is silent, a failed one leaves the text to copy by hand (#942)', async ({ page }) => {
+    const stub = (err: string) => page.addInitScript(e => { Object.defineProperty(navigator, 'share', { value: () => Promise.reject(Object.assign(new Error(e), { name: e })), configurable: true }); }, err);
+    await stub('AbortError');
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await page.locator('#share-progress').click();
+    await expect(page.locator('#share-progress')).toBeEnabled();
+    await expect(page.locator('#share-text')).toBeHidden();
+    await expect(page.locator('#share-msg')).toBeHidden();
+    await page.evaluate(() => Object.defineProperty(navigator, 'share', { value: () => Promise.reject(Object.assign(new Error('x'), { name: 'NotAllowedError' })), configurable: true }));
+    await page.locator('#share-progress').click();
+    await expect(page.locator('#share-text')).toBeVisible();
+    await expect(page.locator('#share-text')).toHaveValue(/progress for Ada/);
+    await expect(page.locator('#share-msg')).toContainText('by hand');
+  });
+
+  test('For grown-ups: with no share sheet and no clipboard the text is shown for copying by hand; the APK share sheet gets the text (#942)', async ({ page }) => {
+    await page.addInitScript(() => { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true }); });
+    await seedPlayer(page, 'volt', 'Ada');
+    await openGrownUps(page);
+    await page.locator('#share-progress').click();
+    await expect(page.locator('#share-text')).toHaveValue(/progress for Ada/);
+    await page.evaluate(() => { (window as any).__shared = null; (window as any).Capacitor = { isNativePlatform: () => true, Plugins: { Share: { share: async (o: { text: string }) => { (window as any).__shared = o.text; } } } }; });
+    await page.locator('#share-progress').click();
+    await expect(page.locator('#share-msg')).toHaveText('Shared.');
+    expect(await page.evaluate(() => (window as any).__shared)).toContain('progress for Ada');
+  });
+
   test('a finished Mission writes today\'s entry into the day log with its topic (#939)', async ({ page }) => {
     await seedPlayer(page);
     await startTopic(page, 'reception', 'r-count');

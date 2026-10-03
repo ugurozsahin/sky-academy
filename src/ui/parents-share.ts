@@ -17,7 +17,10 @@ export function bindShare(sm: ParentSummary, name: string) {
   const box = $<HTMLTextAreaElement>('#share-text'), msg = $('#share-msg');
   const say = (text: string) => { msg.textContent = text; msg.hidden = false; };
   const byHand = (text: string) => { box.value = text; box.hidden = false; box.select(); say('Select the text above and copy it by hand — this browser will not do it for us.'); };
-  $('#share-progress').addEventListener('click', async () => {
+  const btn = $<HTMLButtonElement>('#share-progress');
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;   // a second tap while the sheet is open makes navigator.share reject with InvalidStateError
     sfx.tap();
     const text = progressText(sm, name), cap = plugin<CapShare>('Share');
     const route = summaryRoute({ webShare: typeof navigator.share === 'function', capacitorShare: !!cap, clipboard: !!navigator.clipboard?.writeText });
@@ -28,7 +31,8 @@ export function bindShare(sm: ParentSummary, name: string) {
       else byHand(text);
     } catch (e) {
       if ((e as { name?: string })?.name === 'AbortError') return;   // a cancelled share sheet is not an error
+      console.warn('progress summary: share failed', e);
       byHand(text);
-    }
+    } finally { btn.disabled = false; }
   });
 }
