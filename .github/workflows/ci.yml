@@ -79,13 +79,13 @@ concurrency:
 jobs:
   test:
     # #1538: the nightly's e2e outgrew one runner (40-42 min of a 45 min ceiling, cancelled on 2026-10-03), so the
-    # full arm is split in two `--shard`s on two runners; a pull request stays one shard (`1/1`, the whole run).
+    # full arm is split in two `--shard`s on two runners; a pull request and a push to main stay one shard (`1/1`).
     # The ceiling below is NOT raised: each shard needs about half of what the single job did.
-    name: ${{ github.event_name == 'pull_request' && 'test' || format('test ({0})', matrix.shard) }}
+    name: ${{ matrix.shard == '1/1' && 'test' || format('test ({0})', matrix.shard) }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(github.event_name == 'pull_request' && '["1/1"]' || '["1/2","2/2"]') }}
+        shard: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["1/2","2/2"]' || '["1/1"]') }}
     runs-on: ubuntu-latest
     # 45, raised from 30 on 2026-09-25 (#718) as a STOP-GAP, on the owner's decision in session. The nightly
     # full-matrix job had grown 899s -> 1816s in eight days and crossed the old ceiling, so the 2026-09-25 run
@@ -278,7 +278,7 @@ jobs:
       - if: failure() && github.event_name != 'push'
         uses: actions/upload-artifact@v6
         with:
-          name: playwright-traces      # `reporter: list` writes no HTML report; the traces live here
+          name: playwright-traces-${{ strategy.job-index }}      # `reporter: list` writes no HTML report; the traces live here
           path: |
             test-results/
             docs/sketchbook/           # #715: a BLANK verdict is only arguable with the frame it was given on
