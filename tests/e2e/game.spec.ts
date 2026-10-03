@@ -1213,21 +1213,25 @@ test.describe('Sky Ninja Academy', () => {
     expect(await toast.textContent(), 'and must leave no stale text behind for the next toast to inherit').toBe('');
   });
 
+  // Every Reception maths topic starred except `unstarred` — derived from the registry, so a new topic cannot
+  // leave the #929 tests below with a hand-written list that is one short (#971 r-measure did exactly that).
+  const starAllExcept = (...unstarred: string[]) => Object.fromEntries(
+    TOPICS.filter(t => t.year === 'reception' && t.subject === 'maths' && !t.drill && !unstarred.includes(t.id))
+      .map(t => [t.id, { stars: 1, best: 5, plays: 1 }]),
+  );
+
   /**
    * #929: the results row's one contextual action, real play through to a real second mission — the unit
    * tests (`results.test.ts`, `screen.test.ts`) pin `resultsAction()`'s precedence and the button's markup;
    * this is the one place `play.ts`'s own wiring (which topic "next" resolves to, and that tapping it starts
-   * a mission on it) is exercised at all. Reception maths has 14 topics (`reception.ts`); every one but
-   * `r-count` (about to be won) and `r-doubles` is pre-starred, so `r-doubles` is the only unstarred topic
+   * a mission on it) is exercised at all. Every Reception maths topic but
+   * `r-count` (about to be won) and `r-doubles` is pre-starred (`starAllExcept`), so `r-doubles` is the only unstarred topic
    * left after the win and the "first after r-count, wrapping" rule has exactly one candidate to find.
    */
   test('results screen (#929): "Next topic →" starts the next unstarred topic in the same subject', async ({ page }) => {
     test.setTimeout(150_000);
     await seedPlayer(page, 'volt', 'Ada', {
-      progress: Object.fromEntries(
-        ['r-numeral', 'r-subitise', 'r-compare', 'r-onemore', 'r-bonds', 'r-add', 'r-sub', 'r-counton', 'r-order', 'r-balance', 'r-share', 'r-oddeven']
-          .map(id => [id, { stars: 1, best: 5, plays: 1 }]),
-      ),
+      progress: starAllExcept('r-count', 'r-doubles'),
     });
     await startTopic(page, 'reception', 'r-count');
     await winMission(page);   // the precondition (#749) — commitResult() stars r-count before showResults() runs
@@ -1242,19 +1246,15 @@ test.describe('Sky Ninja Academy', () => {
   });
 
   /**
-   * #929 review (pr-test-analyzer): the test above always plays `r-count`, index 0 of Reception's 14 maths
-   * topics, so `(i + k) % list.length` never once reaches `list.length` and the modulo wrap is a no-op —
+   * #929 review (pr-test-analyzer): the test above always plays `r-count`, the first Reception maths
+   * topic, so `(i + k) % list.length` never once reaches `list.length` and the modulo wrap is a no-op —
    * the one line of `nextUnstarredTopic()` the wrap exists for was never actually exercised. This plays the
-   * *last* topic (`r-oddeven`, the final index) with the only unstarred one sitting near the *start* (`r-subitise`,
-   * index 1), so the search has to run off the end of the array and wrap back round to find it.
+   * *last* topic (`r-oddeven`) with the only unstarred one sitting near the *start* (`r-subitise`), so the search has to run off the end of the array and wrap back round to find it.
    */
   test('results screen (#929): "Next topic →" wraps from the last topic in the subject back to an early one', async ({ page }) => {
     test.setTimeout(150_000);
     await seedPlayer(page, 'volt', 'Ada', {
-      progress: Object.fromEntries(
-        ['r-count', 'r-numeral', 'r-compare', 'r-onemore', 'r-bonds', 'r-add', 'r-sub', 'r-counton', 'r-order', 'r-balance', 'r-doubles', 'r-share']
-          .map(id => [id, { stars: 1, best: 5, plays: 1 }]),
-      ),
+      progress: starAllExcept('r-oddeven', 'r-subitise'),
     });
     await startTopic(page, 'reception', 'r-oddeven');
     await winMission(page);
@@ -1270,10 +1270,7 @@ test.describe('Sky Ninja Academy', () => {
   test('results screen (#929): no "Next topic →" once every topic in the subject is already starred', async ({ page }) => {
     test.setTimeout(150_000);
     await seedPlayer(page, 'volt', 'Ada', {
-      progress: Object.fromEntries(
-        ['r-numeral', 'r-subitise', 'r-compare', 'r-onemore', 'r-bonds', 'r-add', 'r-sub', 'r-counton', 'r-order', 'r-balance', 'r-doubles', 'r-share', 'r-oddeven']
-          .map(id => [id, { stars: 1, best: 5, plays: 1 }]),
-      ),
+      progress: starAllExcept('r-count'),
     });
     await startTopic(page, 'reception', 'r-count');
     await winMission(page);

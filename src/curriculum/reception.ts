@@ -44,6 +44,25 @@ const rOneMore: Generator = (d, rng) => {
   if (ans < 0) return rOneMore(d, rng);
   return numQ(rng, `One ${more ? 'more' : 'less'} than ${n}?`, ans, { min: 0, max: 20, visual: d < 3 ? { type: 'tenframe', n } : undefined });
 };
+// #971: Development Matters "compare length, weight and capacity" — hand-keyed [bigger, smaller] pairs, answered
+// from real-world knowledge. No numbers, no units, and the two emoji are drawn the same size (not to scale).
+type Measure = 'taller' | 'longer' | 'heavier' | 'holds more';
+export const MEASURE_PAIRS: Record<Measure, [string, string][]> = {
+  taller: [['🦒', '🐭'], ['🌳', '🌷'], ['🏢', '🏠'], ['🐘', '🐜']],
+  longer: [['🐍', '🐛'], ['🚂', '🚲'], ['🚌', '🛴'], ['🦕', '🐸']],
+  heavier: [['🐘', '🐁'], ['🚗', '🎈'], ['🚛', '🚲'], ['🐳', '🐟']],
+  'holds more': [['🛁', '☕'], ['🛁', '🥛'], ['🛢️', '🥄'], ['🛢️', '🍼']],
+};
+const MEASURE_OPPOSITE: Record<Measure, string> = { taller: 'shorter', longer: 'shorter', heavier: 'lighter', 'holds more': 'holds less' };
+const rMeasure: Generator = (d, rng) => {
+  const attrs: Measure[] = d === 1 ? ['taller', 'longer'] : d === 2 ? ['taller', 'longer', 'heavier'] : ['taller', 'longer', 'heavier', 'holds more'];
+  const attr = pick(rng, attrs);
+  const [big, small] = pick(rng, MEASURE_PAIRS[attr]);
+  const opposite = d > 1 && rng() < 0.5;
+  const word = opposite ? MEASURE_OPPOSITE[attr] : attr;
+  const prompt = attr === 'holds more' ? `Which ${word}?` : `Which is ${word}?`;
+  return wordQ(rng, prompt, opposite ? small : big, [opposite ? big : small], { say: prompt });
+};
 const rBonds: Generator = (d, rng) => {
   const total = d === 1 ? 5 : d === 2 ? pick(rng, [5, 6, 7, 8]) : 10;
   const a = ri(rng, 0, total);
@@ -308,6 +327,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   { id: 'r-subitise', title: 'Quick Dots', icon: '🎲', subject: 'maths', year: 'reception', nc: 'ELG Number: subitise to 5', gen: rSubitise },
   { id: 'r-compare', title: 'More or Fewer', icon: '⚖️', subject: 'maths', year: 'reception', nc: 'ELG Patterns: compare quantities', gen: rCompare },
   { id: 'r-onemore', title: 'One More, One Less', icon: '➕', subject: 'maths', year: 'reception', nc: 'ELG Number: composition to 10', gen: rOneMore },
+  { id: 'r-measure', title: 'Taller, Heavier, Holds More', icon: '📏', subject: 'maths', year: 'reception', nc: 'ELG Patterns: compare length, weight and capacity', gen: rMeasure },
   { id: 'r-bonds', title: 'Number Bonds', icon: '🔗', subject: 'maths', year: 'reception', nc: 'ELG Number: bonds to 5 and 10', gen: rBonds },
   { id: 'r-add', title: 'Adding', icon: '🧮', subject: 'maths', year: 'reception', nc: 'ELG Number: composition, addition to 10', gen: rAdd },
   { id: 'r-sub', title: 'Taking Away', icon: '✂️', subject: 'maths', year: 'reception', nc: 'ELG Number: subtraction facts', gen: rSub },

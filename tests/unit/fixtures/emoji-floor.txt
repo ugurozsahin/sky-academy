@@ -3,6 +3,7 @@
 ⏳	0.6	hourglass not done
 ☀	0.6	sun
 ☂	0.7	umbrella
+☕	0.6	hot beverage
 ⚖	1.0	balance scale
 ⚽	0.6	soccer ball
 ⛵	0.6	sailboat
@@ -31,6 +32,7 @@
 🌡	0.7	thermometer
 🌧	0.7	cloud with rain
 🌳	1.0	deciduous tree
+🌷	0.6	tulip
 🌹	0.6	rose
 🌻	0.6	sunflower
 🌼	0.6	blossom
@@ -46,6 +48,7 @@
 🍲	0.6	pot of food
 🍳	0.6	cooking
 🍴	0.6	fork and knife
+🍼	1.0	baby bottle
 🎀	0.6	ribbon
 🎁	0.6	wrapped gift
 🎂	0.6	birthday cake
@@ -65,7 +68,9 @@
 🏖	0.7	beach with umbrella
 🏛	0.7	classical building
 🏠	0.6	house
+🏢	0.6	office building
 🐀	1.0	rat
+🐁	1.0	mouse
 🐈	0.7	cat
 🐉	1.0	dragon
 🐋	1.0	whale
@@ -140,9 +145,11 @@
 🖊	0.7	pen
 🗺	0.7	world map
 🚀	0.6	rocket
+🚂	1.0	locomotive
 🚌	0.6	bus
 🚐	1.0	minibus
 🚗	0.6	automobile
+🚛	1.0	articulated lorry
 🚢	0.6	ship
 🚪	0.6	door
 🚰	1.0	potable water
@@ -150,13 +157,16 @@
 🛁	1.0	bathtub
 🛏	0.7	bed
 🛢	0.7	oil drum
+🛴	3.0	kick scooter
 🟢	12.0	green circle
 🟣	12.0	purple circle
 🟦	12.0	blue square
 🤝	3.0	handshake
 🤸	3.0	person cartwheeling
+🥄	3.0	spoon
 🥅	3.0	goal net
 🥚	3.0	egg
+🥛	3.0	glass of milk
 🥜	3.0	peanuts
 🥤	5.0	cup with straw
 🥫	5.0	canned food
@@ -166,6 +176,8 @@
 🦈	3.0	shark
 🦊	3.0	fox
 🦋	3.0	butterfly
+🦒	3.0	giraffe
+🦕	5.0	sauropod
 🦘	11.0	kangaroo
 🦵	11.0	leg
 🧁	11.0	cupcake

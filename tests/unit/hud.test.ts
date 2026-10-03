@@ -286,9 +286,9 @@ describe('correctionLine (#893 — the spoken line after a wrong slice or a miss
   // Topics whose answer is never a letter or digit at any difficulty, so `correctionLine` is null on every
   // draw by the generic glyph check rather than by `NO_SAY_ANSWER_TOPICS`: `y2-compare` answers a bare
   // `<`/`>`/`=`, `y2-patterns` a pattern glyph/emoji, `y2-punct` a bare punctuation mark, `r-read` (#967) the
-  // CVC picture's own emoji, never the word itself, and `r-initial` (#928) the same CVC picture's emoji, and `r-rhyme` (#972) a rhyming picture's emoji, and `r-numeral` (#973) a string of dots. Found by running the sweep once and reading which topics
+  // CVC picture's own emoji, never the word itself, `r-initial` (#928) the same CVC picture's emoji, `r-rhyme` (#972) a rhyming picture's emoji, `r-measure` (#971) one of the two compared emoji, and `r-numeral` (#973) a string of dots. Found by running the sweep once and reading which topics
   // came back with zero non-null lines.
-  const ALWAYS_SYMBOLIC = new Set(['y2-compare', 'y2-patterns', 'y2-punct', 'r-read', 'r-initial', 'r-rhyme', 'r-numeral']);
+  const ALWAYS_SYMBOLIC = new Set(['y2-compare', 'y2-patterns', 'y2-punct', 'r-read', 'r-initial', 'r-rhyme', 'r-measure', 'r-numeral']);
 
   it('every non-null correction line across the whole registry is "It\'s …", ends in one full stop, and fits the hold', () => {
     let checked = 0, nonNull = 0;
