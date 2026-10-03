@@ -13,15 +13,14 @@ describe("ci.yml's nightly e2e shard wiring (#1538)", () => {
     expect(jobs.indexOf('\n  branch-name:'), 'branch-name bounds the slice').toBeGreaterThan(jobs.indexOf('\n  test:'));
   });
 
-  it('shards only on schedule and workflow_dispatch, and the two shards are 1/2 and 2/2 of one N', () => {
+  it('gives the two-shard list to schedule and workflow_dispatch, and the one-shard list to everything else', () => {
     const list = test.match(/shard: \$\{\{ fromJSON\((.*)\) \}\}/)?.[1] ?? '';
-    expect(list, 'the matrix must be a fromJSON of two lists').toBeTruthy();
-    expect(list).toContain(`'["1/2","2/2"]'`);
-    expect(list).toContain(`'["1/1"]'`);
-    expect(list, 'a push to main must not get the sharded list').not.toContain("'push'");
-    expect(list, 'a pull request must not get the sharded list').not.toContain("'pull_request'");
-    expect(list).toMatch(/github\.event_name == 'schedule'/);
-    expect(list).toMatch(/github\.event_name == 'workflow_dispatch'/);
+    expect(list, 'the matrix must be a fromJSON of one expression').toBeTruthy();
+    // The whole expression, not "each string appears somewhere": swapping the two lists passed the looser
+    // rail and sent the nightly back to one runner and every pull request to two (round-2 review of #1539).
+    expect(list).toBe(
+      `(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["1/2","2/2"]' || '["1/1"]'`,
+    );
   });
 
   it('keeps fail-fast off, so one red shard still lets the other report', () => {
@@ -30,7 +29,10 @@ describe("ci.yml's nightly e2e shard wiring (#1538)", () => {
 
   it('names the single-shard job `test` and passes --shard to the e2e command', () => {
     expect(test).toMatch(/name: \$\{\{ matrix\.shard == '1\/1' && 'test' \|\| format\('test \(\{0\}\)', matrix\.shard\) \}\}/);
-    expect(test).toContain('--shard=${{ matrix.shard }}');
+    const e2eLine = test.split('\n').find((l) => l.includes('npx playwright test') && l.includes('--project=mobile'));
+    expect(e2eLine, 'the e2e step must still be one `npx playwright test` line').toBeTruthy();
+    expect(e2eLine!.trim().startsWith('run:'), 'the command must be a `run:` line, not a comment').toBe(true);
+    expect(e2eLine).toMatch(/\}\} --shard=\$\{\{ matrix\.shard \}\}$/);
   });
 
   it('uploads each shard\'s traces under its own artifact name', () => {
