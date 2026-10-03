@@ -81,6 +81,13 @@ const y1Sub: Generator = (d, rng) => {
 const y1Missing: Generator = (d, rng) => {
   const max = d === 1 ? 10 : 20;
   const a = ri(rng, 1, max), b = ri(rng, 0, a);
+  // #984: from d2 the sum can sit on the right of "=" ("7 = ? − 9", the PoS's own example); d1 draws nothing extra.
+  if (d >= 2 && rng() < (d === 2 ? 0.25 : 0.5)) {
+    const shape = ri(rng, 0, 3);
+    const mp = [`${a - b} = ? − ${b}`, `${b} = ${a} − ?`, `${a} = ? + ${b}`, `${a} = ${b} + ?`][shape];
+    const left = shape === 0 ? a - b : shape === 1 ? b : a;
+    return numQ(rng, mp, shape === 0 ? a : a - b, { min: 0, max: 20, distractors: [left], ...q(mp) });
+  }
   const kind = ri(rng, 0, 2);
   const p = kind === 0 ? `${b} + ? = ${a}` : kind === 1 ? `${a} − ? = ${b}` : `? − ${b} = ${a - b}`;
   const ans = kind === 0 ? a - b : kind === 1 ? a - b : a;
