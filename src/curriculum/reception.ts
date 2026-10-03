@@ -11,6 +11,7 @@ import {
   gapQ, spellQ, soundQ, sentGen, type Sent,
   PHASE2, PHASE2B, PHASE3, VOWELS, LETTERS, CVC, DIGRAPHS,
 } from './util';
+import { syllableQ } from './syllables';
 
 // ---------- Reception maths ----------
 const rCount: Generator = (d, rng) => {
@@ -18,6 +19,20 @@ const rCount: Generator = (d, rng) => {
   const n = ri(rng, 1, max);
   const emoji = pick(rng, OBJECTS);
   return numQ(rng, 'How many?', n, { min: 1, max, visual: { type: 'objects', emoji, n }, say: 'How many can you count?' });
+};
+// #973: the reverse of rCount — the numeral is on the card, the child slices the group of dots that matches it.
+// `say` is the instruction only: reading the numeral is the skill, so the number is never spoken.
+const rNumeral: Generator = (d, rng) => {
+  const n = ri(rng, 1, d === 1 ? 4 : 5);
+  const decoys = new Set<number>();
+  if (d === 3) for (const k of shuffle(rng, [n - 1, n + 1])) if (k >= 1 && k <= 5) decoys.add(k);
+  const rest = shuffle(rng, [1, 2, 3, 4, 5].filter(k => k !== n));
+  const want = d === 3 ? 3 : 2;
+  for (const k of rest) if (decoys.size < want) decoys.add(k);
+  return wordQ(rng, 'Find this many', '●'.repeat(n), [...decoys].map(k => '●'.repeat(k)), {
+    visual: { type: 'word', text: String(n) },
+    say: 'Find the group that matches the number',
+  });
 };
 const rSubitise: Generator = (d, rng) => {
   const n = ri(rng, 1, d === 1 ? 4 : d === 2 ? 5 : 6);
@@ -309,6 +324,7 @@ const rSentence = sentGen(R_SENTS, R_DECOYS, [1, 1, 2], 3);          // Receptio
 export const RECEPTION_TOPICS: Topic[] = [
   // Reception maths — EYFS Early Learning Goals: Number, Numerical Patterns
   { id: 'r-count', title: 'Count It', icon: '🍎', subject: 'maths', year: 'reception', nc: 'ELG Number: count objects to 10', gen: rCount },
+  { id: 'r-numeral', title: 'Match the Number', icon: '🔟', subject: 'maths', year: 'reception', nc: 'ELG Number: link the numeral with its cardinal value', gen: rNumeral },
   { id: 'r-subitise', title: 'Quick Dots', icon: '🎲', subject: 'maths', year: 'reception', nc: 'ELG Number: subitise to 5', gen: rSubitise },
   { id: 'r-compare', title: 'More or Fewer', icon: '⚖️', subject: 'maths', year: 'reception', nc: 'ELG Patterns: compare quantities', gen: rCompare },
   { id: 'r-onemore', title: 'One More, One Less', icon: '➕', subject: 'maths', year: 'reception', nc: 'ELG Number: composition to 10', gen: rOneMore },
@@ -325,6 +341,7 @@ export const RECEPTION_TOPICS: Topic[] = [
   // Reception writing
   { id: 'r-rhyme', title: 'Rhyme Time', icon: '🎵', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: spot and suggest rhymes (Development Matters phonological awareness)', gen: rRhyme },
   { id: 'r-sounds', title: 'Letter Sounds', icon: '🔊', subject: 'writing', year: 'reception', nc: 'ELG Writing: sounds to letters', gen: rLetterSound },
+  { id: 'r-syllables', title: 'How Many Beats?', icon: '👏', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: count or clap syllables in a word', gen: (d, rng) => syllableQ(rng, d, 2) },
   { id: 'r-soundhunt', title: 'Sound Hunt', icon: '👂', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: say a sound for each letter; phase 2–3 sounds by ear', gen: rSoundHunt },
   { id: 'r-capitals', title: 'Big & Small Letters', icon: '🅰️', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: letters', gen: rCapitals },
   { id: 'r-tricky', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'reception', nc: 'ELG Word Reading: common exception words', gen: rTricky },

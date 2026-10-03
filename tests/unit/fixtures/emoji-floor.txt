@@ -36,6 +36,7 @@
 🌹	0.6	rose
 🌻	0.6	sunflower
 🌼	0.6	blossom
+🍅	0.6	tomato
 🍌	0.6	banana
 🍎	0.6	red apple
 🍓	0.6	strawberry
@@ -73,6 +74,7 @@
 🐁	1.0	mouse
 🐈	0.7	cat
 🐉	1.0	dragon
+🐊	1.0	crocodile
 🐋	1.0	whale
 🐌	0.6	snail
 🐍	0.6	snake
@@ -81,10 +83,12 @@
 🐒	0.6	monkey
 🐔	0.6	chicken
 🐘	0.6	elephant
+🐙	0.6	octopus
 🐛	0.6	bug
 🐜	0.6	ant
 🐝	0.6	honeybee
 🐟	0.6	fish
+🐢	1.0	turtle
 🐤	0.6	baby chick
 🐦	0.6	bird
 🐧	0.6	penguin
@@ -103,6 +107,7 @@
 👀	0.6	eyes
 👂	0.6	ear
 👃	0.6	nose
+👏	0.6	clapping hands
 👑	0.6	crown
 👜	0.6	handbag
 👩	0.6	woman
@@ -141,6 +146,8 @@
 🕐	0.6	one o’clock
 🕒	0.6	three o’clock
 🕔	0.6	five o’clock
+🕯	0.7	candle
+🕷	0.7	spider
 🕸	0.7	spider web
 🖊	0.7	pen
 🗺	0.7	world map
@@ -165,6 +172,7 @@
 🤸	3.0	person cartwheeling
 🥄	3.0	spoon
 🥅	3.0	goal net
+🥔	3.0	potato
 🥚	3.0	egg
 🥛	3.0	glass of milk
 🥜	3.0	peanuts

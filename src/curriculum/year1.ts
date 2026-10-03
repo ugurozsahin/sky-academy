@@ -12,6 +12,7 @@ import {
   gapLetters, gapQ, spellQ, sentGen, type Sent, PUNCT_SENTS, LETTERS, CVC, DIGRAPHS, Y1_CEW,
   soundQ, PHASE3, PHASE5, SPLIT,
 } from './util';
+import { syllableQ } from './syllables';
 import { y1SkipAnyOrder } from './year1-skip-anyorder';
 
 // ---------- Year 1 maths ----------
@@ -404,6 +405,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year1', nc: 'Y1 Grammar: capitals, . ? !', gen: y1Punct },
   { id: 'y1-alphabet', title: 'Alphabet Order', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: name the letters of the alphabet in order', sequenceFrom: 3, gen: y1Alphabet },
   { id: 'y1-days', title: 'Days of the Week', icon: '📅', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: days', sequenceFrom: 3, gen: y1Days },
+  { id: 'y1-syllables', title: 'How Many Beats?', icon: '👏', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: division of words into syllables', gen: (d, rng) => syllableQ(rng, d, 3) },
   { id: 'y1-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year1', nc: 'Y1 Writing: sequence words into sentences, and', sequenceFrom: 1, gen: y1Sentence },
   { id: 'y1-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Handwriting', input: 'tracing', gen: y1Trace },
 ];
