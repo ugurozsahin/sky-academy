@@ -78,6 +78,14 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
+    # #1538: the nightly's e2e outgrew one runner (40-42 min of a 45 min ceiling, cancelled on 2026-10-03), so the
+    # full arm is split in two `--shard`s on two runners; a pull request stays one shard (`1/1`, the whole run).
+    # The ceiling below is NOT raised: each shard needs about half of what the single job did.
+    name: ${{ github.event_name == 'pull_request' && 'test' || format('test ({0})', matrix.shard) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(github.event_name == 'pull_request' && '["1/1"]' || '["1/2","2/2"]') }}
     runs-on: ubuntu-latest
     # 45, raised from 30 on 2026-09-25 (#718) as a STOP-GAP, on the owner's decision in session. The nightly
     # full-matrix job had grown 899s -> 1816s in eight days and crossed the old ceiling, so the 2026-09-25 run
@@ -245,7 +253,7 @@ jobs:
       # pull-request arm to exactly `--project=mobile --grep @smoke` and keeps `--grep` out of the nightly arm.
       - name: End-to-end (${{ github.event_name == 'pull_request' && 'mobile @smoke' || 'full matrix' }})
         if: github.event_name != 'push' && steps.scope.outputs.e2e == 'true'
-        run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile --grep @smoke' || '--project=mobile --project=desktop --project=tablet --project=tablet-landscape --project=sketchbook' }}
+        run: npx playwright test ${{ github.event_name == 'pull_request' && '--project=mobile --grep @smoke' || '--project=mobile --project=desktop --project=tablet --project=tablet-landscape --project=sketchbook' }} --shard=${{ matrix.shard }}
       # #715: a pull request whose diff touches the sketchbook runs its one spec — the screenshot script — as its
       # own step, on top of e2e when the diff also reaches the game and instead of it when it does not. Seconds,
       # not minutes: one page, a handful of frames. The nightly needs no step of its own: the full matrix above
