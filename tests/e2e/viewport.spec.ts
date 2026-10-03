@@ -537,6 +537,11 @@ test.describe('tablet viewports (#116)', () => {
    * needing a third row at that narrower width (fewer auto-fill columns than at 1280), not the mode
    * buttons, which this issue does not touch and which #18's own 2026-09-22 14:02Z comment already found
    * "already fine".
+   *
+   * #1541 re-measure: the island now has seven mode buttons, not five (#1518 Retry, #1519 Legend run, #1522
+   * Relaxed practice, #1532/#1534 Ninja Duel), so the same 3-column grid takes three rows (282px / 278px)
+   * instead of two. The grid is unchanged; the island is ~45px (1280×800) and ~86px (1024×768) taller, the
+   * targets above are the measured 845px and 951px. The `.mode-grid` < 300px assertion still bounds the grid.
    */
   const ISLAND_TOLERANCE = 20;
   // One array, not a separate w/h loop plus a target keyed by width: two literals that had to stay in sync
@@ -544,8 +549,8 @@ test.describe('tablet viewports (#116)', () => {
   // other read `target` as `undefined` at runtime and fail the assertions below with a confusing NaN
   // comparison instead of a clear "no target for this viewport" error (type-design-analyzer, #563 review).
   const ISLAND_CASES = [
-    { w: 1280, h: 800, target: 800 },
-    { w: 1024, h: 768, target: 865 },
+    { w: 1280, h: 800, target: 845 },
+    { w: 1024, h: 768, target: 951 },
   ] as const;
 
   for (const { w, h, target } of ISLAND_CASES) {
