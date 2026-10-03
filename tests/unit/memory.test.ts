@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { gridFor, hasMemoryDecks, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
+import { clockEmoji, gridFor, hasMemoryDecks, Memory, spokenOnFlip, THEMES, pickTheme } from '../../src/game/memory';
 import { YEARS, isKs2, type YearId } from '../../src/curriculum';
+import { clockPhrase } from '../../src/curriculum/year2';
 import { CVC, DIGRAPHS, SAME_SOLID, SHAPES_3D } from '../../src/curriculum/util';
 
 function rng(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -208,5 +209,42 @@ describe('Read & Match (#964)', () => {
     }
     expect(read.pairs(rng(3)).every(p => p.a.quiet && !p.b.quiet)).toBe(true);
     expect(THEMES.reception!.filter(t => t.id !== 'read').every(t => t.pairs(rng(3)).every(p => !p.a.quiet && !p.b.quiet))).toBe(true);
+  });
+});
+
+// #965: Year 1's clock deck. The emoji table is checked against the code points, and every board's phrase must
+// be the one `clockPhrase` gives for the hour its emoji shows — the one-partner rail.
+describe('year 1 clocks deck', () => {
+  const deck = THEMES.year1!.find(t => t.id === 'clocks')!;
+  it('exists on Year 1 only, with a 6-pair board', () => {
+    expect(deck).toBeDefined();
+    for (const y of ['reception', 'year2'] as const) expect(THEMES[y]!.some(t => t.id === 'clocks')).toBe(false);
+    expect(deck.pairs(rng(1)).length).toBe(6);
+  });
+  it('clockEmoji matches the Unicode clock faces', () => {
+    expect(clockEmoji(1, false)).toBe('\u{1F550}');
+    expect(clockEmoji(12, false)).toBe('\u{1F55B}');
+    expect(clockEmoji(1, true)).toBe('\u{1F55C}');
+    expect(clockEmoji(12, true)).toBe('\u{1F567}');
+    expect(clockEmoji(3, false)).toBe('🕒');
+    expect(clockEmoji(3, true)).toBe('🕞');
+  });
+  it('every emoji pairs with exactly one phrase, and the phrase is its time (seeds 1–200)', () => {
+    const kinds = new Set<string>();
+    for (let seed = 1; seed <= 200; seed++) {
+      const pairs = deck.pairs(rng(seed));
+      const phrases = new Set(pairs.map(p => p.b.text));
+      expect(phrases.size).toBe(6);
+      expect(new Set(pairs.map(p => p.a.text)).size).toBe(6);
+      for (const p of pairs) {
+        const times = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].flatMap(h => [[h, false], [h, true]] as const).filter(([h, half]) => clockEmoji(h, half) === p.a.text);
+        expect(times.length).toBe(1);
+        const [h, half] = times[0];
+        expect(p.b.text).toBe(clockPhrase(h, half ? 30 : 0));
+        expect(p.a.say).toBe(p.b.text);
+        kinds.add(half ? 'half' : 'oclock');
+      }
+    }
+    expect(kinds.size).toBe(2);
   });
 });
