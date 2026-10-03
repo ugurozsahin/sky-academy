@@ -1217,7 +1217,7 @@ describe('the repeat key holds the whole question (#412)', () => {
   /** Pinned exactly, for the same reason as `MEASURABLE_TOPICS` above (#453 item 3): a count cannot distinguish
    *  "these twenty-eight" from "twenty-eight, several of them not the ones B1 was measured on". */
   const BIG_ENOUGH_TOPICS = [
-    'r-soundhunt', 'y1-add', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
+    'r-soundhunt', 'y1-add', 'y1-alphabet', 'y1-balance', 'y1-capacity', 'y1-length', 'y1-mass', 'y1-missing', 'y1-moreless',
     'y1-order', 'y1-soundhunt', 'y1-spelling', 'y1-story', 'y1-sub', 'y2-add', 'y2-balance', 'y2-capacity', 'y2-compare',
     'y2-inverse', 'y2-length', 'y2-line', 'y2-mass', 'y2-order', 'y2-pv', 'y2-skip', 'y2-spelling', 'y2-stats',
     'y2-sub', 'y2-temp', 'y2-three',

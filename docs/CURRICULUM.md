@@ -66,6 +66,7 @@ Writing:
 - y1-plurals — -s/-es
 - y1-suffix — -ing -ed -er -est
 - y1-punct — capital letters, . ? !
+- y1-alphabet — Alphabet Order: which letter comes after/before; d3 half slice the next three letters in order (letter names, never after z or before a)
 - y1-days
 - y1-sentence — Story Sentences: 4–7 words, `and`/`or`/`but`, d1 shown, d2–3 listen & build
 - y1-trace

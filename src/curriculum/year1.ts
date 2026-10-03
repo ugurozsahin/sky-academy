@@ -329,6 +329,24 @@ const y1Punct: Generator = (d, rng) => {
   const [s, p] = pick(rng, PUNCT_SENTS);
   return wordQ(rng, `${s}_`, p, ['.', '?', '!'], { visual: { type: 'sentence', text: `${s}_` }, say: `${s}. Full stop, question mark or exclamation mark?`, hint: 'Slice the missing punctuation', hintIsData: false });
 };
+// Letter names in order (#976). Oracle: the answer is the shown letter's alphabet neighbour; never "after z" / "before a".
+const y1Alphabet: Generator = (d, rng) => {
+  const seq = d === 3 && rng() < 0.5;
+  const dir = seq ? 1 : pick(rng, [1, -1]);
+  const i = seq ? ri(rng, 0, 22) : dir === 1 ? ri(rng, 0, 24) : ri(rng, 1, 25);   // seq: shown letter at most w
+  const shown = LETTERS[i], say = shown.toUpperCase();
+  if (seq) {
+    const letters = LETTERS.slice(i + 1, i + 4);
+    const pool = LETTERS.filter(l => !letters.includes(l));
+    const ds = [shown, ...shuffle(rng, pool.filter(l => l !== shown))].slice(0, 3);
+    return { prompt: `Slice the next three letters after ${shown}`, say: `Slice the next three letters after ${say}`, answer: letters.join(''), sequence: letters, options: shuffle(rng, [...letters, ...ds]), visual: { type: 'word', text: shown }, hint: 'Slice the letters in order', hintIsData: false };
+  }
+  const answer = LETTERS[i + dir], word = dir === 1 ? 'after' : 'before';
+  const near = [LETTERS[i - dir], LETTERS[i + 2 * dir]].filter((l): l is string => l !== undefined && l !== answer);
+  const ds = [...near, ...shuffle(rng, LETTERS.filter(l => l !== answer && l !== shown && !near.includes(l)))].slice(0, d === 1 ? 2 : 3);
+  const q = wordQ(rng, `Which letter comes ${word} ${shown}?`, answer, ds, { say: `Which letter comes ${word} ${say}?`, visual: { type: 'word', text: shown }, hint: 'Think of the alphabet song', hintIsData: false });
+  return q;
+};
 const y1Days: Generator = (d, rng) => {
   const day = pick(rng, DAYS);
   if (d === 3) return spellQ(rng, day, '📅', 3);   // days keep their capital letter (Y1 grammar)
@@ -384,6 +402,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-plurals', title: 'Plurals -s -es', icon: '🐈', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: plurals', gen: y1Plurals },
   { id: 'y1-suffix', title: 'Endings -ing -ed -er', icon: '🏃', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: suffixes', gen: y1Suffix },
   { id: 'y1-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year1', nc: 'Y1 Grammar: capitals, . ? !', gen: y1Punct },
+  { id: 'y1-alphabet', title: 'Alphabet Order', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: name the letters of the alphabet in order', sequenceFrom: 3, gen: y1Alphabet },
   { id: 'y1-days', title: 'Days of the Week', icon: '📅', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: days', sequenceFrom: 3, gen: y1Days },
   { id: 'y1-sentence', title: 'Story Sentences', icon: '📖', subject: 'writing', year: 'year1', nc: 'Y1 Writing: sequence words into sentences, and', sequenceFrom: 1, gen: y1Sentence },
   { id: 'y1-trace', title: 'Trace Letters', icon: '✍️', subject: 'writing', year: 'year1', nc: 'Y1 Handwriting', input: 'tracing', gen: y1Trace },
