@@ -60,7 +60,7 @@ async function pickAvatar(page: Page, id = 'volt', name = 'Ada') {
   await page.fill('#name', name);
   await page.click('#go');
   await expect(page.locator('.intro-card')).toBeVisible();   // #67: first run continues into the introduction
-  await page.click('#intro-go');
+  await page.click('#intro-skip');
   await expect(page.locator('.home')).toBeVisible();
 }
 /**
@@ -305,7 +305,7 @@ test.describe('Sky Ninja Academy', () => {
     await expect(page.locator('#name')).toHaveValue('Ada');   // carried over from the seeded save
     await page.click('#go');
     await expect(page.locator('.intro-card')).toBeVisible();   // #67: first run continues into the introduction
-    await page.click('#intro-go');
+    await page.click('#intro-skip');
     await expect(page.locator('.hero small')).toContainText('Master Ninja');
     await page.click('.island[data-year="year1"]');
     await expect(page.locator('#train img')).toHaveAttribute('src', /sensei/);         // Sensei fronts the training button
@@ -378,7 +378,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.click('#go');
     // #67: first run continues into the introduction step, not straight to the map.
     await expect(page.locator('.intro-card')).toBeVisible();
-    await page.click('#intro-go');
+    await page.click('#intro-skip');
     await expect(page.locator('.home')).toBeVisible();
 
     // A returning player re-enters via #change-av for the ninja only (#67) — never the name field again,
@@ -445,8 +445,40 @@ test.describe('Sky Ninja Academy', () => {
     await page.goForward();
     await expect(page.locator('.intro-card')).toBeVisible();
 
-    await page.click('#intro-go');
+    await page.click('#intro-skip');
     await expect(page.locator('.home')).toBeVisible();
+  });
+
+  /** #947: "Let's go!" starts the first Mission on the island's first Maths topic; Back goes island → map. */
+  test("onboarding: \"Let's go!\" starts the first mission with the tutorial hand, and Back unwinds island then map (#947)", async ({ page }) => {
+    await page.goto('/?reset=1');
+    await page.click('.avatar-card[data-id="volt"]');
+    await page.click('#next');
+    await page.fill('#name', 'Ada');
+    await page.click('#go');
+    await expect(page.locator('.intro-card')).toBeVisible();
+    await page.click('#intro-go');
+    await expect(page.locator('.play')).toBeVisible();
+    await expect(page.locator('#tutorial')).toBeVisible();
+    await page.waitForFunction(() => window.__sna?.state().prompt);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sna:v1')!).onboarded)).toBe(true);
+    await page.goBack();   // #887: the first back pauses a live mission, the second leaves it
+    await page.goBack();
+    await expect(page.locator('.island-screen')).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('.intro-card')).toHaveCount(0);
+  });
+
+  test("onboarding: \"Skip\" still lands on the sky map (#947)", async ({ page }) => {
+    await page.goto('/?reset=1');
+    await page.click('.avatar-card[data-id="volt"]');
+    await page.click('#next');
+    await page.fill('#name', 'Ada');
+    await page.click('#go');
+    await page.click('#intro-skip');
+    await expect(page.locator('.home')).toBeVisible();
+    await expect(page.locator('.play')).toHaveCount(0);
   });
 
   test('onboarding: a reload mid-wizard does not lose the ninja that was already picked', async ({ page }) => {
@@ -496,7 +528,7 @@ test.describe('Sky Ninja Academy', () => {
       await page.fill('#name', 'Ada');
       await page.click('#go');
       await expect(page.locator('.intro-card')).toBeVisible();
-      await page.click('#intro-go');
+      await page.click('#intro-skip');
       await expect(page.locator('.home')).toBeVisible();
 
       // And the stale entry from before the reload, wherever `history.go(-2)` actually left it in the
@@ -531,7 +563,7 @@ test.describe('Sky Ninja Academy', () => {
     // it is the *third* dot that is active on step 3, not the first or second
     await expect(page.locator('.wizard-progress .dot').nth(2)).toHaveClass(/active/);
 
-    await page.click('#intro-go');
+    await page.click('#intro-skip');
     await expect(page.locator('.home')).toBeVisible();
 
     // a returning player re-entering via #change-av is not mid-wizard — no step rail to show them
@@ -1368,7 +1400,7 @@ test.describe('Sky Ninja Academy', () => {
     await page.fill('#name', 'Ada');
     await page.click('#go');
     await expect(page.locator('.intro-card')).toBeVisible();
-    await page.click('#intro-go');
+    await page.click('#intro-skip');
     await expect(page.locator('.home')).toBeVisible();
     await startTopic(page, 'reception', 'r-count');
     // The win is the precondition here, not the claim (#749) — skip every stage via winMission() rather than
@@ -4285,7 +4317,7 @@ test.describe('profile picker (#20 slice 2)', () => {
       await page.click('#next');
       await page.fill('#name', name);
       await page.click('#go');
-      await page.click('#intro-go');
+      await page.click('#intro-skip');
       await expect(page.locator('.home')).toBeVisible();
       await expect(page.locator('#change-av')).toContainText(name);
       await page.click('#who');
@@ -4341,7 +4373,7 @@ test.describe('profile picker (#20 slice 2)', () => {
       await page.click('#next');
       await page.fill('#name', 'Cass');
       await page.click('#go');
-      await page.click('#intro-go');
+      await page.click('#intro-skip');
 
       await expect(page.locator('.home.map'), "the new child's own sky map, not the screen the picker was opened from").toBeVisible();
       await expect(page.locator('#change-av')).toContainText('Cass');
