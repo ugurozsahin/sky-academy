@@ -159,6 +159,7 @@
 🚛	1.0	articulated lorry
 🚢	0.6	ship
 🚪	0.6	door
+🚫	0.6	prohibited
 🚰	1.0	potable water
 🚲	0.6	bicycle
 🛁	1.0	bathtub

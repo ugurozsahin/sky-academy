@@ -318,6 +318,20 @@ const y1Suffix: Generator = (_d, rng) => {
   const [, suf, sent] = pick(rng, W);
   return wordQ(rng, sent, suf, ['ing', 'ed', 'er', 'est'], { visual: { type: 'sentence', text: sent }, say: sent.replace('___', 'blank'), hint: 'Slice the ending', hintIsData: false });
 };
+// #977: un- negates an adjective ("not kind") or undoes a verb ("opposite of lock"); the root never changes spelling.
+// Oracle: the answer is exactly 'un' + the root named in the prompt. Every option is a word from this bank.
+const UN_ADJ = ['kind', 'happy', 'fair', 'well', 'safe', 'tidy', 'lucky', 'wise', 'true'];
+const UN_VERB = ['lock', 'tie', 'do', 'pack', 'zip', 'load'];
+const y1Prefix: Generator = (d, rng) => {
+  const verb = d === 3 && rng() < 0.5;
+  const root = pick(rng, verb ? UN_VERB : UN_ADJ);
+  const answer = `un${root}`;
+  const others = shuffle(rng, [...UN_ADJ, ...UN_VERB].filter(r => r !== root)).map(r => `un${r}`);
+  const prompt = verb ? `Which word is the opposite of ${root}?` : `Which word means not ${root}?`;
+  return wordQ(rng, prompt, answer, [root, ...others].slice(0, d === 1 ? 2 : 3), {
+    visual: { type: 'word', text: root }, say: prompt, hint: 'Add un- to the front', hintIsData: false,
+  });
+};
 const y1Punct: Generator = (d, rng) => {
   if (d === 1 || (d === 2 && rng() < 0.5)) {
     const [s, p] = pick(rng, PUNCT_SENTS);
@@ -402,6 +416,7 @@ export const YEAR1_TOPICS: Topic[] = [
   { id: 'y1-spelling', title: 'Tricky Words', icon: '🧠', subject: 'writing', year: 'year1', nc: 'Y1 common exception words', sequenceFrom: 3, gen: y1Spelling },
   { id: 'y1-plurals', title: 'Plurals -s -es', icon: '🐈', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: plurals', gen: y1Plurals },
   { id: 'y1-suffix', title: 'Endings -ing -ed -er', icon: '🏃', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: suffixes', gen: y1Suffix },
+  { id: 'y1-prefix', title: 'Un- Words', icon: '🚫', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: the prefix un-', gen: y1Prefix },
   { id: 'y1-punct', title: 'Fix the Sentence', icon: '❗', subject: 'writing', year: 'year1', nc: 'Y1 Grammar: capitals, . ? !', gen: y1Punct },
   { id: 'y1-alphabet', title: 'Alphabet Order', icon: '🔤', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: name the letters of the alphabet in order', sequenceFrom: 3, gen: y1Alphabet },
   { id: 'y1-days', title: 'Days of the Week', icon: '📅', subject: 'writing', year: 'year1', nc: 'Y1 Spelling: days', sequenceFrom: 3, gen: y1Days },

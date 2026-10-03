@@ -67,6 +67,7 @@ Writing:
 - y1-spelling — 45 CEW
 - y1-plurals — -s/-es
 - y1-suffix — -ing -ed -er -est
+- y1-prefix — Un- Words: un- changes the meaning ("means not kind" → unkind); d3 half "opposite of lock" → unlock; hand-curated bank, root spelling unchanged
 - y1-punct — capital letters, . ? !
 - y1-alphabet — Alphabet Order: which letter comes after/before; d3 half slice the next three letters in order (letter names, never after z or before a)
 - y1-days
