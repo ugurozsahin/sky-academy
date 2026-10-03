@@ -9,7 +9,7 @@ export { type ProfileCard, profileCard, profileCards } from './profile-card';
 export { PROFILE_IDS, type ProfileId, MAX_PROFILES, saveKeyFor, profileIds, activeProfile } from './profile-index';
 export { type RenameProfileResult, type RenameRefusal, renameProfile, type DeleteProfileResult, type DeleteRefusal, deleteProfile } from './profile-manage';
 export { type SetActiveResult, setActiveProfile, type AddProfileResult, addProfile } from './profile-switch';
-export { recordTopic, recordAccuracy, recordTraining, recordEndless, recordSprint, recordTopicSprint, recordBossWin, recordMemory, today, touchStreak } from './progress';
+export { recordTopic, recordCrown, recordAccuracy, recordTraining, recordEndless, recordSprint, recordTopicSprint, recordBossWin, recordMemory, today, touchStreak } from './progress';
 export { addCoins, dojoToday, recordDojo, type GameEndOutcome, recordGameEnd } from './rewards';
 export { type AnswerTally, type TopicProgress, type StoredCert, type StoredDuel, type SaveData, SAVE_VERSION } from './shape';
 export { isReadOnlySave, isWriteFailing } from './state';

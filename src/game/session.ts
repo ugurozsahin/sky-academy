@@ -77,7 +77,7 @@ export interface DeckItem { topic: Topic; q: Question }
  * their coins were paid in the lost run, so `buildResult()` leaves them out of the coins.
  */
 export interface Resume { stage: number; stageStars: number[] }
-export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; resume?: Resume; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean; slower?: boolean }
+export interface SessionOpts { mode: Mode; year: YearInfo; topic?: Topic; pool?: Topic[]; weights?: number[]; deck?: DeckItem[]; resume?: Resume; rng?: () => number; stages?: number; seconds?: number; bossHp?: number; practice?: boolean; slower?: boolean; legend?: boolean }
 
 /**
  * The "Fix my mistakes" deck (#930): the 5 most recent misses, newest first — `misses` is already newest-last
@@ -114,7 +114,7 @@ export class Session {
   }
   /** The behaviour table entry for this run's mode (#26). */
   get spec(): ModeSpec { return MODES[this.o.mode]; }
-  private get ctx(): ModeCtx { return { year: this.o.year, stage: this.stage, questionsAsked: this.questionsAsked, sequence: !!this.current?.sequence, slow: !!this.current?.slow, slower: !!this.o.slower, enraged: this.enraged }; }
+  private get ctx(): ModeCtx { return { year: this.o.year, stage: this.stage, questionsAsked: this.questionsAsked, sequence: !!this.current?.sequence, slow: !!this.current?.slow, slower: !!this.o.slower, legend: !!this.o.legend, enraged: this.enraged }; }
   get perStage() { return this.o.year.perStage; }
   get secondsLeft() { return Math.ceil(this.timeLeft / 1000); }
   get difficulty(): Difficulty { return this.spec.difficulty(this.ctx); }

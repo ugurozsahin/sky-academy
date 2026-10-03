@@ -69,7 +69,7 @@ const nav = {
   },
   map: () => { leave(); year = null; if (!fromPop && history.state?.screen) { history.back(); return; } fromPop = false; mapScreen(nav); },
   island: (y: YearInfo) => { leave(); year = y; enter('island'); islandScreen(nav, y); },
-  play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, weights: o.weights }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume })); }) as StartPlay,
+  play: ((o: PlayOpts) => { leave(); year = o.year; enter('play'); dispose = playScreen(o, up, () => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, weights: o.weights, legend: o.legend }), t => nav.play({ year: o.year, mode: 'mission', topic: t }), misses => nav.play({ year: o.year, mode: o.mode, topic: o.topic, pool: o.pool, deck: fixDeck(misses, topicById), practice: true }), resume => nav.play({ year: o.year, mode: 'mission', topic: o.topic, resume, legend: o.legend })); }) as StartPlay,
   memory: (y: YearInfo) => { leave(); year = y; enter('memory'); dispose = memoryScreen({ year: y }, up, () => nav.memory(y)); },
   duel: (y: YearInfo, topic?: string) => { leave(); year = y; enter('duel'); dispose = duelScreen({ year: y, topic }, up, () => nav.duel(y, topic)); },   // #16
   rewards: () => { leave(); enter('rewards'); rewardsScreen(nav); },

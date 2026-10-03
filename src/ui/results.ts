@@ -6,7 +6,7 @@ import type { Question, Topic } from '../curriculum';
 import { esc } from './dom';
 import { REST_LINE, restDue, type RestClock } from '../game/rest';
 import type { RestSetting } from '../device-settings';
-import { load, recordSprint, recordTopic, recordTopicSprint } from '../storage';
+import { load, recordCrown, recordSprint, recordTopic, recordTopicSprint } from '../storage';
 import { raisesTrophy, trophyFor, TROPHY_WORD } from '../game/trophies';
 import { listedTopics, type YearInfo } from '../curriculum';
 import { beltFor, totalStarsOf } from '../game/belts';
@@ -191,9 +191,10 @@ export function recordSprintOutcome(year: YearInfo, topic: Topic | undefined, r:
 export const missionBestCandidates = (topic: Pick<Topic, 'title'>, isNewBest: boolean): ResultCandidate[] =>
   isNewBest ? [{ kind: 'best', text: `New best for ${topic.title}!` }] : [];
 
-/** Record a Mission's result and work out its announcements (#933 best, #951 belt), so `commitResult()` stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. */
-export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number }): { candidates: ResultCandidate[] } {
+/** Record a Mission's result and work out its announcements (#933 best, #951 belt), so `commitResult()` stays one line for it: the call site is pinned in `results.test.ts`, not only the pieces. A *won* Legend run also crowns the topic (#932); a lost one changes nothing more. */
+export function recordMissionOutcome(topic: Topic, r: { stars: number; score: number; won?: boolean }, legend = false): { candidates: ResultCandidate[] } {
   const total = () => totalStarsOf(load().progress, listedTopics()), before = beltFor(total());
   const candidates = missionBestCandidates(topic, recordTopic(topic.id, r.stars, r.score)), after = beltFor(total());
+  if (legend && r.won) recordCrown(topic.id);
   return { candidates: after.n > before.n ? [{ kind: 'belt', text: `🥋 You earned the ${after.name} belt!`, spoken: `You earned the ${after.name} belt!` }, ...candidates] : candidates };
 }

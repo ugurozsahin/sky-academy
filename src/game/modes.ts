@@ -14,6 +14,7 @@ export interface ModeCtx {
   slow: boolean;            // the current question is flagged `slow` by its generator — several mental steps (#297)
   slower: boolean;          // the child's own "Slower bubbles" accessibility setting is on (#905)
   enraged: boolean;         // boss on its last 3 HP
+  legend: boolean;          // a Legend run (#932): the hardest questions from stage 1, one speed step faster
 }
 /** What a finished run scored — used to award end-stars and coins. */
 export interface EndCtx {
@@ -77,8 +78,9 @@ export const MODES: Record<Mode, ModeSpec> = {
   mission: {
     id: 'mission', title: 'Mission', overHeadingWon: 'Mission complete!', overHeadingLost: 'Out of lives',
     hasLives: true, staged: true, timed: false, boss: false, villain: false,
-    difficulty: c => c.year.diffs[Math.min(c.stage, c.year.diffs.length) - 1] ?? 3,
-    speed: c => eased(c, c.year.speeds[Math.min(c.stage, c.year.speeds.length) - 1] ?? 3),
+    difficulty: c => c.legend ? 3 : c.year.diffs[Math.min(c.stage, c.year.diffs.length) - 1] ?? 3,
+    // #932: Legend's step comes before `eased()`'s, so "Slower bubbles" still takes one off the Legend speed; a gentle year gets none (#700).
+    speed: c => { const s = c.year.speeds[Math.min(c.stage, c.year.speeds.length) - 1] ?? 3; return eased(c, c.legend && !c.year.gentle ? Math.min(3, s + 1) : s); },
     basePoints: c => 10 * c.stage,
     stars: c => c.won ? Math.max(1, Math.round(c.stageStarsTotal / c.stages)) : 0,
     coins: c => baseCoins(c) + (c.won ? 20 : 0),

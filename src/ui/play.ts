@@ -20,7 +20,7 @@ import { pauseHTML, stageClearHTML } from './overlays';
 import { certToStored, certWords, drawCertificate, type CertInfo } from './certificate';
 import type { PlayHooks } from './hooks';
 
-export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume'>;   // pool = Sensei training; resume = #931
+export type PlayOpts = Pick<SessionOpts, 'year' | 'topic' | 'mode' | 'pool' | 'weights' | 'deck' | 'practice' | 'resume' | 'legend'>;   // pool = Sensei training; resume = #931
 
 export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, next: (t: Topic) => void, fix: (m: Miss[]) => void, retry: (r: Resume) => void) {
   const d = load(); const av = avatarById(d.avatar);
@@ -88,7 +88,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
   // and the state only they touch live in play-session.ts. This screen keeps the markup, the arena, the
   // overlays and the test hooks, and hands the callbacks the few things they need from up here.
   const playSession = createPlaySession({
-    mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, resume: o.resume, slower: d.settings.slow,
+    mode: o.mode, year: o.year, topic: o.topic, weights: o.weights, deck: o.deck, practice: o.practice, resume: o.resume, legend: o.legend, slower: d.settings.slow,
     pool: o.pool ?? (o.mode !== 'mission' ? topicsFor(o.year.id).filter(t => t.input !== 'tracing') : undefined),
   }, {
     training, tracing, villain: villainMode, av, els, hud, hold: HOLD,
@@ -204,7 +204,7 @@ export function playScreen(o: PlayOpts, goHome: () => void, replay: () => void, 
     // `recordDuel`. A phantom `plays` increment or an unearned best score would otherwise stick around forever
     // and skew `parents.ts`'s "topics tried" count and `sensei.ts`'s weakest-topic ranking.
     if (!r.incomplete) {
-      if (o.mode === 'mission' && o.topic) ({ candidates } = recordMissionOutcome(o.topic, r));   // #933
+      if (o.mode === 'mission' && o.topic) ({ candidates } = recordMissionOutcome(o.topic, r, !!o.legend));   // #933, #932
       else if (training) { if (r.won) recordTraining(o.year.id); }
       else if (o.mode === 'sprint') ({ newBest, candidates } = recordSprintOutcome(o.year, o.topic, r));   // #911/#912
       else if (o.mode === 'boss') { if (r.won) recordBossWin(o.year.id); }
