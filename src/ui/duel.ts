@@ -23,10 +23,10 @@ import { dojoRowsHTML } from './memory';
 import { pauseHTML } from './overlays';
 import { waveOptsFor } from './play-session';
 import { renderVisual } from './visuals';
-import { fontReady } from './font';
+import { duelTopic } from '../game/duel-topic'; import { fontReady } from './font';
 import type { DuelHooks } from './hooks';
 
-export interface DuelScreenOpts { year: YearInfo }
+export interface DuelScreenOpts { year: YearInfo; topic?: string }
 const PLAYERS = DUEL_PLAYERS;
 const NAME: Record<DuelPlayer, string> = { a: 'Player 1', b: 'Player 2' };
 /** Outcome holds (ms, unscaled): the winning bubble stays lit this long before the next round. `miss` is the
@@ -54,7 +54,7 @@ export function duelScreen(o: DuelScreenOpts, goHome: () => void, replay: () => 
   const difficulty = o.year.diffs[0] ?? 1;          // the year's gentlest stage, for the pool AND the match
   const pool = duelPool(topicsFor(o.year.id), difficulty);
   if (!pool.length) throw new Error(`Ninja Duel: ${o.year.id} has no bubble topic to duel on`);   // before anything is built to leak
-  const topic = pool[Math.floor(Math.random() * pool.length)];
+  const topic = duelTopic(pool, o.topic, Math.random);
   render(`
   <section class="screen play duel-screen" style="--glow:${av.glow}">
     <div class="duel-half b" id="half-b">
