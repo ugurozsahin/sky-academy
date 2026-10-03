@@ -59,7 +59,7 @@ export const Y2_GENS: Record<string, Topic['gen']> = {
  * compares, so it came off; d3's own pool is still small enough to stay blind.
  */
 export const NO_REPEATED_SET = new Set([
-'r-order d1', 'r-order d2', 'r-order d3', 'r-share d2', 'r-share d3',
+'r-measure d1', 'r-order d1', 'r-order d2', 'r-order d3', 'r-share d2', 'r-share d3',
 'r-build d3', 'r-sentence d1', 'r-sentence d2', 'r-sentence d3',
 'y1-skip d1', 'y1-skip d2', 'y1-skip d3', 'y1-order d1', 'y1-order d2', 'y1-order d3',
 'y1-coins d3', 'y1-shapes d3', 'y1-plurals d1', 'y1-punct d1', 'y1-days d3',

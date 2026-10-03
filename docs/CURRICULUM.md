@@ -9,6 +9,7 @@ Sources: DfE *Mathematics programmes of study: KS1* (2013/2014), *EYFS statutory
 | r-subitise | Number: subitise to 5 | dot patterns 1–6 |
 | r-compare | Numerical Patterns: compare quantities | more/fewer of two groups; d3: or the same (=) |
 | r-onemore | Number: composition | one more / one less to 20 |
+| r-measure | Numerical Patterns: compare length, weight and capacity | two emoji, no numbers; d1 taller/longer, d2 adds heavier and shorter/lighter, d3 adds holds more/less |
 | r-bonds | Number: bonds to 5, some to 10 | ten-frame visual |
 | r-add | Number: composition | within 10, pictorial |
 | r-sub | Number: composition | within 10, pictorial |
