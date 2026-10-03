@@ -40,7 +40,7 @@ Maths:
 - y1-add — within 20, incl. 0
 - y1-story — Story Sums: one-step adding/subtracting in a spoken, pictured story (d3 adds "how many were left/taken")
 - y1-sub — within 20, incl. 0
-- y1-missing — missing-number problems
+- y1-missing — missing-number problems; from d2 the sum can sit after the equals sign (`7 = ? − 9`: a quarter of d2 cards, half of d3, #984)
 - y1-doubles — double within 20
 - y1-skip — count in 2s/5s/10s; at d2–d3 one card in three is "Slice every multiple of 5/10" (any order, #920)
 - y1-moreless — to 100; half the cards are "Count back: 42, 41, 40, ?", d3 crossing a tens boundary a third of the time (#983)
