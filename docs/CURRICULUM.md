@@ -99,6 +99,7 @@ Maths:
 - y2-story-times — short story problems with the 2, 5 and 10 tables: equal groups with an array (d1), sharing and grouping (d2), a mix (d3)
 - y2-oddeven — is n odd/even (d1); at d2–d3 about 1 in 3 cards is "slice every even/odd number" over six numbers (any order); of the rest, half asks n odd/even and half shows 4 numbers and asks which one is odd/even, d3 decoys within 5 of the answer
 - y2-fractions — ⅓ ¼ 2/4 ¾, of quantities
+- y2-equiv — 2/4 is the same as 1/2, as fractions and of a quantity
 - y2-money — £ and p recorded separately — `£1 and 50p`, never `£1.50`; change
 - y2-story-money — shop stories in pence: two prices added (d1), change from 50p (d2), change from £1 after two items (d3); every amount via `coinLabel`, no decimals
 - y2-coincombo — which coins make 20p: coin sets largest first (d1 two coins ≤20p, d2 ≤50p, d3 two or three coins ≤£1); every coin via `coinLabel`, no decimals

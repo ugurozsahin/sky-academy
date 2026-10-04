@@ -71,7 +71,7 @@ export const y2Inverse: Generator = (d, rng) => {
   return slowAtD3(d, numQ(rng, p, ans, { min: 0, max: 100, ...q(p) }));
 };
 /** `a/b` written as text has the same value as num/den (cross-multiplied, so 2/4 and 1/2 are equal). */
-const sameFraction = (text: string, num: number, den: number) => { const [a, b] = text.split('/').map(Number); return a * den === num * b; };
+export const sameFraction = (text: string, num: number, den: number) => { const [a, b] = text.split('/').map(Number); return a * den === num * b; };
 export const y2Fractions: Generator = (d, rng) => {
   const fr = d === 1 ? pick(rng, [[1, 2], [1, 4]]) : d === 2 ? pick(rng, [[1, 2], [1, 3], [1, 4]]) : pick(rng, [[1, 3], [1, 4], [2, 4], [3, 4]]);
   const [num, den] = fr;

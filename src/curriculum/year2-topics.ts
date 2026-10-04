@@ -11,6 +11,7 @@ import {
 } from './year2';
 import { y2Related } from './year2-related';
 import { y2OddEven } from './year2-oddeven';
+import { y2Equiv } from './year2-equiv';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
 import { y2AnyOrder } from './year2-anyorder';
@@ -39,6 +40,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-story-times', title: 'Story Times', icon: '🍎', subject: 'maths', year: 'year2', nc: 'Y2 M&D: solve problems in contexts using the 2, 5 and 10 tables', gen: y2StoryTimes },
   { id: 'y2-oddeven', title: 'Odd or Even', icon: '🐾', subject: 'maths', year: 'year2', nc: 'Y2 M&D: odd and even', sequenceFrom: 2, gen: y2OddEven },
   { id: 'y2-fractions', title: 'Fractions', icon: '🍕', subject: 'maths', year: 'year2', nc: 'Y2 Fractions: 1/3 1/4 2/4 3/4', gen: y2Fractions },
+  { id: 'y2-equiv', title: 'Same Fraction', icon: '🍕', subject: 'maths', year: 'year2', nc: 'Y2 Fractions: equivalence of 2/4 and 1/2', gen: y2Equiv },
   { id: 'y2-money', title: 'Money £ and p', icon: '💷', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: money, change', gen: y2Money },
   { id: 'y2-story-money', title: 'Shop Stories', icon: '🍎', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: money problems in a practical context, including change', gen: y2StoryMoney },
   { id: 'y2-coincombo', title: 'Coin Combinations', icon: '💰', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: find different combinations of coins that equal the same amounts of money', gen: y2CoinCombo },
