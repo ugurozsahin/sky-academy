@@ -9,11 +9,13 @@ import {
   y2Mass, y2Capacity, y2Temp, y2Duration, y2Balance, y2Stats, y2Spelling, y2Contractions, y2Suffix,
   y2SuffixRoot, y2Homophones, y2SentenceType, y2Tense, y2Punct, y2Sentence, y2Trace,
 } from './year2';
+import { y2Related } from './year2-related';
 import { y2OddEven } from './year2-oddeven';
 import { y2Equiv } from './year2-equiv';
 import { y2WordClass } from './year2-wordclass';
 import { y2StoryAdd } from './year2-story-add';
 import { y2StoryMoney } from './year2-story-money';
+import { y2CoinCombo } from './year2-coincombo';
 import { y2StoryTimes } from './year2-story-times';
 import { y2Objects3d } from './year2-objects3d';
 import { tableDrill } from './tables';
@@ -25,6 +27,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-skip', title: 'Count in 2s, 3s, 5s, 10s', icon: '🦘', subject: 'maths', year: 'year2', nc: 'Y2 NPV: count in steps', gen: y2Skip },
   { id: 'y2-add', title: 'Adding to 100', icon: '➕', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit addition', gen: y2Add },
   { id: 'y2-sub', title: 'Subtracting', icon: '➖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: 2-digit subtraction', gen: y2Sub },
+  { id: 'y2-related', title: 'Related Facts', icon: '🔗', subject: 'maths', year: 'year2', nc: 'Y2 A&S: derive and use related facts up to 100', gen: y2Related },
   { id: 'y2-three', title: 'Three Numbers', icon: '🎯', subject: 'maths', year: 'year2', nc: 'Y2 A&S: add three 1-digit', gen: y2Three },
   { id: 'y2-inverse', title: 'Missing Number', icon: '❓', subject: 'maths', year: 'year2', nc: 'Y2 A&S: inverse, missing number', gen: y2Inverse },
   { id: 'y2-story-add', title: 'Story Sums', icon: '📖', subject: 'maths', year: 'year2', nc: 'Y2 A&S: solve problems with addition and subtraction in context', gen: y2StoryAdd },
@@ -38,6 +41,7 @@ export const YEAR2_TOPICS: Topic[] = [
   { id: 'y2-equiv', title: 'Same Fraction', icon: '🍕', subject: 'maths', year: 'year2', nc: 'Y2 Fractions: equivalence of 2/4 and 1/2', gen: y2Equiv },
   { id: 'y2-money', title: 'Money £ and p', icon: '💷', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: money, change', gen: y2Money },
   { id: 'y2-story-money', title: 'Shop Stories', icon: '🍎', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: money problems in a practical context, including change', gen: y2StoryMoney },
+  { id: 'y2-coincombo', title: 'Coin Combinations', icon: '💰', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: find different combinations of coins that equal the same amounts of money', gen: y2CoinCombo },
   { id: 'y2-time', title: 'Telling Time', icon: '🕔', subject: 'maths', year: 'year2', nc: 'Y2 Measurement: time to 5 min', gen: y2Time },
   { id: 'y2-words', title: 'Number Words', icon: '🔤', subject: 'maths', year: 'year2', nc: 'Y2 NPV: numbers to 100 in words', gen: y2Words },
   { id: 'y2-order', title: 'Order Up!', icon: '📶', subject: 'maths', year: 'year2', nc: 'Y2 NPV: order numbers to 100', sequenceFrom: 1, gen: y2Order },

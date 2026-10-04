@@ -87,6 +87,7 @@ Maths:
 - y2-skip — 2,3,5,10 incl. backwards
 - y2-add — 2-digit ± ones/tens/2-digit
 - y2-sub — 2-digit ± ones/tens/2-digit
+- y2-related — related facts: 3 + 4 = 7, so 30 + 40 = ?; d1 adds, d2 subtracts, d3 hides the second number or the result
 - y2-three — three 1-digit
 - y2-inverse — missing number
 - y2-story-add — short story problems within 100: add or take away, ones (d1), tens (d2), two 2-digit numbers or one-unit measures (d3)
@@ -100,6 +101,7 @@ Maths:
 - y2-equiv — 2/4 is the same as 1/2, as fractions and of a quantity
 - y2-money — £ and p recorded separately — `£1 and 50p`, never `£1.50`; change
 - y2-story-money — shop stories in pence: two prices added (d1), change from 50p (d2), change from £1 after two items (d3); every amount via `coinLabel`, no decimals
+- y2-coincombo — which coins make 20p: coin sets largest first (d1 two coins ≤20p, d2 ≤50p, d3 two or three coins ≤£1); every coin via `coinLabel`, no decimals
 - y2-time — 5 minutes, quarter past/to
 - y2-words — to 100
 - y2-order — order to 100
