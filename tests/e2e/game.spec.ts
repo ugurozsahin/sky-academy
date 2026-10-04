@@ -81,6 +81,11 @@ async function seedPlayer(page: Page, id = 'volt', name = 'Ada', extra: Record<s
   await page.goto('/');
   await expect(page.locator('.home')).toBeVisible();
 }
+/** #1052: put every `YEARS` row on the map (the `sna:years` preview key, #1032). An init script applies from the
+ *  next navigation, so call this **before** `seedPlayer` — which navigates. A test that never calls it sees only the gated years. */
+async function seedPreview(page: Page) {
+  await page.addInitScript(() => localStorage.setItem('sna:years', 'all'));
+}
 /** Open the grown-ups dashboard from the map, answering the maths gate with the product it asks for. */
 async function openGrownUps(page: Page) {
   await page.click('#grownups');
@@ -5378,4 +5383,26 @@ test('a y3-speech d3 card fits a 390×664 phone, one version per line (#1110)', 
     expect(lines, `seed ${seed}: three versions, three lines, none wrapped`).toBe(3);
     await expectFitsViewport(page, `y3-speech d3 card, seed ${seed}`);
   }
+});
+
+// #1052: a hidden KS2 year is off the map, so only the preview key reaches it. One smoke test per KS2 shell plays
+// its first topic through the real map, island and play screen, so a topic that breaks in the browser shows at once.
+test.describe('hidden KS2 years (preview)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((fast) => { window.__SNA_FAST = fast; }, FAST);
+  });
+  test('Year 3: the map, island and first topic play through (#1052)', { tag: '@smoke' }, async ({ page }) => {
+    await seedPlayer(page);                                   // no preview: the map follows the gate and nothing more
+    const gated = await page.$$eval('.islands .island', els => els.map(el => (el as HTMLElement).dataset.year));
+    expect(gated.includes('year3')).toBe(shownYears().some(y => y.id === 'year3'));
+
+    await seedPreview(page);                                  // before the navigation that seedPlayer makes
+    await seedPlayer(page);
+    await expect(page.locator('.island[data-year="year3"]')).toBeVisible();
+    await startTopic(page, 'year3', 'y3-count');
+    await page.waitForFunction(() => window.__sna.bubbles().length > 1);   // the wave is up before the hook can slice
+    const before = await page.evaluate(() => window.__sna.state());
+    await expect.poll(() => answer(page), { message: 'the hook slices the right bubble once it is launched' }).toBe(true);
+    await page.waitForFunction(b => { const s = window.__sna.state(); return s.index !== b.index || s.score !== b.score; }, before);
+  });
 });

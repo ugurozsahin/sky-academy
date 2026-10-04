@@ -496,9 +496,9 @@ describe('the @smoke e2e subset is non-empty and actually reachable by npm run t
       ['onboarding', 'avatar selection is required, saved and shown on the home screen'],
       ['a wrong answer', 'wrong slice loses a life and shows the answer; correct then continues'],
       ['a won mission', 'a full mission (5 stages) ends with results, medal, coins, a sticker and saved stars'],
-      ['a duel starting, both arenas dealt one wave', 'the two halves pose the identical wave — same order, same moments, same arcs'],
+      ['a duel starting, both arenas dealt one wave', 'the two halves pose the identical wave — same order, same moments, same arcs'], ['a hidden KS2 year, via the preview key (#1052)', 'Year 3: the map, island and first topic play through'],
     ]) expect(out, `the @smoke subset must still walk ${path} (#854)`).toContain(title);
-    expect(Number(testCount), 'the eight paths above, one test each (#854)').toBe(8);
+    expect(Number(testCount), 'the nine paths above, one test each (#854, #1052)').toBe(9);
   }, 20_000);   // Vitest's own default 5000ms test timeout fired before the 15s subprocess timeout above ever got the chance to, under CI load (reproduced twice) — now exceeds it.
 });
 
