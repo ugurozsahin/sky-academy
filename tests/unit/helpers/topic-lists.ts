@@ -14,6 +14,8 @@ import { y2StoryMoney } from '../../../src/curriculum/year2-story-money';
 import { y2CoinCombo } from '../../../src/curriculum/year2-coincombo';
 import { y2StoryTimes } from '../../../src/curriculum/year2-story-times';
 import { y2Objects3d } from '../../../src/curriculum/year2-objects3d';
+import { y2SpellKn } from '../../../src/curriculum/year2-spell-kn';
+import { y2Conjunction } from '../../../src/curriculum/year2-conjunction';
 
 // The per-topic lists a new topic adds itself to (#1411). They live here, not in `curriculum.test.ts`, because that
 // file is frozen at its length (#1388) and a list cannot be moved to a new file one line at a time. `add-topic` says
@@ -24,8 +26,8 @@ export const Y2_IDS = [
   'y2-pv', 'y2-compare', 'y2-skip', 'y2-add', 'y2-sub', 'y2-related', 'y2-three', 'y2-inverse', 'y2-story-add', 'y2-anyorder', 'y2-tables', 'y2-story-times', 'y2-oddeven',
   'y2-fractions', 'y2-equiv', 'y2-money', 'y2-story-money', 'y2-coincombo', 'y2-time', 'y2-words', 'y2-order', 'y2-line', 'y2-shapes', 'y2-objects3d', 'y2-symmetry',
   'y2-patterns', 'y2-position', 'y2-length', 'y2-mass', 'y2-capacity', 'y2-temp', 'y2-duration', 'y2-balance',
-  'y2-stats', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-suffix-root', 'y2-homophones', 'y2-wordclass',
-  'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-trace',
+  'y2-stats', 'y2-spelling', 'y2-contractions', 'y2-suffix', 'y2-suffix-root', 'y2-homophones', 'y2-spell-kn', 'y2-wordclass',
+  'y2-sentencetype', 'y2-tense', 'y2-punct', 'y2-sentence', 'y2-conjunction', 'y2-trace',
 ];
 
 /**
@@ -39,8 +41,8 @@ export const Y2_GENS: Record<string, Topic['gen']> = {
   'y2-shapes': y2Shapes, 'y2-objects3d': y2Objects3d, 'y2-symmetry': y2Symmetry, 'y2-patterns': y2Patterns, 'y2-position': y2Position, 'y2-length': y2Length,
   'y2-mass': y2Mass, 'y2-capacity': y2Capacity, 'y2-temp': y2Temp, 'y2-duration': y2Duration, 'y2-balance': y2Balance,
   'y2-stats': y2Stats, 'y2-spelling': y2Spelling, 'y2-contractions': y2Contractions, 'y2-suffix': y2Suffix, 'y2-suffix-root': y2SuffixRoot,
-  'y2-homophones': y2Homophones, 'y2-wordclass': y2WordClass, 'y2-sentencetype': y2SentenceType, 'y2-tense': y2Tense, 'y2-punct': y2Punct,
-  'y2-sentence': y2Sentence, 'y2-trace': y2Trace,
+  'y2-homophones': y2Homophones, 'y2-spell-kn': y2SpellKn, 'y2-wordclass': y2WordClass, 'y2-sentencetype': y2SentenceType, 'y2-tense': y2Tense, 'y2-punct': y2Punct,
+  'y2-sentence': y2Sentence, 'y2-conjunction': y2Conjunction, 'y2-trace': y2Trace,
 };
 
 /**
@@ -82,11 +84,13 @@ export const NO_REPEATED_SET = new Set([
 'y2-money d1', 'y2-money d2', 'y2-money d3', 'y2-time d1', 'y2-time d2', 'y2-time d3',
 'y2-words d1', 'y2-words d2', 'y2-words d3', 'y2-duration d1', 'y2-duration d3',
 'y2-suffix-root d1', 'y2-sentence d1', 'y2-sentence d2', 'y2-sentence d3',
+  'y2-conjunction d1', 'y2-conjunction d2', 'y2-conjunction d3', // #1007: each bank row carries its own decoys, so an option set never recurs with a different answer at these seeds
   'y1-share d2', 'y1-share d3', // #986: the decoys are the total, k and answer ±1, all derived from the card, so no option set recurs with a different answer at these seeds
   'y2-story-times d1', // #995: the array on d1 cards is the whole question and its decoys derive from the card, so no option set recurs with a different answer
   'y2-story-add d1', 'y2-story-add d3', // #994: the decoys are the other operation and answer ±1/±10, all derived from the card, so no option set recurs with a different answer
   'y2-anyorder d3', // #999: the decoys are the swapped operands' neighbours, all derived from the card, so no option set recurs with a different answer
   'r-initial d3', // #928: any-order, the target set is every picture sharing the keyword's sound, so no two cards offer the same bubbles with different answers
   'y2-equiv d1', 'y2-equiv d2', 'y2-equiv d3', // #1001: both fraction answers share one decoy set and quantity decoys derive from the whole, so no option set recurs with a different answer
+  'y2-spell-kn d1', 'y2-spell-kn d2', 'y2-spell-kn d3', // #1009: each bank word carries its own decoys, so an option set never recurs with a different answer
   'y3-count d2', 'y3-count d3', // #1050/#1448: moreOrLess's decoys (otherPower/wrongDirection/both/sameLead) are all derived from base/answer, the same structural reason as every other entry above
 ]);

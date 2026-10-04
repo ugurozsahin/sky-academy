@@ -179,6 +179,7 @@
 🟣	12.0	purple circle
 🟦	12.0	blue square
 🤝	3.0	handshake
+🤫	5.0	shushing face
 🤸	3.0	person cartwheeling
 🥁	3.0	drum
 🥄	3.0	spoon

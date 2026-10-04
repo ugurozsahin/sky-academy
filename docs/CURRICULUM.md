@@ -126,11 +126,13 @@ Writing:
 - y2-suffix — -ful -less -ness -ly -ment, root unchanged
 - y2-suffix-root — endings that change the root: drop the `e` at d1, double the last letter at d2, `y → i` at d3
 - y2-homophones
+- y2-spell-kn — silent first letters, hand-banked: kn at d1 (3 bubbles), adds wr at d2 (4 bubbles), adds gn at d3; every wrong bubble is an invented non-word and no answer has a common homophone
 - y2-wordclass — name the noun, verb, adjective or adverb in a sentence: noun & verb at d1, adjective at d2, adverb at d3; from d2 about one card in three is "Slice every noun" (d3: or "every verb") over a sentence's content words
 - y2-sentencetype — statement, question, command or exclamation: statement & question at d1, command at d2, the `What …!`/`How …!` exclamation at d3
 - y2-tense — present and past: name the tense of a finished sentence at d1, with the progressive at d2, and fill the gap with the form the sentence needs at d3
 - y2-punct — commas in lists, possessive apostrophe
 - y2-sentence — Story Sentences: 5–7 words, expanded noun phrases, `because`/`when`/`if`/`that`, commands & exclamations; d1 shown, d2–3 listen & build
+- y2-conjunction — Joining Words: gap sentence, slice the joining word; d1 and/or/but (3 bubbles), d2 because/when/if/that (3), d3 any (4); decoys hand-keyed per sentence so only one word fits
 - y2-trace — words
 
 Unit conversion (`1 m = 100 cm`, `1 kg = 1000 g`, `1 l = 1000 ml`) is **not** a KS1 topic and the three Year 2

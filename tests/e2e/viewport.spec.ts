@@ -541,6 +541,9 @@ test.describe('tablet viewports (#116)', () => {
    * Relaxed practice, #1532/#1534 Ninja Duel), so the same 3-column grid takes three rows (282px / 278px)
    * instead of two. The grid is unchanged; the island is ~45px (1280×800) and ~86px (1024×768) taller, the
    * targets above are the measured 845px and 951px. The `.mode-grid` < 300px assertion still bounds the grid.
+   *
+   * Nightly 2026-10-04 re-measure: the Reception topics grid gained topics (#971, #973, #974 …) and needs one
+   * more row at 1280×800, so that island is now 969px (was 845px); 1024×768 is unchanged at 951px.
    */
   const ISLAND_TOLERANCE = 20;
   // One array, not a separate w/h loop plus a target keyed by width: two literals that had to stay in sync
@@ -548,7 +551,7 @@ test.describe('tablet viewports (#116)', () => {
   // other read `target` as `undefined` at runtime and fail the assertions below with a confusing NaN
   // comparison instead of a clear "no target for this viewport" error (type-design-analyzer, #563 review).
   const ISLAND_CASES = [
-    { w: 1280, h: 800, target: 845 },
+    { w: 1280, h: 800, target: 969 },
     { w: 1024, h: 768, target: 951 },
   ] as const;
 
