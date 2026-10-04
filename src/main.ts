@@ -16,6 +16,7 @@ import { plugin, wireBackButton, type AppPlugin } from './native';
 import { backGuard } from './ui/screen';
 import { topicById, topicsFor, YEARS, type YearInfo } from './curriculum';
 import { fixDeck } from './game/session';
+import { placementYear } from './school-year';
 
 // Tiny screen router: avatar → sky map (islands) → island (topics) → play.
 // Each screen below the map pushes a history entry, so the browser's back button steps back one screen —
@@ -55,7 +56,7 @@ const finishWizard = (go: boolean) => { save({ onboarded: true }); pendingFirstM
 const renderIntro = () => introScreen(() => finishWizard(true), () => finishWizard(false));
 /** The first Mission of the ninja's current island: its first Maths topic, never a tracing one. */
 const startFirstMission = () => {
-  const y = YEARS.find(i => i.id === load().year), topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
+  const y = YEARS.find(i => i.id === (placementYear(load()) ?? 'reception')), topic = y && topicsFor(y.id, 'maths').find(t => t.input !== 'tracing');
   if (!y || !topic) { nav.map(); return; }
   year = y; enter('island');   // [map, island, play]: Back from the mission lands on the island, then the map
   nav.play({ year: y, mode: 'mission', topic });
