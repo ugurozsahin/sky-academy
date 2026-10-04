@@ -128,6 +128,7 @@ Writing:
 - y2-homophones
 - y2-spell-kn — silent first letters, hand-banked: kn at d1 (3 bubbles), adds wr at d2 (4 bubbles), adds gn at d3; every wrong bubble is an invented non-word and no answer has a common homophone
 - y2-spell-le — word endings, hand-banked: -le at d1 (3 bubbles), adds -el at d2 (4 bubbles), adds -al and -il at d3; every wrong bubble is the same stem with another ending, an invented non-word, and homophone words (pedal, medal, metal, petal) stay out
+- y2-spell-dge — the /dʒ/ sound, hand-banked (3 bubbles throughout): -dge after a short vowel at d1, adds -ge at d2, adds g before e, i and y at d3; every wrong bubble is an invented non-word (the -j spelling is never right at the end of a word) and no answer has a common homophone
 - y2-wordclass — name the noun, verb, adjective or adverb in a sentence: noun & verb at d1, adjective at d2, adverb at d3; from d2 about one card in three is "Slice every noun" (d3: or "every verb") over a sentence's content words
 - y2-sentencetype — statement, question, command or exclamation: statement & question at d1, command at d2, the `What …!`/`How …!` exclamation at d3
 - y2-tense — present and past: name the tense of a finished sentence at d1, with the progressive at d2, and fill the gap with the form the sentence needs at d3

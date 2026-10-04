@@ -9,7 +9,7 @@ import { shuffle, wordQ } from './util';
  * what it met and says why. **Not** `AVOID` — that set means "crude", and its rails assert it (#324).
  */
 export const REAL_LOOKALIKES: ReadonlySet<string> = new Set([
-  'nock', 'nee', 'nome', 'nat', 'wrung', 'wist', 'ren', 'rap', 'ring', 'rite', 'right', 'no', 'new', 'night', 'not', 'nit', 'nose', 'nor', 'rote',
+  'nock', 'nee', 'nome', 'nat', 'wrung', 'wist', 'ren', 'rap', 'ring', 'rite', 'right', 'no', 'new', 'night', 'not', 'nit', 'nose', 'nor', 'rote', 'doge', 'cadge',
 ]);
 
 /** One bank row: the answer, its sentence with a `___` gap, and the invented non-words that are wrong spellings. */

@@ -66,6 +66,7 @@
 🎻	0.6	violin
 🏀	0.6	basketball
 🏃	0.6	person running
+🏅	1.0	sports medal
 🏇	1.0	horse racing
 🏊	0.6	person swimming
 🏋	0.7	person lifting weights
