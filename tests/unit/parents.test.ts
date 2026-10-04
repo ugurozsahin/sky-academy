@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { numberWord } from '../../src/curriculum/util';
 import { gateChallenge, checkGate, parentSummary, ncForGrownUps, pct, RANK_MIN_TRIES, recentSlips, type SlipRow } from '../../src/game/parents';
 import { TOPICS, CORE_TOPICS, YEARS, topicsFor } from '../../src/curriculum';
 import { activeProfile, isReadOnlySave, isWriteFailing, load, reset, save, saveKeyFor, SAVE_VERSION, STICKER_IDS, type ProfileCard, type ProfileId, type SaveData, type TopicProgress } from '../../src/storage';
@@ -31,6 +32,19 @@ describe('grown-ups gate', () => {
       expect(g.b).toBeGreaterThanOrEqual(6); expect(g.b).toBeLessThanOrEqual(9);
       expect(g.answer).toBe(g.a * g.b);
       expect(g.prompt).toBe(`${g.a} × ${g.b}`);
+    }
+  });
+  it('with a KS2 island shown, asks a 13–99 product in words, never a 2–12 fact (#1053)', () => {
+    const r = rngOf(11);
+    const WORD = Object.fromEntries([...Array(100).keys()].map(n => [numberWord(n), n]));
+    for (let i = 0; i < 2000; i++) {
+      const g = gateChallenge(r, true);
+      expect(g.a).toBeGreaterThanOrEqual(13); expect(g.a).toBeLessThanOrEqual(99);
+      expect(g.b).toBeGreaterThanOrEqual(13); expect(g.b).toBeLessThanOrEqual(99);
+      expect(g.prompt).not.toMatch(/\d/);
+      const [x, y] = g.prompt.split(' times ');
+      expect([WORD[x], WORD[y]]).toEqual([g.a, g.b]);
+      expect(g.answer).toBe(g.a * g.b);
     }
   });
   it('accepts only the exact whole-number answer', () => {

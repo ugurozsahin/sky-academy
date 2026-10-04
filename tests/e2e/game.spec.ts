@@ -6,7 +6,7 @@ import { SAVE_VERSION } from '../../src/storage';
 import { itemById } from '../../src/game/shop';
 import { dailyChallenges } from '../../src/game/dojo';
 import type { PlayHooks, MemoryHooks } from '../../src/ui/hooks';
-import { expectFitsViewport } from './viewport';
+import { expectFitsViewport, gateProduct } from './viewport';
 import { seededRng } from '../../src/game/rng';
 import { renderVisual } from '../../src/ui/visuals';
 import { CARD_TEXT_WIDTH_390, PROMPT_FS_PHONE, PROMPT_FS_SHORT, promptLines } from '../unit/helpers/card-budget';
@@ -86,8 +86,7 @@ async function openGrownUps(page: Page) {
   await page.click('#grownups');
   await expect(page.locator('.parents .gate')).toBeVisible();
   const q = await page.locator('#gate-q').textContent();          // e.g. "6 × 8"
-  const [a, b] = q!.split('×').map(s => parseInt(s.trim(), 10));
-  await page.fill('#gate-input', String(a * b));
+  await page.fill('#gate-input', String(gateProduct(q!)));
   await page.click('#gate-go');
   await expect(page.locator('.parents-dash')).toBeVisible();
 }
@@ -3738,8 +3737,7 @@ test.describe('Sky Ninja Academy', () => {
 
     // the correct product opens the dashboard
     const q = await page.locator('#gate-q').textContent();          // e.g. "6 × 8"
-    const [a, b] = q!.split('×').map(s => parseInt(s.trim(), 10));
-    await page.fill('#gate-input', String(a * b));
+    await page.fill('#gate-input', String(gateProduct(q!)));
     await page.click('#gate-go');
     await expect(page.locator('.parents-dash')).toBeVisible();
     await expect(page.locator('.p-stats div')).toHaveCount(8);       // overall stat tiles + the four "This week" tiles (#939)

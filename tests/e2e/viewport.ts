@@ -106,3 +106,19 @@ export async function outsideItsBox(page: Page, parentSel: string, childSel: str
     return out;
   }, [parentSel, childSel, tolerance] as const);
 }
+
+/** The product the grown-ups gate asks for: "6 × 8", or "thirty-seven times twenty-four" once a KS2 island is shown (#1053). */
+export function gateProduct(q: string): number {
+  const ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+  const tens: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+  const teens = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const num = (s: string) => {
+    const t = s.trim();
+    if (/^\d+$/.test(t)) return parseInt(t, 10);
+    const [h, l] = t.split('-');
+    if (teens.includes(h)) return 10 + teens.indexOf(h);
+    return l ? tens[h] + ones.indexOf(l) : (tens[h] ?? ones.indexOf(h));
+  };
+  const [a, b] = q.split(/×|times/).map(num);
+  return a * b;
+}

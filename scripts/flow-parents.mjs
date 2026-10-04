@@ -23,7 +23,10 @@ export default async function run(p) {
   await p.waitForSelector('.home');
   await p.click('#grownups');
   const q = await p.locator('#gate-q').textContent();
-  const [a, b] = q.split('×').map(s => parseInt(s.trim(), 10));
+  const W = 'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split(' ');
+  const T = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+  const num = s => { s = s.trim(); if (/^\d+$/.test(s)) return +s; const [h, l] = s.split('-'); return l ? T[h] + W.indexOf(l) : (T[h] ?? W.indexOf(h)); };   // "6 × 8" or "thirty-seven times twenty-four" (#1053)
+  const [a, b] = q.split(/×|times/).map(num);
   await p.fill('#gate-input', String(a * b));
   await p.click('#gate-go');
   await p.waitForSelector('.parents-dash');

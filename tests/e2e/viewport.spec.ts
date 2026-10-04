@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { expectFitsViewport, outsideItsBox, overrideSafeAreaInsets } from './viewport';
+import { expectFitsViewport, gateProduct, outsideItsBox, overrideSafeAreaInsets } from './viewport';
 import { AVATARS, VILLAIN } from '../../src/avatars';
 import type { StoredCert, StoredDuel } from '../../src/storage';
 
@@ -60,8 +60,7 @@ async function openDashboard(page: Page) {
   await page.click('#grownups');
   await expect(page.locator('.parents .gate')).toBeVisible();
   const q = await page.locator('#gate-q').textContent();          // e.g. "6 × 8"
-  const [a, b] = q!.split('×').map(s => parseInt(s.trim(), 10));
-  await page.fill('#gate-input', String(a * b));
+  await page.fill('#gate-input', String(gateProduct(q!)));
   await page.click('#gate-go');
   await expect(page.locator('.parents-dash')).toBeVisible();
   await expect(page.locator('.p-year').first()).toBeVisible();     // the cards are drawn, not an empty shell
