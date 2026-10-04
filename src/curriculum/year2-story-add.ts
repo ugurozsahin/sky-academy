@@ -39,7 +39,8 @@ export const y2StoryAdd: Generator = (d, rng): Question => {
   // The other operation (the child added when the story takes away), then ±10 and ±1; ±2 and ±20 are spares.
   const pool = [add ? a - b : a + b, ans + 10, ans - 10, ans + 1, ans - 1, ans + 2, ans - 2, ans + 20, ans - 20];
   const ok = pool.filter((x, i) => x >= 0 && x <= 100 && x !== ans && pool.indexOf(x) === i);
-  const ds = [...shuffle(rng, ok.slice(0, 5)), ...ok.slice(5)].slice(0, 3);
+  const keep = ok[0] === pool[0] ? [ok[0]] : []; // the other operation is the design's main distractor
+  const ds = [...keep, ...shuffle(rng, ok.slice(keep.length, 5)), ...ok.slice(5)].slice(0, 3);
   if (!unit) return numQ(rng, story(false), ans, { min: 0, max: 100, distractors: ds, say: story(true) });
   return wordQ(rng, story(false), `${ans} ${unit}`, ds.map(x => `${x} ${unit}`), { say: story(true) });
 };

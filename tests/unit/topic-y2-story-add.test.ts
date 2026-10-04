@@ -40,4 +40,20 @@ describe('y2-story-add (#994)', () => {
       expect(nums(y2StoryAdd(3, rng).prompt)[1]).toBeGreaterThanOrEqual(11);
     }
   });
+
+  it('measures appear at d3, are spoken in full words, and the wrong-operation decoy is offered', () => {
+    const rng = mulberry32(11);
+    let measures = 0;
+    for (let i = 0; i < DRAWS; i++) {
+      const q = y2StoryAdd(3, rng);
+      const [a, b] = nums(q.prompt);
+      const row = BANK.find(t => q.prompt.startsWith(t[1].split('#')[0]))!;
+      const add = q.prompt.includes(` ${row[2].split('#')[1].trim()}`);
+      const other = add ? a - b : a + b;
+      if (other >= 0 && other <= 100 && other !== nums(q.answer)[0]) expect(q.options.map(o => nums(o)[0])).toContain(other);
+      if (row[0]) { measures++; expect(q.say).not.toMatch(/\d (cm|ml|g|kg|l|m)\b/); }
+      else expect(q.say).toContain('How many are there now?');
+    }
+    expect(measures).toBeGreaterThan(50);
+  });
 });
