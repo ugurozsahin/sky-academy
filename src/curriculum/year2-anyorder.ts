@@ -9,17 +9,17 @@ const TABLES = [2, 5, 10];
 /** Four options for "Which is the same as <prompt>?": `answer` (the operands swapped) and three decoys. */
 function sameQ(rng: Rng, prompt: string, value: number, answer: string, spares: [string, number][]): Question {
   // A decoy whose value equals the prompt's (`2 + 2` against `2 × 2`) is dropped, so the next spare takes its place.
-  const ds = spares.filter(([s, v], i) => v !== value && s !== answer && spares.findIndex(x => x[0] === s) === i).slice(0, 3).map(x => x[0]);
+  const ds = spares.filter(([s, v], i) => v !== value && v <= 100 && s !== answer && spares.findIndex(x => x[0] === s) === i).slice(0, 3).map(x => x[0]);
+  if (ds.length < 3) throw new Error(`y2AnyOrder: only ${ds.length} decoy(s) for ${prompt}`);
   return wordQ(rng, `Which is the same as ${prompt}?`, answer, ds, { say: `Which is the same as ${symSay(prompt)}`, hint: 'Swap the two numbers', hintIsData: false });
 }
 
 function sameAdd(rng: Rng): Question {
   let a: number, b: number;
-  do { a = ri(rng, 1, 99); b = ri(rng, 1, 99); } while (a === b || a + b > 99);
+  do { a = ri(rng, 2, 98); b = ri(rng, 1, 98); } while (a === b || a + b > 99);
   const hi = Math.max(a, b), lo = Math.min(a, b);
   return sameQ(rng, `${a} + ${b}`, a + b, `${b} + ${a}`, [
-    [`${b} + ${a + 1}`, a + b + 1], [a === 1 ? `${b} + ${a + 2}` : `${b} + ${a - 1}`, a === 1 ? a + b + 2 : a + b - 1],
-    [`${hi} − ${lo}`, hi - lo], [`${b} + ${a + 2}`, a + b + 2],
+    [`${b} + ${a + 1}`, a + b + 1], [`${b} + ${a - 1}`, a + b - 1], [`${hi} − ${lo}`, hi - lo],
   ]);
 }
 
