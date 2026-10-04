@@ -1,5 +1,5 @@
 import { avatarOrNull } from '../avatars';
-import { listedTopics, shownYears } from '../curriculum';
+import { isKs2, listedTopics, shownYears } from '../curriculum';
 import { deleteProfile, exportSave, importSave, isReadOnlySave, isWriteFailing, load, NAME_MAX, profileCards, renameProfile, reset, save, STICKER_IDS, threeSetting, type DeleteRefusal, type ProfileCard, type ProfileId, type RenameRefusal, type SaveData, type ThreeSetting } from '../storage';
 import { sfx, voiceState } from '../audio';
 import { gateChallenge, checkGate, parentSummary, pct, type ParentSummary, type TopicStat } from '../game/parents';
@@ -304,7 +304,7 @@ function wireMove(redraw: () => void) {
 
 /** For grown-ups: a quick maths gate, then a read-only progress dashboard. */
 export function parentsScreen(nav: Nav) {
-  let gate = gateChallenge(Math.random);
+  let gate = gateChallenge(Math.random, shownYears().some(y => isKs2(y.id)));
 
   const drawGate = (wrong = false) => {
     render(`
@@ -321,7 +321,7 @@ export function parentsScreen(nav: Nav) {
     const input = $<HTMLInputElement>('#gate-input');
     const submit = () => {
       if (checkGate(input.value, gate.answer)) { sfx.correct(); drawDash(); }
-      else { sfx.wrong(); gate = gateChallenge(Math.random); drawGate(true); }
+      else { sfx.wrong(); gate = gateChallenge(Math.random, shownYears().some(y => isKs2(y.id))); drawGate(true); }
     };
     $('#gate-go').addEventListener('click', submit);
     input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });

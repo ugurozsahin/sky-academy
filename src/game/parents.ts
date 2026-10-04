@@ -1,6 +1,7 @@
 // Parent dashboard: a read-only summary of a child's progress, behind a grown-ups gate.
 // Pure logic (no DOM) so it can be unit-tested. Reads only what storage.ts already records.
 import type { Rng, Topic, YearId, YearInfo } from '../curriculum';
+import { numberWord } from '../curriculum/util';
 import type { SaveData, TopicProgress } from '../storage';
 import { safeRecord, today } from '../storage';
 import type { LogDay } from '../save-records';
@@ -10,7 +11,12 @@ import { beltFor } from './belts';
 // ---------- Grown-ups gate ----------
 // A times-table question a Reception/Year-1 child cannot do yet, but any grown-up answers at a glance.
 export interface Gate { a: number; b: number; prompt: string; answer: number }
-export function gateChallenge(rng: Rng): Gate {
+// Once a KS2 island is shown (#1053) the facts are 13–99 products in words: Year 4 is tested on 6–12 tables.
+export function gateChallenge(rng: Rng, ks2Shown = false): Gate {
+  if (ks2Shown) {
+    const a = 13 + Math.floor(rng() * 87), b = 13 + Math.floor(rng() * 87);   // 13–99
+    return { a, b, prompt: `${numberWord(a)} times ${numberWord(b)}`, answer: a * b };
+  }
   const a = 6 + Math.floor(rng() * 4);   // 6–9
   const b = 6 + Math.floor(rng() * 4);   // 6–9
   return { a, b, prompt: `${a} × ${b}`, answer: a * b };
