@@ -151,7 +151,7 @@ export class Session {
    */
   armQuestionClock(scale: (ms: number) => number = ms => ms) {
     const base = this.spec.questionMs;
-    if (base === undefined || !this.current || this.waiting || this.ended) return;
+    if (base === undefined || this.qArmed || !this.current || this.waiting || this.ended) return;   // a second arm (a sequence relaunch) never refills the budget
     this.qBudget = scale(base) * (this.o.timeScale ?? 1); this.questionLeft = this.qBudget; this.qElapsed = 0; this.qArmed = true;
   }
   /** Count the armed question down; at zero it is a miss. Real elapsed time only — the UI never speeds this up (#32). */
@@ -162,7 +162,7 @@ export class Session {
   }
   /** The question was decided (or replaced): stop the clock and keep how long it took. */
   private stopClock(expired = false) {
-    if (this.qArmed) this.lastAnswerMs = expired ? this.qBudget : this.qElapsed;
+    this.lastAnswerMs = !this.qArmed ? 0 : expired ? this.qBudget : this.qElapsed;   // 0 = decided before the UI armed it
     this.qArmed = false; this.questionLeft = 0;
   }
   /** Time ran out: the same miss as a fallen target, with `picked: null` in `misses`. */
@@ -268,7 +268,7 @@ export class Session {
     const isTarget = q.sequence
       ? (q.anyOrder ? q.sequence.includes(label) && !this.slicedTargets.has(label) : label === q.sequence[this.seqIndex])
       : label === q.answer;
-    if (!isTarget || this.spec.questionMs !== undefined) return;   // a timed question (#1063) is decided by a slice or its clock, never by a fall
+    if (!isTarget || this.qArmed) return;   // an armed question (#1063) is decided by a slice or its clock, never by a fall; unarmed, a fall is the old miss
     this.waiting = true; this.attempts++; this.stageAttempts++; this.combo = 0; this.tally(false); this.recordMiss(q, null);
     this.ev.onMiss(q); this.bossHeal();
     if (!this.o.year.gentle) this.loseLife();

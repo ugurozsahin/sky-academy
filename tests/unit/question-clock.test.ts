@@ -66,6 +66,12 @@ describe('per-question clock (#1063)', () => {
     p.start(); p.fall(p.current!.answer);
     expect(plain.onMiss).toHaveBeenCalledTimes(1);
   });
+  it('before the UI arms the clock a fall is still the old miss, so a card can never hang', () => {
+    MODES.mission.questionMs = 6000;
+    const ev = events(); const s = new Session({ mode: 'mission', year: Y1, topic: topicById('y1-add')!, rng: () => 0.3 }, ev);
+    s.start(); s.fall(s.current!.answer);
+    expect(ev.onMiss).toHaveBeenCalledTimes(1);
+  });
   it('a mode without questionMs has no clock', () => {
     const { s } = make(undefined, null);
     expect(s.questionLeft).toBe(0); s.tick(60000); expect(s.waiting).toBe(false);
@@ -82,6 +88,13 @@ describe('per-question clock (#1063)', () => {
     expect(s.questionLeft).toBe(0);
     s.tick(10000);
     expect(ev.onMiss).not.toHaveBeenCalled(); expect(s.attempts).toBe(0);
+  });
+  it('arming twice keeps the first budget; a card decided unarmed reports 0, not the last card\'s time', () => {
+    const { s } = make();
+    s.tick(2000); s.armQuestionClock(); expect(s.questionLeft).toBe(4000);
+    s.hit(s.current!.answer); expect(s.lastAnswerMs).toBe(2000);
+    s.advance(); s.hit(s.current!.answer);
+    expect(s.lastAnswerMs).toBe(0);
   });
   it('a deck question replaced while armed disarms the clock too', () => {
     MODES.mission.questionMs = 6000;
